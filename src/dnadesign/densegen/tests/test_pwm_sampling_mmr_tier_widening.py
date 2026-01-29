@@ -11,7 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dnadesign.densegen.src.adapters.sources import pwm_sampling
+from dnadesign.densegen.src.adapters.sources import pwm_sampling, stage_a_selection
 
 
 def _motif_with_log_odds() -> pwm_sampling.PWMMotif:
@@ -52,9 +52,9 @@ def test_mmr_tier_widening_widens_instead_of_crashing() -> None:
             )
         )
 
-    selected, meta, diag = pwm_sampling._select_by_mmr(
+    selected, meta, diag = stage_a_selection._select_by_mmr(
         ranked,
-        motif=motif,
+        log_odds=motif.log_odds or [],
         n_sites=20,
         alpha=0.9,
         shortlist_min=50,
@@ -85,9 +85,9 @@ def test_mmr_tier_widening_honors_shortlist_target() -> None:
             )
         )
 
-    selected, _meta, diag = pwm_sampling._select_by_mmr(
+    selected, _meta, diag = stage_a_selection._select_by_mmr(
         ranked,
-        motif=motif,
+        log_odds=motif.log_odds or [],
         n_sites=10,
         alpha=0.9,
         shortlist_min=10,

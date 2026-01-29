@@ -15,12 +15,12 @@ from __future__ import annotations
 import io
 import logging
 
-from dnadesign.densegen.src.adapters.sources import pwm_sampling
+from dnadesign.densegen.src.adapters.sources import stage_a_progress
 from dnadesign.densegen.src.utils import logging_utils
 
 
 def test_pwm_progress_line_densegen_fields() -> None:
-    line = pwm_sampling._format_pwm_progress_line(
+    line = stage_a_progress._format_pwm_progress_line(
         motif_id="M1",
         backend="densegen",
         generated=50,
@@ -43,7 +43,7 @@ def test_pwm_progress_line_densegen_fields() -> None:
 
 
 def test_pwm_progress_line_fimo_fields() -> None:
-    line = pwm_sampling._format_pwm_progress_line(
+    line = stage_a_progress._format_pwm_progress_line(
         motif_id="M2",
         backend="fimo",
         generated=25,
@@ -195,7 +195,7 @@ def test_pwm_progress_dedupes_identical_updates() -> None:
     logging_utils.set_progress_enabled(True)
     stream = _TtyBuffer()
     try:
-        progress = pwm_sampling._PwmSamplingProgress(
+        progress = stage_a_progress._PwmSamplingProgress(
             motif_id="M1",
             backend="densegen",
             target=10,

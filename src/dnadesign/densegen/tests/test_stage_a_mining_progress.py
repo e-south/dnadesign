@@ -15,7 +15,7 @@ from typing import List
 
 from rich.console import Console
 
-from dnadesign.densegen.src.adapters.sources import pwm_sampling
+from dnadesign.densegen.src.adapters.sources import stage_a_progress
 from dnadesign.densegen.src.utils import logging_utils
 
 
@@ -40,7 +40,7 @@ def test_stage_a_screen_progress_static_table_for_non_tty() -> None:
     logging_utils.set_progress_enabled(True)
     logging_utils.set_progress_style("screen")
     stream = _BufferStream(isatty=False)
-    progress = pwm_sampling._PwmSamplingProgress(
+    progress = stage_a_progress._PwmSamplingProgress(
         motif_id="demo_motif",
         backend="fimo",
         target=10,
@@ -66,7 +66,7 @@ def test_stage_a_screen_progress_static_table_for_pixi_tty(monkeypatch) -> None:
     logging_utils.set_progress_enabled(True)
     logging_utils.set_progress_style("screen")
     stream = _BufferStream(isatty=True)
-    progress = pwm_sampling._PwmSamplingProgress(
+    progress = stage_a_progress._PwmSamplingProgress(
         motif_id="demo_motif",
         backend="fimo",
         target=10,
@@ -88,9 +88,9 @@ def test_stage_a_screen_progress_static_table_for_pixi_tty(monkeypatch) -> None:
 
 
 def test_stage_a_progress_target_updates_in_render() -> None:
-    prev_state = dict(pwm_sampling._STAGE_A_LIVE_STATE)
-    pwm_sampling._STAGE_A_LIVE_STATE.clear()
-    pwm_sampling._STAGE_A_LIVE_STATE["demo"] = {
+    prev_state = dict(stage_a_progress._STAGE_A_LIVE_STATE)
+    stage_a_progress._STAGE_A_LIVE_STATE.clear()
+    stage_a_progress._STAGE_A_LIVE_STATE["demo"] = {
         "motif": "demo",
         "generated": 0,
         "target": 5,
@@ -100,25 +100,25 @@ def test_stage_a_progress_target_updates_in_render() -> None:
         "elapsed": 0.0,
     }
     try:
-        pwm_sampling._stage_a_live_update(
+        stage_a_progress._stage_a_live_update(
             key="demo",
             generated=10,
             accepted=2,
             elapsed=1.0,
             target=20,
         )
-        renderable = pwm_sampling._stage_a_live_render(pwm_sampling._STAGE_A_LIVE_STATE)
+        renderable = stage_a_progress._stage_a_live_render(stage_a_progress._STAGE_A_LIVE_STATE)
         console = Console(width=120, record=True)
         console.print(renderable)
         text = console.export_text()
         assert "10/20" in text
     finally:
-        pwm_sampling._STAGE_A_LIVE_STATE.clear()
-        pwm_sampling._STAGE_A_LIVE_STATE.update(prev_state)
+        stage_a_progress._STAGE_A_LIVE_STATE.clear()
+        stage_a_progress._STAGE_A_LIVE_STATE.update(prev_state)
 
 
 def test_stage_a_milestone_message_format() -> None:
-    message = pwm_sampling._format_stage_a_milestone(
+    message = stage_a_progress._format_stage_a_milestone(
         motif_id="lexA",
         phase="postprocess",
         detail="eligible=10",

@@ -11,7 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dnadesign.densegen.src.adapters.sources import pwm_sampling
+from dnadesign.densegen.src.adapters.sources import pwm_sampling, stage_a_selection
 
 
 def _motif_with_log_odds() -> pwm_sampling.PWMMotif:
@@ -51,9 +51,9 @@ def test_mmr_prefers_diverse_when_scores_equal() -> None:
         _cand("AAT", 5.0),
         _cand("CCC", 5.0),
     ]
-    selected, meta, diag = pwm_sampling._select_by_mmr(
+    selected, meta, diag = stage_a_selection._select_by_mmr(
         ranked,
-        motif=motif,
+        log_odds=motif.log_odds or [],
         n_sites=2,
         alpha=0.9,
         shortlist_min=3,

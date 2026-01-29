@@ -12,15 +12,12 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import hashlib
 import logging
-import os
 import sys
-import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Sequence, TextIO, Tuple, Union
+from typing import List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -29,343 +26,20 @@ from ...config import PWMSamplingConfig
 from ...core.artifacts.ids import hash_candidate_id
 from ...core.score_tiers import score_tier_counts
 from ...core.stage_a_constants import FIMO_REPORT_THRESH
-from ...utils import logging_utils
-from ...utils.rich_style import make_panel, make_table
+from .stage_a_diversity import _diversity_summary
+from .stage_a_progress import _format_stage_a_milestone, _PwmSamplingProgress
+from .stage_a_selection import (
+    _collapse_by_core_identity,
+    _core_sequence,
+    _select_by_mmr,
+    _select_diversity_baseline_candidates,
+    _select_diversity_global_candidates,
+)
 
 SMOOTHING_ALPHA = 1e-6
 SCORE_HIST_BINS = 60
 log = logging.getLogger(__name__)
 _SAFE_LABEL_RE = None
-_STAGE_A_LIVE = None
-_STAGE_A_LIVE_MODE: str | None = None
-_STAGE_A_LIVE_CONSOLE = None
-_STAGE_A_LIVE_STATE: dict[str, dict[str, object]] = {}
-_STAGE_A_LIVE_LOCK = threading.Lock()
-
-
-def _format_rate(rate: float) -> str:
-    if rate >= 1000.0:
-        return f"{rate / 1000.0:.1f}k/s"
-    return f"{rate:.1f}/s"
-
-
-def _format_tier_yield(eligible_unique: int) -> str:
-    if eligible_unique <= 0:
-        return "-"
-    n0, n1, n2, _n3 = score_tier_counts(int(eligible_unique))
-    return f"{n0}/{n1}/{n2}"
-
-
-def _format_progress_bar(current: int, total: int, *, width: int = 12) -> str:
-    if total <= 0:
-        return "[?]"
-    filled = int(width * (current / max(1, total)))
-    filled = min(width, max(0, filled))
-    return "[" + ("#" * filled) + ("-" * (width - filled)) + "]"
-
-
-def _format_pwm_progress_line(
-    *,
-    motif_id: str,
-    backend: str,
-    generated: int,
-    target: int,
-    accepted: Optional[int],
-    accepted_target: Optional[int],
-    batch_index: Optional[int],
-    batch_total: Optional[int],
-    elapsed: float,
-    target_fraction: Optional[float],
-    tier_yield: Optional[str],
-) -> str:
-    safe_target = max(1, int(target))
-    gen_pct = min(100, int(100 * generated / safe_target))
-    gen_bar = _format_progress_bar(int(generated), int(safe_target))
-    parts = [f"PWM {motif_id}", backend, f"gen {gen_pct}% {gen_bar} ({generated}/{safe_target})"]
-    if accepted is not None:
-        if accepted_target is not None and int(accepted_target) > 0:
-            acc_pct = min(100, int(100 * int(accepted) / max(1, int(accepted_target))))
-            parts.append(f"eligible {acc_pct}% ({accepted}/{accepted_target})")
-        else:
-            parts.append(f"eligible {accepted}")
-    if target_fraction is not None:
-        parts.append(f"tier {float(target_fraction) * 100:.3f}%")
-    if tier_yield:
-        parts.append(f"tiers 0.1/1/9={tier_yield}")
-    if batch_index is not None:
-        total_label = "-" if batch_total is None else str(int(batch_total))
-        parts.append(f"batch {int(batch_index)}/{total_label}")
-    elapsed_label = f"{max(0.0, float(elapsed)):.1f}s"
-    rate = generated / elapsed if elapsed > 0 else 0.0
-    parts.append(elapsed_label)
-    parts.append(_format_rate(rate))
-    return " | ".join(parts)
-
-
-def _format_stage_a_milestone(
-    *,
-    motif_id: str,
-    phase: str,
-    detail: Optional[str] = None,
-    elapsed: Optional[float] = None,
-) -> str:
-    message = f"Stage-A {phase} for {motif_id}"
-    suffix = []
-    if detail:
-        suffix.append(str(detail))
-    if elapsed is not None:
-        suffix.append(f"elapsed={float(elapsed):.1f}s")
-    if suffix:
-        return message + " | " + " | ".join(suffix)
-    return message
-
-
-def _stage_a_live_render(state: dict[str, dict[str, object]]):
-    table = make_table(show_header=True, pad_edge=False)
-    table.add_column("motif")
-    table.add_column("generated", no_wrap=True, overflow="ellipsis", min_width=14)
-    table.add_column("progress", no_wrap=True, overflow="ellipsis", min_width=12)
-    table.add_column("eligible", no_wrap=True, overflow="ellipsis", min_width=12)
-    table.add_column("tier target")
-    table.add_column("tier yield (0.1/1/9%)")
-    table.add_column("elapsed")
-    table.add_column("rate")
-    for key in sorted(state, key=lambda k: str(state[k].get("motif"))):
-        row = state[key]
-        generated = int(row.get("generated", 0))
-        target = max(1, int(row.get("target", 1)))
-        accepted = row.get("accepted")
-        accepted_target = row.get("accepted_target")
-        target_fraction = row.get("target_fraction")
-        elapsed = float(row.get("elapsed", 0.0))
-        gen_pct = min(100, int(100 * generated / target))
-        gen_bar = _format_progress_bar(int(generated), int(target))
-        gen_label = f"{generated}/{target}"
-        progress_label = f"{gen_bar} {gen_pct}%"
-        if accepted is None:
-            eligible_label = "-"
-        elif accepted_target is not None and int(accepted_target) > 0:
-            acc_pct = min(100, int(100 * int(accepted) / max(1, int(accepted_target))))
-            eligible_label = f"{accepted}/{accepted_target} ({acc_pct}%)"
-        else:
-            eligible_label = str(accepted)
-        tier_label = "-"
-        if target_fraction is not None:
-            tier_label = f"{float(target_fraction) * 100:.3f}%"
-        tier_yield = _format_tier_yield(int(accepted)) if accepted is not None else "-"
-        elapsed_label = f"{max(0.0, float(elapsed)):.1f}s"
-        rate = generated / elapsed if elapsed > 0 else 0.0
-        rate_label = _format_rate(rate)
-        table.add_row(
-            str(row.get("motif", "-")),
-            gen_label,
-            progress_label,
-            eligible_label,
-            tier_label,
-            tier_yield,
-            elapsed_label,
-            rate_label,
-        )
-    return make_panel(table, title="Stage-A mining")
-
-
-def _stage_a_live_start(stream: TextIO):
-    import shutil
-
-    from rich.console import Console
-    from rich.live import Live
-
-    pixi_in_shell = bool(os.environ.get("PIXI_IN_SHELL"))
-    tty = bool(getattr(stream, "isatty", lambda: False)())
-    if not tty or pixi_in_shell:
-        width = shutil.get_terminal_size(fallback=(140, 40)).columns
-        console = Console(file=stream, width=int(width), force_terminal=False)
-        if pixi_in_shell:
-            log.warning(
-                "Stage-A mining live progress disabled because PIXI_IN_SHELL is set; using static table output."
-            )
-        return None, console
-    console = Console(file=stream)
-    if not console.is_terminal:
-        return None, console
-    live = Live(console=console, refresh_per_second=4, transient=False)
-    live.start()
-    return live, console
-
-
-def _stage_a_live_register(
-    *,
-    key: str,
-    motif_id: str,
-    target: int,
-    accepted_target: Optional[int],
-    target_fraction: Optional[float],
-    stream: TextIO,
-) -> bool:
-    global _STAGE_A_LIVE
-    global _STAGE_A_LIVE_CONSOLE
-    global _STAGE_A_LIVE_MODE
-    with _STAGE_A_LIVE_LOCK:
-        if _STAGE_A_LIVE_MODE is None:
-            _STAGE_A_LIVE, _STAGE_A_LIVE_CONSOLE = _stage_a_live_start(stream)
-            _STAGE_A_LIVE_MODE = "live" if _STAGE_A_LIVE is not None else "static"
-        _STAGE_A_LIVE_STATE[key] = {
-            "motif": motif_id,
-            "generated": 0,
-            "target": int(target),
-            "accepted": None,
-            "accepted_target": int(accepted_target) if accepted_target is not None else None,
-            "target_fraction": target_fraction,
-            "elapsed": 0.0,
-        }
-        return _STAGE_A_LIVE is not None
-
-
-def _stage_a_live_update(
-    *,
-    key: str,
-    generated: int,
-    accepted: Optional[int],
-    elapsed: float,
-    target: Optional[int] = None,
-    accepted_target: Optional[int] = None,
-) -> None:
-    with _STAGE_A_LIVE_LOCK:
-        row = _STAGE_A_LIVE_STATE.get(key)
-        if row is None:
-            return
-        row["generated"] = int(generated)
-        row["accepted"] = int(accepted) if accepted is not None else None
-        row["elapsed"] = float(elapsed)
-        if target is not None:
-            row["target"] = int(target)
-        if accepted_target is not None:
-            row["accepted_target"] = int(accepted_target)
-        if _STAGE_A_LIVE is None:
-            return
-        renderable = _stage_a_live_render(_STAGE_A_LIVE_STATE)
-        _STAGE_A_LIVE.update(renderable, refresh=True)
-
-
-def _stage_a_live_finish(*, key: str) -> None:
-    global _STAGE_A_LIVE
-    global _STAGE_A_LIVE_CONSOLE
-    global _STAGE_A_LIVE_MODE
-    with _STAGE_A_LIVE_LOCK:
-        snapshot = dict(_STAGE_A_LIVE_STATE)
-        _STAGE_A_LIVE_STATE.pop(key, None)
-        if not _STAGE_A_LIVE_STATE:
-            if _STAGE_A_LIVE is not None:
-                _STAGE_A_LIVE.stop()
-            elif _STAGE_A_LIVE_MODE == "static" and _STAGE_A_LIVE_CONSOLE is not None:
-                _STAGE_A_LIVE_CONSOLE.print(_stage_a_live_render(snapshot))
-            _STAGE_A_LIVE = None
-            _STAGE_A_LIVE_CONSOLE = None
-            _STAGE_A_LIVE_MODE = None
-
-
-@dataclass
-class _PwmSamplingProgress:
-    motif_id: str
-    backend: str
-    target: int
-    accepted_target: Optional[int]
-    stream: TextIO
-    target_fraction: Optional[float] = None
-    min_interval: float = 0.2
-
-    def __post_init__(self) -> None:
-        self._mode = str(logging_utils.get_progress_style())
-        tty = bool(getattr(self.stream, "isatty", lambda: False)())
-        self._enabled = bool(logging_utils.is_progress_enabled()) and (self._mode == "screen" or tty)
-        self._use_live = self._enabled and self._mode == "screen"
-        self._use_table = False
-        self._live_key = f"{self.motif_id}:{id(self)}"
-        self._start = time.monotonic()
-        self._last_update = self._start
-        self._last_len = 0
-        self._last_state: tuple[int, Optional[int], Optional[int], Optional[int], int, Optional[int]] | None = None
-        self._shown = False
-        if self._enabled:
-            logging_utils.set_progress_active(True)
-        if self._use_live:
-            self._use_live = _stage_a_live_register(
-                key=self._live_key,
-                motif_id=self.motif_id,
-                target=int(self.target),
-                accepted_target=self.accepted_target,
-                target_fraction=self.target_fraction,
-                stream=self.stream,
-            )
-            self._use_table = not self._use_live
-
-    def update(
-        self,
-        *,
-        generated: int,
-        accepted: Optional[int],
-        batch_index: Optional[int] = None,
-        batch_total: Optional[int] = None,
-        force: bool = False,
-    ) -> None:
-        if not self._enabled:
-            return
-        now = time.monotonic()
-        if not force and (now - self._last_update) < float(self.min_interval):
-            return
-        state = (
-            int(generated),
-            int(accepted) if accepted is not None else None,
-            batch_index,
-            batch_total,
-            int(self.target),
-            int(self.accepted_target) if self.accepted_target is not None else None,
-        )
-        if self._shown and state == self._last_state and logging_utils.is_progress_line_visible():
-            self._last_update = now
-            return
-        if self._use_live or self._use_table:
-            _stage_a_live_update(
-                key=self._live_key,
-                generated=int(generated),
-                accepted=accepted,
-                elapsed=now - self._start,
-                target=int(self.target),
-                accepted_target=self.accepted_target,
-            )
-        else:
-            line = _format_pwm_progress_line(
-                motif_id=self.motif_id,
-                backend=self.backend,
-                generated=int(generated),
-                target=int(self.target),
-                accepted=accepted,
-                accepted_target=self.accepted_target,
-                batch_index=batch_index,
-                batch_total=batch_total,
-                elapsed=now - self._start,
-                target_fraction=self.target_fraction,
-                tier_yield=_format_tier_yield(int(accepted)) if accepted is not None else None,
-            )
-            padded = line.ljust(self._last_len)
-            self._last_len = max(self._last_len, len(line))
-            self.stream.write(f"\r{padded}")
-            self.stream.flush()
-            logging_utils.mark_progress_line_visible()
-        self._last_update = now
-        self._last_state = state
-        self._shown = True
-
-    def finish(self) -> None:
-        if self._enabled:
-            logging_utils.set_progress_active(False)
-        if self._use_live or self._use_table:
-            _stage_a_live_finish(key=self._live_key)
-        if not self._shown:
-            return
-        if not self._use_live and not self._use_table:
-            self.stream.write("\n")
-            self.stream.flush()
 
 
 def _safe_label(text: str) -> str:
@@ -448,203 +122,11 @@ class FimoCandidate:
     matched_sequence: Optional[str] = None
 
 
-def _core_sequence(candidate: FimoCandidate) -> str:
-    if candidate.matched_sequence:
-        return str(candidate.matched_sequence)
-    raise ValueError("FIMO matched_sequence is required to derive the TFBS core.")
-
-
 def _evaluate_tier_target(*, n_sites: int, target_tier_fraction: float, eligible_unique: int) -> tuple[int, bool]:
     if target_tier_fraction <= 0 or target_tier_fraction > 1:
         raise ValueError("target_tier_fraction must be in (0, 1].")
     required_unique = int(np.ceil(float(n_sites) / float(target_tier_fraction)))
     return required_unique, int(eligible_unique) >= required_unique
-
-
-def _contrib_vector(core: str, log_odds: Sequence[dict[str, float]]) -> np.ndarray:
-    if len(core) != len(log_odds):
-        raise ValueError("TFBS core length must match PWM log-odds length.")
-    contrib = []
-    for base, row in zip(core, log_odds):
-        val = float(row.get(base, float("nan")))
-        if not np.isfinite(val):
-            raise ValueError("Non-finite log-odds contribution encountered for core sequence.")
-        contrib.append(val)
-    return np.asarray(contrib, dtype=float)
-
-
-def _score_norm(values: Sequence[float]) -> dict[float, float]:
-    if not values:
-        return {}
-    lo = float(min(values))
-    hi = float(max(values))
-    if hi == lo:
-        return {float(v): 1.0 for v in values}
-    return {float(v): (float(v) - lo) / (hi - lo) for v in values}
-
-
-def _similarity_from_distance(distance: float) -> float:
-    return 1.0 / (1.0 + float(distance))
-
-
-def _select_by_mmr(
-    ranked: Sequence[FimoCandidate],
-    *,
-    motif: PWMMotif,
-    n_sites: int,
-    alpha: float,
-    shortlist_min: int,
-    shortlist_factor: int,
-    shortlist_max: Optional[int],
-    tier_widening: Optional[Sequence[float]],
-    ensure_shortlist_target: bool = False,
-) -> tuple[list[FimoCandidate], dict[str, dict], dict]:
-    if not ranked or n_sites <= 0:
-        return [], {}, {"shortlist_k": 0, "shortlist_target": 0, "tier_fraction_used": None, "tier_limit": 0}
-    if alpha <= 0.0 or alpha > 1.0:
-        raise ValueError("selection.alpha must be in (0, 1].")
-    log_odds = motif.log_odds or build_log_odds(motif.matrix, motif.background)
-    core_by_seq = {cand.seq: _core_sequence(cand) for cand in ranked}
-    contrib_by_seq = {seq: _contrib_vector(core, log_odds) for seq, core in core_by_seq.items()}
-    scores = [cand.score for cand in ranked]
-    norm_by_score = _score_norm(scores)
-    tier_fractions = list(tier_widening) if tier_widening else [1.0]
-    total = len(ranked)
-    shortlist_target = max(int(shortlist_min), int(shortlist_factor) * int(n_sites))
-
-    def _best_candidate(
-        candidates: Sequence[FimoCandidate],
-        selected: list[FimoCandidate],
-    ) -> tuple[FimoCandidate, float, float]:
-        best = None
-        best_utility = None
-        best_score = None
-        best_core = None
-        best_seq = None
-        best_sim = None
-        selected_vectors = [contrib_by_seq[c.seq] for c in selected]
-        for cand in candidates:
-            if cand in selected:
-                continue
-            score_norm = norm_by_score.get(float(cand.score), 1.0)
-            if not selected_vectors:
-                max_sim = 0.0
-            else:
-                dists = [float(np.abs(contrib_by_seq[cand.seq] - vec).sum()) for vec in selected_vectors]
-                max_sim = _similarity_from_distance(min(dists))
-            utility = float(alpha * score_norm - (1.0 - alpha) * max_sim)
-            cand_core = core_by_seq[cand.seq]
-            if best is None:
-                best = cand
-                best_utility = utility
-                best_score = cand.score
-                best_core = cand_core
-                best_seq = cand.seq
-                best_sim = max_sim
-                continue
-            if utility > float(best_utility):
-                pass
-            elif utility == float(best_utility):
-                if cand.score > float(best_score):
-                    pass
-                elif cand.score == float(best_score):
-                    if cand_core < str(best_core):
-                        pass
-                    elif cand_core == str(best_core):
-                        if cand.seq >= str(best_seq):
-                            continue
-                    else:
-                        continue
-                else:
-                    continue
-            else:
-                continue
-            best = cand
-            best_utility = utility
-            best_score = cand.score
-            best_core = cand_core
-            best_seq = cand.seq
-            best_sim = max_sim
-        if best is None or best_utility is None or best_sim is None:
-            raise ValueError("MMR selection failed to identify a candidate.")
-        return best, float(best_utility), float(best_sim)
-
-    def _select_from_slice(candidates: Sequence[FimoCandidate]) -> tuple[list[FimoCandidate], dict[str, dict], int]:
-        if not candidates:
-            return [], {}, 0
-        max_k = len(candidates) if shortlist_max is None else min(len(candidates), int(shortlist_max))
-        k = min(max_k, max(1, int(shortlist_target)))
-        if k <= 0:
-            k = min(len(candidates), int(n_sites))
-        shortlist = list(candidates[:k])
-        target_n = min(int(n_sites), len(shortlist))
-        selected: list[FimoCandidate] = []
-        meta: dict[str, dict] = {}
-        while len(selected) < target_n:
-            pick, utility, max_sim = _best_candidate(shortlist, selected)
-            selected.append(pick)
-            meta[pick.seq] = {
-                "selection_rank": len(selected),
-                "selection_utility": float(utility),
-                "nearest_selected_similarity": float(max_sim),
-            }
-        if len(selected) < int(n_sites) and k < max_k:
-            shortlist = list(candidates[:max_k])
-            target_n = min(int(n_sites), len(shortlist))
-            selected = []
-            meta = {}
-            while len(selected) < target_n:
-                pick, utility, max_sim = _best_candidate(shortlist, selected)
-                selected.append(pick)
-                meta[pick.seq] = {
-                    "selection_rank": len(selected),
-                    "selection_utility": float(utility),
-                    "nearest_selected_similarity": float(max_sim),
-                }
-            return selected, meta, int(max_k)
-        return selected, meta, int(k)
-
-    last_selected: list[FimoCandidate] = []
-    last_meta: dict[str, dict] = {}
-    last_shortlist = 0
-    fraction_used = None
-    tier_limit = total
-    shortlist_target_met = False
-    for fraction in tier_fractions:
-        if fraction <= 0:
-            continue
-        tier_limit = min(total, max(1, int(np.floor(float(fraction) * total))))
-        subset = ranked[:tier_limit]
-        selected, meta, shortlist_k = _select_from_slice(subset)
-        last_selected = selected
-        last_meta = meta
-        last_shortlist = shortlist_k
-        fraction_used = float(fraction)
-        shortlist_target_met = int(shortlist_k) >= int(shortlist_target)
-        if len(selected) >= int(n_sites):
-            if ensure_shortlist_target and not shortlist_target_met:
-                continue
-            break
-    diag = {
-        "shortlist_k": int(last_shortlist),
-        "shortlist_target": int(shortlist_target),
-        "shortlist_target_met": bool(shortlist_target_met),
-        "tier_fraction_used": fraction_used,
-        "tier_limit": int(tier_limit),
-    }
-    return last_selected, last_meta, diag
-
-
-def _collapse_by_core_identity(ranked: Sequence[FimoCandidate]) -> tuple[list[FimoCandidate], int]:
-    best_by_core: dict[str, FimoCandidate] = {}
-    for cand in ranked:
-        core = _core_sequence(cand)
-        prev = best_by_core.get(core)
-        if prev is None or cand.score > prev.score or (cand.score == prev.score and cand.seq < prev.seq):
-            best_by_core[core] = cand
-    collapsed = max(0, len(ranked) - len(best_by_core))
-    kept = sorted(best_by_core.values(), key=lambda item: (-item.score, item.seq))
-    return kept, collapsed
 
 
 def _write_candidate_records(
@@ -812,266 +294,59 @@ def _summarize_scores(
     return float(arr.min()), float(np.median(arr)), float(arr.mean()), float(arr.max())
 
 
-def _score_quantiles(scores: Sequence[float]) -> dict[str, float] | None:
-    if not scores:
-        return None
-    arr = np.asarray(scores, dtype=float)
-    p10, p50, p90 = np.percentile(arr, [10, 50, 90])
-    return {
-        "p10": float(p10),
-        "p50": float(p50),
-        "p90": float(p90),
-        "mean": float(arr.mean()),
-    }
+def _background_cdf(probs: dict[str, float]) -> np.ndarray:
+    bases = ["A", "C", "G", "T"]
+    weights = np.array([float(probs.get(b, 0.0)) for b in bases], dtype=float)
+    total = float(weights.sum())
+    if total <= 0:
+        raise ValueError("Background frequencies must sum to > 0.")
+    weights = weights / total
+    return np.cumsum(weights)
 
 
-def _assert_uniform_core_length(cores: Sequence[str], *, label: str) -> int:
-    if not cores:
-        return 0
-    lengths = {len(core) for core in cores}
-    if len(lengths) > 1:
-        preview = ", ".join(sorted({str(len(core)) for core in cores[:10]}))
-        raise ValueError(f"Non-uniform core lengths for {label} (saw {preview}).")
-    return int(next(iter(lengths)))
+def _matrix_cdf(matrix: List[dict[str, float]]) -> np.ndarray:
+    arr = _matrix_array(matrix)
+    row_sums = arr.sum(axis=1, keepdims=True)
+    if np.any(row_sums <= 0):
+        raise ValueError("PWM matrix rows must sum to > 0.")
+    weights = arr / row_sums
+    return np.cumsum(weights, axis=1)
 
 
-def _stable_subsample(values: Sequence[str], max_size: int) -> tuple[list[str], bool]:
-    if len(values) <= max_size:
-        return list(values), False
-    keyed = []
-    for idx, val in enumerate(values):
-        digest = hashlib.md5(str(val).encode("utf-8")).hexdigest()
-        keyed.append((digest, idx, val))
-    keyed.sort()
-    sampled = [val for _, _, val in keyed[: int(max_size)]]
-    return sampled, True
+def _sample_from_background_cdf(rng: np.random.Generator, cdf: np.ndarray, length: int) -> str:
+    bases = np.array(["A", "C", "G", "T"])
+    idx = np.searchsorted(cdf, rng.random(int(length)))
+    return "".join(bases[idx])
 
 
-def _core_entropy(cores: Sequence[str]) -> list[float]:
-    if not cores:
-        return []
-    length = len(cores[0])
-    if any(len(core) != length for core in cores):
-        return []
-    counts = np.zeros((length, 4), dtype=float)
-    idx_map = {"A": 0, "C": 1, "G": 2, "T": 3}
-    for core in cores:
-        for pos, base in enumerate(core):
-            idx = idx_map.get(base)
-            if idx is None:
-                continue
-            counts[pos, idx] += 1.0
-    entropies: list[float] = []
-    for row in counts:
-        total = float(row.sum())
-        if total <= 0:
-            entropies.append(0.0)
-            continue
-        probs = row / total
-        mask = probs > 0
-        entropies.append(float(-(probs[mask] * np.log2(probs[mask])).sum()))
-    return entropies
-
-
-def _core_hamming_knn(
-    cores: Sequence[str],
+def _sample_pwm_batch(
+    rng: np.random.Generator,
+    cdf: np.ndarray,
     *,
-    k: int,
-    max_n: int = 2500,
-) -> dict[str, object] | None:
-    if not cores:
-        return None
-    if int(k) <= 0:
-        raise ValueError("k must be >= 1 for k-nearest neighbor distances.")
-    length = len(cores[0])
-    if length == 0 or any(len(core) != length for core in cores):
-        return None
-    sample, subsampled = _stable_subsample(cores, max_n)
-    n = len(sample)
-    if n == 0:
-        return None
-    if n == 1:
-        if int(k) > 1:
-            return None
-        distances = np.array([0], dtype=int)
-    else:
-        if int(k) >= n:
-            return None
-        idx_map = {"A": 0, "C": 1, "G": 2, "T": 3}
-        encoded = np.full((n, length), 4, dtype=np.int8)
-        for i, core in enumerate(sample):
-            encoded[i] = np.array([idx_map.get(base, 4) for base in core], dtype=np.int8)
-        distances = np.zeros(n, dtype=int)
-        kth = int(k) - 1
-        for i in range(n):
-            diff = (encoded[i] != encoded).sum(axis=1)
-            diff[i] = length + 1
-            distances[i] = int(np.partition(diff, kth)[kth])
-    max_dist = int(length)
-    counts = np.bincount(distances, minlength=max_dist + 1)
-    frac_le_1 = float(np.mean(distances <= 1)) if distances.size else 0.0
-    p05 = float(np.percentile(distances, 5)) if distances.size else 0.0
-    p95 = float(np.percentile(distances, 95)) if distances.size else 0.0
-    return {
-        "bins": list(range(max_dist + 1)),
-        "counts": [int(v) for v in counts.tolist()],
-        "median": float(np.median(distances)) if distances.size else 0.0,
-        "p05": p05,
-        "p95": p95,
-        "frac_le_1": float(frac_le_1),
-        "n": int(n),
-        "subsampled": bool(subsampled),
-        "k": int(k),
-    }
+    count: int,
+) -> list[str]:
+    bases = np.array(["A", "C", "G", "T"])
+    width = int(cdf.shape[0])
+    draws = rng.random((int(count), width))
+    idx = (draws[:, :, None] <= cdf[None, :, :]).argmax(axis=2)
+    return ["".join(bases[row]) for row in idx]
 
 
-def _core_hamming_nnd(cores: Sequence[str], *, max_n: int = 2500) -> dict[str, object] | None:
-    return _core_hamming_knn(cores, k=1, max_n=max_n)
-
-
-def _diversity_summary(
+def _sample_background_batch(
+    rng: np.random.Generator,
+    cdf: np.ndarray,
     *,
-    baseline_cores: Sequence[str],
-    actual_cores: Sequence[str],
-    baseline_scores: Sequence[float],
-    actual_scores: Sequence[float],
-    baseline_global_cores: Sequence[str] | None = None,
-    baseline_global_scores: Sequence[float] | None = None,
-    uniqueness_key: str | None = None,
-    candidate_pool_size: int | None = None,
-    shortlist_target: int | None = None,
-    label: str | None = None,
-    max_n: int = 2500,
-) -> dict[str, object] | None:
-    label = label or "diversity"
-    base_len = _assert_uniform_core_length(baseline_cores, label=f"{label} baseline")
-    actual_len = _assert_uniform_core_length(actual_cores, label=f"{label} actual")
-    if base_len and actual_len and base_len != actual_len:
-        raise ValueError(f"Core length mismatch for {label} (baseline {base_len} vs actual {actual_len}).")
-    global_len = 0
-    if baseline_global_cores:
-        global_len = _assert_uniform_core_length(baseline_global_cores, label=f"{label} baseline global")
-    if base_len and global_len and base_len != global_len:
-        raise ValueError(f"Core length mismatch for {label} (baseline {base_len} vs global {global_len}).")
-    if uniqueness_key == "core" and actual_cores:
-        if len(set(actual_cores)) != len(actual_cores):
-            raise ValueError(f"Duplicate retained cores detected for {label} with uniqueness.key=core.")
-    baseline_k1 = _core_hamming_knn(baseline_cores, k=1, max_n=max_n)
-    actual_k1 = _core_hamming_knn(actual_cores, k=1, max_n=max_n)
-    if baseline_k1 is None or actual_k1 is None:
-        return None
-    baseline_k5 = _core_hamming_knn(baseline_cores, k=5, max_n=max_n)
-    actual_k5 = _core_hamming_knn(actual_cores, k=5, max_n=max_n)
-    baseline_pairwise = _pairwise_hamming_summary(baseline_cores, max_pairs=10000)
-    actual_pairwise = _pairwise_hamming_summary(actual_cores, max_pairs=10000)
-    baseline_entropy = _core_entropy(baseline_cores)
-    actual_entropy = _core_entropy(actual_cores)
-    baseline_quantiles = _score_quantiles(baseline_scores)
-    actual_quantiles = _score_quantiles(actual_scores)
-    baseline_global_quantiles = _score_quantiles(baseline_global_scores or [])
-    overlap_fraction = None
-    overlap_swaps = None
-    if actual_cores:
-        overlap = len(set(baseline_cores) & set(actual_cores))
-        overlap_fraction = float(overlap) / float(len(actual_cores))
-        overlap_swaps = int(len(actual_cores) - overlap)
-    core_hamming = {
-        "nnd_k1": {"baseline": baseline_k1, "actual": actual_k1},
-        "nnd_k5": {"baseline": baseline_k5, "actual": actual_k5}
-        if baseline_k5 is not None and actual_k5 is not None
-        else None,
-        "pairwise": {"baseline": baseline_pairwise, "actual": actual_pairwise}
-        if baseline_pairwise is not None and actual_pairwise is not None
-        else None,
-    }
-    return {
-        "candidate_pool_size": candidate_pool_size,
-        "shortlist_target": shortlist_target,
-        "core_hamming": core_hamming,
-        "overlap_actual_fraction": overlap_fraction,
-        "overlap_actual_swaps": overlap_swaps,
-        "core_entropy": {
-            "baseline": {"values": baseline_entropy, "n": int(len(baseline_cores))},
-            "actual": {"values": actual_entropy, "n": int(len(actual_cores))},
-        },
-        "score_quantiles": {
-            "baseline": baseline_quantiles,
-            "actual": actual_quantiles,
-            "baseline_global": baseline_global_quantiles,
-        },
-    }
+    count: int,
+    length: int,
+) -> list[str]:
+    bases = np.array(["A", "C", "G", "T"])
+    draws = rng.random((int(count), int(length)))
+    idx = np.searchsorted(cdf, draws)
+    return ["".join(bases[row]) for row in idx]
 
 
 def _ranges_overlap(a_start: int, a_stop: int, b_start: int, b_stop: int) -> bool:
     return int(a_start) <= int(b_stop) and int(b_start) <= int(a_stop)
-
-
-def _stable_seed_from_sequences(values: Sequence[str]) -> int:
-    hashed = [hashlib.md5(str(val).encode("utf-8")).hexdigest() for val in values]
-    joined = "|".join(sorted(hashed))
-    digest = hashlib.md5(joined.encode("utf-8")).hexdigest()
-    return int(digest[:8], 16)
-
-
-def _pairwise_hamming_summary(cores: Sequence[str], *, max_pairs: int = 10000) -> dict[str, object] | None:
-    if len(cores) < 2:
-        return None
-    length = len(cores[0])
-    if length == 0 or any(len(core) != length for core in cores):
-        return None
-    n = len(cores)
-    total_pairs = n * (n - 1) // 2
-    sample_pairs = int(min(max_pairs, total_pairs))
-    rng = np.random.default_rng(_stable_seed_from_sequences(cores))
-    idx_map = {"A": 0, "C": 1, "G": 2, "T": 3}
-    encoded = np.full((n, length), 4, dtype=np.int8)
-    for i, core in enumerate(cores):
-        encoded[i] = np.array([idx_map.get(base, 4) for base in core], dtype=np.int8)
-    distances: list[int] = []
-    while len(distances) < sample_pairs:
-        i = int(rng.integers(0, n))
-        j = int(rng.integers(0, n))
-        if i == j:
-            continue
-        dist = int((encoded[i] != encoded[j]).sum())
-        distances.append(dist)
-    arr = np.asarray(distances, dtype=float)
-    return {
-        "median": float(np.median(arr)),
-        "mean": float(arr.mean()),
-        "p10": float(np.percentile(arr, 10)),
-        "p90": float(np.percentile(arr, 90)),
-        "n_pairs": int(sample_pairs),
-        "total_pairs": int(total_pairs),
-    }
-
-
-def _select_diversity_baseline_candidates(
-    ranked: Sequence[FimoCandidate],
-    *,
-    selection_policy: str,
-    selection_diag: dict | None,
-    n_sites: int,
-) -> list[FimoCandidate]:
-    candidate_slice: list[FimoCandidate] = list(ranked)
-    if selection_policy == "mmr" and selection_diag is not None:
-        tier_limit = selection_diag.get("tier_limit")
-        if isinstance(tier_limit, int) and tier_limit > 0:
-            candidate_slice = candidate_slice[:tier_limit]
-        shortlist_k = selection_diag.get("shortlist_k")
-        if isinstance(shortlist_k, int) and shortlist_k > 0:
-            candidate_slice = candidate_slice[:shortlist_k]
-    target_n = min(int(n_sites), len(candidate_slice))
-    return candidate_slice[:target_n]
-
-
-def _select_diversity_global_candidates(
-    ranked: Sequence[FimoCandidate],
-    *,
-    n_sites: int,
-) -> list[FimoCandidate]:
-    target_n = min(int(n_sites), len(ranked))
-    return list(ranked[:target_n])
 
 
 def _rank_scored_sequences(scored: Sequence[tuple[str, float]]) -> list[tuple[str, float]]:
@@ -1235,21 +510,12 @@ def _build_summary(
 
 
 def sample_sequence_from_background(rng: np.random.Generator, probs: dict[str, float], length: int) -> str:
-    bases = ["A", "C", "G", "T"]
-    weights = np.array([probs[b] for b in bases], dtype=float)
-    weights = weights / weights.sum()
-    idx = rng.choice(len(bases), size=length, replace=True, p=weights)
-    return "".join(bases[i] for i in idx)
+    return _sample_from_background_cdf(rng, _background_cdf(probs), int(length))
 
 
 def sample_sequence_from_pwm(rng: np.random.Generator, matrix: List[dict[str, float]]) -> str:
-    seq = []
-    for probs in matrix:
-        bases = ["A", "C", "G", "T"]
-        weights = np.array([probs[b] for b in bases], dtype=float)
-        weights = weights / weights.sum()
-        seq.append(bases[int(rng.choice(len(bases), p=weights))])
-    return "".join(seq)
+    cdf = _matrix_cdf(matrix)
+    return _sample_pwm_batch(rng, cdf, count=1)[0]
 
 
 def _matrix_array(matrix: List[dict[str, float]]) -> np.ndarray:
@@ -1369,6 +635,8 @@ def sample_pwm_sites(
         )
     else:
         matrix = motif.matrix
+    matrix_cdf = _matrix_cdf(matrix)
+    background_cdf = _background_cdf(motif.background)
 
     score_label = "best_hit_score"
     length_label = str(length_policy)
@@ -1510,8 +778,8 @@ def sample_pwm_sites(
         extra = target_len - len(seq)
         left_len = int(rng.integers(0, extra + 1))
         right_len = extra - left_len
-        left = sample_sequence_from_background(rng, motif.background, left_len)
-        right = sample_sequence_from_background(rng, motif.background, right_len)
+        left = _sample_from_background_cdf(rng, background_cdf, left_len)
+        right = _sample_from_background_cdf(rng, background_cdf, right_len)
         return f"{left}{seq}{right}", int(left_len)
 
     progress: _PwmSamplingProgress | None = None
@@ -1584,18 +852,23 @@ def sample_pwm_sites(
             sequences: list[str] = []
             lengths: list[int] = []
             time_limited = False
+            target_lengths = []
             for _ in range(count):
-                if mining_max_seconds is not None and sequences:
+                if mining_max_seconds is not None and target_lengths:
                     if (time.monotonic() - batch_start) >= float(mining_max_seconds):
                         time_limited = True
                         break
                 target_len = _resolve_length()
-                lengths.append(int(target_len))
-                if strategy == "background":
-                    core = sample_sequence_from_background(rng, motif.background, width)
-                else:
-                    core = sample_sequence_from_pwm(rng, matrix)
-                full_seq, left_len = _embed_with_background(core, target_len)
+                target_lengths.append(int(target_len))
+            if not target_lengths:
+                return sequences, lengths, time_limited
+            lengths.extend(target_lengths)
+            if strategy == "background":
+                cores = _sample_background_batch(rng, background_cdf, count=len(target_lengths), length=width)
+            else:
+                cores = _sample_pwm_batch(rng, matrix_cdf, count=len(target_lengths))
+            for core, target_len in zip(cores, target_lengths):
+                full_seq, left_len = _embed_with_background(core, int(target_len))
                 intended_start = int(left_len) + 1
                 intended_stop = int(left_len) + int(width)
                 intended_core_by_seq[full_seq] = (intended_start, intended_stop)
@@ -1922,7 +1195,7 @@ def sample_pwm_sites(
         if selection_policy == "mmr":
             picked, selection_meta, selection_diag = _select_by_mmr(
                 ranked,
-                motif=motif,
+                log_odds=log_odds,
                 n_sites=int(n_sites),
                 alpha=float(selection_alpha),
                 shortlist_min=int(selection_shortlist_min),
