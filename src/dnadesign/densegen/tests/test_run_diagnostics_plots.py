@@ -16,6 +16,7 @@ from pathlib import Path
 
 import matplotlib
 import pandas as pd
+import pytest
 
 from dnadesign.densegen.src.core.artifacts.pool import TFBSPoolArtifact
 from dnadesign.densegen.src.viz.plotting import (
@@ -214,7 +215,43 @@ def _cfg() -> dict:
     }
 
 
-def _pool_manifest(tmp_path: Path) -> TFBSPoolArtifact:
+def _diversity_block() -> dict:
+    return {
+        "candidate_pool_size": 2,
+        "shortlist_target": 10,
+        "core_hamming": {
+            "nnd_k1": {
+                "bins": [0, 1, 2],
+                "counts": [0, 2, 0],
+                "median": 1.0,
+                "p05": 1.0,
+                "p95": 1.0,
+                "frac_le_1": 1.0,
+                "n": 2,
+                "subsampled": False,
+                "k": 1,
+            },
+            "nnd_k5": None,
+            "pairwise": {
+                "baseline": {"median": 1.0, "mean": 1.0, "p10": 1.0, "p90": 1.0, "n_pairs": 1, "total_pairs": 1},
+                "actual": {"median": 1.0, "mean": 1.0, "p10": 1.0, "p90": 1.0, "n_pairs": 1, "total_pairs": 1},
+            },
+        },
+        "overlap_actual_fraction": 1.0,
+        "overlap_actual_swaps": 0,
+        "core_entropy": {
+            "baseline": {"values": [0.0, 1.0], "n": 2},
+            "actual": {"values": [0.0, 1.0], "n": 2},
+        },
+        "score_quantiles": {
+            "baseline": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
+            "actual": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
+            "baseline_global": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
+        },
+    }
+
+
+def _pool_manifest(tmp_path: Path, *, include_diversity: bool = False) -> TFBSPoolArtifact:
     pools_dir = tmp_path / "pools"
     pools_dir.mkdir(parents=True, exist_ok=True)
     manifest = {
@@ -257,6 +294,8 @@ def _pool_manifest(tmp_path: Path) -> TFBSPoolArtifact:
             }
         ],
     }
+    if include_diversity:
+        manifest["inputs"][0]["stage_a_sampling"]["eligible_score_hist"][0]["diversity"] = _diversity_block()
     path = pools_dir / "pool_manifest.json"
     path.write_text(json.dumps(manifest, indent=2, sort_keys=True))
     return TFBSPoolArtifact.load(path)
@@ -337,6 +376,23 @@ def test_plot_stage_b_summary(tmp_path: Path) -> None:
     assert Path(paths[0]).exists()
 
 
+def test_plot_stage_b_summary_requires_metrics(tmp_path: Path) -> None:
+    matplotlib.use("Agg", force=True)
+    out_path = tmp_path / "stage_b_summary_missing.png"
+    builds = _library_builds_df().copy()
+    builds["slack_bp"] = [None, None]
+    with pytest.raises(ValueError, match="slack"):
+        plot_stage_b_summary(
+            pd.DataFrame(),
+            out_path,
+            library_builds_df=builds,
+            library_members_df=_library_members_df(),
+            composition_df=_composition_df(),
+            cfg=_cfg(),
+            style={},
+        )
+
+
 def test_plot_stage_a_summary(tmp_path: Path) -> None:
     matplotlib.use("Agg", force=True)
     out_path = tmp_path / "stage_a_summary.png"
@@ -351,7 +407,7 @@ def test_plot_stage_a_summary(tmp_path: Path) -> None:
         }
     )
     pools = {"demo_input": pool_df}
-    manifest = _pool_manifest(tmp_path)
+    manifest = _pool_manifest(tmp_path, include_diversity=True)
     paths = plot_stage_a_summary(
         pd.DataFrame(),
         out_path,
@@ -364,3 +420,28 @@ def test_plot_stage_a_summary(tmp_path: Path) -> None:
     assert Path(paths[0]).exists()
     assert Path(paths[1]).exists()
     assert Path(paths[2]).exists()
+
+
+def test_plot_stage_a_summary_requires_diversity(tmp_path: Path) -> None:
+    matplotlib.use("Agg", force=True)
+    out_path = tmp_path / "stage_a_summary_missing.png"
+    pool_df = pd.DataFrame(
+        {
+            "input_name": ["demo_input", "demo_input"],
+            "tf": ["TF_A", "TF_A"],
+            "tfbs_sequence": ["AAAA", "AAAAT"],
+            "best_hit_score": [2.0, 1.5],
+            "tier": [0, 1],
+            "rank_within_regulator": [1, 2],
+        }
+    )
+    pools = {"demo_input": pool_df}
+    manifest = _pool_manifest(tmp_path, include_diversity=False)
+    with pytest.raises(ValueError, match="diversity"):
+        plot_stage_a_summary(
+            pd.DataFrame(),
+            out_path,
+            pools=pools,
+            pool_manifest=manifest,
+            style={},
+        )
