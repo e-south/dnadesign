@@ -169,9 +169,10 @@ to rebuild pools from scratch.
 For FIMO-backed PWM inputs, it also records Stage‑A sampling metadata
 (tier scheme, eligibility/retention rules, FIMO threshold, background source/bgfile, and
 eligible score histograms with tier boundary scores per regulator), plus per‑TF diversity
-summaries (core nearest‑neighbor distance + core entropy, baseline vs actual; large sets are
-deterministically subsampled to 2500 sequences) and padding audit stats (best‑hit overlap with
-intended core; core offset histogram).
+summaries (core nearest‑neighbor distance + core entropy, baseline vs actual; overlap +
+sampled pairwise median Hamming distance; large sets are deterministically subsampled to
+2500 sequences) and padding audit stats (best‑hit overlap with intended core; core offset
+histogram).
 Stage‑A pool rows include `best_hit_score`, `tier`, `rank_within_regulator` (1‑based rank among
 eligible unique TFBS per regulator), and `tfbs_core` for core‑level uniqueness checks.
 

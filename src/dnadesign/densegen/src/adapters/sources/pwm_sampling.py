@@ -838,16 +838,27 @@ def _diversity_summary(
     actual_nnd = _core_hamming_nnd(actual_cores, max_n=max_n)
     if baseline_nnd is None or actual_nnd is None:
         return None
+    baseline_pairwise = _pairwise_median_hamming(baseline_cores, max_pairs=10000)
+    actual_pairwise = _pairwise_median_hamming(actual_cores, max_pairs=10000)
     baseline_entropy = _core_entropy(baseline_cores)
     actual_entropy = _core_entropy(actual_cores)
     _, baseline_median, _, _ = _summarize_scores(baseline_scores)
     _, actual_median, _, _ = _summarize_scores(actual_scores)
+    overlap_fraction = None
+    if actual_cores:
+        overlap = len(set(baseline_cores) & set(actual_cores))
+        overlap_fraction = float(overlap) / float(len(actual_cores))
     return {
         "core_hamming_nnd": {
             "bins": baseline_nnd.get("bins") or actual_nnd.get("bins"),
             "baseline": baseline_nnd,
             "actual": actual_nnd,
         },
+        "pairwise_median": {
+            "baseline": baseline_pairwise,
+            "actual": actual_pairwise,
+        },
+        "overlap_actual_fraction": overlap_fraction,
         "core_entropy": {
             "baseline": {"values": baseline_entropy, "n": int(len(baseline_cores))},
             "actual": {"values": actual_entropy, "n": int(len(actual_cores))},
@@ -861,6 +872,43 @@ def _diversity_summary(
 
 def _ranges_overlap(a_start: int, a_stop: int, b_start: int, b_stop: int) -> bool:
     return int(a_start) <= int(b_stop) and int(b_start) <= int(a_stop)
+
+
+def _stable_seed_from_sequences(values: Sequence[str]) -> int:
+    hashed = [hashlib.md5(str(val).encode("utf-8")).hexdigest() for val in values]
+    joined = "|".join(sorted(hashed))
+    digest = hashlib.md5(joined.encode("utf-8")).hexdigest()
+    return int(digest[:8], 16)
+
+
+def _pairwise_median_hamming(cores: Sequence[str], *, max_pairs: int = 10000) -> dict[str, object] | None:
+    if len(cores) < 2:
+        return None
+    length = len(cores[0])
+    if length == 0 or any(len(core) != length for core in cores):
+        return None
+    n = len(cores)
+    total_pairs = n * (n - 1) // 2
+    sample_pairs = int(min(max_pairs, total_pairs))
+    rng = np.random.default_rng(_stable_seed_from_sequences(cores))
+    idx_map = {"A": 0, "C": 1, "G": 2, "T": 3}
+    encoded = np.full((n, length), 4, dtype=np.int8)
+    for i, core in enumerate(cores):
+        encoded[i] = np.array([idx_map.get(base, 4) for base in core], dtype=np.int8)
+    distances: list[int] = []
+    while len(distances) < sample_pairs:
+        i = int(rng.integers(0, n))
+        j = int(rng.integers(0, n))
+        if i == j:
+            continue
+        dist = int((encoded[i] != encoded[j]).sum())
+        distances.append(dist)
+    arr = np.asarray(distances, dtype=float)
+    return {
+        "median": float(np.median(arr)),
+        "n_pairs": int(sample_pairs),
+        "total_pairs": int(total_pairs),
+    }
 
 
 def _select_diversity_baseline_candidates(

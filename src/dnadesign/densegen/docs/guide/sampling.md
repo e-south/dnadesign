@@ -270,7 +270,8 @@ If you want to know what happened in a run, these are the canonical “truth” 
   - background source (motif background vs bgfile)
   - tier boundary scores and yield counters (generated / eligible / eligible_unique / retained)
   - tier-target success/shortfall reporting
-  - core diversity summaries (nearest‑neighbor Hamming distance + per‑position entropy, baseline vs actual)
+  - core diversity summaries (nearest‑neighbor Hamming distance + per‑position entropy, baseline vs actual),
+    plus overlap and sampled pairwise median Hamming distance
     computed on `tfbs_core` only; baseline uses the same candidate slice considered by selection
     (tier slice/shortlist for MMR), and large sets are deterministically subsampled to 2500 sequences
   - padding audit stats (best‑hit overlap with intended core; core‑offset histogram)

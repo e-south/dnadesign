@@ -1501,43 +1501,45 @@ def _build_stage_a_diversity_figure(
         ax_header.set_label("header")
         ax_header.text(
             0.5,
-            0.84,
-            f"Stage-A core diversity — {input_name}",
+            0.76,
+            f"Stage-A core diversity (tfbs_core only) — {input_name}",
             ha="center",
             va="center",
             fontsize=text_sizes["fig_title"],
             color="#111111",
         )
-        ax_header.text(
-            0.5,
-            0.48,
-            "Core-only diversity metrics (flanks excluded)",
-            ha="center",
-            va="center",
-            fontsize=text_sizes["annotation"],
-            color="#555555",
-        )
         body = outer[1].subgridspec(
             nrows=n_regs,
-            ncols=2,
-            width_ratios=[1.15, 1.0],
+            ncols=3,
+            width_ratios=[0.22, 1.15, 1.0],
             hspace=0.32,
             wspace=0.35,
         )
         axes_left: list[mpl.axes.Axes] = []
         axes_right: list[mpl.axes.Axes] = []
+        label_axes: list[mpl.axes.Axes] = []
         for idx in range(n_regs):
-            share_left = axes_left[0] if axes_left else None
-            share_right = axes_right[0] if axes_right else None
-            axes_left.append(fig.add_subplot(body[idx, 0], sharex=share_left, sharey=share_left))
-            axes_right.append(fig.add_subplot(body[idx, 1], sharex=share_right, sharey=share_right))
+            label_axes.append(fig.add_subplot(body[idx, 0]))
+            axes_left.append(fig.add_subplot(body[idx, 1]))
+            axes_right.append(fig.add_subplot(body[idx, 2]))
 
         diversity_by_reg = {str(row.get("regulator") or ""): row.get("diversity") for row in eligible_hist}
         for idx, reg in enumerate(regulators):
             hue = reg_colors.get(reg, "#4c78a8")
             label = format_regulator_label(reg)
+            ax_label = label_axes[idx]
             ax_left = axes_left[idx]
             ax_right = axes_right[idx]
+            ax_label.set_axis_off()
+            ax_label.text(
+                0.98,
+                0.5,
+                label,
+                ha="right",
+                va="center",
+                fontsize=text_sizes["regulator_label"] * 0.95,
+                color="#222222",
+            )
             diversity = diversity_by_reg.get(reg) if isinstance(diversity_by_reg.get(reg), dict) else None
             core_nnd = diversity.get("core_hamming_nnd") if isinstance(diversity, dict) else None
             if not isinstance(core_nnd, dict):
@@ -1550,27 +1552,38 @@ def _build_stage_a_diversity_figure(
                 if baseline and actual and bins:
                     baseline_counts = np.asarray(baseline.get("counts", []), dtype=float)
                     actual_counts = np.asarray(actual.get("counts", []), dtype=float)
-                    x_vals = np.asarray(bins, dtype=float)
                     if baseline_counts.size and actual_counts.size:
-                        ax_left.plot(
-                            x_vals,
-                            baseline_counts,
+                        total_base = float(baseline_counts.sum())
+                        total_act = float(actual_counts.sum())
+                        base_frac = baseline_counts / total_base if total_base > 0 else baseline_counts
+                        act_frac = actual_counts / total_act if total_act > 0 else actual_counts
+                        centers = np.asarray(bins, dtype=float)
+                        ax_left.bar(
+                            centers,
+                            act_frac,
+                            width=0.9,
+                            color=hue,
+                            alpha=0.5,
+                            label="actual",
+                            align="center",
+                        )
+                        ax_left.step(
+                            centers,
+                            base_frac,
                             color="#777777",
                             linewidth=1.2,
-                            drawstyle="steps-mid",
+                            where="mid",
                             label="baseline",
                         )
-                        ax_left.plot(
-                            x_vals,
-                            actual_counts,
-                            color=hue,
-                            linewidth=1.4,
-                            drawstyle="steps-mid",
-                            label="actual",
-                        )
-                        ax_left.set_xlim(x_vals.min(), x_vals.max())
-                        ax_left.set_ylabel("Count")
-                        ax_left.legend(loc="upper right", frameon=False, fontsize=text_sizes["annotation"] * 0.8)
+                        ax_left.set_xlim(centers.min() - 0.5, centers.max() + 0.5)
+                        ax_left.set_ylabel("Fraction" if idx == 0 else "")
+                        ax_left.xaxis.set_major_locator(mpl.ticker.MaxNLocator(integer=True))
+                        if idx == 0:
+                            ax_left.legend(
+                                loc="upper right",
+                                frameon=False,
+                                fontsize=text_sizes["annotation"] * 0.8,
+                            )
                         baseline_med = baseline.get("median")
                         actual_med = actual.get("median")
                         actual_frac = actual.get("frac_le_1")
@@ -1579,13 +1592,24 @@ def _build_stage_a_diversity_figure(
                             note_lines.append(f"med {baseline_med:.2f} → {actual_med:.2f}")
                         if actual_frac is not None:
                             note_lines.append(f"p(NND≤1) {float(actual_frac) * 100:.1f}%")
+                        pairwise = diversity.get("pairwise_median") if isinstance(diversity, dict) else None
+                        if isinstance(pairwise, dict):
+                            base_pair = pairwise.get("baseline")
+                            act_pair = pairwise.get("actual")
+                            if isinstance(base_pair, dict) and isinstance(act_pair, dict):
+                                base_med = base_pair.get("median")
+                                act_med = act_pair.get("median")
+                                if base_med is not None and act_med is not None:
+                                    note_lines.append(f"pairwise med {base_med:.2f} → {act_med:.2f}")
+                        overlap = diversity.get("overlap_actual_fraction") if isinstance(diversity, dict) else None
+                        if overlap is not None:
+                            note_lines.append(f"overlap {float(overlap) * 100:.1f}%")
                         score_block = diversity.get("score_baseline_vs_actual") if isinstance(diversity, dict) else None
                         if isinstance(score_block, dict):
                             base_score = score_block.get("baseline_median")
                             act_score = score_block.get("actual_median")
                             if base_score is not None and act_score is not None:
                                 note_lines.append(f"score {base_score:.2f} → {act_score:.2f}")
-                        note_lines.append("tfbs_core only")
                         if note_lines:
                             ax_left.text(
                                 0.02,
@@ -1612,28 +1636,25 @@ def _build_stage_a_diversity_figure(
                             label="actual",
                         )
                         if base_entropy:
+                            base_vals = base_entropy[: len(actual_entropy)]
                             ax_right.plot(
                                 positions,
-                                base_entropy,
+                                base_vals,
                                 color="#777777",
                                 linewidth=1.2,
                                 marker="o",
                                 markersize=2.5,
                                 label="baseline",
                             )
-                        ax_right.set_ylabel("Entropy (bits)")
-                        ax_right.legend(loc="upper right", frameon=False, fontsize=text_sizes["annotation"] * 0.8)
-            ax_left.text(
-                -0.06,
-                0.64,
-                label,
-                transform=ax_left.transAxes,
-                ha="right",
-                va="center",
-                fontsize=text_sizes["regulator_label"] * 0.9,
-                color="#222222",
-                clip_on=False,
-            )
+                        ax_right.set_ylabel("Entropy (bits)" if idx == 0 else "")
+                        ax_right.set_xlim(0.5, len(actual_entropy) + 0.5)
+                        ax_right.xaxis.set_major_locator(mpl.ticker.MaxNLocator(integer=True))
+                        if idx == 0:
+                            ax_right.legend(
+                                loc="upper right",
+                                frameon=False,
+                                fontsize=text_sizes["annotation"] * 0.8,
+                            )
             ax_left.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
             ax_right.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
 
@@ -1642,8 +1663,10 @@ def _build_stage_a_diversity_figure(
             axes_right[0].set_title("Core positional entropy", fontsize=subtitle_size, pad=title_pad)
             axes_left[-1].set_xlabel("Nearest-neighbor distance (Hamming)")
             axes_right[-1].set_xlabel("Core position")
-            _shared_x_cleanup(axes_left)
-            _shared_x_cleanup(axes_right)
+            for ax in axes_left[:-1]:
+                ax.tick_params(labelbottom=False)
+            for ax in axes_right[:-1]:
+                ax.tick_params(labelbottom=False)
 
         for ax in axes_left + axes_right:
             _apply_style(ax, style)

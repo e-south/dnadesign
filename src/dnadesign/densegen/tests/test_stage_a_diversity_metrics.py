@@ -60,6 +60,12 @@ def test_diversity_summary_scores() -> None:
         max_n=2500,
     )
     assert summary is not None
+    overlap = summary.get("overlap_actual_fraction")
+    assert overlap == 1.0
+    pairwise = summary.get("pairwise_median")
+    assert isinstance(pairwise, dict)
+    assert pairwise.get("baseline") is not None
+    assert pairwise.get("actual") is not None
     score_block = summary.get("score_baseline_vs_actual")
     assert isinstance(score_block, dict)
     assert score_block.get("baseline_median") == 1.5
