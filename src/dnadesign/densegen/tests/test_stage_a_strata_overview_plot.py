@@ -228,6 +228,10 @@ def test_draw_tier_markers_caps_height_and_adds_box() -> None:
         for line in ax.lines:
             ydata = line.get_ydata()
             assert max(ydata) <= 0.58 + 1e-6
+        assert ax.collections
         assert any(isinstance(artist, AnchoredText) for artist in ax.artists)
+        labels = [text.get_text() for text in ax.texts]
+        assert "0.1%" in labels
+        assert "1%" in labels
     finally:
         fig.clf()
