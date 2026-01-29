@@ -115,9 +115,9 @@ def sfxi_v1(
 ) -> ObjectiveResult:
     if y_pred.ndim == 3:
         y_pred, std_devs = y_pred
-        scalar_uncertainty = np.nanmean(std_devs, axis = 1)
+        var = np.exp2(std_devs)
     else:
-        scalar_uncertainty = None
+        var = None
     # assert y_pred dims
     if not (isinstance(y_pred, np.ndarray) and y_pred.ndim == 2 and y_pred.shape[1] >= 8):
         raise ValueError(f"[sfxi_v1] Expected y_pred shape (n, 8+); got {getattr(y_pred, 'shape', None)}.")
@@ -193,6 +193,27 @@ def sfxi_v1(
         "intensity_disabled": bool(intensity_disabled),
         "all_off_setpoint": bool(intensity_disabled),
     }
+
+    # ---- creating scalar uncertainty ----
+    if var is not None:
+        # REDO INDEXING
+        # Starting with effect intensity (because it is a lot easier)
+        placeholder = (np.exp2(y_pred[:, 3:7])*np.log(2))**2
+        ind_var = np.multiply(placeholder, var[:, 3:7])
+        wt_var = np.multiply(ind_var, w)
+        effect_var = np.sum(wt_var, axis = 1)
+        effect_exp = np.sum(np.multiply(w, np.exp2(y_pred[:, 3:7])), axis=1)
+        # Now on to logic fidelity
+        # Need to (at some point) convert standard deviation to variance
+        c = 1/(_worst_corner_distance(setpoint)**2)
+        ph2 = 4*(y_pred[:,0:3]**2)*var[:,0:3] + 4*(setpoint**2)*var[:,0:3] \
+                + 2(var[:,0:3]**2) - 8*y_pred[:,0:4]*setpoint*var[:,0:3]
+        lf_var = c * np.sum(ph2, axis=1)
+        lf_exp = c * np.sum((y_pred[:,0:3]**2 + var[:,0:3] - (2*y_pred[:,0:3] * setpoint ) + setpoint**2), axis=1)
+        # Combine into scalar uncertainty
+        scalar_uncertainty = effect_var * lf_var + effect_var * lf_exp**2 + lf_var * effect_exp**2
+    else:
+        scalar_uncertainty = None
 
     # Emit optional, named summary stats so the runner can log them generically
     try:
