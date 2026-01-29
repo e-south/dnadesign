@@ -618,28 +618,53 @@ def _stage_a_sampling_rows(
                 )
                 diversity_label = "-"
                 diversity_delta = "-"
-                diversity_score_delta = "-"
+                diversity_score_p10_delta = "-"
+                diversity_score_med_delta = "-"
+                diversity_overlap = "-"
+                diversity_swaps = "-"
+                diversity_pool = "-"
                 diversity = summary.diversity or {}
-                core_nnd = diversity.get("core_hamming_nnd") if isinstance(diversity, dict) else None
-                if isinstance(core_nnd, dict):
-                    baseline = core_nnd.get("baseline") if isinstance(core_nnd.get("baseline"), dict) else None
-                    actual = core_nnd.get("actual") if isinstance(core_nnd.get("actual"), dict) else None
-                    baseline_med = baseline.get("median") if baseline is not None else None
-                    actual_med = actual.get("median") if actual is not None else None
-                    diversity_label = _format_diversity_value(actual_med)
-                    if baseline_med is not None and actual_med is not None:
-                        diversity_delta = _format_diversity_value(
-                            float(actual_med) - float(baseline_med), show_sign=True
-                        )
-                score_block = diversity.get("score_baseline_vs_actual") if isinstance(diversity, dict) else None
+                core_hamming = diversity.get("core_hamming") if isinstance(diversity, dict) else None
+                if isinstance(core_hamming, dict):
+                    nnd_k5 = core_hamming.get("nnd_k5") if isinstance(core_hamming.get("nnd_k5"), dict) else None
+                    nnd_k1 = core_hamming.get("nnd_k1") if isinstance(core_hamming.get("nnd_k1"), dict) else None
+                    block = nnd_k5 or nnd_k1
+                    if isinstance(block, dict):
+                        baseline = block.get("baseline") if isinstance(block.get("baseline"), dict) else None
+                        actual = block.get("actual") if isinstance(block.get("actual"), dict) else None
+                        baseline_med = baseline.get("median") if baseline is not None else None
+                        actual_med = actual.get("median") if actual is not None else None
+                        diversity_label = _format_diversity_value(actual_med)
+                        if baseline_med is not None and actual_med is not None:
+                            diversity_delta = _format_diversity_value(
+                                float(actual_med) - float(baseline_med), show_sign=True
+                            )
+                score_block = diversity.get("score_quantiles") if isinstance(diversity, dict) else None
                 if isinstance(score_block, dict):
-                    base_med = score_block.get("baseline_median")
-                    act_med = score_block.get("actual_median")
-                    if base_med is not None and act_med is not None:
-                        diversity_score_delta = _format_diversity_value(
-                            float(act_med) - float(base_med),
-                            show_sign=True,
-                        )
+                    base = score_block.get("baseline") if isinstance(score_block.get("baseline"), dict) else None
+                    actual = score_block.get("actual") if isinstance(score_block.get("actual"), dict) else None
+                    if base is not None and actual is not None:
+                        if base.get("p10") is not None and actual.get("p10") is not None:
+                            diversity_score_p10_delta = _format_diversity_value(
+                                float(actual.get("p10")) - float(base.get("p10")),
+                                show_sign=True,
+                            )
+                        if base.get("p50") is not None and actual.get("p50") is not None:
+                            diversity_score_med_delta = _format_diversity_value(
+                                float(actual.get("p50")) - float(base.get("p50")),
+                                show_sign=True,
+                            )
+                overlap = diversity.get("overlap_actual_fraction") if isinstance(diversity, dict) else None
+                swaps = diversity.get("overlap_actual_swaps") if isinstance(diversity, dict) else None
+                if overlap is not None:
+                    diversity_overlap = f"{float(overlap) * 100:.1f}%"
+                if swaps is not None:
+                    diversity_swaps = str(int(swaps))
+                pool_size = diversity.get("candidate_pool_size") if isinstance(diversity, dict) else None
+                shortlist_target = diversity.get("shortlist_target") if isinstance(diversity, dict) else None
+                if pool_size is not None or shortlist_target is not None:
+                    pool_label = f"{pool_size if pool_size is not None else '-'}"
+                    pool_label = f"{pool_label}/{shortlist_target if shortlist_target is not None else '-'}"
                 rows.append(
                     {
                         "input_name": str(input_name),
@@ -655,7 +680,11 @@ def _stage_a_sampling_rows(
                         "length": length_label,
                         "diversity_med": diversity_label,
                         "diversity_delta": diversity_delta,
-                        "diversity_score_delta": diversity_score_delta,
+                        "diversity_score_p10_delta": diversity_score_p10_delta,
+                        "diversity_score_med_delta": diversity_score_med_delta,
+                        "diversity_overlap": diversity_overlap,
+                        "diversity_swaps": diversity_swaps,
+                        "diversity_pool": diversity_pool,
                         "tier0_score": summary.tier0_score,
                         "tier1_score": summary.tier1_score,
                         "tier2_score": summary.tier2_score,
@@ -696,7 +725,11 @@ def _stage_a_sampling_rows(
                 "length": length_label,
                 "diversity_med": "-",
                 "diversity_delta": "-",
-                "diversity_score_delta": "-",
+                "diversity_score_p10_delta": "-",
+                "diversity_score_med_delta": "-",
+                "diversity_overlap": "-",
+                "diversity_swaps": "-",
+                "diversity_pool": "-",
                 "tier0_score": None,
                 "tier1_score": None,
                 "tier2_score": None,
@@ -2076,8 +2109,12 @@ def stage_a_build_pool(
             recap_table.add_column("tier target")
             recap_table.add_column("tier fill")
             recap_table.add_column("selection")
-            recap_table.add_column("div(medNND)")
-            recap_table.add_column("Δdiv")
+            recap_table.add_column("k(pool/target)")
+            recap_table.add_column("div(k5)")
+            recap_table.add_column("Δdiv(k5)")
+            recap_table.add_column("overlap")
+            recap_table.add_column("swaps")
+            recap_table.add_column("Δscore(p10)")
             recap_table.add_column("Δscore(med)")
             recap_table.add_column("score(min/med/avg/max)")
             recap_table.add_column("len(n/min/med/avg/max)")
@@ -2093,9 +2130,13 @@ def stage_a_build_pool(
                     str(row.get("tier_target", "-")),
                     str(row["tier_fill"]),
                     str(row.get("selection", "-")),
+                    str(row.get("diversity_pool", "-")),
                     str(row.get("diversity_med", "-")),
                     str(row.get("diversity_delta", "-")),
-                    str(row.get("diversity_score_delta", "-")),
+                    str(row.get("diversity_overlap", "-")),
+                    str(row.get("diversity_swaps", "-")),
+                    str(row.get("diversity_score_p10_delta", "-")),
+                    str(row.get("diversity_score_med_delta", "-")),
                     str(row["score"]),
                     str(row["length"]),
                 )
@@ -2128,7 +2169,10 @@ def stage_a_build_pool(
         console.print(
             "Legend: generated=PWM candidates; eligible=best_hit_score>0 with hit; "
             "retained=top-N by score after dedupe; tier target=diagnostic tier target status; "
-            "tier fill=deepest diagnostic tier used; selection=Stage-A selection policy."
+            "tier fill=deepest diagnostic tier used; selection=Stage-A selection policy; "
+            "k(pool/target)=MMR shortlist pool vs target; div(k5)=k=5 Hamming median; "
+            "overlap=baseline∩actual; swaps=actual - overlap; "
+            "Δscore columns compare baseline vs actual p10/median."
         )
     console.print(
         f":sparkles: [bold green]Pool manifest written[/]: "

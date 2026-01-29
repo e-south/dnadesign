@@ -150,6 +150,8 @@ Performance/behavior knobs for MMR:
 - `selection.shortlist_*` controls how many of the top-ranked candidates are considered.
 - `selection.tier_widening` can specify a ladder of ranked fractions to search (e.g. `[0.001, 0.01, 0.09, 1.0]`).
   DenseGen tries the first rung (top slice); if it can’t fill from that slice, it widens to the next rung.
+- `selection.tier_widening.ensure_shortlist_target` (bool) widens until the candidate pool
+  reaches `shortlist_target = max(shortlist_min, shortlist_factor * n_sites)` (or the ladder exhausts).
 
 > Practical advice: MMR is best used when you expect **many** eligible unique candidates and you want
 > to avoid near-duplicates while still staying near the score frontier.
@@ -270,10 +272,12 @@ If you want to know what happened in a run, these are the canonical “truth” 
   - background source (motif background vs bgfile)
   - tier boundary scores and yield counters (generated / eligible / eligible_unique / retained)
   - tier-target success/shortfall reporting
-  - core diversity summaries (nearest‑neighbor Hamming distance + per‑position entropy, baseline vs actual),
-    plus overlap and sampled pairwise median Hamming distance
+  - core diversity summaries (k=1 and k=5 nearest‑neighbor Hamming distances, sampled pairwise Hamming summary,
+    and per‑position entropy, baseline vs actual), plus overlap and candidate‑pool diagnostics,
     computed on `tfbs_core` only; baseline uses the same candidate slice considered by selection
-    (tier slice/shortlist for MMR), and large sets are deterministically subsampled to 2500 sequences
+    (tier slice/shortlist for MMR). k‑NN distances are deterministically subsampled to 2500 sequences;
+    entropy uses the full baseline/actual sets; score quantiles include both local (shortlist) and
+    global (eligible‑unique) baselines for tradeoff audits
   - padding audit stats (best‑hit overlap with intended core; core‑offset histogram)
 
 Optional Stage‑A debug:

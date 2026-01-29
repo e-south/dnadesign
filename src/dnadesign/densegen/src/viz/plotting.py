@@ -1502,7 +1502,7 @@ def _build_stage_a_diversity_figure(
         ax_header.text(
             0.5,
             0.76,
-            f"Stage-A core diversity (tfbs_core only) — {input_name}",
+            f"Stage-A core diversity (tfbs_core only; baseline vs actual) — {input_name}",
             ha="center",
             va="center",
             fontsize=text_sizes["fig_title"],
@@ -1524,9 +1524,31 @@ def _build_stage_a_diversity_figure(
             axes_right.append(fig.add_subplot(body[idx, 2]))
 
         diversity_by_reg = {str(row.get("regulator") or ""): row.get("diversity") for row in eligible_hist}
+
+        def _ecdf_from_counts(bins: list[float] | list[int], counts: list[int]) -> tuple[np.ndarray, np.ndarray] | None:
+            if not bins or not counts:
+                return None
+            arr = np.asarray(counts, dtype=float)
+            total = float(arr.sum())
+            if total <= 0:
+                return None
+            x = np.asarray(bins, dtype=float)
+            y = np.cumsum(arr) / total
+            return x, y
+
         for idx, reg in enumerate(regulators):
             hue = reg_colors.get(reg, "#4c78a8")
+            diversity = diversity_by_reg.get(reg) if isinstance(diversity_by_reg.get(reg), dict) else None
+            core_len = None
+            if isinstance(diversity, dict):
+                entropy_block = diversity.get("core_entropy")
+                if isinstance(entropy_block, dict):
+                    actual_vals = entropy_block.get("actual", {}).get("values", [])
+                    if actual_vals:
+                        core_len = len(actual_vals)
             label = format_regulator_label(reg)
+            if core_len:
+                label = f"{label} (core {core_len} bp)"
             ax_label = label_axes[idx]
             ax_left = axes_left[idx]
             ax_right = axes_right[idx]
@@ -1540,87 +1562,128 @@ def _build_stage_a_diversity_figure(
                 fontsize=text_sizes["regulator_label"] * 0.95,
                 color="#222222",
             )
-            diversity = diversity_by_reg.get(reg) if isinstance(diversity_by_reg.get(reg), dict) else None
-            core_nnd = diversity.get("core_hamming_nnd") if isinstance(diversity, dict) else None
-            if not isinstance(core_nnd, dict):
+            core_hamming = diversity.get("core_hamming") if isinstance(diversity, dict) else None
+            if not isinstance(core_hamming, dict):
                 ax_left.text(0.5, 0.5, "No diversity data", ha="center", va="center", transform=ax_left.transAxes)
                 ax_right.text(0.5, 0.5, "No diversity data", ha="center", va="center", transform=ax_right.transAxes)
             else:
-                baseline = core_nnd.get("baseline") if isinstance(core_nnd.get("baseline"), dict) else None
-                actual = core_nnd.get("actual") if isinstance(core_nnd.get("actual"), dict) else None
-                bins = core_nnd.get("bins") if isinstance(core_nnd.get("bins"), list) else None
-                if baseline and actual and bins:
-                    baseline_counts = np.asarray(baseline.get("counts", []), dtype=float)
-                    actual_counts = np.asarray(actual.get("counts", []), dtype=float)
-                    if baseline_counts.size and actual_counts.size:
-                        total_base = float(baseline_counts.sum())
-                        total_act = float(actual_counts.sum())
-                        base_frac = baseline_counts / total_base if total_base > 0 else baseline_counts
-                        act_frac = actual_counts / total_act if total_act > 0 else actual_counts
-                        centers = np.asarray(bins, dtype=float)
-                        ax_left.bar(
-                            centers,
-                            act_frac,
-                            width=0.9,
-                            color=hue,
-                            alpha=0.5,
-                            label="actual",
-                            align="center",
-                        )
-                        ax_left.step(
-                            centers,
-                            base_frac,
-                            color="#777777",
-                            linewidth=1.2,
-                            where="mid",
-                            label="baseline",
-                        )
-                        ax_left.set_xlim(centers.min() - 0.5, centers.max() + 0.5)
-                        ax_left.set_ylabel("Fraction" if idx == 0 else "")
-                        ax_left.xaxis.set_major_locator(mpl.ticker.MaxNLocator(integer=True))
-                        if idx == 0:
-                            ax_left.legend(
-                                loc="upper right",
-                                frameon=False,
-                                fontsize=text_sizes["annotation"] * 0.8,
-                            )
-                        baseline_med = baseline.get("median")
-                        actual_med = actual.get("median")
-                        actual_frac = actual.get("frac_le_1")
-                        note_lines = []
-                        if baseline_med is not None and actual_med is not None:
-                            note_lines.append(f"med {baseline_med:.2f} → {actual_med:.2f}")
-                        if actual_frac is not None:
-                            note_lines.append(f"p(NND≤1) {float(actual_frac) * 100:.1f}%")
-                        pairwise = diversity.get("pairwise_median") if isinstance(diversity, dict) else None
-                        if isinstance(pairwise, dict):
-                            base_pair = pairwise.get("baseline")
-                            act_pair = pairwise.get("actual")
-                            if isinstance(base_pair, dict) and isinstance(act_pair, dict):
-                                base_med = base_pair.get("median")
-                                act_med = act_pair.get("median")
-                                if base_med is not None and act_med is not None:
-                                    note_lines.append(f"pairwise med {base_med:.2f} → {act_med:.2f}")
-                        overlap = diversity.get("overlap_actual_fraction") if isinstance(diversity, dict) else None
-                        if overlap is not None:
-                            note_lines.append(f"overlap {float(overlap) * 100:.1f}%")
-                        score_block = diversity.get("score_baseline_vs_actual") if isinstance(diversity, dict) else None
-                        if isinstance(score_block, dict):
-                            base_score = score_block.get("baseline_median")
-                            act_score = score_block.get("actual_median")
-                            if base_score is not None and act_score is not None:
-                                note_lines.append(f"score {base_score:.2f} → {act_score:.2f}")
-                        if note_lines:
-                            ax_left.text(
-                                0.02,
-                                0.95,
-                                "\n".join(note_lines),
-                                transform=ax_left.transAxes,
-                                ha="left",
-                                va="top",
-                                fontsize=text_sizes["annotation"] * 0.8,
-                                color="#333333",
-                            )
+                nnd_k5 = core_hamming.get("nnd_k5") if isinstance(core_hamming.get("nnd_k5"), dict) else None
+                nnd_k1 = core_hamming.get("nnd_k1") if isinstance(core_hamming.get("nnd_k1"), dict) else None
+                plot_block = nnd_k5 or nnd_k1
+                note_lines: list[str] = []
+                if isinstance(plot_block, dict):
+                    baseline = plot_block.get("baseline") if isinstance(plot_block.get("baseline"), dict) else None
+                    actual = plot_block.get("actual") if isinstance(plot_block.get("actual"), dict) else None
+                    bins = None
+                    if isinstance(baseline, dict) and isinstance(baseline.get("bins"), list):
+                        bins = baseline.get("bins")
+                    elif isinstance(actual, dict) and isinstance(actual.get("bins"), list):
+                        bins = actual.get("bins")
+                    if baseline and actual and bins:
+                        base_ecdf = _ecdf_from_counts(bins, baseline.get("counts", []))
+                        act_ecdf = _ecdf_from_counts(bins, actual.get("counts", []))
+                        if base_ecdf and act_ecdf:
+                            x_base, y_base = base_ecdf
+                            x_act, y_act = act_ecdf
+                            base_line = ax_left.step(
+                                x_base,
+                                y_base,
+                                where="post",
+                                color="#777777",
+                                linewidth=1.2,
+                                label="baseline",
+                            )[0]
+                            act_line = ax_left.step(
+                                x_act,
+                                y_act,
+                                where="post",
+                                color=hue,
+                                linewidth=1.5,
+                                label="actual",
+                            )[0]
+                            ax_left.fill_between(x_act, y_act, step="post", color=hue, alpha=0.12)
+                            ax_left.set_xlim(0, max(x_act.max(), x_base.max()))
+                            ax_left.set_ylim(0, 1.0)
+                            ax_left.set_ylabel("Fraction <= d" if idx == 0 else "")
+                            ax_left.xaxis.set_major_locator(mpl.ticker.MaxNLocator(integer=True))
+                            if idx == 0:
+                                ax_left.legend(
+                                    handles=[base_line, act_line],
+                                    loc="lower right",
+                                    frameon=False,
+                                    fontsize=text_sizes["annotation"] * 0.8,
+                                )
+                if nnd_k5 is None and nnd_k1 is not None:
+                    note_lines.append("k=1 (n<6)")
+                if isinstance(plot_block, dict):
+                    baseline = plot_block.get("baseline") if isinstance(plot_block.get("baseline"), dict) else None
+                    actual = plot_block.get("actual") if isinstance(plot_block.get("actual"), dict) else None
+                    baseline_med = baseline.get("median") if baseline is not None else None
+                    actual_med = actual.get("median") if actual is not None else None
+                    if baseline_med is not None and actual_med is not None:
+                        note_lines.append(f"delta div {float(actual_med) - float(baseline_med):+.2f}")
+                pairwise = core_hamming.get("pairwise") if isinstance(core_hamming.get("pairwise"), dict) else None
+                if isinstance(pairwise, dict):
+                    base_pair = pairwise.get("baseline") if isinstance(pairwise.get("baseline"), dict) else None
+                    act_pair = pairwise.get("actual") if isinstance(pairwise.get("actual"), dict) else None
+                    base_med = base_pair.get("median") if base_pair is not None else None
+                    act_med = act_pair.get("median") if act_pair is not None else None
+                    if base_med is not None and act_med is not None:
+                        note_lines.append(f"delta pairwise {float(act_med) - float(base_med):+.2f}")
+                overlap = diversity.get("overlap_actual_fraction") if isinstance(diversity, dict) else None
+                swaps = diversity.get("overlap_actual_swaps") if isinstance(diversity, dict) else None
+                if overlap is not None:
+                    overlap_label = f"overlap {float(overlap) * 100:.1f}%"
+                    if swaps is not None:
+                        overlap_label = f"{overlap_label} (swaps={int(swaps)})"
+                    note_lines.append(overlap_label)
+                pool_size = diversity.get("candidate_pool_size") if isinstance(diversity, dict) else None
+                shortlist_target = diversity.get("shortlist_target") if isinstance(diversity, dict) else None
+                if pool_size is not None or shortlist_target is not None:
+                    note_lines.append(
+                        f"k(pool/target) {pool_size if pool_size is not None else '-'}"
+                        f"/{shortlist_target if shortlist_target is not None else '-'}"
+                    )
+                score_block = diversity.get("score_quantiles") if isinstance(diversity, dict) else None
+                if isinstance(score_block, dict):
+                    base = score_block.get("baseline") if isinstance(score_block.get("baseline"), dict) else None
+                    actual = score_block.get("actual") if isinstance(score_block.get("actual"), dict) else None
+                    base_global = (
+                        score_block.get("baseline_global")
+                        if isinstance(score_block.get("baseline_global"), dict)
+                        else None
+                    )
+                    if base is not None and actual is not None:
+                        p10_delta = None
+                        p50_delta = None
+                        if base.get("p10") is not None and actual.get("p10") is not None:
+                            p10_delta = float(actual.get("p10")) - float(base.get("p10"))
+                        if base.get("p50") is not None and actual.get("p50") is not None:
+                            p50_delta = float(actual.get("p50")) - float(base.get("p50"))
+                        if p10_delta is not None or p50_delta is not None:
+                            p10_text = f"{p10_delta:+.2f}" if p10_delta is not None else "-"
+                            p50_text = f"{p50_delta:+.2f}" if p50_delta is not None else "-"
+                            note_lines.append(f"delta score p10/med {p10_text} / {p50_text}")
+                    if base_global is not None and actual is not None:
+                        g10_delta = None
+                        g50_delta = None
+                        if base_global.get("p10") is not None and actual.get("p10") is not None:
+                            g10_delta = float(actual.get("p10")) - float(base_global.get("p10"))
+                        if base_global.get("p50") is not None and actual.get("p50") is not None:
+                            g50_delta = float(actual.get("p50")) - float(base_global.get("p50"))
+                        if g10_delta is not None or g50_delta is not None:
+                            g10_text = f"{g10_delta:+.2f}" if g10_delta is not None else "-"
+                            g50_text = f"{g50_delta:+.2f}" if g50_delta is not None else "-"
+                            note_lines.append(f"delta score global {g10_text} / {g50_text}")
+                if note_lines:
+                    _add_anchored_box(
+                        ax_left,
+                        note_lines,
+                        loc="upper left",
+                        fontsize=text_sizes["annotation"] * 0.75,
+                        alpha=0.9,
+                        edgecolor="none",
+                    )
                 core_entropy = diversity.get("core_entropy") if isinstance(diversity, dict) else None
                 if isinstance(core_entropy, dict):
                     base_entropy = core_entropy.get("baseline", {}).get("values", [])
@@ -1648,6 +1711,7 @@ def _build_stage_a_diversity_figure(
                             )
                         ax_right.set_ylabel("Entropy (bits)" if idx == 0 else "")
                         ax_right.set_xlim(0.5, len(actual_entropy) + 0.5)
+                        ax_right.set_ylim(0.0, 2.0)
                         ax_right.xaxis.set_major_locator(mpl.ticker.MaxNLocator(integer=True))
                         if idx == 0:
                             ax_right.legend(
@@ -1655,13 +1719,29 @@ def _build_stage_a_diversity_figure(
                                 frameon=False,
                                 fontsize=text_sizes["annotation"] * 0.8,
                             )
+                        base_sum = float(np.sum(base_entropy)) if base_entropy else None
+                        act_sum = float(np.sum(actual_entropy))
+                        if act_sum is not None:
+                            sum_line = (
+                                f"sumH {base_sum:.1f} -> {act_sum:.1f}"
+                                if base_sum is not None
+                                else f"sumH {act_sum:.1f}"
+                            )
+                            _add_anchored_box(
+                                ax_right,
+                                [sum_line],
+                                loc="upper left",
+                                fontsize=text_sizes["annotation"] * 0.7,
+                                alpha=0.85,
+                                edgecolor="none",
+                            )
             ax_left.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
             ax_right.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
 
         if axes_left:
-            axes_left[0].set_title("Core nearest-neighbor distance", fontsize=subtitle_size, pad=title_pad)
+            axes_left[0].set_title("Core k-NN distance", fontsize=subtitle_size, pad=title_pad)
             axes_right[0].set_title("Core positional entropy", fontsize=subtitle_size, pad=title_pad)
-            axes_left[-1].set_xlabel("Nearest-neighbor distance (Hamming)")
+            axes_left[-1].set_xlabel("Hamming distance (k=5 neighbor)")
             axes_right[-1].set_xlabel("Core position")
             for ax in axes_left[:-1]:
                 ax.tick_params(labelbottom=False)

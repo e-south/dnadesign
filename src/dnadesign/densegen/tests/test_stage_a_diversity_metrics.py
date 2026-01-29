@@ -16,6 +16,7 @@ import pytest
 from dnadesign.densegen.src.adapters.sources.pwm_sampling import (
     FimoCandidate,
     _core_entropy,
+    _core_hamming_knn,
     _core_hamming_nnd,
     _diversity_summary,
     _select_diversity_baseline_candidates,
@@ -43,6 +44,16 @@ def test_core_hamming_nnd_subsample_flag() -> None:
     assert summary.get("subsampled") is True
 
 
+def test_core_hamming_knn_counts_and_median() -> None:
+    cores = ["AAAA", "AAAT", "AATT", "TTTT"]
+    summary = _core_hamming_knn(cores, k=2, max_n=2500)
+    assert summary is not None
+    counts = summary.get("counts")
+    assert isinstance(counts, list)
+    assert summary.get("median") == 2.0
+    assert summary.get("frac_le_1") == 0.25
+
+
 def test_core_entropy_values() -> None:
     cores = ["AAAA", "AAAT"]
     entropies = _core_entropy(cores)
@@ -62,14 +73,22 @@ def test_diversity_summary_scores() -> None:
     assert summary is not None
     overlap = summary.get("overlap_actual_fraction")
     assert overlap == 1.0
-    pairwise = summary.get("pairwise_median")
+    n_swaps = summary.get("overlap_actual_swaps")
+    assert n_swaps == 0
+    core_hamming = summary.get("core_hamming")
+    assert isinstance(core_hamming, dict)
+    pairwise = core_hamming.get("pairwise")
     assert isinstance(pairwise, dict)
     assert pairwise.get("baseline") is not None
     assert pairwise.get("actual") is not None
-    score_block = summary.get("score_baseline_vs_actual")
+    score_block = summary.get("score_quantiles")
     assert isinstance(score_block, dict)
-    assert score_block.get("baseline_median") == 1.5
-    assert score_block.get("actual_median") == 1.5
+    base = score_block.get("baseline")
+    actual = score_block.get("actual")
+    assert isinstance(base, dict)
+    assert isinstance(actual, dict)
+    assert base.get("p50") == 1.5
+    assert actual.get("p50") == 1.5
 
 
 def _cand(seq: str, score: float) -> FimoCandidate:

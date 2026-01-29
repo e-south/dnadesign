@@ -259,6 +259,7 @@ class PWMUniquenessConfig(BaseModel):
 class PWMSelectionTierWidening(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enabled: bool = False
+    ensure_shortlist_target: bool = False
     ladder: List[float] = Field(default_factory=list)
 
     @field_validator("ladder")

@@ -284,6 +284,8 @@ def _build_stage_a_sampling_manifest(
                 "selection_shortlist_min": summary.selection_shortlist_min,
                 "selection_shortlist_factor": summary.selection_shortlist_factor,
                 "selection_shortlist_max": summary.selection_shortlist_max,
+                "selection_shortlist_target": summary.selection_shortlist_target,
+                "selection_shortlist_target_met": summary.selection_shortlist_target_met,
                 "selection_tier_fraction_used": summary.selection_tier_fraction_used,
                 "selection_tier_limit": summary.selection_tier_limit,
                 "collapsed_by_core_identity": summary.collapsed_by_core_identity,

@@ -101,8 +101,9 @@ def _format_pwm_progress_line(
 def _stage_a_live_render(state: dict[str, dict[str, object]]):
     table = make_table(show_header=True, pad_edge=False)
     table.add_column("motif")
-    table.add_column("generated")
-    table.add_column("eligible")
+    table.add_column("generated", no_wrap=True, overflow="ellipsis", min_width=14)
+    table.add_column("progress", no_wrap=True, overflow="ellipsis", min_width=12)
+    table.add_column("eligible", no_wrap=True, overflow="ellipsis", min_width=12)
     table.add_column("tier target")
     table.add_column("tier yield (0.1/1/9%)")
     table.add_column("elapsed")
@@ -117,7 +118,8 @@ def _stage_a_live_render(state: dict[str, dict[str, object]]):
         elapsed = float(row.get("elapsed", 0.0))
         gen_pct = min(100, int(100 * generated / target))
         gen_bar = _format_progress_bar(int(generated), int(target))
-        gen_label = f"{generated}/{target} {gen_bar} ({gen_pct}%)"
+        gen_label = f"{generated}/{target}"
+        progress_label = f"{gen_bar} {gen_pct}%"
         if accepted is None:
             eligible_label = "-"
         elif accepted_target is not None and int(accepted_target) > 0:
@@ -135,6 +137,7 @@ def _stage_a_live_render(state: dict[str, dict[str, object]]):
         table.add_row(
             str(row.get("motif", "-")),
             gen_label,
+            progress_label,
             eligible_label,
             tier_label,
             tier_yield,
@@ -443,9 +446,10 @@ def _select_by_mmr(
     shortlist_factor: int,
     shortlist_max: Optional[int],
     tier_widening: Optional[Sequence[float]],
+    ensure_shortlist_target: bool = False,
 ) -> tuple[list[FimoCandidate], dict[str, dict], dict]:
     if not ranked or n_sites <= 0:
-        return [], {}, {"shortlist_k": 0, "tier_fraction_used": None, "tier_limit": 0}
+        return [], {}, {"shortlist_k": 0, "shortlist_target": 0, "tier_fraction_used": None, "tier_limit": 0}
     if alpha <= 0.0 or alpha > 1.0:
         raise ValueError("selection.alpha must be in (0, 1].")
     log_odds = motif.log_odds or build_log_odds(motif.matrix, motif.background)
@@ -455,6 +459,7 @@ def _select_by_mmr(
     norm_by_score = _score_norm(scores)
     tier_fractions = list(tier_widening) if tier_widening else [1.0]
     total = len(ranked)
+    shortlist_target = max(int(shortlist_min), int(shortlist_factor) * int(n_sites))
 
     def _best_candidate(
         candidates: Sequence[FimoCandidate],
@@ -517,8 +522,7 @@ def _select_by_mmr(
         if not candidates:
             return [], {}, 0
         max_k = len(candidates) if shortlist_max is None else min(len(candidates), int(shortlist_max))
-        base_k = max(int(shortlist_min), int(shortlist_factor) * int(n_sites))
-        k = min(max_k, max(1, base_k))
+        k = min(max_k, max(1, int(shortlist_target)))
         if k <= 0:
             k = min(len(candidates), int(n_sites))
         shortlist = list(candidates[:k])
@@ -554,6 +558,7 @@ def _select_by_mmr(
     last_shortlist = 0
     fraction_used = None
     tier_limit = total
+    shortlist_target_met = False
     for fraction in tier_fractions:
         if fraction <= 0:
             continue
@@ -564,10 +569,15 @@ def _select_by_mmr(
         last_meta = meta
         last_shortlist = shortlist_k
         fraction_used = float(fraction)
+        shortlist_target_met = int(shortlist_k) >= int(shortlist_target)
         if len(selected) >= int(n_sites):
+            if ensure_shortlist_target and not shortlist_target_met:
+                continue
             break
     diag = {
         "shortlist_k": int(last_shortlist),
+        "shortlist_target": int(shortlist_target),
+        "shortlist_target_met": bool(shortlist_target_met),
         "tier_fraction_used": fraction_used,
         "tier_limit": int(tier_limit),
     }
@@ -671,6 +681,8 @@ class PWMSamplingSummary:
     selection_shortlist_min: Optional[int] = None
     selection_shortlist_factor: Optional[int] = None
     selection_shortlist_max: Optional[int] = None
+    selection_shortlist_target: Optional[int] = None
+    selection_shortlist_target_met: Optional[bool] = None
     selection_tier_fraction_used: Optional[float] = None
     selection_tier_limit: Optional[int] = None
     diversity_nearest_distance_mean: Optional[float] = None
@@ -749,6 +761,29 @@ def _summarize_scores(
     return float(arr.min()), float(np.median(arr)), float(arr.mean()), float(arr.max())
 
 
+def _score_quantiles(scores: Sequence[float]) -> dict[str, float] | None:
+    if not scores:
+        return None
+    arr = np.asarray(scores, dtype=float)
+    p10, p50, p90 = np.percentile(arr, [10, 50, 90])
+    return {
+        "p10": float(p10),
+        "p50": float(p50),
+        "p90": float(p90),
+        "mean": float(arr.mean()),
+    }
+
+
+def _assert_uniform_core_length(cores: Sequence[str], *, label: str) -> int:
+    if not cores:
+        return 0
+    lengths = {len(core) for core in cores}
+    if len(lengths) > 1:
+        preview = ", ".join(sorted({str(len(core)) for core in cores[:10]}))
+        raise ValueError(f"Non-uniform core lengths for {label} (saw {preview}).")
+    return int(next(iter(lengths)))
+
+
 def _stable_subsample(values: Sequence[str], max_size: int) -> tuple[list[str], bool]:
     if len(values) <= max_size:
         return list(values), False
@@ -787,9 +822,16 @@ def _core_entropy(cores: Sequence[str]) -> list[float]:
     return entropies
 
 
-def _core_hamming_nnd(cores: Sequence[str], *, max_n: int = 2500) -> dict[str, object] | None:
+def _core_hamming_knn(
+    cores: Sequence[str],
+    *,
+    k: int,
+    max_n: int = 2500,
+) -> dict[str, object] | None:
     if not cores:
         return None
+    if int(k) <= 0:
+        raise ValueError("k must be >= 1 for k-nearest neighbor distances.")
     length = len(cores[0])
     if length == 0 or any(len(core) != length for core in cores):
         return None
@@ -797,18 +839,23 @@ def _core_hamming_nnd(cores: Sequence[str], *, max_n: int = 2500) -> dict[str, o
     n = len(sample)
     if n == 0:
         return None
-    idx_map = {"A": 0, "C": 1, "G": 2, "T": 3}
-    encoded = np.full((n, length), 4, dtype=np.int8)
-    for i, core in enumerate(sample):
-        encoded[i] = np.array([idx_map.get(base, 4) for base in core], dtype=np.int8)
-    distances = np.zeros(n, dtype=int)
     if n == 1:
-        distances[0] = 0
+        if int(k) > 1:
+            return None
+        distances = np.array([0], dtype=int)
     else:
+        if int(k) >= n:
+            return None
+        idx_map = {"A": 0, "C": 1, "G": 2, "T": 3}
+        encoded = np.full((n, length), 4, dtype=np.int8)
+        for i, core in enumerate(sample):
+            encoded[i] = np.array([idx_map.get(base, 4) for base in core], dtype=np.int8)
+        distances = np.zeros(n, dtype=int)
+        kth = int(k) - 1
         for i in range(n):
             diff = (encoded[i] != encoded).sum(axis=1)
             diff[i] = length + 1
-            distances[i] = int(diff.min())
+            distances[i] = int(np.partition(diff, kth)[kth])
     max_dist = int(length)
     counts = np.bincount(distances, minlength=max_dist + 1)
     frac_le_1 = float(np.mean(distances <= 1)) if distances.size else 0.0
@@ -823,7 +870,12 @@ def _core_hamming_nnd(cores: Sequence[str], *, max_n: int = 2500) -> dict[str, o
         "frac_le_1": float(frac_le_1),
         "n": int(n),
         "subsampled": bool(subsampled),
+        "k": int(k),
     }
+
+
+def _core_hamming_nnd(cores: Sequence[str], *, max_n: int = 2500) -> dict[str, object] | None:
+    return _core_hamming_knn(cores, k=1, max_n=max_n)
 
 
 def _diversity_summary(
@@ -832,40 +884,69 @@ def _diversity_summary(
     actual_cores: Sequence[str],
     baseline_scores: Sequence[float],
     actual_scores: Sequence[float],
+    baseline_global_cores: Sequence[str] | None = None,
+    baseline_global_scores: Sequence[float] | None = None,
+    uniqueness_key: str | None = None,
+    candidate_pool_size: int | None = None,
+    shortlist_target: int | None = None,
+    label: str | None = None,
     max_n: int = 2500,
 ) -> dict[str, object] | None:
-    baseline_nnd = _core_hamming_nnd(baseline_cores, max_n=max_n)
-    actual_nnd = _core_hamming_nnd(actual_cores, max_n=max_n)
-    if baseline_nnd is None or actual_nnd is None:
+    label = label or "diversity"
+    base_len = _assert_uniform_core_length(baseline_cores, label=f"{label} baseline")
+    actual_len = _assert_uniform_core_length(actual_cores, label=f"{label} actual")
+    if base_len and actual_len and base_len != actual_len:
+        raise ValueError(f"Core length mismatch for {label} (baseline {base_len} vs actual {actual_len}).")
+    global_len = 0
+    if baseline_global_cores:
+        global_len = _assert_uniform_core_length(baseline_global_cores, label=f"{label} baseline global")
+    if base_len and global_len and base_len != global_len:
+        raise ValueError(f"Core length mismatch for {label} (baseline {base_len} vs global {global_len}).")
+    if uniqueness_key == "core" and actual_cores:
+        if len(set(actual_cores)) != len(actual_cores):
+            raise ValueError(f"Duplicate retained cores detected for {label} with uniqueness.key=core.")
+    baseline_k1 = _core_hamming_knn(baseline_cores, k=1, max_n=max_n)
+    actual_k1 = _core_hamming_knn(actual_cores, k=1, max_n=max_n)
+    if baseline_k1 is None or actual_k1 is None:
         return None
-    baseline_pairwise = _pairwise_median_hamming(baseline_cores, max_pairs=10000)
-    actual_pairwise = _pairwise_median_hamming(actual_cores, max_pairs=10000)
+    baseline_k5 = _core_hamming_knn(baseline_cores, k=5, max_n=max_n)
+    actual_k5 = _core_hamming_knn(actual_cores, k=5, max_n=max_n)
+    baseline_pairwise = _pairwise_hamming_summary(baseline_cores, max_pairs=10000)
+    actual_pairwise = _pairwise_hamming_summary(actual_cores, max_pairs=10000)
     baseline_entropy = _core_entropy(baseline_cores)
     actual_entropy = _core_entropy(actual_cores)
-    _, baseline_median, _, _ = _summarize_scores(baseline_scores)
-    _, actual_median, _, _ = _summarize_scores(actual_scores)
+    baseline_quantiles = _score_quantiles(baseline_scores)
+    actual_quantiles = _score_quantiles(actual_scores)
+    baseline_global_quantiles = _score_quantiles(baseline_global_scores or [])
     overlap_fraction = None
+    overlap_swaps = None
     if actual_cores:
         overlap = len(set(baseline_cores) & set(actual_cores))
         overlap_fraction = float(overlap) / float(len(actual_cores))
+        overlap_swaps = int(len(actual_cores) - overlap)
+    core_hamming = {
+        "nnd_k1": {"baseline": baseline_k1, "actual": actual_k1},
+        "nnd_k5": {"baseline": baseline_k5, "actual": actual_k5}
+        if baseline_k5 is not None and actual_k5 is not None
+        else None,
+        "pairwise": {"baseline": baseline_pairwise, "actual": actual_pairwise}
+        if baseline_pairwise is not None and actual_pairwise is not None
+        else None,
+    }
     return {
-        "core_hamming_nnd": {
-            "bins": baseline_nnd.get("bins") or actual_nnd.get("bins"),
-            "baseline": baseline_nnd,
-            "actual": actual_nnd,
-        },
-        "pairwise_median": {
-            "baseline": baseline_pairwise,
-            "actual": actual_pairwise,
-        },
+        "candidate_pool_size": candidate_pool_size,
+        "shortlist_target": shortlist_target,
+        "core_hamming": core_hamming,
         "overlap_actual_fraction": overlap_fraction,
+        "overlap_actual_swaps": overlap_swaps,
         "core_entropy": {
             "baseline": {"values": baseline_entropy, "n": int(len(baseline_cores))},
             "actual": {"values": actual_entropy, "n": int(len(actual_cores))},
         },
-        "score_baseline_vs_actual": {
-            "baseline_median": baseline_median,
-            "actual_median": actual_median,
+        "score_quantiles": {
+            "baseline": baseline_quantiles,
+            "actual": actual_quantiles,
+            "baseline_global": baseline_global_quantiles,
         },
     }
 
@@ -881,7 +962,7 @@ def _stable_seed_from_sequences(values: Sequence[str]) -> int:
     return int(digest[:8], 16)
 
 
-def _pairwise_median_hamming(cores: Sequence[str], *, max_pairs: int = 10000) -> dict[str, object] | None:
+def _pairwise_hamming_summary(cores: Sequence[str], *, max_pairs: int = 10000) -> dict[str, object] | None:
     if len(cores) < 2:
         return None
     length = len(cores[0])
@@ -906,6 +987,9 @@ def _pairwise_median_hamming(cores: Sequence[str], *, max_pairs: int = 10000) ->
     arr = np.asarray(distances, dtype=float)
     return {
         "median": float(np.median(arr)),
+        "mean": float(arr.mean()),
+        "p10": float(np.percentile(arr, 10)),
+        "p90": float(np.percentile(arr, 90)),
         "n_pairs": int(sample_pairs),
         "total_pairs": int(total_pairs),
     }
@@ -928,6 +1012,15 @@ def _select_diversity_baseline_candidates(
             candidate_slice = candidate_slice[:shortlist_k]
     target_n = min(int(n_sites), len(candidate_slice))
     return candidate_slice[:target_n]
+
+
+def _select_diversity_global_candidates(
+    ranked: Sequence[FimoCandidate],
+    *,
+    n_sites: int,
+) -> list[FimoCandidate]:
+    target_n = min(int(n_sites), len(ranked))
+    return list(ranked[:target_n])
 
 
 def _rank_scored_sequences(scored: Sequence[tuple[str, float]]) -> list[tuple[str, float]]:
@@ -1012,6 +1105,8 @@ def _build_summary(
     selection_shortlist_min: Optional[int] = None,
     selection_shortlist_factor: Optional[int] = None,
     selection_shortlist_max: Optional[int] = None,
+    selection_shortlist_target: Optional[int] = None,
+    selection_shortlist_target_met: Optional[bool] = None,
     selection_tier_fraction_used: Optional[float] = None,
     selection_tier_limit: Optional[int] = None,
     diversity_nearest_distance_mean: Optional[float] = None,
@@ -1066,6 +1161,10 @@ def _build_summary(
         selection_shortlist_min=int(selection_shortlist_min) if selection_shortlist_min is not None else None,
         selection_shortlist_factor=int(selection_shortlist_factor) if selection_shortlist_factor is not None else None,
         selection_shortlist_max=int(selection_shortlist_max) if selection_shortlist_max is not None else None,
+        selection_shortlist_target=int(selection_shortlist_target) if selection_shortlist_target is not None else None,
+        selection_shortlist_target_met=bool(selection_shortlist_target_met)
+        if selection_shortlist_target_met is not None
+        else None,
         selection_tier_fraction_used=float(selection_tier_fraction_used)
         if selection_tier_fraction_used is not None
         else None,
@@ -1233,6 +1332,7 @@ def sample_pwm_sites(
     selection_shortlist_factor = _selection_attr(selection, "shortlist_factor", 5)
     selection_shortlist_max = _selection_attr(selection, "shortlist_max", None)
     selection_tier_widening = _selection_attr(selection, "tier_widening", None)
+    selection_ensure_shortlist_target = False
     if selection_policy == "mmr":
         selection_alpha = float(selection_alpha)
         if selection_alpha <= 0.0 or selection_alpha > 1.0:
@@ -1252,9 +1352,11 @@ def sample_pwm_sites(
         if hasattr(selection_tier_widening, "enabled"):
             enabled = bool(getattr(selection_tier_widening, "enabled"))
             ladder = getattr(selection_tier_widening, "ladder", None)
+            selection_ensure_shortlist_target = bool(getattr(selection_tier_widening, "ensure_shortlist_target", False))
             selection_tier_widening = ladder if enabled else None
         elif isinstance(selection_tier_widening, dict):
             enabled = bool(selection_tier_widening.get("enabled", False))
+            selection_ensure_shortlist_target = bool(selection_tier_widening.get("ensure_shortlist_target", False))
             selection_tier_widening = selection_tier_widening.get("ladder") if enabled else None
 
     include_matched_sequence = bool(include_matched_sequence)
@@ -1759,6 +1861,7 @@ def sample_pwm_sites(
                 shortlist_factor=int(selection_shortlist_factor),
                 shortlist_max=int(selection_shortlist_max) if selection_shortlist_max is not None else None,
                 tier_widening=selection_tier_widening,
+                ensure_shortlist_target=selection_ensure_shortlist_target,
             )
         else:
             picked = ranked[: int(n_sites)]
@@ -1768,7 +1871,13 @@ def sample_pwm_sites(
                     "selection_utility": None,
                     "nearest_selected_similarity": None,
                 }
-            selection_diag = {"shortlist_k": None, "tier_fraction_used": None, "tier_limit": None}
+            selection_diag = {
+                "shortlist_k": None,
+                "shortlist_target": None,
+                "shortlist_target_met": None,
+                "tier_fraction_used": None,
+                "tier_limit": None,
+            }
         retained_tier_counts = [0, 0, 0, 0]
         for cand in picked:
             retained_tier_counts[tier_by_seq[cand.seq]] += 1
@@ -1778,15 +1887,31 @@ def sample_pwm_sites(
             selection_diag=selection_diag,
             n_sites=int(n_sites),
         )
+        baseline_global_candidates = _select_diversity_global_candidates(ranked, n_sites=int(n_sites))
         baseline_cores = [(_core_sequence(cand)) for cand in baseline_candidates if cand.matched_sequence]
         actual_cores = [(_core_sequence(cand)) for cand in picked if cand.matched_sequence]
+        baseline_global_cores = [(_core_sequence(cand)) for cand in baseline_global_candidates if cand.matched_sequence]
         baseline_scores = [float(cand.score) for cand in baseline_candidates]
         actual_scores = [float(cand.score) for cand in picked]
+        baseline_global_scores = [float(cand.score) for cand in baseline_global_candidates]
+        candidate_pool_size = None
+        shortlist_target = None
+        if isinstance(selection_diag, dict):
+            shortlist_target = selection_diag.get("shortlist_target")
+            candidate_pool_size = selection_diag.get("shortlist_k")
+            if candidate_pool_size is None:
+                candidate_pool_size = selection_diag.get("tier_limit")
         diversity = _diversity_summary(
             baseline_cores=baseline_cores,
             actual_cores=actual_cores,
             baseline_scores=baseline_scores,
             actual_scores=actual_scores,
+            baseline_global_cores=baseline_global_cores,
+            baseline_global_scores=baseline_global_scores,
+            uniqueness_key=uniqueness_key,
+            candidate_pool_size=int(candidate_pool_size) if candidate_pool_size is not None else None,
+            shortlist_target=int(shortlist_target) if shortlist_target is not None else None,
+            label=motif.motif_id,
         )
         padding_audit = None
         if intended_core_by_seq:
@@ -1981,6 +2106,8 @@ def sample_pwm_sites(
                 selection_shortlist_min=selection_shortlist_min if selection_policy == "mmr" else None,
                 selection_shortlist_factor=selection_shortlist_factor if selection_policy == "mmr" else None,
                 selection_shortlist_max=selection_shortlist_max if selection_policy == "mmr" else None,
+                selection_shortlist_target=selection_diag.get("shortlist_target"),
+                selection_shortlist_target_met=selection_diag.get("shortlist_target_met"),
                 selection_tier_fraction_used=selection_diag.get("tier_fraction_used"),
                 selection_tier_limit=selection_diag.get("tier_limit"),
                 diversity_nearest_similarity_mean=diversity_nearest_similarity_mean,
