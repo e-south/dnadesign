@@ -653,6 +653,10 @@ def _format_tier_counts(eligible: list[int] | None, retained: list[int] | None) 
     return " | ".join(parts)
 
 
+def _format_tier_fraction_label(fraction: float) -> str:
+    return f"{float(fraction) * 100:.3f}%"
+
+
 def _stage_a_sampling_rows(
     pool_data: dict[str, PoolData],
 ) -> list[dict[str, object]]:
@@ -664,7 +668,28 @@ def _stage_a_sampling_rows(
                 if not isinstance(summary, PWMSamplingSummary):
                     continue
                 input_name = summary.input_name or pool.name
-                regulator = summary.regulator or "-"
+                if not summary.regulator:
+                    raise ValueError("Stage-A summary missing regulator.")
+                regulator = summary.regulator
+                if summary.candidates_with_hit is None:
+                    raise ValueError("Stage-A summary missing candidates_with_hit.")
+                if summary.eligible_raw is None:
+                    raise ValueError("Stage-A summary missing eligible_raw.")
+                if summary.eligible_tier_counts is None or summary.retained_tier_counts is None:
+                    raise ValueError("Stage-A summary missing tier counts.")
+                if len(summary.eligible_tier_counts) != len(summary.retained_tier_counts):
+                    raise ValueError("Stage-A summary tier counts length mismatch.")
+                if summary.tier_fractions is None:
+                    raise ValueError("Stage-A summary missing tier fractions.")
+                tier_fractions = list(summary.tier_fractions)
+                if len(summary.retained_tier_counts) not in {len(tier_fractions), len(tier_fractions) + 1}:
+                    raise ValueError("Stage-A summary tier fraction/count length mismatch.")
+                if summary.selection_policy is None:
+                    raise ValueError("Stage-A summary missing selection policy.")
+                if summary.selection_pool_source is None:
+                    raise ValueError("Stage-A summary missing selection pool source.")
+                if summary.diversity is None:
+                    raise ValueError("Stage-A diversity summary missing.")
                 candidates = _format_count(summary.generated)
                 has_hit = _format_ratio(summary.candidates_with_hit, summary.generated)
                 eligible_raw = _format_ratio(summary.eligible_raw, summary.generated)
@@ -682,22 +707,25 @@ def _stage_a_sampling_rows(
                             tier_target = f"{frac_label} unmet (need {required})"
                         else:
                             tier_target = f"{frac_label} unmet"
-                selection_label = summary.selection_policy or "-"
+                selection_label = summary.selection_policy
                 if summary.selection_policy == "mmr":
-                    alpha = summary.selection_alpha
-                    shortlist = summary.selection_shortlist_k
-                    alpha_label = f"{float(alpha):.2f}" if alpha is not None else "-"
-                    shortlist_label = f"{int(shortlist)}" if shortlist is not None else "-"
-                    selection_label = f"mmr a={alpha_label} k={shortlist_label}"
+                    if summary.selection_alpha is None or summary.selection_shortlist_k is None:
+                        raise ValueError("Stage-A summary missing MMR selection alpha or shortlist size.")
+                    selection_alpha = float(summary.selection_alpha)
+                    selection_shortlist_k = int(summary.selection_shortlist_k)
+                    selection_label = f"mmr a={selection_alpha:.2f} k={selection_shortlist_k}"
                 tier_counts = _format_tier_counts(summary.eligible_tier_counts, summary.retained_tier_counts)
                 tier_fill = "-"
                 if summary.retained_tier_counts:
+                    tier_labels = [_format_tier_fraction_label(frac) for frac in tier_fractions]
+                    if len(summary.retained_tier_counts) == len(tier_fractions) + 1:
+                        tier_labels.append("rest")
                     last_idx = None
                     for idx, val in enumerate(summary.retained_tier_counts):
                         if int(val) > 0:
                             last_idx = idx
                     if last_idx is not None:
-                        tier_fill = {0: "0.1%", 1: "1%", 2: "9%", 3: "rest"}.get(last_idx, "-")
+                        tier_fill = tier_labels[last_idx]
                 length_label = _format_sampling_lengths(
                     min_len=summary.retained_len_min,
                     median_len=summary.retained_len_median,
@@ -711,61 +739,37 @@ def _stage_a_sampling_rows(
                     mean_score=summary.retained_score_mean,
                     max_score=summary.retained_score_max,
                 )
-                diversity_label = "-"
-                diversity_delta = "-"
-                diversity_score_p10_delta = "-"
-                diversity_score_med_delta = "-"
-                diversity_overlap = "-"
-                diversity_swaps = "-"
-                diversity_pool = "-"
-                diversity = summary.diversity or {}
-                if hasattr(diversity, "to_dict"):
-                    diversity = diversity.to_dict()
-                core_hamming = diversity.get("core_hamming") if isinstance(diversity, dict) else None
-                if isinstance(core_hamming, dict):
-                    pairwise = core_hamming.get("pairwise") if isinstance(core_hamming.get("pairwise"), dict) else None
-                    if isinstance(pairwise, dict):
-                        baseline = pairwise.get("baseline") if isinstance(pairwise.get("baseline"), dict) else None
-                        actual = pairwise.get("actual") if isinstance(pairwise.get("actual"), dict) else None
-                        if baseline is None or actual is None:
-                            raise ValueError("Stage-A diversity missing pairwise baseline/actual summary.")
-                        baseline_med = baseline.get("median")
-                        actual_med = actual.get("median")
-                        diversity_label = _format_diversity_value(actual_med)
-                        if baseline_med is not None and actual_med is not None:
-                            diversity_delta = _format_diversity_value(
-                                float(actual_med) - float(baseline_med), show_sign=True
-                            )
-                score_block = diversity.get("score_quantiles") if isinstance(diversity, dict) else None
-                if isinstance(score_block, dict):
-                    base = score_block.get("baseline") if isinstance(score_block.get("baseline"), dict) else None
-                    actual = score_block.get("actual") if isinstance(score_block.get("actual"), dict) else None
-                    if base is not None and actual is not None:
-                        if base.get("p10") is not None and actual.get("p10") is not None:
-                            diversity_score_p10_delta = _format_diversity_value(
-                                float(actual.get("p10")) - float(base.get("p10")),
-                                show_sign=True,
-                            )
-                        if base.get("p50") is not None and actual.get("p50") is not None:
-                            diversity_score_med_delta = _format_diversity_value(
-                                float(actual.get("p50")) - float(base.get("p50")),
-                                show_sign=True,
-                            )
-                overlap = diversity.get("set_overlap_fraction") if isinstance(diversity, dict) else None
-                swaps = diversity.get("set_overlap_swaps") if isinstance(diversity, dict) else None
-                if overlap is not None:
-                    diversity_overlap = f"{float(overlap) * 100:.1f}%"
-                if swaps is not None:
-                    diversity_swaps = str(int(swaps))
-                pool_size = diversity.get("candidate_pool_size") if isinstance(diversity, dict) else None
-                shortlist_target = diversity.get("shortlist_target") if isinstance(diversity, dict) else None
-                if pool_size is not None or shortlist_target is not None:
-                    pool_label = f"{pool_size if pool_size is not None else '-'}"
-                    pool_label = f"{pool_label}/{shortlist_target if shortlist_target is not None else '-'}"
-                    pool_source = summary.selection_pool_source
-                    if pool_source is None:
-                        raise ValueError("Stage-A selection pool source missing for summary.")
-                    diversity_pool = f"{pool_label} ({pool_source})"
+                diversity = summary.diversity
+                core_hamming = diversity.core_hamming
+                pairwise = core_hamming.pairwise
+                if pairwise is None:
+                    raise ValueError("Stage-A diversity missing pairwise summary.")
+                baseline_pairwise = pairwise.baseline
+                actual_pairwise = pairwise.actual
+                diversity_label = _format_diversity_value(actual_pairwise.median)
+                diversity_delta = _format_diversity_value(
+                    float(actual_pairwise.median) - float(baseline_pairwise.median),
+                    show_sign=True,
+                )
+                score_block = diversity.score_quantiles
+                if score_block.baseline is None or score_block.actual is None:
+                    raise ValueError("Stage-A diversity missing baseline/actual score quantiles.")
+                diversity_score_p10_delta = _format_diversity_value(
+                    float(score_block.actual.p10) - float(score_block.baseline.p10),
+                    show_sign=True,
+                )
+                diversity_score_med_delta = _format_diversity_value(
+                    float(score_block.actual.p50) - float(score_block.baseline.p50),
+                    show_sign=True,
+                )
+                if diversity.set_overlap_fraction is None or diversity.set_overlap_swaps is None:
+                    raise ValueError("Stage-A diversity missing overlap stats.")
+                diversity_overlap = f"{float(diversity.set_overlap_fraction) * 100:.1f}%"
+                diversity_swaps = str(int(diversity.set_overlap_swaps))
+                if diversity.candidate_pool_size is None or diversity.shortlist_target is None:
+                    raise ValueError("Stage-A diversity missing pool size or shortlist target.")
+                pool_label = f"{int(diversity.candidate_pool_size)}/{int(diversity.shortlist_target)}"
+                diversity_pool = f"{pool_label} ({summary.selection_pool_source})"
                 rows.append(
                     {
                         "input_name": str(input_name),

@@ -88,24 +88,25 @@ def test_stage_a_screen_progress_stream_for_pixi_tty(monkeypatch) -> None:
 
 def test_stage_a_progress_target_updates_in_render() -> None:
     state = {
-        "demo": {
-            "motif": "demo",
-            "backend": "fimo",
-            "generated": 0,
-            "target": 5,
-            "accepted": None,
-            "accepted_target": None,
-            "target_fraction": None,
-            "tier_fractions": [0.001, 0.01, 0.09],
-            "elapsed": 0.0,
-            "batch_index": None,
-            "batch_total": None,
-        }
+        "demo": stage_a_progress.StageAProgressState(
+            motif_id="demo",
+            backend="fimo",
+            phase=None,
+            generated=0,
+            target=5,
+            accepted=None,
+            accepted_target=None,
+            target_fraction=None,
+            tier_fractions=[0.001, 0.01, 0.09],
+            elapsed=0.0,
+            batch_index=None,
+            batch_total=None,
+        )
     }
-    state["demo"]["generated"] = 10
-    state["demo"]["accepted"] = 2
-    state["demo"]["elapsed"] = 1.0
-    state["demo"]["target"] = 20
+    state["demo"].generated = 10
+    state["demo"].accepted = 2
+    state["demo"].elapsed = 1.0
+    state["demo"].target = 20
     renderable = stage_a_progress._stage_a_live_render(state)
     console = Console(width=120, record=True)
     console.print(renderable)

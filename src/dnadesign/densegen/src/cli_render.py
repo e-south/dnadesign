@@ -28,14 +28,14 @@ def stage_a_plan_table(plan_rows: Iterable[dict[str, str]]):
     table.add_column("length")
     for row in plan_rows:
         table.add_row(
-            str(row.get("input", "-")),
-            str(row.get("tf", "-")),
-            str(row.get("retain", "-")),
-            str(row.get("budget", "-")),
-            str(row.get("eligibility", "-")),
-            str(row.get("selection", "-")),
-            str(row.get("uniqueness", "-")),
-            str(row.get("length", "-")),
+            str(row["input"]),
+            str(row["tf"]),
+            str(row["retain"]),
+            str(row["budget"]),
+            str(row["eligibility"]),
+            str(row["selection"]),
+            str(row["uniqueness"]),
+            str(row["length"]),
         )
     return table
 
@@ -78,20 +78,20 @@ def stage_a_recap_tables(
             recap_table.add_row(
                 reg_label,
                 str(row["generated"]),
-                str(row.get("has_hit", "-")),
+                str(row["has_hit"]),
                 str(row["eligible_raw"]),
                 str(row["eligible_unique"]),
                 str(row["retained"]),
-                str(row.get("tier_target", "-")),
+                str(row["tier_target"]),
                 str(row["tier_fill"]),
-                str(row.get("selection", "-")),
-                str(row.get("diversity_pool", "-")),
-                str(row.get("diversity_med", "-")),
-                str(row.get("diversity_delta", "-")),
-                str(row.get("set_overlap", "-")),
-                str(row.get("set_swaps", "-")),
-                str(row.get("diversity_score_p10_delta", "-")),
-                str(row.get("diversity_score_med_delta", "-")),
+                str(row["selection"]),
+                str(row["diversity_pool"]),
+                str(row["diversity_med"]),
+                str(row["diversity_delta"]),
+                str(row["set_overlap"]),
+                str(row["set_swaps"]),
+                str(row["diversity_score_p10_delta"]),
+                str(row["diversity_score_med_delta"]),
                 str(row["score"]),
                 str(row["length"]),
             )
@@ -110,9 +110,9 @@ def stage_a_recap_tables(
                 reg_label = str(row["regulator"])
                 if not show_motif_ids:
                     reg_label = display_map_by_input.get(input_name, {}).get(reg_label, reg_label)
-                t0 = row.get("tier0_score")
-                t1 = row.get("tier1_score")
-                t2 = row.get("tier2_score")
+                t0 = row["tier0_score"]
+                t1 = row["tier1_score"]
+                t2 = row["tier2_score"]
                 boundary_table.add_row(
                     reg_label,
                     f"{float(t0):.2f}" if t0 is not None else "-",

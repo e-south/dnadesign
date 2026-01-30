@@ -21,6 +21,18 @@ import pandas as pd
 import yaml
 
 from dnadesign.densegen.src.adapters.sources.base import BaseDataSource
+from dnadesign.densegen.src.adapters.sources.stage_a_metrics import (
+    CoreHammingSummary,
+    DiversitySummary,
+    EntropyBlock,
+    EntropySummary,
+    KnnBlock,
+    KnnSummary,
+    PairwiseBlock,
+    PairwiseSummary,
+    ScoreQuantiles,
+    ScoreQuantilesBlock,
+)
 from dnadesign.densegen.src.adapters.sources.stage_a_summary import PWMSamplingSummary
 from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.core.artifacts.pool import build_pool_artifact
@@ -37,6 +49,75 @@ class _DummySource(BaseDataSource):
                 "motif_id": ["m1", "m1", "m2"],
                 "tfbs_id": ["id1", "id2", "id3"],
             }
+        )
+        baseline_knn = KnnSummary(
+            bins=[0.0, 1.0],
+            counts=[0, 1],
+            median=1.0,
+            p05=1.0,
+            p95=1.0,
+            frac_le_1=1.0,
+            n=2,
+            subsampled=False,
+            k=1,
+        )
+        actual_knn = KnnSummary(
+            bins=[0.0, 1.0],
+            counts=[0, 1],
+            median=1.0,
+            p05=1.0,
+            p95=1.0,
+            frac_le_1=1.0,
+            n=2,
+            subsampled=False,
+            k=1,
+        )
+        baseline_pairwise = PairwiseSummary(
+            bins=[0.0, 1.0],
+            counts=[0, 1],
+            median=1.0,
+            mean=1.0,
+            p10=1.0,
+            p90=1.0,
+            n_pairs=1,
+            total_pairs=1,
+            subsampled=False,
+        )
+        actual_pairwise = PairwiseSummary(
+            bins=[0.0, 1.0],
+            counts=[0, 1],
+            median=1.0,
+            mean=1.0,
+            p10=1.0,
+            p90=1.0,
+            n_pairs=1,
+            total_pairs=1,
+            subsampled=False,
+        )
+        core_hamming = CoreHammingSummary(
+            metric="hamming",
+            nnd_k1=KnnBlock(baseline=baseline_knn, actual=actual_knn),
+            nnd_k5=None,
+            pairwise=PairwiseBlock(baseline=baseline_pairwise, actual=actual_pairwise, upper_bound=None),
+        )
+        entropy_block = EntropyBlock(
+            baseline=EntropySummary(values=[0.0, 0.0], n=2),
+            actual=EntropySummary(values=[0.0, 0.0], n=2),
+        )
+        score_block = ScoreQuantilesBlock(
+            baseline=ScoreQuantiles(p10=0.5, p50=1.0, p90=1.5, mean=1.0),
+            actual=ScoreQuantiles(p10=0.5, p50=1.0, p90=1.5, mean=1.0),
+            baseline_global=None,
+            upper_bound=None,
+        )
+        diversity = DiversitySummary(
+            candidate_pool_size=2,
+            shortlist_target=2,
+            core_hamming=core_hamming,
+            set_overlap_fraction=1.0,
+            set_overlap_swaps=0,
+            core_entropy=entropy_block,
+            score_quantiles=score_block,
         )
         summary = PWMSamplingSummary(
             input_name="demo_pwm",
@@ -73,6 +154,9 @@ class _DummySource(BaseDataSource):
             tier_target_required_unique=2000,
             tier_target_met=True,
             selection_policy="top_score",
+            selection_pool_source="eligible_unique",
+            selection_shortlist_k=0,
+            diversity=diversity,
             mining_audit=None,
         )
         return [("regA", "AAAA", "dummy")], df, [summary]

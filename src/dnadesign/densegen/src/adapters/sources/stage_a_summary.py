@@ -71,7 +71,7 @@ class PWMSamplingSummary:
     diversity_nearest_distance_mean: Optional[float] = None
     diversity_nearest_distance_min: Optional[float] = None
     diversity_nearest_similarity_mean: Optional[float] = None
-    diversity: Optional[DiversitySummary | dict[str, object]] = None
+    diversity: Optional[DiversitySummary] = None
     mining_audit: Optional[dict[str, object]] = None
     padding_audit: Optional[dict[str, object]] = None
 
@@ -186,7 +186,7 @@ def _build_summary(
     diversity_nearest_distance_mean: Optional[float] = None,
     diversity_nearest_distance_min: Optional[float] = None,
     diversity_nearest_similarity_mean: Optional[float] = None,
-    diversity: Optional[DiversitySummary | dict[str, object]] = None,
+    diversity: Optional[DiversitySummary] = None,
     mining_audit: Optional[dict[str, object]] = None,
     padding_audit: Optional[dict[str, object]] = None,
     pwm_consensus: Optional[str] = None,
@@ -194,6 +194,8 @@ def _build_summary(
     regulator: Optional[str] = None,
     backend: Optional[str] = None,
 ) -> PWMSamplingSummary:
+    if diversity is not None and not isinstance(diversity, DiversitySummary):
+        raise ValueError("Stage-A diversity must be a DiversitySummary instance.")
     lengths = [len(seq) for seq in retained]
     min_len, median_len, mean_len, max_len = _summarize_lengths(lengths)
     score_min, score_median, score_mean, score_max = _summarize_scores(retained_scores or [])
@@ -258,7 +260,7 @@ def _build_summary(
         diversity_nearest_similarity_mean=float(diversity_nearest_similarity_mean)
         if diversity_nearest_similarity_mean is not None
         else None,
-        diversity=dict(diversity) if isinstance(diversity, dict) else diversity,
+        diversity=diversity,
         mining_audit=dict(mining_audit) if mining_audit is not None else None,
         padding_audit=dict(padding_audit) if padding_audit is not None else None,
     )

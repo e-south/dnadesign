@@ -17,6 +17,8 @@ from typing import Sequence
 
 import numpy as np
 
+from .stage_a_encoding import encode_cores
+
 
 @dataclass(frozen=True)
 class KnnSummary:
@@ -288,10 +290,7 @@ def _core_hamming_knn(
     else:
         if int(k) >= n:
             return None
-        idx_map = {"A": 0, "C": 1, "G": 2, "T": 3}
-        encoded = np.full((n, length), 4, dtype=np.int8)
-        for i, core in enumerate(sample):
-            encoded[i] = np.array([idx_map.get(base, 4) for base in core], dtype=np.int8)
+        encoded = encode_cores(sample)
         weights_arr = None
         if weights is not None:
             weights_arr = np.asarray(weights, dtype=float)
@@ -365,21 +364,15 @@ def _pairwise_hamming_summary(
     total_pairs = n * (n - 1) // 2
     sample_pairs = int(min(max_pairs, total_pairs))
     rng = np.random.default_rng(_stable_seed_from_sequences(cores))
-    idx_map = {"A": 0, "C": 1, "G": 2, "T": 3}
-    encoded = np.full((n, length), 4, dtype=np.int8)
-    for i, core in enumerate(cores):
-        encoded[i] = np.array([idx_map.get(base, 4) for base in core], dtype=np.int8)
+    encoded = encode_cores(cores)
     weights_arr = None
     if weights is not None:
         weights_arr = np.asarray(weights, dtype=float)
         if weights_arr.shape[0] != length:
             raise ValueError("Weighted Hamming requires weights matching core length.")
     idx_i = rng.integers(0, n, size=sample_pairs)
-    idx_j = rng.integers(0, n, size=sample_pairs)
-    mask = idx_i == idx_j
-    while np.any(mask):
-        idx_j[mask] = rng.integers(0, n, size=int(mask.sum()))
-        mask = idx_i == idx_j
+    idx_j = rng.integers(0, n - 1, size=sample_pairs)
+    idx_j = idx_j + (idx_j >= idx_i)
     diff = encoded[idx_i] != encoded[idx_j]
     if weights_arr is None:
         distances = diff.sum(axis=1).astype(float)

@@ -32,8 +32,8 @@ def _build_stage_a_yield_bias_figure(
     style["seaborn_style"] = False
     rc = stage_a_rcparams(style)
     text_sizes = _stage_a_text_sizes(style)
-    eligible_hist = sampling.get("eligible_score_hist") or []
-    if not eligible_hist:
+    eligible_hist = sampling.get("eligible_score_hist")
+    if not isinstance(eligible_hist, list) or not eligible_hist:
         raise ValueError(f"Stage-A sampling missing eligible score histogram for input '{input_name}'.")
     if "regulator_id" in pool_df.columns:
         tf_col = "regulator_id"
@@ -50,7 +50,11 @@ def _build_stage_a_yield_bias_figure(
     if "best_hit_score" not in pool_df.columns:
         raise ValueError(f"Stage-A pool missing best_hit_score for input '{input_name}'.")
 
-    regs = [str(row.get("regulator") or "") for row in eligible_hist]
+    regs: list[str] = []
+    for row in eligible_hist:
+        if "regulator" not in row:
+            raise ValueError(f"Stage-A sampling missing regulator labels for input '{input_name}'.")
+        regs.append(str(row["regulator"]))
     stage_counts = []
     duplication_factors: dict[str, float] = {}
     pool_headrooms: dict[str, float] = {}
@@ -63,25 +67,31 @@ def _build_stage_a_yield_bias_figure(
             core_lengths.setdefault(reg, []).append(len(core))
         core_lengths = {reg: int(np.median(vals)) for reg, vals in core_lengths.items() if vals}
     for row in eligible_hist:
-        reg = str(row.get("regulator") or "")
-        generated = row.get("generated")
-        candidates_with_hit = row.get("candidates_with_hit")
-        eligible_raw = row.get("eligible_raw")
-        eligible_unique = row.get("eligible_unique")
-        retained = row.get("retained")
-        if (
-            generated is None
-            or candidates_with_hit is None
-            or eligible_raw is None
-            or eligible_unique is None
-            or retained is None
-        ):
-            raise ValueError(f"Stage-A sampling missing yield counters for input '{input_name}' ({reg}).")
-        selection_pool = row.get("selection_shortlist_k")
-        if selection_pool is None:
+        reg = str(row["regulator"])
+        if "generated" not in row:
+            raise ValueError(f"Stage-A sampling missing generated count for '{input_name}' ({reg}).")
+        if "candidates_with_hit" not in row or "eligible_raw" not in row:
+            raise ValueError(f"Stage-A sampling missing yield counters for '{input_name}' ({reg}).")
+        if "eligible_unique" not in row or "retained" not in row:
+            raise ValueError(f"Stage-A sampling missing retained counters for '{input_name}' ({reg}).")
+        generated = row["generated"]
+        candidates_with_hit = row["candidates_with_hit"]
+        eligible_raw = row["eligible_raw"]
+        eligible_unique = row["eligible_unique"]
+        retained = row["retained"]
+        if "selection_pool_source" not in row:
+            raise ValueError(f"Stage-A sampling missing selection_pool_source for '{input_name}' ({reg}).")
+        pool_source = row["selection_pool_source"]
+        if pool_source == "shortlist_k":
+            selection_pool = row.get("selection_shortlist_k")
+        elif pool_source == "tier_limit":
             selection_pool = row.get("selection_tier_limit")
-        if selection_pool is None and eligible_unique is not None:
-            selection_pool = eligible_unique
+        elif pool_source == "eligible_unique":
+            selection_pool = row.get("eligible_unique")
+        else:
+            raise ValueError(f"Stage-A selection_pool_source invalid for '{input_name}' ({reg}).")
+        if selection_pool is None:
+            raise ValueError(f"Stage-A selection pool size missing for '{input_name}' ({reg}).")
         if eligible_unique is not None and int(eligible_unique) > 0 and eligible_raw is not None:
             duplication_factors[reg] = float(eligible_raw) / float(eligible_unique)
         if retained is not None and int(retained) > 0 and selection_pool is not None:

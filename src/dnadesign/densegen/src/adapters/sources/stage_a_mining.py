@@ -29,6 +29,7 @@ from .pwm_fimo import (
     write_candidates_fasta,
     write_minimal_meme_motif,
 )
+from .stage_a_paths import safe_label
 from .stage_a_progress import _format_stage_a_milestone
 from .stage_a_sampling_utils import (
     _sample_background_batch,
@@ -74,50 +75,6 @@ class StageAMiningResult:
     core_offset_by_seq: dict[str, int]
     candidate_records: list[dict] | None
     debug_dir: Path | None
-
-
-def _safe_label(text: str) -> str:
-    return "".join(c if c.isalnum() or c in "-._" else "_" for c in str(text).strip()) or "stage_a"
-
-
-def write_candidate_records(
-    records: list[dict],
-    *,
-    debug_output_dir: Path,
-    debug_label: str,
-    motif_id: str,
-    motif_hash: str | None = None,
-) -> Path:
-    suffix = ""
-    if motif_hash:
-        suffix = f"__{_safe_label(motif_hash[:10])}"
-    safe_label = f"{_safe_label(debug_label or motif_id)}{suffix}"
-    debug_output_dir.mkdir(parents=True, exist_ok=True)
-    path = debug_output_dir / f"candidates__{safe_label}.parquet"
-    import pandas as pd
-
-    df = pd.DataFrame(records)
-    if path.exists():
-        try:
-            existing = pd.read_parquet(path)
-            if "candidate_id" not in existing.columns or "candidate_id" not in df.columns:
-                raise ValueError(
-                    f"Candidate append requires candidate_id in {path}. "
-                    "Clear outputs/pools/candidates or use --fresh to reset."
-                )
-            if set(existing.columns) != set(df.columns):
-                raise ValueError(
-                    f"Candidate schema mismatch for {path}. Clear outputs/pools/candidates or use --fresh to reset."
-                )
-            df = df[existing.columns]
-            df = pd.concat([existing, df], ignore_index=True)
-            df = df.drop_duplicates(subset=["candidate_id"], keep="last")
-        except Exception as exc:
-            if isinstance(exc, ValueError):
-                raise
-            raise RuntimeError(f"Failed to append candidate records to {path}") from exc
-    df.to_parquet(path, index=False)
-    return path
 
 
 def mine_pwm_candidates(
@@ -180,7 +137,7 @@ def mine_pwm_candidates(
                 debug_dir,
             )
         debug_dir.mkdir(parents=True, exist_ok=True)
-        label = _safe_label(debug_label or motif.motif_id)
+        label = safe_label(debug_label or motif.motif_id)
         debug_path = debug_dir / f"{label}__fimo.tsv"
 
     def _merge_tsv(existing: list[str], text: str) -> None:

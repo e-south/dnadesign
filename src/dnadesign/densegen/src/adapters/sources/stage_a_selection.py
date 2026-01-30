@@ -16,6 +16,7 @@ from typing import Optional, Protocol, Sequence
 
 import numpy as np
 
+from .stage_a_encoding import encode_cores
 from .stage_a_types import SelectionMeta
 
 
@@ -98,17 +99,6 @@ def _pwm_tolerant_weights(matrix: Sequence[dict[str, float]]) -> np.ndarray:
         info_norm = min(1.0, max(0.0, info_bits / 2.0))
         weights.append(1.0 - info_norm)
     return np.asarray(weights, dtype=float)
-
-
-def _encode_core(core: str) -> np.ndarray:
-    idx_map = {"A": 0, "C": 1, "G": 2, "T": 3}
-    encoded = []
-    for base in core:
-        idx = idx_map.get(base)
-        if idx is None:
-            raise ValueError(f"Unsupported base '{base}' in TFBS core; expected A/C/G/T.")
-        encoded.append(idx)
-    return np.asarray(encoded, dtype=np.int8)
 
 
 def _score_norm(values: Sequence[float]) -> dict[float, float]:
@@ -211,7 +201,7 @@ def _select_diversity_upper_bound_candidates(
             raise ValueError("Weighted Hamming requires weights matching core length.")
     else:
         weights_arr = np.ones(length, dtype=float)
-    encoded = np.vstack([_encode_core(core) for core in cores])
+    encoded = encode_cores(cores)
     scores = [float(cand.score) for cand in candidate_slice]
     seqs = [cand.seq for cand in candidate_slice]
 
@@ -348,7 +338,7 @@ def _select_by_mmr(
         cores = [core_by_seq[cand.seq] for cand in shortlist]
         if len(weights) != len(cores[0]):
             raise ValueError("PWM weights length must match TFBS core length.")
-        encoded = np.vstack([_encode_core(core) for core in cores])
+        encoded = encode_cores(cores)
         seqs = [cand.seq for cand in shortlist]
         core_ranks = _lex_ranks(cores)
         seq_ranks = _lex_ranks(seqs)
@@ -402,7 +392,7 @@ def _select_by_mmr(
             cores = [core_by_seq[cand.seq] for cand in shortlist]
             if len(weights) != len(cores[0]):
                 raise ValueError("PWM weights length must match TFBS core length.")
-            encoded = np.vstack([_encode_core(core) for core in cores])
+            encoded = encode_cores(cores)
             seqs = [cand.seq for cand in shortlist]
             core_ranks = _lex_ranks(cores)
             seq_ranks = _lex_ranks(seqs)

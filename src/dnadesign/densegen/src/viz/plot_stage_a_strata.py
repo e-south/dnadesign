@@ -35,8 +35,8 @@ def _build_stage_a_strata_overview_figure(
     text_sizes = _stage_a_text_sizes(style)
     if sampling.get("backend") != "fimo":
         raise ValueError(f"Stage-A strata overview requires FIMO sampling (input '{input_name}').")
-    eligible_score_hist = sampling.get("eligible_score_hist") or []
-    if not eligible_score_hist:
+    eligible_score_hist = sampling.get("eligible_score_hist")
+    if not isinstance(eligible_score_hist, list) or not eligible_score_hist:
         raise ValueError(f"Stage-A sampling missing eligible score histogram for input '{input_name}'.")
     if "regulator_id" in pool_df.columns:
         tf_col = "regulator_id"
@@ -53,18 +53,32 @@ def _build_stage_a_strata_overview_figure(
     if "best_hit_score" not in pool_df.columns:
         raise ValueError(f"Stage-A pool missing best_hit_score for input '{input_name}'.")
 
-    regulators = [str(row.get("regulator") or "") for row in eligible_score_hist]
+    regulators: list[str] = []
+    for row in eligible_score_hist:
+        if "regulator" not in row:
+            raise ValueError(f"Stage-A eligible score histogram missing regulator for input '{input_name}'.")
+        regulators.append(str(row["regulator"]))
     if not regulators:
         raise ValueError(f"Stage-A sampling missing regulator labels for input '{input_name}'.")
     hist_by_reg: dict[str, tuple[list[float], list[int], float | None, float | None, float | None]] = {}
+    tier_labels_by_reg: dict[str, list[str]] = {}
     global_scores: list[float] = []
     for row in eligible_score_hist:
-        reg = str(row.get("regulator"))
-        edges = [float(v) for v in (row.get("edges") or [])]
-        counts = [int(v) for v in (row.get("counts") or [])]
-        tier0_score = row.get("tier0_score")
-        tier1_score = row.get("tier1_score")
-        tier2_score = row.get("tier2_score")
+        reg = str(row["regulator"])
+        if "edges" not in row or "counts" not in row:
+            raise ValueError(f"Stage-A eligible score histogram missing edges/counts for '{input_name}' ({reg}).")
+        edges = [float(v) for v in row["edges"]]
+        counts = [int(v) for v in row["counts"]]
+        if "tier0_score" not in row or "tier1_score" not in row or "tier2_score" not in row:
+            raise ValueError(f"Stage-A eligible score histogram missing tier scores for '{input_name}' ({reg}).")
+        tier0_score = row["tier0_score"]
+        tier1_score = row["tier1_score"]
+        tier2_score = row["tier2_score"]
+        if "tier_fractions" not in row:
+            raise ValueError(f"Stage-A eligible score histogram missing tier fractions for '{input_name}' ({reg}).")
+        tier_fractions = [float(v) for v in row["tier_fractions"]]
+        if len(tier_fractions) < 3:
+            raise ValueError(f"Stage-A tier fractions require at least 3 values for '{input_name}' ({reg}).")
         if not edges:
             raise ValueError(f"Stage-A eligible score histogram empty for input '{input_name}' ({reg}).")
         if len(counts) != len(edges) - 1:
@@ -74,6 +88,12 @@ def _build_stage_a_strata_overview_figure(
         for val in (tier0_score, tier1_score, tier2_score):
             if val is not None:
                 global_scores.append(float(val))
+
+        def _format_frac(frac: float) -> str:
+            label = f"{float(frac) * 100:.3f}".rstrip("0").rstrip(".")
+            return f"{label}%"
+
+        tier_labels_by_reg[reg] = [_format_frac(frac) for frac in tier_fractions[:3]]
         hist_by_reg[reg] = (
             edges,
             counts,
@@ -179,12 +199,15 @@ def _build_stage_a_strata_overview_figure(
             retained_density = retained_arr / scale
             ax.fill_between(centers, 0.0, retained_density, color=hue, alpha=0.5)
             retained = retained_tiers.get(reg, {})
+            tier_labels = tier_labels_by_reg.get(reg)
+            if tier_labels is None or len(tier_labels) < 3:
+                raise ValueError(f"Stage-A tier labels missing for '{input_name}' ({reg}).")
             _draw_tier_markers(
                 ax,
                 [
-                    ("Top 0.1% cutoff", tier0_score, str(retained.get(0, 0))),
-                    ("Top 1% cutoff", tier1_score, str(retained.get(1, 0))),
-                    ("Top 9% cutoff", tier2_score, str(retained.get(2, 0))),
+                    (f"Top {tier_labels[0]} cutoff", tier0_score, str(retained.get(0, 0))),
+                    (f"Top {tier_labels[1]} cutoff", tier1_score, str(retained.get(1, 0))),
+                    (f"Top {tier_labels[2]} cutoff", tier2_score, str(retained.get(2, 0))),
                 ],
                 ymax_fraction=0.58,
                 label_mode="box",

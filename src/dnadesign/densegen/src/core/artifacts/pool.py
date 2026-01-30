@@ -279,6 +279,8 @@ def _build_stage_a_sampling_manifest(
             raise ValueError("Stage-A sampling summaries missing yield counters.")
         reg_bgfile = bgfile_by_regulator.get(summary.regulator, bgfile)
         reg_bgfiles.append(reg_bgfile)
+        if summary.diversity is None:
+            raise ValueError("Stage-A sampling summaries missing diversity metrics.")
         diversity_block = summary.diversity
         if hasattr(diversity_block, "to_dict"):
             diversity_block = diversity_block.to_dict()
