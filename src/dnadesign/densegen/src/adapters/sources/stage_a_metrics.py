@@ -364,7 +364,7 @@ def _stable_seed_from_sequences(values: Sequence[str]) -> int:
 def _pairwise_hamming_summary(
     cores: Sequence[str],
     *,
-    max_pairs: int = 10000,
+    max_pairs: int | None = 10000,
     weights: Sequence[float] | None = None,
     encoding_store: CoreEncodingStore | None = None,
 ) -> PairwiseSummary | None:
@@ -403,22 +403,38 @@ def _pairwise_hamming_summary(
         )
     n = len(cores)
     total_pairs = n * (n - 1) // 2
-    sample_pairs = int(min(max_pairs, total_pairs))
-    rng = np.random.default_rng(_stable_seed_from_sequences(cores))
     encoded = encoding_store.encode(cores) if encoding_store is not None else encode_cores(cores)
     weights_arr = None
     if weights is not None:
         weights_arr = np.asarray(weights, dtype=float)
         if weights_arr.shape[0] != length:
             raise ValueError("Weighted Hamming requires weights matching core length.")
-    idx_i = rng.integers(0, n, size=sample_pairs)
-    idx_j = rng.integers(0, n - 1, size=sample_pairs)
-    idx_j = idx_j + (idx_j >= idx_i)
-    diff = encoded[idx_i] != encoded[idx_j]
-    if weights_arr is None:
-        distances = diff.sum(axis=1).astype(float)
+    if max_pairs is None:
+        sample_pairs = int(total_pairs)
     else:
-        distances = (diff * weights_arr).sum(axis=1)
+        sample_pairs = int(min(max_pairs, total_pairs))
+    if sample_pairs == total_pairs:
+        distances = np.empty(sample_pairs, dtype=float)
+        offset = 0
+        for idx in range(n - 1):
+            diff = encoded[idx + 1 :] != encoded[idx]
+            if weights_arr is None:
+                row_distances = diff.sum(axis=1).astype(float)
+            else:
+                row_distances = diff @ weights_arr
+            end = offset + row_distances.shape[0]
+            distances[offset:end] = row_distances
+            offset = end
+    else:
+        rng = np.random.default_rng(_stable_seed_from_sequences(cores))
+        idx_i = rng.integers(0, n, size=sample_pairs)
+        idx_j = rng.integers(0, n - 1, size=sample_pairs)
+        idx_j = idx_j + (idx_j >= idx_i)
+        diff = encoded[idx_i] != encoded[idx_j]
+        if weights_arr is None:
+            distances = diff.sum(axis=1).astype(float)
+        else:
+            distances = (diff * weights_arr).sum(axis=1)
     if weights_arr is None:
         max_dist = int(length)
         counts = np.bincount(distances.astype(int), minlength=max_dist + 1)
@@ -535,13 +551,13 @@ def _diversity_summary(
     )
     baseline_pairwise = _pairwise_hamming_summary(
         baseline_cores,
-        max_pairs=10000,
+        max_pairs=None,
         weights=distance_weights,
         encoding_store=encoding_store,
     )
     actual_pairwise = _pairwise_hamming_summary(
         actual_cores,
-        max_pairs=10000,
+        max_pairs=None,
         weights=distance_weights,
         encoding_store=encoding_store,
     )
@@ -549,7 +565,7 @@ def _diversity_summary(
     if upper_bound_cores:
         upper_pairwise = _pairwise_hamming_summary(
             upper_bound_cores,
-            max_pairs=10000,
+            max_pairs=None,
             weights=distance_weights,
             encoding_store=encoding_store,
         )
