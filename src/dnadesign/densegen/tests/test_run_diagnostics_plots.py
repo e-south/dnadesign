@@ -307,7 +307,17 @@ def _pool_manifest(tmp_path: Path, *, include_diversity: bool = False) -> TFBSPo
                 "type": "binding_sites",
                 "pool_path": "demo_input__pool.parquet",
                 "rows": 2,
-                "columns": ["input_name", "tf", "tfbs_sequence", "best_hit_score", "tier", "rank_within_regulator"],
+                "columns": [
+                    "input_name",
+                    "tf",
+                    "tfbs_sequence",
+                    "tfbs_core",
+                    "best_hit_score",
+                    "tier",
+                    "rank_within_regulator",
+                    "selection_rank",
+                    "nearest_selected_similarity",
+                ],
                 "pool_mode": "tfbs",
                 "stage_a_sampling": {
                     "backend": "fimo",
@@ -321,6 +331,7 @@ def _pool_manifest(tmp_path: Path, *, include_diversity: bool = False) -> TFBSPo
                         {
                             "regulator": "TF_A",
                             "pwm_consensus": "AAA",
+                            "pwm_max_score": 2.0,
                             "edges": [0.0, 1.0, 2.0],
                             "counts": [1, 1],
                             "tier0_score": 2.0,
@@ -460,9 +471,12 @@ def test_plot_stage_a_summary(tmp_path: Path) -> None:
             "input_name": ["demo_input", "demo_input"],
             "tf": ["TF_A", "TF_A"],
             "tfbs_sequence": ["AAAA", "AAAAT"],
+            "tfbs_core": ["AAAA", "AAAT"],
             "best_hit_score": [2.0, 1.5],
             "tier": [0, 1],
             "rank_within_regulator": [1, 2],
+            "selection_rank": [1, 2],
+            "nearest_selected_similarity": [0.0, 0.5],
         }
     )
     pools = {"demo_input": pool_df}
@@ -489,9 +503,12 @@ def test_plot_stage_a_summary_requires_diversity(tmp_path: Path) -> None:
             "input_name": ["demo_input", "demo_input"],
             "tf": ["TF_A", "TF_A"],
             "tfbs_sequence": ["AAAA", "AAAAT"],
+            "tfbs_core": ["AAAA", "AAAT"],
             "best_hit_score": [2.0, 1.5],
             "tier": [0, 1],
             "rank_within_regulator": [1, 2],
+            "selection_rank": [1, 2],
+            "nearest_selected_similarity": [0.0, 0.5],
         }
     )
     pools = {"demo_input": pool_df}

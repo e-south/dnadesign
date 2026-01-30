@@ -2223,7 +2223,7 @@ def stage_a_build_pool(
                 "k(pool/target)=MMR shortlist pool vs target (target=max(shortlist_min, shortlist_factor×n_sites)); "
                 "div(pairwise)=pairwise weighted Hamming median; "
                 "overlap=baseline∩actual; set_swaps=actual - overlap; "
-                "Δscore columns compare baseline vs actual p10/med."
+                "Δscore_norm columns compare baseline vs actual p10/med."
             )
         else:
             console.print(
@@ -2232,7 +2232,7 @@ def stage_a_build_pool(
                 "selection=Stage-A selection policy; "
                 "k(pool/target)=MMR shortlist pool vs target (target=max(shortlist_min, shortlist_factor×n_sites)); "
                 "div(pairwise)=pairwise weighted Hamming median; "
-                "overlap=baseline∩actual; Δscore med compares baseline vs actual median."
+                "overlap=baseline∩actual; Δscore_norm med compares baseline vs actual median."
             )
     console.print(
         f":sparkles: [bold green]Pool manifest written[/]: "

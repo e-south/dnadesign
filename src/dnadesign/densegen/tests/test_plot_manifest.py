@@ -154,9 +154,12 @@ def _write_pool_manifest(run_root: Path) -> None:
             "input_name": ["demo_input"] * 3,
             "tf": ["tfA", "tfA", "tfB"],
             "tfbs": ["AAAA", "AAAAT", "AAAAAA"],
+            "tfbs_core": ["AAAA", "AAAT", "AAAAAA"],
             "best_hit_score": [7.0, 9.0, 5.5],
             "tier": [1, 0, 2],
             "rank_within_regulator": [2, 1, 1],
+            "selection_rank": [2, 1, 1],
+            "nearest_selected_similarity": [0.5, 0.0, 0.0],
             "motif_id": ["m1", "m1", "m2"],
             "tfbs_id": ["id1", "id2", "id3"],
         }
@@ -188,6 +191,7 @@ def _write_pool_manifest(run_root: Path) -> None:
                         {
                             "regulator": "tfA",
                             "pwm_consensus": "AAAA",
+                            "pwm_max_score": 10.0,
                             "edges": [4.0, 6.0, 8.0, 10.0],
                             "counts": [0, 1, 1],
                             "tier0_score": 9.0,
@@ -219,6 +223,7 @@ def _write_pool_manifest(run_root: Path) -> None:
                         {
                             "regulator": "tfB",
                             "pwm_consensus": "AAAAAA",
+                            "pwm_max_score": 6.0,
                             "edges": [4.0, 6.0, 8.0],
                             "counts": [1, 0],
                             "tier0_score": 5.5,

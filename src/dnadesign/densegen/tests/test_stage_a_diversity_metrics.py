@@ -19,9 +19,14 @@ from dnadesign.densegen.src.adapters.sources.stage_a_diversity import (
     _core_hamming_nnd,
     _diversity_summary,
 )
-from dnadesign.densegen.src.adapters.sources.stage_a_metrics import KnnSummary, PairwiseSummary
+from dnadesign.densegen.src.adapters.sources.stage_a_metrics import (
+    KnnSummary,
+    PairwiseSummary,
+    _mmr_objective,
+)
 from dnadesign.densegen.src.adapters.sources.stage_a_selection import (
     SelectionDiagnostics,
+    _score_norm,
     _select_diversity_baseline_candidates,
     _select_diversity_upper_bound_candidates,
 )
@@ -72,6 +77,7 @@ def test_diversity_summary_scores() -> None:
         actual_scores=scores,
         upper_bound_cores=cores,
         upper_bound_scores=scores,
+        pwm_max_score=2.0,
         max_n=2500,
     )
     assert summary is not None
@@ -92,8 +98,8 @@ def test_diversity_summary_scores() -> None:
     actual = score_block.actual
     assert base is not None
     assert actual is not None
-    assert base.p50 == 1.5
-    assert actual.p50 == 1.5
+    assert base.p50 == 0.75
+    assert actual.p50 == 0.75
 
 
 def _base4_sequence(index: int, *, length: int = 6) -> str:
@@ -116,6 +122,7 @@ def test_diversity_summary_pairwise_is_exact_for_retained_sets() -> None:
         actual_scores=scores,
         upper_bound_cores=cores,
         upper_bound_scores=scores,
+        pwm_max_score=100.0,
         max_n=2500,
     )
     assert summary is not None
@@ -138,6 +145,26 @@ def _cand(seq: str, score: float) -> FimoCandidate:
         strand="+",
         matched_sequence=seq,
     )
+
+
+def test_mmr_objective_mean_utility() -> None:
+    cores = ["AAAA", "AAAT", "TTTT"]
+    scores = [3.0, 2.0, 1.0]
+    scores_norm_map = _score_norm(scores)
+    baseline = _mmr_objective(
+        cores=cores,
+        scores=scores,
+        scores_norm_map=scores_norm_map,
+        alpha=0.5,
+    )
+    assert baseline == pytest.approx(0.125)
+    actual = _mmr_objective(
+        cores=["AAAA", "TTTT", "AAAT"],
+        scores=[3.0, 1.0, 2.0],
+        scores_norm_map=scores_norm_map,
+        alpha=0.5,
+    )
+    assert actual == pytest.approx(0.13333333333333333)
 
 
 def test_baseline_candidates_use_shortlist_k() -> None:

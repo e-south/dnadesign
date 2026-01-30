@@ -192,6 +192,9 @@ class DiversitySummary:
     set_overlap_swaps: int | None
     core_entropy: EntropyBlock
     score_quantiles: ScoreQuantilesBlock
+    objective_baseline: float | None = None
+    objective_actual: float | None = None
+    objective_delta: float | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -202,6 +205,9 @@ class DiversitySummary:
             "set_overlap_swaps": self.set_overlap_swaps,
             "core_entropy": self.core_entropy.to_dict(),
             "score_quantiles": self.score_quantiles.to_dict(),
+            "objective_baseline": self.objective_baseline,
+            "objective_actual": self.objective_actual,
+            "objective_delta": self.objective_delta,
         }
 
 
@@ -361,6 +367,54 @@ def _stable_seed_from_sequences(values: Sequence[str]) -> int:
     return int(digest[:8], 16)
 
 
+def _mmr_objective(
+    *,
+    cores: Sequence[str],
+    scores: Sequence[float],
+    scores_norm_map: dict[float, float],
+    alpha: float,
+    distance_weights: Sequence[float] | None = None,
+    encoding_store: CoreEncodingStore | None = None,
+) -> float | None:
+    if not cores or not scores:
+        return None
+    if len(cores) != len(scores):
+        raise ValueError("MMR objective cores/scores length mismatch.")
+    if alpha <= 0.0 or alpha > 1.0:
+        raise ValueError("MMR objective alpha must be in (0, 1].")
+    length = _assert_uniform_core_length(cores, label="mmr objective")
+    if length <= 0:
+        return None
+    weights_arr = None
+    if distance_weights is not None:
+        weights_arr = np.asarray(distance_weights, dtype=float)
+        if weights_arr.shape[0] != length:
+            raise ValueError("MMR objective weights length must match core length.")
+    encoded = encoding_store.encode(cores) if encoding_store is not None else encode_cores(cores)
+    min_dist = np.full(len(cores), np.inf, dtype=float)
+    utilities = np.empty(len(cores), dtype=float)
+    score_weight = float(alpha)
+    diversity_weight = 1.0 - score_weight
+    for idx, score in enumerate(scores):
+        score_val = float(score)
+        score_norm = scores_norm_map.get(score_val)
+        if score_norm is None:
+            raise ValueError("MMR objective missing normalized score for candidate.")
+        if idx == 0:
+            max_sim = 0.0
+        else:
+            max_sim = 1.0 / (1.0 + float(min_dist[idx]))
+        utilities[idx] = score_weight * score_norm - diversity_weight * max_sim
+        diff = encoded != encoded[idx]
+        if weights_arr is None:
+            dists = diff.sum(axis=1).astype(float)
+        else:
+            dists = diff @ weights_arr
+        min_dist = np.minimum(min_dist, dists)
+        min_dist[idx] = 0.0
+    return float(np.mean(utilities))
+
+
 def _pairwise_hamming_summary(
     cores: Sequence[str],
     *,
@@ -493,6 +547,9 @@ def _diversity_summary(
     baseline_global_scores: Sequence[float] | None = None,
     upper_bound_cores: Sequence[str] | None = None,
     upper_bound_scores: Sequence[float] | None = None,
+    pwm_max_score: float | None = None,
+    objective_baseline: float | None = None,
+    objective_actual: float | None = None,
     uniqueness_key: str | None = None,
     candidate_pool_size: int | None = None,
     shortlist_target: int | None = None,
@@ -571,16 +628,32 @@ def _diversity_summary(
         )
     baseline_entropy = _core_entropy(baseline_cores)
     actual_entropy = _core_entropy(actual_cores)
-    baseline_quantiles = _score_quantiles(baseline_scores)
-    actual_quantiles = _score_quantiles(actual_scores)
-    baseline_global_quantiles = _score_quantiles(baseline_global_scores or [])
-    upper_bound_quantiles = _score_quantiles(upper_bound_scores or [])
+    score_denominator = None
+    if baseline_scores or actual_scores or baseline_global_scores or upper_bound_scores:
+        if pwm_max_score is None:
+            raise ValueError("pwm_max_score is required to normalize Stage-A score quantiles.")
+        if float(pwm_max_score) == 0.0:
+            raise ValueError("pwm_max_score must be non-zero to normalize Stage-A score quantiles.")
+        score_denominator = float(pwm_max_score)
+    baseline_norm = [float(score) / score_denominator for score in baseline_scores] if baseline_scores else []
+    actual_norm = [float(score) / score_denominator for score in actual_scores] if actual_scores else []
+    baseline_global_norm = (
+        [float(score) / score_denominator for score in baseline_global_scores] if baseline_global_scores else []
+    )
+    upper_bound_norm = [float(score) / score_denominator for score in upper_bound_scores] if upper_bound_scores else []
+    baseline_quantiles = _score_quantiles(baseline_norm)
+    actual_quantiles = _score_quantiles(actual_norm)
+    baseline_global_quantiles = _score_quantiles(baseline_global_norm)
+    upper_bound_quantiles = _score_quantiles(upper_bound_norm)
     overlap_fraction = None
     overlap_swaps = None
     if actual_cores:
         overlap = len(set(baseline_cores) & set(actual_cores))
         overlap_fraction = float(overlap) / float(len(actual_cores))
         overlap_swaps = int(len(actual_cores) - overlap)
+    objective_delta = None
+    if objective_baseline is not None and objective_actual is not None:
+        objective_delta = float(objective_actual) - float(objective_baseline)
     core_hamming = CoreHammingSummary(
         metric="weighted_hamming_tolerant" if distance_weights is not None else "hamming",
         nnd_k1=KnnBlock(baseline=baseline_k1, actual=actual_k1),
@@ -611,4 +684,7 @@ def _diversity_summary(
         set_overlap_swaps=overlap_swaps,
         core_entropy=entropy_block,
         score_quantiles=score_block,
+        objective_baseline=float(objective_baseline) if objective_baseline is not None else None,
+        objective_actual=float(objective_actual) if objective_actual is not None else None,
+        objective_delta=objective_delta,
     )

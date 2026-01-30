@@ -260,7 +260,7 @@ def test_stage_a_build_pool_compact_recap_omits_verbose_columns(tmp_path: Path) 
     assert result.exit_code == 0, result.output
     assert "has_hit" not in result.output
     assert "eligible_raw" not in result.output
-    assert "Δscore(p10)" not in result.output
+    assert "Δscore_norm p10" not in result.output
 
 
 def test_stage_a_build_pool_verbose_recap_includes_verbose_columns(tmp_path: Path) -> None:
@@ -326,7 +326,7 @@ def test_stage_a_recap_tables_include_verbose_headers() -> None:
     rows = _stage_a_sampling_rows({"demo": pool})
     tables = stage_a_recap_tables(rows, display_map_by_input={}, show_motif_ids=True, verbose=True)
     headers = [col.header for col in tables[0][1].columns]
-    assert "Δscore p10" in headers
+    assert "Δscore_norm p10" in headers
 
 
 def test_stage_a_build_pool_accepts_fresh_flag(tmp_path: Path) -> None:

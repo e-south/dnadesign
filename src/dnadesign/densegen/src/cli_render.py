@@ -71,8 +71,8 @@ def stage_a_recap_tables(
         recap_table.add_column("overlap")
         if verbose:
             recap_table.add_column("set_swaps")
-            recap_table.add_column("Δscore p10")
-        recap_table.add_column("Δscore med")
+            recap_table.add_column("Δscore_norm p10")
+        recap_table.add_column("Δscore_norm med")
         recap_table.add_column("score(min/med/avg/max)")
         recap_table.add_column("len(n/min/med/avg/max)")
         for row in sorted(grouped[input_name], key=lambda item: str(item["regulator"])):

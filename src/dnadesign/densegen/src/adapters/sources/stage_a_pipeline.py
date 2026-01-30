@@ -24,7 +24,7 @@ from .stage_a_candidate_store import write_candidate_records, write_fimo_debug_t
 from .stage_a_diversity import _diversity_summary
 from .stage_a_encoding import CoreEncodingStore
 from .stage_a_metadata import TFBSMeta
-from .stage_a_metrics import _tail_unique_slope
+from .stage_a_metrics import _mmr_objective, _tail_unique_slope
 from .stage_a_mining import mine_pwm_candidates
 from .stage_a_progress import _format_stage_a_milestone, _PwmSamplingProgress
 from .stage_a_sampling_utils import _ranges_overlap
@@ -34,6 +34,7 @@ from .stage_a_selection import (
     _collapse_by_core_identity,
     _core_sequence,
     _pwm_tolerant_weights,
+    _score_norm,
     _select_by_mmr,
     _select_diversity_baseline_candidates,
     _select_diversity_candidate_pool,
@@ -372,6 +373,28 @@ def run_stage_a_pipeline(
     actual_scores = [float(cand.score) for cand in picked]
     baseline_global_scores = [float(cand.score) for cand in baseline_global_candidates]
     upper_bound_scores = [float(cand.score) for cand in upper_bound_candidates]
+    objective_baseline = None
+    objective_actual = None
+    if selection_policy == "mmr" and candidate_pool:
+        scores_norm_map = _score_norm([float(cand.score) for cand in candidate_pool])
+        baseline_scores_objective = [float(cand.score) for cand in baseline_candidates if cand.matched_sequence]
+        actual_scores_objective = [float(cand.score) for cand in picked if cand.matched_sequence]
+        objective_baseline = _mmr_objective(
+            cores=baseline_cores,
+            scores=baseline_scores_objective,
+            scores_norm_map=scores_norm_map,
+            alpha=float(selection_alpha),
+            distance_weights=distance_weights,
+            encoding_store=encoding_store,
+        )
+        objective_actual = _mmr_objective(
+            cores=actual_cores,
+            scores=actual_scores_objective,
+            scores_norm_map=scores_norm_map,
+            alpha=float(selection_alpha),
+            distance_weights=distance_weights,
+            encoding_store=encoding_store,
+        )
     candidate_pool_size = None
     shortlist_target = None
     if selection_diag is not None:
@@ -400,6 +423,9 @@ def run_stage_a_pipeline(
         baseline_global_scores=baseline_global_scores,
         upper_bound_cores=upper_bound_cores,
         upper_bound_scores=upper_bound_scores,
+        pwm_max_score=pwm_max_score,
+        objective_baseline=objective_baseline,
+        objective_actual=objective_actual,
         uniqueness_key=uniqueness_key,
         candidate_pool_size=int(candidate_pool_size) if candidate_pool_size is not None else None,
         shortlist_target=int(shortlist_target) if shortlist_target is not None else None,
