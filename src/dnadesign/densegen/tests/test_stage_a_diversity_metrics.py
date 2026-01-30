@@ -79,8 +79,12 @@ def test_diversity_summary_scores() -> None:
     assert isinstance(core_hamming, dict)
     pairwise = core_hamming.get("pairwise")
     assert isinstance(pairwise, dict)
-    assert pairwise.get("baseline") is not None
-    assert pairwise.get("actual") is not None
+    base_pair = pairwise.get("baseline")
+    act_pair = pairwise.get("actual")
+    assert base_pair is not None
+    assert act_pair is not None
+    assert base_pair.get("bins") is not None
+    assert base_pair.get("counts") is not None
     score_block = summary.get("score_quantiles")
     assert isinstance(score_block, dict)
     base = score_block.get("baseline")

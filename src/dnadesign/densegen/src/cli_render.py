@@ -55,6 +55,7 @@ def stage_a_recap_tables(
         recap_table = make_table()
         recap_table.add_column("TF", overflow="fold")
         recap_table.add_column("generated")
+        recap_table.add_column("has_hit")
         recap_table.add_column("eligible_raw")
         recap_table.add_column("eligible_unique")
         recap_table.add_column("retained")
@@ -62,8 +63,8 @@ def stage_a_recap_tables(
         recap_table.add_column("tier fill")
         recap_table.add_column("selection")
         recap_table.add_column("k(pool/target)")
-        recap_table.add_column("div(k5)")
-        recap_table.add_column("Δdiv(k5)")
+        recap_table.add_column("div(pairwise)")
+        recap_table.add_column("Δdiv(pairwise)")
         recap_table.add_column("set_overlap")
         recap_table.add_column("set_swaps")
         recap_table.add_column("Δscore(p10)")
@@ -77,6 +78,7 @@ def stage_a_recap_tables(
             recap_table.add_row(
                 reg_label,
                 str(row["generated"]),
+                str(row.get("has_hit", "-")),
                 str(row["eligible_raw"]),
                 str(row["eligible_unique"]),
                 str(row["retained"]),

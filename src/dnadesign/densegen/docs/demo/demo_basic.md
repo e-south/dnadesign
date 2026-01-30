@@ -181,7 +181,10 @@ What this demo config is doing:
 * **Stage‑A (`densegen.inputs[].sampling`)**
   Mine `n_sites=500` per motif using FIMO score eligibility (`best_hit_score > 0`), collapse near‑duplicates
   by core (`uniqueness.key: core`), and retain a score-first but diversity-biased set via MMR
-  (`selection.policy: mmr`, `alpha=0.9`). Sites are length-normalized with `length.policy: range` (`[15, 20]`).
+  (`selection.policy: mmr`, `alpha=0.9`). MMR uses PWM‑tolerant weighted Hamming
+  (weights ∝ 1 − IC) so diversity is emphasized in low‑information positions while preserving PWM‑likeness
+  (MMR per Carbonell & Goldstein, 1998; see sampling guide).
+  Sites are length-normalized with `length.policy: range` (`[15, 20]`).
 
 * **Stage‑B (`densegen.generation.sampling`)**
   Build `library_size=20` subsampled libraries using `library_sampling_strategy: coverage_weighted`, requiring

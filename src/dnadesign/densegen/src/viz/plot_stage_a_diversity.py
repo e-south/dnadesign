@@ -60,7 +60,7 @@ def _build_stage_a_diversity_figure(
         ax_header.text(
             0.5,
             0.76,
-            f"Stage-A core diversity (tfbs_core only; baseline vs actual) -- {input_name}",
+            f"Stage-A core diversity (tfbs_core only; Top-score vs MMR) -- {input_name}",
             ha="center",
             va="center",
             fontsize=text_sizes["fig_title"],
@@ -83,17 +83,18 @@ def _build_stage_a_diversity_figure(
 
         diversity_by_reg = {str(row.get("regulator") or ""): row.get("diversity") for row in eligible_hist}
 
-        def _ecdf_from_counts(bins: list[float] | list[int], counts: list[int]) -> tuple[np.ndarray, np.ndarray]:
+        def _fraction_from_counts(bins: list[float] | list[int], counts: list[int]) -> tuple[np.ndarray, np.ndarray]:
             if not bins or not counts:
-                raise ValueError("Stage-A diversity missing k-NN bins or counts.")
+                raise ValueError("Stage-A diversity missing pairwise bins or counts.")
             arr = np.asarray(counts, dtype=float)
             total = float(arr.sum())
             if total <= 0:
-                raise ValueError("Stage-A diversity k-NN counts are empty.")
+                raise ValueError("Stage-A diversity pairwise counts are empty.")
             x = np.asarray(bins, dtype=float)
-            y = np.cumsum(arr) / total
+            y = arr / total
             return x, y
 
+        metric_label = "Hamming distance (pairwise)"
         for idx, reg in enumerate(regulators):
             hue = reg_colors.get(reg, "#4c78a8")
             diversity = diversity_by_reg.get(reg) if isinstance(diversity_by_reg.get(reg), dict) else None
@@ -124,69 +125,62 @@ def _build_stage_a_diversity_figure(
             core_hamming = diversity.get("core_hamming")
             if not isinstance(core_hamming, dict):
                 raise ValueError(f"Stage-A diversity missing core_hamming for '{input_name}' ({reg}).")
-            nnd_k5 = core_hamming.get("nnd_k5") if isinstance(core_hamming.get("nnd_k5"), dict) else None
-            nnd_k1 = core_hamming.get("nnd_k1") if isinstance(core_hamming.get("nnd_k1"), dict) else None
-            plot_block = nnd_k5 or nnd_k1
-            if not isinstance(plot_block, dict):
-                raise ValueError(f"Stage-A diversity missing k-NN stats for '{input_name}' ({reg}).")
-            baseline = plot_block.get("baseline") if isinstance(plot_block.get("baseline"), dict) else None
-            actual = plot_block.get("actual") if isinstance(plot_block.get("actual"), dict) else None
+            metric = str(core_hamming.get("metric") or "").strip()
+            if metric == "weighted_hamming_tolerant":
+                metric_label = "Weighted Hamming distance (pairwise, 1-IC)"
+            pairwise = core_hamming.get("pairwise") if isinstance(core_hamming.get("pairwise"), dict) else None
+            if not isinstance(pairwise, dict):
+                raise ValueError(f"Stage-A diversity missing pairwise stats for '{input_name}' ({reg}).")
+            baseline = pairwise.get("baseline") if isinstance(pairwise.get("baseline"), dict) else None
+            actual = pairwise.get("actual") if isinstance(pairwise.get("actual"), dict) else None
             if not baseline or not actual:
-                raise ValueError(f"Stage-A diversity missing k-NN baseline/actual for '{input_name}' ({reg}).")
+                raise ValueError(f"Stage-A diversity missing pairwise baseline/actual for '{input_name}' ({reg}).")
             bins = None
             if isinstance(baseline.get("bins"), list):
                 bins = baseline.get("bins")
             elif isinstance(actual.get("bins"), list):
                 bins = actual.get("bins")
             if not bins:
-                raise ValueError(f"Stage-A diversity missing k-NN bins for '{input_name}' ({reg}).")
-            base_ecdf = _ecdf_from_counts(bins, baseline.get("counts", []))
-            act_ecdf = _ecdf_from_counts(bins, actual.get("counts", []))
-            x_base, y_base = base_ecdf
-            x_act, y_act = act_ecdf
+                raise ValueError(f"Stage-A diversity missing pairwise bins for '{input_name}' ({reg}).")
+            x_base, y_base = _fraction_from_counts(bins, baseline.get("counts", []))
+            x_act, y_act = _fraction_from_counts(bins, actual.get("counts", []))
+            bar_width = 0.8
+            if x_act.size > 1:
+                bar_width = float(np.median(np.diff(x_act))) * 0.85
+            act_bar = ax_left.bar(
+                x_act,
+                y_act,
+                width=bar_width,
+                color=hue,
+                alpha=0.35,
+                label="MMR",
+                zorder=2,
+            )[0]
             base_line = ax_left.step(
                 x_base,
                 y_base,
-                where="post",
+                where="mid",
                 color="#777777",
-                linewidth=1.2,
-                label="baseline",
+                linewidth=1.3,
+                label="Top-score",
+                zorder=3,
             )[0]
-            act_line = ax_left.step(
-                x_act,
-                y_act,
-                where="post",
-                color=hue,
-                linewidth=1.5,
-                label="actual",
-            )[0]
-            ax_left.fill_between(x_act, y_act, step="post", color=hue, alpha=0.12)
-            ax_left.set_xlim(0, max(x_act.max(), x_base.max()))
-            ax_left.set_ylim(0, 1.0)
-            ax_left.set_ylabel("Fraction <= d" if idx == 0 else "")
-            ax_left.xaxis.set_major_locator(mpl.ticker.MaxNLocator(integer=True))
+            ax_left.set_xlim(x_base.min() - bar_width, x_base.max() + bar_width)
+            ax_left.set_ylim(0, max(y_base.max(), y_act.max()) * 1.15)
+            ax_left.set_ylabel("Fraction of pairs" if idx == 0 else "")
+            ax_left.xaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=5))
             if idx == 0:
                 ax_left.legend(
-                    handles=[base_line, act_line],
+                    handles=[base_line, act_bar],
                     loc="lower right",
                     frameon=False,
                     fontsize=text_sizes["annotation"] * 0.8,
                 )
             note_lines: list[str] = []
-            if nnd_k5 is None and nnd_k1 is not None:
-                note_lines.append("k=1 (n<6)")
-            baseline_med = baseline.get("median")
-            actual_med = actual.get("median")
-            if baseline_med is not None and actual_med is not None:
-                note_lines.append(f"delta div {float(actual_med) - float(baseline_med):+.2f}")
-            pairwise = core_hamming.get("pairwise") if isinstance(core_hamming.get("pairwise"), dict) else None
-            if isinstance(pairwise, dict):
-                base_pair = pairwise.get("baseline") if isinstance(pairwise.get("baseline"), dict) else None
-                act_pair = pairwise.get("actual") if isinstance(pairwise.get("actual"), dict) else None
-                base_med = base_pair.get("median") if base_pair is not None else None
-                act_med = act_pair.get("median") if act_pair is not None else None
-                if base_med is not None and act_med is not None:
-                    note_lines.append(f"delta pairwise {float(act_med) - float(base_med):+.2f}")
+            base_med = baseline.get("median")
+            act_med = actual.get("median")
+            if base_med is not None and act_med is not None:
+                note_lines.append(f"delta pairwise {float(act_med) - float(base_med):+.2f}")
             overlap = diversity.get("set_overlap_fraction")
             swaps = diversity.get("set_overlap_swaps")
             if overlap is not None:
@@ -291,9 +285,9 @@ def _build_stage_a_diversity_figure(
             ax_right.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
 
         if axes_left:
-            axes_left[0].set_title("Core k-NN distance", fontsize=subtitle_size, pad=title_pad)
+            axes_left[0].set_title("Core pairwise distance", fontsize=subtitle_size, pad=title_pad)
             axes_right[0].set_title("Core positional entropy", fontsize=subtitle_size, pad=title_pad)
-            axes_left[-1].set_xlabel("Hamming distance (k-NN)")
+            axes_left[-1].set_xlabel(metric_label)
             axes_right[-1].set_xlabel("Core position")
             for ax in axes_left[:-1]:
                 ax.tick_params(labelbottom=False)

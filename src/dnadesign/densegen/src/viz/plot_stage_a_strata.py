@@ -18,7 +18,7 @@ import pandas as pd
 from matplotlib.patches import Patch
 
 from ..utils.plot_style import format_regulator_label, stage_a_rcparams
-from .plot_common import _apply_style, _draw_tier_markers, _shared_axis_cleanup, _style
+from .plot_common import _apply_style, _draw_tier_markers, _style
 from .plot_stage_a_common import _pastelize_color, _stage_a_regulator_colors, _stage_a_text_sizes
 
 
@@ -173,17 +173,40 @@ def _build_stage_a_strata_overview_figure(
             _draw_tier_markers(
                 ax,
                 [
-                    ("0.1%", tier0_score, str(retained.get(0, 0))),
-                    ("1%", tier1_score, str(retained.get(1, 0))),
-                    ("9%", tier2_score, str(retained.get(2, 0))),
+                    ("Top 0.1% cutoff", tier0_score, str(retained.get(0, 0))),
+                    ("Top 1% cutoff", tier1_score, str(retained.get(1, 0))),
+                    ("Top 9% cutoff", tier2_score, str(retained.get(2, 0))),
                 ],
                 ymax_fraction=0.58,
                 label_mode="box",
                 loc="lower right",
                 fontsize=text_sizes["annotation"] * 0.65,
             )
-            ax.set_yticks([])
             ax.set_ylim(0, 1.05)
+            retained_cutoff = float(retained_vals.min())
+            y_min, y_max = ax.get_ylim()
+            y_top = y_min + (y_max - y_min) * 0.58
+            ax.axvline(
+                retained_cutoff,
+                ymin=0.0,
+                ymax=0.58,
+                linewidth=1.2,
+                linestyle="-",
+                color="#222222",
+                alpha=0.95,
+            )
+            ax.scatter([retained_cutoff], [y_top], s=18, color="#222222", edgecolors="none", zorder=5)
+            ax.annotate(
+                "Retained cutoff",
+                (retained_cutoff, y_top),
+                xytext=(0, 4),
+                textcoords="offset points",
+                ha="center",
+                va="bottom",
+                fontsize=text_sizes["annotation"] * 0.6,
+                color="#222222",
+            )
+            ax.set_yticks([])
             label = format_regulator_label(reg)
             core_len = core_lengths.get(reg)
             ax.set_ylabel("")
@@ -216,15 +239,15 @@ def _build_stage_a_strata_overview_figure(
 
         if axes_left:
             axes_left[0].set_title(
-                "Eligible score tiers with retained overlays",
+                "Eligible unique cores: score distribution; retained subset highlighted",
                 fontsize=text_sizes["annotation"],
                 color="#444444",
                 pad=12,
                 loc="center",
             )
+            axes_left[0].set_ylabel("Scaled density (peak=1)")
             axes_left[-1].set_xlabel("FIMO log-odds score")
             axes_left[-1].xaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=5))
-            _shared_axis_cleanup(axes_left)
 
         lengths_by_reg: dict[str, list[int]] = {}
         for reg, seq in pool_df[[tf_col, tfbs_col]].itertuples(index=False):

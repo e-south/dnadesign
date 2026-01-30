@@ -64,10 +64,17 @@ def _build_stage_a_yield_bias_figure(
     for row in eligible_hist:
         reg = str(row.get("regulator") or "")
         generated = row.get("generated")
+        candidates_with_hit = row.get("candidates_with_hit")
         eligible_raw = row.get("eligible_raw")
         eligible_unique = row.get("eligible_unique")
         retained = row.get("retained")
-        if generated is None or eligible_raw is None or eligible_unique is None or retained is None:
+        if (
+            generated is None
+            or candidates_with_hit is None
+            or eligible_raw is None
+            or eligible_unique is None
+            or retained is None
+        ):
             raise ValueError(f"Stage-A sampling missing yield counters for input '{input_name}' ({reg}).")
         selection_pool = row.get("selection_shortlist_k")
         if selection_pool is None:
@@ -83,7 +90,7 @@ def _build_stage_a_yield_bias_figure(
             overlap = audit.get("best_hit_overlaps_intended_core_fraction")
             if overlap is not None:
                 hit_overlap[reg] = float(overlap)
-        stage_counts.append([generated, eligible_raw, eligible_unique, selection_pool, retained])
+        stage_counts.append([generated, candidates_with_hit, eligible_raw, eligible_unique, selection_pool, retained])
 
     if not regs:
         raise ValueError(f"Stage-A sampling missing regulator labels for input '{input_name}'.")
@@ -124,7 +131,7 @@ def _build_stage_a_yield_bias_figure(
     n_regs = max(1, len(reg_order))
     fig_height = max(4.8, base_height, 1.75 * n_regs + 0.8)
     reg_colors = _stage_a_regulator_colors(reg_order, style)
-    stage_labels = ["Generated", "Eligible raw", "Unique core", "Selection pool", "Retained"]
+    stage_labels = ["Generated", "Has hit", "Eligible", "Unique core", "MMR pool", "Retained"]
     counts_by_reg = {reg: counts for reg, counts in zip(regs, stage_counts)}
     max_count = max((max(counts) for counts in stage_counts), default=0)
     subtitle_size = text_sizes["panel_title"] * 0.88
@@ -233,10 +240,10 @@ def _build_stage_a_yield_bias_figure(
             note_lines = []
             dup = duplication_factors.get(reg)
             if dup is not None:
-                note_lines.append(f"dup x{dup:.1f}")
+                note_lines.append(f"dup pressure: eligible/unique={dup:.1f}x")
             headroom = pool_headrooms.get(reg)
             if headroom is not None:
-                note_lines.append(f"pool x{headroom:.1f}")
+                note_lines.append(f"MMR headroom: pool/retained={headroom:.1f}x")
             if note_lines:
                 _add_anchored_box(
                     ax,

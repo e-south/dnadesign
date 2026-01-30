@@ -739,11 +739,12 @@ def _process_plan_for_source(
             if budget_mode == "fixed_candidates":
                 budget_label = f"fixed={budget_candidates}"
             elif budget_mode == "tier_target":
-                budget_label = (
-                    f"tier={budget_target_tier_fraction} max_candidates={budget_max_candidates}"
+                tier_label = (
+                    f"{float(budget_target_tier_fraction) * 100:.3f}%"
                     if budget_target_tier_fraction is not None
-                    else "tier=unset"
+                    else "unset"
                 )
+                budget_label = f"tier={tier_label} max_candidates={budget_max_candidates}"
             if progress_style != "screen":
                 log.info(
                     "Stage-A PWM sampling for %s: motifs=%d | sites=%s | strategy=%s | backend=%s | "

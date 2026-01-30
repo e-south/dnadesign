@@ -87,6 +87,7 @@ def _core_hamming_knn(
     *,
     k: int,
     max_n: int = 2500,
+    weights: Sequence[float] | None = None,
 ) -> dict[str, object] | None:
     if not cores:
         return None
@@ -102,7 +103,7 @@ def _core_hamming_knn(
     if n == 1:
         if int(k) > 1:
             return None
-        distances = np.array([0], dtype=int)
+        distances = np.array([0.0], dtype=float)
     else:
         if int(k) >= n:
             return None
@@ -110,19 +111,37 @@ def _core_hamming_knn(
         encoded = np.full((n, length), 4, dtype=np.int8)
         for i, core in enumerate(sample):
             encoded[i] = np.array([idx_map.get(base, 4) for base in core], dtype=np.int8)
-        distances = np.zeros(n, dtype=int)
+        weights_arr = None
+        if weights is not None:
+            weights_arr = np.asarray(weights, dtype=float)
+            if weights_arr.shape[0] != length:
+                raise ValueError("Weighted Hamming requires weights matching core length.")
+        distances = np.zeros(n, dtype=float)
         kth = int(k) - 1
         for i in range(n):
-            diff = (encoded[i] != encoded).sum(axis=1)
-            diff[i] = length + 1
-            distances[i] = int(np.partition(diff, kth)[kth])
-    max_dist = int(length)
-    counts = np.bincount(distances, minlength=max_dist + 1)
-    frac_le_1 = float(np.mean(distances <= 1)) if distances.size else 0.0
+            diff = encoded[i] != encoded
+            if weights_arr is None:
+                dist = diff.sum(axis=1).astype(float)
+                dist[i] = float(length) + 1.0
+            else:
+                dist = (diff * weights_arr).sum(axis=1)
+                dist[i] = float(weights_arr.sum()) + 1.0
+            distances[i] = float(np.partition(dist, kth)[kth])
+    if weights is None:
+        max_dist = int(length)
+        counts = np.bincount(distances.astype(int), minlength=max_dist + 1)
+        centers = list(range(max_dist + 1))
+    else:
+        max_dist = float(np.asarray(weights, dtype=float).sum())
+        bin_count = max(6, min(20, int(length) + 1))
+        edges = np.linspace(0.0, max_dist, num=bin_count + 1)
+        counts, _ = np.histogram(distances, bins=edges)
+        centers = ((edges[:-1] + edges[1:]) / 2.0).tolist()
+    frac_le_1 = float(np.mean(distances <= 1.0)) if distances.size else 0.0
     p05 = float(np.percentile(distances, 5)) if distances.size else 0.0
     p95 = float(np.percentile(distances, 95)) if distances.size else 0.0
     return {
-        "bins": list(range(max_dist + 1)),
+        "bins": [float(v) for v in centers],
         "counts": [int(v) for v in counts.tolist()],
         "median": float(np.median(distances)) if distances.size else 0.0,
         "p05": p05,
@@ -134,8 +153,13 @@ def _core_hamming_knn(
     }
 
 
-def _core_hamming_nnd(cores: Sequence[str], *, max_n: int = 2500) -> dict[str, object] | None:
-    return _core_hamming_knn(cores, k=1, max_n=max_n)
+def _core_hamming_nnd(
+    cores: Sequence[str],
+    *,
+    max_n: int = 2500,
+    weights: Sequence[float] | None = None,
+) -> dict[str, object] | None:
+    return _core_hamming_knn(cores, k=1, max_n=max_n, weights=weights)
 
 
 def _stable_seed_from_sequences(values: Sequence[str]) -> int:
@@ -145,7 +169,12 @@ def _stable_seed_from_sequences(values: Sequence[str]) -> int:
     return int(digest[:8], 16)
 
 
-def _pairwise_hamming_summary(cores: Sequence[str], *, max_pairs: int = 10000) -> dict[str, object] | None:
+def _pairwise_hamming_summary(
+    cores: Sequence[str],
+    *,
+    max_pairs: int = 10000,
+    weights: Sequence[float] | None = None,
+) -> dict[str, object] | None:
     if len(cores) < 2:
         return None
     length = len(cores[0])
@@ -159,22 +188,44 @@ def _pairwise_hamming_summary(cores: Sequence[str], *, max_pairs: int = 10000) -
     encoded = np.full((n, length), 4, dtype=np.int8)
     for i, core in enumerate(cores):
         encoded[i] = np.array([idx_map.get(base, 4) for base in core], dtype=np.int8)
-    distances: list[int] = []
+    weights_arr = None
+    if weights is not None:
+        weights_arr = np.asarray(weights, dtype=float)
+        if weights_arr.shape[0] != length:
+            raise ValueError("Weighted Hamming requires weights matching core length.")
+    distances: list[float] = []
     while len(distances) < sample_pairs:
         i = int(rng.integers(0, n))
         j = int(rng.integers(0, n))
         if i == j:
             continue
-        dist = int((encoded[i] != encoded[j]).sum())
+        diff = encoded[i] != encoded[j]
+        if weights_arr is None:
+            dist = float(diff.sum())
+        else:
+            dist = float((diff * weights_arr).sum())
         distances.append(dist)
     arr = np.asarray(distances, dtype=float)
+    if weights_arr is None:
+        max_dist = int(length)
+        counts = np.bincount(arr.astype(int), minlength=max_dist + 1)
+        centers = list(range(max_dist + 1))
+    else:
+        max_dist = float(weights_arr.sum())
+        bin_count = max(6, min(20, int(length) + 1))
+        edges = np.linspace(0.0, max_dist, num=bin_count + 1)
+        counts, _ = np.histogram(arr, bins=edges)
+        centers = ((edges[:-1] + edges[1:]) / 2.0).tolist()
     return {
+        "bins": [float(v) for v in centers],
+        "counts": [int(v) for v in counts.tolist()],
         "median": float(np.median(arr)),
         "mean": float(arr.mean()),
         "p10": float(np.percentile(arr, 10)),
         "p90": float(np.percentile(arr, 90)),
         "n_pairs": int(sample_pairs),
         "total_pairs": int(total_pairs),
+        "subsampled": bool(sample_pairs < total_pairs),
     }
 
 
@@ -191,6 +242,7 @@ def _diversity_summary(
     shortlist_target: int | None = None,
     label: str | None = None,
     max_n: int = 2500,
+    distance_weights: Sequence[float] | None = None,
 ) -> dict[str, object] | None:
     label = label or "diversity"
     base_len = _assert_uniform_core_length(baseline_cores, label=f"{label} baseline")
@@ -205,14 +257,14 @@ def _diversity_summary(
     if uniqueness_key == "core" and actual_cores:
         if len(set(actual_cores)) != len(actual_cores):
             raise ValueError(f"Duplicate retained cores detected for {label} with uniqueness.key=core.")
-    baseline_k1 = _core_hamming_knn(baseline_cores, k=1, max_n=max_n)
-    actual_k1 = _core_hamming_knn(actual_cores, k=1, max_n=max_n)
+    baseline_k1 = _core_hamming_knn(baseline_cores, k=1, max_n=max_n, weights=distance_weights)
+    actual_k1 = _core_hamming_knn(actual_cores, k=1, max_n=max_n, weights=distance_weights)
     if baseline_k1 is None or actual_k1 is None:
         return None
-    baseline_k5 = _core_hamming_knn(baseline_cores, k=5, max_n=max_n)
-    actual_k5 = _core_hamming_knn(actual_cores, k=5, max_n=max_n)
-    baseline_pairwise = _pairwise_hamming_summary(baseline_cores, max_pairs=10000)
-    actual_pairwise = _pairwise_hamming_summary(actual_cores, max_pairs=10000)
+    baseline_k5 = _core_hamming_knn(baseline_cores, k=5, max_n=max_n, weights=distance_weights)
+    actual_k5 = _core_hamming_knn(actual_cores, k=5, max_n=max_n, weights=distance_weights)
+    baseline_pairwise = _pairwise_hamming_summary(baseline_cores, max_pairs=10000, weights=distance_weights)
+    actual_pairwise = _pairwise_hamming_summary(actual_cores, max_pairs=10000, weights=distance_weights)
     baseline_entropy = _core_entropy(baseline_cores)
     actual_entropy = _core_entropy(actual_cores)
     baseline_quantiles = _score_quantiles(baseline_scores)
@@ -225,6 +277,7 @@ def _diversity_summary(
         overlap_fraction = float(overlap) / float(len(actual_cores))
         overlap_swaps = int(len(actual_cores) - overlap)
     core_hamming = {
+        "metric": "weighted_hamming_tolerant" if distance_weights is not None else "hamming",
         "nnd_k1": {"baseline": baseline_k1, "actual": actual_k1},
         "nnd_k5": {"baseline": baseline_k5, "actual": actual_k5}
         if baseline_k5 is not None and actual_k5 is not None

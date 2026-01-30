@@ -101,7 +101,8 @@ highest score, with deterministic tie-breakers.
 
 Terminology used in outputs:
 
-- `eligible_raw` — candidates that passed eligibility (hit + `best_hit_score > 0`) before deduplication.
+- `candidates_with_hit` — candidates with at least one FIMO hit (pre‑eligibility).
+- `eligible_raw` — candidates that passed eligibility (`best_hit_score > 0`) before deduplication.
 - `eligible_unique` — the deduplicated candidate set used for ranking/retention.
 
 Pool columns you’ll commonly use:
@@ -140,16 +141,27 @@ After ranking (and deduplication), Stage‑A retains `n_sites` per regulator usi
 - `mmr`
   Use Maximal Marginal Relevance to trade off score vs diversity while staying score-first.
 
-MMR (high-level, faithful to implementation):
+MMR (high-level, faithful to implementation; after Carbonell & Goldstein, 1998):
 
-- Each candidate core is represented by a per-position log‑odds contribution vector
-  (one value per motif position for the matched core).
-- Distance is L1 between vectors; similarity is:
-  `similarity = 1 / (1 + distance)`
-- Utility is:
+- Utility:
   `utility = alpha * normalized_score - (1 - alpha) * max_similarity_to_selected`
 - `alpha ∈ (0, 1]` biases toward score (`→ 1`) vs diversity (`→ 0`).
 - `normalized_score` is the percentile rank within the candidate pool (0–1, ties averaged).
+- Similarity is derived from a **PWM‑tolerant weighted Hamming distance** on `tfbs_core`:
+
+  - Information content per position:
+    `IC_i = 2 - H_i` where `H_i = -Σ p_i(b) log2 p_i(b)` (bits).
+  - PWM‑tolerant weights:
+    `w_i = 1 - (IC_i / 2)` (so low‑information positions get higher weight).
+  - Distance:
+    `dist(x, y) = Σ w_i * [x_i ≠ y_i]`
+  - Similarity:
+    `similarity = 1 / (1 + dist)`
+
+This weighting encourages diversity in **tolerant** (low‑IC) positions while preserving PWM‑likeness.
+
+Reference: Carbonell & Goldstein, “The Use of MMR, Diversity-Based Reranking for Reordering Documents and Producing Summaries.” (SIGIR 1998)
+https://www.cs.cmu.edu/~jgc/publication/The_Use_MMR_Diversity_Based_LTMIR_1998.pdf
 
 Performance/behavior knobs for MMR:
 
@@ -276,10 +288,10 @@ If you want to know what happened in a run, these are the canonical “truth” 
   Stage‑A sampling truth, including:
   - eligibility rule, tier scheme, FIMO threshold
   - background source (motif background vs bgfile)
-  - tier boundary scores and yield counters (generated / eligible_raw / eligible_unique / retained)
+  - tier boundary scores and yield counters (generated / candidates_with_hit / eligible_raw / eligible_unique / retained)
   - tier-target success/shortfall reporting
-  - core diversity summaries (k=1 and k=5 nearest‑neighbor Hamming distances, sampled pairwise Hamming summary,
-    and per‑position entropy, baseline vs actual), plus overlap and candidate‑pool diagnostics,
+  - core diversity summaries (k=1 and k=5 nearest‑neighbor distances plus sampled **pairwise weighted‑Hamming**
+    distribution and per‑position entropy, baseline vs actual), plus overlap and candidate‑pool diagnostics,
     computed on `tfbs_core` only; baseline uses the same candidate slice considered by selection
     (tier slice/shortlist for MMR). k‑NN distances are deterministically subsampled to 2500 sequences;
     entropy uses the full baseline/actual sets; score quantiles include both local (shortlist) and

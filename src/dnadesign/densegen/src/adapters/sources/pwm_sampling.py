@@ -31,6 +31,7 @@ from .stage_a_progress import _format_stage_a_milestone, _PwmSamplingProgress
 from .stage_a_selection import (
     _collapse_by_core_identity,
     _core_sequence,
+    _pwm_tolerant_weights,
     _select_by_mmr,
     _select_diversity_baseline_candidates,
     _select_diversity_global_candidates,
@@ -1156,7 +1157,7 @@ def sample_pwm_sites(
         if selection_policy == "mmr":
             picked, selection_meta, selection_diag = _select_by_mmr(
                 ranked,
-                log_odds=log_odds,
+                matrix=matrix,
                 n_sites=int(n_sites),
                 alpha=float(selection_alpha),
                 shortlist_min=int(selection_shortlist_min),
@@ -1195,6 +1196,7 @@ def sample_pwm_sites(
         baseline_scores = [float(cand.score) for cand in baseline_candidates]
         actual_scores = [float(cand.score) for cand in picked]
         baseline_global_scores = [float(cand.score) for cand in baseline_global_candidates]
+        distance_weights = _pwm_tolerant_weights(matrix)
         candidate_pool_size = None
         shortlist_target = None
         if isinstance(selection_diag, dict):
@@ -1226,6 +1228,7 @@ def sample_pwm_sites(
             shortlist_target=int(shortlist_target) if shortlist_target is not None else None,
             label=motif.motif_id,
             max_n=diversity_max_n,
+            distance_weights=distance_weights,
         )
         log.info(
             _format_stage_a_milestone(
@@ -1350,7 +1353,7 @@ def sample_pwm_sites(
             meta["nearest_selected_similarity"] = selection_meta_row.get("nearest_selected_similarity")
             meta["selection_policy"] = selection_policy
             meta["selection_alpha"] = selection_alpha if selection_policy == "mmr" else None
-            meta["selection_similarity"] = "contribution_l1" if selection_policy == "mmr" else None
+            meta["selection_similarity"] = "weighted_hamming_tolerant" if selection_policy == "mmr" else None
             meta["selection_shortlist_min"] = selection_shortlist_min if selection_policy == "mmr" else None
             meta["selection_shortlist_factor"] = selection_shortlist_factor if selection_policy == "mmr" else None
             meta["selection_shortlist_max"] = selection_shortlist_max if selection_policy == "mmr" else None
@@ -1420,7 +1423,7 @@ def sample_pwm_sites(
                 tier_target_met=tier_target_met,
                 selection_policy=selection_policy,
                 selection_alpha=selection_alpha if selection_policy == "mmr" else None,
-                selection_similarity="contribution_l1" if selection_policy == "mmr" else None,
+                selection_similarity="weighted_hamming_tolerant" if selection_policy == "mmr" else None,
                 selection_shortlist_k=selection_diag.get("shortlist_k"),
                 selection_shortlist_min=selection_shortlist_min if selection_policy == "mmr" else None,
                 selection_shortlist_factor=selection_shortlist_factor if selection_policy == "mmr" else None,

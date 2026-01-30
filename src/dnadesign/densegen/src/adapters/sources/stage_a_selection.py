@@ -39,16 +39,34 @@ def _collapse_by_core_identity(ranked: Sequence[_CandidateLike]) -> tuple[list[_
     return sorted(best_by_core.values(), key=lambda cand: (-cand.score, cand.seq)), int(collapsed)
 
 
-def _contrib_vector(core: str, log_odds: Sequence[dict[str, float]]) -> np.ndarray:
-    if len(core) != len(log_odds):
-        raise ValueError("TFBS core length must match PWM log-odds length.")
-    contrib = []
-    for base, row in zip(core, log_odds):
-        val = float(row.get(base, float("nan")))
-        if not np.isfinite(val):
-            raise ValueError("Non-finite log-odds contribution encountered for core sequence.")
-        contrib.append(val)
-    return np.asarray(contrib, dtype=float)
+def _pwm_tolerant_weights(matrix: Sequence[dict[str, float]]) -> np.ndarray:
+    if not matrix:
+        raise ValueError("PWM matrix is required to compute PWM-tolerant weights.")
+    weights: list[float] = []
+    for row in matrix:
+        probs = [float(row.get(base, 0.0)) for base in ("A", "C", "G", "T")]
+        if any(p < 0 for p in probs):
+            raise ValueError("PWM probabilities must be >= 0 to compute information content.")
+        total = float(sum(probs))
+        if total <= 0:
+            raise ValueError("PWM probabilities must sum to > 0 to compute information content.")
+        probs = [p / total for p in probs]
+        entropy = float(-sum(p * np.log2(p) for p in probs if p > 0))
+        info_bits = 2.0 - entropy
+        info_norm = min(1.0, max(0.0, info_bits / 2.0))
+        weights.append(1.0 - info_norm)
+    return np.asarray(weights, dtype=float)
+
+
+def _encode_core(core: str) -> np.ndarray:
+    idx_map = {"A": 0, "C": 1, "G": 2, "T": 3}
+    encoded = []
+    for base in core:
+        idx = idx_map.get(base)
+        if idx is None:
+            raise ValueError(f"Unsupported base '{base}' in TFBS core; expected A/C/G/T.")
+        encoded.append(idx)
+    return np.asarray(encoded, dtype=np.int8)
 
 
 def _score_norm(values: Sequence[float]) -> dict[float, float]:
@@ -111,7 +129,7 @@ def _select_diversity_global_candidates(
 def _select_by_mmr(
     ranked: Sequence[_CandidateLike],
     *,
-    log_odds: Sequence[dict[str, float]],
+    matrix: Sequence[dict[str, float]],
     n_sites: int,
     alpha: float,
     shortlist_min: int,
@@ -124,7 +142,7 @@ def _select_by_mmr(
     if alpha <= 0.0 or alpha > 1.0:
         raise ValueError("selection.alpha must be in (0, 1].")
     core_by_seq = {cand.seq: _core_sequence(cand) for cand in ranked}
-    contrib_by_seq = {seq: _contrib_vector(core, log_odds) for seq, core in core_by_seq.items()}
+    weights = _pwm_tolerant_weights(matrix)
     tier_fractions = list(tier_widening) if tier_widening else [1.0]
     total = len(ranked)
     shortlist_target = max(int(shortlist_min), int(shortlist_factor) * int(n_sites))
@@ -202,10 +220,12 @@ def _select_by_mmr(
         target_n = min(int(n_sites), len(shortlist))
         if target_n <= 0:
             return [], {}, int(k)
-        vectors = np.vstack([contrib_by_seq[cand.seq] for cand in shortlist])
         scores_norm_map = _score_norm([float(cand.score) for cand in shortlist])
         scores_norm = np.array([scores_norm_map.get(float(cand.score), 1.0) for cand in shortlist], dtype=float)
         cores = [core_by_seq[cand.seq] for cand in shortlist]
+        if len(weights) != len(cores[0]):
+            raise ValueError("PWM weights length must match TFBS core length.")
+        encoded = np.vstack([_encode_core(core) for core in cores])
         seqs = [cand.seq for cand in shortlist]
         selected_mask = np.zeros(len(shortlist), dtype=bool)
         min_dist = np.full(len(shortlist), np.inf, dtype=float)
@@ -228,17 +248,18 @@ def _select_by_mmr(
                 "selection_utility": float(utility),
                 "nearest_selected_similarity": float(max_sim),
             }
-            vec = vectors[idx]
-            dists = np.abs(vectors - vec).sum(axis=1)
+            dists = ((encoded != encoded[idx]) * weights).sum(axis=1)
             min_dist = np.minimum(min_dist, dists)
             min_dist[idx] = 0.0
         if len(selected) < int(n_sites) and k < max_k:
             shortlist = list(candidates[:max_k])
             target_n = min(int(n_sites), len(shortlist))
-            vectors = np.vstack([contrib_by_seq[cand.seq] for cand in shortlist])
             scores_norm_map = _score_norm([float(cand.score) for cand in shortlist])
             scores_norm = np.array([scores_norm_map.get(float(cand.score), 1.0) for cand in shortlist], dtype=float)
             cores = [core_by_seq[cand.seq] for cand in shortlist]
+            if len(weights) != len(cores[0]):
+                raise ValueError("PWM weights length must match TFBS core length.")
+            encoded = np.vstack([_encode_core(core) for core in cores])
             seqs = [cand.seq for cand in shortlist]
             selected_mask = np.zeros(len(shortlist), dtype=bool)
             min_dist = np.full(len(shortlist), np.inf, dtype=float)
@@ -261,8 +282,7 @@ def _select_by_mmr(
                     "selection_utility": float(utility),
                     "nearest_selected_similarity": float(max_sim),
                 }
-                vec = vectors[idx]
-                dists = np.abs(vectors - vec).sum(axis=1)
+                dists = ((encoded != encoded[idx]) * weights).sum(axis=1)
                 min_dist = np.minimum(min_dist, dists)
                 min_dist[idx] = 0.0
             return selected, meta, int(max_k)

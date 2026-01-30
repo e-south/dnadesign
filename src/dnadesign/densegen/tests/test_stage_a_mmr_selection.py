@@ -16,25 +16,6 @@ import pytest
 from dnadesign.densegen.src.adapters.sources import pwm_sampling, stage_a_selection
 
 
-def _motif_with_log_odds() -> pwm_sampling.PWMMotif:
-    matrix = [
-        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
-        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
-        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
-    ]
-    log_odds = [
-        {"A": 2.0, "C": 0.0, "G": 0.0, "T": 0.0},
-        {"A": 2.0, "C": 0.0, "G": 0.0, "T": 0.0},
-        {"A": 2.0, "C": 5.0, "G": 0.0, "T": 1.0},
-    ]
-    return pwm_sampling.PWMMotif(
-        motif_id="M1",
-        matrix=matrix,
-        background={"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
-        log_odds=log_odds,
-    )
-
-
 def _cand(seq: str, score: float) -> pwm_sampling.FimoCandidate:
     return pwm_sampling.FimoCandidate(
         seq=seq,
@@ -46,26 +27,29 @@ def _cand(seq: str, score: float) -> pwm_sampling.FimoCandidate:
     )
 
 
-def test_mmr_prefers_diverse_when_scores_equal() -> None:
-    motif = _motif_with_log_odds()
+def test_mmr_prefers_low_ic_mismatch_when_scores_equal() -> None:
+    matrix = [
+        {"A": 0.97, "C": 0.01, "G": 0.01, "T": 0.01},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+    ]
     ranked = [
-        _cand("AAA", 6.0),
-        _cand("AAT", 5.0),
-        _cand("CCC", 5.0),
+        _cand("AA", 10.0),
+        _cand("AT", 9.0),
+        _cand("TA", 9.0),
     ]
     selected, meta, diag = stage_a_selection._select_by_mmr(
         ranked,
-        log_odds=motif.log_odds or [],
+        matrix=matrix,
         n_sites=2,
-        alpha=0.9,
+        alpha=0.5,
         shortlist_min=3,
         shortlist_factor=1,
         shortlist_max=None,
         tier_widening=None,
     )
-    assert [cand.seq for cand in selected] == ["AAA", "CCC"]
-    assert meta["AAA"]["selection_rank"] == 1
-    assert meta["CCC"]["selection_rank"] == 2
+    assert [cand.seq for cand in selected] == ["AA", "AT"]
+    assert meta["AA"]["selection_rank"] == 1
+    assert meta["AT"]["selection_rank"] == 2
     assert diag["shortlist_k"] == 3
 
 
@@ -75,3 +59,12 @@ def test_score_norm_uses_percentile_rank() -> None:
     assert norm[10.0] == pytest.approx(0.166666, rel=1e-5)
     assert norm[30.0] == pytest.approx(0.666666, rel=1e-5)
     assert norm[40.0] == pytest.approx(1.0, rel=1e-5)
+
+
+def test_pwm_tolerant_weights_emphasize_low_ic_positions() -> None:
+    matrix = [
+        {"A": 0.97, "C": 0.01, "G": 0.01, "T": 0.01},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+    ]
+    weights = stage_a_selection._pwm_tolerant_weights(matrix)
+    assert weights[1] > weights[0]

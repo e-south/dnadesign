@@ -72,7 +72,7 @@ def test_stage_a_yield_bias_labels_and_ticks() -> None:
     try:
         assert axes_left[-1].get_xlabel() == "Stage"
         labels = [tick.get_text() for tick in axes_left[-1].get_xticklabels() if tick.get_text()]
-        assert labels == ["Generated", "Eligible raw", "Unique core", "Selection pool", "Retained"]
+        assert labels == ["Generated", "Has hit", "Eligible", "Unique core", "MMR pool", "Retained"]
         assert axes_left[0].get_title() == "Stepwise sequence yield"
         assert axes_right[0].get_title() == "Retained sites: score vs length (GC color)"
         assert axes_left[0].yaxis.get_offset_text().get_text() == ""

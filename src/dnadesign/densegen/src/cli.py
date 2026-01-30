@@ -666,6 +666,7 @@ def _stage_a_sampling_rows(
                 input_name = summary.input_name or pool.name
                 regulator = summary.regulator or "-"
                 candidates = _format_count(summary.generated)
+                has_hit = _format_ratio(summary.candidates_with_hit, summary.generated)
                 eligible_raw = _format_ratio(summary.eligible_raw, summary.generated)
                 eligible_unique = _format_ratio(summary.eligible_unique, summary.eligible_raw)
                 retained = _format_count(summary.retained)
@@ -720,14 +721,14 @@ def _stage_a_sampling_rows(
                 diversity = summary.diversity or {}
                 core_hamming = diversity.get("core_hamming") if isinstance(diversity, dict) else None
                 if isinstance(core_hamming, dict):
-                    nnd_k5 = core_hamming.get("nnd_k5") if isinstance(core_hamming.get("nnd_k5"), dict) else None
-                    nnd_k1 = core_hamming.get("nnd_k1") if isinstance(core_hamming.get("nnd_k1"), dict) else None
-                    block = nnd_k5 or nnd_k1
-                    if isinstance(block, dict):
-                        baseline = block.get("baseline") if isinstance(block.get("baseline"), dict) else None
-                        actual = block.get("actual") if isinstance(block.get("actual"), dict) else None
-                        baseline_med = baseline.get("median") if baseline is not None else None
-                        actual_med = actual.get("median") if actual is not None else None
+                    pairwise = core_hamming.get("pairwise") if isinstance(core_hamming.get("pairwise"), dict) else None
+                    if isinstance(pairwise, dict):
+                        baseline = pairwise.get("baseline") if isinstance(pairwise.get("baseline"), dict) else None
+                        actual = pairwise.get("actual") if isinstance(pairwise.get("actual"), dict) else None
+                        if baseline is None or actual is None:
+                            raise ValueError("Stage-A diversity missing pairwise baseline/actual summary.")
+                        baseline_med = baseline.get("median")
+                        actual_med = actual.get("median")
                         diversity_label = _format_diversity_value(actual_med)
                         if baseline_med is not None and actual_med is not None:
                             diversity_delta = _format_diversity_value(
@@ -765,6 +766,7 @@ def _stage_a_sampling_rows(
                         "input_name": str(input_name),
                         "regulator": str(regulator),
                         "generated": candidates,
+                        "has_hit": has_hit,
                         "eligible_raw": eligible_raw,
                         "eligible_unique": eligible_unique,
                         "retained": retained,
@@ -811,6 +813,7 @@ def _stage_a_sampling_rows(
                 "input_name": str(pool.name),
                 "regulator": "-",
                 "generated": _format_count(total),
+                "has_hit": _format_ratio(total, total),
                 "eligible_raw": _format_ratio(total, total),
                 "eligible_unique": _format_ratio(total, total),
                 "retained": _format_count(total),
@@ -876,8 +879,10 @@ def _stage_a_plan_rows(
                 if mode == "fixed_candidates":
                     budget_label = f"fixed={getattr(budget, 'candidates', '-')}"
                 elif mode == "tier_target":
+                    target_frac = getattr(budget, "target_tier_fraction", None)
+                    tier_label = "-" if target_frac is None else f"{float(target_frac) * 100:.3f}%"
                     budget_label = (
-                        f"tier={getattr(budget, 'target_tier_fraction', '-')}"
+                        f"tier={tier_label}"
                         f" max_candidates={getattr(budget, 'max_candidates', '-')}"
                         f" max_seconds={getattr(budget, 'max_seconds', '-')}"
                     )
@@ -1876,8 +1881,10 @@ def inspect_config(
                     if mode == "fixed_candidates":
                         budget_label = f"fixed={getattr(budget, 'candidates', '-')}"
                     elif mode == "tier_target":
+                        target_frac = getattr(budget, "target_tier_fraction", None)
+                        tier_label = "-" if target_frac is None else f"{float(target_frac) * 100:.3f}%"
                         budget_label = (
-                            f"tier={getattr(budget, 'target_tier_fraction', '-')}"
+                            f"tier={tier_label}"
                             f" max_candidates={getattr(budget, 'max_candidates', '-')}"
                             f" max_seconds={getattr(budget, 'max_seconds', '-')}"
                         )
@@ -2183,11 +2190,11 @@ def stage_a_build_pool(
                 console.print(f"[bold]{title}[/]")
             console.print(table)
         console.print(
-            "Legend: generated=PWM candidates; eligible_raw=best_hit_score>0 with hit; "
-            "eligible_unique=deduped by uniqueness.key; retained=top-N by score after dedupe; "
-            "tier target=diagnostic tier target status; "
+            "Legend: generated=PWM candidates; has_hit=FIMO hit present; "
+            "eligible_raw=best_hit_score>0 among hits; eligible_unique=deduped by uniqueness.key; "
+            "retained=top-N by score after dedupe; tier target=diagnostic tier target status; "
             "tier fill=deepest diagnostic tier used; selection=Stage-A selection policy; "
-            "k(pool/target)=MMR shortlist pool vs target; div(k5)=k=5 Hamming median; "
+            "k(pool/target)=MMR shortlist pool vs target; div(pairwise)=pairwise weighted Hamming median; "
             "set_overlap=baseline∩actual; set_swaps=actual - overlap; "
             "Δscore columns compare baseline vs actual p10/median."
         )
