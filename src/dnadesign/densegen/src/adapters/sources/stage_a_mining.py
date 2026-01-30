@@ -425,8 +425,6 @@ def mine_pwm_candidates(
                         cap_applied = True
                         break
                     target_candidates = next_target
-                    if progress is not None:
-                        progress.target = target_candidates
                     continue
                 remaining = int(target_candidates) - generated_total
                 if remaining <= 0:

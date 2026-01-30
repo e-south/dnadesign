@@ -43,8 +43,8 @@ class StageAProgressState:
         self.validate()
 
     def validate(self) -> None:
-        if int(self.target) <= 0:
-            raise ValueError("Stage-A progress target must be > 0.")
+        if int(self.target) < 0:
+            raise ValueError("Stage-A progress target must be >= 0.")
         if int(self.generated) < 0:
             raise ValueError("Stage-A progress generated must be >= 0.")
         if self.accepted is not None and int(self.accepted) < 0:
@@ -111,21 +111,19 @@ def _format_pwm_progress_line(
     tier_fractions: Sequence[float] | None,
     tier_yield: Optional[str],
 ) -> str:
-    safe_target = max(1, int(target))
-    gen_pct = min(100, int(100 * generated / safe_target))
-    gen_bar = _format_progress_bar(int(generated), int(safe_target))
+    safe_target = int(target)
     parts = [f"PWM {motif_id}", backend]
     if phase:
         parts.append(f"phase {phase}")
-    parts.append(f"gen {gen_pct}% {gen_bar} ({generated}/{safe_target})")
+    if safe_target > 0:
+        parts.append(f"gen {generated}/{safe_target}")
+    else:
+        parts.append(f"gen {generated}")
     if accepted is not None:
         if accepted_target is not None and int(accepted_target) > 0:
-            acc_pct = min(100, int(100 * int(accepted) / max(1, int(accepted_target))))
-            parts.append(f"eligible_unique {acc_pct}% ({accepted}/{accepted_target})")
+            parts.append(f"eligible_unique {accepted}/{accepted_target}")
         else:
             parts.append(f"eligible_unique {accepted}")
-    if target_fraction is not None:
-        parts.append(f"tier {float(target_fraction) * 100:.3f}%")
     if tier_yield:
         tier_label = _format_tier_fraction_label(tier_fractions)
         if tier_label:
@@ -163,12 +161,9 @@ def _format_stage_a_milestone(
 def _stage_a_live_render(state: dict[str, StageAProgressState]):
     table = make_table(show_header=True, pad_edge=False)
     table.add_column("motif")
-    table.add_column("backend")
     table.add_column("phase")
-    table.add_column("generated/target", no_wrap=True, overflow="ellipsis", min_width=14)
-    table.add_column("gen %", no_wrap=True, overflow="ellipsis", min_width=12)
+    table.add_column("generated/limit", no_wrap=True, overflow="ellipsis", min_width=14)
     table.add_column("eligible_unique/target", no_wrap=True, overflow="ellipsis", min_width=18)
-    table.add_column("tier target")
     table.add_column("tier yield")
     table.add_column("batch")
     table.add_column("elapsed")
@@ -176,17 +171,13 @@ def _stage_a_live_render(state: dict[str, StageAProgressState]):
     for key in sorted(state, key=lambda k: str(state[k].motif_id)):
         row = state[key]
         generated = int(row.generated)
-        target = max(1, int(row.target))
+        target = int(row.target)
         accepted = row.accepted
         accepted_target = row.accepted_target
-        target_fraction = row.target_fraction
         elapsed = float(row.elapsed)
         batch_index = row.batch_index
         batch_total = row.batch_total
-        gen_pct = min(100, int(100 * generated / target))
-        gen_bar = _format_progress_bar(int(generated), int(target))
-        gen_label = f"{generated}/{target}"
-        progress_label = f"{gen_bar} {gen_pct}%"
+        gen_label = f"{generated}/{target}" if target > 0 else f"{generated}/-"
         if accepted is None:
             eligible_label = "-"
         elif accepted_target is not None and int(accepted_target) > 0:
@@ -194,9 +185,6 @@ def _stage_a_live_render(state: dict[str, StageAProgressState]):
             eligible_label = f"{accepted}/{accepted_target} ({acc_pct}%)"
         else:
             eligible_label = str(accepted)
-        tier_target_label = "-"
-        if target_fraction is not None:
-            tier_target_label = f"{float(target_fraction) * 100:.3f}%"
         tier_fractions = row.tier_fractions
         tier_yield = _format_tier_yield(int(accepted), fractions=tier_fractions) if accepted is not None else "-"
         tier_label = _format_tier_fraction_label(tier_fractions)
@@ -211,12 +199,9 @@ def _stage_a_live_render(state: dict[str, StageAProgressState]):
             batch_label = f"{int(batch_index)}/{total_label}"
         table.add_row(
             str(row.motif_id),
-            str(row.backend),
             str(row.phase or "-"),
             gen_label,
-            progress_label,
             eligible_label,
-            tier_target_label,
             tier_yield,
             batch_label,
             elapsed_label,
@@ -304,7 +289,7 @@ class StageAProgressManager:
         with self._lock:
             row = self._state.get(key)
             if row is None:
-                return
+                raise RuntimeError("Stage-A progress update received before registration.")
             row.generated = int(generated)
             row.accepted = int(accepted) if accepted is not None else None
             row.elapsed = float(elapsed)
@@ -328,7 +313,7 @@ class StageAProgressManager:
         with self._lock:
             row = self._state.get(key)
             if row is None:
-                return
+                raise RuntimeError("Stage-A progress phase update received before registration.")
             row.phase = phase
             if self._live is None:
                 return
@@ -374,12 +359,13 @@ class _PwmSamplingProgress:
         interactive = tty
         self._use_live = self._enabled and self._mode == "screen" and interactive
         self._use_table = False
-        self._allow_carriage = interactive
+        self._allow_carriage = interactive and self._mode == "summary"
         self._live_key = f"{self.motif_id}:{id(self)}"
         self._phase: Optional[str] = "mining"
         self._start = time.monotonic()
         self._last_update = self._start
         self._last_len = 0
+        self._last_emitted_phase: Optional[str] = None
         self._last_state: (
             tuple[
                 int,
@@ -432,6 +418,11 @@ class _PwmSamplingProgress:
             int(self.accepted_target) if self.accepted_target is not None else None,
             self._phase,
         )
+        phase_changed = self._phase != self._last_emitted_phase
+        if self._mode == "stream" and not force and self._shown and not phase_changed:
+            self._last_state = state
+            self._last_update = now
+            return
         if self._shown and state == self._last_state:
             if self._mode != "screen" or logging_utils.is_progress_line_visible():
                 self._last_update = now
@@ -482,6 +473,8 @@ class _PwmSamplingProgress:
                 self.stream.flush()
         self._last_update = now
         self._last_state = state
+        if self._mode == "stream":
+            self._last_emitted_phase = self._phase
         self._shown = True
 
     def set_phase(self, phase: Optional[str]) -> None:

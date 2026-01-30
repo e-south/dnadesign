@@ -309,6 +309,15 @@ Optional Stage‑A debug:
 - `outputs/pools/candidates/` (when `keep_all_candidates_debug: true`)
   Candidate-level Parquet logs with accept/reject reasons (`reject_reason`) for audits.
 
+Stage‑A build‑pool stdout:
+
+- Live progress table (screen mode) reports: motif, phase, generated/limit, eligible_unique/target,
+  tier yield (0.1/1/9), batch, elapsed, and rate.
+- The sampling recap is compact by default (generated, eligible_unique, retained, tier fill, selection,
+  pool headroom, diversity delta, overlap, Δscore med, score/length stats).
+- Use `dense stage-a build-pool --verbose` to include full diagnostics
+  (has_hit, eligible_raw, tier target, set_swaps, Δscore p10).
+
 #### Stage‑B artifacts
 
 - `outputs/libraries/library_builds.parquet` + `outputs/libraries/library_members.parquet`

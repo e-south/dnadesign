@@ -45,6 +45,7 @@ def stage_a_recap_tables(
     *,
     display_map_by_input: dict[str, dict[str, str]],
     show_motif_ids: bool,
+    verbose: bool = False,
 ) -> list[tuple[str, object]]:
     grouped: dict[str, list[dict[str, object]]] = {}
     for row in recap_rows:
@@ -55,46 +56,74 @@ def stage_a_recap_tables(
         recap_table = make_table()
         recap_table.add_column("TF", overflow="fold")
         recap_table.add_column("generated")
-        recap_table.add_column("has_hit")
-        recap_table.add_column("eligible_raw")
+        if verbose:
+            recap_table.add_column("has_hit")
+            recap_table.add_column("eligible_raw")
         recap_table.add_column("eligible_unique")
         recap_table.add_column("retained")
-        recap_table.add_column("tier target")
+        if verbose:
+            recap_table.add_column("tier target")
         recap_table.add_column("tier fill")
         recap_table.add_column("selection")
         recap_table.add_column("k(pool/target)")
         recap_table.add_column("div(pairwise)")
         recap_table.add_column("Δdiv(pairwise)")
-        recap_table.add_column("baseline overlap")
-        recap_table.add_column("set_swaps")
-        recap_table.add_column("Δscore(p10)")
-        recap_table.add_column("Δscore(med)")
+        recap_table.add_column("overlap")
+        if verbose:
+            recap_table.add_column("set_swaps")
+            recap_table.add_column("Δscore p10")
+        recap_table.add_column("Δscore med")
         recap_table.add_column("score(min/med/avg/max)")
         recap_table.add_column("len(n/min/med/avg/max)")
         for row in sorted(grouped[input_name], key=lambda item: str(item["regulator"])):
             reg_label = str(row["regulator"])
             if not show_motif_ids:
                 reg_label = display_map_by_input.get(input_name, {}).get(reg_label, reg_label)
-            recap_table.add_row(
-                reg_label,
-                str(row["generated"]),
-                str(row["has_hit"]),
-                str(row["eligible_raw"]),
-                str(row["eligible_unique"]),
-                str(row["retained"]),
-                str(row["tier_target"]),
-                str(row["tier_fill"]),
-                str(row["selection"]),
-                str(row["diversity_pool"]),
-                str(row["diversity_med"]),
-                str(row["diversity_delta"]),
-                str(row["set_overlap"]),
-                str(row["set_swaps"]),
-                str(row["diversity_score_p10_delta"]),
-                str(row["diversity_score_med_delta"]),
-                str(row["score"]),
-                str(row["length"]),
+            pool_label = str(row["diversity_pool"])
+            pool_source = str(row["diversity_pool_source"])
+            if verbose and pool_source not in {"-", ""}:
+                pool_label = f"{pool_label} ({pool_source})"
+            recap_row = [reg_label, str(row["generated"])]
+            if verbose:
+                recap_row.extend([str(row["has_hit"]), str(row["eligible_raw"])])
+            recap_row.extend(
+                [
+                    str(row["eligible_unique"]),
+                    str(row["retained"]),
+                ]
             )
+            if verbose:
+                recap_row.append(str(row["tier_target"]))
+            recap_row.extend(
+                [
+                    str(row["tier_fill"]),
+                    str(row["selection"]),
+                    pool_label,
+                    str(row["diversity_med"]),
+                    str(row["diversity_delta"]),
+                    str(row["set_overlap"]),
+                ]
+            )
+            if verbose:
+                recap_row.extend([str(row["set_swaps"]), str(row["diversity_score_p10_delta"])])
+            recap_row.extend(
+                [
+                    str(row["diversity_score_med_delta"]),
+                    str(row["score"]),
+                    str(row["length"]),
+                ]
+            )
+            if verbose:
+                recap_row.extend(
+                    [
+                        str(row["has_hit"]),
+                        str(row["eligible_raw"]),
+                        str(row["tier_target"]),
+                        str(row["set_swaps"]),
+                        str(row["diversity_score_p10_delta"]),
+                    ]
+                )
+            recap_table.add_row(*recap_row)
         tables.append((f"Input: {input_name}", recap_table))
 
         tier_rows = [

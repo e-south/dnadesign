@@ -333,10 +333,18 @@ def sample_pwm_sites(
         if budget_max_candidates is not None:
             requested_candidates = min(requested_candidates, int(budget_max_candidates))
     n_candidates = max(1, int(requested_candidates))
+    if budget_mode == "fixed_candidates":
+        progress_target = int(budget_candidates)
+    elif budget_max_candidates is not None:
+        progress_target = int(budget_max_candidates)
+    elif budget_max_seconds is not None:
+        progress_target = 0
+    else:
+        progress_target = int(requested_candidates)
     progress = _PwmSamplingProgress(
         motif_id=motif.motif_id,
         backend=scoring_backend,
-        target=requested_candidates,
+        target=progress_target,
         accepted_target=progress_accepted_target,
         stream=sys.stdout,
         tier_fractions=tier_fractions,

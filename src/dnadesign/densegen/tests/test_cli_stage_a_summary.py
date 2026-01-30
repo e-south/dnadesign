@@ -34,6 +34,7 @@ from dnadesign.densegen.src.adapters.sources.stage_a_metrics import (
 )
 from dnadesign.densegen.src.adapters.sources.stage_a_summary import PWMSamplingSummary
 from dnadesign.densegen.src.cli import _format_tier_counts, _stage_a_sampling_rows, app
+from dnadesign.densegen.src.cli_render import stage_a_recap_tables
 from dnadesign.densegen.src.core.artifacts.pool import PoolData
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
 
@@ -252,6 +253,82 @@ def test_stage_a_build_pool_reports_sampling_recap(tmp_path: Path) -> None:
     assert "retained" in result.output
 
 
+def test_stage_a_build_pool_compact_recap_omits_verbose_columns(tmp_path: Path) -> None:
+    cfg_path = _write_stage_a_config(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["stage-a", "build-pool", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    assert "has_hit" not in result.output
+    assert "eligible_raw" not in result.output
+    assert "Δscore(p10)" not in result.output
+
+
+def test_stage_a_build_pool_verbose_recap_includes_verbose_columns(tmp_path: Path) -> None:
+    cfg_path = _write_stage_a_config(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["stage-a", "build-pool", "--verbose", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    assert "has_hit" in result.output
+    assert "eligible_raw" in result.output
+
+
+def test_stage_a_recap_tables_include_verbose_headers() -> None:
+    summary = PWMSamplingSummary(
+        input_name="demo",
+        regulator="regA",
+        backend="fimo",
+        pwm_consensus="AAAA",
+        uniqueness_key="core",
+        collapsed_by_core_identity=0,
+        generated=10,
+        target=10,
+        target_sites=2,
+        candidates_with_hit=9,
+        eligible_raw=8,
+        eligible_unique=5,
+        retained=2,
+        retained_len_min=4,
+        retained_len_median=4.0,
+        retained_len_mean=4.0,
+        retained_len_max=4,
+        retained_score_min=1.0,
+        retained_score_median=1.0,
+        retained_score_mean=1.0,
+        retained_score_max=1.0,
+        eligible_tier_counts=[1, 1, 0, 0],
+        retained_tier_counts=[1, 0, 0, 0],
+        tier0_score=2.0,
+        tier1_score=1.5,
+        tier2_score=1.0,
+        tier_fractions=[0.001, 0.01, 0.09],
+        tier_fractions_source="default",
+        eligible_score_hist_edges=[0.0, 1.0],
+        eligible_score_hist_counts=[1],
+        selection_policy="mmr",
+        selection_alpha=0.9,
+        selection_shortlist_k=50,
+        selection_shortlist_min=10,
+        selection_shortlist_factor=5,
+        selection_shortlist_target=250,
+        selection_pool_source="shortlist_k",
+        diversity=_dummy_diversity_summary(),
+        mining_audit=None,
+    )
+    pool = PoolData(
+        name="demo",
+        input_type="pwm_meme",
+        pool_mode="tfbs",
+        df=None,
+        sequences=[],
+        pool_path=Path("demo.parquet"),
+        summaries=[summary],
+    )
+    rows = _stage_a_sampling_rows({"demo": pool})
+    tables = stage_a_recap_tables(rows, display_map_by_input={}, show_motif_ids=True, verbose=True)
+    headers = [col.header for col in tables[0][1].columns]
+    assert "Δscore p10" in headers
+
+
 def test_stage_a_build_pool_accepts_fresh_flag(tmp_path: Path) -> None:
     cfg_path = _write_stage_a_config(tmp_path)
     runner = CliRunner()
@@ -336,7 +413,7 @@ def test_stage_a_sampling_rows_include_pool_headroom() -> None:
         summaries=[summary],
     )
     rows = _stage_a_sampling_rows({"demo": pool})
-    assert rows[0]["diversity_pool"] == "50/250 (shortlist_k)"
+    assert rows[0]["diversity_pool"] == "50/250"
 
 
 def test_stage_a_sampling_rows_tier_target_omits_required_unique() -> None:

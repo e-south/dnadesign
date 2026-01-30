@@ -777,7 +777,7 @@ def _stage_a_sampling_rows(
                 if diversity.candidate_pool_size is None or diversity.shortlist_target is None:
                     raise ValueError("Stage-A diversity missing pool size or shortlist target.")
                 pool_label = f"{int(diversity.candidate_pool_size)}/{int(diversity.shortlist_target)}"
-                diversity_pool = f"{pool_label} ({summary.selection_pool_source})"
+                diversity_pool = pool_label
                 rows.append(
                     {
                         "input_name": str(input_name),
@@ -800,6 +800,7 @@ def _stage_a_sampling_rows(
                         "set_overlap": diversity_overlap,
                         "set_swaps": diversity_swaps,
                         "diversity_pool": diversity_pool,
+                        "diversity_pool_source": summary.selection_pool_source,
                         "tier0_score": summary.tier0_score,
                         "tier1_score": summary.tier1_score,
                         "tier2_score": summary.tier2_score,
@@ -847,6 +848,7 @@ def _stage_a_sampling_rows(
                 "set_overlap": "-",
                 "set_swaps": "-",
                 "diversity_pool": "-",
+                "diversity_pool_source": "-",
                 "tier0_score": None,
                 "tier1_score": None,
                 "tier2_score": None,
@@ -2071,6 +2073,11 @@ def stage_a_build_pool(
         "--show-motif-ids",
         help="Show full motif IDs instead of TF names.",
     ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        help="Show verbose Stage-A recap columns.",
+    ),
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
 ):
     cfg_path, is_default = _resolve_config_path(ctx, config)
@@ -2202,20 +2209,31 @@ def stage_a_build_pool(
             recap_rows,
             display_map_by_input=display_map_by_input,
             show_motif_ids=show_motif_ids,
+            verbose=verbose,
         ):
             if title:
                 console.print(f"[bold]{title}[/]")
             console.print(table)
-        console.print(
-            "Legend: generated=PWM candidates; has_hit=FIMO hit present; "
-            "eligible_raw=best_hit_score>0 among hits; eligible_unique=deduped by uniqueness.key; "
-            "retained=top-N by score after dedupe; tier target=diagnostic tier target status; "
-            "tier fill=deepest diagnostic tier used; selection=Stage-A selection policy; "
-            "k(pool/target)=MMR shortlist pool vs target (target=max(shortlist_min, shortlist_factor×n_sites)); "
-            "div(pairwise)=pairwise weighted Hamming median; "
-            "baseline overlap=baseline∩actual; set_swaps=actual - overlap; "
-            "Δscore columns compare baseline vs actual p10/median."
-        )
+        if verbose:
+            console.print(
+                "Legend: generated=PWM candidates; has_hit=FIMO hit present; "
+                "eligible_raw=best_hit_score>0 among hits; eligible_unique=deduped by uniqueness.key; "
+                "retained=top-N by score after dedupe; tier target=diagnostic tier target status; "
+                "tier fill=deepest diagnostic tier used; selection=Stage-A selection policy; "
+                "k(pool/target)=MMR shortlist pool vs target (target=max(shortlist_min, shortlist_factor×n_sites)); "
+                "div(pairwise)=pairwise weighted Hamming median; "
+                "overlap=baseline∩actual; set_swaps=actual - overlap; "
+                "Δscore columns compare baseline vs actual p10/med."
+            )
+        else:
+            console.print(
+                "Legend: generated=PWM candidates; eligible_unique=deduped by uniqueness.key; "
+                "retained=top-N by score after dedupe; tier fill=deepest diagnostic tier used; "
+                "selection=Stage-A selection policy; "
+                "k(pool/target)=MMR shortlist pool vs target (target=max(shortlist_min, shortlist_factor×n_sites)); "
+                "div(pairwise)=pairwise weighted Hamming median; "
+                "overlap=baseline∩actual; Δscore med compares baseline vs actual median."
+            )
     console.print(
         f":sparkles: [bold green]Pool manifest written[/]: "
         f"{_display_path(artifact.manifest_path, run_root, absolute=False)}"
