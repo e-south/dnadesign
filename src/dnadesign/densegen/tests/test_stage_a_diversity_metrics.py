@@ -96,6 +96,39 @@ def test_diversity_summary_scores() -> None:
     assert actual.p50 == 1.5
 
 
+def _base4_sequence(index: int, *, length: int = 6) -> str:
+    bases = ["A", "C", "G", "T"]
+    digits = []
+    value = int(index)
+    for _ in range(int(length)):
+        digits.append(bases[value % 4])
+        value //= 4
+    return "".join(digits)
+
+
+def test_diversity_summary_pairwise_is_exact_for_retained_sets() -> None:
+    cores = [_base4_sequence(i, length=6) for i in range(200)]
+    scores = [float(i) for i in range(200)]
+    summary = _diversity_summary(
+        baseline_cores=cores,
+        actual_cores=cores,
+        baseline_scores=scores,
+        actual_scores=scores,
+        upper_bound_cores=cores,
+        upper_bound_scores=scores,
+        max_n=2500,
+    )
+    assert summary is not None
+    pairwise = summary.core_hamming.pairwise
+    assert pairwise is not None
+    total_pairs = len(cores) * (len(cores) - 1) // 2
+    assert pairwise.baseline.total_pairs == total_pairs
+    assert pairwise.baseline.n_pairs == total_pairs
+    assert pairwise.baseline.subsampled is False
+    assert pairwise.actual.n_pairs == total_pairs
+    assert pairwise.actual.subsampled is False
+
+
 def _cand(seq: str, score: float) -> FimoCandidate:
     return FimoCandidate(
         seq=seq,
