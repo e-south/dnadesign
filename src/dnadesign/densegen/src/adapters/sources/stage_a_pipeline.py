@@ -20,8 +20,9 @@ from typing import List, Optional, Sequence
 import numpy as np
 
 from ...core.score_tiers import score_tier_counts
-from .stage_a_candidate_store import write_candidate_records
+from .stage_a_candidate_store import write_candidate_records, write_fimo_debug_tsv
 from .stage_a_diversity import _diversity_summary
+from .stage_a_encoding import CoreEncodingStore
 from .stage_a_metadata import TFBSMeta
 from .stage_a_metrics import _tail_unique_slope
 from .stage_a_mining import mine_pwm_candidates
@@ -231,6 +232,8 @@ def run_stage_a_pipeline(
     generated_by_batch = mining_result.generated_by_batch
     candidate_records = mining_result.candidate_records
     debug_dir = mining_result.debug_dir
+    debug_tsv_lines = mining_result.debug_tsv_lines
+    debug_tsv_path = mining_result.debug_tsv_path
     requested_final = mining_result.requested_final
     intended_core_by_seq = mining_result.intended_core_by_seq
     core_offset_by_seq = mining_result.core_offset_by_seq
@@ -297,6 +300,7 @@ def run_stage_a_pipeline(
         eligible_tier_counts[tier] += 1
     selection_meta: dict[str, SelectionMeta] = {}
     selection_diag: SelectionDiagnostics | None = None
+    encoding_store = CoreEncodingStore()
     if selection_policy == "mmr":
         picked, selection_meta, selection_diag = _select_by_mmr(
             ranked,
@@ -307,6 +311,7 @@ def run_stage_a_pipeline(
             shortlist_factor=int(selection_shortlist_factor),
             shortlist_max=int(selection_shortlist_max) if selection_shortlist_max is not None else None,
             tier_widening=selection_tier_widening,
+            encoding_store=encoding_store,
         )
     else:
         picked = ranked[: int(n_sites)]
@@ -345,6 +350,7 @@ def run_stage_a_pipeline(
         selection_diag=selection_diag,
         n_sites=int(n_sites),
         weights=distance_weights,
+        encoding_store=encoding_store,
     )
     baseline_global_candidates = _select_diversity_global_candidates(ranked, n_sites=int(n_sites))
     baseline_cores = [(_core_sequence(cand)) for cand in baseline_candidates if cand.matched_sequence]
@@ -389,6 +395,7 @@ def run_stage_a_pipeline(
         label=motif.motif_id,
         max_n=diversity_max_n,
         distance_weights=distance_weights,
+        encoding_store=encoding_store,
     )
     if diversity is None:
         raise ValueError("Stage-A diversity metrics missing; ensure core sequences are available.")
@@ -534,17 +541,17 @@ def run_stage_a_pipeline(
                 row["reject_reason"] = None
             elif row.get("accepted"):
                 row["reject_reason"] = "not_selected"
-        try:
-            path = write_candidate_records(
-                candidate_records,
-                debug_output_dir=debug_dir,
-                debug_label=debug_label or motif.motif_id,
-                motif_id=motif.motif_id,
-                motif_hash=motif_hash,
-            )
-            log.info("FIMO candidate records written: %s", path)
-        except Exception:
-            log.warning("Failed to write FIMO candidate records.", exc_info=True)
+        path = write_candidate_records(
+            candidate_records,
+            debug_output_dir=debug_dir,
+            debug_label=debug_label or motif.motif_id,
+            motif_id=motif.motif_id,
+            motif_hash=motif_hash,
+        )
+        log.info("FIMO candidate records written: %s", path)
+    if debug_tsv_lines is not None and debug_tsv_path is not None:
+        path = write_fimo_debug_tsv(debug_tsv_lines, debug_path=debug_tsv_path)
+        log.info("FIMO debug TSV written: %s", path)
     nearest_sims = [
         float(meta.nearest_selected_similarity)
         for meta in selection_meta.values()

@@ -155,10 +155,13 @@ MMR (high-level, faithful to implementation; after Carbonell & Goldstein, 1998):
     `w_i = 1 - (IC_i / 2)` (so low‑information positions get higher weight).
   - Distance:
     `dist(x, y) = Σ w_i * [x_i ≠ y_i]`
-  - Similarity:
-    `similarity = 1 / (1 + dist)`
+- Similarity:
+  `similarity = 1 / (1 + dist)`
 
-This weighting encourages diversity in **tolerant** (low‑IC) positions while preserving PWM‑likeness.
+PWM‑tolerant diversity (safer for PWM‑likeness):
+- weights ~ (1 - IC)
+- encourages diversity in low‑information (tolerant) positions
+- preserves high‑information (specific) positions
 
 Reference: Carbonell & Goldstein, “The Use of MMR, Diversity-Based Reranking for Reordering Documents and Producing Summaries.” (SIGIR 1998)
 https://www.cs.cmu.edu/~jgc/publication/The_Use_MMR_Diversity_Based_LTMIR_1998.pdf

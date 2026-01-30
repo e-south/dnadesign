@@ -35,6 +35,8 @@ def test_stage_a_strata_overview_axes_and_legend() -> None:
                 "tier0_score": 6.0,
                 "tier1_score": 4.0,
                 "tier2_score": 2.0,
+                "tier_fractions": [0.001, 0.01, 0.09],
+                "tier_fractions_source": "default",
             },
             {
                 "regulator": "regB",
@@ -43,6 +45,8 @@ def test_stage_a_strata_overview_axes_and_legend() -> None:
                 "tier0_score": 2.0,
                 "tier1_score": 1.0,
                 "tier2_score": 0.5,
+                "tier_fractions": [0.001, 0.01, 0.09],
+                "tier_fractions_source": "default",
             },
         ],
     }
@@ -97,6 +101,8 @@ def test_stage_a_strata_overview_accepts_regulator_id_columns() -> None:
                 "tier0_score": 4.0,
                 "tier1_score": 2.0,
                 "tier2_score": 1.0,
+                "tier_fractions": [0.001, 0.01, 0.09],
+                "tier_fractions_source": "default",
             }
         ],
     }
@@ -137,6 +143,8 @@ def test_stage_a_strata_overview_length_axis_expands_for_long_tfbs() -> None:
                 "tier0_score": 2.0,
                 "tier1_score": 1.0,
                 "tier2_score": 0.5,
+                "tier_fractions": [0.001, 0.01, 0.09],
+                "tier_fractions_source": "default",
             }
         ],
     }
@@ -178,6 +186,8 @@ def test_stage_a_strata_overview_xlims_cover_all_regulators() -> None:
                 "tier0_score": 14.5,
                 "tier1_score": 11.0,
                 "tier2_score": 6.0,
+                "tier_fractions": [0.001, 0.01, 0.09],
+                "tier_fractions_source": "default",
             },
             {
                 "regulator": "cpxR",
@@ -186,6 +196,8 @@ def test_stage_a_strata_overview_xlims_cover_all_regulators() -> None:
                 "tier0_score": 5.5,
                 "tier1_score": 4.0,
                 "tier2_score": 2.0,
+                "tier_fractions": [0.001, 0.01, 0.09],
+                "tier_fractions_source": "default",
             },
         ],
     }

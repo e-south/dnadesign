@@ -32,7 +32,9 @@ def _build_stage_a_yield_bias_figure(
     style["seaborn_style"] = False
     rc = stage_a_rcparams(style)
     text_sizes = _stage_a_text_sizes(style)
-    eligible_hist = sampling.get("eligible_score_hist")
+    if "eligible_score_hist" not in sampling:
+        raise ValueError(f"Stage-A sampling missing eligible score histogram for input '{input_name}'.")
+    eligible_hist = sampling["eligible_score_hist"]
     if not isinstance(eligible_hist, list) or not eligible_hist:
         raise ValueError(f"Stage-A sampling missing eligible score histogram for input '{input_name}'.")
     if "regulator_id" in pool_df.columns:
@@ -79,15 +81,21 @@ def _build_stage_a_yield_bias_figure(
         eligible_raw = row["eligible_raw"]
         eligible_unique = row["eligible_unique"]
         retained = row["retained"]
+        if any(val is None for val in (generated, candidates_with_hit, eligible_raw, eligible_unique, retained)):
+            raise ValueError(f"Stage-A sampling missing yield counters for '{input_name}' ({reg}).")
         if "selection_pool_source" not in row:
             raise ValueError(f"Stage-A sampling missing selection_pool_source for '{input_name}' ({reg}).")
         pool_source = row["selection_pool_source"]
         if pool_source == "shortlist_k":
-            selection_pool = row.get("selection_shortlist_k")
+            if "selection_shortlist_k" not in row:
+                raise ValueError(f"Stage-A selection missing shortlist size for '{input_name}' ({reg}).")
+            selection_pool = row["selection_shortlist_k"]
         elif pool_source == "tier_limit":
-            selection_pool = row.get("selection_tier_limit")
+            if "selection_tier_limit" not in row:
+                raise ValueError(f"Stage-A selection missing tier limit for '{input_name}' ({reg}).")
+            selection_pool = row["selection_tier_limit"]
         elif pool_source == "eligible_unique":
-            selection_pool = row.get("eligible_unique")
+            selection_pool = row["eligible_unique"]
         else:
             raise ValueError(f"Stage-A selection_pool_source invalid for '{input_name}' ({reg}).")
         if selection_pool is None:
@@ -96,12 +104,16 @@ def _build_stage_a_yield_bias_figure(
             duplication_factors[reg] = float(eligible_raw) / float(eligible_unique)
         if retained is not None and int(retained) > 0 and selection_pool is not None:
             pool_headrooms[reg] = float(selection_pool) / float(retained)
-        audit = row.get("padding_audit")
+        if "padding_audit" not in row:
+            raise ValueError(f"Stage-A sampling missing padding_audit for '{input_name}' ({reg}).")
+        audit = row["padding_audit"]
         if isinstance(audit, dict):
             overlap = audit.get("best_hit_overlaps_intended_core_fraction")
             if overlap is not None:
                 hit_overlap[reg] = float(overlap)
-        mining = row.get("mining_audit")
+        if "mining_audit" not in row:
+            raise ValueError(f"Stage-A sampling missing mining_audit for '{input_name}' ({reg}).")
+        mining = row["mining_audit"]
         if isinstance(mining, dict):
             slope = mining.get("unique_slope")
             if slope is not None:
@@ -211,10 +223,10 @@ def _build_stage_a_yield_bias_figure(
         y_limit = max_count * 1.25 + offset if max_count else 1.0
         for idx, reg in enumerate(reg_order):
             ax = axes_left[idx]
-            counts = counts_by_reg.get(reg)
-            if not counts:
+            if reg not in counts_by_reg:
                 raise ValueError(f"Stage-A yield counts missing for '{input_name}' ({reg}).")
-            hue = reg_colors.get(reg, "#4c78a8")
+            counts = counts_by_reg[reg]
+            hue = reg_colors[reg]
             ax.plot(x_positions, counts, color=hue, marker="o", linewidth=1.4, markersize=4)
             ax.set_ylim(0.0, y_limit)
             for step_idx, cur in enumerate(counts):

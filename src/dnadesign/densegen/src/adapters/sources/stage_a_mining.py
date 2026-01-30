@@ -75,6 +75,8 @@ class StageAMiningResult:
     core_offset_by_seq: dict[str, int]
     candidate_records: list[dict] | None
     debug_dir: Path | None
+    debug_tsv_lines: list[str] | None
+    debug_tsv_path: Path | None
 
 
 def mine_pwm_candidates(
@@ -373,6 +375,8 @@ def mine_pwm_candidates(
                     core_offset_by_seq={},
                     candidate_records=candidate_records,
                     debug_dir=debug_dir,
+                    debug_tsv_lines=tsv_lines if debug_path is not None else None,
+                    debug_tsv_path=debug_path,
                 )
             if requested_final > 0 and n_candidates == requested_final:
                 lengths_all = [int(width) for _ in range(int(n_candidates))]
@@ -526,9 +530,6 @@ def mine_pwm_candidates(
 
     if progress is not None:
         progress.set_phase("postprocess")
-    if debug_path is not None and tsv_lines:
-        debug_path.write_text("\n".join(tsv_lines) + "\n")
-        log.info("FIMO debug TSV written: %s", debug_path)
     return StageAMiningResult(
         candidates_by_seq=candidates_by_seq,
         candidates_with_hit=candidates_with_hit,
@@ -546,4 +547,6 @@ def mine_pwm_candidates(
         core_offset_by_seq=core_offset_by_seq,
         candidate_records=candidate_records,
         debug_dir=debug_dir,
+        debug_tsv_lines=tsv_lines if debug_path is not None else None,
+        debug_tsv_path=debug_path,
     )

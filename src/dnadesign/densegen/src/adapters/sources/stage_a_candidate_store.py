@@ -54,3 +54,15 @@ def write_candidate_records(
             raise RuntimeError(f"Failed to append candidate records to {path}") from exc
     df.to_parquet(path, index=False)
     return path
+
+
+def write_fimo_debug_tsv(
+    lines: list[str],
+    *,
+    debug_path: Path,
+) -> Path:
+    if not lines:
+        raise ValueError("FIMO debug TSV lines are required.")
+    debug_path.parent.mkdir(parents=True, exist_ok=True)
+    debug_path.write_text("\n".join(lines) + "\n")
+    return debug_path

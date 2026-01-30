@@ -16,7 +16,7 @@ from typing import Optional, Protocol, Sequence
 
 import numpy as np
 
-from .stage_a_encoding import encode_cores
+from .stage_a_encoding import CoreEncodingStore, encode_cores
 from .stage_a_types import SelectionMeta
 
 
@@ -179,6 +179,7 @@ def _select_diversity_upper_bound_candidates(
     selection_diag: SelectionDiagnostics | None,
     n_sites: int,
     weights: Sequence[float] | None = None,
+    encoding_store: CoreEncodingStore | None = None,
 ) -> list[_CandidateLike]:
     candidate_slice = _select_diversity_candidate_pool(
         ranked,
@@ -201,7 +202,7 @@ def _select_diversity_upper_bound_candidates(
             raise ValueError("Weighted Hamming requires weights matching core length.")
     else:
         weights_arr = np.ones(length, dtype=float)
-    encoded = encode_cores(cores)
+    encoded = encoding_store.encode(cores) if encoding_store is not None else encode_cores(cores)
     scores = [float(cand.score) for cand in candidate_slice]
     seqs = [cand.seq for cand in candidate_slice]
 
@@ -293,6 +294,7 @@ def _select_by_mmr(
     shortlist_factor: int,
     shortlist_max: Optional[int],
     tier_widening: Optional[Sequence[float]],
+    encoding_store: CoreEncodingStore | None = None,
 ) -> tuple[list[_CandidateLike], dict[str, SelectionMeta], SelectionDiagnostics]:
     if not ranked or n_sites <= 0:
         return (
@@ -335,10 +337,12 @@ def _select_by_mmr(
         scores_arr = np.array([float(cand.score) for cand in shortlist], dtype=float)
         scores_norm_map = _score_norm(scores_arr.tolist())
         scores_norm = np.array([scores_norm_map.get(float(cand.score), 1.0) for cand in shortlist], dtype=float)
+        score_weight = float(alpha)
+        diversity_weight = 1.0 - score_weight
         cores = [core_by_seq[cand.seq] for cand in shortlist]
         if len(weights) != len(cores[0]):
             raise ValueError("PWM weights length must match TFBS core length.")
-        encoded = encode_cores(cores)
+        encoded = encoding_store.encode(cores) if encoding_store is not None else encode_cores(cores)
         seqs = [cand.seq for cand in shortlist]
         core_ranks = _lex_ranks(cores)
         seq_ranks = _lex_ranks(seqs)
@@ -354,7 +358,7 @@ def _select_by_mmr(
                     max_sim = np.zeros(len(shortlist), dtype=float)
                 else:
                     max_sim = 1.0 / (1.0 + min_dist)
-                utility = alpha * scores_norm - (1.0 - alpha) * max_sim
+                utility = score_weight * scores_norm - diversity_weight * max_sim
                 utility[selected_mask] = -np.inf
                 best_val = float(np.max(utility))
                 candidate_idx = np.flatnonzero(utility == best_val)
@@ -392,7 +396,7 @@ def _select_by_mmr(
             cores = [core_by_seq[cand.seq] for cand in shortlist]
             if len(weights) != len(cores[0]):
                 raise ValueError("PWM weights length must match TFBS core length.")
-            encoded = encode_cores(cores)
+            encoded = encoding_store.encode(cores) if encoding_store is not None else encode_cores(cores)
             seqs = [cand.seq for cand in shortlist]
             core_ranks = _lex_ranks(cores)
             seq_ranks = _lex_ranks(seqs)

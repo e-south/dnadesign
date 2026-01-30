@@ -161,6 +161,7 @@ DenseGen can materialize Stage‑A/Stage‑B artifacts without running the solve
   - `outputs/pools/pool_manifest.json`
   - `outputs/pools/<input>__pool.parquet`
   - `outputs/pools/candidates/candidates__<label>.parquet` (when `keep_all_candidates_debug: true`)
+  - `outputs/pools/candidates/<label>__fimo.tsv` (when `keep_all_candidates_debug: true`)
   - `outputs/pools/candidates/candidates.parquet` + `candidates_summary.parquet` + `candidates_manifest.json`
     (overwritten by `stage-a build-pool --fresh` or `dense run --rebuild-stage-a`)
 - `dense stage-b build-libraries` writes:
@@ -171,7 +172,7 @@ DenseGen can materialize Stage‑A/Stage‑B artifacts without running the solve
 `dense stage-a build-pool` appends new unique TFBS to existing pools by default; pass `--fresh`
 to rebuild pools from scratch.
 `pool_manifest.json` includes the input config hash plus file fingerprints; append requires they match.
-For FIMO-backed PWM inputs, it also records Stage‑A sampling metadata
+For FIMO-backed PWM inputs, it also records Stage-A sampling metadata
 (tier fractions + source derived from `selection.tier_widening` or defaults, tier scheme label,
 eligibility/retention rules, FIMO threshold, background source/bgfile, and
 eligible score histograms with tier boundary scores per regulator, including `candidates_with_hit`,
@@ -183,6 +184,11 @@ upper bound (`upper_bound`) to show headroom; local and global
 score quantiles for tradeoff audits; large sets are deterministically subsampled to 2500
 sequences for k‑NN distances) and padding audit stats (best‑hit overlap with intended core;
 core offset histogram).
+Key fields to audit tier behavior and selection pool construction:
+- `tier_fractions` — ladder of rank fractions used to define diagnostic tiers
+- `tier_fractions_source` — config source for the ladder (e.g., `selection.tier_widening` or default)
+- `tier_scheme` — derived label for the ladder (e.g., `pct_0.1_1_9`)
+- `selection_pool_source` — which pool fed selection (`shortlist_k`, `tier_limit`, `eligible_unique`)
 Stage‑A pool rows include `best_hit_score`, `tier`, `rank_within_regulator` (1‑based rank among
 eligible_unique TFBS per regulator), and `tfbs_core` for core‑level uniqueness checks.
 

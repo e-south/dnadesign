@@ -33,9 +33,13 @@ def _build_stage_a_strata_overview_figure(
     style["seaborn_style"] = False
     rc = stage_a_rcparams(style)
     text_sizes = _stage_a_text_sizes(style)
-    if sampling.get("backend") != "fimo":
+    if "backend" not in sampling:
+        raise ValueError(f"Stage-A sampling missing backend for input '{input_name}'.")
+    if sampling["backend"] != "fimo":
         raise ValueError(f"Stage-A strata overview requires FIMO sampling (input '{input_name}').")
-    eligible_score_hist = sampling.get("eligible_score_hist")
+    if "eligible_score_hist" not in sampling:
+        raise ValueError(f"Stage-A sampling missing eligible score histogram for input '{input_name}'.")
+    eligible_score_hist = sampling["eligible_score_hist"]
     if not isinstance(eligible_score_hist, list) or not eligible_score_hist:
         raise ValueError(f"Stage-A sampling missing eligible score histogram for input '{input_name}'.")
     if "regulator_id" in pool_df.columns:
@@ -173,7 +177,9 @@ def _build_stage_a_strata_overview_figure(
         global_max += pad
         for idx, reg in enumerate(regulators):
             ax = axes_left[idx]
-            edges, counts, tier0_score, tier1_score, tier2_score = hist_by_reg.get(reg, ([], [], None, None, None))
+            if reg not in hist_by_reg:
+                raise ValueError(f"Stage-A eligible score histogram missing for '{input_name}' ({reg}).")
+            edges, counts, tier0_score, tier1_score, tier2_score = hist_by_reg[reg]
             if not edges:
                 raise ValueError(f"Stage-A eligible score histogram missing for '{input_name}' ({reg}).")
             counts_arr = np.asarray(counts, dtype=float)
@@ -183,7 +189,7 @@ def _build_stage_a_strata_overview_figure(
             scale = max_count if max_count > 0 else 1.0
             density = counts_arr / scale
             centers = (np.asarray(edges[:-1]) + np.asarray(edges[1:])) / 2.0
-            hue = color_by_reg.get(reg, "#4c78a8")
+            hue = color_by_reg[reg]
             ax.fill_between(centers, 0.0, density, color=hue, alpha=0.28)
             ax.plot(centers, density, color=hue, linewidth=1.2)
             retained_vals = pd.to_numeric(
@@ -199,9 +205,9 @@ def _build_stage_a_strata_overview_figure(
             retained_density = retained_arr / scale
             ax.fill_between(centers, 0.0, retained_density, color=hue, alpha=0.5)
             retained = retained_tiers.get(reg, {})
-            tier_labels = tier_labels_by_reg.get(reg)
-            if tier_labels is None or len(tier_labels) < 3:
+            if reg not in tier_labels_by_reg:
                 raise ValueError(f"Stage-A tier labels missing for '{input_name}' ({reg}).")
+            tier_labels = tier_labels_by_reg[reg]
             _draw_tier_markers(
                 ax,
                 [
@@ -297,7 +303,7 @@ def _build_stage_a_strata_overview_figure(
         for reg, lengths in lengths_by_reg.items():
             if not lengths:
                 continue
-            hue = color_by_reg.get(reg, "#4c78a8")
+            hue = color_by_reg[reg]
             ax_right.hist(
                 lengths,
                 bins=bins,

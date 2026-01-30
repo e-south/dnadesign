@@ -11,6 +11,9 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
+from collections import OrderedDict
+from dataclasses import dataclass, field
 from typing import Sequence
 
 import numpy as np
@@ -38,3 +41,33 @@ def encode_cores(cores: Sequence[str]) -> np.ndarray:
 
 def encode_core(core: str) -> np.ndarray:
     return encode_cores([core])[0]
+
+
+def _encoding_key(cores: Sequence[str]) -> str:
+    hasher = hashlib.md5()
+    hasher.update(str(len(cores)).encode("utf-8"))
+    for core in cores:
+        hasher.update(b"\0")
+        hasher.update(str(core).encode("utf-8"))
+    return hasher.hexdigest()
+
+
+@dataclass
+class CoreEncodingStore:
+    max_entries: int = 8
+    _cache: OrderedDict[str, np.ndarray] = field(default_factory=OrderedDict, init=False)
+
+    def encode(self, cores: Sequence[str]) -> np.ndarray:
+        if not cores:
+            return encode_cores(cores)
+        key = _encoding_key(cores)
+        cached = self._cache.get(key)
+        if cached is not None:
+            self._cache.move_to_end(key)
+            return cached
+        encoded = encode_cores(cores)
+        self._cache[key] = encoded
+        self._cache.move_to_end(key)
+        if len(self._cache) > int(self.max_entries):
+            self._cache.popitem(last=False)
+        return encoded

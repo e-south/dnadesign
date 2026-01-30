@@ -17,7 +17,7 @@ from typing import Sequence
 
 import numpy as np
 
-from .stage_a_encoding import encode_cores
+from .stage_a_encoding import CoreEncodingStore, encode_cores
 
 
 @dataclass(frozen=True)
@@ -271,6 +271,7 @@ def _core_hamming_knn(
     k: int,
     max_n: int = 2500,
     weights: Sequence[float] | None = None,
+    encoding_store: CoreEncodingStore | None = None,
 ) -> KnnSummary | None:
     if not cores:
         return None
@@ -290,7 +291,7 @@ def _core_hamming_knn(
     else:
         if int(k) >= n:
             return None
-        encoded = encode_cores(sample)
+        encoded = encoding_store.encode(sample) if encoding_store is not None else encode_cores(sample)
         weights_arr = None
         if weights is not None:
             weights_arr = np.asarray(weights, dtype=float)
@@ -338,8 +339,9 @@ def _core_hamming_nnd(
     *,
     max_n: int = 2500,
     weights: Sequence[float] | None = None,
+    encoding_store: CoreEncodingStore | None = None,
 ) -> KnnSummary | None:
-    return _core_hamming_knn(cores, k=1, max_n=max_n, weights=weights)
+    return _core_hamming_knn(cores, k=1, max_n=max_n, weights=weights, encoding_store=encoding_store)
 
 
 def _stable_seed_from_sequences(values: Sequence[str]) -> int:
@@ -354,6 +356,7 @@ def _pairwise_hamming_summary(
     *,
     max_pairs: int = 10000,
     weights: Sequence[float] | None = None,
+    encoding_store: CoreEncodingStore | None = None,
 ) -> PairwiseSummary | None:
     if len(cores) < 2:
         return None
@@ -364,7 +367,7 @@ def _pairwise_hamming_summary(
     total_pairs = n * (n - 1) // 2
     sample_pairs = int(min(max_pairs, total_pairs))
     rng = np.random.default_rng(_stable_seed_from_sequences(cores))
-    encoded = encode_cores(cores)
+    encoded = encoding_store.encode(cores) if encoding_store is not None else encode_cores(cores)
     weights_arr = None
     if weights is not None:
         weights_arr = np.asarray(weights, dtype=float)
@@ -442,6 +445,7 @@ def _diversity_summary(
     label: str | None = None,
     max_n: int = 2500,
     distance_weights: Sequence[float] | None = None,
+    encoding_store: CoreEncodingStore | None = None,
 ) -> DiversitySummary | None:
     label = label or "diversity"
     base_len = _assert_uniform_core_length(baseline_cores, label=f"{label} baseline")
@@ -461,17 +465,56 @@ def _diversity_summary(
     if uniqueness_key == "core" and actual_cores:
         if len(set(actual_cores)) != len(actual_cores):
             raise ValueError(f"Duplicate retained cores detected for {label} with uniqueness.key=core.")
-    baseline_k1 = _core_hamming_knn(baseline_cores, k=1, max_n=max_n, weights=distance_weights)
-    actual_k1 = _core_hamming_knn(actual_cores, k=1, max_n=max_n, weights=distance_weights)
+    baseline_k1 = _core_hamming_knn(
+        baseline_cores,
+        k=1,
+        max_n=max_n,
+        weights=distance_weights,
+        encoding_store=encoding_store,
+    )
+    actual_k1 = _core_hamming_knn(
+        actual_cores,
+        k=1,
+        max_n=max_n,
+        weights=distance_weights,
+        encoding_store=encoding_store,
+    )
     if baseline_k1 is None or actual_k1 is None:
         return None
-    baseline_k5 = _core_hamming_knn(baseline_cores, k=5, max_n=max_n, weights=distance_weights)
-    actual_k5 = _core_hamming_knn(actual_cores, k=5, max_n=max_n, weights=distance_weights)
-    baseline_pairwise = _pairwise_hamming_summary(baseline_cores, max_pairs=10000, weights=distance_weights)
-    actual_pairwise = _pairwise_hamming_summary(actual_cores, max_pairs=10000, weights=distance_weights)
+    baseline_k5 = _core_hamming_knn(
+        baseline_cores,
+        k=5,
+        max_n=max_n,
+        weights=distance_weights,
+        encoding_store=encoding_store,
+    )
+    actual_k5 = _core_hamming_knn(
+        actual_cores,
+        k=5,
+        max_n=max_n,
+        weights=distance_weights,
+        encoding_store=encoding_store,
+    )
+    baseline_pairwise = _pairwise_hamming_summary(
+        baseline_cores,
+        max_pairs=10000,
+        weights=distance_weights,
+        encoding_store=encoding_store,
+    )
+    actual_pairwise = _pairwise_hamming_summary(
+        actual_cores,
+        max_pairs=10000,
+        weights=distance_weights,
+        encoding_store=encoding_store,
+    )
     upper_pairwise = None
     if upper_bound_cores:
-        upper_pairwise = _pairwise_hamming_summary(upper_bound_cores, max_pairs=10000, weights=distance_weights)
+        upper_pairwise = _pairwise_hamming_summary(
+            upper_bound_cores,
+            max_pairs=10000,
+            weights=distance_weights,
+            encoding_store=encoding_store,
+        )
     baseline_entropy = _core_entropy(baseline_cores)
     actual_entropy = _core_entropy(actual_cores)
     baseline_quantiles = _score_quantiles(baseline_scores)

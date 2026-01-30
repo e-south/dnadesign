@@ -645,8 +645,10 @@ def _format_diversity_value(value: float | None, *, show_sign: bool = False) -> 
 
 
 def _format_tier_counts(eligible: list[int] | None, retained: list[int] | None) -> str:
-    if not eligible or not retained or len(eligible) != len(retained):
-        return "-"
+    if not eligible or not retained:
+        raise ValueError("Stage-A tier counts are required.")
+    if len(eligible) != len(retained):
+        raise ValueError("Stage-A tier counts length mismatch.")
     parts = []
     for idx in range(len(eligible)):
         parts.append(f"t{idx} {int(eligible[idx])}/{int(retained[idx])}")
@@ -668,6 +670,8 @@ def _stage_a_sampling_rows(
                 if not isinstance(summary, PWMSamplingSummary):
                     continue
                 input_name = summary.input_name or pool.name
+                if summary.generated is None:
+                    raise ValueError("Stage-A summary missing generated count.")
                 if not summary.regulator:
                     raise ValueError("Stage-A summary missing regulator.")
                 regulator = summary.regulator
@@ -675,6 +679,10 @@ def _stage_a_sampling_rows(
                     raise ValueError("Stage-A summary missing candidates_with_hit.")
                 if summary.eligible_raw is None:
                     raise ValueError("Stage-A summary missing eligible_raw.")
+                if summary.eligible_unique is None:
+                    raise ValueError("Stage-A summary missing eligible_unique.")
+                if summary.retained is None:
+                    raise ValueError("Stage-A summary missing retained count.")
                 if summary.eligible_tier_counts is None or summary.retained_tier_counts is None:
                     raise ValueError("Stage-A summary missing tier counts.")
                 if len(summary.eligible_tier_counts) != len(summary.retained_tier_counts):
