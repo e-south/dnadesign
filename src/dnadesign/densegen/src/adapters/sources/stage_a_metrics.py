@@ -30,6 +30,14 @@ class KnnSummary:
     subsampled: bool
     k: int
 
+    def __post_init__(self) -> None:
+        if len(self.bins) != len(self.counts):
+            raise ValueError("KNN summary bins/counts length mismatch.")
+        if int(self.n) < 0:
+            raise ValueError("KNN summary n must be >= 0.")
+        if int(self.k) <= 0:
+            raise ValueError("KNN summary k must be >= 1.")
+
     def to_dict(self) -> dict[str, object]:
         return {
             "bins": [float(v) for v in self.bins],
@@ -55,6 +63,14 @@ class PairwiseSummary:
     n_pairs: int
     total_pairs: int
     subsampled: bool
+
+    def __post_init__(self) -> None:
+        if len(self.bins) != len(self.counts):
+            raise ValueError("Pairwise summary bins/counts length mismatch.")
+        if int(self.n_pairs) < 0 or int(self.total_pairs) < 0:
+            raise ValueError("Pairwise summary pair counts must be >= 0.")
+        if int(self.n_pairs) > int(self.total_pairs):
+            raise ValueError("Pairwise summary n_pairs must be <= total_pairs.")
 
     def to_dict(self) -> dict[str, object]:
         return {

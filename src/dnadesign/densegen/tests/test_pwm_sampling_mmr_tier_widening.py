@@ -52,7 +52,7 @@ def test_mmr_tier_widening_widens_instead_of_crashing() -> None:
     )
 
     assert len(selected) == 20
-    assert diag["tier_fraction_used"] in (0.1, 1.0)
+    assert diag.tier_fraction_used in (0.1, 1.0)
     assert all(cand.seq in meta for cand in selected)
 
 
@@ -85,4 +85,4 @@ def test_mmr_tier_widening_honors_shortlist_target() -> None:
     )
 
     assert len(selected) == 10
-    assert diag["tier_limit"] >= 50
+    assert diag.tier_limit >= 50

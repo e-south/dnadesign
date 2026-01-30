@@ -14,18 +14,13 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from typing import Optional, TextIO
+from typing import Optional, Sequence, TextIO
 
 from ...core.score_tiers import score_tier_counts
 from ...utils import logging_utils
 from ...utils.rich_style import make_panel, make_table
 
 log = logging.getLogger(__name__)
-_STAGE_A_LIVE = None
-_STAGE_A_LIVE_MODE: str | None = None
-_STAGE_A_LIVE_CONSOLE = None
-_STAGE_A_LIVE_STATE: dict[str, dict[str, object]] = {}
-_STAGE_A_LIVE_LOCK = threading.Lock()
 
 
 def _format_rate(rate: float) -> str:
@@ -34,10 +29,23 @@ def _format_rate(rate: float) -> str:
     return f"{rate:.1f}/s"
 
 
-def _format_tier_yield(eligible_unique: int) -> str:
+def _format_tier_fraction_label(fractions: Sequence[float] | None) -> str:
+    if not fractions:
+        return ""
+    parts = []
+    for frac in fractions:
+        pct = float(frac) * 100.0
+        if pct.is_integer():
+            parts.append(str(int(pct)))
+        else:
+            parts.append(str(round(pct, 3)).rstrip("0").rstrip("."))
+    return "/".join(parts)
+
+
+def _format_tier_yield(eligible_unique: int, *, fractions: Sequence[float] | None = None) -> str:
     if eligible_unique <= 0:
         return "-"
-    n0, n1, n2, _n3 = score_tier_counts(int(eligible_unique))
+    n0, n1, n2, _n3 = score_tier_counts(int(eligible_unique), fractions=fractions)
     return f"{n0}/{n1}/{n2}"
 
 
@@ -61,6 +69,7 @@ def _format_pwm_progress_line(
     batch_total: Optional[int],
     elapsed: float,
     target_fraction: Optional[float],
+    tier_fractions: Sequence[float] | None,
     tier_yield: Optional[str],
 ) -> str:
     safe_target = max(1, int(target))
@@ -76,7 +85,11 @@ def _format_pwm_progress_line(
     if target_fraction is not None:
         parts.append(f"tier {float(target_fraction) * 100:.3f}%")
     if tier_yield:
-        parts.append(f"tiers 0.1/1/9={tier_yield}")
+        tier_label = _format_tier_fraction_label(tier_fractions)
+        if tier_label:
+            parts.append(f"tiers {tier_label}={tier_yield}")
+        else:
+            parts.append(f"tiers {tier_yield}")
     if batch_index is not None:
         total_label = "-" if batch_total is None else str(int(batch_total))
         parts.append(f"batch {int(batch_index)}/{total_label}")
@@ -113,7 +126,7 @@ def _stage_a_live_render(state: dict[str, dict[str, object]]):
     table.add_column("gen %", no_wrap=True, overflow="ellipsis", min_width=12)
     table.add_column("eligible_unique/target", no_wrap=True, overflow="ellipsis", min_width=18)
     table.add_column("tier target")
-    table.add_column("tier yield (0.1/1/9%)")
+    table.add_column("tier yield")
     table.add_column("batch")
     table.add_column("elapsed")
     table.add_column("rate")
@@ -138,10 +151,14 @@ def _stage_a_live_render(state: dict[str, dict[str, object]]):
             eligible_label = f"{accepted}/{accepted_target} ({acc_pct}%)"
         else:
             eligible_label = str(accepted)
-        tier_label = "-"
+        tier_target_label = "-"
         if target_fraction is not None:
-            tier_label = f"{float(target_fraction) * 100:.3f}%"
-        tier_yield = _format_tier_yield(int(accepted)) if accepted is not None else "-"
+            tier_target_label = f"{float(target_fraction) * 100:.3f}%"
+        tier_fractions = row.get("tier_fractions")
+        tier_yield = _format_tier_yield(int(accepted), fractions=tier_fractions) if accepted is not None else "-"
+        tier_label = _format_tier_fraction_label(tier_fractions)
+        if tier_label and tier_yield != "-":
+            tier_yield = f"{tier_label}={tier_yield}"
         elapsed_label = f"{max(0.0, float(elapsed)):.1f}s"
         rate = generated / elapsed if elapsed > 0 else 0.0
         rate_label = _format_rate(rate)
@@ -155,7 +172,7 @@ def _stage_a_live_render(state: dict[str, dict[str, object]]):
             gen_label,
             progress_label,
             eligible_label,
-            tier_label,
+            tier_target_label,
             tier_yield,
             batch_label,
             elapsed_label,
@@ -182,83 +199,89 @@ def _stage_a_live_start(stream: TextIO):
     return live, console
 
 
-def _stage_a_live_register(
-    *,
-    key: str,
-    motif_id: str,
-    backend: str,
-    target: int,
-    accepted_target: Optional[int],
-    target_fraction: Optional[float],
-    stream: TextIO,
-) -> bool:
-    global _STAGE_A_LIVE
-    global _STAGE_A_LIVE_MODE
-    with _STAGE_A_LIVE_LOCK:
-        if _STAGE_A_LIVE_MODE is None:
-            _STAGE_A_LIVE, _STAGE_A_LIVE_CONSOLE = _stage_a_live_start(stream)
-            if _STAGE_A_LIVE is None:
-                _STAGE_A_LIVE_CONSOLE = None
+class StageAProgressManager:
+    def __init__(self, *, stream: TextIO) -> None:
+        self._stream = stream
+        self._lock = threading.Lock()
+        self._state: dict[str, dict[str, object]] = {}
+        self._live = None
+        self._console = None
+
+    def _ensure_live(self) -> bool:
+        if self._live is not None:
+            return True
+        self._live, self._console = _stage_a_live_start(self._stream)
+        return self._live is not None
+
+    def register(
+        self,
+        *,
+        key: str,
+        motif_id: str,
+        backend: str,
+        target: int,
+        accepted_target: Optional[int],
+        target_fraction: Optional[float],
+        tier_fractions: Sequence[float] | None,
+    ) -> bool:
+        with self._lock:
+            if not self._ensure_live():
                 return False
-            _STAGE_A_LIVE_MODE = "live"
-        _STAGE_A_LIVE_STATE[key] = {
-            "motif": motif_id,
-            "backend": backend,
-            "generated": 0,
-            "target": int(target),
-            "accepted": None,
-            "accepted_target": int(accepted_target) if accepted_target is not None else None,
-            "target_fraction": target_fraction,
-            "elapsed": 0.0,
-            "batch_index": None,
-            "batch_total": None,
-        }
-        return True
+            self._state[key] = {
+                "motif": motif_id,
+                "backend": backend,
+                "generated": 0,
+                "target": int(target),
+                "accepted": None,
+                "accepted_target": int(accepted_target) if accepted_target is not None else None,
+                "target_fraction": target_fraction,
+                "tier_fractions": list(tier_fractions) if tier_fractions is not None else None,
+                "elapsed": 0.0,
+                "batch_index": None,
+                "batch_total": None,
+            }
+            return True
 
+    def update(
+        self,
+        *,
+        key: str,
+        generated: int,
+        accepted: Optional[int],
+        elapsed: float,
+        target: Optional[int] = None,
+        accepted_target: Optional[int] = None,
+        batch_index: Optional[int] = None,
+        batch_total: Optional[int] = None,
+    ) -> None:
+        with self._lock:
+            row = self._state.get(key)
+            if row is None:
+                return
+            row["generated"] = int(generated)
+            row["accepted"] = int(accepted) if accepted is not None else None
+            row["elapsed"] = float(elapsed)
+            if target is not None:
+                row["target"] = int(target)
+            if accepted_target is not None:
+                row["accepted_target"] = int(accepted_target)
+            if batch_index is not None:
+                row["batch_index"] = int(batch_index)
+            if batch_total is not None:
+                row["batch_total"] = int(batch_total)
+            if self._live is None:
+                return
+            renderable = _stage_a_live_render(self._state)
+            self._live.update(renderable, refresh=True)
 
-def _stage_a_live_update(
-    *,
-    key: str,
-    generated: int,
-    accepted: Optional[int],
-    elapsed: float,
-    target: Optional[int] = None,
-    accepted_target: Optional[int] = None,
-    batch_index: Optional[int] = None,
-    batch_total: Optional[int] = None,
-) -> None:
-    with _STAGE_A_LIVE_LOCK:
-        row = _STAGE_A_LIVE_STATE.get(key)
-        if row is None:
-            return
-        row["generated"] = int(generated)
-        row["accepted"] = int(accepted) if accepted is not None else None
-        row["elapsed"] = float(elapsed)
-        if target is not None:
-            row["target"] = int(target)
-        if accepted_target is not None:
-            row["accepted_target"] = int(accepted_target)
-        if batch_index is not None:
-            row["batch_index"] = int(batch_index)
-        if batch_total is not None:
-            row["batch_total"] = int(batch_total)
-        if _STAGE_A_LIVE is None:
-            return
-        renderable = _stage_a_live_render(_STAGE_A_LIVE_STATE)
-        _STAGE_A_LIVE.update(renderable, refresh=True)
-
-
-def _stage_a_live_finish(*, key: str) -> None:
-    global _STAGE_A_LIVE
-    global _STAGE_A_LIVE_MODE
-    with _STAGE_A_LIVE_LOCK:
-        _STAGE_A_LIVE_STATE.pop(key, None)
-        if not _STAGE_A_LIVE_STATE:
-            if _STAGE_A_LIVE is not None:
-                _STAGE_A_LIVE.stop()
-            _STAGE_A_LIVE = None
-            _STAGE_A_LIVE_CONSOLE = None
-            _STAGE_A_LIVE_MODE = None
+    def finish(self, *, key: str) -> None:
+        with self._lock:
+            self._state.pop(key, None)
+            if not self._state:
+                if self._live is not None:
+                    self._live.stop()
+                self._live = None
+                self._console = None
 
 
 class _PwmSamplingProgress:
@@ -270,6 +293,8 @@ class _PwmSamplingProgress:
         target: int,
         accepted_target: Optional[int],
         stream: TextIO,
+        tier_fractions: Sequence[float] | None = None,
+        manager: StageAProgressManager | None = None,
         target_fraction: Optional[float] = None,
         min_interval: float = 0.2,
     ) -> None:
@@ -278,6 +303,8 @@ class _PwmSamplingProgress:
         self.target = int(target)
         self.accepted_target = accepted_target
         self.stream = stream
+        self._tier_fractions = list(tier_fractions) if tier_fractions is not None else None
+        self._manager = manager
         self.target_fraction = target_fraction
         self.min_interval = float(min_interval)
         self._mode = str(logging_utils.get_progress_style())
@@ -296,14 +323,16 @@ class _PwmSamplingProgress:
         if self._enabled:
             logging_utils.set_progress_active(True)
         if self._use_live:
-            self._use_live = _stage_a_live_register(
+            if self._manager is None:
+                self._manager = StageAProgressManager(stream=self.stream)
+            self._use_live = self._manager.register(
                 key=self._live_key,
                 motif_id=self.motif_id,
                 backend=self.backend,
                 target=int(self.target),
                 accepted_target=self.accepted_target,
                 target_fraction=self.target_fraction,
-                stream=self.stream,
+                tier_fractions=self._tier_fractions,
             )
 
     def update(
@@ -333,7 +362,9 @@ class _PwmSamplingProgress:
                 self._last_update = now
                 return
         if self._use_live:
-            _stage_a_live_update(
+            if self._manager is None:
+                raise RuntimeError("Stage-A progress manager missing for live update.")
+            self._manager.update(
                 key=self._live_key,
                 generated=int(generated),
                 accepted=accepted,
@@ -355,7 +386,13 @@ class _PwmSamplingProgress:
                 batch_total=batch_total,
                 elapsed=now - self._start,
                 target_fraction=self.target_fraction,
-                tier_yield=_format_tier_yield(int(accepted)) if accepted is not None else None,
+                tier_fractions=self._tier_fractions,
+                tier_yield=_format_tier_yield(
+                    int(accepted),
+                    fractions=self._tier_fractions,
+                )
+                if accepted is not None
+                else None,
             )
             if self._allow_carriage:
                 padded = line.ljust(self._last_len)
@@ -374,7 +411,9 @@ class _PwmSamplingProgress:
         if self._enabled:
             logging_utils.set_progress_active(False)
         if self._use_live:
-            _stage_a_live_finish(key=self._live_key)
+            if self._manager is None:
+                raise RuntimeError("Stage-A progress manager missing for live finish.")
+            self._manager.finish(key=self._live_key)
         if not self._shown:
             return
         if not self._use_live and self._allow_carriage:

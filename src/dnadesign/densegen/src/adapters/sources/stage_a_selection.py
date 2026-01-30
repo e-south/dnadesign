@@ -32,6 +32,18 @@ class SelectionDiagnostics:
     tier_limit: int
     pool_source: str
 
+    def __post_init__(self) -> None:
+        if int(self.shortlist_k) < 0:
+            raise ValueError("Selection shortlist_k must be >= 0.")
+        if int(self.shortlist_target) < 0:
+            raise ValueError("Selection shortlist_target must be >= 0.")
+        if int(self.tier_limit) < 0:
+            raise ValueError("Selection tier_limit must be >= 0.")
+        if self.pool_source not in {"shortlist_k", "tier_limit", "eligible_unique"}:
+            raise ValueError(
+                f"Selection pool_source must be shortlist_k/tier_limit/eligible_unique, got {self.pool_source}."
+            )
+
     def pool_size(self) -> int:
         if self.pool_source == "shortlist_k":
             return int(self.shortlist_k)

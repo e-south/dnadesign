@@ -22,9 +22,8 @@ from typing import Iterable
 
 import pandas as pd
 
-from ...adapters.sources.pwm_sampling import PWMSamplingSummary
+from ...adapters.sources.stage_a_summary import PWMSamplingSummary
 from ...config import resolve_relative_path
-from ...core.score_tiers import TIER_FRACTIONS
 from ...core.stage_a_constants import FIMO_REPORT_THRESH
 from ...utils.logging_utils import install_native_stderr_filters
 from .ids import hash_tfbs_id
@@ -262,9 +261,17 @@ def _build_stage_a_sampling_manifest(
     selection_shortlist_factor = {summary.selection_shortlist_factor for summary in fimo_summaries}
     selection_shortlist_max = {summary.selection_shortlist_max for summary in fimo_summaries}
     tier_target_fraction = {summary.tier_target_fraction for summary in fimo_summaries}
+    tier_fractions_values: list[tuple[float, float, float]] = []
+    tier_fractions_sources: list[str] = []
     for summary in fimo_summaries:
         if summary.eligible_score_hist_edges is None or summary.eligible_score_hist_counts is None:
             raise ValueError("Stage-A sampling summaries missing eligible score histogram.")
+        if summary.tier_fractions is None:
+            raise ValueError("Stage-A sampling summaries missing tier fractions.")
+        if summary.tier_fractions_source is None:
+            raise ValueError("Stage-A sampling summaries missing tier fractions source.")
+        tier_fractions_values.append(tuple(float(v) for v in summary.tier_fractions))
+        tier_fractions_sources.append(str(summary.tier_fractions_source))
         if summary.eligible_score_hist_edges:
             if len(summary.eligible_score_hist_counts) != len(summary.eligible_score_hist_edges) - 1:
                 raise ValueError("Stage-A eligible score histogram length mismatch.")
@@ -284,6 +291,8 @@ def _build_stage_a_sampling_manifest(
                 "tier0_score": summary.tier0_score,
                 "tier1_score": summary.tier1_score,
                 "tier2_score": summary.tier2_score,
+                "tier_fractions": list(summary.tier_fractions),
+                "tier_fractions_source": summary.tier_fractions_source,
                 "bgfile": reg_bgfile,
                 "background_source": "bgfile" if reg_bgfile else "motif_background",
                 "generated": int(summary.generated),
@@ -335,11 +344,24 @@ def _build_stage_a_sampling_manifest(
     )
     selection_shortlist_max_value = next(iter(selection_shortlist_max)) if len(selection_shortlist_max) == 1 else None
     tier_target_fraction_value = next(iter(tier_target_fraction)) if len(tier_target_fraction) == 1 else None
-    tier_fractions_value = [float(v) for v in TIER_FRACTIONS]
+    tier_fractions_value: list[float] | None = None
+    tier_scheme_label = "mixed"
+    if tier_fractions_values:
+        unique_fractions = {vals for vals in tier_fractions_values}
+        if len(unique_fractions) == 1:
+            tier_fractions_value = list(next(iter(unique_fractions)))
+            tier_scheme_label = _tier_scheme_label(tier_fractions_value)
+    tier_fractions_source_value = None
+    unique_sources = {src for src in tier_fractions_sources}
+    if len(unique_sources) == 1:
+        tier_fractions_source_value = next(iter(unique_sources))
+    elif unique_sources:
+        tier_fractions_source_value = "mixed"
     return {
         "backend": "fimo",
-        "tier_scheme": _tier_scheme_label(tier_fractions_value),
+        "tier_scheme": tier_scheme_label,
         "tier_fractions": tier_fractions_value,
+        "tier_fractions_source": tier_fractions_source_value,
         "eligibility_rule": "best_hit_score > 0 (and has at least one FIMO hit)",
         "retention_rule": "top_n_sites_by_best_hit_score",
         "fimo_thresh": FIMO_REPORT_THRESH,

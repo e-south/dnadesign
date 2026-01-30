@@ -20,7 +20,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from dnadesign.densegen.src.adapters.sources.pwm_sampling import PWMSamplingSummary
+from dnadesign.densegen.src.adapters.sources.stage_a_summary import PWMSamplingSummary
 from dnadesign.densegen.src.cli import _format_tier_counts, _stage_a_sampling_rows, app
 from dnadesign.densegen.src.core.artifacts.pool import PoolData
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
@@ -228,6 +228,8 @@ def test_stage_a_sampling_rows_include_pool_headroom() -> None:
         tier0_score=2.0,
         tier1_score=1.5,
         tier2_score=1.0,
+        tier_fractions=[0.001, 0.01, 0.09],
+        tier_fractions_source="default",
         eligible_score_hist_edges=[0.0, 1.0],
         eligible_score_hist_counts=[1],
         selection_policy="mmr",
@@ -235,6 +237,7 @@ def test_stage_a_sampling_rows_include_pool_headroom() -> None:
         selection_shortlist_min=10,
         selection_shortlist_factor=5,
         selection_shortlist_target=250,
+        selection_pool_source="shortlist_k",
         diversity={"candidate_pool_size": 50, "shortlist_target": 250},
         mining_audit=None,
     )

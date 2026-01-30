@@ -50,7 +50,7 @@ def test_mmr_prefers_low_ic_mismatch_when_scores_equal() -> None:
     assert [cand.seq for cand in selected] == ["AA", "AT"]
     assert meta["AA"]["selection_rank"] == 1
     assert meta["AT"]["selection_rank"] == 2
-    assert diag["shortlist_k"] == 3
+    assert diag.shortlist_k == 3
 
 
 def test_score_norm_uses_percentile_rank() -> None:

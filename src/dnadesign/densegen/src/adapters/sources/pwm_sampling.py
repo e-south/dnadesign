@@ -24,10 +24,11 @@ import pandas as pd
 
 from ...config import PWMMiningConfig, PWMSamplingConfig, PWMSelectionConfig, PWMSelectionTierWidening
 from ...core.artifacts.ids import hash_candidate_id
-from ...core.score_tiers import score_tier_counts
+from ...core.score_tiers import resolve_tier_fractions, score_tier_counts
 from ...core.stage_a_constants import FIMO_REPORT_THRESH
-from .stage_a_diversity import DiversitySummary, _diversity_summary
-from .stage_a_progress import _format_stage_a_milestone, _PwmSamplingProgress
+from .stage_a_diversity import _diversity_summary
+from .stage_a_metrics import _tail_unique_slope
+from .stage_a_progress import StageAProgressManager, _format_stage_a_milestone, _PwmSamplingProgress
 from .stage_a_selection import (
     SelectionDiagnostics,
     _collapse_by_core_identity,
@@ -39,9 +40,15 @@ from .stage_a_selection import (
     _select_diversity_global_candidates,
     _select_diversity_upper_bound_candidates,
 )
+from .stage_a_summary import (
+    PWMSamplingSummary,
+    _assign_score_tiers,
+    _build_score_hist,
+    _build_summary,
+    _ranked_sequence_positions,
+)
 
 SMOOTHING_ALPHA = 1e-6
-SCORE_HIST_BINS = 60
 log = logging.getLogger(__name__)
 _BASES = np.array(["A", "C", "G", "T"])
 _SAFE_LABEL_RE = None
@@ -143,59 +150,6 @@ class PWMMotif:
     log_odds: Optional[List[dict[str, float]]] = None
 
 
-@dataclass(frozen=True)
-class PWMSamplingSummary:
-    input_name: Optional[str]
-    regulator: str
-    backend: str
-    pwm_consensus: Optional[str]
-    uniqueness_key: Optional[str]
-    collapsed_by_core_identity: Optional[int]
-    generated: int
-    target: int
-    target_sites: Optional[int]
-    candidates_with_hit: Optional[int]
-    eligible_raw: Optional[int]
-    eligible_unique: int
-    retained: int
-    retained_len_min: Optional[int]
-    retained_len_median: Optional[float]
-    retained_len_mean: Optional[float]
-    retained_len_max: Optional[int]
-    retained_score_min: Optional[float]
-    retained_score_median: Optional[float]
-    retained_score_mean: Optional[float]
-    retained_score_max: Optional[float]
-    eligible_tier_counts: Optional[List[int]]
-    retained_tier_counts: Optional[List[int]]
-    tier0_score: Optional[float]
-    tier1_score: Optional[float]
-    tier2_score: Optional[float]
-    eligible_score_hist_edges: Optional[List[float]] = None
-    eligible_score_hist_counts: Optional[List[int]] = None
-    tier_target_fraction: Optional[float] = None
-    tier_target_required_unique: Optional[int] = None
-    tier_target_met: Optional[bool] = None
-    selection_policy: Optional[str] = None
-    selection_alpha: Optional[float] = None
-    selection_similarity: Optional[str] = None
-    selection_shortlist_k: Optional[int] = None
-    selection_shortlist_min: Optional[int] = None
-    selection_shortlist_factor: Optional[int] = None
-    selection_shortlist_max: Optional[int] = None
-    selection_shortlist_target: Optional[int] = None
-    selection_shortlist_target_met: Optional[bool] = None
-    selection_tier_fraction_used: Optional[float] = None
-    selection_tier_limit: Optional[int] = None
-    selection_pool_source: Optional[str] = None
-    diversity_nearest_distance_mean: Optional[float] = None
-    diversity_nearest_distance_min: Optional[float] = None
-    diversity_nearest_similarity_mean: Optional[float] = None
-    diversity: Optional[DiversitySummary | dict[str, object]] = None
-    mining_audit: Optional[dict[str, object]] = None
-    padding_audit: Optional[dict[str, object]] = None
-
-
 def normalize_background(bg: Optional[dict[str, float]]) -> dict[str, float]:
     if not bg:
         return {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
@@ -247,47 +201,6 @@ def score_sequence(
             return float("-inf")
         score += float(lod)
     return score
-
-
-def _summarize_lengths(lengths: Sequence[int]) -> tuple[Optional[int], Optional[float], Optional[float], Optional[int]]:
-    if not lengths:
-        return None, None, None, None
-    arr = np.asarray(lengths, dtype=float)
-    return int(arr.min()), float(np.median(arr)), float(arr.mean()), int(arr.max())
-
-
-def _summarize_scores(
-    scores: Sequence[float],
-) -> tuple[Optional[float], Optional[float], Optional[float], Optional[float]]:
-    if not scores:
-        return None, None, None, None
-    arr = np.asarray(scores, dtype=float)
-    return float(arr.min()), float(np.median(arr)), float(arr.mean()), float(arr.max())
-
-
-def _tail_unique_slope(
-    generated_by_batch: Sequence[int],
-    unique_by_batch: Sequence[int],
-    *,
-    window: int = 5,
-) -> dict[str, object] | None:
-    if not generated_by_batch or len(generated_by_batch) < 2:
-        return None
-    if len(generated_by_batch) != len(unique_by_batch):
-        raise ValueError("Generated/unique batch lengths must match for tail slope.")
-    window = min(int(window), len(generated_by_batch))
-    if window < 2:
-        return None
-    start_idx = max(0, len(generated_by_batch) - window)
-    delta_gen = int(generated_by_batch[-1]) - int(generated_by_batch[start_idx])
-    delta_unique = int(unique_by_batch[-1]) - int(unique_by_batch[start_idx])
-    if delta_gen <= 0:
-        return None
-    return {
-        "unique_slope": float(delta_unique) / float(delta_gen),
-        "unique_slope_window": int(window),
-        "unique_slope_generated": int(delta_gen),
-    }
 
 
 def _background_cdf(probs: dict[str, float]) -> np.ndarray:
@@ -356,172 +269,6 @@ def _sample_background_batch(
 
 def _ranges_overlap(a_start: int, a_stop: int, b_start: int, b_stop: int) -> bool:
     return int(a_start) <= int(b_stop) and int(b_start) <= int(a_stop)
-
-
-def _rank_scored_sequences(scored: Sequence[tuple[str, float]]) -> list[tuple[str, float]]:
-    best_by_seq: dict[str, float] = {}
-    for seq, score in scored:
-        seq = str(seq)
-        val = float(score)
-        prev = best_by_seq.get(seq)
-        if prev is None or val > prev:
-            best_by_seq[seq] = val
-    return sorted(best_by_seq.items(), key=lambda item: (-item[1], item[0]))
-
-
-def _ranked_sequence_positions(ranked: Sequence[tuple[str, float]]) -> dict[str, int]:
-    return {seq: idx + 1 for idx, (seq, _score) in enumerate(ranked)}
-
-
-def _score_tier_counts(total: int) -> tuple[int, int, int, int]:
-    return score_tier_counts(total)
-
-
-def _assign_score_tiers(ranked: Sequence[tuple[str, float]]) -> list[int]:
-    total = len(ranked)
-    n0, n1, n2, _n3 = _score_tier_counts(total)
-    tiers: list[int] = []
-    for idx in range(total):
-        if idx < n0:
-            tiers.append(0)
-        elif idx < n0 + n1:
-            tiers.append(1)
-        elif idx < n0 + n1 + n2:
-            tiers.append(2)
-        else:
-            tiers.append(3)
-    return tiers
-
-
-def _build_score_hist(
-    scores: Sequence[float],
-    *,
-    bins: int = SCORE_HIST_BINS,
-) -> tuple[list[float], list[int]]:
-    vals = [float(v) for v in scores if v is not None]
-    if not vals:
-        return [], []
-    lo = min(vals)
-    hi = max(vals)
-    lo = min(lo, 0.0)
-    if hi <= lo:
-        hi = lo + 1.0
-    edges = np.linspace(lo, hi, num=int(bins) + 1)
-    counts, _ = np.histogram(np.asarray(vals, dtype=float), bins=edges)
-    return [float(v) for v in edges], [int(v) for v in counts]
-
-
-def _build_summary(
-    *,
-    generated: int,
-    target: int,
-    target_sites: Optional[int],
-    candidates_with_hit: Optional[int],
-    eligible_raw: Optional[int],
-    eligible_unique: Sequence[str],
-    retained: Sequence[str],
-    retained_scores: Optional[Sequence[float]] = None,
-    uniqueness_key: Optional[str] = None,
-    collapsed_by_core_identity: Optional[int] = None,
-    eligible_tier_counts: Optional[Sequence[int]] = None,
-    retained_tier_counts: Optional[Sequence[int]] = None,
-    tier0_score: Optional[float] = None,
-    tier1_score: Optional[float] = None,
-    tier2_score: Optional[float] = None,
-    eligible_score_hist_edges: Optional[Sequence[float]] = None,
-    eligible_score_hist_counts: Optional[Sequence[int]] = None,
-    tier_target_fraction: Optional[float] = None,
-    tier_target_required_unique: Optional[int] = None,
-    tier_target_met: Optional[bool] = None,
-    selection_policy: Optional[str] = None,
-    selection_alpha: Optional[float] = None,
-    selection_similarity: Optional[str] = None,
-    selection_shortlist_k: Optional[int] = None,
-    selection_shortlist_min: Optional[int] = None,
-    selection_shortlist_factor: Optional[int] = None,
-    selection_shortlist_max: Optional[int] = None,
-    selection_shortlist_target: Optional[int] = None,
-    selection_shortlist_target_met: Optional[bool] = None,
-    selection_tier_fraction_used: Optional[float] = None,
-    selection_tier_limit: Optional[int] = None,
-    selection_pool_source: Optional[str] = None,
-    diversity_nearest_distance_mean: Optional[float] = None,
-    diversity_nearest_distance_min: Optional[float] = None,
-    diversity_nearest_similarity_mean: Optional[float] = None,
-    diversity: Optional[DiversitySummary | dict[str, object]] = None,
-    mining_audit: Optional[dict[str, object]] = None,
-    padding_audit: Optional[dict[str, object]] = None,
-    pwm_consensus: Optional[str] = None,
-    input_name: Optional[str] = None,
-    regulator: Optional[str] = None,
-    backend: Optional[str] = None,
-) -> PWMSamplingSummary:
-    lengths = [len(seq) for seq in retained]
-    min_len, median_len, mean_len, max_len = _summarize_lengths(lengths)
-    score_min, score_median, score_mean, score_max = _summarize_scores(retained_scores or [])
-    return PWMSamplingSummary(
-        input_name=input_name,
-        regulator=str(regulator or ""),
-        backend=str(backend or ""),
-        pwm_consensus=str(pwm_consensus) if pwm_consensus is not None else None,
-        uniqueness_key=str(uniqueness_key) if uniqueness_key is not None else None,
-        collapsed_by_core_identity=int(collapsed_by_core_identity) if collapsed_by_core_identity is not None else None,
-        generated=int(generated),
-        target=int(target),
-        target_sites=int(target_sites) if target_sites is not None else None,
-        candidates_with_hit=int(candidates_with_hit) if candidates_with_hit is not None else None,
-        eligible_raw=int(eligible_raw) if eligible_raw is not None else None,
-        eligible_unique=int(len(eligible_unique)),
-        retained=int(len(retained)),
-        retained_len_min=min_len,
-        retained_len_median=median_len,
-        retained_len_mean=mean_len,
-        retained_len_max=max_len,
-        retained_score_min=score_min,
-        retained_score_median=score_median,
-        retained_score_mean=score_mean,
-        retained_score_max=score_max,
-        eligible_tier_counts=list(eligible_tier_counts) if eligible_tier_counts is not None else None,
-        retained_tier_counts=list(retained_tier_counts) if retained_tier_counts is not None else None,
-        tier0_score=float(tier0_score) if tier0_score is not None else None,
-        tier1_score=float(tier1_score) if tier1_score is not None else None,
-        tier2_score=float(tier2_score) if tier2_score is not None else None,
-        eligible_score_hist_edges=list(eligible_score_hist_edges) if eligible_score_hist_edges is not None else None,
-        eligible_score_hist_counts=list(eligible_score_hist_counts) if eligible_score_hist_counts is not None else None,
-        tier_target_fraction=float(tier_target_fraction) if tier_target_fraction is not None else None,
-        tier_target_required_unique=int(tier_target_required_unique)
-        if tier_target_required_unique is not None
-        else None,
-        tier_target_met=bool(tier_target_met) if tier_target_met is not None else None,
-        selection_policy=str(selection_policy) if selection_policy is not None else None,
-        selection_alpha=float(selection_alpha) if selection_alpha is not None else None,
-        selection_similarity=str(selection_similarity) if selection_similarity is not None else None,
-        selection_shortlist_k=int(selection_shortlist_k) if selection_shortlist_k is not None else None,
-        selection_shortlist_min=int(selection_shortlist_min) if selection_shortlist_min is not None else None,
-        selection_shortlist_factor=int(selection_shortlist_factor) if selection_shortlist_factor is not None else None,
-        selection_shortlist_max=int(selection_shortlist_max) if selection_shortlist_max is not None else None,
-        selection_shortlist_target=int(selection_shortlist_target) if selection_shortlist_target is not None else None,
-        selection_shortlist_target_met=bool(selection_shortlist_target_met)
-        if selection_shortlist_target_met is not None
-        else None,
-        selection_tier_fraction_used=float(selection_tier_fraction_used)
-        if selection_tier_fraction_used is not None
-        else None,
-        selection_tier_limit=int(selection_tier_limit) if selection_tier_limit is not None else None,
-        selection_pool_source=str(selection_pool_source) if selection_pool_source is not None else None,
-        diversity_nearest_distance_mean=float(diversity_nearest_distance_mean)
-        if diversity_nearest_distance_mean is not None
-        else None,
-        diversity_nearest_distance_min=float(diversity_nearest_distance_min)
-        if diversity_nearest_distance_min is not None
-        else None,
-        diversity_nearest_similarity_mean=float(diversity_nearest_similarity_mean)
-        if diversity_nearest_similarity_mean is not None
-        else None,
-        diversity=dict(diversity) if isinstance(diversity, dict) else diversity,
-        mining_audit=dict(mining_audit) if mining_audit is not None else None,
-        padding_audit=dict(padding_audit) if padding_audit is not None else None,
-    )
 
 
 def sample_sequence_from_background(rng: np.random.Generator, probs: dict[str, float], length: int) -> str:
@@ -606,6 +353,7 @@ def sample_pwm_sites(
     length_range: Optional[Sequence[int]] = None,
     trim_window_length: Optional[int] = None,
     trim_window_strategy: str = "max_info",
+    progress_manager: StageAProgressManager | None = None,
     return_metadata: bool = False,
     return_summary: bool = False,
 ) -> Union[
@@ -691,6 +439,8 @@ def sample_pwm_sites(
         selection_tier_widening = list(tier_cfg.ladder)
 
     include_matched_sequence = bool(include_matched_sequence)
+    tier_fractions = list(resolve_tier_fractions(selection_tier_widening))
+    tier_fractions_source = "tier_widening" if selection_tier_widening else "default"
 
     budget = mining.budget
     budget_mode = str(budget.mode or "fixed_candidates").lower()
@@ -954,6 +704,15 @@ def sample_pwm_sites(
                 fasta_path = tmp_path / "candidates.fasta"
                 records = build_candidate_records(motif.motif_id, provided_sequences, start_index=0)
                 write_candidates_fasta(records, fasta_path)
+                fimo_label = f"batch=1/1 candidates={len(records)}"
+                fimo_start = time.monotonic()
+                log.info(
+                    _format_stage_a_milestone(
+                        motif_id=motif.motif_id,
+                        phase="fimo batch start",
+                        detail=fimo_label,
+                    )
+                )
                 rows, raw_tsv = run_fimo(
                     meme_motif_path=meme_path,
                     fasta_path=fasta_path,
@@ -962,6 +721,14 @@ def sample_pwm_sites(
                     norc=True,
                     include_matched_sequence=include_matched_sequence or keep_all_candidates_debug,
                     return_tsv=debug_path is not None,
+                )
+                log.info(
+                    _format_stage_a_milestone(
+                        motif_id=motif.motif_id,
+                        phase="fimo batch end",
+                        detail=f"{fimo_label} hits={len(rows)}",
+                        elapsed=time.monotonic() - fimo_start,
+                    )
                 )
                 if debug_path is not None and raw_tsv is not None:
                     _merge_tsv(tsv_lines, raw_tsv)
@@ -1075,6 +842,15 @@ def sample_pwm_sites(
                     fasta_path = tmp_path / "candidates.fasta"
                     records = build_candidate_records(motif.motif_id, sequences, start_index=generated_total)
                     write_candidates_fasta(records, fasta_path)
+                    fimo_label = f"batch={batches + 1}/- candidates={len(records)}"
+                    fimo_start = time.monotonic()
+                    log.info(
+                        _format_stage_a_milestone(
+                            motif_id=motif.motif_id,
+                            phase="fimo batch start",
+                            detail=fimo_label,
+                        )
+                    )
                     rows, raw_tsv = run_fimo(
                         meme_motif_path=meme_path,
                         fasta_path=fasta_path,
@@ -1083,6 +859,14 @@ def sample_pwm_sites(
                         norc=True,
                         include_matched_sequence=include_matched_sequence or keep_all_candidates_debug,
                         return_tsv=debug_path is not None,
+                    )
+                    log.info(
+                        _format_stage_a_milestone(
+                            motif_id=motif.motif_id,
+                            phase="fimo batch end",
+                            detail=f"{fimo_label} hits={len(rows)}",
+                            elapsed=time.monotonic() - fimo_start,
+                        )
                     )
                     if debug_path is not None and raw_tsv is not None:
                         _merge_tsv(tsv_lines, raw_tsv)
@@ -1207,7 +991,7 @@ def sample_pwm_sites(
             )
         )
         ranked_pairs = [(cand.seq, cand.score) for cand in ranked]
-        tiers = _assign_score_tiers(ranked_pairs)
+        tiers = _assign_score_tiers(ranked_pairs, fractions=tier_fractions)
         rank_by_seq = _ranked_sequence_positions(ranked_pairs)
         tier_by_seq = {cand.seq: tiers[idx] for idx, cand in enumerate(ranked)}
         eligible_tier_counts = [0, 0, 0, 0]
@@ -1392,7 +1176,7 @@ def sample_pwm_sites(
                     "Try next: " + "; ".join(suggestions) + ".",
                 ]
                 log.warning(" ".join(warn_lines))
-        n0, n1, n2, _n3 = _score_tier_counts(len(ranked))
+        n0, n1, n2, _n3 = score_tier_counts(len(ranked), fractions=tier_fractions)
         tier0_score = ranked[n0 - 1].score if n0 > 0 else None
         tier1_score = ranked[n0 + n1 - 1].score if n1 > 0 else None
         tier2_score = ranked[n0 + n1 + n2 - 1].score if n2 > 0 else None
@@ -1485,6 +1269,8 @@ def sample_pwm_sites(
             diversity_nearest_distance_min = float(min((1.0 / sim) - 1.0 for sim in nearest_sims if sim > 0))
         summary = None
         if return_summary:
+            if selection_diag is None:
+                raise ValueError("Stage-A selection diagnostics missing for summary.")
             summary = _build_summary(
                 generated=generated_total,
                 target=requested,
@@ -1501,6 +1287,8 @@ def sample_pwm_sites(
                 tier0_score=tier0_score,
                 tier1_score=tier1_score,
                 tier2_score=tier2_score,
+                tier_fractions=tier_fractions,
+                tier_fractions_source=tier_fractions_source,
                 eligible_score_hist_edges=hist_edges,
                 eligible_score_hist_counts=hist_counts,
                 tier_target_fraction=budget_target_tier_fraction,
@@ -1540,6 +1328,8 @@ def sample_pwm_sites(
             target=1,
             accepted_target=progress_accepted_target,
             stream=sys.stdout,
+            tier_fractions=tier_fractions,
+            manager=progress_manager,
             target_fraction=progress_target_fraction,
         )
         seq = "".join(max(row.items(), key=lambda kv: kv[1])[0] for row in matrix)
@@ -1578,6 +1368,8 @@ def sample_pwm_sites(
         target=requested_candidates,
         accepted_target=progress_accepted_target,
         stream=sys.stdout,
+        tier_fractions=tier_fractions,
+        manager=progress_manager,
         target_fraction=progress_target_fraction,
     )
     selected, meta, summary = _score_with_fimo(

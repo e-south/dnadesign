@@ -53,7 +53,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.traceback import install as rich_traceback
 
-from .adapters.sources.pwm_sampling import PWMSamplingSummary
+from .adapters.sources.stage_a_summary import PWMSamplingSummary
 from .cli_render import stage_a_plan_table, stage_a_recap_tables
 from .config import (
     LATEST_SCHEMA_VERSION,
@@ -764,12 +764,7 @@ def _stage_a_sampling_rows(
                     pool_label = f"{pool_label}/{shortlist_target if shortlist_target is not None else '-'}"
                     pool_source = summary.selection_pool_source
                     if pool_source is None:
-                        if summary.selection_shortlist_k is not None and int(summary.selection_shortlist_k) > 0:
-                            pool_source = "shortlist_k"
-                        elif summary.selection_tier_limit is not None:
-                            pool_source = "tier_limit"
-                        else:
-                            pool_source = "eligible_unique"
+                        raise ValueError("Stage-A selection pool source missing for summary.")
                     diversity_pool = f"{pool_label} ({pool_source})"
                 rows.append(
                     {

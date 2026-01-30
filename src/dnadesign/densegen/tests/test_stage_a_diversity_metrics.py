@@ -20,6 +20,7 @@ from dnadesign.densegen.src.adapters.sources.stage_a_diversity import (
     _core_hamming_nnd,
     _diversity_summary,
 )
+from dnadesign.densegen.src.adapters.sources.stage_a_metrics import KnnSummary, PairwiseSummary
 from dnadesign.densegen.src.adapters.sources.stage_a_selection import (
     SelectionDiagnostics,
     _select_diversity_baseline_candidates,
@@ -164,3 +165,45 @@ def test_upper_bound_candidates_prefer_diverse_cores() -> None:
     assert len(selected) == 2
     picked = {cand.seq for cand in selected}
     assert {"AAAA", "TTTT"} <= picked
+
+
+def test_selection_diagnostics_rejects_unknown_pool_source() -> None:
+    with pytest.raises(ValueError):
+        SelectionDiagnostics(
+            shortlist_k=1,
+            shortlist_target=1,
+            shortlist_target_met=True,
+            tier_fraction_used=1.0,
+            tier_limit=1,
+            pool_source="unknown",
+        )
+
+
+def test_knn_summary_rejects_mismatched_bins() -> None:
+    with pytest.raises(ValueError):
+        KnnSummary(
+            bins=[0.0, 1.0],
+            counts=[1],
+            median=1.0,
+            p05=1.0,
+            p95=1.0,
+            frac_le_1=1.0,
+            n=1,
+            subsampled=False,
+            k=1,
+        )
+
+
+def test_pairwise_summary_rejects_mismatched_bins() -> None:
+    with pytest.raises(ValueError):
+        PairwiseSummary(
+            bins=[0.0, 1.0],
+            counts=[1, 2, 3],
+            median=1.0,
+            mean=1.0,
+            p10=1.0,
+            p90=1.0,
+            n_pairs=1,
+            total_pairs=1,
+            subsampled=False,
+        )

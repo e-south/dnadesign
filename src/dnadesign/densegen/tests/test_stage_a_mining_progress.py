@@ -79,40 +79,38 @@ def test_stage_a_screen_progress_stream_for_pixi_tty(monkeypatch) -> None:
         assert progress._use_table is False
         progress.update(generated=10, accepted=5)
         progress.finish()
-        assert stage_a_progress._STAGE_A_LIVE is None
+        assert progress._manager is not None
+        assert progress._manager._live is None
     finally:
         logging_utils.set_progress_enabled(prev_enabled)
         logging_utils.set_progress_style(prev_style)
 
 
 def test_stage_a_progress_target_updates_in_render() -> None:
-    prev_state = dict(stage_a_progress._STAGE_A_LIVE_STATE)
-    stage_a_progress._STAGE_A_LIVE_STATE.clear()
-    stage_a_progress._STAGE_A_LIVE_STATE["demo"] = {
-        "motif": "demo",
-        "generated": 0,
-        "target": 5,
-        "accepted": None,
-        "accepted_target": None,
-        "target_fraction": None,
-        "elapsed": 0.0,
+    state = {
+        "demo": {
+            "motif": "demo",
+            "backend": "fimo",
+            "generated": 0,
+            "target": 5,
+            "accepted": None,
+            "accepted_target": None,
+            "target_fraction": None,
+            "tier_fractions": [0.001, 0.01, 0.09],
+            "elapsed": 0.0,
+            "batch_index": None,
+            "batch_total": None,
+        }
     }
-    try:
-        stage_a_progress._stage_a_live_update(
-            key="demo",
-            generated=10,
-            accepted=2,
-            elapsed=1.0,
-            target=20,
-        )
-        renderable = stage_a_progress._stage_a_live_render(stage_a_progress._STAGE_A_LIVE_STATE)
-        console = Console(width=120, record=True)
-        console.print(renderable)
-        text = console.export_text()
-        assert "10/20" in text
-    finally:
-        stage_a_progress._STAGE_A_LIVE_STATE.clear()
-        stage_a_progress._STAGE_A_LIVE_STATE.update(prev_state)
+    state["demo"]["generated"] = 10
+    state["demo"]["accepted"] = 2
+    state["demo"]["elapsed"] = 1.0
+    state["demo"]["target"] = 20
+    renderable = stage_a_progress._stage_a_live_render(state)
+    console = Console(width=120, record=True)
+    console.print(renderable)
+    text = console.export_text()
+    assert "10/20" in text
 
 
 def test_stage_a_milestone_message_format() -> None:

@@ -21,7 +21,7 @@ import pandas as pd
 import yaml
 
 from dnadesign.densegen.src.adapters.sources.base import BaseDataSource
-from dnadesign.densegen.src.adapters.sources.pwm_sampling import PWMSamplingSummary
+from dnadesign.densegen.src.adapters.sources.stage_a_summary import PWMSamplingSummary
 from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.core.artifacts.pool import build_pool_artifact
 from dnadesign.densegen.src.core.pipeline import PipelineDeps, default_deps
@@ -65,6 +65,8 @@ class _DummySource(BaseDataSource):
             tier0_score=2.0,
             tier1_score=1.5,
             tier2_score=1.0,
+            tier_fractions=[0.001, 0.01, 0.09],
+            tier_fractions_source="default",
             eligible_score_hist_edges=[0.0, 1.0, 2.0],
             eligible_score_hist_counts=[1, 1],
             tier_target_fraction=0.001,
@@ -163,6 +165,7 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
     assert stage_a_sampling["backend"] == "fimo"
     assert stage_a_sampling["tier_scheme"] == "pct_0.1_1_9"
     assert stage_a_sampling["tier_fractions"] == [0.001, 0.01, 0.09]
+    assert stage_a_sampling["tier_fractions_source"] == "default"
     assert stage_a_sampling["eligibility_rule"].startswith("best_hit_score")
     assert stage_a_sampling["retention_rule"] == "top_n_sites_by_best_hit_score"
     assert stage_a_sampling["fimo_thresh"] == 1.0
@@ -177,6 +180,8 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
     assert hist[0]["tier0_score"] == 2.0
     assert hist[0]["tier1_score"] == 1.5
     assert hist[0]["tier2_score"] == 1.0
+    assert hist[0]["tier_fractions"] == [0.001, 0.01, 0.09]
+    assert hist[0]["tier_fractions_source"] == "default"
     assert hist[0]["generated"] == 10
     assert hist[0]["candidates_with_hit"] == 9
     assert hist[0]["eligible_raw"] == 3

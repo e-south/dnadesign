@@ -12,6 +12,7 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List
@@ -22,6 +23,7 @@ from ...core.run_paths import candidates_root
 from .base import BaseDataSource, resolve_path
 from .pwm_artifact import load_artifact
 from .pwm_sampling import sample_pwm_sites, sampling_kwargs_from_config
+from .stage_a_progress import StageAProgressManager
 
 
 @dataclass
@@ -55,6 +57,7 @@ class PWMArtifactSetDataSource(BaseDataSource):
                 preview = ", ".join(unknown[:10])
                 raise ValueError(f"pwm_artifact_set.overrides_by_motif_id contains unknown motif_id: {preview}")
 
+        progress_manager = StageAProgressManager(stream=sys.stdout)
         entries = []
         all_rows = []
         summaries = []
@@ -100,6 +103,7 @@ class PWMArtifactSetDataSource(BaseDataSource):
                 length_range=sampling_kwargs["length_range"],
                 trim_window_length=sampling_kwargs["trim_window_length"],
                 trim_window_strategy=str(sampling_kwargs["trim_window_strategy"]),
+                progress_manager=progress_manager,
                 return_metadata=return_meta,
                 return_summary=True,
                 strategy=str(sampling_kwargs["strategy"]),

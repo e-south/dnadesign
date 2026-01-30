@@ -31,6 +31,7 @@ def test_pwm_progress_line_densegen_fields() -> None:
         batch_total=None,
         elapsed=1.2,
         target_fraction=None,
+        tier_fractions=None,
         tier_yield=None,
     )
     assert "PWM M1" in line
@@ -54,6 +55,7 @@ def test_pwm_progress_line_fimo_fields() -> None:
         batch_total=None,
         elapsed=2.5,
         target_fraction=0.001,
+        tier_fractions=[0.001, 0.01, 0.09],
         tier_yield="1/2/3",
     )
     assert "PWM M2" in line

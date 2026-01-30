@@ -11,3 +11,4 @@ Dunlop Lab
 """
 
 FIMO_REPORT_THRESH = 1.0
+SCORE_HIST_BINS = 60

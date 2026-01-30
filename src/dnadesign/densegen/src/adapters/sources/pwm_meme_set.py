@@ -12,6 +12,7 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
@@ -24,6 +25,7 @@ from ...core.run_paths import candidates_root
 from .base import BaseDataSource, resolve_path
 from .pwm_meme import _background_from_meta, _motif_to_pwm
 from .pwm_sampling import sample_pwm_sites, sampling_kwargs_from_config
+from .stage_a_progress import StageAProgressManager
 
 
 def _filter_motifs(motifs: List[MemeMotif], keep: set[str]) -> list[MemeMotif]:
@@ -93,6 +95,7 @@ class PWMMemeSetDataSource(BaseDataSource):
                 raise ValueError("keep_all_candidates_debug requires run_id to be set.")
             debug_output_dir = candidates_root(Path(outputs_root), run_id) / self.input_name
 
+        progress_manager = StageAProgressManager(stream=sys.stdout)
         entries = []
         all_rows = []
         summaries = []
@@ -123,6 +126,7 @@ class PWMMemeSetDataSource(BaseDataSource):
                 length_range=sampling_kwargs["length_range"],
                 trim_window_length=sampling_kwargs["trim_window_length"],
                 trim_window_strategy=str(sampling_kwargs["trim_window_strategy"]),
+                progress_manager=progress_manager,
                 return_metadata=return_meta,
                 return_summary=True,
                 strategy=str(sampling_kwargs["strategy"]),
