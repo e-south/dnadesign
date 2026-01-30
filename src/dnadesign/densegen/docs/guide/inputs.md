@@ -44,7 +44,7 @@ Optional (supported):
 - `keep_all_candidates_debug` (bool): write candidate‑level Parquet under `outputs/pools/candidates/`
   (files named `candidates__<label>.parquet`) and aggregate to
   `outputs/pools/candidates/candidates.parquet` + `outputs/pools/candidates/candidates_summary.parquet`
-- `include_matched_sequence` (default true)
+- `include_matched_sequence` (default true; must be true for PWM sampling; config validation rejects false)
 - `length`:
   - `policy`: `exact | range` (default `exact`)
   - `range`: `[min, max]` (required when `policy: range`)
@@ -62,6 +62,8 @@ Optional (supported):
   - `tier_widening` (optional):
     - `enabled` (bool)
     - `ladder` (fractions in (0, 1]; widening continues until shortlist_target is met or the ladder is exhausted)
+  - When `selection.policy: mmr` and `selection.tier_widening` is omitted, DenseGen enables tier widening
+    with the default ladder `[0.001, 0.01, 0.09, 1.0]`.
 
 Strict validation behavior:
 - Unknown keys are errors (extra fields are rejected).

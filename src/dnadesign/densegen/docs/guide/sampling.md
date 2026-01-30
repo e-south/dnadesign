@@ -173,6 +173,8 @@ Performance/behavior knobs for MMR:
   DenseGen tries the first rung (top slice); if it can’t fill from that slice, it widens to the next rung.
 - When tier widening is enabled, DenseGen widens until the candidate pool reaches
   `shortlist_target = max(shortlist_min, shortlist_factor * n_sites)` (or the ladder exhausts).
+- When `selection.policy: mmr` and `selection.tier_widening` is omitted, DenseGen enables tier widening
+  with the default ladder `[0.001, 0.01, 0.09, 1.0]`.
 
 > Practical advice: MMR is best used when you expect **many** eligible unique candidates and you want
 > to avoid near-duplicates while still staying near the score frontier.
@@ -347,7 +349,7 @@ Plots that map cleanly to the above:
 2) **Core uniqueness requires a core**
    Symptom: core-dedupe can’t work if `tfbs_core` can’t be derived.
    Cause: core identity comes from FIMO `matched_sequence`.
-   Fix: keep matched-sequence capture enabled when using core uniqueness/dedupe.
+   Fix: `include_matched_sequence` is required for PWM sampling; config validation rejects false.
 
 3) **Tier targeting can be mathematically impossible under your caps**
    With `target_tier_fraction = f`, you need `ceil(n_sites / f)` eligible uniques.

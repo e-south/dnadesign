@@ -55,3 +55,7 @@
 - Follow-up: fixed fixed_candidates mining to stop at the requested budget (prevented long-running FIMO tests), updated mining shortfall/core dedupe tests, and confirmed full densegen test suite passes.
 - Task: Stage-A summary visual redesign (publication-quality layout).
 - Decisions: dedicated header row via GridSpec, yield/dedupe funnel plot, anchored tier summary box, shared axes cleanup, and Okabe-Ito color mapping with lexA/cpxR overrides.
+
+### 2026-01-30
+- Task: Stage-A documentation/code alignment review and behavioral audit focused on Stage-A sampling and demo narrative/plots.
+- Follow-up: added Stage-A audit notes (2026-01-30) and aligned docs with PWM include_matched_sequence requirement and default MMR tier_widening ladder.

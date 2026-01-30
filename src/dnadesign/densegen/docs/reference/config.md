@@ -74,7 +74,8 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
     - `keep_all_candidates_debug` (bool, default false) - write candidate Parquet logs to
       `outputs/pools/candidates/` for inspection (overwritten by `stage-a build-pool --fresh`
       or `dense run --rebuild-stage-a`)
-    - `include_matched_sequence` (bool, default true) - include `fimo_matched_sequence` in TFBS outputs
+    - `include_matched_sequence` (bool, default true; must be true for PWM sampling) - include
+      `fimo_matched_sequence` in TFBS outputs (config validation rejects false)
     - `length`
       - `policy`: `exact | range` (default: `exact`)
       - `range`: `[min, max]` (required when `policy=range`; `min` >= motif length)
@@ -92,6 +93,8 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
       - `tier_widening` (optional)
         - `enabled` (bool)
         - `ladder` (fractions in (0, 1], e.g. `[0.001, 0.01, 0.09, 1.0]`; widening continues until shortlist_target is met or the ladder is exhausted)
+      - When `selection.policy: mmr` and `tier_widening` is omitted, DenseGen enables tier widening with
+        the default ladder `[0.001, 0.01, 0.09, 1.0]`.
     - `consensus` requires `n_sites: 1`
     - `background` samples cores from the PWM background distribution before padding
     - FIMO resolves `fimo` via `MEME_BIN` or PATH; pixi users should run `pixi run dense ...` so it is available.
