@@ -11,6 +11,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import io
+
 from dnadesign.densegen.src.adapters.sources.stage_a_progress import _PwmSamplingProgress, _stage_a_live_start
 from dnadesign.densegen.src.utils import logging_utils
 
@@ -27,6 +29,15 @@ class _DummyStream:
 
     def flush(self) -> None:
         return None
+
+
+class _CaptureStream(io.StringIO):
+    def __init__(self, *, tty: bool) -> None:
+        super().__init__()
+        self._tty = tty
+
+    def isatty(self) -> bool:
+        return self._tty
 
 
 def test_progress_allows_carriage_for_stream_tty() -> None:
@@ -48,6 +59,33 @@ def test_progress_allows_carriage_for_stream_tty() -> None:
             assert progress._use_live is False
         finally:
             progress.finish()
+    finally:
+        logging_utils.set_progress_style(prev_style)
+        logging_utils.set_progress_enabled(prev_enabled)
+
+
+def test_stream_phase_update_emits_line() -> None:
+    prev_style = logging_utils.get_progress_style()
+    prev_enabled = logging_utils.is_progress_enabled()
+    try:
+        logging_utils.set_progress_style("stream")
+        logging_utils.set_progress_enabled(True)
+        stream = _CaptureStream(tty=True)
+        progress = _PwmSamplingProgress(
+            motif_id="demo",
+            backend="fimo",
+            target=10,
+            accepted_target=5,
+            stream=stream,
+            target_fraction=0.001,
+        )
+        try:
+            progress.update(generated=2, accepted=1)
+            progress.set_phase("postprocess")
+        finally:
+            progress.finish()
+        output = stream.getvalue()
+        assert "phase postprocess" in output
     finally:
         logging_utils.set_progress_style(prev_style)
         logging_utils.set_progress_enabled(prev_enabled)
