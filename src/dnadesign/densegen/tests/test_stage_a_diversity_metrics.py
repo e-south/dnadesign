@@ -102,6 +102,45 @@ def test_diversity_summary_scores() -> None:
     assert actual.p50 == 0.75
 
 
+def test_diversity_summary_allows_zero_pwm_max_score_for_zero_scores() -> None:
+    cores = ["AAAA", "AAAT"]
+    scores = [0.0, 0.0]
+    summary = _diversity_summary(
+        baseline_cores=cores,
+        actual_cores=cores,
+        baseline_scores=scores,
+        actual_scores=scores,
+        upper_bound_cores=cores,
+        upper_bound_scores=scores,
+        pwm_max_score=0.0,
+        max_n=2500,
+    )
+    assert summary is not None
+    score_block = summary.score_quantiles
+    base = score_block.baseline
+    actual = score_block.actual
+    assert base is not None
+    assert actual is not None
+    assert base.p50 == 0.0
+    assert actual.p50 == 0.0
+
+
+def test_diversity_summary_rejects_zero_pwm_max_score_with_nonzero_scores() -> None:
+    cores = ["AAAA", "AAAT"]
+    scores = [0.0, 1.0]
+    with pytest.raises(ValueError, match="pwm_max_score"):
+        _diversity_summary(
+            baseline_cores=cores,
+            actual_cores=cores,
+            baseline_scores=scores,
+            actual_scores=scores,
+            upper_bound_cores=cores,
+            upper_bound_scores=scores,
+            pwm_max_score=0.0,
+            max_n=2500,
+        )
+
+
 def _base4_sequence(index: int, *, length: int = 6) -> str:
     bases = ["A", "C", "G", "T"]
     digits = []

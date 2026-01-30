@@ -632,9 +632,17 @@ def _diversity_summary(
     if baseline_scores or actual_scores or baseline_global_scores or upper_bound_scores:
         if pwm_max_score is None:
             raise ValueError("pwm_max_score is required to normalize Stage-A score quantiles.")
-        if float(pwm_max_score) == 0.0:
-            raise ValueError("pwm_max_score must be non-zero to normalize Stage-A score quantiles.")
-        score_denominator = float(pwm_max_score)
+        pwm_max_score = float(pwm_max_score)
+        if pwm_max_score < 0.0:
+            raise ValueError("pwm_max_score must be >= 0 to normalize Stage-A score quantiles.")
+        if pwm_max_score == 0.0:
+            all_scores = list(baseline_scores) + list(actual_scores)
+            all_scores += list(baseline_global_scores or []) + list(upper_bound_scores or [])
+            if any(abs(float(score)) > 1e-9 for score in all_scores):
+                raise ValueError("pwm_max_score=0 but nonzero scores found in Stage-A score quantiles.")
+            score_denominator = 1.0
+        else:
+            score_denominator = pwm_max_score
     baseline_norm = [float(score) / score_denominator for score in baseline_scores] if baseline_scores else []
     actual_norm = [float(score) / score_denominator for score in actual_scores] if actual_scores else []
     baseline_global_norm = (

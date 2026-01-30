@@ -37,8 +37,7 @@ def test_pwm_progress_line_densegen_fields() -> None:
     )
     assert "PWM M1" in line
     assert "densegen" in line
-    assert "gen 50%" in line
-    assert "(50/100)" in line
+    assert "gen 50/100" in line
     assert "acc" not in line
     assert "| 1.2s |" in line
     assert line.endswith("/s")
@@ -62,8 +61,7 @@ def test_pwm_progress_line_fimo_fields() -> None:
     )
     assert "PWM M2" in line
     assert "fimo" in line
-    assert "gen 25%" in line
-    assert "(25/100)" in line
+    assert "gen 25/100" in line
     assert "batch 3/-" in line
     assert "| 2.5s |" in line
     assert line.endswith("/s")
