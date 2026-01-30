@@ -26,6 +26,7 @@ from rich.logging import RichHandler
 _NATIVE_STDERR_PATTERNS: list[tuple[str, re.Pattern, str | None]] = []
 _NATIVE_STDERR_LOCK = threading.Lock()
 _FIMO_STDOUT_SUPPRESS_RE = re.compile(r"^\s*FIMO (mining|yield)\b")
+_STAGE_A_VERBOSE_RE = re.compile(r"^\s*Stage-A (fimo batch|postprocess|diversity)\b")
 _PROGRESS_LOCK = threading.Lock()
 _PROGRESS_ENABLED = True
 _PROGRESS_ACTIVE = False
@@ -93,6 +94,8 @@ class FimoMiningBatchLogFilter(logging.Filter):
         message = record.getMessage()
         if _FIMO_STDOUT_SUPPRESS_RE.search(message):
             return False
+        if _STAGE_A_VERBOSE_RE.search(message):
+            return False
         return True
 
 
@@ -103,6 +106,8 @@ class ProgressAwareStreamHandler(logging.StreamHandler):
         if getattr(record, "suppress_stdout", False):
             return
         if _FIMO_STDOUT_SUPPRESS_RE.search(record.getMessage()):
+            return
+        if _STAGE_A_VERBOSE_RE.search(record.getMessage()):
             return
         _maybe_clear_progress_line(self.stream)
         try:
@@ -119,6 +124,8 @@ class ProgressAwareRichHandler(RichHandler):
             return
         message = record.getMessage()
         if _FIMO_STDOUT_SUPPRESS_RE.search(message):
+            return
+        if _STAGE_A_VERBOSE_RE.search(message):
             return
         stream = self.console.file if self.console is not None else sys.stdout
         if getattr(stream, "closed", False):
@@ -246,6 +253,8 @@ def setup_logging(
     """
     Configure root logging for console + optional file, and optionally install a
     native stderr deduper to suppress noisy OR-Tools/absl warnings.
+    When progress rendering is enabled, console logs are sent to stderr so
+    screen/stream progress updates can own stdout.
 
     Parameters
     ----------
@@ -269,7 +278,10 @@ def setup_logging(
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    console = Console(file=sys.stdout)
+    progress_enabled = is_progress_enabled()
+    progress_style = get_progress_style()
+    console_stream = sys.stderr if progress_enabled and progress_style in {"screen", "stream"} else sys.stdout
+    console = Console(file=console_stream)
     sh = ProgressAwareRichHandler(
         console=console,
         show_time=True,

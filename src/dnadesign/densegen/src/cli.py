@@ -710,11 +710,7 @@ def _stage_a_sampling_rows(
                     if summary.tier_target_met is True:
                         tier_target = f"{frac_label} met"
                     elif summary.tier_target_met is False:
-                        required = summary.tier_target_required_unique
-                        if required is not None:
-                            tier_target = f"{frac_label} unmet (need {required})"
-                        else:
-                            tier_target = f"{frac_label} unmet"
+                        tier_target = f"{frac_label} unmet"
                 selection_label = summary.selection_policy
                 if summary.selection_policy == "mmr":
                     if summary.selection_alpha is None or summary.selection_shortlist_k is None:

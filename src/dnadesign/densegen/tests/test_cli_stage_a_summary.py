@@ -337,3 +337,61 @@ def test_stage_a_sampling_rows_include_pool_headroom() -> None:
     )
     rows = _stage_a_sampling_rows({"demo": pool})
     assert rows[0]["diversity_pool"] == "50/250 (shortlist_k)"
+
+
+def test_stage_a_sampling_rows_tier_target_omits_required_unique() -> None:
+    summary = PWMSamplingSummary(
+        input_name="demo",
+        regulator="regA",
+        backend="fimo",
+        pwm_consensus="AAAA",
+        uniqueness_key="core",
+        collapsed_by_core_identity=0,
+        generated=10,
+        target=10,
+        target_sites=2,
+        candidates_with_hit=9,
+        eligible_raw=8,
+        eligible_unique=5,
+        retained=2,
+        retained_len_min=4,
+        retained_len_median=4.0,
+        retained_len_mean=4.0,
+        retained_len_max=4,
+        retained_score_min=1.0,
+        retained_score_median=1.0,
+        retained_score_mean=1.0,
+        retained_score_max=1.0,
+        eligible_tier_counts=[1, 1, 0, 0],
+        retained_tier_counts=[1, 0, 0, 0],
+        tier0_score=2.0,
+        tier1_score=1.5,
+        tier2_score=1.0,
+        tier_fractions=[0.001, 0.01, 0.09],
+        tier_fractions_source="default",
+        eligible_score_hist_edges=[0.0, 1.0],
+        eligible_score_hist_counts=[1],
+        tier_target_fraction=0.001,
+        tier_target_required_unique=5000,
+        tier_target_met=False,
+        selection_policy="mmr",
+        selection_alpha=0.9,
+        selection_shortlist_k=50,
+        selection_shortlist_min=10,
+        selection_shortlist_factor=5,
+        selection_shortlist_target=250,
+        selection_pool_source="shortlist_k",
+        diversity=_dummy_diversity_summary(),
+        mining_audit=None,
+    )
+    pool = PoolData(
+        name="demo",
+        input_type="pwm_meme",
+        pool_mode="tfbs",
+        df=None,
+        sequences=[],
+        pool_path=Path("demo.parquet"),
+        summaries=[summary],
+    )
+    rows = _stage_a_sampling_rows({"demo": pool})
+    assert "need" not in rows[0]["tier_target"]
