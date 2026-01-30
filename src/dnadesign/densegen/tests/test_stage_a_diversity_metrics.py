@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import pytest
 
-from dnadesign.densegen.src.adapters.sources.pwm_sampling import FimoCandidate
 from dnadesign.densegen.src.adapters.sources.stage_a_diversity import (
     _core_entropy,
     _core_hamming_knn,
@@ -26,6 +25,7 @@ from dnadesign.densegen.src.adapters.sources.stage_a_selection import (
     _select_diversity_baseline_candidates,
     _select_diversity_upper_bound_candidates,
 )
+from dnadesign.densegen.src.adapters.sources.stage_a_types import FimoCandidate
 
 
 def test_core_hamming_nnd_counts_and_median() -> None:

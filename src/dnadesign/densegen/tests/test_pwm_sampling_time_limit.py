@@ -5,7 +5,8 @@ import logging
 import numpy as np
 import pytest
 
-from dnadesign.densegen.src.adapters.sources.pwm_sampling import PWMMotif, sample_pwm_sites
+from dnadesign.densegen.src.adapters.sources.pwm_sampling import sample_pwm_sites
+from dnadesign.densegen.src.adapters.sources.stage_a_types import PWMMotif
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
 from dnadesign.densegen.tests.pwm_sampling_fixtures import selection_top_score, tier_target_mining
 

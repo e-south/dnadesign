@@ -11,7 +11,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dnadesign.densegen.src.adapters.sources import pwm_sampling, stage_a_selection
+from dnadesign.densegen.src.adapters.sources import stage_a_selection
+from dnadesign.densegen.src.adapters.sources.stage_a_types import FimoCandidate
 
 
 def _motif_with_pwm() -> list[dict[str, float]]:
@@ -30,7 +31,7 @@ def test_mmr_tier_widening_widens_instead_of_crashing() -> None:
         core = "ACGT"
         seq = f"TT{core}AA{idx:03d}"
         ranked.append(
-            pwm_sampling.FimoCandidate(
+            FimoCandidate(
                 seq=seq,
                 score=float(200 - idx),
                 start=3,
@@ -63,7 +64,7 @@ def test_mmr_tier_widening_honors_shortlist_target() -> None:
         core = "ACGT"
         seq = f"TT{core}AA{idx:03d}"
         ranked.append(
-            pwm_sampling.FimoCandidate(
+            FimoCandidate(
                 seq=seq,
                 score=float(100 - idx),
                 start=3,

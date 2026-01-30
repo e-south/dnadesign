@@ -17,7 +17,8 @@ import logging
 import numpy as np
 import pytest
 
-from dnadesign.densegen.src.adapters.sources.pwm_sampling import PWMMotif, sample_pwm_sites
+from dnadesign.densegen.src.adapters.sources.pwm_sampling import sample_pwm_sites
+from dnadesign.densegen.src.adapters.sources.stage_a_types import PWMMotif
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
 from dnadesign.densegen.tests.pwm_sampling_fixtures import fixed_candidates_mining, selection_top_score
 
@@ -53,10 +54,10 @@ def test_pwm_sampling_fimo_mining_consensus_includes_score_metadata() -> None:
 
     assert len(selected) == 1
     info = meta[selected[0]]
-    assert info["best_hit_score"] > 0
-    assert info["rank_within_regulator"] == 1
-    assert info["tier"] in {0, 1, 2}
-    assert info["fimo_matched_sequence"] is not None
+    assert info.best_hit_score > 0
+    assert info.rank_within_regulator == 1
+    assert info.tier in {0, 1, 2}
+    assert info.fimo_matched_sequence is not None
 
 
 def test_pwm_sampling_fimo_mining_shortfall_warns(caplog) -> None:

@@ -4,11 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from dnadesign.densegen.src.adapters.sources.pwm_sampling import _write_candidate_records
+from dnadesign.densegen.src.adapters.sources.stage_a_mining import write_candidate_records
 
 
 def _write_candidates(path: Path, records: list[dict]) -> None:
-    _write_candidate_records(
+    write_candidate_records(
         records,
         debug_output_dir=path,
         debug_label="demo",

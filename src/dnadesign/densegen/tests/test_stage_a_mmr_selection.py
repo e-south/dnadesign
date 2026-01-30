@@ -13,11 +13,12 @@ from __future__ import annotations
 
 import pytest
 
-from dnadesign.densegen.src.adapters.sources import pwm_sampling, stage_a_selection
+from dnadesign.densegen.src.adapters.sources import stage_a_selection
+from dnadesign.densegen.src.adapters.sources.stage_a_types import FimoCandidate
 
 
-def _cand(seq: str, score: float) -> pwm_sampling.FimoCandidate:
-    return pwm_sampling.FimoCandidate(
+def _cand(seq: str, score: float) -> FimoCandidate:
+    return FimoCandidate(
         seq=seq,
         score=score,
         start=1,
@@ -48,8 +49,8 @@ def test_mmr_prefers_low_ic_mismatch_when_scores_equal() -> None:
         tier_widening=None,
     )
     assert [cand.seq for cand in selected] == ["AA", "AT"]
-    assert meta["AA"]["selection_rank"] == 1
-    assert meta["AT"]["selection_rank"] == 2
+    assert meta["AA"].selection_rank == 1
+    assert meta["AT"].selection_rank == 2
     assert diag.shortlist_k == 3
 
 

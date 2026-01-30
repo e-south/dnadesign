@@ -18,7 +18,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from dnadesign.densegen.src.adapters.sources.pwm_sampling import PWMMotif, sample_pwm_sites
+from dnadesign.densegen.src.adapters.sources.pwm_sampling import sample_pwm_sites
+from dnadesign.densegen.src.adapters.sources.stage_a_types import PWMMotif
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
 from dnadesign.densegen.tests.pwm_sampling_fixtures import fixed_candidates_mining, selection_top_score
 
@@ -66,5 +67,5 @@ def test_fimo_retains_top_scores_with_dedup(tmp_path: Path) -> None:
     )
     expected = dedup.head(len(selected))["sequence"].tolist()
     assert selected == expected
-    scores = [meta[seq]["best_hit_score"] for seq in selected]
+    scores = [meta[seq].best_hit_score for seq in selected]
     assert scores == sorted(scores, reverse=True)

@@ -13,11 +13,8 @@ from __future__ import annotations
 
 import pytest
 
-from dnadesign.densegen.src.adapters.sources.pwm_sampling import (
-    FimoCandidate,
-    _collapse_by_core_identity,
-    _core_sequence,
-)
+from dnadesign.densegen.src.adapters.sources.stage_a_selection import _collapse_by_core_identity, _core_sequence
+from dnadesign.densegen.src.adapters.sources.stage_a_types import FimoCandidate
 
 
 def test_core_sequence_prefers_matched_sequence() -> None:

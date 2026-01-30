@@ -23,6 +23,7 @@ import numpy as np
 from ...config import PWMMiningConfig, PWMSamplingConfig, PWMSelectionConfig, PWMSelectionTierWidening
 from ...core.score_tiers import resolve_tier_fractions, score_tier_counts
 from .stage_a_diversity import _diversity_summary
+from .stage_a_metadata import TFBSMeta
 from .stage_a_metrics import _tail_unique_slope
 from .stage_a_mining import mine_pwm_candidates, write_candidate_records
 from .stage_a_progress import StageAProgressManager, _format_stage_a_milestone, _PwmSamplingProgress
@@ -53,7 +54,7 @@ from .stage_a_summary import (
     _build_summary,
     _ranked_sequence_positions,
 )
-from .stage_a_types import PWMMotif
+from .stage_a_types import PWMMotif, SelectionMeta
 
 log = logging.getLogger(__name__)
 _BASES = np.array(["A", "C", "G", "T"])
@@ -115,9 +116,9 @@ def sample_pwm_sites(
     return_summary: bool = False,
 ) -> Union[
     List[str],
-    Tuple[List[str], dict[str, dict]],
+    Tuple[List[str], dict[str, TFBSMeta]],
     Tuple[List[str], PWMSamplingSummary],
-    Tuple[List[str], dict[str, dict], Optional[PWMSamplingSummary]],
+    Tuple[List[str], dict[str, TFBSMeta], Optional[PWMSamplingSummary]],
 ]:
     if n_sites <= 0:
         raise ValueError("n_sites must be > 0")
@@ -311,7 +312,7 @@ def sample_pwm_sites(
         sequences: Optional[List[str]] = None,
         intended_core_by_seq: Optional[dict[str, tuple[int, int]]] = None,
         core_offset_by_seq: Optional[dict[str, int]] = None,
-    ) -> tuple[List[str], dict[str, dict]]:
+    ) -> tuple[List[str], dict[str, TFBSMeta], Optional[PWMSamplingSummary]]:
         mining_batch_size = int(mining.batch_size)
         mining_max_seconds = budget_max_seconds
         mining_log_every = int(mining.log_every_batches)
@@ -419,7 +420,7 @@ def sample_pwm_sites(
         eligible_tier_counts = [0, 0, 0, 0]
         for tier in tiers:
             eligible_tier_counts[tier] += 1
-        selection_meta: dict[str, dict] = {}
+        selection_meta: dict[str, SelectionMeta] = {}
         selection_diag: SelectionDiagnostics | None = None
         if selection_policy == "mmr":
             picked, selection_meta, selection_diag = _select_by_mmr(
@@ -435,11 +436,11 @@ def sample_pwm_sites(
         else:
             picked = ranked[: int(n_sites)]
             for idx, cand in enumerate(picked):
-                selection_meta[cand.seq] = {
-                    "selection_rank": idx + 1,
-                    "selection_utility": None,
-                    "nearest_selected_similarity": None,
-                }
+                selection_meta[cand.seq] = SelectionMeta(
+                    selection_rank=idx + 1,
+                    selection_utility=None,
+                    nearest_selected_similarity=None,
+                )
             selection_diag = SelectionDiagnostics(
                 shortlist_k=0,
                 shortlist_target=0,
@@ -618,44 +619,36 @@ def sample_pwm_sites(
             len(picked),
             extra={"suppress_stdout": True},
         )
-        meta_by_seq: dict[str, dict] = {}
+        meta_by_seq: dict[str, TFBSMeta] = {}
         for cand in picked:
-            meta = {
-                "best_hit_score": cand.score,
-                "rank_within_regulator": rank_by_seq[cand.seq],
-                "tier": tier_by_seq[cand.seq],
-                "fimo_start": cand.start,
-                "fimo_stop": cand.stop,
-                "fimo_strand": cand.strand,
-            }
-            meta["tfbs_core"] = _core_sequence(cand)
-            if cand.matched_sequence:
-                meta["fimo_matched_sequence"] = cand.matched_sequence
-            selection_meta_row = selection_meta.get(cand.seq, {})
-            meta["selection_rank"] = selection_meta_row.get("selection_rank")
-            meta["selection_utility"] = selection_meta_row.get("selection_utility")
-            meta["nearest_selected_similarity"] = selection_meta_row.get("nearest_selected_similarity")
-            meta["selection_policy"] = selection_policy
-            meta["selection_alpha"] = selection_alpha if selection_policy == "mmr" else None
-            meta["selection_similarity"] = "weighted_hamming_tolerant" if selection_policy == "mmr" else None
-            meta["selection_shortlist_min"] = selection_shortlist_min if selection_policy == "mmr" else None
-            meta["selection_shortlist_factor"] = selection_shortlist_factor if selection_policy == "mmr" else None
-            meta["selection_shortlist_max"] = selection_shortlist_max if selection_policy == "mmr" else None
-            if selection_diag is not None:
-                meta["selection_tier_fraction_used"] = selection_diag.tier_fraction_used
-                meta["selection_tier_limit"] = selection_diag.tier_limit
-                meta["shortlist_k"] = selection_diag.shortlist_k
-                meta["selection_pool_source"] = selection_diag.pool_source
-            else:
-                meta["selection_tier_fraction_used"] = None
-                meta["selection_tier_limit"] = None
-                meta["shortlist_k"] = None
-                meta["selection_pool_source"] = None
-            meta["tier_target_fraction"] = budget_target_tier_fraction
-            meta["tier_target_required_unique"] = tier_target_required_unique
-            meta["tier_target_met"] = tier_target_met
-            meta["tier_target_eligible_unique"] = int(len(ranked))
-            meta_by_seq[cand.seq] = meta
+            selection_meta_row = selection_meta.get(cand.seq)
+            if selection_meta_row is None:
+                raise ValueError(f"Selection metadata missing for retained TFBS {cand.seq}.")
+            meta_by_seq[cand.seq] = TFBSMeta(
+                best_hit_score=float(cand.score),
+                rank_within_regulator=int(rank_by_seq[cand.seq]),
+                tier=int(tier_by_seq[cand.seq]),
+                fimo_start=int(cand.start),
+                fimo_stop=int(cand.stop),
+                fimo_strand=str(cand.strand),
+                tfbs_core=_core_sequence(cand),
+                fimo_matched_sequence=str(cand.matched_sequence) if cand.matched_sequence else None,
+                selection_meta=selection_meta_row,
+                selection_policy=str(selection_policy),
+                selection_alpha=float(selection_alpha) if selection_policy == "mmr" else None,
+                selection_similarity="weighted_hamming_tolerant" if selection_policy == "mmr" else None,
+                selection_shortlist_min=int(selection_shortlist_min) if selection_policy == "mmr" else None,
+                selection_shortlist_factor=int(selection_shortlist_factor) if selection_policy == "mmr" else None,
+                selection_shortlist_max=int(selection_shortlist_max) if selection_policy == "mmr" else None,
+                selection_tier_fraction_used=selection_diag.tier_fraction_used if selection_diag else None,
+                selection_tier_limit=selection_diag.tier_limit if selection_diag else None,
+                shortlist_k=selection_diag.shortlist_k if selection_diag else None,
+                selection_pool_source=selection_diag.pool_source if selection_diag else None,
+                tier_target_fraction=budget_target_tier_fraction,
+                tier_target_required_unique=tier_target_required_unique,
+                tier_target_met=tier_target_met,
+                tier_target_eligible_unique=int(len(ranked)),
+            )
         if candidate_records is not None and debug_dir is not None:
             selected_set = {c.seq for c in picked}
             for row in candidate_records:
@@ -676,11 +669,9 @@ def sample_pwm_sites(
             except Exception:
                 log.warning("Failed to write FIMO candidate records.", exc_info=True)
         nearest_sims = [
-            float(meta.get("nearest_selected_similarity"))
+            float(meta.nearest_selected_similarity)
             for meta in selection_meta.values()
-            if meta.get("selection_rank") is not None
-            and int(meta.get("selection_rank")) > 1
-            and meta.get("nearest_selected_similarity") is not None
+            if int(meta.selection_rank) > 1 and meta.nearest_selected_similarity is not None
         ]
         diversity_nearest_similarity_mean = None
         diversity_nearest_distance_mean = None

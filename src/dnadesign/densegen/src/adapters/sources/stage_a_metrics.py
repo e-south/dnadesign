@@ -374,18 +374,12 @@ def _pairwise_hamming_summary(
         weights_arr = np.asarray(weights, dtype=float)
         if weights_arr.shape[0] != length:
             raise ValueError("Weighted Hamming requires weights matching core length.")
-    pairs = []
-    while len(pairs) < sample_pairs:
-        draw = rng.integers(0, n, size=(sample_pairs * 2, 2))
-        mask = draw[:, 0] != draw[:, 1]
-        if not np.any(mask):
-            continue
-        for i, j in draw[mask]:
-            pairs.append((int(i), int(j)))
-            if len(pairs) >= sample_pairs:
-                break
-    idx_i = np.fromiter((pair[0] for pair in pairs), dtype=int, count=sample_pairs)
-    idx_j = np.fromiter((pair[1] for pair in pairs), dtype=int, count=sample_pairs)
+    idx_i = rng.integers(0, n, size=sample_pairs)
+    idx_j = rng.integers(0, n, size=sample_pairs)
+    mask = idx_i == idx_j
+    while np.any(mask):
+        idx_j[mask] = rng.integers(0, n, size=int(mask.sum()))
+        mask = idx_i == idx_j
     diff = encoded[idx_i] != encoded[idx_j]
     if weights_arr is None:
         distances = diff.sum(axis=1).astype(float)

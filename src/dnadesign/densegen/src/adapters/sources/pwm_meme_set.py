@@ -141,10 +141,10 @@ class PWMMemeSetDataSource(BaseDataSource):
                 summaries.append(summary)
             for seq in selected:
                 entries.append((pwm.motif_id, seq, str(path)))
-                meta = meta_by_seq.get(seq, {}) if meta_by_seq else {}
-                start = meta.get("fimo_start")
-                stop = meta.get("fimo_stop")
-                strand = meta.get("fimo_strand")
+                meta = meta_by_seq[seq] if return_meta else None
+                start = meta.fimo_start if meta is not None else None
+                stop = meta.fimo_stop if meta is not None else None
+                strand = meta.fimo_strand if meta is not None else None
                 tfbs_id = hash_tfbs_id(
                     motif_id=motif_hash,
                     sequence=seq,
@@ -162,8 +162,8 @@ class PWMMemeSetDataSource(BaseDataSource):
                     "motif_id": motif_hash,
                     "tfbs_id": tfbs_id,
                 }
-                if meta:
-                    row.update(meta)
+                if meta is not None:
+                    row.update(meta.to_dict())
                 all_rows.append(row)
 
         import pandas as pd

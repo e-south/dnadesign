@@ -16,6 +16,8 @@ from typing import Optional, Protocol, Sequence
 
 import numpy as np
 
+from .stage_a_types import SelectionMeta
+
 
 class _CandidateLike(Protocol):
     seq: str
@@ -301,7 +303,7 @@ def _select_by_mmr(
     shortlist_factor: int,
     shortlist_max: Optional[int],
     tier_widening: Optional[Sequence[float]],
-) -> tuple[list[_CandidateLike], dict[str, dict], SelectionDiagnostics]:
+) -> tuple[list[_CandidateLike], dict[str, SelectionMeta], SelectionDiagnostics]:
     if not ranked or n_sites <= 0:
         return (
             [],
@@ -323,7 +325,13 @@ def _select_by_mmr(
     total = len(ranked)
     shortlist_target = max(int(shortlist_min), int(shortlist_factor) * int(n_sites))
 
-    def _select_from_slice(candidates: Sequence[_CandidateLike]) -> tuple[list[_CandidateLike], dict[str, dict], int]:
+    def _lex_ranks(values: Sequence[str]) -> np.ndarray:
+        order = {val: idx for idx, val in enumerate(sorted(set(values)))}
+        return np.array([order[val] for val in values], dtype=int)
+
+    def _select_from_slice(
+        candidates: Sequence[_CandidateLike],
+    ) -> tuple[list[_CandidateLike], dict[str, SelectionMeta], int]:
         if not candidates:
             return [], {}, 0
         max_k = len(candidates) if shortlist_max is None else min(len(candidates), int(shortlist_max))
@@ -342,51 +350,49 @@ def _select_by_mmr(
             raise ValueError("PWM weights length must match TFBS core length.")
         encoded = np.vstack([_encode_core(core) for core in cores])
         seqs = [cand.seq for cand in shortlist]
-        selected_mask = np.zeros(len(shortlist), dtype=bool)
-        min_dist = np.full(len(shortlist), np.inf, dtype=float)
-        selected: list[_CandidateLike] = []
-        meta: dict[str, dict] = {}
-        any_selected = False
+        core_ranks = _lex_ranks(cores)
+        seq_ranks = _lex_ranks(seqs)
 
-        def _select_next() -> tuple[int, float, float]:
-            if not any_selected:
-                max_sim = np.zeros(len(shortlist), dtype=float)
-            else:
-                max_sim = 1.0 / (1.0 + min_dist)
-            utility = alpha * scores_norm - (1.0 - alpha) * max_sim
-            utility[selected_mask] = -np.inf
-            best_val = float(np.max(utility))
-            candidate_idx = np.where(utility == best_val)[0]
-            if candidate_idx.size == 0:
-                raise ValueError("MMR selection failed to identify a candidate.")
-            best_idx = int(candidate_idx[0])
-            for idx in candidate_idx[1:]:
-                idx = int(idx)
-                if scores_arr[idx] > scores_arr[best_idx]:
-                    best_idx = idx
-                    continue
-                if scores_arr[idx] == scores_arr[best_idx]:
-                    if cores[idx] < cores[best_idx]:
-                        best_idx = idx
-                        continue
-                    if cores[idx] == cores[best_idx] and seqs[idx] < seqs[best_idx]:
-                        best_idx = idx
-            return best_idx, float(utility[best_idx]), float(max_sim[best_idx])
+        def _run_mmr() -> tuple[list[_CandidateLike], dict[str, SelectionMeta]]:
+            selected_mask = np.zeros(len(shortlist), dtype=bool)
+            min_dist = np.full(len(shortlist), np.inf, dtype=float)
+            selected: list[_CandidateLike] = []
+            meta: dict[str, SelectionMeta] = {}
+            any_selected = False
+            while len(selected) < target_n:
+                if not any_selected:
+                    max_sim = np.zeros(len(shortlist), dtype=float)
+                else:
+                    max_sim = 1.0 / (1.0 + min_dist)
+                utility = alpha * scores_norm - (1.0 - alpha) * max_sim
+                utility[selected_mask] = -np.inf
+                best_val = float(np.max(utility))
+                candidate_idx = np.flatnonzero(utility == best_val)
+                if candidate_idx.size == 0:
+                    raise ValueError("MMR selection failed to identify a candidate.")
+                if candidate_idx.size == 1:
+                    best_idx = int(candidate_idx[0])
+                else:
+                    cand_scores = scores_arr[candidate_idx]
+                    cand_core = core_ranks[candidate_idx]
+                    cand_seq = seq_ranks[candidate_idx]
+                    order = np.lexsort((cand_seq, cand_core, -cand_scores))
+                    best_idx = int(candidate_idx[order[0]])
+                chosen = shortlist[best_idx]
+                selected.append(chosen)
+                selected_mask[best_idx] = True
+                any_selected = True
+                meta[chosen.seq] = SelectionMeta(
+                    selection_rank=len(selected),
+                    selection_utility=float(utility[best_idx]),
+                    nearest_selected_similarity=float(max_sim[best_idx]),
+                )
+                dists = ((encoded != encoded[best_idx]) * weights).sum(axis=1)
+                min_dist = np.minimum(min_dist, dists)
+                min_dist[best_idx] = 0.0
+            return selected, meta
 
-        while len(selected) < target_n:
-            idx, utility, max_sim = _select_next()
-            chosen = shortlist[idx]
-            selected.append(chosen)
-            selected_mask[idx] = True
-            any_selected = True
-            meta[chosen.seq] = {
-                "selection_rank": len(selected),
-                "selection_utility": float(utility),
-                "nearest_selected_similarity": float(max_sim),
-            }
-            dists = ((encoded != encoded[idx]) * weights).sum(axis=1)
-            min_dist = np.minimum(min_dist, dists)
-            min_dist[idx] = 0.0
+        selected, meta = _run_mmr()
         if len(selected) < int(n_sites) and k < max_k:
             shortlist = list(candidates[:max_k])
             target_n = min(int(n_sites), len(shortlist))
@@ -398,25 +404,9 @@ def _select_by_mmr(
                 raise ValueError("PWM weights length must match TFBS core length.")
             encoded = np.vstack([_encode_core(core) for core in cores])
             seqs = [cand.seq for cand in shortlist]
-            selected_mask = np.zeros(len(shortlist), dtype=bool)
-            min_dist = np.full(len(shortlist), np.inf, dtype=float)
-            selected = []
-            meta = {}
-            any_selected = False
-            while len(selected) < target_n:
-                idx, utility, max_sim = _select_next()
-                chosen = shortlist[idx]
-                selected.append(chosen)
-                selected_mask[idx] = True
-                any_selected = True
-                meta[chosen.seq] = {
-                    "selection_rank": len(selected),
-                    "selection_utility": float(utility),
-                    "nearest_selected_similarity": float(max_sim),
-                }
-                dists = ((encoded != encoded[idx]) * weights).sum(axis=1)
-                min_dist = np.minimum(min_dist, dists)
-                min_dist[idx] = 0.0
+            core_ranks = _lex_ranks(cores)
+            seq_ranks = _lex_ranks(seqs)
+            selected, meta = _run_mmr()
             return selected, meta, int(max_k)
         return selected, meta, int(k)
 

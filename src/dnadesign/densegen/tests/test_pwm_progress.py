@@ -23,6 +23,7 @@ def test_pwm_progress_line_densegen_fields() -> None:
     line = stage_a_progress._format_pwm_progress_line(
         motif_id="M1",
         backend="densegen",
+        phase=None,
         generated=50,
         target=100,
         accepted=None,
@@ -47,6 +48,7 @@ def test_pwm_progress_line_fimo_fields() -> None:
     line = stage_a_progress._format_pwm_progress_line(
         motif_id="M2",
         backend="fimo",
+        phase=None,
         generated=25,
         target=100,
         accepted=10,
@@ -65,6 +67,25 @@ def test_pwm_progress_line_fimo_fields() -> None:
     assert "batch 3/-" in line
     assert "| 2.5s |" in line
     assert line.endswith("/s")
+
+
+def test_pwm_progress_line_phase_field() -> None:
+    line = stage_a_progress._format_pwm_progress_line(
+        motif_id="M3",
+        backend="fimo",
+        phase="postprocess",
+        generated=10,
+        target=100,
+        accepted=5,
+        accepted_target=40,
+        batch_index=None,
+        batch_total=None,
+        elapsed=1.0,
+        target_fraction=None,
+        tier_fractions=None,
+        tier_yield=None,
+    )
+    assert "phase postprocess" in line
 
 
 def test_fimo_mining_batch_filter_blocks_batch_lines() -> None:

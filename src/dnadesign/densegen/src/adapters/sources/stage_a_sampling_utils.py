@@ -108,8 +108,9 @@ def _sample_pwm_batch(
     *,
     count: int,
 ) -> List[str]:
-    draw = rng.random((int(count), matrix_cdf.shape[0]))
-    idx = np.searchsorted(matrix_cdf, draw, side="left")
+    width = int(matrix_cdf.shape[0])
+    draws = rng.random((int(count), width))
+    idx = (draws[:, :, None] <= matrix_cdf[None, :, :]).argmax(axis=2)
     return ["".join(_BASES[row]) for row in idx]
 
 
@@ -157,31 +158,40 @@ def _information_bits(matrix: np.ndarray) -> float:
     if np.any(row_sums <= 0):
         raise ValueError("PWM rows must sum to > 0 for information content.")
     probs = matrix / row_sums
-    entropy = -(probs * np.where(probs > 0, np.log2(probs), 0.0)).sum(axis=1)
+    safe = np.clip(probs, 1e-9, 1.0)
+    entropy = -(probs * np.log2(safe)).sum(axis=1)
     info_bits = 2.0 - entropy
     return float(info_bits.sum())
 
 
 def _select_pwm_window(
-    matrix: List[dict[str, float]],
     *,
-    window_length: int,
-    window_strategy: str,
-) -> tuple[List[dict[str, float]], int, int]:
-    if window_length <= 0:
-        raise ValueError("trimming.window_length must be > 0.")
-    if window_length >= len(matrix):
-        return matrix, 0, len(matrix)
-    if window_strategy != "max_info":
-        raise ValueError(f"Unsupported trimming.window_strategy: {window_strategy}")
+    matrix: List[dict[str, float]],
+    log_odds: List[dict[str, float]],
+    length: int,
+    strategy: str,
+) -> tuple[List[dict[str, float]], List[dict[str, float]], int, float]:
+    if length < 1:
+        raise ValueError("pwm.sampling.trim_window_length must be >= 1")
+    if length > len(matrix):
+        raise ValueError(f"pwm.sampling.trim_window_length={length} exceeds motif width {len(matrix)}")
+    if strategy != "max_info":
+        raise ValueError("pwm.sampling.trim_window_strategy must be 'max_info'")
+    if length == len(matrix):
+        return matrix, log_odds, 0, 0.0
+    arr = _matrix_array(matrix)
     best_start = 0
     best_score = float("-inf")
-    matrix_arr = _matrix_array(matrix)
-    for start in range(0, len(matrix) - window_length + 1):
-        window = matrix_arr[start : start + window_length]
-        info_bits = _information_bits(window)
-        if info_bits > best_score:
-            best_score = info_bits
+    last_start = len(matrix) - length
+    for start in range(last_start + 1):
+        window = arr[start : start + length]
+        score = _information_bits(window)
+        if score > best_score:
+            best_score = score
             best_start = start
-    end = best_start + window_length
-    return matrix[best_start:end], best_start, end
+    return (
+        matrix[best_start : best_start + length],
+        log_odds[best_start : best_start + length],
+        best_start,
+        best_score,
+    )

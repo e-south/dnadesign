@@ -21,7 +21,9 @@ from ...config import PWMSamplingConfig
 from ...core.artifacts.ids import hash_pwm_motif, hash_tfbs_id
 from ...core.run_paths import candidates_root
 from .base import BaseDataSource, resolve_path
-from .pwm_sampling import PWMMotif, normalize_background, sample_pwm_sites, sampling_kwargs_from_config
+from .pwm_sampling import sample_pwm_sites, sampling_kwargs_from_config
+from .stage_a_sampling_utils import normalize_background
+from .stage_a_types import PWMMotif
 
 
 @dataclass
@@ -124,10 +126,10 @@ class PWMMatrixCSVDataSource(BaseDataSource):
         entries = [(motif.motif_id, seq, str(csv_path)) for seq in selected]
         rows = []
         for seq in selected:
-            meta = meta_by_seq.get(seq, {}) if meta_by_seq else {}
-            start = meta.get("fimo_start")
-            stop = meta.get("fimo_stop")
-            strand = meta.get("fimo_strand")
+            meta = meta_by_seq[seq] if return_meta else None
+            start = meta.fimo_start if meta is not None else None
+            stop = meta.fimo_stop if meta is not None else None
+            strand = meta.fimo_strand if meta is not None else None
             tfbs_id = hash_tfbs_id(
                 motif_id=motif_hash,
                 sequence=seq,
@@ -145,8 +147,8 @@ class PWMMatrixCSVDataSource(BaseDataSource):
                 "motif_id": motif_hash,
                 "tfbs_id": tfbs_id,
             }
-            if meta:
-                row.update(meta)
+            if meta is not None:
+                row.update(meta.to_dict())
             rows.append(row)
         df_out = pd.DataFrame(rows)
         summaries = [summary] if summary is not None else []

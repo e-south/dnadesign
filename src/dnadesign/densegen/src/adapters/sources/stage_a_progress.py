@@ -61,6 +61,7 @@ def _format_pwm_progress_line(
     *,
     motif_id: str,
     backend: str,
+    phase: Optional[str],
     generated: int,
     target: int,
     accepted: Optional[int],
@@ -75,7 +76,10 @@ def _format_pwm_progress_line(
     safe_target = max(1, int(target))
     gen_pct = min(100, int(100 * generated / safe_target))
     gen_bar = _format_progress_bar(int(generated), int(safe_target))
-    parts = [f"PWM {motif_id}", backend, f"gen {gen_pct}% {gen_bar} ({generated}/{safe_target})"]
+    parts = [f"PWM {motif_id}", backend]
+    if phase:
+        parts.append(f"phase {phase}")
+    parts.append(f"gen {gen_pct}% {gen_bar} ({generated}/{safe_target})")
     if accepted is not None:
         if accepted_target is not None and int(accepted_target) > 0:
             acc_pct = min(100, int(100 * int(accepted) / max(1, int(accepted_target))))
@@ -122,6 +126,7 @@ def _stage_a_live_render(state: dict[str, dict[str, object]]):
     table = make_table(show_header=True, pad_edge=False)
     table.add_column("motif")
     table.add_column("backend")
+    table.add_column("phase")
     table.add_column("generated/target", no_wrap=True, overflow="ellipsis", min_width=14)
     table.add_column("gen %", no_wrap=True, overflow="ellipsis", min_width=12)
     table.add_column("eligible_unique/target", no_wrap=True, overflow="ellipsis", min_width=18)
@@ -169,6 +174,7 @@ def _stage_a_live_render(state: dict[str, dict[str, object]]):
         table.add_row(
             str(row.get("motif", "-")),
             str(row.get("backend", "-")),
+            str(row.get("phase", "-") or "-"),
             gen_label,
             progress_label,
             eligible_label,
@@ -219,6 +225,7 @@ class StageAProgressManager:
         key: str,
         motif_id: str,
         backend: str,
+        phase: Optional[str],
         target: int,
         accepted_target: Optional[int],
         target_fraction: Optional[float],
@@ -230,6 +237,7 @@ class StageAProgressManager:
             self._state[key] = {
                 "motif": motif_id,
                 "backend": backend,
+                "phase": phase,
                 "generated": 0,
                 "target": int(target),
                 "accepted": None,
@@ -253,6 +261,7 @@ class StageAProgressManager:
         accepted_target: Optional[int] = None,
         batch_index: Optional[int] = None,
         batch_total: Optional[int] = None,
+        phase: Optional[str] = None,
     ) -> None:
         with self._lock:
             row = self._state.get(key)
@@ -261,6 +270,8 @@ class StageAProgressManager:
             row["generated"] = int(generated)
             row["accepted"] = int(accepted) if accepted is not None else None
             row["elapsed"] = float(elapsed)
+            if phase is not None:
+                row["phase"] = phase
             if target is not None:
                 row["target"] = int(target)
             if accepted_target is not None:
@@ -269,6 +280,17 @@ class StageAProgressManager:
                 row["batch_index"] = int(batch_index)
             if batch_total is not None:
                 row["batch_total"] = int(batch_total)
+            if self._live is None:
+                return
+            renderable = _stage_a_live_render(self._state)
+            self._live.update(renderable, refresh=True)
+
+    def set_phase(self, *, key: str, phase: Optional[str]) -> None:
+        with self._lock:
+            row = self._state.get(key)
+            if row is None:
+                return
+            row["phase"] = phase
             if self._live is None:
                 return
             renderable = _stage_a_live_render(self._state)
@@ -315,6 +337,7 @@ class _PwmSamplingProgress:
         self._use_table = False
         self._allow_carriage = interactive
         self._live_key = f"{self.motif_id}:{id(self)}"
+        self._phase: Optional[str] = "mining"
         self._start = time.monotonic()
         self._last_update = self._start
         self._last_len = 0
@@ -329,6 +352,7 @@ class _PwmSamplingProgress:
                 key=self._live_key,
                 motif_id=self.motif_id,
                 backend=self.backend,
+                phase=self._phase,
                 target=int(self.target),
                 accepted_target=self.accepted_target,
                 target_fraction=self.target_fraction,
@@ -369,6 +393,7 @@ class _PwmSamplingProgress:
                 generated=int(generated),
                 accepted=accepted,
                 elapsed=now - self._start,
+                phase=self._phase,
                 target=int(self.target),
                 accepted_target=self.accepted_target,
                 batch_index=batch_index,
@@ -378,6 +403,7 @@ class _PwmSamplingProgress:
             line = _format_pwm_progress_line(
                 motif_id=self.motif_id,
                 backend=self.backend,
+                phase=self._phase,
                 generated=int(generated),
                 target=int(self.target),
                 accepted=accepted,
@@ -406,6 +432,14 @@ class _PwmSamplingProgress:
         self._last_update = now
         self._last_state = state
         self._shown = True
+
+    def set_phase(self, phase: Optional[str]) -> None:
+        self._phase = phase
+        if not self._use_live:
+            return
+        if self._manager is None:
+            raise RuntimeError("Stage-A progress manager missing for live update.")
+        self._manager.set_phase(key=self._live_key, phase=phase)
 
     def finish(self) -> None:
         if self._enabled:

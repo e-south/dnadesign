@@ -18,7 +18,8 @@ import pandas as pd
 import pytest
 import yaml
 
-from dnadesign.densegen.src.adapters.sources import pwm_sampling
+from dnadesign.densegen.src.adapters.sources import stage_a_selection
+from dnadesign.densegen.src.adapters.sources.stage_a_types import FimoCandidate
 from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.core.artifacts.pool import build_pool_artifact
 from dnadesign.densegen.src.core.pipeline import default_deps
@@ -98,10 +99,10 @@ def _write_config(tmp_path: Path) -> Path:
 
 def _top_scoring_sequences(candidates: pd.DataFrame, count: int) -> list[str]:
     ranked_rows = candidates.sort_values(["best_hit_score", "sequence"], ascending=[False, True])
-    ranked: list[pwm_sampling.FimoCandidate] = []
+    ranked: list[FimoCandidate] = []
     for row in ranked_rows.itertuples():
         ranked.append(
-            pwm_sampling.FimoCandidate(
+            FimoCandidate(
                 seq=str(row.sequence),
                 score=float(row.best_hit_score),
                 start=int(row.start),
@@ -110,7 +111,7 @@ def _top_scoring_sequences(candidates: pd.DataFrame, count: int) -> list[str]:
                 matched_sequence=str(row.matched_sequence) if row.matched_sequence else None,
             )
         )
-    deduped, _collapsed = pwm_sampling._collapse_by_core_identity(ranked)
+    deduped, _collapsed = stage_a_selection._collapse_by_core_identity(ranked)
     return [cand.seq for cand in deduped[:count]]
 
 
