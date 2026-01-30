@@ -162,6 +162,7 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
     assert stage_a_sampling is not None
     assert stage_a_sampling["backend"] == "fimo"
     assert stage_a_sampling["tier_scheme"] == "pct_0.1_1_9"
+    assert stage_a_sampling["tier_fractions"] == [0.001, 0.01, 0.09]
     assert stage_a_sampling["eligibility_rule"].startswith("best_hit_score")
     assert stage_a_sampling["retention_rule"] == "top_n_sites_by_best_hit_score"
     assert stage_a_sampling["fimo_thresh"] == 1.0

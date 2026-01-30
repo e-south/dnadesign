@@ -719,6 +719,8 @@ def _stage_a_sampling_rows(
                 diversity_swaps = "-"
                 diversity_pool = "-"
                 diversity = summary.diversity or {}
+                if hasattr(diversity, "to_dict"):
+                    diversity = diversity.to_dict()
                 core_hamming = diversity.get("core_hamming") if isinstance(diversity, dict) else None
                 if isinstance(core_hamming, dict):
                     pairwise = core_hamming.get("pairwise") if isinstance(core_hamming.get("pairwise"), dict) else None
@@ -760,7 +762,15 @@ def _stage_a_sampling_rows(
                 if pool_size is not None or shortlist_target is not None:
                     pool_label = f"{pool_size if pool_size is not None else '-'}"
                     pool_label = f"{pool_label}/{shortlist_target if shortlist_target is not None else '-'}"
-                    diversity_pool = pool_label
+                    pool_source = summary.selection_pool_source
+                    if pool_source is None:
+                        if summary.selection_shortlist_k is not None and int(summary.selection_shortlist_k) > 0:
+                            pool_source = "shortlist_k"
+                        elif summary.selection_tier_limit is not None:
+                            pool_source = "tier_limit"
+                        else:
+                            pool_source = "eligible_unique"
+                    diversity_pool = f"{pool_label} ({pool_source})"
                 rows.append(
                     {
                         "input_name": str(input_name),

@@ -248,4 +248,4 @@ def test_stage_a_sampling_rows_include_pool_headroom() -> None:
         summaries=[summary],
     )
     rows = _stage_a_sampling_rows({"demo": pool})
-    assert rows[0]["diversity_pool"] == "50/250"
+    assert rows[0]["diversity_pool"] == "50/250 (shortlist_k)"

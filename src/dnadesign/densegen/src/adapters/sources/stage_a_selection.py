@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Optional, Protocol, Sequence
 
 import numpy as np
@@ -20,6 +21,33 @@ class _CandidateLike(Protocol):
     seq: str
     score: float
     matched_sequence: Optional[str]
+
+
+@dataclass(frozen=True)
+class SelectionDiagnostics:
+    shortlist_k: int
+    shortlist_target: int
+    shortlist_target_met: bool
+    tier_fraction_used: float | None
+    tier_limit: int
+    pool_source: str
+
+    def pool_size(self) -> int:
+        if self.pool_source == "shortlist_k":
+            return int(self.shortlist_k)
+        if self.pool_source == "tier_limit":
+            return int(self.tier_limit)
+        return int(self.tier_limit)
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "shortlist_k": int(self.shortlist_k),
+            "shortlist_target": int(self.shortlist_target),
+            "shortlist_target_met": bool(self.shortlist_target_met),
+            "tier_fraction_used": float(self.tier_fraction_used) if self.tier_fraction_used is not None else None,
+            "tier_limit": int(self.tier_limit),
+            "pool_source": str(self.pool_source),
+        }
 
 
 def _core_sequence(candidate: _CandidateLike) -> str:
@@ -102,7 +130,7 @@ def _select_diversity_baseline_candidates(
     ranked: Sequence[_CandidateLike],
     *,
     selection_policy: str,
-    selection_diag: dict | None,
+    selection_diag: SelectionDiagnostics | None,
     n_sites: int,
 ) -> list[_CandidateLike]:
     candidate_slice = _select_diversity_candidate_pool(
@@ -127,15 +155,15 @@ def _select_diversity_candidate_pool(
     ranked: Sequence[_CandidateLike],
     *,
     selection_policy: str,
-    selection_diag: dict | None,
+    selection_diag: SelectionDiagnostics | None,
 ) -> list[_CandidateLike]:
     candidate_slice: list[_CandidateLike] = list(ranked)
     if selection_policy == "mmr" and selection_diag is not None:
-        tier_limit = selection_diag.get("tier_limit")
-        if isinstance(tier_limit, int) and tier_limit > 0:
+        tier_limit = int(selection_diag.tier_limit)
+        if tier_limit > 0:
             candidate_slice = candidate_slice[:tier_limit]
-        shortlist_k = selection_diag.get("shortlist_k")
-        if isinstance(shortlist_k, int) and shortlist_k > 0:
+        shortlist_k = int(selection_diag.shortlist_k)
+        if shortlist_k > 0:
             candidate_slice = candidate_slice[:shortlist_k]
     return candidate_slice
 
@@ -144,7 +172,7 @@ def _select_diversity_upper_bound_candidates(
     ranked: Sequence[_CandidateLike],
     *,
     selection_policy: str,
-    selection_diag: dict | None,
+    selection_diag: SelectionDiagnostics | None,
     n_sites: int,
     weights: Sequence[float] | None = None,
 ) -> list[_CandidateLike]:
@@ -261,9 +289,20 @@ def _select_by_mmr(
     shortlist_factor: int,
     shortlist_max: Optional[int],
     tier_widening: Optional[Sequence[float]],
-) -> tuple[list[_CandidateLike], dict[str, dict], dict]:
+) -> tuple[list[_CandidateLike], dict[str, dict], SelectionDiagnostics]:
     if not ranked or n_sites <= 0:
-        return [], {}, {"shortlist_k": 0, "shortlist_target": 0, "tier_fraction_used": None, "tier_limit": 0}
+        return (
+            [],
+            {},
+            SelectionDiagnostics(
+                shortlist_k=0,
+                shortlist_target=0,
+                shortlist_target_met=False,
+                tier_fraction_used=None,
+                tier_limit=0,
+                pool_source="tier_limit",
+            ),
+        )
     if alpha <= 0.0 or alpha > 1.0:
         raise ValueError("selection.alpha must be in (0, 1].")
     core_by_seq = {cand.seq: _core_sequence(cand) for cand in ranked}
@@ -271,68 +310,6 @@ def _select_by_mmr(
     tier_fractions = list(tier_widening) if tier_widening else [1.0]
     total = len(ranked)
     shortlist_target = max(int(shortlist_min), int(shortlist_factor) * int(n_sites))
-
-    def _best_candidate(
-        shortlist: Sequence[_CandidateLike],
-        *,
-        selected_mask: np.ndarray,
-        min_dist: np.ndarray,
-        cores: Sequence[str],
-        seqs: Sequence[str],
-        scores_norm: np.ndarray,
-    ) -> tuple[int, float, float]:
-        best_idx = None
-        best_utility = None
-        best_score = None
-        best_core = None
-        best_seq = None
-        best_sim = None
-        any_selected = bool(np.any(selected_mask))
-        for idx, cand in enumerate(shortlist):
-            if selected_mask[idx]:
-                continue
-            if not any_selected:
-                max_sim = 0.0
-            else:
-                max_sim = _similarity_from_distance(float(min_dist[idx]))
-            utility = float(alpha * scores_norm[idx] - (1.0 - alpha) * max_sim)
-            cand_core = cores[idx]
-            cand_seq = seqs[idx]
-            cand_score = float(cand.score)
-            if best_idx is None:
-                best_idx = idx
-                best_utility = utility
-                best_score = cand_score
-                best_core = cand_core
-                best_seq = cand_seq
-                best_sim = max_sim
-                continue
-            if utility > float(best_utility):
-                pass
-            elif utility == float(best_utility):
-                if cand_score > float(best_score):
-                    pass
-                elif cand_score == float(best_score):
-                    if cand_core < str(best_core):
-                        pass
-                    elif cand_core == str(best_core):
-                        if cand_seq >= str(best_seq):
-                            continue
-                    else:
-                        continue
-                else:
-                    continue
-            else:
-                continue
-            best_idx = idx
-            best_utility = utility
-            best_score = cand_score
-            best_core = cand_core
-            best_seq = cand_seq
-            best_sim = max_sim
-        if best_idx is None or best_utility is None or best_sim is None:
-            raise ValueError("MMR selection failed to identify a candidate.")
-        return int(best_idx), float(best_utility), float(best_sim)
 
     def _select_from_slice(candidates: Sequence[_CandidateLike]) -> tuple[list[_CandidateLike], dict[str, dict], int]:
         if not candidates:
@@ -345,7 +322,8 @@ def _select_by_mmr(
         target_n = min(int(n_sites), len(shortlist))
         if target_n <= 0:
             return [], {}, int(k)
-        scores_norm_map = _score_norm([float(cand.score) for cand in shortlist])
+        scores_arr = np.array([float(cand.score) for cand in shortlist], dtype=float)
+        scores_norm_map = _score_norm(scores_arr.tolist())
         scores_norm = np.array([scores_norm_map.get(float(cand.score), 1.0) for cand in shortlist], dtype=float)
         cores = [core_by_seq[cand.seq] for cand in shortlist]
         if len(weights) != len(cores[0]):
@@ -356,18 +334,39 @@ def _select_by_mmr(
         min_dist = np.full(len(shortlist), np.inf, dtype=float)
         selected: list[_CandidateLike] = []
         meta: dict[str, dict] = {}
+        any_selected = False
+
+        def _select_next() -> tuple[int, float, float]:
+            if not any_selected:
+                max_sim = np.zeros(len(shortlist), dtype=float)
+            else:
+                max_sim = 1.0 / (1.0 + min_dist)
+            utility = alpha * scores_norm - (1.0 - alpha) * max_sim
+            utility[selected_mask] = -np.inf
+            best_val = float(np.max(utility))
+            candidate_idx = np.where(utility == best_val)[0]
+            if candidate_idx.size == 0:
+                raise ValueError("MMR selection failed to identify a candidate.")
+            best_idx = int(candidate_idx[0])
+            for idx in candidate_idx[1:]:
+                idx = int(idx)
+                if scores_arr[idx] > scores_arr[best_idx]:
+                    best_idx = idx
+                    continue
+                if scores_arr[idx] == scores_arr[best_idx]:
+                    if cores[idx] < cores[best_idx]:
+                        best_idx = idx
+                        continue
+                    if cores[idx] == cores[best_idx] and seqs[idx] < seqs[best_idx]:
+                        best_idx = idx
+            return best_idx, float(utility[best_idx]), float(max_sim[best_idx])
+
         while len(selected) < target_n:
-            idx, utility, max_sim = _best_candidate(
-                shortlist,
-                selected_mask=selected_mask,
-                min_dist=min_dist,
-                cores=cores,
-                seqs=seqs,
-                scores_norm=scores_norm,
-            )
+            idx, utility, max_sim = _select_next()
             chosen = shortlist[idx]
             selected.append(chosen)
             selected_mask[idx] = True
+            any_selected = True
             meta[chosen.seq] = {
                 "selection_rank": len(selected),
                 "selection_utility": float(utility),
@@ -379,7 +378,8 @@ def _select_by_mmr(
         if len(selected) < int(n_sites) and k < max_k:
             shortlist = list(candidates[:max_k])
             target_n = min(int(n_sites), len(shortlist))
-            scores_norm_map = _score_norm([float(cand.score) for cand in shortlist])
+            scores_arr = np.array([float(cand.score) for cand in shortlist], dtype=float)
+            scores_norm_map = _score_norm(scores_arr.tolist())
             scores_norm = np.array([scores_norm_map.get(float(cand.score), 1.0) for cand in shortlist], dtype=float)
             cores = [core_by_seq[cand.seq] for cand in shortlist]
             if len(weights) != len(cores[0]):
@@ -390,18 +390,13 @@ def _select_by_mmr(
             min_dist = np.full(len(shortlist), np.inf, dtype=float)
             selected = []
             meta = {}
+            any_selected = False
             while len(selected) < target_n:
-                idx, utility, max_sim = _best_candidate(
-                    shortlist,
-                    selected_mask=selected_mask,
-                    min_dist=min_dist,
-                    cores=cores,
-                    seqs=seqs,
-                    scores_norm=scores_norm,
-                )
+                idx, utility, max_sim = _select_next()
                 chosen = shortlist[idx]
                 selected.append(chosen)
                 selected_mask[idx] = True
+                any_selected = True
                 meta[chosen.seq] = {
                     "selection_rank": len(selected),
                     "selection_utility": float(utility),
@@ -435,11 +430,13 @@ def _select_by_mmr(
             if widen_for_shortlist and not shortlist_target_met:
                 continue
             break
-    diag = {
-        "shortlist_k": int(last_shortlist),
-        "shortlist_target": int(shortlist_target),
-        "shortlist_target_met": bool(shortlist_target_met),
-        "tier_fraction_used": fraction_used,
-        "tier_limit": int(tier_limit),
-    }
+    pool_source = "shortlist_k" if int(last_shortlist) > 0 else "tier_limit"
+    diag = SelectionDiagnostics(
+        shortlist_k=int(last_shortlist),
+        shortlist_target=int(shortlist_target),
+        shortlist_target_met=bool(shortlist_target_met),
+        tier_fraction_used=fraction_used,
+        tier_limit=int(tier_limit),
+        pool_source=pool_source,
+    )
     return last_selected, last_meta, diag

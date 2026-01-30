@@ -24,6 +24,7 @@ import pandas as pd
 
 from ...adapters.sources.pwm_sampling import PWMSamplingSummary
 from ...config import resolve_relative_path
+from ...core.score_tiers import TIER_FRACTIONS
 from ...core.stage_a_constants import FIMO_REPORT_THRESH
 from ...utils.logging_utils import install_native_stderr_filters
 from .ids import hash_tfbs_id
@@ -61,6 +62,18 @@ def _hash_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _tier_scheme_label(fractions: Iterable[float]) -> str:
+    values = []
+    for frac in fractions:
+        pct = float(frac) * 100.0
+        if pct.is_integer():
+            values.append(str(int(pct)))
+        else:
+            values.append(str(round(pct, 3)).rstrip("0").rstrip("."))
+    label = "_".join(values) if values else "custom"
+    return f"pct_{label}"
 
 
 def _normalize_fingerprints(fingerprints: list[dict]) -> list[dict]:
@@ -259,6 +272,9 @@ def _build_stage_a_sampling_manifest(
             raise ValueError("Stage-A sampling summaries missing yield counters.")
         reg_bgfile = bgfile_by_regulator.get(summary.regulator, bgfile)
         reg_bgfiles.append(reg_bgfile)
+        diversity_block = summary.diversity
+        if hasattr(diversity_block, "to_dict"):
+            diversity_block = diversity_block.to_dict()
         eligible_score_hist.append(
             {
                 "regulator": summary.regulator,
@@ -289,11 +305,12 @@ def _build_stage_a_sampling_manifest(
                 "selection_shortlist_target_met": summary.selection_shortlist_target_met,
                 "selection_tier_fraction_used": summary.selection_tier_fraction_used,
                 "selection_tier_limit": summary.selection_tier_limit,
+                "selection_pool_source": summary.selection_pool_source,
                 "collapsed_by_core_identity": summary.collapsed_by_core_identity,
                 "diversity_nearest_distance_mean": summary.diversity_nearest_distance_mean,
                 "diversity_nearest_distance_min": summary.diversity_nearest_distance_min,
                 "diversity_nearest_similarity_mean": summary.diversity_nearest_similarity_mean,
-                "diversity": summary.diversity,
+                "diversity": diversity_block,
                 "mining_audit": summary.mining_audit,
                 "padding_audit": summary.padding_audit,
             }
@@ -318,9 +335,11 @@ def _build_stage_a_sampling_manifest(
     )
     selection_shortlist_max_value = next(iter(selection_shortlist_max)) if len(selection_shortlist_max) == 1 else None
     tier_target_fraction_value = next(iter(tier_target_fraction)) if len(tier_target_fraction) == 1 else None
+    tier_fractions_value = [float(v) for v in TIER_FRACTIONS]
     return {
         "backend": "fimo",
-        "tier_scheme": "pct_0.1_1_9",
+        "tier_scheme": _tier_scheme_label(tier_fractions_value),
+        "tier_fractions": tier_fractions_value,
         "eligibility_rule": "best_hit_score > 0 (and has at least one FIMO hit)",
         "retention_rule": "top_n_sites_by_best_hit_score",
         "fimo_thresh": FIMO_REPORT_THRESH,

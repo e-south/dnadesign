@@ -26,9 +26,10 @@ from ...config import PWMMiningConfig, PWMSamplingConfig, PWMSelectionConfig, PW
 from ...core.artifacts.ids import hash_candidate_id
 from ...core.score_tiers import score_tier_counts
 from ...core.stage_a_constants import FIMO_REPORT_THRESH
-from .stage_a_diversity import _diversity_summary
+from .stage_a_diversity import DiversitySummary, _diversity_summary
 from .stage_a_progress import _format_stage_a_milestone, _PwmSamplingProgress
 from .stage_a_selection import (
+    SelectionDiagnostics,
     _collapse_by_core_identity,
     _core_sequence,
     _pwm_tolerant_weights,
@@ -186,10 +187,11 @@ class PWMSamplingSummary:
     selection_shortlist_target_met: Optional[bool] = None
     selection_tier_fraction_used: Optional[float] = None
     selection_tier_limit: Optional[int] = None
+    selection_pool_source: Optional[str] = None
     diversity_nearest_distance_mean: Optional[float] = None
     diversity_nearest_distance_min: Optional[float] = None
     diversity_nearest_similarity_mean: Optional[float] = None
-    diversity: Optional[dict[str, object]] = None
+    diversity: Optional[DiversitySummary | dict[str, object]] = None
     mining_audit: Optional[dict[str, object]] = None
     padding_audit: Optional[dict[str, object]] = None
 
@@ -442,10 +444,11 @@ def _build_summary(
     selection_shortlist_target_met: Optional[bool] = None,
     selection_tier_fraction_used: Optional[float] = None,
     selection_tier_limit: Optional[int] = None,
+    selection_pool_source: Optional[str] = None,
     diversity_nearest_distance_mean: Optional[float] = None,
     diversity_nearest_distance_min: Optional[float] = None,
     diversity_nearest_similarity_mean: Optional[float] = None,
-    diversity: Optional[dict[str, object]] = None,
+    diversity: Optional[DiversitySummary | dict[str, object]] = None,
     mining_audit: Optional[dict[str, object]] = None,
     padding_audit: Optional[dict[str, object]] = None,
     pwm_consensus: Optional[str] = None,
@@ -505,6 +508,7 @@ def _build_summary(
         if selection_tier_fraction_used is not None
         else None,
         selection_tier_limit=int(selection_tier_limit) if selection_tier_limit is not None else None,
+        selection_pool_source=str(selection_pool_source) if selection_pool_source is not None else None,
         diversity_nearest_distance_mean=float(diversity_nearest_distance_mean)
         if diversity_nearest_distance_mean is not None
         else None,
@@ -514,7 +518,7 @@ def _build_summary(
         diversity_nearest_similarity_mean=float(diversity_nearest_similarity_mean)
         if diversity_nearest_similarity_mean is not None
         else None,
-        diversity=dict(diversity) if diversity is not None else None,
+        diversity=dict(diversity) if isinstance(diversity, dict) else diversity,
         mining_audit=dict(mining_audit) if mining_audit is not None else None,
         padding_audit=dict(padding_audit) if padding_audit is not None else None,
     )
@@ -1210,7 +1214,7 @@ def sample_pwm_sites(
         for tier in tiers:
             eligible_tier_counts[tier] += 1
         selection_meta: dict[str, dict] = {}
-        selection_diag: dict = {}
+        selection_diag: SelectionDiagnostics | None = None
         if selection_policy == "mmr":
             picked, selection_meta, selection_diag = _select_by_mmr(
                 ranked,
@@ -1230,13 +1234,14 @@ def sample_pwm_sites(
                     "selection_utility": None,
                     "nearest_selected_similarity": None,
                 }
-            selection_diag = {
-                "shortlist_k": None,
-                "shortlist_target": None,
-                "shortlist_target_met": None,
-                "tier_fraction_used": None,
-                "tier_limit": None,
-            }
+            selection_diag = SelectionDiagnostics(
+                shortlist_k=0,
+                shortlist_target=0,
+                shortlist_target_met=False,
+                tier_fraction_used=None,
+                tier_limit=int(len(ranked)),
+                pool_source="eligible_unique",
+            )
         retained_tier_counts = [0, 0, 0, 0]
         for cand in picked:
             retained_tier_counts[tier_by_seq[cand.seq]] += 1
@@ -1270,11 +1275,9 @@ def sample_pwm_sites(
         upper_bound_scores = [float(cand.score) for cand in upper_bound_candidates]
         candidate_pool_size = None
         shortlist_target = None
-        if isinstance(selection_diag, dict):
-            shortlist_target = selection_diag.get("shortlist_target")
-            candidate_pool_size = selection_diag.get("shortlist_k")
-            if candidate_pool_size is None:
-                candidate_pool_size = selection_diag.get("tier_limit")
+        if selection_diag is not None:
+            shortlist_target = int(selection_diag.shortlist_target)
+            candidate_pool_size = int(selection_diag.pool_size())
         if candidate_pool_size is None and candidate_pool:
             candidate_pool_size = len(candidate_pool)
         diversity_max_n = 2500
@@ -1432,9 +1435,16 @@ def sample_pwm_sites(
             meta["selection_shortlist_min"] = selection_shortlist_min if selection_policy == "mmr" else None
             meta["selection_shortlist_factor"] = selection_shortlist_factor if selection_policy == "mmr" else None
             meta["selection_shortlist_max"] = selection_shortlist_max if selection_policy == "mmr" else None
-            meta["selection_tier_fraction_used"] = selection_diag.get("tier_fraction_used")
-            meta["selection_tier_limit"] = selection_diag.get("tier_limit")
-            meta["shortlist_k"] = selection_diag.get("shortlist_k")
+            if selection_diag is not None:
+                meta["selection_tier_fraction_used"] = selection_diag.tier_fraction_used
+                meta["selection_tier_limit"] = selection_diag.tier_limit
+                meta["shortlist_k"] = selection_diag.shortlist_k
+                meta["selection_pool_source"] = selection_diag.pool_source
+            else:
+                meta["selection_tier_fraction_used"] = None
+                meta["selection_tier_limit"] = None
+                meta["shortlist_k"] = None
+                meta["selection_pool_source"] = None
             meta["tier_target_fraction"] = budget_target_tier_fraction
             meta["tier_target_required_unique"] = tier_target_required_unique
             meta["tier_target_met"] = tier_target_met
@@ -1499,14 +1509,17 @@ def sample_pwm_sites(
                 selection_policy=selection_policy,
                 selection_alpha=selection_alpha if selection_policy == "mmr" else None,
                 selection_similarity="weighted_hamming_tolerant" if selection_policy == "mmr" else None,
-                selection_shortlist_k=selection_diag.get("shortlist_k"),
+                selection_shortlist_k=selection_diag.shortlist_k if selection_diag is not None else None,
                 selection_shortlist_min=selection_shortlist_min if selection_policy == "mmr" else None,
                 selection_shortlist_factor=selection_shortlist_factor if selection_policy == "mmr" else None,
                 selection_shortlist_max=selection_shortlist_max if selection_policy == "mmr" else None,
-                selection_shortlist_target=selection_diag.get("shortlist_target"),
-                selection_shortlist_target_met=selection_diag.get("shortlist_target_met"),
-                selection_tier_fraction_used=selection_diag.get("tier_fraction_used"),
-                selection_tier_limit=selection_diag.get("tier_limit"),
+                selection_shortlist_target=selection_diag.shortlist_target if selection_diag is not None else None,
+                selection_shortlist_target_met=(
+                    selection_diag.shortlist_target_met if selection_diag is not None else None
+                ),
+                selection_tier_fraction_used=selection_diag.tier_fraction_used if selection_diag is not None else None,
+                selection_tier_limit=selection_diag.tier_limit if selection_diag is not None else None,
+                selection_pool_source=selection_diag.pool_source if selection_diag is not None else None,
                 diversity_nearest_similarity_mean=diversity_nearest_similarity_mean,
                 diversity_nearest_distance_mean=diversity_nearest_distance_mean,
                 diversity_nearest_distance_min=diversity_nearest_distance_min,
