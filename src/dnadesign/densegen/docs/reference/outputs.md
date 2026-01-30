@@ -176,14 +176,14 @@ For FIMO-backed PWM inputs, it also records Stage-A sampling metadata
 (tier fractions + source derived from `selection.tier_widening` or defaults, tier scheme label,
 eligibility/retention rules, FIMO threshold, background source/bgfile, and
 eligible score histograms with tier boundary scores per regulator, including `candidates_with_hit`,
-`eligible_raw`, and `eligible_unique` counts), PWM consensus strings (`pwm_consensus`), and
-mining saturation audits (`mining_audit` tail Δunique/Δgen), plus per‑TF diversity summaries (k=1 and k=5
-nearest‑neighbor **weighted‑Hamming** distances, sampled pairwise **weighted‑Hamming** distribution,
-core entropy, baseline vs actual; overlap + candidate‑pool diagnostics; greedy max‑diversity
-upper bound (`upper_bound`) to show headroom; local and global
-score quantiles for tradeoff audits; large sets are deterministically subsampled to 2500
-sequences for k‑NN distances) and padding audit stats (best‑hit overlap with intended core;
-core offset histogram).
+`eligible_raw`, and `eligible_unique` counts), PWM consensus strings (`pwm_consensus`) plus
+their log‑odds max (`pwm_max_score`), and mining saturation audits (`mining_audit` tail Δunique/Δgen),
+plus per‑TF diversity summaries (k=1 and k=5 nearest‑neighbor **weighted‑Hamming** distances,
+pairwise **weighted‑Hamming** distribution [exact for retained sets], core entropy, baseline vs actual;
+overlap + candidate‑pool diagnostics; greedy max‑diversity upper bound (`upper_bound`) to show headroom;
+local and global score quantiles normalized by `pwm_max_score` for tradeoff audits; ΔJ (MMR objective gain);
+large sets are deterministically subsampled to 2500 sequences for k‑NN distances) and padding audit stats
+(best‑hit overlap with intended core; core offset histogram).
 Key fields to audit tier behavior and selection pool construction:
 - `tier_fractions` — ladder of rank fractions used to define diagnostic tiers
 - `tier_fractions_source` — config source for the ladder (e.g., `selection.tier_widening` or default)

@@ -224,6 +224,12 @@ Optional: view Stage‑A yield/tiering/length effects:
 dense plot --only stage_a_summary
 ```
 
+Stage‑A diversity panel interpretation:
+
+* Left: pairwise distance ECDF for Top‑score vs MMR (Δdiv = median pairwise gain).
+* Right: score vs selection‑time nearest distance (MMR contribution), with score normalized by
+  `pwm_max_score` (consensus log‑odds). ΔJ reports the mean MMR objective gain.
+
 ---
 
 ### 6. Stage‑B build‑libraries

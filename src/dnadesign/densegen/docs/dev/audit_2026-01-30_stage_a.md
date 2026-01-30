@@ -69,9 +69,9 @@ The demo explicitly calls Stage-A before Stage-B; the key diagnostic plot is sta
 - Narrative use: validates that Stage-A is converting candidates into a high-quality pool without obvious length/GC bias or core misalignment.
 
 3) stage_a_summary__lexA_cpxR_artifacts__diversity.png
-- Left: pairwise core distance distribution (Top-score baseline vs MMR actual), with overlap/swaps and pool sizing annotations.
-- Right: per-position core entropy (baseline vs actual), with entropy sum to show whether MMR expands positional variability.
-- Narrative use: shows whether MMR actually creates core diversity or mostly preserves the top-score set.
+- Left: pairwise core distance ECDF (Top-score vs MMR), with Δdiv (median gain), ΔJ (objective gain), and overlap annotations.
+- Right: score vs selection-time nearest distance (MMR contribution), with scores normalized by pwm_max_score.
+- Narrative use: separates the final diversity outcome (left) from the selection-time tradeoffs that produced it (right).
 
 The demo suggests running dense plot --only stage_a_summary right after stage-a build-pool so you can link the warnings (tier target unmet) to visual evidence of tier placement and diversity tradeoffs.
 

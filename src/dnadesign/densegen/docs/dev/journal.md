@@ -60,3 +60,4 @@
 - Task: Stage-A documentation/code alignment review and behavioral audit focused on Stage-A sampling and demo narrative/plots.
 - Follow-up: added Stage-A audit notes (2026-01-30) and aligned docs with PWM include_matched_sequence requirement and default MMR tier_widening ladder.
 - Task: Stage-A diversity metrics + plots aligned to MMR objective (pwm max normalization, exact pairwise, ΔJ/Δdiv, score vs diversity contribution).
+- Follow-up: recorded pwm_max_score in Stage-A summaries/manifests, normalized score quantiles by pwm_max_score, added MMR objective gain metrics, rebuilt diversity plot as pairwise ECDF + score-vs-selection-distance contribution view, and updated demo/audit/outputs docs + tests.

@@ -147,6 +147,8 @@ MMR (high-level, faithful to implementation; after Carbonell & Goldstein, 1998):
   `utility = alpha * normalized_score - (1 - alpha) * max_similarity_to_selected`
 - `alpha ∈ (0, 1]` biases toward score (`→ 1`) vs diversity (`→ 0`).
 - `normalized_score` is the percentile rank within the candidate pool (0–1, ties averaged).
+- Reporting uses `score_norm = best_hit_score / pwm_max_score` (PWM consensus log‑odds)
+  for cross‑TF comparability; this is separate from the MMR percentile normalization used in selection.
 - Similarity is derived from a **PWM‑tolerant weighted Hamming distance** on `tfbs_core`:
 
   - Information content per position:
@@ -295,14 +297,14 @@ If you want to know what happened in a run, these are the canonical “truth” 
   - background source (motif background vs bgfile)
   - tier boundary scores and yield counters (generated / candidates_with_hit / eligible_raw / eligible_unique / retained)
   - tier-target success/shortfall reporting
-  - PWM consensus string (`pwm_consensus`) for entropy x‑tick labels
-  - core diversity summaries (k=1 and k=5 nearest‑neighbor distances plus sampled **pairwise weighted‑Hamming**
-    distribution and per‑position entropy, baseline vs actual), plus overlap and candidate‑pool diagnostics,
-    computed on `tfbs_core` only; baseline uses the same candidate slice considered by selection
-    (tier slice/shortlist for MMR). k‑NN distances are deterministically subsampled to 2500 sequences;
-    entropy uses the full baseline/actual sets; score quantiles include both local (shortlist) and
-    global (eligible‑unique) baselines for tradeoff audits; a greedy max‑diversity upper bound
-    (`upper_bound`) is recorded to show whether diversity headroom exists in the pool
+  - PWM consensus string (`pwm_consensus`) and its log‑odds max (`pwm_max_score`)
+  - core diversity summaries (k=1 and k=5 nearest‑neighbor distances plus **pairwise weighted‑Hamming**
+    distribution, baseline vs actual), overlap, and candidate‑pool diagnostics computed on `tfbs_core` only;
+    baseline uses the same candidate slice considered by selection (tier slice/shortlist for MMR).
+    Pairwise distances are exact for retained sets; k‑NN distances are deterministically subsampled to 2500
+    sequences; entropy uses the full baseline/actual sets; score quantiles are normalized by `pwm_max_score`
+    for tradeoff audits; a greedy max‑diversity upper bound (`upper_bound`) is recorded to show whether
+    diversity headroom exists in the pool; ΔJ (MMR objective gain) is recorded alongside pairwise Δdiv.
   - mining saturation audit (`mining_audit`) with tail slope Δunique/Δgen to flag plateauing yield
   - padding audit stats (best‑hit overlap with intended core; core‑offset histogram)
 
@@ -316,9 +318,9 @@ Stage‑A build‑pool stdout:
 - Live progress table (screen mode) reports: motif, phase, generated/limit, eligible_unique/target,
   tier yield (0.1/1/9), batch, elapsed, and rate.
 - The sampling recap is compact by default (generated, eligible_unique, retained, tier fill, selection,
-  pool headroom, diversity delta, overlap, Δscore med, score/length stats).
+  pool headroom, diversity delta, overlap, Δscore_norm med, score/length stats).
 - Use `dense stage-a build-pool --verbose` to include full diagnostics
-  (has_hit, eligible_raw, tier target, set_swaps, Δscore p10).
+  (has_hit, eligible_raw, tier target, set_swaps, Δscore_norm p10).
 
 #### Stage‑B artifacts
 
