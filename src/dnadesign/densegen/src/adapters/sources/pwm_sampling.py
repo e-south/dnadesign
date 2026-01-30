@@ -15,20 +15,26 @@ from __future__ import annotations
 import logging
 import sys
 import time
-from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Sequence, Tuple, Union
 
 import numpy as np
-import pandas as pd
 
 from ...config import PWMMiningConfig, PWMSamplingConfig, PWMSelectionConfig, PWMSelectionTierWidening
-from ...core.artifacts.ids import hash_candidate_id
 from ...core.score_tiers import resolve_tier_fractions, score_tier_counts
-from ...core.stage_a_constants import FIMO_REPORT_THRESH
 from .stage_a_diversity import _diversity_summary
 from .stage_a_metrics import _tail_unique_slope
+from .stage_a_mining import mine_pwm_candidates, write_candidate_records
 from .stage_a_progress import StageAProgressManager, _format_stage_a_milestone, _PwmSamplingProgress
+from .stage_a_sampling_utils import (
+    _background_cdf,
+    _matrix_cdf,
+    _pwm_consensus,
+    _ranges_overlap,
+    _sample_from_background_cdf,
+    _select_pwm_window,
+    build_log_odds,
+)
 from .stage_a_selection import (
     SelectionDiagnostics,
     _collapse_by_core_identity,
@@ -47,21 +53,10 @@ from .stage_a_summary import (
     _build_summary,
     _ranked_sequence_positions,
 )
+from .stage_a_types import PWMMotif
 
-SMOOTHING_ALPHA = 1e-6
 log = logging.getLogger(__name__)
 _BASES = np.array(["A", "C", "G", "T"])
-_SAFE_LABEL_RE = None
-
-
-def _safe_label(text: str) -> str:
-    global _SAFE_LABEL_RE
-    if _SAFE_LABEL_RE is None:
-        import re
-
-        _SAFE_LABEL_RE = re.compile(r"[^A-Za-z0-9_.-]+")
-    cleaned = _SAFE_LABEL_RE.sub("_", str(text).strip())
-    return cleaned or "motif"
 
 
 def sampling_kwargs_from_config(sampling: PWMSamplingConfig) -> dict:
@@ -87,249 +82,11 @@ def sampling_kwargs_from_config(sampling: PWMSamplingConfig) -> dict:
     }
 
 
-@dataclass(frozen=True)
-class FimoCandidate:
-    seq: str
-    score: float
-    start: int
-    stop: int
-    strand: str
-    matched_sequence: Optional[str] = None
-
-
 def _evaluate_tier_target(*, n_sites: int, target_tier_fraction: float, eligible_unique: int) -> tuple[int, bool]:
     if target_tier_fraction <= 0 or target_tier_fraction > 1:
         raise ValueError("target_tier_fraction must be in (0, 1].")
     required_unique = int(np.ceil(float(n_sites) / float(target_tier_fraction)))
     return required_unique, int(eligible_unique) >= required_unique
-
-
-def _write_candidate_records(
-    records: list[dict],
-    *,
-    debug_output_dir: Path,
-    debug_label: str,
-    motif_id: str,
-    motif_hash: str | None = None,
-) -> Path:
-    suffix = ""
-    if motif_hash:
-        suffix = f"__{_safe_label(motif_hash[:10])}"
-    safe_label = f"{_safe_label(debug_label or motif_id)}{suffix}"
-    debug_output_dir.mkdir(parents=True, exist_ok=True)
-    path = debug_output_dir / f"candidates__{safe_label}.parquet"
-    df = pd.DataFrame(records)
-    if path.exists():
-        try:
-            existing = pd.read_parquet(path)
-            if "candidate_id" not in existing.columns or "candidate_id" not in df.columns:
-                raise ValueError(
-                    f"Candidate append requires candidate_id in {path}. "
-                    "Clear outputs/pools/candidates or use --fresh to reset."
-                )
-            if set(existing.columns) != set(df.columns):
-                raise ValueError(
-                    f"Candidate schema mismatch for {path}. Clear outputs/pools/candidates or use --fresh to reset."
-                )
-            df = df[existing.columns]
-            df = pd.concat([existing, df], ignore_index=True)
-            df = df.drop_duplicates(subset=["candidate_id"], keep="last")
-        except Exception as exc:
-            if isinstance(exc, ValueError):
-                raise
-            raise RuntimeError(f"Failed to append candidate records to {path}") from exc
-    df.to_parquet(path, index=False)
-    return path
-
-
-@dataclass(frozen=True)
-class PWMMotif:
-    motif_id: str
-    matrix: List[dict[str, float]]  # per-position A/C/G/T probabilities
-    background: dict[str, float]
-    log_odds: Optional[List[dict[str, float]]] = None
-
-
-def normalize_background(bg: Optional[dict[str, float]]) -> dict[str, float]:
-    if not bg:
-        return {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
-    total = sum(bg.values())
-    if total <= 0:
-        raise ValueError("Background frequencies must sum to > 0.")
-    return {k: float(v) / total for k, v in bg.items()}
-
-
-def build_log_odds(
-    matrix: List[dict[str, float]],
-    background: dict[str, float],
-    *,
-    smoothing_alpha: float = SMOOTHING_ALPHA,
-) -> List[dict[str, float]]:
-    # Alignment (3): smooth PWM probabilities to avoid -inf log-odds on zeros.
-    bg = normalize_background(background)
-    log_odds: List[dict[str, float]] = []
-    for row in matrix:
-        lod_row: dict[str, float] = {}
-        for base in ("A", "C", "G", "T"):
-            p = float(row.get(base, 0.0))
-            b = float(bg.get(base, 0.0))
-            if smoothing_alpha > 0.0:
-                p = (1.0 - smoothing_alpha) * p + smoothing_alpha * b
-            if p <= 0.0 or b <= 0.0:
-                lod_row[base] = float("-inf")
-            else:
-                lod_row[base] = float(np.log(p / b))
-        log_odds.append(lod_row)
-    return log_odds
-
-
-def score_sequence(
-    seq: str,
-    matrix: List[dict[str, float]],
-    *,
-    log_odds: Optional[List[dict[str, float]]] = None,
-    background: Optional[dict[str, float]] = None,
-) -> float:
-    score = 0.0
-    if log_odds is None:
-        if background is None:
-            background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
-        log_odds = build_log_odds(matrix, background)
-    for base, probs in zip(seq, log_odds):
-        lod = probs.get(base, float("-inf"))
-        if lod == float("-inf"):
-            return float("-inf")
-        score += float(lod)
-    return score
-
-
-def _background_cdf(probs: dict[str, float]) -> np.ndarray:
-    bases = ["A", "C", "G", "T"]
-    weights = np.array([float(probs.get(b, 0.0)) for b in bases], dtype=float)
-    total = float(weights.sum())
-    if total <= 0:
-        raise ValueError("Background frequencies must sum to > 0.")
-    weights = weights / total
-    return np.cumsum(weights)
-
-
-def _matrix_cdf(matrix: List[dict[str, float]]) -> np.ndarray:
-    arr = _matrix_array(matrix)
-    row_sums = arr.sum(axis=1, keepdims=True)
-    if np.any(row_sums <= 0):
-        raise ValueError("PWM matrix rows must sum to > 0.")
-    weights = arr / row_sums
-    return np.cumsum(weights, axis=1)
-
-
-def _pwm_consensus(matrix: Sequence[dict[str, float]]) -> str:
-    if not matrix:
-        raise ValueError("PWM matrix is required to compute consensus.")
-    bases = ("A", "C", "G", "T")
-    consensus: list[str] = []
-    for row in matrix:
-        probs = [float(row.get(base, 0.0)) for base in bases]
-        total = float(sum(probs))
-        if total <= 0:
-            raise ValueError("PWM probabilities must sum to > 0 to compute consensus.")
-        max_val = max(probs)
-        best_idx = probs.index(max_val)
-        consensus.append(bases[best_idx])
-    return "".join(consensus)
-
-
-def _sample_from_background_cdf(rng: np.random.Generator, cdf: np.ndarray, length: int) -> str:
-    idx = np.searchsorted(cdf, rng.random(int(length)))
-    return "".join(_BASES[idx])
-
-
-def _sample_pwm_batch(
-    rng: np.random.Generator,
-    cdf: np.ndarray,
-    *,
-    count: int,
-) -> list[str]:
-    width = int(cdf.shape[0])
-    draws = rng.random((int(count), width))
-    idx = (draws[:, :, None] <= cdf[None, :, :]).argmax(axis=2)
-    return ["".join(_BASES[row]) for row in idx]
-
-
-def _sample_background_batch(
-    rng: np.random.Generator,
-    cdf: np.ndarray,
-    *,
-    count: int,
-    length: int,
-) -> list[str]:
-    draws = rng.random((int(count), int(length)))
-    idx = np.searchsorted(cdf, draws)
-    return ["".join(_BASES[row]) for row in idx]
-
-
-def _ranges_overlap(a_start: int, a_stop: int, b_start: int, b_stop: int) -> bool:
-    return int(a_start) <= int(b_stop) and int(b_start) <= int(a_stop)
-
-
-def sample_sequence_from_background(rng: np.random.Generator, probs: dict[str, float], length: int) -> str:
-    return _sample_from_background_cdf(rng, _background_cdf(probs), int(length))
-
-
-def sample_sequence_from_pwm(rng: np.random.Generator, matrix: List[dict[str, float]]) -> str:
-    cdf = _matrix_cdf(matrix)
-    return _sample_pwm_batch(rng, cdf, count=1)[0]
-
-
-def _matrix_array(matrix: List[dict[str, float]]) -> np.ndarray:
-    rows = []
-    for row in matrix:
-        rows.append(
-            [
-                float(row.get("A", 0.0)),
-                float(row.get("C", 0.0)),
-                float(row.get("G", 0.0)),
-                float(row.get("T", 0.0)),
-            ]
-        )
-    return np.asarray(rows, dtype=float)
-
-
-def _information_bits(matrix: np.ndarray) -> float:
-    p = matrix + 1e-9
-    return float((2 + (p * np.log2(p)).sum(axis=1)).sum())
-
-
-def _select_pwm_window(
-    *,
-    matrix: List[dict[str, float]],
-    log_odds: List[dict[str, float]],
-    length: int,
-    strategy: str,
-) -> tuple[List[dict[str, float]], List[dict[str, float]], int, float]:
-    if length < 1:
-        raise ValueError("pwm.sampling.trim_window_length must be >= 1")
-    if length > len(matrix):
-        raise ValueError(f"pwm.sampling.trim_window_length={length} exceeds motif width {len(matrix)}")
-    if strategy != "max_info":
-        raise ValueError("pwm.sampling.trim_window_strategy must be 'max_info'")
-    if length == len(matrix):
-        return matrix, log_odds, 0, 0.0
-    arr = _matrix_array(matrix)
-    best_start = 0
-    best_score = float("-inf")
-    last_start = len(matrix) - length
-    for start in range(last_start + 1):
-        window = arr[start : start + length]
-        score = _information_bits(window)
-        if score > best_score:
-            best_score = score
-            best_start = start
-    return (
-        matrix[best_start : best_start + length],
-        log_odds[best_start : best_start + length],
-        best_start,
-        best_score,
-    )
 
 
 def sample_pwm_sites(
@@ -555,396 +312,61 @@ def sample_pwm_sites(
         intended_core_by_seq: Optional[dict[str, tuple[int, int]]] = None,
         core_offset_by_seq: Optional[dict[str, int]] = None,
     ) -> tuple[List[str], dict[str, dict]]:
-        import tempfile
-
-        from .pwm_fimo import (
-            aggregate_best_hits,
-            build_candidate_records,
-            run_fimo,
-            write_candidates_fasta,
-            write_minimal_meme_motif,
-        )
-
         mining_batch_size = int(mining.batch_size)
         mining_max_seconds = budget_max_seconds
         mining_log_every = int(mining.log_every_batches)
-        log.info(
-            "FIMO mining config for %s: mode=%s target=%d batch=%d max_seconds=%s max_candidates=%s thresh=%s",
-            motif.motif_id,
-            budget_mode,
-            n_candidates,
-            mining_batch_size,
-            str(mining_max_seconds) if mining_max_seconds is not None else "-",
-            str(budget_max_candidates) if budget_max_candidates is not None else "-",
-            FIMO_REPORT_THRESH,
-            extra={"suppress_stdout": True},
+        mining_result = mine_pwm_candidates(
+            rng=rng,
+            motif=motif,
+            matrix=matrix,
+            background_cdf=background_cdf,
+            matrix_cdf=matrix_cdf,
+            width=width,
+            strategy=strategy,
+            length_policy=length_policy,
+            length_range=length_range,
+            mining_batch_size=mining_batch_size,
+            mining_log_every=mining_log_every,
+            budget_mode=budget_mode,
+            budget_growth_factor=budget_growth_factor,
+            budget_max_candidates=budget_max_candidates,
+            budget_min_candidates=budget_min_candidates,
+            budget_max_seconds=budget_max_seconds,
+            budget_target_tier_fraction=budget_target_tier_fraction,
+            n_candidates=n_candidates,
+            requested=requested,
+            n_sites=n_sites,
+            bgfile=Path(bgfile) if bgfile is not None else None,
+            keep_all_candidates_debug=keep_all_candidates_debug,
+            include_matched_sequence=include_matched_sequence,
+            debug_output_dir=debug_output_dir,
+            debug_label=debug_label,
+            motif_hash=motif_hash,
+            input_name=input_name,
+            run_id=run_id,
+            scoring_backend=scoring_backend,
+            uniqueness_key=uniqueness_key,
+            progress=progress,
+            provided_sequences=sequences,
+            intended_core_by_seq=intended_core_by_seq,
+            core_offset_by_seq=core_offset_by_seq,
         )
-        debug_path: Optional[Path] = None
-        debug_dir = debug_output_dir
-        if keep_all_candidates_debug:
-            if debug_dir is None:
-                tmp_dir = tempfile.mkdtemp(prefix="densegen-fimo-")
-                debug_dir = Path(tmp_dir)
-                log.warning(
-                    "Stage-A PWM sampling keep_all_candidates_debug enabled without outputs_root; "
-                    "writing FIMO debug TSVs to %s",
-                    debug_dir,
-                )
-            debug_dir.mkdir(parents=True, exist_ok=True)
-            label = _safe_label(debug_label or motif.motif_id)
-            debug_path = debug_dir / f"{label}__fimo.tsv"
-
-        def _merge_tsv(existing: list[str], text: str) -> None:
-            lines = [ln for ln in text.splitlines() if ln.strip()]
-            if not lines:
-                return
-            if not existing:
-                existing.extend(lines)
-                return
-            header_skipped = False
-            for ln in lines:
-                if ln.lstrip().startswith("#"):
-                    continue
-                if not header_skipped:
-                    header_skipped = True
-                    continue
-                existing.append(ln)
-
-        def _generate_batch(count: int) -> tuple[list[str], list[int], bool]:
-            batch_start = time.monotonic()
-            sequences: list[str] = []
-            lengths: list[int] = []
-            time_limited = False
-            target_lengths = []
-            for _ in range(count):
-                if mining_max_seconds is not None and target_lengths:
-                    if (time.monotonic() - batch_start) >= float(mining_max_seconds):
-                        time_limited = True
-                        break
-                target_len = _resolve_length()
-                target_lengths.append(int(target_len))
-            if not target_lengths:
-                return sequences, lengths, time_limited
-            lengths.extend(target_lengths)
-            if strategy == "background":
-                cores = _sample_background_batch(rng, background_cdf, count=len(target_lengths), length=width)
-            else:
-                cores = _sample_pwm_batch(rng, matrix_cdf, count=len(target_lengths))
-            for core, target_len in zip(cores, target_lengths):
-                full_seq, left_len = _embed_with_background(core, int(target_len))
-                intended_start = int(left_len) + 1
-                intended_stop = int(left_len) + int(width)
-                intended_core_by_seq[full_seq] = (intended_start, intended_stop)
-                core_offset_by_seq[full_seq] = int(left_len)
-                sequences.append(full_seq)
-            return sequences, lengths, time_limited
-
-        candidates_by_seq: dict[str, FimoCandidate] = {}
-        candidates_with_hit = 0
-        eligible_raw = 0
-        lengths_all: list[int] = []
-        generated_total = 0
-        time_limited = False
-        mining_time_limited = False
-        cap_applied = False
-        batches = 0
-        unique_by_batch: list[int] = []
-        generated_by_batch: list[int] = []
-        tsv_lines: list[str] = []
-        provided_sequences = sequences
-        requested_final = int(requested)
-        candidate_records: list[dict] | None = [] if keep_all_candidates_debug else None
-        intended_core_by_seq = dict(intended_core_by_seq or {})
-        core_offset_by_seq = dict(core_offset_by_seq or {})
-
-        def _record_candidate(
-            *,
-            seq: str,
-            hit,
-            accepted: bool,
-            reject_reason: str | None,
-        ) -> None:
-            if candidate_records is None:
-                return
-            resolved_motif_id = motif_hash or motif.motif_id
-            candidate_id = hash_candidate_id(
-                input_name=input_name,
-                motif_id=resolved_motif_id,
-                sequence=seq,
-                scoring_backend=scoring_backend,
-            )
-            candidate_records.append(
-                {
-                    "candidate_id": candidate_id,
-                    "run_id": run_id,
-                    "input_name": input_name,
-                    "motif_id": resolved_motif_id,
-                    "motif_label": motif.motif_id,
-                    "scoring_backend": scoring_backend,
-                    "sequence": seq,
-                    "best_hit_score": None if hit is None else hit.score,
-                    "start": None if hit is None else hit.start,
-                    "stop": None if hit is None else hit.stop,
-                    "strand": None if hit is None else hit.strand,
-                    "matched_sequence": None if hit is None else hit.matched_sequence,
-                    "accepted": bool(accepted),
-                    "selected": False,
-                    "reject_reason": reject_reason,
-                }
-            )
-
-        with tempfile.TemporaryDirectory() as tmp:
-            tmp_path = Path(tmp)
-            meme_path = tmp_path / "motif.meme"
-            motif_for_fimo = PWMMotif(motif_id=motif.motif_id, matrix=matrix, background=motif.background)
-            # FIMO background uses the MEME motif background unless bgfile is provided.
-            write_minimal_meme_motif(motif_for_fimo, meme_path)
-            if provided_sequences is not None:
-                lengths_all = [len(seq) for seq in provided_sequences]
-                fasta_path = tmp_path / "candidates.fasta"
-                records = build_candidate_records(motif.motif_id, provided_sequences, start_index=0)
-                write_candidates_fasta(records, fasta_path)
-                fimo_label = f"batch=1/1 candidates={len(records)}"
-                fimo_start = time.monotonic()
-                log.info(
-                    _format_stage_a_milestone(
-                        motif_id=motif.motif_id,
-                        phase="fimo batch start",
-                        detail=fimo_label,
-                    )
-                )
-                rows, raw_tsv = run_fimo(
-                    meme_motif_path=meme_path,
-                    fasta_path=fasta_path,
-                    bgfile=Path(bgfile) if bgfile is not None else None,
-                    thresh=FIMO_REPORT_THRESH,
-                    norc=True,
-                    include_matched_sequence=include_matched_sequence or keep_all_candidates_debug,
-                    return_tsv=debug_path is not None,
-                )
-                log.info(
-                    _format_stage_a_milestone(
-                        motif_id=motif.motif_id,
-                        phase="fimo batch end",
-                        detail=f"{fimo_label} hits={len(rows)}",
-                        elapsed=time.monotonic() - fimo_start,
-                    )
-                )
-                if debug_path is not None and raw_tsv is not None:
-                    _merge_tsv(tsv_lines, raw_tsv)
-                best_hits = aggregate_best_hits(rows)
-                for rec_id, seq in records:
-                    hit = best_hits.get(rec_id)
-                    if hit is None:
-                        _record_candidate(
-                            seq=seq,
-                            hit=None,
-                            accepted=False,
-                            reject_reason="no_hit",
-                        )
-                        continue
-                    candidates_with_hit += 1
-                    if hit.score <= 0:
-                        _record_candidate(
-                            seq=seq,
-                            hit=hit,
-                            accepted=False,
-                            reject_reason="score_non_positive",
-                        )
-                        continue
-                    eligible_raw += 1
-                    _record_candidate(
-                        seq=seq,
-                        hit=hit,
-                        accepted=True,
-                        reject_reason=None,
-                    )
-                    prev = candidates_by_seq.get(seq)
-                    if (
-                        prev is None
-                        or hit.score > prev.score
-                        or (hit.score == prev.score and (hit.start, hit.stop) < (prev.start, prev.stop))
-                    ):
-                        candidates_by_seq[seq] = FimoCandidate(
-                            seq=seq,
-                            score=hit.score,
-                            start=hit.start,
-                            stop=hit.stop,
-                            strand=hit.strand,
-                            matched_sequence=hit.matched_sequence,
-                        )
-                generated_total = len(provided_sequences)
-                batches = 1
-                unique_by_batch.append(len(candidates_by_seq))
-                generated_by_batch.append(generated_total)
-                if progress is not None:
-                    progress.update(generated=generated_total, accepted=len(candidates_by_seq), force=True)
-            else:
-                mining_start = time.monotonic()
-                target_candidates = int(n_candidates)
-                cap_applied = False
-                core_by_seq: dict[str, str] = {}
-                core_counts: dict[str, int] = {}
-
-                def _eligible_unique_count() -> int:
-                    if uniqueness_key == "core":
-                        return int(len(core_counts))
-                    return int(len(candidates_by_seq))
-
-                def _record_core(seq: str, cand: FimoCandidate) -> None:
-                    core = _core_sequence(cand)
-                    prev_core = core_by_seq.get(seq)
-                    if prev_core is not None:
-                        core_counts[prev_core] = core_counts.get(prev_core, 0) - 1
-                        if core_counts.get(prev_core) == 0:
-                            core_counts.pop(prev_core, None)
-                    core_by_seq[seq] = core
-                    core_counts[core] = core_counts.get(core, 0) + 1
-
-                while True:
-                    if budget_max_seconds is not None and (time.monotonic() - mining_start) >= float(
-                        budget_max_seconds
-                    ):
-                        mining_time_limited = True
-                        break
-                    if generated_total >= target_candidates:
-                        if budget_mode == "fixed_candidates":
-                            break
-                        if budget_mode == "tier_target":
-                            if budget_min_candidates is None or generated_total >= int(budget_min_candidates):
-                                if budget_target_tier_fraction is not None:
-                                    required_unique = int(np.ceil(float(n_sites) / float(budget_target_tier_fraction)))
-                                    if _eligible_unique_count() >= required_unique:
-                                        break
-                        if budget_max_candidates is not None and generated_total >= int(budget_max_candidates):
-                            cap_applied = True
-                            break
-                        next_target = int(np.ceil(target_candidates * budget_growth_factor))
-                        if budget_max_candidates is not None:
-                            next_target = min(next_target, int(budget_max_candidates))
-                        if next_target <= target_candidates:
-                            cap_applied = True
-                            break
-                        target_candidates = next_target
-                        if progress is not None:
-                            progress.target = target_candidates
-                        continue
-                    remaining = int(target_candidates) - generated_total
-                    if remaining <= 0:
-                        continue
-                    batch_target = min(int(mining_batch_size), remaining)
-                    sequences, lengths, batch_limited = _generate_batch(batch_target)
-                    if batch_limited:
-                        time_limited = True
-                    if not sequences:
-                        break
-                    lengths_all.extend(lengths)
-                    fasta_path = tmp_path / "candidates.fasta"
-                    records = build_candidate_records(motif.motif_id, sequences, start_index=generated_total)
-                    write_candidates_fasta(records, fasta_path)
-                    fimo_label = f"batch={batches + 1}/- candidates={len(records)}"
-                    fimo_start = time.monotonic()
-                    log.info(
-                        _format_stage_a_milestone(
-                            motif_id=motif.motif_id,
-                            phase="fimo batch start",
-                            detail=fimo_label,
-                        )
-                    )
-                    rows, raw_tsv = run_fimo(
-                        meme_motif_path=meme_path,
-                        fasta_path=fasta_path,
-                        bgfile=Path(bgfile) if bgfile is not None else None,
-                        thresh=FIMO_REPORT_THRESH,
-                        norc=True,
-                        include_matched_sequence=include_matched_sequence or keep_all_candidates_debug,
-                        return_tsv=debug_path is not None,
-                    )
-                    log.info(
-                        _format_stage_a_milestone(
-                            motif_id=motif.motif_id,
-                            phase="fimo batch end",
-                            detail=f"{fimo_label} hits={len(rows)}",
-                            elapsed=time.monotonic() - fimo_start,
-                        )
-                    )
-                    if debug_path is not None and raw_tsv is not None:
-                        _merge_tsv(tsv_lines, raw_tsv)
-                    best_hits = aggregate_best_hits(rows)
-                    for rec_id, seq in records:
-                        hit = best_hits.get(rec_id)
-                        if hit is None:
-                            _record_candidate(
-                                seq=seq,
-                                hit=None,
-                                accepted=False,
-                                reject_reason="no_hit",
-                            )
-                            continue
-                        candidates_with_hit += 1
-                        if hit.score <= 0:
-                            _record_candidate(
-                                seq=seq,
-                                hit=hit,
-                                accepted=False,
-                                reject_reason="score_non_positive",
-                            )
-                            continue
-                        eligible_raw += 1
-                        _record_candidate(
-                            seq=seq,
-                            hit=hit,
-                            accepted=True,
-                            reject_reason=None,
-                        )
-                        prev = candidates_by_seq.get(seq)
-                        if (
-                            prev is None
-                            or hit.score > prev.score
-                            or (hit.score == prev.score and (hit.start, hit.stop) < (prev.start, prev.stop))
-                        ):
-                            cand = FimoCandidate(
-                                seq=seq,
-                                score=hit.score,
-                                start=hit.start,
-                                stop=hit.stop,
-                                strand=hit.strand,
-                                matched_sequence=hit.matched_sequence,
-                            )
-                            candidates_by_seq[seq] = cand
-                            if uniqueness_key == "core":
-                                _record_core(seq, cand)
-                    generated_total += len(sequences)
-                    batches += 1
-                    unique_by_batch.append(_eligible_unique_count())
-                    generated_by_batch.append(generated_total)
-                    if progress is not None:
-                        progress.update(
-                            generated=generated_total,
-                            accepted=_eligible_unique_count(),
-                            batch_index=batches,
-                            batch_total=None,
-                        )
-                    if mining_log_every > 0 and batches % mining_log_every == 0:
-                        log.info(
-                            "FIMO mining %s batch %d/%s: generated=%d/%d eligible_unique=%d",
-                            motif.motif_id,
-                            batches,
-                            "-",
-                            generated_total,
-                            target_candidates,
-                            _eligible_unique_count(),
-                        )
-                    if budget_mode == "tier_target" and budget_target_tier_fraction is not None:
-                        if budget_min_candidates is None or generated_total >= int(budget_min_candidates):
-                            required_unique = int(np.ceil(float(n_sites) / float(budget_target_tier_fraction)))
-                            if _eligible_unique_count() >= required_unique:
-                                break
-                requested_final = int(target_candidates)
-
-        if debug_path is not None and tsv_lines:
-            debug_path.write_text("\n".join(tsv_lines) + "\n")
-            log.info("FIMO debug TSV written: %s", debug_path)
+        candidates_by_seq = mining_result.candidates_by_seq
+        candidates_with_hit = mining_result.candidates_with_hit
+        eligible_raw = mining_result.eligible_raw
+        lengths_all = mining_result.lengths_all
+        generated_total = mining_result.generated_total
+        time_limited = mining_result.time_limited
+        mining_time_limited = mining_result.mining_time_limited
+        cap_applied = mining_result.cap_applied
+        batches = mining_result.batches
+        unique_by_batch = mining_result.unique_by_batch
+        generated_by_batch = mining_result.generated_by_batch
+        candidate_records = mining_result.candidate_records
+        debug_dir = mining_result.debug_dir
+        requested_final = mining_result.requested_final
+        intended_core_by_seq = mining_result.intended_core_by_seq
+        core_offset_by_seq = mining_result.core_offset_by_seq
 
         length_obs = "-"
         if lengths_all:
@@ -1243,7 +665,7 @@ def sample_pwm_sites(
                 elif row.get("accepted"):
                     row["reject_reason"] = "not_selected"
             try:
-                path = _write_candidate_records(
+                path = write_candidate_records(
                     candidate_records,
                     debug_output_dir=debug_dir,
                     debug_label=debug_label or motif.motif_id,
