@@ -262,6 +262,7 @@ def _build_stage_a_sampling_manifest(
         eligible_score_hist.append(
             {
                 "regulator": summary.regulator,
+                "pwm_consensus": summary.pwm_consensus,
                 "edges": [float(v) for v in summary.eligible_score_hist_edges],
                 "counts": [int(v) for v in summary.eligible_score_hist_counts],
                 "tier0_score": summary.tier0_score,
@@ -293,6 +294,7 @@ def _build_stage_a_sampling_manifest(
                 "diversity_nearest_distance_min": summary.diversity_nearest_distance_min,
                 "diversity_nearest_similarity_mean": summary.diversity_nearest_similarity_mean,
                 "diversity": summary.diversity,
+                "mining_audit": summary.mining_audit,
                 "padding_audit": summary.padding_audit,
             }
         )

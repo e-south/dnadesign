@@ -105,14 +105,11 @@ def _select_diversity_baseline_candidates(
     selection_diag: dict | None,
     n_sites: int,
 ) -> list[_CandidateLike]:
-    candidate_slice: list[_CandidateLike] = list(ranked)
-    if selection_policy == "mmr" and selection_diag is not None:
-        tier_limit = selection_diag.get("tier_limit")
-        if isinstance(tier_limit, int) and tier_limit > 0:
-            candidate_slice = candidate_slice[:tier_limit]
-        shortlist_k = selection_diag.get("shortlist_k")
-        if isinstance(shortlist_k, int) and shortlist_k > 0:
-            candidate_slice = candidate_slice[:shortlist_k]
+    candidate_slice = _select_diversity_candidate_pool(
+        ranked,
+        selection_policy=selection_policy,
+        selection_diag=selection_diag,
+    )
     target_n = min(int(n_sites), len(candidate_slice))
     return candidate_slice[:target_n]
 
@@ -124,6 +121,134 @@ def _select_diversity_global_candidates(
 ) -> list[_CandidateLike]:
     target_n = min(int(n_sites), len(ranked))
     return list(ranked[:target_n])
+
+
+def _select_diversity_candidate_pool(
+    ranked: Sequence[_CandidateLike],
+    *,
+    selection_policy: str,
+    selection_diag: dict | None,
+) -> list[_CandidateLike]:
+    candidate_slice: list[_CandidateLike] = list(ranked)
+    if selection_policy == "mmr" and selection_diag is not None:
+        tier_limit = selection_diag.get("tier_limit")
+        if isinstance(tier_limit, int) and tier_limit > 0:
+            candidate_slice = candidate_slice[:tier_limit]
+        shortlist_k = selection_diag.get("shortlist_k")
+        if isinstance(shortlist_k, int) and shortlist_k > 0:
+            candidate_slice = candidate_slice[:shortlist_k]
+    return candidate_slice
+
+
+def _select_diversity_upper_bound_candidates(
+    ranked: Sequence[_CandidateLike],
+    *,
+    selection_policy: str,
+    selection_diag: dict | None,
+    n_sites: int,
+    weights: Sequence[float] | None = None,
+) -> list[_CandidateLike]:
+    candidate_slice = _select_diversity_candidate_pool(
+        ranked,
+        selection_policy=selection_policy,
+        selection_diag=selection_diag,
+    )
+    if not candidate_slice or n_sites <= 0:
+        return []
+    target_n = min(int(n_sites), len(candidate_slice))
+    if target_n <= 0:
+        return []
+    cores = [_core_sequence(cand) for cand in candidate_slice]
+    length = len(cores[0])
+    if any(len(core) != length for core in cores):
+        raise ValueError("Core length mismatch in max-diversity selection pool.")
+    weights_arr = None
+    if weights is not None:
+        weights_arr = np.asarray(weights, dtype=float)
+        if weights_arr.shape[0] != length:
+            raise ValueError("Weighted Hamming requires weights matching core length.")
+    else:
+        weights_arr = np.ones(length, dtype=float)
+    encoded = np.vstack([_encode_core(core) for core in cores])
+    scores = [float(cand.score) for cand in candidate_slice]
+    seqs = [cand.seq for cand in candidate_slice]
+
+    freqs = np.zeros((length, 4), dtype=float)
+    for base_idx in range(4):
+        freqs[:, base_idx] = (encoded == base_idx).mean(axis=0)
+    expected = np.zeros(len(candidate_slice), dtype=float)
+    for idx in range(len(candidate_slice)):
+        base_freq = freqs[np.arange(length), encoded[idx]]
+        expected[idx] = float(np.sum(weights_arr * (1.0 - base_freq)))
+
+    def _pick_best(indices: Sequence[int], values: np.ndarray) -> int:
+        best_idx = None
+        best_val = None
+        best_score = None
+        best_core = None
+        best_seq = None
+        for idx in indices:
+            val = float(values[idx])
+            score = float(scores[idx])
+            core = cores[idx]
+            seq = seqs[idx]
+            if best_idx is None:
+                best_idx = idx
+                best_val = val
+                best_score = score
+                best_core = core
+                best_seq = seq
+                continue
+            if val > float(best_val):
+                pass
+            elif val == float(best_val):
+                if score > float(best_score):
+                    pass
+                elif score == float(best_score):
+                    if core < str(best_core):
+                        pass
+                    elif core == str(best_core):
+                        if seq >= str(best_seq):
+                            continue
+                    else:
+                        continue
+                else:
+                    continue
+            else:
+                continue
+            best_idx = idx
+            best_val = val
+            best_score = score
+            best_core = core
+            best_seq = seq
+        if best_idx is None:
+            raise ValueError("Max-diversity selection could not choose a seed.")
+        return int(best_idx)
+
+    all_indices = list(range(len(candidate_slice)))
+    seed_idx = _pick_best(all_indices, expected)
+    selected_indices: list[int] = []
+    selected_mask = np.zeros(len(candidate_slice), dtype=bool)
+    min_dist = np.full(len(candidate_slice), np.inf, dtype=float)
+
+    def _update_dist(idx: int) -> None:
+        diff = encoded != encoded[idx]
+        dist = (diff * weights_arr).sum(axis=1)
+        min_dist[:] = np.minimum(min_dist, dist)
+        min_dist[idx] = 0.0
+
+    selected_indices.append(seed_idx)
+    selected_mask[seed_idx] = True
+    _update_dist(seed_idx)
+    while len(selected_indices) < target_n:
+        remaining = [idx for idx in all_indices if not selected_mask[idx]]
+        if not remaining:
+            break
+        next_idx = _pick_best(remaining, min_dist)
+        selected_indices.append(next_idx)
+        selected_mask[next_idx] = True
+        _update_dist(next_idx)
+    return [candidate_slice[idx] for idx in selected_indices]
 
 
 def _select_by_mmr(

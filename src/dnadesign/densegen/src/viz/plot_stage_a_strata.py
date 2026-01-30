@@ -110,6 +110,15 @@ def _build_stage_a_strata_overview_figure(
             fontsize=text_sizes["fig_title"],
             color="#111111",
         )
+        ax_header.text(
+            0.5,
+            0.48,
+            "Scores are per-motif; compare within TF",
+            ha="center",
+            va="center",
+            fontsize=text_sizes["annotation"] * 0.85,
+            color="#444444",
+        )
         gs = outer[1].subgridspec(
             nrows=n_regs,
             ncols=2,

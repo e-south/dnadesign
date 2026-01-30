@@ -34,7 +34,9 @@ from .stage_a_selection import (
     _pwm_tolerant_weights,
     _select_by_mmr,
     _select_diversity_baseline_candidates,
+    _select_diversity_candidate_pool,
     _select_diversity_global_candidates,
+    _select_diversity_upper_bound_candidates,
 )
 
 SMOOTHING_ALPHA = 1e-6
@@ -145,6 +147,7 @@ class PWMSamplingSummary:
     input_name: Optional[str]
     regulator: str
     backend: str
+    pwm_consensus: Optional[str]
     uniqueness_key: Optional[str]
     collapsed_by_core_identity: Optional[int]
     generated: int
@@ -187,6 +190,7 @@ class PWMSamplingSummary:
     diversity_nearest_distance_min: Optional[float] = None
     diversity_nearest_similarity_mean: Optional[float] = None
     diversity: Optional[dict[str, object]] = None
+    mining_audit: Optional[dict[str, object]] = None
     padding_audit: Optional[dict[str, object]] = None
 
 
@@ -259,6 +263,31 @@ def _summarize_scores(
     return float(arr.min()), float(np.median(arr)), float(arr.mean()), float(arr.max())
 
 
+def _tail_unique_slope(
+    generated_by_batch: Sequence[int],
+    unique_by_batch: Sequence[int],
+    *,
+    window: int = 5,
+) -> dict[str, object] | None:
+    if not generated_by_batch or len(generated_by_batch) < 2:
+        return None
+    if len(generated_by_batch) != len(unique_by_batch):
+        raise ValueError("Generated/unique batch lengths must match for tail slope.")
+    window = min(int(window), len(generated_by_batch))
+    if window < 2:
+        return None
+    start_idx = max(0, len(generated_by_batch) - window)
+    delta_gen = int(generated_by_batch[-1]) - int(generated_by_batch[start_idx])
+    delta_unique = int(unique_by_batch[-1]) - int(unique_by_batch[start_idx])
+    if delta_gen <= 0:
+        return None
+    return {
+        "unique_slope": float(delta_unique) / float(delta_gen),
+        "unique_slope_window": int(window),
+        "unique_slope_generated": int(delta_gen),
+    }
+
+
 def _background_cdf(probs: dict[str, float]) -> np.ndarray:
     bases = ["A", "C", "G", "T"]
     weights = np.array([float(probs.get(b, 0.0)) for b in bases], dtype=float)
@@ -276,6 +305,22 @@ def _matrix_cdf(matrix: List[dict[str, float]]) -> np.ndarray:
         raise ValueError("PWM matrix rows must sum to > 0.")
     weights = arr / row_sums
     return np.cumsum(weights, axis=1)
+
+
+def _pwm_consensus(matrix: Sequence[dict[str, float]]) -> str:
+    if not matrix:
+        raise ValueError("PWM matrix is required to compute consensus.")
+    bases = ("A", "C", "G", "T")
+    consensus: list[str] = []
+    for row in matrix:
+        probs = [float(row.get(base, 0.0)) for base in bases]
+        total = float(sum(probs))
+        if total <= 0:
+            raise ValueError("PWM probabilities must sum to > 0 to compute consensus.")
+        max_val = max(probs)
+        best_idx = probs.index(max_val)
+        consensus.append(bases[best_idx])
+    return "".join(consensus)
 
 
 def _sample_from_background_cdf(rng: np.random.Generator, cdf: np.ndarray, length: int) -> str:
@@ -401,7 +446,9 @@ def _build_summary(
     diversity_nearest_distance_min: Optional[float] = None,
     diversity_nearest_similarity_mean: Optional[float] = None,
     diversity: Optional[dict[str, object]] = None,
+    mining_audit: Optional[dict[str, object]] = None,
     padding_audit: Optional[dict[str, object]] = None,
+    pwm_consensus: Optional[str] = None,
     input_name: Optional[str] = None,
     regulator: Optional[str] = None,
     backend: Optional[str] = None,
@@ -413,6 +460,7 @@ def _build_summary(
         input_name=input_name,
         regulator=str(regulator or ""),
         backend=str(backend or ""),
+        pwm_consensus=str(pwm_consensus) if pwm_consensus is not None else None,
         uniqueness_key=str(uniqueness_key) if uniqueness_key is not None else None,
         collapsed_by_core_identity=int(collapsed_by_core_identity) if collapsed_by_core_identity is not None else None,
         generated=int(generated),
@@ -467,6 +515,7 @@ def _build_summary(
         if diversity_nearest_similarity_mean is not None
         else None,
         diversity=dict(diversity) if diversity is not None else None,
+        mining_audit=dict(mining_audit) if mining_audit is not None else None,
         padding_audit=dict(padding_audit) if padding_audit is not None else None,
     )
 
@@ -603,6 +652,7 @@ def sample_pwm_sites(
         matrix = motif.matrix
     matrix_cdf = _matrix_cdf(matrix)
     background_cdf = _background_cdf(motif.background)
+    pwm_consensus = _pwm_consensus(matrix)
 
     score_label = "best_hit_score"
     length_label = str(length_policy)
@@ -844,6 +894,8 @@ def sample_pwm_sites(
         mining_time_limited = False
         cap_applied = False
         batches = 0
+        unique_by_batch: list[int] = []
+        generated_by_batch: list[int] = []
         tsv_lines: list[str] = []
         provided_sequences = sequences
         requested_final = int(requested)
@@ -952,6 +1004,8 @@ def sample_pwm_sites(
                         )
                 generated_total = len(provided_sequences)
                 batches = 1
+                unique_by_batch.append(len(candidates_by_seq))
+                generated_by_batch.append(generated_total)
                 if progress is not None:
                     progress.update(generated=generated_total, accepted=len(candidates_by_seq), force=True)
             else:
@@ -1074,6 +1128,8 @@ def sample_pwm_sites(
                                 _record_core(seq, cand)
                     generated_total += len(sequences)
                     batches += 1
+                    unique_by_batch.append(_eligible_unique_count())
+                    generated_by_batch.append(generated_total)
                     if progress is not None:
                         progress.update(
                             generated=generated_total,
@@ -1125,6 +1181,7 @@ def sample_pwm_sites(
         if uniqueness_key == "core":
             ranked, collapsed_by_core_identity = _collapse_by_core_identity(ranked)
         eligible_unique = len(ranked)
+        mining_audit = _tail_unique_slope(generated_by_batch, unique_by_batch, window=5)
         if progress is not None:
             progress.update(
                 generated=generated_total,
@@ -1183,20 +1240,34 @@ def sample_pwm_sites(
         retained_tier_counts = [0, 0, 0, 0]
         for cand in picked:
             retained_tier_counts[tier_by_seq[cand.seq]] += 1
+        candidate_pool = _select_diversity_candidate_pool(
+            ranked,
+            selection_policy=selection_policy,
+            selection_diag=selection_diag,
+        )
         baseline_candidates = _select_diversity_baseline_candidates(
             ranked,
             selection_policy=selection_policy,
             selection_diag=selection_diag,
             n_sites=int(n_sites),
         )
+        distance_weights = _pwm_tolerant_weights(matrix)
+        upper_bound_candidates = _select_diversity_upper_bound_candidates(
+            ranked,
+            selection_policy=selection_policy,
+            selection_diag=selection_diag,
+            n_sites=int(n_sites),
+            weights=distance_weights,
+        )
         baseline_global_candidates = _select_diversity_global_candidates(ranked, n_sites=int(n_sites))
         baseline_cores = [(_core_sequence(cand)) for cand in baseline_candidates if cand.matched_sequence]
         actual_cores = [(_core_sequence(cand)) for cand in picked if cand.matched_sequence]
         baseline_global_cores = [(_core_sequence(cand)) for cand in baseline_global_candidates if cand.matched_sequence]
+        upper_bound_cores = [(_core_sequence(cand)) for cand in upper_bound_candidates if cand.matched_sequence]
         baseline_scores = [float(cand.score) for cand in baseline_candidates]
         actual_scores = [float(cand.score) for cand in picked]
         baseline_global_scores = [float(cand.score) for cand in baseline_global_candidates]
-        distance_weights = _pwm_tolerant_weights(matrix)
+        upper_bound_scores = [float(cand.score) for cand in upper_bound_candidates]
         candidate_pool_size = None
         shortlist_target = None
         if isinstance(selection_diag, dict):
@@ -1204,6 +1275,8 @@ def sample_pwm_sites(
             candidate_pool_size = selection_diag.get("shortlist_k")
             if candidate_pool_size is None:
                 candidate_pool_size = selection_diag.get("tier_limit")
+        if candidate_pool_size is None and candidate_pool:
+            candidate_pool_size = len(candidate_pool)
         diversity_max_n = 2500
         log.info(
             _format_stage_a_milestone(
@@ -1223,6 +1296,8 @@ def sample_pwm_sites(
             actual_scores=actual_scores,
             baseline_global_cores=baseline_global_cores,
             baseline_global_scores=baseline_global_scores,
+            upper_bound_cores=upper_bound_cores,
+            upper_bound_scores=upper_bound_scores,
             uniqueness_key=uniqueness_key,
             candidate_pool_size=int(candidate_pool_size) if candidate_pool_size is not None else None,
             shortlist_target=int(shortlist_target) if shortlist_target is not None else None,
@@ -1436,7 +1511,9 @@ def sample_pwm_sites(
                 diversity_nearest_distance_mean=diversity_nearest_distance_mean,
                 diversity_nearest_distance_min=diversity_nearest_distance_min,
                 diversity=diversity,
+                mining_audit=mining_audit,
                 padding_audit=padding_audit,
+                pwm_consensus=pwm_consensus,
                 input_name=input_name,
                 regulator=motif.motif_id,
                 backend=scoring_backend,

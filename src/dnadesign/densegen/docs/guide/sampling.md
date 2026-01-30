@@ -290,12 +290,15 @@ If you want to know what happened in a run, these are the canonical “truth” 
   - background source (motif background vs bgfile)
   - tier boundary scores and yield counters (generated / candidates_with_hit / eligible_raw / eligible_unique / retained)
   - tier-target success/shortfall reporting
+  - PWM consensus string (`pwm_consensus`) for entropy x‑tick labels
   - core diversity summaries (k=1 and k=5 nearest‑neighbor distances plus sampled **pairwise weighted‑Hamming**
     distribution and per‑position entropy, baseline vs actual), plus overlap and candidate‑pool diagnostics,
     computed on `tfbs_core` only; baseline uses the same candidate slice considered by selection
     (tier slice/shortlist for MMR). k‑NN distances are deterministically subsampled to 2500 sequences;
     entropy uses the full baseline/actual sets; score quantiles include both local (shortlist) and
-    global (eligible‑unique) baselines for tradeoff audits
+    global (eligible‑unique) baselines for tradeoff audits; a greedy max‑diversity upper bound
+    (`upper_bound`) is recorded to show whether diversity headroom exists in the pool
+  - mining saturation audit (`mining_audit`) with tail slope Δunique/Δgen to flag plateauing yield
   - padding audit stats (best‑hit overlap with intended core; core‑offset histogram)
 
 Optional Stage‑A debug:

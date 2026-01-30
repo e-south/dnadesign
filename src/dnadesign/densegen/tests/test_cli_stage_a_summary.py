@@ -205,6 +205,7 @@ def test_stage_a_sampling_rows_include_pool_headroom() -> None:
         input_name="demo",
         regulator="regA",
         backend="fimo",
+        pwm_consensus="AAAA",
         uniqueness_key="core",
         collapsed_by_core_identity=0,
         generated=10,
@@ -235,6 +236,7 @@ def test_stage_a_sampling_rows_include_pool_headroom() -> None:
         selection_shortlist_factor=5,
         selection_shortlist_target=250,
         diversity={"candidate_pool_size": 50, "shortlist_target": 250},
+        mining_audit=None,
     )
     pool = PoolData(
         name="demo",

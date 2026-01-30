@@ -237,6 +237,8 @@ def _diversity_summary(
     actual_scores: Sequence[float],
     baseline_global_cores: Sequence[str] | None = None,
     baseline_global_scores: Sequence[float] | None = None,
+    upper_bound_cores: Sequence[str] | None = None,
+    upper_bound_scores: Sequence[float] | None = None,
     uniqueness_key: str | None = None,
     candidate_pool_size: int | None = None,
     shortlist_target: int | None = None,
@@ -254,6 +256,11 @@ def _diversity_summary(
         global_len = _assert_uniform_core_length(baseline_global_cores, label=f"{label} baseline global")
     if base_len and global_len and base_len != global_len:
         raise ValueError(f"Core length mismatch for {label} (baseline {base_len} vs global {global_len}).")
+    upper_len = 0
+    if upper_bound_cores:
+        upper_len = _assert_uniform_core_length(upper_bound_cores, label=f"{label} upper bound")
+    if base_len and upper_len and base_len != upper_len:
+        raise ValueError(f"Core length mismatch for {label} (baseline {base_len} vs upper bound {upper_len}).")
     if uniqueness_key == "core" and actual_cores:
         if len(set(actual_cores)) != len(actual_cores):
             raise ValueError(f"Duplicate retained cores detected for {label} with uniqueness.key=core.")
@@ -265,11 +272,15 @@ def _diversity_summary(
     actual_k5 = _core_hamming_knn(actual_cores, k=5, max_n=max_n, weights=distance_weights)
     baseline_pairwise = _pairwise_hamming_summary(baseline_cores, max_pairs=10000, weights=distance_weights)
     actual_pairwise = _pairwise_hamming_summary(actual_cores, max_pairs=10000, weights=distance_weights)
+    upper_pairwise = None
+    if upper_bound_cores:
+        upper_pairwise = _pairwise_hamming_summary(upper_bound_cores, max_pairs=10000, weights=distance_weights)
     baseline_entropy = _core_entropy(baseline_cores)
     actual_entropy = _core_entropy(actual_cores)
     baseline_quantiles = _score_quantiles(baseline_scores)
     actual_quantiles = _score_quantiles(actual_scores)
     baseline_global_quantiles = _score_quantiles(baseline_global_scores or [])
+    upper_bound_quantiles = _score_quantiles(upper_bound_scores or [])
     overlap_fraction = None
     overlap_swaps = None
     if actual_cores:
@@ -282,7 +293,11 @@ def _diversity_summary(
         "nnd_k5": {"baseline": baseline_k5, "actual": actual_k5}
         if baseline_k5 is not None and actual_k5 is not None
         else None,
-        "pairwise": {"baseline": baseline_pairwise, "actual": actual_pairwise}
+        "pairwise": {
+            "baseline": baseline_pairwise,
+            "actual": actual_pairwise,
+            "upper_bound": upper_pairwise,
+        }
         if baseline_pairwise is not None and actual_pairwise is not None
         else None,
     }
@@ -300,5 +315,6 @@ def _diversity_summary(
             "baseline": baseline_quantiles,
             "actual": actual_quantiles,
             "baseline_global": baseline_global_quantiles,
+            "upper_bound": upper_bound_quantiles,
         },
     }

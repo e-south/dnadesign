@@ -55,6 +55,7 @@ def _build_stage_a_yield_bias_figure(
     duplication_factors: dict[str, float] = {}
     pool_headrooms: dict[str, float] = {}
     hit_overlap: dict[str, float] = {}
+    mining_slopes: dict[str, float] = {}
     core_lengths: dict[str, int] = {}
     if "tfbs_core" in pool_df.columns:
         core_series = pool_df["tfbs_core"].astype(str)
@@ -90,6 +91,11 @@ def _build_stage_a_yield_bias_figure(
             overlap = audit.get("best_hit_overlaps_intended_core_fraction")
             if overlap is not None:
                 hit_overlap[reg] = float(overlap)
+        mining = row.get("mining_audit")
+        if isinstance(mining, dict):
+            slope = mining.get("unique_slope")
+            if slope is not None:
+                mining_slopes[reg] = float(slope)
         stage_counts.append([generated, candidates_with_hit, eligible_raw, eligible_unique, selection_pool, retained])
 
     if not regs:
@@ -158,6 +164,15 @@ def _build_stage_a_yield_bias_figure(
             va="center",
             fontsize=text_sizes["fig_title"],
             color="#111111",
+        )
+        ax_header.text(
+            0.5,
+            0.42,
+            "Scores are per-motif; compare within TF",
+            ha="center",
+            va="center",
+            fontsize=text_sizes["annotation"] * 0.85,
+            color="#444444",
         )
         body = outer[1].subgridspec(
             nrows=1,
@@ -244,6 +259,9 @@ def _build_stage_a_yield_bias_figure(
             headroom = pool_headrooms.get(reg)
             if headroom is not None:
                 note_lines.append(f"MMR headroom: pool/retained={headroom:.1f}x")
+            slope = mining_slopes.get(reg)
+            if slope is not None:
+                note_lines.append(f"tail slope Δunique/Δgen={slope:.3f}")
             if note_lines:
                 _add_anchored_box(
                     ax,
@@ -267,12 +285,34 @@ def _build_stage_a_yield_bias_figure(
             mask = tf_vals == reg
             if not np.any(mask):
                 raise ValueError(f"Stage-A pool missing retained sites for '{input_name}' ({reg}).")
+            reg_lengths = lengths[mask]
+            reg_scores = scores_arr[mask]
+            by_length: dict[int, list[float]] = {}
+            for length_val, score_val in zip(reg_lengths, reg_scores):
+                by_length.setdefault(int(length_val), []).append(float(score_val))
+            if by_length:
+                positions = sorted(by_length)
+                box_data = [by_length[pos] for pos in positions]
+                box = ax.boxplot(
+                    box_data,
+                    positions=positions,
+                    widths=0.6,
+                    patch_artist=True,
+                    showfliers=False,
+                    medianprops={"color": "#222222", "linewidth": 1.0},
+                    boxprops={"linewidth": 0.8, "color": "#333333"},
+                    whiskerprops={"linewidth": 0.8, "color": "#555555"},
+                    capprops={"linewidth": 0.8, "color": "#555555"},
+                )
+                for patch in box.get("boxes", []):
+                    patch.set_facecolor("#c7c7c7")
+                    patch.set_alpha(0.25)
             ax.scatter(
                 lengths_j[mask],
                 scores_arr[mask],
                 c=gc_arr[mask],
                 cmap="viridis",
-                alpha=0.65,
+                alpha=0.45,
                 s=12,
                 marker="o",
                 edgecolors="none",
@@ -298,7 +338,7 @@ def _build_stage_a_yield_bias_figure(
                     edgecolor="none",
                 )
         axes_right[0].set_title(
-            "Retained sites: score vs length (GC color)",
+            "Retained sites: score by length (GC color)",
             fontsize=subtitle_size,
             pad=title_pad,
         )

@@ -74,6 +74,16 @@ def _diversity_block(core_len: int) -> dict:
                     "n_pairs": 1,
                     "total_pairs": 1,
                 },
+                "upper_bound": {
+                    "bins": bins,
+                    "counts": counts,
+                    "median": 1.0,
+                    "mean": 1.0,
+                    "p10": 1.0,
+                    "p90": 1.0,
+                    "n_pairs": 1,
+                    "total_pairs": 1,
+                },
             },
         },
         "set_overlap_fraction": 1.0,
@@ -86,6 +96,7 @@ def _diversity_block(core_len: int) -> dict:
             "baseline": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
             "actual": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
             "baseline_global": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
+            "upper_bound": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
         },
     }
 

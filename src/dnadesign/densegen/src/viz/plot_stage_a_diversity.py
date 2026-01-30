@@ -82,6 +82,7 @@ def _build_stage_a_diversity_figure(
             axes_right.append(fig.add_subplot(body[idx, 2]))
 
         diversity_by_reg = {str(row.get("regulator") or ""): row.get("diversity") for row in eligible_hist}
+        row_by_reg = {str(row.get("regulator") or ""): row for row in eligible_hist}
 
         def _fraction_from_counts(bins: list[float] | list[int], counts: list[int]) -> tuple[np.ndarray, np.ndarray]:
             if not bins or not counts:
@@ -97,6 +98,7 @@ def _build_stage_a_diversity_figure(
         metric_label = "Hamming distance (pairwise)"
         for idx, reg in enumerate(regulators):
             hue = reg_colors.get(reg, "#4c78a8")
+            row = row_by_reg.get(reg, {}) if isinstance(row_by_reg.get(reg), dict) else {}
             diversity = diversity_by_reg.get(reg) if isinstance(diversity_by_reg.get(reg), dict) else None
             if not isinstance(diversity, dict):
                 raise ValueError(f"Stage-A diversity missing for input '{input_name}' ({reg}).")
@@ -133,6 +135,7 @@ def _build_stage_a_diversity_figure(
                 raise ValueError(f"Stage-A diversity missing pairwise stats for '{input_name}' ({reg}).")
             baseline = pairwise.get("baseline") if isinstance(pairwise.get("baseline"), dict) else None
             actual = pairwise.get("actual") if isinstance(pairwise.get("actual"), dict) else None
+            upper_bound = pairwise.get("upper_bound") if isinstance(pairwise.get("upper_bound"), dict) else None
             if not baseline or not actual:
                 raise ValueError(f"Stage-A diversity missing pairwise baseline/actual for '{input_name}' ({reg}).")
             bins = None
@@ -184,7 +187,7 @@ def _build_stage_a_diversity_figure(
             overlap = diversity.get("set_overlap_fraction")
             swaps = diversity.get("set_overlap_swaps")
             if overlap is not None:
-                overlap_label = f"set overlap {float(overlap) * 100:.1f}%"
+                overlap_label = f"baseline overlap {float(overlap) * 100:.1f}%"
                 if swaps is not None:
                     overlap_label = f"{overlap_label} (swaps={int(swaps)})"
                 note_lines.append(overlap_label)
@@ -195,6 +198,18 @@ def _build_stage_a_diversity_figure(
                     f"k(pool/target) {pool_size if pool_size is not None else '-'}"
                     f"/{shortlist_target if shortlist_target is not None else '-'}"
                 )
+                shortlist_factor = row.get("selection_shortlist_factor")
+                shortlist_min = row.get("selection_shortlist_min")
+                retained = row.get("retained")
+                if (
+                    shortlist_factor is not None
+                    and shortlist_min is not None
+                    and retained is not None
+                    and int(retained) > 0
+                ):
+                    note_lines.append(f"target=max({int(shortlist_min)}, {int(shortlist_factor)}×{int(retained)})")
+            if upper_bound is not None and upper_bound.get("median") is not None:
+                note_lines.append(f"max-div med {float(upper_bound.get('median')):.2f}")
             score_block = diversity.get("score_quantiles")
             if isinstance(score_block, dict):
                 base = score_block.get("baseline") if isinstance(score_block.get("baseline"), dict) else None
@@ -263,7 +278,13 @@ def _build_stage_a_diversity_figure(
             ax_right.set_ylabel("Entropy (bits)" if idx == 0 else "")
             ax_right.set_xlim(0.5, len(actual_entropy) + 0.5)
             ax_right.set_ylim(0.0, 2.0)
-            ax_right.xaxis.set_major_locator(mpl.ticker.MaxNLocator(integer=True))
+            consensus = str(row.get("pwm_consensus") or "")
+            if consensus and len(consensus) >= len(actual_entropy):
+                labels = [f"{pos}:{base}" for pos, base in enumerate(consensus[: len(actual_entropy)], start=1)]
+                ax_right.set_xticks(positions)
+                ax_right.set_xticklabels(labels, fontsize=text_sizes["annotation"] * 0.7)
+            else:
+                ax_right.xaxis.set_major_locator(mpl.ticker.MaxNLocator(integer=True))
             if idx == 0:
                 ax_right.legend(
                     loc="upper right",
@@ -291,8 +312,8 @@ def _build_stage_a_diversity_figure(
             axes_right[-1].set_xlabel("Core position")
             for ax in axes_left[:-1]:
                 ax.tick_params(labelbottom=False)
-            for ax in axes_right[:-1]:
-                ax.tick_params(labelbottom=False)
+            for ax in axes_right:
+                ax.tick_params(labelbottom=True)
 
         for ax in axes_left + axes_right:
             _apply_style(ax, style)

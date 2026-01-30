@@ -2194,8 +2194,9 @@ def stage_a_build_pool(
             "eligible_raw=best_hit_score>0 among hits; eligible_unique=deduped by uniqueness.key; "
             "retained=top-N by score after dedupe; tier target=diagnostic tier target status; "
             "tier fill=deepest diagnostic tier used; selection=Stage-A selection policy; "
-            "k(pool/target)=MMR shortlist pool vs target; div(pairwise)=pairwise weighted Hamming median; "
-            "set_overlap=baseline∩actual; set_swaps=actual - overlap; "
+            "k(pool/target)=MMR shortlist pool vs target (target=max(shortlist_min, shortlist_factor×n_sites)); "
+            "div(pairwise)=pairwise weighted Hamming median; "
+            "baseline overlap=baseline∩actual; set_swaps=actual - overlap; "
             "Δscore columns compare baseline vs actual p10/median."
         )
     console.print(

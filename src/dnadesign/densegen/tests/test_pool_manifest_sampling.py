@@ -42,6 +42,7 @@ class _DummySource(BaseDataSource):
             input_name="demo_pwm",
             regulator="regA",
             backend="fimo",
+            pwm_consensus="AAAA",
             uniqueness_key="core",
             collapsed_by_core_identity=0,
             generated=10,
@@ -70,6 +71,7 @@ class _DummySource(BaseDataSource):
             tier_target_required_unique=2000,
             tier_target_met=True,
             selection_policy="top_score",
+            mining_audit=None,
         )
         return [("regA", "AAAA", "dummy")], df, [summary]
 
@@ -168,6 +170,7 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
     assert stage_a_sampling["background_source"] == "bgfile"
     hist = stage_a_sampling["eligible_score_hist"]
     assert hist[0]["regulator"] == "regA"
+    assert hist[0]["pwm_consensus"] == "AAAA"
     assert hist[0]["edges"] == [0.0, 1.0, 2.0]
     assert hist[0]["counts"] == [1, 1]
     assert hist[0]["tier0_score"] == 2.0
@@ -178,3 +181,4 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
     assert hist[0]["eligible_raw"] == 3
     assert hist[0]["eligible_unique"] == 2
     assert hist[0]["retained"] == 1
+    assert hist[0]["mining_audit"] is None

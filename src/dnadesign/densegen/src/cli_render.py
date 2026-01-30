@@ -65,7 +65,7 @@ def stage_a_recap_tables(
         recap_table.add_column("k(pool/target)")
         recap_table.add_column("div(pairwise)")
         recap_table.add_column("Δdiv(pairwise)")
-        recap_table.add_column("set_overlap")
+        recap_table.add_column("baseline overlap")
         recap_table.add_column("set_swaps")
         recap_table.add_column("Δscore(p10)")
         recap_table.add_column("Δscore(med)")

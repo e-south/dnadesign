@@ -12,7 +12,6 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import logging
-import os
 import threading
 import time
 from typing import Optional, TextIO
@@ -171,12 +170,11 @@ def _stage_a_live_start(stream: TextIO):
     from rich.console import Console
     from rich.live import Live
 
-    pixi_in_shell = bool(os.environ.get("PIXI_IN_SHELL"))
     tty = bool(getattr(stream, "isatty", lambda: False)())
-    if not (tty or pixi_in_shell):
+    if not tty:
         return None, None
     width = shutil.get_terminal_size((120, 24)).columns
-    console = Console(file=stream, force_terminal=tty or pixi_in_shell, width=width)
+    console = Console(file=stream, force_terminal=tty, width=width)
     if not console.is_terminal:
         return None, None
     live = Live(console=console, refresh_per_second=4, transient=False)
@@ -284,12 +282,11 @@ class _PwmSamplingProgress:
         self.min_interval = float(min_interval)
         self._mode = str(logging_utils.get_progress_style())
         tty = bool(getattr(self.stream, "isatty", lambda: False)())
-        pixi_in_shell = bool(os.environ.get("PIXI_IN_SHELL"))
         self._enabled = bool(logging_utils.is_progress_enabled())
-        interactive = tty or pixi_in_shell
+        interactive = tty
         self._use_live = self._enabled and self._mode == "screen" and interactive
         self._use_table = False
-        self._allow_carriage = self._mode == "screen" and interactive
+        self._allow_carriage = interactive
         self._live_key = f"{self.motif_id}:{id(self)}"
         self._start = time.monotonic()
         self._last_update = self._start

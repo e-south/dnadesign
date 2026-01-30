@@ -20,7 +20,10 @@ from dnadesign.densegen.src.adapters.sources.stage_a_diversity import (
     _core_hamming_nnd,
     _diversity_summary,
 )
-from dnadesign.densegen.src.adapters.sources.stage_a_selection import _select_diversity_baseline_candidates
+from dnadesign.densegen.src.adapters.sources.stage_a_selection import (
+    _select_diversity_baseline_candidates,
+    _select_diversity_upper_bound_candidates,
+)
 
 
 def test_core_hamming_nnd_counts_and_median() -> None:
@@ -68,6 +71,8 @@ def test_diversity_summary_scores() -> None:
         actual_cores=cores,
         baseline_scores=scores,
         actual_scores=scores,
+        upper_bound_cores=cores,
+        upper_bound_scores=scores,
         max_n=2500,
     )
     assert summary is not None
@@ -81,8 +86,10 @@ def test_diversity_summary_scores() -> None:
     assert isinstance(pairwise, dict)
     base_pair = pairwise.get("baseline")
     act_pair = pairwise.get("actual")
+    upper_pair = pairwise.get("upper_bound")
     assert base_pair is not None
     assert act_pair is not None
+    assert upper_pair is not None
     assert base_pair.get("bins") is not None
     assert base_pair.get("counts") is not None
     score_block = summary.get("score_quantiles")
@@ -128,3 +135,18 @@ def test_baseline_candidates_use_tier_limit_when_shortlist_missing() -> None:
         n_sites=3,
     )
     assert [cand.seq for cand in baseline] == ["AAAA", "AAAT"]
+
+
+def test_upper_bound_candidates_prefer_diverse_cores() -> None:
+    ranked = [_cand("AAAA", 4.0), _cand("AAAT", 3.0), _cand("AATT", 2.0), _cand("TTTT", 1.0)]
+    diag = {"shortlist_k": 4, "tier_limit": 4}
+    selected = _select_diversity_upper_bound_candidates(
+        ranked,
+        selection_policy="mmr",
+        selection_diag=diag,
+        n_sites=2,
+        weights=None,
+    )
+    assert len(selected) == 2
+    picked = {cand.seq for cand in selected}
+    assert {"AAAA", "TTTT"} <= picked

@@ -174,9 +174,11 @@ to rebuild pools from scratch.
 For FIMO-backed PWM inputs, it also records Stage‑A sampling metadata
 (tier scheme, eligibility/retention rules, FIMO threshold, background source/bgfile, and
 eligible score histograms with tier boundary scores per regulator, including `candidates_with_hit`,
-`eligible_raw`, and `eligible_unique` counts), plus per‑TF diversity summaries (k=1 and k=5
+`eligible_raw`, and `eligible_unique` counts), PWM consensus strings (`pwm_consensus`), and
+mining saturation audits (`mining_audit` tail Δunique/Δgen), plus per‑TF diversity summaries (k=1 and k=5
 nearest‑neighbor **weighted‑Hamming** distances, sampled pairwise **weighted‑Hamming** distribution,
-core entropy, baseline vs actual; overlap + candidate‑pool diagnostics; local and global
+core entropy, baseline vs actual; overlap + candidate‑pool diagnostics; greedy max‑diversity
+upper bound (`upper_bound`) to show headroom; local and global
 score quantiles for tradeoff audits; large sets are deterministically subsampled to 2500
 sequences for k‑NN distances) and padding audit stats (best‑hit overlap with intended core;
 core offset histogram).
