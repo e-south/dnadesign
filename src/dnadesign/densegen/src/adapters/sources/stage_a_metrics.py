@@ -368,11 +368,39 @@ def _pairwise_hamming_summary(
     weights: Sequence[float] | None = None,
     encoding_store: CoreEncodingStore | None = None,
 ) -> PairwiseSummary | None:
-    if len(cores) < 2:
-        return None
+    if not cores:
+        return PairwiseSummary(
+            bins=[0.0],
+            counts=[0],
+            median=0.0,
+            mean=0.0,
+            p10=0.0,
+            p90=0.0,
+            n_pairs=0,
+            total_pairs=0,
+            subsampled=False,
+        )
     length = len(cores[0])
-    if length == 0 or any(len(core) != length for core in cores):
-        return None
+    if length == 0:
+        raise ValueError("Core length must be > 0 for pairwise distance summary.")
+    if any(len(core) != length for core in cores):
+        raise ValueError("Core length mismatch in pairwise distance summary.")
+    if len(cores) < 2:
+        if weights is not None:
+            weights_arr = np.asarray(weights, dtype=float)
+            if weights_arr.shape[0] != length:
+                raise ValueError("Weighted Hamming requires weights matching core length.")
+        return PairwiseSummary(
+            bins=[0.0],
+            counts=[0],
+            median=0.0,
+            mean=0.0,
+            p10=0.0,
+            p90=0.0,
+            n_pairs=0,
+            total_pairs=0,
+            subsampled=False,
+        )
     n = len(cores)
     total_pairs = n * (n - 1) // 2
     sample_pairs = int(min(max_pairs, total_pairs))

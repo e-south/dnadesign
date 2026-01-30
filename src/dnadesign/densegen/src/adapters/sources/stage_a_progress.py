@@ -380,7 +380,18 @@ class _PwmSamplingProgress:
         self._start = time.monotonic()
         self._last_update = self._start
         self._last_len = 0
-        self._last_state: tuple[int, Optional[int], Optional[int], Optional[int], int, Optional[int]] | None = None
+        self._last_state: (
+            tuple[
+                int,
+                Optional[int],
+                Optional[int],
+                Optional[int],
+                int,
+                Optional[int],
+                Optional[str],
+            ]
+            | None
+        ) = None
         self._shown = False
         if self._enabled:
             logging_utils.set_progress_active(True)
@@ -419,8 +430,9 @@ class _PwmSamplingProgress:
             batch_total,
             int(self.target),
             int(self.accepted_target) if self.accepted_target is not None else None,
+            self._phase,
         )
-        if not force and self._shown and state == self._last_state:
+        if self._shown and state == self._last_state:
             if self._mode != "screen" or logging_utils.is_progress_line_visible():
                 self._last_update = now
                 return
@@ -475,9 +487,10 @@ class _PwmSamplingProgress:
     def set_phase(self, phase: Optional[str]) -> None:
         self._phase = phase
         if not self._use_live:
-            if not self._shown or self._last_state is None:
+            if self._last_state is None:
+                self.update(generated=0, accepted=None, force=True)
                 return
-            generated, accepted, batch_index, batch_total, _target, _accepted_target = self._last_state
+            generated, accepted, batch_index, batch_total, _target, _accepted_target, _phase = self._last_state
             self.update(
                 generated=int(generated),
                 accepted=accepted,

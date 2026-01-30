@@ -754,11 +754,15 @@ def _stage_a_sampling_rows(
                     raise ValueError("Stage-A diversity missing pairwise summary.")
                 baseline_pairwise = pairwise.baseline
                 actual_pairwise = pairwise.actual
-                diversity_label = _format_diversity_value(actual_pairwise.median)
-                diversity_delta = _format_diversity_value(
-                    float(actual_pairwise.median) - float(baseline_pairwise.median),
-                    show_sign=True,
-                )
+                if int(actual_pairwise.n_pairs) <= 0 or int(baseline_pairwise.n_pairs) <= 0:
+                    diversity_label = "n/a"
+                    diversity_delta = "n/a"
+                else:
+                    diversity_label = _format_diversity_value(actual_pairwise.median)
+                    diversity_delta = _format_diversity_value(
+                        float(actual_pairwise.median) - float(baseline_pairwise.median),
+                        show_sign=True,
+                    )
                 score_block = diversity.score_quantiles
                 if score_block.baseline is None or score_block.actual is None:
                     raise ValueError("Stage-A diversity missing baseline/actual score quantiles.")

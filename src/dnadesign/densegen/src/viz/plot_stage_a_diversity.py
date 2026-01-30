@@ -106,9 +106,9 @@ def _build_stage_a_diversity_figure(
                 raise ValueError("Stage-A diversity missing pairwise bins or counts.")
             arr = np.asarray(counts, dtype=float)
             total = float(arr.sum())
-            if total <= 0:
-                raise ValueError("Stage-A diversity pairwise counts are empty.")
             x = np.asarray(bins, dtype=float)
+            if total <= 0:
+                return x, np.zeros_like(x, dtype=float)
             y = arr / total
             return x, y
 
@@ -200,7 +200,10 @@ def _build_stage_a_diversity_figure(
                 zorder=3,
             )[0]
             ax_left.set_xlim(x_base.min() - bar_width, x_base.max() + bar_width)
-            ax_left.set_ylim(0, max(y_base.max(), y_act.max()) * 1.15)
+            max_val = float(max(y_base.max(), y_act.max()))
+            if max_val <= 0:
+                max_val = 1.0
+            ax_left.set_ylim(0, max_val * 1.15)
             ax_left.set_ylabel("Fraction of pairs" if idx == 0 else "")
             ax_left.xaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=5))
             if idx == 0:
@@ -211,11 +214,18 @@ def _build_stage_a_diversity_figure(
                     fontsize=text_sizes["annotation"] * 0.8,
                 )
             note_lines: list[str] = []
-            if "median" not in baseline or "median" not in actual:
-                raise ValueError(f"Stage-A diversity missing pairwise median for '{input_name}' ({reg}).")
-            base_med = baseline["median"]
-            act_med = actual["median"]
-            note_lines.append(f"delta pairwise {float(act_med) - float(base_med):+.2f}")
+            if "n_pairs" not in baseline or "n_pairs" not in actual:
+                raise ValueError(f"Stage-A diversity missing pairwise n_pairs for '{input_name}' ({reg}).")
+            base_pairs = int(baseline["n_pairs"])
+            act_pairs = int(actual["n_pairs"])
+            if base_pairs <= 0 or act_pairs <= 0:
+                note_lines.append("pairwise n/a (n<2)")
+            else:
+                if "median" not in baseline or "median" not in actual:
+                    raise ValueError(f"Stage-A diversity missing pairwise median for '{input_name}' ({reg}).")
+                base_med = baseline["median"]
+                act_med = actual["median"]
+                note_lines.append(f"delta pairwise {float(act_med) - float(base_med):+.2f}")
             if "set_overlap_fraction" not in diversity or "set_overlap_swaps" not in diversity:
                 raise ValueError(f"Stage-A diversity missing overlap stats for '{input_name}' ({reg}).")
             overlap = diversity["set_overlap_fraction"]
