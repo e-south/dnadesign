@@ -101,7 +101,7 @@ def mine_pwm_candidates(
     n_candidates: int,
     requested: int,
     n_sites: int,
-    bgfile: Path | None,
+    bgfile: Path | str | None,
     keep_all_candidates_debug: bool,
     include_matched_sequence: bool,
     debug_output_dir: Path | None,
@@ -273,6 +273,7 @@ def mine_pwm_candidates(
         meme_path = tmp_path / "motif.meme"
         motif_for_fimo = PWMMotif(motif_id=motif.motif_id, matrix=matrix, background=motif.background)
         write_minimal_meme_motif(motif_for_fimo, meme_path)
+        fimo_bgfile = bgfile if bgfile is not None else "motif-file"
         if progress is not None:
             progress.set_phase("fimo")
         if provided_sequences is not None:
@@ -292,7 +293,7 @@ def mine_pwm_candidates(
             rows, raw_tsv = run_fimo(
                 meme_motif_path=meme_path,
                 fasta_path=fasta_path,
-                bgfile=bgfile,
+                bgfile=fimo_bgfile,
                 thresh=FIMO_REPORT_THRESH,
                 norc=True,
                 include_matched_sequence=include_matched_sequence or keep_all_candidates_debug,
@@ -453,7 +454,7 @@ def mine_pwm_candidates(
                 rows, raw_tsv = run_fimo(
                     meme_motif_path=meme_path,
                     fasta_path=fasta_path,
-                    bgfile=bgfile,
+                    bgfile=fimo_bgfile,
                     thresh=FIMO_REPORT_THRESH,
                     norc=True,
                     include_matched_sequence=include_matched_sequence or keep_all_candidates_debug,

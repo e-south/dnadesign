@@ -162,7 +162,7 @@ def run_fimo(
     *,
     meme_motif_path: Path,
     fasta_path: Path,
-    bgfile: Path | None = None,
+    bgfile: Path | str | None = None,
     norc: bool = False,
     thresh: float | None = None,
     include_matched_sequence: bool = False,

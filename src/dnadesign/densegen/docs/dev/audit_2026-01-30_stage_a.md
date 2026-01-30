@@ -70,7 +70,8 @@ The demo explicitly calls Stage-A before Stage-B; the key diagnostic plot is sta
 
 3) stage_a_summary__lexA_cpxR_artifacts__diversity.png
 - Left: pairwise core distance ECDF (Top-score vs MMR), with Δdiv (median gain), ΔJ (objective gain), and overlap annotations.
-- Right: score vs selection-time nearest distance (MMR contribution), with scores normalized by pwm_max_score.
+- Right: score vs selection-time nearest distance (MMR contribution), with scores normalized by pwm_max_score
+  in FIMO score scale.
 - Narrative use: separates the final diversity outcome (left) from the selection-time tradeoffs that produced it (right).
 
 The demo suggests running dense plot --only stage_a_summary right after stage-a build-pool so you can link the warnings (tier target unmet) to visual evidence of tier placement and diversity tradeoffs.

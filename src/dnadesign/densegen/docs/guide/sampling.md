@@ -76,6 +76,8 @@ Key scoring semantics:
 
 - FIMO is run with `--thresh 1.0` so the reporting threshold does not gate results.
 - Stage‑A uses `--norc` (forward strand only) for scoring.
+- When `sampling.bgfile` is unset, Stage‑A passes `--bgfile motif-file` so FIMO uses the motif
+  background; when `sampling.bgfile` is set, that file is passed through.
 
 #### 4) Eligibility (hard gate)
 
@@ -147,7 +149,7 @@ MMR (high-level, faithful to implementation; after Carbonell & Goldstein, 1998):
   `utility = alpha * normalized_score - (1 - alpha) * max_similarity_to_selected`
 - `alpha ∈ (0, 1]` biases toward score (`→ 1`) vs diversity (`→ 0`).
 - `normalized_score` is the percentile rank within the candidate pool (0–1, ties averaged).
-- Reporting uses `score_norm = best_hit_score / pwm_max_score` (PWM consensus log‑odds)
+- Reporting uses `score_norm = best_hit_score / pwm_max_score` (PWM consensus log‑odds in FIMO score scale)
   for cross‑TF comparability; this is separate from the MMR percentile normalization used in selection.
 - Similarity is derived from a **PWM‑tolerant weighted Hamming distance** on `tfbs_core`:
 

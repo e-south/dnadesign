@@ -137,6 +137,8 @@ def sample_pwm_sites(
     background_cdf = _background_cdf(motif.background)
     pwm_consensus = _pwm_consensus(matrix)
     pwm_max_score = score_sequence(pwm_consensus, matrix, log_odds=log_odds, background=motif.background)
+    if np.isfinite(pwm_max_score):
+        pwm_max_score = float(pwm_max_score) / float(np.log(2.0))
 
     score_label = "best_hit_score"
     length_label = str(length_policy)

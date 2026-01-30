@@ -61,3 +61,4 @@
 - Follow-up: added Stage-A audit notes (2026-01-30) and aligned docs with PWM include_matched_sequence requirement and default MMR tier_widening ladder.
 - Task: Stage-A diversity metrics + plots aligned to MMR objective (pwm max normalization, exact pairwise, ΔJ/Δdiv, score vs diversity contribution).
 - Follow-up: recorded pwm_max_score in Stage-A summaries/manifests, normalized score quantiles by pwm_max_score, added MMR objective gain metrics, rebuilt diversity plot as pairwise ECDF + score-vs-selection-distance contribution view, and updated demo/audit/outputs docs + tests.
+- Follow-up: made FIMO background explicit (`--bgfile motif-file` when no bgfile provided), aligned pwm_max_score to FIMO score scale, fixed FIMO shortfall tests, and relocated __main__ under src.
