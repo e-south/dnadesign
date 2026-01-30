@@ -29,6 +29,7 @@ def _diversity_block(core_len: int) -> dict:
         "candidate_pool_size": 2,
         "shortlist_target": 10,
         "core_hamming": {
+            "metric": "hamming",
             "nnd_k1": {
                 "k": 1,
                 "baseline": {

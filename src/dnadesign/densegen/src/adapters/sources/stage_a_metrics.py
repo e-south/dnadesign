@@ -274,7 +274,17 @@ def _core_hamming_knn(
     encoding_store: CoreEncodingStore | None = None,
 ) -> KnnSummary | None:
     if not cores:
-        return None
+        return KnnSummary(
+            bins=[0.0],
+            counts=[0],
+            median=0.0,
+            p05=0.0,
+            p95=0.0,
+            frac_le_1=0.0,
+            n=0,
+            subsampled=False,
+            k=int(k),
+        )
     if int(k) <= 0:
         raise ValueError("k must be >= 1 for k-nearest neighbor distances.")
     length = len(cores[0])

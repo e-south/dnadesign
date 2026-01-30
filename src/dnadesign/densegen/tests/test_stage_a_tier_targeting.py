@@ -11,11 +11,11 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dnadesign.densegen.src.adapters.sources import pwm_sampling
+from dnadesign.densegen.src.adapters.sources.stage_a_pipeline import _evaluate_tier_target
 
 
 def test_tier_target_requirement_computation() -> None:
-    required, met = pwm_sampling._evaluate_tier_target(
+    required, met = _evaluate_tier_target(
         n_sites=200,
         target_tier_fraction=0.001,
         eligible_unique=150_000,
