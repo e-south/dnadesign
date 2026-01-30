@@ -31,6 +31,7 @@ from .stage_a_sampling_utils import (
     _sample_from_background_cdf,
     _select_pwm_window,
     build_log_odds,
+    score_sequence,
 )
 from .stage_a_summary import PWMSamplingSummary
 from .stage_a_types import PWMMotif
@@ -135,6 +136,7 @@ def sample_pwm_sites(
     matrix_cdf = _matrix_cdf(matrix)
     background_cdf = _background_cdf(motif.background)
     pwm_consensus = _pwm_consensus(matrix)
+    pwm_max_score = score_sequence(pwm_consensus, matrix, log_odds=log_odds, background=motif.background)
 
     score_label = "best_hit_score"
     length_label = str(length_policy)
@@ -302,6 +304,7 @@ def sample_pwm_sites(
             tier_fractions=tier_fractions,
             tier_fractions_source=tier_fractions_source,
             pwm_consensus=pwm_consensus,
+            pwm_max_score=pwm_max_score,
             length_label=length_label,
             window_label=window_label,
             score_label=score_label,
@@ -392,6 +395,7 @@ def sample_pwm_sites(
         tier_fractions=tier_fractions,
         tier_fractions_source=tier_fractions_source,
         pwm_consensus=pwm_consensus,
+        pwm_max_score=pwm_max_score,
         length_label=length_label,
         window_label=window_label,
         score_label=score_label,

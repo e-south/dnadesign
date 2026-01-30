@@ -288,6 +288,7 @@ def _build_stage_a_sampling_manifest(
             {
                 "regulator": summary.regulator,
                 "pwm_consensus": summary.pwm_consensus,
+                "pwm_max_score": summary.pwm_max_score,
                 "edges": [float(v) for v in summary.eligible_score_hist_edges],
                 "counts": [int(v) for v in summary.eligible_score_hist_counts],
                 "tier0_score": summary.tier0_score,

@@ -74,6 +74,7 @@ class PWMSamplingSummary:
     diversity: Optional[DiversitySummary] = None
     mining_audit: Optional[dict[str, object]] = None
     padding_audit: Optional[dict[str, object]] = None
+    pwm_max_score: Optional[float] = None
 
 
 def _summarize_lengths(
@@ -190,6 +191,7 @@ def _build_summary(
     mining_audit: Optional[dict[str, object]] = None,
     padding_audit: Optional[dict[str, object]] = None,
     pwm_consensus: Optional[str] = None,
+    pwm_max_score: Optional[float] = None,
     input_name: Optional[str] = None,
     regulator: Optional[str] = None,
     backend: Optional[str] = None,
@@ -263,4 +265,5 @@ def _build_summary(
         diversity=diversity,
         mining_audit=dict(mining_audit) if mining_audit is not None else None,
         padding_audit=dict(padding_audit) if padding_audit is not None else None,
+        pwm_max_score=float(pwm_max_score) if pwm_max_score is not None else None,
     )
