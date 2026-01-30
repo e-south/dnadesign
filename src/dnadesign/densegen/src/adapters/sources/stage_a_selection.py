@@ -54,11 +54,26 @@ def _contrib_vector(core: str, log_odds: Sequence[dict[str, float]]) -> np.ndarr
 def _score_norm(values: Sequence[float]) -> dict[float, float]:
     if not values:
         return {}
-    lo = float(min(values))
-    hi = float(max(values))
-    if hi == lo:
-        return {float(v): 1.0 for v in values}
-    return {float(v): (float(v) - lo) / (hi - lo) for v in values}
+    vals = [float(v) for v in values]
+    n = len(vals)
+    if n == 1:
+        return {vals[0]: 1.0}
+    if min(vals) == max(vals):
+        return {float(v): 1.0 for v in vals}
+    sorted_vals = sorted(vals)
+    bounds: dict[float, list[int]] = {}
+    for idx, val in enumerate(sorted_vals):
+        bucket = bounds.get(val)
+        if bucket is None:
+            bounds[val] = [idx, idx]
+        else:
+            bucket[1] = idx
+    norm: dict[float, float] = {}
+    denom = float(n - 1)
+    for val, (first, last) in bounds.items():
+        avg_rank = (float(first) + float(last)) / 2.0 + 1.0
+        norm[float(val)] = (avg_rank - 1.0) / denom if denom > 0 else 1.0
+    return norm
 
 
 def _similarity_from_distance(distance: float) -> float:
@@ -103,7 +118,6 @@ def _select_by_mmr(
     shortlist_factor: int,
     shortlist_max: Optional[int],
     tier_widening: Optional[Sequence[float]],
-    ensure_shortlist_target: bool = False,
 ) -> tuple[list[_CandidateLike], dict[str, dict], dict]:
     if not ranked or n_sites <= 0:
         return [], {}, {"shortlist_k": 0, "shortlist_target": 0, "tier_fraction_used": None, "tier_limit": 0}
@@ -111,8 +125,6 @@ def _select_by_mmr(
         raise ValueError("selection.alpha must be in (0, 1].")
     core_by_seq = {cand.seq: _core_sequence(cand) for cand in ranked}
     contrib_by_seq = {seq: _contrib_vector(core, log_odds) for seq, core in core_by_seq.items()}
-    scores = [cand.score for cand in ranked]
-    norm_by_score = _score_norm(scores)
     tier_fractions = list(tier_widening) if tier_widening else [1.0]
     total = len(ranked)
     shortlist_target = max(int(shortlist_min), int(shortlist_factor) * int(n_sites))
@@ -191,7 +203,8 @@ def _select_by_mmr(
         if target_n <= 0:
             return [], {}, int(k)
         vectors = np.vstack([contrib_by_seq[cand.seq] for cand in shortlist])
-        scores_norm = np.array([norm_by_score.get(float(cand.score), 1.0) for cand in shortlist], dtype=float)
+        scores_norm_map = _score_norm([float(cand.score) for cand in shortlist])
+        scores_norm = np.array([scores_norm_map.get(float(cand.score), 1.0) for cand in shortlist], dtype=float)
         cores = [core_by_seq[cand.seq] for cand in shortlist]
         seqs = [cand.seq for cand in shortlist]
         selected_mask = np.zeros(len(shortlist), dtype=bool)
@@ -223,7 +236,8 @@ def _select_by_mmr(
             shortlist = list(candidates[:max_k])
             target_n = min(int(n_sites), len(shortlist))
             vectors = np.vstack([contrib_by_seq[cand.seq] for cand in shortlist])
-            scores_norm = np.array([norm_by_score.get(float(cand.score), 1.0) for cand in shortlist], dtype=float)
+            scores_norm_map = _score_norm([float(cand.score) for cand in shortlist])
+            scores_norm = np.array([scores_norm_map.get(float(cand.score), 1.0) for cand in shortlist], dtype=float)
             cores = [core_by_seq[cand.seq] for cand in shortlist]
             seqs = [cand.seq for cand in shortlist]
             selected_mask = np.zeros(len(shortlist), dtype=bool)
@@ -260,6 +274,7 @@ def _select_by_mmr(
     fraction_used = None
     tier_limit = total
     shortlist_target_met = False
+    widen_for_shortlist = bool(tier_widening)
     for fraction in tier_fractions:
         if fraction <= 0:
             continue
@@ -272,7 +287,7 @@ def _select_by_mmr(
         fraction_used = float(fraction)
         shortlist_target_met = int(shortlist_k) >= int(shortlist_target)
         if len(selected) >= int(n_sites):
-            if ensure_shortlist_target and not shortlist_target_met:
+            if widen_for_shortlist and not shortlist_target_met:
                 continue
             break
     diag = {

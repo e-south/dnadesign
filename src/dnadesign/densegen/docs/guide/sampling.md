@@ -99,6 +99,11 @@ Stage‑A deduplicates **eligible** candidates before ranking and retention. Con
 When multiple candidates map to the same core, Stage‑A keeps **the best representative**:
 highest score, with deterministic tie-breakers.
 
+Terminology used in outputs:
+
+- `eligible_raw` — candidates that passed eligibility (hit + `best_hit_score > 0`) before deduplication.
+- `eligible_unique` — the deduplicated candidate set used for ranking/retention.
+
 Pool columns you’ll commonly use:
 
 - `tfbs` — full TFBS sequence (core + flanks)
@@ -144,14 +149,15 @@ MMR (high-level, faithful to implementation):
 - Utility is:
   `utility = alpha * normalized_score - (1 - alpha) * max_similarity_to_selected`
 - `alpha ∈ (0, 1]` biases toward score (`→ 1`) vs diversity (`→ 0`).
+- `normalized_score` is the percentile rank within the candidate pool (0–1, ties averaged).
 
 Performance/behavior knobs for MMR:
 
 - `selection.shortlist_*` controls how many of the top-ranked candidates are considered.
 - `selection.tier_widening` can specify a ladder of ranked fractions to search (e.g. `[0.001, 0.01, 0.09, 1.0]`).
   DenseGen tries the first rung (top slice); if it can’t fill from that slice, it widens to the next rung.
-- `selection.tier_widening.ensure_shortlist_target` (bool) widens until the candidate pool
-  reaches `shortlist_target = max(shortlist_min, shortlist_factor * n_sites)` (or the ladder exhausts).
+- When tier widening is enabled, DenseGen widens until the candidate pool reaches
+  `shortlist_target = max(shortlist_min, shortlist_factor * n_sites)` (or the ladder exhausts).
 
 > Practical advice: MMR is best used when you expect **many** eligible unique candidates and you want
 > to avoid near-duplicates while still staying near the score frontier.
@@ -270,7 +276,7 @@ If you want to know what happened in a run, these are the canonical “truth” 
   Stage‑A sampling truth, including:
   - eligibility rule, tier scheme, FIMO threshold
   - background source (motif background vs bgfile)
-  - tier boundary scores and yield counters (generated / eligible / eligible_unique / retained)
+  - tier boundary scores and yield counters (generated / eligible_raw / eligible_unique / retained)
   - tier-target success/shortfall reporting
   - core diversity summaries (k=1 and k=5 nearest‑neighbor Hamming distances, sampled pairwise Hamming summary,
     and per‑position entropy, baseline vs actual), plus overlap and candidate‑pool diagnostics,

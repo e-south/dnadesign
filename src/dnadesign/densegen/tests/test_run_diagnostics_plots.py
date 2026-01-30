@@ -249,8 +249,8 @@ def _diversity_block() -> dict:
                 "actual": {"median": 1.0, "mean": 1.0, "p10": 1.0, "p90": 1.0, "n_pairs": 1, "total_pairs": 1},
             },
         },
-        "overlap_actual_fraction": 1.0,
-        "overlap_actual_swaps": 0,
+        "set_overlap_fraction": 1.0,
+        "set_overlap_swaps": 0,
         "core_entropy": {
             "baseline": {"values": [0.0, 1.0], "n": 2},
             "actual": {"values": [0.0, 1.0], "n": 2},
@@ -297,7 +297,7 @@ def _pool_manifest(tmp_path: Path, *, include_diversity: bool = False) -> TFBSPo
                             "tier2_score": 0.5,
                             "generated": 10,
                             "candidates_with_hit": 8,
-                            "eligible": 6,
+                            "eligible_raw": 6,
                             "eligible_unique": 4,
                             "retained": 2,
                         }

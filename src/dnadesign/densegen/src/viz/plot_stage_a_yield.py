@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 
 from ..utils.plot_style import format_regulator_label, stage_a_rcparams
-from .plot_common import _apply_style, _format_percent, _shared_x_cleanup, _style
+from .plot_common import _add_anchored_box, _apply_style, _format_percent, _shared_x_cleanup, _style
 from .plot_stage_a_common import _stage_a_regulator_colors, _stage_a_text_sizes
 
 
@@ -52,6 +52,9 @@ def _build_stage_a_yield_bias_figure(
 
     regs = [str(row.get("regulator") or "") for row in eligible_hist]
     stage_counts = []
+    duplication_factors: dict[str, float] = {}
+    pool_headrooms: dict[str, float] = {}
+    hit_overlap: dict[str, float] = {}
     core_lengths: dict[str, int] = {}
     if "tfbs_core" in pool_df.columns:
         core_series = pool_df["tfbs_core"].astype(str)
@@ -59,15 +62,28 @@ def _build_stage_a_yield_bias_figure(
             core_lengths.setdefault(reg, []).append(len(core))
         core_lengths = {reg: int(np.median(vals)) for reg, vals in core_lengths.items() if vals}
     for row in eligible_hist:
-        stage_counts.append(
-            [
-                row.get("generated"),
-                row.get("candidates_with_hit"),
-                row.get("eligible"),
-                row.get("eligible_unique"),
-                row.get("retained"),
-            ]
-        )
+        reg = str(row.get("regulator") or "")
+        generated = row.get("generated")
+        eligible_raw = row.get("eligible_raw")
+        eligible_unique = row.get("eligible_unique")
+        retained = row.get("retained")
+        if generated is None or eligible_raw is None or eligible_unique is None or retained is None:
+            raise ValueError(f"Stage-A sampling missing yield counters for input '{input_name}' ({reg}).")
+        selection_pool = row.get("selection_shortlist_k")
+        if selection_pool is None:
+            selection_pool = row.get("selection_tier_limit")
+        if selection_pool is None and eligible_unique is not None:
+            selection_pool = eligible_unique
+        if eligible_unique is not None and int(eligible_unique) > 0 and eligible_raw is not None:
+            duplication_factors[reg] = float(eligible_raw) / float(eligible_unique)
+        if retained is not None and int(retained) > 0 and selection_pool is not None:
+            pool_headrooms[reg] = float(selection_pool) / float(retained)
+        audit = row.get("padding_audit")
+        if isinstance(audit, dict):
+            overlap = audit.get("best_hit_overlaps_intended_core_fraction")
+            if overlap is not None:
+                hit_overlap[reg] = float(overlap)
+        stage_counts.append([generated, eligible_raw, eligible_unique, selection_pool, retained])
 
     if not regs:
         raise ValueError(f"Stage-A sampling missing regulator labels for input '{input_name}'.")
@@ -108,7 +124,7 @@ def _build_stage_a_yield_bias_figure(
     n_regs = max(1, len(reg_order))
     fig_height = max(4.8, base_height, 1.75 * n_regs + 0.8)
     reg_colors = _stage_a_regulator_colors(reg_order, style)
-    stage_labels = ["Generated", "Hit", "Eligible", "Unique", "Retained"]
+    stage_labels = ["Generated", "Eligible raw", "Unique core", "Selection pool", "Retained"]
     counts_by_reg = {reg: counts for reg, counts in zip(regs, stage_counts)}
     max_count = max((max(counts) for counts in stage_counts), default=0)
     subtitle_size = text_sizes["panel_title"] * 0.88
@@ -158,7 +174,6 @@ def _build_stage_a_yield_bias_figure(
             axes_right.append(fig.add_subplot(main[idx, 1], sharex=share_right, sharey=share_right))
         cbar_ax = fig.add_subplot(body[0, 1])
 
-        stage_labels = [label.capitalize() for label in stage_labels]
         x_positions = np.arange(len(stage_labels))
         offset = max(1.0, max_count * 0.03) if max_count else 1.0
         y_limit = max_count * 1.25 + offset if max_count else 1.0
@@ -215,6 +230,22 @@ def _build_stage_a_yield_bias_figure(
             ax.yaxis.set_major_formatter(mpl.ticker.StrMethodFormatter("{x:,.0f}"))
             ax.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
             ax.yaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=4, integer=True))
+            note_lines = []
+            dup = duplication_factors.get(reg)
+            if dup is not None:
+                note_lines.append(f"dup x{dup:.1f}")
+            headroom = pool_headrooms.get(reg)
+            if headroom is not None:
+                note_lines.append(f"pool x{headroom:.1f}")
+            if note_lines:
+                _add_anchored_box(
+                    ax,
+                    note_lines,
+                    loc="upper right",
+                    fontsize=text_sizes["annotation"] * 0.7,
+                    alpha=0.85,
+                    edgecolor="none",
+                )
 
         axes_left[0].set_title("Stepwise sequence yield", fontsize=subtitle_size, pad=title_pad)
         axes_left[-1].set_xticks(x_positions)
@@ -242,6 +273,23 @@ def _build_stage_a_yield_bias_figure(
             ax.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
             ax.xaxis.set_major_locator(mpl.ticker.MaxNLocator(integer=True, nbins=5))
             ax.yaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=4))
+            note_lines = []
+            if mask.any():
+                corr = pd.Series(lengths[mask]).corr(pd.Series(scores_arr[mask]), method="spearman")
+                if corr is not None and np.isfinite(corr):
+                    note_lines.append(f"rho(score,len) {float(corr):+.2f}")
+            overlap = hit_overlap.get(reg)
+            if overlap is not None:
+                note_lines.append(f"hit overlap {float(overlap) * 100:.0f}%")
+            if note_lines:
+                _add_anchored_box(
+                    ax,
+                    note_lines,
+                    loc="upper right",
+                    fontsize=text_sizes["annotation"] * 0.7,
+                    alpha=0.85,
+                    edgecolor="none",
+                )
         axes_right[0].set_title(
             "Retained sites: score vs length (GC color)",
             fontsize=subtitle_size,

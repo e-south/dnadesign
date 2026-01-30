@@ -71,9 +71,9 @@ def test_diversity_summary_scores() -> None:
         max_n=2500,
     )
     assert summary is not None
-    overlap = summary.get("overlap_actual_fraction")
+    overlap = summary.get("set_overlap_fraction")
     assert overlap == 1.0
-    n_swaps = summary.get("overlap_actual_swaps")
+    n_swaps = summary.get("set_overlap_swaps")
     assert n_swaps == 0
     core_hamming = summary.get("core_hamming")
     assert isinstance(core_hamming, dict)

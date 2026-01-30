@@ -173,14 +173,15 @@ to rebuild pools from scratch.
 `pool_manifest.json` includes the input config hash plus file fingerprints; append requires they match.
 For FIMO-backed PWM inputs, it also records Stage‑A sampling metadata
 (tier scheme, eligibility/retention rules, FIMO threshold, background source/bgfile, and
-eligible score histograms with tier boundary scores per regulator), plus per‑TF diversity
+eligible score histograms with tier boundary scores per regulator, including `eligible_raw`
+and `eligible_unique` counts), plus per‑TF diversity
 summaries (k=1 and k=5 nearest‑neighbor Hamming distances, sampled pairwise Hamming summary,
 core entropy, baseline vs actual; overlap + candidate‑pool diagnostics; local and global
 score quantiles for tradeoff audits; large sets are deterministically subsampled to 2500
 sequences for k‑NN distances) and padding audit stats (best‑hit overlap with intended core;
 core offset histogram).
 Stage‑A pool rows include `best_hit_score`, `tier`, `rank_within_regulator` (1‑based rank among
-eligible unique TFBS per regulator), and `tfbs_core` for core‑level uniqueness checks.
+eligible_unique TFBS per regulator), and `tfbs_core` for core‑level uniqueness checks.
 
 Stage‑B expects Stage‑A pools (default `outputs/pools`). `dense run` reuses these pools by default
 and fails fast if they are missing or stale; rebuild them with `dense stage-a build-pool --fresh` or

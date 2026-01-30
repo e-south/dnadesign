@@ -119,10 +119,10 @@ def test_stage_a_milestone_message_format() -> None:
     message = stage_a_progress._format_stage_a_milestone(
         motif_id="lexA",
         phase="postprocess",
-        detail="eligible=10",
+        detail="eligible_unique=10",
         elapsed=1.23,
     )
     assert "Stage-A postprocess" in message
     assert "lexA" in message
-    assert "eligible=10" in message
+    assert "eligible_unique=10" in message
     assert "1.2s" in message

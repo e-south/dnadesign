@@ -61,8 +61,7 @@ Optional (supported):
   - `shortlist_max` (optional int > 0)
   - `tier_widening` (optional):
     - `enabled` (bool)
-    - `ensure_shortlist_target` (bool; widen until shortlist_target is met or ladder is exhausted)
-    - `ladder` (fractions in (0, 1])
+    - `ladder` (fractions in (0, 1]; widening continues until shortlist_target is met or the ladder is exhausted)
 
 Strict validation behavior:
 - Unknown keys are errors (extra fields are rejected).

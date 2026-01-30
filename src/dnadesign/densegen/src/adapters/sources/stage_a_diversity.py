@@ -237,8 +237,8 @@ def _diversity_summary(
         "candidate_pool_size": candidate_pool_size,
         "shortlist_target": shortlist_target,
         "core_hamming": core_hamming,
-        "overlap_actual_fraction": overlap_fraction,
-        "overlap_actual_swaps": overlap_swaps,
+        "set_overlap_fraction": overlap_fraction,
+        "set_overlap_swaps": overlap_swaps,
         "core_entropy": {
             "baseline": {"values": baseline_entropy, "n": int(len(baseline_cores))},
             "actual": {"values": actual_entropy, "n": int(len(actual_cores))},

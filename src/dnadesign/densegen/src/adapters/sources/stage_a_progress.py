@@ -71,9 +71,9 @@ def _format_pwm_progress_line(
     if accepted is not None:
         if accepted_target is not None and int(accepted_target) > 0:
             acc_pct = min(100, int(100 * int(accepted) / max(1, int(accepted_target))))
-            parts.append(f"eligible {acc_pct}% ({accepted}/{accepted_target})")
+            parts.append(f"eligible_unique {acc_pct}% ({accepted}/{accepted_target})")
         else:
-            parts.append(f"eligible {accepted}")
+            parts.append(f"eligible_unique {accepted}")
     if target_fraction is not None:
         parts.append(f"tier {float(target_fraction) * 100:.3f}%")
     if tier_yield:
@@ -112,7 +112,7 @@ def _stage_a_live_render(state: dict[str, dict[str, object]]):
     table.add_column("backend")
     table.add_column("generated/target", no_wrap=True, overflow="ellipsis", min_width=14)
     table.add_column("gen %", no_wrap=True, overflow="ellipsis", min_width=12)
-    table.add_column("eligible/target", no_wrap=True, overflow="ellipsis", min_width=14)
+    table.add_column("eligible_unique/target", no_wrap=True, overflow="ellipsis", min_width=18)
     table.add_column("tier target")
     table.add_column("tier yield (0.1/1/9%)")
     table.add_column("batch")

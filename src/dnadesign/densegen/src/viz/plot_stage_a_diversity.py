@@ -187,10 +187,10 @@ def _build_stage_a_diversity_figure(
                 act_med = act_pair.get("median") if act_pair is not None else None
                 if base_med is not None and act_med is not None:
                     note_lines.append(f"delta pairwise {float(act_med) - float(base_med):+.2f}")
-            overlap = diversity.get("overlap_actual_fraction")
-            swaps = diversity.get("overlap_actual_swaps")
+            overlap = diversity.get("set_overlap_fraction")
+            swaps = diversity.get("set_overlap_swaps")
             if overlap is not None:
-                overlap_label = f"overlap {float(overlap) * 100:.1f}%"
+                overlap_label = f"set overlap {float(overlap) * 100:.1f}%"
                 if swaps is not None:
                     overlap_label = f"{overlap_label} (swaps={int(swaps)})"
                 note_lines.append(overlap_label)
@@ -293,7 +293,7 @@ def _build_stage_a_diversity_figure(
         if axes_left:
             axes_left[0].set_title("Core k-NN distance", fontsize=subtitle_size, pad=title_pad)
             axes_right[0].set_title("Core positional entropy", fontsize=subtitle_size, pad=title_pad)
-            axes_left[-1].set_xlabel("Hamming distance (k=5 neighbor)")
+            axes_left[-1].set_xlabel("Hamming distance (k-NN)")
             axes_right[-1].set_xlabel("Core position")
             for ax in axes_left[:-1]:
                 ax.tick_params(labelbottom=False)

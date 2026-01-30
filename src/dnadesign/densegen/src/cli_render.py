@@ -55,7 +55,8 @@ def stage_a_recap_tables(
         recap_table = make_table()
         recap_table.add_column("TF", overflow="fold")
         recap_table.add_column("generated")
-        recap_table.add_column("eligible")
+        recap_table.add_column("eligible_raw")
+        recap_table.add_column("eligible_unique")
         recap_table.add_column("retained")
         recap_table.add_column("tier target")
         recap_table.add_column("tier fill")
@@ -63,8 +64,8 @@ def stage_a_recap_tables(
         recap_table.add_column("k(pool/target)")
         recap_table.add_column("div(k5)")
         recap_table.add_column("Δdiv(k5)")
-        recap_table.add_column("overlap")
-        recap_table.add_column("swaps")
+        recap_table.add_column("set_overlap")
+        recap_table.add_column("set_swaps")
         recap_table.add_column("Δscore(p10)")
         recap_table.add_column("Δscore(med)")
         recap_table.add_column("score(min/med/avg/max)")
@@ -76,7 +77,8 @@ def stage_a_recap_tables(
             recap_table.add_row(
                 reg_label,
                 str(row["generated"]),
-                str(row["eligible"]),
+                str(row["eligible_raw"]),
+                str(row["eligible_unique"]),
                 str(row["retained"]),
                 str(row.get("tier_target", "-")),
                 str(row["tier_fill"]),
@@ -84,8 +86,8 @@ def stage_a_recap_tables(
                 str(row.get("diversity_pool", "-")),
                 str(row.get("diversity_med", "-")),
                 str(row.get("diversity_delta", "-")),
-                str(row.get("diversity_overlap", "-")),
-                str(row.get("diversity_swaps", "-")),
+                str(row.get("set_overlap", "-")),
+                str(row.get("set_swaps", "-")),
                 str(row.get("diversity_score_p10_delta", "-")),
                 str(row.get("diversity_score_med_delta", "-")),
                 str(row["score"]),

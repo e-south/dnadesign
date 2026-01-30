@@ -35,7 +35,7 @@ def test_stage_a_yield_bias_labels_and_ticks() -> None:
                 "tier2_score": 1.0,
                 "generated": 1000,
                 "candidates_with_hit": 500,
-                "eligible": 250,
+                "eligible_raw": 250,
                 "eligible_unique": 200,
                 "retained": 120,
             },
@@ -48,7 +48,7 @@ def test_stage_a_yield_bias_labels_and_ticks() -> None:
                 "tier2_score": 0.5,
                 "generated": 800,
                 "candidates_with_hit": 400,
-                "eligible": 200,
+                "eligible_raw": 200,
                 "eligible_unique": 160,
                 "retained": 90,
             },
@@ -72,7 +72,7 @@ def test_stage_a_yield_bias_labels_and_ticks() -> None:
     try:
         assert axes_left[-1].get_xlabel() == "Stage"
         labels = [tick.get_text() for tick in axes_left[-1].get_xticklabels() if tick.get_text()]
-        assert labels == ["Generated", "Hit", "Eligible", "Unique", "Retained"]
+        assert labels == ["Generated", "Eligible raw", "Unique core", "Selection pool", "Retained"]
         assert axes_left[0].get_title() == "Stepwise sequence yield"
         assert axes_right[0].get_title() == "Retained sites: score vs length (GC color)"
         assert axes_left[0].yaxis.get_offset_text().get_text() == ""

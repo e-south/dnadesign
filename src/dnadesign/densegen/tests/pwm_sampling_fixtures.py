@@ -64,13 +64,11 @@ def selection_mmr(
     shortlist_min: int = 50,
     shortlist_max: Optional[int] = None,
     tier_widening: Optional[Iterable[float]] = None,
-    ensure_shortlist_target: bool = False,
 ) -> PWMSelectionConfig:
     tier_config = None
     if tier_widening is not None:
         tier_config = PWMSelectionTierWidening(
             enabled=True,
-            ensure_shortlist_target=bool(ensure_shortlist_target),
             ladder=[float(val) for val in tier_widening],
         )
     return PWMSelectionConfig(

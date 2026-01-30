@@ -175,7 +175,7 @@ def test_stage_a_end_to_end_score_sampling(tmp_path: Path) -> None:
         assert "tier2_score" in row
         assert "generated" in row
         assert "candidates_with_hit" in row
-        assert "eligible" in row
+        assert "eligible_raw" in row
         assert "eligible_unique" in row
         assert "retained" in row
 

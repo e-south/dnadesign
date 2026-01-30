@@ -600,13 +600,13 @@ def _format_count(value: int | None) -> str:
     return f"{int(value):,}"
 
 
-def _format_eligible(eligible: int | None, generated: int | None) -> str:
-    if eligible is None:
+def _format_ratio(count: int | None, total: int | None) -> str:
+    if count is None:
         return "-"
-    if generated is None or generated <= 0:
-        return _format_count(eligible)
-    pct = 100.0 * float(eligible) / float(generated)
-    return f"{_format_count(eligible)} ({pct:.0f}%)"
+    if total is None or int(total) <= 0:
+        return _format_count(count)
+    pct = 100.0 * float(count) / float(total)
+    return f"{_format_count(count)} ({pct:.0f}%)"
 
 
 def _format_sampling_lengths(
@@ -666,7 +666,8 @@ def _stage_a_sampling_rows(
                 input_name = summary.input_name or pool.name
                 regulator = summary.regulator or "-"
                 candidates = _format_count(summary.generated)
-                eligible = _format_eligible(summary.eligible, summary.generated)
+                eligible_raw = _format_ratio(summary.eligible_raw, summary.generated)
+                eligible_unique = _format_ratio(summary.eligible_unique, summary.eligible_raw)
                 retained = _format_count(summary.retained)
                 tier_target = "-"
                 if summary.tier_target_fraction is not None:
@@ -747,8 +748,8 @@ def _stage_a_sampling_rows(
                                 float(actual.get("p50")) - float(base.get("p50")),
                                 show_sign=True,
                             )
-                overlap = diversity.get("overlap_actual_fraction") if isinstance(diversity, dict) else None
-                swaps = diversity.get("overlap_actual_swaps") if isinstance(diversity, dict) else None
+                overlap = diversity.get("set_overlap_fraction") if isinstance(diversity, dict) else None
+                swaps = diversity.get("set_overlap_swaps") if isinstance(diversity, dict) else None
                 if overlap is not None:
                     diversity_overlap = f"{float(overlap) * 100:.1f}%"
                 if swaps is not None:
@@ -758,12 +759,14 @@ def _stage_a_sampling_rows(
                 if pool_size is not None or shortlist_target is not None:
                     pool_label = f"{pool_size if pool_size is not None else '-'}"
                     pool_label = f"{pool_label}/{shortlist_target if shortlist_target is not None else '-'}"
+                    diversity_pool = pool_label
                 rows.append(
                     {
                         "input_name": str(input_name),
                         "regulator": str(regulator),
                         "generated": candidates,
-                        "eligible": eligible,
+                        "eligible_raw": eligible_raw,
+                        "eligible_unique": eligible_unique,
                         "retained": retained,
                         "tier_fill": tier_fill,
                         "tier_counts": tier_counts,
@@ -775,8 +778,8 @@ def _stage_a_sampling_rows(
                         "diversity_delta": diversity_delta,
                         "diversity_score_p10_delta": diversity_score_p10_delta,
                         "diversity_score_med_delta": diversity_score_med_delta,
-                        "diversity_overlap": diversity_overlap,
-                        "diversity_swaps": diversity_swaps,
+                        "set_overlap": diversity_overlap,
+                        "set_swaps": diversity_swaps,
                         "diversity_pool": diversity_pool,
                         "tier0_score": summary.tier0_score,
                         "tier1_score": summary.tier1_score,
@@ -808,7 +811,8 @@ def _stage_a_sampling_rows(
                 "input_name": str(pool.name),
                 "regulator": "-",
                 "generated": _format_count(total),
-                "eligible": _format_eligible(total, total),
+                "eligible_raw": _format_ratio(total, total),
+                "eligible_unique": _format_ratio(total, total),
                 "retained": _format_count(total),
                 "tier_fill": "-",
                 "tier_counts": "-",
@@ -820,8 +824,8 @@ def _stage_a_sampling_rows(
                 "diversity_delta": "-",
                 "diversity_score_p10_delta": "-",
                 "diversity_score_med_delta": "-",
-                "diversity_overlap": "-",
-                "diversity_swaps": "-",
+                "set_overlap": "-",
+                "set_swaps": "-",
                 "diversity_pool": "-",
                 "tier0_score": None,
                 "tier1_score": None,
@@ -2179,11 +2183,12 @@ def stage_a_build_pool(
                 console.print(f"[bold]{title}[/]")
             console.print(table)
         console.print(
-            "Legend: generated=PWM candidates; eligible=best_hit_score>0 with hit; "
-            "retained=top-N by score after dedupe; tier target=diagnostic tier target status; "
+            "Legend: generated=PWM candidates; eligible_raw=best_hit_score>0 with hit; "
+            "eligible_unique=deduped by uniqueness.key; retained=top-N by score after dedupe; "
+            "tier target=diagnostic tier target status; "
             "tier fill=deepest diagnostic tier used; selection=Stage-A selection policy; "
             "k(pool/target)=MMR shortlist pool vs target; div(k5)=k=5 Hamming median; "
-            "overlap=baseline∩actual; swaps=actual - overlap; "
+            "set_overlap=baseline∩actual; set_swaps=actual - overlap; "
             "Δscore columns compare baseline vs actual p10/median."
         )
     console.print(

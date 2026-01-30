@@ -70,3 +70,13 @@ def test_sample_pwm_sites_requires_config_objects() -> None:
             mining=mining,
             selection={"policy": "top_score"},
         )
+
+
+def test_selection_tier_widening_requires_ladder() -> None:
+    with pytest.raises(ValueError, match="tier_widening.ladder must be set"):
+        PWMSelectionConfig.model_validate(
+            {
+                "policy": "mmr",
+                "tier_widening": {"enabled": True},
+            }
+        )

@@ -255,7 +255,7 @@ def _build_stage_a_sampling_manifest(
         if summary.eligible_score_hist_edges:
             if len(summary.eligible_score_hist_counts) != len(summary.eligible_score_hist_edges) - 1:
                 raise ValueError("Stage-A eligible score histogram length mismatch.")
-        if summary.candidates_with_hit is None or summary.eligible_total is None:
+        if summary.candidates_with_hit is None or summary.eligible_raw is None:
             raise ValueError("Stage-A sampling summaries missing yield counters.")
         reg_bgfile = bgfile_by_regulator.get(summary.regulator, bgfile)
         reg_bgfiles.append(reg_bgfile)
@@ -271,8 +271,8 @@ def _build_stage_a_sampling_manifest(
                 "background_source": "bgfile" if reg_bgfile else "motif_background",
                 "generated": int(summary.generated),
                 "candidates_with_hit": int(summary.candidates_with_hit),
-                "eligible": int(summary.eligible_total),
-                "eligible_unique": int(summary.eligible),
+                "eligible_raw": int(summary.eligible_raw),
+                "eligible_unique": int(summary.eligible_unique),
                 "retained": int(summary.retained),
                 "target_tier_fraction": summary.tier_target_fraction,
                 "required_unique_for_target_tier": summary.tier_target_required_unique,

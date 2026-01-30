@@ -150,8 +150,8 @@ class PWMSamplingSummary:
     target: int
     target_sites: Optional[int]
     candidates_with_hit: Optional[int]
-    eligible_total: Optional[int]
-    eligible: int
+    eligible_raw: Optional[int]
+    eligible_unique: int
     retained: int
     retained_len_min: Optional[int]
     retained_len_median: Optional[float]
@@ -369,8 +369,8 @@ def _build_summary(
     target: int,
     target_sites: Optional[int],
     candidates_with_hit: Optional[int],
-    eligible_total: Optional[int],
-    eligible: Sequence[str],
+    eligible_raw: Optional[int],
+    eligible_unique: Sequence[str],
     retained: Sequence[str],
     retained_scores: Optional[Sequence[float]] = None,
     uniqueness_key: Optional[str] = None,
@@ -418,8 +418,8 @@ def _build_summary(
         target=int(target),
         target_sites=int(target_sites) if target_sites is not None else None,
         candidates_with_hit=int(candidates_with_hit) if candidates_with_hit is not None else None,
-        eligible_total=int(eligible_total) if eligible_total is not None else None,
-        eligible=int(len(eligible)),
+        eligible_raw=int(eligible_raw) if eligible_raw is not None else None,
+        eligible_unique=int(len(eligible_unique)),
         retained=int(len(retained)),
         retained_len_min=min_len,
         retained_len_median=median_len,
@@ -616,7 +616,6 @@ def sample_pwm_sites(
     selection_shortlist_factor = int(selection.shortlist_factor)
     selection_shortlist_max = int(selection.shortlist_max) if selection.shortlist_max is not None else None
     selection_tier_widening: Optional[Sequence[float]] = None
-    selection_ensure_shortlist_target = False
     if selection_policy == "mmr":
         selection_alpha = float(selection_alpha)
         if selection_alpha <= 0.0 or selection_alpha > 1.0:
@@ -634,7 +633,6 @@ def sample_pwm_sites(
 
     tier_cfg = selection.tier_widening
     if isinstance(tier_cfg, PWMSelectionTierWidening) and tier_cfg.enabled:
-        selection_ensure_shortlist_target = bool(tier_cfg.ensure_shortlist_target)
         selection_tier_widening = list(tier_cfg.ladder)
 
     include_matched_sequence = bool(include_matched_sequence)
@@ -838,7 +836,7 @@ def sample_pwm_sites(
 
         candidates_by_seq: dict[str, FimoCandidate] = {}
         candidates_with_hit = 0
-        eligible_total = 0
+        eligible_raw = 0
         lengths_all: list[int] = []
         generated_total = 0
         time_limited = False
@@ -930,7 +928,7 @@ def sample_pwm_sites(
                             reject_reason="score_non_positive",
                         )
                         continue
-                    eligible_total += 1
+                    eligible_raw += 1
                     _record_candidate(
                         seq=seq,
                         hit=hit,
@@ -1049,7 +1047,7 @@ def sample_pwm_sites(
                                 reject_reason="score_non_positive",
                             )
                             continue
-                        eligible_total += 1
+                        eligible_raw += 1
                         _record_candidate(
                             seq=seq,
                             hit=hit,
@@ -1084,7 +1082,7 @@ def sample_pwm_sites(
                         )
                     if mining_log_every > 0 and batches % mining_log_every == 0:
                         log.info(
-                            "FIMO mining %s batch %d/%s: generated=%d/%d eligible=%d",
+                            "FIMO mining %s batch %d/%s: generated=%d/%d eligible_unique=%d",
                             motif.motif_id,
                             batches,
                             "-",
@@ -1125,11 +1123,11 @@ def sample_pwm_sites(
         collapsed_by_core_identity = 0
         if uniqueness_key == "core":
             ranked, collapsed_by_core_identity = _collapse_by_core_identity(ranked)
-        eligible_hits = len(ranked)
+        eligible_unique = len(ranked)
         if progress is not None:
             progress.update(
                 generated=generated_total,
-                accepted=eligible_hits,
+                accepted=eligible_unique,
                 batch_index=batches if batches > 0 else None,
                 batch_total=None,
                 force=True,
@@ -1140,7 +1138,10 @@ def sample_pwm_sites(
             _format_stage_a_milestone(
                 motif_id=motif.motif_id,
                 phase="postprocess",
-                detail=f"eligible={eligible_hits} collapsed={collapsed_by_core_identity} selection={selection_policy}",
+                detail=(
+                    f"eligible_unique={eligible_unique} collapsed={collapsed_by_core_identity} "
+                    f"selection={selection_policy}"
+                ),
             )
         )
         ranked_pairs = [(cand.seq, cand.score) for cand in ranked]
@@ -1162,7 +1163,6 @@ def sample_pwm_sites(
                 shortlist_factor=int(selection_shortlist_factor),
                 shortlist_max=int(selection_shortlist_max) if selection_shortlist_max is not None else None,
                 tier_widening=selection_tier_widening,
-                ensure_shortlist_target=selection_ensure_shortlist_target,
             )
         else:
             picked = ranked[: int(n_sites)]
@@ -1325,9 +1325,9 @@ def sample_pwm_sites(
             )
         )
         log.info(
-            "FIMO yield for motif %s: eligible=%d retained=%d",
+            "FIMO yield for motif %s: eligible_unique=%d retained=%d",
             motif.motif_id,
-            eligible_hits,
+            eligible_unique,
             len(picked),
             extra={"suppress_stdout": True},
         )
@@ -1402,8 +1402,8 @@ def sample_pwm_sites(
                 target=requested,
                 target_sites=n_sites,
                 candidates_with_hit=candidates_with_hit,
-                eligible_total=eligible_total,
-                eligible=[cand.seq for cand in ranked],
+                eligible_raw=eligible_raw,
+                eligible_unique=[cand.seq for cand in ranked],
                 retained=[c.seq for c in picked],
                 retained_scores=[cand.score for cand in picked],
                 uniqueness_key=uniqueness_key,

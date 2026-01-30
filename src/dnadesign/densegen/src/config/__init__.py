@@ -259,7 +259,6 @@ class PWMUniquenessConfig(BaseModel):
 class PWMSelectionTierWidening(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enabled: bool = False
-    ensure_shortlist_target: bool = False
     ladder: List[float] = Field(default_factory=list)
 
     @field_validator("ladder")
@@ -272,6 +271,12 @@ class PWMSelectionTierWidening(BaseModel):
                 raise ValueError("pwm.sampling.selection.tier_widening.ladder values must be in (0, 1]")
             cleaned.append(val)
         return cleaned
+
+    @model_validator(mode="after")
+    def _ladder_required_when_enabled(self):
+        if self.enabled and not self.ladder:
+            raise ValueError("pwm.sampling.selection.tier_widening.ladder must be set when tier_widening is enabled.")
+        return self
 
 
 class PWMSelectionConfig(BaseModel):

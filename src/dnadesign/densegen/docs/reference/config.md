@@ -91,8 +91,7 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
       - `shortlist_max` (optional int > 0)
       - `tier_widening` (optional)
         - `enabled` (bool)
-        - `ensure_shortlist_target` (bool; widen until shortlist_target is met or ladder is exhausted)
-        - `ladder` (fractions in (0, 1], e.g. `[0.001, 0.01, 0.09, 1.0]`)
+        - `ladder` (fractions in (0, 1], e.g. `[0.001, 0.01, 0.09, 1.0]`; widening continues until shortlist_target is met or the ladder is exhausted)
     - `consensus` requires `n_sites: 1`
     - `background` samples cores from the PWM background distribution before padding
     - FIMO resolves `fimo` via `MEME_BIN` or PATH; pixi users should run `pixi run dense ...` so it is available.

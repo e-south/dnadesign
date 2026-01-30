@@ -94,7 +94,6 @@ def test_mmr_tier_widening_honors_shortlist_target() -> None:
         shortlist_factor=5,
         shortlist_max=None,
         tier_widening=[0.2, 0.5, 1.0],
-        ensure_shortlist_target=True,
     )
 
     assert len(selected) == 10

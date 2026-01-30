@@ -20,7 +20,9 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from dnadesign.densegen.src.cli import _format_tier_counts, app
+from dnadesign.densegen.src.adapters.sources.pwm_sampling import PWMSamplingSummary
+from dnadesign.densegen.src.cli import _format_tier_counts, _stage_a_sampling_rows, app
+from dnadesign.densegen.src.core.artifacts.pool import PoolData
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
 
 _FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
@@ -196,3 +198,52 @@ def test_stage_a_build_pool_reports_plan(tmp_path: Path) -> None:
 def test_tier_rows_include_zero_counts() -> None:
     label = _format_tier_counts([2, 0, 1, 0], [1, 0, 0, 0])
     assert label == "t0 2/1 | t1 0/0 | t2 1/0 | t3 0/0"
+
+
+def test_stage_a_sampling_rows_include_pool_headroom() -> None:
+    summary = PWMSamplingSummary(
+        input_name="demo",
+        regulator="regA",
+        backend="fimo",
+        uniqueness_key="core",
+        collapsed_by_core_identity=0,
+        generated=10,
+        target=10,
+        target_sites=2,
+        candidates_with_hit=9,
+        eligible_raw=8,
+        eligible_unique=5,
+        retained=2,
+        retained_len_min=4,
+        retained_len_median=4.0,
+        retained_len_mean=4.0,
+        retained_len_max=4,
+        retained_score_min=1.0,
+        retained_score_median=1.0,
+        retained_score_mean=1.0,
+        retained_score_max=1.0,
+        eligible_tier_counts=[1, 1, 0, 0],
+        retained_tier_counts=[1, 0, 0, 0],
+        tier0_score=2.0,
+        tier1_score=1.5,
+        tier2_score=1.0,
+        eligible_score_hist_edges=[0.0, 1.0],
+        eligible_score_hist_counts=[1],
+        selection_policy="mmr",
+        selection_shortlist_k=50,
+        selection_shortlist_min=10,
+        selection_shortlist_factor=5,
+        selection_shortlist_target=250,
+        diversity={"candidate_pool_size": 50, "shortlist_target": 250},
+    )
+    pool = PoolData(
+        name="demo",
+        input_type="pwm_meme",
+        pool_mode="tfbs",
+        df=None,
+        sequences=[],
+        pool_path=Path("demo.parquet"),
+        summaries=[summary],
+    )
+    rows = _stage_a_sampling_rows({"demo": pool})
+    assert rows[0]["diversity_pool"] == "50/250"
