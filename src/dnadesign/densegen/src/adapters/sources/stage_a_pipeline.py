@@ -85,6 +85,14 @@ def _cap_label(
     return cap_label
 
 
+def _coerce_shortlist_max(policy: str, value: int | None) -> int | None:
+    if policy != "mmr":
+        return None
+    if value is None:
+        return None
+    return int(value)
+
+
 def _context(
     *,
     motif: PWMMotif,
@@ -525,7 +533,7 @@ def run_stage_a_pipeline(
             selection_similarity="weighted_hamming_tolerant" if selection_policy == "mmr" else None,
             selection_shortlist_min=int(selection_shortlist_min) if selection_policy == "mmr" else None,
             selection_shortlist_factor=int(selection_shortlist_factor) if selection_policy == "mmr" else None,
-            selection_shortlist_max=int(selection_shortlist_max) if selection_policy == "mmr" else None,
+            selection_shortlist_max=_coerce_shortlist_max(selection_policy, selection_shortlist_max),
             selection_tier_fraction_used=selection_diag.tier_fraction_used if selection_diag else None,
             selection_tier_limit=selection_diag.tier_limit if selection_diag else None,
             shortlist_k=selection_diag.shortlist_k if selection_diag else None,
