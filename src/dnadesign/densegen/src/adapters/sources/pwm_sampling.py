@@ -28,6 +28,7 @@ from .stage_a_sampling_utils import (
     _background_cdf,
     _matrix_cdf,
     _pwm_consensus,
+    _pwm_consensus_iupac,
     _sample_from_background_cdf,
     _select_pwm_window,
     build_log_odds,
@@ -136,6 +137,7 @@ def sample_pwm_sites(
     matrix_cdf = _matrix_cdf(matrix)
     background_cdf = _background_cdf(motif.background)
     pwm_consensus = _pwm_consensus(matrix)
+    pwm_consensus_iupac = _pwm_consensus_iupac(matrix)
     pwm_max_score = score_sequence(pwm_consensus, matrix, log_odds=log_odds, background=motif.background)
     if np.isfinite(pwm_max_score):
         pwm_max_score = float(pwm_max_score) / float(np.log(2.0))
@@ -306,6 +308,7 @@ def sample_pwm_sites(
             tier_fractions=tier_fractions,
             tier_fractions_source=tier_fractions_source,
             pwm_consensus=pwm_consensus,
+            pwm_consensus_iupac=pwm_consensus_iupac,
             pwm_max_score=pwm_max_score,
             length_label=length_label,
             window_label=window_label,
@@ -397,6 +400,7 @@ def sample_pwm_sites(
         tier_fractions=tier_fractions,
         tier_fractions_source=tier_fractions_source,
         pwm_consensus=pwm_consensus,
+        pwm_consensus_iupac=pwm_consensus_iupac,
         pwm_max_score=pwm_max_score,
         length_label=length_label,
         window_label=window_label,

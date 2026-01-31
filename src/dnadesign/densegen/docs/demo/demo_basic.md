@@ -228,7 +228,7 @@ Stage‑A diversity panel interpretation:
 
 * Left: pairwise distance ECDF for Top Sequences vs Diversified Sequences (Δdiv = median pairwise gain).
 * Right: score vs selection‑time nearest distance (MMR contribution), with score normalized by
-  `pwm_max_score` (consensus log‑odds in FIMO score scale). ΔJ reports the mean MMR objective gain.
+  the PWM consensus score (`pwm_max_score`, FIMO log‑odds scale). ΔJ reports the mean MMR objective gain.
 
 ---
 

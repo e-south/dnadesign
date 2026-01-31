@@ -300,7 +300,7 @@ def _build_stage_a_diversity_figure(
                 "MMR contribution (score vs nearest distance)", fontsize=subtitle_size, pad=title_pad
             )
             axes_left[-1].set_xlabel(metric_label)
-            axes_right[-1].set_xlabel("Score / PWM max")
+            axes_right[-1].set_xlabel("Score / PWM consensus score")
             for ax in axes_left[:-1]:
                 ax.tick_params(labelbottom=False)
             for ax in axes_right:

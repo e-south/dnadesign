@@ -64,15 +64,15 @@ The demo explicitly calls Stage-A before Stage-B; the key diagnostic plot is sta
 - Right panel: retained TFBS length counts confirm the requested 15-20 nt range.
 
 2) stage_a_summary__lexA_cpxR_artifacts__yield_bias.png
-- Left: yield funnel (Generated -> Eligible -> Unique core -> MMR pool -> Retained) with duplication pressure, MMR headroom, and mining tail slope annotations.
-- Right: core positional entropy (bits) for diversified sequences, labeled by PWM consensus letters.
+- Left: yield funnel (Generated -> Eligible -> Unique core -> MMR pool -> Retained) showing stepwise counts.
+- Right: core positional entropy (bits) for diversified sequences, labeled by PWM IUPAC consensus letters.
 - Narrative use: validates that Stage-A is converting candidates into a high-quality pool and highlights which core positions remain diverse.
 
 3) stage_a_summary__lexA_cpxR_artifacts__diversity.png
 - Left: pairwise core distance ECDF (Top Sequences vs Diversified Sequences), with Δdiv (median gain), ΔJ (objective gain), and overlap annotations.
 - Δdiv reports the median pairwise distance gain (diversified minus top); ΔJ reports the MMR objective gain.
-- Right: score vs selection-time nearest distance (MMR contribution), with scores normalized by pwm_max_score
-  in FIMO score scale.
+- Right: score vs selection-time nearest distance (MMR contribution), with scores normalized by
+  the PWM consensus score (`pwm_max_score`, FIMO log-odds scale).
 - Narrative use: separates the final diversity outcome (left) from the selection-time tradeoffs that produced it (right).
 
 The demo suggests running dense plot --only stage_a_summary right after stage-a build-pool so you can link the warnings (tier target unmet) to visual evidence of tier placement and diversity tradeoffs.

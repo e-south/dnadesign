@@ -270,6 +270,8 @@ def _build_stage_a_sampling_manifest(
             raise ValueError("Stage-A sampling summaries missing tier fractions.")
         if summary.tier_fractions_source is None:
             raise ValueError("Stage-A sampling summaries missing tier fractions source.")
+        if summary.pwm_consensus_iupac is None:
+            raise ValueError("Stage-A sampling summaries missing pwm_consensus_iupac.")
         tier_fractions_values.append(tuple(float(v) for v in summary.tier_fractions))
         tier_fractions_sources.append(str(summary.tier_fractions_source))
         if summary.eligible_score_hist_edges:
@@ -288,6 +290,7 @@ def _build_stage_a_sampling_manifest(
             {
                 "regulator": summary.regulator,
                 "pwm_consensus": summary.pwm_consensus,
+                "pwm_consensus_iupac": summary.pwm_consensus_iupac,
                 "pwm_max_score": summary.pwm_max_score,
                 "edges": [float(v) for v in summary.eligible_score_hist_edges],
                 "counts": [int(v) for v in summary.eligible_score_hist_counts],

@@ -27,6 +27,7 @@ class PWMSamplingSummary:
     regulator: str
     backend: str
     pwm_consensus: Optional[str]
+    pwm_consensus_iupac: Optional[str]
     uniqueness_key: Optional[str]
     collapsed_by_core_identity: Optional[int]
     generated: int
@@ -191,6 +192,7 @@ def _build_summary(
     mining_audit: Optional[dict[str, object]] = None,
     padding_audit: Optional[dict[str, object]] = None,
     pwm_consensus: Optional[str] = None,
+    pwm_consensus_iupac: Optional[str] = None,
     pwm_max_score: Optional[float] = None,
     input_name: Optional[str] = None,
     regulator: Optional[str] = None,
@@ -206,6 +208,7 @@ def _build_summary(
         regulator=str(regulator or ""),
         backend=str(backend or ""),
         pwm_consensus=str(pwm_consensus) if pwm_consensus is not None else None,
+        pwm_consensus_iupac=str(pwm_consensus_iupac) if pwm_consensus_iupac is not None else None,
         uniqueness_key=str(uniqueness_key) if uniqueness_key is not None else None,
         collapsed_by_core_identity=int(collapsed_by_core_identity) if collapsed_by_core_identity is not None else None,
         generated=int(generated),

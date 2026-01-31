@@ -191,6 +191,7 @@ def _write_pool_manifest(run_root: Path) -> None:
                         {
                             "regulator": "tfA",
                             "pwm_consensus": "AAAA",
+                            "pwm_consensus_iupac": "AAAA",
                             "pwm_max_score": 10.0,
                             "edges": [4.0, 6.0, 8.0, 10.0],
                             "counts": [0, 1, 1],
@@ -223,6 +224,7 @@ def _write_pool_manifest(run_root: Path) -> None:
                         {
                             "regulator": "tfB",
                             "pwm_consensus": "AAAAAA",
+                            "pwm_consensus_iupac": "AAAAAA",
                             "pwm_max_score": 6.0,
                             "edges": [4.0, 6.0, 8.0],
                             "counts": [1, 0],

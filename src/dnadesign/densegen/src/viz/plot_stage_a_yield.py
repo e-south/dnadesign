@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 
 from ..utils.plot_style import format_regulator_label, stage_a_rcparams
-from .plot_common import _add_anchored_box, _apply_style, _format_percent, _shared_x_cleanup, _style
+from .plot_common import _apply_style, _format_percent, _shared_x_cleanup, _style
 from .plot_stage_a_common import _stage_a_regulator_colors, _stage_a_text_sizes
 
 
@@ -49,17 +49,14 @@ def _build_stage_a_yield_bias_figure(
             raise ValueError(f"Stage-A sampling missing regulator labels for input '{input_name}'.")
         regs.append(str(row["regulator"]))
     stage_counts = []
-    duplication_factors: dict[str, float] = {}
-    pool_headrooms: dict[str, float] = {}
     diversity_by_reg: dict[str, dict] = {}
     consensus_by_reg: dict[str, str] = {}
-    mining_slopes: dict[str, float] = {}
     core_lengths: dict[str, int] = {}
     for row in eligible_hist:
         reg = str(row["regulator"])
-        consensus = row.get("pwm_consensus")
+        consensus = row.get("pwm_consensus_iupac")
         if not consensus:
-            raise ValueError(f"Stage-A sampling missing pwm_consensus for '{input_name}' ({reg}).")
+            raise ValueError(f"Stage-A sampling missing pwm_consensus_iupac for '{input_name}' ({reg}).")
         consensus = str(consensus)
         consensus_by_reg[reg] = consensus
         core_lengths[reg] = len(consensus)
@@ -96,17 +93,6 @@ def _build_stage_a_yield_bias_figure(
             raise ValueError(f"Stage-A selection_pool_source invalid for '{input_name}' ({reg}).")
         if selection_pool is None:
             raise ValueError(f"Stage-A selection pool size missing for '{input_name}' ({reg}).")
-        if eligible_unique is not None and int(eligible_unique) > 0 and eligible_raw is not None:
-            duplication_factors[reg] = float(eligible_raw) / float(eligible_unique)
-        if retained is not None and int(retained) > 0 and selection_pool is not None:
-            pool_headrooms[reg] = float(selection_pool) / float(retained)
-        if "mining_audit" not in row:
-            raise ValueError(f"Stage-A sampling missing mining_audit for '{input_name}' ({reg}).")
-        mining = row["mining_audit"]
-        if isinstance(mining, dict):
-            slope = mining.get("unique_slope")
-            if slope is not None:
-                mining_slopes[reg] = float(slope)
         stage_counts.append([generated, eligible_raw, eligible_unique, selection_pool, retained])
 
     if not regs:
@@ -231,26 +217,6 @@ def _build_stage_a_yield_bias_figure(
             ax.yaxis.set_major_formatter(mpl.ticker.StrMethodFormatter("{x:,.0f}"))
             ax.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
             ax.yaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=4, integer=True))
-            note_lines = []
-            dup = duplication_factors.get(reg)
-            if dup is not None:
-                note_lines.append(f"dup pressure: eligible/unique={dup:.1f}x")
-            headroom = pool_headrooms.get(reg)
-            if headroom is not None:
-                note_lines.append(f"MMR headroom: pool/retained={headroom:.1f}x")
-            slope = mining_slopes.get(reg)
-            if slope is not None:
-                note_lines.append(f"tail slope Δunique/Δgen={slope:.3f}")
-            if note_lines:
-                _add_anchored_box(
-                    ax,
-                    note_lines,
-                    loc="upper right",
-                    fontsize=text_sizes["annotation"] * 0.7,
-                    alpha=0.85,
-                    edgecolor="none",
-                )
-
         axes_left[0].set_title("Stepwise sequence yield", fontsize=subtitle_size, pad=title_pad)
         axes_left[-1].set_xticks(x_positions)
         axes_left[-1].set_xticklabels(stage_labels)

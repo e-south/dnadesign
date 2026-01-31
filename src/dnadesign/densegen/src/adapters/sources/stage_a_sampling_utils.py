@@ -94,6 +94,49 @@ def _pwm_consensus(matrix: Sequence[dict[str, float]]) -> str:
     return "".join(max(row.items(), key=lambda kv: kv[1])[0] for row in matrix)
 
 
+def _pwm_consensus_iupac(matrix: Sequence[dict[str, float]]) -> str:
+    iupac_map = {
+        frozenset({"A"}): "A",
+        frozenset({"C"}): "C",
+        frozenset({"G"}): "G",
+        frozenset({"T"}): "T",
+        frozenset({"A", "G"}): "R",
+        frozenset({"C", "T"}): "Y",
+        frozenset({"G", "C"}): "S",
+        frozenset({"A", "T"}): "W",
+        frozenset({"G", "T"}): "K",
+        frozenset({"A", "C"}): "M",
+        frozenset({"C", "G", "T"}): "B",
+        frozenset({"A", "G", "T"}): "D",
+        frozenset({"A", "C", "T"}): "H",
+        frozenset({"A", "C", "G"}): "V",
+        frozenset({"A", "C", "G", "T"}): "N",
+    }
+    consensus: list[str] = []
+    for row in matrix:
+        probs = {base: float(row.get(base, 0.0)) for base in ("A", "C", "G", "T")}
+        if any(val < 0 for val in probs.values()):
+            raise ValueError("PWM probabilities must be >= 0 to compute IUPAC consensus.")
+        total = float(sum(probs.values()))
+        if total <= 0:
+            raise ValueError("PWM probabilities must sum to > 0 to compute IUPAC consensus.")
+        for base in probs:
+            probs[base] = probs[base] / total
+        max_prob = max(probs.values())
+        tol = 1e-9
+        if max_prob >= 0.5 - tol:
+            selected = {base for base, val in probs.items() if abs(val - max_prob) <= tol}
+        else:
+            selected = {base for base, val in probs.items() if val >= 0.25 - tol}
+            if not selected:
+                selected = {max(probs.items(), key=lambda kv: kv[1])[0]}
+        code = iupac_map.get(frozenset(selected))
+        if code is None:
+            raise ValueError(f"Unsupported IUPAC consensus bases: {sorted(selected)}")
+        consensus.append(code)
+    return "".join(consensus)
+
+
 def _sample_from_background_cdf(rng: np.random.Generator, cdf: np.ndarray, length: int) -> str:
     if length <= 0:
         return ""

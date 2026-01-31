@@ -149,7 +149,7 @@ MMR (high-level, faithful to implementation; after Carbonell & Goldstein, 1998):
   `utility = alpha * normalized_score - (1 - alpha) * max_similarity_to_selected`
 - `alpha ∈ (0, 1]` biases toward score (`→ 1`) vs diversity (`→ 0`).
 - `normalized_score` is the percentile rank within the candidate pool (0–1, ties averaged).
-- Reporting uses `score_norm = best_hit_score / pwm_max_score` (PWM consensus log‑odds in FIMO score scale)
+- Reporting uses `score_norm = best_hit_score / pwm_max_score` (PWM consensus log‑odds score in FIMO score scale)
   for cross‑TF comparability; this is separate from the MMR percentile normalization used in selection.
 - Similarity is derived from a **PWM‑tolerant weighted Hamming distance** on `tfbs_core`:
 
@@ -299,7 +299,10 @@ If you want to know what happened in a run, these are the canonical “truth” 
   - background source (motif background vs bgfile)
   - tier boundary scores and yield counters (generated / candidates_with_hit / eligible_raw / eligible_unique / retained)
   - tier-target success/shortfall reporting
-  - PWM consensus string (`pwm_consensus`) and its log‑odds max (`pwm_max_score`)
+  - PWM consensus string (`pwm_consensus`), IUPAC consensus (`pwm_consensus_iupac`), and the PWM
+    consensus log‑odds score (`pwm_max_score`). IUPAC consensus uses the max‑probability base when
+    any base has ≥0.5 probability; otherwise it includes bases with ≥0.25 probability (after
+    normalization). Stage‑A plots use the IUPAC consensus on entropy axes.
   - core diversity summaries (k=1 and k=5 nearest‑neighbor distances plus **pairwise weighted‑Hamming**
     distribution, top vs diversified), overlap, and candidate‑pool diagnostics computed on `tfbs_core` only;
     `top_candidates` uses the same candidate slice considered by selection (tier slice/shortlist for MMR).

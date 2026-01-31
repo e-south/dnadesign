@@ -16,7 +16,11 @@ import numpy as np
 import pytest
 
 from dnadesign.densegen.src.adapters.sources.pwm_sampling import sample_pwm_sites
-from dnadesign.densegen.src.adapters.sources.stage_a_sampling_utils import build_log_odds, score_sequence
+from dnadesign.densegen.src.adapters.sources.stage_a_sampling_utils import (
+    _pwm_consensus_iupac,
+    build_log_odds,
+    score_sequence,
+)
 from dnadesign.densegen.src.adapters.sources.stage_a_types import PWMMotif
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
 from dnadesign.densegen.tests.pwm_sampling_fixtures import fixed_candidates_mining, selection_top_score
@@ -51,3 +55,13 @@ def test_pwm_log_odds_smoothing_finite() -> None:
     core = sites[0][: len(matrix)]
     score = score_sequence(core, matrix, background=background)
     assert np.isfinite(score)
+
+
+def test_pwm_iupac_consensus_from_pwm() -> None:
+    matrix = [
+        {"A": 0.7, "C": 0.1, "G": 0.1, "T": 0.1},
+        {"A": 0.4, "C": 0.4, "G": 0.1, "T": 0.1},
+        {"A": 0.34, "C": 0.33, "G": 0.01, "T": 0.32},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+    ]
+    assert _pwm_consensus_iupac(matrix) == "AMHN"

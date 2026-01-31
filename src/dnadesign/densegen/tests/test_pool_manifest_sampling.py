@@ -126,6 +126,7 @@ class _DummySource(BaseDataSource):
             regulator="regA",
             backend="fimo",
             pwm_consensus="AAAA",
+            pwm_consensus_iupac="AAAA",
             pwm_max_score=1.0,
             uniqueness_key="core",
             collapsed_by_core_identity=0,
@@ -262,6 +263,7 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
     hist = stage_a_sampling["eligible_score_hist"]
     assert hist[0]["regulator"] == "regA"
     assert hist[0]["pwm_consensus"] == "AAAA"
+    assert hist[0]["pwm_consensus_iupac"] == "AAAA"
     assert hist[0]["pwm_max_score"] == 1.0
     assert hist[0]["edges"] == [0.0, 1.0, 2.0]
     assert hist[0]["counts"] == [1, 1]

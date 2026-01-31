@@ -331,6 +331,7 @@ def _pool_manifest(tmp_path: Path, *, include_diversity: bool = False) -> TFBSPo
                         {
                             "regulator": "TF_A",
                             "pwm_consensus": "AAA",
+                            "pwm_consensus_iupac": "AAA",
                             "pwm_max_score": 2.0,
                             "edges": [0.0, 1.0, 2.0],
                             "counts": [1, 1],

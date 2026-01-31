@@ -176,8 +176,9 @@ For FIMO-backed PWM inputs, it also records Stage-A sampling metadata
 (tier fractions + source derived from `selection.tier_widening` or defaults, tier scheme label,
 eligibility/retention rules, FIMO threshold, background source/bgfile, and
 eligible score histograms with tier boundary scores per regulator, including `candidates_with_hit`,
-`eligible_raw`, and `eligible_unique` counts), PWM consensus strings (`pwm_consensus`) plus
-their log‑odds max in FIMO score scale (`pwm_max_score`), and mining saturation audits
+`eligible_raw`, and `eligible_unique` counts), PWM consensus strings (`pwm_consensus`), IUPAC
+consensus strings (`pwm_consensus_iupac`), PWM consensus log‑odds scores in FIMO score scale
+(`pwm_max_score`), and mining saturation audits
 (`mining_audit` tail Δunique/Δgen),
 plus per‑TF diversity summaries (k=1 and k=5 nearest‑neighbor **weighted‑Hamming** distances,
 pairwise **weighted‑Hamming** distribution [exact for retained sets], core entropy for `top_candidates` and
