@@ -182,19 +182,25 @@ eligible score histograms with tier boundary scores per regulator, including `ca
 consensus strings (`pwm_consensus_iupac`), PWM consensus log‑odds scores in FIMO score scale
 (`pwm_consensus_score`), PWM theoretical max log‑odds scores (`pwm_theoretical_max_score`), and mining saturation audits
 (`mining_audit` tail Δunique/Δgen),
-plus per‑TF diversity summaries (k=1 and k=5 nearest‑neighbor **weighted‑Hamming** distances,
-pairwise **weighted‑Hamming** distribution [exact for retained sets], core entropy for `top_candidates` and
-`diversified_candidates`; overlap + candidate‑pool diagnostics; greedy max‑diversity upper bound
-(`max_diversity_upper_bound`) to show headroom; local and global score quantiles normalized by
-`pwm_theoretical_max_score` for tradeoff audits (`top_candidates`, `diversified_candidates`, `top_candidates_global`);
-ΔJ (MMR objective gain) and Δnnd (median nearest‑neighbor distance gain);
-large sets are deterministically subsampled to 2500 sequences for k‑NN distances) and padding audit stats
+plus per‑TF diversity summaries (k=1 **unweighted Hamming** nearest‑neighbor distances,
+k=1 and k=5 nearest‑neighbor **weighted‑Hamming** distances, pairwise **weighted‑Hamming** distribution
+[exact for retained sets], core entropy for `top_candidates` and `diversified_candidates`; overlap +
+candidate‑pool diagnostics; greedy max‑diversity upper bound (`max_diversity_upper_bound`) to show headroom;
+local and global score quantiles normalized by `pwm_theoretical_max_score` for tradeoff audits
+(`top_candidates`, `diversified_candidates`, `top_candidates_global`); ΔJ (MMR objective gain) and
+Δnnd (median nearest‑neighbor distance gain); large sets are deterministically subsampled to 2500
+sequences for k‑NN distances) and padding audit stats
 (best‑hit overlap with intended core; core offset histogram).
 Key fields to audit tier behavior and selection pool construction:
 - `tier_fractions` — ladder of rank fractions used to define diagnostic tiers
 - `tier_fractions_source` — config source for the ladder (e.g., `selection.tier_widening` or default)
 - `tier_scheme` — derived label for the ladder (e.g., `pct_0.1_1_9`)
-- `selection_pool_source` — which pool fed selection (`shortlist_k`, `tier_limit`, `eligible_unique`)
+- `selection_relevance_norm` — relevance normalization used (`minmax_raw_score` or `percentile`)
+- `selection_pool_size_final` — final pool size after rung, `min_score_norm`, and optional cap
+- `selection_pool_rung_fraction_used` — rung fraction used from the tier ladder
+- `selection_pool_min_score_norm_used` — `min_score_norm` applied to pool eligibility
+- `selection_pool_capped` — whether `selection_pool_max_candidates` truncated the pool
+- `selection_pool_cap_value` — cap value when truncation occurs
 Stage‑A pool rows include `best_hit_score`, `tier`, `rank_within_regulator` (1‑based rank among
 eligible_unique TFBS per regulator), and `tfbs_core` for core‑level uniqueness checks.
 

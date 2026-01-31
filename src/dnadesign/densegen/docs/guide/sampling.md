@@ -75,7 +75,8 @@ DenseGen invokes FIMO in score-first mode and records:
 Key scoring semantics:
 
 - FIMO is run with `--thresh 1.0` so the reporting threshold does not gate results.
-- Stage‑A uses `--norc` (forward strand only) for scoring.
+- Stage‑A uses `--norc` (forward strand only) for scoring; TFBS cores are treated as
+  orientation‑agnostic bricks that can be placed forward or reverse‑complement later.
 - When `sampling.bgfile` is unset, Stage‑A passes `--bgfile motif-file` so FIMO uses the motif
   background; when `sampling.bgfile` is set, that file is passed through.
 
@@ -148,10 +149,11 @@ MMR (high-level, faithful to implementation; after Carbonell & Goldstein, 1998):
 - Utility:
   `utility = alpha * normalized_score - (1 - alpha) * max_similarity_to_selected`
 - `alpha ∈ (0, 1]` biases toward score (`→ 1`) vs diversity (`→ 0`).
-- `normalized_score` is the percentile rank within the candidate pool (0–1, ties averaged).
-- Reporting uses `score_norm = best_hit_score / pwm_theoretical_max_score` (PWM theoretical max log‑odds score,
-  in the same FIMO score scale) for cross‑TF comparability; this is separate from the MMR percentile normalization
-  used in selection.
+- `normalized_score` uses `selection.pool.relevance_norm`:
+  - `minmax_raw_score` (default): `score_norm = best_hit_score / pwm_theoretical_max_score`
+  - `percentile`: percentile rank within the selection pool (0–1, ties averaged)
+- `score_norm` (best_hit_score / pwm_theoretical_max_score) is recorded for cross‑TF comparability and is
+  the eligibility filter for `selection.pool.min_score_norm` (required, set explicitly in config).
 - Similarity is derived from a **PWM‑tolerant weighted Hamming distance** on `tfbs_core`:
 
   - Relative‑entropy information per position (background‑aware):
@@ -175,11 +177,17 @@ https://www.cs.cmu.edu/~jgc/publication/The_Use_MMR_Diversity_Based_LTMIR_1998.p
 
 Performance/behavior knobs for MMR:
 
-- `selection.shortlist_*` controls how many of the top-ranked candidates are considered.
+- `selection.pool.min_score_norm` (required) filters eligible unique candidates by
+  `score_norm = best_hit_score / pwm_theoretical_max_score`. This must be set explicitly in the config
+  (recommended `0.85`).
+  Stage‑A computes `score_norm` for all eligible uniques before MMR pool selection.
 - `selection.tier_widening` can specify a ladder of ranked fractions to search (e.g. `[0.001, 0.01, 0.09, 1.0]`).
-  DenseGen tries the first rung (top slice); if it can’t fill from that slice, it widens to the next rung.
-- When tier widening is enabled, DenseGen widens until the candidate pool reaches
-  `shortlist_target = max(shortlist_min, shortlist_factor * n_sites)` (or the ladder exhausts).
+  DenseGen tries the first rung (top slice); if it can’t fill `n_sites` after applying `min_score_norm`,
+  it widens to the next rung.
+- `selection.pool.max_candidates` (optional) caps the pool for compute; when set, the pool is truncated to
+  the top-by-score candidates after filtering.
+- `selection.pool.relevance_norm` chooses the relevance normalization (`minmax_raw_score` default,
+  `percentile` optional).
 - When `selection.policy: mmr` and `selection.tier_widening` is omitted, DenseGen enables tier widening
   with the default ladder `[0.001, 0.01, 0.09, 1.0]`.
 
@@ -204,6 +212,9 @@ Performance/behavior knobs for MMR:
 
 When tier targeting is unmet, DenseGen still retains the best available set and records the shortfall
 in `outputs/pools/pool_manifest.json` so downstream audits stay honest.
+
+Recommendation: prefer `fixed_candidates` when you want direct control of compute; `tier_target` is
+advanced and can still stop early at caps/time.
 
 ---
 
@@ -294,7 +305,7 @@ If you want to know what happened in a run, these are the canonical “truth” 
   - scoring: `best_hit_score`, `rank_within_regulator`, `tier`
   - core identity: `tfbs_core`
   - FIMO hit metadata: `fimo_start`, `fimo_stop`, `fimo_strand`, `fimo_matched_sequence` (when captured)
-  - selection metadata (MMR): `selection_rank`, `selection_utility`, `selection_score_percentile`,
+  - selection metadata (MMR): `selection_rank`, `selection_utility`, `selection_score_norm`,
     `nearest_selected_similarity`, `nearest_selected_distance_norm`, etc.
 
 - `outputs/pools/pool_manifest.json`
@@ -310,7 +321,8 @@ If you want to know what happened in a run, these are the canonical “truth” 
     normalization). Stage‑A plots use the IUPAC consensus on entropy axes.
   - core diversity summaries (k=1 and k=5 nearest‑neighbor distances plus **pairwise weighted‑Hamming**
     distribution, top vs diversified), overlap, and candidate‑pool diagnostics computed on `tfbs_core` only;
-    `top_candidates` uses the same candidate slice considered by selection (tier slice/shortlist for MMR).
+    `top_candidates` uses the same candidate slice considered by selection (tier slice + `min_score_norm`
+    filtering + optional `max_candidates` cap for MMR).
     Pairwise distances are exact for retained sets; k‑NN distances are deterministically subsampled to 2500
     sequences; entropy uses the full `top_candidates`/`diversified_candidates` sets; score quantiles are
     normalized by `pwm_theoretical_max_score` for tradeoff audits; a greedy max‑diversity upper bound
@@ -385,9 +397,9 @@ What to conclude / tune:
 #### `stage_a_summary__<input>__diversity.png` — Diversity outcome and MMR contribution
 
 What it shows:
-- Left: nearest‑neighbor distance distribution (k=1) for Top Sequences vs Diversified Sequences.
-- Right: score percentile vs selection‑time nearest distance (normalized) for diversified sequences.
-- X-axis is `selection_score_percentile` (0–1, within the selection pool).
+- Left: **unweighted Hamming** nearest‑neighbor distance distribution (k=1) for Top vs Diversified.
+- Right: selection trajectory — selection rank (1..n_sites) vs selection‑time nearest distance (weighted),
+  with `selection_score_norm` overlaid on a second axis.
 - "Top Sequences" corresponds to `top_candidates` in manifests; "Diversified Sequences" corresponds to
   `diversified_candidates`.
 
@@ -396,7 +408,7 @@ Question it answers:
 
 What to conclude / tune:
 - A right-shifted nearest‑neighbor distribution indicates higher diversity in the final pool.
-- The scatter explains selection-time tradeoffs; it is only available for `selection.policy: mmr`.
+- The trajectory shows how diversity evolves as MMR proceeds and whether later picks trade score.
 
 Glossary (plot annotations):
 - Δnnd (median): median nearest‑neighbor distance change (Diversified − Top).

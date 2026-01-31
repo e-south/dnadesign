@@ -21,7 +21,7 @@ This is the YAML schema for DenseGen. Unknown keys are errors and all paths reso
 ### Top-level
 
 - `densegen` (required)
-- `densegen.schema_version` (required; supported: `2.7`)
+- `densegen.schema_version` (required; supported: `2.8`)
 - `densegen.run` (required; run-scoped I/O root)
 - `plots` (optional; required `source` when `output.targets` has multiple sinks)
 
@@ -70,6 +70,8 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
         - `min_candidates` (optional int > 0; floor before tier_target can stop)
         - `growth_factor` (float > 1; default 1.25)
       - `log_every_batches` (int > 0; default 1)
+    - `fixed_candidates` is the recommended mining mode (direct, user-set budget).
+      `tier_target` is advanced and may stop early at caps/time; shortfalls are recorded in the manifest.
     - `bgfile` (optional path) - MEME bfile-format background model for FIMO
     - `keep_all_candidates_debug` (bool, default false) - write candidate Parquet logs to
       `outputs/pools/candidates/` for inspection (overwritten by `stage-a build-pool --fresh`
@@ -87,12 +89,13 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
     - `selection`
       - `policy`: `top_score | mmr` (default `top_score`)
       - `alpha` (float in (0, 1]; MMR score weight)
-      - `shortlist_factor` (int > 0)
-      - `shortlist_min` (int > 0)
-      - `shortlist_max` (optional int > 0)
+      - `pool` (required when `policy=mmr`)
+        - `min_score_norm` (float in (0, 1]; required; recommended default is `0.85` but must be set explicitly)
+        - `max_candidates` (optional int > 0; cap the MMR pool to the top-by-score slice)
+        - `relevance_norm` (optional: `percentile | minmax_raw_score`; default `minmax_raw_score`)
       - `tier_widening` (optional)
         - `enabled` (bool)
-        - `ladder` (fractions in (0, 1], e.g. `[0.001, 0.01, 0.09, 1.0]`; widening continues until shortlist_target is met or the ladder is exhausted)
+        - `ladder` (fractions in (0, 1], e.g. `[0.001, 0.01, 0.09, 1.0]`; widening continues until the pool can fill `n_sites` after `min_score_norm` filtering, or the ladder is exhausted)
       - When `selection.policy: mmr` and `tier_widening` is omitted, DenseGen enables tier widening with
         the default ladder `[0.001, 0.01, 0.09, 1.0]`.
     - `consensus` requires `n_sites: 1`
@@ -298,7 +301,7 @@ Notes:
 
 ```yaml
 densegen:
-  schema_version: "2.7"
+  schema_version: "2.8"
   run:
     id: demo
     root: "."

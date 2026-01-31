@@ -40,6 +40,8 @@ Optional (supported):
     - `min_candidates` (optional)
     - `growth_factor` (float > 1; default 1.25)
   - `log_every_batches` (int > 0)
+- `fixed_candidates` is the recommended mining mode (direct, user-set budget).
+  `tier_target` is advanced and may stop early at caps/time; shortfalls are recorded in the manifest.
 - `bgfile`: MEME background file
 - `keep_all_candidates_debug` (bool): write candidate‑level Parquet under `outputs/pools/candidates/`
   (files named `candidates__<label>.parquet`) and aggregate to
@@ -56,12 +58,13 @@ Optional (supported):
 - `selection`:
   - `policy`: `top_score | mmr` (default `top_score`)
   - `alpha` (float in (0, 1]; MMR score weight)
-  - `shortlist_factor` (int > 0)
-  - `shortlist_min` (int > 0)
-  - `shortlist_max` (optional int > 0)
+  - `pool` (required when `policy=mmr`)
+    - `min_score_norm` (float in (0, 1]; required; recommended default is `0.85` but must be set explicitly)
+    - `max_candidates` (optional int > 0; cap the MMR pool to the top-by-score slice)
+    - `relevance_norm` (optional: `percentile | minmax_raw_score`; default `minmax_raw_score`)
   - `tier_widening` (optional):
     - `enabled` (bool)
-    - `ladder` (fractions in (0, 1]; widening continues until shortlist_target is met or the ladder is exhausted)
+    - `ladder` (fractions in (0, 1]; widening continues until the pool can fill `n_sites` after `min_score_norm` filtering, or the ladder is exhausted)
   - When `selection.policy: mmr` and `selection.tier_widening` is omitted, DenseGen enables tier widening
     with the default ladder `[0.001, 0.01, 0.09, 1.0]`.
 
@@ -86,9 +89,8 @@ inputs:
       mining:
         batch_size: 5000
         budget:
-          mode: tier_target
-          target_tier_fraction: 0.001
-          max_candidates: 200000
+          mode: fixed_candidates
+          candidates: 200000
 ```
 
 ---
@@ -169,9 +171,8 @@ inputs:
       mining:
         batch_size: 5000
         budget:
-          mode: tier_target
-          target_tier_fraction: 0.001
-          max_candidates: 200000
+          mode: fixed_candidates
+          candidates: 200000
 ```
 
 ---
@@ -200,9 +201,8 @@ inputs:
       mining:
         batch_size: 5000
         budget:
-          mode: tier_target
-          target_tier_fraction: 0.001
-          max_candidates: 200000
+          mode: fixed_candidates
+          candidates: 200000
 ```
 
 ---
@@ -230,9 +230,8 @@ inputs:
       mining:
         batch_size: 5000
         budget:
-          mode: tier_target
-          target_tier_fraction: 0.001
-          max_candidates: 200000
+          mode: fixed_candidates
+          candidates: 200000
 ```
 
 ---
@@ -261,9 +260,8 @@ inputs:
       mining:
         batch_size: 5000
         budget:
-          mode: tier_target
-          target_tier_fraction: 0.001
-          max_candidates: 200000
+          mode: fixed_candidates
+          candidates: 200000
 ```
 
 ---
@@ -291,9 +289,8 @@ inputs:
       mining:
         batch_size: 5000
         budget:
-          mode: tier_target
-          target_tier_fraction: 0.001
-          max_candidates: 200000
+          mode: fixed_candidates
+          candidates: 200000
 ```
 
 ---
@@ -324,9 +321,8 @@ inputs:
       mining:
         batch_size: 5000
         budget:
-          mode: tier_target
-          target_tier_fraction: 0.001
-          max_candidates: 200000
+          mode: fixed_candidates
+          candidates: 200000
 ```
 
 ---

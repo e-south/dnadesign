@@ -5,6 +5,9 @@
 - Changes: renamed diversity schema to top_candidates/diversified_candidates; Stage-A yield plot now shows diversified core positional entropy; Stage-A strata labels simplified; diversity plot labels clarified; docs updated to match.
 - Behavior: kept forward-strand-only FIMO scoring (`--norc`) with matched_sequence required for core identity.
 - Validation: ran dense stage-a build-pool --fresh, dense plot --only stage_a_summary, and full densegen pytest.
+- Task: Stage-A MMR pool refactor (selection.pool + min_score_norm) and diversity plot update.
+- Changes: removed shortlist contraction; added selection.pool min_score_norm + optional cap; renamed selection_score_norm; added unweighted k=1 NND metrics and selection-trajectory diversity plot; schema bump to 2.8.
+- Decision: min_score_norm is required and must be set explicitly in config (recommended 0.85).
 
 ### 2026-01-26
 - Task: Stage-A PWM sampling overhaul to FIMO score-only semantics; remove p-value strata and p-value-based retention.
