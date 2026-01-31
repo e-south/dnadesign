@@ -180,14 +180,14 @@ eligibility/retention rules, FIMO threshold, background source/bgfile, and
 eligible score histograms with tier boundary scores per regulator, including `candidates_with_hit`,
 `eligible_raw`, and `eligible_unique` counts), PWM consensus strings (`pwm_consensus`), IUPAC
 consensus strings (`pwm_consensus_iupac`), PWM consensus log‑odds scores in FIMO score scale
-(`pwm_max_score`), and mining saturation audits
+(`pwm_consensus_score`), PWM theoretical max log‑odds scores (`pwm_theoretical_max_score`), and mining saturation audits
 (`mining_audit` tail Δunique/Δgen),
 plus per‑TF diversity summaries (k=1 and k=5 nearest‑neighbor **weighted‑Hamming** distances,
 pairwise **weighted‑Hamming** distribution [exact for retained sets], core entropy for `top_candidates` and
 `diversified_candidates`; overlap + candidate‑pool diagnostics; greedy max‑diversity upper bound
 (`max_diversity_upper_bound`) to show headroom; local and global score quantiles normalized by
-`pwm_max_score` for tradeoff audits (`top_candidates`, `diversified_candidates`, `top_candidates_global`);
-ΔJ (MMR objective gain) and Δdiv (median pairwise distance gain);
+`pwm_theoretical_max_score` for tradeoff audits (`top_candidates`, `diversified_candidates`, `top_candidates_global`);
+ΔJ (MMR objective gain) and Δnnd (median nearest‑neighbor distance gain);
 large sets are deterministically subsampled to 2500 sequences for k‑NN distances) and padding audit stats
 (best‑hit overlap with intended core; core offset histogram).
 Key fields to audit tier behavior and selection pool construction:

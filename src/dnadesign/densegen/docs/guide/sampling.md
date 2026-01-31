@@ -149,21 +149,24 @@ MMR (high-level, faithful to implementation; after Carbonell & Goldstein, 1998):
   `utility = alpha * normalized_score - (1 - alpha) * max_similarity_to_selected`
 - `alpha ∈ (0, 1]` biases toward score (`→ 1`) vs diversity (`→ 0`).
 - `normalized_score` is the percentile rank within the candidate pool (0–1, ties averaged).
-- Reporting uses `score_norm = best_hit_score / pwm_max_score` (PWM consensus log‑odds score in FIMO score scale)
-  for cross‑TF comparability; this is separate from the MMR percentile normalization used in selection.
+- Reporting uses `score_norm = best_hit_score / pwm_theoretical_max_score` (PWM theoretical max log‑odds score,
+  in the same FIMO score scale) for cross‑TF comparability; this is separate from the MMR percentile normalization
+  used in selection.
 - Similarity is derived from a **PWM‑tolerant weighted Hamming distance** on `tfbs_core`:
 
-  - Information content per position:
-    `IC_i = 2 - H_i` where `H_i = -Σ p_i(b) log2 p_i(b)` (bits).
+  - Relative‑entropy information per position (background‑aware):
+    `IC_i = Σ p_i(b) log2(p_i(b) / bg(b))` (bits), with `bg` from the PWM background (or bgfile).
+  - Max possible information:
+    `IC_max = log2(1 / min_b bg(b))`.
   - PWM‑tolerant weights:
-    `w_i = 1 - (IC_i / 2)` (so low‑information positions get higher weight).
+    `w_i = 1 - (IC_i / IC_max)` (so low‑information positions get higher weight).
   - Distance:
     `dist(x, y) = Σ w_i * [x_i ≠ y_i]`
 - Similarity:
   `similarity = 1 / (1 + dist)`
 
 PWM‑tolerant diversity (safer for PWM‑likeness):
-- weights ~ (1 - IC)
+- weights ~ (1 - relative‑entropy information vs background)
 - encourages diversity in low‑information (tolerant) positions
 - preserves high‑information (specific) positions
 
@@ -291,7 +294,8 @@ If you want to know what happened in a run, these are the canonical “truth” 
   - scoring: `best_hit_score`, `rank_within_regulator`, `tier`
   - core identity: `tfbs_core`
   - FIMO hit metadata: `fimo_start`, `fimo_stop`, `fimo_strand`, `fimo_matched_sequence` (when captured)
-  - selection metadata (MMR): `selection_rank`, `selection_utility`, `nearest_selected_similarity`, etc.
+  - selection metadata (MMR): `selection_rank`, `selection_utility`, `selection_score_percentile`,
+    `nearest_selected_similarity`, `nearest_selected_distance_norm`, etc.
 
 - `outputs/pools/pool_manifest.json`
   Stage‑A sampling truth, including:
@@ -299,8 +303,9 @@ If you want to know what happened in a run, these are the canonical “truth” 
   - background source (motif background vs bgfile)
   - tier boundary scores and yield counters (generated / candidates_with_hit / eligible_raw / eligible_unique / retained)
   - tier-target success/shortfall reporting
-  - PWM consensus string (`pwm_consensus`), IUPAC consensus (`pwm_consensus_iupac`), and the PWM
-    consensus log‑odds score (`pwm_max_score`). IUPAC consensus uses the max‑probability base when
+  - PWM consensus string (`pwm_consensus`), IUPAC consensus (`pwm_consensus_iupac`), PWM consensus
+    log‑odds score (`pwm_consensus_score`), and PWM theoretical max log‑odds score
+    (`pwm_theoretical_max_score`). IUPAC consensus uses the max‑probability base when
     any base has ≥0.5 probability; otherwise it includes bases with ≥0.25 probability (after
     normalization). Stage‑A plots use the IUPAC consensus on entropy axes.
   - core diversity summaries (k=1 and k=5 nearest‑neighbor distances plus **pairwise weighted‑Hamming**
@@ -308,9 +313,10 @@ If you want to know what happened in a run, these are the canonical “truth” 
     `top_candidates` uses the same candidate slice considered by selection (tier slice/shortlist for MMR).
     Pairwise distances are exact for retained sets; k‑NN distances are deterministically subsampled to 2500
     sequences; entropy uses the full `top_candidates`/`diversified_candidates` sets; score quantiles are
-    normalized by `pwm_max_score` for tradeoff audits; a greedy max‑diversity upper bound
+    normalized by `pwm_theoretical_max_score` for tradeoff audits; a greedy max‑diversity upper bound
     (`max_diversity_upper_bound`) is recorded to show whether diversity headroom exists in the pool; ΔJ
-    (MMR objective gain) is recorded alongside Δdiv (median pairwise distance gain).
+    (MMR objective gain) is recorded alongside Δnnd (median nearest‑neighbor distance gain) in the
+    Stage‑A summary plots.
   - mining saturation audit (`mining_audit`) with tail slope Δunique/Δgen to flag plateauing yield
   - padding audit stats (best‑hit overlap with intended core; core‑offset histogram)
 
@@ -366,7 +372,7 @@ What to conclude / tune:
 
 What it shows:
 - Stepwise yield across Generated → Eligible → Unique core → MMR pool → Retained.
-- Core positional entropy (bits) for diversified sequences only.
+- Core positional entropy (bits) for top-score vs diversified sequences (overlay).
 - X-axis labels are IUPAC consensus letters derived from the PWM (per position).
 
 Question it answers:
@@ -379,9 +385,9 @@ What to conclude / tune:
 #### `stage_a_summary__<input>__diversity.png` — Diversity outcome and MMR contribution
 
 What it shows:
-- Left: pairwise distance ECDF (Top Sequences vs Diversified Sequences).
-- Right: score vs selection-time nearest distance (MMR contribution) for diversified sequences.
-- Score normalization uses `best_hit_score / pwm_max_score` (PWM consensus score, FIMO log-odds scale).
+- Left: nearest‑neighbor distance distribution (k=1) for Top Sequences vs Diversified Sequences.
+- Right: score percentile vs selection‑time nearest distance (normalized) for diversified sequences.
+- X-axis is `selection_score_percentile` (0–1, within the selection pool).
 - "Top Sequences" corresponds to `top_candidates` in manifests; "Diversified Sequences" corresponds to
   `diversified_candidates`.
 
@@ -389,11 +395,11 @@ Question it answers:
 - Did MMR increase diversity, and how did it trade score vs distance when it did?
 
 What to conclude / tune:
-- A right-shifted ECDF indicates higher diversity in the final pool.
+- A right-shifted nearest‑neighbor distribution indicates higher diversity in the final pool.
 - The scatter explains selection-time tradeoffs; it is only available for `selection.policy: mmr`.
 
 Glossary (plot annotations):
-- Δdiv (median): median pairwise distance change (Diversified − Top).
+- Δnnd (median): median nearest‑neighbor distance change (Diversified − Top).
 - ΔJ: MMR objective gain (Diversified − Top).
 - overlap: fraction of shared sequences between Top and Diversified sets.
 
