@@ -250,21 +250,23 @@ def _build_stage_a_yield_bias_figure(
             top_entropy_vals = [float(v) for v in top_values]
             positions = np.arange(1, len(entropy_vals) + 1)
             hue = reg_colors.get(reg, "#4c78a8")
-            ax.bar(
+            ax.plot(
                 positions,
                 entropy_vals,
                 color=hue,
-                alpha=0.35,
-                edgecolor=hue,
-                linewidth=0.8,
+                linewidth=1.3,
+                marker="o",
+                markersize=3.6,
+                label="Diversified",
             )
-            ax.plot(positions, entropy_vals, color=hue, linewidth=1.2, label="Diversified")
             ax.plot(
                 positions,
                 top_entropy_vals,
                 color="#444444",
                 linewidth=1.1,
                 linestyle="--",
+                marker="s",
+                markersize=3.3,
                 label="Top score",
             )
             ax.set_xlim(0.5, len(entropy_vals) + 0.5)

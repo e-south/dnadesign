@@ -76,7 +76,7 @@ def _build_stage_a_diversity_figure(
         ax_header.text(
             0.5,
             0.76,
-            f"Stage-A core diversity (unweighted NN + selection trajectory) -- {input_name}",
+            f"Stage-A core diversity -- {input_name}",
             ha="center",
             va="center",
             fontsize=text_sizes["fig_title"],
@@ -120,7 +120,9 @@ def _build_stage_a_diversity_figure(
             y = arr / total
             return x, y
 
-        metric_label = "Unweighted Hamming NN distance (k=1)"
+        metric_label = "Pairwise Hamming NN"
+        top_color = "#a8d5c2"
+        diversified_color = "#2e8b57"
         for idx, reg in enumerate(regulators):
             hue = reg_colors.get(reg, "#4c78a8")
             row = row_by_reg[reg]
@@ -157,7 +159,6 @@ def _build_stage_a_diversity_figure(
                 raise ValueError(
                     (f"Stage-A diversity missing unweighted nnd_k1 top/diversified for '{input_name}' ({reg}).")
                 )
-            metric_label = "Unweighted Hamming nearest-neighbor distance (k=1)"
             bins = top_candidates.get("bins") or diversified_candidates.get("bins")
             if not isinstance(bins, list) or not bins:
                 raise ValueError(f"Stage-A diversity missing nnd_k1 bins for '{input_name}' ({reg}).")
@@ -167,26 +168,33 @@ def _build_stage_a_diversity_figure(
                 raise ValueError(f"Stage-A diversity missing nnd_k1 counts for '{input_name}' ({reg}).")
             x_base, y_base = _dist_from_counts(bins, top_counts)
             x_act, y_act = _dist_from_counts(bins, diversified_counts)
-            base_line = ax_left.plot(
+            base_line = ax_left.bar(
                 x_base,
                 y_base,
-                color="#777777",
-                linewidth=1.3,
-                label="Top Sequences",
+                width=0.8,
+                color=top_color,
+                alpha=0.6,
+                label="Top",
                 zorder=2,
-            )[0]
-            act_line = ax_left.plot(
+            )
+            act_line = ax_left.bar(
                 x_act,
                 y_act,
-                color=hue,
-                linewidth=1.4,
-                label="Diversified Sequences",
+                width=0.5,
+                color=diversified_color,
+                alpha=0.85,
+                label="Diversified",
                 zorder=3,
-            )[0]
-            ax_left.set_xlim(min(x_base.min(), x_act.min()), max(x_base.max(), x_act.max()))
+            )
+            x_min = float(min(x_base.min(), x_act.min()))
+            x_max = float(max(x_base.max(), x_act.max()))
+            ax_left.set_xlim(x_min - 0.5, x_max + 0.5)
             ax_left.set_ylim(0.0, max(1.05 * float(np.max([y_base.max(), y_act.max()])), 0.4))
-            ax_left.set_ylabel("Fraction" if idx == 0 else "")
-            ax_left.xaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=5))
+            ax_left.set_ylabel("")
+            tick_start = int(np.floor(x_min))
+            tick_end = int(np.ceil(x_max))
+            ax_left.set_xticks(np.arange(tick_start, tick_end + 1))
+            ax_left.tick_params(labelbottom=True)
             if idx == 0:
                 ax_left.legend(
                     handles=[base_line, act_line],
@@ -254,7 +262,7 @@ def _build_stage_a_diversity_figure(
                         linewidth=1.2,
                         markersize=3.5,
                         alpha=0.85,
-                        label="Distance to nearest selected",
+                        label="Nearest selected dist",
                         zorder=3,
                     )
                     y_max = float(np.nanmax(dist_vals[dist_mask]))
@@ -280,10 +288,6 @@ def _build_stage_a_diversity_figure(
                     label=score_label,
                 )
                 ax_score.set_ylim(0.0, 1.0)
-                if idx == 0:
-                    ax_score.set_ylabel("Score vs max", fontsize=text_sizes["annotation"] * 0.8)
-                else:
-                    ax_score.tick_params(labelright=False)
                 _apply_style(ax_score, style)
                 if idx == 0 and dist_line and score_line:
                     ax_right.legend(
@@ -303,8 +307,9 @@ def _build_stage_a_diversity_figure(
                     fontsize=text_sizes["annotation"] * 0.75,
                     color="#666666",
                 )
-            ax_right.set_ylabel("Distance to nearest selected" if idx == 0 else "")
+            ax_right.set_ylabel("")
             ax_right.xaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=5))
+            ax_right.tick_params(labelbottom=True)
             ax_left.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
             ax_right.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
 
@@ -312,11 +317,40 @@ def _build_stage_a_diversity_figure(
             axes_left[0].set_title("NN distance distribution", fontsize=subtitle_size, pad=title_pad)
             axes_right[0].set_title("Selection trajectory", fontsize=subtitle_size, pad=title_pad)
             axes_left[-1].set_xlabel(metric_label)
-            axes_right[-1].set_xlabel("Selection rank")
-            for ax in axes_left[:-1]:
-                ax.tick_params(labelbottom=False)
-            for ax in axes_right:
-                ax.tick_params(labelbottom=True)
+            axes_right[-1].set_xlabel("MMR selection step")
+            y_center = (axes_left[0].get_position().y1 + axes_left[-1].get_position().y0) / 2.0
+            left_bbox = axes_left[0].get_position()
+            right_bbox = axes_right[0].get_position()
+            fig.text(
+                left_bbox.x0 - 0.04,
+                y_center,
+                "Fraction",
+                rotation="vertical",
+                ha="right",
+                va="center",
+                fontsize=text_sizes["annotation"] * 0.85,
+                color="#222222",
+            )
+            fig.text(
+                right_bbox.x0 - 0.04,
+                y_center,
+                "Nearest selected dist",
+                rotation="vertical",
+                ha="right",
+                va="center",
+                fontsize=text_sizes["annotation"] * 0.85,
+                color="#222222",
+            )
+            fig.text(
+                right_bbox.x1 + 0.02,
+                y_center,
+                "Score vs max",
+                rotation="vertical",
+                ha="left",
+                va="center",
+                fontsize=text_sizes["annotation"] * 0.85,
+                color="#222222",
+            )
 
         for ax in axes_left + axes_right:
             _apply_style(ax, style)

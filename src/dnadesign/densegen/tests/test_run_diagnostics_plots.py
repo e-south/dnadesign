@@ -618,3 +618,36 @@ def test_stage_a_diversity_trajectory_has_nonzero_xlim(tmp_path: Path) -> None:
         assert x_max > x_min
     finally:
         fig.clf()
+
+
+def test_stage_a_diversity_axis_labels(tmp_path: Path) -> None:
+    matplotlib.use("Agg", force=True)
+    manifest = _pool_manifest(tmp_path, include_diversity=True)
+    sampling = manifest.entry_for("demo_input").stage_a_sampling
+    assert sampling is not None
+    pool_df = pd.DataFrame(
+        {
+            "input_name": ["demo_input", "demo_input"],
+            "tf": ["TF_A", "TF_A"],
+            "tfbs_sequence": ["AAAA", "AAAAT"],
+            "tfbs_core": ["AAAA", "AAAT"],
+            "best_hit_score": [2.0, 1.5],
+            "tier": [0, 1],
+            "rank_within_regulator": [1, 2],
+            "selection_rank": [1, 2],
+            "nearest_selected_similarity": [0.0, 0.5],
+            "selection_score_norm": [1.0, 0.5],
+            "nearest_selected_distance_norm": [0.2, 0.4],
+        }
+    )
+    fig, axes_left, axes_right = _build_stage_a_diversity_figure(
+        input_name="demo_input",
+        pool_df=pool_df,
+        sampling=sampling,
+        style={},
+    )
+    try:
+        assert axes_left[-1].get_xlabel() == "Pairwise Hamming NN"
+        assert axes_right[-1].get_xlabel() == "MMR selection step"
+    finally:
+        fig.clf()

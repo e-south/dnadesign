@@ -204,6 +204,7 @@ def _draw_tier_markers(
     label_mode: str = "box",
     loc: str = "upper right",
     fontsize: float | None = None,
+    solid_values: list[float] | None = None,
 ) -> None:
     cleaned: list[tuple[str, float, str | None]] = []
     for label, value, label_text in thresholds:
@@ -213,7 +214,23 @@ def _draw_tier_markers(
     if not cleaned:
         return
     for _, value, _ in cleaned:
-        ax.axvline(value, ymin=0.0, ymax=ymax_fraction, linestyle="--", linewidth=1, alpha=0.85, color="#222222")
+        is_solid = False
+        if solid_values:
+            for solid_value in solid_values:
+                if abs(float(solid_value) - float(value)) <= 1e-6:
+                    is_solid = True
+                    break
+        linestyle = "-" if is_solid else "--"
+        linewidth = 1.2 if is_solid else 1.0
+        ax.axvline(
+            value,
+            ymin=0.0,
+            ymax=ymax_fraction,
+            linestyle=linestyle,
+            linewidth=linewidth,
+            alpha=0.9,
+            color="#222222",
+        )
     if label_mode == "box":
         lines = []
         for label, value, label_text in cleaned:

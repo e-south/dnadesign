@@ -199,6 +199,11 @@ def _build_stage_a_strata_overview_figure(
             if reg not in tier_labels_by_reg:
                 raise ValueError(f"Stage-A tier labels missing for '{input_name}' ({reg}).")
             tier_labels = tier_labels_by_reg[reg]
+            retained_cutoff = float(retained_vals.min())
+            tier_scores = [val for val in (tier0_score, tier1_score, tier2_score) if val is not None]
+            cutoff_overlaps = bool(tier_scores) and bool(
+                np.isclose(retained_cutoff, np.asarray(tier_scores, dtype=float), rtol=1e-6, atol=1e-6).any()
+            )
             _draw_tier_markers(
                 ax,
                 [
@@ -210,31 +215,32 @@ def _build_stage_a_strata_overview_figure(
                 label_mode="box",
                 loc="lower right",
                 fontsize=text_sizes["annotation"] * 0.65,
+                solid_values=[retained_cutoff] if cutoff_overlaps else None,
             )
             ax.set_ylim(0, 1.05)
-            retained_cutoff = float(retained_vals.min())
-            y_min, y_max = ax.get_ylim()
-            y_top = y_min + (y_max - y_min) * 0.58
-            ax.axvline(
-                retained_cutoff,
-                ymin=0.0,
-                ymax=0.58,
-                linewidth=1.2,
-                linestyle="-",
-                color="#222222",
-                alpha=0.95,
-            )
-            ax.scatter([retained_cutoff], [y_top], s=18, color="#222222", edgecolors="none", zorder=5)
-            ax.annotate(
-                "Retained cutoff",
-                (retained_cutoff, y_top),
-                xytext=(0, 4),
-                textcoords="offset points",
-                ha="center",
-                va="bottom",
-                fontsize=text_sizes["annotation"] * 0.6,
-                color="#222222",
-            )
+            if not cutoff_overlaps:
+                y_min, y_max = ax.get_ylim()
+                y_top = y_min + (y_max - y_min) * 0.58
+                ax.axvline(
+                    retained_cutoff,
+                    ymin=0.0,
+                    ymax=0.58,
+                    linewidth=1.2,
+                    linestyle="-",
+                    color="#222222",
+                    alpha=0.95,
+                )
+                ax.scatter([retained_cutoff], [y_top], s=18, color="#222222", edgecolors="none", zorder=5)
+                ax.annotate(
+                    "Retained cutoff",
+                    (retained_cutoff, y_top),
+                    xytext=(0, 4),
+                    textcoords="offset points",
+                    ha="center",
+                    va="bottom",
+                    fontsize=text_sizes["annotation"] * 0.6,
+                    color="#222222",
+                )
             ax.set_yticks([])
             label = format_regulator_label(reg)
             core_len = core_lengths.get(reg)
