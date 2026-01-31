@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 
 from ..utils.plot_style import format_regulator_label, stage_a_rcparams
-from .plot_common import _add_anchored_box, _apply_style, _style
+from .plot_common import _apply_style, _style
 from .plot_stage_a_common import _stage_a_regulator_colors, _stage_a_text_sizes
 
 
@@ -76,32 +76,11 @@ def _build_stage_a_diversity_figure(
         ax_header.text(
             0.5,
             0.76,
-            f"Stage-A core diversity (unweighted NN + MMR trajectory) -- {input_name}",
+            f"Stage-A core diversity (unweighted NN + selection trajectory) -- {input_name}",
             ha="center",
             va="center",
             fontsize=text_sizes["fig_title"],
             color="#111111",
-        )
-        ax_header.text(
-            0.5,
-            0.46,
-            "MMR (Carbonell & Goldstein): utility = alpha*relevance − (1−alpha)*max similarity",
-            ha="center",
-            va="center",
-            fontsize=text_sizes["annotation"] * 0.85,
-            color="#444444",
-        )
-        ax_header.text(
-            0.5,
-            0.24,
-            (
-                "relevance = score percentile (or configured normalization); "
-                "similarity from weighted Hamming: sim = 1/(1+dist)"
-            ),
-            ha="center",
-            va="center",
-            fontsize=text_sizes["annotation"] * 0.82,
-            color="#444444",
         )
         body = outer[1].subgridspec(
             nrows=n_regs,
@@ -214,41 +193,6 @@ def _build_stage_a_diversity_figure(
                     loc="lower right",
                     frameon=False,
                     fontsize=text_sizes["annotation"] * 0.8,
-                )
-            note_lines: list[str] = []
-            if "median" not in top_candidates or "median" not in diversified_candidates:
-                raise ValueError(f"Stage-A diversity missing nnd_k1 median for '{input_name}' ({reg}).")
-            base_med = float(top_candidates["median"])
-            act_med = float(diversified_candidates["median"])
-            note_lines.append(f"Δnnd unweighted {act_med - base_med:+.2f}")
-            weighted_block = core_hamming.get("nnd_k1")
-            if isinstance(weighted_block, dict):
-                weighted_top = weighted_block.get("top_candidates")
-                weighted_div = weighted_block.get("diversified_candidates")
-                if isinstance(weighted_top, dict) and isinstance(weighted_div, dict):
-                    if "median" in weighted_top and "median" in weighted_div:
-                        w_delta = float(weighted_div["median"]) - float(weighted_top["median"])
-                        note_lines.append(f"Δnnd weighted {w_delta:+.2f}")
-            objective_delta = diversity.get("objective_delta")
-            if objective_delta is None:
-                objective_top = diversity.get("objective_top_candidates")
-                objective_diversified = diversity.get("objective_diversified_candidates")
-                if objective_top is not None and objective_diversified is not None:
-                    objective_delta = float(objective_diversified) - float(objective_top)
-            if objective_delta is not None:
-                note_lines.append(f"ΔJ {float(objective_delta):+.3f}")
-            if "set_overlap_fraction" not in diversity:
-                raise ValueError(f"Stage-A diversity missing overlap stats for '{input_name}' ({reg}).")
-            overlap = float(diversity["set_overlap_fraction"])
-            note_lines.append(f"overlap {overlap * 100:.1f}%")
-            if note_lines:
-                _add_anchored_box(
-                    ax_left,
-                    note_lines,
-                    loc="upper left",
-                    fontsize=text_sizes["annotation"] * 0.75,
-                    alpha=0.9,
-                    edgecolor="none",
                 )
             selection_policy = str(row.get("selection_policy") or "").lower()
             reg_df = pool_df[pool_df[tf_col].astype(str) == reg].copy()
