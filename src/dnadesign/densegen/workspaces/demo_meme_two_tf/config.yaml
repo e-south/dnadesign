@@ -20,7 +20,7 @@ densegen:
           budget:
             mode: tier_target
             target_tier_fraction: 0.001
-            max_candidates: 500000
+            max_candidates: 5000000
             max_seconds: 300
             growth_factor: 1.25
           log_every_batches: 1
@@ -31,7 +31,7 @@ densegen:
           key: core
         selection:
           policy: mmr
-          alpha: 0.9
+          alpha: 0.5
           shortlist_factor: 5
           shortlist_min: 50
           tier_widening:

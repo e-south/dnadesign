@@ -2,7 +2,11 @@
 
 **DenseGen** packs transcription factor binding sites (TFBSs) into dense synthetic nucleic acid sequences, wrapping the ["dense-arrays"](https://github.com/e-south/dense-arrays) ILP solver with added features. It involves two distinct sampling stages:
 
-1. **Stage‑A sampling (input sampling)** — mine TFBSs from PWM artifacts (via [FIMO](https://meme-suite.org/meme/doc/fimo.html)) to build TF‑aware TFBS pools.
+1. **Stage‑A sampling (input sampling)** — mine TFBSs from PWM artifacts (via [FIMO](https://meme-suite.org/meme/doc/fimo.html)) to build TF‑aware TFBS pools. The goal is to retain a final TFBS library that
+    - Stays near the PWM score frontier.
+    - Is meaningfully diverse (primarily in PWM‑tolerant/ambiguous positions).
+    - Allows variable TFBS lengths via flanks.
+
 2. **Stage‑B sampling (library sampling)** — feed TFBS pools to the dense-array solver.
 
 DenseGen also plans sequence constraints/quotas, dense-array generation with run‑scoped, fail‑fast Parquet I/O and manifests for reproducibility, and produces audit reports plus plots (e.g., TF usage and coverage).
