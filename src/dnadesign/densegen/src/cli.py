@@ -659,6 +659,33 @@ def _format_tier_fraction_label(fraction: float) -> str:
     return f"{float(fraction) * 100:.3f}%"
 
 
+def _format_selection_label(
+    *,
+    policy: str,
+    alpha: float | None = None,
+    min_score_norm: float | None = None,
+    relevance_norm: str | None = None,
+    max_candidates: int | None = None,
+) -> str:
+    selection_policy = str(policy or "top_score")
+    if selection_policy != "mmr":
+        return selection_policy
+    if alpha is None:
+        raise ValueError("MMR selection alpha is required.")
+    parts: list[str] = []
+    if alpha is not None:
+        parts.append(f"a={float(alpha):.2f}")
+    if min_score_norm is not None:
+        parts.append(f"min={float(min_score_norm):.2f}")
+    if relevance_norm:
+        parts.append(f"rel={relevance_norm}")
+    if max_candidates is not None:
+        parts.append(f"cap={int(max_candidates)}")
+    if not parts:
+        return "mmr"
+    return f"mmr({','.join(parts)})"
+
+
 def _stage_a_sampling_rows(
     pool_data: dict[str, PoolData],
 ) -> list[dict[str, object]]:
@@ -709,13 +736,12 @@ def _stage_a_sampling_rows(
                         tier_target = f"{frac_label} met"
                     elif summary.tier_target_met is False:
                         tier_target = f"{frac_label} unmet"
-                selection_label = summary.selection_policy
-                if summary.selection_policy == "mmr":
-                    if summary.selection_alpha is None:
-                        raise ValueError("Stage-A summary missing MMR selection alpha.")
-                    selection_alpha = float(summary.selection_alpha)
-                    relevance_norm = summary.selection_relevance_norm or "minmax_raw_score"
-                    selection_label = f"mmr a={selection_alpha:.2f} rel={relevance_norm}"
+                selection_label = _format_selection_label(
+                    policy=str(summary.selection_policy),
+                    alpha=summary.selection_alpha,
+                    min_score_norm=summary.selection_pool_min_score_norm_used,
+                    relevance_norm=summary.selection_relevance_norm or "minmax_raw_score",
+                )
                 tier_counts = _format_tier_counts(summary.eligible_tier_counts, summary.retained_tier_counts)
                 tier_fill = "-"
                 if summary.retained_tier_counts:
@@ -915,9 +941,14 @@ def _stage_a_plan_rows(
             selection_cfg = getattr(effective_sampling, "selection", None) if effective_sampling else None
             selection_policy = str(getattr(selection_cfg, "policy", "top_score"))
             selection_alpha = getattr(selection_cfg, "alpha", None)
-            selection_label = selection_policy
-            if selection_policy == "mmr" and selection_alpha is not None:
-                selection_label = f"mmr(alpha={selection_alpha})"
+            pool_cfg = getattr(selection_cfg, "pool", None) if selection_cfg is not None else None
+            selection_label = _format_selection_label(
+                policy=selection_policy,
+                alpha=selection_alpha,
+                min_score_norm=getattr(pool_cfg, "min_score_norm", None) if pool_cfg is not None else None,
+                relevance_norm=getattr(pool_cfg, "relevance_norm", None) if pool_cfg is not None else None,
+                max_candidates=getattr(pool_cfg, "max_candidates", None) if pool_cfg is not None else None,
+            )
             label = motif_id if show_motif_ids else display_name
             rows.append(
                 {
@@ -1894,9 +1925,14 @@ def inspect_config(
             selection_cfg = getattr(sampling, "selection", None)
             selection_policy = str(getattr(selection_cfg, "policy", "top_score"))
             selection_alpha = getattr(selection_cfg, "alpha", None)
-            selection_label = selection_policy
-            if selection_policy == "mmr" and selection_alpha is not None:
-                selection_label = f"mmr(alpha={selection_alpha})"
+            pool_cfg = getattr(selection_cfg, "pool", None) if selection_cfg is not None else None
+            selection_label = _format_selection_label(
+                policy=selection_policy,
+                alpha=selection_alpha,
+                min_score_norm=getattr(pool_cfg, "min_score_norm", None) if pool_cfg is not None else None,
+                relevance_norm=getattr(pool_cfg, "relevance_norm", None) if pool_cfg is not None else None,
+                max_candidates=getattr(pool_cfg, "max_candidates", None) if pool_cfg is not None else None,
+            )
             budget_label = "-"
             if mining_cfg is not None:
                 budget = getattr(mining_cfg, "budget", None)
