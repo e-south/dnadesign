@@ -456,7 +456,7 @@ def _select_by_mmr(
             pool_candidates,
             key=lambda cand: (-float(cand.score), core_by_seq[cand.seq], cand.seq),
         )[:pool_max_candidates_value]
-    if len(pool_candidates) < int(n_sites) and total >= int(n_sites):
+    if len(pool_candidates) <= int(n_sites):
         import logging
 
         details = []
@@ -466,7 +466,7 @@ def _select_by_mmr(
             details.append(f"cap={int(pool_cap_value)}")
         detail_label = f" ({', '.join(details)})" if details else ""
         logging.getLogger(__name__).warning(
-            "Stage-A MMR pool contains %d candidates (< n_sites=%d)%s; selection will return fewer sites.",
+            "Stage-A MMR degenerate: pool size %d <= n_sites=%d%s; returning pool in score order.",
             len(pool_candidates),
             int(n_sites),
             detail_label,

@@ -221,7 +221,33 @@ def test_mmr_pool_shortfall_warns(caplog: pytest.LogCaptureFixture) -> None:
             pwm_theoretical_max_score=100.0,
         )
     assert len(selected) == 3
-    assert "MMR pool" in caplog.text
+    assert "MMR degenerate" in caplog.text
+
+
+def test_mmr_pool_degenerate_warns_when_equal_to_n_sites(caplog: pytest.LogCaptureFixture) -> None:
+    matrix = [
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+    ]
+    background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
+    seqs = _seqs(12, length=3)
+    ranked = [_cand(seqs[i], float(100 - i)) for i in range(12)]
+    with caplog.at_level(logging.WARNING):
+        selected, _meta, _diag = stage_a_selection._select_by_mmr(
+            ranked,
+            matrix=matrix,
+            background=background,
+            n_sites=3,
+            alpha=0.5,
+            pool_min_score_norm=None,
+            pool_max_candidates=None,
+            relevance_norm="minmax_raw_score",
+            tier_fractions=[0.2, 0.3, 0.4],
+            pwm_theoretical_max_score=100.0,
+        )
+    assert len(selected) == 3
+    assert "MMR degenerate" in caplog.text
 
 
 def test_mmr_pool_cap_is_deterministic() -> None:

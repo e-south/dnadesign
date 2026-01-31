@@ -120,7 +120,7 @@ def _build_stage_a_diversity_figure(
             y = arr / total
             return x, y
 
-        metric_label = "Unweighted Hamming nearest-neighbor distance (k=1)"
+        metric_label = "Unweighted Hamming NN distance (k=1)"
         for idx, reg in enumerate(regulators):
             hue = reg_colors.get(reg, "#4c78a8")
             row = row_by_reg[reg]
@@ -195,6 +195,14 @@ def _build_stage_a_diversity_figure(
                     fontsize=text_sizes["annotation"] * 0.8,
                 )
             selection_policy = str(row.get("selection_policy") or "").lower()
+            pool_size_final = row.get("selection_pool_size_final")
+            retained_count = row.get("retained")
+            is_degenerate = (
+                selection_policy == "mmr"
+                and pool_size_final is not None
+                and retained_count is not None
+                and int(pool_size_final) <= int(retained_count)
+            )
             reg_df = pool_df[pool_df[tf_col].astype(str) == reg].copy()
             if "selection_score_norm" not in reg_df.columns:
                 raise ValueError(f"Stage-A pool missing selection_score_norm for input '{input_name}' ({reg}).")
@@ -229,6 +237,8 @@ def _build_stage_a_diversity_figure(
                     color="#666666",
                 )
             else:
+                dist_line = None
+                score_line = None
                 ordered = ranks[mask].to_numpy(dtype=float)
                 sort_idx = np.argsort(ordered)
                 ordered = ordered[sort_idx]
@@ -236,7 +246,7 @@ def _build_stage_a_diversity_figure(
                 dist_vals = dist_norm[mask].to_numpy(dtype=float)[sort_idx]
                 dist_mask = np.isfinite(dist_vals)
                 if dist_mask.any():
-                    ax_right.plot(
+                    dist_line = ax_right.plot(
                         ordered[dist_mask],
                         dist_vals[dist_mask],
                         color=hue,
@@ -244,6 +254,7 @@ def _build_stage_a_diversity_figure(
                         linewidth=1.2,
                         markersize=3.5,
                         alpha=0.85,
+                        label="Distance to nearest selected",
                         zorder=3,
                     )
                     y_max = float(np.nanmax(dist_vals[dist_mask]))
@@ -255,30 +266,51 @@ def _build_stage_a_diversity_figure(
                     else:
                         ax_right.set_xlim(1.0, x_max)
                 ax_score = ax_right.twinx()
-                ax_score.plot(
+                score_label = "Score vs max"
+                min_score_norm = row.get("selection_pool_min_score_norm_used")
+                if min_score_norm is not None and np.isfinite(min_score_norm):
+                    score_label = f"Score vs max (τ={float(min_score_norm):.2f})"
+                score_line = ax_score.plot(
                     ordered,
                     score_vals,
                     color="#555555",
                     linestyle="--",
                     linewidth=1.0,
                     alpha=0.6,
+                    label=score_label,
                 )
                 ax_score.set_ylim(0.0, 1.0)
                 if idx == 0:
-                    ax_score.set_ylabel("Score norm", fontsize=text_sizes["annotation"] * 0.8)
+                    ax_score.set_ylabel("Score vs max", fontsize=text_sizes["annotation"] * 0.8)
                 else:
                     ax_score.tick_params(labelright=False)
                 _apply_style(ax_score, style)
-            ax_right.set_ylabel("Nearest selected distance (weighted, normalized)" if idx == 0 else "")
+                if idx == 0 and dist_line and score_line:
+                    ax_right.legend(
+                        handles=[dist_line[0], score_line[0]],
+                        loc="upper right",
+                        frameon=False,
+                        fontsize=text_sizes["annotation"] * 0.75,
+                    )
+            if is_degenerate:
+                ax_right.text(
+                    0.02,
+                    0.94,
+                    "MMR degenerate:\npool ≤ n_sites\n(diversified = top-score)",
+                    ha="left",
+                    va="top",
+                    transform=ax_right.transAxes,
+                    fontsize=text_sizes["annotation"] * 0.75,
+                    color="#666666",
+                )
+            ax_right.set_ylabel("Distance to nearest selected" if idx == 0 else "")
             ax_right.xaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=5))
             ax_left.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
             ax_right.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
 
         if axes_left:
-            axes_left[0].set_title("Nearest-neighbor distance distribution", fontsize=subtitle_size, pad=title_pad)
-            axes_right[0].set_title(
-                "Selection trajectory (MMR distance + score)", fontsize=subtitle_size, pad=title_pad
-            )
+            axes_left[0].set_title("NN distance distribution", fontsize=subtitle_size, pad=title_pad)
+            axes_right[0].set_title("Selection trajectory", fontsize=subtitle_size, pad=title_pad)
             axes_left[-1].set_xlabel(metric_label)
             axes_right[-1].set_xlabel("Selection rank")
             for ax in axes_left[:-1]:
