@@ -1,5 +1,11 @@
 ## Journal
 
+### 2026-01-31
+- Task: Stage-A plots/metrics and audit alignment for demo_meme_two_tf.
+- Changes: renamed diversity schema to top_candidates/diversified_candidates; Stage-A yield plot now shows diversified core positional entropy; Stage-A strata labels simplified; diversity plot labels clarified; docs updated to match.
+- Behavior: kept forward-strand-only FIMO scoring (`--norc`) with matched_sequence required for core identity.
+- Validation: ran dense stage-a build-pool --fresh, dense plot --only stage_a_summary, and full densegen pytest.
+
 ### 2026-01-26
 - Task: Stage-A PWM sampling overhaul to FIMO score-only semantics; remove p-value strata and p-value-based retention.
 - User decision: FIMO-only backend; remove densegen backend and score_threshold/score_percentile knobs.
