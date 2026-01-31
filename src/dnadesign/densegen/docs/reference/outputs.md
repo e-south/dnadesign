@@ -129,7 +129,7 @@ Core diagnostics plots (canonical set):
 - `placement_map` — 1‑nt occupancy map across binding‑site types (regulators + fixed elements).
 - `tfbs_usage` — TFBS allocation summary (rank–frequency + distribution across all TFBS).
 - `run_health` — attempts outcomes + failure composition + duplicate pressure (binned for scale).
-- `stage_a_summary` — Stage‑A pool quality, yield/dedupe, score/length bias, and core diversity checks.
+- `stage_a_summary` — Stage‑A pool quality, yield/dedupe, core positional entropy, and core diversity checks.
 - `stage_b_summary` — Stage‑B feasibility + composition distributions + offered‑vs‑used utilization.
 
 `stage_a_summary` writes multiple images per input, e.g.:
@@ -180,9 +180,11 @@ eligible score histograms with tier boundary scores per regulator, including `ca
 their log‑odds max in FIMO score scale (`pwm_max_score`), and mining saturation audits
 (`mining_audit` tail Δunique/Δgen),
 plus per‑TF diversity summaries (k=1 and k=5 nearest‑neighbor **weighted‑Hamming** distances,
-pairwise **weighted‑Hamming** distribution [exact for retained sets], core entropy, baseline vs actual;
-overlap + candidate‑pool diagnostics; greedy max‑diversity upper bound (`upper_bound`) to show headroom;
-local and global score quantiles normalized by `pwm_max_score` for tradeoff audits; ΔJ (MMR objective gain);
+pairwise **weighted‑Hamming** distribution [exact for retained sets], core entropy for `top_candidates` and
+`diversified_candidates`; overlap + candidate‑pool diagnostics; greedy max‑diversity upper bound
+(`max_diversity_upper_bound`) to show headroom; local and global score quantiles normalized by
+`pwm_max_score` for tradeoff audits (`top_candidates`, `diversified_candidates`, `top_candidates_global`);
+ΔJ (MMR objective gain) and Δdiv (median pairwise distance gain);
 large sets are deterministically subsampled to 2500 sequences for k‑NN distances) and padding audit stats
 (best‑hit overlap with intended core; core offset histogram).
 Key fields to audit tier behavior and selection pool construction:

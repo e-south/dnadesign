@@ -215,7 +215,7 @@ def _cfg() -> dict:
     }
 
 
-def _diversity_block() -> dict:
+def _diversity_block(core_len: int) -> dict:
     return {
         "candidate_pool_size": 2,
         "shortlist_target": 10,
@@ -223,7 +223,7 @@ def _diversity_block() -> dict:
             "metric": "hamming",
             "nnd_k1": {
                 "k": 1,
-                "baseline": {
+                "top_candidates": {
                     "bins": [0, 1, 2],
                     "counts": [0, 2, 0],
                     "median": 1.0,
@@ -233,7 +233,7 @@ def _diversity_block() -> dict:
                     "n": 2,
                     "subsampled": False,
                 },
-                "actual": {
+                "diversified_candidates": {
                     "bins": [0, 1, 2],
                     "counts": [0, 2, 0],
                     "median": 1.0,
@@ -246,7 +246,7 @@ def _diversity_block() -> dict:
             },
             "nnd_k5": None,
             "pairwise": {
-                "baseline": {
+                "top_candidates": {
                     "bins": [0.0, 1.0, 2.0],
                     "counts": [0, 1, 0],
                     "median": 1.0,
@@ -256,7 +256,7 @@ def _diversity_block() -> dict:
                     "n_pairs": 1,
                     "total_pairs": 1,
                 },
-                "actual": {
+                "diversified_candidates": {
                     "bins": [0.0, 1.0, 2.0],
                     "counts": [0, 1, 0],
                     "median": 1.0,
@@ -266,7 +266,7 @@ def _diversity_block() -> dict:
                     "n_pairs": 1,
                     "total_pairs": 1,
                 },
-                "upper_bound": {
+                "max_diversity_upper_bound": {
                     "bins": [0.0, 1.0, 2.0],
                     "counts": [0, 1, 0],
                     "median": 1.0,
@@ -281,14 +281,14 @@ def _diversity_block() -> dict:
         "set_overlap_fraction": 1.0,
         "set_overlap_swaps": 0,
         "core_entropy": {
-            "baseline": {"values": [0.0, 1.0], "n": 2},
-            "actual": {"values": [0.0, 1.0], "n": 2},
+            "top_candidates": {"values": [0.0] * core_len, "n": 2},
+            "diversified_candidates": {"values": [0.0] * core_len, "n": 2},
         },
         "score_quantiles": {
-            "baseline": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
-            "actual": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
-            "baseline_global": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
-            "upper_bound": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
+            "top_candidates": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
+            "diversified_candidates": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
+            "top_candidates_global": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
+            "max_diversity_upper_bound": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
         },
     }
 
@@ -365,7 +365,10 @@ def _pool_manifest(tmp_path: Path, *, include_diversity: bool = False) -> TFBSPo
         ],
     }
     if include_diversity:
-        manifest["inputs"][0]["stage_a_sampling"]["eligible_score_hist"][0]["diversity"] = _diversity_block()
+        consensus = manifest["inputs"][0]["stage_a_sampling"]["eligible_score_hist"][0]["pwm_consensus"]
+        manifest["inputs"][0]["stage_a_sampling"]["eligible_score_hist"][0]["diversity"] = _diversity_block(
+            core_len=len(str(consensus))
+        )
     path = pools_dir / "pool_manifest.json"
     path.write_text(json.dumps(manifest, indent=2, sort_keys=True))
     return TFBSPoolArtifact.load(path)

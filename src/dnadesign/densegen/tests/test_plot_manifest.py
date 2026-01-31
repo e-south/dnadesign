@@ -32,7 +32,7 @@ def _diversity_block(core_len: int) -> dict:
             "metric": "hamming",
             "nnd_k1": {
                 "k": 1,
-                "baseline": {
+                "top_candidates": {
                     "bins": bins,
                     "counts": counts,
                     "median": 1.0,
@@ -42,7 +42,7 @@ def _diversity_block(core_len: int) -> dict:
                     "n": 2,
                     "subsampled": False,
                 },
-                "actual": {
+                "diversified_candidates": {
                     "bins": bins,
                     "counts": counts,
                     "median": 1.0,
@@ -55,7 +55,7 @@ def _diversity_block(core_len: int) -> dict:
             },
             "nnd_k5": None,
             "pairwise": {
-                "baseline": {
+                "top_candidates": {
                     "bins": bins,
                     "counts": counts,
                     "median": 1.0,
@@ -65,7 +65,7 @@ def _diversity_block(core_len: int) -> dict:
                     "n_pairs": 1,
                     "total_pairs": 1,
                 },
-                "actual": {
+                "diversified_candidates": {
                     "bins": bins,
                     "counts": counts,
                     "median": 1.0,
@@ -75,7 +75,7 @@ def _diversity_block(core_len: int) -> dict:
                     "n_pairs": 1,
                     "total_pairs": 1,
                 },
-                "upper_bound": {
+                "max_diversity_upper_bound": {
                     "bins": bins,
                     "counts": counts,
                     "median": 1.0,
@@ -90,14 +90,14 @@ def _diversity_block(core_len: int) -> dict:
         "set_overlap_fraction": 1.0,
         "set_overlap_swaps": 0,
         "core_entropy": {
-            "baseline": {"values": [0.0] * core_len, "n": 2},
-            "actual": {"values": [0.0] * core_len, "n": 2},
+            "top_candidates": {"values": [0.0] * core_len, "n": 2},
+            "diversified_candidates": {"values": [0.0] * core_len, "n": 2},
         },
         "score_quantiles": {
-            "baseline": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
-            "actual": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
-            "baseline_global": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
-            "upper_bound": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
+            "top_candidates": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
+            "diversified_candidates": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
+            "top_candidates_global": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
+            "max_diversity_upper_bound": {"p10": 1.0, "p50": 1.5, "p90": 2.0, "mean": 1.5},
         },
     }
 

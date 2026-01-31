@@ -95,11 +95,11 @@ def test_diversity_summary_scores() -> None:
     assert base_pair.counts
     score_block = summary.score_quantiles
     base = score_block.top_candidates
-    actual = score_block.diversified_candidates
+    diversified = score_block.diversified_candidates
     assert base is not None
-    assert actual is not None
+    assert diversified is not None
     assert base.p50 == 0.75
-    assert actual.p50 == 0.75
+    assert diversified.p50 == 0.75
 
 
 def test_diversity_summary_allows_zero_pwm_max_score_for_zero_scores() -> None:
@@ -118,11 +118,11 @@ def test_diversity_summary_allows_zero_pwm_max_score_for_zero_scores() -> None:
     assert summary is not None
     score_block = summary.score_quantiles
     base = score_block.top_candidates
-    actual = score_block.diversified_candidates
+    diversified = score_block.diversified_candidates
     assert base is not None
-    assert actual is not None
+    assert diversified is not None
     assert base.p50 == 0.0
-    assert actual.p50 == 0.0
+    assert diversified.p50 == 0.0
 
 
 def test_diversity_summary_rejects_zero_pwm_max_score_with_nonzero_scores() -> None:
@@ -190,20 +190,20 @@ def test_mmr_objective_mean_utility() -> None:
     cores = ["AAAA", "AAAT", "TTTT"]
     scores = [3.0, 2.0, 1.0]
     scores_norm_map = _score_norm(scores)
-    baseline = _mmr_objective(
+    top_candidates = _mmr_objective(
         cores=cores,
         scores=scores,
         scores_norm_map=scores_norm_map,
         alpha=0.5,
     )
-    assert baseline == pytest.approx(0.125)
-    actual = _mmr_objective(
+    assert top_candidates == pytest.approx(0.125)
+    diversified = _mmr_objective(
         cores=["AAAA", "TTTT", "AAAT"],
         scores=[3.0, 1.0, 2.0],
         scores_norm_map=scores_norm_map,
         alpha=0.5,
     )
-    assert actual == pytest.approx(0.13333333333333333)
+    assert diversified == pytest.approx(0.13333333333333333)
 
 
 def test_top_candidates_use_shortlist_k() -> None:

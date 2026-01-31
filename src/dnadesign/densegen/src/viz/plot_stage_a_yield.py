@@ -69,16 +69,15 @@ def _build_stage_a_yield_bias_figure(
         diversity_by_reg[reg] = diversity
         if "generated" not in row:
             raise ValueError(f"Stage-A sampling missing generated count for '{input_name}' ({reg}).")
-        if "candidates_with_hit" not in row or "eligible_raw" not in row:
+        if "eligible_raw" not in row:
             raise ValueError(f"Stage-A sampling missing yield counters for '{input_name}' ({reg}).")
         if "eligible_unique" not in row or "retained" not in row:
             raise ValueError(f"Stage-A sampling missing retained counters for '{input_name}' ({reg}).")
         generated = row["generated"]
-        candidates_with_hit = row["candidates_with_hit"]
         eligible_raw = row["eligible_raw"]
         eligible_unique = row["eligible_unique"]
         retained = row["retained"]
-        if any(val is None for val in (generated, candidates_with_hit, eligible_raw, eligible_unique, retained)):
+        if any(val is None for val in (generated, eligible_raw, eligible_unique, retained)):
             raise ValueError(f"Stage-A sampling missing yield counters for '{input_name}' ({reg}).")
         if "selection_pool_source" not in row:
             raise ValueError(f"Stage-A sampling missing selection_pool_source for '{input_name}' ({reg}).")

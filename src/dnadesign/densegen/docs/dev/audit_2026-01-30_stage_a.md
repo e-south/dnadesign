@@ -30,7 +30,7 @@
 - MMR selection: shortlist_k=2500 (target 2500) from tier fraction 0.09 (tier_limit=7830).
 - scores (min/med/avg/max): 17.21 / 18.02 / 18.28 / 21.65.
 - lengths (min/med/avg/max): 17 / 19.0 / 19.1 / 20.
-- diversity: pairwise median 2.77 (baseline 2.80, delta -0.02); overlap 99.6% (2 swaps).
+- diversity: pairwise median 2.77 (top 2.80, delta -0.02); overlap 99.6% (2 swaps).
 - score deltas (p10/median): +0.00 / +0.00 (MMR did not trade away score).
 - mining tail slope: about 0.108 delta unique / delta generated (yield flattening).
 - padding audit: 100% best-hit overlap with intended core; core offsets concentrated at 0-5.
@@ -43,7 +43,7 @@
 - MMR selection: shortlist_k=2500 (target 2500) from tier fraction 0.09 (tier_limit=10811).
 - scores (min/med/avg/max): 8.51 / 9.00 / 9.19 / 11.56.
 - lengths (min/med/avg/max): 15 / 18.0 / 17.6 / 20.
-- diversity: pairwise median 3.39 (baseline 3.41, delta -0.01); overlap 99.0% (5 swaps).
+- diversity: pairwise median 3.39 (top 3.41, delta -0.01); overlap 99.0% (5 swaps).
 - score deltas (p10/median): +0.00 / +0.00.
 - mining tail slope: about 0.121 delta unique / delta generated.
 - padding audit: 100% best-hit overlap with intended core; core offsets spread across 0-9.
@@ -64,12 +64,13 @@ The demo explicitly calls Stage-A before Stage-B; the key diagnostic plot is sta
 - Right panel: retained TFBS length counts confirm the requested 15-20 nt range.
 
 2) stage_a_summary__lexA_cpxR_artifacts__yield_bias.png
-- Left: yield funnel (Generated -> Has hit -> Eligible -> Unique core -> MMR pool -> Retained) with duplication pressure, MMR headroom, and mining tail slope annotations.
-- Right: scatter of retained score vs length, colored by GC fraction, plus rho(score,length) and hit overlap.
-- Narrative use: validates that Stage-A is converting candidates into a high-quality pool without obvious length/GC bias or core misalignment.
+- Left: yield funnel (Generated -> Eligible -> Unique core -> MMR pool -> Retained) with duplication pressure, MMR headroom, and mining tail slope annotations.
+- Right: core positional entropy (bits) for diversified sequences, labeled by PWM consensus letters.
+- Narrative use: validates that Stage-A is converting candidates into a high-quality pool and highlights which core positions remain diverse.
 
 3) stage_a_summary__lexA_cpxR_artifacts__diversity.png
-- Left: pairwise core distance ECDF (Top-score vs MMR), with Δdiv (median gain), ΔJ (objective gain), and overlap annotations.
+- Left: pairwise core distance ECDF (Top Sequences vs Diversified Sequences), with Δdiv (median gain), ΔJ (objective gain), and overlap annotations.
+- Δdiv reports the median pairwise distance gain (diversified minus top); ΔJ reports the MMR objective gain.
 - Right: score vs selection-time nearest distance (MMR contribution), with scores normalized by pwm_max_score
   in FIMO score scale.
 - Narrative use: separates the final diversity outcome (left) from the selection-time tradeoffs that produced it (right).
