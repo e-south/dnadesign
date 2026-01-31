@@ -98,7 +98,7 @@ def _build_stage_a_yield_bias_figure(
     n_regs = max(1, len(reg_order))
     fig_height = max(4.8, base_height, 1.75 * n_regs + 0.8)
     reg_colors = _stage_a_regulator_colors(reg_order, style)
-    stage_labels = ["Generated", "Eligible", "Unique core", "MMR pool", "Retained"]
+    stage_labels = ["Generated", "Eligible", "Unique core", "Selection pool", "Retained"]
     counts_by_reg = {reg: counts for reg, counts in zip(regs, stage_counts)}
     max_count = max((max(counts) for counts in stage_counts), default=0)
     subtitle_size = text_sizes["panel_title"] * 0.88

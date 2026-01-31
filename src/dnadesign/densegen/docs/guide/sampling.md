@@ -383,7 +383,7 @@ What to conclude / tune:
 #### `stage_a_summary__<input>__yield_bias.png` — Yield and core positional entropy
 
 What it shows:
-- Stepwise yield across Generated → Eligible → Unique core → MMR pool → Retained.
+- Stepwise yield across Generated → Eligible → Unique core → Selection pool → Retained.
 - Core positional entropy (bits) for top-score vs diversified sequences (overlay).
 - X-axis labels are IUPAC consensus letters derived from the PWM (per position).
 

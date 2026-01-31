@@ -19,6 +19,7 @@ import pandas as pd
 import pytest
 
 from dnadesign.densegen.src.core.artifacts.pool import TFBSPoolArtifact
+from dnadesign.densegen.src.viz.plot_stage_a_diversity import _build_stage_a_diversity_figure
 from dnadesign.densegen.src.viz.plotting import (
     _plot_required_columns,
     plot_placement_map,
@@ -584,3 +585,36 @@ def test_plot_stage_a_summary_requires_selection_rank(tmp_path: Path) -> None:
             pool_manifest=manifest,
             style={},
         )
+
+
+def test_stage_a_diversity_trajectory_has_nonzero_xlim(tmp_path: Path) -> None:
+    matplotlib.use("Agg", force=True)
+    manifest = _pool_manifest(tmp_path, include_diversity=True)
+    sampling = manifest.entry_for("demo_input").stage_a_sampling
+    assert sampling is not None
+    pool_df = pd.DataFrame(
+        {
+            "input_name": ["demo_input"],
+            "tf": ["TF_A"],
+            "tfbs_sequence": ["AAAA"],
+            "tfbs_core": ["AAA"],
+            "best_hit_score": [2.0],
+            "tier": [0],
+            "rank_within_regulator": [1],
+            "selection_rank": [1],
+            "nearest_selected_similarity": [None],
+            "selection_score_norm": [1.0],
+            "nearest_selected_distance_norm": [None],
+        }
+    )
+    fig, _axes_left, axes_right = _build_stage_a_diversity_figure(
+        input_name="demo_input",
+        pool_df=pool_df,
+        sampling=sampling,
+        style={},
+    )
+    try:
+        x_min, x_max = axes_right[0].get_xlim()
+        assert x_max > x_min
+    finally:
+        fig.clf()

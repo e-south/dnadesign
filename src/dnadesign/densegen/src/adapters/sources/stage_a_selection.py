@@ -343,16 +343,12 @@ def _select_by_mmr(
     weight_sum = float(weights.sum())
     tier_fractions = list(tier_widening) if tier_widening else [1.0]
     total = len(ranked)
-    score_norm_denominator = None
-    if pool_min_score_norm_value is not None or relevance_norm == "minmax_raw_score":
-        if pwm_theoretical_max_score is None:
-            raise ValueError("pwm_theoretical_max_score is required for score normalization in Stage-A MMR.")
-        score_norm_denominator = float(pwm_theoretical_max_score)
-        if score_norm_denominator <= 0.0:
-            raise ValueError("pwm_theoretical_max_score must be > 0 for Stage-A MMR score normalization.")
-    score_norm_ratio = None
-    if score_norm_denominator is not None:
-        score_norm_ratio = np.array([float(cand.score) / score_norm_denominator for cand in ranked], dtype=float)
+    if pwm_theoretical_max_score is None:
+        raise ValueError("pwm_theoretical_max_score is required for score normalization in Stage-A MMR.")
+    score_norm_denominator = float(pwm_theoretical_max_score)
+    if score_norm_denominator <= 0.0:
+        raise ValueError("pwm_theoretical_max_score must be > 0 for Stage-A MMR score normalization.")
+    score_norm_ratio = np.array([float(cand.score) / score_norm_denominator for cand in ranked], dtype=float)
 
     def _lex_ranks(values: Sequence[str]) -> np.ndarray:
         order = {val: idx for idx, val in enumerate(sorted(set(values)))}
@@ -371,9 +367,8 @@ def _select_by_mmr(
             scores_norm_map = _score_percentile_norm(scores_arr.tolist())
             scores_norm = np.array([scores_norm_map.get(float(cand.score), 1.0) for cand in candidates], dtype=float)
         else:
-            if score_norm_denominator is None:
-                raise ValueError("pwm_theoretical_max_score is required for minmax_raw_score relevance_norm.")
             scores_norm = np.array([float(cand.score) / score_norm_denominator for cand in candidates], dtype=float)
+        score_norm_for_meta = np.array([float(cand.score) / score_norm_denominator for cand in candidates], dtype=float)
         score_weight = float(alpha)
         diversity_weight = 1.0 - score_weight
         cores = [core_by_seq[cand.seq] for cand in candidates]
@@ -421,7 +416,7 @@ def _select_by_mmr(
                 meta[chosen.seq] = SelectionMeta(
                     selection_rank=len(selected),
                     selection_utility=float(utility[best_idx]),
-                    selection_score_norm=float(scores_norm[best_idx]),
+                    selection_score_norm=float(score_norm_for_meta[best_idx]),
                     nearest_selected_similarity=float(max_sim[best_idx]) if had_selected else None,
                     nearest_selected_distance=nearest_distance,
                     nearest_selected_distance_norm=nearest_distance_norm,

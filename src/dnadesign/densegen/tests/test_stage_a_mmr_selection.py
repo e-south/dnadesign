@@ -119,6 +119,32 @@ def test_mmr_records_score_norm_and_distance_norm() -> None:
     assert meta["AT"].nearest_selected_distance_norm == pytest.approx(0.5)
 
 
+def test_mmr_selection_score_norm_uses_pwm_ratio_with_percentile_relevance() -> None:
+    matrix = [
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+    ]
+    background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
+    ranked = [
+        _cand("AA", 100.0),
+        _cand("AC", 90.0),
+    ]
+    selected, meta, _diag = stage_a_selection._select_by_mmr(
+        ranked,
+        matrix=matrix,
+        background=background,
+        n_sites=2,
+        alpha=0.5,
+        pool_min_score_norm=0.1,
+        pool_max_candidates=None,
+        relevance_norm="percentile",
+        tier_widening=[1.0],
+        pwm_theoretical_max_score=100.0,
+    )
+    assert [cand.seq for cand in selected] == ["AA", "AC"]
+    assert meta["AC"].selection_score_norm == pytest.approx(0.9)
+
+
 def test_mmr_pool_includes_full_rung_without_cap() -> None:
     matrix = [
         {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},

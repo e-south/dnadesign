@@ -304,7 +304,12 @@ def _build_stage_a_diversity_figure(
                     )
                     y_max = float(np.nanmax(dist_vals[dist_mask]))
                     ax_right.set_ylim(0.0, y_max * 1.15 if y_max > 0 else 1.0)
-                ax_right.set_xlim(1.0, float(np.nanmax(ordered)) if ordered.size else 1.0)
+                if ordered.size:
+                    x_max = float(np.nanmax(ordered))
+                    if not np.isfinite(x_max) or x_max <= 1.0:
+                        ax_right.set_xlim(0.5, 1.5)
+                    else:
+                        ax_right.set_xlim(1.0, x_max)
                 ax_score = ax_right.twinx()
                 ax_score.plot(
                     ordered,
