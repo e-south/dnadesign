@@ -19,7 +19,7 @@ densegen:
           batch_size: 5000
           budget:
             mode: fixed_candidates
-            candidates: 5000000
+            candidates: 500000
             growth_factor: 1.25
           log_every_batches: 1
         length:
