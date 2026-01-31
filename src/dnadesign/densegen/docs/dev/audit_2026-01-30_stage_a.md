@@ -55,27 +55,9 @@
 - Length and GC: retained TFBS lengths align with the requested range and show mild score-length relationships; GC is tracked in plots to spot bias.
 - Core alignment: 100% overlap of best hit with intended core indicates FIMO scoring aligns with the sampled PWM core placement (no systematic shifts from flanks).
 
-## Demo narrative and plots (how they support the story)
-The demo explicitly calls Stage-A before Stage-B; the key diagnostic plot is stage_a_summary:
-
-1) stage_a_summary__lexA_cpxR_artifacts.png (tiers and length)
-- Left panels: per-TF score distributions for eligible uniques with the retained subset shaded.
-- Tier cutoff markers (0.1%, 1%, 9%) and the retained cutoff show where the final pool sits.
-- Right panel: retained TFBS length counts confirm the requested 15-20 nt range.
-
-2) stage_a_summary__lexA_cpxR_artifacts__yield_bias.png
-- Left: yield funnel (Generated -> Eligible -> Unique core -> MMR pool -> Retained) showing stepwise counts.
-- Right: core positional entropy (bits) for diversified sequences, labeled by PWM IUPAC consensus letters.
-- Narrative use: validates that Stage-A is converting candidates into a high-quality pool and highlights which core positions remain diverse.
-
-3) stage_a_summary__lexA_cpxR_artifacts__diversity.png
-- Left: pairwise core distance ECDF (Top Sequences vs Diversified Sequences), with Δdiv (median gain), ΔJ (objective gain), and overlap annotations.
-- Δdiv reports the median pairwise distance gain (diversified minus top); ΔJ reports the MMR objective gain.
-- Right: score vs selection-time nearest distance (MMR contribution), with scores normalized by
-  the PWM consensus score (`pwm_max_score`, FIMO log-odds scale).
-- Narrative use: separates the final diversity outcome (left) from the selection-time tradeoffs that produced it (right).
-
-The demo suggests running dense plot --only stage_a_summary right after stage-a build-pool so you can link the warnings (tier target unmet) to visual evidence of tier placement and diversity tradeoffs.
+## Stage-A plots (interpretation)
+Plot interpretation lives in the sampling guide:
+`../guide/sampling.md#how-to-read-stage_a_summary-three-figures`.
 
 ## Audit takeaways
 - Stage-A behavior is consistent with the documented semantics and current code paths.

@@ -343,6 +343,62 @@ Plots that map cleanly to the above:
 
 ---
 
+### How to read `stage_a_summary` (three figures)
+
+Stage-A writes three plots per input. This section is the canonical interpretation for the bundle.
+
+#### `stage_a_summary__<input>.png` — Stage-A pool tiers
+
+What it shows:
+- Score distribution of eligible unique cores (deduplicated by core identity).
+- Tier cutoff markers labeled by configured percentages (e.g., 0.1%, 1%, 9%).
+- Retained cutoff as the minimum score among retained sequences.
+- Retained TFBS length histogram (full TFBS length, not core length).
+
+Question it answers:
+- How close the retained pool is to the high-score frontier, and how deep selection went to fill `n_sites`.
+
+What to conclude / tune:
+- If the retained cutoff sits below the target tier, mining could not satisfy the tier target.
+- Adjust mining caps or tier targets if you need retention deeper or shallower in the ranked pool.
+
+#### `stage_a_summary__<input>__yield_bias.png` — Yield and core positional entropy
+
+What it shows:
+- Stepwise yield across Generated → Eligible → Unique core → MMR pool → Retained.
+- Core positional entropy (bits) for diversified sequences only.
+- X-axis labels are IUPAC consensus letters derived from the PWM (per position).
+
+Question it answers:
+- Where candidates drop out, and which motif positions remain variable in the final pool.
+
+What to conclude / tune:
+- Large drops at "Unique core" indicate heavy core-level duplication.
+- Low entropy at tolerant positions signals score-dominated selection or insufficient diversity headroom.
+
+#### `stage_a_summary__<input>__diversity.png` — Diversity outcome and MMR contribution
+
+What it shows:
+- Left: pairwise distance ECDF (Top Sequences vs Diversified Sequences).
+- Right: score vs selection-time nearest distance (MMR contribution) for diversified sequences.
+- Score normalization uses `best_hit_score / pwm_max_score` (PWM consensus score, FIMO log-odds scale).
+- "Top Sequences" corresponds to `top_candidates` in manifests; "Diversified Sequences" corresponds to
+  `diversified_candidates`.
+
+Question it answers:
+- Did MMR increase diversity, and how did it trade score vs distance when it did?
+
+What to conclude / tune:
+- A right-shifted ECDF indicates higher diversity in the final pool.
+- The scatter explains selection-time tradeoffs; it is only available for `selection.policy: mmr`.
+
+Glossary (plot annotations):
+- Δdiv (median): median pairwise distance change (Diversified − Top).
+- ΔJ: MMR objective gain (Diversified − Top).
+- overlap: fraction of shared sequences between Top and Diversified sets.
+
+---
+
 ### Common footguns and how to avoid them
 
 1) **MMR requires enough eligible unique candidates to fill `n_sites`**

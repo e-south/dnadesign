@@ -129,12 +129,14 @@ Core diagnostics plots (canonical set):
 - `placement_map` — 1‑nt occupancy map across binding‑site types (regulators + fixed elements).
 - `tfbs_usage` — TFBS allocation summary (rank–frequency + distribution across all TFBS).
 - `run_health` — attempts outcomes + failure composition + duplicate pressure (binned for scale).
-- `stage_a_summary` — Stage‑A pool quality, yield/dedupe, core positional entropy, and core diversity checks.
+- `stage_a_summary` — Stage‑A pool diagnostics (interpretation in the sampling guide).
 - `stage_b_summary` — Stage‑B feasibility + composition distributions + offered‑vs‑used utilization.
 
 `stage_a_summary` writes multiple images per input, e.g.:
 `stage_a_summary__<input>.png`, `stage_a_summary__<input>__yield_bias.png`,
 and `stage_a_summary__<input>__diversity.png`.
+
+See `../guide/sampling.md#how-to-read-stage_a_summary-three-figures` for plot interpretation.
 
 `stage_a_summary` requires diversity metrics in `pool_manifest.json`. If you are using a legacy pool
 manifest that predates diversity, rerun `dense stage-a build-pool --fresh` to regenerate it.

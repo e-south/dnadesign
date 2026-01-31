@@ -224,11 +224,8 @@ Optional: view Stage‑A yield/tiering and core diversity effects:
 dense plot --only stage_a_summary
 ```
 
-Stage‑A diversity panel interpretation:
-
-* Left: pairwise distance ECDF for Top Sequences vs Diversified Sequences (Δdiv = median pairwise gain).
-* Right: score vs selection‑time nearest distance (MMR contribution), with score normalized by
-  the PWM consensus score (`pwm_max_score`, FIMO log‑odds scale). ΔJ reports the mean MMR objective gain.
+Plot interpretation lives in the sampling guide:
+`../guide/sampling.md#how-to-read-stage_a_summary-three-figures`.
 
 ---
 
