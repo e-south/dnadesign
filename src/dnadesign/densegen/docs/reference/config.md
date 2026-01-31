@@ -101,7 +101,7 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
     - FIMO resolves `fimo` via `MEME_BIN` or PATH; pixi users should run `pixi run dense ...` so it is available.
     - Eligibility is `best_hit_score > 0` and requires a FIMO hit.
 - Algorithmic behavior (eligibility, tiering, tier-target mining math, and MMR diversity) is defined in:
-  - `../guide/sampling.md#stage-a-sampling`
+  - `../guide/sampling.md`
 - `type: pwm_meme_set`
   - `paths` - list of MEME PWM files (merged into a single TF pool)
   - `motif_ids` (optional list) - choose motifs by ID across files
@@ -189,7 +189,7 @@ These controls apply to **Stage‑B sampling** (library construction) after Stag
 `library_size` does not change Stage‑A sampling counts. `library_size` also bounds the motif count
 offered to the solver for binding-site and PWM-sampled inputs.
 For conceptual behavior (what a library is, coverage/uniqueness enforcement, and resampling), see:
-- `../guide/sampling.md#stage-b-sampling`
+- `../guide/sampling.md`
 
 - `pool_strategy`: `full | subsample | iterative_subsample`
 - `library_source`: `build | artifact` (use `artifact` to replay prebuilt libraries)

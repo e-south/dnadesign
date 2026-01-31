@@ -136,7 +136,7 @@ Core diagnostics plots (canonical set):
 `stage_a_summary__<input>.png`, `stage_a_summary__<input>__yield_bias.png`,
 and `stage_a_summary__<input>__diversity.png`.
 
-See `../guide/sampling.md#how-to-read-stage_a_summary-three-figures` for plot interpretation.
+See `../guide/sampling.md` for plot interpretation context.
 
 `stage_a_summary` requires diversity metrics in `pool_manifest.json`. If your pool manifest predates
 diversity metrics, rerun `dense stage-a build-pool --fresh` to regenerate it.
