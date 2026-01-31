@@ -663,6 +663,9 @@ def run_stage_a_pipeline(
         diversity_nearest_similarity_mean = float(np.mean(nearest_sims))
         diversity_nearest_distance_mean = float(np.mean([(1.0 / sim) - 1.0 for sim in nearest_sims if sim > 0]))
         diversity_nearest_distance_min = float(min((1.0 / sim) - 1.0 for sim in nearest_sims if sim > 0))
+    max_observed_score = None
+    if ranked:
+        max_observed_score = float(max(cand.score for cand in ranked))
     summary = None
     if return_summary:
         if selection_diag is None:
@@ -703,6 +706,12 @@ def run_stage_a_pipeline(
             else None,
             selection_pool_capped=selection_diag.selection_pool_capped if selection_diag is not None else None,
             selection_pool_cap_value=selection_diag.selection_pool_cap_value if selection_diag is not None else None,
+            selection_score_norm_max_raw=selection_diag.selection_score_norm_max_raw
+            if selection_diag is not None
+            else None,
+            selection_score_norm_clipped=selection_diag.selection_score_norm_clipped
+            if selection_diag is not None
+            else None,
             diversity_nearest_similarity_mean=diversity_nearest_similarity_mean,
             diversity_nearest_distance_mean=diversity_nearest_distance_mean,
             diversity_nearest_distance_min=diversity_nearest_distance_min,
@@ -714,6 +723,7 @@ def run_stage_a_pipeline(
             pwm_consensus_iupac=pwm_consensus_iupac,
             pwm_consensus_score=pwm_consensus_score,
             pwm_theoretical_max_score=pwm_theoretical_max_score,
+            max_observed_score=max_observed_score,
             input_name=input_name,
             regulator=motif.motif_id,
             backend=scoring_backend,

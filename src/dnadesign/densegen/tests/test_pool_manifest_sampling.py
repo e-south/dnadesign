@@ -291,6 +291,9 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
     assert hist[0]["tier_fractions"] == [0.001, 0.01, 0.09]
     assert hist[0]["tier_fractions_source"] == "default"
     assert hist[0]["eligible_score_norm_by_tier"] == {"tier0": {"min": 0.9, "median": 0.9, "max": 0.9}}
+    assert hist[0]["selection_score_norm_max_raw"] is None
+    assert hist[0]["selection_score_norm_clipped"] is None
+    assert hist[0]["max_observed_score"] is None
     assert hist[0]["generated"] == 10
     assert hist[0]["candidates_with_hit"] == 9
     assert hist[0]["eligible_raw"] == 3

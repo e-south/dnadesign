@@ -139,7 +139,7 @@ def test_mmr_selection_score_norm_uses_pwm_ratio_with_percentile_relevance() -> 
         pool_min_score_norm=0.1,
         pool_max_candidates=None,
         relevance_norm="percentile",
-        tier_fractions=[0.5, 0.75, 0.9],
+        tier_fractions=[0.1, 0.2, 0.3],
         pwm_theoretical_max_score=100.0,
     )
     assert [cand.seq for cand in selected] == ["AA", "AC"]
@@ -164,11 +164,11 @@ def test_mmr_pool_includes_full_rung_without_cap() -> None:
         pool_min_score_norm=None,
         pool_max_candidates=None,
         relevance_norm="minmax_raw_score",
-        tier_fractions=[0.5, 0.75, 0.9],
+        tier_fractions=[0.1, 0.2, 0.3],
         pwm_theoretical_max_score=100.0,
     )
     assert len(selected) == 3
-    assert diag.selection_pool_size_final == 6
+    assert diag.selection_pool_size_final == 4
     assert diag.selection_pool_capped is False
 
 
@@ -194,8 +194,8 @@ def test_mmr_pool_min_score_norm_is_report_only() -> None:
         pwm_theoretical_max_score=100.0,
     )
     assert len(selected) == 3
-    assert diag.selection_pool_size_final == 3
-    assert diag.selection_pool_rung_fraction_used == pytest.approx(0.2)
+    assert diag.selection_pool_size_final == 4
+    assert diag.selection_pool_rung_fraction_used == pytest.approx(0.3)
 
 
 def test_mmr_pool_shortfall_warns(caplog: pytest.LogCaptureFixture) -> None:
@@ -246,7 +246,7 @@ def test_mmr_pool_degenerate_warns_when_equal_to_n_sites(caplog: pytest.LogCaptu
             tier_fractions=[0.2, 0.3, 0.4],
             pwm_theoretical_max_score=100.0,
         )
-    assert len(selected) == 3
+    assert [cand.seq for cand in selected] == seqs[:3]
     assert "MMR degenerate" in caplog.text
 
 
@@ -263,15 +263,45 @@ def test_mmr_pool_cap_is_deterministic() -> None:
         ranked,
         matrix=matrix,
         background=background,
-        n_sites=2,
+        n_sites=5,
         alpha=0.5,
         pool_min_score_norm=None,
         pool_max_candidates=4,
         relevance_norm="minmax_raw_score",
-        tier_fractions=[0.5, 0.75, 0.9],
+        tier_fractions=[0.1, 0.2, 0.3],
         pwm_theoretical_max_score=100.0,
     )
-    assert len(selected) == 2
+    assert len(selected) == 4
     assert diag.selection_pool_size_final == 4
     assert diag.selection_pool_capped is True
     assert diag.selection_pool_cap_value == 4
+
+
+def test_selection_score_norm_clips_and_warns(caplog: pytest.LogCaptureFixture) -> None:
+    matrix = [
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+    ]
+    background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
+    ranked = [
+        _cand("AA", 10.0),
+        _cand("AC", 9.0),
+    ]
+    with caplog.at_level(logging.ERROR):
+        selected, meta, diag = stage_a_selection._select_by_mmr(
+            ranked,
+            matrix=matrix,
+            background=background,
+            n_sites=1,
+            alpha=0.5,
+            pool_min_score_norm=None,
+            pool_max_candidates=None,
+            relevance_norm="minmax_raw_score",
+            tier_fractions=None,
+            pwm_theoretical_max_score=5.0,
+        )
+    assert [cand.seq for cand in selected] == ["AA"]
+    assert meta["AA"].selection_score_norm == pytest.approx(1.0)
+    assert diag.selection_score_norm_clipped is True
+    assert diag.selection_score_norm_max_raw == pytest.approx(2.0)
+    assert "score_norm exceeded" in caplog.text

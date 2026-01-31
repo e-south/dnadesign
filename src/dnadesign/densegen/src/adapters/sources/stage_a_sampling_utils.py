@@ -33,7 +33,10 @@ def build_log_odds(
     background: dict[str, float],
     *,
     smoothing_alpha: float = SMOOTHING_ALPHA,
+    log_base: float = 2.0,
 ) -> List[dict[str, float]]:
+    if log_base <= 0.0 or log_base == 1.0:
+        raise ValueError("log_base must be > 0 and != 1.0.")
     bg = normalize_background(background)
     log_odds: List[dict[str, float]] = []
     for row in matrix:
@@ -46,7 +49,11 @@ def build_log_odds(
             if p <= 0.0 or b <= 0.0:
                 lod_row[base] = float("-inf")
             else:
-                lod_row[base] = float(np.log(p / b))
+                ratio = float(p / b)
+                if log_base == 2.0:
+                    lod_row[base] = float(np.log2(ratio))
+                else:
+                    lod_row[base] = float(np.log(ratio) / np.log(log_base))
         log_odds.append(lod_row)
     return log_odds
 
@@ -62,7 +69,7 @@ def score_sequence(
     if log_odds is None:
         if background is None:
             background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
-        log_odds = build_log_odds(matrix, background)
+        log_odds = build_log_odds(matrix, background, log_base=2.0)
     for base, probs in zip(seq, log_odds):
         lod = probs.get(base, float("-inf"))
         if lod == float("-inf"):

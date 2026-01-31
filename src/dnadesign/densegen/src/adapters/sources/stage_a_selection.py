@@ -35,6 +35,8 @@ class SelectionDiagnostics:
     selection_pool_min_score_norm_used: float | None
     selection_pool_capped: bool
     selection_pool_cap_value: int | None
+    selection_score_norm_max_raw: float | None = None
+    selection_score_norm_clipped: bool | None = None
 
     def __post_init__(self) -> None:
         if int(self.selection_pool_size_final) < 0:
@@ -49,6 +51,10 @@ class SelectionDiagnostics:
                 raise ValueError("Selection pool min score norm must be in (0, 1].")
         if self.selection_pool_cap_value is not None and int(self.selection_pool_cap_value) <= 0:
             raise ValueError("Selection pool cap value must be > 0 when set.")
+        if self.selection_score_norm_max_raw is not None:
+            value = float(self.selection_score_norm_max_raw)
+            if not np.isfinite(value):
+                raise ValueError("Selection score norm max must be finite when set.")
 
     def pool_size(self) -> int:
         return int(self.selection_pool_size_final)
@@ -68,6 +74,12 @@ class SelectionDiagnostics:
             ),
             "selection_pool_capped": bool(self.selection_pool_capped),
             "selection_pool_cap_value": int(self.selection_pool_cap_value) if self.selection_pool_cap_value else None,
+            "selection_score_norm_max_raw": (
+                float(self.selection_score_norm_max_raw) if self.selection_score_norm_max_raw is not None else None
+            ),
+            "selection_score_norm_clipped": (
+                bool(self.selection_score_norm_clipped) if self.selection_score_norm_clipped is not None else None
+            ),
         }
 
 
@@ -343,8 +355,12 @@ def _select_by_mmr(
     weights = _pwm_tolerant_weights(matrix, background=background)
     weight_sum = float(weights.sum())
     tier_fractions = list(normalize_tier_fractions(tier_fractions))
-    ladder = list(tier_fractions)
-    if not ladder or ladder[-1] < 1.0:
+    ladder = [
+        tier_fractions[0],
+        tier_fractions[0] + tier_fractions[1],
+        tier_fractions[0] + tier_fractions[1] + tier_fractions[2],
+    ]
+    if ladder[-1] < 1.0:
         ladder.append(1.0)
     total = len(ranked)
     if pwm_theoretical_max_score is None:
@@ -356,6 +372,9 @@ def _select_by_mmr(
     def _lex_ranks(values: Sequence[str]) -> np.ndarray:
         order = {val: idx for idx, val in enumerate(sorted(set(values)))}
         return np.array([order[val] for val in values], dtype=int)
+
+    score_norm_max_raw: float | None = None
+    score_norm_clipped: bool | None = None
 
     def _select_from_pool(
         candidates: Sequence[_CandidateLike],
@@ -372,6 +391,34 @@ def _select_by_mmr(
         else:
             scores_norm = np.array([float(cand.score) / score_norm_denominator for cand in candidates], dtype=float)
         score_norm_for_meta = np.array([float(cand.score) / score_norm_denominator for cand in candidates], dtype=float)
+        max_raw = float(np.nanmax(score_norm_for_meta)) if score_norm_for_meta.size else None
+        if max_raw is not None:
+            nonlocal score_norm_max_raw, score_norm_clipped
+            score_norm_max_raw = max_raw
+            score_norm_clipped = False
+            if max_raw > 1.0 + 1e-6:
+                score_norm_clipped = True
+                logging.getLogger(__name__).error(
+                    "Stage-A score_norm exceeded 1.0 (max_raw=%.6f, theoretical_max=%.6f); clipping to 1.0.",
+                    max_raw,
+                    score_norm_denominator,
+                )
+        score_norm_for_meta = np.clip(score_norm_for_meta, 0.0, 1.0)
+        if relevance_norm == "minmax_raw_score":
+            scores_norm = np.clip(scores_norm, 0.0, 1.0)
+        if target_n == len(candidates):
+            selected = list(candidates)
+            meta: dict[str, SelectionMeta] = {}
+            for idx, cand in enumerate(selected):
+                meta[cand.seq] = SelectionMeta(
+                    selection_rank=idx + 1,
+                    selection_utility=None,
+                    selection_score_norm=float(score_norm_for_meta[idx]) if score_norm_for_meta.size > idx else None,
+                    nearest_selected_similarity=None,
+                    nearest_selected_distance=None,
+                    nearest_selected_distance_norm=None,
+                )
+            return selected, meta
         score_weight = float(alpha)
         diversity_weight = 1.0 - score_weight
         cores = [core_by_seq[cand.seq] for cand in candidates]
@@ -485,5 +532,7 @@ def _select_by_mmr(
         selection_pool_min_score_norm_used=pool_min_score_norm_value,
         selection_pool_capped=bool(pool_capped),
         selection_pool_cap_value=int(pool_cap_value) if pool_cap_value is not None else None,
+        selection_score_norm_max_raw=score_norm_max_raw,
+        selection_score_norm_clipped=score_norm_clipped,
     )
     return selected, meta, diag

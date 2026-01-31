@@ -66,6 +66,8 @@ class PWMSamplingSummary:
     selection_pool_min_score_norm_used: Optional[float] = None
     selection_pool_capped: Optional[bool] = None
     selection_pool_cap_value: Optional[int] = None
+    selection_score_norm_max_raw: Optional[float] = None
+    selection_score_norm_clipped: Optional[bool] = None
     diversity_nearest_distance_mean: Optional[float] = None
     diversity_nearest_distance_min: Optional[float] = None
     diversity_nearest_similarity_mean: Optional[float] = None
@@ -75,6 +77,7 @@ class PWMSamplingSummary:
     padding_audit: Optional[dict[str, object]] = None
     pwm_consensus_score: Optional[float] = None
     pwm_theoretical_max_score: Optional[float] = None
+    max_observed_score: Optional[float] = None
 
 
 def _summarize_lengths(
@@ -181,6 +184,8 @@ def _build_summary(
     selection_pool_min_score_norm_used: Optional[float] = None,
     selection_pool_capped: Optional[bool] = None,
     selection_pool_cap_value: Optional[int] = None,
+    selection_score_norm_max_raw: Optional[float] = None,
+    selection_score_norm_clipped: Optional[bool] = None,
     diversity_nearest_distance_mean: Optional[float] = None,
     diversity_nearest_distance_min: Optional[float] = None,
     diversity_nearest_similarity_mean: Optional[float] = None,
@@ -192,6 +197,7 @@ def _build_summary(
     pwm_consensus_iupac: Optional[str] = None,
     pwm_consensus_score: Optional[float] = None,
     pwm_theoretical_max_score: Optional[float] = None,
+    max_observed_score: Optional[float] = None,
     input_name: Optional[str] = None,
     regulator: Optional[str] = None,
     backend: Optional[str] = None,
@@ -251,6 +257,12 @@ def _build_summary(
         else None,
         selection_pool_capped=bool(selection_pool_capped) if selection_pool_capped is not None else None,
         selection_pool_cap_value=int(selection_pool_cap_value) if selection_pool_cap_value is not None else None,
+        selection_score_norm_max_raw=float(selection_score_norm_max_raw)
+        if selection_score_norm_max_raw is not None
+        else None,
+        selection_score_norm_clipped=bool(selection_score_norm_clipped)
+        if selection_score_norm_clipped is not None
+        else None,
         diversity_nearest_distance_mean=float(diversity_nearest_distance_mean)
         if diversity_nearest_distance_mean is not None
         else None,
@@ -266,4 +278,5 @@ def _build_summary(
         padding_audit=dict(padding_audit) if padding_audit is not None else None,
         pwm_consensus_score=float(pwm_consensus_score) if pwm_consensus_score is not None else None,
         pwm_theoretical_max_score=(float(pwm_theoretical_max_score) if pwm_theoretical_max_score is not None else None),
+        max_observed_score=float(max_observed_score) if max_observed_score is not None else None,
     )
