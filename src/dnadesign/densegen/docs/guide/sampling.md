@@ -421,10 +421,14 @@ Glossary (plot annotations):
 
 1) **MMR requires enough eligible unique candidates to fill `n_sites`**
    Symptom: Stage‑A fails (or cannot fill) when `selection.policy: mmr` but eligible unique count is too small
-   (often after `uniqueness.key: core` collapses many flank variants).
+   (often after `uniqueness.key: core` collapses many flank variants). A strict
+   `selection.pool.min_score_norm` can also shrink the MMR pool below `n_sites`, even when the
+   overall eligible set is large (the run warns and returns fewer sites).
    Fixes:
    - reduce `n_sites`
+   - lower `selection.pool.min_score_norm`
    - increase mining (`max_candidates`, `max_seconds`, and/or relax `target_tier_fraction`)
+   - widen the `selection.tier_widening.ladder` to include more of the ranked list
    - switch to `selection.policy: top_score` for small pools
    - if flank diversity matters, consider `uniqueness.key: sequence` (larger unique set)
 

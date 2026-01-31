@@ -465,6 +465,23 @@ def _select_by_mmr(
             pool_candidates,
             key=lambda cand: (-float(cand.score), core_by_seq[cand.seq], cand.seq),
         )[:pool_max_candidates_value]
+    if len(pool_candidates) < int(n_sites) and total >= int(n_sites):
+        import logging
+
+        details = []
+        if fraction_used is not None:
+            details.append(f"rung={float(fraction_used) * 100:.3f}%")
+        if pool_min_score_norm_value is not None:
+            details.append(f"min_score_norm={float(pool_min_score_norm_value):.2f}")
+        if pool_capped and pool_cap_value is not None:
+            details.append(f"cap={int(pool_cap_value)}")
+        detail_label = f" ({', '.join(details)})" if details else ""
+        logging.getLogger(__name__).warning(
+            "Stage-A MMR pool contains %d candidates (< n_sites=%d)%s; selection will return fewer sites.",
+            len(pool_candidates),
+            int(n_sites),
+            detail_label,
+        )
     if pool_max_candidates_value is None and len(pool_candidates) > 100_000:
         import logging
 

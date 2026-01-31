@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import itertools
+import logging
 
 import pytest
 
@@ -195,6 +196,32 @@ def test_mmr_pool_min_score_norm_widens_rung() -> None:
     assert len(selected) == 2
     assert diag.selection_pool_size_final == 2
     assert diag.selection_pool_rung_fraction_used == pytest.approx(1.0)
+
+
+def test_mmr_pool_shortfall_warns(caplog: pytest.LogCaptureFixture) -> None:
+    matrix = [
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+    ]
+    background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
+    seqs = _seqs(12, length=3)
+    ranked = [_cand(seqs[i], float(100 - i)) for i in range(12)]
+    with caplog.at_level(logging.WARNING):
+        selected, _meta, _diag = stage_a_selection._select_by_mmr(
+            ranked,
+            matrix=matrix,
+            background=background,
+            n_sites=5,
+            alpha=0.5,
+            pool_min_score_norm=0.99,
+            pool_max_candidates=None,
+            relevance_norm="minmax_raw_score",
+            tier_widening=[0.25, 0.5, 1.0],
+            pwm_theoretical_max_score=100.0,
+        )
+    assert len(selected) < 5
+    assert "MMR pool" in caplog.text
 
 
 def test_mmr_pool_cap_is_deterministic() -> None:
