@@ -78,6 +78,17 @@ def test_selection_tier_widening_requires_ladder() -> None:
         PWMSelectionConfig.model_validate(
             {
                 "policy": "mmr",
+                "pool": {"min_score_norm": 0.85},
                 "tier_widening": {"enabled": True},
             }
         )
+
+
+def test_selection_mmr_requires_pool() -> None:
+    with pytest.raises(ValueError, match="selection.pool"):
+        PWMSelectionConfig.model_validate({"policy": "mmr"})
+
+
+def test_selection_mmr_requires_min_score_norm() -> None:
+    with pytest.raises(ValueError, match="selection.pool.min_score_norm"):
+        PWMSelectionConfig.model_validate({"policy": "mmr", "pool": {}})

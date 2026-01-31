@@ -48,18 +48,19 @@ def test_mmr_tier_widening_widens_instead_of_crashing() -> None:
         background=background,
         n_sites=20,
         alpha=0.9,
-        shortlist_min=50,
-        shortlist_factor=5,
-        shortlist_max=None,
+        pool_min_score_norm=None,
+        pool_max_candidates=None,
+        relevance_norm="minmax_raw_score",
         tier_widening=[0.01, 0.1, 1.0],
+        pwm_theoretical_max_score=200.0,
     )
 
     assert len(selected) == 20
-    assert diag.tier_fraction_used in (0.1, 1.0)
+    assert diag.selection_pool_rung_fraction_used in (0.1, 1.0)
     assert all(cand.seq in meta for cand in selected)
 
 
-def test_mmr_tier_widening_honors_shortlist_target() -> None:
+def test_mmr_tier_widening_honors_pool_size() -> None:
     matrix = _motif_with_pwm()
     background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
     ranked = []
@@ -83,11 +84,12 @@ def test_mmr_tier_widening_honors_shortlist_target() -> None:
         background=background,
         n_sites=10,
         alpha=0.9,
-        shortlist_min=10,
-        shortlist_factor=5,
-        shortlist_max=None,
+        pool_min_score_norm=None,
+        pool_max_candidates=None,
+        relevance_norm="minmax_raw_score",
         tier_widening=[0.2, 0.5, 1.0],
+        pwm_theoretical_max_score=100.0,
     )
 
     assert len(selected) == 10
-    assert diag.tier_limit >= 50
+    assert diag.selection_pool_size_final >= 20

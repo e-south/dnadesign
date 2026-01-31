@@ -41,7 +41,7 @@ def test_stage_a_yield_bias_labels_and_ticks() -> None:
                 "eligible_raw": 250,
                 "eligible_unique": 200,
                 "retained": 120,
-                "selection_pool_source": "eligible_unique",
+                "selection_pool_size_final": 200,
                 "diversity": {
                     "core_entropy": {
                         "diversified_candidates": {"values": [0.1, 0.2, 0.3, 0.4], "n": 2},
@@ -64,7 +64,7 @@ def test_stage_a_yield_bias_labels_and_ticks() -> None:
                 "eligible_raw": 200,
                 "eligible_unique": 160,
                 "retained": 90,
-                "selection_pool_source": "eligible_unique",
+                "selection_pool_size_final": 160,
                 "diversity": {
                     "core_entropy": {
                         "diversified_candidates": {"values": [0.0, 0.1, 0.2, 0.3], "n": 2},
@@ -123,7 +123,7 @@ def test_stage_a_yield_bias_requires_iupac_consensus() -> None:
                 "eligible_raw": 250,
                 "eligible_unique": 200,
                 "retained": 120,
-                "selection_pool_source": "eligible_unique",
+                "selection_pool_size_final": 200,
                 "diversity": {
                     "core_entropy": {
                         "diversified_candidates": {"values": [0.1, 0.2, 0.3, 0.4], "n": 2},

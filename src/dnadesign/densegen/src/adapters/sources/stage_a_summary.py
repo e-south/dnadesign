@@ -60,15 +60,12 @@ class PWMSamplingSummary:
     selection_policy: Optional[str] = None
     selection_alpha: Optional[float] = None
     selection_similarity: Optional[str] = None
-    selection_shortlist_k: Optional[int] = None
-    selection_shortlist_min: Optional[int] = None
-    selection_shortlist_factor: Optional[int] = None
-    selection_shortlist_max: Optional[int] = None
-    selection_shortlist_target: Optional[int] = None
-    selection_shortlist_target_met: Optional[bool] = None
-    selection_tier_fraction_used: Optional[float] = None
-    selection_tier_limit: Optional[int] = None
-    selection_pool_source: Optional[str] = None
+    selection_relevance_norm: Optional[str] = None
+    selection_pool_size_final: Optional[int] = None
+    selection_pool_rung_fraction_used: Optional[float] = None
+    selection_pool_min_score_norm_used: Optional[float] = None
+    selection_pool_capped: Optional[bool] = None
+    selection_pool_cap_value: Optional[int] = None
     diversity_nearest_distance_mean: Optional[float] = None
     diversity_nearest_distance_min: Optional[float] = None
     diversity_nearest_similarity_mean: Optional[float] = None
@@ -177,15 +174,12 @@ def _build_summary(
     selection_policy: Optional[str] = None,
     selection_alpha: Optional[float] = None,
     selection_similarity: Optional[str] = None,
-    selection_shortlist_k: Optional[int] = None,
-    selection_shortlist_min: Optional[int] = None,
-    selection_shortlist_factor: Optional[int] = None,
-    selection_shortlist_max: Optional[int] = None,
-    selection_shortlist_target: Optional[int] = None,
-    selection_shortlist_target_met: Optional[bool] = None,
-    selection_tier_fraction_used: Optional[float] = None,
-    selection_tier_limit: Optional[int] = None,
-    selection_pool_source: Optional[str] = None,
+    selection_relevance_norm: Optional[str] = None,
+    selection_pool_size_final: Optional[int] = None,
+    selection_pool_rung_fraction_used: Optional[float] = None,
+    selection_pool_min_score_norm_used: Optional[float] = None,
+    selection_pool_capped: Optional[bool] = None,
+    selection_pool_cap_value: Optional[int] = None,
     diversity_nearest_distance_mean: Optional[float] = None,
     diversity_nearest_distance_min: Optional[float] = None,
     diversity_nearest_similarity_mean: Optional[float] = None,
@@ -245,19 +239,16 @@ def _build_summary(
         selection_policy=str(selection_policy) if selection_policy is not None else None,
         selection_alpha=float(selection_alpha) if selection_alpha is not None else None,
         selection_similarity=str(selection_similarity) if selection_similarity is not None else None,
-        selection_shortlist_k=int(selection_shortlist_k) if selection_shortlist_k is not None else None,
-        selection_shortlist_min=int(selection_shortlist_min) if selection_shortlist_min is not None else None,
-        selection_shortlist_factor=int(selection_shortlist_factor) if selection_shortlist_factor is not None else None,
-        selection_shortlist_max=int(selection_shortlist_max) if selection_shortlist_max is not None else None,
-        selection_shortlist_target=int(selection_shortlist_target) if selection_shortlist_target is not None else None,
-        selection_shortlist_target_met=bool(selection_shortlist_target_met)
-        if selection_shortlist_target_met is not None
+        selection_relevance_norm=str(selection_relevance_norm) if selection_relevance_norm is not None else None,
+        selection_pool_size_final=int(selection_pool_size_final) if selection_pool_size_final is not None else None,
+        selection_pool_rung_fraction_used=float(selection_pool_rung_fraction_used)
+        if selection_pool_rung_fraction_used is not None
         else None,
-        selection_tier_fraction_used=float(selection_tier_fraction_used)
-        if selection_tier_fraction_used is not None
+        selection_pool_min_score_norm_used=float(selection_pool_min_score_norm_used)
+        if selection_pool_min_score_norm_used is not None
         else None,
-        selection_tier_limit=int(selection_tier_limit) if selection_tier_limit is not None else None,
-        selection_pool_source=str(selection_pool_source) if selection_pool_source is not None else None,
+        selection_pool_capped=bool(selection_pool_capped) if selection_pool_capped is not None else None,
+        selection_pool_cap_value=int(selection_pool_cap_value) if selection_pool_cap_value is not None else None,
         diversity_nearest_distance_mean=float(diversity_nearest_distance_mean)
         if diversity_nearest_distance_mean is not None
         else None,

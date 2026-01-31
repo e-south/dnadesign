@@ -29,40 +29,44 @@ class _CandidateLike(Protocol):
 
 @dataclass(frozen=True)
 class SelectionDiagnostics:
-    shortlist_k: int
-    shortlist_target: int
-    shortlist_target_met: bool
-    tier_fraction_used: float | None
-    tier_limit: int
-    pool_source: str
+    selection_pool_size_final: int
+    selection_pool_rung_fraction_used: float | None
+    selection_pool_min_score_norm_used: float | None
+    selection_pool_capped: bool
+    selection_pool_cap_value: int | None
 
     def __post_init__(self) -> None:
-        if int(self.shortlist_k) < 0:
-            raise ValueError("Selection shortlist_k must be >= 0.")
-        if int(self.shortlist_target) < 0:
-            raise ValueError("Selection shortlist_target must be >= 0.")
-        if int(self.tier_limit) < 0:
-            raise ValueError("Selection tier_limit must be >= 0.")
-        if self.pool_source not in {"shortlist_k", "tier_limit", "eligible_unique"}:
-            raise ValueError(
-                f"Selection pool_source must be shortlist_k/tier_limit/eligible_unique, got {self.pool_source}."
-            )
+        if int(self.selection_pool_size_final) < 0:
+            raise ValueError("Selection pool size must be >= 0.")
+        if self.selection_pool_rung_fraction_used is not None:
+            value = float(self.selection_pool_rung_fraction_used)
+            if value <= 0.0 or value > 1.0:
+                raise ValueError("Selection pool rung fraction must be in (0, 1].")
+        if self.selection_pool_min_score_norm_used is not None:
+            value = float(self.selection_pool_min_score_norm_used)
+            if value <= 0.0 or value > 1.0:
+                raise ValueError("Selection pool min score norm must be in (0, 1].")
+        if self.selection_pool_cap_value is not None and int(self.selection_pool_cap_value) <= 0:
+            raise ValueError("Selection pool cap value must be > 0 when set.")
 
     def pool_size(self) -> int:
-        if self.pool_source == "shortlist_k":
-            return int(self.shortlist_k)
-        if self.pool_source == "tier_limit":
-            return int(self.tier_limit)
-        return int(self.tier_limit)
+        return int(self.selection_pool_size_final)
 
     def to_dict(self) -> dict[str, object]:
         return {
-            "shortlist_k": int(self.shortlist_k),
-            "shortlist_target": int(self.shortlist_target),
-            "shortlist_target_met": bool(self.shortlist_target_met),
-            "tier_fraction_used": float(self.tier_fraction_used) if self.tier_fraction_used is not None else None,
-            "tier_limit": int(self.tier_limit),
-            "pool_source": str(self.pool_source),
+            "selection_pool_size_final": int(self.selection_pool_size_final),
+            "selection_pool_rung_fraction_used": (
+                float(self.selection_pool_rung_fraction_used)
+                if self.selection_pool_rung_fraction_used is not None
+                else None
+            ),
+            "selection_pool_min_score_norm_used": (
+                float(self.selection_pool_min_score_norm_used)
+                if self.selection_pool_min_score_norm_used is not None
+                else None
+            ),
+            "selection_pool_capped": bool(self.selection_pool_capped),
+            "selection_pool_cap_value": int(self.selection_pool_cap_value) if self.selection_pool_cap_value else None,
         }
 
 
@@ -116,7 +120,7 @@ def _pwm_tolerant_weights(
     return weights_arr
 
 
-def _score_norm(values: Sequence[float]) -> dict[float, float]:
+def _score_percentile_norm(values: Sequence[float]) -> dict[float, float]:
     if not values:
         return {}
     vals = [float(v) for v in values]
@@ -178,12 +182,9 @@ def _select_diversity_candidate_pool(
 ) -> list[_CandidateLike]:
     candidate_slice: list[_CandidateLike] = list(ranked)
     if selection_policy == "mmr" and selection_diag is not None:
-        tier_limit = int(selection_diag.tier_limit)
-        if tier_limit > 0:
-            candidate_slice = candidate_slice[:tier_limit]
-        shortlist_k = int(selection_diag.shortlist_k)
-        if shortlist_k > 0:
-            candidate_slice = candidate_slice[:shortlist_k]
+        pool_size = int(selection_diag.selection_pool_size_final)
+        if pool_size > 0:
+            candidate_slice = candidate_slice[:pool_size]
     return candidate_slice
 
 
@@ -306,10 +307,11 @@ def _select_by_mmr(
     background: dict[str, float],
     n_sites: int,
     alpha: float,
-    shortlist_min: int,
-    shortlist_factor: int,
-    shortlist_max: Optional[int],
+    pool_min_score_norm: float | None,
+    pool_max_candidates: int | None,
+    relevance_norm: str,
     tier_widening: Optional[Sequence[float]],
+    pwm_theoretical_max_score: float | None,
     encoding_store: CoreEncodingStore | None = None,
 ) -> tuple[list[_CandidateLike], dict[str, SelectionMeta], SelectionDiagnostics]:
     if not ranked or n_sites <= 0:
@@ -317,62 +319,80 @@ def _select_by_mmr(
             [],
             {},
             SelectionDiagnostics(
-                shortlist_k=0,
-                shortlist_target=0,
-                shortlist_target_met=False,
-                tier_fraction_used=None,
-                tier_limit=0,
-                pool_source="tier_limit",
+                selection_pool_size_final=0,
+                selection_pool_rung_fraction_used=None,
+                selection_pool_min_score_norm_used=None,
+                selection_pool_capped=False,
+                selection_pool_cap_value=None,
             ),
         )
     if alpha <= 0.0 or alpha > 1.0:
         raise ValueError("selection.alpha must be in (0, 1].")
+    relevance_norm = str(relevance_norm or "minmax_raw_score").lower()
+    if relevance_norm not in {"percentile", "minmax_raw_score"}:
+        raise ValueError("selection.pool.relevance_norm must be 'percentile' or 'minmax_raw_score'.")
+    pool_min_score_norm_value = float(pool_min_score_norm) if pool_min_score_norm is not None else None
+    if pool_min_score_norm_value is not None:
+        if pool_min_score_norm_value <= 0.0 or pool_min_score_norm_value > 1.0:
+            raise ValueError("selection.pool.min_score_norm must be in (0, 1].")
+    pool_max_candidates_value = int(pool_max_candidates) if pool_max_candidates is not None else None
+    if pool_max_candidates_value is not None and pool_max_candidates_value <= 0:
+        raise ValueError("selection.pool.max_candidates must be > 0 when set.")
     core_by_seq = {cand.seq: _core_sequence(cand) for cand in ranked}
     weights = _pwm_tolerant_weights(matrix, background=background)
     weight_sum = float(weights.sum())
     tier_fractions = list(tier_widening) if tier_widening else [1.0]
     total = len(ranked)
-    shortlist_target = max(int(shortlist_min), int(shortlist_factor) * int(n_sites))
+    score_norm_denominator = None
+    if pool_min_score_norm_value is not None or relevance_norm == "minmax_raw_score":
+        if pwm_theoretical_max_score is None:
+            raise ValueError("pwm_theoretical_max_score is required for score normalization in Stage-A MMR.")
+        score_norm_denominator = float(pwm_theoretical_max_score)
+        if score_norm_denominator <= 0.0:
+            raise ValueError("pwm_theoretical_max_score must be > 0 for Stage-A MMR score normalization.")
+    score_norm_ratio = None
+    if score_norm_denominator is not None:
+        score_norm_ratio = np.array([float(cand.score) / score_norm_denominator for cand in ranked], dtype=float)
 
     def _lex_ranks(values: Sequence[str]) -> np.ndarray:
         order = {val: idx for idx, val in enumerate(sorted(set(values)))}
         return np.array([order[val] for val in values], dtype=int)
 
-    def _select_from_slice(
+    def _select_from_pool(
         candidates: Sequence[_CandidateLike],
-    ) -> tuple[list[_CandidateLike], dict[str, SelectionMeta], int]:
+    ) -> tuple[list[_CandidateLike], dict[str, SelectionMeta]]:
         if not candidates:
-            return [], {}, 0
-        max_k = len(candidates) if shortlist_max is None else min(len(candidates), int(shortlist_max))
-        k = min(max_k, max(1, int(shortlist_target)))
-        if k <= 0:
-            k = min(len(candidates), int(n_sites))
-        shortlist = list(candidates[:k])
-        target_n = min(int(n_sites), len(shortlist))
+            return [], {}
+        target_n = min(int(n_sites), len(candidates))
         if target_n <= 0:
-            return [], {}, int(k)
-        scores_arr = np.array([float(cand.score) for cand in shortlist], dtype=float)
-        scores_norm_map = _score_norm(scores_arr.tolist())
-        scores_norm = np.array([scores_norm_map.get(float(cand.score), 1.0) for cand in shortlist], dtype=float)
+            return [], {}
+        scores_arr = np.array([float(cand.score) for cand in candidates], dtype=float)
+        if relevance_norm == "percentile":
+            scores_norm_map = _score_percentile_norm(scores_arr.tolist())
+            scores_norm = np.array([scores_norm_map.get(float(cand.score), 1.0) for cand in candidates], dtype=float)
+        else:
+            if score_norm_denominator is None:
+                raise ValueError("pwm_theoretical_max_score is required for minmax_raw_score relevance_norm.")
+            scores_norm = np.array([float(cand.score) / score_norm_denominator for cand in candidates], dtype=float)
         score_weight = float(alpha)
         diversity_weight = 1.0 - score_weight
-        cores = [core_by_seq[cand.seq] for cand in shortlist]
+        cores = [core_by_seq[cand.seq] for cand in candidates]
         if len(weights) != len(cores[0]):
             raise ValueError("PWM weights length must match TFBS core length.")
         encoded = encoding_store.encode(cores) if encoding_store is not None else encode_cores(cores)
-        seqs = [cand.seq for cand in shortlist]
+        seqs = [cand.seq for cand in candidates]
         core_ranks = _lex_ranks(cores)
         seq_ranks = _lex_ranks(seqs)
 
         def _run_mmr() -> tuple[list[_CandidateLike], dict[str, SelectionMeta]]:
-            selected_mask = np.zeros(len(shortlist), dtype=bool)
-            min_dist = np.full(len(shortlist), np.inf, dtype=float)
+            selected_mask = np.zeros(len(candidates), dtype=bool)
+            min_dist = np.full(len(candidates), np.inf, dtype=float)
             selected: list[_CandidateLike] = []
             meta: dict[str, SelectionMeta] = {}
             any_selected = False
             while len(selected) < target_n:
                 if not any_selected:
-                    max_sim = np.zeros(len(shortlist), dtype=float)
+                    max_sim = np.zeros(len(candidates), dtype=float)
                 else:
                     max_sim = 1.0 / (1.0 + min_dist)
                 utility = score_weight * scores_norm - diversity_weight * max_sim
@@ -389,7 +409,7 @@ def _select_by_mmr(
                     cand_seq = seq_ranks[candidate_idx]
                     order = np.lexsort((cand_seq, cand_core, -cand_scores))
                     best_idx = int(candidate_idx[order[0]])
-                chosen = shortlist[best_idx]
+                chosen = candidates[best_idx]
                 selected.append(chosen)
                 selected_mask[best_idx] = True
                 had_selected = any_selected
@@ -401,7 +421,7 @@ def _select_by_mmr(
                 meta[chosen.seq] = SelectionMeta(
                     selection_rank=len(selected),
                     selection_utility=float(utility[best_idx]),
-                    selection_score_percentile=float(scores_norm[best_idx]),
+                    selection_score_norm=float(scores_norm[best_idx]),
                     nearest_selected_similarity=float(max_sim[best_idx]) if had_selected else None,
                     nearest_selected_distance=nearest_distance,
                     nearest_selected_distance_norm=nearest_distance_norm,
@@ -413,52 +433,56 @@ def _select_by_mmr(
             return selected, meta
 
         selected, meta = _run_mmr()
-        if len(selected) < int(n_sites) and k < max_k:
-            shortlist = list(candidates[:max_k])
-            target_n = min(int(n_sites), len(shortlist))
-            scores_arr = np.array([float(cand.score) for cand in shortlist], dtype=float)
-            scores_norm_map = _score_norm(scores_arr.tolist())
-            scores_norm = np.array([scores_norm_map.get(float(cand.score), 1.0) for cand in shortlist], dtype=float)
-            cores = [core_by_seq[cand.seq] for cand in shortlist]
-            if len(weights) != len(cores[0]):
-                raise ValueError("PWM weights length must match TFBS core length.")
-            encoded = encoding_store.encode(cores) if encoding_store is not None else encode_cores(cores)
-            seqs = [cand.seq for cand in shortlist]
-            core_ranks = _lex_ranks(cores)
-            seq_ranks = _lex_ranks(seqs)
-            selected, meta = _run_mmr()
-            return selected, meta, int(max_k)
-        return selected, meta, int(k)
+        return selected, meta
 
-    last_selected: list[_CandidateLike] = []
-    last_meta: dict[str, dict] = {}
-    last_shortlist = 0
+    pool_candidates: list[_CandidateLike] = []
     fraction_used = None
-    tier_limit = total
-    shortlist_target_met = False
-    widen_for_shortlist = bool(tier_widening)
     for fraction in tier_fractions:
-        if fraction <= 0:
+        if float(fraction) <= 0:
             continue
-        tier_limit = min(total, max(1, int(np.floor(float(fraction) * total))))
-        subset = ranked[:tier_limit]
-        selected, meta, shortlist_k = _select_from_slice(subset)
-        last_selected = selected
-        last_meta = meta
-        last_shortlist = shortlist_k
+        tier_limit = min(total, max(1, int(np.ceil(float(fraction) * total))))
+        subset = list(ranked[:tier_limit])
+        if pool_min_score_norm_value is not None and score_norm_ratio is not None:
+            subset = [
+                cand
+                for idx, cand in enumerate(ranked[:tier_limit])
+                if float(score_norm_ratio[idx]) >= float(pool_min_score_norm_value)
+            ]
+        pool_candidates = subset
         fraction_used = float(fraction)
-        shortlist_target_met = int(shortlist_k) >= int(shortlist_target)
-        if len(selected) >= int(n_sites):
-            if widen_for_shortlist and not shortlist_target_met:
-                continue
+        if len(pool_candidates) >= int(n_sites):
             break
-    pool_source = "shortlist_k" if int(last_shortlist) > 0 else "tier_limit"
+    if fraction_used is None:
+        fraction_used = 1.0
+        pool_candidates = list(ranked)
+        if pool_min_score_norm_value is not None and score_norm_ratio is not None:
+            pool_candidates = [
+                cand
+                for idx, cand in enumerate(ranked)
+                if float(score_norm_ratio[idx]) >= float(pool_min_score_norm_value)
+            ]
+    pool_capped = False
+    pool_cap_value = None
+    if pool_max_candidates_value is not None and len(pool_candidates) > pool_max_candidates_value:
+        pool_capped = True
+        pool_cap_value = int(pool_max_candidates_value)
+        pool_candidates = sorted(
+            pool_candidates,
+            key=lambda cand: (-float(cand.score), core_by_seq[cand.seq], cand.seq),
+        )[:pool_max_candidates_value]
+    if pool_max_candidates_value is None and len(pool_candidates) > 100_000:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "Stage-A MMR pool size is %d candidates; consider setting selection.pool.max_candidates.",
+            len(pool_candidates),
+        )
+    selected, meta = _select_from_pool(pool_candidates)
     diag = SelectionDiagnostics(
-        shortlist_k=int(last_shortlist),
-        shortlist_target=int(shortlist_target),
-        shortlist_target_met=bool(shortlist_target_met),
-        tier_fraction_used=fraction_used,
-        tier_limit=int(tier_limit),
-        pool_source=pool_source,
+        selection_pool_size_final=int(len(pool_candidates)),
+        selection_pool_rung_fraction_used=fraction_used,
+        selection_pool_min_score_norm_used=pool_min_score_norm_value,
+        selection_pool_capped=bool(pool_capped),
+        selection_pool_cap_value=int(pool_cap_value) if pool_cap_value is not None else None,
     )
-    return last_selected, last_meta, diag
+    return selected, meta, diag

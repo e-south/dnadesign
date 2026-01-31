@@ -218,7 +218,33 @@ def _cfg() -> dict:
 def _diversity_block(core_len: int) -> dict:
     return {
         "candidate_pool_size": 2,
-        "shortlist_target": 10,
+        "nnd_unweighted_k1": {
+            "top_candidates": {
+                "bins": [0, 1, 2],
+                "counts": [0, 2, 0],
+                "median": 1.0,
+                "p05": 1.0,
+                "p95": 1.0,
+                "frac_le_1": 1.0,
+                "n": 2,
+                "subsampled": False,
+                "k": 1,
+            },
+            "diversified_candidates": {
+                "bins": [0, 1, 2],
+                "counts": [0, 2, 0],
+                "median": 1.0,
+                "p05": 1.0,
+                "p95": 1.0,
+                "frac_le_1": 1.0,
+                "n": 2,
+                "subsampled": False,
+                "k": 1,
+            },
+        },
+        "nnd_unweighted_median_top": 1.0,
+        "nnd_unweighted_median_diversified": 1.0,
+        "delta_nnd_unweighted_median": 0.0,
         "core_hamming": {
             "metric": "hamming",
             "nnd_k1": {
@@ -317,7 +343,7 @@ def _pool_manifest(tmp_path: Path, *, include_diversity: bool = False) -> TFBSPo
                     "rank_within_regulator",
                     "selection_rank",
                     "nearest_selected_similarity",
-                    "selection_score_percentile",
+                    "selection_score_norm",
                     "nearest_selected_distance_norm",
                 ],
                 "pool_mode": "tfbs",
@@ -351,15 +377,12 @@ def _pool_manifest(tmp_path: Path, *, include_diversity: bool = False) -> TFBSPo
                             "selection_policy": "mmr",
                             "selection_alpha": 0.9,
                             "selection_similarity": "weighted_hamming_tolerant",
-                            "selection_shortlist_k": 20,
-                            "selection_shortlist_min": 10,
-                            "selection_shortlist_factor": 5,
-                            "selection_shortlist_max": None,
-                            "selection_shortlist_target": 100,
-                            "selection_shortlist_target_met": True,
-                            "selection_tier_fraction_used": 0.001,
-                            "selection_tier_limit": 20,
-                            "selection_pool_source": "shortlist_k",
+                            "selection_relevance_norm": "minmax_raw_score",
+                            "selection_pool_size_final": 20,
+                            "selection_pool_rung_fraction_used": 0.001,
+                            "selection_pool_min_score_norm_used": None,
+                            "selection_pool_capped": False,
+                            "selection_pool_cap_value": None,
                             "mining_audit": None,
                             "padding_audit": None,
                         }
@@ -484,7 +507,7 @@ def test_plot_stage_a_summary(tmp_path: Path) -> None:
             "rank_within_regulator": [1, 2],
             "selection_rank": [1, 2],
             "nearest_selected_similarity": [0.0, 0.5],
-            "selection_score_percentile": [1.0, 0.5],
+            "selection_score_norm": [1.0, 0.5],
             "nearest_selected_distance_norm": [None, 0.5],
         }
     )
@@ -518,13 +541,42 @@ def test_plot_stage_a_summary_requires_diversity(tmp_path: Path) -> None:
             "rank_within_regulator": [1, 2],
             "selection_rank": [1, 2],
             "nearest_selected_similarity": [0.0, 0.5],
-            "selection_score_percentile": [1.0, 0.5],
+            "selection_score_norm": [1.0, 0.5],
             "nearest_selected_distance_norm": [None, 0.5],
         }
     )
     pools = {"demo_input": pool_df}
     manifest = _pool_manifest(tmp_path, include_diversity=False)
     with pytest.raises(ValueError, match="diversity"):
+        plot_stage_a_summary(
+            pd.DataFrame(),
+            out_path,
+            pools=pools,
+            pool_manifest=manifest,
+            style={},
+        )
+
+
+def test_plot_stage_a_summary_requires_selection_rank(tmp_path: Path) -> None:
+    matplotlib.use("Agg", force=True)
+    out_path = tmp_path / "stage_a_summary_missing_rank.png"
+    pool_df = pd.DataFrame(
+        {
+            "input_name": ["demo_input", "demo_input"],
+            "tf": ["TF_A", "TF_A"],
+            "tfbs_sequence": ["AAAA", "AAAAT"],
+            "tfbs_core": ["AAAA", "AAAT"],
+            "best_hit_score": [2.0, 1.5],
+            "tier": [0, 1],
+            "rank_within_regulator": [1, 2],
+            "nearest_selected_similarity": [0.0, 0.5],
+            "selection_score_norm": [1.0, 0.5],
+            "nearest_selected_distance_norm": [None, 0.5],
+        }
+    )
+    pools = {"demo_input": pool_df}
+    manifest = _pool_manifest(tmp_path, include_diversity=True)
+    with pytest.raises(ValueError, match="selection_rank"):
         plot_stage_a_summary(
             pd.DataFrame(),
             out_path,

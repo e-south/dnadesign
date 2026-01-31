@@ -26,7 +26,7 @@ from dnadesign.densegen.src.adapters.sources.stage_a_metrics import (
 )
 from dnadesign.densegen.src.adapters.sources.stage_a_selection import (
     SelectionDiagnostics,
-    _score_norm,
+    _score_percentile_norm,
     _select_diversity_top_candidates,
     _select_diversity_upper_bound_candidates,
 )
@@ -100,6 +100,9 @@ def test_diversity_summary_scores() -> None:
     assert diversified is not None
     assert base.p50 == 0.75
     assert diversified.p50 == 0.75
+    assert summary.nnd_unweighted_median_top == 1.0
+    assert summary.nnd_unweighted_median_diversified == 1.0
+    assert summary.delta_nnd_unweighted_median == 0.0
 
 
 def test_diversity_summary_allows_zero_pwm_theoretical_max_score_for_zero_scores() -> None:
@@ -189,7 +192,7 @@ def _cand(seq: str, score: float) -> FimoCandidate:
 def test_mmr_objective_mean_utility() -> None:
     cores = ["AAAA", "AAAT", "TTTT"]
     scores = [3.0, 2.0, 1.0]
-    scores_norm_map = _score_norm(scores)
+    scores_norm_map = _score_percentile_norm(scores)
     top_candidates = _mmr_objective(
         cores=cores,
         scores=scores,
@@ -206,15 +209,14 @@ def test_mmr_objective_mean_utility() -> None:
     assert diversified == pytest.approx(0.13333333333333333)
 
 
-def test_top_candidates_use_shortlist_k() -> None:
+def test_top_candidates_use_selection_pool_size() -> None:
     ranked = [_cand("AAAA", 4.0), _cand("AAAT", 3.0), _cand("AATT", 2.0), _cand("TTTT", 1.0)]
     diag = SelectionDiagnostics(
-        shortlist_k=2,
-        shortlist_target=2,
-        shortlist_target_met=True,
-        tier_fraction_used=1.0,
-        tier_limit=4,
-        pool_source="shortlist_k",
+        selection_pool_size_final=2,
+        selection_pool_rung_fraction_used=1.0,
+        selection_pool_min_score_norm_used=None,
+        selection_pool_capped=False,
+        selection_pool_cap_value=None,
     )
     top_candidates = _select_diversity_top_candidates(
         ranked,
@@ -225,15 +227,14 @@ def test_top_candidates_use_shortlist_k() -> None:
     assert [cand.seq for cand in top_candidates] == ["AAAA", "AAAT"]
 
 
-def test_top_candidates_use_tier_limit_when_shortlist_missing() -> None:
+def test_top_candidates_use_full_pool_when_uncapped() -> None:
     ranked = [_cand("AAAA", 4.0), _cand("AAAT", 3.0), _cand("AATT", 2.0), _cand("TTTT", 1.0)]
     diag = SelectionDiagnostics(
-        shortlist_k=0,
-        shortlist_target=0,
-        shortlist_target_met=False,
-        tier_fraction_used=1.0,
-        tier_limit=2,
-        pool_source="tier_limit",
+        selection_pool_size_final=4,
+        selection_pool_rung_fraction_used=1.0,
+        selection_pool_min_score_norm_used=None,
+        selection_pool_capped=False,
+        selection_pool_cap_value=None,
     )
     top_candidates = _select_diversity_top_candidates(
         ranked,
@@ -241,18 +242,17 @@ def test_top_candidates_use_tier_limit_when_shortlist_missing() -> None:
         selection_diag=diag,
         n_sites=3,
     )
-    assert [cand.seq for cand in top_candidates] == ["AAAA", "AAAT"]
+    assert [cand.seq for cand in top_candidates] == ["AAAA", "AAAT", "AATT"]
 
 
 def test_upper_bound_candidates_prefer_diverse_cores() -> None:
     ranked = [_cand("AAAA", 4.0), _cand("AAAT", 3.0), _cand("AATT", 2.0), _cand("TTTT", 1.0)]
     diag = SelectionDiagnostics(
-        shortlist_k=4,
-        shortlist_target=4,
-        shortlist_target_met=True,
-        tier_fraction_used=1.0,
-        tier_limit=4,
-        pool_source="shortlist_k",
+        selection_pool_size_final=4,
+        selection_pool_rung_fraction_used=1.0,
+        selection_pool_min_score_norm_used=None,
+        selection_pool_capped=False,
+        selection_pool_cap_value=None,
     )
     selected = _select_diversity_upper_bound_candidates(
         ranked,
@@ -266,15 +266,14 @@ def test_upper_bound_candidates_prefer_diverse_cores() -> None:
     assert {"AAAA", "TTTT"} <= picked
 
 
-def test_selection_diagnostics_rejects_unknown_pool_source() -> None:
+def test_selection_diagnostics_rejects_negative_pool_size() -> None:
     with pytest.raises(ValueError):
         SelectionDiagnostics(
-            shortlist_k=1,
-            shortlist_target=1,
-            shortlist_target_met=True,
-            tier_fraction_used=1.0,
-            tier_limit=1,
-            pool_source="unknown",
+            selection_pool_size_final=-1,
+            selection_pool_rung_fraction_used=1.0,
+            selection_pool_min_score_norm_used=None,
+            selection_pool_capped=False,
+            selection_pool_cap_value=None,
         )
 
 

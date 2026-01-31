@@ -11,6 +11,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import itertools
+
 import pytest
 
 from dnadesign.densegen.src.adapters.sources import stage_a_selection
@@ -26,6 +28,18 @@ def _cand(seq: str, score: float) -> FimoCandidate:
         strand="+",
         matched_sequence=seq,
     )
+
+
+def _seqs(count: int, length: int = 3) -> list[str]:
+    bases = ["A", "C", "G", "T"]
+    seqs: list[str] = []
+    for core in itertools.product(bases, repeat=length):
+        seqs.append("".join(core))
+        if len(seqs) >= count:
+            break
+    if len(seqs) < count:
+        raise ValueError("Insufficient unique sequences for requested count.")
+    return seqs
 
 
 def test_mmr_prefers_low_ic_mismatch_when_scores_equal() -> None:
@@ -45,20 +59,21 @@ def test_mmr_prefers_low_ic_mismatch_when_scores_equal() -> None:
         background=background,
         n_sites=2,
         alpha=0.5,
-        shortlist_min=3,
-        shortlist_factor=1,
-        shortlist_max=None,
+        pool_min_score_norm=None,
+        pool_max_candidates=None,
+        relevance_norm="minmax_raw_score",
         tier_widening=None,
+        pwm_theoretical_max_score=10.0,
     )
     assert [cand.seq for cand in selected] == ["AA", "AT"]
     assert meta["AA"].selection_rank == 1
     assert meta["AT"].selection_rank == 2
-    assert diag.shortlist_k == 3
+    assert diag.selection_pool_size_final == 3
 
 
 def test_score_norm_uses_percentile_rank() -> None:
     values = [10.0, 10.0, 30.0, 40.0]
-    norm = stage_a_selection._score_norm(values)
+    norm = stage_a_selection._score_percentile_norm(values)
     assert norm[10.0] == pytest.approx(0.166666, rel=1e-5)
     assert norm[30.0] == pytest.approx(0.666666, rel=1e-5)
     assert norm[40.0] == pytest.approx(1.0, rel=1e-5)
@@ -75,7 +90,7 @@ def test_pwm_tolerant_weights_use_background_information() -> None:
     assert weights[0] > weights[1]
 
 
-def test_mmr_records_score_percentile_and_distance_norm() -> None:
+def test_mmr_records_score_norm_and_distance_norm() -> None:
     matrix = [
         {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
         {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
@@ -92,12 +107,92 @@ def test_mmr_records_score_percentile_and_distance_norm() -> None:
         background=background,
         n_sites=2,
         alpha=0.5,
-        shortlist_min=3,
-        shortlist_factor=1,
-        shortlist_max=None,
+        pool_min_score_norm=None,
+        pool_max_candidates=None,
+        relevance_norm="minmax_raw_score",
         tier_widening=None,
+        pwm_theoretical_max_score=10.0,
     )
     assert [cand.seq for cand in selected] == ["AA", "AT"]
-    assert meta["AA"].selection_score_percentile == pytest.approx(1.0)
-    assert meta["AT"].selection_score_percentile == pytest.approx(0.25)
+    assert meta["AA"].selection_score_norm == pytest.approx(1.0)
+    assert meta["AT"].selection_score_norm == pytest.approx(0.9)
     assert meta["AT"].nearest_selected_distance_norm == pytest.approx(0.5)
+
+
+def test_mmr_pool_includes_full_rung_without_cap() -> None:
+    matrix = [
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+    ]
+    background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
+    seqs = _seqs(12, length=3)
+    ranked = [_cand(seqs[i], float(100 - i)) for i in range(12)]
+    selected, _meta, diag = stage_a_selection._select_by_mmr(
+        ranked,
+        matrix=matrix,
+        background=background,
+        n_sites=3,
+        alpha=0.5,
+        pool_min_score_norm=None,
+        pool_max_candidates=None,
+        relevance_norm="minmax_raw_score",
+        tier_widening=[0.5, 1.0],
+        pwm_theoretical_max_score=100.0,
+    )
+    assert len(selected) == 3
+    assert diag.selection_pool_size_final == 6
+    assert diag.selection_pool_capped is False
+
+
+def test_mmr_pool_min_score_norm_widens_rung() -> None:
+    matrix = [
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+    ]
+    background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
+    seqs = _seqs(12, length=3)
+    ranked = [_cand(seqs[i], float(100 - i)) for i in range(12)]
+    selected, _meta, diag = stage_a_selection._select_by_mmr(
+        ranked,
+        matrix=matrix,
+        background=background,
+        n_sites=3,
+        alpha=0.5,
+        pool_min_score_norm=0.99,
+        pool_max_candidates=None,
+        relevance_norm="minmax_raw_score",
+        tier_widening=[0.25, 0.5, 1.0],
+        pwm_theoretical_max_score=100.0,
+    )
+    assert len(selected) == 2
+    assert diag.selection_pool_size_final == 2
+    assert diag.selection_pool_rung_fraction_used == pytest.approx(1.0)
+
+
+def test_mmr_pool_cap_is_deterministic() -> None:
+    matrix = [
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+    ]
+    background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
+    seqs = _seqs(10, length=3)
+    ranked = [_cand(seqs[i], float(100 - i)) for i in range(10)]
+    selected, _meta, diag = stage_a_selection._select_by_mmr(
+        ranked,
+        matrix=matrix,
+        background=background,
+        n_sites=2,
+        alpha=0.5,
+        pool_min_score_norm=None,
+        pool_max_candidates=4,
+        relevance_norm="minmax_raw_score",
+        tier_widening=[1.0],
+        pwm_theoretical_max_score=100.0,
+    )
+    assert len(selected) == 2
+    assert diag.selection_pool_size_final == 4
+    assert diag.selection_pool_capped is True
+    assert diag.selection_pool_cap_value == 4

@@ -40,7 +40,7 @@ def _construct_mapping(loader, node, deep: bool = False):
 _StrictLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_mapping)
 
 
-LATEST_SCHEMA_VERSION = "2.7"
+LATEST_SCHEMA_VERSION = "2.8"
 SUPPORTED_SCHEMA_VERSIONS = {LATEST_SCHEMA_VERSION}
 
 
@@ -279,13 +279,37 @@ class PWMSelectionTierWidening(BaseModel):
         return self
 
 
+class PWMSelectionPoolConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    min_score_norm: Optional[float] = None
+    max_candidates: Optional[int] = None
+    relevance_norm: Literal["percentile", "minmax_raw_score"] = "minmax_raw_score"
+
+    @field_validator("min_score_norm")
+    @classmethod
+    def _min_score_norm_ok(cls, v: Optional[float]):
+        if v is None:
+            return v
+        value = float(v)
+        if value <= 0.0 or value > 1.0:
+            raise ValueError("pwm.sampling.selection.pool.min_score_norm must be in (0, 1]")
+        return value
+
+    @field_validator("max_candidates")
+    @classmethod
+    def _max_candidates_ok(cls, v: Optional[int]):
+        if v is None:
+            return v
+        if int(v) <= 0:
+            raise ValueError("pwm.sampling.selection.pool.max_candidates must be > 0 when set")
+        return int(v)
+
+
 class PWMSelectionConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     policy: Literal["top_score", "mmr"] = "top_score"
     alpha: float = 0.9
-    shortlist_factor: int = 5
-    shortlist_min: int = 50
-    shortlist_max: Optional[int] = None
+    pool: Optional[PWMSelectionPoolConfig] = None
     tier_widening: Optional[PWMSelectionTierWidening] = None
 
     @field_validator("alpha")
@@ -295,29 +319,20 @@ class PWMSelectionConfig(BaseModel):
             raise ValueError("pwm.sampling.selection.alpha must be in (0, 1]")
         return float(v)
 
-    @field_validator("shortlist_factor", "shortlist_min")
-    @classmethod
-    def _shortlist_positive(cls, v: int, info):
-        if int(v) <= 0:
-            raise ValueError(f"pwm.sampling.selection.{info.field_name} must be > 0")
-        return int(v)
-
-    @field_validator("shortlist_max")
-    @classmethod
-    def _shortlist_max_ok(cls, v: Optional[int]):
-        if v is None:
-            return v
-        if int(v) <= 0:
-            raise ValueError("pwm.sampling.selection.shortlist_max must be > 0 when set")
-        return int(v)
-
     @model_validator(mode="after")
     def _defaults_for_policy(self):
-        if self.policy == "mmr" and self.tier_widening is None:
-            self.tier_widening = PWMSelectionTierWidening(
-                enabled=True,
-                ladder=[0.001, 0.01, 0.09, 1.0],
-            )
+        if self.policy == "mmr":
+            if self.pool is None:
+                raise ValueError("pwm.sampling.selection.pool is required when policy=mmr.")
+            if self.pool.min_score_norm is None:
+                raise ValueError("pwm.sampling.selection.pool.min_score_norm is required when policy=mmr.")
+            if self.tier_widening is None:
+                self.tier_widening = PWMSelectionTierWidening(
+                    enabled=True,
+                    ladder=[0.001, 0.01, 0.09, 1.0],
+                )
+        elif self.pool is not None:
+            raise ValueError("pwm.sampling.selection.pool is only valid when policy=mmr.")
         return self
 
 

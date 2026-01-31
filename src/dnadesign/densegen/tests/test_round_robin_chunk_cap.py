@@ -83,7 +83,7 @@ def test_round_robin_chunk_cap_subsample(tmp_path: Path) -> None:
 
     cfg = {
         "densegen": {
-            "schema_version": "2.7",
+            "schema_version": "2.8",
             "run": {"id": "demo", "root": "."},
             "inputs": [
                 {
@@ -188,7 +188,7 @@ def test_stall_detected_with_no_solutions(tmp_path: Path) -> None:
 
     cfg = {
         "densegen": {
-            "schema_version": "2.7",
+            "schema_version": "2.8",
             "run": {"id": "demo", "root": "."},
             "inputs": [
                 {

@@ -76,21 +76,9 @@ def _build_stage_a_yield_bias_figure(
         retained = row["retained"]
         if any(val is None for val in (generated, eligible_raw, eligible_unique, retained)):
             raise ValueError(f"Stage-A sampling missing yield counters for '{input_name}' ({reg}).")
-        if "selection_pool_source" not in row:
-            raise ValueError(f"Stage-A sampling missing selection_pool_source for '{input_name}' ({reg}).")
-        pool_source = row["selection_pool_source"]
-        if pool_source == "shortlist_k":
-            if "selection_shortlist_k" not in row:
-                raise ValueError(f"Stage-A selection missing shortlist size for '{input_name}' ({reg}).")
-            selection_pool = row["selection_shortlist_k"]
-        elif pool_source == "tier_limit":
-            if "selection_tier_limit" not in row:
-                raise ValueError(f"Stage-A selection missing tier limit for '{input_name}' ({reg}).")
-            selection_pool = row["selection_tier_limit"]
-        elif pool_source == "eligible_unique":
-            selection_pool = row["eligible_unique"]
-        else:
-            raise ValueError(f"Stage-A selection_pool_source invalid for '{input_name}' ({reg}).")
+        if "selection_pool_size_final" not in row:
+            raise ValueError(f"Stage-A sampling missing selection_pool_size_final for '{input_name}' ({reg}).")
+        selection_pool = row["selection_pool_size_final"]
         if selection_pool is None:
             raise ValueError(f"Stage-A selection pool size missing for '{input_name}' ({reg}).")
         stage_counts.append([generated, eligible_raw, eligible_unique, selection_pool, retained])

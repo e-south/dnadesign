@@ -28,7 +28,7 @@ def _write_config(path: Path) -> None:
         yaml.safe_dump(
             {
                 "densegen": {
-                    "schema_version": "2.7",
+                    "schema_version": "2.8",
                     "run": {"id": "demo", "root": "."},
                     "inputs": [
                         {

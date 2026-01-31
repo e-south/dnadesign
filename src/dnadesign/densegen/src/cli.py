@@ -694,8 +694,6 @@ def _stage_a_sampling_rows(
                     raise ValueError("Stage-A summary tier fraction/count length mismatch.")
                 if summary.selection_policy is None:
                     raise ValueError("Stage-A summary missing selection policy.")
-                if summary.selection_pool_source is None:
-                    raise ValueError("Stage-A summary missing selection pool source.")
                 if summary.diversity is None:
                     raise ValueError("Stage-A diversity summary missing.")
                 candidates = _format_count(summary.generated)
@@ -713,11 +711,11 @@ def _stage_a_sampling_rows(
                         tier_target = f"{frac_label} unmet"
                 selection_label = summary.selection_policy
                 if summary.selection_policy == "mmr":
-                    if summary.selection_alpha is None or summary.selection_shortlist_k is None:
-                        raise ValueError("Stage-A summary missing MMR selection alpha or shortlist size.")
+                    if summary.selection_alpha is None:
+                        raise ValueError("Stage-A summary missing MMR selection alpha.")
                     selection_alpha = float(summary.selection_alpha)
-                    selection_shortlist_k = int(summary.selection_shortlist_k)
-                    selection_label = f"mmr a={selection_alpha:.2f} k={selection_shortlist_k}"
+                    relevance_norm = summary.selection_relevance_norm or "minmax_raw_score"
+                    selection_label = f"mmr a={selection_alpha:.2f} rel={relevance_norm}"
                 tier_counts = _format_tier_counts(summary.eligible_tier_counts, summary.retained_tier_counts)
                 tier_fill = "-"
                 if summary.retained_tier_counts:
@@ -774,9 +772,16 @@ def _stage_a_sampling_rows(
                     raise ValueError("Stage-A diversity missing overlap stats.")
                 diversity_overlap = f"{float(diversity.set_overlap_fraction) * 100:.1f}%"
                 diversity_swaps = str(int(diversity.set_overlap_swaps))
-                if diversity.candidate_pool_size is None or diversity.shortlist_target is None:
-                    raise ValueError("Stage-A diversity missing pool size or shortlist target.")
-                pool_label = f"{int(diversity.candidate_pool_size)}/{int(diversity.shortlist_target)}"
+                if diversity.candidate_pool_size is None:
+                    raise ValueError("Stage-A diversity missing pool size.")
+                pool_label = str(int(diversity.candidate_pool_size))
+                pool_source = "-"
+                if summary.selection_pool_capped:
+                    pool_label = f"{pool_label}*"
+                    if summary.selection_pool_cap_value is not None:
+                        pool_source = f"cap={int(summary.selection_pool_cap_value)}"
+                elif summary.selection_pool_rung_fraction_used is not None:
+                    pool_source = f"rung={float(summary.selection_pool_rung_fraction_used) * 100:.3f}%"
                 diversity_pool = pool_label
                 rows.append(
                     {
@@ -800,7 +805,7 @@ def _stage_a_sampling_rows(
                         "set_overlap": diversity_overlap,
                         "set_swaps": diversity_swaps,
                         "diversity_pool": diversity_pool,
-                        "diversity_pool_source": summary.selection_pool_source,
+                        "diversity_pool_source": pool_source,
                         "tier0_score": summary.tier0_score,
                         "tier1_score": summary.tier1_score,
                         "tier2_score": summary.tier2_score,
@@ -2220,7 +2225,7 @@ def stage_a_build_pool(
                 "eligible_raw=best_hit_score>0 among hits; eligible_unique=deduped by uniqueness.key; "
                 "retained=top-N by score after dedupe; tier target=diagnostic tier target status; "
                 "tier fill=deepest diagnostic tier used; selection=Stage-A selection policy; "
-                "k(pool/target)=MMR shortlist pool vs target (target=max(shortlist_min, shortlist_factor×n_sites)); "
+                "pool=MMR selection pool size (after rung + score_norm filter; '*' means capped); "
                 "div(pairwise)=pairwise weighted Hamming median; "
                 "overlap=top_candidates∩diversified_candidates; set_swaps=diversified - overlap; "
                 "Δscore_norm columns compare top_candidates vs diversified p10/med."
@@ -2230,7 +2235,7 @@ def stage_a_build_pool(
                 "Legend: generated=PWM candidates; eligible_unique=deduped by uniqueness.key; "
                 "retained=top-N by score after dedupe; tier fill=deepest diagnostic tier used; "
                 "selection=Stage-A selection policy; "
-                "k(pool/target)=MMR shortlist pool vs target (target=max(shortlist_min, shortlist_factor×n_sites)); "
+                "pool=MMR selection pool size (after rung + score_norm filter; '*' means capped); "
                 "div(pairwise)=pairwise weighted Hamming median; "
                 "overlap=top_candidates∩diversified_candidates; Δscore_norm med compares top_candidates vs diversified."
             )

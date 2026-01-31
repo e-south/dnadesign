@@ -99,9 +99,10 @@ def _extract_pwm_sampling_config(source_cfg) -> dict | None:
     selection_cfg = _sampling_attr(sampling, "selection")
     selection_policy = _sampling_attr(selection_cfg, "policy")
     selection_alpha = _sampling_attr(selection_cfg, "alpha")
-    selection_shortlist_factor = _sampling_attr(selection_cfg, "shortlist_factor")
-    selection_shortlist_min = _sampling_attr(selection_cfg, "shortlist_min")
-    selection_shortlist_max = _sampling_attr(selection_cfg, "shortlist_max")
+    selection_pool_cfg = _sampling_attr(selection_cfg, "pool")
+    selection_pool_min_score_norm = _sampling_attr(selection_pool_cfg, "min_score_norm")
+    selection_pool_max_candidates = _sampling_attr(selection_pool_cfg, "max_candidates")
+    selection_pool_relevance_norm = _sampling_attr(selection_pool_cfg, "relevance_norm")
     selection_tier_widening = _sampling_attr(selection_cfg, "tier_widening")
     if selection_tier_widening is not None:
         if hasattr(selection_tier_widening, "model_dump"):
@@ -138,9 +139,9 @@ def _extract_pwm_sampling_config(source_cfg) -> dict | None:
         "uniqueness_key": uniqueness_key,
         "selection_policy": selection_policy,
         "selection_alpha": selection_alpha,
-        "selection_shortlist_factor": selection_shortlist_factor,
-        "selection_shortlist_min": selection_shortlist_min,
-        "selection_shortlist_max": selection_shortlist_max,
+        "selection_pool_min_score_norm": selection_pool_min_score_norm,
+        "selection_pool_max_candidates": selection_pool_max_candidates,
+        "selection_pool_relevance_norm": selection_pool_relevance_norm,
         "selection_tier_widening": selection_tier_widening,
         "mining": {
             "batch_size": mining_batch_size,
@@ -242,9 +243,10 @@ def _input_metadata(source_cfg, cfg_path: Path) -> dict:
             selection = getattr(sampling, "selection", None)
             meta["input_pwm_selection_policy"] = _sampling_attr(selection, "policy")
             meta["input_pwm_selection_alpha"] = _sampling_attr(selection, "alpha")
-            meta["input_pwm_selection_shortlist_min"] = _sampling_attr(selection, "shortlist_min")
-            meta["input_pwm_selection_shortlist_factor"] = _sampling_attr(selection, "shortlist_factor")
-            meta["input_pwm_selection_shortlist_max"] = _sampling_attr(selection, "shortlist_max")
+            selection_pool = _sampling_attr(selection, "pool")
+            meta["input_pwm_selection_pool_min_score_norm"] = _sampling_attr(selection_pool, "min_score_norm")
+            meta["input_pwm_selection_pool_max_candidates"] = _sampling_attr(selection_pool, "max_candidates")
+            meta["input_pwm_selection_pool_relevance_norm"] = _sampling_attr(selection_pool, "relevance_norm")
     else:
         meta["input_mode"] = source_type
         meta["input_pwm_ids"] = []

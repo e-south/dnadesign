@@ -197,7 +197,10 @@ class ScoreQuantilesBlock:
 @dataclass(frozen=True)
 class DiversitySummary:
     candidate_pool_size: int | None
-    shortlist_target: int | None
+    nnd_unweighted_k1: KnnBlock
+    nnd_unweighted_median_top: float | None
+    nnd_unweighted_median_diversified: float | None
+    delta_nnd_unweighted_median: float | None
     core_hamming: CoreHammingSummary
     set_overlap_fraction: float | None
     set_overlap_swaps: int | None
@@ -210,7 +213,10 @@ class DiversitySummary:
     def to_dict(self) -> dict[str, object]:
         return {
             "candidate_pool_size": self.candidate_pool_size,
-            "shortlist_target": self.shortlist_target,
+            "nnd_unweighted_k1": self.nnd_unweighted_k1.to_dict(),
+            "nnd_unweighted_median_top": self.nnd_unweighted_median_top,
+            "nnd_unweighted_median_diversified": self.nnd_unweighted_median_diversified,
+            "delta_nnd_unweighted_median": self.delta_nnd_unweighted_median,
             "core_hamming": self.core_hamming.to_dict(),
             "set_overlap_fraction": self.set_overlap_fraction,
             "set_overlap_swaps": self.set_overlap_swaps,
@@ -563,7 +569,6 @@ def _diversity_summary(
     objective_diversified_candidates: float | None = None,
     uniqueness_key: str | None = None,
     candidate_pool_size: int | None = None,
-    shortlist_target: int | None = None,
     label: str | None = None,
     max_n: int = 2500,
     distance_weights: Sequence[float] | None = None,
@@ -589,6 +594,30 @@ def _diversity_summary(
     if uniqueness_key == "core" and diversified_candidates_cores:
         if len(set(diversified_candidates_cores)) != len(diversified_candidates_cores):
             raise ValueError(f"Duplicate retained cores detected for {label} with uniqueness.key=core.")
+    top_candidates_unweighted_k1 = _core_hamming_knn(
+        top_candidates_cores,
+        k=1,
+        max_n=max_n,
+        weights=None,
+        encoding_store=encoding_store,
+    )
+    diversified_candidates_unweighted_k1 = _core_hamming_knn(
+        diversified_candidates_cores,
+        k=1,
+        max_n=max_n,
+        weights=None,
+        encoding_store=encoding_store,
+    )
+    if top_candidates_unweighted_k1 is None or diversified_candidates_unweighted_k1 is None:
+        return None
+    nnd_unweighted_k1 = KnnBlock(
+        top_candidates=top_candidates_unweighted_k1,
+        diversified_candidates=diversified_candidates_unweighted_k1,
+    )
+    nnd_unweighted_median_top = float(top_candidates_unweighted_k1.median)
+    nnd_unweighted_median_diversified = float(diversified_candidates_unweighted_k1.median)
+    delta_nnd_unweighted_median = nnd_unweighted_median_diversified - nnd_unweighted_median_top
+
     top_candidates_k1 = _core_hamming_knn(
         top_candidates_cores,
         k=1,
@@ -720,7 +749,10 @@ def _diversity_summary(
     )
     return DiversitySummary(
         candidate_pool_size=int(candidate_pool_size) if candidate_pool_size is not None else None,
-        shortlist_target=int(shortlist_target) if shortlist_target is not None else None,
+        nnd_unweighted_k1=nnd_unweighted_k1,
+        nnd_unweighted_median_top=nnd_unweighted_median_top,
+        nnd_unweighted_median_diversified=nnd_unweighted_median_diversified,
+        delta_nnd_unweighted_median=delta_nnd_unweighted_median,
         core_hamming=core_hamming,
         set_overlap_fraction=overlap_fraction,
         set_overlap_swaps=overlap_swaps,

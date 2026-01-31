@@ -34,7 +34,7 @@ from .stage_a_selection import (
     _collapse_by_core_identity,
     _core_sequence,
     _pwm_tolerant_weights,
-    _score_norm,
+    _score_percentile_norm,
     _select_by_mmr,
     _select_diversity_candidate_pool,
     _select_diversity_global_candidates,
@@ -86,7 +86,7 @@ def _cap_label(
     return cap_label
 
 
-def _coerce_shortlist_max(policy: str, value: int | None) -> int | None:
+def _coerce_pool_max_candidates(policy: str, value: int | None) -> int | None:
     if policy != "mmr":
         return None
     if value is None:
@@ -179,9 +179,9 @@ def run_stage_a_pipeline(
     progress: _PwmSamplingProgress | None,
     selection_policy: str,
     selection_alpha: float,
-    selection_shortlist_min: int,
-    selection_shortlist_factor: int,
-    selection_shortlist_max: Optional[int],
+    selection_pool_min_score_norm: float | None,
+    selection_pool_max_candidates: int | None,
+    selection_relevance_norm: str | None,
     selection_tier_widening: Optional[Sequence[float]],
     tier_fractions: Sequence[float],
     tier_fractions_source: str,
@@ -322,10 +322,11 @@ def run_stage_a_pipeline(
             background=motif.background,
             n_sites=int(n_sites),
             alpha=float(selection_alpha),
-            shortlist_min=int(selection_shortlist_min),
-            shortlist_factor=int(selection_shortlist_factor),
-            shortlist_max=int(selection_shortlist_max) if selection_shortlist_max is not None else None,
+            pool_min_score_norm=selection_pool_min_score_norm,
+            pool_max_candidates=selection_pool_max_candidates,
+            relevance_norm=selection_relevance_norm or "minmax_raw_score",
             tier_widening=selection_tier_widening,
+            pwm_theoretical_max_score=pwm_theoretical_max_score,
             encoding_store=encoding_store,
         )
     else:
@@ -337,12 +338,11 @@ def run_stage_a_pipeline(
                 nearest_selected_similarity=None,
             )
         selection_diag = SelectionDiagnostics(
-            shortlist_k=0,
-            shortlist_target=0,
-            shortlist_target_met=False,
-            tier_fraction_used=None,
-            tier_limit=int(len(ranked)),
-            pool_source="eligible_unique",
+            selection_pool_size_final=int(len(ranked)),
+            selection_pool_rung_fraction_used=None,
+            selection_pool_min_score_norm_used=None,
+            selection_pool_capped=False,
+            selection_pool_cap_value=None,
         )
     retained_tier_counts = [0, 0, 0, 0]
     for cand in picked:
@@ -381,7 +381,13 @@ def run_stage_a_pipeline(
     objective_top_candidates = None
     objective_diversified_candidates = None
     if selection_policy == "mmr" and candidate_pool:
-        scores_norm_map = _score_norm([float(cand.score) for cand in candidate_pool])
+        if (selection_relevance_norm or "minmax_raw_score") == "percentile":
+            scores_norm_map = _score_percentile_norm([float(cand.score) for cand in candidate_pool])
+        else:
+            if pwm_theoretical_max_score is None or float(pwm_theoretical_max_score) <= 0.0:
+                raise ValueError("pwm_theoretical_max_score is required for minmax_raw_score relevance_norm.")
+            denom = float(pwm_theoretical_max_score)
+            scores_norm_map = {float(cand.score): float(cand.score) / denom for cand in candidate_pool}
         top_scores_objective = [float(cand.score) for cand in top_candidates if cand.matched_sequence]
         diversified_scores_objective = [float(cand.score) for cand in picked if cand.matched_sequence]
         objective_top_candidates = _mmr_objective(
@@ -401,9 +407,7 @@ def run_stage_a_pipeline(
             encoding_store=encoding_store,
         )
     candidate_pool_size = None
-    shortlist_target = None
     if selection_diag is not None:
-        shortlist_target = int(selection_diag.shortlist_target)
         candidate_pool_size = int(selection_diag.pool_size())
     if candidate_pool_size is None and candidate_pool:
         candidate_pool_size = len(candidate_pool)
@@ -433,7 +437,6 @@ def run_stage_a_pipeline(
         objective_diversified_candidates=objective_diversified_candidates,
         uniqueness_key=uniqueness_key,
         candidate_pool_size=int(candidate_pool_size) if candidate_pool_size is not None else None,
-        shortlist_target=int(shortlist_target) if shortlist_target is not None else None,
         label=motif.motif_id,
         max_n=diversity_max_n,
         distance_weights=distance_weights,
@@ -510,6 +513,12 @@ def run_stage_a_pipeline(
             eligible_unique=len(ranked),
         )
         if not tier_target_met:
+            reason_bits = []
+            if cap_applied and budget_max_candidates is not None:
+                reason_bits.append(f"max_candidates={int(budget_max_candidates)}")
+            if mining_time_limited and budget_max_seconds is not None:
+                reason_bits.append(f"max_seconds={float(budget_max_seconds):g}")
+            reason_label = ", ".join(reason_bits) if reason_bits else "mining limits"
             suggestions = [
                 "increase mining.budget.max_candidates",
                 "relax mining.budget.target_tier_fraction",
@@ -521,9 +530,18 @@ def run_stage_a_pipeline(
                 f"Stage-A tier target unmet for motif '{motif.motif_id}': "
                 f"eligible_unique={len(ranked)} < required_unique={tier_target_required_unique} "
                 f"for target_tier_fraction={budget_target_tier_fraction}.",
+                (
+                    "tier_target unmet; reached "
+                    f"{reason_label}; retained from best available; consider mining.budget.mode=fixed_candidates."
+                ),
                 "Retained set will spill beyond the target tier.",
                 "Try next: " + "; ".join(suggestions) + ".",
             ]
+            if mining_audit is None:
+                mining_audit = {}
+            mining_audit["tier_target_unmet_reason"] = reason_label
+            mining_audit["tier_target_unmet_cap_applied"] = bool(cap_applied)
+            mining_audit["tier_target_unmet_time_limited"] = bool(mining_time_limited)
             log.warning(" ".join(warn_lines))
     n0, n1, n2, _n3 = score_tier_counts(len(ranked), fractions=tier_fractions)
     tier0_score = ranked[n0 - 1].score if n0 > 0 else None
@@ -563,13 +581,16 @@ def run_stage_a_pipeline(
             selection_policy=str(selection_policy),
             selection_alpha=float(selection_alpha) if selection_policy == "mmr" else None,
             selection_similarity="weighted_hamming_tolerant" if selection_policy == "mmr" else None,
-            selection_shortlist_min=int(selection_shortlist_min) if selection_policy == "mmr" else None,
-            selection_shortlist_factor=int(selection_shortlist_factor) if selection_policy == "mmr" else None,
-            selection_shortlist_max=_coerce_shortlist_max(selection_policy, selection_shortlist_max),
-            selection_tier_fraction_used=selection_diag.tier_fraction_used if selection_diag else None,
-            selection_tier_limit=selection_diag.tier_limit if selection_diag else None,
-            shortlist_k=selection_diag.shortlist_k if selection_diag else None,
-            selection_pool_source=selection_diag.pool_source if selection_diag else None,
+            selection_relevance_norm=str(selection_relevance_norm) if selection_policy == "mmr" else None,
+            selection_pool_size_final=selection_diag.selection_pool_size_final if selection_diag else None,
+            selection_pool_rung_fraction_used=(
+                selection_diag.selection_pool_rung_fraction_used if selection_diag else None
+            ),
+            selection_pool_min_score_norm_used=selection_diag.selection_pool_min_score_norm_used
+            if selection_diag
+            else None,
+            selection_pool_capped=selection_diag.selection_pool_capped if selection_diag else None,
+            selection_pool_cap_value=selection_diag.selection_pool_cap_value if selection_diag else None,
             tier_target_fraction=budget_target_tier_fraction,
             tier_target_required_unique=tier_target_required_unique,
             tier_target_met=tier_target_met,
@@ -636,15 +657,16 @@ def run_stage_a_pipeline(
             selection_policy=selection_policy,
             selection_alpha=selection_alpha if selection_policy == "mmr" else None,
             selection_similarity="weighted_hamming_tolerant" if selection_policy == "mmr" else None,
-            selection_shortlist_k=selection_diag.shortlist_k if selection_diag is not None else None,
-            selection_shortlist_min=selection_shortlist_min if selection_policy == "mmr" else None,
-            selection_shortlist_factor=selection_shortlist_factor if selection_policy == "mmr" else None,
-            selection_shortlist_max=selection_shortlist_max if selection_policy == "mmr" else None,
-            selection_shortlist_target=selection_diag.shortlist_target if selection_diag is not None else None,
-            selection_shortlist_target_met=selection_diag.shortlist_target_met if selection_diag is not None else None,
-            selection_tier_fraction_used=selection_diag.tier_fraction_used if selection_diag is not None else None,
-            selection_tier_limit=selection_diag.tier_limit if selection_diag is not None else None,
-            selection_pool_source=selection_diag.pool_source if selection_diag is not None else None,
+            selection_relevance_norm=str(selection_relevance_norm) if selection_policy == "mmr" else None,
+            selection_pool_size_final=selection_diag.selection_pool_size_final if selection_diag is not None else None,
+            selection_pool_rung_fraction_used=selection_diag.selection_pool_rung_fraction_used
+            if selection_diag is not None
+            else None,
+            selection_pool_min_score_norm_used=selection_diag.selection_pool_min_score_norm_used
+            if selection_diag is not None
+            else None,
+            selection_pool_capped=selection_diag.selection_pool_capped if selection_diag is not None else None,
+            selection_pool_cap_value=selection_diag.selection_pool_cap_value if selection_diag is not None else None,
             diversity_nearest_similarity_mean=diversity_nearest_similarity_mean,
             diversity_nearest_distance_mean=diversity_nearest_distance_mean,
             diversity_nearest_distance_min=diversity_nearest_distance_min,

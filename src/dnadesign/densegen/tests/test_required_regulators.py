@@ -75,7 +75,7 @@ def test_required_regulators_filtering(tmp_path: Path) -> None:
     csv_path.write_text("tf,tfbs\nTF1,AAA\nTF2,CCC\n")
     cfg = {
         "densegen": {
-            "schema_version": "2.7",
+            "schema_version": "2.8",
             "run": {"id": "demo", "root": "."},
             "inputs": [
                 {
@@ -152,7 +152,7 @@ def test_required_regulators_k_of_n(tmp_path: Path) -> None:
     csv_path.write_text("tf,tfbs\nTF1,AAA\nTF2,CCC\n")
     cfg = {
         "densegen": {
-            "schema_version": "2.7",
+            "schema_version": "2.8",
             "run": {"id": "demo", "root": "."},
             "inputs": [
                 {

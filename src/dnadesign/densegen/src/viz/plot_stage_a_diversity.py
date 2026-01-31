@@ -76,11 +76,32 @@ def _build_stage_a_diversity_figure(
         ax_header.text(
             0.5,
             0.76,
-            f"Stage-A core diversity (nearest-neighbor outcome + MMR contribution) -- {input_name}",
+            f"Stage-A core diversity (unweighted NN + MMR trajectory) -- {input_name}",
             ha="center",
             va="center",
             fontsize=text_sizes["fig_title"],
             color="#111111",
+        )
+        ax_header.text(
+            0.5,
+            0.46,
+            "MMR (Carbonell & Goldstein): utility = alpha*relevance − (1−alpha)*max similarity",
+            ha="center",
+            va="center",
+            fontsize=text_sizes["annotation"] * 0.85,
+            color="#444444",
+        )
+        ax_header.text(
+            0.5,
+            0.24,
+            (
+                "relevance = score percentile (or configured normalization); "
+                "similarity from weighted Hamming: sim = 1/(1+dist)"
+            ),
+            ha="center",
+            va="center",
+            fontsize=text_sizes["annotation"] * 0.82,
+            color="#444444",
         )
         body = outer[1].subgridspec(
             nrows=n_regs,
@@ -120,7 +141,7 @@ def _build_stage_a_diversity_figure(
             y = arr / total
             return x, y
 
-        metric_label = "Nearest-neighbor distance (k=1)"
+        metric_label = "Unweighted Hamming nearest-neighbor distance (k=1)"
         for idx, reg in enumerate(regulators):
             hue = reg_colors.get(reg, "#4c78a8")
             row = row_by_reg[reg]
@@ -148,20 +169,16 @@ def _build_stage_a_diversity_figure(
             core_hamming = diversity.get("core_hamming")
             if not isinstance(core_hamming, dict):
                 raise ValueError(f"Stage-A diversity missing core_hamming for '{input_name}' ({reg}).")
-            if "metric" not in core_hamming:
-                raise ValueError(f"Stage-A diversity missing metric for '{input_name}' ({reg}).")
-            metric = str(core_hamming["metric"]).strip()
-            if not metric:
-                raise ValueError(f"Stage-A diversity missing metric for '{input_name}' ({reg}).")
-            if metric == "weighted_hamming_tolerant":
-                metric_label = "Weighted Hamming nearest-neighbor distance (k=1)"
-            nnd_block = core_hamming.get("nnd_k1")
-            if not isinstance(nnd_block, dict):
-                raise ValueError(f"Stage-A diversity missing nnd_k1 stats for '{input_name}' ({reg}).")
-            top_candidates = nnd_block.get("top_candidates")
-            diversified_candidates = nnd_block.get("diversified_candidates")
+            nnd_unweighted = diversity.get("nnd_unweighted_k1")
+            if not isinstance(nnd_unweighted, dict):
+                raise ValueError(f"Stage-A diversity missing unweighted nnd_k1 for '{input_name}' ({reg}).")
+            top_candidates = nnd_unweighted.get("top_candidates")
+            diversified_candidates = nnd_unweighted.get("diversified_candidates")
             if not isinstance(top_candidates, dict) or not isinstance(diversified_candidates, dict):
-                raise ValueError(f"Stage-A diversity missing nnd_k1 top/diversified for '{input_name}' ({reg}).")
+                raise ValueError(
+                    (f"Stage-A diversity missing unweighted nnd_k1 top/diversified for '{input_name}' ({reg}).")
+                )
+            metric_label = "Unweighted Hamming nearest-neighbor distance (k=1)"
             bins = top_candidates.get("bins") or diversified_candidates.get("bins")
             if not isinstance(bins, list) or not bins:
                 raise ValueError(f"Stage-A diversity missing nnd_k1 bins for '{input_name}' ({reg}).")
@@ -203,7 +220,15 @@ def _build_stage_a_diversity_figure(
                 raise ValueError(f"Stage-A diversity missing nnd_k1 median for '{input_name}' ({reg}).")
             base_med = float(top_candidates["median"])
             act_med = float(diversified_candidates["median"])
-            note_lines.append(f"Δnnd (median) {act_med - base_med:+.2f}")
+            note_lines.append(f"Δnnd unweighted {act_med - base_med:+.2f}")
+            weighted_block = core_hamming.get("nnd_k1")
+            if isinstance(weighted_block, dict):
+                weighted_top = weighted_block.get("top_candidates")
+                weighted_div = weighted_block.get("diversified_candidates")
+                if isinstance(weighted_top, dict) and isinstance(weighted_div, dict):
+                    if "median" in weighted_top and "median" in weighted_div:
+                        w_delta = float(weighted_div["median"]) - float(weighted_top["median"])
+                        note_lines.append(f"Δnnd weighted {w_delta:+.2f}")
             objective_delta = diversity.get("objective_delta")
             if objective_delta is None:
                 objective_top = diversity.get("objective_top_candidates")
@@ -227,20 +252,18 @@ def _build_stage_a_diversity_figure(
                 )
             selection_policy = str(row.get("selection_policy") or "").lower()
             reg_df = pool_df[pool_df[tf_col].astype(str) == reg].copy()
-            if "selection_score_percentile" not in reg_df.columns:
-                raise ValueError(f"Stage-A pool missing selection_score_percentile for input '{input_name}' ({reg}).")
+            if "selection_score_norm" not in reg_df.columns:
+                raise ValueError(f"Stage-A pool missing selection_score_norm for input '{input_name}' ({reg}).")
             if "nearest_selected_distance_norm" not in reg_df.columns:
                 raise ValueError(
                     f"Stage-A pool missing nearest_selected_distance_norm for input '{input_name}' ({reg})."
                 )
-            score_pct = pd.to_numeric(reg_df["selection_score_percentile"], errors="coerce")
+            if "selection_rank" not in reg_df.columns:
+                raise ValueError(f"Stage-A pool missing selection_rank for input '{input_name}' ({reg}).")
+            score_norm = pd.to_numeric(reg_df["selection_score_norm"], errors="coerce")
             dist_norm = pd.to_numeric(reg_df["nearest_selected_distance_norm"], errors="coerce")
-            ranks = (
-                pd.to_numeric(reg_df["selection_rank"], errors="coerce") if "selection_rank" in reg_df.columns else None
-            )
-            mask = dist_norm.notna() & score_pct.notna()
-            if ranks is not None:
-                mask &= ranks > 1
+            ranks = pd.to_numeric(reg_df["selection_rank"], errors="coerce")
+            mask = ranks.notna() & score_norm.notna()
             if selection_policy != "mmr":
                 ax_right.text(
                     0.5,
@@ -262,21 +285,42 @@ def _build_stage_a_diversity_figure(
                     color="#666666",
                 )
             else:
-                score_norm = score_pct[mask].to_numpy(dtype=float)
-                distances = dist_norm[mask].to_numpy(dtype=float)
-                ax_right.scatter(
-                    score_norm,
-                    distances,
-                    s=18,
-                    color=hue,
-                    alpha=0.75,
-                    edgecolor="none",
-                    zorder=3,
+                ordered = ranks[mask].to_numpy(dtype=float)
+                sort_idx = np.argsort(ordered)
+                ordered = ordered[sort_idx]
+                score_vals = score_norm[mask].to_numpy(dtype=float)[sort_idx]
+                dist_vals = dist_norm[mask].to_numpy(dtype=float)[sort_idx]
+                dist_mask = np.isfinite(dist_vals)
+                if dist_mask.any():
+                    ax_right.plot(
+                        ordered[dist_mask],
+                        dist_vals[dist_mask],
+                        color=hue,
+                        marker="o",
+                        linewidth=1.2,
+                        markersize=3.5,
+                        alpha=0.85,
+                        zorder=3,
+                    )
+                    y_max = float(np.nanmax(dist_vals[dist_mask]))
+                    ax_right.set_ylim(0.0, y_max * 1.15 if y_max > 0 else 1.0)
+                ax_right.set_xlim(1.0, float(np.nanmax(ordered)) if ordered.size else 1.0)
+                ax_score = ax_right.twinx()
+                ax_score.plot(
+                    ordered,
+                    score_vals,
+                    color="#555555",
+                    linestyle="--",
+                    linewidth=1.0,
+                    alpha=0.6,
                 )
-                ax_right.set_xlim(0.0, 1.0)
-                y_max = float(np.nanmax(distances)) if distances.size else 0.0
-                ax_right.set_ylim(0.0, y_max * 1.15 if y_max > 0 else 1.0)
-            ax_right.set_ylabel("Selection-time nearest distance (normalized)" if idx == 0 else "")
+                ax_score.set_ylim(0.0, 1.0)
+                if idx == 0:
+                    ax_score.set_ylabel("Score norm", fontsize=text_sizes["annotation"] * 0.8)
+                else:
+                    ax_score.tick_params(labelright=False)
+                _apply_style(ax_score, style)
+            ax_right.set_ylabel("Nearest selected distance (weighted, normalized)" if idx == 0 else "")
             ax_right.xaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=5))
             ax_left.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
             ax_right.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
@@ -284,10 +328,10 @@ def _build_stage_a_diversity_figure(
         if axes_left:
             axes_left[0].set_title("Nearest-neighbor distance distribution", fontsize=subtitle_size, pad=title_pad)
             axes_right[0].set_title(
-                "MMR contribution (score vs nearest distance)", fontsize=subtitle_size, pad=title_pad
+                "Selection trajectory (MMR distance + score)", fontsize=subtitle_size, pad=title_pad
             )
             axes_left[-1].set_xlabel(metric_label)
-            axes_right[-1].set_xlabel("Score percentile (selection pool)")
+            axes_right[-1].set_xlabel("Selection rank")
             for ax in axes_left[:-1]:
                 ax.tick_params(labelbottom=False)
             for ax in axes_right:

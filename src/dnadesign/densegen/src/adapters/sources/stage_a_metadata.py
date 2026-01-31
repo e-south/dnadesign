@@ -31,13 +31,12 @@ class TFBSMeta:
     selection_policy: str
     selection_alpha: Optional[float]
     selection_similarity: Optional[str]
-    selection_shortlist_min: Optional[int]
-    selection_shortlist_factor: Optional[int]
-    selection_shortlist_max: Optional[int]
-    selection_tier_fraction_used: Optional[float]
-    selection_tier_limit: Optional[int]
-    shortlist_k: Optional[int]
-    selection_pool_source: Optional[str]
+    selection_relevance_norm: Optional[str]
+    selection_pool_size_final: Optional[int]
+    selection_pool_rung_fraction_used: Optional[float]
+    selection_pool_min_score_norm_used: Optional[float]
+    selection_pool_capped: Optional[bool]
+    selection_pool_cap_value: Optional[int]
     tier_target_fraction: Optional[float]
     tier_target_required_unique: Optional[int]
     tier_target_met: Optional[bool]
@@ -65,13 +64,12 @@ class TFBSMeta:
             "selection_policy": str(self.selection_policy),
             "selection_alpha": self.selection_alpha,
             "selection_similarity": self.selection_similarity,
-            "selection_shortlist_min": self.selection_shortlist_min,
-            "selection_shortlist_factor": self.selection_shortlist_factor,
-            "selection_shortlist_max": self.selection_shortlist_max,
-            "selection_tier_fraction_used": self.selection_tier_fraction_used,
-            "selection_tier_limit": self.selection_tier_limit,
-            "shortlist_k": self.shortlist_k,
-            "selection_pool_source": self.selection_pool_source,
+            "selection_relevance_norm": self.selection_relevance_norm,
+            "selection_pool_size_final": self.selection_pool_size_final,
+            "selection_pool_rung_fraction_used": self.selection_pool_rung_fraction_used,
+            "selection_pool_min_score_norm_used": self.selection_pool_min_score_norm_used,
+            "selection_pool_capped": self.selection_pool_capped,
+            "selection_pool_cap_value": self.selection_pool_cap_value,
             "tier_target_fraction": self.tier_target_fraction,
             "tier_target_required_unique": self.tier_target_required_unique,
             "tier_target_met": self.tier_target_met,

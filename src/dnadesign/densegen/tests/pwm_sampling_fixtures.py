@@ -60,9 +60,9 @@ def selection_top_score() -> PWMSelectionConfig:
 def selection_mmr(
     *,
     alpha: float = 0.9,
-    shortlist_factor: int = 5,
-    shortlist_min: int = 50,
-    shortlist_max: Optional[int] = None,
+    min_score_norm: Optional[float] = None,
+    max_candidates: Optional[int] = None,
+    relevance_norm: str = "minmax_raw_score",
     tier_widening: Optional[Iterable[float]] = None,
 ) -> PWMSelectionConfig:
     tier_config = None
@@ -74,9 +74,11 @@ def selection_mmr(
     return PWMSelectionConfig(
         policy="mmr",
         alpha=float(alpha),
-        shortlist_factor=int(shortlist_factor),
-        shortlist_min=int(shortlist_min),
-        shortlist_max=int(shortlist_max) if shortlist_max is not None else None,
+        pool={
+            "min_score_norm": min_score_norm,
+            "max_candidates": max_candidates,
+            "relevance_norm": str(relevance_norm),
+        },
         tier_widening=tier_config,
     )
 

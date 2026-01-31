@@ -27,7 +27,33 @@ def _diversity_block(core_len: int) -> dict:
     counts = [0, 2, 0]
     return {
         "candidate_pool_size": 2,
-        "shortlist_target": 10,
+        "nnd_unweighted_k1": {
+            "top_candidates": {
+                "bins": bins,
+                "counts": counts,
+                "median": 1.0,
+                "p05": 1.0,
+                "p95": 1.0,
+                "frac_le_1": 1.0,
+                "n": 2,
+                "subsampled": False,
+                "k": 1,
+            },
+            "diversified_candidates": {
+                "bins": bins,
+                "counts": counts,
+                "median": 1.0,
+                "p05": 1.0,
+                "p95": 1.0,
+                "frac_le_1": 1.0,
+                "n": 2,
+                "subsampled": False,
+                "k": 1,
+            },
+        },
+        "nnd_unweighted_median_top": 1.0,
+        "nnd_unweighted_median_diversified": 1.0,
+        "delta_nnd_unweighted_median": 0.0,
         "core_hamming": {
             "metric": "hamming",
             "nnd_k1": {
@@ -107,7 +133,7 @@ def _write_config(path: Path, *, plots_default: list[str]) -> None:
         textwrap.dedent(
             """
             densegen:
-              schema_version: "2.7"
+              schema_version: "2.8"
               run:
                 id: demo
                 root: "."
@@ -160,7 +186,7 @@ def _write_pool_manifest(run_root: Path) -> None:
             "rank_within_regulator": [2, 1, 1],
             "selection_rank": [2, 1, 1],
             "nearest_selected_similarity": [0.5, 0.0, 0.0],
-            "selection_score_percentile": [0.25, 1.0, 1.0],
+            "selection_score_norm": [0.25, 1.0, 1.0],
             "nearest_selected_distance_norm": [0.5, None, None],
             "motif_id": ["m1", "m1", "m2"],
             "tfbs_id": ["id1", "id2", "id3"],
@@ -211,15 +237,12 @@ def _write_pool_manifest(run_root: Path) -> None:
                             "selection_policy": "mmr",
                             "selection_alpha": 0.9,
                             "selection_similarity": "weighted_hamming_tolerant",
-                            "selection_shortlist_k": 50,
-                            "selection_shortlist_min": 10,
-                            "selection_shortlist_factor": 5,
-                            "selection_shortlist_max": None,
-                            "selection_shortlist_target": 250,
-                            "selection_shortlist_target_met": True,
-                            "selection_tier_fraction_used": 0.001,
-                            "selection_tier_limit": 50,
-                            "selection_pool_source": "shortlist_k",
+                            "selection_relevance_norm": "minmax_raw_score",
+                            "selection_pool_size_final": 50,
+                            "selection_pool_rung_fraction_used": 0.001,
+                            "selection_pool_min_score_norm_used": None,
+                            "selection_pool_capped": False,
+                            "selection_pool_cap_value": None,
                             "diversity": _diversity_block(core_len=4),
                             "mining_audit": None,
                             "padding_audit": None,
@@ -245,15 +268,12 @@ def _write_pool_manifest(run_root: Path) -> None:
                             "selection_policy": "mmr",
                             "selection_alpha": 0.9,
                             "selection_similarity": "weighted_hamming_tolerant",
-                            "selection_shortlist_k": 10,
-                            "selection_shortlist_min": 5,
-                            "selection_shortlist_factor": 5,
-                            "selection_shortlist_max": None,
-                            "selection_shortlist_target": 25,
-                            "selection_shortlist_target_met": True,
-                            "selection_tier_fraction_used": 0.001,
-                            "selection_tier_limit": 10,
-                            "selection_pool_source": "shortlist_k",
+                            "selection_relevance_norm": "minmax_raw_score",
+                            "selection_pool_size_final": 10,
+                            "selection_pool_rung_fraction_used": 0.001,
+                            "selection_pool_min_score_norm_used": None,
+                            "selection_pool_capped": False,
+                            "selection_pool_cap_value": None,
                             "diversity": _diversity_block(core_len=6),
                             "mining_audit": None,
                             "padding_audit": None,

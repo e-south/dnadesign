@@ -102,6 +102,7 @@ class _DummySource(BaseDataSource):
                 top_candidates=top_pairwise, diversified_candidates=diversified_pairwise, max_diversity_upper_bound=None
             ),
         )
+        unweighted_knn = KnnBlock(top_candidates=top_knn, diversified_candidates=diversified_knn)
         entropy_block = EntropyBlock(
             top_candidates=EntropySummary(values=[0.0, 0.0], n=2),
             diversified_candidates=EntropySummary(values=[0.0, 0.0], n=2),
@@ -114,7 +115,10 @@ class _DummySource(BaseDataSource):
         )
         diversity = DiversitySummary(
             candidate_pool_size=2,
-            shortlist_target=2,
+            nnd_unweighted_k1=unweighted_knn,
+            nnd_unweighted_median_top=1.0,
+            nnd_unweighted_median_diversified=1.0,
+            delta_nnd_unweighted_median=0.0,
             core_hamming=core_hamming,
             set_overlap_fraction=1.0,
             set_overlap_swaps=0,
@@ -159,8 +163,12 @@ class _DummySource(BaseDataSource):
             tier_target_required_unique=2000,
             tier_target_met=True,
             selection_policy="top_score",
-            selection_pool_source="eligible_unique",
-            selection_shortlist_k=0,
+            selection_relevance_norm=None,
+            selection_pool_size_final=2,
+            selection_pool_rung_fraction_used=1.0,
+            selection_pool_min_score_norm_used=None,
+            selection_pool_capped=False,
+            selection_pool_cap_value=None,
             diversity=diversity,
             mining_audit=None,
         )
@@ -173,7 +181,7 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
         yaml.safe_dump(
             {
                 "densegen": {
-                    "schema_version": "2.7",
+                    "schema_version": "2.8",
                     "run": {"id": "demo", "root": "."},
                     "inputs": [
                         {

@@ -155,24 +155,21 @@ def sample_pwm_sites(
     if selection_policy not in {"top_score", "mmr"}:
         raise ValueError(f"Stage-A selection.policy must be 'top_score' or 'mmr', got '{selection_policy}'.")
     selection_alpha = float(selection.alpha)
-    selection_shortlist_min = int(selection.shortlist_min)
-    selection_shortlist_factor = int(selection.shortlist_factor)
-    selection_shortlist_max = int(selection.shortlist_max) if selection.shortlist_max is not None else None
+    selection_pool_min_score_norm = None
+    selection_pool_max_candidates = None
+    selection_relevance_norm = None
+    selection_pool = selection.pool if selection_policy == "mmr" else None
+    if selection_pool is not None:
+        selection_pool_min_score_norm = selection_pool.min_score_norm
+        selection_pool_max_candidates = selection_pool.max_candidates
+        selection_relevance_norm = str(selection_pool.relevance_norm)
     selection_tier_widening: Optional[Sequence[float]] = None
     if selection_policy == "mmr":
         selection_alpha = float(selection_alpha)
         if selection_alpha <= 0.0 or selection_alpha > 1.0:
             raise ValueError("selection.alpha must be in (0, 1].")
-        if int(selection_shortlist_min) <= 0:
-            raise ValueError("selection.shortlist_min must be > 0.")
-        if int(selection_shortlist_factor) <= 0:
-            raise ValueError("selection.shortlist_factor must be > 0.")
-        if selection_shortlist_max is not None and int(selection_shortlist_max) <= 0:
-            raise ValueError("selection.shortlist_max must be > 0 when set.")
-        if selection_shortlist_max is not None and int(selection_shortlist_max) < int(selection_shortlist_min):
-            raise ValueError("selection.shortlist_max must be >= selection.shortlist_min.")
-        if selection_shortlist_max is not None and int(selection_shortlist_max) < int(n_sites):
-            raise ValueError("selection.shortlist_max must be >= n_sites when selection.policy=mmr.")
+        if selection_pool is None:
+            raise ValueError("selection.pool must be set when selection.policy=mmr.")
 
     tier_cfg = selection.tier_widening
     if isinstance(tier_cfg, PWMSelectionTierWidening) and tier_cfg.enabled:
@@ -305,9 +302,9 @@ def sample_pwm_sites(
             progress=progress,
             selection_policy=selection_policy,
             selection_alpha=selection_alpha,
-            selection_shortlist_min=selection_shortlist_min,
-            selection_shortlist_factor=selection_shortlist_factor,
-            selection_shortlist_max=selection_shortlist_max,
+            selection_pool_min_score_norm=selection_pool_min_score_norm,
+            selection_pool_max_candidates=selection_pool_max_candidates,
+            selection_relevance_norm=selection_relevance_norm,
             selection_tier_widening=selection_tier_widening,
             tier_fractions=tier_fractions,
             tier_fractions_source=tier_fractions_source,
@@ -398,9 +395,9 @@ def sample_pwm_sites(
         progress=progress,
         selection_policy=selection_policy,
         selection_alpha=selection_alpha,
-        selection_shortlist_min=selection_shortlist_min,
-        selection_shortlist_factor=selection_shortlist_factor,
-        selection_shortlist_max=selection_shortlist_max,
+        selection_pool_min_score_norm=selection_pool_min_score_norm,
+        selection_pool_max_candidates=selection_pool_max_candidates,
+        selection_relevance_norm=selection_relevance_norm,
         selection_tier_widening=selection_tier_widening,
         tier_fractions=tier_fractions,
         tier_fractions_source=tier_fractions_source,

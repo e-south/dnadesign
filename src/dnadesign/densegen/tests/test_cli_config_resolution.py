@@ -26,7 +26,7 @@ def test_auto_config_path_single_workspace(tmp_path: Path, monkeypatch) -> None:
     ws = root / "src" / "dnadesign" / "densegen" / "workspaces" / "demo"
     ws.mkdir(parents=True)
     cfg = ws / "config.yaml"
-    cfg.write_text("densegen:\n  schema_version: '2.7'\n")
+    cfg.write_text("densegen:\n  schema_version: '2.8'\n")
 
     monkeypatch.chdir(root)
     monkeypatch.setenv("PIXI_PROJECT_ROOT", str(root))
@@ -41,7 +41,7 @@ def test_auto_config_path_multiple_workspaces(tmp_path: Path, monkeypatch) -> No
     for name in ("alpha", "beta"):
         ws = root / "src" / "dnadesign" / "densegen" / "workspaces" / name
         ws.mkdir(parents=True)
-        (ws / "config.yaml").write_text("densegen:\n  schema_version: '2.7'\n")
+        (ws / "config.yaml").write_text("densegen:\n  schema_version: '2.8'\n")
 
     monkeypatch.chdir(root)
     monkeypatch.setenv("PIXI_PROJECT_ROOT", str(root))
@@ -53,7 +53,7 @@ def test_auto_config_path_multiple_workspaces(tmp_path: Path, monkeypatch) -> No
 
 def test_resolve_config_path_prefers_env(tmp_path: Path, monkeypatch) -> None:
     cfg = tmp_path / "config.yaml"
-    cfg.write_text("densegen:\n  schema_version: '2.7'\n")
+    cfg.write_text("densegen:\n  schema_version: '2.8'\n")
 
     monkeypatch.setenv("DENSEGEN_CONFIG_PATH", str(cfg))
     ctx = _Ctx()
@@ -67,7 +67,7 @@ def test_resolve_config_path_prefers_parent_config(tmp_path: Path, monkeypatch) 
     root = tmp_path / "workspace"
     root.mkdir()
     cfg = root / "config.yaml"
-    cfg.write_text("densegen:\n  schema_version: '2.7'\n")
+    cfg.write_text("densegen:\n  schema_version: '2.8'\n")
     child = root / "outputs"
     child.mkdir()
     monkeypatch.chdir(child)

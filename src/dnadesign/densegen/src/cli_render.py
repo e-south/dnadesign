@@ -65,7 +65,7 @@ def stage_a_recap_tables(
             recap_table.add_column("tier target")
         recap_table.add_column("tier fill")
         recap_table.add_column("selection")
-        recap_table.add_column("k(pool/target)")
+        recap_table.add_column("pool")
         recap_table.add_column("div(pairwise)")
         recap_table.add_column("Δdiv(pairwise)")
         recap_table.add_column("overlap")

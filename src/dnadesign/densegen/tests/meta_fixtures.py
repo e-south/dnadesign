@@ -14,7 +14,7 @@ from __future__ import annotations
 
 def output_meta(*, library_hash: str, library_index: int) -> dict:
     return {
-        "schema_version": "2.7",
+        "schema_version": "2.8",
         "run_id": "demo",
         "run_root": ".",
         "run_config_path": "config.yaml",
@@ -77,9 +77,9 @@ def output_meta(*, library_hash: str, library_index: int) -> dict:
         "input_pwm_uniqueness_key": None,
         "input_pwm_selection_policy": None,
         "input_pwm_selection_alpha": None,
-        "input_pwm_selection_shortlist_min": None,
-        "input_pwm_selection_shortlist_factor": None,
-        "input_pwm_selection_shortlist_max": None,
+        "input_pwm_selection_pool_min_score_norm": None,
+        "input_pwm_selection_pool_max_candidates": None,
+        "input_pwm_selection_pool_relevance_norm": None,
         "fixed_elements": {"promoter_constraints": [], "side_biases": {"left": [], "right": []}},
         "visual": "",
         "compression_ratio": None,

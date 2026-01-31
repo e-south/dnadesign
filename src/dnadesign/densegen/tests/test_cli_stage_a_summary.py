@@ -94,6 +94,7 @@ def _dummy_diversity_summary() -> DiversitySummary:
             top_candidates=top_pairwise, diversified_candidates=diversified_pairwise, max_diversity_upper_bound=None
         ),
     )
+    unweighted_knn = KnnBlock(top_candidates=top_knn, diversified_candidates=diversified_knn)
     entropy_block = EntropyBlock(
         top_candidates=EntropySummary(values=[0.1, 0.2, 0.3], n=2),
         diversified_candidates=EntropySummary(values=[0.1, 0.2, 0.3], n=2),
@@ -106,7 +107,10 @@ def _dummy_diversity_summary() -> DiversitySummary:
     )
     return DiversitySummary(
         candidate_pool_size=50,
-        shortlist_target=250,
+        nnd_unweighted_k1=unweighted_knn,
+        nnd_unweighted_median_top=1.0,
+        nnd_unweighted_median_diversified=1.0,
+        delta_nnd_unweighted_median=0.0,
         core_hamming=core_hamming,
         set_overlap_fraction=0.5,
         set_overlap_swaps=1,
@@ -134,7 +138,7 @@ def _write_stage_a_config(tmp_path: Path) -> Path:
         textwrap.dedent(
             f"""
             densegen:
-              schema_version: "2.7"
+              schema_version: "2.8"
               run:
                 id: demo
                 root: "."
@@ -201,7 +205,7 @@ def _write_pwm_stage_a_config(tmp_path: Path) -> Path:
         textwrap.dedent(
             f"""
             densegen:
-              schema_version: "2.7"
+              schema_version: "2.8"
               run:
                 id: demo
                 root: "."
@@ -311,11 +315,12 @@ def test_stage_a_recap_tables_include_verbose_headers() -> None:
         eligible_score_hist_counts=[1],
         selection_policy="mmr",
         selection_alpha=0.9,
-        selection_shortlist_k=50,
-        selection_shortlist_min=10,
-        selection_shortlist_factor=5,
-        selection_shortlist_target=250,
-        selection_pool_source="shortlist_k",
+        selection_relevance_norm="minmax_raw_score",
+        selection_pool_size_final=50,
+        selection_pool_rung_fraction_used=0.001,
+        selection_pool_min_score_norm_used=None,
+        selection_pool_capped=False,
+        selection_pool_cap_value=None,
         diversity=_dummy_diversity_summary(),
         mining_audit=None,
     )
@@ -403,11 +408,12 @@ def test_stage_a_sampling_rows_include_pool_headroom() -> None:
         eligible_score_hist_counts=[1],
         selection_policy="mmr",
         selection_alpha=0.9,
-        selection_shortlist_k=50,
-        selection_shortlist_min=10,
-        selection_shortlist_factor=5,
-        selection_shortlist_target=250,
-        selection_pool_source="shortlist_k",
+        selection_relevance_norm="minmax_raw_score",
+        selection_pool_size_final=50,
+        selection_pool_rung_fraction_used=0.001,
+        selection_pool_min_score_norm_used=None,
+        selection_pool_capped=False,
+        selection_pool_cap_value=None,
         diversity=_dummy_diversity_summary(),
         mining_audit=None,
     )
@@ -421,7 +427,7 @@ def test_stage_a_sampling_rows_include_pool_headroom() -> None:
         summaries=[summary],
     )
     rows = _stage_a_sampling_rows({"demo": pool})
-    assert rows[0]["diversity_pool"] == "50/250"
+    assert rows[0]["diversity_pool"] == "50"
 
 
 def test_stage_a_sampling_rows_tier_target_omits_required_unique() -> None:
@@ -464,11 +470,12 @@ def test_stage_a_sampling_rows_tier_target_omits_required_unique() -> None:
         tier_target_met=False,
         selection_policy="mmr",
         selection_alpha=0.9,
-        selection_shortlist_k=50,
-        selection_shortlist_min=10,
-        selection_shortlist_factor=5,
-        selection_shortlist_target=250,
-        selection_pool_source="shortlist_k",
+        selection_relevance_norm="minmax_raw_score",
+        selection_pool_size_final=50,
+        selection_pool_rung_fraction_used=0.001,
+        selection_pool_min_score_norm_used=None,
+        selection_pool_capped=False,
+        selection_pool_cap_value=None,
         diversity=_dummy_diversity_summary(),
         mining_audit=None,
     )

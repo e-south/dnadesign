@@ -12,7 +12,7 @@ def _write_config(run_root: Path) -> Path:
     cfg_path.write_text(
         """
         densegen:
-          schema_version: "2.7"
+          schema_version: "2.8"
           run:
             id: demo
             root: "."
@@ -64,7 +64,7 @@ def _write_pwm_config(run_root: Path) -> Path:
     cfg_path.write_text(
         """
         densegen:
-          schema_version: "2.7"
+          schema_version: "2.8"
           run:
             id: demo
             root: "."

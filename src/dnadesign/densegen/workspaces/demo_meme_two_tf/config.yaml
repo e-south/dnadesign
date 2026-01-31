@@ -1,6 +1,6 @@
 # DenseGen demo: two TF motifs (LexA + CpxR) with bounded PWM sampling.
 densegen:
-  schema_version: "2.7"
+  schema_version: "2.8"
   run:
     id: demo_meme_two_tf
     root: "."
@@ -18,10 +18,8 @@ densegen:
         mining:
           batch_size: 5000
           budget:
-            mode: tier_target
-            target_tier_fraction: 0.001
-            max_candidates: 5000000
-            max_seconds: 300
+            mode: fixed_candidates
+            candidates: 5000000
             growth_factor: 1.25
           log_every_batches: 1
         length:
@@ -32,8 +30,10 @@ densegen:
         selection:
           policy: mmr
           alpha: 0.5
-          shortlist_factor: 5
-          shortlist_min: 50
+          pool:
+            min_score_norm: 0.85
+            max_candidates: null
+            relevance_norm: minmax_raw_score
           tier_widening:
             enabled: true
             ladder: [0.001, 0.01, 0.09, 1.0]

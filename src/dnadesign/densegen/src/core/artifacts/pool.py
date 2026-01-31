@@ -263,9 +263,9 @@ def _build_stage_a_sampling_manifest(
     selection_policies = {summary.selection_policy for summary in fimo_summaries}
     selection_alphas = {summary.selection_alpha for summary in fimo_summaries}
     selection_similarity = {summary.selection_similarity for summary in fimo_summaries}
-    selection_shortlist_min = {summary.selection_shortlist_min for summary in fimo_summaries}
-    selection_shortlist_factor = {summary.selection_shortlist_factor for summary in fimo_summaries}
-    selection_shortlist_max = {summary.selection_shortlist_max for summary in fimo_summaries}
+    selection_relevance_norm = {summary.selection_relevance_norm for summary in fimo_summaries}
+    selection_pool_min_score_norm = {summary.selection_pool_min_score_norm_used for summary in fimo_summaries}
+    selection_pool_cap_value = {summary.selection_pool_cap_value for summary in fimo_summaries}
     tier_target_fraction = {summary.tier_target_fraction for summary in fimo_summaries}
     tier_fractions_values: list[tuple[float, float, float]] = []
     tier_fractions_sources: list[str] = []
@@ -323,15 +323,12 @@ def _build_stage_a_sampling_manifest(
                 "selection_policy": summary.selection_policy,
                 "selection_alpha": summary.selection_alpha,
                 "selection_similarity": summary.selection_similarity,
-                "selection_shortlist_k": summary.selection_shortlist_k,
-                "selection_shortlist_min": summary.selection_shortlist_min,
-                "selection_shortlist_factor": summary.selection_shortlist_factor,
-                "selection_shortlist_max": summary.selection_shortlist_max,
-                "selection_shortlist_target": summary.selection_shortlist_target,
-                "selection_shortlist_target_met": summary.selection_shortlist_target_met,
-                "selection_tier_fraction_used": summary.selection_tier_fraction_used,
-                "selection_tier_limit": summary.selection_tier_limit,
-                "selection_pool_source": summary.selection_pool_source,
+                "selection_relevance_norm": summary.selection_relevance_norm,
+                "selection_pool_size_final": summary.selection_pool_size_final,
+                "selection_pool_rung_fraction_used": summary.selection_pool_rung_fraction_used,
+                "selection_pool_min_score_norm_used": summary.selection_pool_min_score_norm_used,
+                "selection_pool_capped": summary.selection_pool_capped,
+                "selection_pool_cap_value": summary.selection_pool_cap_value,
                 "collapsed_by_core_identity": summary.collapsed_by_core_identity,
                 "diversity_nearest_distance_mean": summary.diversity_nearest_distance_mean,
                 "diversity_nearest_distance_min": summary.diversity_nearest_distance_min,
@@ -355,11 +352,15 @@ def _build_stage_a_sampling_manifest(
     selection_policy = next(iter(selection_policies)) if len(selection_policies) == 1 else "mixed"
     selection_alpha_value = next(iter(selection_alphas)) if len(selection_alphas) == 1 else None
     selection_similarity_value = next(iter(selection_similarity)) if len(selection_similarity) == 1 else None
-    selection_shortlist_min_value = next(iter(selection_shortlist_min)) if len(selection_shortlist_min) == 1 else None
-    selection_shortlist_factor_value = (
-        next(iter(selection_shortlist_factor)) if len(selection_shortlist_factor) == 1 else None
+    selection_relevance_norm_value = (
+        next(iter(selection_relevance_norm)) if len(selection_relevance_norm) == 1 else None
     )
-    selection_shortlist_max_value = next(iter(selection_shortlist_max)) if len(selection_shortlist_max) == 1 else None
+    selection_pool_min_score_norm_value = (
+        next(iter(selection_pool_min_score_norm)) if len(selection_pool_min_score_norm) == 1 else None
+    )
+    selection_pool_cap_value_value = (
+        next(iter(selection_pool_cap_value)) if len(selection_pool_cap_value) == 1 else None
+    )
     tier_target_fraction_value = next(iter(tier_target_fraction)) if len(tier_target_fraction) == 1 else None
     tier_fractions_value: list[float] | None = None
     tier_scheme_label = "mixed"
@@ -386,9 +387,9 @@ def _build_stage_a_sampling_manifest(
         "selection_policy": selection_policy,
         "selection_alpha": selection_alpha_value,
         "selection_similarity": selection_similarity_value,
-        "selection_shortlist_min": selection_shortlist_min_value,
-        "selection_shortlist_factor": selection_shortlist_factor_value,
-        "selection_shortlist_max": selection_shortlist_max_value,
+        "selection_relevance_norm": selection_relevance_norm_value,
+        "selection_pool_min_score_norm": selection_pool_min_score_norm_value,
+        "selection_pool_cap_value": selection_pool_cap_value_value,
         "target_tier_fraction": tier_target_fraction_value,
         "bgfile": base_bgfile,
         "background_source": background_source,
