@@ -44,6 +44,7 @@ def test_stage_a_yield_bias_labels_and_ticks() -> None:
                 "selection_pool_size_final": 200,
                 "diversity": {
                     "core_entropy": {
+                        "top_candidates": {"values": [0.05, 0.1, 0.15, 0.2], "n": 2},
                         "diversified_candidates": {"values": [0.1, 0.2, 0.3, 0.4], "n": 2},
                     }
                 },
@@ -67,6 +68,7 @@ def test_stage_a_yield_bias_labels_and_ticks() -> None:
                 "selection_pool_size_final": 160,
                 "diversity": {
                     "core_entropy": {
+                        "top_candidates": {"values": [0.0, 0.05, 0.1, 0.2], "n": 2},
                         "diversified_candidates": {"values": [0.0, 0.1, 0.2, 0.3], "n": 2},
                     }
                 },
@@ -95,7 +97,7 @@ def test_stage_a_yield_bias_labels_and_ticks() -> None:
         labels = [tick.get_text() for tick in axes_left[-1].get_xticklabels() if tick.get_text()]
         assert labels == ["Generated", "Eligible", "Unique core", "MMR pool", "Retained"]
         assert axes_left[0].get_title() == "Stepwise sequence yield"
-        assert axes_right[0].get_title() == "Diversified sequences: core positional entropy"
+        assert axes_right[0].get_title() == "Core positional entropy (top vs diversified)"
         assert axes_left[0].yaxis.get_offset_text().get_text() == ""
     finally:
         fig.clf()
@@ -126,6 +128,7 @@ def test_stage_a_yield_bias_requires_iupac_consensus() -> None:
                 "selection_pool_size_final": 200,
                 "diversity": {
                     "core_entropy": {
+                        "top_candidates": {"values": [0.05, 0.1, 0.15, 0.2], "n": 2},
                         "diversified_candidates": {"values": [0.1, 0.2, 0.3, 0.4], "n": 2},
                     }
                 },
