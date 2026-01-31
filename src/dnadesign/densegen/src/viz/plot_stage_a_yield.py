@@ -43,15 +43,6 @@ def _build_stage_a_yield_bias_figure(
         tf_col = "tf"
     else:
         raise ValueError(f"Stage-A pool missing regulator_id or tf column for input '{input_name}'.")
-    if "tfbs_sequence" in pool_df.columns:
-        tfbs_col = "tfbs_sequence"
-    elif "tfbs" in pool_df.columns:
-        tfbs_col = "tfbs"
-    else:
-        raise ValueError(f"Stage-A pool missing tfbs_sequence or tfbs column for input '{input_name}'.")
-    if "best_hit_score" not in pool_df.columns:
-        raise ValueError(f"Stage-A pool missing best_hit_score for input '{input_name}'.")
-
     regs: list[str] = []
     for row in eligible_hist:
         if "regulator" not in row:
@@ -60,16 +51,22 @@ def _build_stage_a_yield_bias_figure(
     stage_counts = []
     duplication_factors: dict[str, float] = {}
     pool_headrooms: dict[str, float] = {}
-    hit_overlap: dict[str, float] = {}
+    diversity_by_reg: dict[str, dict] = {}
+    consensus_by_reg: dict[str, str] = {}
     mining_slopes: dict[str, float] = {}
     core_lengths: dict[str, int] = {}
-    if "tfbs_core" in pool_df.columns:
-        core_series = pool_df["tfbs_core"].astype(str)
-        for reg, core in zip(pool_df[tf_col].astype(str).to_list(), core_series.to_list()):
-            core_lengths.setdefault(reg, []).append(len(core))
-        core_lengths = {reg: int(np.median(vals)) for reg, vals in core_lengths.items() if vals}
     for row in eligible_hist:
         reg = str(row["regulator"])
+        consensus = row.get("pwm_consensus")
+        if not consensus:
+            raise ValueError(f"Stage-A sampling missing pwm_consensus for '{input_name}' ({reg}).")
+        consensus = str(consensus)
+        consensus_by_reg[reg] = consensus
+        core_lengths[reg] = len(consensus)
+        diversity = row.get("diversity")
+        if not isinstance(diversity, dict):
+            raise ValueError(f"Stage-A sampling missing diversity for '{input_name}' ({reg}).")
+        diversity_by_reg[reg] = diversity
         if "generated" not in row:
             raise ValueError(f"Stage-A sampling missing generated count for '{input_name}' ({reg}).")
         if "candidates_with_hit" not in row or "eligible_raw" not in row:
@@ -104,13 +101,6 @@ def _build_stage_a_yield_bias_figure(
             duplication_factors[reg] = float(eligible_raw) / float(eligible_unique)
         if retained is not None and int(retained) > 0 and selection_pool is not None:
             pool_headrooms[reg] = float(selection_pool) / float(retained)
-        if "padding_audit" not in row:
-            raise ValueError(f"Stage-A sampling missing padding_audit for '{input_name}' ({reg}).")
-        audit = row["padding_audit"]
-        if isinstance(audit, dict):
-            overlap = audit.get("best_hit_overlaps_intended_core_fraction")
-            if overlap is not None:
-                hit_overlap[reg] = float(overlap)
         if "mining_audit" not in row:
             raise ValueError(f"Stage-A sampling missing mining_audit for '{input_name}' ({reg}).")
         mining = row["mining_audit"]
@@ -118,38 +108,14 @@ def _build_stage_a_yield_bias_figure(
             slope = mining.get("unique_slope")
             if slope is not None:
                 mining_slopes[reg] = float(slope)
-        stage_counts.append([generated, candidates_with_hit, eligible_raw, eligible_unique, selection_pool, retained])
+        stage_counts.append([generated, eligible_raw, eligible_unique, selection_pool, retained])
 
     if not regs:
         raise ValueError(f"Stage-A sampling missing regulator labels for input '{input_name}'.")
-    base_keys = pool_df[tf_col].astype(str).tolist()
-    lengths = pool_df[tfbs_col].astype(str).str.len().to_numpy(dtype=float)
-    scores = pd.to_numeric(pool_df["best_hit_score"], errors="coerce")
-    if scores.isna().all():
-        raise ValueError(f"Stage-A pool missing best_hit_score values for input '{input_name}'.")
-    scores_arr = scores.to_numpy(dtype=float)
-    gc_vals = []
-    for seq in pool_df[tfbs_col].astype(str).to_list():
-        seq = str(seq).upper()
-        if not seq:
-            gc_vals.append(0.0)
-        else:
-            gc_vals.append(float(seq.count("G") + seq.count("C")) / float(len(seq)))
-    gc_arr = np.asarray(gc_vals, dtype=float)
-    tf_vals = pool_df[tf_col].astype(str).to_numpy()
-
-    def _stable_jitter(keys: list[str], width: float = 0.18) -> np.ndarray:
-        import hashlib
-
-        values = []
-        for key in keys:
-            digest = hashlib.md5(key.encode("utf-8")).hexdigest()
-            bucket = int(digest[:8], 16) / float(0xFFFFFFFF)
-            values.append((bucket - 0.5) * width + 0.0)
-        return np.asarray(values) if values else np.zeros((0,), dtype=float)
-
-    jitter = _stable_jitter(base_keys)
-    lengths_j = lengths + jitter
+    pool_regs = set(pool_df[tf_col].astype(str).tolist())
+    for reg in regs:
+        if reg not in pool_regs:
+            raise ValueError(f"Stage-A pool missing regulator '{reg}' for input '{input_name}'.")
 
     fig_width = float(style.get("figsize", (11, 4.2))[0])
     base_height = float(style.get("figsize", (11, 4.2))[1])
@@ -159,7 +125,7 @@ def _build_stage_a_yield_bias_figure(
     n_regs = max(1, len(reg_order))
     fig_height = max(4.8, base_height, 1.75 * n_regs + 0.8)
     reg_colors = _stage_a_regulator_colors(reg_order, style)
-    stage_labels = ["Generated", "Has hit", "Eligible", "Unique core", "MMR pool", "Retained"]
+    stage_labels = ["Generated", "Eligible", "Unique core", "MMR pool", "Retained"]
     counts_by_reg = {reg: counts for reg, counts in zip(regs, stage_counts)}
     max_count = max((max(counts) for counts in stage_counts), default=0)
     subtitle_size = text_sizes["panel_title"] * 0.88
@@ -187,15 +153,6 @@ def _build_stage_a_yield_bias_figure(
             fontsize=text_sizes["fig_title"],
             color="#111111",
         )
-        ax_header.text(
-            0.5,
-            0.42,
-            "Scores are per-motif; compare within TF",
-            ha="center",
-            va="center",
-            fontsize=text_sizes["annotation"] * 0.85,
-            color="#444444",
-        )
         body = outer[1].subgridspec(
             nrows=1,
             ncols=2,
@@ -215,8 +172,9 @@ def _build_stage_a_yield_bias_figure(
             share_left = axes_left[0] if axes_left else None
             share_right = axes_right[0] if axes_right else None
             axes_left.append(fig.add_subplot(main[idx, 0], sharex=share_left, sharey=share_left))
-            axes_right.append(fig.add_subplot(main[idx, 1], sharex=share_right, sharey=share_right))
+            axes_right.append(fig.add_subplot(main[idx, 1], sharey=share_right))
         cbar_ax = fig.add_subplot(body[0, 1])
+        cbar_ax.set_axis_off()
 
         x_positions = np.arange(len(stage_labels))
         offset = max(1.0, max_count * 0.03) if max_count else 1.0
@@ -304,82 +262,55 @@ def _build_stage_a_yield_bias_figure(
 
         for idx, reg in enumerate(reg_order):
             ax = axes_right[idx]
-            mask = tf_vals == reg
-            if not np.any(mask):
-                raise ValueError(f"Stage-A pool missing retained sites for '{input_name}' ({reg}).")
-            reg_lengths = lengths[mask]
-            reg_scores = scores_arr[mask]
-            by_length: dict[int, list[float]] = {}
-            for length_val, score_val in zip(reg_lengths, reg_scores):
-                by_length.setdefault(int(length_val), []).append(float(score_val))
-            if by_length:
-                positions = sorted(by_length)
-                box_data = [by_length[pos] for pos in positions]
-                box = ax.boxplot(
-                    box_data,
-                    positions=positions,
-                    widths=0.6,
-                    patch_artist=True,
-                    showfliers=False,
-                    medianprops={"color": "#222222", "linewidth": 1.0},
-                    boxprops={"linewidth": 0.8, "color": "#333333"},
-                    whiskerprops={"linewidth": 0.8, "color": "#555555"},
-                    capprops={"linewidth": 0.8, "color": "#555555"},
+            diversity = diversity_by_reg.get(reg)
+            if not isinstance(diversity, dict):
+                raise ValueError(f"Stage-A diversity missing for '{input_name}' ({reg}).")
+            entropy_block = diversity.get("core_entropy")
+            if not isinstance(entropy_block, dict):
+                raise ValueError(f"Stage-A diversity missing core_entropy for '{input_name}' ({reg}).")
+            diversified_block = entropy_block.get("diversified_candidates")
+            if not isinstance(diversified_block, dict):
+                raise ValueError(f"Stage-A diversity missing diversified entropy for '{input_name}' ({reg}).")
+            values = diversified_block.get("values")
+            if not isinstance(values, list) or not values:
+                raise ValueError(f"Stage-A diversity missing entropy values for '{input_name}' ({reg}).")
+            consensus = consensus_by_reg.get(reg)
+            if consensus is None:
+                raise ValueError(f"Stage-A sampling missing pwm_consensus for '{input_name}' ({reg}).")
+            if len(consensus) != len(values):
+                raise ValueError(
+                    f"Stage-A diversity entropy length mismatch for '{input_name}' ({reg}). "
+                    f"consensus={len(consensus)} entropy={len(values)}"
                 )
-                for patch in box.get("boxes", []):
-                    patch.set_facecolor("#c7c7c7")
-                    patch.set_alpha(0.25)
-            ax.scatter(
-                lengths_j[mask],
-                scores_arr[mask],
-                c=gc_arr[mask],
-                cmap="viridis",
-                alpha=0.45,
-                s=12,
-                marker="o",
-                edgecolors="none",
+            entropy_vals = [float(v) for v in values]
+            positions = np.arange(1, len(entropy_vals) + 1)
+            hue = reg_colors.get(reg, "#4c78a8")
+            ax.bar(
+                positions,
+                entropy_vals,
+                color=hue,
+                alpha=0.35,
+                edgecolor=hue,
+                linewidth=0.8,
             )
+            ax.plot(positions, entropy_vals, color=hue, linewidth=1.2)
+            ax.set_xlim(0.5, len(entropy_vals) + 0.5)
+            ax.set_ylim(0.0, 2.0)
+            ax.set_xticks(positions)
+            ax.set_xticklabels(list(consensus))
             ax.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
-            ax.xaxis.set_major_locator(mpl.ticker.MaxNLocator(integer=True, nbins=5))
             ax.yaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=4))
-            note_lines = []
-            if mask.any():
-                corr = pd.Series(lengths[mask]).corr(pd.Series(scores_arr[mask]), method="spearman")
-                if corr is not None and np.isfinite(corr):
-                    note_lines.append(f"rho(score,len) {float(corr):+.2f}")
-            overlap = hit_overlap.get(reg)
-            if overlap is not None:
-                note_lines.append(f"hit overlap {float(overlap) * 100:.0f}%")
-            if note_lines:
-                _add_anchored_box(
-                    ax,
-                    note_lines,
-                    loc="upper right",
-                    fontsize=text_sizes["annotation"] * 0.7,
-                    alpha=0.85,
-                    edgecolor="none",
-                )
+            ax.tick_params(axis="y", labelsize=tick_size, labelleft=True)
+            ax.tick_params(axis="x", labelsize=tick_size)
+            if idx == 0:
+                ax.set_ylabel("Entropy (bits)")
+            if idx == len(reg_order) - 1:
+                ax.set_xlabel("Core position")
         axes_right[0].set_title(
-            "Retained sites: score by length (GC color)",
+            "Diversified sequences: core positional entropy",
             fontsize=subtitle_size,
             pad=title_pad,
         )
-        axes_right[-1].set_xlabel("TFBS length (nt)")
-        for ax in axes_right:
-            ax.set_ylabel("Best-hit score")
-            ax.tick_params(axis="y", labelsize=tick_size, labelleft=True)
-            ax.tick_params(axis="x", labelsize=tick_size)
-        x_min = float(np.nanmin(lengths)) if len(lengths) else 0.0
-        x_max = float(np.nanmax(lengths)) if len(lengths) else 0.0
-        if x_max <= x_min:
-            raise ValueError(f"Stage-A pool missing TFBS length range for input '{input_name}'.")
-        for ax in axes_right:
-            ax.set_xlim(x_min - 1.0, x_max + 1.0)
-        sm = plt.cm.ScalarMappable(cmap="viridis", norm=mpl.colors.Normalize(vmin=0.0, vmax=1.0))
-        cbar = fig.colorbar(sm, cax=cbar_ax)
-        cbar.set_label("GC fraction", fontsize=text_sizes["annotation"] * 0.85)
-        cbar.ax.tick_params(labelsize=tick_size)
-        _shared_x_cleanup(axes_right)
         for ax in axes_left + axes_right:
             _apply_style(ax, style)
             ax.tick_params(axis="both", labelsize=tick_size)

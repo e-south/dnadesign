@@ -130,7 +130,7 @@ def _similarity_from_distance(distance: float) -> float:
     return 1.0 / (1.0 + float(distance))
 
 
-def _select_diversity_baseline_candidates(
+def _select_diversity_top_candidates(
     ranked: Sequence[_CandidateLike],
     *,
     selection_policy: str,

@@ -158,26 +158,26 @@ def _build_stage_a_diversity_figure(
             pairwise = core_hamming.get("pairwise")
             if not isinstance(pairwise, dict):
                 raise ValueError(f"Stage-A diversity missing pairwise stats for '{input_name}' ({reg}).")
-            baseline = pairwise.get("baseline")
-            actual = pairwise.get("actual")
-            if not isinstance(baseline, dict) or not isinstance(actual, dict):
-                raise ValueError(f"Stage-A diversity missing pairwise baseline/actual for '{input_name}' ({reg}).")
-            bins = baseline.get("bins") or actual.get("bins")
+            top_candidates = pairwise.get("top_candidates")
+            diversified_candidates = pairwise.get("diversified_candidates")
+            if not isinstance(top_candidates, dict) or not isinstance(diversified_candidates, dict):
+                raise ValueError(f"Stage-A diversity missing pairwise top/diversified for '{input_name}' ({reg}).")
+            bins = top_candidates.get("bins") or diversified_candidates.get("bins")
             if not isinstance(bins, list) or not bins:
                 raise ValueError(f"Stage-A diversity missing pairwise bins for '{input_name}' ({reg}).")
-            base_counts = baseline.get("counts")
-            actual_counts = actual.get("counts")
-            if not isinstance(base_counts, list) or not isinstance(actual_counts, list):
+            top_counts = top_candidates.get("counts")
+            diversified_counts = diversified_candidates.get("counts")
+            if not isinstance(top_counts, list) or not isinstance(diversified_counts, list):
                 raise ValueError(f"Stage-A diversity missing pairwise counts for '{input_name}' ({reg}).")
-            x_base, y_base = _ecdf_from_counts(bins, base_counts)
-            x_act, y_act = _ecdf_from_counts(bins, actual_counts)
+            x_base, y_base = _ecdf_from_counts(bins, top_counts)
+            x_act, y_act = _ecdf_from_counts(bins, diversified_counts)
             base_line = ax_left.step(
                 x_base,
                 y_base,
                 where="mid",
                 color="#777777",
                 linewidth=1.3,
-                label="Top-score",
+                label="Top Sequences",
                 zorder=2,
             )[0]
             act_line = ax_left.step(
@@ -186,7 +186,7 @@ def _build_stage_a_diversity_figure(
                 where="mid",
                 color=hue,
                 linewidth=1.4,
-                label="MMR",
+                label="Diversified Sequences",
                 zorder=3,
             )[0]
             ax_left.set_xlim(min(x_base.min(), x_act.min()), max(x_base.max(), x_act.max()))
@@ -201,24 +201,24 @@ def _build_stage_a_diversity_figure(
                     fontsize=text_sizes["annotation"] * 0.8,
                 )
             note_lines: list[str] = []
-            if "n_pairs" not in baseline or "n_pairs" not in actual:
+            if "n_pairs" not in top_candidates or "n_pairs" not in diversified_candidates:
                 raise ValueError(f"Stage-A diversity missing pairwise n_pairs for '{input_name}' ({reg}).")
-            base_pairs = int(baseline["n_pairs"])
-            act_pairs = int(actual["n_pairs"])
+            base_pairs = int(top_candidates["n_pairs"])
+            act_pairs = int(diversified_candidates["n_pairs"])
             if base_pairs <= 0 or act_pairs <= 0:
                 note_lines.append("pairwise n/a (n<2)")
             else:
-                if "median" not in baseline or "median" not in actual:
+                if "median" not in top_candidates or "median" not in diversified_candidates:
                     raise ValueError(f"Stage-A diversity missing pairwise median for '{input_name}' ({reg}).")
-                base_med = float(baseline["median"])
-                act_med = float(actual["median"])
+                base_med = float(top_candidates["median"])
+                act_med = float(diversified_candidates["median"])
                 note_lines.append(f"Δdiv (median) {act_med - base_med:+.2f}")
             objective_delta = diversity.get("objective_delta")
             if objective_delta is None:
-                objective_base = diversity.get("objective_baseline")
-                objective_actual = diversity.get("objective_actual")
-                if objective_base is not None and objective_actual is not None:
-                    objective_delta = float(objective_actual) - float(objective_base)
+                objective_top = diversity.get("objective_top_candidates")
+                objective_diversified = diversity.get("objective_diversified_candidates")
+                if objective_top is not None and objective_diversified is not None:
+                    objective_delta = float(objective_diversified) - float(objective_top)
             if objective_delta is not None:
                 note_lines.append(f"ΔJ {float(objective_delta):+.3f}")
             if "set_overlap_fraction" not in diversity:

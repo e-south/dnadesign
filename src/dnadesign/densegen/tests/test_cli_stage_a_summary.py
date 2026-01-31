@@ -42,7 +42,7 @@ _FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
 
 def _dummy_diversity_summary() -> DiversitySummary:
-    baseline_knn = KnnSummary(
+    top_knn = KnnSummary(
         bins=[0.0, 1.0],
         counts=[0, 1],
         median=1.0,
@@ -53,7 +53,7 @@ def _dummy_diversity_summary() -> DiversitySummary:
         subsampled=False,
         k=1,
     )
-    actual_knn = KnnSummary(
+    diversified_knn = KnnSummary(
         bins=[0.0, 1.0],
         counts=[0, 1],
         median=1.0,
@@ -64,7 +64,7 @@ def _dummy_diversity_summary() -> DiversitySummary:
         subsampled=False,
         k=1,
     )
-    baseline_pairwise = PairwiseSummary(
+    top_pairwise = PairwiseSummary(
         bins=[0.0, 1.0],
         counts=[0, 1],
         median=1.0,
@@ -75,7 +75,7 @@ def _dummy_diversity_summary() -> DiversitySummary:
         total_pairs=1,
         subsampled=False,
     )
-    actual_pairwise = PairwiseSummary(
+    diversified_pairwise = PairwiseSummary(
         bins=[0.0, 1.0],
         counts=[0, 1],
         median=1.0,
@@ -88,19 +88,21 @@ def _dummy_diversity_summary() -> DiversitySummary:
     )
     core_hamming = CoreHammingSummary(
         metric="hamming",
-        nnd_k1=KnnBlock(baseline=baseline_knn, actual=actual_knn),
+        nnd_k1=KnnBlock(top_candidates=top_knn, diversified_candidates=diversified_knn),
         nnd_k5=None,
-        pairwise=PairwiseBlock(baseline=baseline_pairwise, actual=actual_pairwise, upper_bound=None),
+        pairwise=PairwiseBlock(
+            top_candidates=top_pairwise, diversified_candidates=diversified_pairwise, max_diversity_upper_bound=None
+        ),
     )
     entropy_block = EntropyBlock(
-        baseline=EntropySummary(values=[0.1, 0.2, 0.3], n=2),
-        actual=EntropySummary(values=[0.1, 0.2, 0.3], n=2),
+        top_candidates=EntropySummary(values=[0.1, 0.2, 0.3], n=2),
+        diversified_candidates=EntropySummary(values=[0.1, 0.2, 0.3], n=2),
     )
     score_block = ScoreQuantilesBlock(
-        baseline=ScoreQuantiles(p10=0.5, p50=1.0, p90=1.5, mean=1.0),
-        actual=ScoreQuantiles(p10=0.4, p50=0.9, p90=1.4, mean=0.9),
-        baseline_global=None,
-        upper_bound=None,
+        top_candidates=ScoreQuantiles(p10=0.5, p50=1.0, p90=1.5, mean=1.0),
+        diversified_candidates=ScoreQuantiles(p10=0.4, p50=0.9, p90=1.4, mean=0.9),
+        top_candidates_global=None,
+        max_diversity_upper_bound=None,
     )
     return DiversitySummary(
         candidate_pool_size=50,

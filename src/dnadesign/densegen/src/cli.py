@@ -748,26 +748,26 @@ def _stage_a_sampling_rows(
                 pairwise = core_hamming.pairwise
                 if pairwise is None:
                     raise ValueError("Stage-A diversity missing pairwise summary.")
-                baseline_pairwise = pairwise.baseline
-                actual_pairwise = pairwise.actual
-                if int(actual_pairwise.n_pairs) <= 0 or int(baseline_pairwise.n_pairs) <= 0:
+                top_pairwise = pairwise.top_candidates
+                diversified_pairwise = pairwise.diversified_candidates
+                if int(diversified_pairwise.n_pairs) <= 0 or int(top_pairwise.n_pairs) <= 0:
                     diversity_label = "n/a"
                     diversity_delta = "n/a"
                 else:
-                    diversity_label = _format_diversity_value(actual_pairwise.median)
+                    diversity_label = _format_diversity_value(diversified_pairwise.median)
                     diversity_delta = _format_diversity_value(
-                        float(actual_pairwise.median) - float(baseline_pairwise.median),
+                        float(diversified_pairwise.median) - float(top_pairwise.median),
                         show_sign=True,
                     )
                 score_block = diversity.score_quantiles
-                if score_block.baseline is None or score_block.actual is None:
-                    raise ValueError("Stage-A diversity missing baseline/actual score quantiles.")
+                if score_block.top_candidates is None or score_block.diversified_candidates is None:
+                    raise ValueError("Stage-A diversity missing top/diversified score quantiles.")
                 diversity_score_p10_delta = _format_diversity_value(
-                    float(score_block.actual.p10) - float(score_block.baseline.p10),
+                    float(score_block.diversified_candidates.p10) - float(score_block.top_candidates.p10),
                     show_sign=True,
                 )
                 diversity_score_med_delta = _format_diversity_value(
-                    float(score_block.actual.p50) - float(score_block.baseline.p50),
+                    float(score_block.diversified_candidates.p50) - float(score_block.top_candidates.p50),
                     show_sign=True,
                 )
                 if diversity.set_overlap_fraction is None or diversity.set_overlap_swaps is None:
@@ -2222,8 +2222,8 @@ def stage_a_build_pool(
                 "tier fill=deepest diagnostic tier used; selection=Stage-A selection policy; "
                 "k(pool/target)=MMR shortlist pool vs target (target=max(shortlist_min, shortlist_factor×n_sites)); "
                 "div(pairwise)=pairwise weighted Hamming median; "
-                "overlap=baseline∩actual; set_swaps=actual - overlap; "
-                "Δscore_norm columns compare baseline vs actual p10/med."
+                "overlap=top_candidates∩diversified_candidates; set_swaps=diversified - overlap; "
+                "Δscore_norm columns compare top_candidates vs diversified p10/med."
             )
         else:
             console.print(
@@ -2232,7 +2232,7 @@ def stage_a_build_pool(
                 "selection=Stage-A selection policy; "
                 "k(pool/target)=MMR shortlist pool vs target (target=max(shortlist_min, shortlist_factor×n_sites)); "
                 "div(pairwise)=pairwise weighted Hamming median; "
-                "overlap=baseline∩actual; Δscore_norm med compares baseline vs actual median."
+                "overlap=top_candidates∩diversified_candidates; Δscore_norm med compares top_candidates vs diversified."
             )
     console.print(
         f":sparkles: [bold green]Pool manifest written[/]: "

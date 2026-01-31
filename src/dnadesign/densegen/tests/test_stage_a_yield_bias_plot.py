@@ -28,6 +28,7 @@ def test_stage_a_yield_bias_labels_and_ticks() -> None:
         "eligible_score_hist": [
             {
                 "regulator": "lexA",
+                "pwm_consensus": "AATT",
                 "edges": [0.0, 2.0, 4.0],
                 "counts": [1, 1],
                 "tier0_score": 4.0,
@@ -39,11 +40,17 @@ def test_stage_a_yield_bias_labels_and_ticks() -> None:
                 "eligible_unique": 200,
                 "retained": 120,
                 "selection_pool_source": "eligible_unique",
+                "diversity": {
+                    "core_entropy": {
+                        "diversified_candidates": {"values": [0.1, 0.2, 0.3, 0.4], "n": 2},
+                    }
+                },
                 "padding_audit": None,
                 "mining_audit": None,
             },
             {
                 "regulator": "cpxR",
+                "pwm_consensus": "CCGG",
                 "edges": [0.0, 1.0, 2.0],
                 "counts": [1, 1],
                 "tier0_score": 2.0,
@@ -55,6 +62,11 @@ def test_stage_a_yield_bias_labels_and_ticks() -> None:
                 "eligible_unique": 160,
                 "retained": 90,
                 "selection_pool_source": "eligible_unique",
+                "diversity": {
+                    "core_entropy": {
+                        "diversified_candidates": {"values": [0.0, 0.1, 0.2, 0.3], "n": 2},
+                    }
+                },
                 "padding_audit": None,
                 "mining_audit": None,
             },
@@ -78,9 +90,9 @@ def test_stage_a_yield_bias_labels_and_ticks() -> None:
     try:
         assert axes_left[-1].get_xlabel() == "Stage"
         labels = [tick.get_text() for tick in axes_left[-1].get_xticklabels() if tick.get_text()]
-        assert labels == ["Generated", "Has hit", "Eligible", "Unique core", "MMR pool", "Retained"]
+        assert labels == ["Generated", "Eligible", "Unique core", "MMR pool", "Retained"]
         assert axes_left[0].get_title() == "Stepwise sequence yield"
-        assert axes_right[0].get_title() == "Retained sites: score by length (GC color)"
+        assert axes_right[0].get_title() == "Diversified sequences: core positional entropy"
         assert axes_left[0].yaxis.get_offset_text().get_text() == ""
     finally:
         fig.clf()

@@ -27,7 +27,7 @@ from dnadesign.densegen.src.adapters.sources.stage_a_metrics import (
 from dnadesign.densegen.src.adapters.sources.stage_a_selection import (
     SelectionDiagnostics,
     _score_norm,
-    _select_diversity_baseline_candidates,
+    _select_diversity_top_candidates,
     _select_diversity_upper_bound_candidates,
 )
 from dnadesign.densegen.src.adapters.sources.stage_a_types import FimoCandidate
@@ -71,12 +71,12 @@ def test_diversity_summary_scores() -> None:
     cores = ["AAAA", "AAAT"]
     scores = [1.0, 2.0]
     summary = _diversity_summary(
-        baseline_cores=cores,
-        actual_cores=cores,
-        baseline_scores=scores,
-        actual_scores=scores,
-        upper_bound_cores=cores,
-        upper_bound_scores=scores,
+        top_candidates_cores=cores,
+        diversified_candidates_cores=cores,
+        top_candidates_scores=scores,
+        diversified_candidates_scores=scores,
+        max_diversity_upper_bound_cores=cores,
+        max_diversity_upper_bound_scores=scores,
         pwm_max_score=2.0,
         max_n=2500,
     )
@@ -88,14 +88,14 @@ def test_diversity_summary_scores() -> None:
     core_hamming = summary.core_hamming
     pairwise = core_hamming.pairwise
     assert pairwise is not None
-    base_pair = pairwise.baseline
-    upper_pair = pairwise.upper_bound
+    base_pair = pairwise.top_candidates
+    upper_pair = pairwise.max_diversity_upper_bound
     assert upper_pair is not None
     assert base_pair.bins
     assert base_pair.counts
     score_block = summary.score_quantiles
-    base = score_block.baseline
-    actual = score_block.actual
+    base = score_block.top_candidates
+    actual = score_block.diversified_candidates
     assert base is not None
     assert actual is not None
     assert base.p50 == 0.75
@@ -106,19 +106,19 @@ def test_diversity_summary_allows_zero_pwm_max_score_for_zero_scores() -> None:
     cores = ["AAAA", "AAAT"]
     scores = [0.0, 0.0]
     summary = _diversity_summary(
-        baseline_cores=cores,
-        actual_cores=cores,
-        baseline_scores=scores,
-        actual_scores=scores,
-        upper_bound_cores=cores,
-        upper_bound_scores=scores,
+        top_candidates_cores=cores,
+        diversified_candidates_cores=cores,
+        top_candidates_scores=scores,
+        diversified_candidates_scores=scores,
+        max_diversity_upper_bound_cores=cores,
+        max_diversity_upper_bound_scores=scores,
         pwm_max_score=0.0,
         max_n=2500,
     )
     assert summary is not None
     score_block = summary.score_quantiles
-    base = score_block.baseline
-    actual = score_block.actual
+    base = score_block.top_candidates
+    actual = score_block.diversified_candidates
     assert base is not None
     assert actual is not None
     assert base.p50 == 0.0
@@ -130,12 +130,12 @@ def test_diversity_summary_rejects_zero_pwm_max_score_with_nonzero_scores() -> N
     scores = [0.0, 1.0]
     with pytest.raises(ValueError, match="pwm_max_score"):
         _diversity_summary(
-            baseline_cores=cores,
-            actual_cores=cores,
-            baseline_scores=scores,
-            actual_scores=scores,
-            upper_bound_cores=cores,
-            upper_bound_scores=scores,
+            top_candidates_cores=cores,
+            diversified_candidates_cores=cores,
+            top_candidates_scores=scores,
+            diversified_candidates_scores=scores,
+            max_diversity_upper_bound_cores=cores,
+            max_diversity_upper_bound_scores=scores,
             pwm_max_score=0.0,
             max_n=2500,
         )
@@ -155,12 +155,12 @@ def test_diversity_summary_pairwise_is_exact_for_retained_sets() -> None:
     cores = [_base4_sequence(i, length=6) for i in range(200)]
     scores = [float(i) for i in range(200)]
     summary = _diversity_summary(
-        baseline_cores=cores,
-        actual_cores=cores,
-        baseline_scores=scores,
-        actual_scores=scores,
-        upper_bound_cores=cores,
-        upper_bound_scores=scores,
+        top_candidates_cores=cores,
+        diversified_candidates_cores=cores,
+        top_candidates_scores=scores,
+        diversified_candidates_scores=scores,
+        max_diversity_upper_bound_cores=cores,
+        max_diversity_upper_bound_scores=scores,
         pwm_max_score=100.0,
         max_n=2500,
     )
@@ -168,11 +168,11 @@ def test_diversity_summary_pairwise_is_exact_for_retained_sets() -> None:
     pairwise = summary.core_hamming.pairwise
     assert pairwise is not None
     total_pairs = len(cores) * (len(cores) - 1) // 2
-    assert pairwise.baseline.total_pairs == total_pairs
-    assert pairwise.baseline.n_pairs == total_pairs
-    assert pairwise.baseline.subsampled is False
-    assert pairwise.actual.n_pairs == total_pairs
-    assert pairwise.actual.subsampled is False
+    assert pairwise.top_candidates.total_pairs == total_pairs
+    assert pairwise.top_candidates.n_pairs == total_pairs
+    assert pairwise.top_candidates.subsampled is False
+    assert pairwise.diversified_candidates.n_pairs == total_pairs
+    assert pairwise.diversified_candidates.subsampled is False
 
 
 def _cand(seq: str, score: float) -> FimoCandidate:
@@ -206,7 +206,7 @@ def test_mmr_objective_mean_utility() -> None:
     assert actual == pytest.approx(0.13333333333333333)
 
 
-def test_baseline_candidates_use_shortlist_k() -> None:
+def test_top_candidates_use_shortlist_k() -> None:
     ranked = [_cand("AAAA", 4.0), _cand("AAAT", 3.0), _cand("AATT", 2.0), _cand("TTTT", 1.0)]
     diag = SelectionDiagnostics(
         shortlist_k=2,
@@ -216,16 +216,16 @@ def test_baseline_candidates_use_shortlist_k() -> None:
         tier_limit=4,
         pool_source="shortlist_k",
     )
-    baseline = _select_diversity_baseline_candidates(
+    top_candidates = _select_diversity_top_candidates(
         ranked,
         selection_policy="mmr",
         selection_diag=diag,
         n_sites=3,
     )
-    assert [cand.seq for cand in baseline] == ["AAAA", "AAAT"]
+    assert [cand.seq for cand in top_candidates] == ["AAAA", "AAAT"]
 
 
-def test_baseline_candidates_use_tier_limit_when_shortlist_missing() -> None:
+def test_top_candidates_use_tier_limit_when_shortlist_missing() -> None:
     ranked = [_cand("AAAA", 4.0), _cand("AAAT", 3.0), _cand("AATT", 2.0), _cand("TTTT", 1.0)]
     diag = SelectionDiagnostics(
         shortlist_k=0,
@@ -235,13 +235,13 @@ def test_baseline_candidates_use_tier_limit_when_shortlist_missing() -> None:
         tier_limit=2,
         pool_source="tier_limit",
     )
-    baseline = _select_diversity_baseline_candidates(
+    top_candidates = _select_diversity_top_candidates(
         ranked,
         selection_policy="mmr",
         selection_diag=diag,
         n_sites=3,
     )
-    assert [cand.seq for cand in baseline] == ["AAAA", "AAAT"]
+    assert [cand.seq for cand in top_candidates] == ["AAAA", "AAAT"]
 
 
 def test_upper_bound_candidates_prefer_diverse_cores() -> None:

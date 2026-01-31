@@ -90,27 +90,29 @@ class PairwiseSummary:
 
 @dataclass(frozen=True)
 class PairwiseBlock:
-    baseline: PairwiseSummary
-    actual: PairwiseSummary
-    upper_bound: PairwiseSummary | None
+    top_candidates: PairwiseSummary
+    diversified_candidates: PairwiseSummary
+    max_diversity_upper_bound: PairwiseSummary | None
 
     def to_dict(self) -> dict[str, object]:
         return {
-            "baseline": self.baseline.to_dict(),
-            "actual": self.actual.to_dict(),
-            "upper_bound": self.upper_bound.to_dict() if self.upper_bound is not None else None,
+            "top_candidates": self.top_candidates.to_dict(),
+            "diversified_candidates": self.diversified_candidates.to_dict(),
+            "max_diversity_upper_bound": (
+                self.max_diversity_upper_bound.to_dict() if self.max_diversity_upper_bound is not None else None
+            ),
         }
 
 
 @dataclass(frozen=True)
 class KnnBlock:
-    baseline: KnnSummary
-    actual: KnnSummary
+    top_candidates: KnnSummary
+    diversified_candidates: KnnSummary
 
     def to_dict(self) -> dict[str, object]:
         return {
-            "baseline": self.baseline.to_dict(),
-            "actual": self.actual.to_dict(),
+            "top_candidates": self.top_candidates.to_dict(),
+            "diversified_candidates": self.diversified_candidates.to_dict(),
         }
 
 
@@ -144,11 +146,14 @@ class EntropySummary:
 
 @dataclass(frozen=True)
 class EntropyBlock:
-    baseline: EntropySummary
-    actual: EntropySummary
+    top_candidates: EntropySummary
+    diversified_candidates: EntropySummary
 
     def to_dict(self) -> dict[str, object]:
-        return {"baseline": self.baseline.to_dict(), "actual": self.actual.to_dict()}
+        return {
+            "top_candidates": self.top_candidates.to_dict(),
+            "diversified_candidates": self.diversified_candidates.to_dict(),
+        }
 
 
 @dataclass(frozen=True)
@@ -169,17 +174,23 @@ class ScoreQuantiles:
 
 @dataclass(frozen=True)
 class ScoreQuantilesBlock:
-    baseline: ScoreQuantiles | None
-    actual: ScoreQuantiles | None
-    baseline_global: ScoreQuantiles | None
-    upper_bound: ScoreQuantiles | None
+    top_candidates: ScoreQuantiles | None
+    diversified_candidates: ScoreQuantiles | None
+    top_candidates_global: ScoreQuantiles | None
+    max_diversity_upper_bound: ScoreQuantiles | None
 
     def to_dict(self) -> dict[str, object]:
         return {
-            "baseline": self.baseline.to_dict() if self.baseline is not None else None,
-            "actual": self.actual.to_dict() if self.actual is not None else None,
-            "baseline_global": self.baseline_global.to_dict() if self.baseline_global is not None else None,
-            "upper_bound": self.upper_bound.to_dict() if self.upper_bound is not None else None,
+            "top_candidates": self.top_candidates.to_dict() if self.top_candidates is not None else None,
+            "diversified_candidates": (
+                self.diversified_candidates.to_dict() if self.diversified_candidates is not None else None
+            ),
+            "top_candidates_global": (
+                self.top_candidates_global.to_dict() if self.top_candidates_global is not None else None
+            ),
+            "max_diversity_upper_bound": (
+                self.max_diversity_upper_bound.to_dict() if self.max_diversity_upper_bound is not None else None
+            ),
         }
 
 
@@ -192,8 +203,8 @@ class DiversitySummary:
     set_overlap_swaps: int | None
     core_entropy: EntropyBlock
     score_quantiles: ScoreQuantilesBlock
-    objective_baseline: float | None = None
-    objective_actual: float | None = None
+    objective_top_candidates: float | None = None
+    objective_diversified_candidates: float | None = None
     objective_delta: float | None = None
 
     def to_dict(self) -> dict[str, object]:
@@ -205,8 +216,8 @@ class DiversitySummary:
             "set_overlap_swaps": self.set_overlap_swaps,
             "core_entropy": self.core_entropy.to_dict(),
             "score_quantiles": self.score_quantiles.to_dict(),
-            "objective_baseline": self.objective_baseline,
-            "objective_actual": self.objective_actual,
+            "objective_top_candidates": self.objective_top_candidates,
+            "objective_diversified_candidates": self.objective_diversified_candidates,
             "objective_delta": self.objective_delta,
         }
 
@@ -539,17 +550,17 @@ def _tail_unique_slope(
 
 def _diversity_summary(
     *,
-    baseline_cores: Sequence[str],
-    actual_cores: Sequence[str],
-    baseline_scores: Sequence[float],
-    actual_scores: Sequence[float],
-    baseline_global_cores: Sequence[str] | None = None,
-    baseline_global_scores: Sequence[float] | None = None,
-    upper_bound_cores: Sequence[str] | None = None,
-    upper_bound_scores: Sequence[float] | None = None,
+    top_candidates_cores: Sequence[str],
+    diversified_candidates_cores: Sequence[str],
+    top_candidates_scores: Sequence[float],
+    diversified_candidates_scores: Sequence[float],
+    top_candidates_global_cores: Sequence[str] | None = None,
+    top_candidates_global_scores: Sequence[float] | None = None,
+    max_diversity_upper_bound_cores: Sequence[str] | None = None,
+    max_diversity_upper_bound_scores: Sequence[float] | None = None,
     pwm_max_score: float | None = None,
-    objective_baseline: float | None = None,
-    objective_actual: float | None = None,
+    objective_top_candidates: float | None = None,
+    objective_diversified_candidates: float | None = None,
     uniqueness_key: str | None = None,
     candidate_pool_size: int | None = None,
     shortlist_target: int | None = None,
@@ -559,130 +570,153 @@ def _diversity_summary(
     encoding_store: CoreEncodingStore | None = None,
 ) -> DiversitySummary | None:
     label = label or "diversity"
-    base_len = _assert_uniform_core_length(baseline_cores, label=f"{label} baseline")
-    actual_len = _assert_uniform_core_length(actual_cores, label=f"{label} actual")
-    if base_len and actual_len and base_len != actual_len:
-        raise ValueError(f"Core length mismatch for {label} (baseline {base_len} vs actual {actual_len}).")
+    top_len = _assert_uniform_core_length(top_candidates_cores, label=f"{label} top candidates")
+    actual_len = _assert_uniform_core_length(diversified_candidates_cores, label=f"{label} diversified candidates")
+    if top_len and actual_len and top_len != actual_len:
+        raise ValueError(f"Core length mismatch for {label} (top {top_len} vs diversified {actual_len}).")
     global_len = 0
-    if baseline_global_cores:
-        global_len = _assert_uniform_core_length(baseline_global_cores, label=f"{label} baseline global")
-    if base_len and global_len and base_len != global_len:
-        raise ValueError(f"Core length mismatch for {label} (baseline {base_len} vs global {global_len}).")
+    if top_candidates_global_cores:
+        global_len = _assert_uniform_core_length(top_candidates_global_cores, label=f"{label} top candidates global")
+    if top_len and global_len and top_len != global_len:
+        raise ValueError(f"Core length mismatch for {label} (top {top_len} vs global {global_len}).")
     upper_len = 0
-    if upper_bound_cores:
-        upper_len = _assert_uniform_core_length(upper_bound_cores, label=f"{label} upper bound")
-    if base_len and upper_len and base_len != upper_len:
-        raise ValueError(f"Core length mismatch for {label} (baseline {base_len} vs upper bound {upper_len}).")
-    if uniqueness_key == "core" and actual_cores:
-        if len(set(actual_cores)) != len(actual_cores):
+    if max_diversity_upper_bound_cores:
+        upper_len = _assert_uniform_core_length(
+            max_diversity_upper_bound_cores, label=f"{label} max diversity upper bound"
+        )
+    if top_len and upper_len and top_len != upper_len:
+        raise ValueError(f"Core length mismatch for {label} (top {top_len} vs upper bound {upper_len}).")
+    if uniqueness_key == "core" and diversified_candidates_cores:
+        if len(set(diversified_candidates_cores)) != len(diversified_candidates_cores):
             raise ValueError(f"Duplicate retained cores detected for {label} with uniqueness.key=core.")
-    baseline_k1 = _core_hamming_knn(
-        baseline_cores,
+    top_candidates_k1 = _core_hamming_knn(
+        top_candidates_cores,
         k=1,
         max_n=max_n,
         weights=distance_weights,
         encoding_store=encoding_store,
     )
-    actual_k1 = _core_hamming_knn(
-        actual_cores,
+    diversified_candidates_k1 = _core_hamming_knn(
+        diversified_candidates_cores,
         k=1,
         max_n=max_n,
         weights=distance_weights,
         encoding_store=encoding_store,
     )
-    if baseline_k1 is None or actual_k1 is None:
+    if top_candidates_k1 is None or diversified_candidates_k1 is None:
         return None
-    baseline_k5 = _core_hamming_knn(
-        baseline_cores,
+    top_candidates_k5 = _core_hamming_knn(
+        top_candidates_cores,
         k=5,
         max_n=max_n,
         weights=distance_weights,
         encoding_store=encoding_store,
     )
-    actual_k5 = _core_hamming_knn(
-        actual_cores,
+    diversified_candidates_k5 = _core_hamming_knn(
+        diversified_candidates_cores,
         k=5,
         max_n=max_n,
         weights=distance_weights,
         encoding_store=encoding_store,
     )
-    baseline_pairwise = _pairwise_hamming_summary(
-        baseline_cores,
+    top_candidates_pairwise = _pairwise_hamming_summary(
+        top_candidates_cores,
         max_pairs=None,
         weights=distance_weights,
         encoding_store=encoding_store,
     )
-    actual_pairwise = _pairwise_hamming_summary(
-        actual_cores,
+    diversified_candidates_pairwise = _pairwise_hamming_summary(
+        diversified_candidates_cores,
         max_pairs=None,
         weights=distance_weights,
         encoding_store=encoding_store,
     )
-    upper_pairwise = None
-    if upper_bound_cores:
-        upper_pairwise = _pairwise_hamming_summary(
-            upper_bound_cores,
+    max_diversity_upper_pairwise = None
+    if max_diversity_upper_bound_cores:
+        max_diversity_upper_pairwise = _pairwise_hamming_summary(
+            max_diversity_upper_bound_cores,
             max_pairs=None,
             weights=distance_weights,
             encoding_store=encoding_store,
         )
-    baseline_entropy = _core_entropy(baseline_cores)
-    actual_entropy = _core_entropy(actual_cores)
+    top_candidates_entropy = _core_entropy(top_candidates_cores)
+    diversified_candidates_entropy = _core_entropy(diversified_candidates_cores)
     score_denominator = None
-    if baseline_scores or actual_scores or baseline_global_scores or upper_bound_scores:
+    if (
+        top_candidates_scores
+        or diversified_candidates_scores
+        or top_candidates_global_scores
+        or max_diversity_upper_bound_scores
+    ):
         if pwm_max_score is None:
             raise ValueError("pwm_max_score is required to normalize Stage-A score quantiles.")
         pwm_max_score = float(pwm_max_score)
         if pwm_max_score < 0.0:
             raise ValueError("pwm_max_score must be >= 0 to normalize Stage-A score quantiles.")
         if pwm_max_score == 0.0:
-            all_scores = list(baseline_scores) + list(actual_scores)
-            all_scores += list(baseline_global_scores or []) + list(upper_bound_scores or [])
+            all_scores = list(top_candidates_scores) + list(diversified_candidates_scores)
+            all_scores += list(top_candidates_global_scores or []) + list(max_diversity_upper_bound_scores or [])
             if any(abs(float(score)) > 1e-9 for score in all_scores):
                 raise ValueError("pwm_max_score=0 but nonzero scores found in Stage-A score quantiles.")
             score_denominator = 1.0
         else:
             score_denominator = pwm_max_score
-    baseline_norm = [float(score) / score_denominator for score in baseline_scores] if baseline_scores else []
-    actual_norm = [float(score) / score_denominator for score in actual_scores] if actual_scores else []
-    baseline_global_norm = (
-        [float(score) / score_denominator for score in baseline_global_scores] if baseline_global_scores else []
+    top_candidates_norm = (
+        [float(score) / score_denominator for score in top_candidates_scores] if top_candidates_scores else []
     )
-    upper_bound_norm = [float(score) / score_denominator for score in upper_bound_scores] if upper_bound_scores else []
-    baseline_quantiles = _score_quantiles(baseline_norm)
-    actual_quantiles = _score_quantiles(actual_norm)
-    baseline_global_quantiles = _score_quantiles(baseline_global_norm)
-    upper_bound_quantiles = _score_quantiles(upper_bound_norm)
+    diversified_candidates_norm = (
+        [float(score) / score_denominator for score in diversified_candidates_scores]
+        if diversified_candidates_scores
+        else []
+    )
+    top_candidates_global_norm = (
+        [float(score) / score_denominator for score in top_candidates_global_scores]
+        if top_candidates_global_scores
+        else []
+    )
+    max_diversity_upper_bound_norm = (
+        [float(score) / score_denominator for score in max_diversity_upper_bound_scores]
+        if max_diversity_upper_bound_scores
+        else []
+    )
+    top_candidates_quantiles = _score_quantiles(top_candidates_norm)
+    diversified_candidates_quantiles = _score_quantiles(diversified_candidates_norm)
+    top_candidates_global_quantiles = _score_quantiles(top_candidates_global_norm)
+    max_diversity_upper_bound_quantiles = _score_quantiles(max_diversity_upper_bound_norm)
     overlap_fraction = None
     overlap_swaps = None
-    if actual_cores:
-        overlap = len(set(baseline_cores) & set(actual_cores))
-        overlap_fraction = float(overlap) / float(len(actual_cores))
-        overlap_swaps = int(len(actual_cores) - overlap)
+    if diversified_candidates_cores:
+        overlap = len(set(top_candidates_cores) & set(diversified_candidates_cores))
+        overlap_fraction = float(overlap) / float(len(diversified_candidates_cores))
+        overlap_swaps = int(len(diversified_candidates_cores) - overlap)
     objective_delta = None
-    if objective_baseline is not None and objective_actual is not None:
-        objective_delta = float(objective_actual) - float(objective_baseline)
+    if objective_top_candidates is not None and objective_diversified_candidates is not None:
+        objective_delta = float(objective_diversified_candidates) - float(objective_top_candidates)
     core_hamming = CoreHammingSummary(
         metric="weighted_hamming_tolerant" if distance_weights is not None else "hamming",
-        nnd_k1=KnnBlock(baseline=baseline_k1, actual=actual_k1),
-        nnd_k5=KnnBlock(baseline=baseline_k5, actual=actual_k5) if baseline_k5 and actual_k5 else None,
+        nnd_k1=KnnBlock(top_candidates=top_candidates_k1, diversified_candidates=diversified_candidates_k1),
+        nnd_k5=KnnBlock(top_candidates=top_candidates_k5, diversified_candidates=diversified_candidates_k5)
+        if top_candidates_k5 and diversified_candidates_k5
+        else None,
         pairwise=PairwiseBlock(
-            baseline=baseline_pairwise,
-            actual=actual_pairwise,
-            upper_bound=upper_pairwise,
+            top_candidates=top_candidates_pairwise,
+            diversified_candidates=diversified_candidates_pairwise,
+            max_diversity_upper_bound=max_diversity_upper_pairwise,
         )
-        if baseline_pairwise and actual_pairwise
+        if top_candidates_pairwise and diversified_candidates_pairwise
         else None,
     )
     entropy_block = EntropyBlock(
-        baseline=EntropySummary(values=baseline_entropy, n=int(len(baseline_cores))),
-        actual=EntropySummary(values=actual_entropy, n=int(len(actual_cores))),
+        top_candidates=EntropySummary(values=top_candidates_entropy, n=int(len(top_candidates_cores))),
+        diversified_candidates=EntropySummary(
+            values=diversified_candidates_entropy, n=int(len(diversified_candidates_cores))
+        ),
     )
     score_block = ScoreQuantilesBlock(
-        baseline=baseline_quantiles,
-        actual=actual_quantiles,
-        baseline_global=baseline_global_quantiles,
-        upper_bound=upper_bound_quantiles,
+        top_candidates=top_candidates_quantiles,
+        diversified_candidates=diversified_candidates_quantiles,
+        top_candidates_global=top_candidates_global_quantiles,
+        max_diversity_upper_bound=max_diversity_upper_bound_quantiles,
     )
     return DiversitySummary(
         candidate_pool_size=int(candidate_pool_size) if candidate_pool_size is not None else None,
@@ -692,7 +726,9 @@ def _diversity_summary(
         set_overlap_swaps=overlap_swaps,
         core_entropy=entropy_block,
         score_quantiles=score_block,
-        objective_baseline=float(objective_baseline) if objective_baseline is not None else None,
-        objective_actual=float(objective_actual) if objective_actual is not None else None,
+        objective_top_candidates=float(objective_top_candidates) if objective_top_candidates is not None else None,
+        objective_diversified_candidates=float(objective_diversified_candidates)
+        if objective_diversified_candidates is not None
+        else None,
         objective_delta=objective_delta,
     )

@@ -134,15 +134,6 @@ def _build_stage_a_strata_overview_figure(
             fontsize=text_sizes["fig_title"],
             color="#111111",
         )
-        ax_header.text(
-            0.5,
-            0.48,
-            "Scores are per-motif; compare within TF",
-            ha="center",
-            va="center",
-            fontsize=text_sizes["annotation"] * 0.85,
-            color="#444444",
-        )
         gs = outer[1].subgridspec(
             nrows=n_regs,
             ncols=2,
@@ -211,9 +202,9 @@ def _build_stage_a_strata_overview_figure(
             _draw_tier_markers(
                 ax,
                 [
-                    (f"Top {tier_labels[0]} cutoff", tier0_score, str(retained.get(0, 0))),
-                    (f"Top {tier_labels[1]} cutoff", tier1_score, str(retained.get(1, 0))),
-                    (f"Top {tier_labels[2]} cutoff", tier2_score, str(retained.get(2, 0))),
+                    (tier_labels[0], tier0_score, str(retained.get(0, 0))),
+                    (tier_labels[1], tier1_score, str(retained.get(1, 0))),
+                    (tier_labels[2], tier2_score, str(retained.get(2, 0))),
                 ],
                 ymax_fraction=0.58,
                 label_mode="box",
@@ -277,13 +268,12 @@ def _build_stage_a_strata_overview_figure(
 
         if axes_left:
             axes_left[0].set_title(
-                "Eligible unique cores: score distribution; retained subset highlighted",
+                "Score distribution of unique cores",
                 fontsize=text_sizes["annotation"],
                 color="#444444",
                 pad=12,
                 loc="center",
             )
-            axes_left[0].set_ylabel("Scaled density (peak=1)")
             axes_left[-1].set_xlabel("FIMO log-odds score")
             axes_left[-1].xaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=5))
 

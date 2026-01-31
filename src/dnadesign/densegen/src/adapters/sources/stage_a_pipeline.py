@@ -36,9 +36,9 @@ from .stage_a_selection import (
     _pwm_tolerant_weights,
     _score_norm,
     _select_by_mmr,
-    _select_diversity_baseline_candidates,
     _select_diversity_candidate_pool,
     _select_diversity_global_candidates,
+    _select_diversity_top_candidates,
     _select_diversity_upper_bound_candidates,
 )
 from .stage_a_summary import (
@@ -349,7 +349,7 @@ def run_stage_a_pipeline(
         selection_policy=selection_policy,
         selection_diag=selection_diag,
     )
-    baseline_candidates = _select_diversity_baseline_candidates(
+    top_candidates = _select_diversity_top_candidates(
         ranked,
         selection_policy=selection_policy,
         selection_diag=selection_diag,
@@ -364,32 +364,34 @@ def run_stage_a_pipeline(
         weights=distance_weights,
         encoding_store=encoding_store,
     )
-    baseline_global_candidates = _select_diversity_global_candidates(ranked, n_sites=int(n_sites))
-    baseline_cores = [(_core_sequence(cand)) for cand in baseline_candidates if cand.matched_sequence]
-    actual_cores = [(_core_sequence(cand)) for cand in picked if cand.matched_sequence]
-    baseline_global_cores = [(_core_sequence(cand)) for cand in baseline_global_candidates if cand.matched_sequence]
-    upper_bound_cores = [(_core_sequence(cand)) for cand in upper_bound_candidates if cand.matched_sequence]
-    baseline_scores = [float(cand.score) for cand in baseline_candidates]
-    actual_scores = [float(cand.score) for cand in picked]
-    baseline_global_scores = [float(cand.score) for cand in baseline_global_candidates]
-    upper_bound_scores = [float(cand.score) for cand in upper_bound_candidates]
-    objective_baseline = None
-    objective_actual = None
+    top_candidates_global = _select_diversity_global_candidates(ranked, n_sites=int(n_sites))
+    top_candidates_cores = [(_core_sequence(cand)) for cand in top_candidates if cand.matched_sequence]
+    diversified_candidates_cores = [(_core_sequence(cand)) for cand in picked if cand.matched_sequence]
+    top_candidates_global_cores = [(_core_sequence(cand)) for cand in top_candidates_global if cand.matched_sequence]
+    max_diversity_upper_bound_cores = [
+        (_core_sequence(cand)) for cand in upper_bound_candidates if cand.matched_sequence
+    ]
+    top_candidates_scores = [float(cand.score) for cand in top_candidates]
+    diversified_candidates_scores = [float(cand.score) for cand in picked]
+    top_candidates_global_scores = [float(cand.score) for cand in top_candidates_global]
+    max_diversity_upper_bound_scores = [float(cand.score) for cand in upper_bound_candidates]
+    objective_top_candidates = None
+    objective_diversified_candidates = None
     if selection_policy == "mmr" and candidate_pool:
         scores_norm_map = _score_norm([float(cand.score) for cand in candidate_pool])
-        baseline_scores_objective = [float(cand.score) for cand in baseline_candidates if cand.matched_sequence]
-        actual_scores_objective = [float(cand.score) for cand in picked if cand.matched_sequence]
-        objective_baseline = _mmr_objective(
-            cores=baseline_cores,
-            scores=baseline_scores_objective,
+        top_scores_objective = [float(cand.score) for cand in top_candidates if cand.matched_sequence]
+        diversified_scores_objective = [float(cand.score) for cand in picked if cand.matched_sequence]
+        objective_top_candidates = _mmr_objective(
+            cores=top_candidates_cores,
+            scores=top_scores_objective,
             scores_norm_map=scores_norm_map,
             alpha=float(selection_alpha),
             distance_weights=distance_weights,
             encoding_store=encoding_store,
         )
-        objective_actual = _mmr_objective(
-            cores=actual_cores,
-            scores=actual_scores_objective,
+        objective_diversified_candidates = _mmr_objective(
+            cores=diversified_candidates_cores,
+            scores=diversified_scores_objective,
             scores_norm_map=scores_norm_map,
             alpha=float(selection_alpha),
             distance_weights=distance_weights,
@@ -408,24 +410,24 @@ def run_stage_a_pipeline(
             motif_id=motif.motif_id,
             phase="diversity",
             detail=(
-                f"baseline={len(baseline_cores)} actual={len(actual_cores)} "
-                f"global={len(baseline_global_cores)} cap={diversity_max_n}"
+                f"top={len(top_candidates_cores)} diversified={len(diversified_candidates_cores)} "
+                f"global={len(top_candidates_global_cores)} cap={diversity_max_n}"
             ),
         )
     )
     diversity_start = time.monotonic()
     diversity = _diversity_summary(
-        baseline_cores=baseline_cores,
-        actual_cores=actual_cores,
-        baseline_scores=baseline_scores,
-        actual_scores=actual_scores,
-        baseline_global_cores=baseline_global_cores,
-        baseline_global_scores=baseline_global_scores,
-        upper_bound_cores=upper_bound_cores,
-        upper_bound_scores=upper_bound_scores,
+        top_candidates_cores=top_candidates_cores,
+        diversified_candidates_cores=diversified_candidates_cores,
+        top_candidates_scores=top_candidates_scores,
+        diversified_candidates_scores=diversified_candidates_scores,
+        top_candidates_global_cores=top_candidates_global_cores,
+        top_candidates_global_scores=top_candidates_global_scores,
+        max_diversity_upper_bound_cores=max_diversity_upper_bound_cores,
+        max_diversity_upper_bound_scores=max_diversity_upper_bound_scores,
         pwm_max_score=pwm_max_score,
-        objective_baseline=objective_baseline,
-        objective_actual=objective_actual,
+        objective_top_candidates=objective_top_candidates,
+        objective_diversified_candidates=objective_diversified_candidates,
         uniqueness_key=uniqueness_key,
         candidate_pool_size=int(candidate_pool_size) if candidate_pool_size is not None else None,
         shortlist_target=int(shortlist_target) if shortlist_target is not None else None,
