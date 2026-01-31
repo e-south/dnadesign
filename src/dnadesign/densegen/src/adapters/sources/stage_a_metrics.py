@@ -558,7 +558,7 @@ def _diversity_summary(
     top_candidates_global_scores: Sequence[float] | None = None,
     max_diversity_upper_bound_cores: Sequence[str] | None = None,
     max_diversity_upper_bound_scores: Sequence[float] | None = None,
-    pwm_max_score: float | None = None,
+    pwm_theoretical_max_score: float | None = None,
     objective_top_candidates: float | None = None,
     objective_diversified_candidates: float | None = None,
     uniqueness_key: str | None = None,
@@ -648,19 +648,19 @@ def _diversity_summary(
         or top_candidates_global_scores
         or max_diversity_upper_bound_scores
     ):
-        if pwm_max_score is None:
-            raise ValueError("pwm_max_score is required to normalize Stage-A score quantiles.")
-        pwm_max_score = float(pwm_max_score)
-        if pwm_max_score < 0.0:
-            raise ValueError("pwm_max_score must be >= 0 to normalize Stage-A score quantiles.")
-        if pwm_max_score == 0.0:
+        if pwm_theoretical_max_score is None:
+            raise ValueError("pwm_theoretical_max_score is required to normalize Stage-A score quantiles.")
+        pwm_theoretical_max_score = float(pwm_theoretical_max_score)
+        if pwm_theoretical_max_score < 0.0:
+            raise ValueError("pwm_theoretical_max_score must be >= 0 to normalize Stage-A score quantiles.")
+        if pwm_theoretical_max_score == 0.0:
             all_scores = list(top_candidates_scores) + list(diversified_candidates_scores)
             all_scores += list(top_candidates_global_scores or []) + list(max_diversity_upper_bound_scores or [])
             if any(abs(float(score)) > 1e-9 for score in all_scores):
-                raise ValueError("pwm_max_score=0 but nonzero scores found in Stage-A score quantiles.")
+                raise ValueError("pwm_theoretical_max_score=0 but nonzero scores found in Stage-A score quantiles.")
             score_denominator = 1.0
         else:
-            score_denominator = pwm_max_score
+            score_denominator = pwm_theoretical_max_score
     top_candidates_norm = (
         [float(score) / score_denominator for score in top_candidates_scores] if top_candidates_scores else []
     )

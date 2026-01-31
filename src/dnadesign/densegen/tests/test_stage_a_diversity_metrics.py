@@ -77,7 +77,7 @@ def test_diversity_summary_scores() -> None:
         diversified_candidates_scores=scores,
         max_diversity_upper_bound_cores=cores,
         max_diversity_upper_bound_scores=scores,
-        pwm_max_score=2.0,
+        pwm_theoretical_max_score=2.0,
         max_n=2500,
     )
     assert summary is not None
@@ -102,7 +102,7 @@ def test_diversity_summary_scores() -> None:
     assert diversified.p50 == 0.75
 
 
-def test_diversity_summary_allows_zero_pwm_max_score_for_zero_scores() -> None:
+def test_diversity_summary_allows_zero_pwm_theoretical_max_score_for_zero_scores() -> None:
     cores = ["AAAA", "AAAT"]
     scores = [0.0, 0.0]
     summary = _diversity_summary(
@@ -112,7 +112,7 @@ def test_diversity_summary_allows_zero_pwm_max_score_for_zero_scores() -> None:
         diversified_candidates_scores=scores,
         max_diversity_upper_bound_cores=cores,
         max_diversity_upper_bound_scores=scores,
-        pwm_max_score=0.0,
+        pwm_theoretical_max_score=0.0,
         max_n=2500,
     )
     assert summary is not None
@@ -125,10 +125,10 @@ def test_diversity_summary_allows_zero_pwm_max_score_for_zero_scores() -> None:
     assert diversified.p50 == 0.0
 
 
-def test_diversity_summary_rejects_zero_pwm_max_score_with_nonzero_scores() -> None:
+def test_diversity_summary_rejects_zero_pwm_theoretical_max_score_with_nonzero_scores() -> None:
     cores = ["AAAA", "AAAT"]
     scores = [0.0, 1.0]
-    with pytest.raises(ValueError, match="pwm_max_score"):
+    with pytest.raises(ValueError, match="pwm_theoretical_max_score"):
         _diversity_summary(
             top_candidates_cores=cores,
             diversified_candidates_cores=cores,
@@ -136,7 +136,7 @@ def test_diversity_summary_rejects_zero_pwm_max_score_with_nonzero_scores() -> N
             diversified_candidates_scores=scores,
             max_diversity_upper_bound_cores=cores,
             max_diversity_upper_bound_scores=scores,
-            pwm_max_score=0.0,
+            pwm_theoretical_max_score=0.0,
             max_n=2500,
         )
 
@@ -161,7 +161,7 @@ def test_diversity_summary_pairwise_is_exact_for_retained_sets() -> None:
         diversified_candidates_scores=scores,
         max_diversity_upper_bound_cores=cores,
         max_diversity_upper_bound_scores=scores,
-        pwm_max_score=100.0,
+        pwm_theoretical_max_score=100.0,
         max_n=2500,
     )
     assert summary is not None

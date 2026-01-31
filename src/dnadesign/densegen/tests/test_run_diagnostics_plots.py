@@ -297,7 +297,7 @@ def _pool_manifest(tmp_path: Path, *, include_diversity: bool = False) -> TFBSPo
     pools_dir = tmp_path / "pools"
     pools_dir.mkdir(parents=True, exist_ok=True)
     manifest = {
-        "schema_version": "1.5",
+        "schema_version": "1.6",
         "run_id": "demo",
         "run_root": ".",
         "config_path": "config.yaml",
@@ -317,6 +317,8 @@ def _pool_manifest(tmp_path: Path, *, include_diversity: bool = False) -> TFBSPo
                     "rank_within_regulator",
                     "selection_rank",
                     "nearest_selected_similarity",
+                    "selection_score_percentile",
+                    "nearest_selected_distance_norm",
                 ],
                 "pool_mode": "tfbs",
                 "stage_a_sampling": {
@@ -332,7 +334,8 @@ def _pool_manifest(tmp_path: Path, *, include_diversity: bool = False) -> TFBSPo
                             "regulator": "TF_A",
                             "pwm_consensus": "AAA",
                             "pwm_consensus_iupac": "AAA",
-                            "pwm_max_score": 2.0,
+                            "pwm_consensus_score": 2.0,
+                            "pwm_theoretical_max_score": 2.0,
                             "edges": [0.0, 1.0, 2.0],
                             "counts": [1, 1],
                             "tier0_score": 2.0,
@@ -481,6 +484,8 @@ def test_plot_stage_a_summary(tmp_path: Path) -> None:
             "rank_within_regulator": [1, 2],
             "selection_rank": [1, 2],
             "nearest_selected_similarity": [0.0, 0.5],
+            "selection_score_percentile": [1.0, 0.5],
+            "nearest_selected_distance_norm": [None, 0.5],
         }
     )
     pools = {"demo_input": pool_df}
@@ -513,6 +518,8 @@ def test_plot_stage_a_summary_requires_diversity(tmp_path: Path) -> None:
             "rank_within_regulator": [1, 2],
             "selection_rank": [1, 2],
             "nearest_selected_similarity": [0.0, 0.5],
+            "selection_score_percentile": [1.0, 0.5],
+            "nearest_selected_distance_norm": [None, 0.5],
         }
     )
     pools = {"demo_input": pool_df}

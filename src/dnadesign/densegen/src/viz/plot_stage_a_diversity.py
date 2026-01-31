@@ -76,7 +76,7 @@ def _build_stage_a_diversity_figure(
         ax_header.text(
             0.5,
             0.76,
-            f"Stage-A core diversity (pairwise outcome + MMR contribution) -- {input_name}",
+            f"Stage-A core diversity (nearest-neighbor outcome + MMR contribution) -- {input_name}",
             ha="center",
             va="center",
             fontsize=text_sizes["fig_title"],
@@ -109,18 +109,18 @@ def _build_stage_a_diversity_figure(
             diversity_by_reg[reg] = diversity
             row_by_reg[reg] = row
 
-        def _ecdf_from_counts(bins: list[float] | list[int], counts: list[int]) -> tuple[np.ndarray, np.ndarray]:
+        def _dist_from_counts(bins: list[float] | list[int], counts: list[int]) -> tuple[np.ndarray, np.ndarray]:
             if not bins or not counts:
-                raise ValueError("Stage-A diversity missing pairwise bins or counts.")
+                raise ValueError("Stage-A diversity missing nearest-neighbor bins or counts.")
             arr = np.asarray(counts, dtype=float)
             total = float(arr.sum())
             x = np.asarray(bins, dtype=float)
             if total <= 0:
                 return x, np.zeros_like(x, dtype=float)
-            y = np.cumsum(arr) / total
+            y = arr / total
             return x, y
 
-        metric_label = "Hamming distance (pairwise)"
+        metric_label = "Nearest-neighbor distance (k=1)"
         for idx, reg in enumerate(regulators):
             hue = reg_colors.get(reg, "#4c78a8")
             row = row_by_reg[reg]
@@ -154,44 +154,42 @@ def _build_stage_a_diversity_figure(
             if not metric:
                 raise ValueError(f"Stage-A diversity missing metric for '{input_name}' ({reg}).")
             if metric == "weighted_hamming_tolerant":
-                metric_label = "Weighted Hamming distance (pairwise)"
-            pairwise = core_hamming.get("pairwise")
-            if not isinstance(pairwise, dict):
-                raise ValueError(f"Stage-A diversity missing pairwise stats for '{input_name}' ({reg}).")
-            top_candidates = pairwise.get("top_candidates")
-            diversified_candidates = pairwise.get("diversified_candidates")
+                metric_label = "Weighted Hamming nearest-neighbor distance (k=1)"
+            nnd_block = core_hamming.get("nnd_k1")
+            if not isinstance(nnd_block, dict):
+                raise ValueError(f"Stage-A diversity missing nnd_k1 stats for '{input_name}' ({reg}).")
+            top_candidates = nnd_block.get("top_candidates")
+            diversified_candidates = nnd_block.get("diversified_candidates")
             if not isinstance(top_candidates, dict) or not isinstance(diversified_candidates, dict):
-                raise ValueError(f"Stage-A diversity missing pairwise top/diversified for '{input_name}' ({reg}).")
+                raise ValueError(f"Stage-A diversity missing nnd_k1 top/diversified for '{input_name}' ({reg}).")
             bins = top_candidates.get("bins") or diversified_candidates.get("bins")
             if not isinstance(bins, list) or not bins:
-                raise ValueError(f"Stage-A diversity missing pairwise bins for '{input_name}' ({reg}).")
+                raise ValueError(f"Stage-A diversity missing nnd_k1 bins for '{input_name}' ({reg}).")
             top_counts = top_candidates.get("counts")
             diversified_counts = diversified_candidates.get("counts")
             if not isinstance(top_counts, list) or not isinstance(diversified_counts, list):
-                raise ValueError(f"Stage-A diversity missing pairwise counts for '{input_name}' ({reg}).")
-            x_base, y_base = _ecdf_from_counts(bins, top_counts)
-            x_act, y_act = _ecdf_from_counts(bins, diversified_counts)
-            base_line = ax_left.step(
+                raise ValueError(f"Stage-A diversity missing nnd_k1 counts for '{input_name}' ({reg}).")
+            x_base, y_base = _dist_from_counts(bins, top_counts)
+            x_act, y_act = _dist_from_counts(bins, diversified_counts)
+            base_line = ax_left.plot(
                 x_base,
                 y_base,
-                where="mid",
                 color="#777777",
                 linewidth=1.3,
                 label="Top Sequences",
                 zorder=2,
             )[0]
-            act_line = ax_left.step(
+            act_line = ax_left.plot(
                 x_act,
                 y_act,
-                where="mid",
                 color=hue,
                 linewidth=1.4,
                 label="Diversified Sequences",
                 zorder=3,
             )[0]
             ax_left.set_xlim(min(x_base.min(), x_act.min()), max(x_base.max(), x_act.max()))
-            ax_left.set_ylim(0.0, 1.05)
-            ax_left.set_ylabel("ECDF" if idx == 0 else "")
+            ax_left.set_ylim(0.0, max(1.05 * float(np.max([y_base.max(), y_act.max()])), 0.4))
+            ax_left.set_ylabel("Fraction" if idx == 0 else "")
             ax_left.xaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=5))
             if idx == 0:
                 ax_left.legend(
@@ -201,18 +199,11 @@ def _build_stage_a_diversity_figure(
                     fontsize=text_sizes["annotation"] * 0.8,
                 )
             note_lines: list[str] = []
-            if "n_pairs" not in top_candidates or "n_pairs" not in diversified_candidates:
-                raise ValueError(f"Stage-A diversity missing pairwise n_pairs for '{input_name}' ({reg}).")
-            base_pairs = int(top_candidates["n_pairs"])
-            act_pairs = int(diversified_candidates["n_pairs"])
-            if base_pairs <= 0 or act_pairs <= 0:
-                note_lines.append("pairwise n/a (n<2)")
-            else:
-                if "median" not in top_candidates or "median" not in diversified_candidates:
-                    raise ValueError(f"Stage-A diversity missing pairwise median for '{input_name}' ({reg}).")
-                base_med = float(top_candidates["median"])
-                act_med = float(diversified_candidates["median"])
-                note_lines.append(f"Δdiv (median) {act_med - base_med:+.2f}")
+            if "median" not in top_candidates or "median" not in diversified_candidates:
+                raise ValueError(f"Stage-A diversity missing nnd_k1 median for '{input_name}' ({reg}).")
+            base_med = float(top_candidates["median"])
+            act_med = float(diversified_candidates["median"])
+            note_lines.append(f"Δnnd (median) {act_med - base_med:+.2f}")
             objective_delta = diversity.get("objective_delta")
             if objective_delta is None:
                 objective_top = diversity.get("objective_top_candidates")
@@ -235,18 +226,19 @@ def _build_stage_a_diversity_figure(
                     edgecolor="none",
                 )
             selection_policy = str(row.get("selection_policy") or "").lower()
-            pwm_max_score = row.get("pwm_max_score")
-            if pwm_max_score is None:
-                raise ValueError(f"Stage-A diversity missing pwm_max_score for '{input_name}' ({reg}).")
             reg_df = pool_df[pool_df[tf_col].astype(str) == reg].copy()
-            if "nearest_selected_similarity" not in reg_df.columns:
-                raise ValueError(f"Stage-A pool missing nearest_selected_similarity for input '{input_name}' ({reg}).")
-            scores = pd.to_numeric(reg_df["best_hit_score"], errors="coerce")
-            sims = pd.to_numeric(reg_df["nearest_selected_similarity"], errors="coerce")
+            if "selection_score_percentile" not in reg_df.columns:
+                raise ValueError(f"Stage-A pool missing selection_score_percentile for input '{input_name}' ({reg}).")
+            if "nearest_selected_distance_norm" not in reg_df.columns:
+                raise ValueError(
+                    f"Stage-A pool missing nearest_selected_distance_norm for input '{input_name}' ({reg})."
+                )
+            score_pct = pd.to_numeric(reg_df["selection_score_percentile"], errors="coerce")
+            dist_norm = pd.to_numeric(reg_df["nearest_selected_distance_norm"], errors="coerce")
             ranks = (
                 pd.to_numeric(reg_df["selection_rank"], errors="coerce") if "selection_rank" in reg_df.columns else None
             )
-            mask = sims.notna() & (sims > 0)
+            mask = dist_norm.notna() & score_pct.notna()
             if ranks is not None:
                 mask &= ranks > 1
             if selection_policy != "mmr":
@@ -270,8 +262,8 @@ def _build_stage_a_diversity_figure(
                     color="#666666",
                 )
             else:
-                score_norm = (scores[mask] / float(pwm_max_score)).to_numpy(dtype=float)
-                distances = ((1.0 / sims[mask]) - 1.0).to_numpy(dtype=float)
+                score_norm = score_pct[mask].to_numpy(dtype=float)
+                distances = dist_norm[mask].to_numpy(dtype=float)
                 ax_right.scatter(
                     score_norm,
                     distances,
@@ -281,26 +273,21 @@ def _build_stage_a_diversity_figure(
                     edgecolor="none",
                     zorder=3,
                 )
-                x_min = float(np.nanmin(score_norm))
-                x_max = float(np.nanmax(score_norm))
-                if not np.isfinite(x_min) or not np.isfinite(x_max):
-                    x_min, x_max = 0.0, 1.0
-                pad = 0.05 * (x_max - x_min) if x_max > x_min else 0.1
-                ax_right.set_xlim(x_min - pad, x_max + pad)
+                ax_right.set_xlim(0.0, 1.0)
                 y_max = float(np.nanmax(distances)) if distances.size else 0.0
                 ax_right.set_ylim(0.0, y_max * 1.15 if y_max > 0 else 1.0)
-            ax_right.set_ylabel("Selection-time nearest distance" if idx == 0 else "")
+            ax_right.set_ylabel("Selection-time nearest distance (normalized)" if idx == 0 else "")
             ax_right.xaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=5))
             ax_left.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
             ax_right.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
 
         if axes_left:
-            axes_left[0].set_title("Pairwise distance ECDF", fontsize=subtitle_size, pad=title_pad)
+            axes_left[0].set_title("Nearest-neighbor distance distribution", fontsize=subtitle_size, pad=title_pad)
             axes_right[0].set_title(
                 "MMR contribution (score vs nearest distance)", fontsize=subtitle_size, pad=title_pad
             )
             axes_left[-1].set_xlabel(metric_label)
-            axes_right[-1].set_xlabel("Score / PWM consensus score")
+            axes_right[-1].set_xlabel("Score percentile (selection pool)")
             for ax in axes_left[:-1]:
                 ax.tick_params(labelbottom=False)
             for ax in axes_right:

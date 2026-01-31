@@ -33,6 +33,7 @@ def test_mmr_prefers_low_ic_mismatch_when_scores_equal() -> None:
         {"A": 0.97, "C": 0.01, "G": 0.01, "T": 0.01},
         {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
     ]
+    background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
     ranked = [
         _cand("AA", 10.0),
         _cand("AT", 9.0),
@@ -41,6 +42,7 @@ def test_mmr_prefers_low_ic_mismatch_when_scores_equal() -> None:
     selected, meta, diag = stage_a_selection._select_by_mmr(
         ranked,
         matrix=matrix,
+        background=background,
         n_sites=2,
         alpha=0.5,
         shortlist_min=3,
@@ -62,10 +64,40 @@ def test_score_norm_uses_percentile_rank() -> None:
     assert norm[40.0] == pytest.approx(1.0, rel=1e-5)
 
 
-def test_pwm_tolerant_weights_emphasize_low_ic_positions() -> None:
+def test_pwm_tolerant_weights_use_background_information() -> None:
     matrix = [
+        {"A": 0.7, "C": 0.1, "G": 0.1, "T": 0.1},
         {"A": 0.97, "C": 0.01, "G": 0.01, "T": 0.01},
+    ]
+    background = {"A": 0.7, "C": 0.1, "G": 0.1, "T": 0.1}
+    weights = stage_a_selection._pwm_tolerant_weights(matrix, background=background)
+    assert weights[0] == pytest.approx(1.0)
+    assert weights[0] > weights[1]
+
+
+def test_mmr_records_score_percentile_and_distance_norm() -> None:
+    matrix = [
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
         {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
     ]
-    weights = stage_a_selection._pwm_tolerant_weights(matrix)
-    assert weights[1] > weights[0]
+    background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
+    ranked = [
+        _cand("AA", 10.0),
+        _cand("AT", 9.0),
+        _cand("TA", 9.0),
+    ]
+    selected, meta, _diag = stage_a_selection._select_by_mmr(
+        ranked,
+        matrix=matrix,
+        background=background,
+        n_sites=2,
+        alpha=0.5,
+        shortlist_min=3,
+        shortlist_factor=1,
+        shortlist_max=None,
+        tier_widening=None,
+    )
+    assert [cand.seq for cand in selected] == ["AA", "AT"]
+    assert meta["AA"].selection_score_percentile == pytest.approx(1.0)
+    assert meta["AT"].selection_score_percentile == pytest.approx(0.25)
+    assert meta["AT"].nearest_selected_distance_norm == pytest.approx(0.5)

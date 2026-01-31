@@ -26,6 +26,7 @@ def _motif_with_pwm() -> list[dict[str, float]]:
 
 def test_mmr_tier_widening_widens_instead_of_crashing() -> None:
     matrix = _motif_with_pwm()
+    background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
     ranked = []
     for idx in range(200):
         core = "ACGT"
@@ -44,6 +45,7 @@ def test_mmr_tier_widening_widens_instead_of_crashing() -> None:
     selected, meta, diag = stage_a_selection._select_by_mmr(
         ranked,
         matrix=matrix,
+        background=background,
         n_sites=20,
         alpha=0.9,
         shortlist_min=50,
@@ -59,6 +61,7 @@ def test_mmr_tier_widening_widens_instead_of_crashing() -> None:
 
 def test_mmr_tier_widening_honors_shortlist_target() -> None:
     matrix = _motif_with_pwm()
+    background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
     ranked = []
     for idx in range(100):
         core = "ACGT"
@@ -77,6 +80,7 @@ def test_mmr_tier_widening_honors_shortlist_target() -> None:
     selected, _meta, diag = stage_a_selection._select_by_mmr(
         ranked,
         matrix=matrix,
+        background=background,
         n_sites=10,
         alpha=0.9,
         shortlist_min=10,

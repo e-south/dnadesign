@@ -17,6 +17,7 @@ from typing import Optional, Protocol, Sequence
 import numpy as np
 
 from .stage_a_encoding import CoreEncodingStore, encode_cores
+from .stage_a_sampling_utils import normalize_background
 from .stage_a_types import SelectionMeta
 
 
@@ -82,23 +83,37 @@ def _collapse_by_core_identity(ranked: Sequence[_CandidateLike]) -> tuple[list[_
     return sorted(best_by_core.values(), key=lambda cand: (-cand.score, cand.seq)), int(collapsed)
 
 
-def _pwm_tolerant_weights(matrix: Sequence[dict[str, float]]) -> np.ndarray:
+def _pwm_tolerant_weights(
+    matrix: Sequence[dict[str, float]],
+    *,
+    background: dict[str, float],
+) -> np.ndarray:
     if not matrix:
         raise ValueError("PWM matrix is required to compute PWM-tolerant weights.")
+    bg = normalize_background(background)
+    bg_vals = np.array([float(bg.get(base, 0.0)) for base in ("A", "C", "G", "T")], dtype=float)
+    if np.any(bg_vals <= 0):
+        raise ValueError("Background probabilities must be > 0 to compute relative entropy.")
+    max_info_bits = float(np.log2(1.0 / float(bg_vals.min())))
+    if max_info_bits <= 0.0:
+        raise ValueError("Background probabilities must yield positive information content.")
     weights: list[float] = []
     for row in matrix:
-        probs = [float(row.get(base, 0.0)) for base in ("A", "C", "G", "T")]
-        if any(p < 0 for p in probs):
+        probs = np.array([float(row.get(base, 0.0)) for base in ("A", "C", "G", "T")], dtype=float)
+        if np.any(probs < 0):
             raise ValueError("PWM probabilities must be >= 0 to compute information content.")
-        total = float(sum(probs))
+        total = float(probs.sum())
         if total <= 0:
             raise ValueError("PWM probabilities must sum to > 0 to compute information content.")
-        probs = [p / total for p in probs]
-        entropy = float(-sum(p * np.log2(p) for p in probs if p > 0))
-        info_bits = 2.0 - entropy
-        info_norm = min(1.0, max(0.0, info_bits / 2.0))
+        probs = probs / total
+        mask = probs > 0
+        info_bits = float(np.sum(probs[mask] * np.log2(probs[mask] / bg_vals[mask])))
+        info_norm = min(1.0, max(0.0, info_bits / max_info_bits))
         weights.append(1.0 - info_norm)
-    return np.asarray(weights, dtype=float)
+    weights_arr = np.asarray(weights, dtype=float)
+    if float(weights_arr.sum()) <= 1e-6:
+        weights_arr = np.ones(len(weights_arr), dtype=float)
+    return weights_arr
 
 
 def _score_norm(values: Sequence[float]) -> dict[float, float]:
@@ -288,6 +303,7 @@ def _select_by_mmr(
     ranked: Sequence[_CandidateLike],
     *,
     matrix: Sequence[dict[str, float]],
+    background: dict[str, float],
     n_sites: int,
     alpha: float,
     shortlist_min: int,
@@ -312,7 +328,8 @@ def _select_by_mmr(
     if alpha <= 0.0 or alpha > 1.0:
         raise ValueError("selection.alpha must be in (0, 1].")
     core_by_seq = {cand.seq: _core_sequence(cand) for cand in ranked}
-    weights = _pwm_tolerant_weights(matrix)
+    weights = _pwm_tolerant_weights(matrix, background=background)
+    weight_sum = float(weights.sum())
     tier_fractions = list(tier_widening) if tier_widening else [1.0]
     total = len(ranked)
     shortlist_target = max(int(shortlist_min), int(shortlist_factor) * int(n_sites))
@@ -375,12 +392,21 @@ def _select_by_mmr(
                 chosen = shortlist[best_idx]
                 selected.append(chosen)
                 selected_mask[best_idx] = True
-                any_selected = True
+                had_selected = any_selected
+                nearest_distance = None
+                nearest_distance_norm = None
+                if had_selected:
+                    nearest_distance = float(min_dist[best_idx])
+                    nearest_distance_norm = float(nearest_distance / weight_sum) if weight_sum > 0 else None
                 meta[chosen.seq] = SelectionMeta(
                     selection_rank=len(selected),
                     selection_utility=float(utility[best_idx]),
-                    nearest_selected_similarity=float(max_sim[best_idx]),
+                    selection_score_percentile=float(scores_norm[best_idx]),
+                    nearest_selected_similarity=float(max_sim[best_idx]) if had_selected else None,
+                    nearest_selected_distance=nearest_distance,
+                    nearest_selected_distance_norm=nearest_distance_norm,
                 )
+                any_selected = True
                 dists = ((encoded != encoded[best_idx]) * weights).sum(axis=1)
                 min_dist = np.minimum(min_dist, dists)
                 min_dist[best_idx] = 0.0

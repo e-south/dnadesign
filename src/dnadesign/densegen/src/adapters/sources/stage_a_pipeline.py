@@ -187,7 +187,8 @@ def run_stage_a_pipeline(
     tier_fractions_source: str,
     pwm_consensus: str,
     pwm_consensus_iupac: str,
-    pwm_max_score: float | None,
+    pwm_consensus_score: float | None,
+    pwm_theoretical_max_score: float | None,
     length_label: str,
     window_label: str,
     score_label: str,
@@ -318,6 +319,7 @@ def run_stage_a_pipeline(
         picked, selection_meta, selection_diag = _select_by_mmr(
             ranked,
             matrix=matrix,
+            background=motif.background,
             n_sites=int(n_sites),
             alpha=float(selection_alpha),
             shortlist_min=int(selection_shortlist_min),
@@ -356,7 +358,7 @@ def run_stage_a_pipeline(
         selection_diag=selection_diag,
         n_sites=int(n_sites),
     )
-    distance_weights = _pwm_tolerant_weights(matrix)
+    distance_weights = _pwm_tolerant_weights(matrix, background=motif.background)
     upper_bound_candidates = _select_diversity_upper_bound_candidates(
         ranked,
         selection_policy=selection_policy,
@@ -426,7 +428,7 @@ def run_stage_a_pipeline(
         top_candidates_global_scores=top_candidates_global_scores,
         max_diversity_upper_bound_cores=max_diversity_upper_bound_cores,
         max_diversity_upper_bound_scores=max_diversity_upper_bound_scores,
-        pwm_max_score=pwm_max_score,
+        pwm_theoretical_max_score=pwm_theoretical_max_score,
         objective_top_candidates=objective_top_candidates,
         objective_diversified_candidates=objective_diversified_candidates,
         uniqueness_key=uniqueness_key,
@@ -651,7 +653,8 @@ def run_stage_a_pipeline(
             padding_audit=padding_audit,
             pwm_consensus=pwm_consensus,
             pwm_consensus_iupac=pwm_consensus_iupac,
-            pwm_max_score=pwm_max_score,
+            pwm_consensus_score=pwm_consensus_score,
+            pwm_theoretical_max_score=pwm_theoretical_max_score,
             input_name=input_name,
             regulator=motif.motif_id,
             backend=scoring_backend,

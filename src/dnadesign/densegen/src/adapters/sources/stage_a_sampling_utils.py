@@ -71,6 +71,20 @@ def score_sequence(
     return score
 
 
+def _pwm_theoretical_max_score(log_odds: List[dict[str, float]]) -> float:
+    if not log_odds:
+        return 0.0
+    total = 0.0
+    for row in log_odds:
+        if not row:
+            raise ValueError("PWM log-odds rows must be non-empty to compute theoretical max score.")
+        best = max(float(row.get(base, float("-inf"))) for base in ("A", "C", "G", "T"))
+        if not np.isfinite(best):
+            return float("-inf")
+        total += best
+    return float(total)
+
+
 def _background_cdf(probs: dict[str, float]) -> np.ndarray:
     bases = ["A", "C", "G", "T"]
     weights = np.array([float(probs.get(b, 0.0)) for b in bases], dtype=float)

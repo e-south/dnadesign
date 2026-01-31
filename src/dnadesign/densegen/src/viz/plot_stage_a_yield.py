@@ -172,9 +172,9 @@ def _build_stage_a_yield_bias_figure(
             hue = reg_colors[reg]
             ax.plot(x_positions, counts, color=hue, marker="o", linewidth=1.4, markersize=4)
             ax.set_ylim(0.0, y_limit)
+            generated = counts[0] if counts else 0
             for step_idx, cur in enumerate(counts):
-                prev = counts[step_idx - 1] if step_idx > 0 else cur
-                frac = float(cur) / float(prev) if prev else 0.0
+                frac = float(cur) / float(generated) if generated else 0.0
                 label = f"{cur:,}\n{_format_percent(frac)}"
                 ax.annotate(
                     label,
@@ -233,6 +233,12 @@ def _build_stage_a_yield_bias_figure(
             entropy_block = diversity.get("core_entropy")
             if not isinstance(entropy_block, dict):
                 raise ValueError(f"Stage-A diversity missing core_entropy for '{input_name}' ({reg}).")
+            top_block = entropy_block.get("top_candidates")
+            if not isinstance(top_block, dict):
+                raise ValueError(f"Stage-A diversity missing top entropy for '{input_name}' ({reg}).")
+            top_values = top_block.get("values")
+            if not isinstance(top_values, list) or not top_values:
+                raise ValueError(f"Stage-A diversity missing top entropy values for '{input_name}' ({reg}).")
             diversified_block = entropy_block.get("diversified_candidates")
             if not isinstance(diversified_block, dict):
                 raise ValueError(f"Stage-A diversity missing diversified entropy for '{input_name}' ({reg}).")
@@ -247,7 +253,13 @@ def _build_stage_a_yield_bias_figure(
                     f"Stage-A diversity entropy length mismatch for '{input_name}' ({reg}). "
                     f"consensus={len(consensus)} entropy={len(values)}"
                 )
+            if len(consensus) != len(top_values):
+                raise ValueError(
+                    f"Stage-A diversity top entropy length mismatch for '{input_name}' ({reg}). "
+                    f"consensus={len(consensus)} entropy={len(top_values)}"
+                )
             entropy_vals = [float(v) for v in values]
+            top_entropy_vals = [float(v) for v in top_values]
             positions = np.arange(1, len(entropy_vals) + 1)
             hue = reg_colors.get(reg, "#4c78a8")
             ax.bar(
@@ -258,7 +270,15 @@ def _build_stage_a_yield_bias_figure(
                 edgecolor=hue,
                 linewidth=0.8,
             )
-            ax.plot(positions, entropy_vals, color=hue, linewidth=1.2)
+            ax.plot(positions, entropy_vals, color=hue, linewidth=1.2, label="Diversified")
+            ax.plot(
+                positions,
+                top_entropy_vals,
+                color="#444444",
+                linewidth=1.1,
+                linestyle="--",
+                label="Top score",
+            )
             ax.set_xlim(0.5, len(entropy_vals) + 0.5)
             ax.set_ylim(0.0, 2.0)
             ax.set_xticks(positions)
@@ -269,10 +289,15 @@ def _build_stage_a_yield_bias_figure(
             ax.tick_params(axis="x", labelsize=tick_size)
             if idx == 0:
                 ax.set_ylabel("Entropy (bits)")
+                ax.legend(
+                    loc="upper right",
+                    frameon=False,
+                    fontsize=text_sizes["annotation"] * 0.75,
+                )
             if idx == len(reg_order) - 1:
                 ax.set_xlabel("Core position")
         axes_right[0].set_title(
-            "Diversified sequences: core positional entropy",
+            "Core positional entropy (top vs diversified)",
             fontsize=subtitle_size,
             pad=title_pad,
         )

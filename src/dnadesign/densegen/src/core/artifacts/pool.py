@@ -28,7 +28,7 @@ from ...core.stage_a_constants import FIMO_REPORT_THRESH
 from ...utils.logging_utils import install_native_stderr_filters
 from .ids import hash_tfbs_id
 
-POOL_SCHEMA_VERSION = "1.5"
+POOL_SCHEMA_VERSION = "1.6"
 POOL_MODE_TFBS = "tfbs"
 POOL_MODE_SEQUENCE = "sequence"
 _SAFE_FILENAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
@@ -141,6 +141,12 @@ class TFBSPoolArtifact:
     @classmethod
     def load(cls, manifest_path: Path) -> "TFBSPoolArtifact":
         payload = json.loads(manifest_path.read_text())
+        schema_version = str(payload.get("schema_version"))
+        if schema_version != POOL_SCHEMA_VERSION:
+            raise ValueError(
+                f"Pool manifest schema_version={schema_version} is unsupported "
+                f"(expected {POOL_SCHEMA_VERSION}). Rebuild pools with --fresh."
+            )
         entries = {}
         for item in payload.get("inputs", []):
             fingerprints = item.get("fingerprints")
@@ -163,7 +169,7 @@ class TFBSPoolArtifact:
         return cls(
             manifest_path=manifest_path,
             inputs=entries,
-            schema_version=str(payload.get("schema_version")),
+            schema_version=schema_version,
             run_id=str(payload.get("run_id")),
             run_root=str(payload.get("run_root")),
             config_path=str(payload.get("config_path")),
@@ -272,6 +278,10 @@ def _build_stage_a_sampling_manifest(
             raise ValueError("Stage-A sampling summaries missing tier fractions source.")
         if summary.pwm_consensus_iupac is None:
             raise ValueError("Stage-A sampling summaries missing pwm_consensus_iupac.")
+        if summary.pwm_consensus_score is None:
+            raise ValueError("Stage-A sampling summaries missing pwm_consensus_score.")
+        if summary.pwm_theoretical_max_score is None:
+            raise ValueError("Stage-A sampling summaries missing pwm_theoretical_max_score.")
         tier_fractions_values.append(tuple(float(v) for v in summary.tier_fractions))
         tier_fractions_sources.append(str(summary.tier_fractions_source))
         if summary.eligible_score_hist_edges:
@@ -291,7 +301,8 @@ def _build_stage_a_sampling_manifest(
                 "regulator": summary.regulator,
                 "pwm_consensus": summary.pwm_consensus,
                 "pwm_consensus_iupac": summary.pwm_consensus_iupac,
-                "pwm_max_score": summary.pwm_max_score,
+                "pwm_consensus_score": summary.pwm_consensus_score,
+                "pwm_theoretical_max_score": summary.pwm_theoretical_max_score,
                 "edges": [float(v) for v in summary.eligible_score_hist_edges],
                 "counts": [int(v) for v in summary.eligible_score_hist_counts],
                 "tier0_score": summary.tier0_score,

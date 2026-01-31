@@ -160,6 +160,8 @@ def _write_pool_manifest(run_root: Path) -> None:
             "rank_within_regulator": [2, 1, 1],
             "selection_rank": [2, 1, 1],
             "nearest_selected_similarity": [0.5, 0.0, 0.0],
+            "selection_score_percentile": [0.25, 1.0, 1.0],
+            "nearest_selected_distance_norm": [0.5, None, None],
             "motif_id": ["m1", "m1", "m2"],
             "tfbs_id": ["id1", "id2", "id3"],
         }
@@ -167,7 +169,7 @@ def _write_pool_manifest(run_root: Path) -> None:
     pool_path = pools_dir / "demo_input__pool.parquet"
     df.to_parquet(pool_path, index=False)
     manifest = {
-        "schema_version": "1.5",
+        "schema_version": "1.6",
         "run_id": "demo",
         "run_root": ".",
         "config_path": "config.yaml",
@@ -192,7 +194,8 @@ def _write_pool_manifest(run_root: Path) -> None:
                             "regulator": "tfA",
                             "pwm_consensus": "AAAA",
                             "pwm_consensus_iupac": "AAAA",
-                            "pwm_max_score": 10.0,
+                            "pwm_consensus_score": 10.0,
+                            "pwm_theoretical_max_score": 10.0,
                             "edges": [4.0, 6.0, 8.0, 10.0],
                             "counts": [0, 1, 1],
                             "tier0_score": 9.0,
@@ -225,7 +228,8 @@ def _write_pool_manifest(run_root: Path) -> None:
                             "regulator": "tfB",
                             "pwm_consensus": "AAAAAA",
                             "pwm_consensus_iupac": "AAAAAA",
-                            "pwm_max_score": 6.0,
+                            "pwm_consensus_score": 6.0,
+                            "pwm_theoretical_max_score": 6.0,
                             "edges": [4.0, 6.0, 8.0],
                             "counts": [1, 0],
                             "tier0_score": 5.5,
