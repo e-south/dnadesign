@@ -103,6 +103,13 @@ def test_diversity_summary_scores() -> None:
     assert summary.nnd_unweighted_median_top == 1.0
     assert summary.nnd_unweighted_median_diversified == 1.0
     assert summary.delta_nnd_unweighted_median == 0.0
+    score_norm_summary = summary.score_norm_summary
+    assert score_norm_summary is not None
+    assert score_norm_summary.top_candidates is not None
+    assert score_norm_summary.diversified_candidates is not None
+    assert score_norm_summary.top_candidates.min == pytest.approx(0.5)
+    assert score_norm_summary.top_candidates.median == pytest.approx(0.75)
+    assert score_norm_summary.top_candidates.max == pytest.approx(1.0)
 
 
 def test_diversity_summary_allows_zero_pwm_theoretical_max_score_for_zero_scores() -> None:

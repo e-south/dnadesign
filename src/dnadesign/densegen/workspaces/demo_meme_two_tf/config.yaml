@@ -34,9 +34,7 @@ densegen:
             min_score_norm: 0.85
             max_candidates: null
             relevance_norm: minmax_raw_score
-          tier_widening:
-            enabled: true
-            ladder: [0.001, 0.01, 0.09, 1.0]
+        tier_fractions: [0.001, 0.01, 0.09]
 
   output:
     targets: [parquet]

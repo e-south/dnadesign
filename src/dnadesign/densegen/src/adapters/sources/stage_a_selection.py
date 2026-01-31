@@ -16,6 +16,7 @@ from typing import Optional, Protocol, Sequence
 
 import numpy as np
 
+from ...core.score_tiers import normalize_tier_fractions
 from .stage_a_encoding import CoreEncodingStore, encode_cores
 from .stage_a_sampling_utils import normalize_background
 from .stage_a_types import SelectionMeta
@@ -310,7 +311,7 @@ def _select_by_mmr(
     pool_min_score_norm: float | None,
     pool_max_candidates: int | None,
     relevance_norm: str,
-    tier_widening: Optional[Sequence[float]],
+    tier_fractions: Optional[Sequence[float]],
     pwm_theoretical_max_score: float | None,
     encoding_store: CoreEncodingStore | None = None,
 ) -> tuple[list[_CandidateLike], dict[str, SelectionMeta], SelectionDiagnostics]:
@@ -341,14 +342,16 @@ def _select_by_mmr(
     core_by_seq = {cand.seq: _core_sequence(cand) for cand in ranked}
     weights = _pwm_tolerant_weights(matrix, background=background)
     weight_sum = float(weights.sum())
-    tier_fractions = list(tier_widening) if tier_widening else [1.0]
+    tier_fractions = list(normalize_tier_fractions(tier_fractions))
+    ladder = list(tier_fractions)
+    if not ladder or ladder[-1] < 1.0:
+        ladder.append(1.0)
     total = len(ranked)
     if pwm_theoretical_max_score is None:
         raise ValueError("pwm_theoretical_max_score is required for score normalization in Stage-A MMR.")
     score_norm_denominator = float(pwm_theoretical_max_score)
     if score_norm_denominator <= 0.0:
         raise ValueError("pwm_theoretical_max_score must be > 0 for Stage-A MMR score normalization.")
-    score_norm_ratio = np.array([float(cand.score) / score_norm_denominator for cand in ranked], dtype=float)
 
     def _lex_ranks(values: Sequence[str]) -> np.ndarray:
         order = {val: idx for idx, val in enumerate(sorted(set(values)))}
@@ -432,17 +435,11 @@ def _select_by_mmr(
 
     pool_candidates: list[_CandidateLike] = []
     fraction_used = None
-    for fraction in tier_fractions:
+    for fraction in ladder:
         if float(fraction) <= 0:
             continue
         tier_limit = min(total, max(1, int(np.ceil(float(fraction) * total))))
         subset = list(ranked[:tier_limit])
-        if pool_min_score_norm_value is not None and score_norm_ratio is not None:
-            subset = [
-                cand
-                for idx, cand in enumerate(ranked[:tier_limit])
-                if float(score_norm_ratio[idx]) >= float(pool_min_score_norm_value)
-            ]
         pool_candidates = subset
         fraction_used = float(fraction)
         if len(pool_candidates) >= int(n_sites):
@@ -450,12 +447,6 @@ def _select_by_mmr(
     if fraction_used is None:
         fraction_used = 1.0
         pool_candidates = list(ranked)
-        if pool_min_score_norm_value is not None and score_norm_ratio is not None:
-            pool_candidates = [
-                cand
-                for idx, cand in enumerate(ranked)
-                if float(score_norm_ratio[idx]) >= float(pool_min_score_norm_value)
-            ]
     pool_capped = False
     pool_cap_value = None
     if pool_max_candidates_value is not None and len(pool_candidates) > pool_max_candidates_value:
@@ -471,8 +462,6 @@ def _select_by_mmr(
         details = []
         if fraction_used is not None:
             details.append(f"rung={float(fraction_used) * 100:.3f}%")
-        if pool_min_score_norm_value is not None:
-            details.append(f"min_score_norm={float(pool_min_score_norm_value):.2f}")
         if pool_capped and pool_cap_value is not None:
             details.append(f"cap={int(pool_cap_value)}")
         detail_label = f" ({', '.join(details)})" if details else ""

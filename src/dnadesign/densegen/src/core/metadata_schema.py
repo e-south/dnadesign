@@ -137,6 +137,7 @@ META_FIELDS: list[MetaField] = [
     MetaField("input_pwm_keep_all_candidates_debug", (bool,), "Stage-A PWM FIMO debug TSV enabled.", allow_none=True),
     MetaField("input_pwm_include_matched_sequence", (bool,), "Stage-A PWM matched-sequence capture.", allow_none=True),
     MetaField("input_pwm_n_sites", (int,), "Stage-A PWM sampling n_sites.", allow_none=True),
+    MetaField("input_pwm_tier_fractions", (list,), "Stage-A PWM tier fractions ladder.", allow_none=True),
     MetaField("input_pwm_uniqueness_key", (str,), "Stage-A PWM uniqueness key.", allow_none=True),
     MetaField("input_pwm_selection_policy", (str,), "Stage-A PWM selection policy.", allow_none=True),
     MetaField("input_pwm_selection_alpha", (numbers.Real,), "Stage-A PWM selection alpha.", allow_none=True),

@@ -19,7 +19,7 @@ from typing import List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
-from ...config import PWMMiningConfig, PWMSamplingConfig, PWMSelectionConfig, PWMSelectionTierWidening
+from ...config import PWMMiningConfig, PWMSamplingConfig, PWMSelectionConfig
 from ...core.score_tiers import resolve_tier_fractions
 from .stage_a_metadata import TFBSMeta
 from .stage_a_pipeline import run_stage_a_pipeline
@@ -56,6 +56,7 @@ def sampling_kwargs_from_config(sampling: PWMSamplingConfig) -> dict:
         "bgfile": sampling.bgfile,
         "keep_all_candidates_debug": bool(sampling.keep_all_candidates_debug),
         "include_matched_sequence": bool(sampling.include_matched_sequence),
+        "tier_fractions": sampling.tier_fractions,
         "uniqueness_key": str(uniqueness_cfg.key),
         "selection": sampling.selection,
         "length_policy": str(length_cfg.policy),
@@ -86,6 +87,7 @@ def sample_pwm_sites(
     length_range: Optional[Sequence[int]] = None,
     trim_window_length: Optional[int] = None,
     trim_window_strategy: str = "max_info",
+    tier_fractions: Optional[Sequence[float]] = None,
     progress_manager: StageAProgressManager | None = None,
     return_metadata: bool = False,
     return_summary: bool = False,
@@ -163,7 +165,6 @@ def sample_pwm_sites(
         selection_pool_min_score_norm = selection_pool.min_score_norm
         selection_pool_max_candidates = selection_pool.max_candidates
         selection_relevance_norm = str(selection_pool.relevance_norm)
-    selection_tier_widening: Optional[Sequence[float]] = None
     if selection_policy == "mmr":
         selection_alpha = float(selection_alpha)
         if selection_alpha <= 0.0 or selection_alpha > 1.0:
@@ -171,13 +172,9 @@ def sample_pwm_sites(
         if selection_pool is None:
             raise ValueError("selection.pool must be set when selection.policy=mmr.")
 
-    tier_cfg = selection.tier_widening
-    if isinstance(tier_cfg, PWMSelectionTierWidening) and tier_cfg.enabled:
-        selection_tier_widening = list(tier_cfg.ladder)
-
     include_matched_sequence = bool(include_matched_sequence)
-    tier_fractions = list(resolve_tier_fractions(selection_tier_widening))
-    tier_fractions_source = "tier_widening" if selection_tier_widening else "default"
+    tier_fractions = list(resolve_tier_fractions(tier_fractions))
+    tier_fractions_source = "sampling.tier_fractions" if tier_fractions else "default"
 
     budget = mining.budget
     budget_mode = str(budget.mode or "fixed_candidates").lower()
@@ -305,7 +302,6 @@ def sample_pwm_sites(
             selection_pool_min_score_norm=selection_pool_min_score_norm,
             selection_pool_max_candidates=selection_pool_max_candidates,
             selection_relevance_norm=selection_relevance_norm,
-            selection_tier_widening=selection_tier_widening,
             tier_fractions=tier_fractions,
             tier_fractions_source=tier_fractions_source,
             pwm_consensus=pwm_consensus,
@@ -398,7 +394,6 @@ def sample_pwm_sites(
         selection_pool_min_score_norm=selection_pool_min_score_norm,
         selection_pool_max_candidates=selection_pool_max_candidates,
         selection_relevance_norm=selection_relevance_norm,
-        selection_tier_widening=selection_tier_widening,
         tier_fractions=tier_fractions,
         tier_fractions_source=tier_fractions_source,
         pwm_consensus=pwm_consensus,

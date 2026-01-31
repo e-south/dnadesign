@@ -74,6 +74,7 @@ def output_meta(*, library_hash: str, library_index: int) -> dict:
         "input_pwm_keep_all_candidates_debug": None,
         "input_pwm_include_matched_sequence": None,
         "input_pwm_n_sites": None,
+        "input_pwm_tier_fractions": None,
         "input_pwm_uniqueness_key": None,
         "input_pwm_selection_policy": None,
         "input_pwm_selection_alpha": None,

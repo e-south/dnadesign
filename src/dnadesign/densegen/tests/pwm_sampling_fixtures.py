@@ -13,13 +13,7 @@ from __future__ import annotations
 
 from typing import Iterable, Optional
 
-from dnadesign.densegen.src.config import (
-    PWMMiningBudgetConfig,
-    PWMMiningConfig,
-    PWMSamplingConfig,
-    PWMSelectionConfig,
-    PWMSelectionTierWidening,
-)
+from dnadesign.densegen.src.config import PWMMiningBudgetConfig, PWMMiningConfig, PWMSamplingConfig, PWMSelectionConfig
 
 
 def fixed_candidates_mining(
@@ -63,14 +57,7 @@ def selection_mmr(
     min_score_norm: Optional[float] = None,
     max_candidates: Optional[int] = None,
     relevance_norm: str = "minmax_raw_score",
-    tier_widening: Optional[Iterable[float]] = None,
 ) -> PWMSelectionConfig:
-    tier_config = None
-    if tier_widening is not None:
-        tier_config = PWMSelectionTierWidening(
-            enabled=True,
-            ladder=[float(val) for val in tier_widening],
-        )
     return PWMSelectionConfig(
         policy="mmr",
         alpha=float(alpha),
@@ -79,7 +66,6 @@ def selection_mmr(
             "max_candidates": max_candidates,
             "relevance_norm": str(relevance_norm),
         },
-        tier_widening=tier_config,
     )
 
 
@@ -96,6 +82,7 @@ def sampling_config(
     length_range: Optional[tuple[int, int]] = None,
     trim_window_length: Optional[int] = None,
     trim_window_strategy: str = "max_info",
+    tier_fractions: Optional[Iterable[float]] = None,
 ) -> PWMSamplingConfig:
     return PWMSamplingConfig(
         n_sites=int(n_sites),
@@ -107,4 +94,5 @@ def sampling_config(
         uniqueness={"key": str(uniqueness_key)},
         length={"policy": str(length_policy), "range": length_range},
         trimming={"window_length": trim_window_length, "window_strategy": str(trim_window_strategy)},
+        tier_fractions=list(tier_fractions) if tier_fractions is not None else None,
     )

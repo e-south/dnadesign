@@ -74,12 +74,12 @@ def test_sample_pwm_sites_requires_config_objects() -> None:
 
 
 def test_selection_tier_widening_requires_ladder() -> None:
-    with pytest.raises(ValueError, match="tier_widening.ladder must be set"):
+    with pytest.raises(ValueError, match="Extra inputs are not permitted"):
         PWMSelectionConfig.model_validate(
             {
                 "policy": "mmr",
-                "pool": {"min_score_norm": 0.85},
-                "tier_widening": {"enabled": True},
+                "pool": {},
+                "tier_widening": {"enabled": True, "ladder": [0.1, 0.2, 1.0]},
             }
         )
 
@@ -90,5 +90,21 @@ def test_selection_mmr_requires_pool() -> None:
 
 
 def test_selection_mmr_requires_min_score_norm() -> None:
-    with pytest.raises(ValueError, match="selection.pool.min_score_norm"):
-        PWMSelectionConfig.model_validate({"policy": "mmr", "pool": {}})
+    selection = PWMSelectionConfig.model_validate({"policy": "mmr", "pool": {}})
+    assert selection.pool is not None
+    assert selection.pool.min_score_norm is None
+
+
+def test_sampling_tier_fractions_validation() -> None:
+    with pytest.raises(ValueError, match="Tier fractions must contain exactly three values"):
+        PWMSamplingConfig.model_validate(
+            {
+                "n_sites": 10,
+                "mining": {
+                    "batch_size": 50,
+                    "budget": {"mode": "fixed_candidates", "candidates": 100},
+                },
+                "selection": {"policy": "top_score"},
+                "tier_fractions": [0.1, 0.2],
+            }
+        )

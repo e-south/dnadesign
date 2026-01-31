@@ -86,6 +86,35 @@ def _cap_label(
     return cap_label
 
 
+def _score_norm_by_tier(
+    scores_by_seq: dict[str, float],
+    tier_by_seq: dict[str, int],
+    *,
+    denominator: float,
+) -> dict[str, dict[str, float]] | None:
+    if not scores_by_seq:
+        return None
+    denom = float(denominator)
+    if denom <= 0.0:
+        raise ValueError("pwm_theoretical_max_score must be > 0 for score_norm summaries.")
+    tier_scores: dict[str, list[float]] = {"tier0": [], "tier1": [], "tier2": [], "rest": []}
+    for seq, score in scores_by_seq.items():
+        tier_idx = int(tier_by_seq.get(seq, 3))
+        label = "rest" if tier_idx >= 3 else f"tier{tier_idx}"
+        tier_scores[label].append(float(score) / denom)
+    summary: dict[str, dict[str, float]] = {}
+    for label, values in tier_scores.items():
+        if not values:
+            continue
+        arr = np.asarray(values, dtype=float)
+        summary[label] = {
+            "min": float(arr.min()),
+            "median": float(np.median(arr)),
+            "max": float(arr.max()),
+        }
+    return summary or None
+
+
 def _coerce_pool_max_candidates(policy: str, value: int | None) -> int | None:
     if policy != "mmr":
         return None
@@ -182,7 +211,6 @@ def run_stage_a_pipeline(
     selection_pool_min_score_norm: float | None,
     selection_pool_max_candidates: int | None,
     selection_relevance_norm: str | None,
-    selection_tier_widening: Optional[Sequence[float]],
     tier_fractions: Sequence[float],
     tier_fractions_source: str,
     pwm_consensus: str,
@@ -309,6 +337,14 @@ def run_stage_a_pipeline(
     tiers = _assign_score_tiers(ranked_pairs, fractions=tier_fractions)
     rank_by_seq = _ranked_sequence_positions(ranked_pairs)
     tier_by_seq = {cand.seq: tiers[idx] for idx, cand in enumerate(ranked)}
+    eligible_score_norm_by_tier: dict[str, dict[str, float]] | None = None
+    if pwm_theoretical_max_score is not None:
+        scores_by_seq = {cand.seq: float(cand.score) for cand in ranked}
+        eligible_score_norm_by_tier = _score_norm_by_tier(
+            scores_by_seq,
+            tier_by_seq,
+            denominator=float(pwm_theoretical_max_score),
+        )
     eligible_tier_counts = [0, 0, 0, 0]
     for tier in tiers:
         eligible_tier_counts[tier] += 1
@@ -325,7 +361,7 @@ def run_stage_a_pipeline(
             pool_min_score_norm=selection_pool_min_score_norm,
             pool_max_candidates=selection_pool_max_candidates,
             relevance_norm=selection_relevance_norm or "minmax_raw_score",
-            tier_widening=selection_tier_widening,
+            tier_fractions=tier_fractions,
             pwm_theoretical_max_score=pwm_theoretical_max_score,
             encoding_store=encoding_store,
         )
@@ -671,6 +707,7 @@ def run_stage_a_pipeline(
             diversity_nearest_distance_mean=diversity_nearest_distance_mean,
             diversity_nearest_distance_min=diversity_nearest_distance_min,
             diversity=diversity,
+            eligible_score_norm_by_tier=eligible_score_norm_by_tier,
             mining_audit=mining_audit,
             padding_audit=padding_audit,
             pwm_consensus=pwm_consensus,

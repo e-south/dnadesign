@@ -333,6 +333,7 @@ def _build_stage_a_sampling_manifest(
                 "diversity_nearest_distance_mean": summary.diversity_nearest_distance_mean,
                 "diversity_nearest_distance_min": summary.diversity_nearest_distance_min,
                 "diversity_nearest_similarity_mean": summary.diversity_nearest_similarity_mean,
+                "eligible_score_norm_by_tier": summary.eligible_score_norm_by_tier,
                 "diversity": diversity_block,
                 "mining_audit": summary.mining_audit,
                 "padding_audit": summary.padding_audit,

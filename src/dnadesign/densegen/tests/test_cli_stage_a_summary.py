@@ -31,6 +31,8 @@ from dnadesign.densegen.src.adapters.sources.stage_a_metrics import (
     PairwiseSummary,
     ScoreQuantiles,
     ScoreQuantilesBlock,
+    ScoreSummary,
+    ScoreSummaryBlock,
 )
 from dnadesign.densegen.src.adapters.sources.stage_a_summary import PWMSamplingSummary
 from dnadesign.densegen.src.cli import _format_tier_counts, _stage_a_sampling_rows, app
@@ -105,6 +107,10 @@ def _dummy_diversity_summary() -> DiversitySummary:
         top_candidates_global=None,
         max_diversity_upper_bound=None,
     )
+    score_norm_summary = ScoreSummaryBlock(
+        top_candidates=ScoreSummary(min=0.9, median=0.95, max=1.0),
+        diversified_candidates=ScoreSummary(min=0.88, median=0.94, max=0.99),
+    )
     return DiversitySummary(
         candidate_pool_size=50,
         nnd_unweighted_k1=unweighted_knn,
@@ -116,6 +122,7 @@ def _dummy_diversity_summary() -> DiversitySummary:
         set_overlap_swaps=1,
         core_entropy=entropy_block,
         score_quantiles=score_block,
+        score_norm_summary=score_norm_summary,
     )
 
 
@@ -337,6 +344,7 @@ def test_stage_a_recap_tables_include_verbose_headers() -> None:
     tables = stage_a_recap_tables(rows, display_map_by_input={}, show_motif_ids=True, verbose=True)
     headers = [col.header for col in tables[0][1].columns]
     assert "Δscore_norm p10" in headers
+    assert "score_norm top/div" in headers
 
 
 def test_stage_a_build_pool_accepts_fresh_flag(tmp_path: Path) -> None:

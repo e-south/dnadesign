@@ -63,7 +63,7 @@ def test_mmr_prefers_low_ic_mismatch_when_scores_equal() -> None:
         pool_min_score_norm=None,
         pool_max_candidates=None,
         relevance_norm="minmax_raw_score",
-        tier_widening=None,
+        tier_fractions=None,
         pwm_theoretical_max_score=10.0,
     )
     assert [cand.seq for cand in selected] == ["AA", "AT"]
@@ -111,7 +111,7 @@ def test_mmr_records_score_norm_and_distance_norm() -> None:
         pool_min_score_norm=None,
         pool_max_candidates=None,
         relevance_norm="minmax_raw_score",
-        tier_widening=None,
+        tier_fractions=None,
         pwm_theoretical_max_score=10.0,
     )
     assert [cand.seq for cand in selected] == ["AA", "AT"]
@@ -139,7 +139,7 @@ def test_mmr_selection_score_norm_uses_pwm_ratio_with_percentile_relevance() -> 
         pool_min_score_norm=0.1,
         pool_max_candidates=None,
         relevance_norm="percentile",
-        tier_widening=[1.0],
+        tier_fractions=[0.5, 0.75, 0.9],
         pwm_theoretical_max_score=100.0,
     )
     assert [cand.seq for cand in selected] == ["AA", "AC"]
@@ -164,7 +164,7 @@ def test_mmr_pool_includes_full_rung_without_cap() -> None:
         pool_min_score_norm=None,
         pool_max_candidates=None,
         relevance_norm="minmax_raw_score",
-        tier_widening=[0.5, 1.0],
+        tier_fractions=[0.5, 0.75, 0.9],
         pwm_theoretical_max_score=100.0,
     )
     assert len(selected) == 3
@@ -172,7 +172,7 @@ def test_mmr_pool_includes_full_rung_without_cap() -> None:
     assert diag.selection_pool_capped is False
 
 
-def test_mmr_pool_min_score_norm_widens_rung() -> None:
+def test_mmr_pool_min_score_norm_is_report_only() -> None:
     matrix = [
         {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
         {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
@@ -190,12 +190,12 @@ def test_mmr_pool_min_score_norm_widens_rung() -> None:
         pool_min_score_norm=0.99,
         pool_max_candidates=None,
         relevance_norm="minmax_raw_score",
-        tier_widening=[0.25, 0.5, 1.0],
+        tier_fractions=[0.1, 0.2, 0.3],
         pwm_theoretical_max_score=100.0,
     )
-    assert len(selected) == 2
-    assert diag.selection_pool_size_final == 2
-    assert diag.selection_pool_rung_fraction_used == pytest.approx(1.0)
+    assert len(selected) == 3
+    assert diag.selection_pool_size_final == 3
+    assert diag.selection_pool_rung_fraction_used == pytest.approx(0.2)
 
 
 def test_mmr_pool_shortfall_warns(caplog: pytest.LogCaptureFixture) -> None:
@@ -214,13 +214,13 @@ def test_mmr_pool_shortfall_warns(caplog: pytest.LogCaptureFixture) -> None:
             background=background,
             n_sites=5,
             alpha=0.5,
-            pool_min_score_norm=0.99,
-            pool_max_candidates=None,
+            pool_min_score_norm=None,
+            pool_max_candidates=3,
             relevance_norm="minmax_raw_score",
-            tier_widening=[0.25, 0.5, 1.0],
+            tier_fractions=[0.1, 0.2, 0.3],
             pwm_theoretical_max_score=100.0,
         )
-    assert len(selected) < 5
+    assert len(selected) == 3
     assert "MMR pool" in caplog.text
 
 
@@ -242,7 +242,7 @@ def test_mmr_pool_cap_is_deterministic() -> None:
         pool_min_score_norm=None,
         pool_max_candidates=4,
         relevance_norm="minmax_raw_score",
-        tier_widening=[1.0],
+        tier_fractions=[0.5, 0.75, 0.9],
         pwm_theoretical_max_score=100.0,
     )
     assert len(selected) == 2

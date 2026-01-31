@@ -195,6 +195,34 @@ class ScoreQuantilesBlock:
 
 
 @dataclass(frozen=True)
+class ScoreSummary:
+    min: float
+    median: float
+    max: float
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "min": float(self.min),
+            "median": float(self.median),
+            "max": float(self.max),
+        }
+
+
+@dataclass(frozen=True)
+class ScoreSummaryBlock:
+    top_candidates: ScoreSummary | None
+    diversified_candidates: ScoreSummary | None
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "top_candidates": self.top_candidates.to_dict() if self.top_candidates is not None else None,
+            "diversified_candidates": (
+                self.diversified_candidates.to_dict() if self.diversified_candidates is not None else None
+            ),
+        }
+
+
+@dataclass(frozen=True)
 class DiversitySummary:
     candidate_pool_size: int | None
     nnd_unweighted_k1: KnnBlock
@@ -206,6 +234,7 @@ class DiversitySummary:
     set_overlap_swaps: int | None
     core_entropy: EntropyBlock
     score_quantiles: ScoreQuantilesBlock
+    score_norm_summary: ScoreSummaryBlock | None
     objective_top_candidates: float | None = None
     objective_diversified_candidates: float | None = None
     objective_delta: float | None = None
@@ -222,6 +251,7 @@ class DiversitySummary:
             "set_overlap_swaps": self.set_overlap_swaps,
             "core_entropy": self.core_entropy.to_dict(),
             "score_quantiles": self.score_quantiles.to_dict(),
+            "score_norm_summary": self.score_norm_summary.to_dict() if self.score_norm_summary is not None else None,
             "objective_top_candidates": self.objective_top_candidates,
             "objective_diversified_candidates": self.objective_diversified_candidates,
             "objective_delta": self.objective_delta,
@@ -238,6 +268,15 @@ def _score_quantiles(scores: Sequence[float]) -> ScoreQuantiles | None:
     p50 = np.percentile(arr, 50)
     p90 = np.percentile(arr, 90)
     return ScoreQuantiles(p10=float(p10), p50=float(p50), p90=float(p90), mean=float(arr.mean()))
+
+
+def _score_summary(scores: Sequence[float]) -> ScoreSummary | None:
+    if not scores:
+        return None
+    arr = np.asarray(scores, dtype=float)
+    if arr.size == 0:
+        return None
+    return ScoreSummary(min=float(arr.min()), median=float(np.median(arr)), max=float(arr.max()))
 
 
 def _assert_uniform_core_length(cores: Sequence[str], *, label: str) -> int:
@@ -712,6 +751,10 @@ def _diversity_summary(
     diversified_candidates_quantiles = _score_quantiles(diversified_candidates_norm)
     top_candidates_global_quantiles = _score_quantiles(top_candidates_global_norm)
     max_diversity_upper_bound_quantiles = _score_quantiles(max_diversity_upper_bound_norm)
+    score_norm_summary = ScoreSummaryBlock(
+        top_candidates=_score_summary(top_candidates_norm),
+        diversified_candidates=_score_summary(diversified_candidates_norm),
+    )
     overlap_fraction = None
     overlap_swaps = None
     if diversified_candidates_cores:
@@ -758,6 +801,7 @@ def _diversity_summary(
         set_overlap_swaps=overlap_swaps,
         core_entropy=entropy_block,
         score_quantiles=score_block,
+        score_norm_summary=score_norm_summary,
         objective_top_candidates=float(objective_top_candidates) if objective_top_candidates is not None else None,
         objective_diversified_candidates=float(objective_diversified_candidates)
         if objective_diversified_candidates is not None

@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/densegen/tests/test_pwm_sampling_mmr_tier_widening.py
 
-MMR tier widening behavior when early rungs are too small.
+MMR tier ladder behavior when early tiers are too small.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -24,7 +24,7 @@ def _motif_with_pwm() -> list[dict[str, float]]:
     ]
 
 
-def test_mmr_tier_widening_widens_instead_of_crashing() -> None:
+def test_mmr_tier_ladder_widens_instead_of_crashing() -> None:
     matrix = _motif_with_pwm()
     background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
     ranked = []
@@ -51,16 +51,16 @@ def test_mmr_tier_widening_widens_instead_of_crashing() -> None:
         pool_min_score_norm=None,
         pool_max_candidates=None,
         relevance_norm="minmax_raw_score",
-        tier_widening=[0.01, 0.1, 1.0],
+        tier_fractions=[0.01, 0.1, 0.5],
         pwm_theoretical_max_score=200.0,
     )
 
     assert len(selected) == 20
-    assert diag.selection_pool_rung_fraction_used in (0.1, 1.0)
+    assert diag.selection_pool_rung_fraction_used in (0.1, 0.5, 1.0)
     assert all(cand.seq in meta for cand in selected)
 
 
-def test_mmr_tier_widening_honors_pool_size() -> None:
+def test_mmr_tier_ladder_honors_pool_size() -> None:
     matrix = _motif_with_pwm()
     background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
     ranked = []
@@ -87,7 +87,7 @@ def test_mmr_tier_widening_honors_pool_size() -> None:
         pool_min_score_norm=None,
         pool_max_candidates=None,
         relevance_norm="minmax_raw_score",
-        tier_widening=[0.2, 0.5, 1.0],
+        tier_fractions=[0.2, 0.3, 0.4],
         pwm_theoretical_max_score=100.0,
     )
 

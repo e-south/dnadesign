@@ -70,6 +70,7 @@ class PWMSamplingSummary:
     diversity_nearest_distance_min: Optional[float] = None
     diversity_nearest_similarity_mean: Optional[float] = None
     diversity: Optional[DiversitySummary] = None
+    eligible_score_norm_by_tier: Optional[dict[str, dict[str, float]]] = None
     mining_audit: Optional[dict[str, object]] = None
     padding_audit: Optional[dict[str, object]] = None
     pwm_consensus_score: Optional[float] = None
@@ -184,6 +185,7 @@ def _build_summary(
     diversity_nearest_distance_min: Optional[float] = None,
     diversity_nearest_similarity_mean: Optional[float] = None,
     diversity: Optional[DiversitySummary] = None,
+    eligible_score_norm_by_tier: Optional[dict[str, dict[str, float]]] = None,
     mining_audit: Optional[dict[str, object]] = None,
     padding_audit: Optional[dict[str, object]] = None,
     pwm_consensus: Optional[str] = None,
@@ -259,6 +261,7 @@ def _build_summary(
         if diversity_nearest_similarity_mean is not None
         else None,
         diversity=diversity,
+        eligible_score_norm_by_tier=eligible_score_norm_by_tier,
         mining_audit=dict(mining_audit) if mining_audit is not None else None,
         padding_audit=dict(padding_audit) if padding_audit is not None else None,
         pwm_consensus_score=float(pwm_consensus_score) if pwm_consensus_score is not None else None,

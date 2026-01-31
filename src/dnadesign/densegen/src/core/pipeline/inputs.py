@@ -96,6 +96,9 @@ def _extract_pwm_sampling_config(source_cfg) -> dict | None:
     trim_window_strategy = _sampling_attr(trimming_cfg, "window_strategy")
     uniqueness_cfg = _sampling_attr(sampling, "uniqueness")
     uniqueness_key = _sampling_attr(uniqueness_cfg, "key")
+    tier_fractions = _sampling_attr(sampling, "tier_fractions")
+    if tier_fractions is not None:
+        tier_fractions = list(tier_fractions)
     selection_cfg = _sampling_attr(sampling, "selection")
     selection_policy = _sampling_attr(selection_cfg, "policy")
     selection_alpha = _sampling_attr(selection_cfg, "alpha")
@@ -103,17 +106,6 @@ def _extract_pwm_sampling_config(source_cfg) -> dict | None:
     selection_pool_min_score_norm = _sampling_attr(selection_pool_cfg, "min_score_norm")
     selection_pool_max_candidates = _sampling_attr(selection_pool_cfg, "max_candidates")
     selection_pool_relevance_norm = _sampling_attr(selection_pool_cfg, "relevance_norm")
-    selection_tier_widening = _sampling_attr(selection_cfg, "tier_widening")
-    if selection_tier_widening is not None:
-        if hasattr(selection_tier_widening, "model_dump"):
-            selection_tier_widening = selection_tier_widening.model_dump()
-        elif hasattr(selection_tier_widening, "enabled") or hasattr(selection_tier_widening, "ladder"):
-            selection_tier_widening = {
-                "enabled": bool(getattr(selection_tier_widening, "enabled", True)),
-                "ladder": list(getattr(selection_tier_widening, "ladder", []) or []),
-            }
-        elif isinstance(selection_tier_widening, (list, tuple)):
-            selection_tier_widening = list(selection_tier_widening)
     mining_batch_size = _mining_attr(mining, "batch_size")
     mining_log_every_batches = _mining_attr(mining, "log_every_batches")
     return {
@@ -137,12 +129,12 @@ def _extract_pwm_sampling_config(source_cfg) -> dict | None:
         "trim_window_length": trim_window_length,
         "trim_window_strategy": trim_window_strategy,
         "uniqueness_key": uniqueness_key,
+        "tier_fractions": tier_fractions,
         "selection_policy": selection_policy,
         "selection_alpha": selection_alpha,
         "selection_pool_min_score_norm": selection_pool_min_score_norm,
         "selection_pool_max_candidates": selection_pool_max_candidates,
         "selection_pool_relevance_norm": selection_pool_relevance_norm,
-        "selection_tier_widening": selection_tier_widening,
         "mining": {
             "batch_size": mining_batch_size,
             "log_every_batches": mining_log_every_batches,
@@ -238,6 +230,7 @@ def _input_metadata(source_cfg, cfg_path: Path) -> dict:
             meta["input_pwm_keep_all_candidates_debug"] = getattr(sampling, "keep_all_candidates_debug", None)
             meta["input_pwm_include_matched_sequence"] = getattr(sampling, "include_matched_sequence", None)
             meta["input_pwm_n_sites"] = getattr(sampling, "n_sites", None)
+            meta["input_pwm_tier_fractions"] = getattr(sampling, "tier_fractions", None)
             uniqueness = getattr(sampling, "uniqueness", None)
             meta["input_pwm_uniqueness_key"] = _sampling_attr(uniqueness, "key")
             selection = getattr(sampling, "selection", None)

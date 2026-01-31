@@ -32,6 +32,8 @@ from dnadesign.densegen.src.adapters.sources.stage_a_metrics import (
     PairwiseSummary,
     ScoreQuantiles,
     ScoreQuantilesBlock,
+    ScoreSummary,
+    ScoreSummaryBlock,
 )
 from dnadesign.densegen.src.adapters.sources.stage_a_summary import PWMSamplingSummary
 from dnadesign.densegen.src.config import load_config
@@ -113,6 +115,10 @@ class _DummySource(BaseDataSource):
             top_candidates_global=None,
             max_diversity_upper_bound=None,
         )
+        score_norm_summary = ScoreSummaryBlock(
+            top_candidates=ScoreSummary(min=0.9, median=0.95, max=1.0),
+            diversified_candidates=ScoreSummary(min=0.9, median=0.95, max=1.0),
+        )
         diversity = DiversitySummary(
             candidate_pool_size=2,
             nnd_unweighted_k1=unweighted_knn,
@@ -124,6 +130,7 @@ class _DummySource(BaseDataSource):
             set_overlap_swaps=0,
             core_entropy=entropy_block,
             score_quantiles=score_block,
+            score_norm_summary=score_norm_summary,
         )
         summary = PWMSamplingSummary(
             input_name="demo_pwm",
@@ -170,6 +177,7 @@ class _DummySource(BaseDataSource):
             selection_pool_capped=False,
             selection_pool_cap_value=None,
             diversity=diversity,
+            eligible_score_norm_by_tier={"tier0": {"min": 0.9, "median": 0.9, "max": 0.9}},
             mining_audit=None,
         )
         return [("regA", "AAAA", "dummy")], df, [summary]
@@ -282,6 +290,7 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
     assert hist[0]["tier2_score"] == 1.0
     assert hist[0]["tier_fractions"] == [0.001, 0.01, 0.09]
     assert hist[0]["tier_fractions_source"] == "default"
+    assert hist[0]["eligible_score_norm_by_tier"] == {"tier0": {"min": 0.9, "median": 0.9, "max": 0.9}}
     assert hist[0]["generated"] == 10
     assert hist[0]["candidates_with_hit"] == 9
     assert hist[0]["eligible_raw"] == 3

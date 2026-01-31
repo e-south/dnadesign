@@ -156,6 +156,7 @@ def build_metadata(
         "input_pwm_keep_all_candidates_debug": input_meta.get("input_pwm_keep_all_candidates_debug"),
         "input_pwm_include_matched_sequence": input_meta.get("input_pwm_include_matched_sequence"),
         "input_pwm_n_sites": input_meta.get("input_pwm_n_sites"),
+        "input_pwm_tier_fractions": input_meta.get("input_pwm_tier_fractions"),
         "input_pwm_uniqueness_key": input_meta.get("input_pwm_uniqueness_key"),
         "input_pwm_selection_policy": input_meta.get("input_pwm_selection_policy"),
         "input_pwm_selection_alpha": input_meta.get("input_pwm_selection_alpha"),

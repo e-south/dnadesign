@@ -73,6 +73,7 @@ def stage_a_recap_tables(
             recap_table.add_column("set_swaps")
             recap_table.add_column("Δscore_norm p10")
         recap_table.add_column("Δscore_norm med")
+        recap_table.add_column("score_norm top/div")
         recap_table.add_column("score(min/med/avg/max)")
         recap_table.add_column("len(n/min/med/avg/max)")
         for row in sorted(grouped[input_name], key=lambda item: str(item["regulator"])):
@@ -109,6 +110,7 @@ def stage_a_recap_tables(
             recap_row.extend(
                 [
                     str(row["diversity_score_med_delta"]),
+                    str(row["score_norm_summary"]),
                     str(row["score"]),
                     str(row["length"]),
                 ]

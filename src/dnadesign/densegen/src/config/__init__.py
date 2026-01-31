@@ -256,29 +256,6 @@ class PWMUniquenessConfig(BaseModel):
     key: Literal["sequence", "core"] = "core"
 
 
-class PWMSelectionTierWidening(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    enabled: bool = False
-    ladder: List[float] = Field(default_factory=list)
-
-    @field_validator("ladder")
-    @classmethod
-    def _ladder_ok(cls, v: List[float]):
-        cleaned: List[float] = []
-        for frac in v:
-            val = float(frac)
-            if val <= 0 or val > 1:
-                raise ValueError("pwm.sampling.selection.tier_widening.ladder values must be in (0, 1]")
-            cleaned.append(val)
-        return cleaned
-
-    @model_validator(mode="after")
-    def _ladder_required_when_enabled(self):
-        if self.enabled and not self.ladder:
-            raise ValueError("pwm.sampling.selection.tier_widening.ladder must be set when tier_widening is enabled.")
-        return self
-
-
 class PWMSelectionPoolConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     min_score_norm: Optional[float] = None
@@ -310,7 +287,6 @@ class PWMSelectionConfig(BaseModel):
     policy: Literal["top_score", "mmr"] = "top_score"
     alpha: float = 0.9
     pool: Optional[PWMSelectionPoolConfig] = None
-    tier_widening: Optional[PWMSelectionTierWidening] = None
 
     @field_validator("alpha")
     @classmethod
@@ -324,13 +300,6 @@ class PWMSelectionConfig(BaseModel):
         if self.policy == "mmr":
             if self.pool is None:
                 raise ValueError("pwm.sampling.selection.pool is required when policy=mmr.")
-            if self.pool.min_score_norm is None:
-                raise ValueError("pwm.sampling.selection.pool.min_score_norm is required when policy=mmr.")
-            if self.tier_widening is None:
-                self.tier_widening = PWMSelectionTierWidening(
-                    enabled=True,
-                    ladder=[0.001, 0.01, 0.09, 1.0],
-                )
         elif self.pool is not None:
             raise ValueError("pwm.sampling.selection.pool is only valid when policy=mmr.")
         return self
@@ -344,6 +313,7 @@ class PWMSamplingConfig(BaseModel):
     bgfile: Optional[str] = None
     keep_all_candidates_debug: bool = False
     include_matched_sequence: bool = True
+    tier_fractions: Optional[List[float]] = None
     length: PWMLengthConfig = Field(default_factory=PWMLengthConfig)
     trimming: PWMTrimmingConfig = Field(default_factory=PWMTrimmingConfig)
     uniqueness: PWMUniquenessConfig = Field(default_factory=PWMUniquenessConfig)
@@ -364,6 +334,16 @@ class PWMSamplingConfig(BaseModel):
         if not str(v).strip():
             raise ValueError("pwm.sampling.bgfile must be a non-empty string when set")
         return str(v).strip()
+
+    @field_validator("tier_fractions")
+    @classmethod
+    def _tier_fractions_ok(cls, v: Optional[List[float]]):
+        if v is None:
+            return v
+        from ..core.score_tiers import normalize_tier_fractions
+
+        normalize_tier_fractions(v)
+        return [float(val) for val in v]
 
     @model_validator(mode="after")
     def _sampling_rules(self):
