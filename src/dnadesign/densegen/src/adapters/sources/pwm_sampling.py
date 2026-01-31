@@ -115,7 +115,7 @@ def sample_pwm_sites(
         raise ValueError(f"PWM motif '{motif.motif_id}' has zero width.")
     if length_policy not in {"exact", "range"}:
         raise ValueError(f"Unsupported pwm length.policy: {length_policy}")
-    log_odds = motif.log_odds or build_log_odds(motif.matrix, motif.background)
+    log_odds = build_log_odds(motif.matrix, motif.background, smoothing_alpha=0.0)
     window_label = "full"
     if trim_window_length is not None:
         matrix, log_odds, window_start, window_score = _select_pwm_window(

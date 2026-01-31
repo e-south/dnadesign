@@ -18,6 +18,7 @@ import pytest
 from dnadesign.densegen.src.adapters.sources.pwm_sampling import sample_pwm_sites
 from dnadesign.densegen.src.adapters.sources.stage_a_sampling_utils import (
     _pwm_consensus_iupac,
+    _pwm_theoretical_max_score,
     build_log_odds,
     score_sequence,
 )
@@ -55,6 +56,35 @@ def test_pwm_log_odds_smoothing_finite() -> None:
     core = sites[0][: len(matrix)]
     score = score_sequence(core, matrix, background=background)
     assert np.isfinite(score)
+
+
+def test_pwm_sampling_theoretical_max_uses_matrix_log_odds() -> None:
+    if _FIMO_MISSING:
+        pytest.skip("fimo executable not available (run tests via `pixi run pytest` or set MEME_BIN).")
+
+    matrix = [
+        {"A": 0.8, "C": 0.1, "G": 0.05, "T": 0.05},
+        {"A": 0.1, "C": 0.8, "G": 0.05, "T": 0.05},
+    ]
+    background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
+    log_odds = build_log_odds(matrix, background, smoothing_alpha=0.0)
+    mismatched = [{base: val * 0.5 for base, val in row.items()} for row in log_odds]
+    motif = PWMMotif(motif_id="M1", matrix=matrix, background=background, log_odds=mismatched)
+
+    expected = _pwm_theoretical_max_score(log_odds) / float(np.log(2.0))
+    rng = np.random.default_rng(1)
+    _selected, summary = sample_pwm_sites(
+        rng,
+        motif,
+        strategy="consensus",
+        n_sites=1,
+        mining=fixed_candidates_mining(batch_size=1, candidates=1, log_every_batches=1),
+        selection=selection_top_score(),
+        return_summary=True,
+    )
+
+    assert summary is not None
+    assert summary.pwm_theoretical_max_score == pytest.approx(expected, rel=1e-6)
 
 
 def test_pwm_iupac_consensus_from_pwm() -> None:
