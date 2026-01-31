@@ -48,13 +48,13 @@ Optional keys (ignored by DenseGen but recommended for provenance):
 
 ### Scoring semantics
 
-DenseGen scores sampled candidates using **PWM log-odds** with the provided background.
-Probabilities are used for sequence generation; log-odds are used for scoring and
-thresholding.
+DenseGen scores sampled candidates via **FIMO log-odds** using the PWM probabilities and
+background. The `log_odds` field is validated and stored for provenance, but scoring is
+performed by FIMO on the motif probabilities.
 
-Log-odds values must be **finite** (no infinities). DenseGen assumes log-odds are
-computed with the natural log (ln) of `p/background`. If your matrices contain zeros,
-apply pseudocounts before emitting artifacts.
+Log-odds values must be **finite** (no infinities). Provide log-odds as **log2(p/bg)**
+to align with FIMO’s score scale. If your matrices contain zeros, apply pseudocounts
+before emitting artifacts.
 
 ---
 
@@ -74,9 +74,9 @@ apply pseudocounts before emitting artifacts.
     {"A": 0.1, "C": 0.1, "G": 0.7, "T": 0.1}
   ],
   "log_odds": [
-    {"A": 1.1632, "C": -0.9163, "G": -1.6094, "T": -1.6094},
-    {"A": -0.9163, "C": 1.0296, "G": -0.9163, "T": -0.9163},
-    {"A": -0.9163, "C": -0.9163, "G": 1.0296, "T": -0.9163}
+    {"A": 1.6781, "C": -1.3219, "G": -2.3219, "T": -2.3219},
+    {"A": -1.3219, "C": 1.4854, "G": -1.3219, "T": -1.3219},
+    {"A": -1.3219, "C": -1.3219, "G": 1.4854, "T": -1.3219}
   ],
   "provenance": {"source_url": "https://example.org", "citation": "Example et al. 2025"}
 }

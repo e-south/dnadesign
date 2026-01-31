@@ -152,8 +152,9 @@ MMR (high-level, faithful to implementation; after Carbonell & Goldstein, 1998):
 - `normalized_score` uses `selection.pool.relevance_norm`:
   - `minmax_raw_score` (default): `score_norm = best_hit_score / pwm_theoretical_max_score`
   - `percentile`: percentile rank within the selection pool (0–1, ties averaged)
-- `score_norm` (best_hit_score / pwm_theoretical_max_score) is recorded for cross‑TF comparability and is
-  the eligibility filter for `selection.pool.min_score_norm` (required, set explicitly in config).
+- `score_norm` (best_hit_score / pwm_theoretical_max_score) is recorded for cross‑TF comparability.
+  If `selection.pool.min_score_norm` is set, it is used as a “within τ of max” reference in reports
+  (it does **not** filter the MMR pool).
 - Similarity is derived from a **PWM‑tolerant weighted Hamming distance** on `tfbs_core`:
 
   - Relative‑entropy information per position (background‑aware):
@@ -177,19 +178,13 @@ https://www.cs.cmu.edu/~jgc/publication/The_Use_MMR_Diversity_Based_LTMIR_1998.p
 
 Performance/behavior knobs for MMR:
 
-- `selection.pool.min_score_norm` (required) filters eligible unique candidates by
-  `score_norm = best_hit_score / pwm_theoretical_max_score`. This must be set explicitly in the config
-  (recommended `0.85`).
-  Stage‑A computes `score_norm` for all eligible uniques before MMR pool selection.
-- `selection.tier_widening` can specify a ladder of ranked fractions to search (e.g. `[0.001, 0.01, 0.09, 1.0]`).
-  DenseGen tries the first rung (top slice); if it can’t fill `n_sites` after applying `min_score_norm`,
-  it widens to the next rung.
+- `sampling.tier_fractions` defines the diagnostic tiers **and** the cumulative rung ladder used for the
+  MMR pool. The pool is the smallest rung that can supply `n_sites` (or the full list if none can).
 - `selection.pool.max_candidates` (optional) caps the pool for compute; when set, the pool is truncated to
-  the top-by-score candidates after filtering.
+  the top-by-score candidates after rung selection.
 - `selection.pool.relevance_norm` chooses the relevance normalization (`minmax_raw_score` default,
   `percentile` optional).
-- When `selection.policy: mmr` and `selection.tier_widening` is omitted, DenseGen enables tier widening
-  with the default ladder `[0.001, 0.01, 0.09, 1.0]`.
+- `selection.pool.min_score_norm` (optional) records a “within τ of max” reference for reporting.
 
 > Practical advice: MMR is best used when you expect **many** eligible unique candidates and you want
 > to avoid near-duplicates while still staying near the score frontier.
@@ -321,8 +316,8 @@ If you want to know what happened in a run, these are the canonical “truth” 
     normalization). Stage‑A plots use the IUPAC consensus on entropy axes.
   - core diversity summaries (k=1 and k=5 nearest‑neighbor distances plus **pairwise weighted‑Hamming**
     distribution, top vs diversified), overlap, and candidate‑pool diagnostics computed on `tfbs_core` only;
-    `top_candidates` uses the same candidate slice considered by selection (tier slice + `min_score_norm`
-    filtering + optional `max_candidates` cap for MMR).
+    `top_candidates` uses the same candidate slice considered by selection (tier rung slice +
+    optional `max_candidates` cap for MMR). `selection.pool.min_score_norm` is report-only.
     Pairwise distances are exact for retained sets; k‑NN distances are deterministically subsampled to 2500
     sequences; entropy uses the full `top_candidates`/`diversified_candidates` sets; score quantiles are
     normalized by `pwm_theoretical_max_score` for tradeoff audits; a greedy max‑diversity upper bound
@@ -420,15 +415,12 @@ Glossary (plot annotations):
 ### Common footguns and how to avoid them
 
 1) **MMR requires enough eligible unique candidates to fill `n_sites`**
-   Symptom: Stage‑A fails (or cannot fill) when `selection.policy: mmr` but eligible unique count is too small
-   (often after `uniqueness.key: core` collapses many flank variants). A strict
-   `selection.pool.min_score_norm` can also shrink the MMR pool below `n_sites`, even when the
-   overall eligible set is large (the run warns and returns fewer sites).
+   Symptom: Stage‑A warns and returns fewer sites (or behaves degenerate) when the MMR pool
+   size is ≤ `n_sites` (often after `uniqueness.key: core` collapses many flank variants).
    Fixes:
    - reduce `n_sites`
-   - lower `selection.pool.min_score_norm`
    - increase mining (`max_candidates`, `max_seconds`, and/or relax `target_tier_fraction`)
-   - widen the `selection.tier_widening.ladder` to include more of the ranked list
+   - increase `tier_fractions` so the pool rung slice is larger
    - switch to `selection.policy: top_score` for small pools
    - if flank diversity matters, consider `uniqueness.key: sequence` (larger unique set)
 

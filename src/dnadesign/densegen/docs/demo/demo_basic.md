@@ -176,20 +176,15 @@ If you want the full semantics behind these terms (eligibility, tier targeting m
 * [Stage‑A sampling (PWM mining → TFBS pools)](../guide/sampling.md#stage-a-sampling)
 * [Stage‑B sampling (TFBS pools → solver libraries)](../guide/sampling.md#stage-b-sampling)
 
-What this demo config is doing:
+What this demo config is doing (high level):
 
 * **Stage‑A (`densegen.inputs[].sampling`)**
-  Mine `n_sites=500` per motif using FIMO score eligibility (`best_hit_score > 0`), collapse near‑duplicates
-  by core (`uniqueness.key: core`), and retain a score-first but diversity-biased set via MMR
-  (`selection.policy: mmr`, `alpha=0.9`). MMR uses PWM‑tolerant weighted Hamming
-  (weights ∝ 1 − IC) so diversity is emphasized in low‑information positions while preserving PWM‑likeness
-  (MMR per Carbonell & Goldstein, 1998; see sampling guide).
-  Sites are length-normalized with `length.policy: range` (`[15, 20]`).
+  Mine `n_sites=500` per motif with FIMO score eligibility, core‑unique dedupe, MMR selection (`alpha=0.9`),
+  and length normalization to `[15, 20]`. See the sampling guide for full semantics.
 
 * **Stage‑B (`densegen.generation.sampling`)**
-  Build `library_size=20` subsampled libraries using `library_sampling_strategy: coverage_weighted`, requiring
-  regulator coverage (`cover_all_regulators: true`) and enforcing core uniqueness inside each library
-  (`unique_binding_cores: true`).
+  Build `library_size=20` libraries with coverage‑weighted sampling, full regulator coverage, and core
+  uniqueness inside each library. See the generation guide for policy details.
 
 Also helpful for interpreting outputs later:
 

@@ -175,7 +175,7 @@ DenseGen can materialize Stage‑A/Stage‑B artifacts without running the solve
 to rebuild pools from scratch.
 `pool_manifest.json` includes the input config hash plus file fingerprints; append requires they match.
 For FIMO-backed PWM inputs, it also records Stage-A sampling metadata
-(tier fractions + source derived from `selection.tier_widening` or defaults, tier scheme label,
+(tier fractions + source derived from `sampling.tier_fractions` or defaults, tier scheme label,
 eligibility/retention rules, FIMO threshold, background source/bgfile, and
 eligible score histograms with tier boundary scores per regulator, including `candidates_with_hit`,
 `eligible_raw`, and `eligible_unique` counts), PWM consensus strings (`pwm_consensus`), IUPAC
@@ -193,14 +193,17 @@ sequences for k‑NN distances) and padding audit stats
 (best‑hit overlap with intended core; core offset histogram).
 Key fields to audit tier behavior and selection pool construction:
 - `tier_fractions` — ladder of rank fractions used to define diagnostic tiers
-- `tier_fractions_source` — config source for the ladder (e.g., `selection.tier_widening` or default)
+- `tier_fractions_source` — config source for the ladder (e.g., `sampling.tier_fractions` or default)
 - `tier_scheme` — derived label for the ladder (e.g., `pct_0.1_1_9`)
 - `selection_relevance_norm` — relevance normalization used (`minmax_raw_score` or `percentile`)
-- `selection_pool_size_final` — final pool size after rung, `min_score_norm`, and optional cap
+- `selection_pool_size_final` — final pool size after rung selection and optional cap
 - `selection_pool_rung_fraction_used` — rung fraction used from the tier ladder
-- `selection_pool_min_score_norm_used` — `min_score_norm` applied to pool eligibility
+- `selection_pool_min_score_norm_used` — `min_score_norm` recorded for reporting
 - `selection_pool_capped` — whether `selection_pool_max_candidates` truncated the pool
 - `selection_pool_cap_value` — cap value when truncation occurs
+- `selection_score_norm_max_raw` — max un-clipped score_norm observed before clipping (if any)
+- `selection_score_norm_clipped` — whether score_norm clipping occurred
+- `max_observed_score` — max `best_hit_score` observed among eligible uniques
 Stage‑A pool rows include `best_hit_score`, `tier`, `rank_within_regulator` (1‑based rank among
 eligible_unique TFBS per regulator), and `tfbs_core` for core‑level uniqueness checks.
 

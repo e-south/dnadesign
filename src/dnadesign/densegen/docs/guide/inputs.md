@@ -47,6 +47,8 @@ Optional (supported):
   (files named `candidates__<label>.parquet`) and aggregate to
   `outputs/pools/candidates/candidates.parquet` + `outputs/pools/candidates/candidates_summary.parquet`
 - `include_matched_sequence` (default true; must be true for PWM sampling; config validation rejects false)
+- `tier_fractions` (optional list of three floats in (0, 1], non‑decreasing, sum ≤ 1.0; default
+  `[0.001, 0.01, 0.09]`). Used for diagnostic tiers and as the cumulative rung ladder for MMR pool selection.
 - `length`:
   - `policy`: `exact | range` (default `exact`)
   - `range`: `[min, max]` (required when `policy: range`)
@@ -59,14 +61,11 @@ Optional (supported):
   - `policy`: `top_score | mmr` (default `top_score`)
   - `alpha` (float in (0, 1]; MMR score weight)
   - `pool` (required when `policy=mmr`)
-    - `min_score_norm` (float in (0, 1]; required; recommended default is `0.85` but must be set explicitly)
+    - `min_score_norm` (optional float in (0, 1]; recorded as a “within τ of max” reference in reports)
     - `max_candidates` (optional int > 0; cap the MMR pool to the top-by-score slice)
     - `relevance_norm` (optional: `percentile | minmax_raw_score`; default `minmax_raw_score`)
-  - `tier_widening` (optional):
-    - `enabled` (bool)
-    - `ladder` (fractions in (0, 1]; widening continues until the pool can fill `n_sites` after `min_score_norm` filtering, or the ladder is exhausted)
-  - When `selection.policy: mmr` and `selection.tier_widening` is omitted, DenseGen enables tier widening
-    with the default ladder `[0.001, 0.01, 0.09, 1.0]`.
+  - MMR pool selection uses the cumulative tier ladder derived from `sampling.tier_fractions`.
+    It chooses the smallest rung that can supply `n_sites` (or the full list if none can).
 
 Strict validation behavior:
 - Unknown keys are errors (extra fields are rejected).
