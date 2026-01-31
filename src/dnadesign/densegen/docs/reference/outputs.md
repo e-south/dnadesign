@@ -138,8 +138,8 @@ and `stage_a_summary__<input>__diversity.png`.
 
 See `../guide/sampling.md#how-to-read-stage_a_summary-three-figures` for plot interpretation.
 
-`stage_a_summary` requires diversity metrics in `pool_manifest.json`. If you are using a legacy pool
-manifest that predates diversity, rerun `dense stage-a build-pool --fresh` to regenerate it.
+`stage_a_summary` requires diversity metrics in `pool_manifest.json`. If your pool manifest predates
+diversity metrics, rerun `dense stage-a build-pool --fresh` to regenerate it.
 `stage_b_summary` requires `slack_bp` in `library_builds.parquet` plus non-empty composition rows
 for each input/plan; missing metrics will fail fast.
 
@@ -174,36 +174,16 @@ DenseGen can materialize Stage‑A/Stage‑B artifacts without running the solve
 `dense stage-a build-pool` appends new unique TFBS to existing pools by default; pass `--fresh`
 to rebuild pools from scratch.
 `pool_manifest.json` includes the input config hash plus file fingerprints; append requires they match.
-For FIMO-backed PWM inputs, it also records Stage-A sampling metadata
-(tier fractions + source derived from `sampling.tier_fractions` or defaults, tier scheme label,
-eligibility/retention rules, FIMO threshold, background source/bgfile, and
-eligible score histograms with tier boundary scores per regulator, including `candidates_with_hit`,
-`eligible_raw`, and `eligible_unique` counts), PWM consensus strings (`pwm_consensus`), IUPAC
-consensus strings (`pwm_consensus_iupac`), PWM consensus log‑odds scores in FIMO score scale
-(`pwm_consensus_score`), PWM theoretical max log‑odds scores (`pwm_theoretical_max_score`), and mining saturation audits
-(`mining_audit` tail Δunique/Δgen),
-plus per‑TF diversity summaries (k=1 **unweighted Hamming** nearest‑neighbor distances,
-k=1 and k=5 nearest‑neighbor **weighted‑Hamming** distances, pairwise **weighted‑Hamming** distribution
-[exact for retained sets], core entropy for `top_candidates` and `diversified_candidates`; overlap +
-candidate‑pool diagnostics; greedy max‑diversity upper bound (`max_diversity_upper_bound`) to show headroom;
-local and global score quantiles normalized by `pwm_theoretical_max_score` for tradeoff audits
-(`top_candidates`, `diversified_candidates`, `top_candidates_global`); ΔJ (MMR objective gain) and
-Δnnd (median nearest‑neighbor distance gain); large sets are deterministically subsampled to 2500
-sequences for k‑NN distances) and padding audit stats
-(best‑hit overlap with intended core; core offset histogram).
-Key fields to audit tier behavior and selection pool construction:
-- `tier_fractions` — ladder of rank fractions used to define diagnostic tiers
-- `tier_fractions_source` — config source for the ladder (e.g., `sampling.tier_fractions` or default)
-- `tier_scheme` — derived label for the ladder (e.g., `pct_0.1_1_9`)
-- `selection_relevance_norm` — relevance normalization used (`minmax_raw_score` or `percentile`)
-- `selection_pool_size_final` — final pool size after rung selection and optional cap
-- `selection_pool_rung_fraction_used` — rung fraction used from the tier ladder
-- `selection_pool_min_score_norm_used` — `min_score_norm` recorded for reporting
-- `selection_pool_capped` — whether `selection_pool_max_candidates` truncated the pool
-- `selection_pool_cap_value` — cap value when truncation occurs
-- `selection_score_norm_max_raw` — max un-clipped score_norm observed before clipping (if any)
-- `selection_score_norm_clipped` — whether score_norm clipping occurred
-- `max_observed_score` — max `best_hit_score` observed among eligible uniques
+For FIMO-backed PWM inputs, it records Stage-A sampling metadata, including:
+- tier fractions + source + scheme label
+- eligibility/retention rules, FIMO threshold, background source/bgfile
+- consensus and max-score stats (`pwm_consensus`, `pwm_consensus_iupac`, `pwm_consensus_score`,
+  `pwm_theoretical_max_score`, `max_observed_score`)
+- selection pool diagnostics (`selection_pool_*`, `selection_score_norm_*`)
+- diversity summaries (k‑NN unweighted/weighted, pairwise weighted, overlap, score quantiles)
+- mining and padding audits
+
+See the sampling guide for interpretation; the manifest is the source of truth for field names.
 Stage‑A pool rows include `best_hit_score`, `tier`, `rank_within_regulator` (1‑based rank among
 eligible_unique TFBS per regulator), and `tfbs_core` for core‑level uniqueness checks.
 
