@@ -2264,23 +2264,27 @@ def stage_a_build_pool(
             if title:
                 console.print(f"[bold]{title}[/]")
             console.print(table)
-        console.print("Legend:")
-        console.print("  generated = PWM candidates")
+        legend_rows = [
+            ("generated", "PWM candidates"),
+            ("eligible_unique", "deduped by uniqueness.key"),
+            ("retained", "carried forward after selection"),
+            ("tier fill", "deepest diagnostic tier used"),
+            ("selection", "Stage-A selection policy"),
+            ("pool", "MMR pool size after rung slice ('*' = capped)"),
+            ("overlap", "top ∩ diversified"),
+            ("pairwise top/div", "weighted Hamming median (tfbs_core)"),
+            ("score_norm top/div", "min/med/max"),
+        ]
         if verbose:
-            console.print("  has_hit = FIMO hit present")
-            console.print("  eligible_raw = best_hit_score > 0 among hits")
-        console.print("  eligible_unique = deduped by uniqueness.key")
-        console.print("  retained = carried forward after selection")
-        if verbose:
-            console.print("  tier target = diagnostic tier target status")
-        console.print("  tier fill = deepest diagnostic tier used")
-        console.print("  selection = Stage-A selection policy")
-        console.print("  pool = MMR pool size after rung slice ('*' = capped)")
-        console.print("  overlap = top ∩ diversified")
-        if verbose:
-            console.print("  set_swaps = diversified - overlap")
-        console.print("  pairwise top/div = weighted Hamming median (tfbs_core)")
-        console.print("  score_norm top/div = min/med/max")
+            legend_rows.insert(1, ("has_hit", "FIMO hit present"))
+            legend_rows.insert(2, ("eligible_raw", "best_hit_score > 0 among hits"))
+            legend_rows.append(("tier target", "diagnostic tier target status"))
+            legend_rows.append(("set_swaps", "diversified - overlap"))
+        legend_table = make_table("Legend", "Meaning")
+        for key, desc in legend_rows:
+            legend_table.add_row(str(key), str(desc))
+        console.print("[bold]Legend[/]")
+        console.print(legend_table)
     console.print(
         f":sparkles: [bold green]Pool manifest written[/]: "
         f"{_display_path(artifact.manifest_path, run_root, absolute=False)}"

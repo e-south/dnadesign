@@ -278,7 +278,6 @@ def _build_stage_a_yield_bias_figure(
             ax.tick_params(axis="y", labelsize=tick_size, labelleft=True)
             ax.tick_params(axis="x", labelsize=tick_size)
             if idx == 0:
-                ax.set_ylabel("Entropy (bits)")
                 ax.legend(
                     loc="upper right",
                     frameon=False,
@@ -291,6 +290,19 @@ def _build_stage_a_yield_bias_figure(
             fontsize=subtitle_size,
             pad=title_pad,
         )
+        if axes_right:
+            y_center = (axes_right[0].get_position().y1 + axes_right[-1].get_position().y0) / 2.0
+            right_bbox = axes_right[0].get_position()
+            fig.text(
+                right_bbox.x0 - 0.04,
+                y_center,
+                "Entropy (bits)",
+                rotation="vertical",
+                ha="right",
+                va="center",
+                fontsize=text_sizes["annotation"] * 0.85,
+                color="#222222",
+            )
         for ax in axes_left + axes_right:
             _apply_style(ax, style)
             ax.tick_params(axis="both", labelsize=tick_size)

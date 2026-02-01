@@ -71,9 +71,9 @@ def stage_a_recap_tables(
             recap_table.add_column("set_swaps")
         recap_table.add_column("pairwise top")
         recap_table.add_column("pairwise div")
-        recap_table.add_column("score_norm top")
-        recap_table.add_column("score_norm div")
-        recap_table.add_column("score(min/med/avg/max)")
+        recap_table.add_column("score_norm top (min/med/max)")
+        recap_table.add_column("score_norm div (min/med/max)")
+        recap_table.add_column("fimo(min/med/avg/max)")
         recap_table.add_column("len(n/min/med/avg/max)")
         for row in sorted(grouped[input_name], key=lambda item: str(item["regulator"])):
             reg_label = str(row["regulator"])

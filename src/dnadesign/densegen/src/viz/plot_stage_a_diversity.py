@@ -123,6 +123,8 @@ def _build_stage_a_diversity_figure(
         metric_label = "Pairwise Hamming NN"
         top_color = "#cfe8dc"
         diversified_color = "#7fbf9b"
+        label_size = float(style.get("label_size", text_sizes["annotation"]))
+        tick_size = text_sizes["annotation"] * 0.7
         for idx, reg in enumerate(regulators):
             hue = reg_colors.get(reg, "#4c78a8")
             row = row_by_reg[reg]
@@ -195,6 +197,7 @@ def _build_stage_a_diversity_figure(
             tick_end = int(np.ceil(x_max))
             ax_left.set_xticks(np.arange(tick_start, tick_end + 1))
             ax_left.tick_params(labelbottom=True)
+            ax_left.tick_params(axis="both", labelsize=tick_size)
             if idx == 0:
                 ax_left.legend(
                     handles=[base_line, act_line],
@@ -288,7 +291,10 @@ def _build_stage_a_diversity_figure(
                     label=score_label,
                 )
                 ax_score.set_ylim(0.0, 1.0)
+                ax_score.tick_params(labelright=True, labelsize=tick_size, pad=2)
                 _apply_style(ax_score, style)
+                if "right" in ax_score.spines:
+                    ax_score.spines["right"].set_visible(True)
                 if idx == 0 and dist_line and score_line:
                     ax_right.legend(
                         handles=[dist_line[0], score_line[0]],
@@ -310,14 +316,15 @@ def _build_stage_a_diversity_figure(
             ax_right.set_ylabel("")
             ax_right.xaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=5))
             ax_right.tick_params(labelbottom=True)
+            ax_right.tick_params(axis="both", labelsize=tick_size)
             ax_left.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
             ax_right.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
 
         if axes_left:
             axes_left[0].set_title("NN distance distribution", fontsize=subtitle_size, pad=title_pad)
             axes_right[0].set_title("Selection trajectory", fontsize=subtitle_size, pad=title_pad)
-            axes_left[-1].set_xlabel(metric_label)
-            axes_right[-1].set_xlabel("MMR selection step")
+            axes_left[-1].set_xlabel(metric_label, fontsize=label_size)
+            axes_right[-1].set_xlabel("MMR selection step", fontsize=label_size)
             y_center = (axes_left[0].get_position().y1 + axes_left[-1].get_position().y0) / 2.0
             left_bbox = axes_left[0].get_position()
             right_bbox = axes_right[0].get_position()
@@ -328,7 +335,7 @@ def _build_stage_a_diversity_figure(
                 rotation="vertical",
                 ha="right",
                 va="center",
-                fontsize=text_sizes["annotation"] * 0.85,
+                fontsize=label_size,
                 color="#222222",
             )
             fig.text(
@@ -338,20 +345,22 @@ def _build_stage_a_diversity_figure(
                 rotation="vertical",
                 ha="right",
                 va="center",
-                fontsize=text_sizes["annotation"] * 0.85,
+                fontsize=label_size,
                 color="#222222",
             )
             fig.text(
-                right_bbox.x1 + 0.02,
+                right_bbox.x1 + 0.06,
                 y_center,
                 "Score vs max",
                 rotation="vertical",
                 ha="left",
                 va="center",
-                fontsize=text_sizes["annotation"] * 0.85,
+                fontsize=label_size,
                 color="#222222",
             )
 
         for ax in axes_left + axes_right:
             _apply_style(ax, style)
+            if ax in axes_right and "right" in ax.spines:
+                ax.spines["right"].set_visible(True)
     return fig, axes_left, axes_right

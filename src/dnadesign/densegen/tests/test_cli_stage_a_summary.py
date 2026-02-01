@@ -344,8 +344,8 @@ def test_stage_a_recap_tables_include_verbose_headers() -> None:
     rows = _stage_a_sampling_rows({"demo": pool})
     tables = stage_a_recap_tables(rows, display_map_by_input={}, show_motif_ids=True, verbose=True)
     headers = [col.header for col in tables[0][1].columns]
-    assert "score_norm top" in headers
-    assert "score_norm div" in headers
+    assert "score_norm top (min/med/max)" in headers
+    assert "score_norm div (min/med/max)" in headers
     assert "pairwise top" in headers
     assert "pairwise div" in headers
 

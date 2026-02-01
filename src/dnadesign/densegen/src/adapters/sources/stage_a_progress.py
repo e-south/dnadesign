@@ -163,7 +163,7 @@ def _stage_a_live_render(state: dict[str, StageAProgressState]):
     table.add_column("motif")
     table.add_column("phase")
     table.add_column("generated/limit", no_wrap=True, overflow="ellipsis", min_width=14)
-    table.add_column("eligible_unique/target", no_wrap=True, overflow="ellipsis", min_width=18)
+    table.add_column("eligible_unique", no_wrap=True, overflow="ellipsis", min_width=18)
     table.add_column("tier yield")
     table.add_column("batch")
     table.add_column("elapsed")
