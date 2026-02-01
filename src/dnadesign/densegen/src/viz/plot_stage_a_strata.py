@@ -233,16 +233,6 @@ def _build_stage_a_strata_overview_figure(
                     alpha=0.95,
                 )
                 ax.scatter([retained_cutoff], [y_top], s=18, color="#222222", edgecolors="none", zorder=5)
-                ax.annotate(
-                    "Retained cutoff",
-                    (retained_cutoff, y_top),
-                    xytext=(0, 4),
-                    textcoords="offset points",
-                    ha="center",
-                    va="bottom",
-                    fontsize=text_sizes["annotation"] * 0.6,
-                    color="#222222",
-                )
             ax.set_yticks([])
             label = format_regulator_label(reg)
             core_len = core_lengths.get(reg)

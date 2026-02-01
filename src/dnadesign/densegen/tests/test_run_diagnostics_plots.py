@@ -20,6 +20,7 @@ import pytest
 
 from dnadesign.densegen.src.core.artifacts.pool import TFBSPoolArtifact
 from dnadesign.densegen.src.viz.plot_stage_a_diversity import _build_stage_a_diversity_figure
+from dnadesign.densegen.src.viz.plot_stage_a_strata import _build_stage_a_strata_overview_figure
 from dnadesign.densegen.src.viz.plotting import (
     _plot_required_columns,
     plot_placement_map,
@@ -616,6 +617,33 @@ def test_stage_a_diversity_trajectory_has_nonzero_xlim(tmp_path: Path) -> None:
     try:
         x_min, x_max = axes_right[0].get_xlim()
         assert x_max > x_min
+    finally:
+        fig.clf()
+
+
+def test_stage_a_strata_omits_retained_cutoff_label(tmp_path: Path) -> None:
+    matplotlib.use("Agg", force=True)
+    manifest = _pool_manifest(tmp_path, include_diversity=True)
+    sampling = manifest.entry_for("demo_input").stage_a_sampling
+    assert sampling is not None
+    pool_df = pd.DataFrame(
+        {
+            "input_name": ["demo_input", "demo_input"],
+            "tf": ["TF_A", "TF_A"],
+            "tfbs_sequence": ["AAAA", "AAAT"],
+            "best_hit_score": [2.0, 1.5],
+            "tier": [0, 1],
+        }
+    )
+    fig, axes_left, _ax_right = _build_stage_a_strata_overview_figure(
+        input_name="demo_input",
+        pool_df=pool_df,
+        sampling=sampling,
+        style={},
+    )
+    try:
+        labels = [text.get_text() for ax in axes_left for text in ax.texts]
+        assert "Retained cutoff" not in labels
     finally:
         fig.clf()
 
