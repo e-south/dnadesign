@@ -121,8 +121,8 @@ def _build_stage_a_diversity_figure(
             return x, y
 
         metric_label = "Pairwise Hamming NN"
-        top_color = "#a8d5c2"
-        diversified_color = "#2e8b57"
+        top_color = "#cfe8dc"
+        diversified_color = "#7fbf9b"
         for idx, reg in enumerate(regulators):
             hue = reg_colors.get(reg, "#4c78a8")
             row = row_by_reg[reg]
@@ -173,16 +173,16 @@ def _build_stage_a_diversity_figure(
                 y_base,
                 width=0.8,
                 color=top_color,
-                alpha=0.6,
+                alpha=0.55,
                 label="Top",
                 zorder=2,
             )
             act_line = ax_left.bar(
                 x_act,
                 y_act,
-                width=0.5,
+                width=0.8,
                 color=diversified_color,
-                alpha=0.85,
+                alpha=0.75,
                 label="Diversified",
                 zorder=3,
             )

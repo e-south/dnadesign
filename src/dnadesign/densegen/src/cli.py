@@ -657,6 +657,15 @@ def _format_score_norm_summary(summary) -> str:
     )
 
 
+def _format_score_norm_triplet(summary, *, label: str) -> str:
+    if summary is None:
+        return "-"
+    block = getattr(summary, label, None)
+    if block is None:
+        return "-"
+    return f"{float(block.min):.2f}/{float(block.median):.2f}/{float(block.max):.2f}"
+
+
 def _format_tier_counts(eligible: list[int] | None, retained: list[int] | None) -> str:
     if not eligible or not retained:
         raise ValueError("Stage-A tier counts are required.")
@@ -676,7 +685,6 @@ def _format_selection_label(
     *,
     policy: str,
     alpha: float | None = None,
-    min_score_norm: float | None = None,
     relevance_norm: str | None = None,
     max_candidates: int | None = None,
 ) -> str:
@@ -688,9 +696,7 @@ def _format_selection_label(
     parts: list[str] = []
     if alpha is not None:
         parts.append(f"a={float(alpha):.2f}")
-    if min_score_norm is not None:
-        parts.append(f"min={float(min_score_norm):.2f}")
-    if relevance_norm:
+    if relevance_norm and relevance_norm != "minmax_raw_score":
         parts.append(f"rel={relevance_norm}")
     if max_candidates is not None:
         parts.append(f"cap={int(max_candidates)}")
@@ -752,7 +758,6 @@ def _stage_a_sampling_rows(
                 selection_label = _format_selection_label(
                     policy=str(summary.selection_policy),
                     alpha=summary.selection_alpha,
-                    min_score_norm=summary.selection_pool_min_score_norm_used,
                     relevance_norm=summary.selection_relevance_norm or "minmax_raw_score",
                 )
                 tier_counts = _format_tier_counts(summary.eligible_tier_counts, summary.retained_tier_counts)
@@ -788,25 +793,17 @@ def _stage_a_sampling_rows(
                 top_pairwise = pairwise.top_candidates
                 diversified_pairwise = pairwise.diversified_candidates
                 if int(diversified_pairwise.n_pairs) <= 0 or int(top_pairwise.n_pairs) <= 0:
-                    diversity_label = "n/a"
-                    diversity_delta = "n/a"
+                    pairwise_top_label = "n/a"
+                    pairwise_div_label = "n/a"
                 else:
-                    diversity_label = _format_diversity_value(diversified_pairwise.median)
-                    diversity_delta = _format_diversity_value(
-                        float(diversified_pairwise.median) - float(top_pairwise.median),
-                        show_sign=True,
-                    )
+                    pairwise_top_label = _format_diversity_value(top_pairwise.median)
+                    pairwise_div_label = _format_diversity_value(diversified_pairwise.median)
                 score_block = diversity.score_quantiles
                 if score_block.top_candidates is None or score_block.diversified_candidates is None:
                     raise ValueError("Stage-A diversity missing top/diversified score quantiles.")
-                score_norm_summary = _format_score_norm_summary(diversity.score_norm_summary)
-                diversity_score_p10_delta = _format_diversity_value(
-                    float(score_block.diversified_candidates.p10) - float(score_block.top_candidates.p10),
-                    show_sign=True,
-                )
-                diversity_score_med_delta = _format_diversity_value(
-                    float(score_block.diversified_candidates.p50) - float(score_block.top_candidates.p50),
-                    show_sign=True,
+                score_norm_top = _format_score_norm_triplet(diversity.score_norm_summary, label="top_candidates")
+                score_norm_div = _format_score_norm_triplet(
+                    diversity.score_norm_summary, label="diversified_candidates"
                 )
                 if diversity.set_overlap_fraction is None or diversity.set_overlap_swaps is None:
                     raise ValueError("Stage-A diversity missing overlap stats.")
@@ -838,11 +835,10 @@ def _stage_a_sampling_rows(
                         "selection": selection_label,
                         "score": score_label,
                         "length": length_label,
-                        "diversity_med": diversity_label,
-                        "diversity_delta": diversity_delta,
-                        "diversity_score_p10_delta": diversity_score_p10_delta,
-                        "diversity_score_med_delta": diversity_score_med_delta,
-                        "score_norm_summary": score_norm_summary,
+                        "pairwise_top": pairwise_top_label,
+                        "pairwise_div": pairwise_div_label,
+                        "score_norm_top": score_norm_top,
+                        "score_norm_div": score_norm_div,
                         "set_overlap": diversity_overlap,
                         "set_swaps": diversity_swaps,
                         "diversity_pool": diversity_pool,
@@ -887,10 +883,10 @@ def _stage_a_sampling_rows(
                 "selection": "-",
                 "score": "-",
                 "length": length_label,
-                "diversity_med": "-",
-                "diversity_delta": "-",
-                "diversity_score_p10_delta": "-",
-                "diversity_score_med_delta": "-",
+                "pairwise_top": "-",
+                "pairwise_div": "-",
+                "score_norm_top": "-",
+                "score_norm_div": "-",
                 "set_overlap": "-",
                 "set_swaps": "-",
                 "diversity_pool": "-",
@@ -960,7 +956,6 @@ def _stage_a_plan_rows(
             selection_label = _format_selection_label(
                 policy=selection_policy,
                 alpha=selection_alpha,
-                min_score_norm=getattr(pool_cfg, "min_score_norm", None) if pool_cfg is not None else None,
                 relevance_norm=getattr(pool_cfg, "relevance_norm", None) if pool_cfg is not None else None,
                 max_candidates=getattr(pool_cfg, "max_candidates", None) if pool_cfg is not None else None,
             )
@@ -1944,7 +1939,6 @@ def inspect_config(
             selection_label = _format_selection_label(
                 policy=selection_policy,
                 alpha=selection_alpha,
-                min_score_norm=getattr(pool_cfg, "min_score_norm", None) if pool_cfg is not None else None,
                 relevance_norm=getattr(pool_cfg, "relevance_norm", None) if pool_cfg is not None else None,
                 max_candidates=getattr(pool_cfg, "max_candidates", None) if pool_cfg is not None else None,
             )
@@ -2270,29 +2264,23 @@ def stage_a_build_pool(
             if title:
                 console.print(f"[bold]{title}[/]")
             console.print(table)
+        console.print("Legend:")
+        console.print("  generated = PWM candidates")
         if verbose:
-            console.print(
-                "Legend: generated=PWM candidates; has_hit=FIMO hit present; "
-                "eligible_raw=best_hit_score>0 among hits; eligible_unique=deduped by uniqueness.key; "
-                "retained=top-N by score after dedupe; tier target=diagnostic tier target status; "
-                "tier fill=deepest diagnostic tier used; selection=Stage-A selection policy; "
-                "pool=MMR selection pool size (after rung slice; '*' means capped); "
-                "div(pairwise)=pairwise weighted Hamming median; "
-                "overlap=top_candidates∩diversified_candidates; set_swaps=diversified - overlap; "
-                "Δscore_norm columns compare top_candidates vs diversified p10/med; "
-                "score_norm top/div reports min/med/max."
-            )
-        else:
-            console.print(
-                "Legend: generated=PWM candidates; eligible_unique=deduped by uniqueness.key; "
-                "retained=top-N by score after dedupe; tier fill=deepest diagnostic tier used; "
-                "selection=Stage-A selection policy; "
-                "pool=MMR selection pool size (after rung slice; '*' means capped); "
-                "div(pairwise)=pairwise weighted Hamming median; "
-                "overlap=top_candidates∩diversified_candidates; "
-                "Δscore_norm med compares top_candidates vs diversified; "
-                "score_norm top/div reports min/med/max."
-            )
+            console.print("  has_hit = FIMO hit present")
+            console.print("  eligible_raw = best_hit_score > 0 among hits")
+        console.print("  eligible_unique = deduped by uniqueness.key")
+        console.print("  retained = carried forward after selection")
+        if verbose:
+            console.print("  tier target = diagnostic tier target status")
+        console.print("  tier fill = deepest diagnostic tier used")
+        console.print("  selection = Stage-A selection policy")
+        console.print("  pool = MMR pool size after rung slice ('*' = capped)")
+        console.print("  overlap = top ∩ diversified")
+        if verbose:
+            console.print("  set_swaps = diversified - overlap")
+        console.print("  pairwise top/div = weighted Hamming median (tfbs_core)")
+        console.print("  score_norm top/div = min/med/max")
     console.print(
         f":sparkles: [bold green]Pool manifest written[/]: "
         f"{_display_path(artifact.manifest_path, run_root, absolute=False)}"

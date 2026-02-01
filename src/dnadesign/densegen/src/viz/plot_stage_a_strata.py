@@ -202,7 +202,7 @@ def _build_stage_a_strata_overview_figure(
             retained_cutoff = float(retained_vals.min())
             tier_scores = [val for val in (tier0_score, tier1_score, tier2_score) if val is not None]
             cutoff_overlaps = bool(tier_scores) and bool(
-                np.isclose(retained_cutoff, np.asarray(tier_scores, dtype=float), rtol=1e-6, atol=1e-6).any()
+                np.isclose(retained_cutoff, np.asarray(tier_scores, dtype=float), rtol=1e-4, atol=1e-2).any()
             )
             _draw_tier_markers(
                 ax,

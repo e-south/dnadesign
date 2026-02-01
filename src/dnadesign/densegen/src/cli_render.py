@@ -60,20 +60,19 @@ def stage_a_recap_tables(
             recap_table.add_column("has_hit")
             recap_table.add_column("eligible_raw")
         recap_table.add_column("eligible_unique")
+        recap_table.add_column("pool")
         recap_table.add_column("retained")
         if verbose:
             recap_table.add_column("tier target")
         recap_table.add_column("tier fill")
         recap_table.add_column("selection")
-        recap_table.add_column("pool")
-        recap_table.add_column("div(pairwise)")
-        recap_table.add_column("Δdiv(pairwise)")
         recap_table.add_column("overlap")
         if verbose:
             recap_table.add_column("set_swaps")
-            recap_table.add_column("Δscore_norm p10")
-        recap_table.add_column("Δscore_norm med")
-        recap_table.add_column("score_norm top/div")
+        recap_table.add_column("pairwise top")
+        recap_table.add_column("pairwise div")
+        recap_table.add_column("score_norm top")
+        recap_table.add_column("score_norm div")
         recap_table.add_column("score(min/med/avg/max)")
         recap_table.add_column("len(n/min/med/avg/max)")
         for row in sorted(grouped[input_name], key=lambda item: str(item["regulator"])):
@@ -87,44 +86,28 @@ def stage_a_recap_tables(
             recap_row = [reg_label, str(row["generated"])]
             if verbose:
                 recap_row.extend([str(row["has_hit"]), str(row["eligible_raw"])])
-            recap_row.extend(
-                [
-                    str(row["eligible_unique"]),
-                    str(row["retained"]),
-                ]
-            )
+            recap_row.extend([str(row["eligible_unique"]), pool_label, str(row["retained"])])
             if verbose:
                 recap_row.append(str(row["tier_target"]))
             recap_row.extend(
                 [
                     str(row["tier_fill"]),
                     str(row["selection"]),
-                    pool_label,
-                    str(row["diversity_med"]),
-                    str(row["diversity_delta"]),
                     str(row["set_overlap"]),
                 ]
             )
             if verbose:
-                recap_row.extend([str(row["set_swaps"]), str(row["diversity_score_p10_delta"])])
+                recap_row.extend([str(row["set_swaps"])])
             recap_row.extend(
                 [
-                    str(row["diversity_score_med_delta"]),
-                    str(row["score_norm_summary"]),
+                    str(row["pairwise_top"]),
+                    str(row["pairwise_div"]),
+                    str(row["score_norm_top"]),
+                    str(row["score_norm_div"]),
                     str(row["score"]),
                     str(row["length"]),
                 ]
             )
-            if verbose:
-                recap_row.extend(
-                    [
-                        str(row["has_hit"]),
-                        str(row["eligible_raw"]),
-                        str(row["tier_target"]),
-                        str(row["set_swaps"]),
-                        str(row["diversity_score_p10_delta"]),
-                    ]
-                )
             recap_table.add_row(*recap_row)
         tables.append((f"Input: {input_name}", recap_table))
 
