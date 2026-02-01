@@ -124,7 +124,7 @@ def _build_stage_a_diversity_figure(
         top_color = "#cfe8dc"
         diversified_color = "#7fbf9b"
         label_size = float(style.get("label_size", text_sizes["annotation"]))
-        tick_size = text_sizes["annotation"] * 0.7
+        tick_size = text_sizes["annotation"] * 0.8
         for idx, reg in enumerate(regulators):
             hue = reg_colors.get(reg, "#4c78a8")
             row = row_by_reg[reg]

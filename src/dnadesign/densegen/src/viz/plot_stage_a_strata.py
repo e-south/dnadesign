@@ -199,13 +199,19 @@ def _build_stage_a_strata_overview_figure(
             if reg not in tier_labels_by_reg:
                 raise ValueError(f"Stage-A tier labels missing for '{input_name}' ({reg}).")
             tier_labels = tier_labels_by_reg[reg]
-            retained_cutoff = float(retained_vals.min())
-            tier_scores = [val for val in (tier0_score, tier1_score, tier2_score) if val is not None]
-            cutoff_overlaps = False
-            for score in tier_scores:
-                if round(float(retained_cutoff), 2) == round(float(score), 2):
-                    cutoff_overlaps = True
-                    break
+            solid_value = None
+            last_idx = None
+            if retained:
+                for idx, count in retained.items():
+                    if int(count) > 0:
+                        last_idx = idx if last_idx is None else max(last_idx, idx)
+            if last_idx is not None:
+                if last_idx <= 0:
+                    solid_value = tier0_score
+                elif last_idx == 1:
+                    solid_value = tier1_score
+                else:
+                    solid_value = tier2_score
             _draw_tier_markers(
                 ax,
                 [
@@ -217,22 +223,9 @@ def _build_stage_a_strata_overview_figure(
                 label_mode="box",
                 loc="lower right",
                 fontsize=text_sizes["annotation"] * 0.65,
-                solid_values=[retained_cutoff] if cutoff_overlaps else None,
+                solid_values=[solid_value] if solid_value is not None else None,
             )
             ax.set_ylim(0, 1.05)
-            if not cutoff_overlaps:
-                y_min, y_max = ax.get_ylim()
-                y_top = y_min + (y_max - y_min) * 0.58
-                ax.axvline(
-                    retained_cutoff,
-                    ymin=0.0,
-                    ymax=0.58,
-                    linewidth=1.2,
-                    linestyle="-",
-                    color="#222222",
-                    alpha=0.95,
-                )
-                ax.scatter([retained_cutoff], [y_top], s=18, color="#222222", edgecolors="none", zorder=5)
             ax.set_yticks([])
             label = format_regulator_label(reg)
             core_len = core_lengths.get(reg)
@@ -335,7 +328,7 @@ def _build_stage_a_strata_overview_figure(
             _apply_style(ax, style)
 
     ax_left = axes_left[-1]
-    ax_left.tick_params(axis="x", labelsize=text_sizes["annotation"] * 0.82)
-    ax_right.tick_params(axis="x", labelsize=text_sizes["annotation"] * 0.8)
-    ax_right.tick_params(axis="y", labelsize=text_sizes["annotation"] * 0.8)
+    ax_left.tick_params(axis="x", labelsize=text_sizes["annotation"] * 0.9)
+    ax_right.tick_params(axis="x", labelsize=text_sizes["annotation"] * 0.9)
+    ax_right.tick_params(axis="y", labelsize=text_sizes["annotation"] * 0.9)
     return fig, axes_left, ax_right
