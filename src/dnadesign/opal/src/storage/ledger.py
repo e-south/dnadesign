@@ -47,6 +47,8 @@ ALLOW: dict[str, set[str]] = {
         "pred__y_obj_scalar",
         "sel__rank_competition",
         "sel__is_selected",
+        "pred__scalar_var",
+        "scores",
         # row-level objective diagnostics only
         "obj__logic_fidelity",
         "obj__effect_raw",

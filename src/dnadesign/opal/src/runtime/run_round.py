@@ -401,6 +401,8 @@ def _stage_fit_predict_score(
         objective=mode,
         ctx=sctx,
     )
+    raw_scores = raw_sel["score"]
+    del raw_sel['score']
     sel_norm = normalize_selection_result(
         raw_sel,
         ids=np.array(id_order_pool),
@@ -409,6 +411,7 @@ def _stage_fit_predict_score(
         tie_handling=tie_handling,
         objective=mode,
     )
+
 
     required_keys = {"rank_competition", "selected_bool"}
     missing = sorted(k for k in required_keys if k not in sel_norm)
@@ -469,6 +472,8 @@ def _stage_fit_predict_score(
         selected_effective=selected_effective,
         top_k=top_k,
         obj_sha=obj_sha,
+        uq_scalar=uq_scalar,
+        score=raw_scores,
     )
 
 

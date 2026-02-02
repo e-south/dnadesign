@@ -90,6 +90,8 @@ def build_run_pred_events(
     y_obj_scalar_sd: Optional[np.ndarray],
     obj_diagnostics: dict[str, Any],
     sel_emit: SelectionEmit,
+    uq_scalar: Optional[np.ndarray] = None,
+    scores: Optional[np.ndarray] = None,
 ) -> pd.DataFrame:
     n = len(ids)
     if y_hat_model.shape[0] != n or y_obj_scalar.shape[0] != n:
@@ -127,6 +129,8 @@ def build_run_pred_events(
         "pred__y_dim": [int(y_dim)] * n,
         "pred__y_hat_model": [list(map(float, row)) for row in y_hat_model],
         "pred__y_obj_scalar": list(map(float, y_obj_scalar)),
+        "pred__scalar_var": list(map(float, uq_scalar)),
+        "scores": list(map(float, scores)),
         "sel__rank_competition": sel_emit.ranks_competition.astype(int).tolist(),
         "sel__is_selected": sel_emit.selected_bool.astype(bool).tolist(),
     }

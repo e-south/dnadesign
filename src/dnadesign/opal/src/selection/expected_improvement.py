@@ -41,10 +41,12 @@ def ei(
     std_devs = np.asarray(scalar_uncertainty, dtype=float)
     if ids.shape[0] != scores.shape[0]:
         raise ValueError("ids and scores must have same length")
+    
+    # Normalizing standard deviations to avoid extremely large EI values
+    std_devs = std_devs/np.max(std_devs)
 
     max_score = np.nanmax(scores)
     diffs = scores - max_score
-    # Need to figure out how to get standard devs for GP over to this script
     z_vals = diffs / std_devs
     scores = np.multiply(diffs, norm.cdf(z_vals)) + np.multiply(std_devs, norm.pdf(z_vals))
 
@@ -56,7 +58,5 @@ def ei(
 
     # lexsort uses the *last* key as primary → (ids, primary)
     order_idx = np.lexsort((ids, primary)).astype(int)
-    print(scores)
-    print(order_idx)
 
-    return {"order_idx": order_idx}
+    return {"order_idx": order_idx, "score": scores}

@@ -25,7 +25,6 @@ from ..registries.models import register_model
 class FitMetrics:
     kernal_lml: Optional[float] = None
 
-# Come back and see if this needs adjustment/figure out what it's doing
 @roundctx_contract(
     category="model",
     requires=[],
@@ -87,11 +86,12 @@ class GaussianProcessModel:
 
         return FitMetrics(kernal_lml=kernal_lml)
 
-    def predict(self, X: np.ndarray, *, ctx=None) -> np.ndarray:
+    def predict(self, X: np.ndarray, std = False, *, ctx=None) -> np.ndarray:
         if self._est is None:
             raise RuntimeError("[gaussian_process] predict() before fit().")
-        y = self._est.predict(X, return_std = True)
+        y = self._est.predict(X, return_std = std)
         y = np.asarray(y, dtype=float)
+        np.savetxt(r"\\wsl.localhost\Ubuntu\home\emarkert\Rotation3_MJD\Data_Sim\Test_IO\var.txt", y[1])
         if y.ndim == 1:
             y = y.reshape(-1, 1)
         return y
