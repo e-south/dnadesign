@@ -34,6 +34,7 @@ cruncher:
   motif_discovery:
     tool: meme                         # prefer MEME explicitly
     meme_mod: oops                     # each site is one motif
+    meme_prior: addone                 # stabilize sparse site sets
     source_id: meme_suite_meme         # must match source_preference
 
   ingest:
@@ -83,7 +84,7 @@ cruncher fetch sites --tf baeR --update -c "$CONFIG"
 cruncher doctor -c "$CONFIG"
 
 # MEME discovery (preferred) so all three TFs have consistent PWMs.
-cruncher discover motifs --tf lexA --tf cpxR --tf baeR --tool meme --meme-mod oops --source-id meme_suite_meme -c "$CONFIG"
+cruncher discover motifs --tf lexA --tf cpxR --tf baeR --tool meme --meme-mod oops --meme-prior addone --source-id meme_suite_meme -c "$CONFIG"
 
 # Render PWM logos for grounding/QA.
 cruncher catalog logos --source meme_suite_meme --set 1 -c "$CONFIG"
@@ -101,7 +102,7 @@ Logos are saved under `outputs/logos/catalog/` (the command prints the exact pat
 #### Export into a DenseGen workspace
 
 ```bash
-cruncher catalog export-densegen --set 1 --densegen-workspace demo_meme_two_tf --pseudocount 0.1 --overwrite -c "$CONFIG"
+cruncher catalog export-densegen --set 1 --densegen-workspace demo_meme_two_tf --overwrite -c "$CONFIG"
 cruncher catalog export-sites   --set 1 --densegen-workspace demo_meme_two_tf --overwrite -c "$CONFIG"
 ```
 

@@ -14,6 +14,7 @@ cruncher:
   motif_discovery:
     tool: meme
     meme_mod: oops
+    meme_prior: addone
     source_id: meme_suite_meme
 
   ingest:

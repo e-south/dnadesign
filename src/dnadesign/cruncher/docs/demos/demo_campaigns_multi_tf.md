@@ -139,10 +139,10 @@ Use `--keep-existing` to retain historical runs.
 ```bash
 cruncher discover check -c "$CONFIG"
 cruncher discover motifs --tf lexA --tf cpxR --tool streme --source-id meme_suite_streme -c "$CONFIG"
-cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --source-id meme_suite_meme -c "$CONFIG"
+cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --meme-prior addone --source-id meme_suite_meme -c "$CONFIG"
 ```
 
-Tip: if each sequence represents one site, prefer MEME with `--meme-mod oops`.
+Tip: if each sequence represents one site, prefer MEME with `--meme-mod oops` and `--meme-prior addone`.
 
 How to read the outputs:
 

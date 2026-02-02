@@ -509,8 +509,9 @@ Examples:
 * `cruncher discover motifs --tf lexA --tf cpxR --tool streme <config>`
 * `cruncher discover motifs --tf lexA --tf cpxR --tool meme <config>`
 * `cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops <config>`
+* `cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --meme-prior addone <config>`
 * `cruncher discover motifs --tf lexA --tf cpxR --tool streme --source-id meme_suite_streme <config>`
-* `cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --source-id meme_suite_meme <config>`
+* `cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --meme-prior addone --source-id meme_suite_meme <config>`
 * `cruncher discover motifs --tf lexA --tool streme --replace-existing <config>`
 * `cruncher discover motifs --tool-path /opt/meme/bin --tool streme <config>`
 * `cruncher discover check <config>`
@@ -531,6 +532,7 @@ Notes:
 * By default discovery replaces previous discovered motifs for the same TF/source
   (`motif_discovery.replace_existing=true`). Pass `--keep-existing` to retain historical runs.
 * `--meme-mod` applies to MEME only; use it when each sequence is expected to contain one site.
+* `--meme-prior` applies to MEME only; `addone` is a good default for sparse site sets.
 * Use `--tool-path` or the `MEME_BIN` environment variable to point at a specific install.
   Relative `--tool-path` values resolve from the config file location.
 * MEME Suite is a system dependency; install `streme`/`meme` via your system package manager,

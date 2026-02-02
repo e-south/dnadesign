@@ -1356,6 +1356,10 @@ class MotifDiscoveryConfig(StrictBaseModel):
         None,
         description="Optional MEME -mod setting (oops/zoops/anr). When unset, MEME defaults apply.",
     )
+    meme_prior: Optional[Literal["dirichlet", "dmix", "mega", "megap", "addone"]] = Field(
+        None,
+        description="Optional MEME -prior setting (dirichlet/dmix/mega/megap/addone).",
+    )
     min_sequences_for_streme: int = Field(50, description="Threshold for auto tool selection.")
     source_id: str = Field("meme_suite", description="Catalog source_id for discovered motifs.")
     replace_existing: bool = Field(

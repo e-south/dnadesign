@@ -111,6 +111,9 @@ mix), follow the Cruncher handoff workflow:
 
 * `../workflows/cruncher_pwm_pipeline.md`
 
+That workflow uses MEME with **OOPS** (plus the `addone` prior) so sparse site sets
+produce stable PWMs without post-processing.
+
 ```bash
 dense stage-a build-pool --fresh -c "$CONFIG"
 ```

@@ -111,6 +111,23 @@ def test_unknown_nested_key_is_rejected(tmp_path: Path) -> None:
     assert any(err.get("type") == "extra_forbidden" and err.get("loc", ())[-1] == "bogus" for err in exc.value.errors())
 
 
+def test_motif_discovery_accepts_meme_prior(tmp_path: Path) -> None:
+    config = _base_config()
+    config["cruncher"]["motif_discovery"] = {"tool": "meme", "meme_prior": "addone"}
+    config_path = _write_config(tmp_path, config)
+
+    load_config(config_path)
+
+
+def test_motif_discovery_rejects_invalid_meme_prior(tmp_path: Path) -> None:
+    config = _base_config()
+    config["cruncher"]["motif_discovery"] = {"tool": "meme", "meme_prior": "invalid"}
+    config_path = _write_config(tmp_path, config)
+
+    with pytest.raises(ValidationError, match="meme_prior"):
+        load_config(config_path)
+
+
 def test_missing_cruncher_root_is_rejected(tmp_path: Path) -> None:
     config_path = _write_config(tmp_path, {"not_cruncher": {"out_dir": "runs"}})
 

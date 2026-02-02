@@ -76,6 +76,20 @@ def _compute_log_odds(
     return out
 
 
+def _normalize_log_odds_matrix(matrix: Sequence[Sequence[float]]) -> list[list[float]]:
+    if not matrix:
+        raise ValueError("log_odds_matrix is empty")
+    out: list[list[float]] = []
+    for i, row in enumerate(matrix):
+        if len(row) != 4:
+            raise ValueError(f"log_odds_matrix row {i} length must be 4")
+        vals = [float(v) for v in row]
+        if any(not math.isfinite(v) for v in vals):
+            raise ValueError("log_odds_matrix rows must be finite")
+        out.append(vals)
+    return out
+
+
 def _background_from_matrix(matrix: Sequence[Sequence[float]]) -> list[float]:
     sums = [0.0, 0.0, 0.0, 0.0]
     count = 0
@@ -130,7 +144,14 @@ def build_densegen_artifact(
     probs = _normalize_prob_matrix(matrix)
     background = resolve_background(payload, policy=background_policy)
     background = _normalize_background(background)
-    log_odds = _compute_log_odds(probs, background, pseudocount=pseudocount)
+    log_odds = None
+    raw_log_odds = payload.get("log_odds_matrix")
+    if pseudocount in (None, 0) and raw_log_odds is not None:
+        log_odds = _normalize_log_odds_matrix(raw_log_odds)
+        if len(log_odds) != len(probs):
+            raise ValueError("log_odds_matrix length must match matrix length")
+    if log_odds is None:
+        log_odds = _compute_log_odds(probs, background, pseudocount=pseudocount)
 
     def _as_row_dict(row: Sequence[float]) -> dict:
         return {"A": float(row[0]), "C": float(row[1]), "G": float(row[2]), "T": float(row[3])}

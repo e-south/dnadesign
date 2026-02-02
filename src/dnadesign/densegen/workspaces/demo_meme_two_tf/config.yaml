@@ -10,9 +10,9 @@ densegen:
     - name: lexA_cpxR_baeR_artifacts
       type: pwm_artifact_set
       paths:
-        - inputs/motif_artifacts/lexA__meme_suite_streme__lexA_1-CTGTATAWAWWHACAGT.json
-        - inputs/motif_artifacts/cpxR__meme_suite_streme__cpxR_1-MTTTACAYWWMTTTACAWWW.json
-        - inputs/motif_artifacts/baeR__meme_suite_streme__baeR_1-CTTTTTTTCTCCACGATTGG.json
+        - inputs/motif_artifacts/lexA__meme_suite_meme__lexA_CTGTATAWAWWHACA.json
+        - inputs/motif_artifacts/cpxR__meme_suite_meme__cpxR_MANWWHTTTAM.json
+        - inputs/motif_artifacts/baeR__meme_suite_meme__baeR_SBWWTWKTYYYYMHDAWTSK.json
       sampling:
         strategy: stochastic
         n_sites: 250

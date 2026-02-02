@@ -128,6 +128,7 @@ motif_discovery:
   maxw: null                      # maximum motif width (auto from site lengths if unset)
   nmotifs: 1                      # motifs per TF
   meme_mod: null                  # optional MEME -mod setting: oops | zoops | anr
+  meme_prior: null                # optional MEME -prior setting: dirichlet | dmix | mega | megap | addone
   min_sequences_for_streme: 50    # auto threshold
   source_id: meme_suite           # catalog source ID
   replace_existing: true          # replace prior discovered motifs for same TF/source
