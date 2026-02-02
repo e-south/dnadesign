@@ -61,14 +61,19 @@ dense() { pixi run dense -- "$@"; }  # convenience wrapper
 
 If you want DenseGen to verify your solver is reachable, `dense validate-config --probe-solver -c "$CONFIG"` does that (step 2).
 
+> After you set `CONFIG` and the `dense()` wrapper, you can reset outputs and run the full path:
+
+```bash
+dense campaign-reset -c "$CONFIG"  # remove outputs to start fresh
+dense validate-config --probe-solver -c "$CONFIG"
+dense stage-a build-pool --fresh -c "$CONFIG"
+dense run --fresh -c "$CONFIG"
+dense plot --only stage_a_summary,placement_map -c "$CONFIG"
+```
+
 ---
 
 ### 1. Enter the demo workspace
-
-```bash
-cd src/dnadesign/densegen/workspaces/demo_meme_two_tf
-CONFIG="$PWD/config.yaml"
-```
 
 This folder is a **self-contained workspace**: it has a `config.yaml` plus `inputs/` and an `outputs/` root.
 
@@ -345,5 +350,3 @@ If you want the deeper “why” behind each stage:
 ---
 
 @e-south
-
-````

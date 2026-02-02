@@ -56,7 +56,7 @@ cruncher:
       dpi: 150                         # plot resolution
 ```
 
-#### Fetch sources + run MEME (preferred)
+#### Fetch sources + run MEME
 
 ```bash
 # Option A: cd into the dedicated cruncher workspace
