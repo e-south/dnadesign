@@ -11,11 +11,10 @@ This demo runs inside a packaged workspace that already contains inputs and a `c
 2. [Enter the demo workspace](#1-enter-the-demo-workspace)
 3. [Validate config + solver](#2-validate-config-solver)
 4. [Build Stage‑A pools](#3-build-stagea-pools)
-5. [Optional: Build Stage‑B libraries](#4-optional-build-stageb-libraries)
-6. [Run generation](#5-run-generation)
-7. [Plot](#6-plot)
-8. [Report (optional)](#7-report-optional)
-9. [Reset the demo (optional)](#8-reset-the-demo-optional)
+5. [Run generation](#4-run-generation)
+6. [Plot](#5-plot)
+7. [Report (optional)](#6-report-optional)
+8. [Reset the demo (optional)](#7-reset-the-demo-optional)
 10. [Where outputs go](#where-outputs-go)
 11. [Common troubleshooting](#common-troubleshooting)
 12. [Next steps](#next-steps)
@@ -125,6 +124,12 @@ dense stage-a build-pool --fresh -c "$CONFIG"
 
 > Without `--fresh`, `dense stage-a build-pool` appends *new unique* TFBS into an existing pool by default.
 
+To plot Stage‑A diagnostics right away:
+
+```bash
+dense plot --only stage_a_summary -c "$CONFIG"
+```
+
 What Stage‑A is doing:
 
 * For PWM-backed inputs, Stage‑A generates candidate sites, scores them with **FIMO log‑odds** (forward strand only), applies eligibility rules, deduplicates by your configured uniqueness key (commonly `core` for PWM inputs), and then **retains** `n_sites` per regulator according to the selection policy (e.g., top-score or MMR).
@@ -141,30 +146,7 @@ How to interpret common recap fields:
 
 ---
 
-### 4. Optional: Build Stage‑B libraries
-
-```bash
-dense stage-b build-libraries --overwrite -c "$CONFIG"
-```
-
-You do **not** need this step for a normal run when `library_source: build` (the default);
-`dense run` will build libraries automatically.
-
-This helper is useful when you want to:
-
-* **Inspect feasibility** before running the solver (are there enough bp/sites to satisfy constraints?).
-* **Materialize library artifacts** for replay workflows (`library_source: artifact`).
-* Compare library builds across config tweaks without running the full generation.
-
-Where Stage‑B writes:
-
-* `outputs/libraries/library_builds.parquet`
-* `outputs/libraries/library_members.parquet`
-* `outputs/libraries/library_manifest.json`
-
----
-
-### 5. Run generation
+### 4. Run generation
 
 ```bash
 dense run -c "$CONFIG"
@@ -172,8 +154,7 @@ dense run -c "$CONFIG"
 
 What happens here:
 
-* DenseGen consumes Stage‑A pools (and Stage‑B libraries, either prebuilt or built on demand),
-  then calls the solver to generate sequences under your plan and constraints.
+* DenseGen consumes Stage‑A pools, then calls the solver to generate sequences under your plan and constraints.
 * Stage‑B is the only stage that typically resamples during a run. When runtime guards trigger
   (stalls, duplicates, exhaustion), DenseGen rebuilds libraries and tries again.
 
@@ -203,12 +184,16 @@ Why `dense inspect run` is worth doing:
 
 ---
 
-### 6. Plot
+### 5. Plot
 
 The canonical “small but high-signal” plot set for this demo is:
 
 ```bash
-dense plot --only stage_a_summary,placement_map -c "$CONFIG"
+# Stage‑A diagnostics (pools only)
+dense plot --only stage_a_summary -c "$CONFIG"
+
+# Stage‑B fingerprint (requires dense arrays from a completed run)
+dense plot --only placement_map -c "$CONFIG"
 ```
 
 What these plots tell you:
@@ -230,7 +215,7 @@ Operational note: run health is usually faster to inspect than to plot:
 
 ---
 
-### 7. Report (optional)
+### 6. Report (optional)
 
 ```bash
 dense report --plots include -c "$CONFIG"
@@ -243,7 +228,7 @@ Notes:
 
 ---
 
-### 8. Reset the demo (optional)
+### 7. Reset the demo (optional)
 
 If you want to rerun from scratch (keeping config + inputs intact):
 

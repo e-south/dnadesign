@@ -80,12 +80,12 @@ densegen:
           groups:
             - name: group_a
               members:
-                - cpxR_1-MTTTACAYWWMTTTACAWWW
-                - baeR_1-CTTTTTTTCTCCACGATTGG
+                - cpxR_MANWWHTTTAM
+                - baeR_SBWWTWKTYYYYMHDAWTSK
               min_required: 1
             - name: group_b
               members:
-                - lexA_1-CTGTATAWAWWHACAGT
+                - lexA_CTGTATAWAWWHACA
               min_required: 1
 
   solver:
