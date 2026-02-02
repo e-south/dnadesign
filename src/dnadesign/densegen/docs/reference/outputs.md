@@ -129,15 +129,19 @@ Core diagnostics plots (canonical set):
 - `stage_a_summary` — Stage-A pool diagnostics (interpretation in the sampling guide).
 - `placement_map` — Stage-B fingerprint: per-position occupancy/event counts across the final
   dense arrays, with overlaid categories for regulators and fixed elements (e.g., promoter -35/-10),
-  plus a TFBS top-K usage leaderboard.
+  plus a TFBS allocation view (rank–frequency + cumulative share).
 
 Optional / advanced:
 - `run_health` — attempts outcomes + failure composition. (Not a default plot; prefer `dense inspect run`.)
-- `tfbs_usage` — legacy TFBS allocation view (may be superseded by placement_map’s leaderboard).
+- `tfbs_usage` — legacy TFBS allocation view (superseded by placement_map’s allocation plot).
 
 `stage_a_summary` writes multiple images per input, e.g.:
 `stage_a_summary__<input>.png`, `stage_a_summary__<input>__yield_bias.png`,
 and `stage_a_summary__<input>__diversity.png`.
+
+`placement_map` writes two images per input/plan:
+`placement_map__<input>__<plan>__occupancy.png` and
+`placement_map__<input>__<plan>__tfbs_allocation.png`.
 
 See `../guide/sampling.md` for plot interpretation context.
 
@@ -151,9 +155,9 @@ diversity metrics, rerun `dense stage-a build-pool --fresh` to regenerate it.
 `placement_map` visualizes 1-nt occupancy across binding-site types (regulators and fixed elements).
 
 When your plan includes `fixed_elements.promoter_constraints`, `placement_map` renders the promoter
-as fixed-element bands overlaid alongside TFBS usage so you can see how fixed constraints
-consume positional budget relative to sampled regulator sites.
-Fixed elements are labeled `fixed:<name>:-35` and `fixed:<name>:-10`.
+as fixed-element bands overlaid alongside regulator occupancy so you can see how fixed constraints
+consume positional budget relative to sampled sites.
+Fixed elements are shown in the legend as `<name> -35` and `<name> -10`.
 
 ---
 
