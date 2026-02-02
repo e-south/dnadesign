@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Sequence
 
@@ -18,6 +19,15 @@ import numpy as np
 
 SMOOTHING_ALPHA = 1e-6
 _BASES = np.array(["A", "C", "G", "T"])
+
+
+@dataclass(frozen=True)
+class PWMWindowSelection:
+    length: int
+    start: int
+    score: float
+    matrix: List[dict[str, float]]
+    log_odds: List[dict[str, float]]
 
 
 def normalize_background(bg: Optional[dict[str, float]]) -> dict[str, float]:
@@ -293,4 +303,26 @@ def _select_pwm_window(
         log_odds[best_start : best_start + length],
         best_start,
         best_score,
+    )
+
+
+def select_pwm_window_by_length(
+    *,
+    matrix: List[dict[str, float]],
+    log_odds: List[dict[str, float]],
+    length: int,
+    strategy: str = "max_info",
+) -> PWMWindowSelection:
+    window_matrix, window_log_odds, start, score = _select_pwm_window(
+        matrix=matrix,
+        log_odds=log_odds,
+        length=int(length),
+        strategy=str(strategy),
+    )
+    return PWMWindowSelection(
+        length=len(window_matrix),
+        start=int(start),
+        score=float(score),
+        matrix=window_matrix,
+        log_odds=window_log_odds,
     )

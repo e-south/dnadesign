@@ -35,6 +35,7 @@ from .stage_a_sampling_utils import (
     build_log_odds,
     parse_bgfile,
     score_sequence,
+    select_pwm_window_by_length,
 )
 from .stage_a_summary import PWMSamplingSummary
 from .stage_a_types import PWMMotif
@@ -243,8 +244,6 @@ def sample_pwm_sites(
             raise ValueError("pwm.sampling.length.range values must be > 0")
         if lo > hi:
             raise ValueError("pwm.sampling.length.range must be min <= max")
-        if lo < width:
-            raise ValueError(f"pwm.sampling.length.range min must be >= motif width ({width}), got {lo}")
         return int(rng.integers(lo, hi + 1))
 
     def _embed_with_background(seq: str, target_len: int) -> tuple[str, int]:
@@ -272,8 +271,32 @@ def sample_pwm_sites(
             manager=progress_manager,
             target_fraction=progress_target_fraction,
         )
-        seq = "".join(max(row.items(), key=lambda kv: kv[1])[0] for row in matrix)
         target_len = _resolve_length()
+        if length_policy == "range" and length_range is not None and target_len < width:
+            window = select_pwm_window_by_length(
+                matrix=matrix,
+                log_odds=log_odds,
+                length=int(target_len),
+                strategy=str(trim_window_strategy),
+            )
+            matrix = window.matrix
+            log_odds = window.log_odds
+            width = len(matrix)
+            if window_label == "full":
+                window_label = f"{width}@{window.start}"
+            else:
+                window_label = f"{window_label}|{width}@{window.start}"
+            matrix_cdf = _matrix_cdf(matrix)
+            pwm_consensus = _pwm_consensus(matrix)
+            pwm_consensus_iupac = _pwm_consensus_iupac(matrix)
+            pwm_consensus_score = score_sequence(
+                pwm_consensus,
+                matrix,
+                log_odds=log_odds,
+                background=effective_background,
+            )
+            pwm_theoretical_max_score = _pwm_theoretical_max_score(log_odds)
+        seq = str(pwm_consensus)
         full_seq, left_len = _embed_with_background(seq, target_len)
         intended_start = int(left_len) + 1
         intended_stop = int(left_len) + int(width)

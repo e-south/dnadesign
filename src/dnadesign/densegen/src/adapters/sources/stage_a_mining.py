@@ -23,6 +23,7 @@ import numpy as np
 from ...core.artifacts.ids import hash_candidate_id
 from ...core.stage_a_constants import FIMO_REPORT_THRESH
 from .pwm_fimo import (
+    FimoHit,
     aggregate_best_hits,
     build_candidate_records,
     run_fimo,
@@ -32,9 +33,12 @@ from .pwm_fimo import (
 from .stage_a_paths import safe_label
 from .stage_a_progress import _format_stage_a_milestone
 from .stage_a_sampling_utils import (
+    _matrix_cdf,
     _sample_background_batch,
     _sample_from_background_cdf,
     _sample_pwm_batch,
+    build_log_odds,
+    select_pwm_window_by_length,
 )
 from .stage_a_types import FimoCandidate, PWMMotif
 
@@ -168,8 +172,6 @@ def mine_pwm_candidates(
             raise ValueError("pwm.sampling.length.range values must be > 0")
         if lo > hi:
             raise ValueError("pwm.sampling.length.range must be min <= max")
-        if lo < int(width):
-            raise ValueError(f"pwm.sampling.length.range min must be >= motif width ({width}), got {lo}")
         return int(rng.integers(lo, hi + 1))
 
     def _embed_with_background(seq: str, target_len: int) -> tuple[str, int]:
@@ -201,18 +203,24 @@ def mine_pwm_candidates(
             target_lengths.append(int(target_len))
         if not target_lengths:
             return sequences, lengths, time_limited
-        lengths.extend(target_lengths)
-        if strategy == "background":
-            cores = _sample_background_batch(rng, background_cdf, count=len(target_lengths), length=int(width))
-        else:
-            cores = _sample_pwm_batch(rng, matrix_cdf, count=len(target_lengths))
-        for core, target_len in zip(cores, target_lengths):
-            full_seq, left_len = _embed_with_background(core, int(target_len))
-            intended_start = int(left_len) + 1
-            intended_stop = int(left_len) + int(width)
-            intended_core[full_seq] = (intended_start, intended_stop)
-            offsets[full_seq] = int(left_len)
-            sequences.append(full_seq)
+        counts_by_length: dict[int, int] = {}
+        for target_len in target_lengths:
+            counts_by_length[int(target_len)] = counts_by_length.get(int(target_len), 0) + 1
+        for target_len, group_count in counts_by_length.items():
+            core_len = min(int(width), int(target_len))
+            if strategy == "background":
+                cores = _sample_background_batch(rng, background_cdf, count=int(group_count), length=int(core_len))
+            else:
+                _, matrix_cdf_for_len, _ = _resolve_window(int(target_len))
+                cores = _sample_pwm_batch(rng, matrix_cdf_for_len, count=int(group_count))
+            for core in cores:
+                full_seq, left_len = _embed_with_background(core, int(target_len))
+                intended_start = int(left_len) + 1
+                intended_stop = int(left_len) + int(core_len)
+                intended_core[full_seq] = (intended_start, intended_stop)
+                offsets[full_seq] = int(left_len)
+                sequences.append(full_seq)
+                lengths.append(int(target_len))
         return sequences, lengths, time_limited
 
     candidates_by_seq: dict[str, FimoCandidate] = {}
@@ -274,6 +282,32 @@ def mine_pwm_candidates(
         motif_for_fimo = PWMMotif(motif_id=motif.motif_id, matrix=matrix, background=motif.background)
         write_minimal_meme_motif(motif_for_fimo, meme_path)
         fimo_bgfile = bgfile if bgfile is not None else "motif-file"
+        log_odds_full = build_log_odds(matrix, motif.background, smoothing_alpha=0.0)
+        window_cache: dict[int, tuple[list[dict[str, float]], np.ndarray, Path]] = {}
+
+        def _resolve_window(target_len: int) -> tuple[list[dict[str, float]], np.ndarray, Path]:
+            if target_len >= int(width):
+                return matrix, matrix_cdf, meme_path
+            cached = window_cache.get(int(target_len))
+            if cached is not None:
+                return cached
+            window = select_pwm_window_by_length(
+                matrix=matrix,
+                log_odds=log_odds_full,
+                length=int(target_len),
+            )
+            trimmed_matrix = window.matrix
+            trimmed_cdf = _matrix_cdf(trimmed_matrix)
+            trimmed_motif = PWMMotif(
+                motif_id=motif.motif_id,
+                matrix=trimmed_matrix,
+                background=motif.background,
+            )
+            trimmed_path = tmp_path / f"motif_{int(target_len)}.meme"
+            write_minimal_meme_motif(trimmed_motif, trimmed_path)
+            window_cache[int(target_len)] = (trimmed_matrix, trimmed_cdf, trimmed_path)
+            return window_cache[int(target_len)]
+
         if progress is not None:
             progress.set_phase("fimo")
         if provided_sequences is not None:
@@ -439,38 +473,45 @@ def mine_pwm_candidates(
                 if not sequences:
                     break
                 lengths_all.extend(lengths)
-                fasta_path = tmp_path / "candidates.fasta"
                 records = build_candidate_records(motif.motif_id, sequences, start_index=generated_total)
-                write_candidates_fasta(records, fasta_path)
-                fimo_label = f"batch={batches + 1}/- candidates={len(records)}"
-                fimo_start = time.monotonic()
-                log.info(
-                    _format_stage_a_milestone(
-                        motif_id=motif.motif_id,
-                        phase="fimo batch start",
-                        detail=fimo_label,
+                records_by_len: dict[int, list[tuple[str, str]]] = {}
+                for (rec_id, seq), target_len in zip(records, lengths):
+                    records_by_len.setdefault(int(target_len), []).append((rec_id, seq))
+                best_hits: dict[str, FimoHit] = {}
+                for target_len, group_records in records_by_len.items():
+                    fasta_path = tmp_path / f"candidates_{int(target_len)}.fasta"
+                    write_candidates_fasta(group_records, fasta_path)
+                    _, _, motif_path = _resolve_window(int(target_len))
+                    fimo_label = f"batch={batches + 1}/- len={int(target_len)} candidates={len(group_records)}"
+                    fimo_start = time.monotonic()
+                    log.info(
+                        _format_stage_a_milestone(
+                            motif_id=motif.motif_id,
+                            phase="fimo batch start",
+                            detail=fimo_label,
+                        )
                     )
-                )
-                rows, raw_tsv = run_fimo(
-                    meme_motif_path=meme_path,
-                    fasta_path=fasta_path,
-                    bgfile=fimo_bgfile,
-                    thresh=FIMO_REPORT_THRESH,
-                    norc=True,
-                    include_matched_sequence=include_matched_sequence or keep_all_candidates_debug,
-                    return_tsv=debug_path is not None,
-                )
-                log.info(
-                    _format_stage_a_milestone(
-                        motif_id=motif.motif_id,
-                        phase="fimo batch end",
-                        detail=f"{fimo_label} hits={len(rows)}",
-                        elapsed=time.monotonic() - fimo_start,
+                    rows, raw_tsv = run_fimo(
+                        meme_motif_path=motif_path,
+                        fasta_path=fasta_path,
+                        bgfile=fimo_bgfile,
+                        thresh=FIMO_REPORT_THRESH,
+                        norc=True,
+                        include_matched_sequence=include_matched_sequence or keep_all_candidates_debug,
+                        return_tsv=debug_path is not None,
                     )
-                )
-                if debug_path is not None and raw_tsv is not None:
-                    _merge_tsv(tsv_lines, raw_tsv)
-                best_hits = aggregate_best_hits(rows)
+                    log.info(
+                        _format_stage_a_milestone(
+                            motif_id=motif.motif_id,
+                            phase="fimo batch end",
+                            detail=f"{fimo_label} hits={len(rows)}",
+                            elapsed=time.monotonic() - fimo_start,
+                        )
+                    )
+                    if debug_path is not None and raw_tsv is not None:
+                        _merge_tsv(tsv_lines, raw_tsv)
+                    group_best = aggregate_best_hits(rows)
+                    best_hits.update(group_best)
                 for rec_id, seq in records:
                     hit = best_hits.get(rec_id)
                     if hit is None:
