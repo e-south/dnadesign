@@ -106,6 +106,32 @@ def _fixed_labels(constraints: list[dict]) -> list[str]:
     return labels
 
 
+def _sanitize_tf_label(label: str) -> str:
+    label = str(label)
+    if "_" in label:
+        return label.split("_", 1)[0]
+    return label
+
+
+def _sanitize_fixed_label(label: str) -> str:
+    label = str(label)
+    if label.startswith("fixed:"):
+        label = label[len("fixed:") :]
+    if ":" in label:
+        name, suffix = label.rsplit(":", 1)
+        return f"{name} {suffix}"
+    return label
+
+
+def _normalize_tf_label(label: str, fixed_set: set[str]) -> str:
+    label = str(label).strip()
+    if not label:
+        return ""
+    if label in fixed_set or label.startswith("fixed:"):
+        return label
+    return _sanitize_tf_label(label)
+
+
 def _find_positions(seq: str, motif: str, pos_range) -> list[int]:
     seq = str(seq).upper()
     motif = str(motif).upper()
@@ -186,6 +212,223 @@ def _placement_bounds(row: pd.Series, seq_len: int) -> tuple[int, int] | None:
     return lo, hi
 
 
+def _category_display_label(label: str) -> str:
+    if label.startswith("fixed:"):
+        return _sanitize_fixed_label(label)
+    return label
+
+
+def _build_occupancy(
+    sub: pd.DataFrame,
+    *,
+    solutions: pd.DataFrame,
+    seq_len: int,
+    constraints: list[dict],
+    max_categories: int,
+) -> tuple[dict[str, np.ndarray], list[str], dict[str, int]]:
+    fixed_labels = _fixed_labels(constraints)
+    fixed_set = set(fixed_labels)
+    if max_categories < len(fixed_labels):
+        msg = (
+            "placement_map occupancy_max_categories="
+            f"{max_categories} is smaller than fixed categories ({len(fixed_labels)})."
+        )
+        raise ValueError(msg)
+
+    sub = sub.copy()
+    sub["tf_label"] = sub["tf"].map(lambda tf: _normalize_tf_label(tf, fixed_set))
+    regulator_labels = sorted(
+        {str(tf) for tf in sub["tf_label"].astype(str).tolist() if str(tf).strip() and str(tf) not in fixed_set}
+    )
+    tf_totals: dict[str, int] = {}
+    for _, row in sub.iterrows():
+        tf_label = str(row.get("tf_label") or "").strip()
+        if not tf_label or tf_label in fixed_set:
+            continue
+        bounds = _placement_bounds(row, seq_len)
+        if bounds is None:
+            continue
+        lo, hi = bounds
+        tf_totals[tf_label] = tf_totals.get(tf_label, 0) + max(0, hi - lo)
+
+    max_regulators = max(0, max_categories - len(fixed_labels))
+    if len(regulator_labels) > max_regulators and max_regulators > 0:
+        keep = max(0, max_regulators - 1)
+        ranked = sorted(regulator_labels, key=lambda t: (-tf_totals.get(t, 0), t))
+        selected_tfs = sorted(ranked[:keep])
+        other_tfs = ranked[keep:]
+    elif max_regulators <= 0 and regulator_labels:
+        selected_tfs = []
+        other_tfs = regulator_labels
+    else:
+        selected_tfs = sorted(regulator_labels)
+        other_tfs = []
+
+    categories = list(fixed_labels) + list(selected_tfs)
+    if other_tfs:
+        categories.append("other")
+    occupancy = {label: np.zeros(seq_len, dtype=float) for label in categories}
+
+    for _, row in sub.iterrows():
+        tf_label = str(row.get("tf_label") or "").strip()
+        if not tf_label:
+            continue
+        if tf_label in fixed_set:
+            label = tf_label
+        else:
+            label = tf_label if tf_label in selected_tfs else ("other" if other_tfs else tf_label)
+        if label not in occupancy:
+            continue
+        bounds = _placement_bounds(row, seq_len)
+        if bounds is None:
+            continue
+        lo, hi = bounds
+        occupancy[label][lo:hi] += 1.0
+
+    fixed_from_composition = set(sub["tf_label"]).intersection(fixed_set)
+    missing_counts: dict[str, int] = {}
+    for pc_idx, pc in enumerate(constraints):
+        name = pc.get("name") or f"promoter_{pc_idx + 1}"
+        label_up = f"fixed:{name}:-35"
+        label_down = f"fixed:{name}:-10"
+        for _, row in solutions.iterrows():
+            seq = str(row.get("sequence") or "")
+            pair = _select_promoter_pair(seq, pc)
+            if pair is None:
+                missing_counts[name] = missing_counts.get(name, 0) + 1
+                continue
+            up_start, down_start = pair
+            up_end = up_start + len(pc["upstream"])
+            down_end = down_start + len(pc["downstream"])
+            up_lo = max(0, min(up_start, seq_len))
+            up_hi = max(up_lo, min(up_end, seq_len))
+            down_lo = max(0, min(down_start, seq_len))
+            down_hi = max(down_lo, min(down_end, seq_len))
+            if up_hi > up_lo and label_up in occupancy and label_up not in fixed_from_composition:
+                occupancy[label_up][up_lo:up_hi] += 1.0
+            if down_hi > down_lo and label_down in occupancy and label_down not in fixed_from_composition:
+                occupancy[label_down][down_lo:down_hi] += 1.0
+
+    return occupancy, categories, missing_counts
+
+
+def _build_tfbs_counts(sub: pd.DataFrame) -> pd.DataFrame:
+    counts = sub.groupby(["tf", "tfbs"]).size().reset_index(name="count")
+    if counts.empty:
+        raise ValueError("placement_map found no TFBS usage for the selected solutions.")
+    counts["tf"] = counts["tf"].astype(str)
+    counts["tfbs"] = counts["tfbs"].astype(str)
+    counts["rank_key"] = counts["tf"] + ":" + counts["tfbs"]
+    counts = counts.sort_values(by=["count", "rank_key"], ascending=[False, True]).reset_index(drop=True)
+    return counts
+
+
+def _render_occupancy(
+    occupancy: dict[str, np.ndarray],
+    categories: list[str],
+    *,
+    seq_len: int,
+    input_name: str,
+    plan_name: str,
+    n_solutions: int,
+    alpha: float,
+    style: dict,
+) -> tuple[plt.Figure, plt.Axes]:
+    width = max(8.0, float(seq_len) * 0.2)
+    fig, ax = plt.subplots(1, 1, figsize=(width, 2.5))
+    x = np.arange(seq_len)
+    colors = _palette(style, len(categories))
+    for label, color in zip(categories, colors):
+        y = occupancy[label]
+        ax.step(x, y, where="mid", color=color, linewidth=1.0)
+        ax.fill_between(x, y, step="mid", alpha=alpha, color=color, label=_category_display_label(label))
+
+    ax.set_xlim(0, seq_len)
+    ax.set_xticks(np.arange(0, seq_len + 1, 5, dtype=int))
+    ax.set_xlabel("Position (nt)")
+    ax.set_ylabel("Occurrences")
+    ax.set_title(f"Placement map - {input_name}/{plan_name} (n={n_solutions})")
+    ncol = min(4, max(1, len(categories)))
+    ax.legend(
+        loc="upper center",
+        bbox_to_anchor=(0.5, 1.32),
+        ncol=ncol,
+        frameon=bool(style.get("legend_frame", False)),
+    )
+    _apply_style(ax, style)
+    fig.tight_layout()
+    return fig, ax
+
+
+def _render_tfbs_allocation(
+    counts: pd.DataFrame,
+    *,
+    input_name: str,
+    plan_name: str,
+    n_solutions: int,
+    top_k_annotation: int,
+    style: dict,
+) -> tuple[plt.Figure, dict[str, plt.Axes]]:
+    ranks = np.arange(1, len(counts) + 1)
+    values = counts["count"].astype(float).to_numpy()
+    total = float(values.sum()) if len(values) else 0.0
+    cum = np.cumsum(values) / total if total > 0 else np.zeros_like(values)
+
+    fig, axes = plt.subplots(2, 1, figsize=(8, 5), sharex=True)
+    ax_rank, ax_cum = axes
+    color = _palette(style, 1)[0]
+    ax_rank.plot(ranks, values, color=color, linewidth=1.5)
+    ax_rank.set_yscale("log")
+    ax_rank.set_ylabel("Usage count")
+    ax_rank.set_title(f"TFBS allocation - {input_name}/{plan_name} (n={n_solutions})")
+
+    ax_cum.plot(ranks, cum, color=color, linewidth=1.5)
+    ax_cum.set_ylabel("Cumulative share")
+    ax_cum.set_xlabel("Rank")
+    ax_cum.set_ylim(0.0, 1.0)
+
+    top10 = values[: min(10, len(values))].sum() / total if total > 0 else 0.0
+    top50 = values[: min(50, len(values))].sum() / total if total > 0 else 0.0
+    summary = "\n".join(
+        [
+            f"placements: {int(total)}",
+            f"unique TFBS: {len(values)}",
+            f"top10 share: {top10:.2f}",
+            f"top50 share: {top50:.2f}",
+        ]
+    )
+    ax_rank.text(
+        0.98,
+        0.95,
+        summary,
+        transform=ax_rank.transAxes,
+        ha="right",
+        va="top",
+        fontsize=8,
+        bbox=dict(boxstyle="round", facecolor="white", alpha=0.7, linewidth=0.5),
+    )
+
+    if top_k_annotation and top_k_annotation > 0:
+        k = min(top_k_annotation, len(values))
+        for idx in range(k):
+            row = counts.iloc[idx]
+            label = f"{_sanitize_tf_label(row['tf'])}:{_truncate_tfbs(row['tfbs'])}"
+            ax_rank.annotate(
+                label,
+                (ranks[idx], values[idx]),
+                textcoords="offset points",
+                xytext=(3, 3),
+                fontsize=6,
+                ha="left",
+                va="bottom",
+            )
+
+    _apply_style(ax_rank, style)
+    _apply_style(ax_cum, style)
+    fig.tight_layout()
+    return fig, {"rank": ax_rank, "cum": ax_cum}
+
+
 def plot_placement_map(
     df: pd.DataFrame,
     out_path: Path,
@@ -194,9 +437,9 @@ def plot_placement_map(
     dense_arrays_df: pd.DataFrame,
     cfg: dict,
     style: Optional[dict] = None,
-    alpha: float | None = None,
-    top_k_tfbs: int | None = None,
-    max_categories: int | None = None,
+    occupancy_alpha: float | None = None,
+    occupancy_max_categories: int | None = None,
+    tfbs_top_k_annotation: int | None = None,
 ) -> list[Path]:
     if composition_df is None or composition_df.empty:
         raise ValueError("placement_map requires composition.parquet with placements.")
@@ -217,15 +460,15 @@ def plot_placement_map(
         raise ValueError("composition.parquet requires length or end columns.")
 
     style = _style(style)
-    alpha_val = float(alpha) if alpha is not None else 0.3
+    alpha_val = float(occupancy_alpha) if occupancy_alpha is not None else 0.3
     if not (0.0 < alpha_val <= 1.0):
-        raise ValueError("placement_map alpha must be between 0 and 1.")
-    top_k = int(top_k_tfbs) if top_k_tfbs is not None else 20
-    if top_k <= 0:
-        raise ValueError("placement_map top_k_tfbs must be positive.")
-    max_cats = int(max_categories) if max_categories is not None else 12
+        raise ValueError("placement_map occupancy_alpha must be between 0 and 1.")
+    max_cats = int(occupancy_max_categories) if occupancy_max_categories is not None else 12
     if max_cats <= 0:
-        raise ValueError("placement_map max_categories must be positive.")
+        raise ValueError("placement_map occupancy_max_categories must be positive.")
+    top_k_annotation = int(tfbs_top_k_annotation) if tfbs_top_k_annotation is not None else 0
+    if top_k_annotation < 0:
+        raise ValueError("placement_map tfbs_top_k_annotation must be >= 0.")
 
     seq_len = _sequence_length_from_cfg(cfg)
     dense_arrays_df = dense_arrays_df.copy()
@@ -249,134 +492,52 @@ def plot_placement_map(
             raise ValueError(f"placement_map has no placements for {input_name}/{plan_name}.")
 
         constraints = _promoter_constraints(cfg, str(plan_name))
-        fixed_labels = _fixed_labels(constraints)
-        fixed_set = set(fixed_labels)
-        if max_cats < len(fixed_labels):
-            raise ValueError(
-                f"placement_map max_categories={max_cats} is smaller than fixed categories ({len(fixed_labels)})."
-            )
-
-        tf_labels = sorted({str(tf) for tf in sub["tf"].astype(str).tolist() if str(tf).strip()})
-        regulator_labels = [tf for tf in tf_labels if tf not in fixed_set]
-        tf_totals: dict[str, int] = {}
-        for _, row in sub.iterrows():
-            tf = str(row.get("tf") or "").strip()
-            if not tf:
-                continue
-            bounds = _placement_bounds(row, seq_len)
-            if bounds is None:
-                continue
-            lo, hi = bounds
-            if tf not in fixed_set:
-                tf_totals[tf] = tf_totals.get(tf, 0) + max(0, hi - lo)
-
-        max_regulators = max(0, max_cats - len(fixed_labels))
-        if len(regulator_labels) > max_regulators and max_regulators > 0:
-            keep = max(0, max_regulators - 1)
-            ranked = sorted(regulator_labels, key=lambda t: (-tf_totals.get(t, 0), t))
-            selected_tfs = sorted(ranked[:keep])
-            other_tfs = ranked[keep:]
-        elif max_regulators <= 0 and regulator_labels:
-            selected_tfs = []
-            other_tfs = regulator_labels
-        else:
-            selected_tfs = sorted(regulator_labels)
-            other_tfs = []
-
-        categories = list(fixed_labels) + list(selected_tfs)
-        if other_tfs:
-            categories.append("other")
-        occupancy = {label: np.zeros(seq_len, dtype=float) for label in categories}
-
-        for _, row in sub.iterrows():
-            tf = str(row.get("tf") or "").strip()
-            if not tf:
-                continue
-            if tf in fixed_set:
-                label = tf
-            else:
-                label = tf if tf in selected_tfs else ("other" if other_tfs else tf)
-            if label not in occupancy:
-                continue
-            bounds = _placement_bounds(row, seq_len)
-            if bounds is None:
-                continue
-            lo, hi = bounds
-            occupancy[label][lo:hi] += 1.0
-
-        missing_counts: dict[str, int] = {}
-        fixed_from_composition = {tf for tf in tf_labels if tf in fixed_set}
-        for pc_idx, pc in enumerate(constraints):
-            name = pc.get("name") or f"promoter_{pc_idx + 1}"
-            label_up = f"fixed:{name}:-35"
-            label_down = f"fixed:{name}:-10"
-            for _, row in solutions.iterrows():
-                seq = str(row.get("sequence") or "")
-                pair = _select_promoter_pair(seq, pc)
-                if pair is None:
-                    missing_counts[name] = missing_counts.get(name, 0) + 1
-                    continue
-                up_start, down_start = pair
-                up_end = up_start + len(pc["upstream"])
-                down_end = down_start + len(pc["downstream"])
-                up_lo = max(0, min(up_start, seq_len))
-                up_hi = max(up_lo, min(up_end, seq_len))
-                down_lo = max(0, min(down_start, seq_len))
-                down_hi = max(down_lo, min(down_end, seq_len))
-                if up_hi > up_lo and label_up in occupancy and label_up not in fixed_from_composition:
-                    occupancy[label_up][up_lo:up_hi] += 1.0
-                if down_hi > down_lo and label_down in occupancy and label_down not in fixed_from_composition:
-                    occupancy[label_down][down_lo:down_hi] += 1.0
+        n_solutions = len(solution_ids)
+        occupancy, categories, missing_counts = _build_occupancy(
+            sub,
+            solutions=solutions,
+            seq_len=seq_len,
+            constraints=constraints,
+            max_categories=max_cats,
+        )
 
         if missing_counts:
             misses = ", ".join(f"{name}({count})" for name, count in sorted(missing_counts.items()))
             log.warning("placement_map promoter motifs not found for %s/%s: %s", input_name, plan_name, misses)
 
-        n_solutions = len(solution_ids)
-        x = np.arange(seq_len)
-        fig, (ax_occ, ax_tfbs) = plt.subplots(1, 2, figsize=style["figsize"])
-        colors = _palette(style, len(categories))
-        for label, color in zip(categories, colors):
-            y = occupancy[label]
-            ax_occ.step(x, y, where="pre", color=color, linewidth=1.0)
-            ax_occ.fill_between(x, y, step="pre", alpha=alpha_val, color=color, label=label)
+        fig_occ, _ = _render_occupancy(
+            occupancy,
+            categories,
+            seq_len=seq_len,
+            input_name=str(input_name),
+            plan_name=str(plan_name),
+            n_solutions=n_solutions,
+            alpha=alpha_val,
+            style=style,
+        )
+        occ_name = (
+            f"{out_path.stem}__{_safe_filename(input_name)}__{_safe_filename(plan_name)}__occupancy{out_path.suffix}"
+        )
+        occ_path = out_path.parent / occ_name
+        fig_occ.savefig(occ_path)
+        plt.close(fig_occ)
+        paths.append(occ_path)
 
-        ax_occ.set_xlim(0, seq_len)
-        ax_occ.set_xticks(np.arange(0, seq_len + 1, dtype=int))
-        ax_occ.set_xlabel("Position (nt)")
-        ax_occ.set_ylabel("Occurrences")
-        ax_occ.set_title(f"Placement map - {input_name}/{plan_name} (n={n_solutions})")
-        ax_occ.legend(loc="upper right", frameon=bool(style.get("legend_frame", False)))
-
-        counts = sub.groupby(["tf", "tfbs"]).size().reset_index(name="count")
-        if counts.empty:
-            raise ValueError(f"placement_map found no TFBS usage for {input_name}/{plan_name}.")
-        counts = counts.sort_values(by=["count", "tfbs", "tf"], ascending=[False, True, True])
-        if len(counts) > top_k:
-            top = counts.head(top_k)
-            other_count = int(counts["count"].sum() - top["count"].sum())
-        else:
-            top = counts
-            other_count = 0
-        labels = [f"{row['tf']}:{_truncate_tfbs(row['tfbs'])}" for _, row in top.iterrows()]
-        values = top["count"].astype(int).tolist()
-        if other_count > 0:
-            labels.append("other")
-            values.append(other_count)
-        y_pos = np.arange(len(labels))
-        ax_tfbs.barh(y_pos, values, color="#4c78a8")
-        ax_tfbs.set_yticks(y_pos)
-        ax_tfbs.set_yticklabels(labels)
-        ax_tfbs.invert_yaxis()
-        ax_tfbs.set_xlabel("Usage count")
-        ax_tfbs.set_title(f"TFBS usage (top {top_k})")
-
-        _apply_style(ax_occ, style)
-        _apply_style(ax_tfbs, style)
-        fig.tight_layout()
-        fname = f"{out_path.stem}__{_safe_filename(input_name)}__{_safe_filename(plan_name)}{out_path.suffix}"
-        path = out_path.parent / fname
-        fig.savefig(path)
-        plt.close(fig)
-        paths.append(path)
+        counts = _build_tfbs_counts(sub)
+        fig_tfbs, _ = _render_tfbs_allocation(
+            counts,
+            input_name=str(input_name),
+            plan_name=str(plan_name),
+            n_solutions=n_solutions,
+            top_k_annotation=top_k_annotation,
+            style=style,
+        )
+        tfbs_name = (
+            f"{out_path.stem}__{_safe_filename(input_name)}__{_safe_filename(plan_name)}"
+            f"__tfbs_allocation{out_path.suffix}"
+        )
+        tfbs_path = out_path.parent / tfbs_name
+        fig_tfbs.savefig(tfbs_path)
+        plt.close(fig_tfbs)
+        paths.append(tfbs_path)
     return paths

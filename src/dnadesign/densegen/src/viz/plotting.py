@@ -206,7 +206,7 @@ for _name, _spec in PLOT_SPECS.items():
 
 # Options explicitly supported by each plot; unknown options raise errors (strict).
 _ALLOWED_OPTIONS = {
-    "placement_map": {"alpha", "top_k_tfbs", "max_categories"},
+    "placement_map": {"occupancy_alpha", "occupancy_max_categories", "tfbs_top_k_annotation"},
     "tfbs_usage": set(),
     "run_health": set(),
     "stage_a_summary": set(),

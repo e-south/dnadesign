@@ -23,7 +23,11 @@ from dnadesign.densegen.src.core.artifacts.pool import TFBSPoolArtifact
 from dnadesign.densegen.src.viz.plot_run import _build_run_health_figure, plot_run_health, plot_tfbs_usage
 from dnadesign.densegen.src.viz.plot_stage_a_diversity import _build_stage_a_diversity_figure
 from dnadesign.densegen.src.viz.plot_stage_a_strata import _build_stage_a_strata_overview_figure
-from dnadesign.densegen.src.viz.plot_stage_b_placement import plot_placement_map
+from dnadesign.densegen.src.viz.plot_stage_b_placement import (
+    _sanitize_fixed_label,
+    _sanitize_tf_label,
+    plot_placement_map,
+)
 from dnadesign.densegen.src.viz.plotting import _plot_required_columns, plot_stage_a_summary
 
 
@@ -385,8 +389,14 @@ def test_plot_placement_map(tmp_path: Path) -> None:
         cfg=_cfg(),
         style={},
     )
-    assert paths
-    assert Path(paths[0]).exists()
+    assert len(paths) == 2
+    names = {Path(path).name for path in paths}
+    assert "placement_map__demo_input__demo_plan__occupancy.png" in names
+    assert "placement_map__demo_input__demo_plan__tfbs_allocation.png" in names
+    for path in paths:
+        path = Path(path)
+        assert path.exists()
+        assert path.stat().st_size > 0
 
 
 def test_plot_placement_map_accepts_effective_config(tmp_path: Path) -> None:
@@ -400,8 +410,18 @@ def test_plot_placement_map_accepts_effective_config(tmp_path: Path) -> None:
         cfg={"config": _cfg()},
         style={},
     )
-    assert paths
-    assert Path(paths[0]).exists()
+    assert len(paths) == 2
+    for path in paths:
+        path = Path(path)
+        assert path.exists()
+        assert path.stat().st_size > 0
+
+
+def test_placement_map_label_sanitizer() -> None:
+    assert _sanitize_tf_label("lexA_CTGTATAW") == "lexA"
+    assert _sanitize_tf_label("cpxR") == "cpxR"
+    assert _sanitize_fixed_label("fixed:sigma70_consensus:-35") == "sigma70_consensus -35"
+    assert _sanitize_fixed_label("fixed:sigma70_consensus:-10") == "sigma70_consensus -10"
 
 
 def test_plot_tfbs_usage(tmp_path: Path) -> None:
