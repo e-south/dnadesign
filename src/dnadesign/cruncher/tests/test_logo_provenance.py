@@ -10,7 +10,12 @@ Author(s): Eric J. South
 from __future__ import annotations
 
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
-from dnadesign.cruncher.viz.logos import logo_subtitle, pwm_provenance_summary
+from dnadesign.cruncher.viz.logos import logo_subtitle, logo_title, pwm_provenance_summary
+
+
+def test_logo_title_includes_tf_motif_and_nsites() -> None:
+    title = logo_title(tf_name="lexA", motif_id="lexA_1", nsites=12)
+    assert title == "lexA - lexA_1 (n=12)"
 
 
 def test_logo_subtitle_matrix_includes_source_and_origin() -> None:
@@ -31,7 +36,7 @@ def test_logo_subtitle_matrix_includes_source_and_origin() -> None:
         combine_sites=False,
         site_kinds=None,
     )
-    assert subtitle == "meme_suite (streme, n=50)"
+    assert subtitle == "meme_suite (streme)"
     provenance = pwm_provenance_summary(
         pwm_source="matrix",
         entry=entry,
@@ -71,7 +76,7 @@ def test_logo_subtitle_sites_combined_summary() -> None:
         combine_sites=True,
         site_kinds=None,
     )
-    assert subtitle == "combined (n=20/28, sets=2, alpha+beta, curated+high-throughput (chip seq))"
+    assert subtitle == "combined (sets=2, alpha+beta, curated+high-throughput (chip seq))"
     provenance = pwm_provenance_summary(
         pwm_source="sites",
         entry=entry_a,

@@ -47,7 +47,7 @@ from dnadesign.cruncher.store.catalog_store import CatalogMotifStore
 from dnadesign.cruncher.store.motif_store import MotifRef
 from dnadesign.cruncher.utils.hashing import sha256_bytes, sha256_lines, sha256_path
 from dnadesign.cruncher.utils.paths import resolve_catalog_root
-from dnadesign.cruncher.viz.logos import logo_subtitle, site_entries_for_logo
+from dnadesign.cruncher.viz.logos import logo_subtitle, logo_title, site_entries_for_logo
 from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
 
 app = typer.Typer(no_args_is_help=True, help="Query or inspect cached motifs and binding sites.")
@@ -1430,12 +1430,18 @@ def logos(
                 combine_sites=cfg.motif_store.combine_sites,
                 site_kinds=cfg.motif_store.site_kinds,
             )
+            title = logo_title(
+                tf_name=target.tf_name,
+                motif_id=target.entry.motif_id,
+                nsites=pwm.nsites,
+            )
             stem = _safe_stem(f"{target.tf_name}_{target.entry.source}_{target.entry.motif_id}")
             out_path = out_base / f"{stem}_logo.png"
             plot_pwm(
                 pwm,
                 mode=resolved_bits_mode,
                 out=out_path,
+                title=title,
                 dpi=resolved_dpi,
                 subtitle=f"sites: {subtitle}" if cfg.motif_store.pwm_source == "sites" else subtitle,
             )

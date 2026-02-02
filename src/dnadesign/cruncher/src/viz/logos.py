@@ -30,6 +30,19 @@ def _format_site_counts(site_count: int | None, site_total: int | None) -> str |
     return f"n={site_count}"
 
 
+def logo_title(*, tf_name: str, motif_id: str, nsites: int | None) -> str:
+    if not tf_name:
+        raise ValueError("tf_name is required for logo title")
+    if not motif_id:
+        raise ValueError("motif_id is required for logo title")
+    if nsites is not None and nsites <= 0:
+        raise ValueError("nsites must be positive when provided")
+    title = f"{tf_name} - {motif_id}"
+    if nsites is not None:
+        title += f" (n={nsites})"
+    return title
+
+
 def _matrix_site_count(entry: CatalogEntry) -> int | None:
     tags = entry.tags or {}
     for key in ("discovery_nsites", "meme_nsites", "site_count", "nsites"):
@@ -159,9 +172,6 @@ def logo_subtitle(
 ) -> str:
     if pwm_source == "matrix":
         matrix_source = entry.matrix_source or "matrix"
-        count_label = _format_site_counts(_matrix_site_count(entry), None)
-        if count_label:
-            return f"{entry.source} ({matrix_source}, {count_label})"
         return f"{entry.source} ({matrix_source})"
     if pwm_source == "sites":
         summary = _site_entry_summary(
@@ -172,12 +182,9 @@ def logo_subtitle(
         )
         sources = summary["sources"]
         kinds = summary["kinds"]
-        count_label = _format_site_counts(summary["site_count"], summary["site_total"])
         if combine_sites:
-            details = [count_label, f"sets={summary['set_count']}", sources, kinds]
+            details = [f"sets={summary['set_count']}", sources, kinds]
             detail_text = ", ".join([item for item in details if item])
             return f"combined ({detail_text})"
-        if count_label:
-            return f"{sources} ({kinds}, {count_label})"
         return f"{sources} ({kinds})"
     return "unknown"

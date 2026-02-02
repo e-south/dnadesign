@@ -23,10 +23,11 @@ def plot_pwm(
     pwm: PWM,
     mode: str = "information",
     out: Path | None = None,
+    title: str | None = None,
     dpi: int = 150,
     subtitle: str | None = None,
 ) -> None:
-    """Render a PWM sequence logo and save to disk, using the filename for title case."""
+    """Render a PWM sequence logo and save to disk."""
     # Build DataFrame in float64 (pandas default) so LogoMaker's internal assignments
     # stay in float64 and avoid dtype incompatibility warnings.
     df = pd.DataFrame(
@@ -60,21 +61,24 @@ def plot_pwm(
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
 
-    # Title: prefer the output filename (preserves Finder-case), else pwm.name
-    if out:
-        # e.g. "cpxR_logo.png" → stem "cpxR_logo" → strip trailing "_logo"
-        stem = out.stem
-        if stem.lower().endswith("_logo"):
-            title_text = stem[: -len("_logo")]
+    if title is None:
+        # Title: prefer the output filename (preserves Finder-case), else pwm.name
+        if out:
+            # e.g. "cpxR_logo.png" → stem "cpxR_logo" → strip trailing "_logo"
+            stem = out.stem
+            if stem.lower().endswith("_logo"):
+                title_text = stem[: -len("_logo")]
+            else:
+                title_text = stem
         else:
-            title_text = stem
-    else:
-        title_text = pwm.name
+            title_text = pwm.name
 
-    if pwm.nsites is not None:
-        title_text += f" (n={pwm.nsites})"
-    if pwm.evalue is not None:
-        title_text += f" E={pwm.evalue:.1e}"
+        if pwm.nsites is not None:
+            title_text += f" (n={pwm.nsites})"
+        if pwm.evalue is not None:
+            title_text += f" E={pwm.evalue:.1e}"
+    else:
+        title_text = title
 
     if subtitle:
         ax.set_title(title_text, pad=20)
