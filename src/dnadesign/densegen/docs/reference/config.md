@@ -91,6 +91,7 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
       - `key`: `sequence | core` (default `core` for PWM inputs)
     - `selection`
       - `policy`: `top_score | mmr` (default `top_score`)
+      - `rank_by`: `score | score_norm` (default `score`; `score_norm` is length-normalized)
       - `alpha` (float in (0, 1]; MMR score weight)
       - `pool` (required when `policy=mmr`)
         - `min_score_norm` (optional float in (0, 1]; recorded as a “within τ of max” reference in reports)

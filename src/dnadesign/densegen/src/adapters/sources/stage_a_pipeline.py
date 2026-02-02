@@ -174,6 +174,35 @@ def _score_norm_denominator_by_seq(
     return denom_by_seq
 
 
+def _rank_candidates(
+    candidates: Sequence[object],
+    *,
+    rank_by: str,
+    score_norm_denominator_by_seq: dict[str, float] | None = None,
+) -> list[object]:
+    if not candidates:
+        return []
+    mode = str(rank_by or "score").lower()
+    if mode == "score":
+        return sorted(candidates, key=lambda cand: (-float(cand.score), str(cand.seq)))
+    if mode != "score_norm":
+        raise ValueError("selection.rank_by must be 'score' or 'score_norm'.")
+    if score_norm_denominator_by_seq is None:
+        raise ValueError("score_norm denominators are required for rank_by=score_norm.")
+    ranked: list[tuple[float, float, str, object]] = []
+    for cand in candidates:
+        denom = score_norm_denominator_by_seq.get(str(cand.seq))
+        if denom is None:
+            raise ValueError("score_norm denominator missing entry for rank_by=score_norm.")
+        denom_val = float(denom)
+        if denom_val <= 0.0:
+            raise ValueError("score_norm denominator must be > 0 for rank_by=score_norm.")
+        score_norm = float(cand.score) / denom_val
+        ranked.append((score_norm, float(cand.score), str(cand.seq), cand))
+    ranked.sort(key=lambda item: (-item[0], -item[1], item[2]))
+    return [item[3] for item in ranked]
+
+
 def _coerce_pool_max_candidates(policy: str, value: int | None) -> int | None:
     if policy != "mmr":
         return None
@@ -266,6 +295,7 @@ def run_stage_a_pipeline(
     uniqueness_key: str,
     progress: _PwmSamplingProgress | None,
     selection_policy: str,
+    selection_rank_by: str,
     selection_alpha: float,
     selection_pool_min_score_norm: float | None,
     selection_pool_max_candidates: int | None,
@@ -367,20 +397,32 @@ def run_stage_a_pipeline(
         length_observed=length_obs,
     )
 
-    ranked = sorted(candidates_by_seq.values(), key=lambda cand: (-cand.score, cand.seq))
-    collapsed_by_core_identity = 0
-    if uniqueness_key == "core":
-        ranked, collapsed_by_core_identity = _collapse_by_core_identity(ranked)
-    eligible_unique = len(ranked)
+    selection_rank_by = str(selection_rank_by or "score")
+    candidates = list(candidates_by_seq.values())
     score_norm_denominator_by_seq = (
         _score_norm_denominator_by_seq(
-            [cand.seq for cand in ranked],
+            [cand.seq for cand in candidates],
             matrix=matrix,
             background=motif.background,
         )
-        if ranked
+        if candidates
         else {}
     )
+    collapsed_by_core_identity = 0
+    if uniqueness_key == "core":
+        collapsed, collapsed_by_core_identity = _collapse_by_core_identity(candidates)
+        ranked = _rank_candidates(
+            collapsed,
+            rank_by=selection_rank_by,
+            score_norm_denominator_by_seq=score_norm_denominator_by_seq,
+        )
+    else:
+        ranked = _rank_candidates(
+            candidates,
+            rank_by=selection_rank_by,
+            score_norm_denominator_by_seq=score_norm_denominator_by_seq,
+        )
+    eligible_unique = len(ranked)
     mining_audit = _tail_unique_slope(generated_by_batch, unique_by_batch, window=5)
     if progress is not None:
         progress.update(
@@ -432,6 +474,7 @@ def run_stage_a_pipeline(
             tier_fractions=tier_fractions,
             pwm_theoretical_max_score=pwm_theoretical_max_score,
             score_norm_denominator_by_seq=score_norm_denominator_by_seq,
+            rank_by=selection_rank_by,
             encoding_store=encoding_store,
         )
     else:

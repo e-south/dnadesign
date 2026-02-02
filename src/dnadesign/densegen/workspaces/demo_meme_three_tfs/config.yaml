@@ -30,6 +30,7 @@ densegen:
           key: core
         selection:
           policy: mmr
+          rank_by: score_norm
           alpha: 0.5
           pool:
             min_score_norm: 0.85

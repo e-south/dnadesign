@@ -178,6 +178,7 @@ def sample_pwm_sites(
         selection_pool_min_score_norm = selection_pool.min_score_norm
         selection_pool_max_candidates = selection_pool.max_candidates
         selection_relevance_norm = str(selection_pool.relevance_norm)
+    selection_rank_by = str(selection.rank_by or "score")
     if selection_policy == "mmr":
         selection_alpha = float(selection_alpha)
         if selection_alpha <= 0.0 or selection_alpha > 1.0:
@@ -333,6 +334,7 @@ def sample_pwm_sites(
             uniqueness_key=uniqueness_key,
             progress=progress,
             selection_policy=selection_policy,
+            selection_rank_by=selection_rank_by,
             selection_alpha=selection_alpha,
             selection_pool_min_score_norm=selection_pool_min_score_norm,
             selection_pool_max_candidates=selection_pool_max_candidates,
@@ -425,6 +427,7 @@ def sample_pwm_sites(
         uniqueness_key=uniqueness_key,
         progress=progress,
         selection_policy=selection_policy,
+        selection_rank_by=selection_rank_by,
         selection_alpha=selection_alpha,
         selection_pool_min_score_norm=selection_pool_min_score_norm,
         selection_pool_max_candidates=selection_pool_max_candidates,

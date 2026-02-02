@@ -285,6 +285,7 @@ class PWMSelectionPoolConfig(BaseModel):
 class PWMSelectionConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     policy: Literal["top_score", "mmr"] = "top_score"
+    rank_by: Literal["score", "score_norm"] = "score"
     alpha: float = 0.9
     pool: Optional[PWMSelectionPoolConfig] = None
 

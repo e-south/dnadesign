@@ -52,8 +52,9 @@ targets from being favored solely because they allow higher raw scores.
 
 #### Selection policies
 
-- `top_score`: take the top `n_sites` by `best_hit_score`.
+- `top_score`: take the top `n_sites` by `selection.rank_by` (default `best_hit_score`).
 - `mmr`: Maximal Marginal Relevance (Carbonell & Goldstein).
+  Ranking/tiering/pool order is controlled by `selection.rank_by` (`score` or `score_norm`).
 
 MMR definition used:
 
@@ -75,6 +76,14 @@ fixed length (or keep the length range >= motif width) so all cores are the same
 
 `selection.pool.min_score_norm` is a **report-only** reference for "within tau of theoretical max."
 It does not filter the MMR pool. There is no default; set it explicitly if you want the reference.
+
+#### What I recommend (if you want to fix the bias in code)
+
+Do Option A first: normalize ranking/tiering/pool by length‑normalized score when
+`length.policy=range` and the minimum length is below the motif width. It’s the smallest
+behavioral change that targets the real bias.
+
+Set `pwm.sampling.selection.rank_by: score_norm` (default `score`) to enable this explicitly.
 
 **Stage-A output contract**
 

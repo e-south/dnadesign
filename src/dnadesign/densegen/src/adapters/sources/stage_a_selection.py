@@ -326,6 +326,7 @@ def _select_by_mmr(
     tier_fractions: Optional[Sequence[float]],
     pwm_theoretical_max_score: float | None,
     score_norm_denominator_by_seq: dict[str, float] | None = None,
+    rank_by: str = "score",
     encoding_store: CoreEncodingStore | None = None,
 ) -> tuple[list[_CandidateLike], dict[str, SelectionMeta], SelectionDiagnostics]:
     if not ranked or n_sites <= 0:
@@ -345,6 +346,9 @@ def _select_by_mmr(
     relevance_norm = str(relevance_norm or "minmax_raw_score").lower()
     if relevance_norm not in {"percentile", "minmax_raw_score"}:
         raise ValueError("selection.pool.relevance_norm must be 'percentile' or 'minmax_raw_score'.")
+    rank_by = str(rank_by or "score").lower()
+    if rank_by not in {"score", "score_norm"}:
+        raise ValueError("selection.rank_by must be 'score' or 'score_norm'.")
     pool_min_score_norm_value = float(pool_min_score_norm) if pool_min_score_norm is not None else None
     if pool_min_score_norm_value is not None:
         if pool_min_score_norm_value <= 0.0 or pool_min_score_norm_value > 1.0:
@@ -533,10 +537,19 @@ def _select_by_mmr(
     if pool_max_candidates_value is not None and len(pool_candidates) > pool_max_candidates_value:
         pool_capped = True
         pool_cap_value = int(pool_max_candidates_value)
-        pool_candidates = sorted(
-            pool_candidates,
-            key=lambda cand: (-float(cand.score), core_by_seq[cand.seq], cand.seq),
-        )[:pool_max_candidates_value]
+        if rank_by == "score_norm":
+            scores_arr = np.array([float(cand.score) for cand in pool_candidates], dtype=float)
+            denom_arr, _, _ = _score_norm_denominators(pool_candidates)
+            scores_norm = scores_arr / denom_arr
+            seqs = [cand.seq for cand in pool_candidates]
+            cores = [core_by_seq[cand.seq] for cand in pool_candidates]
+            order = np.lexsort((seqs, cores, -scores_arr, -scores_norm))
+            pool_candidates = [pool_candidates[int(idx)] for idx in order[:pool_max_candidates_value]]
+        else:
+            pool_candidates = sorted(
+                pool_candidates,
+                key=lambda cand: (-float(cand.score), core_by_seq[cand.seq], cand.seq),
+            )[:pool_max_candidates_value]
     if len(pool_candidates) <= int(n_sites):
         import logging
 

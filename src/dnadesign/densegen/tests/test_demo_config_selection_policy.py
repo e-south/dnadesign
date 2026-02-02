@@ -33,5 +33,6 @@ def test_demo_config_declares_selection_policy() -> None:
         uniqueness = getattr(sampling, "uniqueness", None)
         assert selection is not None, f"{inp.name} should declare selection settings"
         assert selection.policy == "mmr", f"{inp.name} should use mmr selection in the demo"
+        assert selection.rank_by == "score_norm", f"{inp.name} should use score_norm ranking in the demo"
         assert uniqueness is not None
         assert uniqueness.key == "core"
