@@ -131,5 +131,5 @@ densegen:
 plots:
   source: parquet
   out_dir: outputs/plots
-  format: png
+  format: pdf
   default: [stage_a_summary, placement_map]

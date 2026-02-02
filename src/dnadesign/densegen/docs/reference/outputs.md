@@ -136,12 +136,12 @@ Optional / advanced:
 - `tfbs_usage` — legacy TFBS allocation view (superseded by placement_map’s allocation plot).
 
 `stage_a_summary` writes multiple images per input, e.g.:
-`stage_a_summary__<input>.png`, `stage_a_summary__<input>__yield_bias.png`,
-and `stage_a_summary__<input>__diversity.png`.
+`stage_a_summary__<input>.pdf`, `stage_a_summary__<input>__yield_bias.pdf`,
+and `stage_a_summary__<input>__diversity.pdf`.
 
 `placement_map` writes two images per input/plan:
-`placement_map__<input>__<plan>__occupancy.png` and
-`placement_map__<input>__<plan>__tfbs_allocation.png`.
+`placement_map__<input>__<plan>__occupancy.pdf` and
+`placement_map__<input>__<plan>__tfbs_allocation.pdf`.
 
 See `../guide/sampling.md` for plot interpretation context.
 

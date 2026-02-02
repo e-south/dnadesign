@@ -195,7 +195,8 @@ def _build_stage_a_diversity_figure(
             ax_left.set_ylabel("")
             tick_start = int(np.floor(x_min))
             tick_end = int(np.ceil(x_max))
-            ax_left.set_xticks(np.arange(tick_start, tick_end + 1))
+            tick_step = 2 if tick_end - tick_start >= 2 else 1
+            ax_left.set_xticks(np.arange(tick_start, tick_end + 1, tick_step))
             ax_left.tick_params(labelbottom=True)
             ax_left.tick_params(axis="both", labelsize=tick_size)
             if idx == 0:

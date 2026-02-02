@@ -102,6 +102,8 @@ def _build_stage_a_yield_bias_figure(
     counts_by_reg = {reg: counts for reg, counts in zip(regs, stage_counts)}
     max_count = max((max(counts) for counts in stage_counts), default=0)
     subtitle_size = text_sizes["panel_title"] * 0.88
+    font_size = float(style.get("font_size", 12.0))
+    label_size = float(style.get("label_size", font_size))
     tick_size = text_sizes["annotation"] * 0.75
     title_pad = 12
     with mpl.rc_context(rc):
@@ -300,7 +302,7 @@ def _build_stage_a_yield_bias_figure(
                 rotation="vertical",
                 ha="right",
                 va="center",
-                fontsize=text_sizes["annotation"] * 0.95,
+                fontsize=label_size,
                 color="#222222",
             )
         for ax in axes_left + axes_right:

@@ -1151,7 +1151,7 @@ class LoggingConfig(BaseModel):
 class PlotConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     out_dir: str = "outputs/plots"
-    format: Literal["png", "pdf", "svg"] = "png"
+    format: Literal["png", "pdf", "svg"] = "pdf"
     source: Optional[Literal["usr", "parquet"]] = None
     default: List[str] = Field(default_factory=list)
     options: Dict[str, Dict[str, Any]] = Field(default_factory=dict)

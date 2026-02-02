@@ -77,6 +77,15 @@ def test_schema_version_supported(tmp_path: Path) -> None:
         load_config(cfg_path)
 
 
+def test_plots_format_defaults_to_pdf(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {}
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    assert loaded.root.plots is not None
+    assert loaded.root.plots.format == "pdf"
+
+
 def test_legacy_pwm_sampling_keys_rejected(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
     cfg["densegen"]["inputs"] = [

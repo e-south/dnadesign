@@ -180,3 +180,4 @@ def test_run_requires_stage_a_pool_when_pwm_inputs_present(tmp_path: Path) -> No
     assert result.exit_code != 0, result.output
     assert "Stage-A pools" in result.output
     assert "stage-a build-pool" in result.output
+    assert "Stage-B libraries are built during dense run" in result.output

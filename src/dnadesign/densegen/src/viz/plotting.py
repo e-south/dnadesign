@@ -254,7 +254,7 @@ def run_plots_from_config(
     plots_cfg = root_cfg.plots
     run_root = resolve_run_root(cfg_path, root_cfg.densegen.run.root)
     out_dir = _ensure_out_dir(plots_cfg, cfg_path, run_root)
-    plot_format = plots_cfg.format if plots_cfg and getattr(plots_cfg, "format", None) else "png"
+    plot_format = plots_cfg.format if plots_cfg and getattr(plots_cfg, "format", None) else "pdf"
     default_list = plots_cfg.default if (plots_cfg and plots_cfg.default) else ["stage_a_summary", "placement_map"]
     selected = [p.strip() for p in (only.split(",") if only else default_list)]
     options = plots_cfg.options if plots_cfg else {}

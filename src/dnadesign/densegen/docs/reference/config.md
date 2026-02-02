@@ -286,7 +286,7 @@ Notes:
 
 - `source`: `usr | parquet` (required if `output.targets` has multiple sinks)
 - `out_dir` (optional; default `outputs/plots`; must be inside `outputs/` under `densegen.run.root`)
-- `format` (optional; `png | pdf | svg`, default `png`)
+- `format` (optional; `png | pdf | svg`, default `pdf`)
 - `default`: list of plot names to run when `dense plot` is invoked (defaults to all)
 - `options`: dict keyed by plot name (strict; unknown options error)
 - `style`: global style dict applied to every plot (can be overridden per plot). Common keys:

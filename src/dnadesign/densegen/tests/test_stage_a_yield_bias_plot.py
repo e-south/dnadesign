@@ -99,6 +99,10 @@ def test_stage_a_yield_bias_labels_and_ticks() -> None:
         assert axes_left[0].get_title() == "Stepwise sequence yield"
         assert axes_right[0].get_title() == "Core positional entropy (top vs diversified)"
         assert axes_left[0].yaxis.get_offset_text().get_text() == ""
+        entropy_labels = [text for text in fig.texts if text.get_text() == "Entropy (bits)"]
+        assert len(entropy_labels) == 1
+        x_label_size = axes_right[-1].xaxis.label.get_size()
+        assert entropy_labels[0].get_fontsize() == pytest.approx(x_label_size)
     finally:
         fig.clf()
 

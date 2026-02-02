@@ -2859,6 +2859,9 @@ def run(
             )
             console.print(f"  - {rebuild_cmd}")
             console.print("  - or rerun with --rebuild-stage-a to bootstrap pools")
+            console.print(
+                "  - Stage-B libraries are built during dense run; no need to run dense stage-b build-libraries"
+            )
             raise typer.Exit(code=1)
         raise
 
