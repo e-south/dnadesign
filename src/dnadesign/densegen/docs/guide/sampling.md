@@ -30,6 +30,23 @@ Stage-A for PWM inputs is a mine -> score -> dedupe -> retain loop:
    - `core` collapses by `tfbs_core` (motif-aligned match).
 5) **Selection**: retain `n_sites` using `selection.policy`.
 
+#### Length range, padding, and trimming
+
+When `sampling.length.policy=range`, Stage‑A samples a **target length per candidate**
+uniformly from `[min, max]`. This happens per generated sequence (not per regulator):
+
+- **Short motifs (width < target length)**: the motif is embedded in background bases.
+  The left pad length is sampled uniformly from `0..extra`, and the right pad receives
+  the remaining bases. Each candidate gets its own left/right split.
+- **Long motifs (width > target length)**: Stage‑A trims to the **max‑information contiguous
+  window** of the target length, then runs FIMO on that trimmed motif window.
+
+Selection uses `score_norm = best_hit_score / pwm_theoretical_max_score`, where the
+theoretical max is computed from the **full motif**. For long motifs, this can bias
+retained pools toward longer target lengths when `min_score_norm` or MMR relevance
+filters are active, because shorter trimmed windows score lower relative to the
+full‑length denominator.
+
 #### Selection policies
 
 - `top_score`: take the top `n_sites` by `best_hit_score`.
@@ -82,12 +99,8 @@ in `outputs/pools/pool_manifest.json`.
 
 Stage-B builds solver libraries from Stage-A pools. Stage-B always consumes the Stage-A pool parquet **as-written** (as-selected).
 
-There are two ways libraries get created:
-
-1) **During `dense run`** (normal): Stage-B sampling builds/rebuilds libraries as runtime resamples
-   occur and records them under `outputs/libraries/`.
-2) **Via `dense stage-b build-libraries`** (helper): materialize libraries up-front (useful for
-   feasibility inspection or `library_source: artifact` replay workflows).
+Stage‑B sampling builds/rebuilds libraries during `dense run` as runtime resamples
+occur and records them under `outputs/libraries/`.
 
 Key control is `densegen.generation.sampling.pool_strategy`:
 
@@ -97,9 +110,6 @@ Key control is `densegen.generation.sampling.pool_strategy`:
 
 Additional Stage-B controls that commonly affect "it fails vs it works":
 
-- **Library source**
-  - `library_source: build` (default): libraries are built from pools.
-  - `library_source: artifact`: replay prebuilt libraries from `library_artifact_path`.
 - **Uniqueness + exhaustion**
   - `unique_binding_sites` / `unique_binding_cores` prevent duplicate sites in a library.
   - `cover_all_regulators` attempts to include every regulator in the library at least once.
