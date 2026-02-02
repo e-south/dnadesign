@@ -33,6 +33,7 @@ from .stage_a_sampling_utils import (
     _sample_from_background_cdf,
     _select_pwm_window,
     build_log_odds,
+    parse_bgfile,
     score_sequence,
 )
 from .stage_a_summary import PWMSamplingSummary
@@ -117,7 +118,17 @@ def sample_pwm_sites(
         raise ValueError(f"PWM motif '{motif.motif_id}' has zero width.")
     if length_policy not in {"exact", "range"}:
         raise ValueError(f"Unsupported pwm length.policy: {length_policy}")
-    log_odds = build_log_odds(motif.matrix, motif.background, smoothing_alpha=0.0)
+    effective_background = motif.background
+    if bgfile is not None:
+        effective_background = parse_bgfile(bgfile)
+    if effective_background != motif.background:
+        motif = PWMMotif(
+            motif_id=motif.motif_id,
+            matrix=motif.matrix,
+            background=effective_background,
+            log_odds=motif.log_odds,
+        )
+    log_odds = build_log_odds(motif.matrix, effective_background, smoothing_alpha=0.0)
     window_label = "full"
     if trim_window_length is not None:
         matrix, log_odds, window_start, window_score = _select_pwm_window(
@@ -138,15 +149,16 @@ def sample_pwm_sites(
     else:
         matrix = motif.matrix
     matrix_cdf = _matrix_cdf(matrix)
-    background_cdf = _background_cdf(motif.background)
+    background_cdf = _background_cdf(effective_background)
     pwm_consensus = _pwm_consensus(matrix)
     pwm_consensus_iupac = _pwm_consensus_iupac(matrix)
-    pwm_consensus_score = score_sequence(pwm_consensus, matrix, log_odds=log_odds, background=motif.background)
+    pwm_consensus_score = score_sequence(
+        pwm_consensus,
+        matrix,
+        log_odds=log_odds,
+        background=effective_background,
+    )
     pwm_theoretical_max_score = _pwm_theoretical_max_score(log_odds)
-    if np.isfinite(pwm_consensus_score):
-        pwm_consensus_score = float(pwm_consensus_score) / float(np.log(2.0))
-    if np.isfinite(pwm_theoretical_max_score):
-        pwm_theoretical_max_score = float(pwm_theoretical_max_score) / float(np.log(2.0))
 
     score_label = "best_hit_score"
     length_label = str(length_policy)

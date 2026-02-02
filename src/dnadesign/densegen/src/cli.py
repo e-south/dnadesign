@@ -64,11 +64,12 @@ from .config import (
     resolve_run_root,
 )
 from .core.artifacts.candidates import build_candidate_artifact, find_candidate_files, prepare_candidates_dir
-from .core.artifacts.library import write_library_artifact
+from .core.artifacts.library import load_library_artifact, write_library_artifact
 from .core.artifacts.pool import (
     POOL_MODE_SEQUENCE,
     POOL_MODE_TFBS,
     PoolData,
+    _hash_file,
     build_pool_artifact,
     load_pool_artifact,
     pool_status_by_input,
@@ -2320,6 +2321,7 @@ def stage_b_build_libraries(
         help="Plan item name(s) to build (defaults to all plans).",
     ),
     overwrite: bool = typer.Option(False, help="Overwrite existing library_builds.parquet."),
+    append: bool = typer.Option(False, "--append", help="Append new libraries to existing artifacts."),
     show_motif_ids: bool = typer.Option(
         False,
         "--show-motif-ids",
@@ -2336,6 +2338,20 @@ def stage_b_build_libraries(
     run_root = _run_root_for(loaded)
     out_dir = _resolve_outputs_path_or_exit(cfg_path, run_root, out, label="stage-b.out")
     out_dir.mkdir(parents=True, exist_ok=True)
+    if overwrite and append:
+        console.print("[bold red]Choose either --append or --overwrite, not both.[/]")
+        raise typer.Exit(code=1)
+    builds_path = out_dir / "library_builds.parquet"
+    members_path = out_dir / "library_members.parquet"
+    manifest_path = out_dir / "library_manifest.json"
+    artifacts_exist = builds_path.exists() or members_path.exists() or manifest_path.exists()
+    if artifacts_exist and not (overwrite or append):
+        out_label = _display_path(out_dir, run_root, absolute=False)
+        console.print(f"[bold red]Library artifacts already exist under[/] {out_label}.")
+        console.print("[bold]Next steps[/]:")
+        console.print("  - rerun with --append to add libraries")
+        console.print("  - or --overwrite to replace existing library artifacts")
+        raise typer.Exit(code=1)
 
     selected_inputs = {name for name in (input_name or [])}
     if selected_inputs:
@@ -2359,7 +2375,6 @@ def stage_b_build_libraries(
     outputs_root = run_root / "outputs"
     events_path = outputs_root / "meta" / "events.jsonl"
     failure_counts = _load_failure_counts_from_attempts(outputs_root)
-    libraries_built = _load_existing_library_index(outputs_root) if outputs_root.exists() else 0
 
     if pool is not None:
         pool_dir = _resolve_outputs_path_or_exit(cfg_path, run_root, pool, label="stage-b.pool")
@@ -2382,6 +2397,74 @@ def stage_b_build_libraries(
         console.print(f"  - {_workspace_command('dense stage-a build-pool', cfg_path=cfg_path, run_root=run_root)}")
         console.print("  - ensure --pool points to the outputs/pools directory for this workspace")
         raise typer.Exit(code=1)
+
+    config_hash = _hash_file(cfg_path)
+    pool_manifest_path = pool_dir / "pool_manifest.json"
+    pool_manifest_hash = _hash_file(pool_manifest_path)
+    append_mode = append and artifacts_exist
+    existing_build_rows: list[dict] = []
+    existing_member_rows: list[dict] = []
+    existing_libraries_total = 0
+    existing_max_index = 0
+    existing_created_at = None
+    if append_mode:
+        if not manifest_path.exists():
+            console.print("[bold red]Library manifest not found; cannot append.[/]")
+            console.print("[bold]Tip[/]: rerun with --overwrite to rebuild library artifacts.")
+            raise typer.Exit(code=1)
+        try:
+            existing_artifact = load_library_artifact(out_dir)
+        except Exception as exc:
+            console.print(f"[bold red]Failed to read existing library manifest:[/] {exc}")
+            console.print("[bold]Tip[/]: rerun with --overwrite to rebuild library artifacts.")
+            raise typer.Exit(code=1)
+        existing_config_hash = existing_artifact.config_hash
+        existing_pool_hash = existing_artifact.pool_manifest_hash
+        if not existing_config_hash or not existing_pool_hash:
+            console.print("[bold red]Library manifest missing config/pool hashes; cannot append.[/]")
+            console.print("[bold]Tip[/]: rerun with --overwrite to rebuild library artifacts.")
+            raise typer.Exit(code=1)
+        if existing_config_hash != config_hash or existing_pool_hash != pool_manifest_hash:
+            console.print("[bold red]Library manifest does not match current config/pool; cannot append.[/]")
+            if existing_config_hash != config_hash:
+                console.print(
+                    "  - config hash mismatch "
+                    f"(manifest={_short_hash(existing_config_hash)}, current={_short_hash(config_hash)})"
+                )
+            if existing_pool_hash != pool_manifest_hash:
+                console.print(
+                    "  - pool manifest hash mismatch "
+                    f"(manifest={_short_hash(existing_pool_hash)}, current={_short_hash(pool_manifest_hash)})"
+                )
+            console.print("[bold]Tip[/]: rerun with --overwrite to rebuild library artifacts.")
+            raise typer.Exit(code=1)
+        if not builds_path.exists() or not members_path.exists():
+            console.print("[bold red]Library artifacts are incomplete; cannot append.[/]")
+            console.print("[bold]Tip[/]: rerun with --overwrite to rebuild library artifacts.")
+            raise typer.Exit(code=1)
+        try:
+            existing_build_rows = pd.read_parquet(builds_path).to_dict("records")
+        except Exception as exc:
+            console.print(f"[bold red]Failed to read existing library_builds.parquet:[/] {exc}")
+            console.print("[bold]Tip[/]: rerun with --overwrite to rebuild library artifacts.")
+            raise typer.Exit(code=1)
+        try:
+            existing_member_rows = pd.read_parquet(members_path).to_dict("records")
+        except Exception as exc:
+            console.print(f"[bold red]Failed to read existing library_members.parquet:[/] {exc}")
+            console.print("[bold]Tip[/]: rerun with --overwrite to rebuild library artifacts.")
+            raise typer.Exit(code=1)
+        existing_libraries_total = len(existing_build_rows)
+        existing_indices = [
+            int(row.get("library_index") or 0) for row in existing_build_rows if row.get("library_index") is not None
+        ]
+        existing_max_index = max(existing_indices, default=0)
+        existing_created_at = existing_artifact.created_at
+
+    if append_mode:
+        libraries_built = existing_max_index
+    else:
+        libraries_built = _load_existing_library_index(outputs_root) if outputs_root.exists() else 0
 
     build_rows = []
     member_rows = []
@@ -2548,19 +2631,47 @@ def stage_b_build_libraries(
             console.print("[yellow]No libraries built (no matching inputs/plans).[/]")
             raise typer.Exit(code=1)
 
+        if append_mode:
+            build_rows_out = existing_build_rows + build_rows
+            member_rows_out = existing_member_rows + member_rows
+            libraries_total = existing_libraries_total + len(build_rows)
+            created_at = existing_created_at
+            updated_at = datetime.now(timezone.utc).isoformat()
+            indices = [
+                int(row.get("library_index") or 0) for row in build_rows_out if row.get("library_index") is not None
+            ]
+            if len(indices) != len(set(indices)):
+                console.print("[bold red]Duplicate library_index detected after append.[/]")
+                console.print("[bold]Tip[/]: rerun with --overwrite to rebuild library artifacts.")
+                raise typer.Exit(code=1)
+        else:
+            build_rows_out = build_rows
+            member_rows_out = member_rows
+            libraries_total = len(build_rows)
+            created_at = None
+            updated_at = None
+        write_overwrite = overwrite or append_mode
         try:
             artifact = write_library_artifact(
                 out_dir=out_dir,
-                builds=build_rows,
-                members=member_rows,
+                builds=build_rows_out,
+                members=member_rows_out,
                 cfg_path=cfg_path,
                 run_id=str(cfg.run.id),
                 run_root=run_root,
-                overwrite=overwrite,
+                overwrite=write_overwrite,
+                config_hash=config_hash,
+                pool_manifest_hash=pool_manifest_hash,
+                libraries_total=libraries_total,
+                created_at=created_at,
+                updated_at=updated_at,
             )
         except FileExistsError as exc:
             console.print(f"[bold red]{exc}[/]")
-            console.print("[bold]Tip[/]: rerun with --overwrite to replace existing library artifacts.")
+            if append_mode:
+                console.print("[bold]Tip[/]: rerun with --overwrite to rebuild library artifacts.")
+            else:
+                console.print("[bold]Tip[/]: rerun with --append or --overwrite to replace existing artifacts.")
             raise typer.Exit(code=1)
 
     summary_df = pd.DataFrame(build_rows)
@@ -2618,6 +2729,7 @@ def stage_b_build_libraries(
         "Sites/TFs/bp totals summarize min/median/max across libraries."
     )
     console.print("bp budget = sequence_length + subsample_over_length_budget_by.")
+    console.print(f"libraries built now: {len(build_rows)}; libraries total: {libraries_total}")
     console.print(
         f":sparkles: [bold green]Library builds written[/]: "
         f"{_display_path(artifact.builds_path, run_root, absolute=False)}"

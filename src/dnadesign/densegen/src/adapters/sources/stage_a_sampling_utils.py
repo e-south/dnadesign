@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import List, Optional, Sequence
 
 import numpy as np
@@ -26,6 +27,40 @@ def normalize_background(bg: Optional[dict[str, float]]) -> dict[str, float]:
     if total <= 0:
         raise ValueError("Background frequencies must sum to > 0.")
     return {k: float(v) / total for k, v in bg.items()}
+
+
+def parse_bgfile(bgfile: str | Path) -> dict[str, float]:
+    path = Path(bgfile)
+    if not path.exists() or not path.is_file():
+        raise FileNotFoundError(f"Stage-A PWM sampling bgfile not found: {path}")
+    base_values: dict[str, float] = {}
+    for raw_line in path.read_text().splitlines():
+        line = raw_line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        lower = line.lower()
+        if lower.startswith("background"):
+            continue
+        line = line.replace("=", " ").replace(":", " ")
+        parts = [part for part in line.split() if part]
+        if not parts:
+            continue
+        token = parts[0].upper()
+        if token not in {"A", "C", "G", "T"}:
+            continue
+        if len(parts) != 2:
+            raise ValueError(f"bgfile line must be '<base> <freq>', got: {raw_line!r}")
+        if token in base_values:
+            raise ValueError(f"bgfile contains duplicate base entries: {token}")
+        try:
+            value = float(parts[1])
+        except ValueError as exc:
+            raise ValueError(f"bgfile value for base {token} must be numeric") from exc
+        base_values[token] = value
+    if set(base_values) != {"A", "C", "G", "T"}:
+        missing = sorted({"A", "C", "G", "T"} - set(base_values))
+        raise ValueError(f"bgfile missing base frequencies: {missing}")
+    return normalize_background(base_values)
 
 
 def build_log_odds(

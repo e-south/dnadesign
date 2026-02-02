@@ -35,7 +35,18 @@ dense stage-a build-pool --fresh
 
 ---
 
-### 4) Run generation
+### 4) (Optional) Build Stage-B libraries (helper)
+
+`dense run` will build libraries automatically when `library_source: build`.
+This helper is useful for feasibility inspection or artifact replay workflows.
+
+```bash
+dense stage-b build-libraries --overwrite
+```
+
+---
+
+### 5) Run generation
 
 ```bash
 dense run
@@ -43,7 +54,7 @@ dense run
 
 ---
 
-### 5) Plot
+### 6) Plot
 
 ```bash
 dense plot --only stage_a_summary,stage_b_summary,run_health
@@ -51,7 +62,7 @@ dense plot --only stage_a_summary,stage_b_summary,run_health
 
 ---
 
-### 6) Report (optional)
+### 7) Report (optional)
 
 ```bash
 dense report --plots include
@@ -59,7 +70,7 @@ dense report --plots include
 
 ---
 
-### 7) Reset the demo (optional)
+### 8) Reset the demo (optional)
 
 ```bash
 dense campaign-reset

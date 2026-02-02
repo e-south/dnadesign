@@ -54,6 +54,7 @@ from ..artifacts.pool import (
     POOL_MODE_SEQUENCE,
     POOL_MODE_TFBS,
     PoolData,
+    _hash_file,
     build_pool_artifact,
     load_pool_data,
     pool_status_by_input,
@@ -2654,6 +2655,13 @@ def run_pipeline(
     _consolidate_parts(tables_root, part_glob="attempts_part-*.parquet", final_name="attempts.parquet")
     _consolidate_parts(tables_root, part_glob="solutions_part-*.parquet", final_name="solutions.parquet")
 
+    pool_manifest_hash = None
+    pool_manifest_path = outputs_root / "pools" / "pool_manifest.json"
+    if pool_manifest_path.exists():
+        pool_manifest_hash = _hash_file(pool_manifest_path)
+    elif library_artifact is not None and library_artifact.pool_manifest_hash:
+        pool_manifest_hash = library_artifact.pool_manifest_hash
+
     libraries_dir = outputs_root / "libraries"
     if library_source == "artifact":
         if library_artifact is None:
@@ -2669,6 +2677,8 @@ def run_pipeline(
                 run_id=str(cfg.run.id),
                 run_root=run_root,
                 overwrite=True,
+                config_hash=config_sha,
+                pool_manifest_hash=pool_manifest_hash,
             )
         except Exception as exc:
             raise RuntimeError(f"Failed to write library artifacts: {exc}") from exc
@@ -2719,6 +2729,8 @@ def run_pipeline(
                 run_id=str(cfg.run.id),
                 run_root=run_root,
                 overwrite=True,
+                config_hash=config_sha,
+                pool_manifest_hash=pool_manifest_hash,
             )
         except Exception as exc:
             raise RuntimeError(f"Failed to write library artifacts: {exc}") from exc

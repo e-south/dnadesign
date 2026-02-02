@@ -139,6 +139,6 @@ def test_inspect_config_shows_mmr_pool_details(tmp_path: Path) -> None:
     result = runner.invoke(app, ["inspect", "config", "-c", str(cfg_path)], env={"COLUMNS": "200"})
     assert result.exit_code == 0, result.output
     assert "mmr(" in result.output
-    assert "min=0.85" in result.output
-    assert "rel=minmax_raw_score" in result.output
+    assert "min=0.85" not in result.output
+    assert "rel=minmax_raw_score" not in result.output
     assert "cap=5000" in result.output

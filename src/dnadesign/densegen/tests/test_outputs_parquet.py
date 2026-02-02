@@ -146,6 +146,25 @@ def test_parquet_sink_writes_file(tmp_path: Path) -> None:
     assert _count_rows(out_file) == 1
 
 
+def test_parquet_sink_accepts_pwm_tier_fractions(tmp_path: Path) -> None:
+    out_file = tmp_path / "dense_arrays.parquet"
+    sink = ParquetSink(path=str(out_file), chunk_size=1)
+    meta = _dummy_meta()
+    meta["input_pwm_tier_fractions"] = [0.001, 0.01, 0.09]
+    meta["input_pwm_selection_pool_relevance_norm"] = "minmax_raw_score"
+    meta["input_pwm_selection_pool_min_score_norm"] = 0.85
+    rec = OutputRecord.from_sequence(
+        sequence="ATGC",
+        meta=meta,
+        source="src",
+        bio_type="dna",
+        alphabet="dna_4",
+    )
+    assert sink.add(rec) is True
+    sink.finalize()
+    assert _count_rows(out_file) == 1
+
+
 def test_parquet_sink_deduplicates(tmp_path: Path) -> None:
     out_file = tmp_path / "dense_arrays.parquet"
     sink = ParquetSink(path=str(out_file), deduplicate=True, chunk_size=1)

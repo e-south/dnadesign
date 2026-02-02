@@ -122,4 +122,4 @@ plots:
   source: parquet
   out_dir: outputs/plots
   format: png
-  default: [placement_map, tfbs_usage, run_health]
+  default: [stage_a_summary, stage_b_summary, placement_map, tfbs_usage, run_health]

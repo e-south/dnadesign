@@ -26,6 +26,11 @@ class LibraryArtifact:
     run_id: str
     run_root: str
     config_path: str
+    config_hash: str | None = None
+    pool_manifest_hash: str | None = None
+    libraries_total: int | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
     @classmethod
     def load(cls, manifest_path: Path) -> "LibraryArtifact":
@@ -38,6 +43,11 @@ class LibraryArtifact:
             run_id=str(payload.get("run_id")),
             run_root=str(payload.get("run_root")),
             config_path=str(payload.get("config_path")),
+            config_hash=payload.get("config_hash"),
+            pool_manifest_hash=payload.get("pool_manifest_hash"),
+            libraries_total=payload.get("libraries_total"),
+            created_at=payload.get("created_at"),
+            updated_at=payload.get("updated_at"),
         )
 
 
@@ -54,6 +64,11 @@ def write_library_artifact(
     run_id: str,
     run_root: Path,
     overwrite: bool = False,
+    config_hash: str | None = None,
+    pool_manifest_hash: str | None = None,
+    libraries_total: int | None = None,
+    created_at: str | None = None,
+    updated_at: str | None = None,
 ) -> LibraryArtifact:
     out_dir.mkdir(parents=True, exist_ok=True)
     install_native_stderr_filters(suppress_solver_messages=False)
@@ -69,12 +84,19 @@ def write_library_artifact(
     pd.DataFrame(builds).to_parquet(builds_path, index=False)
     pd.DataFrame(members).to_parquet(members_path, index=False)
 
+    created_at = created_at or datetime.now(timezone.utc).isoformat()
+    if libraries_total is None:
+        libraries_total = len(builds)
     manifest = {
         "schema_version": LIBRARY_SCHEMA_VERSION,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": created_at,
+        "updated_at": updated_at,
         "run_id": str(run_id),
         "run_root": str(run_root),
         "config_path": str(cfg_path),
+        "config_hash": config_hash,
+        "pool_manifest_hash": pool_manifest_hash,
+        "libraries_total": libraries_total,
         "library_builds_path": str(builds_path),
         "library_members_path": str(members_path),
     }
@@ -88,6 +110,11 @@ def write_library_artifact(
         run_id=str(run_id),
         run_root=str(run_root),
         config_path=str(cfg_path),
+        config_hash=config_hash,
+        pool_manifest_hash=pool_manifest_hash,
+        libraries_total=libraries_total,
+        created_at=created_at,
+        updated_at=updated_at,
     )
 
 

@@ -34,7 +34,7 @@ def _meta_arrow_type(name: str, pa):
         "input_pwm_ids",
         "required_regulators",
     }
-    list_float = set()
+    list_float = {"input_pwm_tier_fractions"}
     list_int = set()
     int_fields = {
         "length",
@@ -48,9 +48,7 @@ def _meta_arrow_type(name: str, pa):
         "input_pwm_budget_candidates",
         "input_pwm_budget_max_candidates",
         "input_pwm_budget_min_candidates",
-        "input_pwm_selection_pool_min_score_norm",
         "input_pwm_selection_pool_max_candidates",
-        "input_pwm_selection_pool_relevance_norm",
         "input_row_count",
         "input_tf_count",
         "input_tfbs_count",

@@ -28,7 +28,7 @@ def _write_stage_b_config(
     library_sampling_strategy: str = "tf_balanced",
 ) -> Path:
     inputs_dir = tmp_path / "inputs"
-    inputs_dir.mkdir()
+    inputs_dir.mkdir(exist_ok=True)
     sites_path = inputs_dir / "sites.csv"
     sites_path.write_text("tf,tfbs\nTF_A,AAAA\nTF_B,CCCC\n")
     cfg_path = tmp_path / "config.yaml"
@@ -113,6 +113,11 @@ def _write_pool_manifest(tmp_path: Path) -> Path:
     return pools_dir
 
 
+def _read_library_manifest(tmp_path: Path) -> dict:
+    manifest_path = tmp_path / "outputs" / "libraries" / "library_manifest.json"
+    return json.loads(manifest_path.read_text())
+
+
 def test_stage_b_reports_missing_required_regulators(tmp_path: Path) -> None:
     cfg_path = _write_stage_b_config(tmp_path, required_regulators=["MISSING_TF"])
     pool_dir = _write_pool_manifest(tmp_path)
@@ -161,7 +166,7 @@ def test_stage_b_emits_sampling_pressure_events(tmp_path: Path) -> None:
     assert any(row.get("event") == "LIBRARY_SAMPLING_PRESSURE" for row in rows)
 
 
-def test_stage_b_requires_overwrite_when_artifacts_exist(tmp_path: Path) -> None:
+def test_stage_b_requires_append_or_overwrite_when_artifacts_exist(tmp_path: Path) -> None:
     cfg_path = _write_stage_b_config(
         tmp_path,
         required_regulators=["TF_A", "TF_B"],
@@ -195,3 +200,122 @@ def test_stage_b_requires_overwrite_when_artifacts_exist(tmp_path: Path) -> None
     )
     assert second.exit_code != 0, second.output
     assert "overwrite" in second.output.lower()
+    assert "append" in second.output.lower()
+
+
+def test_stage_b_append_builds_when_empty(tmp_path: Path) -> None:
+    cfg_path = _write_stage_b_config(
+        tmp_path,
+        required_regulators=["TF_A", "TF_B"],
+        library_sampling_strategy="coverage_weighted",
+    )
+    pool_dir = _write_pool_manifest(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "stage-b",
+            "build-libraries",
+            "-c",
+            str(cfg_path),
+            "--pool",
+            str(pool_dir),
+            "--append",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "libraries built now" in result.output.lower()
+    assert "libraries total" in result.output.lower()
+    manifest = _read_library_manifest(tmp_path)
+    assert manifest.get("libraries_total") == 1
+    assert manifest.get("config_hash")
+    assert manifest.get("pool_manifest_hash")
+    builds_path = tmp_path / "outputs" / "libraries" / "library_builds.parquet"
+    builds_df = pd.read_parquet(builds_path)
+    assert len(builds_df) == 1
+
+
+def test_stage_b_append_appends_libraries_with_matching_hashes(tmp_path: Path) -> None:
+    cfg_path = _write_stage_b_config(
+        tmp_path,
+        required_regulators=["TF_A", "TF_B"],
+        library_sampling_strategy="coverage_weighted",
+    )
+    pool_dir = _write_pool_manifest(tmp_path)
+    runner = CliRunner()
+    first = runner.invoke(
+        app,
+        [
+            "stage-b",
+            "build-libraries",
+            "-c",
+            str(cfg_path),
+            "--pool",
+            str(pool_dir),
+            "--overwrite",
+        ],
+    )
+    assert first.exit_code == 0, first.output
+    second = runner.invoke(
+        app,
+        [
+            "stage-b",
+            "build-libraries",
+            "-c",
+            str(cfg_path),
+            "--pool",
+            str(pool_dir),
+            "--append",
+        ],
+    )
+    assert second.exit_code == 0, second.output
+    assert "libraries built now" in second.output.lower()
+    assert "libraries total" in second.output.lower()
+    builds_path = tmp_path / "outputs" / "libraries" / "library_builds.parquet"
+    builds_df = pd.read_parquet(builds_path)
+    assert len(builds_df) == 2
+    assert sorted(builds_df["library_index"].tolist()) == [1, 2]
+    manifest = _read_library_manifest(tmp_path)
+    assert manifest.get("libraries_total") == 2
+
+
+def test_stage_b_append_requires_matching_hashes(tmp_path: Path) -> None:
+    cfg_path = _write_stage_b_config(
+        tmp_path,
+        required_regulators=["TF_A", "TF_B"],
+        library_sampling_strategy="coverage_weighted",
+    )
+    pool_dir = _write_pool_manifest(tmp_path)
+    runner = CliRunner()
+    first = runner.invoke(
+        app,
+        [
+            "stage-b",
+            "build-libraries",
+            "-c",
+            str(cfg_path),
+            "--pool",
+            str(pool_dir),
+            "--overwrite",
+        ],
+    )
+    assert first.exit_code == 0, first.output
+    cfg_path = _write_stage_b_config(
+        tmp_path,
+        required_regulators=["TF_A", "TF_B"],
+        library_sampling_strategy="uniform_over_pairs",
+    )
+    second = runner.invoke(
+        app,
+        [
+            "stage-b",
+            "build-libraries",
+            "-c",
+            str(cfg_path),
+            "--pool",
+            str(pool_dir),
+            "--append",
+        ],
+    )
+    assert second.exit_code != 0, second.output
+    assert "config hash" in second.output.lower()

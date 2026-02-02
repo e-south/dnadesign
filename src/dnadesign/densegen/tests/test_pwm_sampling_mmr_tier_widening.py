@@ -56,7 +56,8 @@ def test_mmr_tier_ladder_widens_instead_of_crashing() -> None:
     )
 
     assert len(selected) == 20
-    assert diag.selection_pool_rung_fraction_used in (0.1, 0.5, 1.0)
+    ladder = [0.01, 0.01 + 0.1, 0.01 + 0.1 + 0.5, 1.0]
+    assert diag.selection_pool_rung_fraction_used in ladder
     assert all(cand.seq in meta for cand in selected)
 
 

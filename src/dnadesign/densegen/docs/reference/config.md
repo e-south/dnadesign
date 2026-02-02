@@ -72,7 +72,8 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
       - `log_every_batches` (int > 0; default 1)
     - `fixed_candidates` is the recommended mining mode (direct, user-set budget).
       `tier_target` is advanced and may stop early at caps/time; shortfalls are recorded in the manifest.
-    - `bgfile` (optional path) - MEME bfile-format background model for FIMO
+    - `bgfile` (optional path) - MEME bfile-format background model for FIMO (one base per line,
+      e.g., `A 0.25`); also used for Stage-A score normalization and MMR information-content weights
     - `keep_all_candidates_debug` (bool, default false) - write candidate Parquet logs to
       `outputs/pools/candidates/` for inspection (overwritten by `stage-a build-pool --fresh`
       or `dense run --rebuild-stage-a`)

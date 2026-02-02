@@ -114,7 +114,13 @@ Options:
   must be inside `outputs/`).
 - `--input/-i` — input name(s) to build (defaults to all).
 - `--plan/-p` — plan item name(s) to build (defaults to all).
-- `--overwrite` — overwrite existing library artifacts.
+- `--overwrite` — overwrite existing library artifacts (destructive).
+- `--append` — append new libraries to existing artifacts (cumulative). Requires that the existing
+  library manifest matches the current config hash and Stage‑A pool fingerprint; otherwise fails fast.
+
+Behavior:
+- If library artifacts exist and neither `--overwrite` nor `--append` is provided, the command exits
+  non‑zero with an actionable error.
 
 Output summary:
 - CLI output aggregates libraries per input/plan and reports min/median/max for sites, TF counts, and bp totals.

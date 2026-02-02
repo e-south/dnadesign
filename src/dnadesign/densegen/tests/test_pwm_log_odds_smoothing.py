@@ -17,9 +17,11 @@ import pytest
 
 from dnadesign.densegen.src.adapters.sources.pwm_sampling import sample_pwm_sites
 from dnadesign.densegen.src.adapters.sources.stage_a_sampling_utils import (
+    _pwm_consensus,
     _pwm_consensus_iupac,
     _pwm_theoretical_max_score,
     build_log_odds,
+    parse_bgfile,
     score_sequence,
 )
 from dnadesign.densegen.src.adapters.sources.stage_a_types import PWMMotif
@@ -71,7 +73,7 @@ def test_pwm_sampling_theoretical_max_uses_matrix_log_odds() -> None:
     mismatched = [{base: val * 0.5 for base, val in row.items()} for row in log_odds]
     motif = PWMMotif(motif_id="M1", matrix=matrix, background=background, log_odds=mismatched)
 
-    expected = _pwm_theoretical_max_score(log_odds) / float(np.log(2.0))
+    expected = _pwm_theoretical_max_score(log_odds)
     rng = np.random.default_rng(1)
     _selected, summary = sample_pwm_sites(
         rng,
@@ -85,6 +87,40 @@ def test_pwm_sampling_theoretical_max_uses_matrix_log_odds() -> None:
 
     assert summary is not None
     assert summary.pwm_theoretical_max_score == pytest.approx(expected, rel=1e-6)
+
+
+def test_pwm_sampling_uses_bgfile_for_theoretical_max(tmp_path) -> None:
+    if _FIMO_MISSING:
+        pytest.skip("fimo executable not available (run tests via `pixi run pytest` or set MEME_BIN).")
+
+    matrix = [
+        {"A": 0.9, "C": 0.05, "G": 0.03, "T": 0.02},
+        {"A": 0.1, "C": 0.1, "G": 0.7, "T": 0.1},
+    ]
+    motif_background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
+    bgfile = tmp_path / "bg.txt"
+    bgfile.write_text("A 0.7\nC 0.1\nG 0.1\nT 0.1\n")
+    bg = parse_bgfile(bgfile)
+    log_odds = build_log_odds(matrix, bg, smoothing_alpha=0.0)
+    expected_max = _pwm_theoretical_max_score(log_odds)
+    expected_consensus = score_sequence(_pwm_consensus(matrix), matrix, background=bg)
+
+    motif = PWMMotif(motif_id="M_bg", matrix=matrix, background=motif_background)
+    rng = np.random.default_rng(2)
+    _selected, summary = sample_pwm_sites(
+        rng,
+        motif,
+        strategy="consensus",
+        n_sites=1,
+        mining=fixed_candidates_mining(batch_size=1, candidates=1, log_every_batches=1),
+        selection=selection_top_score(),
+        return_summary=True,
+        bgfile=bgfile,
+    )
+
+    assert summary is not None
+    assert summary.pwm_theoretical_max_score == pytest.approx(expected_max, rel=1e-6)
+    assert summary.pwm_consensus_score == pytest.approx(expected_consensus, rel=1e-6)
 
 
 def test_pwm_iupac_consensus_from_pwm() -> None:

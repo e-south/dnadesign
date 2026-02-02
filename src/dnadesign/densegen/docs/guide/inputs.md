@@ -57,7 +57,8 @@ All input paths resolve relative to the config file location unless you pass an 
 ### PWM Stage-A highlights
 
 - **Scoring**: FIMO log-odds, forward strand only (`--norc`). Cores are treated as bricks
-  and can be placed in either orientation later.
+  and can be placed in either orientation later. If `sampling.bgfile` is set, DenseGen uses
+  that background for theoretical max, `score_norm`, and MMR weights.
 - **Eligibility**: candidate must have a FIMO hit and `best_hit_score > 0`.
 - **Deduplication**: `uniqueness.key` controls whether uniqueness is by `tfbs` or `tfbs_core`.
 - **Selection**: `top_score` or `mmr`. MMR uses a score normalization
