@@ -33,11 +33,11 @@ pixi install
 pixi run fimo --version
 
 # Option A: cd into the workspace
-cd src/dnadesign/densegen/workspaces/demo_meme_two_tf  # enter demo workspace
+cd src/dnadesign/densegen/workspaces/demo_meme_three_tfs  # enter demo workspace
 CONFIG="$PWD/config.yaml"  # point to workspace config
 
 # Option B: run from anywhere in the repo
-CONFIG=src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml  # config path from repo root
+CONFIG=src/dnadesign/densegen/workspaces/demo_meme_three_tfs/config.yaml  # config path from repo root
 
 # Choose a runner (pixi is the default in this repo; uv is optional).
 # If `dense` is already an alias, remove it before defining the function.

@@ -116,7 +116,7 @@ DEFAULT_CONFIG_MISSING_MESSAGE = (
     "No config found. cd into a workspace containing config.yaml, or pass -c path/to/config.yaml."
 )
 PACKAGED_TEMPLATES: dict[str, str] = {
-    "demo_meme_two_tf": "workspaces/demo_meme_two_tf",
+    "demo_meme_three_tfs": "workspaces/demo_meme_three_tfs",
 }
 
 

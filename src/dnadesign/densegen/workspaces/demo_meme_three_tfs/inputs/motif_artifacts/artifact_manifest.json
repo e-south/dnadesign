@@ -2,19 +2,19 @@
   "artifacts": [
     {
       "motif_id": "baeR_SBWWTWKTYYYYMHDAWTSK",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/densegen/workspaces/demo_meme_two_tf/inputs/motif_artifacts/baeR__meme_suite_meme__baeR_SBWWTWKTYYYYMHDAWTSK.json",
+      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/densegen/workspaces/demo_meme_three_tfs/inputs/motif_artifacts/baeR__meme_suite_meme__baeR_SBWWTWKTYYYYMHDAWTSK.json",
       "source": "meme_suite_meme",
       "tf_name": "baeR"
     },
     {
       "motif_id": "cpxR_MANWWHTTTAM",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/densegen/workspaces/demo_meme_two_tf/inputs/motif_artifacts/cpxR__meme_suite_meme__cpxR_MANWWHTTTAM.json",
+      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/densegen/workspaces/demo_meme_three_tfs/inputs/motif_artifacts/cpxR__meme_suite_meme__cpxR_MANWWHTTTAM.json",
       "source": "meme_suite_meme",
       "tf_name": "cpxR"
     },
     {
       "motif_id": "lexA_CTGTATAWAWWHACA",
-      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/densegen/workspaces/demo_meme_two_tf/inputs/motif_artifacts/lexA__meme_suite_meme__lexA_CTGTATAWAWWHACA.json",
+      "path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/densegen/workspaces/demo_meme_three_tfs/inputs/motif_artifacts/lexA__meme_suite_meme__lexA_CTGTATAWAWWHACA.json",
       "source": "meme_suite_meme",
       "tf_name": "lexA"
     }
@@ -22,7 +22,7 @@
   "background_policy": "record",
   "catalog_root": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/.cruncher",
   "config_path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/workspaces/densegen_prep_three_tf/config.yaml",
-  "created_at": "2026-02-02T18:27:13.957926+00:00",
+  "created_at": "2026-02-02T19:10:56.013040+00:00",
   "producer": "cruncher",
   "pseudocount": null,
   "schema_version": "1.0"

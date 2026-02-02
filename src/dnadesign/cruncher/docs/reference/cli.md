@@ -475,9 +475,9 @@ Examples:
 * `cruncher catalog pwms <config>`
 * `cruncher catalog pwms --set 1 <config>`
 * `cruncher catalog export-sites --set 1 --out densegen/sites.csv <config>`
-* `cruncher catalog export-sites --set 1 --densegen-workspace demo_meme_two_tf <config>`
+* `cruncher catalog export-sites --set 1 --densegen-workspace demo_meme_three_tfs <config>`
 * `cruncher catalog export-densegen --set 1 --out densegen/pwms <config>`
-* `cruncher catalog export-densegen --set 1 --densegen-workspace demo_meme_two_tf <config>`
+* `cruncher catalog export-densegen --set 1 --densegen-workspace demo_meme_three_tfs <config>`
 * `cruncher catalog logos --set 1 <config>`
 
 `catalog export-densegen` and `catalog export-sites` accept `--densegen-workspace` (workspace

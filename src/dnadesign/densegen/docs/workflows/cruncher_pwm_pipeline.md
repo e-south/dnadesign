@@ -102,12 +102,12 @@ Logos are saved under `outputs/logos/catalog/` (the command prints the exact pat
 #### Export into a DenseGen workspace
 
 ```bash
-cruncher catalog export-densegen --set 1 --densegen-workspace demo_meme_two_tf --overwrite -c "$CONFIG"
-cruncher catalog export-sites   --set 1 --densegen-workspace demo_meme_two_tf --overwrite -c "$CONFIG"
+cruncher catalog export-densegen --set 1 --densegen-workspace demo_meme_three_tfs --overwrite -c "$CONFIG"
+cruncher catalog export-sites   --set 1 --densegen-workspace demo_meme_three_tfs --overwrite -c "$CONFIG"
 ```
 
 These commands write motif JSONs for **lexA**, **cpxR**, and **baeR** under
-`src/dnadesign/densegen/workspaces/demo_meme_two_tf/inputs/motif_artifacts/`,
+`src/dnadesign/densegen/workspaces/demo_meme_three_tfs/inputs/motif_artifacts/`,
 which the DenseGen demo config references directly.
 
 ---

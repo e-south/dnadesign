@@ -140,7 +140,7 @@ Stage a new workspace with `config.yaml`, `inputs/`, `outputs/`, plus `outputs/l
 Options:
 - `--id` — run identifier (directory name).
 - `--root` — workspace root directory (default: current directory).
-- `--template-id` — packaged template id (e.g., `demo_meme_two_tf`).
+- `--template-id` — packaged template id (e.g., `demo_meme_three_tfs`).
 - `--template` — template config YAML to copy (path).
 - `--copy-inputs` — copy file-based inputs into `workspace/inputs` and rewrite paths.
 

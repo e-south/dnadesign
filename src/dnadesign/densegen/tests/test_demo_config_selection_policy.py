@@ -18,7 +18,7 @@ from dnadesign.densegen.src.config import load_config
 
 
 def _demo_config_path() -> Path:
-    return Path(__file__).resolve().parents[1] / "workspaces" / "demo_meme_two_tf" / "config.yaml"
+    return Path(__file__).resolve().parents[1] / "workspaces" / "demo_meme_three_tfs" / "config.yaml"
 
 
 def test_demo_config_declares_selection_policy() -> None:

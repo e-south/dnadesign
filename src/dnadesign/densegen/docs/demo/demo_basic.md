@@ -42,11 +42,11 @@ Workspace + runner setup:
 
 ```bash
 # Option A: cd into the workspace
-cd src/dnadesign/densegen/workspaces/demo_meme_two_tf  # enter demo workspace
+cd src/dnadesign/densegen/workspaces/demo_meme_three_tfs  # enter demo workspace
 CONFIG="$PWD/config.yaml"  # point to workspace config
 
 # Option B: run from anywhere in the repo
-CONFIG=src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml  # config path from repo root
+CONFIG=src/dnadesign/densegen/workspaces/demo_meme_three_tfs/config.yaml  # config path from repo root
 
 # Choose a runner (pixi is the default in this repo; uv is optional).
 # If `dense` is already an alias, remove it before defining the function.
@@ -260,7 +260,7 @@ This removes the entire `outputs/` directory under the configured run root.
 In this packaged workspace, everything is written under:
 
 ```
-src/dnadesign/densegen/workspaces/demo_meme_two_tf/outputs/
+src/dnadesign/densegen/workspaces/demo_meme_three_tfs/outputs/
 ```
 
 Common layout:

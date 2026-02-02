@@ -101,8 +101,8 @@ where = ["src"]
 [tool.setuptools.package-data]
 "dnadesign.cruncher.ingest.certs" = ["*.pem"]
 "dnadesign.densegen" = [
-  "workspaces/demo_meme_two_tf/config.yaml",
-  "workspaces/demo_meme_two_tf/inputs/*.txt",
+  "workspaces/demo_meme_three_tfs/config.yaml",
+  "workspaces/demo_meme_three_tfs/inputs/*.txt",
 ]
 
 [tool.pytest.ini_options]
