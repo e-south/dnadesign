@@ -38,7 +38,21 @@ def _write_config(path: Path, input_path: Path) -> None:
             "generation": {
                 "sequence_length": 3,
                 "quota": 1,
-                "plan": [{"name": "demo_plan", "quota": 1}],
+                "plan": [
+                    {
+                        "name": "demo_plan",
+                        "quota": 1,
+                        "regulator_constraints": {
+                            "groups": [
+                                {
+                                    "name": "all",
+                                    "members": ["TF1"],
+                                    "min_required": 1,
+                                }
+                            ]
+                        },
+                    }
+                ],
             },
             "solver": {"backend": "CBC", "strategy": "iterate"},
             "runtime": {"random_seed": 1},

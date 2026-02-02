@@ -114,7 +114,21 @@ def test_round_robin_chunk_cap_subsample(tmp_path: Path) -> None:
                     "iterative_max_libraries": 5,
                     "iterative_min_new_solutions": 0,
                 },
-                "plan": [{"name": "default", "quota": 5}],
+                "plan": [
+                    {
+                        "name": "default",
+                        "quota": 5,
+                        "regulator_constraints": {
+                            "groups": [
+                                {
+                                    "name": "all",
+                                    "members": ["TF1", "TF2"],
+                                    "min_required": 1,
+                                }
+                            ]
+                        },
+                    }
+                ],
             },
             "solver": {"backend": "CBC", "strategy": "iterate"},
             "runtime": {
@@ -219,7 +233,21 @@ def test_stall_detected_with_no_solutions(tmp_path: Path) -> None:
                     "iterative_max_libraries": 1,
                     "iterative_min_new_solutions": 0,
                 },
-                "plan": [{"name": "default", "quota": 1}],
+                "plan": [
+                    {
+                        "name": "default",
+                        "quota": 1,
+                        "regulator_constraints": {
+                            "groups": [
+                                {
+                                    "name": "all",
+                                    "members": ["TF1", "TF2"],
+                                    "min_required": 1,
+                                }
+                            ]
+                        },
+                    }
+                ],
             },
             "solver": {"backend": "CBC", "strategy": "iterate"},
             "runtime": {

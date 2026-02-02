@@ -36,6 +36,8 @@ def _write_min_config(path: Path) -> None:
                 plan:
                   - name: default
                     quota: 1
+                    regulator_constraints:
+                      groups: []
 
               solver:
                 strategy: approximate
@@ -110,6 +112,8 @@ def _write_pwm_mmr_config(path: Path) -> None:
                 plan:
                   - name: demo_plan
                     quota: 1
+                    regulator_constraints:
+                      groups: []
               solver:
                 backend: CBC
                 strategy: iterate

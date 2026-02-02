@@ -1,30 +1,24 @@
 
 ## DenseGen demo
 
-This demo runs inside a packaged workspace that already contains inputs and a `config.yaml`. It exercises the following pipeline:
-
-- **Stage‑A**: mine + score PWM‑sampled TFBS candidates with **FIMO**, then retain a TFBS pool.
-- **Stage‑B**: call the dense-arrays backend to assemble sequences subject to your TFBS pools and defined constraints.
-- **Outputs**: write tables, manifests, plots, and an audit report under `outputs/`.
-
-This workspace uses **three PWM artifacts** (LexA, BaeR, and CpxR).
+This demo runs inside a packaged workspace that already contains inputs and a `config.yaml`. The workspace design dense-arrays associated with three regulators (LexA, BaeR, and CpxR).
 
 ---
 
 ### Contents
 
-- [Prereqs](#prereqs)
-- [1) Enter the demo workspace](#1-enter-the-demo-workspace)
-- [2) Validate config + solver](#2-validate-config--solver)
-- [3) Build Stage‑A pools](#3-build-stage-a-pools)
-- [4) Optional: Build Stage‑B libraries](#4-optional-build-stage-b-libraries)
-- [5) Run generation](#5-run-generation)
-- [6) Plot](#6-plot)
-- [7) Report (optional)](#7-report-optional)
-- [8) Reset the demo (optional)](#8-reset-the-demo-optional)
-- [Where outputs go](#where-outputs-go)
-- [Common troubleshooting](#common-troubleshooting)
-- [Next steps](#next-steps)
+1. [Prereqs](#prereqs)
+2. [Enter the demo workspace](#1-enter-the-demo-workspace)
+3. [Validate config + solver](#2-validate-config-solver)
+4. [Build Stage‑A pools](#3-build-stagea-pools)
+5. [Optional: Build Stage‑B libraries](#4-optional-build-stageb-libraries)
+6. [Run generation](#5-run-generation)
+7. [Plot](#6-plot)
+8. [Report (optional)](#7-report-optional)
+9. [Reset the demo (optional)](#8-reset-the-demo-optional)
+10. [Where outputs go](#where-outputs-go)
+11. [Common troubleshooting](#common-troubleshooting)
+12. [Next steps](#next-steps)
 
 ---
 
@@ -55,6 +49,8 @@ CONFIG="$PWD/config.yaml"  # point to workspace config
 CONFIG=src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml  # config path from repo root
 
 # Choose a runner (pixi is the default in this repo; uv is optional).
+# If `dense` is already an alias, remove it before defining the function.
+unalias dense 2>/dev/null
 dense() { pixi run dense -- "$@"; }  # convenience wrapper
 
 # Optional: uv-only wrapper
@@ -63,22 +59,18 @@ dense() { pixi run dense -- "$@"; }  # convenience wrapper
 # From here on, commands use $CONFIG for clarity; if you're in the workspace, you can omit -c.
 ```
 
-If you want DenseGen to verify your solver is reachable, `dense validate-config --probe-solver -c "$CONFIG"`
-does that (step 2).
+If you want DenseGen to verify your solver is reachable, `dense validate-config --probe-solver -c "$CONFIG"` does that (step 2).
 
 ---
 
-## 1) Enter the demo workspace (if needed)
+### 1. Enter the demo workspace
 
 ```bash
 cd src/dnadesign/densegen/workspaces/demo_meme_two_tf
 CONFIG="$PWD/config.yaml"
 ```
 
-Why this matters:
-
-* This folder is a **self-contained workspace**: it has a `config.yaml` plus `inputs/` and an `outputs/` root.
-* DenseGen’s CLI can **auto-discover** config when you are in (or under) a directory containing `config.yaml`.
+This folder is a **self-contained workspace**: it has a `config.yaml` plus `inputs/` and an `outputs/` root.
 
 Optional, but useful: print what the workspace thinks it will use.
 
@@ -96,7 +88,7 @@ Those inspection commands are “read-only” and are the fastest way to confirm
 
 ---
 
-## 2) Validate config + solver
+### 2. Validate config + solver
 
 ```bash
 dense validate-config --probe-solver -c "$CONFIG"
@@ -104,52 +96,31 @@ dense validate-config --probe-solver -c "$CONFIG"
 
 What this does:
 
-* **Schema validation**: unknown keys and invalid values are errors (no silent fallbacks).
+* **Schema validation**: unknown keys and invalid values are errors.
 * **Path sanity**: ensures paths resolve correctly (relative to `config.yaml`).
-* **Solver probe (optional)**: verifies your configured backend is available *before* you do any work.
-
-If you hit an error here, fix it now—everything downstream assumes config is valid.
+* **Solver probe (optional)**: verifies your configured backend is available.
 
 ---
 
-## 3) Build Stage‑A pools
+### 3. Build Stage‑A pools
+
+Stage‑A expects PWM artifact JSONs in the Cruncher export format. This demo ships
+prepopulated artifacts for **lexA**, **cpxR**, and **baeR** under
+`inputs/motif_artifacts/`. If you need to regenerate them (or understand the source
+mix), follow the Cruncher handoff workflow:
+
+* `../workflows/cruncher_pwm_pipeline.md`
 
 ```bash
 dense stage-a build-pool --fresh -c "$CONFIG"
 ```
 
-What Stage‑A is doing (high-level):
+> Without `--fresh`, `dense stage-a build-pool` appends *new unique* TFBS into an existing pool by default.
 
-* For PWM-backed inputs, Stage‑A generates candidate sites, scores them with **FIMO log‑odds**
-  (forward strand only), applies eligibility rules, deduplicates by your configured uniqueness key
-  (commonly `core` for PWM inputs), and then **retains** `n_sites` per regulator according to the
-  selection policy (e.g., top-score or MMR).
-* Stage‑A writes the **retained pool**—the exact sites Stage‑B will draw from later. Diagnostics may
-  compare “top-score” vs “diversified,” but the pool parquet is the single source of truth.
+What Stage‑A is doing:
 
-What you should see:
-
-* A **Stage‑A plan** table (per input × TF) showing retain counts, mining budget, eligibility rule,
-  selection policy, uniqueness mode, and length policy.
-* A mining progress section (per motif) showing how many candidates were scored and how many unique,
-  eligible sites were found.
-* A recap summary with score and diversity diagnostics plus a legend.
-
-A real Stage‑A run in this demo looks like (abridged):
-
-```text
-Stage-A plan
-│ input               │ TF   │ retain │ budget       │ eligibility      │ selection   │ uniqueness │ length        │
-│ lexA_cpxR_artifacts │ cpxR │ 250    │ fixed=500000 │ best_hit_score>0 │ mmr(a=0.50) │ core       │ range(15..20) │
-│ lexA_cpxR_artifacts │ lexA │ 250    │ fixed=500000 │ best_hit_score>0 │ mmr(a=0.50) │ core       │ range(15..20) │
-
-Stage-A sampling recap
-│ TF   │ generated │ eligible_unique │ pool │ retained │ tier fill │ selection   │ overlap │ ... │
-│ cpxR │ 500,000   │ 122,064 (25%)   │ ...  │ 250      │ 1.000%    │ mmr(a=0.50) │ 36.0%   │ ... │
-│ lexA │ 500,000   │ 86,514 (17%)    │ ...  │ 250      │ 1.000%    │ mmr(a=0.50) │ 32.0%   │ ... │
-
-✨ Pool manifest written: outputs/pools/pool_manifest.json
-```
+* For PWM-backed inputs, Stage‑A generates candidate sites, scores them with **FIMO log‑odds** (forward strand only), applies eligibility rules, deduplicates by your configured uniqueness key (commonly `core` for PWM inputs), and then **retains** `n_sites` per regulator according to the selection policy (e.g., top-score or MMR).
+* Stage‑A writes the **retained pool**—the exact sites Stage‑B will draw from later. Diagnostics may compare “top-score” vs “diversified,” but the pool parquet is the single source of truth.
 
 How to interpret common recap fields:
 
@@ -160,24 +131,9 @@ How to interpret common recap fields:
 * **selection**: the Stage‑A retention policy (e.g., `top_score` or `mmr(alpha=…)`).
 * **overlap**: how much the diversified selection overlaps the pure top-score set (MMR diagnostics).
 
-Where Stage‑A writes:
-
-* `outputs/pools/pool_manifest.json` — the audit-friendly Stage‑A summary (config hash, fingerprints,
-  mining yields, score summaries, diversity summaries, warnings/shortfalls).
-* `outputs/pools/<input>__pool.parquet` — the **retained TFBS pool** actually used downstream.
-
-Stage‑A caching semantics:
-
-* Without `--fresh`, `dense stage-a build-pool` appends *new unique* TFBS into an existing pool by default.
-* With `--fresh`, it rebuilds from scratch (recommended for demos / pressure testing).
-
-> Important: the regulator labels that show up in Stage‑A pools are the labels you must use in
-> `generation.plan[].required_regulators`. For PWM artifact inputs, those labels are typically motif IDs.
-> If you’re unsure what they are, run `dense inspect inputs --show-motif-ids -c "$CONFIG"`.
-
 ---
 
-## 4) Optional: Build Stage‑B libraries
+### 4. Optional: Build Stage‑B libraries
 
 ```bash
 dense stage-b build-libraries --overwrite -c "$CONFIG"
@@ -200,7 +156,7 @@ Where Stage‑B writes:
 
 ---
 
-## 5) Run generation
+### 5. Run generation
 
 ```bash
 dense run -c "$CONFIG"
@@ -239,7 +195,7 @@ Why `dense inspect run` is worth doing:
 
 ---
 
-## 6) Plot
+### 6. Plot
 
 The canonical “small but high-signal” plot set for this demo is:
 
@@ -266,7 +222,7 @@ Operational note: run health is usually faster to inspect than to plot:
 
 ---
 
-## 7) Report (optional)
+### 7. Report (optional)
 
 ```bash
 dense report --plots include -c "$CONFIG"
@@ -279,7 +235,7 @@ Notes:
 
 ---
 
-## 8) Reset the demo (optional)
+### 8. Reset the demo (optional)
 
 If you want to rerun from scratch (keeping config + inputs intact):
 
@@ -291,7 +247,7 @@ This removes the entire `outputs/` directory under the configured run root.
 
 ---
 
-## Where outputs go
+### Where outputs go
 
 In this packaged workspace, everything is written under:
 
@@ -328,9 +284,9 @@ For full schemas and join keys, see: `../guide/outputs-metadata.md` and `../refe
 
 ---
 
-## Common troubleshooting
+### Common troubleshooting
 
-### `fimo: command not found`
+#### `fimo: command not found`
 
 DenseGen’s PWM-backed Stage‑A requires MEME Suite.
 Ensure `fimo` is on PATH (or run via your environment manager that provides it).
@@ -339,7 +295,7 @@ Ensure `fimo` is on PATH (or run via your environment manager that provides it).
 pixi run fimo --version
 ```
 
-### Solver backend not available
+#### Solver backend not available
 
 Run:
 
@@ -350,9 +306,9 @@ dense validate-config --probe-solver -c "$CONFIG"
 If the probe fails, either install/configure your backend (CBC / GUROBI) or adjust `densegen.solver`
 in `config.yaml`.
 
-### “required_regulators not found” / regulator label mismatches
+#### “regulator group member not found” / regulator label mismatches
 
-Your `required_regulators` must match the regulator labels used in Stage‑A pools.
+Your `generation.plan[].regulator_constraints.groups[].members` must match the regulator labels used in Stage‑A pools.
 
 Run:
 
@@ -360,9 +316,9 @@ Run:
 dense inspect inputs --show-motif-ids -c "$CONFIG"
 ```
 
-Then copy the exact labels into `generation.plan[].required_regulators`.
+Then copy the exact labels into the `regulator_constraints.groups[].members` lists.
 
-### Plotting issues / Matplotlib cache permissions
+#### Plotting issues / Matplotlib cache permissions
 
 If Matplotlib complains about cache directories, set a writable cache path:
 
@@ -372,7 +328,7 @@ export MPLCONFIGDIR=/tmp/matplotlib
 
 ---
 
-## Next steps
+### Next steps
 
 If you want the deeper “why” behind each stage:
 

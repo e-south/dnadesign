@@ -55,6 +55,8 @@ def _write_min_config(path: Path) -> None:
                 plan:
                   - name: default
                     quota: 1
+                    regulator_constraints:
+                      groups: []
 
               solver:
                 backend: CBC

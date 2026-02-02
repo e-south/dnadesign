@@ -16,16 +16,19 @@ Each plan item has a `name` and either `quota` or `fraction`.
 plan:
   - name: sigma70
     quota: 200
-    required_regulators: ["LexA", "CpxR"]
-    min_required_regulators: 2
-    min_count_by_regulator:
-      LexA: 1
-      CpxR: 1
+    regulator_constraints:
+      groups:
+        - name: core
+          members: ["LexA", "CpxR"]
+          min_required: 2
+      min_count_by_regulator:
+        LexA: 1
+        CpxR: 1
 ```
 
 Notes:
 - `generation.sequence_length` must fit all fixed elements and TFBS placements.
-- Regulator labels must match the `tf` labels in the Stage-A pools.
+- Group members must match the `tf` labels in the Stage-A pools.
 
 ---
 

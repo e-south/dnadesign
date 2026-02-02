@@ -93,7 +93,21 @@ def _write_config(path: Path, input_path: Path) -> None:
                     "iterative_max_libraries": 1,
                     "iterative_min_new_solutions": 0,
                 },
-                "plan": [{"name": "default", "quota": 1}],
+                "plan": [
+                    {
+                        "name": "default",
+                        "quota": 1,
+                        "regulator_constraints": {
+                            "groups": [
+                                {
+                                    "name": "all",
+                                    "members": ["TF1"],
+                                    "min_required": 1,
+                                }
+                            ]
+                        },
+                    }
+                ],
             },
             "solver": {"backend": "CBC", "strategy": "iterate"},
             "runtime": {

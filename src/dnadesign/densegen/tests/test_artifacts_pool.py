@@ -36,7 +36,21 @@ def test_build_pool_artifact_binding_sites(tmp_path: Path) -> None:
                     "generation": {
                         "sequence_length": 10,
                         "quota": 1,
-                        "plan": [{"name": "default", "quota": 1}],
+                        "plan": [
+                            {
+                                "name": "default",
+                                "quota": 1,
+                                "regulator_constraints": {
+                                    "groups": [
+                                        {
+                                            "name": "all",
+                                            "members": ["TF1", "TF2"],
+                                            "min_required": 1,
+                                        }
+                                    ]
+                                },
+                            }
+                        ],
                     },
                     "solver": {"backend": "CBC", "strategy": "iterate"},
                     "runtime": {

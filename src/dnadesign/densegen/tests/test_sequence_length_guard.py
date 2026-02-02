@@ -105,7 +105,21 @@ def test_sequence_length_guard_shorter_than_motif(tmp_path: Path) -> None:
                     "iterative_max_libraries": 1,
                     "iterative_min_new_solutions": 0,
                 },
-                "plan": [{"name": "default", "quota": 1}],
+                "plan": [
+                    {
+                        "name": "default",
+                        "quota": 1,
+                        "regulator_constraints": {
+                            "groups": [
+                                {
+                                    "name": "all",
+                                    "members": ["TF1"],
+                                    "min_required": 1,
+                                }
+                            ]
+                        },
+                    }
+                ],
             },
             "solver": {"backend": "CBC", "strategy": "iterate"},
             "runtime": {
@@ -179,7 +193,15 @@ def test_sequence_length_guard_required_regulators_min_length(tmp_path: Path) ->
                     {
                         "name": "default",
                         "quota": 1,
-                        "required_regulators": ["TF1", "TF2"],
+                        "regulator_constraints": {
+                            "groups": [
+                                {
+                                    "name": "all",
+                                    "members": ["TF1", "TF2"],
+                                    "min_required": 2,
+                                }
+                            ]
+                        },
                     }
                 ],
             },
@@ -255,6 +277,15 @@ def test_sequence_length_guard_promoter_constraints_min_length(tmp_path: Path) -
                     {
                         "name": "default",
                         "quota": 1,
+                        "regulator_constraints": {
+                            "groups": [
+                                {
+                                    "name": "all",
+                                    "members": ["TF1"],
+                                    "min_required": 1,
+                                }
+                            ]
+                        },
                         "fixed_elements": {
                             "promoter_constraints": [
                                 {

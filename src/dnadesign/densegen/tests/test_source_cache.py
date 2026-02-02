@@ -137,7 +137,13 @@ def test_source_cache_reuses_loaded_inputs(tmp_path: Path) -> None:
                     "iterative_max_libraries": 2,
                     "iterative_min_new_solutions": 0,
                 },
-                "plan": [{"name": "default", "quota": 2}],
+                "plan": [
+                    {
+                        "name": "default",
+                        "quota": 2,
+                        "regulator_constraints": {"groups": []},
+                    }
+                ],
             },
             "solver": {"backend": "CBC", "strategy": "iterate"},
             "runtime": {

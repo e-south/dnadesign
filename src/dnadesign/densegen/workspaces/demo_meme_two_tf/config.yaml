@@ -1,4 +1,4 @@
-# DenseGen demo: two TF motifs (LexA + CpxR) with bounded PWM sampling.
+# DenseGen demo: three TF motifs (LexA + CpxR + BaeR) with bounded PWM sampling.
 densegen:
   schema_version: "2.8"
   run:
@@ -6,12 +6,13 @@ densegen:
     root: "."
 
   inputs:
-    # LexA + CpxR DenseGen artifacts exported from the Cruncher demo.
-    - name: lexA_cpxR_artifacts
+    # LexA + CpxR + BaeR artifacts exported from the Cruncher handoff workflow.
+    - name: lexA_cpxR_baeR_artifacts
       type: pwm_artifact_set
       paths:
-        - inputs/motif_artifacts/lexA__meme_suite_meme__lexA_CTGTATAWAWWHACA.json
-        - inputs/motif_artifacts/cpxR__meme_suite_meme__cpxR_MANWWHTTTAM.json
+        - inputs/motif_artifacts/lexA__meme_suite_streme__lexA_1-CTGTATAWAWWHACAGT.json
+        - inputs/motif_artifacts/cpxR__meme_suite_streme__cpxR_1-MTTTACAYWWMTTTACAWWW.json
+        - inputs/motif_artifacts/baeR__meme_suite_streme__baeR_1-CTTTTTTTCTCCACGATTGG.json
       sampling:
         strategy: stochastic
         n_sites: 250
@@ -75,8 +76,17 @@ densegen:
               downstream: TATAAT
               spacer_length: [15, 19]
               upstream_pos: [0, 60]
-        required_regulators: [lexA_CTGTATAWAWWHACA, cpxR_MANWWHTTTAM]
-        min_required_regulators: 1
+        regulator_constraints:
+          groups:
+            - name: group_a
+              members:
+                - cpxR_1-MTTTACAYWWMTTTACAWWW
+                - baeR_1-CTTTTTTTCTCCACGATTGG
+              min_required: 1
+            - name: group_b
+              members:
+                - lexA_1-CTGTATAWAWWHACAGT
+              min_required: 1
 
   solver:
     backend: CBC

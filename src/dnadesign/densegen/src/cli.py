@@ -1863,8 +1863,8 @@ def inspect_config(
         "quota/fraction",
         "promoter_constraints",
         "side_biases",
-        "required_regulators",
-        "min_required_regulators",
+        "regulator_groups",
+        "group_min_required",
         "min_count_by_regulator",
     )
     for item in cfg.generation.resolve_plan():
@@ -1872,17 +1872,18 @@ def inspect_config(
         left = item.fixed_elements.side_biases.left if item.fixed_elements.side_biases else []
         right = item.fixed_elements.side_biases.right if item.fixed_elements.side_biases else []
         bias_count = len(set(left)) + len(set(right))
-        req_count = len(item.required_regulators or [])
-        min_req = item.min_required_regulators if item.min_required_regulators is not None else "-"
-        min_count_regs = len(item.min_count_by_regulator or {})
+        groups = list(item.regulator_constraints.groups or [])
+        group_count = len(groups)
+        group_min_total = sum(int(group.min_required) for group in groups)
+        min_count_regs = len(item.regulator_constraints.min_count_by_regulator or {})
         quota = str(item.quota) if item.quota is not None else f"{item.fraction:.3f}"
         plan_table.add_row(
             item.name,
             quota,
             str(len(pcs)),
             str(bias_count),
-            str(req_count),
-            str(min_req),
+            str(group_count),
+            str(group_min_total),
             str(min_count_regs),
         )
     console.print(plan_table)
@@ -1904,8 +1905,13 @@ def inspect_config(
                     console.print(f"  side_biases.left: {', '.join(sb.left)}")
                 if sb.right:
                     console.print(f"  side_biases.right: {', '.join(sb.right)}")
-                if item.required_regulators:
-                    console.print(f"  required_regulators: {', '.join(item.required_regulators)}")
+            constraints = item.regulator_constraints
+            for group in constraints.groups or []:
+                members = ", ".join(group.members)
+                console.print(f"  regulator_group[{group.name}]: min_required={group.min_required} members={members}")
+            if constraints.min_count_by_regulator:
+                entries = ", ".join(f"{tf}:{count}" for tf, count in sorted(constraints.min_count_by_regulator.items()))
+                console.print(f"  min_count_by_regulator: {entries}")
 
     pwm_inputs = [inp for inp in cfg.inputs if str(getattr(inp, "type", "")).startswith("pwm_")]
     if pwm_inputs:
@@ -2516,7 +2522,7 @@ def stage_b_build_libraries(
                     console.print(f"[bold red]Stage-B sampling failed[/]: {exc}")
                     console.print(f"[bold]Context[/]: input={inp.name} plan={plan_item.name}")
                     console.print("[bold]Next steps[/]:")
-                    console.print("  - ensure required_regulators match Stage-A regulator labels")
+                    console.print("  - ensure regulator_constraints group members match Stage-A regulator labels")
                     console.print("  - inspect available regulators via dense inspect inputs")
                     console.print("    or outputs/pools/pool_manifest.json")
                     raise typer.Exit(code=1)
@@ -2535,9 +2541,8 @@ def stage_b_build_libraries(
                     library_tfbs=library_tfbs,
                     library_tfs=library_tfs,
                     fixed_elements=plan_item.fixed_elements,
-                    required_regulators=list(dict.fromkeys(plan_item.required_regulators or [])),
-                    min_required_regulators=plan_item.min_required_regulators,
-                    min_count_by_regulator=dict(plan_item.min_count_by_regulator or {}),
+                    groups=list(plan_item.regulator_constraints.groups or []),
+                    min_count_by_regulator=dict(plan_item.regulator_constraints.min_count_by_regulator or {}),
                     min_count_per_tf=int(cfg.runtime.min_count_per_tf),
                     sequence_length=int(cfg.generation.sequence_length),
                 )

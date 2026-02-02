@@ -49,7 +49,11 @@ def _write_config(tmp_path: Path) -> Path:
                 plan:
                   - name: demo_plan
                     quota: 1
-                    required_regulators: [TF_A, TF_B]
+                    regulator_constraints:
+                      groups:
+                        - name: all
+                          members: [TF_A, TF_B]
+                          min_required: 2
               solver:
                 backend: CBC
                 strategy: iterate

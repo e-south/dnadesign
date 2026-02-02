@@ -42,7 +42,7 @@ MIN_CONFIG = {
         "generation": {
             "sequence_length": 10,
             "quota": 1,
-            "plan": [{"name": "default", "quota": 1}],
+            "plan": [{"name": "default", "quota": 1, "regulator_constraints": {"groups": []}}],
         },
         "solver": {"backend": "CBC", "strategy": "iterate", "strands": "double"},
         "logging": {"log_dir": "outputs/logs"},
@@ -155,6 +155,8 @@ def test_pad_mode_off_accepts_yaml_boolean(tmp_path: Path) -> None:
         plan:
           - name: default
             quota: 1
+            regulator_constraints:
+              groups: []
       solver:
         backend: CBC
         strategy: iterate
@@ -183,8 +185,8 @@ def test_pad_mode_off_accepts_yaml_boolean(tmp_path: Path) -> None:
 def test_plan_mixing_quota_and_fraction(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
     cfg["densegen"]["generation"]["plan"] = [
-        {"name": "a", "quota": 1},
-        {"name": "b", "fraction": 0.5},
+        {"name": "a", "quota": 1, "regulator_constraints": {"groups": []}},
+        {"name": "b", "fraction": 0.5, "regulator_constraints": {"groups": []}},
     ]
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
     with pytest.raises(ConfigError):
@@ -337,6 +339,7 @@ def test_promoter_constraint_motif_validation(tmp_path: Path) -> None:
         {
             "name": "bad",
             "quota": 1,
+            "regulator_constraints": {"groups": []},
             "fixed_elements": {
                 "promoter_constraints": [{"upstream": "TTGAZ", "downstream": "TATAAT", "spacer_length": [16, 18]}]
             },
@@ -416,6 +419,7 @@ def test_promoter_constraint_range_non_negative(tmp_path: Path) -> None:
         {
             "name": "bad",
             "quota": 1,
+            "regulator_constraints": {"groups": []},
             "fixed_elements": {
                 "promoter_constraints": [{"upstream": "TTGACA", "downstream": "TATAAT", "spacer_length": [-1, 18]}]
             },
@@ -432,6 +436,7 @@ def test_side_biases_overlap_rejected(tmp_path: Path) -> None:
         {
             "name": "bad",
             "quota": 1,
+            "regulator_constraints": {"groups": []},
             "fixed_elements": {"side_biases": {"left": ["TTGACA"], "right": ["TTGACA"]}},
         }
     ]
@@ -461,6 +466,7 @@ def test_side_biases_invalid_motif_rejected(tmp_path: Path) -> None:
         {
             "name": "bad",
             "quota": 1,
+            "regulator_constraints": {"groups": []},
             "fixed_elements": {"side_biases": {"left": ["TTGAZ"], "right": []}},
         }
     ]

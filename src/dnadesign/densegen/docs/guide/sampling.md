@@ -80,8 +80,7 @@ in `outputs/pools/pool_manifest.json`.
 
 ### Stage-B sampling
 
-Stage-B builds solver libraries from Stage-A pools. It is the **only** stage that resamples
-during a run. Stage-B always consumes the Stage-A pool parquet **as-written** (as-selected).
+Stage-B builds solver libraries from Stage-A pools. Stage-B always consumes the Stage-A pool parquet **as-written** (as-selected).
 
 There are two ways libraries get created:
 

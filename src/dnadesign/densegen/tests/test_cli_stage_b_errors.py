@@ -24,7 +24,8 @@ from dnadesign.densegen.src.cli import app
 def _write_stage_b_config(
     tmp_path: Path,
     *,
-    required_regulators: list[str],
+    group_members: list[str],
+    group_min_required: int | None = None,
     library_sampling_strategy: str = "tf_balanced",
 ) -> Path:
     inputs_dir = tmp_path / "inputs"
@@ -32,7 +33,8 @@ def _write_stage_b_config(
     sites_path = inputs_dir / "sites.csv"
     sites_path.write_text("tf,tfbs\nTF_A,AAAA\nTF_B,CCCC\n")
     cfg_path = tmp_path / "config.yaml"
-    required = ", ".join(f"{reg!r}" for reg in required_regulators)
+    required = ", ".join(f"{reg!r}" for reg in group_members)
+    min_required = group_min_required if group_min_required is not None else max(1, len(group_members))
     cfg_path.write_text(
         textwrap.dedent(
             f"""
@@ -64,7 +66,11 @@ def _write_stage_b_config(
                 plan:
                   - name: default
                     quota: 1
-                    required_regulators: [{required}]
+                    regulator_constraints:
+                      groups:
+                        - name: group_all
+                          members: [{required}]
+                          min_required: {min_required}
               solver:
                 backend: CBC
                 strategy: iterate
@@ -119,7 +125,7 @@ def _read_library_manifest(tmp_path: Path) -> dict:
 
 
 def test_stage_b_reports_missing_required_regulators(tmp_path: Path) -> None:
-    cfg_path = _write_stage_b_config(tmp_path, required_regulators=["MISSING_TF"])
+    cfg_path = _write_stage_b_config(tmp_path, group_members=["MISSING_TF"])
     pool_dir = _write_pool_manifest(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
@@ -135,14 +141,14 @@ def test_stage_b_reports_missing_required_regulators(tmp_path: Path) -> None:
     )
     assert result.exit_code != 0, result.output
     assert "Stage-B sampling failed" in result.output
-    assert "Required regulators not found in input" in result.output
+    assert "Regulator constraints reference missing regulators" in result.output
     assert "Available regulators" in result.output
 
 
 def test_stage_b_emits_sampling_pressure_events(tmp_path: Path) -> None:
     cfg_path = _write_stage_b_config(
         tmp_path,
-        required_regulators=["TF_A", "TF_B"],
+        group_members=["TF_A", "TF_B"],
         library_sampling_strategy="coverage_weighted",
     )
     pool_dir = _write_pool_manifest(tmp_path)
@@ -169,7 +175,7 @@ def test_stage_b_emits_sampling_pressure_events(tmp_path: Path) -> None:
 def test_stage_b_requires_append_or_overwrite_when_artifacts_exist(tmp_path: Path) -> None:
     cfg_path = _write_stage_b_config(
         tmp_path,
-        required_regulators=["TF_A", "TF_B"],
+        group_members=["TF_A", "TF_B"],
         library_sampling_strategy="coverage_weighted",
     )
     pool_dir = _write_pool_manifest(tmp_path)
@@ -206,7 +212,7 @@ def test_stage_b_requires_append_or_overwrite_when_artifacts_exist(tmp_path: Pat
 def test_stage_b_append_builds_when_empty(tmp_path: Path) -> None:
     cfg_path = _write_stage_b_config(
         tmp_path,
-        required_regulators=["TF_A", "TF_B"],
+        group_members=["TF_A", "TF_B"],
         library_sampling_strategy="coverage_weighted",
     )
     pool_dir = _write_pool_manifest(tmp_path)
@@ -238,7 +244,7 @@ def test_stage_b_append_builds_when_empty(tmp_path: Path) -> None:
 def test_stage_b_append_appends_libraries_with_matching_hashes(tmp_path: Path) -> None:
     cfg_path = _write_stage_b_config(
         tmp_path,
-        required_regulators=["TF_A", "TF_B"],
+        group_members=["TF_A", "TF_B"],
         library_sampling_strategy="coverage_weighted",
     )
     pool_dir = _write_pool_manifest(tmp_path)
@@ -282,7 +288,7 @@ def test_stage_b_append_appends_libraries_with_matching_hashes(tmp_path: Path) -
 def test_stage_b_append_requires_matching_hashes(tmp_path: Path) -> None:
     cfg_path = _write_stage_b_config(
         tmp_path,
-        required_regulators=["TF_A", "TF_B"],
+        group_members=["TF_A", "TF_B"],
         library_sampling_strategy="coverage_weighted",
     )
     pool_dir = _write_pool_manifest(tmp_path)
@@ -302,7 +308,7 @@ def test_stage_b_append_requires_matching_hashes(tmp_path: Path) -> None:
     assert first.exit_code == 0, first.output
     cfg_path = _write_stage_b_config(
         tmp_path,
-        required_regulators=["TF_A", "TF_B"],
+        group_members=["TF_A", "TF_B"],
         library_sampling_strategy="uniform_over_pairs",
     )
     second = runner.invoke(

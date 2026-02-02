@@ -33,6 +33,11 @@ def _write_config(run_root: Path) -> Path:
             plan:
               - name: demo_plan
                 quota: 1
+                regulator_constraints:
+                  groups:
+                    - name: all
+                      members: [lexA]
+                      min_required: 1
           solver:
             backend: CBC
             strategy: iterate
@@ -96,6 +101,11 @@ def _write_pwm_config(run_root: Path) -> Path:
             plan:
               - name: demo_plan
                 quota: 1
+                regulator_constraints:
+                  groups:
+                    - name: all
+                      members: [demo_motif]
+                      min_required: 1
           solver:
             backend: CBC
             strategy: iterate

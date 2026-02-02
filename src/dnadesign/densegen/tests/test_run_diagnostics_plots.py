@@ -146,6 +146,7 @@ def _cfg() -> dict:
             "plan": [
                 {
                     "name": "demo_plan",
+                    "regulator_constraints": {"groups": []},
                     "fixed_elements": {
                         "promoter_constraints": [
                             {

@@ -167,6 +167,11 @@ def _write_stage_a_config(tmp_path: Path) -> Path:
                 plan:
                   - name: default
                     quota: 1
+                    regulator_constraints:
+                      groups:
+                        - name: all
+                          members: [TF1, TF2, TF3]
+                          min_required: 1
               solver:
                 backend: CBC
                 strategy: iterate
@@ -241,6 +246,8 @@ def _write_pwm_stage_a_config(tmp_path: Path) -> Path:
                 plan:
                   - name: default
                     quota: 1
+                    regulator_constraints:
+                      groups: []
               solver:
                 backend: CBC
                 strategy: iterate

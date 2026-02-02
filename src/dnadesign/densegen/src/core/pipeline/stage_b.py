@@ -20,7 +20,7 @@ import pandas as pd
 from ...config import ResolvedPlanItem
 from ..artifacts.ids import hash_tfbs_id
 from ..artifacts.pool import POOL_MODE_TFBS, PoolData
-from ..sampler import TFSampler
+from ..sampler import TFSampler, compute_tf_weights
 from .progress import _aggregate_failure_counts_for_sampling
 
 
@@ -120,13 +120,48 @@ def _min_fixed_elements_length(fixed_elements_dump: dict) -> int:
     return total
 
 
+def select_group_members(
+    *,
+    groups: list,
+    available_tfs: set[str],
+    np_rng: np.random.Generator,
+    sampling_strategy: str,
+    weight_by_tf: dict[str, float] | None,
+) -> tuple[list[str], dict[str, list[str]]]:
+    required_members: list[str] = []
+    selection: dict[str, list[str]] = {}
+    for group in groups:
+        members = list(group.members or [])
+        missing = [m for m in members if m not in available_tfs]
+        if missing:
+            preview = ", ".join(missing[:10])
+            raise ValueError(f"Regulator group '{group.name}' contains missing regulators: {preview}")
+        if group.min_required > len(members):
+            raise ValueError(
+                f"Regulator group '{group.name}' min_required exceeds group size "
+                f"({group.min_required} > {len(members)})."
+            )
+        if sampling_strategy == "coverage_weighted":
+            weights = np.array([float(weight_by_tf.get(tf, 0.0)) if weight_by_tf else 0.0 for tf in members])
+            total = float(weights.sum())
+            if total <= 0:
+                raise ValueError(f"Regulator group '{group.name}' has no sampling weight.")
+            weights = weights / total
+            chosen = np_rng.choice(len(members), size=int(group.min_required), replace=False, p=weights)
+        else:
+            chosen = np_rng.choice(len(members), size=int(group.min_required), replace=False)
+        selected = sorted([members[int(i)] for i in chosen])
+        selection[group.name] = selected
+        required_members.extend(selected)
+    return required_members, selection
+
+
 def _min_required_length_for_constraints(
     *,
     library_tfbs: list[str],
     library_tfs: list[str],
     fixed_elements_dump: dict,
-    required_regulators: list[str] | None,
-    min_required_regulators: int | None,
+    groups: list,
     min_count_by_regulator: dict[str, int] | None,
     min_count_per_tf: int,
 ) -> tuple[int, dict[str, int]]:
@@ -140,9 +175,6 @@ def _min_required_length_for_constraints(
         lengths_by_tf[tf].sort()
 
     per_tf_required: dict[str, int] = {}
-    if required_regulators and min_required_regulators is None:
-        for tf in required_regulators:
-            per_tf_required[tf] = max(per_tf_required.get(tf, 0), 1)
     if min_count_by_regulator:
         for tf, count in min_count_by_regulator.items():
             per_tf_required[tf] = max(per_tf_required.get(tf, 0), int(count))
@@ -162,32 +194,33 @@ def _min_required_length_for_constraints(
         preview = ", ".join(missing[:6])
         raise ValueError(f"Not enough TFBS to satisfy per-regulator minimums: {preview}")
 
-    k_required_extra = 0
-    if min_required_regulators is not None:
-        candidate_set = set(required_regulators or lengths_by_tf.keys())
-        available = [tf for tf in candidate_set if tf in lengths_by_tf]
-        if len(available) < int(min_required_regulators):
-            raise ValueError(
-                "min_required_regulators exceeds available regulators in the Stage-B library "
-                f"({len(available)} < {int(min_required_regulators)})."
-            )
+    group_required_extra = 0
+    if groups:
         already_required = {tf for tf, count in per_tf_required.items() if count > 0}
-        remaining = max(0, int(min_required_regulators) - len(set(available) & already_required))
-        if remaining > 0:
-            candidates = [lengths_by_tf[tf][0] for tf in available if tf not in already_required]
-            if len(candidates) < remaining:
+        for group in groups:
+            members = list(group.members or [])
+            available = [tf for tf in members if tf in lengths_by_tf]
+            if len(available) < int(group.min_required):
                 raise ValueError(
-                    "min_required_regulators exceeds available regulators after fixed minimums "
-                    f"({len(candidates)} < {remaining})."
+                    f"Regulator group '{group.name}' exceeds available regulators in the Stage-B library "
+                    f"({len(available)} < {int(group.min_required)})."
                 )
-            k_required_extra = sum(sorted(candidates)[:remaining])
+            remaining = max(0, int(group.min_required) - len(set(available) & already_required))
+            if remaining > 0:
+                candidates = [lengths_by_tf[tf][0] for tf in available if tf not in already_required]
+                if len(candidates) < remaining:
+                    raise ValueError(
+                        f"Regulator group '{group.name}' exceeds available regulators after fixed minimums "
+                        f"({len(candidates)} < {remaining})."
+                    )
+                group_required_extra += sum(sorted(candidates)[:remaining])
 
     fixed_min = _min_fixed_elements_length(fixed_elements_dump)
-    total = fixed_min + per_tf_total + k_required_extra
+    total = fixed_min + per_tf_total + group_required_extra
     return total, {
         "fixed_elements_min": fixed_min,
         "per_tf_min": per_tf_total,
-        "min_required_extra": k_required_extra,
+        "min_required_extra": group_required_extra,
     }
 
 
@@ -196,8 +229,7 @@ def assess_library_feasibility(
     library_tfbs: list[str],
     library_tfs: list[str],
     fixed_elements,
-    required_regulators: list[str] | None,
-    min_required_regulators: int | None,
+    groups: list,
     min_count_by_regulator: dict[str, int] | None,
     min_count_per_tf: int,
     sequence_length: int,
@@ -207,8 +239,7 @@ def assess_library_feasibility(
         library_tfbs=library_tfbs,
         library_tfs=library_tfs,
         fixed_elements_dump=fixed_elements_dump,
-        required_regulators=required_regulators,
-        min_required_regulators=min_required_regulators,
+        groups=groups,
         min_count_by_regulator=min_count_by_regulator,
         min_count_per_tf=min_count_per_tf,
     )
@@ -290,16 +321,9 @@ def build_library_for_plan(
     meta_df = pool.df if pool.pool_mode == POOL_MODE_TFBS else None
 
     fixed_elements = plan_item.fixed_elements
-    required_regulators = list(dict.fromkeys(plan_item.required_regulators or []))
-    min_required_regulators = plan_item.min_required_regulators
-    plan_min_count_by_regulator = dict(plan_item.min_count_by_regulator or {})
-    k_required = int(min_required_regulators) if min_required_regulators is not None else None
-    k_of_required = bool(required_regulators) and k_required is not None
-    if k_of_required and k_required > len(required_regulators):
-        raise ValueError(
-            "min_required_regulators cannot exceed required_regulators size "
-            f"({k_required} > {len(required_regulators)})."
-        )
+    constraints = plan_item.regulator_constraints
+    groups = list(constraints.groups or [])
+    plan_min_count_by_regulator = dict(constraints.min_count_by_regulator or {})
     side_left, side_right = _extract_side_biases(fixed_elements)
     required_bias_motifs = list(dict.fromkeys([*side_left, *side_right]))
 
@@ -332,7 +356,13 @@ def build_library_for_plan(
                 "generation.sampling.unique_binding_cores=true requires tfbs_core in the Stage-A pool. "
                 "Rebuild pools with core-aware sampling or disable unique_binding_cores."
             )
+        if not groups:
+            raise ValueError(
+                "regulator_constraints.groups must be non-empty for TFBS inputs. "
+                "Define at least one regulator group in generation.plan[].regulator_constraints."
+            )
         available_tfs = set(meta_df["tf"].tolist())
+        all_group_members = list(dict.fromkeys([m for g in groups for m in g.members]))
         tfbs_counts = (
             meta_df.groupby("tf")["tfbs_core"].nunique()
             if unique_binding_cores
@@ -342,12 +372,13 @@ def build_library_for_plan(
                 else meta_df.groupby("tf")["tfbs"].size()
             )
         )
-        missing = [t for t in required_regulators if t not in available_tfs]
+        missing = [t for t in all_group_members if t not in available_tfs]
         if missing:
             preview = ", ".join(missing[:10])
             available_preview = ", ".join(sorted(available_tfs)[:10]) if available_tfs else "n/a"
             raise ValueError(
-                f"Required regulators not found in input: {preview}. Available regulators: {available_preview}."
+                f"Regulator constraints reference missing regulators: {preview}. "
+                f"Available regulators: {available_preview}."
             )
         if plan_min_count_by_regulator:
             missing_counts = [t for t in plan_min_count_by_regulator if t not in available_tfs]
@@ -365,12 +396,6 @@ def build_library_for_plan(
                         f"min_count_by_regulator[{tf}]={min_count} exceeds available sites ({max_allowed}). "
                         "Increase library_size, relax min_count_by_regulator, or allow non-unique binding sites/cores."
                     )
-        if min_required_regulators is not None:
-            if not required_regulators and min_required_regulators > len(available_tfs):
-                raise ValueError(
-                    f"min_required_regulators={min_required_regulators} exceeds available regulators "
-                    f"({len(available_tfs)})."
-                )
         if pool_strategy in {"subsample", "iterative_subsample"} and cover_all_tfs and not allow_incomplete_coverage:
             if library_size > 0 and library_size < len(available_tfs):
                 raise ValueError(
@@ -378,6 +403,36 @@ def build_library_for_plan(
                     f"library_size={library_size} but available_tfs={len(available_tfs)}. "
                     "Increase library_size or allow_incomplete_coverage."
                 )
+
+        failure_counts_by_tfbs: dict[tuple[str, str], int] | None = None
+        if library_sampling_strategy == "coverage_weighted" and getattr(sampling_cfg, "avoid_failed_motifs", False):
+            failure_counts_by_tfbs = _aggregate_failure_counts_for_sampling(
+                failure_counts,
+                input_name=source_label,
+                plan_name=plan_item.name,
+            )
+        weight_df = meta_df
+        if unique_binding_sites:
+            weight_df = weight_df.drop_duplicates(["tf", "tfbs"]).reset_index(drop=True)
+        weight_by_tf = None
+        if library_sampling_strategy == "coverage_weighted":
+            weight_by_tf, _, _ = compute_tf_weights(
+                weight_df,
+                usage_counts=usage_counts,
+                coverage_boost_alpha=float(getattr(sampling_cfg, "coverage_boost_alpha", 0.15)),
+                coverage_boost_power=float(getattr(sampling_cfg, "coverage_boost_power", 1.0)),
+                failure_counts=failure_counts_by_tfbs,
+                avoid_failed_motifs=bool(getattr(sampling_cfg, "avoid_failed_motifs", False)),
+                failure_penalty_alpha=float(getattr(sampling_cfg, "failure_penalty_alpha", 0.5)),
+                failure_penalty_power=float(getattr(sampling_cfg, "failure_penalty_power", 1.0)),
+            )
+        required_regulators_selected, _ = select_group_members(
+            groups=groups,
+            available_tfs=available_tfs,
+            np_rng=np_rng,
+            sampling_strategy=library_sampling_strategy,
+            weight_by_tf=weight_by_tf,
+        )
 
         if pool_strategy == "full":
             lib_df = meta_df.copy()
@@ -407,6 +462,7 @@ def build_library_for_plan(
                 "library_size": len(library),
                 "iterative_max_libraries": iterative_max_libraries,
                 "iterative_min_new_solutions": iterative_min_new_solutions,
+                "required_regulators_selected": required_regulators_selected,
             }
             return _finalize(
                 library,
@@ -420,26 +476,9 @@ def build_library_for_plan(
             )
 
         sampler = TFSampler(meta_df, np_rng)
-        required_regulators_selected = required_regulators
-        if k_of_required:
-            candidates = sorted(required_regulators)
-            if k_required is not None and k_required < len(candidates):
-                chosen = np_rng.choice(len(candidates), size=k_required, replace=False)
-                required_regulators_selected = sorted([candidates[int(i)] for i in chosen])
-            else:
-                required_regulators_selected = candidates
         required_tfs_for_library = list(
             dict.fromkeys([*required_regulators_selected, *plan_min_count_by_regulator.keys()])
         )
-        if min_required_regulators is not None and not required_regulators:
-            if pool_strategy in {"subsample", "iterative_subsample"}:
-                if library_size < int(min_required_regulators):
-                    raise ValueError(
-                        "library_size is too small to satisfy min_required_regulators when "
-                        f"required_regulators is empty. library_size={library_size} "
-                        f"min_required_regulators={min_required_regulators}. "
-                        "Increase library_size or lower min_required_regulators."
-                    )
         if pool_strategy in {"subsample", "iterative_subsample"}:
             required_slots = len(required_bias_motifs) + len(required_tfs_for_library)
             if library_size < required_slots:
@@ -447,16 +486,9 @@ def build_library_for_plan(
                     "library_size is too small for required motifs. "
                     f"library_size={library_size} but required_tfbs={len(required_bias_motifs)} "
                     f"+ required_tfs={len(required_tfs_for_library)} "
-                    f"(min_required_regulators={min_required_regulators}). "
+                    "(regulator constraints). "
                     "Increase library_size or relax required constraints."
                 )
-        failure_counts_by_tfbs: dict[tuple[str, str], int] | None = None
-        if library_sampling_strategy == "coverage_weighted" and getattr(sampling_cfg, "avoid_failed_motifs", False):
-            failure_counts_by_tfbs = _aggregate_failure_counts_for_sampling(
-                failure_counts,
-                input_name=source_label,
-                plan_name=plan_item.name,
-            )
         library, parts, reg_labels, info = sampler.generate_binding_site_library(
             library_size,
             sequence_length=seq_len,
@@ -487,7 +519,7 @@ def build_library_for_plan(
                 "coverage_boost_power": float(getattr(sampling_cfg, "coverage_boost_power", 1.0)),
                 "iterative_max_libraries": iterative_max_libraries,
                 "iterative_min_new_solutions": iterative_min_new_solutions,
-                "required_regulators_selected": required_regulators_selected if k_of_required else None,
+                "required_regulators_selected": required_regulators_selected,
             }
         )
         site_id_by_index = info.get("site_id_by_index")
@@ -505,12 +537,13 @@ def build_library_for_plan(
             motif_id_by_index=motif_id_by_index,
         )
 
-    if required_regulators or plan_min_count_by_regulator or min_required_regulators is not None:
-        preview = ", ".join(required_regulators[:10]) if required_regulators else "n/a"
+    if groups or plan_min_count_by_regulator:
+        members = [m for g in groups for m in g.members] if groups else []
+        preview = ", ".join(members[:10]) if members else "n/a"
         raise ValueError(
-            "Regulator constraints are set (required/min_count/min_required) "
+            "Regulator constraints are set (groups/min_count) "
             "but the input does not provide regulators. "
-            f"required_regulators={preview}."
+            f"group_members={preview}."
         )
     all_sequences = [s for s in data_entries]
     if not all_sequences:

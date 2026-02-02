@@ -46,6 +46,11 @@ def _write_config(path: Path, *, meme_path: Path) -> None:
             plan:
               - name: demo_plan
                 quota: 1
+                regulator_constraints:
+                  groups:
+                    - name: core
+                      members: [lexA_CTGTATAWAWWHACA, cpxR_MANWWHTTTAM]
+                      min_required: 2
           solver:
             backend: CBC
             strategy: iterate

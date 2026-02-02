@@ -171,16 +171,15 @@ Outputs (tables), logs, and plots must resolve inside `outputs/` under `densegen
     - `left`: list of motifs biased toward the 5prime side
     - `right`: list of motifs biased toward the 3prime side
     - Motifs must be A/C/G/T and must exist in the sampled library
-- `required_regulators` (list) - regulators that must appear in each solution when
-  `min_required_regulators` is unset (**all-of**).
-  - Regulator labels must match the `tf` values in the Stage‑A pool (for PWM inputs, this is the motif ID).
-- `min_required_regulators` (int > 0, optional) - require at least K distinct regulators
-  **in the final sequence**. When set alongside `required_regulators`, those regulators
-  become the candidate set (k-of-n). If `required_regulators` is empty, the requirement
-    applies to the full regulator pool.
-  - `min_count_by_regulator` (dict, optional) - per-regulator minimum counts
-    - For regulators listed here, DenseGen uses the maximum of this value and
-      `runtime.min_count_per_tf`.
+  - `regulator_constraints` (required)
+    - `groups` (list) - regulator groups that must appear in each solution.
+      - Each group: `name`, `members`, `min_required`.
+      - Group members must match Stage‑A pool `tf` labels (for PWM inputs, this is the motif ID).
+      - Members must be unique across groups; `min_required` must be > 0 and <= group size.
+      - For sequence-only inputs (no regulators), set `groups: []`.
+    - `min_count_by_regulator` (dict, optional) - per-regulator minimum counts
+      - Keys must match group members.
+      - DenseGen uses the maximum of this value and `runtime.min_count_per_tf`.
 
 ---
 

@@ -613,52 +613,97 @@ class FixedElements(BaseModel):
     side_biases: Optional[SideBiases] = None
 
 
+class RegulatorGroup(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    members: List[str]
+    min_required: int = 1
+
+    @field_validator("name")
+    @classmethod
+    def _group_name_ok(cls, v: str):
+        text = str(v).strip()
+        if not text:
+            raise ValueError("regulator group name must be a non-empty string")
+        return text
+
+    @field_validator("members")
+    @classmethod
+    def _group_members_ok(cls, v: List[str]):
+        if not v:
+            raise ValueError("regulator group members must be non-empty")
+        cleaned = []
+        for raw in v:
+            text = str(raw).strip()
+            if not text:
+                raise ValueError("regulator group members must be non-empty strings")
+            cleaned.append(text)
+        if len(set(cleaned)) != len(cleaned):
+            raise ValueError("regulator group members must be unique")
+        return cleaned
+
+    @field_validator("min_required")
+    @classmethod
+    def _group_min_required_ok(cls, v: int):
+        if int(v) <= 0:
+            raise ValueError("regulator group min_required must be > 0")
+        return int(v)
+
+    @model_validator(mode="after")
+    def _group_min_required_size(self):
+        if self.members and int(self.min_required) > len(self.members):
+            raise ValueError(
+                f"regulator group min_required cannot exceed group size ({self.min_required} > {len(self.members)})."
+            )
+        return self
+
+
+class RegulatorConstraints(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    groups: List[RegulatorGroup]
+    min_count_by_regulator: Dict[str, int] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _constraints_ok(self):
+        if not self.groups and self.min_count_by_regulator:
+            raise ValueError("regulator_constraints.groups must be non-empty when min_count_by_regulator is set")
+        if not self.groups:
+            self.min_count_by_regulator = {}
+            return self
+        names = []
+        member_set: set[str] = set()
+        for group in self.groups:
+            names.append(group.name)
+            for member in group.members:
+                if member in member_set:
+                    raise ValueError(f"regulator group members must be disjoint; duplicate '{member}' found")
+                member_set.add(member)
+        if len(set(names)) != len(names):
+            raise ValueError("regulator group names must be unique")
+        cleaned_counts: Dict[str, int] = {}
+        for key, val in (self.min_count_by_regulator or {}).items():
+            name = str(key).strip()
+            if not name:
+                raise ValueError("min_count_by_regulator keys must be non-empty strings")
+            if name in cleaned_counts:
+                raise ValueError("min_count_by_regulator keys must be unique after trimming")
+            count = int(val)
+            if count <= 0:
+                raise ValueError(f"min_count_by_regulator[{name!r}] must be > 0")
+            if name not in member_set:
+                raise ValueError(f"min_count_by_regulator includes unknown regulator '{name}'")
+            cleaned_counts[name] = count
+        self.min_count_by_regulator = cleaned_counts
+        return self
+
+
 class PlanItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
     quota: Optional[int] = None
     fraction: Optional[float] = None
     fixed_elements: FixedElements = Field(default_factory=FixedElements)
-    required_regulators: List[str] = Field(default_factory=list)
-    min_required_regulators: Optional[int] = None
-    min_count_by_regulator: Dict[str, int] = Field(default_factory=dict)
-
-    @field_validator("required_regulators")
-    @classmethod
-    def _required_regs_ok(cls, v: List[str]):
-        regs = []
-        for r in v:
-            if not isinstance(r, str) or not r.strip():
-                raise ValueError("required_regulators must contain non-empty strings")
-            regs.append(r.strip())
-        if len(set(regs)) != len(regs):
-            raise ValueError("required_regulators must be unique")
-        return regs
-
-    @field_validator("min_required_regulators")
-    @classmethod
-    def _min_required_regs_ok(cls, v: Optional[int]):
-        if v is None:
-            return v
-        if int(v) <= 0:
-            raise ValueError("min_required_regulators must be > 0 when set")
-        return int(v)
-
-    @field_validator("min_count_by_regulator")
-    @classmethod
-    def _min_counts_ok(cls, v: Dict[str, int]):
-        cleaned: Dict[str, int] = {}
-        for key, val in (v or {}).items():
-            name = str(key).strip()
-            if not name:
-                raise ValueError("min_count_by_regulator keys must be non-empty strings")
-            if name in cleaned:
-                raise ValueError("min_count_by_regulator keys must be unique after trimming")
-            count = int(val)
-            if count <= 0:
-                raise ValueError(f"min_count_by_regulator[{name!r}] must be > 0")
-            cleaned[name] = count
-        return cleaned
+    regulator_constraints: RegulatorConstraints
 
     @model_validator(mode="after")
     def _quota_or_fraction(self):
@@ -668,16 +713,6 @@ class PlanItem(BaseModel):
             raise ValueError("Plan item quota must be > 0")
         if self.fraction is not None and self.fraction <= 0:
             raise ValueError("Plan item fraction must be > 0")
-        return self
-
-    @model_validator(mode="after")
-    def _required_regulator_k_ok(self):
-        if self.min_required_regulators is not None and self.required_regulators:
-            if int(self.min_required_regulators) > len(self.required_regulators):
-                raise ValueError(
-                    "min_required_regulators cannot exceed required_regulators size "
-                    f"({self.min_required_regulators} > {len(self.required_regulators)})."
-                )
         return self
 
 
@@ -796,9 +831,7 @@ class GenerationConfig(BaseModel):
                     name=p.name,
                     quota=int(p.quota),
                     fixed_elements=p.fixed_elements,
-                    required_regulators=p.required_regulators,
-                    min_required_regulators=p.min_required_regulators,
-                    min_count_by_regulator=p.min_count_by_regulator,
+                    regulator_constraints=p.regulator_constraints,
                 )
                 for p in self.plan
             ]
@@ -819,9 +852,7 @@ class GenerationConfig(BaseModel):
                     name=p.name,
                     quota=q,
                     fixed_elements=p.fixed_elements,
-                    required_regulators=p.required_regulators,
-                    min_required_regulators=p.min_required_regulators,
-                    min_count_by_regulator=p.min_count_by_regulator,
+                    regulator_constraints=p.regulator_constraints,
                 )
             )
             remaining -= q
@@ -835,9 +866,7 @@ class ResolvedPlanItem:
     name: str
     quota: int
     fixed_elements: FixedElements
-    required_regulators: List[str]
-    min_required_regulators: Optional[int]
-    min_count_by_regulator: Dict[str, int]
+    regulator_constraints: RegulatorConstraints
 
 
 # ---- Output ----

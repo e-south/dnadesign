@@ -1,0 +1,34 @@
+cruncher:
+  out_dir: outputs
+  regulator_sets:
+    - [lexA, cpxR, baeR]
+
+  motif_store:
+    source_preference: [meme_suite_streme, demo_local_meme, regulondb]
+    combine_sites: true
+    site_window_lengths:
+      lexA: 20
+      cpxR: 20
+      baeR: 20
+
+  motif_discovery:
+    tool: streme
+    source_id: meme_suite_streme
+
+  ingest:
+    regulondb:
+      curated_sites: true
+      ht_sites: false
+    local_sources:
+      - source_id: demo_local_meme
+        root: inputs/local_motifs
+        patterns: ["*.txt"]
+        format_map: {".txt": "MEME"}
+        extract_sites: true
+        tf_name_strategy: stem
+
+  parse:
+    plot:
+      logo: true
+      bits_mode: information
+      dpi: 150

@@ -71,7 +71,13 @@ def _write_config(tmp_path: Path) -> Path:
                     "generation": {
                         "sequence_length": 60,
                         "quota": 1,
-                        "plan": [{"name": "default", "quota": 1}],
+                        "plan": [
+                            {
+                                "name": "default",
+                                "quota": 1,
+                                "regulator_constraints": {"groups": []},
+                            }
+                        ],
                     },
                     "solver": {"backend": "CBC", "strategy": "iterate"},
                     "runtime": {

@@ -349,6 +349,51 @@ def _apply_pad_offsets(used_tfbs_detail: list[dict], pad_meta: dict) -> list[dic
     return used_tfbs_detail
 
 
+def _validate_library_constraints(
+    record: LibraryRecord,
+    *,
+    groups: list,
+    min_count_by_regulator: dict[str, int],
+    input_name: str,
+    plan_name: str,
+) -> None:
+    required_regulators_selected = list(record.required_regulators_selected or [])
+    if groups:
+        if not required_regulators_selected:
+            raise RuntimeError(
+                f"Library artifact missing required_regulators_selected for {input_name}/{plan_name} "
+                f"(library_index={record.library_index}). Rebuild libraries with the current version."
+            )
+        library_tf_set = {tf for tf in record.library_tfs if tf}
+        missing = [tf for tf in required_regulators_selected if tf not in library_tf_set]
+        if missing:
+            preview = ", ".join(missing[:10])
+            raise RuntimeError(
+                f"Library artifact required_regulators_selected includes TFs not in the library: {preview}."
+            )
+        group_members = {m for g in groups for m in g.members}
+        invalid = [tf for tf in required_regulators_selected if tf not in group_members]
+        if invalid:
+            preview = ", ".join(invalid[:10])
+            raise RuntimeError(
+                f"Library artifact required_regulators_selected includes TFs not in regulator groups: {preview}."
+            )
+        for group in groups:
+            selected = [tf for tf in required_regulators_selected if tf in group.members]
+            if len(selected) < int(group.min_required):
+                raise RuntimeError(
+                    f"Library artifact required_regulators_selected does not satisfy group '{group.name}' "
+                    f"min_required={group.min_required}."
+                )
+    for tf, min_count in min_count_by_regulator.items():
+        found = sum(1 for t in record.library_tfs if t == tf)
+        if found < int(min_count):
+            raise RuntimeError(
+                f"Library artifact for {input_name}/{plan_name} (library_index={record.library_index}) "
+                f"has tf={tf} count={found} < min_count_by_regulator={min_count}."
+            )
+
+
 def _process_plan_for_source(
     source_cfg,
     plan_item: ResolvedPlanItem,
@@ -783,16 +828,9 @@ def _process_plan_for_source(
             meta_df=meta_df,
         )
     fixed_elements = plan_item.fixed_elements
-    required_regulators = list(dict.fromkeys(plan_item.required_regulators or []))
-    min_required_regulators = plan_item.min_required_regulators
-    plan_min_count_by_regulator = dict(plan_item.min_count_by_regulator or {})
-    k_required = int(min_required_regulators) if min_required_regulators is not None else None
-    k_of_required = bool(required_regulators) and k_required is not None
-    if k_of_required and k_required > len(required_regulators):
-        raise ValueError(
-            "min_required_regulators cannot exceed required_regulators size "
-            f"({k_required} > {len(required_regulators)})."
-        )
+    constraints = plan_item.regulator_constraints
+    groups = list(constraints.groups or [])
+    plan_min_count_by_regulator = dict(constraints.min_count_by_regulator or {})
     metadata_min_counts = {tf: max(min_count_per_tf, int(val)) for tf, val in plan_min_count_by_regulator.items()}
     fixed_elements_dump = _fixed_elements_dump(fixed_elements)
     fixed_elements_max_len = _max_fixed_element_len(fixed_elements_dump)
@@ -850,6 +888,13 @@ def _process_plan_for_source(
                 f"Library artifact size mismatch for {source_label}/{plan_name}: "
                 f"artifact={record.library_size} config={sampling_cfg.library_size}."
             )
+        _validate_library_constraints(
+            record,
+            groups=groups,
+            min_count_by_regulator=plan_min_count_by_regulator,
+            input_name=source_label,
+            plan_name=plan_name,
+        )
         tfbs_parts_local = []
         for idx, tfbs in enumerate(record.library_tfbs):
             tf = record.library_tfs[idx] if idx < len(record.library_tfs) else ""
@@ -911,12 +956,18 @@ def _process_plan_for_source(
     library_sources = list(source_by_index) if source_by_index else []
     library_tfbs_ids = list(tfbs_id_by_index) if tfbs_id_by_index else []
     library_motif_ids = list(motif_id_by_index) if motif_id_by_index else []
+    required_regulators = list(dict.fromkeys(sampling_info.get("required_regulators_selected") or []))
+    if groups and not required_regulators:
+        raise RuntimeError(
+            f"Stage-B sampling did not record required_regulators_selected for {source_label}/{plan_name}. "
+            "Rebuild libraries with the current version."
+        )
+    min_required_regulators = None
     min_required_len, min_breakdown, feasibility = assess_library_feasibility(
         library_tfbs=library_tfbs,
         library_tfs=library_tfs,
         fixed_elements=plan_item.fixed_elements,
-        required_regulators=required_regulators,
-        min_required_regulators=min_required_regulators,
+        groups=groups,
         min_count_by_regulator=plan_min_count_by_regulator,
         min_count_per_tf=min_count_per_tf,
         sequence_length=seq_len,
@@ -956,8 +1007,8 @@ def _process_plan_for_source(
             f"fixed_elements_min={min_breakdown['fixed_elements_min']}, "
             f"per_tf_min={min_breakdown['per_tf_min']}, "
             f"min_required_extra={min_breakdown['min_required_extra']}). "
-            "Increase densegen.generation.sequence_length or relax required_regulators, "
-            "min_required_regulators, min_count_by_regulator, or fixed-element constraints."
+            "Increase densegen.generation.sequence_length or relax regulator_constraints, "
+            "min_count_by_regulator, or fixed-element constraints."
         )
 
     def _current_leaderboard_snapshot() -> dict[str, object]:
@@ -1097,18 +1148,7 @@ def _process_plan_for_source(
         base_min_counts = _min_count_by_regulator(regulator_by_index, min_count_per_tf)
         solver_min_counts = _merge_min_counts(base_min_counts, plan_min_count_by_regulator)
         fe_dict = fixed_elements.model_dump() if hasattr(fixed_elements, "model_dump") else fixed_elements
-        solver_required_regs = required_regulators
-        if k_of_required and regulator_by_index:
-            available = set(regulator_by_index)
-            solver_required_regs = [tf for tf in required_regulators if tf in available]
-            if k_required is not None and len(solver_required_regs) < k_required:
-                raise ValueError(
-                    "Required regulator candidate set is smaller than min_required_regulators "
-                    f"after Stage-B library sampling ({len(solver_required_regs)} < {k_required}). "
-                    "Increase library_size or relax required_regulators/min_required_regulators."
-                )
-        if min_required_regulators is not None and not required_regulators:
-            solver_required_regs = None
+        solver_required_regs = required_regulators or None
         run = deps.optimizer.build(
             library=_library_for_opt,
             sequence_length=seq_len,
@@ -1282,7 +1322,7 @@ def _process_plan_for_source(
                             )
                         continue
 
-                if required_regulators and not k_of_required:
+                if required_regulators:
                     missing = [tf for tf in required_regulators if used_tf_counts.get(tf, 0) < 1]
                     if missing:
                         covers_required = False
@@ -1350,90 +1390,6 @@ def _process_plan_for_source(
                                     }
                                     for tf in missing
                                 ]
-                            },
-                            sequence=seq,
-                            used_tf_counts=used_tf_counts,
-                            used_tf_list=used_tf_list,
-                            sampling_library_index=int(sampling_library_index),
-                            sampling_library_hash=str(sampling_library_hash),
-                            solver_status=solver_status,
-                            solver_objective=solver_objective,
-                            solver_solve_time_s=solver_solve_time_s,
-                            dense_arrays_version=dense_arrays_version,
-                            dense_arrays_version_source=dense_arrays_version_source,
-                            library_tfbs=library_tfbs,
-                            library_tfs=library_tfs,
-                            library_site_ids=library_site_ids,
-                            library_sources=library_sources,
-                            attempts_buffer=attempts_buffer,
-                        )
-                        if max_failed_solutions > 0 and failed_solutions > max_failed_solutions:
-                            raise RuntimeError(
-                                f"[{source_label}/{plan_name}] Exceeded max_failed_solutions={max_failed_solutions}."
-                            )
-                        continue
-
-                if k_of_required:
-                    present_required = [tf for tf in used_tf_list if tf in required_regulators]
-                    missing_required = [tf for tf in required_regulators if tf not in present_required]
-                    if len(present_required) < int(k_required or 0):
-                        covers_required = False
-                        failed_solutions += 1
-                        failed_min_required_regulators += 1
-                        _record_site_failures("min_required_regulators")
-                        attempt_index = _next_attempt_index()
-                        _log_rejection(
-                            tables_root,
-                            run_id=run_id,
-                            input_name=source_label,
-                            plan_name=plan_name,
-                            attempt_index=attempt_index,
-                            reason="min_required_regulators",
-                            detail={
-                                "required_regulators": required_regulators,
-                                "min_required_regulators": int(k_required or 0),
-                                "found_required_count": len(present_required),
-                                "present_required": present_required,
-                                "missing_required": missing_required,
-                            },
-                            sequence=seq,
-                            used_tf_counts=used_tf_counts,
-                            used_tf_list=used_tf_list,
-                            sampling_library_index=int(sampling_library_index),
-                            sampling_library_hash=str(sampling_library_hash),
-                            solver_status=solver_status,
-                            solver_objective=solver_objective,
-                            solver_solve_time_s=solver_solve_time_s,
-                            dense_arrays_version=dense_arrays_version,
-                            dense_arrays_version_source=dense_arrays_version_source,
-                            library_tfbs=library_tfbs,
-                            library_tfs=library_tfs,
-                            library_site_ids=library_site_ids,
-                            library_sources=library_sources,
-                            attempts_buffer=attempts_buffer,
-                        )
-                        if max_failed_solutions > 0 and failed_solutions > max_failed_solutions:
-                            raise RuntimeError(
-                                f"[{source_label}/{plan_name}] Exceeded max_failed_solutions={max_failed_solutions}."
-                            )
-                        continue
-                elif min_required_regulators is not None:
-                    if len(used_tf_list) < int(min_required_regulators):
-                        covers_required = False
-                        failed_solutions += 1
-                        failed_min_required_regulators += 1
-                        _record_site_failures("min_required_regulators")
-                        attempt_index = _next_attempt_index()
-                        _log_rejection(
-                            tables_root,
-                            run_id=run_id,
-                            input_name=source_label,
-                            plan_name=plan_name,
-                            attempt_index=attempt_index,
-                            reason="min_required_regulators",
-                            detail={
-                                "min_required_regulators": int(min_required_regulators),
-                                "used_regulator_count": len(used_tf_list),
                             },
                             sequence=seq,
                             used_tf_counts=used_tf_counts,
@@ -1988,12 +1944,18 @@ def _process_plan_for_source(
             library_sources = list(source_by_index) if source_by_index else []
             library_tfbs_ids = list(tfbs_id_by_index) if tfbs_id_by_index else []
             library_motif_ids = list(motif_id_by_index) if motif_id_by_index else []
+            required_regulators = list(dict.fromkeys(sampling_info.get("required_regulators_selected") or []))
+            if groups and not required_regulators:
+                raise RuntimeError(
+                    f"Stage-B sampling did not record required_regulators_selected for {source_label}/{plan_name}. "
+                    "Rebuild libraries with the current version."
+                )
+            min_required_regulators = None
             min_required_len, min_breakdown, feasibility = assess_library_feasibility(
                 library_tfbs=library_tfbs,
                 library_tfs=library_tfs,
                 fixed_elements=plan_item.fixed_elements,
-                required_regulators=required_regulators,
-                min_required_regulators=min_required_regulators,
+                groups=groups,
                 min_count_by_regulator=plan_min_count_by_regulator,
                 min_count_per_tf=min_count_per_tf,
                 sequence_length=seq_len,
@@ -2313,6 +2275,9 @@ def run_pipeline(
         existing_library_by_plan = _load_existing_library_index_by_plan(tables_root)
         for inp in cfg.inputs:
             for plan_item in pl:
+                constraints = plan_item.regulator_constraints
+                groups = list(constraints.groups or [])
+                plan_min_count_by_regulator = dict(constraints.min_count_by_regulator or {})
                 key = (inp.name, plan_item.name)
                 records = library_records.get(key)
                 if not records:
@@ -2339,33 +2304,13 @@ def run_pipeline(
                             f"Library artifact missing Stage-B sampling metadata for {inp.name}/{plan_item.name} "
                             f"(library_index={rec.library_index})."
                         )
-                    required = list(dict.fromkeys(plan_item.required_regulators or []))
-                    if required:
-                        present = {tf for tf in rec.library_tfs if tf}
-                        k_required = plan_item.min_required_regulators
-                        if k_required is not None:
-                            if len(present.intersection(required)) < int(k_required):
-                                raise RuntimeError(
-                                    f"Library artifact for {inp.name}/{plan_item.name} "
-                                    f"(library_index={rec.library_index}) cannot satisfy "
-                                    f"min_required_regulators={k_required}."
-                                )
-                        else:
-                            missing = [tf for tf in required if tf not in present]
-                            if missing:
-                                raise RuntimeError(
-                                    f"Library artifact for {inp.name}/{plan_item.name} "
-                                    f"(library_index={rec.library_index}) is missing required regulators: "
-                                    f"{', '.join(missing)}"
-                                )
-                    for tf, min_count in (plan_item.min_count_by_regulator or {}).items():
-                        found = sum(1 for t in rec.library_tfs if t == tf)
-                        if found < int(min_count):
-                            raise RuntimeError(
-                                f"Library artifact for {inp.name}/{plan_item.name} "
-                                f"(library_index={rec.library_index}) has tf={tf} count={found} "
-                                f"< min_count_by_regulator={min_count}."
-                            )
+                    _validate_library_constraints(
+                        rec,
+                        groups=groups,
+                        min_count_by_regulator=plan_min_count_by_regulator,
+                        input_name=inp.name,
+                        plan_name=plan_item.name,
+                    )
     elif library_source != "build":
         raise RuntimeError(f"Unsupported Stage-B sampling.library_source: {library_source}")
     ensure_run_meta_dir(run_root)

@@ -71,7 +71,11 @@ META_FIELDS: list[MetaField] = [
     MetaField("used_tf_list", (list,), "TFs used in the final sequence."),
     MetaField("covers_all_tfs_in_solution", (bool,), "Whether min_count_per_tf coverage was satisfied."),
     MetaField("min_count_per_tf", (int,), "Coverage threshold for per-TF placements."),
-    MetaField("required_regulators", (list,), "Regulators required per plan item."),
+    MetaField(
+        "required_regulators",
+        (list,),
+        "Regulators required for this library (selected from regulator_constraints groups).",
+    ),
     MetaField("min_required_regulators", (int,), "Minimum required regulators (k-of-n).", allow_none=True),
     MetaField("min_count_by_regulator", (list,), "Per-regulator minimum counts ({tf, min_count})."),
     MetaField("covers_required_regulators", (bool,), "Whether required regulators were present in the solution."),

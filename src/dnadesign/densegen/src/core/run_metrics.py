@@ -63,40 +63,49 @@ def _plan_fixed_bp_min(plan) -> int:
 def _required_min_length(
     members: pd.DataFrame,
     *,
-    required_regulators: list[str],
-    min_required_regulators: int | None,
+    groups: list,
+    min_count_by_regulator: dict[str, int],
+    min_count_per_tf: int,
 ) -> int | None:
     if members.empty:
         return None
     tf_lengths = (
         members.assign(tfbs_len=members["tfbs"].astype(str).map(len))
         .groupby(members["tf"].astype(str))["tfbs_len"]
-        .min()
+        .apply(list)
         .to_dict()
     )
-    if required_regulators:
-        lengths = [tf_lengths.get(tf) for tf in required_regulators]
-        if any(val is None for val in lengths):
+    if not tf_lengths:
+        return None
+    for tf in tf_lengths:
+        tf_lengths[tf] = sorted(int(v) for v in tf_lengths[tf] if v is not None)
+
+    per_tf_required: dict[str, int] = {}
+    if min_count_per_tf > 0:
+        for tf in tf_lengths:
+            per_tf_required[tf] = max(per_tf_required.get(tf, 0), int(min_count_per_tf))
+    for tf, count in min_count_by_regulator.items():
+        per_tf_required[tf] = max(per_tf_required.get(tf, 0), int(count))
+
+    per_tf_total = 0
+    for tf, count in per_tf_required.items():
+        lengths = tf_lengths.get(tf) or []
+        if len(lengths) < int(count):
             return None
-        if min_required_regulators is not None:
-            k = int(min_required_regulators)
-            if k <= 0:
-                return 0
-            if k > len(lengths):
-                return None
-            return int(sum(sorted(int(v) for v in lengths)[:k]))
-        return int(sum(int(v) for v in lengths))
-    if min_required_regulators is None:
-        return 0
-    all_lengths = [int(v) for v in tf_lengths.values() if v is not None]
-    if not all_lengths:
-        return None
-    k = int(min_required_regulators)
-    if k <= 0:
-        return 0
-    if k > len(all_lengths):
-        return None
-    return int(sum(sorted(all_lengths)[:k]))
+        per_tf_total += int(sum(lengths[: int(count)]))
+
+    group_required_extra = 0
+    for group in groups:
+        members_min = []
+        for tf in group.members:
+            lengths = tf_lengths.get(tf) or []
+            if lengths:
+                members_min.append(int(lengths[0]))
+        if len(members_min) < int(group.min_required):
+            return None
+        group_required_extra += int(sum(sorted(members_min)[: int(group.min_required)]))
+
+    return int(per_tf_total + group_required_extra)
 
 
 def _assign_score_quantiles(df: pd.DataFrame, *, quantiles: int) -> pd.DataFrame:
@@ -329,10 +338,12 @@ def build_run_metrics(*, cfg, run_root: Path) -> pd.DataFrame:
     )
 
     plan_meta = {}
+    min_count_per_tf = int(getattr(cfg.runtime, "min_count_per_tf", 0) or 0)
     for plan in cfg.generation.plan or []:
+        constraints = plan.regulator_constraints
         plan_meta[str(plan.name)] = {
-            "required_regulators": list(plan.required_regulators or []),
-            "min_required_regulators": plan.min_required_regulators,
+            "groups": list(constraints.groups or []),
+            "min_count_by_regulator": dict(constraints.min_count_by_regulator or {}),
             "fixed_bp_min": _plan_fixed_bp_min(plan),
         }
 
@@ -435,8 +446,9 @@ def build_run_metrics(*, cfg, run_root: Path) -> pd.DataFrame:
         plan_info = plan_meta.get(plan_name, {})
         required_min = _required_min_length(
             members,
-            required_regulators=list(plan_info.get("required_regulators") or []),
-            min_required_regulators=plan_info.get("min_required_regulators"),
+            groups=list(plan_info.get("groups") or []),
+            min_count_by_regulator=dict(plan_info.get("min_count_by_regulator") or {}),
+            min_count_per_tf=min_count_per_tf,
         )
         fixed_bp_min = int(plan_info.get("fixed_bp_min") or 0)
         sequence_length = int(cfg.generation.sequence_length)

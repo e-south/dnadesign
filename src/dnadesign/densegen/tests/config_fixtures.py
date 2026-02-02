@@ -30,6 +30,8 @@ def write_minimal_config(path: Path) -> None:
                 plan:
                   - name: demo_plan
                     quota: 1
+                    regulator_constraints:
+                      groups: []
               solver:
                 backend: CBC
                 strategy: iterate

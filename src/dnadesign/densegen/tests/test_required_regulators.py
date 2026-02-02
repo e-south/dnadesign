@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/densegen/tests/test_required_regulators.py
+
+Regulator group constraint coverage for DenseGen.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -60,8 +71,8 @@ class _DummyAdapter:
         solver_threads=None,
     ):
         opt = _DummyOpt()
-        sol1 = _DummySol(sequence="AAA", library=library, used_indices=[0])
-        sol2 = _DummySol(sequence="CCC", library=library, used_indices=[1])
+        sol1 = _DummySol(sequence="AAAAAA", library=library, used_indices=[0])
+        sol2 = _DummySol(sequence="GGGGGG", library=library, used_indices=[0, 2])
 
         def _gen():
             yield sol1
@@ -70,9 +81,9 @@ class _DummyAdapter:
         return OptimizerRun(optimizer=opt, generator=_gen())
 
 
-def test_required_regulators_filtering(tmp_path: Path) -> None:
+def test_regulator_groups_filtering(tmp_path: Path) -> None:
     csv_path = tmp_path / "sites.csv"
-    csv_path.write_text("tf,tfbs\nTF1,AAA\nTF2,CCC\n")
+    csv_path.write_text("tf,tfbs\nTF1,AAA\nTF2,CCC\nTF3,GGG\n")
     cfg = {
         "densegen": {
             "schema_version": "2.8",
@@ -91,11 +102,11 @@ def test_required_regulators_filtering(tmp_path: Path) -> None:
                 "parquet": {"path": "outputs/tables/dense_arrays.parquet"},
             },
             "generation": {
-                "sequence_length": 3,
+                "sequence_length": 6,
                 "quota": 1,
                 "sampling": {
                     "pool_strategy": "full",
-                    "library_size": 2,
+                    "library_size": 3,
                     "subsample_over_length_budget_by": 0,
                     "cover_all_regulators": True,
                     "unique_binding_sites": True,
@@ -109,7 +120,21 @@ def test_required_regulators_filtering(tmp_path: Path) -> None:
                     {
                         "name": "default",
                         "quota": 1,
-                        "required_regulators": ["TF2"],
+                        "regulator_constraints": {
+                            "groups": [
+                                {
+                                    "name": "group_a",
+                                    "members": ["TF1"],
+                                    "min_required": 1,
+                                },
+                                {
+                                    "name": "group_b",
+                                    "members": ["TF3"],
+                                    "min_required": 1,
+                                },
+                            ],
+                            "min_count_by_regulator": {"TF3": 1},
+                        },
                     }
                 ],
             },
@@ -144,82 +169,4 @@ def test_required_regulators_filtering(tmp_path: Path) -> None:
     summary = run_pipeline(loaded, deps=deps, resume=False, build_stage_a=True)
     assert summary.total_generated == 1
     assert len(sink.records) == 1
-    assert sink.records[0].sequence == "CCC"
-
-
-def test_required_regulators_k_of_n(tmp_path: Path) -> None:
-    csv_path = tmp_path / "sites.csv"
-    csv_path.write_text("tf,tfbs\nTF1,AAA\nTF2,CCC\n")
-    cfg = {
-        "densegen": {
-            "schema_version": "2.8",
-            "run": {"id": "demo", "root": "."},
-            "inputs": [
-                {
-                    "name": "demo",
-                    "type": "binding_sites",
-                    "path": str(csv_path),
-                    "format": "csv",
-                }
-            ],
-            "output": {
-                "targets": ["parquet"],
-                "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-                "parquet": {"path": "outputs/tables/dense_arrays.parquet"},
-            },
-            "generation": {
-                "sequence_length": 3,
-                "quota": 1,
-                "sampling": {
-                    "pool_strategy": "full",
-                    "library_size": 2,
-                    "subsample_over_length_budget_by": 0,
-                    "cover_all_regulators": True,
-                    "unique_binding_sites": True,
-                    "max_sites_per_regulator": None,
-                    "relax_on_exhaustion": False,
-                    "allow_incomplete_coverage": False,
-                    "iterative_max_libraries": 1,
-                    "iterative_min_new_solutions": 0,
-                },
-                "plan": [
-                    {
-                        "name": "default",
-                        "quota": 1,
-                        "required_regulators": ["TF1", "TF2"],
-                        "min_required_regulators": 1,
-                    }
-                ],
-            },
-            "solver": {"backend": "CBC", "strategy": "iterate"},
-            "runtime": {
-                "round_robin": False,
-                "arrays_generated_before_resample": 10,
-                "min_count_per_tf": 0,
-                "max_duplicate_solutions": 5,
-                "stall_seconds_before_resample": 10,
-                "stall_warning_every_seconds": 10,
-                "max_resample_attempts": 1,
-                "max_total_resamples": 1,
-                "max_seconds_per_plan": 0,
-                "max_failed_solutions": 0,
-                "random_seed": 1,
-            },
-            "postprocess": {"pad": {"mode": "off"}},
-            "logging": {"log_dir": "outputs/logs", "level": "INFO"},
-        }
-    }
-    cfg_path = tmp_path / "cfg.yaml"
-    cfg_path.write_text(yaml.safe_dump(cfg))
-    loaded = load_config(cfg_path)
-    sink = _DummySink()
-    deps = PipelineDeps(
-        source_factory=data_source_factory,
-        sink_factory=lambda _cfg, _path: [sink],
-        optimizer=_DummyAdapter(),
-        pad=lambda *args, **kwargs: "",
-    )
-    summary = run_pipeline(loaded, deps=deps, resume=False, build_stage_a=True)
-    assert summary.total_generated == 1
-    assert len(sink.records) == 1
-    assert sink.records[0].sequence == "AAA"
+    assert sink.records[0].sequence == "GGGGGG"

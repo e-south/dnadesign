@@ -16,6 +16,37 @@ import numpy as np
 import pandas as pd
 
 
+def compute_tf_weights(
+    df: pd.DataFrame,
+    *,
+    usage_counts: dict[tuple[str, str], int] | None,
+    coverage_boost_alpha: float,
+    coverage_boost_power: float,
+    failure_counts: dict[tuple[str, str], int] | None,
+    avoid_failed_motifs: bool,
+    failure_penalty_alpha: float,
+    failure_penalty_power: float,
+) -> tuple[dict[str, float], dict[str, int], dict[str, int]]:
+    weight_by_tf: dict[str, float] = {}
+    usage_count_by_tf: dict[str, int] = {}
+    failure_count_by_tf: dict[str, int] = {}
+    for _, row in df.iterrows():
+        tf = str(row["tf"])
+        tfbs = str(row["tfbs"])
+        key = (tf, tfbs)
+        count = int(usage_counts.get(key, 0)) if usage_counts else 0
+        usage_count_by_tf[tf] = usage_count_by_tf.get(tf, 0) + count
+        weight = 1.0 + float(coverage_boost_alpha) / ((1.0 + count) ** float(coverage_boost_power))
+        if avoid_failed_motifs and failure_counts is not None:
+            fails = int(failure_counts.get(key, 0))
+            failure_count_by_tf[tf] = failure_count_by_tf.get(tf, 0) + fails
+            if fails > 0:
+                penalty = 1.0 + float(failure_penalty_alpha) * float(fails)
+                weight = weight / (penalty ** float(failure_penalty_power))
+        weight_by_tf[tf] = weight_by_tf.get(tf, 0.0) + float(weight)
+    return weight_by_tf, usage_count_by_tf, failure_count_by_tf
+
+
 class TFSampler:
     """
     Sampler for binding-site tables (DataFrame with 'tf' and 'tfbs').
@@ -126,23 +157,16 @@ class TFSampler:
         usage_count_by_tf: dict[str, int] | None = None
         failure_count_by_tf: dict[str, int] | None = None
         if sampling_strategy == "coverage_weighted":
-            weight_by_tf = {}
-            usage_count_by_tf = {}
-            failure_count_by_tf = {}
-            for _, row in df.iterrows():
-                tf = str(row["tf"])
-                tfbs = str(row["tfbs"])
-                key = (tf, tfbs)
-                count = int(usage_counts.get(key, 0)) if usage_counts else 0
-                usage_count_by_tf[tf] = usage_count_by_tf.get(tf, 0) + count
-                weight = 1.0 + float(coverage_boost_alpha) / ((1.0 + count) ** float(coverage_boost_power))
-                if avoid_failed_motifs and failure_counts is not None:
-                    fails = int(failure_counts.get(key, 0))
-                    failure_count_by_tf[tf] = failure_count_by_tf.get(tf, 0) + fails
-                    if fails > 0:
-                        penalty = 1.0 + float(failure_penalty_alpha) * float(fails)
-                        weight = weight / (penalty ** float(failure_penalty_power))
-                weight_by_tf[tf] = weight_by_tf.get(tf, 0.0) + float(weight)
+            weight_by_tf, usage_count_by_tf, failure_count_by_tf = compute_tf_weights(
+                df,
+                usage_counts=usage_counts,
+                coverage_boost_alpha=coverage_boost_alpha,
+                coverage_boost_power=coverage_boost_power,
+                failure_counts=failure_counts,
+                avoid_failed_motifs=avoid_failed_motifs,
+                failure_penalty_alpha=failure_penalty_alpha,
+                failure_penalty_power=failure_penalty_power,
+            )
             total_weight = sum(weight_by_tf.values()) if weight_by_tf else 0.0
             weight_fraction_by_tf = {
                 tf: (float(val) / total_weight if total_weight > 0 else 0.0) for tf, val in (weight_by_tf or {}).items()

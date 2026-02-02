@@ -48,6 +48,11 @@ def _write_min_config(path: Path) -> None:
                 plan:
                   - name: default
                     quota: 1
+                    regulator_constraints:
+                      groups:
+                        - name: all
+                          members: [TF1]
+                          min_required: 1
 
               solver:
                 backend: CBC
