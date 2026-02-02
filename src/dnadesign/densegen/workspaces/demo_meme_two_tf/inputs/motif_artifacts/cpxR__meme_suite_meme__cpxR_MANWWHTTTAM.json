@@ -8,7 +8,7 @@
   },
   "checksums": {
     "sha256_norm": "f9b643325dbcb66bee077d33f675b8644ce3ffe22cace204c62a723e68cd580d",
-    "sha256_raw": "9b7543e59d5d0ebc60007fe0dac63a5f4be6b9d7f56f875f9c9445ce3ebcb49d"
+    "sha256_raw": "3655f2388a248d9b671be83652837381a88130cbff9c73a5fec1ff022c6b49af"
   },
   "length": 11,
   "log_odds": [
@@ -160,9 +160,9 @@
     "citation": null,
     "license": null,
     "raw_artifact_paths": [
-      "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/.cruncher/discoveries/discover_cpxR_20260123_195714_73f06c/meme.txt"
+      "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/.cruncher/discoveries/discover_cpxR_20260202_130721_f59b5c/meme.txt"
     ],
-    "retrieved_at": "2026-01-24T00:57:15.105298+00:00",
+    "retrieved_at": "2026-02-02T18:07:22.285150+00:00",
     "source_url": null,
     "source_version": null,
     "tags": {}
@@ -174,7 +174,7 @@
     "discovery_minw": "11",
     "discovery_nmotifs": "1",
     "discovery_nsites": "204",
-    "discovery_run": "discover_cpxR_20260123_195714_73f06c",
+    "discovery_run": "discover_cpxR_20260202_130721_f59b5c",
     "discovery_tool": "meme",
     "discovery_tool_path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/.pixi/envs/default/bin/meme",
     "discovery_tool_version": "5.5.9",

@@ -4,7 +4,7 @@ cruncher:
     - [lexA, cpxR, baeR]
 
   motif_store:
-    source_preference: [meme_suite_streme, demo_local_meme, regulondb]
+    source_preference: [meme_suite_meme, meme_suite_streme, demo_local_meme, regulondb]
     combine_sites: true
     site_window_lengths:
       lexA: 20
@@ -12,8 +12,9 @@ cruncher:
       baeR: 20
 
   motif_discovery:
-    tool: streme
-    source_id: meme_suite_streme
+    tool: meme
+    meme_mod: oops
+    source_id: meme_suite_meme
 
   ingest:
     regulondb:

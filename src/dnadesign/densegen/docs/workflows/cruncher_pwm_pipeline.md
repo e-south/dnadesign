@@ -6,7 +6,7 @@ Below is a walkthrough that uses **Cruncher** commands to fetch binding sites fo
 
 ### Three-TF prep (lexA, cpxR, baeR)
 
-This workflow fetches TFBS, runs STREME discovery, and exports DenseGen-ready artifacts.
+This workflow fetches TFBS, runs MEME discovery, and exports DenseGen-ready artifacts.
 
 Assumptions for this example:
 
@@ -24,7 +24,7 @@ cruncher:
     - [lexA, cpxR, baeR]
 
   motif_store:
-    source_preference: [meme_suite_streme, demo_local_meme, regulondb]
+    source_preference: [meme_suite_meme, meme_suite_streme, demo_local_meme, regulondb]
     combine_sites: true                # merge per-TF sites across sources for discovery
     site_window_lengths:               # fixed windows if site-derived PWMs are used
       lexA: 20  # bp window
@@ -32,8 +32,9 @@ cruncher:
       baeR: 20  # bp window
 
   motif_discovery:
-    tool: streme                       # prefer STREME explicitly
-    source_id: meme_suite_streme       # must match source_preference
+    tool: meme                         # prefer MEME explicitly
+    meme_mod: oops                     # each site is one motif
+    source_id: meme_suite_meme         # must match source_preference
 
   ingest:
     regulondb:
@@ -54,7 +55,7 @@ cruncher:
       dpi: 150                         # plot resolution
 ```
 
-#### Fetch sources + run STREME (preferred)
+#### Fetch sources + run MEME (preferred)
 
 ```bash
 # Option A: cd into the dedicated cruncher workspace
@@ -81,8 +82,11 @@ cruncher fetch sites --tf baeR --update -c "$CONFIG"
 # Verify MEME Suite before discovery.
 cruncher doctor -c "$CONFIG"
 
-# STREME discovery (preferred) so all three TFs have consistent PWMs.
-cruncher discover motifs --tf lexA --tf cpxR --tf baeR --tool streme --source-id meme_suite_streme -c "$CONFIG"
+# MEME discovery (preferred) so all three TFs have consistent PWMs.
+cruncher discover motifs --tf lexA --tf cpxR --tf baeR --tool meme --meme-mod oops --source-id meme_suite_meme -c "$CONFIG"
+
+# Render PWM logos for grounding/QA.
+cruncher catalog logos --source meme_suite_meme --set 1 -c "$CONFIG"
 
 # Pin exact motif IDs/hashes for reproducibility.
 cruncher lock -c "$CONFIG"
@@ -92,11 +96,13 @@ If any TF has zero sites, `discover motifs` and `lock` will fail.
 Stop and resolve the missing source before proceeding (for example, add a
 local site set for baeR or adjust your RegulonDB query).
 
+Logos are saved under `outputs/logos/catalog/` (the command prints the exact path).
+
 #### Export into a DenseGen workspace
 
 ```bash
-cruncher catalog export-densegen --set 1 --densegen-workspace demo_meme_two_tf -c "$CONFIG"
-cruncher catalog export-sites   --set 1 --densegen-workspace demo_meme_two_tf -c "$CONFIG"
+cruncher catalog export-densegen --set 1 --densegen-workspace demo_meme_two_tf --pseudocount 0.1 --overwrite -c "$CONFIG"
+cruncher catalog export-sites   --set 1 --densegen-workspace demo_meme_two_tf --overwrite -c "$CONFIG"
 ```
 
 These commands write motif JSONs for **lexA**, **cpxR**, and **baeR** under
