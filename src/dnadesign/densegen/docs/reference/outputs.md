@@ -126,11 +126,14 @@ Run diagnostics metrics are summarized in `outputs/tables/run_metrics.parquet` (
 
 Core diagnostics plots (canonical set):
 
-- `placement_map` — 1‑nt occupancy map across binding‑site types (regulators + fixed elements).
-- `tfbs_usage` — TFBS allocation summary (rank–frequency + distribution across all TFBS).
-- `run_health` — attempts outcomes + failure composition + duplicate pressure (binned for scale).
-- `stage_a_summary` — Stage‑A pool diagnostics (interpretation in the sampling guide).
-- `stage_b_summary` — Stage‑B feasibility + composition distributions + offered‑vs‑used utilization.
+- `stage_a_summary` — Stage-A pool diagnostics (interpretation in the sampling guide).
+- `placement_map` — Stage-B fingerprint: per-position occupancy/event counts across the final
+  dense arrays, with overlaid categories for regulators and fixed elements (e.g., promoter -35/-10),
+  plus a TFBS top-K usage leaderboard.
+
+Optional / advanced:
+- `run_health` — attempts outcomes + failure composition. (Not a default plot; prefer `dense inspect run`.)
+- `tfbs_usage` — legacy TFBS allocation view (may be superseded by placement_map’s leaderboard).
 
 `stage_a_summary` writes multiple images per input, e.g.:
 `stage_a_summary__<input>.png`, `stage_a_summary__<input>__yield_bias.png`,
@@ -140,8 +143,6 @@ See `../guide/sampling.md` for plot interpretation context.
 
 `stage_a_summary` requires diversity metrics in `pool_manifest.json`. If your pool manifest predates
 diversity metrics, rerun `dense stage-a build-pool --fresh` to regenerate it.
-`stage_b_summary` requires `slack_bp` in `library_builds.parquet` plus non-empty composition rows
-for each input/plan; missing metrics will fail fast.
 
 ---
 
@@ -152,6 +153,7 @@ for each input/plan; missing metrics will fail fast.
 When your plan includes `fixed_elements.promoter_constraints`, `placement_map` renders the promoter
 as fixed-element bands overlaid alongside TFBS usage so you can see how fixed constraints
 consume positional budget relative to sampled regulator sites.
+Fixed elements are labeled `fixed:<name>:-35` and `fixed:<name>:-10`.
 
 ---
 

@@ -57,7 +57,10 @@ dense run
 ### 6) Plot
 
 ```bash
-dense plot --only stage_a_summary,stage_b_summary,run_health
+dense plot --only stage_a_summary,placement_map
+
+# Run-health is better inspected than plotted:
+# dense inspect run --events --library
 ```
 
 ---

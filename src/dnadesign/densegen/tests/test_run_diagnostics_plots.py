@@ -15,20 +15,16 @@ import json
 from pathlib import Path
 
 import matplotlib
+import matplotlib.pyplot as plt
 import pandas as pd
 import pytest
 
 from dnadesign.densegen.src.core.artifacts.pool import TFBSPoolArtifact
+from dnadesign.densegen.src.viz.plot_run import _build_run_health_figure, plot_run_health, plot_tfbs_usage
 from dnadesign.densegen.src.viz.plot_stage_a_diversity import _build_stage_a_diversity_figure
 from dnadesign.densegen.src.viz.plot_stage_a_strata import _build_stage_a_strata_overview_figure
-from dnadesign.densegen.src.viz.plotting import (
-    _plot_required_columns,
-    plot_placement_map,
-    plot_run_health,
-    plot_stage_a_summary,
-    plot_stage_b_summary,
-    plot_tfbs_usage,
-)
+from dnadesign.densegen.src.viz.plot_stage_b_placement import plot_placement_map
+from dnadesign.densegen.src.viz.plotting import _plot_required_columns, plot_stage_a_summary
 
 
 def _composition_df() -> pd.DataFrame:
@@ -69,6 +65,25 @@ def _composition_df() -> pd.DataFrame:
                 "offset": 1,
                 "length": 4,
                 "end": 5,
+            },
+        ]
+    )
+
+
+def _dense_arrays_df() -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "id": "s1",
+                "sequence": "TTGACACCCCTATAATGGGG",
+                "densegen__input_name": "demo_input",
+                "densegen__plan": "demo_plan",
+            },
+            {
+                "id": "s2",
+                "sequence": "TTGACAGGGGTATAATCCCC",
+                "densegen__input_name": "demo_input",
+                "densegen__plan": "demo_plan",
             },
         ]
     )
@@ -120,80 +135,6 @@ def _events_df() -> pd.DataFrame:
     )
 
 
-def _library_builds_df() -> pd.DataFrame:
-    return pd.DataFrame(
-        [
-            {
-                "input_name": "demo_input",
-                "plan_name": "demo_plan",
-                "library_index": 1,
-                "library_hash": "hash1",
-                "library_size": 2,
-                "sequence_length": 20,
-                "fixed_bp": 6,
-                "min_required_bp": 6,
-                "slack_bp": 8,
-                "infeasible": False,
-            },
-            {
-                "input_name": "demo_input",
-                "plan_name": "demo_plan",
-                "library_index": 2,
-                "library_hash": "hash2",
-                "library_size": 2,
-                "sequence_length": 20,
-                "fixed_bp": 6,
-                "min_required_bp": 8,
-                "slack_bp": 6,
-                "infeasible": False,
-            },
-        ]
-    )
-
-
-def _library_members_df() -> pd.DataFrame:
-    return pd.DataFrame(
-        [
-            {
-                "input_name": "demo_input",
-                "plan_name": "demo_plan",
-                "library_index": 1,
-                "library_hash": "hash1",
-                "position": 0,
-                "tf": "TF_A",
-                "tfbs": "AAAA",
-            },
-            {
-                "input_name": "demo_input",
-                "plan_name": "demo_plan",
-                "library_index": 1,
-                "library_hash": "hash1",
-                "position": 1,
-                "tf": "TF_B",
-                "tfbs": "CCCCCC",
-            },
-            {
-                "input_name": "demo_input",
-                "plan_name": "demo_plan",
-                "library_index": 2,
-                "library_hash": "hash2",
-                "position": 0,
-                "tf": "TF_A",
-                "tfbs": "AAAA",
-            },
-            {
-                "input_name": "demo_input",
-                "plan_name": "demo_plan",
-                "library_index": 2,
-                "library_hash": "hash2",
-                "position": 1,
-                "tf": "TF_B",
-                "tfbs": "GGGG",
-            },
-        ]
-    )
-
-
 def _cfg() -> dict:
     return {
         "generation": {
@@ -204,10 +145,12 @@ def _cfg() -> dict:
                     "fixed_elements": {
                         "promoter_constraints": [
                             {
+                                "name": "sigma70",
                                 "upstream_pos": [0, 6],
                                 "downstream_pos": [10, 16],
                                 "upstream": "TTGACA",
                                 "downstream": "TATAAT",
+                                "spacer_length": [4, 4],
                             }
                         ]
                     },
@@ -421,6 +364,16 @@ def test_plot_run_health(tmp_path: Path) -> None:
     assert out_path.exists()
 
 
+def test_plot_run_health_no_duplicates_note() -> None:
+    matplotlib.use("Agg", force=True)
+    attempts = _attempts_df()
+    attempts = attempts[attempts["status"] != "duplicate"].reset_index(drop=True)
+    fig, axes = _build_run_health_figure(attempts, events_df=None, style={})
+    dup_texts = [text.get_text() for text in axes["dup"].texts]
+    plt.close(fig)
+    assert any("No duplicates" in text for text in dup_texts)
+
+
 def test_plot_placement_map(tmp_path: Path) -> None:
     matplotlib.use("Agg", force=True)
     out_path = tmp_path / "placement_map.png"
@@ -428,6 +381,7 @@ def test_plot_placement_map(tmp_path: Path) -> None:
         pd.DataFrame(),
         out_path,
         composition_df=_composition_df(),
+        dense_arrays_df=_dense_arrays_df(),
         cfg=_cfg(),
         style={},
     )
@@ -442,6 +396,7 @@ def test_plot_placement_map_accepts_effective_config(tmp_path: Path) -> None:
         pd.DataFrame(),
         out_path,
         composition_df=_composition_df(),
+        dense_arrays_df=_dense_arrays_df(),
         cfg={"config": _cfg()},
         style={},
     )
@@ -460,39 +415,6 @@ def test_plot_tfbs_usage(tmp_path: Path) -> None:
     )
     assert paths
     assert Path(paths[0]).exists()
-
-
-def test_plot_stage_b_summary(tmp_path: Path) -> None:
-    matplotlib.use("Agg", force=True)
-    out_path = tmp_path / "stage_b_summary.png"
-    paths = plot_stage_b_summary(
-        pd.DataFrame(),
-        out_path,
-        library_builds_df=_library_builds_df(),
-        library_members_df=_library_members_df(),
-        composition_df=_composition_df(),
-        cfg=_cfg(),
-        style={},
-    )
-    assert paths
-    assert Path(paths[0]).exists()
-
-
-def test_plot_stage_b_summary_requires_metrics(tmp_path: Path) -> None:
-    matplotlib.use("Agg", force=True)
-    out_path = tmp_path / "stage_b_summary_missing.png"
-    builds = _library_builds_df().copy()
-    builds["slack_bp"] = [None, None]
-    with pytest.raises(ValueError, match="slack"):
-        plot_stage_b_summary(
-            pd.DataFrame(),
-            out_path,
-            library_builds_df=builds,
-            library_members_df=_library_members_df(),
-            composition_df=_composition_df(),
-            cfg=_cfg(),
-            style={},
-        )
 
 
 def test_plot_stage_a_summary(tmp_path: Path) -> None:

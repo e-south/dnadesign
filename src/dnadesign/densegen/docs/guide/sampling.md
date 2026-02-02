@@ -114,8 +114,9 @@ Additional Stage-B controls that commonly affect "it fails vs it works":
     down-weight motifs that frequently fail solves.
 
 Operational note: resampling is driven by runtime controls such as stalls/duplicate pressure
-(see `densegen.runtime.*`). When diagnosing a run, `stage_b_summary` and `dense inspect run --events`
-are the fastest way to see whether the run is rebuilding libraries too often or sampling is exhausted.
+(see `densegen.runtime.*`). When diagnosing a run, `placement_map` and
+`dense inspect run --events --library` are the fastest way to see whether the run is rebuilding
+libraries too often or sampling is exhausted.
 
 For plan constraints and solver configuration, see `guide/generation.md`.
 

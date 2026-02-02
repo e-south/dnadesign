@@ -18,61 +18,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from .plot_common import _apply_style, _fig_ax, _safe_filename, _style
-
-
-def _plot_config(cfg: dict) -> dict:
-    if not isinstance(cfg, dict):
-        return {}
-    if isinstance(cfg.get("generation"), dict):
-        return cfg
-    nested = cfg.get("config")
-    if isinstance(nested, dict):
-        return nested
-    return cfg
-
-
-def _sequence_length_from_cfg(cfg: dict) -> int:
-    cfg = _plot_config(cfg)
-    gen = cfg.get("generation") if cfg else None
-    if not isinstance(gen, dict):
-        raise ValueError("Plot config missing generation block.")
-    length = gen.get("sequence_length")
-    if length is None:
-        raise ValueError("Plot config missing generation.sequence_length.")
-    return int(length)
-
-
-def _extract_fixed_element_ranges(cfg: dict, plan_name: str) -> list[tuple[str, int, int]]:
-    ranges: list[tuple[str, int, int]] = []
-    cfg = _plot_config(cfg)
-    gen = cfg.get("generation", {}) if cfg else {}
-    for item in gen.get("plan", []) or []:
-        name = str(item.get("name") or "").strip()
-        if not name or name != plan_name:
-            continue
-        fixed = item.get("fixed_elements") or {}
-        pcs = fixed.get("promoter_constraints")
-        pcs = [pcs] if isinstance(pcs, dict) else (pcs or [])
-        for p in (x for x in pcs if isinstance(x, dict)):
-            upstream_pos = p.get("upstream_pos")
-            downstream_pos = p.get("downstream_pos")
-            if upstream_pos is not None:
-                lo, hi = upstream_pos
-                ranges.append(("promoter_upstream", int(lo), int(hi)))
-            if downstream_pos is not None:
-                lo, hi = downstream_pos
-                ranges.append(("promoter_downstream", int(lo), int(hi)))
-    return ranges
-
-
-def _fixed_element_alias(label: str) -> str:
-    text = str(label or "").lower()
-    if "upstream" in text or "promoter_upstream" in text:
-        return "-35"
-    if "downstream" in text or "promoter_downstream" in text:
-        return "-10"
-    return str(label)
+from .plot_common import _apply_style, _safe_filename, _style
 
 
 def _bin_attempts(values: np.ndarray, bins: int) -> tuple[np.ndarray, np.ndarray]:
@@ -106,97 +52,6 @@ def _gc_fraction(seq: str) -> float:
     seq = str(seq).upper()
     gc = sum(1 for ch in seq if ch in {"G", "C"})
     return float(gc) / float(len(seq))
-
-
-def plot_placement_map(
-    df: pd.DataFrame,
-    out_path: Path,
-    *,
-    composition_df: pd.DataFrame,
-    cfg: dict,
-    style: Optional[dict] = None,
-) -> list[Path]:
-    if composition_df is None or composition_df.empty:
-        raise ValueError("placement_map requires composition.parquet with placements.")
-    required = {"solution_id", "input_name", "plan_name", "tf", "tfbs"}
-    missing = required - set(composition_df.columns)
-    if missing:
-        raise ValueError(f"composition.parquet missing required columns: {sorted(missing)}")
-    start_col = "offset" if "offset" in composition_df.columns else None
-    length_col = "length" if "length" in composition_df.columns else None
-    end_col = "end" if "end" in composition_df.columns else None
-    if start_col is None and end_col is None:
-        raise ValueError("composition.parquet requires offset or end columns.")
-    if length_col is None and end_col is None:
-        raise ValueError("composition.parquet requires length or end columns.")
-    style = _style(style)
-    seq_len = _sequence_length_from_cfg(cfg)
-    paths: list[Path] = []
-    for (input_name, plan_name), sub in composition_df.groupby(["input_name", "plan_name"]):
-        sub = sub.copy()
-        n_solutions = sub["solution_id"].astype(str).nunique()
-        if n_solutions <= 0:
-            raise ValueError(f"placement_map has no solutions for {input_name}/{plan_name}.")
-        fixed_ranges = _extract_fixed_element_ranges(cfg, str(plan_name))
-        fixed_labels = [_fixed_element_alias(label) for label, _lo, _hi in fixed_ranges]
-        tf_labels = sorted({str(tf) for tf in sub["tf"].astype(str).tolist() if str(tf).strip()})
-        labels = tf_labels + [lab for lab in fixed_labels if lab not in tf_labels]
-        if not labels:
-            raise ValueError(f"placement_map has no binding-site labels for {input_name}/{plan_name}.")
-        occupancy = {label: np.zeros(seq_len, dtype=float) for label in labels}
-        for _sol_id, sol_df in sub.groupby("solution_id"):
-            for label, group in sol_df.groupby("tf"):
-                label = str(label)
-                if label not in occupancy:
-                    continue
-                diff = np.zeros(seq_len + 1, dtype=float)
-                for _, row in group.iterrows():
-                    start = int(row.get(start_col) or 0)
-                    if length_col is not None and row.get(length_col) is not None:
-                        length = int(row.get(length_col))
-                        end = start + length
-                    else:
-                        end = int(row.get(end_col) or 0)
-                        length = end - start
-                    if length <= 0:
-                        continue
-                    lo = max(0, min(start, seq_len))
-                    hi = max(lo, min(end, seq_len))
-                    if hi <= lo:
-                        continue
-                    diff[lo] += 1.0
-                    diff[hi] -= 1.0
-                covered = np.cumsum(diff[:-1]) > 0
-                occupancy[label] += covered.astype(float)
-        for label, lo, hi in fixed_ranges:
-            alias = _fixed_element_alias(label)
-            if alias not in occupancy:
-                occupancy[alias] = np.zeros(seq_len, dtype=float)
-                labels.append(alias)
-            lo = max(0, min(int(lo), seq_len))
-            hi = max(lo, min(int(hi), seq_len))
-            if hi > lo:
-                occupancy[alias][lo:hi] = float(n_solutions)
-        mat = np.vstack([occupancy[label] for label in labels]) / float(n_solutions)
-        fig, ax = _fig_ax(style)
-        im = ax.imshow(mat, aspect="auto", cmap="viridis", vmin=0.0, vmax=1.0)
-        ax.set_yticks(np.arange(len(labels)))
-        ax.set_yticklabels(labels)
-        xticks = np.linspace(0, max(0, seq_len - 1), num=min(seq_len, 8), dtype=int)
-        ax.set_xticks(xticks)
-        ax.set_xticklabels([str(x + 1) for x in xticks])
-        ax.set_xlabel("Position (nt)")
-        ax.set_ylabel("Binding-site type")
-        ax.set_title(f"Placement map -- {input_name}/{plan_name}")
-        fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="Fraction of solutions")
-        _apply_style(ax, style)
-        fig.tight_layout()
-        fname = f"{out_path.stem}__{_safe_filename(input_name)}__{_safe_filename(plan_name)}{out_path.suffix}"
-        path = out_path.parent / fname
-        fig.savefig(path)
-        plt.close(fig)
-        paths.append(path)
-    return paths
 
 
 def plot_tfbs_usage(
@@ -283,6 +138,18 @@ def plot_run_health(
     events_df: pd.DataFrame | None = None,
     style: Optional[dict] = None,
 ) -> None:
+    fig, _axes = _build_run_health_figure(attempts_df, events_df=events_df, style=style)
+    fig.tight_layout()
+    fig.savefig(out_path)
+    plt.close(fig)
+
+
+def _build_run_health_figure(
+    attempts_df: pd.DataFrame,
+    *,
+    events_df: pd.DataFrame | None = None,
+    style: Optional[dict] = None,
+) -> tuple[plt.Figure, dict[str, plt.Axes | None]]:
     if attempts_df is None or attempts_df.empty:
         raise ValueError("run_health requires attempts.parquet.")
     required = {"attempt_index", "status", "reason", "plan_name"}
@@ -321,12 +188,17 @@ def plot_run_health(
     ax_outcome.legend(loc="upper right", frameon=bool(style.get("legend_frame", False)))
 
     totals = sum(counts_by_status.values())
-    dup_rate = np.divide(counts_by_status.get("duplicate", np.zeros_like(totals)), np.where(totals > 0, totals, 1.0))
-    ax_dup.plot(centers, dup_rate, color="#e15759")
-    ax_dup.set_xlabel("Attempt index (binned)")
-    ax_dup.set_ylabel("Duplicate rate")
-    ax_dup.set_ylim(0.0, min(1.0, max(0.05, float(np.nanmax(dup_rate)) + 0.05)))
-    ax_dup.set_title("Duplicate pressure")
+    dup_counts = counts_by_status.get("duplicate", np.zeros_like(totals))
+    dup_rate = np.divide(dup_counts, np.where(totals > 0, totals, 1.0))
+    if dup_counts.sum() <= 0 or np.all(np.isnan(dup_rate)):
+        ax_dup.text(0.5, 0.5, "No duplicates observed", ha="center", va="center", transform=ax_dup.transAxes)
+        ax_dup.set_axis_off()
+    else:
+        ax_dup.plot(centers, dup_rate, color="#e15759")
+        ax_dup.set_xlabel("Attempt index (binned)")
+        ax_dup.set_ylabel("Duplicate rate")
+        ax_dup.set_ylim(0.0, min(1.0, max(0.05, float(np.nanmax(dup_rate)) + 0.05)))
+        ax_dup.set_title("Duplicate pressure")
 
     failed = attempts_df[attempts_df["status"].astype(str) == "failed"]
     if failed.empty:
@@ -382,6 +254,6 @@ def plot_run_health(
     for ax in [ax_outcome, ax_dup, ax_fail] + ([ax_plan] if ax_plan is not None else []):
         if ax is not None:
             _apply_style(ax, style)
-    fig.tight_layout()
-    fig.savefig(out_path)
-    plt.close(fig)
+
+    axes = {"outcome": ax_outcome, "dup": ax_dup, "fail": ax_fail, "plan": ax_plan}
+    return fig, axes

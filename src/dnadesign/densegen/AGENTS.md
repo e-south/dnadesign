@@ -36,8 +36,7 @@ uv run dense stage-b build-libraries
 uv run dense run
 uv run dense inspect run --library --events
 uv run dense ls-plots
-uv run dense plot --only placement_map,tfbs_usage,run_health
-uv run dense plot --only stage_a_summary,stage_b_summary
+uv run dense plot --only stage_a_summary,placement_map
 ```
 
 ### MEME Suite / FIMO pressure testing

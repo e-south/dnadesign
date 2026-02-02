@@ -34,7 +34,7 @@ dense stage-a build-pool --fresh
 dense run
 
 # 5) Plot a minimal diagnostics set.
-dense plot --only stage_a_summary,stage_b_summary,run_health
+dense plot --only stage_a_summary,placement_map
 ```
 
 For a full walkthrough with inspection/reporting steps, see the demo guide.

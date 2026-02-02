@@ -26,5 +26,4 @@ def test_plot_registry_is_canonical_set() -> None:
         "tfbs_usage",
         "run_health",
         "stage_a_summary",
-        "stage_b_summary",
     }

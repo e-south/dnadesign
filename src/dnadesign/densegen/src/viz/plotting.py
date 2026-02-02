@@ -31,11 +31,11 @@ from .plot_common import (  # noqa: F401
     _palette,
 )
 from .plot_registry import PLOT_SPECS
-from .plot_run import plot_placement_map, plot_run_health, plot_tfbs_usage
+from .plot_run import plot_run_health, plot_tfbs_usage
 from .plot_stage_a import plot_stage_a_summary  # noqa: F401
 from .plot_stage_a_strata import _build_stage_a_strata_overview_figure  # noqa: F401
 from .plot_stage_a_yield import _build_stage_a_yield_bias_figure  # noqa: F401
-from .plot_stage_b import plot_stage_b_summary
+from .plot_stage_b_placement import plot_placement_map
 
 _console = Console()
 
@@ -176,12 +176,18 @@ def _load_effective_config(run_root: Path) -> dict:
     return json.loads(path.read_text())
 
 
+def _load_dense_arrays(run_root: Path) -> pd.DataFrame:
+    path = run_root / "outputs" / "tables" / "dense_arrays.parquet"
+    if not path.exists():
+        raise ValueError(f"dense_arrays.parquet not found: {path}")
+    return pd.read_parquet(path)
+
+
 _PLOT_FNS = {
     "placement_map": plot_placement_map,
     "tfbs_usage": plot_tfbs_usage,
     "run_health": plot_run_health,
     "stage_a_summary": plot_stage_a_summary,
-    "stage_b_summary": plot_stage_b_summary,
 }
 
 AVAILABLE_PLOTS: Dict[str, Dict[str, object]] = {}
@@ -200,11 +206,10 @@ for _name, _spec in PLOT_SPECS.items():
 
 # Options explicitly supported by each plot; unknown options raise errors (strict).
 _ALLOWED_OPTIONS = {
-    "placement_map": set(),
+    "placement_map": {"alpha", "top_k_tfbs", "max_categories"},
     "tfbs_usage": set(),
     "run_health": set(),
     "stage_a_summary": set(),
-    "stage_b_summary": set(),
 }
 
 
@@ -250,9 +255,7 @@ def run_plots_from_config(
     run_root = resolve_run_root(cfg_path, root_cfg.densegen.run.root)
     out_dir = _ensure_out_dir(plots_cfg, cfg_path, run_root)
     plot_format = plots_cfg.format if plots_cfg and getattr(plots_cfg, "format", None) else "png"
-    default_list = (
-        plots_cfg.default if (plots_cfg and plots_cfg.default) else ["placement_map", "tfbs_usage", "run_health"]
-    )
+    default_list = plots_cfg.default if (plots_cfg and plots_cfg.default) else ["stage_a_summary", "placement_map"]
     selected = [p.strip() for p in (only.split(",") if only else default_list)]
     options = plots_cfg.options if plots_cfg else {}
     global_style = plots_cfg.style if plots_cfg else {}
@@ -265,6 +268,7 @@ def run_plots_from_config(
     attempts_df: pd.DataFrame | None = None
     events_df: pd.DataFrame | None = None
     composition_df: pd.DataFrame | None = None
+    dense_arrays_df: pd.DataFrame | None = None
     library_builds_df: pd.DataFrame | None = None
     library_members_df: pd.DataFrame | None = None
     cfg_effective: dict | None = None
@@ -318,6 +322,13 @@ def run_plots_from_config(
         libs = _maybe_load_libraries(run_root)
         if libs is not None:
             library_builds_df, library_members_df = libs
+    if "dense_arrays" in required_sources:
+        dense_arrays_df = _load_dense_arrays(run_root)
+        if row_count == 0:
+            row_count = len(dense_arrays_df)
+            src_label = _format_source_label(
+                f"dense_arrays:{run_root / 'outputs' / 'tables' / 'dense_arrays.parquet'}", run_root, absolute
+            )
 
     out_label = _format_plot_path(out_dir, run_root, absolute)
     _console.print(
@@ -353,7 +364,15 @@ def run_plots_from_config(
         out_path = out_dir / f"{name}.{plot_format}"
         try:
             if name == "placement_map":
-                result = fn(df, out_path, style=style, composition_df=composition_df, cfg=cfg_effective, **kwargs)
+                result = fn(
+                    df,
+                    out_path,
+                    style=style,
+                    composition_df=composition_df,
+                    dense_arrays_df=dense_arrays_df,
+                    cfg=cfg_effective,
+                    **kwargs,
+                )
             elif name == "tfbs_usage":
                 result = fn(
                     df,
@@ -368,17 +387,6 @@ def run_plots_from_config(
                 result = fn(df, out_path, style=style, attempts_df=attempts_df, events_df=events_df, **kwargs)
             elif name == "stage_a_summary":
                 result = fn(df, out_path, style=style, pools=pools, pool_manifest=pool_manifest, **kwargs)
-            elif name == "stage_b_summary":
-                result = fn(
-                    df,
-                    out_path,
-                    style=style,
-                    library_builds_df=library_builds_df,
-                    library_members_df=library_members_df,
-                    composition_df=composition_df,
-                    cfg=cfg_effective,
-                    **kwargs,
-                )
             else:
                 result = fn(df, out_path, style=style, **kwargs)
             if result is None:
