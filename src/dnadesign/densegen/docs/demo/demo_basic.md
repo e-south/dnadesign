@@ -157,6 +157,8 @@ What happens here:
 * DenseGen consumes Stage‑A pools, then calls the solver to generate sequences under your plan and constraints.
 * Stage‑B is the only stage that typically resamples during a run. When runtime guards trigger
   (stalls, duplicates, exhaustion), DenseGen rebuilds libraries and tries again.
+* If `plots` are configured in `config.yaml`, `dense run` auto-generates them on completion.
+  Use `dense run --no-plot -c "$CONFIG"` to skip auto-plotting and run `dense plot` manually.
 
 Run guards you should be aware of:
 

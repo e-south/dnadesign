@@ -42,10 +42,13 @@ uniformly from `[min, max]`. This happens per generated sequence (not per regula
   window** of the target length, then runs FIMO on that trimmed motif window.
 
 Selection uses `score_norm = best_hit_score / pwm_theoretical_max_score`, where the
-theoretical max is computed from the **full motif**. For long motifs, this can bias
-retained pools toward longer target lengths when `min_score_norm` or MMR relevance
-filters are active, because shorter trimmed windows score lower relative to the
-full‑length denominator.
+theoretical max is computed from the **same window length** used for the candidate:
+
+- if `target length >= motif width`, the full motif max is used
+- if `target length < motif width`, the max-info window of that target length is used
+
+This keeps `score_norm` comparable across mixed target lengths and prevents longer
+targets from being favored solely because they allow higher raw scores.
 
 #### Selection policies
 
@@ -65,6 +68,10 @@ Relevance:
 Similarity:
 - derived from weighted Hamming on `tfbs_core` with
   `similarity = 1 / (1 + dist)`.
+
+MMR requires **uniform core length**. If you set `sampling.length.policy=range` with
+a minimum below the motif width, configure `sampling.trimming.window_length` to a
+fixed length (or keep the length range >= motif width) so all cores are the same length.
 
 `selection.pool.min_score_norm` is a **report-only** reference for "within tau of theoretical max."
 It does not filter the MMR pool. There is no default; set it explicitly if you want the reference.

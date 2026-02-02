@@ -11,7 +11,18 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dnadesign.densegen.src.adapters.sources.stage_a_pipeline import _evaluate_tier_target, _score_norm_by_tier
+import pytest
+
+from dnadesign.densegen.src.adapters.sources.stage_a_pipeline import (
+    _evaluate_tier_target,
+    _score_norm_by_tier,
+    _score_norm_denominator_by_seq,
+)
+from dnadesign.densegen.src.adapters.sources.stage_a_sampling_utils import (
+    _pwm_theoretical_max_score,
+    build_log_odds,
+    select_pwm_window_by_length,
+)
 
 
 def test_tier_target_requirement_computation() -> None:
@@ -33,3 +44,26 @@ def test_score_norm_by_tier_summary() -> None:
     assert summary["tier1"] == {"min": 0.8, "median": 0.8, "max": 0.8}
     assert summary["tier2"] == {"min": 0.6, "median": 0.6, "max": 0.6}
     assert summary["rest"] == {"min": 0.4, "median": 0.4, "max": 0.4}
+
+
+def test_score_norm_denominator_by_seq_uses_window_max() -> None:
+    matrix = [
+        {"A": 0.97, "C": 0.01, "G": 0.01, "T": 0.01},
+        {"A": 0.97, "C": 0.01, "G": 0.01, "T": 0.01},
+        {"A": 0.97, "C": 0.01, "G": 0.01, "T": 0.01},
+        {"A": 0.97, "C": 0.01, "G": 0.01, "T": 0.01},
+        {"A": 0.97, "C": 0.01, "G": 0.01, "T": 0.01},
+    ]
+    background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
+    sequences = ["AAAAA", "AAAA"]
+    denom_by_seq = _score_norm_denominator_by_seq(
+        sequences,
+        matrix=matrix,
+        background=background,
+    )
+    log_odds = build_log_odds(matrix, background, smoothing_alpha=0.0)
+    full_max = _pwm_theoretical_max_score(log_odds)
+    window = select_pwm_window_by_length(matrix=matrix, log_odds=log_odds, length=4)
+    window_max = _pwm_theoretical_max_score(window.log_odds)
+    assert denom_by_seq["AAAAA"] == pytest.approx(full_max)
+    assert denom_by_seq["AAAA"] == pytest.approx(window_max)

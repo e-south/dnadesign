@@ -60,9 +60,10 @@ dense validate-config --probe-solver -c "$CONFIG"
 dense stage-a build-pool --fresh -c "$CONFIG"
 
 # 3) Run generation (use --resume or --fresh if outputs already exist)
+#    By default, this auto-runs plots configured in `plots`; use --no-plot to skip.
 dense run -c "$CONFIG"
 
-# 4) Plot a minimal diagnostics set
+# 4) Plot a minimal diagnostics set (useful to re-render plots on demand)
 dense plot --only stage_a_summary,placement_map -c "$CONFIG"
 ```
 

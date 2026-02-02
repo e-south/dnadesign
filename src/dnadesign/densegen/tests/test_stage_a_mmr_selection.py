@@ -178,6 +178,33 @@ def test_mmr_selection_score_norm_uses_pwm_ratio_with_percentile_relevance() -> 
     assert meta["AC"].selection_score_norm == pytest.approx(0.9)
 
 
+def test_mmr_rejects_mixed_core_lengths() -> None:
+    matrix = [
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+    ]
+    background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
+    ranked = [
+        _cand("AAA", 10.0),
+        _cand("AAAA", 9.0),
+        _cand("AAAT", 8.0),
+    ]
+    with pytest.raises(ValueError, match="uniform core length"):
+        stage_a_selection._select_by_mmr(
+            ranked,
+            matrix=matrix,
+            background=background,
+            n_sites=2,
+            alpha=0.5,
+            pool_min_score_norm=None,
+            pool_max_candidates=None,
+            relevance_norm="minmax_raw_score",
+            tier_fractions=None,
+            pwm_theoretical_max_score=10.0,
+        )
+
+
 def test_mmr_pool_includes_full_rung_without_cap() -> None:
     matrix = [
         {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},

@@ -447,6 +447,15 @@ def _select_by_mmr(
         score_weight = float(alpha)
         diversity_weight = 1.0 - score_weight
         cores = [core_by_seq[cand.seq] for cand in candidates]
+        core_lengths = {len(core) for core in cores}
+        if len(core_lengths) != 1:
+            length_list = ", ".join(str(length) for length in sorted(core_lengths))
+            raise ValueError(
+                "Stage-A MMR requires a uniform core length; got lengths "
+                f"[{length_list}]. Ensure pwm.sampling.length.range does not "
+                "cross below the motif width or set pwm.sampling.trimming.window_length "
+                "to a fixed length."
+            )
         if len(weights) != len(cores[0]):
             raise ValueError("PWM weights length must match TFBS core length.")
         encoded = encoding_store.encode(cores) if encoding_store is not None else encode_cores(cores)
