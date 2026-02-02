@@ -120,6 +120,38 @@ def test_mmr_records_score_norm_and_distance_norm() -> None:
     assert meta["AT"].nearest_selected_distance_norm == pytest.approx(0.5)
 
 
+def test_mmr_uses_per_candidate_score_norm_denominator() -> None:
+    matrix = [
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+    ]
+    background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
+    ranked = [
+        _cand("AAAA", 10.0),
+        _cand("CCCC", 10.0),
+        _cand("GGGG", 10.0),
+    ]
+    score_norm_denominator_by_seq = {"AAAA": 20.0, "CCCC": 10.0, "GGGG": 40.0}
+    selected, meta, _diag = stage_a_selection._select_by_mmr(
+        ranked,
+        matrix=matrix,
+        background=background,
+        n_sites=2,
+        alpha=1.0,
+        pool_min_score_norm=None,
+        pool_max_candidates=None,
+        relevance_norm="minmax_raw_score",
+        tier_fractions=None,
+        pwm_theoretical_max_score=20.0,
+        score_norm_denominator_by_seq=score_norm_denominator_by_seq,
+    )
+    assert [cand.seq for cand in selected] == ["CCCC", "AAAA"]
+    assert meta["CCCC"].selection_score_norm == pytest.approx(1.0)
+    assert meta["AAAA"].selection_score_norm == pytest.approx(0.5)
+
+
 def test_mmr_selection_score_norm_uses_pwm_ratio_with_percentile_relevance() -> None:
     matrix = [
         {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},

@@ -27,7 +27,12 @@ from .stage_a_metadata import TFBSMeta
 from .stage_a_metrics import _mmr_objective, _tail_unique_slope
 from .stage_a_mining import mine_pwm_candidates
 from .stage_a_progress import _format_stage_a_milestone, _PwmSamplingProgress
-from .stage_a_sampling_utils import _ranges_overlap
+from .stage_a_sampling_utils import (
+    _pwm_theoretical_max_score,
+    _ranges_overlap,
+    build_log_odds,
+    select_pwm_window_by_length,
+)
 from .stage_a_selection import (
     SelectionDiagnostics,
     SelectionMeta,
@@ -90,18 +95,32 @@ def _score_norm_by_tier(
     scores_by_seq: dict[str, float],
     tier_by_seq: dict[str, int],
     *,
-    denominator: float,
+    denominator: float | None = None,
+    denominator_by_seq: dict[str, float] | None = None,
 ) -> dict[str, dict[str, float]] | None:
     if not scores_by_seq:
         return None
-    denom = float(denominator)
-    if denom <= 0.0:
-        raise ValueError("pwm_theoretical_max_score must be > 0 for score_norm summaries.")
+    if denominator_by_seq is None:
+        if denominator is None:
+            raise ValueError("score_norm summaries require a denominator.")
+        denom = float(denominator)
+        if denom <= 0.0:
+            raise ValueError("pwm_theoretical_max_score must be > 0 for score_norm summaries.")
     tier_scores: dict[str, list[float]] = {"tier0": [], "tier1": [], "tier2": [], "rest": []}
     for seq, score in scores_by_seq.items():
         tier_idx = int(tier_by_seq.get(seq, 3))
         label = "rest" if tier_idx >= 3 else f"tier{tier_idx}"
-        tier_scores[label].append(float(score) / denom)
+        if denominator_by_seq is None:
+            score_norm = float(score) / denom
+        else:
+            denom_val = denominator_by_seq.get(seq)
+            if denom_val is None:
+                raise ValueError("score_norm denominator missing entry for Stage-A summary.")
+            denom_val = float(denom_val)
+            if denom_val <= 0.0:
+                raise ValueError("score_norm denominator must be > 0 for Stage-A summary.")
+            score_norm = float(score) / denom_val
+        tier_scores[label].append(score_norm)
     summary: dict[str, dict[str, float]] = {}
     for label, values in tier_scores.items():
         if not values:
@@ -113,6 +132,46 @@ def _score_norm_by_tier(
             "max": float(arr.max()),
         }
     return summary or None
+
+
+def _score_norm_denominator_by_seq(
+    sequences: Sequence[str],
+    *,
+    matrix: Sequence[dict[str, float]],
+    background: dict[str, float],
+) -> dict[str, float]:
+    if not sequences:
+        return {}
+    matrix_list = list(matrix)
+    width = len(matrix_list)
+    if width <= 0:
+        raise ValueError("PWM matrix must have positive width for score_norm denominators.")
+    log_odds = build_log_odds(matrix_list, background, smoothing_alpha=0.0)
+    full_max = _pwm_theoretical_max_score(log_odds)
+    if full_max <= 0.0:
+        raise ValueError("PWM theoretical max must be > 0 for score_norm denominators.")
+    by_length: dict[int, float] = {}
+    denom_by_seq: dict[str, float] = {}
+    for seq in sequences:
+        length = len(seq)
+        if length <= 0:
+            raise ValueError("PWM sampling generated empty sequence; cannot normalize.")
+        if length >= width:
+            denom = full_max
+        else:
+            denom = by_length.get(length)
+            if denom is None:
+                window = select_pwm_window_by_length(
+                    matrix=matrix_list,
+                    log_odds=log_odds,
+                    length=int(length),
+                )
+                denom = _pwm_theoretical_max_score(window.log_odds)
+                if denom <= 0.0:
+                    raise ValueError("PWM window theoretical max must be > 0 for score_norm denominators.")
+                by_length[int(length)] = float(denom)
+        denom_by_seq[str(seq)] = float(denom)
+    return denom_by_seq
 
 
 def _coerce_pool_max_candidates(policy: str, value: int | None) -> int | None:
@@ -313,6 +372,15 @@ def run_stage_a_pipeline(
     if uniqueness_key == "core":
         ranked, collapsed_by_core_identity = _collapse_by_core_identity(ranked)
     eligible_unique = len(ranked)
+    score_norm_denominator_by_seq = (
+        _score_norm_denominator_by_seq(
+            [cand.seq for cand in ranked],
+            matrix=matrix,
+            background=motif.background,
+        )
+        if ranked
+        else {}
+    )
     mining_audit = _tail_unique_slope(generated_by_batch, unique_by_batch, window=5)
     if progress is not None:
         progress.update(
@@ -338,12 +406,12 @@ def run_stage_a_pipeline(
     rank_by_seq = _ranked_sequence_positions(ranked_pairs)
     tier_by_seq = {cand.seq: tiers[idx] for idx, cand in enumerate(ranked)}
     eligible_score_norm_by_tier: dict[str, dict[str, float]] | None = None
-    if pwm_theoretical_max_score is not None:
+    if ranked:
         scores_by_seq = {cand.seq: float(cand.score) for cand in ranked}
         eligible_score_norm_by_tier = _score_norm_by_tier(
             scores_by_seq,
             tier_by_seq,
-            denominator=float(pwm_theoretical_max_score),
+            denominator_by_seq=score_norm_denominator_by_seq,
         )
     eligible_tier_counts = [0, 0, 0, 0]
     for tier in tiers:
@@ -363,6 +431,7 @@ def run_stage_a_pipeline(
             relevance_norm=selection_relevance_norm or "minmax_raw_score",
             tier_fractions=tier_fractions,
             pwm_theoretical_max_score=pwm_theoretical_max_score,
+            score_norm_denominator_by_seq=score_norm_denominator_by_seq,
             encoding_store=encoding_store,
         )
     else:
@@ -417,19 +486,34 @@ def run_stage_a_pipeline(
     objective_top_candidates = None
     objective_diversified_candidates = None
     if selection_policy == "mmr" and candidate_pool:
-        if (selection_relevance_norm or "minmax_raw_score") == "percentile":
+        relevance_norm = selection_relevance_norm or "minmax_raw_score"
+        score_norm_by_seq: dict[str, float] = {}
+        if relevance_norm == "percentile":
             scores_norm_map = _score_percentile_norm([float(cand.score) for cand in candidate_pool])
+            score_norm_by_seq = {
+                cand.seq: float(scores_norm_map.get(float(cand.score), 1.0)) for cand in candidate_pool
+            }
         else:
-            if pwm_theoretical_max_score is None or float(pwm_theoretical_max_score) <= 0.0:
-                raise ValueError("pwm_theoretical_max_score is required for minmax_raw_score relevance_norm.")
-            denom = float(pwm_theoretical_max_score)
-            scores_norm_map = {float(cand.score): float(cand.score) / denom for cand in candidate_pool}
-        top_scores_objective = [float(cand.score) for cand in top_candidates if cand.matched_sequence]
-        diversified_scores_objective = [float(cand.score) for cand in picked if cand.matched_sequence]
+            if not score_norm_denominator_by_seq:
+                raise ValueError("score_norm denominators are required for minmax_raw_score relevance_norm.")
+            for cand in candidate_pool:
+                denom = score_norm_denominator_by_seq.get(cand.seq)
+                if denom is None:
+                    raise ValueError("score_norm denominator missing entry for MMR objective.")
+                denom_val = float(denom)
+                if denom_val <= 0.0:
+                    raise ValueError("score_norm denominator must be > 0 for MMR objective.")
+                score_norm_by_seq[cand.seq] = float(np.clip(float(cand.score) / denom_val, 0.0, 1.0))
+        top_candidates_objective = [cand for cand in top_candidates if cand.matched_sequence]
+        diversified_candidates_objective = [cand for cand in picked if cand.matched_sequence]
+        top_scores_objective = [float(cand.score) for cand in top_candidates_objective]
+        diversified_scores_objective = [float(cand.score) for cand in diversified_candidates_objective]
+        top_scores_norm = [score_norm_by_seq[cand.seq] for cand in top_candidates_objective]
+        diversified_scores_norm = [score_norm_by_seq[cand.seq] for cand in diversified_candidates_objective]
         objective_top_candidates = _mmr_objective(
             cores=top_candidates_cores,
             scores=top_scores_objective,
-            scores_norm_map=scores_norm_map,
+            scores_norm=top_scores_norm,
             alpha=float(selection_alpha),
             distance_weights=distance_weights,
             encoding_store=encoding_store,
@@ -437,7 +521,7 @@ def run_stage_a_pipeline(
         objective_diversified_candidates = _mmr_objective(
             cores=diversified_candidates_cores,
             scores=diversified_scores_objective,
-            scores_norm_map=scores_norm_map,
+            scores_norm=diversified_scores_norm,
             alpha=float(selection_alpha),
             distance_weights=distance_weights,
             encoding_store=encoding_store,

@@ -325,6 +325,7 @@ def _select_by_mmr(
     relevance_norm: str,
     tier_fractions: Optional[Sequence[float]],
     pwm_theoretical_max_score: float | None,
+    score_norm_denominator_by_seq: dict[str, float] | None = None,
     encoding_store: CoreEncodingStore | None = None,
 ) -> tuple[list[_CandidateLike], dict[str, SelectionMeta], SelectionDiagnostics]:
     if not ranked or n_sites <= 0:
@@ -363,11 +364,15 @@ def _select_by_mmr(
     if ladder[-1] < 1.0:
         ladder.append(1.0)
     total = len(ranked)
-    if pwm_theoretical_max_score is None:
-        raise ValueError("pwm_theoretical_max_score is required for score normalization in Stage-A MMR.")
-    score_norm_denominator = float(pwm_theoretical_max_score)
-    if score_norm_denominator <= 0.0:
-        raise ValueError("pwm_theoretical_max_score must be > 0 for Stage-A MMR score normalization.")
+    score_norm_denominator_by_seq = (
+        dict(score_norm_denominator_by_seq) if score_norm_denominator_by_seq is not None else None
+    )
+    if score_norm_denominator_by_seq is None:
+        if pwm_theoretical_max_score is None:
+            raise ValueError("pwm_theoretical_max_score is required for score normalization in Stage-A MMR.")
+        score_norm_denominator = float(pwm_theoretical_max_score)
+        if score_norm_denominator <= 0.0:
+            raise ValueError("pwm_theoretical_max_score must be > 0 for Stage-A MMR score normalization.")
 
     def _lex_ranks(values: Sequence[str]) -> np.ndarray:
         order = {val: idx for idx, val in enumerate(sorted(set(values)))}
@@ -375,6 +380,24 @@ def _select_by_mmr(
 
     score_norm_max_raw: float | None = None
     score_norm_clipped: bool | None = None
+
+    def _score_norm_denominators(
+        candidates: Sequence[_CandidateLike],
+    ) -> tuple[np.ndarray, float, float]:
+        if score_norm_denominator_by_seq is None:
+            denom = float(score_norm_denominator)
+            return np.full(len(candidates), denom, dtype=float), denom, denom
+        values: list[float] = []
+        for cand in candidates:
+            denom = score_norm_denominator_by_seq.get(cand.seq)
+            if denom is None:
+                raise ValueError("score_norm_denominator_by_seq missing entry for candidate.")
+            denom_val = float(denom)
+            if denom_val <= 0.0:
+                raise ValueError("score_norm_denominator_by_seq values must be > 0 for Stage-A MMR.")
+            values.append(denom_val)
+        arr = np.asarray(values, dtype=float)
+        return arr, float(arr.min()), float(arr.max())
 
     def _select_from_pool(
         candidates: Sequence[_CandidateLike],
@@ -385,12 +408,13 @@ def _select_by_mmr(
         if target_n <= 0:
             return [], {}
         scores_arr = np.array([float(cand.score) for cand in candidates], dtype=float)
+        denom_arr, denom_min, denom_max = _score_norm_denominators(candidates)
         if relevance_norm == "percentile":
             scores_norm_map = _score_percentile_norm(scores_arr.tolist())
             scores_norm = np.array([scores_norm_map.get(float(cand.score), 1.0) for cand in candidates], dtype=float)
         else:
-            scores_norm = np.array([float(cand.score) / score_norm_denominator for cand in candidates], dtype=float)
-        score_norm_for_meta = np.array([float(cand.score) / score_norm_denominator for cand in candidates], dtype=float)
+            scores_norm = scores_arr / denom_arr
+        score_norm_for_meta = scores_arr / denom_arr
         max_raw = float(np.nanmax(score_norm_for_meta)) if score_norm_for_meta.size else None
         if max_raw is not None:
             nonlocal score_norm_max_raw, score_norm_clipped
@@ -399,9 +423,10 @@ def _select_by_mmr(
             if max_raw > 1.0 + 1e-6:
                 score_norm_clipped = True
                 logging.getLogger(__name__).error(
-                    "Stage-A score_norm exceeded 1.0 (max_raw=%.6f, theoretical_max=%.6f); clipping to 1.0.",
+                    "Stage-A score_norm exceeded 1.0 (max_raw=%.6f, denom_range=[%.6f, %.6f]); clipping to 1.0.",
                     max_raw,
-                    score_norm_denominator,
+                    denom_min,
+                    denom_max,
                 )
         score_norm_for_meta = np.clip(score_norm_for_meta, 0.0, 1.0)
         if relevance_norm == "minmax_raw_score":

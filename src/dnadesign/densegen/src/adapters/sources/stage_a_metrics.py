@@ -427,7 +427,7 @@ def _mmr_objective(
     *,
     cores: Sequence[str],
     scores: Sequence[float],
-    scores_norm_map: dict[float, float],
+    scores_norm: Sequence[float],
     alpha: float,
     distance_weights: Sequence[float] | None = None,
     encoding_store: CoreEncodingStore | None = None,
@@ -436,6 +436,8 @@ def _mmr_objective(
         return None
     if len(cores) != len(scores):
         raise ValueError("MMR objective cores/scores length mismatch.")
+    if len(scores_norm) != len(scores):
+        raise ValueError("MMR objective scores/scores_norm length mismatch.")
     if alpha <= 0.0 or alpha > 1.0:
         raise ValueError("MMR objective alpha must be in (0, 1].")
     length = _assert_uniform_core_length(cores, label="mmr objective")
@@ -451,11 +453,8 @@ def _mmr_objective(
     utilities = np.empty(len(cores), dtype=float)
     score_weight = float(alpha)
     diversity_weight = 1.0 - score_weight
-    for idx, score in enumerate(scores):
-        score_val = float(score)
-        score_norm = scores_norm_map.get(score_val)
-        if score_norm is None:
-            raise ValueError("MMR objective missing normalized score for candidate.")
+    for idx, score_norm in enumerate(scores_norm):
+        score_norm = float(score_norm)
         if idx == 0:
             max_sim = 0.0
         else:

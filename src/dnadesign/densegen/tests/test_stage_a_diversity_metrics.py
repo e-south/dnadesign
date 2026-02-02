@@ -200,17 +200,18 @@ def test_mmr_objective_mean_utility() -> None:
     cores = ["AAAA", "AAAT", "TTTT"]
     scores = [3.0, 2.0, 1.0]
     scores_norm_map = _score_percentile_norm(scores)
+    scores_norm = [scores_norm_map[score] for score in scores]
     top_candidates = _mmr_objective(
         cores=cores,
         scores=scores,
-        scores_norm_map=scores_norm_map,
+        scores_norm=scores_norm,
         alpha=0.5,
     )
     assert top_candidates == pytest.approx(0.125)
     diversified = _mmr_objective(
         cores=["AAAA", "TTTT", "AAAT"],
         scores=[3.0, 1.0, 2.0],
-        scores_norm_map=scores_norm_map,
+        scores_norm=[scores_norm_map[3.0], scores_norm_map[1.0], scores_norm_map[2.0]],
         alpha=0.5,
     )
     assert diversified == pytest.approx(0.13333333333333333)
