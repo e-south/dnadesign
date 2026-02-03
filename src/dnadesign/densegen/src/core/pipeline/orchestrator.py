@@ -30,7 +30,7 @@ import pandas as pd
 from rich.console import Console
 
 from ...adapters.optimizer import DenseArraysAdapter, OptimizerAdapter
-from ...adapters.outputs import OutputRecord, SinkBase, build_sinks, load_records_from_config, resolve_bio_alphabet
+from ...adapters.outputs import OutputRecord, SinkBase, build_sinks, resolve_bio_alphabet
 from ...adapters.sources import data_source_factory
 from ...adapters.sources.base import BaseDataSource
 from ...config import (
@@ -70,9 +70,7 @@ from .attempts import (
     _append_attempt,
     _flush_attempts,
     _flush_solutions,
-    _load_existing_attempt_index_by_plan,
     _load_existing_library_index,
-    _load_failure_counts_from_attempts,
     _log_rejection,
 )
 from .inputs import (
@@ -104,6 +102,7 @@ from .progress import (
     _summarize_tf_counts,
     _summarize_tfbs_usage_stats,
 )
+from .resume_state import load_resume_state
 from .sequence_validation import (
     _apply_pad_offsets,
     _find_forbidden_kmer,
@@ -121,7 +120,7 @@ from .stage_b import (
     assess_library_feasibility,
     build_library_for_plan,
 )
-from .usage_tracking import _compute_used_tf_info, _parse_used_tfbs_detail, _update_usage_counts
+from .usage_tracking import _compute_used_tf_info, _update_usage_counts
 from .versioning import _resolve_dense_arrays_version
 
 log = logging.getLogger(__name__)
@@ -2084,68 +2083,24 @@ def run_pipeline(
         if existing_state.created_at:
             state_created_at = existing_state.created_at
 
-    existing_counts: dict[tuple[str, str], int] = {}
-    existing_usage_by_plan: dict[tuple[str, str], dict[tuple[str, str], int]] = {}
-    site_failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]] = {}
-    attempt_counters: dict[tuple[str, str], int] = {}
-    if resume:
-        site_failure_counts = _load_failure_counts_from_attempts(tables_root)
-        attempt_counters = _load_existing_attempt_index_by_plan(tables_root)
-        if cfg.output.targets:
-            try:
-                df_existing, _ = load_records_from_config(
-                    loaded.root,
-                    loaded.path,
-                    columns=[
-                        "densegen__run_config_sha256",
-                        "densegen__run_id",
-                        "densegen__input_name",
-                        "densegen__plan",
-                        "densegen__used_tfbs_detail",
-                    ],
-                )
-            except Exception:
-                df_existing = None
-            if df_existing is not None and not df_existing.empty:
-                if "densegen__run_config_sha256" in df_existing.columns:
-                    mismatched = df_existing["densegen__run_config_sha256"].dropna().unique().tolist()
-                    if mismatched and any(val != config_sha for val in mismatched):
-                        raise RuntimeError(
-                            "Existing outputs were produced with a different config. "
-                            "Remove outputs/tables (and outputs/meta if present) "
-                            "or stage a new run root to start fresh."
-                        )
-                if "densegen__run_id" in df_existing.columns:
-                    run_ids = df_existing["densegen__run_id"].dropna().unique().tolist()
-                    if run_ids and any(val != cfg.run.id for val in run_ids):
-                        raise RuntimeError(
-                            "Existing outputs were produced with a different run_id. "
-                            "Remove outputs/tables (and outputs/meta if present) "
-                            "or stage a new run root to start fresh."
-                        )
-                if {"densegen__input_name", "densegen__plan"} <= set(df_existing.columns):
-                    counts = (
-                        df_existing.groupby(["densegen__input_name", "densegen__plan"]).size().astype(int).to_dict()
-                    )
-                    existing_counts = {(str(k[0]), str(k[1])): int(v) for k, v in counts.items()}
-                if "densegen__used_tfbs_detail" in df_existing.columns:
-                    for _, row in df_existing.iterrows():
-                        input_name = str(row.get("densegen__input_name") or "")
-                        plan_name = str(row.get("densegen__plan") or "")
-                        if not input_name or not plan_name:
-                            continue
-                        key = (input_name, plan_name)
-                        counts = existing_usage_by_plan.setdefault(key, {})
-                        used = _parse_used_tfbs_detail(row.get("densegen__used_tfbs_detail"))
-                        _update_usage_counts(counts, used)
-                if existing_counts:
-                    total = sum(existing_counts.values())
-                    per_plan = dict(existing_counts)
-                    log.info(
-                        "Resuming from existing outputs: %d sequences across %d plan(s).",
-                        total,
-                        len(existing_counts),
-                    )
+    resume_state = load_resume_state(
+        resume=resume,
+        loaded=loaded,
+        tables_root=tables_root,
+        config_sha=config_sha,
+    )
+    existing_counts = resume_state.existing_counts
+    existing_usage_by_plan = resume_state.existing_usage_by_plan
+    site_failure_counts = resume_state.site_failure_counts
+    attempt_counters = resume_state.attempt_counters
+    if existing_counts:
+        total = sum(existing_counts.values())
+        per_plan = dict(existing_counts)
+        log.info(
+            "Resuming from existing outputs: %d sequences across %d plan(s).",
+            total,
+            len(existing_counts),
+        )
 
     def _accumulate_stats(key: tuple[str, str], stats: dict) -> None:
         if key not in plan_stats:
