@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from dnadesign.densegen.src.adapters.sources.stage_a_candidate_store import write_candidate_records
+from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_candidate_store import write_candidate_records
 
 
 def _write_candidates(path: Path, records: list[dict]) -> None:

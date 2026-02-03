@@ -11,8 +11,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dnadesign.densegen.src.adapters.sources import stage_a_pipeline
-from dnadesign.densegen.src.adapters.sources.stage_a_types import FimoCandidate
+from dnadesign.densegen.src.adapters.sources.stage_a import stage_a_pipeline
+from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_types import FimoCandidate
 
 
 def _cand(seq: str, score: float) -> FimoCandidate:

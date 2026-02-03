@@ -53,7 +53,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.traceback import install as rich_traceback
 
-from .adapters.sources.stage_a_summary import PWMSamplingSummary
+from .adapters.sources.stage_a import PWMSamplingSummary
 from .cli_render import stage_a_plan_table, stage_a_recap_tables
 from .config import (
     LATEST_SCHEMA_VERSION,

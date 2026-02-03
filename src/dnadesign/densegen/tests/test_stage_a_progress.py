@@ -14,7 +14,7 @@ Module Author(s): Eric J. South
 # ABOUTME: Ensures progress output avoids non-monotonic percentage noise.
 from __future__ import annotations
 
-from dnadesign.densegen.src.adapters.sources.stage_a_progress import _format_pwm_progress_line
+from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_progress import _format_pwm_progress_line
 
 
 def test_progress_line_omits_percent_and_bar() -> None:

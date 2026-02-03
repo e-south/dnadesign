@@ -15,7 +15,7 @@ from typing import List
 
 from rich.console import Console
 
-from dnadesign.densegen.src.adapters.sources import stage_a_progress
+from dnadesign.densegen.src.adapters.sources.stage_a import stage_a_progress
 from dnadesign.densegen.src.utils import logging_utils
 
 

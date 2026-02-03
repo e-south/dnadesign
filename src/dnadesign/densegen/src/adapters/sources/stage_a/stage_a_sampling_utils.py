@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/densegen/src/adapters/sources/stage_a_sampling_utils.py
+src/dnadesign/densegen/src/adapters/sources/stage_a/stage_a_sampling_utils.py
 
 PWM sampling utilities for Stage-A candidate generation.
 

@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/densegen/src/adapters/sources/stage_a_mining.py
+src/dnadesign/densegen/src/adapters/sources/stage_a/stage_a_mining.py
 
 Stage-A PWM mining (candidate generation + FIMO scoring).
 
@@ -20,9 +20,9 @@ from typing import Optional, Protocol, Sequence
 
 import numpy as np
 
-from ...core.artifacts.ids import hash_candidate_id
-from ...core.stage_a_constants import FIMO_REPORT_THRESH
-from .pwm_fimo import (
+from ....core.artifacts.ids import hash_candidate_id
+from ....core.stage_a_constants import FIMO_REPORT_THRESH
+from ..pwm_fimo import (
     FimoHit,
     aggregate_best_hits,
     build_candidate_records,

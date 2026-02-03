@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/densegen/src/adapters/sources/stage_a_paths.py
+src/dnadesign/densegen/src/adapters/sources/stage_a/stage_a_paths.py
 
 Stage-A filename-safe label helpers.
 

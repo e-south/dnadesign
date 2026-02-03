@@ -23,8 +23,7 @@ from ...core.artifacts.ids import hash_pwm_motif, hash_tfbs_id
 from ...core.run_paths import candidates_root
 from .base import BaseDataSource, resolve_path
 from .pwm_sampling import sample_pwm_sites, sampling_kwargs_from_config, validate_mmr_core_length
-from .stage_a_sampling_utils import normalize_background
-from .stage_a_types import PWMMotif
+from .stage_a import PWMMotif, normalize_background
 
 _SUPPORTED_SCHEMA_VERSIONS = {"1.0"}
 _BASES = ("A", "C", "G", "T")

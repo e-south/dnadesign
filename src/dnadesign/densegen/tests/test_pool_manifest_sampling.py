@@ -21,7 +21,7 @@ import pandas as pd
 import yaml
 
 from dnadesign.densegen.src.adapters.sources.base import BaseDataSource
-from dnadesign.densegen.src.adapters.sources.stage_a_metrics import (
+from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_metrics import (
     CoreHammingSummary,
     DiversitySummary,
     EntropyBlock,
@@ -35,7 +35,7 @@ from dnadesign.densegen.src.adapters.sources.stage_a_metrics import (
     ScoreSummary,
     ScoreSummaryBlock,
 )
-from dnadesign.densegen.src.adapters.sources.stage_a_summary import PWMSamplingSummary
+from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_summary import PWMSamplingSummary
 from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.core.artifacts.pool import build_pool_artifact
 from dnadesign.densegen.src.core.pipeline import PipelineDeps, default_deps

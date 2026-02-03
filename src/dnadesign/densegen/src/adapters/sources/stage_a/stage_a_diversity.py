@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/densegen/src/adapters/sources/stage_a_diversity.py
+src/dnadesign/densegen/src/adapters/sources/stage_a/stage_a_diversity.py
 
 Stage-A core diversity metrics for PWM sampling.
 

@@ -15,7 +15,7 @@ import math
 
 import pytest
 
-from dnadesign.densegen.src.adapters.sources import stage_a_sampling_utils
+from dnadesign.densegen.src.adapters.sources.stage_a import stage_a_sampling_utils
 
 
 def test_pwm_theoretical_max_score_matches_log_odds_maxima() -> None:

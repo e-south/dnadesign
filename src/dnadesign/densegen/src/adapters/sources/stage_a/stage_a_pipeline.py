@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/densegen/src/adapters/sources/stage_a_pipeline.py
+src/dnadesign/densegen/src/adapters/sources/stage_a/stage_a_pipeline.py
 
 Stage-A PWM mining, selection, metrics, and summary orchestration.
 
@@ -19,7 +19,7 @@ from typing import List, Optional, Sequence
 
 import numpy as np
 
-from ...core.score_tiers import score_tier_counts
+from ....core.score_tiers import score_tier_counts
 from .stage_a_candidate_store import write_candidate_records, write_fimo_debug_tsv
 from .stage_a_diversity import _diversity_summary
 from .stage_a_encoding import CoreEncodingStore

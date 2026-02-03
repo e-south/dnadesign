@@ -20,7 +20,7 @@ from dnadesign.densegen.src.adapters.sources.background_pool import (
     BackgroundPoolDataSource,
     _run_fimo_exclusion,
 )
-from dnadesign.densegen.src.adapters.sources.stage_a_types import PWMMotif
+from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_types import PWMMotif
 from dnadesign.densegen.src.config import (
     BackgroundPoolFiltersConfig,
     BackgroundPoolFimoExcludeConfig,

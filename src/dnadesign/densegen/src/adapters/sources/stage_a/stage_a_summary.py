@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/densegen/src/adapters/sources/stage_a_summary.py
+src/dnadesign/densegen/src/adapters/sources/stage_a/stage_a_summary.py
 
 Stage-A PWM sampling summary helpers and manifest-facing dataclasses.
 
@@ -16,8 +16,8 @@ from typing import Optional, Sequence
 
 import numpy as np
 
-from ...core.score_tiers import score_tier_counts
-from ...core.stage_a_constants import SCORE_HIST_BINS
+from ....core.score_tiers import score_tier_counts
+from ....core.stage_a_constants import SCORE_HIST_BINS
 from .stage_a_metrics import DiversitySummary
 
 

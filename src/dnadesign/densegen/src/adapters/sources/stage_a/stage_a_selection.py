@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/densegen/src/adapters/sources/stage_a_selection.py
+src/dnadesign/densegen/src/adapters/sources/stage_a/stage_a_selection.py
 
 Stage-A selection and core deduplication helpers.
 
@@ -16,7 +16,7 @@ from typing import Optional, Protocol, Sequence
 
 import numpy as np
 
-from ...core.score_tiers import normalize_tier_fractions
+from ....core.score_tiers import normalize_tier_fractions
 from .stage_a_encoding import CoreEncodingStore, encode_cores
 from .stage_a_sampling_utils import normalize_background
 from .stage_a_types import SelectionMeta

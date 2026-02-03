@@ -18,8 +18,8 @@ import pandas as pd
 import pytest
 import yaml
 
-from dnadesign.densegen.src.adapters.sources import stage_a_selection
-from dnadesign.densegen.src.adapters.sources.stage_a_types import FimoCandidate
+from dnadesign.densegen.src.adapters.sources.stage_a import stage_a_selection
+from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_types import FimoCandidate
 from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.core.artifacts.pool import build_pool_artifact
 from dnadesign.densegen.src.core.pipeline import default_deps

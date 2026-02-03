@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/densegen/src/adapters/sources/stage_a_progress.py
+src/dnadesign/densegen/src/adapters/sources/stage_a/stage_a_progress.py
 
 Stage-A PWM mining progress rendering helpers.
 
@@ -17,9 +17,9 @@ import time
 from dataclasses import dataclass
 from typing import Optional, Sequence, TextIO
 
-from ...core.score_tiers import score_tier_counts
-from ...utils import logging_utils
-from ...utils.rich_style import make_panel, make_table
+from ....core.score_tiers import score_tier_counts
+from ....utils import logging_utils
+from ....utils.rich_style import make_panel, make_table
 
 log = logging.getLogger(__name__)
 

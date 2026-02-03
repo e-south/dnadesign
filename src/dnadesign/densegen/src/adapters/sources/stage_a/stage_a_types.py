@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/densegen/src/adapters/sources/stage_a_types.py
+src/dnadesign/densegen/src/adapters/sources/stage_a/stage_a_types.py
 
 Stage-A data types for PWM sampling.
 

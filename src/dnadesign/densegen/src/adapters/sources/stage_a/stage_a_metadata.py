@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/densegen/src/adapters/sources/stage_a_metadata.py
+src/dnadesign/densegen/src/adapters/sources/stage_a/stage_a_metadata.py
 
 Stage-A TFBS metadata assembly for pool rows.
 

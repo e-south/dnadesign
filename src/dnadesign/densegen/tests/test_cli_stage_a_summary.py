@@ -20,7 +20,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from dnadesign.densegen.src.adapters.sources.stage_a_metrics import (
+from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_metrics import (
     CoreHammingSummary,
     DiversitySummary,
     EntropyBlock,
@@ -34,7 +34,7 @@ from dnadesign.densegen.src.adapters.sources.stage_a_metrics import (
     ScoreSummary,
     ScoreSummaryBlock,
 )
-from dnadesign.densegen.src.adapters.sources.stage_a_summary import PWMSamplingSummary
+from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_summary import PWMSamplingSummary
 from dnadesign.densegen.src.cli import _format_tier_counts, _stage_a_sampling_rows, app
 from dnadesign.densegen.src.cli_render import stage_a_recap_tables
 from dnadesign.densegen.src.core.artifacts.pool import PoolData

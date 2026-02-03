@@ -13,24 +13,24 @@ from __future__ import annotations
 
 import pytest
 
-from dnadesign.densegen.src.adapters.sources.stage_a_diversity import (
+from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_diversity import (
     _core_entropy,
     _core_hamming_knn,
     _core_hamming_nnd,
     _diversity_summary,
 )
-from dnadesign.densegen.src.adapters.sources.stage_a_metrics import (
+from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_metrics import (
     KnnSummary,
     PairwiseSummary,
     _mmr_objective,
 )
-from dnadesign.densegen.src.adapters.sources.stage_a_selection import (
+from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_selection import (
     SelectionDiagnostics,
     _score_percentile_norm,
     _select_diversity_top_candidates,
     _select_diversity_upper_bound_candidates,
 )
-from dnadesign.densegen.src.adapters.sources.stage_a_types import FimoCandidate
+from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_types import FimoCandidate
 
 
 def test_core_hamming_nnd_counts_and_median() -> None:

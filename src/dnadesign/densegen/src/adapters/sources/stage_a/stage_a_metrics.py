@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/densegen/src/adapters/sources/stage_a_metrics.py
+src/dnadesign/densegen/src/adapters/sources/stage_a/stage_a_metrics.py
 
 Stage-A metrics (diversity, mining audits, padding audits).
 

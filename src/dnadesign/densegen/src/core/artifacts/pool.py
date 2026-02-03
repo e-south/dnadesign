@@ -23,7 +23,7 @@ from typing import Iterable
 import pandas as pd
 
 from ...adapters.sources.background_pool import BackgroundPoolDataSource
-from ...adapters.sources.stage_a_summary import PWMSamplingSummary
+from ...adapters.sources.stage_a import PWMSamplingSummary
 from ...config import resolve_relative_path
 from ...core.stage_a_constants import FIMO_REPORT_THRESH
 from ...utils.logging_utils import install_native_stderr_filters

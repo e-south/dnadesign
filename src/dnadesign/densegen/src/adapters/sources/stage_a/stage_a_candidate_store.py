@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/densegen/src/adapters/sources/stage_a_candidate_store.py
+src/dnadesign/densegen/src/adapters/sources/stage_a/stage_a_candidate_store.py
 
 Stage-A debug candidate record persistence helpers.
 

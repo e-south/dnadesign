@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/densegen/src/adapters/sources/stage_a_encoding.py
+src/dnadesign/densegen/src/adapters/sources/stage_a/stage_a_encoding.py
 
 Stage-A core sequence encoding helpers.
 
