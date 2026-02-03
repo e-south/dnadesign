@@ -78,6 +78,13 @@ class PWMSamplingSummary:
     pwm_consensus_score: Optional[float] = None
     pwm_theoretical_max_score: Optional[float] = None
     max_observed_score: Optional[float] = None
+    motif_width: Optional[int] = None
+    trim_window_length: Optional[int] = None
+    trim_window_strategy: Optional[str] = None
+    trim_window_start: Optional[int] = None
+    trim_window_score: Optional[float] = None
+    trimmed_width: Optional[int] = None
+    trim_window_applied: Optional[bool] = None
 
 
 def _summarize_lengths(
@@ -201,6 +208,13 @@ def _build_summary(
     input_name: Optional[str] = None,
     regulator: Optional[str] = None,
     backend: Optional[str] = None,
+    motif_width: Optional[int] = None,
+    trim_window_length: Optional[int] = None,
+    trim_window_strategy: Optional[str] = None,
+    trim_window_start: Optional[int] = None,
+    trim_window_score: Optional[float] = None,
+    trimmed_width: Optional[int] = None,
+    trim_window_applied: Optional[bool] = None,
 ) -> PWMSamplingSummary:
     if diversity is not None and not isinstance(diversity, DiversitySummary):
         raise ValueError("Stage-A diversity must be a DiversitySummary instance.")
@@ -279,4 +293,11 @@ def _build_summary(
         pwm_consensus_score=float(pwm_consensus_score) if pwm_consensus_score is not None else None,
         pwm_theoretical_max_score=(float(pwm_theoretical_max_score) if pwm_theoretical_max_score is not None else None),
         max_observed_score=float(max_observed_score) if max_observed_score is not None else None,
+        motif_width=int(motif_width) if motif_width is not None else None,
+        trim_window_length=int(trim_window_length) if trim_window_length is not None else None,
+        trim_window_strategy=str(trim_window_strategy) if trim_window_strategy is not None else None,
+        trim_window_start=int(trim_window_start) if trim_window_start is not None else None,
+        trim_window_score=float(trim_window_score) if trim_window_score is not None else None,
+        trimmed_width=int(trimmed_width) if trimmed_width is not None else None,
+        trim_window_applied=bool(trim_window_applied) if trim_window_applied is not None else None,
     )

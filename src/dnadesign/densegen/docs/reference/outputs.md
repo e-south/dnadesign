@@ -186,6 +186,8 @@ For FIMO-backed PWM inputs, it records Stage-A sampling metadata, including:
 - consensus and max-score stats (`pwm_consensus`, `pwm_consensus_iupac`, `pwm_consensus_score`,
   `pwm_theoretical_max_score`, `max_observed_score`)
 - selection pool diagnostics (`selection_pool_*`, `selection_score_norm_*`)
+- trimming metadata (`motif_width`, `trimmed_width`, `trim_window_length`,
+  `trim_window_strategy`, `trim_window_start`, `trim_window_score`, `trim_window_applied`)
 - diversity summaries (k‑NN unweighted/weighted, pairwise weighted, overlap, score quantiles)
 - mining and padding audits
 

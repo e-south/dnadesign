@@ -179,6 +179,13 @@ class _DummySource(BaseDataSource):
             diversity=diversity,
             eligible_score_norm_by_tier={"tier0": {"min": 0.9, "median": 0.9, "max": 0.9}},
             mining_audit=None,
+            motif_width=20,
+            trim_window_length=16,
+            trim_window_strategy="max_info",
+            trim_window_start=2,
+            trim_window_score=1.23,
+            trimmed_width=16,
+            trim_window_applied=True,
         )
         return [("regA", "AAAA", "dummy")], df, [summary]
 
@@ -305,3 +312,10 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
     assert hist[0]["eligible_unique"] == 2
     assert hist[0]["retained"] == 1
     assert hist[0]["mining_audit"] is None
+    assert hist[0]["motif_width"] == 20
+    assert hist[0]["trim_window_length"] == 16
+    assert hist[0]["trim_window_strategy"] == "max_info"
+    assert hist[0]["trim_window_start"] == 2
+    assert hist[0]["trim_window_score"] == 1.23
+    assert hist[0]["trimmed_width"] == 16
+    assert hist[0]["trim_window_applied"] is True

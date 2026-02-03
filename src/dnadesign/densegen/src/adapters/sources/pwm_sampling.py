@@ -115,6 +115,7 @@ def sample_pwm_sites(
         raise ValueError("Stage-A PWM sampling strategy 'consensus' requires n_sites=1")
 
     width = len(motif.matrix)
+    original_width = width
     if width <= 0:
         raise ValueError(f"PWM motif '{motif.motif_id}' has zero width.")
     if length_policy not in {"exact", "range"}:
@@ -131,15 +132,36 @@ def sample_pwm_sites(
         )
     log_odds = build_log_odds(motif.matrix, effective_background, smoothing_alpha=0.0)
     window_label = "full"
+    trim_window_start = None
+    trim_window_score = None
     if trim_window_length is not None:
+        trim_window_length = int(trim_window_length)
+        log.info(
+            "Stage-A PWM trim configured for motif %s: window_length=%d strategy=%s width=%d",
+            motif.motif_id,
+            trim_window_length,
+            trim_window_strategy,
+            original_width,
+        )
         matrix, log_odds, window_start, window_score = _select_pwm_window(
             matrix=motif.matrix,
             log_odds=log_odds,
             length=int(trim_window_length),
             strategy=str(trim_window_strategy),
         )
+        trim_window_start = int(window_start)
+        trim_window_score = float(window_score)
         width = len(matrix)
         window_label = f"{width}@{window_start}"
+        if width != original_width:
+            log.info(
+                "Stage-A PWM trim applied for motif %s: width %d -> %d (start=%d, score=%.3f)",
+                motif.motif_id,
+                original_width,
+                width,
+                trim_window_start,
+                trim_window_score,
+            )
         log.debug(
             "Stage-A PWM sampling trimmed motif %s to window length %d (start=%d, score=%.3f).",
             motif.motif_id,
@@ -355,6 +377,10 @@ def sample_pwm_sites(
             pwm_theoretical_max_score=pwm_theoretical_max_score,
             length_label=length_label,
             window_label=window_label,
+            trim_window_length=trim_window_length,
+            trim_window_strategy=str(trim_window_strategy) if trim_window_length is not None else None,
+            trim_window_start=trim_window_start,
+            trim_window_score=trim_window_score,
             score_label=score_label,
             return_summary=return_summary,
             provided_sequences=[full_seq],
@@ -448,6 +474,10 @@ def sample_pwm_sites(
         pwm_theoretical_max_score=pwm_theoretical_max_score,
         length_label=length_label,
         window_label=window_label,
+        trim_window_length=trim_window_length,
+        trim_window_strategy=str(trim_window_strategy) if trim_window_length is not None else None,
+        trim_window_start=trim_window_start,
+        trim_window_score=trim_window_score,
         score_label=score_label,
         return_summary=return_summary,
     )

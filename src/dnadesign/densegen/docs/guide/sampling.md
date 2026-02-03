@@ -21,9 +21,7 @@ This guide is semantic. For exact schema fields, use `reference/config.md`.
 Stage-A for PWM inputs is a mine -> score -> dedupe -> retain loop:
 
 1) **Generate cores** (and optional flanks) via `sampling.strategy`.
-2) **Score** with FIMO log-odds (`--norc` forward only). Cores are treated as bricks and can be
-   placed in either orientation later. If `sampling.bgfile` is set, that background is also used
-   for theoretical max, `score_norm`, and MMR information-content weights.
+2) **Score** with FIMO log-odds (`--norc` forward only). If `sampling.bgfile` is set, that background is also used for theoretical max, `score_norm`, and MMR information -content weights.
 3) **Eligibility**: candidate must have a FIMO hit and `best_hit_score > 0`.
 4) **Deduplication** via `uniqueness.key`:
    - `sequence` keeps unique full TFBS strings.
@@ -33,7 +31,7 @@ Stage-A for PWM inputs is a mine -> score -> dedupe -> retain loop:
 #### Length range, padding, and trimming
 
 When `sampling.length.policy=range`, Stage‑A samples a **target length per candidate**
-uniformly from `[min, max]`. This happens per generated sequence (not per regulator):
+uniformly from `[min, max]`. This happens per generated sequence.
 
 - **Short motifs (width < target length)**: the motif is embedded in background bases.
   The left pad length is sampled uniformly from `0..extra`, and the right pad receives
@@ -73,6 +71,10 @@ Similarity:
 MMR requires **uniform core length**. If you set `sampling.length.policy=range` with
 a minimum below the motif width, configure `sampling.trimming.window_length` to a
 fixed length (or keep the length range >= motif width) so all cores are the same length.
+When a fixed trimming window is set, Stage‑A logs the configured window and records
+per‑motif trimming metadata in `outputs/pools/pool_manifest.json` (stage‑A sampling
+histogram entries include `motif_width`, `trimmed_width`, `trim_window_length`,
+`trim_window_strategy`, `trim_window_start`, `trim_window_score`, and `trim_window_applied`).
 
 `selection.pool.min_score_norm` is a **report-only** reference for "within tau of theoretical max."
 It does not filter the MMR pool. There is no default; set it explicitly if you want the reference.

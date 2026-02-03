@@ -308,6 +308,10 @@ def run_stage_a_pipeline(
     pwm_theoretical_max_score: float | None,
     length_label: str,
     window_label: str,
+    trim_window_length: Optional[int],
+    trim_window_strategy: Optional[str],
+    trim_window_start: Optional[int],
+    trim_window_score: Optional[float],
     score_label: str,
     return_summary: bool,
     provided_sequences: Optional[List[str]] = None,
@@ -797,6 +801,15 @@ def run_stage_a_pipeline(
     if return_summary:
         if selection_diag is None:
             raise ValueError("Stage-A selection diagnostics missing for summary.")
+        motif_width = len(motif.matrix)
+        trimmed_width = width
+        trim_window_applied = None
+        motif_width_value = None
+        trimmed_width_value = None
+        if trim_window_length is not None:
+            motif_width_value = motif_width
+            trimmed_width_value = trimmed_width
+            trim_window_applied = trimmed_width != motif_width
         summary = _build_summary(
             generated=generated_total,
             target=requested,
@@ -854,6 +867,13 @@ def run_stage_a_pipeline(
             input_name=input_name,
             regulator=motif.motif_id,
             backend=scoring_backend,
+            motif_width=motif_width_value,
+            trim_window_length=trim_window_length,
+            trim_window_strategy=trim_window_strategy,
+            trim_window_start=trim_window_start,
+            trim_window_score=trim_window_score,
+            trimmed_width=trimmed_width_value,
+            trim_window_applied=trim_window_applied,
         )
     return StageAPipelineResult(
         sequences=[c.seq for c in picked],
