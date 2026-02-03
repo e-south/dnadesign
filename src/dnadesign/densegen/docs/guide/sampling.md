@@ -28,6 +28,19 @@ Stage-A for PWM inputs is a mine -> score -> dedupe -> retain loop:
    - `core` collapses by `tfbs_core` (motif-aligned match).
 5) **Selection**: retain `n_sites` using `selection.policy`.
 
+Important: Stage-A PWM sampling is **not** full randomness. It is PWM-biased sampling,
+and that happens before FIMO. Only the target length and background padding are random.
+The core itself is sampled from the PWM’s per-position probabilities, so highly specific
+motifs will repeatedly generate the same cores.
+
+What actually happens for PWM inputs when `sampling.strategy=stochastic`:
+
+1) Sample a target length (e.g., 16–20).
+2) Sample a core by drawing each position from the PWM (or the trimmed PWM window).
+3) Embed the core in random background bases to reach the target length.
+4) Run FIMO to score and get `matched_sequence` (core).
+5) Collapse by `tfbs_core` → `eligible_unique` count.
+
 #### Length range, padding, and trimming
 
 When `sampling.length.policy=range`, Stage‑A samples a **target length per candidate**
@@ -79,15 +92,7 @@ histogram entries include `motif_width`, `trimmed_width`, `trim_window_length`,
 `selection.pool.min_score_norm` is a **report-only** reference for "within tau of theoretical max."
 It does not filter the MMR pool. There is no default; set it explicitly if you want the reference.
 
-#### What I recommend (if you want to fix the bias in code)
-
-Do Option A first: normalize ranking/tiering/pool by length‑normalized score when
-`length.policy=range` and the minimum length is below the motif width. It’s the smallest
-behavioral change that targets the real bias.
-
-Set `pwm.sampling.selection.rank_by: score_norm` (default `score`) to enable this explicitly.
-
-**Stage-A output contract**
+#### Stage-A output contract
 
 Stage-A writes a single pool parquet per input under `outputs/pools/<input>__pool.parquet`.
 This parquet contains **only the retained set** (the output of the configured selection policy).
@@ -102,23 +107,14 @@ To keep all candidates for debugging, set:
 densegen.inputs[].sampling.keep_all_candidates_debug: true
 ```
 
-Then after `dense stage-a build-pool`, inspect candidate lengths (candidates are partitioned
-under `outputs/pools/candidates/<input_name>/`):
+Then after `dense stage-a build-pool`, inspect candidate length distributions from
+the per-input parquet under `outputs/pools/candidates/<input_name>/`. Compare:
 
-```bash
-python3 - <<'PY'
-import pandas as pd
-from pathlib import Path
-df = pd.read_parquet(
-    Path("outputs/pools/candidates")
-    / "lexA_cpxR_baeR_artifacts"
-    / "candidates__baeR_SBWWTWKTYYYYMHDAWTSK.parquet"
-)
-df["len"] = df["sequence"].str.len()
-print(df["len"].value_counts().sort_index())
-print(df[df["best_hit_score"] > 0]["len"].value_counts().sort_index())
-PY
-```
+- **All candidates**: length distribution across `[min, max]`
+- **Eligible candidates** (`best_hit_score > 0`): length distribution after FIMO
+
+Use your preferred analysis environment to compute length counts from the
+`candidates__<motif_id>.parquet` file for the motif you care about.
 
 #### Tiers + MMR pool
 

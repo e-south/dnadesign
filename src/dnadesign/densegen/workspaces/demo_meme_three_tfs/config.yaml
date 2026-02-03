@@ -20,7 +20,7 @@ densegen:
           batch_size: 5000
           budget:
             mode: fixed_candidates
-            candidates: 200000
+            candidates: 1000000
             growth_factor: 1.25
           log_every_batches: 1
         length:
@@ -37,10 +37,6 @@ densegen:
             max_candidates: null
             relevance_norm: minmax_raw_score
         tier_fractions: [0.001, 0.01, 0.09]
-      overrides_by_motif_id:
-        baeR_SBWWTWKTYYYYMHDAWTSK:
-          trimming:
-            window_length: 16
 
   output:
     targets: [parquet]
@@ -74,7 +70,7 @@ densegen:
             - name: sigma70_consensus
               upstream: TTGACA
               downstream: TATAAT
-              spacer_length: [15, 19]
+              spacer_length: [16, 20]
               upstream_pos: [0, 60]
         regulator_constraints:
           groups:
@@ -122,7 +118,7 @@ densegen:
     log_dir: outputs/logs
     level: INFO
     suppress_solver_stderr: true
-    print_visual: false
+    print_visual: true
     progress_style: screen
     progress_every: 1
     progress_refresh_seconds: 1.0
