@@ -96,13 +96,13 @@ def build_run_pred_events(
         raise ValueError("Length mismatch in run_pred events")
 
     # Row-level diagnostics subset only (avoid run-level constants/summaries here)
-    ROW_DIAG_KEYS = {
+    ROW_DIAG_KEYS = (
         "logic_fidelity",
         "effect_raw",
         "effect_scaled",
         "clip_lo_mask",
         "clip_hi_mask",
-    }
+    )
 
     def _flatten_row_diagnostics(diag: Dict[str, Any], n_rows: int) -> Dict[str, list]:
         out: Dict[str, list] = {}
