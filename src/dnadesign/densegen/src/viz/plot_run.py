@@ -46,14 +46,6 @@ def _resolution_bins(ax, n_points: int, *, min_bins: int = 25) -> int:
     return max(min_bins, min(int(px), int(n_points)))
 
 
-def _gc_fraction(seq: str) -> float:
-    if not seq:
-        return 0.0
-    seq = str(seq).upper()
-    gc = sum(1 for ch in seq if ch in {"G", "C"})
-    return float(gc) / float(len(seq))
-
-
 def plot_tfbs_usage(
     df: pd.DataFrame,
     out_path: Path,

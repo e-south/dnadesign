@@ -42,6 +42,7 @@ from ...config import (
 )
 from ...utils import logging_utils
 from ...utils.logging_utils import install_native_stderr_filters
+from ...utils.sequence_utils import gc_fraction
 from ..artifacts.candidates import build_candidate_artifact, find_candidate_files, prepare_candidates_dir
 from ..artifacts.library import (
     LibraryArtifact,
@@ -119,6 +120,12 @@ from .progress import (
     _summarize_tf_counts,
     _summarize_tfbs_usage_stats,
 )
+from .sequence_validation import (
+    _apply_pad_offsets,
+    _find_forbidden_kmer,
+    _promoter_windows,
+    _validate_library_constraints,
+)
 from .stage_b import (
     _compute_sampling_fraction,
     _compute_sampling_fraction_pairs,
@@ -129,6 +136,7 @@ from .stage_b import (
     assess_library_feasibility,
     build_library_for_plan,
 )
+from .usage_tracking import _compute_used_tf_info, _parse_used_tfbs_detail, _update_usage_counts
 from .versioning import _resolve_dense_arrays_version
 
 log = logging.getLogger(__name__)
@@ -236,284 +244,6 @@ def select_solver(
             f"Requested solver '{preferred}' failed during probe: {exc}\n"
             "Please install/configure this solver or choose another in solver.backend."
         ) from exc
-
-
-def _gc_fraction(seq: str) -> float:
-    if not seq:
-        return 0.0
-    g = seq.count("G")
-    c = seq.count("C")
-    return (g + c) / len(seq)
-
-
-def _compute_used_tf_info(
-    sol,
-    library_for_opt,
-    regulator_labels,
-    fixed_elements,
-    site_id_by_index,
-    source_by_index,
-    tfbs_id_by_index,
-    motif_id_by_index,
-):
-    promoter_motifs = set()
-    if fixed_elements is not None:
-        if hasattr(fixed_elements, "promoter_constraints"):
-            pcs = getattr(fixed_elements, "promoter_constraints") or []
-        else:
-            pcs = (fixed_elements or {}).get("promoter_constraints") or []
-        for pc in pcs:
-            if hasattr(pc, "upstream") or hasattr(pc, "downstream"):
-                up = getattr(pc, "upstream", None)
-                dn = getattr(pc, "downstream", None)
-                for v in (up, dn):
-                    if isinstance(v, str) and v.strip():
-                        promoter_motifs.add(v.strip().upper())
-            elif isinstance(pc, dict):
-                for k in ("upstream", "downstream"):
-                    v = pc.get(k)
-                    if isinstance(v, str) and v.strip():
-                        promoter_motifs.add(v.strip().upper())
-
-    lib = getattr(sol, "library", [])
-    orig_n = len(library_for_opt)
-    used_simple: list[str] = []
-    used_detail: list[dict] = []
-    counts: dict[str, int] = {}
-    used_tf_set: set[str] = set()
-
-    for offset, idx in sol.offset_indices_in_order():
-        base_idx = idx % len(lib)
-        orientation = "fwd" if idx < len(lib) else "rev"
-        motif = lib[base_idx]
-        if motif in promoter_motifs or base_idx >= orig_n:
-            continue
-        tf_label = (
-            regulator_labels[base_idx] if regulator_labels is not None and base_idx < len(regulator_labels) else ""
-        )
-        tfbs = motif
-        used_simple.append(f"{tf_label}:{tfbs}" if tf_label else tfbs)
-        entry = {
-            "tf": tf_label,
-            "tfbs": tfbs,
-            "orientation": orientation,
-            "offset": int(offset),
-            "offset_raw": int(offset),
-            "length": len(tfbs),
-            "end": int(offset) + len(tfbs),
-            "pad_left": 0,
-        }
-        if site_id_by_index is not None and base_idx < len(site_id_by_index):
-            site_id = site_id_by_index[base_idx]
-            if site_id is not None:
-                entry["site_id"] = site_id
-        if source_by_index is not None and base_idx < len(source_by_index):
-            source = source_by_index[base_idx]
-            if source is not None:
-                entry["source"] = source
-        if tfbs_id_by_index is not None and base_idx < len(tfbs_id_by_index):
-            tfbs_id = tfbs_id_by_index[base_idx]
-            if tfbs_id is not None:
-                entry["tfbs_id"] = tfbs_id
-        if motif_id_by_index is not None and base_idx < len(motif_id_by_index):
-            motif_id = motif_id_by_index[base_idx]
-            if motif_id is not None:
-                entry["motif_id"] = motif_id
-        used_detail.append(entry)
-        if tf_label:
-            counts[tf_label] = counts.get(tf_label, 0) + 1
-            used_tf_set.add(tf_label)
-    return used_simple, used_detail, counts, sorted(used_tf_set)
-
-
-def _parse_used_tfbs_detail(val) -> list[dict]:
-    if val is None or (isinstance(val, float) and pd.isna(val)):
-        return []
-    if isinstance(val, str):
-        s = val.strip()
-        if (s.startswith("{") and s.endswith("}")) or (s.startswith("[") and s.endswith("]")):
-            try:
-                val = json.loads(s)
-            except Exception as exc:
-                raise ValueError(f"Failed to parse used_tfbs_detail JSON: {s[:120]}") from exc
-    if isinstance(val, (list, tuple, np.ndarray)):
-        out: list[dict] = []
-        for item in list(val):
-            if isinstance(item, dict):
-                out.append(item)
-        return out
-    return []
-
-
-def _update_usage_counts(
-    usage_counts: dict[tuple[str, str], int],
-    used_tfbs_detail: list[dict],
-) -> None:
-    for entry in used_tfbs_detail:
-        tf = str(entry.get("tf") or "").strip()
-        tfbs = str(entry.get("tfbs") or "").strip()
-        if not tf or not tfbs:
-            continue
-        key = (tf, tfbs)
-        usage_counts[key] = int(usage_counts.get(key, 0)) + 1
-
-
-def _apply_pad_offsets(used_tfbs_detail: list[dict], pad_meta: dict) -> list[dict]:
-    pad_left = 0
-    if pad_meta.get("used") and pad_meta.get("end") == "5prime":
-        pad_left = int(pad_meta.get("bases") or 0)
-    for entry in used_tfbs_detail:
-        offset_raw = int(entry.get("offset_raw", entry.get("offset", 0)))
-        length = int(entry.get("length", len(entry.get("tfbs") or "")))
-        offset = offset_raw + pad_left
-        entry["offset_raw"] = offset_raw
-        entry["pad_left"] = pad_left
-        entry["length"] = length
-        entry["offset"] = offset
-        entry["end"] = offset + length
-    return used_tfbs_detail
-
-
-def _find_motif_positions(seq: str, motif: str, bounds: tuple[int, int] | list[int] | None) -> list[int]:
-    seq = str(seq)
-    motif = str(motif)
-    if not motif:
-        return []
-    lo = None
-    hi = None
-    if bounds is not None:
-        try:
-            lo = int(bounds[0])
-            hi = int(bounds[1])
-        except Exception:
-            lo = None
-            hi = None
-    positions: list[int] = []
-    start = 0
-    while start < len(seq):
-        idx = seq.find(motif, start)
-        if idx == -1:
-            break
-        if lo is not None and idx < lo:
-            start = idx + 1
-            continue
-        if hi is not None and idx > hi:
-            start = idx + 1
-            continue
-        if idx + len(motif) <= len(seq):
-            positions.append(idx)
-        start = idx + 1
-    return positions
-
-
-def _promoter_windows(seq: str, fixed_elements_dump: dict) -> list[tuple[int, int]]:
-    pcs = fixed_elements_dump.get("promoter_constraints") or []
-    windows: list[tuple[int, int]] = []
-    for pc in pcs:
-        if not isinstance(pc, dict):
-            continue
-        upstream = str(pc.get("upstream") or "").strip().upper()
-        downstream = str(pc.get("downstream") or "").strip().upper()
-        if not upstream or not downstream:
-            continue
-        spacer = pc.get("spacer_length")
-        if isinstance(spacer, (list, tuple)) and spacer:
-            spacer_min = int(min(spacer))
-            spacer_max = int(max(spacer))
-        elif spacer is not None:
-            spacer_min = int(spacer)
-            spacer_max = int(spacer)
-        else:
-            spacer_min = None
-            spacer_max = None
-        up_positions = _find_motif_positions(seq, upstream, pc.get("upstream_pos"))
-        down_positions = _find_motif_positions(seq, downstream, pc.get("downstream_pos"))
-        if not up_positions or not down_positions:
-            continue
-        matched = False
-        for up_start in sorted(up_positions):
-            up_end = up_start + len(upstream)
-            for down_start in sorted(down_positions):
-                if down_start < up_end:
-                    continue
-                spacer_len = down_start - up_end
-                if spacer_min is not None and spacer_len < spacer_min:
-                    continue
-                if spacer_max is not None and spacer_len > spacer_max:
-                    continue
-                windows.append((up_start, up_end))
-                windows.append((down_start, down_start + len(downstream)))
-                matched = True
-                break
-            if matched:
-                break
-    return windows
-
-
-def _find_forbidden_kmer(seq: str, kmers: list[str], allowed_windows: list[tuple[int, int]]) -> tuple[str, int] | None:
-    if not kmers:
-        return None
-    for kmer in kmers:
-        start = 0
-        while start < len(seq):
-            idx = seq.find(kmer, start)
-            if idx == -1:
-                break
-            end = idx + len(kmer)
-            allowed = False
-            for win_start, win_end in allowed_windows:
-                if idx >= win_start and end <= win_end:
-                    allowed = True
-                    break
-            if not allowed:
-                return kmer, idx
-            start = idx + 1
-    return None
-
-
-def _validate_library_constraints(
-    record: LibraryRecord,
-    *,
-    groups: list,
-    min_count_by_regulator: dict[str, int],
-    input_name: str,
-    plan_name: str,
-) -> None:
-    required_regulators_selected = list(record.required_regulators_selected or [])
-    if groups:
-        if not required_regulators_selected:
-            raise RuntimeError(
-                f"Library artifact missing required_regulators_selected for {input_name}/{plan_name} "
-                f"(library_index={record.library_index}). Rebuild libraries with the current version."
-            )
-        library_tf_set = {tf for tf in record.library_tfs if tf}
-        missing = [tf for tf in required_regulators_selected if tf not in library_tf_set]
-        if missing:
-            preview = ", ".join(missing[:10])
-            raise RuntimeError(
-                f"Library artifact required_regulators_selected includes TFs not in the library: {preview}."
-            )
-        group_members = {m for g in groups for m in g.members}
-        invalid = [tf for tf in required_regulators_selected if tf not in group_members]
-        if invalid:
-            preview = ", ".join(invalid[:10])
-            raise RuntimeError(
-                f"Library artifact required_regulators_selected includes TFs not in regulator groups: {preview}."
-            )
-        for group in groups:
-            selected = [tf for tf in required_regulators_selected if tf in group.members]
-            if len(selected) < int(group.min_required):
-                raise RuntimeError(
-                    f"Library artifact required_regulators_selected does not satisfy group '{group.name}' "
-                    f"min_required={group.min_required}."
-                )
-    for tf, min_count in min_count_by_regulator.items():
-        found = sum(1 for t in record.library_tfs if t == tf)
-        if found < int(min_count):
-            raise RuntimeError(
-                f"Library artifact for {input_name}/{plan_name} (library_index={record.library_index}) "
-                f"has tf={tf} count={found} < min_count_by_regulator={min_count}."
-            )
 
 
 def _process_plan_for_source(
@@ -1618,8 +1348,8 @@ def _process_plan_for_source(
                         continue
 
                 used_tfbs_detail = _apply_pad_offsets(used_tfbs_detail, pad_meta)
-                gc_core = _gc_fraction(seq)
-                gc_total = _gc_fraction(final_seq)
+                gc_core = gc_fraction(seq)
+                gc_total = gc_fraction(final_seq)
                 created_at = datetime.now(timezone.utc).isoformat()
                 derived = build_metadata(
                     sol=sol,

@@ -26,6 +26,7 @@ from dnadesign.cruncher.io.parsers.meme import parse_meme_file
 from ...config import BackgroundPoolSamplingConfig, resolve_relative_path
 from ...core.artifacts.ids import hash_label_motif, hash_tfbs_id
 from ...core.stage_a_constants import FIMO_REPORT_THRESH
+from ...utils.sequence_utils import gc_fraction
 from .base import BaseDataSource
 from .pwm_artifact import load_artifact as load_pwm_artifact
 from .pwm_fimo import (
@@ -47,14 +48,6 @@ from .stage_a import (
 )
 
 log = logging.getLogger(__name__)
-
-
-def _gc_fraction(seq: str) -> float:
-    if not seq:
-        return 0.0
-    g = seq.count("G")
-    c = seq.count("C")
-    return (g + c) / len(seq)
 
 
 def _parse_pwm_matrix_csv(path: Path, *, motif_id: str, columns: dict[str, str]) -> PWMMotif:
@@ -171,7 +164,7 @@ def _filter_gc(sequences: Iterable[str], *, gc_min: float | None, gc_max: float 
         return list(sequences)
     filtered: list[str] = []
     for seq in sequences:
-        gc = _gc_fraction(seq)
+        gc = gc_fraction(seq)
         if gc_min is not None and gc < gc_min:
             continue
         if gc_max is not None and gc > gc_max:

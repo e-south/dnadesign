@@ -11,7 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dnadesign.densegen.src.core.pipeline.orchestrator import _find_forbidden_kmer, _promoter_windows
+from dnadesign.densegen.src.core.pipeline.sequence_validation import _find_forbidden_kmer, _promoter_windows
 
 
 def test_postprocess_forbidden_kmer_detects_outside_window() -> None:

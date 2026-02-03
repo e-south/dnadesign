@@ -15,13 +15,7 @@ from __future__ import annotations
 import math
 import random
 
-
-def _gc_fraction(seq: str) -> float:
-    if not seq:
-        return 0.0
-    g = seq.count("G")
-    c = seq.count("C")
-    return (g + c) / len(seq)
+from ...utils.sequence_utils import gc_fraction
 
 
 def generate_pad(
@@ -76,7 +70,7 @@ def generate_pad(
         seq = "".join(bases)
         return seq, {
             "attempts": 1,
-            "gc_actual": _gc_fraction(seq),
+            "gc_actual": gc_fraction(seq),
             "relaxed": False,
             "relaxed_reason": None,
             "final_gc_min": None,
@@ -128,7 +122,7 @@ def generate_pad(
     seq = "".join(bases)
     return seq, {
         "attempts": 1,
-        "gc_actual": _gc_fraction(seq),
+        "gc_actual": gc_fraction(seq),
         "relaxed": relaxed,
         "relaxed_reason": relaxed_reason,
         "final_gc_min": final_min,

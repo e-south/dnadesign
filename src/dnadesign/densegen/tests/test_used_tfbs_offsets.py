@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dnadesign.densegen.src.core.pipeline.orchestrator import _apply_pad_offsets, _compute_used_tf_info
+from dnadesign.densegen.src.core.pipeline.sequence_validation import _apply_pad_offsets
+from dnadesign.densegen.src.core.pipeline.usage_tracking import _compute_used_tf_info
 
 
 class _DummySol:
