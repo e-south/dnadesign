@@ -19,6 +19,7 @@ from pydantic import BaseModel
 
 from dnadesign.opal.src.config.types import PluginRef
 from dnadesign.opal.src.core.round_context import (
+    Contract,
     PluginRegistryView,
     RoundCtx,
     RoundCtxContractError,
@@ -427,7 +428,7 @@ def test_roundctx_contract_rejects_base_produces_with_stage_maps():
             return None
 
 
-def test_stage_maps_require_declared_stage():
+def test_stage_maps_allow_missing_stage():
     class _Dummy:
         pass
 
@@ -441,16 +442,19 @@ def test_stage_maps_require_declared_stage():
     )
     rctx = _rctx({"core/round_index": 0})
     mctx = rctx.for_plugin(category="model", name="dummy", plugin=dummy)
-    with pytest.raises(RoundCtxContractError):
+    try:
         mctx.precheck_requires(stage="predict")
+        mctx.postcheck_produces(stage="predict")
+    except RoundCtxContractError as exc:
+        pytest.fail(f"missing stage should be treated as empty: {exc}")
 
 
-def test_pluginctx_rejects_stage_maps_with_base_produces():
+def test_pluginctx_rejects_base_produces_with_stage_produces():
     class _Dummy:
         pass
 
     dummy = _Dummy()
-    dummy.__opal_contract__ = _StageContract(
+    dummy.__opal_contract__ = Contract(
         category="model",
         requires=tuple(),
         produces=("model/<self>/x_dim",),
@@ -460,6 +464,26 @@ def test_pluginctx_rejects_stage_maps_with_base_produces():
     rctx = _rctx({"core/round_index": 0})
     with pytest.raises(RoundCtxContractError):
         rctx.for_plugin(category="model", name="dummy", plugin=dummy)
+
+
+def test_pluginctx_allows_base_produces_with_stage_requires_only():
+    class _Dummy:
+        pass
+
+    dummy = _Dummy()
+    dummy.__opal_contract__ = Contract(
+        category="model",
+        requires=tuple(),
+        produces=("model/<self>/x_dim",),
+        requires_by_stage={"fit": ("core/round_index",)},
+        produces_by_stage=None,
+    )
+    rctx = _rctx({"core/round_index": 0})
+    mctx = rctx.for_plugin(category="model", name="dummy", plugin=dummy)
+    try:
+        mctx.set("model/<self>/x_dim", 1)
+    except RoundCtxContractError as exc:
+        pytest.fail(f"base produces should remain valid with stage-scoped requires: {exc}")
 
 
 def test_pluginctx_stage_requires_and_produces():
