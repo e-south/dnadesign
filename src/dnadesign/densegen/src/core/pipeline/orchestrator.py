@@ -105,6 +105,7 @@ from .outputs import (
     _write_effective_config,
     _write_to_sinks,
 )
+from .plan_pools import PLAN_POOL_INPUT_TYPE, PlanPoolSpec, build_plan_pools
 from .progress import (
     _build_screen_dashboard,
     _format_progress_bar,
@@ -170,12 +171,36 @@ def _write_run_state(
     state.write_json(path)
 
 
+def _plan_pool_input_meta(spec: PlanPoolSpec) -> dict:
+    meta = {
+        "input_type": PLAN_POOL_INPUT_TYPE,
+        "input_name": spec.pool_name,
+        "input_source_names": list(spec.include_inputs),
+    }
+    if spec.pool.pool_mode == POOL_MODE_TFBS:
+        meta["input_mode"] = "binding_sites"
+        if spec.pool.df is not None and "tf" in spec.pool.df.columns:
+            meta["input_pwm_ids"] = sorted(set(spec.pool.df["tf"].tolist()))
+        else:
+            meta["input_pwm_ids"] = []
+    else:
+        meta["input_mode"] = "sequence_library"
+        meta["input_pwm_ids"] = []
+    return meta
+
+
 @dataclass(frozen=True)
 class PipelineDeps:
     source_factory: Callable[[object, Path], BaseDataSource]
     sink_factory: Callable[[DenseGenConfig, Path], Iterable[SinkBase]]
     optimizer: OptimizerAdapter
     pad: Callable[..., tuple[str, dict] | str]
+
+
+@dataclass(frozen=True)
+class PlanPoolSource:
+    name: str
+    type: str = PLAN_POOL_INPUT_TYPE
 
 
 def default_deps() -> PipelineDeps:
@@ -349,6 +374,103 @@ def _apply_pad_offsets(used_tfbs_detail: list[dict], pad_meta: dict) -> list[dic
     return used_tfbs_detail
 
 
+def _find_motif_positions(seq: str, motif: str, bounds: tuple[int, int] | list[int] | None) -> list[int]:
+    seq = str(seq)
+    motif = str(motif)
+    if not motif:
+        return []
+    lo = None
+    hi = None
+    if bounds is not None:
+        try:
+            lo = int(bounds[0])
+            hi = int(bounds[1])
+        except Exception:
+            lo = None
+            hi = None
+    positions: list[int] = []
+    start = 0
+    while start < len(seq):
+        idx = seq.find(motif, start)
+        if idx == -1:
+            break
+        if lo is not None and idx < lo:
+            start = idx + 1
+            continue
+        if hi is not None and idx > hi:
+            start = idx + 1
+            continue
+        if idx + len(motif) <= len(seq):
+            positions.append(idx)
+        start = idx + 1
+    return positions
+
+
+def _promoter_windows(seq: str, fixed_elements_dump: dict) -> list[tuple[int, int]]:
+    pcs = fixed_elements_dump.get("promoter_constraints") or []
+    windows: list[tuple[int, int]] = []
+    for pc in pcs:
+        if not isinstance(pc, dict):
+            continue
+        upstream = str(pc.get("upstream") or "").strip().upper()
+        downstream = str(pc.get("downstream") or "").strip().upper()
+        if not upstream or not downstream:
+            continue
+        spacer = pc.get("spacer_length")
+        if isinstance(spacer, (list, tuple)) and spacer:
+            spacer_min = int(min(spacer))
+            spacer_max = int(max(spacer))
+        elif spacer is not None:
+            spacer_min = int(spacer)
+            spacer_max = int(spacer)
+        else:
+            spacer_min = None
+            spacer_max = None
+        up_positions = _find_motif_positions(seq, upstream, pc.get("upstream_pos"))
+        down_positions = _find_motif_positions(seq, downstream, pc.get("downstream_pos"))
+        if not up_positions or not down_positions:
+            continue
+        matched = False
+        for up_start in sorted(up_positions):
+            up_end = up_start + len(upstream)
+            for down_start in sorted(down_positions):
+                if down_start < up_end:
+                    continue
+                spacer_len = down_start - up_end
+                if spacer_min is not None and spacer_len < spacer_min:
+                    continue
+                if spacer_max is not None and spacer_len > spacer_max:
+                    continue
+                windows.append((up_start, up_end))
+                windows.append((down_start, down_start + len(downstream)))
+                matched = True
+                break
+            if matched:
+                break
+    return windows
+
+
+def _find_forbidden_kmer(seq: str, kmers: list[str], allowed_windows: list[tuple[int, int]]) -> tuple[str, int] | None:
+    if not kmers:
+        return None
+    for kmer in kmers:
+        start = 0
+        while start < len(seq):
+            idx = seq.find(kmer, start)
+            if idx == -1:
+                break
+            end = idx + len(kmer)
+            allowed = False
+            for win_start, win_end in allowed_windows:
+                if idx >= win_start and end <= win_end:
+                    allowed = True
+                    break
+            if not allowed:
+                return kmer, idx
+            start = idx + 1
+    return None
+
+
 def _validate_library_constraints(
     record: LibraryRecord,
     *,
@@ -425,6 +547,8 @@ def _process_plan_for_source(
     write_state: Callable[[], None] | None = None,
     site_failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]] | None = None,
     source_cache: dict[str, PoolData] | None = None,
+    pool_override: PoolData | None = None,
+    input_meta_override: dict | None = None,
     attempt_counters: dict[tuple[str, str], int] | None = None,
     library_records: dict[tuple[str, str], list[LibraryRecord]] | None = None,
     library_cursor: dict[tuple[str, str], int] | None = None,
@@ -609,6 +733,9 @@ def _process_plan_for_source(
     pad_gc_tolerance = float(pad_gc_cfg.tolerance)
     pad_gc_min_length = int(pad_gc_cfg.min_pad_length)
     pad_max_tries = int(pad_cfg.max_tries)
+    validate_cfg = getattr(post, "validate_final_sequence", None)
+    forbid_kmers_cfg = getattr(validate_cfg, "forbid_kmers_outside_promoter_windows", None) if validate_cfg else None
+    forbid_kmers = list(getattr(forbid_kmers_cfg, "kmers", []) or [])
 
     solver_cfg = global_cfg.solver
     solver_strategy = str(solver_cfg.strategy)
@@ -677,7 +804,11 @@ def _process_plan_for_source(
     # Load source (cache Stage-A PWM sampling results across round-robin passes).
     cache_key = source_label
     cached = source_cache.get(cache_key) if source_cache is not None else None
-    if cached is None:
+    if pool_override is not None:
+        pool = pool_override
+        if source_cache is not None:
+            source_cache[cache_key] = pool
+    elif cached is None:
         src_obj = deps.source_factory(source_cfg, cfg_path)
         data_entries, meta_df, _summaries = src_obj.load_data(
             rng=np_rng,
@@ -709,7 +840,7 @@ def _process_plan_for_source(
         pool = cached
     data_entries = pool.sequences
     meta_df = pool.df
-    input_meta = _input_metadata(source_cfg, cfg_path)
+    input_meta = dict(input_meta_override) if input_meta_override is not None else _input_metadata(source_cfg, cfg_path)
     input_tf_tfbs_pair_count: int | None = None
     if meta_df is not None and isinstance(meta_df, pd.DataFrame):
         input_row_count = int(len(meta_df))
@@ -1445,6 +1576,46 @@ def _process_plan_for_source(
                         "relaxed_reason": pad_info.get("relaxed_reason"),
                         "attempts": pad_info.get("attempts"),
                     }
+
+                if forbid_kmers:
+                    allowed_windows = _promoter_windows(final_seq, fixed_elements_dump)
+                    if not allowed_windows:
+                        raise RuntimeError(
+                            f"[{source_label}/{plan_name}] postprocess validation requires promoter constraints."
+                        )
+                    hit = _find_forbidden_kmer(final_seq, forbid_kmers, allowed_windows)
+                    if hit is not None:
+                        failed_solutions += 1
+                        attempt_index = _next_attempt_index()
+                        _log_rejection(
+                            tables_root,
+                            run_id=run_id,
+                            input_name=source_label,
+                            plan_name=plan_name,
+                            attempt_index=attempt_index,
+                            reason="postprocess_forbidden_kmer",
+                            detail={"kmer": hit[0], "position": int(hit[1])},
+                            sequence=final_seq,
+                            used_tf_counts=used_tf_counts,
+                            used_tf_list=used_tf_list,
+                            sampling_library_index=int(sampling_library_index),
+                            sampling_library_hash=str(sampling_library_hash),
+                            solver_status=solver_status,
+                            solver_objective=solver_objective,
+                            solver_solve_time_s=solver_solve_time_s,
+                            dense_arrays_version=dense_arrays_version,
+                            dense_arrays_version_source=dense_arrays_version_source,
+                            library_tfbs=library_tfbs,
+                            library_tfs=library_tfs,
+                            library_site_ids=library_site_ids,
+                            library_sources=library_sources,
+                            attempts_buffer=attempts_buffer,
+                        )
+                        if max_failed_solutions > 0 and failed_solutions > max_failed_solutions:
+                            raise RuntimeError(
+                                f"[{source_label}/{plan_name}] Exceeded max_failed_solutions={max_failed_solutions}."
+                            )
+                        continue
 
                 used_tfbs_detail = _apply_pad_offsets(used_tfbs_detail, pad_meta)
                 gc_core = _gc_fraction(seq)
@@ -2221,8 +2392,10 @@ def run_pipeline(
         raise RuntimeError(
             "resume=True requires existing Stage-A pools. Run dense stage-a build-pool first or rerun without resume."
         )
-    for name, pool in pool_data.items():
-        source_cache[name] = pool
+    plan_pools = build_plan_pools(plan_items=pl, pool_data=pool_data)
+    plan_pool_sources = {plan_name: PlanPoolSource(name=spec.pool_name) for plan_name, spec in plan_pools.items()}
+    for spec in plan_pools.values():
+        source_cache[spec.pool_name] = spec.pool
     if candidate_logging and build_stage_a:
         candidate_files = find_candidate_files(candidates_dir)
         if candidate_files:
@@ -2262,44 +2435,44 @@ def run_pipeline(
         library_records = load_library_records(library_artifact)
         library_cursor = {}
         existing_library_by_plan = _load_existing_library_index_by_plan(tables_root)
-        for inp in cfg.inputs:
-            for plan_item in pl:
-                constraints = plan_item.regulator_constraints
-                groups = list(constraints.groups or [])
-                plan_min_count_by_regulator = dict(constraints.min_count_by_regulator or {})
-                key = (inp.name, plan_item.name)
-                records = library_records.get(key)
-                if not records:
+        for plan_item in pl:
+            spec = plan_pools[plan_item.name]
+            constraints = plan_item.regulator_constraints
+            groups = list(constraints.groups or [])
+            plan_min_count_by_regulator = dict(constraints.min_count_by_regulator or {})
+            key = (spec.pool_name, plan_item.name)
+            records = library_records.get(key)
+            if not records:
+                raise RuntimeError(
+                    f"Library artifact missing libraries for {spec.pool_name}/{plan_item.name}. "
+                    "Build libraries with `dense stage-b build-libraries` using this config."
+                )
+            max_used = existing_library_by_plan.get(key, 0)
+            used_count = sum(1 for rec in records if int(rec.library_index) <= int(max_used))
+            if max_used and used_count == 0:
+                raise RuntimeError(
+                    f"Library artifact indices do not cover previously used library_index={max_used} "
+                    f"for {spec.pool_name}/{plan_item.name}."
+                )
+            library_cursor[key] = used_count
+            for rec in records:
+                if int(rec.library_index) <= 0:
                     raise RuntimeError(
-                        f"Library artifact missing libraries for {inp.name}/{plan_item.name}. "
-                        "Build libraries with `dense stage-b build-libraries` using this config."
+                        f"Library artifact has non-positive library_index={rec.library_index} "
+                        f"for {spec.pool_name}/{plan_item.name}."
                     )
-                max_used = existing_library_by_plan.get(key, 0)
-                used_count = sum(1 for rec in records if int(rec.library_index) <= int(max_used))
-                if max_used and used_count == 0:
+                if rec.library_sampling_strategy is None or rec.pool_strategy is None:
                     raise RuntimeError(
-                        f"Library artifact indices do not cover previously used library_index={max_used} "
-                        f"for {inp.name}/{plan_item.name}."
+                        f"Library artifact missing Stage-B sampling metadata for {spec.pool_name}/{plan_item.name} "
+                        f"(library_index={rec.library_index})."
                     )
-                library_cursor[key] = used_count
-                for rec in records:
-                    if int(rec.library_index) <= 0:
-                        raise RuntimeError(
-                            f"Library artifact has non-positive library_index={rec.library_index} "
-                            f"for {inp.name}/{plan_item.name}."
-                        )
-                    if rec.library_sampling_strategy is None or rec.pool_strategy is None:
-                        raise RuntimeError(
-                            f"Library artifact missing Stage-B sampling metadata for {inp.name}/{plan_item.name} "
-                            f"(library_index={rec.library_index})."
-                        )
-                    _validate_library_constraints(
-                        rec,
-                        groups=groups,
-                        min_count_by_regulator=plan_min_count_by_regulator,
-                        input_name=inp.name,
-                        plan_name=plan_item.name,
-                    )
+                _validate_library_constraints(
+                    rec,
+                    groups=groups,
+                    min_count_by_regulator=plan_min_count_by_regulator,
+                    input_name=spec.pool_name,
+                    plan_name=plan_item.name,
+                )
     elif library_source != "build":
         raise RuntimeError(f"Unsupported Stage-B sampling.library_source: {library_source}")
     ensure_run_meta_dir(run_root)
@@ -2414,19 +2587,25 @@ def run_pipeline(
             "expect higher runtime for multi-plan runs."
         )
     inputs = cfg.inputs
+    inputs_by_name = {inp.name: inp for inp in inputs}
     display_map_by_input: dict[str, dict[str, str]] = {}
-    for inp in inputs:
+    for item in pl:
+        spec = plan_pools[item.name]
         mapping: dict[str, str] = {}
-        for motif_id, name in input_motifs(inp, loaded.path):
-            if motif_id and name and motif_id not in mapping:
-                mapping[motif_id] = name
+        for input_name in spec.include_inputs:
+            inp = inputs_by_name.get(input_name)
+            if inp is None:
+                continue
+            for motif_id, name in input_motifs(inp, loaded.path):
+                if motif_id and name and motif_id not in mapping:
+                    mapping[motif_id] = name
         if mapping:
-            display_map_by_input[inp.name] = mapping
+            display_map_by_input[spec.pool_name] = mapping
     checkpoint_every = int(cfg.runtime.checkpoint_every)
     state_counts: dict[tuple[str, str], int] = {}
-    for s in inputs:
-        for item in pl:
-            state_counts[(s.name, item.name)] = int(existing_counts.get((s.name, item.name), 0))
+    for item in pl:
+        spec = plan_pools[item.name]
+        state_counts[(spec.pool_name, item.name)] = int(existing_counts.get((spec.pool_name, item.name), 0))
 
     if state_path.exists() and not existing_counts:
         # run_state exists but no outputs; avoid accidental double-counting.
@@ -2450,30 +2629,94 @@ def run_pipeline(
 
     _write_state()
     # Seed plan stats with any existing outputs to keep manifests aligned on resume.
-    for s in inputs:
-        for item in pl:
-            key = (s.name, item.name)
-            if key not in plan_stats:
-                plan_stats[key] = {
-                    "generated": int(existing_counts.get(key, 0)),
-                    "duplicates_skipped": 0,
-                    "failed_solutions": 0,
-                    "total_resamples": 0,
-                    "libraries_built": 0,
-                    "stall_events": 0,
-                    "failed_min_count_per_tf": 0,
-                    "failed_required_regulators": 0,
-                    "failed_min_count_by_regulator": 0,
-                    "failed_min_required_regulators": 0,
-                    "duplicate_solutions": 0,
-                }
-                plan_order.append(key)
+    for item in pl:
+        spec = plan_pools[item.name]
+        key = (spec.pool_name, item.name)
+        if key not in plan_stats:
+            plan_stats[key] = {
+                "generated": int(existing_counts.get(key, 0)),
+                "duplicates_skipped": 0,
+                "failed_solutions": 0,
+                "total_resamples": 0,
+                "libraries_built": 0,
+                "stall_events": 0,
+                "failed_min_count_per_tf": 0,
+                "failed_required_regulators": 0,
+                "failed_min_count_by_regulator": 0,
+                "failed_min_required_regulators": 0,
+                "duplicate_solutions": 0,
+            }
+            plan_order.append(key)
 
     if not round_robin:
-        for s in inputs:
+        for item in pl:
+            spec = plan_pools[item.name]
+            source_cfg = plan_pool_sources[item.name]
+            produced, stats = _process_plan_for_source(
+                source_cfg,
+                item,
+                cfg,
+                sinks,
+                chosen_solver=chosen_solver,
+                deps=deps,
+                rng=rng,
+                np_rng=np_rng_stage_b,
+                cfg_path=loaded.path,
+                run_id=cfg.run.id,
+                run_root=run_root_str,
+                run_config_path=run_cfg_path,
+                run_config_sha256=config_sha,
+                random_seed=seed,
+                dense_arrays_version=dense_arrays_version,
+                dense_arrays_version_source=dense_arrays_version_source,
+                show_tfbs=show_tfbs,
+                show_solutions=show_solutions,
+                output_bio_type=output_bio_type,
+                output_alphabet=output_alphabet,
+                one_subsample_only=False,
+                already_generated=int(existing_counts.get((spec.pool_name, item.name), 0)),
+                inputs_manifest=inputs_manifest_entries,
+                existing_usage_counts=existing_usage_by_plan.get((spec.pool_name, item.name)),
+                state_counts=state_counts,
+                checkpoint_every=checkpoint_every,
+                write_state=_write_state,
+                site_failure_counts=site_failure_counts,
+                source_cache=source_cache,
+                pool_override=spec.pool,
+                input_meta_override=_plan_pool_input_meta(spec),
+                attempt_counters=attempt_counters,
+                library_records=library_records,
+                library_cursor=library_cursor,
+                library_source=library_source,
+                library_build_rows=library_build_rows,
+                library_member_rows=library_member_rows,
+                solution_rows=solution_rows,
+                composition_rows=composition_rows,
+                events_path=events_path,
+                display_map_by_input=display_map_by_input,
+            )
+            per_plan[(spec.pool_name, item.name)] = per_plan.get((spec.pool_name, item.name), 0) + produced
+            total += produced
+            leaderboard_latest = stats.get("leaderboard_latest")
+            if leaderboard_latest is not None:
+                plan_leaderboards[(spec.pool_name, item.name)] = leaderboard_latest
+            _accumulate_stats((spec.pool_name, item.name), stats)
+    else:
+        produced_counts: dict[tuple[str, str], int] = dict(existing_counts)
+        done = False
+        while not done:
+            done = True
             for item in pl:
+                spec = plan_pools[item.name]
+                key = (spec.pool_name, item.name)
+                current = produced_counts.get(key, 0)
+                quota = int(item.quota)
+                if current >= quota:
+                    continue
+                done = False
+                source_cfg = plan_pool_sources[item.name]
                 produced, stats = _process_plan_for_source(
-                    s,
+                    source_cfg,
                     item,
                     cfg,
                     sinks,
@@ -2493,15 +2736,17 @@ def run_pipeline(
                     show_solutions=show_solutions,
                     output_bio_type=output_bio_type,
                     output_alphabet=output_alphabet,
-                    one_subsample_only=False,
-                    already_generated=int(existing_counts.get((s.name, item.name), 0)),
+                    one_subsample_only=True,
+                    already_generated=current,
                     inputs_manifest=inputs_manifest_entries,
-                    existing_usage_counts=existing_usage_by_plan.get((s.name, item.name)),
+                    existing_usage_counts=existing_usage_by_plan.get((spec.pool_name, item.name)),
                     state_counts=state_counts,
                     checkpoint_every=checkpoint_every,
                     write_state=_write_state,
                     site_failure_counts=site_failure_counts,
                     source_cache=source_cache,
+                    pool_override=spec.pool,
+                    input_meta_override=_plan_pool_input_meta(spec),
                     attempt_counters=attempt_counters,
                     library_records=library_records,
                     library_cursor=library_cursor,
@@ -2513,71 +2758,11 @@ def run_pipeline(
                     events_path=events_path,
                     display_map_by_input=display_map_by_input,
                 )
-                per_plan[(s.name, item.name)] = per_plan.get((s.name, item.name), 0) + produced
-                total += produced
+                produced_counts[key] = current + produced
                 leaderboard_latest = stats.get("leaderboard_latest")
                 if leaderboard_latest is not None:
-                    plan_leaderboards[(s.name, item.name)] = leaderboard_latest
-                _accumulate_stats((s.name, item.name), stats)
-    else:
-        produced_counts: dict[tuple[str, str], int] = dict(existing_counts)
-        done = False
-        while not done:
-            done = True
-            for s in inputs:
-                for item in pl:
-                    key = (s.name, item.name)
-                    current = produced_counts.get(key, 0)
-                    quota = int(item.quota)
-                    if current >= quota:
-                        continue
-                    done = False
-                    produced, stats = _process_plan_for_source(
-                        s,
-                        item,
-                        cfg,
-                        sinks,
-                        chosen_solver=chosen_solver,
-                        deps=deps,
-                        rng=rng,
-                        np_rng=np_rng_stage_b,
-                        cfg_path=loaded.path,
-                        run_id=cfg.run.id,
-                        run_root=run_root_str,
-                        run_config_path=run_cfg_path,
-                        run_config_sha256=config_sha,
-                        random_seed=seed,
-                        dense_arrays_version=dense_arrays_version,
-                        dense_arrays_version_source=dense_arrays_version_source,
-                        show_tfbs=show_tfbs,
-                        show_solutions=show_solutions,
-                        output_bio_type=output_bio_type,
-                        output_alphabet=output_alphabet,
-                        one_subsample_only=True,
-                        already_generated=current,
-                        inputs_manifest=inputs_manifest_entries,
-                        existing_usage_counts=existing_usage_by_plan.get((s.name, item.name)),
-                        state_counts=state_counts,
-                        checkpoint_every=checkpoint_every,
-                        write_state=_write_state,
-                        site_failure_counts=site_failure_counts,
-                        source_cache=source_cache,
-                        attempt_counters=attempt_counters,
-                        library_records=library_records,
-                        library_cursor=library_cursor,
-                        library_source=library_source,
-                        library_build_rows=library_build_rows,
-                        library_member_rows=library_member_rows,
-                        solution_rows=solution_rows,
-                        composition_rows=composition_rows,
-                        events_path=events_path,
-                        display_map_by_input=display_map_by_input,
-                    )
-                    produced_counts[key] = current + produced
-                    leaderboard_latest = stats.get("leaderboard_latest")
-                    if leaderboard_latest is not None:
-                        plan_leaderboards[key] = leaderboard_latest
-                    _accumulate_stats(key, stats)
+                    plan_leaderboards[key] = leaderboard_latest
+                _accumulate_stats(key, stats)
         per_plan = produced_counts
         total = sum(per_plan.values())
 
@@ -2735,14 +2920,18 @@ def run_pipeline(
     manifest.write_json(manifest_path)
 
     if inputs_manifest_entries:
+        manifest_inputs: list[dict] = []
+        for item in pl:
+            spec = plan_pools[item.name]
+            entry = inputs_manifest_entries.get(spec.pool_name)
+            if entry is not None:
+                manifest_inputs.append(entry)
         payload = {
             "schema_version": str(cfg.schema_version),
             "run_id": cfg.run.id,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "config_sha256": config_sha,
-            "inputs": [
-                inputs_manifest_entries.get(inp.name) for inp in cfg.inputs if inp.name in inputs_manifest_entries
-            ],
+            "inputs": manifest_inputs,
             "library_sampling": cfg.generation.sampling.model_dump(),
         }
         inputs_manifest = inputs_manifest_path(run_root)

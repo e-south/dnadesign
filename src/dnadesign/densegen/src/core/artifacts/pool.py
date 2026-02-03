@@ -22,8 +22,10 @@ from typing import Iterable
 
 import pandas as pd
 
+from ...adapters.sources.background_pool import BackgroundPoolDataSource
 from ...adapters.sources.stage_a_summary import PWMSamplingSummary
 from ...config import resolve_relative_path
+from ...core.pipeline.inputs import PWM_INPUT_TYPES
 from ...core.stage_a_constants import FIMO_REPORT_THRESH
 from ...utils.logging_utils import install_native_stderr_filters
 from .ids import hash_tfbs_id
@@ -525,6 +527,7 @@ def build_pool_artifact(
     preserved_entries: dict[str, PoolInputEntry] = {}
     config_hash = _hash_pool_config(cfg)
     fingerprints_by_input = {inp.name: _resolve_input_fingerprints(cfg_path, inp) for inp in cfg.inputs}
+    inputs_by_name = {inp.name: inp for inp in cfg.inputs}
 
     if not overwrite:
         manifest_path = _pool_manifest_path(out_dir)
@@ -571,7 +574,32 @@ def build_pool_artifact(
             if not pool_path.exists():
                 raise FileNotFoundError(f"Pool file listed in manifest is missing: {pool_path}")
             existing_df = pd.read_parquet(pool_path)
-        src = deps.source_factory(inp, cfg_path)
+        if getattr(inp, "type", None) == "background_pool":
+            fimo_cfg = getattr(inp.sampling, "filters", None)
+            fimo_cfg = getattr(fimo_cfg, "fimo_exclude", None) if fimo_cfg is not None else None
+            pwm_inputs = []
+            if fimo_cfg is not None:
+                names = list(getattr(fimo_cfg, "pwms_input", []) or [])
+                for name in names:
+                    source = inputs_by_name.get(name)
+                    if source is None:
+                        raise ValueError(
+                            f"background_pool.sampling.filters.fimo_exclude.pwms_input references unknown input: {name}"
+                        )
+                    if getattr(source, "type", None) not in PWM_INPUT_TYPES:
+                        raise ValueError(
+                            "background_pool.sampling.filters.fimo_exclude.pwms_input "
+                            f"must reference PWM inputs, got: {name}"
+                        )
+                    pwm_inputs.append(source)
+            src = BackgroundPoolDataSource(
+                cfg_path=cfg_path,
+                sampling=inp.sampling,
+                input_name=inp.name,
+                pwm_inputs=pwm_inputs,
+            )
+        else:
+            src = deps.source_factory(inp, cfg_path)
         data_entries, meta_df, summaries = src.load_data(
             rng=rng,
             outputs_root=outputs_root,

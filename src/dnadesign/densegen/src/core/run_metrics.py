@@ -21,7 +21,8 @@ from typing import Iterable
 import numpy as np
 import pandas as pd
 
-from .artifacts.pool import load_pool_artifact
+from .artifacts.pool import POOL_MODE_TFBS, load_pool_data
+from .pipeline.plan_pools import build_plan_pools
 from .run_paths import run_outputs_root, run_tables_root
 
 RUN_METRICS_VERSION = "1.0"
@@ -222,24 +223,28 @@ def _placements_from_dense_arrays(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _load_pool_frames(run_root: Path) -> tuple[pd.DataFrame | None, str | None]:
+def _load_pool_frames(run_root: Path, *, cfg) -> tuple[pd.DataFrame | None, str | None]:
     pool_dir = run_outputs_root(run_root) / "pools"
     if not pool_dir.exists():
         return None, "missing_pool_dir"
     try:
-        manifest = load_pool_artifact(pool_dir)
+        _artifact, pool_data = load_pool_data(pool_dir)
     except FileNotFoundError:
         return None, "missing_pool_manifest"
-    frames = []
-    for name, entry in manifest.inputs.items():
-        pool_path = entry.pool_path
-        if not pool_path.is_absolute():
-            pool_path = pool_dir / pool_path
-        if not pool_path.exists():
-            return None, f"missing_pool:{pool_path.name}"
-        df = pd.read_parquet(pool_path)
+    if not pool_data:
+        return None, "empty_pool"
+    plan_items = list(cfg.generation.resolve_plan() if hasattr(cfg.generation, "resolve_plan") else cfg.generation.plan)
+    plan_pools = build_plan_pools(plan_items=plan_items, pool_data=pool_data)
+    frames: list[pd.DataFrame] = []
+    for plan in plan_items:
+        spec = plan_pools.get(str(plan.name))
+        if spec is None:
+            continue
+        if spec.pool.pool_mode != POOL_MODE_TFBS or spec.pool.df is None:
+            continue
+        df = spec.pool.df.copy()
         if "input_name" not in df.columns:
-            df.insert(0, "input_name", name)
+            df.insert(0, "input_name", spec.pool.name)
         if "tfbs" not in df.columns and "tfbs_sequence" in df.columns:
             df["tfbs"] = df["tfbs_sequence"].astype(str)
         frames.append(df)
@@ -295,7 +300,7 @@ def build_run_metrics(*, cfg, run_root: Path) -> pd.DataFrame:
     if events_path.exists():
         events_df = _load_events(events_path)
 
-    pool_df, pool_status = _load_pool_frames(run_root)
+    pool_df, pool_status = _load_pool_frames(run_root, cfg=cfg)
     has_scores = False
     has_tiers = False
     if pool_df is not None:

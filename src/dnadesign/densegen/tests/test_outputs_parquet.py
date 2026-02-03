@@ -22,7 +22,7 @@ from dnadesign.densegen.src.adapters.outputs import OutputRecord, ParquetSink
 
 def _dummy_meta() -> dict:
     return {
-        "schema_version": "2.8",
+        "schema_version": "2.9",
         "run_id": "demo",
         "run_root": ".",
         "run_config_path": "config.yaml",

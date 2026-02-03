@@ -131,6 +131,7 @@ def build_metadata(
         "min_count_per_tf": int(min_count_per_tf),
         "input_type": input_meta.get("input_type"),
         "input_name": input_meta.get("input_name"),
+        "input_source_names": input_meta.get("input_source_names") or [],
         "input_path": input_meta.get("input_path"),
         "input_dataset": input_meta.get("input_dataset"),
         "input_root": input_meta.get("input_root"),

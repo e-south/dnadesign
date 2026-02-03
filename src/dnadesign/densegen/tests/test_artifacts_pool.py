@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/test_artifacts_pool.py
+
+Stage-A pool artifact tests for DenseGen.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -18,7 +29,7 @@ def test_build_pool_artifact_binding_sites(tmp_path: Path) -> None:
         yaml.safe_dump(
             {
                 "densegen": {
-                    "schema_version": "2.8",
+                    "schema_version": "2.9",
                     "run": {"id": "demo", "root": "."},
                     "inputs": [
                         {
@@ -40,6 +51,7 @@ def test_build_pool_artifact_binding_sites(tmp_path: Path) -> None:
                             {
                                 "name": "default",
                                 "quota": 1,
+                                "sampling": {"include_inputs": ["demo input"]},
                                 "regulator_constraints": {
                                     "groups": [
                                         {

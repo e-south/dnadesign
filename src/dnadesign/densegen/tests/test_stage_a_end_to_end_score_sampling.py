@@ -43,7 +43,7 @@ def _write_config(tmp_path: Path) -> Path:
         yaml.safe_dump(
             {
                 "densegen": {
-                    "schema_version": "2.8",
+                    "schema_version": "2.9",
                     "run": {"id": "stage_a_e2e", "root": "."},
                     "inputs": [
                         {

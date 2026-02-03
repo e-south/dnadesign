@@ -66,18 +66,17 @@ from .config import (
 from .core.artifacts.candidates import build_candidate_artifact, find_candidate_files, prepare_candidates_dir
 from .core.artifacts.library import load_library_artifact, write_library_artifact
 from .core.artifacts.pool import (
-    POOL_MODE_SEQUENCE,
-    POOL_MODE_TFBS,
     PoolData,
     _hash_file,
     build_pool_artifact,
-    load_pool_artifact,
+    load_pool_data,
     pool_status_by_input,
 )
 from .core.motif_labels import input_motifs
 from .core.pipeline import default_deps, resolve_plan, run_pipeline
 from .core.pipeline.attempts import _load_existing_library_index, _load_failure_counts_from_attempts
 from .core.pipeline.outputs import _emit_event
+from .core.pipeline.plan_pools import PLAN_POOL_INPUT_TYPE, build_plan_pools
 from .core.pipeline.stage_b import assess_library_feasibility, build_library_for_plan
 from .core.reporting import collect_report_data, write_report
 from .core.run_manifest import load_run_manifest
@@ -2383,7 +2382,7 @@ def stage_b_build_libraries(
         pool_label = _display_path(pool_dir, run_root, absolute=False)
         raise typer.BadParameter(f"Pool directory not found: {pool_label}")
     try:
-        pool_artifact = load_pool_artifact(pool_dir)
+        pool_artifact, pool_data = load_pool_data(pool_dir)
     except FileNotFoundError as exc:
         console.print(f"[bold red]{exc}[/]")
         entries = _list_dir_entries(pool_dir, limit=10)
@@ -2462,163 +2461,148 @@ def stage_b_build_libraries(
     else:
         libraries_built = _load_existing_library_index(outputs_root) if outputs_root.exists() else 0
 
+    plan_pools = build_plan_pools(plan_items=resolved_plan, pool_data=pool_data)
+    plan_specs: list[tuple[object, object]] = []
+    for plan_item in resolved_plan:
+        spec = plan_pools.get(str(plan_item.name))
+        if spec is None:
+            continue
+        if selected_plans and plan_item.name not in selected_plans:
+            continue
+        if selected_inputs and not set(selected_inputs).issubset(set(spec.include_inputs)):
+            continue
+        plan_specs.append((plan_item, spec))
+
     build_rows = []
     member_rows = []
     with _suppress_pyarrow_sysctl_warnings():
-        for inp in cfg.inputs:
-            if selected_inputs and inp.name not in selected_inputs:
-                continue
-            entry = pool_artifact.entry_for(inp.name)
-            pool_path = pool_dir / entry.pool_path
-            if not pool_path.exists():
-                pool_label = _display_path(pool_path, run_root, absolute=False)
-                raise typer.BadParameter(f"Pool file not found for input {inp.name}: {pool_label}")
-            df = pd.read_parquet(pool_path)
-            if entry.pool_mode == POOL_MODE_TFBS:
-                meta_df = df
-                data_entries = df["tfbs"].tolist() if "tfbs" in df.columns else []
-            elif entry.pool_mode == POOL_MODE_SEQUENCE:
-                meta_df = None
-                data_entries = df["sequence"].tolist()
-            else:
-                raise typer.BadParameter(f"Unsupported pool_mode for input {inp.name}: {entry.pool_mode}")
-            pool = PoolData(
-                name=inp.name,
-                input_type=str(inp.type),
-                pool_mode=entry.pool_mode,
-                df=meta_df,
-                sequences=list(data_entries),
-                pool_path=pool_path,
-            )
-
-            for plan_item in resolved_plan:
-                if selected_plans and plan_item.name not in selected_plans:
-                    continue
-                try:
-                    library, _parts, reg_labels, info = build_library_for_plan(
-                        source_label=inp.name,
-                        plan_item=plan_item,
-                        pool=pool,
-                        sampling_cfg=sampling_cfg,
-                        seq_len=int(cfg.generation.sequence_length),
-                        min_count_per_tf=int(cfg.runtime.min_count_per_tf),
-                        usage_counts={},
-                        failure_counts=failure_counts if failure_counts else None,
-                        rng=rng,
-                        np_rng=np_rng,
-                        library_index_start=libraries_built,
-                    )
-                except ValueError as exc:
-                    console.print(f"[bold red]Stage-B sampling failed[/]: {exc}")
-                    console.print(f"[bold]Context[/]: input={inp.name} plan={plan_item.name}")
-                    console.print("[bold]Next steps[/]:")
-                    console.print("  - ensure regulator_constraints group members match Stage-A regulator labels")
-                    console.print("  - inspect available regulators via dense inspect inputs")
-                    console.print("    or outputs/pools/pool_manifest.json")
-                    raise typer.Exit(code=1)
-                libraries_built = int(info.get("library_index", libraries_built))
-                library_hash = str(info.get("library_hash") or "")
-                achieved_len = int(info.get("achieved_length") or 0)
-                pool_strategy = str(info.get("pool_strategy") or sampling_cfg.pool_strategy)
-                sampling_strategy = str(info.get("library_sampling_strategy") or sampling_cfg.library_sampling_strategy)
-                library_id = library_hash
-                tfbs_id_by_index = info.get("tfbs_id_by_index") or []
-                motif_id_by_index = info.get("motif_id_by_index") or []
-                library_tfbs = list(library)
-                library_tfs = list(reg_labels) if reg_labels else []
-                _min_required_len, _min_breakdown, feasibility = assess_library_feasibility(
-                    library_tfbs=library_tfbs,
-                    library_tfs=library_tfs,
-                    fixed_elements=plan_item.fixed_elements,
-                    groups=list(plan_item.regulator_constraints.groups or []),
-                    min_count_by_regulator=dict(plan_item.regulator_constraints.min_count_by_regulator or {}),
+        for plan_item, spec in plan_specs:
+            pool = spec.pool
+            try:
+                library, _parts, reg_labels, info = build_library_for_plan(
+                    source_label=spec.pool_name,
+                    plan_item=plan_item,
+                    pool=pool,
+                    sampling_cfg=sampling_cfg,
+                    seq_len=int(cfg.generation.sequence_length),
                     min_count_per_tf=int(cfg.runtime.min_count_per_tf),
-                    sequence_length=int(cfg.generation.sequence_length),
+                    usage_counts={},
+                    failure_counts=failure_counts if failure_counts else None,
+                    rng=rng,
+                    np_rng=np_rng,
+                    library_index_start=libraries_built,
                 )
-                row = {
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                    "input_name": inp.name,
-                    "input_type": inp.type,
-                    "plan_name": plan_item.name,
-                    "library_index": int(info.get("library_index") or 0),
-                    "library_id": library_id,
-                    "library_hash": library_hash,
-                    "library_tfbs": library_tfbs,
-                    "library_tfs": library_tfs,
-                    "unique_tf_count": len(set(library_tfs)),
-                    "library_site_ids": list(info.get("site_id_by_index") or []),
-                    "library_sources": list(info.get("source_by_index") or []),
-                    "library_tfbs_ids": list(tfbs_id_by_index),
-                    "library_motif_ids": list(motif_id_by_index),
-                    "pool_strategy": pool_strategy,
-                    "library_sampling_strategy": sampling_strategy,
-                    "library_size": int(info.get("library_size") or len(library)),
-                    "achieved_length": achieved_len,
-                    "relaxed_cap": bool(info.get("relaxed_cap") or False),
-                    "final_cap": info.get("final_cap"),
-                    "iterative_max_libraries": int(info.get("iterative_max_libraries") or 0),
-                    "iterative_min_new_solutions": int(info.get("iterative_min_new_solutions") or 0),
-                    "required_regulators_selected": info.get("required_regulators_selected"),
-                    "fixed_bp": int(feasibility["fixed_bp"]),
-                    "min_required_bp": int(feasibility["min_required_bp"]),
-                    "slack_bp": int(feasibility["slack_bp"]),
-                    "infeasible": bool(feasibility["infeasible"]),
-                    "sequence_length": int(feasibility["sequence_length"]),
-                }
-                build_rows.append(row)
-                try:
+            except ValueError as exc:
+                console.print(f"[bold red]Stage-B sampling failed[/]: {exc}")
+                console.print(f"[bold]Context[/]: input={spec.pool_name} plan={plan_item.name}")
+                console.print("[bold]Next steps[/]:")
+                console.print("  - ensure regulator_constraints group members match Stage-A regulator labels")
+                console.print("  - inspect available regulators via dense inspect inputs")
+                console.print("    or outputs/pools/pool_manifest.json")
+                raise typer.Exit(code=1)
+            libraries_built = int(info.get("library_index", libraries_built))
+            library_hash = str(info.get("library_hash") or "")
+            achieved_len = int(info.get("achieved_length") or 0)
+            pool_strategy = str(info.get("pool_strategy") or sampling_cfg.pool_strategy)
+            sampling_strategy = str(info.get("library_sampling_strategy") or sampling_cfg.library_sampling_strategy)
+            library_id = library_hash
+            tfbs_id_by_index = info.get("tfbs_id_by_index") or []
+            motif_id_by_index = info.get("motif_id_by_index") or []
+            library_tfbs = list(library)
+            library_tfs = list(reg_labels) if reg_labels else []
+            _min_required_len, _min_breakdown, feasibility = assess_library_feasibility(
+                library_tfbs=library_tfbs,
+                library_tfs=library_tfs,
+                fixed_elements=plan_item.fixed_elements,
+                groups=list(plan_item.regulator_constraints.groups or []),
+                min_count_by_regulator=dict(plan_item.regulator_constraints.min_count_by_regulator or {}),
+                min_count_per_tf=int(cfg.runtime.min_count_per_tf),
+                sequence_length=int(cfg.generation.sequence_length),
+            )
+            row = {
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "input_name": spec.pool_name,
+                "input_type": PLAN_POOL_INPUT_TYPE,
+                "plan_name": plan_item.name,
+                "library_index": int(info.get("library_index") or 0),
+                "library_id": library_id,
+                "library_hash": library_hash,
+                "library_tfbs": library_tfbs,
+                "library_tfs": library_tfs,
+                "unique_tf_count": len(set(library_tfs)),
+                "library_site_ids": list(info.get("site_id_by_index") or []),
+                "library_sources": list(info.get("source_by_index") or []),
+                "library_tfbs_ids": list(tfbs_id_by_index),
+                "library_motif_ids": list(motif_id_by_index),
+                "pool_strategy": pool_strategy,
+                "library_sampling_strategy": sampling_strategy,
+                "library_size": int(info.get("library_size") or len(library)),
+                "achieved_length": achieved_len,
+                "relaxed_cap": bool(info.get("relaxed_cap") or False),
+                "final_cap": info.get("final_cap"),
+                "iterative_max_libraries": int(info.get("iterative_max_libraries") or 0),
+                "iterative_min_new_solutions": int(info.get("iterative_min_new_solutions") or 0),
+                "required_regulators_selected": info.get("required_regulators_selected"),
+                "fixed_bp": int(feasibility["fixed_bp"]),
+                "min_required_bp": int(feasibility["min_required_bp"]),
+                "slack_bp": int(feasibility["slack_bp"]),
+                "infeasible": bool(feasibility["infeasible"]),
+                "sequence_length": int(feasibility["sequence_length"]),
+            }
+            build_rows.append(row)
+            try:
+                _emit_event(
+                    events_path,
+                    event="LIBRARY_BUILT",
+                    payload={
+                        "input_name": spec.pool_name,
+                        "plan_name": plan_item.name,
+                        "library_index": int(info.get("library_index") or 0),
+                        "library_hash": library_hash,
+                        "library_size": int(info.get("library_size") or len(library)),
+                    },
+                )
+                if info.get("sampling_weight_by_tf"):
                     _emit_event(
                         events_path,
-                        event="LIBRARY_BUILT",
+                        event="LIBRARY_SAMPLING_PRESSURE",
                         payload={
-                            "input_name": inp.name,
+                            "input_name": spec.pool_name,
                             "plan_name": plan_item.name,
                             "library_index": int(info.get("library_index") or 0),
                             "library_hash": library_hash,
-                            "library_size": int(info.get("library_size") or len(library)),
+                            "sampling_strategy": sampling_strategy,
+                            "weight_by_tf": info.get("sampling_weight_by_tf"),
+                            "weight_fraction_by_tf": info.get("sampling_weight_fraction_by_tf"),
+                            "usage_count_by_tf": info.get("sampling_usage_count_by_tf"),
+                            "failure_count_by_tf": info.get("sampling_failure_count_by_tf"),
                         },
                     )
-                    if info.get("sampling_weight_by_tf"):
-                        _emit_event(
-                            events_path,
-                            event="LIBRARY_SAMPLING_PRESSURE",
-                            payload={
-                                "input_name": inp.name,
-                                "plan_name": plan_item.name,
-                                "library_index": int(info.get("library_index") or 0),
-                                "library_hash": library_hash,
-                                "sampling_strategy": sampling_strategy,
-                                "weight_by_tf": info.get("sampling_weight_by_tf"),
-                                "weight_fraction_by_tf": info.get("sampling_weight_fraction_by_tf"),
-                                "usage_count_by_tf": info.get("sampling_usage_count_by_tf"),
-                                "failure_count_by_tf": info.get("sampling_failure_count_by_tf"),
-                            },
-                        )
-                except Exception as exc:
-                    raise RuntimeError(
-                        f"Failed to write Stage-B events for {inp.name}/{plan_item.name}: {exc}"
-                    ) from exc
-                for idx, tfbs in enumerate(list(library)):
-                    member_rows.append(
-                        {
-                            "library_id": library_id,
-                            "library_hash": library_hash,
-                            "library_index": int(info.get("library_index") or 0),
-                            "input_name": inp.name,
-                            "plan_name": plan_item.name,
-                            "position": int(idx),
-                            "tf": reg_labels[idx] if idx < len(reg_labels or []) else "",
-                            "tfbs": tfbs,
-                            "tfbs_id": tfbs_id_by_index[idx] if idx < len(tfbs_id_by_index) else None,
-                            "motif_id": motif_id_by_index[idx] if idx < len(motif_id_by_index) else None,
-                            "site_id": (info.get("site_id_by_index") or [None])[idx]
-                            if idx < len(info.get("site_id_by_index") or [])
-                            else None,
-                            "source": (info.get("source_by_index") or [None])[idx]
-                            if idx < len(info.get("source_by_index") or [])
-                            else None,
-                        }
-                    )
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Failed to write Stage-B events for {spec.pool_name}/{plan_item.name}: {exc}"
+                ) from exc
+            for idx, tfbs in enumerate(list(library)):
+                member_rows.append(
+                    {
+                        "library_id": library_id,
+                        "library_hash": library_hash,
+                        "library_index": int(info.get("library_index") or 0),
+                        "input_name": spec.pool_name,
+                        "plan_name": plan_item.name,
+                        "position": int(idx),
+                        "tf": reg_labels[idx] if idx < len(reg_labels or []) else "",
+                        "tfbs": tfbs,
+                        "tfbs_id": tfbs_id_by_index[idx] if idx < len(tfbs_id_by_index) else None,
+                        "motif_id": motif_id_by_index[idx] if idx < len(motif_id_by_index) else None,
+                        "site_id": (info.get("site_id_by_index") or [None])[idx]
+                        if idx < len(info.get("site_id_by_index") or [])
+                        else None,
+                        "source": (info.get("source_by_index") or [None])[idx]
+                        if idx < len(info.get("source_by_index") or [])
+                        else None,
+                    }
+                )
 
         if not build_rows:
             console.print("[yellow]No libraries built (no matching inputs/plans).[/]")

@@ -33,7 +33,7 @@ DenseGen exposes a Typer CLI via `dense`. This page is an operator manual (comma
 - If no config is found, the CLI exits non‑zero with an actionable error message.
 - Input paths resolve against the config file directory.
 - Outputs/tables/logs/plots/report must resolve inside `outputs/` under `densegen.run.root`.
-- Config files must include `densegen.schema_version` (currently `2.8`) and `densegen.run`.
+- Config files must include `densegen.schema_version` (currently `2.9`) and `densegen.run`.
 
 ---
 

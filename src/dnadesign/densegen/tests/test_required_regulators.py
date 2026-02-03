@@ -86,7 +86,7 @@ def test_regulator_groups_filtering(tmp_path: Path) -> None:
     csv_path.write_text("tf,tfbs\nTF1,AAA\nTF2,CCC\nTF3,GGG\n")
     cfg = {
         "densegen": {
-            "schema_version": "2.8",
+            "schema_version": "2.9",
             "run": {"id": "demo", "root": "."},
             "inputs": [
                 {

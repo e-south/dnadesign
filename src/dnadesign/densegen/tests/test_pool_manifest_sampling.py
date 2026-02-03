@@ -196,7 +196,7 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
         yaml.safe_dump(
             {
                 "densegen": {
-                    "schema_version": "2.8",
+                    "schema_version": "2.9",
                     "run": {"id": "demo", "root": "."},
                     "inputs": [
                         {

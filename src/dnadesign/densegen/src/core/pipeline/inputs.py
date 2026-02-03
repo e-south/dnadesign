@@ -160,6 +160,7 @@ def _build_input_manifest_entry(
         "name": getattr(source_cfg, "name", "unknown"),
         "type": source_type,
         "mode": input_meta.get("input_mode"),
+        "input_source_names": list(input_meta.get("input_source_names") or []),
         "resolved_paths": _resolve_input_paths(source_cfg, cfg_path),
         "resolved_root": str(resolve_relative_path(cfg_path, getattr(source_cfg, "root")))
         if hasattr(source_cfg, "root")
@@ -190,7 +191,7 @@ def _build_input_manifest_entry(
 def _input_metadata(source_cfg, cfg_path: Path) -> dict:
     source_type = getattr(source_cfg, "type", "unknown")
     source_name = getattr(source_cfg, "name", "unknown")
-    meta = {"input_type": source_type, "input_name": source_name}
+    meta = {"input_type": source_type, "input_name": source_name, "input_source_names": [source_name]}
     if hasattr(source_cfg, "path"):
         meta["input_path"] = str(resolve_relative_path(cfg_path, getattr(source_cfg, "path")))
     if source_type == "usr_sequences":
@@ -202,6 +203,9 @@ def _input_metadata(source_cfg, cfg_path: Path) -> dict:
         meta["input_mode"] = "sequence_library"
         meta["input_pwm_ids"] = []
     elif source_type == "binding_sites":
+        meta["input_mode"] = "binding_sites"
+        meta["input_pwm_ids"] = []
+    elif source_type == "background_pool":
         meta["input_mode"] = "binding_sites"
         meta["input_pwm_ids"] = []
     elif source_type in PWM_INPUT_TYPES:

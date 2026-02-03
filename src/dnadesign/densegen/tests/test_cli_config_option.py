@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/test_cli_config_option.py
+
+CLI config flag handling tests for DenseGen.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import os
@@ -25,7 +36,7 @@ def _write_min_config(path: Path) -> None:
         textwrap.dedent(
             """
             densegen:
-              schema_version: "2.8"
+              schema_version: "2.9"
               run:
                 id: demo
                 root: "."
@@ -48,6 +59,8 @@ def _write_min_config(path: Path) -> None:
                 plan:
                   - name: default
                     quota: 1
+                    sampling:
+                      include_inputs: [demo_input]
                     regulator_constraints:
                       groups:
                         - name: all

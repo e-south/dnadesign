@@ -21,7 +21,7 @@ from dnadesign.densegen.src.config import ConfigError, load_config
 
 MIN_CONFIG = {
     "densegen": {
-        "schema_version": "2.8",
+        "schema_version": "2.9",
         "run": {"id": "demo", "root": "."},
         "inputs": [
             {
@@ -222,7 +222,7 @@ def test_pad_config_accepts(tmp_path: Path) -> None:
 def test_pad_mode_off_accepts_yaml_boolean(tmp_path: Path) -> None:
     cfg_text = """
     densegen:
-      schema_version: "2.8"
+      schema_version: "2.9"
       run:
         id: demo
         root: "."

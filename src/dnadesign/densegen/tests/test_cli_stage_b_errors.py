@@ -39,7 +39,7 @@ def _write_stage_b_config(
         textwrap.dedent(
             f"""
             densegen:
-              schema_version: "2.8"
+              schema_version: "2.9"
               run:
                 id: demo
                 root: "."

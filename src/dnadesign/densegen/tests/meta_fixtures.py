@@ -14,7 +14,7 @@ from __future__ import annotations
 
 def output_meta(*, library_hash: str, library_index: int) -> dict:
     return {
-        "schema_version": "2.8",
+        "schema_version": "2.9",
         "run_id": "demo",
         "run_root": ".",
         "run_config_path": "config.yaml",
@@ -49,6 +49,7 @@ def output_meta(*, library_hash: str, library_index: int) -> dict:
         "min_count_per_tf": 0,
         "input_type": "binding_sites",
         "input_name": "demo_input",
+        "input_source_names": ["demo_input"],
         "input_path": "inputs.csv",
         "input_dataset": None,
         "input_root": None,

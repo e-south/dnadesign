@@ -81,6 +81,7 @@ META_FIELDS: list[MetaField] = [
     MetaField("covers_required_regulators", (bool,), "Whether required regulators were present in the solution."),
     MetaField("input_type", (str,), "Input source type."),
     MetaField("input_name", (str,), "Input source name."),
+    MetaField("input_source_names", (list,), "Input names feeding the active pool."),
     MetaField("input_path", (str,), "Resolved path for file-based inputs.", allow_none=True),
     MetaField("input_dataset", (str,), "USR dataset name for USR inputs.", allow_none=True),
     MetaField("input_root", (str,), "Resolved root for USR inputs.", allow_none=True),
@@ -232,6 +233,7 @@ def _validate_list_fields(meta: Mapping[str, Any]) -> None:
         "used_tfbs",
         "used_tf_list",
         "input_pwm_ids",
+        "input_source_names",
         "required_regulators",
     }
     for name in list_of_str:

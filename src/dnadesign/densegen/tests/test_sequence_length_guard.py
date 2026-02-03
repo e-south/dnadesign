@@ -74,7 +74,7 @@ def test_sequence_length_guard_shorter_than_motif(tmp_path: Path) -> None:
     csv_path.write_text("tf,tfbs\nTF1,AAAAAAAA\n")
     cfg = {
         "densegen": {
-            "schema_version": "2.8",
+            "schema_version": "2.9",
             "run": {"id": "demo", "root": "."},
             "inputs": [
                 {
@@ -153,7 +153,7 @@ def test_sequence_length_guard_library_total_bp_too_small(tmp_path: Path) -> Non
     csv_path.write_text("tf,tfbs\nTF1,AAA\nTF2,CCC\n")
     cfg = {
         "densegen": {
-            "schema_version": "2.8",
+            "schema_version": "2.9",
             "run": {"id": "demo", "root": "."},
             "inputs": [
                 {
@@ -231,7 +231,7 @@ def test_sequence_length_guard_required_regulators_min_length(tmp_path: Path) ->
     csv_path.write_text("tf,tfbs\nTF1,AAAAA\nTF2,TTTTT\n")
     cfg = {
         "densegen": {
-            "schema_version": "2.8",
+            "schema_version": "2.9",
             "run": {"id": "demo", "root": "."},
             "inputs": [
                 {
@@ -310,7 +310,7 @@ def test_sequence_length_guard_promoter_constraints_min_length(tmp_path: Path) -
     csv_path.write_text("tf,tfbs\nTF1,AAAAAAAA\n")
     cfg = {
         "densegen": {
-            "schema_version": "2.8",
+            "schema_version": "2.9",
             "run": {"id": "demo", "root": "."},
             "inputs": [
                 {

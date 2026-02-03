@@ -21,7 +21,7 @@ This is the YAML schema for DenseGen. Unknown keys are errors and all paths reso
 ### Top-level
 
 - `densegen` (required)
-- `densegen.schema_version` (required; supported: `2.8`)
+- `densegen.schema_version` (required; supported: `2.9`)
 - `densegen.run` (required; run-scoped I/O root)
 - `plots` (optional; required `source` when `output.targets` has multiple sinks)
 
@@ -301,7 +301,7 @@ Notes:
 
 ```yaml
 densegen:
-  schema_version: "2.8"
+  schema_version: "2.9"
   run:
     id: demo
     root: "."

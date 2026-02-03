@@ -40,7 +40,7 @@ def _construct_mapping(loader, node, deep: bool = False):
 _StrictLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_mapping)
 
 
-LATEST_SCHEMA_VERSION = "2.8"
+LATEST_SCHEMA_VERSION = "2.9"
 SUPPORTED_SCHEMA_VERSIONS = {LATEST_SCHEMA_VERSION}
 
 
@@ -157,6 +157,213 @@ class SequenceLibraryInput(BaseModel):
     path: str
     format: Optional[Literal["csv", "parquet"]] = None
     sequence_column: str = "sequence"
+
+
+class BackgroundPoolMiningBudgetConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    mode: Literal["fixed_candidates"]
+    candidates: int
+
+    @field_validator("candidates")
+    @classmethod
+    def _candidates_ok(cls, v: int):
+        if int(v) <= 0:
+            raise ValueError("background_pool.sampling.mining.budget.candidates must be > 0")
+        return int(v)
+
+
+class BackgroundPoolMiningConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    batch_size: int
+    budget: BackgroundPoolMiningBudgetConfig
+    log_every_batches: int = 1
+
+    @field_validator("batch_size")
+    @classmethod
+    def _batch_size_ok(cls, v: int):
+        if int(v) <= 0:
+            raise ValueError("background_pool.sampling.mining.batch_size must be > 0")
+        return int(v)
+
+    @field_validator("log_every_batches")
+    @classmethod
+    def _log_every_ok(cls, v: int):
+        if int(v) <= 0:
+            raise ValueError("background_pool.sampling.mining.log_every_batches must be > 0")
+        return int(v)
+
+
+class BackgroundPoolLengthConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    policy: Literal["exact", "range"] = "exact"
+    range: Optional[tuple[int, int]] = None
+    exact: Optional[int] = None
+
+    @field_validator("range")
+    @classmethod
+    def _range_ok(cls, v: Optional[tuple[int, int]]):
+        if v is None:
+            return v
+        if len(v) != 2:
+            raise ValueError("background_pool.sampling.length.range must be a 2-tuple (min, max)")
+        lo, hi = v
+        if lo <= 0 or hi <= 0:
+            raise ValueError("background_pool.sampling.length.range values must be > 0")
+        if lo > hi:
+            raise ValueError("background_pool.sampling.length.range must be min <= max")
+        return v
+
+    @field_validator("exact")
+    @classmethod
+    def _exact_ok(cls, v: Optional[int]):
+        if v is None:
+            return v
+        if int(v) <= 0:
+            raise ValueError("background_pool.sampling.length.exact must be > 0")
+        return int(v)
+
+
+class BackgroundPoolUniquenessConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    key: Literal["sequence"] = "sequence"
+
+
+class BackgroundPoolGCConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    min: Optional[float] = None
+    max: Optional[float] = None
+
+    @model_validator(mode="after")
+    def _gc_ok(self):
+        if self.min is None and self.max is None:
+            return self
+        if self.min is not None:
+            value = float(self.min)
+            if value < 0 or value > 1:
+                raise ValueError("background_pool.sampling.gc.min must be in [0, 1]")
+            self.min = value
+        if self.max is not None:
+            value = float(self.max)
+            if value < 0 or value > 1:
+                raise ValueError("background_pool.sampling.gc.max must be in [0, 1]")
+            self.max = value
+        if self.min is not None and self.max is not None and float(self.min) > float(self.max):
+            raise ValueError("background_pool.sampling.gc.min must be <= background_pool.sampling.gc.max")
+        return self
+
+
+class BackgroundPoolFimoExcludeConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    pwms_input: List[str]
+    max_score_norm: Optional[float] = None
+    allow_zero_hit_only: bool = False
+
+    @field_validator("pwms_input", mode="before")
+    @classmethod
+    def _coerce_pwms_input(cls, v):
+        if isinstance(v, str):
+            return [v]
+        return v
+
+    @field_validator("pwms_input")
+    @classmethod
+    def _pwms_input_ok(cls, v: List[str]):
+        if not v:
+            raise ValueError("background_pool.sampling.filters.fimo_exclude.pwms_input must be non-empty")
+        cleaned: list[str] = []
+        for raw in v:
+            name = str(raw).strip()
+            if not name:
+                raise ValueError("background_pool.sampling.filters.fimo_exclude.pwms_input must be non-empty")
+            cleaned.append(name)
+        if len(set(cleaned)) != len(cleaned):
+            raise ValueError("background_pool.sampling.filters.fimo_exclude.pwms_input must be unique")
+        return cleaned
+
+    @field_validator("max_score_norm")
+    @classmethod
+    def _max_score_norm_ok(cls, v: Optional[float]):
+        if v is None:
+            return v
+        value = float(v)
+        if value <= 0 or value > 1:
+            raise ValueError("background_pool.sampling.filters.fimo_exclude.max_score_norm must be in (0, 1]")
+        return value
+
+    @model_validator(mode="after")
+    def _mode_ok(self):
+        if bool(self.allow_zero_hit_only) and self.max_score_norm is not None:
+            raise ValueError(
+                "background_pool.sampling.filters.fimo_exclude.max_score_norm "
+                "must be unset when allow_zero_hit_only=true"
+            )
+        if not bool(self.allow_zero_hit_only) and self.max_score_norm is None:
+            raise ValueError(
+                "background_pool.sampling.filters.fimo_exclude.max_score_norm "
+                "is required when allow_zero_hit_only=false"
+            )
+        return self
+
+
+class BackgroundPoolFiltersConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    forbid_kmers: List[str] = Field(default_factory=list)
+    fimo_exclude: Optional[BackgroundPoolFimoExcludeConfig] = None
+
+    @field_validator("forbid_kmers")
+    @classmethod
+    def _forbid_kmers_ok(cls, v: List[str]):
+        cleaned: list[str] = []
+        for raw in v:
+            if not isinstance(raw, str):
+                raise ValueError("background_pool.sampling.filters.forbid_kmers must be strings")
+            seq = raw.strip().upper()
+            if not seq:
+                raise ValueError("background_pool.sampling.filters.forbid_kmers must be non-empty")
+            if any(ch not in {"A", "C", "G", "T"} for ch in seq):
+                raise ValueError("background_pool.sampling.filters.forbid_kmers must contain only A/C/G/T")
+            cleaned.append(seq)
+        if len(set(cleaned)) != len(cleaned):
+            raise ValueError("background_pool.sampling.filters.forbid_kmers must be unique")
+        return cleaned
+
+
+class BackgroundPoolSamplingConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    n_sites: int
+    mining: BackgroundPoolMiningConfig
+    length: BackgroundPoolLengthConfig = Field(default_factory=BackgroundPoolLengthConfig)
+    uniqueness: BackgroundPoolUniquenessConfig = Field(default_factory=BackgroundPoolUniquenessConfig)
+    gc: Optional[BackgroundPoolGCConfig] = None
+    filters: BackgroundPoolFiltersConfig = Field(default_factory=BackgroundPoolFiltersConfig)
+
+    @field_validator("n_sites")
+    @classmethod
+    def _n_sites_ok(cls, v: int):
+        if int(v) <= 0:
+            raise ValueError("background_pool.sampling.n_sites must be > 0")
+        return int(v)
+
+    @model_validator(mode="after")
+    def _sampling_rules(self):
+        if self.length.policy == "exact":
+            if self.length.range is not None:
+                raise ValueError("background_pool.sampling.length.range is not allowed when policy=exact")
+            if self.length.exact is None:
+                raise ValueError("background_pool.sampling.length.exact is required when policy=exact")
+        if self.length.policy == "range":
+            if self.length.range is None:
+                raise ValueError("background_pool.sampling.length.range is required when policy=range")
+            if self.length.exact is not None:
+                raise ValueError("background_pool.sampling.length.exact is not allowed when policy=range")
+        return self
+
+
+class BackgroundPoolInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    type: Literal["background_pool"]
+    sampling: BackgroundPoolSamplingConfig
 
 
 class PWMMiningBudgetConfig(BaseModel):
@@ -562,6 +769,7 @@ InputConfig = Annotated[
     Union[
         BindingSitesInput,
         SequenceLibraryInput,
+        BackgroundPoolInput,
         PWMMemeInput,
         PWMMemeSetInput,
         PWMJasparInput,
@@ -734,11 +942,32 @@ class RegulatorConstraints(BaseModel):
         return self
 
 
+class PlanSamplingConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    include_inputs: List[str]
+
+    @field_validator("include_inputs")
+    @classmethod
+    def _include_inputs_ok(cls, v: List[str]):
+        if not v:
+            raise ValueError("plan.sampling.include_inputs must be a non-empty list")
+        cleaned = []
+        for raw in v:
+            name = str(raw).strip()
+            if not name:
+                raise ValueError("plan.sampling.include_inputs must contain non-empty strings")
+            cleaned.append(name)
+        if len(set(cleaned)) != len(cleaned):
+            raise ValueError("plan.sampling.include_inputs must be unique")
+        return cleaned
+
+
 class PlanItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
     quota: Optional[int] = None
     fraction: Optional[float] = None
+    sampling: PlanSamplingConfig
     fixed_elements: FixedElements = Field(default_factory=FixedElements)
     regulator_constraints: RegulatorConstraints
 
@@ -863,6 +1092,7 @@ class GenerationConfig(BaseModel):
                 ResolvedPlanItem(
                     name=p.name,
                     quota=int(p.quota),
+                    include_inputs=list(p.sampling.include_inputs),
                     fixed_elements=p.fixed_elements,
                     regulator_constraints=p.regulator_constraints,
                 )
@@ -884,6 +1114,7 @@ class GenerationConfig(BaseModel):
                 ResolvedPlanItem(
                     name=p.name,
                     quota=q,
+                    include_inputs=list(p.sampling.include_inputs),
                     fixed_elements=p.fixed_elements,
                     regulator_constraints=p.regulator_constraints,
                 )
@@ -898,6 +1129,7 @@ class GenerationConfig(BaseModel):
 class ResolvedPlanItem:
     name: str
     quota: int
+    include_inputs: list[str]
     fixed_elements: FixedElements
     regulator_constraints: RegulatorConstraints
 
@@ -1129,9 +1361,50 @@ class PadConfig(BaseModel):
         return v
 
 
+class FinalSequenceKmerFilterConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kmers: List[str]
+
+    @field_validator("kmers")
+    @classmethod
+    def _kmers_ok(cls, v: List[str]):
+        if not v:
+            raise ValueError(
+                "postprocess.validate_final_sequence.forbid_kmers_outside_promoter_windows.kmers must be set"
+            )
+        cleaned: list[str] = []
+        for raw in v:
+            if not isinstance(raw, str):
+                raise ValueError(
+                    "postprocess.validate_final_sequence.forbid_kmers_outside_promoter_windows.kmers must be strings"
+                )
+            seq = raw.strip().upper()
+            if not seq:
+                raise ValueError(
+                    "postprocess.validate_final_sequence.forbid_kmers_outside_promoter_windows.kmers must be non-empty"
+                )
+            if any(ch not in {"A", "C", "G", "T"} for ch in seq):
+                raise ValueError(
+                    "postprocess.validate_final_sequence.forbid_kmers_outside_promoter_windows.kmers "
+                    "must contain only A/C/G/T"
+                )
+            cleaned.append(seq)
+        if len(set(cleaned)) != len(cleaned):
+            raise ValueError(
+                "postprocess.validate_final_sequence.forbid_kmers_outside_promoter_windows.kmers must be unique"
+            )
+        return cleaned
+
+
+class FinalSequenceValidationConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    forbid_kmers_outside_promoter_windows: Optional[FinalSequenceKmerFilterConfig] = None
+
+
 class PostprocessConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     pad: PadConfig = Field(default_factory=PadConfig)
+    validate_final_sequence: Optional[FinalSequenceValidationConfig] = None
 
 
 # ---- Logging ----
@@ -1230,6 +1503,53 @@ class DenseGenConfig(BaseModel):
         names = [i.name for i in self.inputs]
         if len(set(names)) != len(names):
             raise ValueError("Input names must be unique")
+        return self
+
+    @model_validator(mode="after")
+    def _plan_include_inputs(self):
+        input_names = {i.name for i in self.inputs}
+        for plan in self.generation.plan or []:
+            include_inputs = list(plan.sampling.include_inputs or [])
+            missing = [name for name in include_inputs if name not in input_names]
+            if missing:
+                preview = ", ".join(missing[:10])
+                raise ValueError(
+                    "generation.plan[].sampling.include_inputs includes unknown inputs: "
+                    f"{preview}. Known inputs: {sorted(input_names)}"
+                )
+        return self
+
+    @model_validator(mode="after")
+    def _background_pool_inputs(self):
+        input_by_name = {i.name: i for i in self.inputs}
+        pwm_inputs = {
+            "pwm_meme",
+            "pwm_meme_set",
+            "pwm_jaspar",
+            "pwm_matrix_csv",
+            "pwm_artifact",
+            "pwm_artifact_set",
+        }
+        for inp in self.inputs:
+            if getattr(inp, "type", None) != "background_pool":
+                continue
+            filters = getattr(inp.sampling, "filters", None)
+            fimo_cfg = getattr(filters, "fimo_exclude", None) if filters is not None else None
+            if fimo_cfg is None:
+                continue
+            names = list(getattr(fimo_cfg, "pwms_input", []) or [])
+            missing = [name for name in names if name not in input_by_name]
+            if missing:
+                preview = ", ".join(missing[:10])
+                raise ValueError(
+                    f"background_pool.sampling.filters.fimo_exclude.pwms_input includes unknown inputs: {preview}."
+                )
+            non_pwm = [name for name in names if getattr(input_by_name[name], "type", None) not in pwm_inputs]
+            if non_pwm:
+                preview = ", ".join(non_pwm[:10])
+                raise ValueError(
+                    f"background_pool.sampling.filters.fimo_exclude.pwms_input must reference PWM inputs: {preview}."
+                )
         return self
 
 

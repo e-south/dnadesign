@@ -29,7 +29,7 @@ def test_inspect_run_uses_relative_root(tmp_path: Path) -> None:
     run_manifest = {
         "run_id": "demo",
         "created_at": "2026-01-14T00:00:00+00:00",
-        "schema_version": "2.8",
+        "schema_version": "2.9",
         "config_sha256": "dummy",
         "run_root": str(tmp_path),
         "random_seed": 0,

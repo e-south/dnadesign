@@ -63,7 +63,7 @@ class _DummyAdapter:
 def _write_config(path: Path, input_path: Path) -> None:
     cfg = {
         "densegen": {
-            "schema_version": "2.8",
+            "schema_version": "2.9",
             "run": {"id": "demo", "root": "."},
             "inputs": [
                 {

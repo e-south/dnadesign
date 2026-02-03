@@ -25,8 +25,9 @@ import pandas as pd
 
 from ..adapters.outputs import load_records_from_config
 from ..config import RootConfig, resolve_outputs_scoped_path, resolve_run_root
-from .artifacts.pool import POOL_MODE_TFBS, load_pool_artifact
+from .artifacts.pool import POOL_MODE_TFBS, load_pool_data
 from .motif_labels import input_motifs, motif_display_name
+from .pipeline.plan_pools import build_plan_pools, plan_pool_label
 from .run_manifest import load_run_manifest
 from .run_paths import (
     candidates_root,
@@ -394,13 +395,21 @@ def collect_report_data(
     tables: Dict[str, pd.DataFrame] = {}
     tables["solutions"] = solutions_df
     display_map_by_input: dict[str, dict[str, str]] = {}
-    for inp in root_cfg.densegen.inputs:
+    inputs_by_name = {inp.name: inp for inp in root_cfg.densegen.inputs}
+    plan_items = list(root_cfg.densegen.generation.resolve_plan())
+    for plan in plan_items:
+        include_inputs = list(plan.sampling.include_inputs or [])
         mapping: dict[str, str] = {}
-        for motif_id, name in input_motifs(inp, cfg_path):
-            if motif_id and name and motif_id not in mapping:
-                mapping[motif_id] = name
+        for input_name in include_inputs:
+            inp = inputs_by_name.get(input_name)
+            if inp is None:
+                continue
+            for motif_id, name in input_motifs(inp, cfg_path):
+                if motif_id and name and motif_id not in mapping:
+                    mapping[motif_id] = name
         if mapping:
-            display_map_by_input[inp.name] = mapping
+            pool_name = plan_pool_label(str(plan.name))
+            display_map_by_input[pool_name] = mapping
 
     def _display_tf_label(input_name: str, tf: str) -> str:
         mapping = display_map_by_input.get(input_name, {})
@@ -423,16 +432,15 @@ def collect_report_data(
     pool_dir = outputs_root / "pools"
     if pool_dir.exists():
         try:
-            pool_artifact = load_pool_artifact(pool_dir)
+            _artifact, pool_data = load_pool_data(pool_dir)
+            plan_pools = build_plan_pools(plan_items=plan_items, pool_data=pool_data)
             rows: list[dict[str, Any]] = []
             score_rows: list[dict[str, Any]] = []
-            for entry in pool_artifact.inputs.values():
-                if entry.pool_mode != POOL_MODE_TFBS:
+            for plan in plan_items:
+                spec = plan_pools.get(str(plan.name))
+                if spec is None or spec.pool.pool_mode != POOL_MODE_TFBS or spec.pool.df is None:
                     continue
-                pool_path = pool_dir / entry.pool_path
-                if not pool_path.exists():
-                    continue
-                df_pool = pd.read_parquet(pool_path)
+                df_pool = spec.pool.df
                 if "tf" not in df_pool.columns:
                     continue
                 if "tier" in df_pool.columns:
@@ -441,7 +449,7 @@ def collect_report_data(
                     for (tf, tier), group in grouped:
                         rows.append(
                             {
-                                "input_name": entry.name,
+                                "input_name": spec.pool.name,
                                 "tf": tf,
                                 "tier": int(tier),
                                 "count": int(len(group)),
@@ -456,7 +464,7 @@ def collect_report_data(
                         if not vals.empty:
                             score_rows.append(
                                 {
-                                    "input_name": entry.name,
+                                    "input_name": spec.pool.name,
                                     "tf": tf,
                                     "metric": "best_hit_score",
                                     "count": int(len(vals)),
@@ -472,7 +480,7 @@ def collect_report_data(
                             if not vals.empty:
                                 score_rows.append(
                                     {
-                                        "input_name": entry.name,
+                                        "input_name": spec.pool.name,
                                         "tf": tf,
                                         "metric": "densegen_score",
                                         "count": int(len(vals)),

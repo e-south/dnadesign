@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/config_fixtures.py
+
+Config writer helpers for DenseGen tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import textwrap
@@ -9,7 +20,7 @@ def write_minimal_config(path: Path) -> None:
         textwrap.dedent(
             """
             densegen:
-              schema_version: "2.8"
+              schema_version: "2.9"
               run:
                 id: demo
                 root: "."
@@ -30,6 +41,8 @@ def write_minimal_config(path: Path) -> None:
                 plan:
                   - name: demo_plan
                     quota: 1
+                    sampling:
+                      include_inputs: [demo_input]
                     regulator_constraints:
                       groups: []
               solver:

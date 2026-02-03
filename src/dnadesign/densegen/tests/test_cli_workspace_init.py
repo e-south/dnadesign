@@ -13,7 +13,7 @@ def _write_template_config(path: Path) -> None:
         textwrap.dedent(
             """
             densegen:
-              schema_version: "2.8"
+              schema_version: "2.9"
               run:
                 id: demo
                 root: "."
@@ -32,7 +32,7 @@ def _write_min_config(path: Path) -> None:
         textwrap.dedent(
             """
             densegen:
-              schema_version: "2.8"
+              schema_version: "2.9"
               run:
                 id: demo
                 root: "."

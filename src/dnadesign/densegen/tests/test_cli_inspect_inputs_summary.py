@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/test_cli_inspect_inputs_summary.py
+
+CLI inspect inputs summary tests for DenseGen.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import textwrap
@@ -12,7 +23,7 @@ def _write_config(path: Path, *, meme_path: Path) -> None:
     payload = textwrap.dedent(
         f"""
         densegen:
-          schema_version: "2.8"
+          schema_version: "2.9"
           run:
             id: demo
             root: "."
@@ -46,6 +57,8 @@ def _write_config(path: Path, *, meme_path: Path) -> None:
             plan:
               - name: demo_plan
                 quota: 1
+                sampling:
+                  include_inputs: [demo_sites, demo_pwm]
                 regulator_constraints:
                   groups:
                     - name: core

@@ -133,7 +133,7 @@ def _write_config(path: Path, *, plots_default: list[str]) -> None:
         textwrap.dedent(
             """
             densegen:
-              schema_version: "2.8"
+              schema_version: "2.9"
               run:
                 id: demo
                 root: "."
