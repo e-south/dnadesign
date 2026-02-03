@@ -100,6 +100,38 @@ def test_runtime_default_max_consecutive_failures(tmp_path: Path) -> None:
     assert loaded.root.densegen.runtime.max_consecutive_failures == 25
 
 
+def test_pwm_artifact_set_partial_overrides_merge(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["inputs"] = [
+        {
+            "name": "demo_pwm",
+            "type": "pwm_artifact_set",
+            "paths": ["inputs/M1.json", "inputs/M2.json"],
+            "sampling": {
+                "strategy": "stochastic",
+                "n_sites": 2,
+                "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 20}},
+                "length": {"policy": "range", "range": [16, 20]},
+                "uniqueness": {"key": "core"},
+                "selection": {
+                    "policy": "mmr",
+                    "alpha": 0.5,
+                    "pool": {"min_score_norm": 0.8},
+                },
+            },
+            "overrides_by_motif_id": {
+                "M2": {"trimming": {"window_length": 16}},
+            },
+        }
+    ]
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    inp = loaded.root.densegen.inputs[0]
+    override = inp.overrides_by_motif_id["M2"]
+    assert override.trimming.window_length == 16
+    assert override.selection.policy == "mmr"
+
+
 def test_allow_incomplete_coverage_rejected(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
     cfg["densegen"]["generation"]["sampling"] = {"allow_incomplete_coverage": True}

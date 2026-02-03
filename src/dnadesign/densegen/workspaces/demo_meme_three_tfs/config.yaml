@@ -20,12 +20,12 @@ densegen:
           batch_size: 5000
           budget:
             mode: fixed_candidates
-            candidates: 1000000
+            candidates: 200000
             growth_factor: 1.25
           log_every_batches: 1
         length:
           policy: range
-          range: [15, 20]
+          range: [16, 20]
         uniqueness:
           key: core
         selection:
@@ -37,6 +37,10 @@ densegen:
             max_candidates: null
             relevance_norm: minmax_raw_score
         tier_fractions: [0.001, 0.01, 0.09]
+      overrides_by_motif_id:
+        baeR_SBWWTWKTYYYYMHDAWTSK:
+          trimming:
+            window_length: 16
 
   output:
     targets: [parquet]

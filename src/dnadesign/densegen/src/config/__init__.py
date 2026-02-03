@@ -58,6 +58,16 @@ def _expand_path(value: str | os.PathLike) -> Path:
     return Path(os.path.expanduser(os.path.expandvars(str(value))))
 
 
+def _deep_merge_dicts(base: dict, override: dict) -> dict:
+    merged: dict = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _deep_merge_dicts(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
 def resolve_relative_path(cfg_path: Path, value: str | os.PathLike) -> Path:
     p = _expand_path(value)
     if p.is_absolute():
@@ -493,6 +503,32 @@ class PWMArtifactSetInput(BaseModel):
     paths: List[str]
     sampling: PWMSamplingConfig
     overrides_by_motif_id: Dict[str, PWMSamplingConfig] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _merge_partial_overrides(cls, data: object):
+        if not isinstance(data, dict):
+            return data
+        overrides = data.get("overrides_by_motif_id")
+        if not isinstance(overrides, dict) or not overrides:
+            return data
+        sampling = data.get("sampling")
+        if sampling is None:
+            return data
+        if isinstance(sampling, BaseModel):
+            base_sampling = sampling.model_dump()
+        elif isinstance(sampling, dict):
+            base_sampling = sampling
+        else:
+            return data
+        merged: dict[str, object] = {}
+        for key, value in overrides.items():
+            if isinstance(value, dict):
+                merged[key] = _deep_merge_dicts(base_sampling, value)
+            else:
+                merged[key] = value
+        data["overrides_by_motif_id"] = merged
+        return data
 
     @field_validator("paths")
     @classmethod

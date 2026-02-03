@@ -107,7 +107,8 @@ inputs:
 ```
 
 Exact length is the default. To enable variable length, set `length.policy: range` and
-provide `length.range: [min, max]` where `min >= motif_length`.
+provide `length.range: [min, max]`. If `min` is below the motif length, Stage‑A trims to the
+max‑information window per candidate (and MMR requires a fixed trimming window length).
 
 ---
 

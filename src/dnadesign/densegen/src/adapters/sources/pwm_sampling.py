@@ -185,6 +185,14 @@ def sample_pwm_sites(
             raise ValueError("selection.alpha must be in (0, 1].")
         if selection_pool is None:
             raise ValueError("selection.pool must be set when selection.policy=mmr.")
+        if length_policy == "range" and length_range is not None and len(length_range) == 2:
+            min_len = int(min(length_range))
+            if min_len < width:
+                raise ValueError(
+                    "Stage-A MMR requires a fixed trim window when length.policy=range "
+                    "and min length is below the motif width. Set pwm.sampling.trimming.window_length "
+                    "to <= the minimum length or increase length.range."
+                )
 
     include_matched_sequence = bool(include_matched_sequence)
     tier_fractions = list(resolve_tier_fractions(tier_fractions))

@@ -83,7 +83,8 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
       `[0.001, 0.01, 0.09]`). Used for diagnostic tiers and the cumulative rung ladder for MMR pool selection.
     - `length`
       - `policy`: `exact | range` (default: `exact`)
-      - `range`: `[min, max]` (required when `policy=range`; `min` >= motif length)
+      - `range`: `[min, max]` (required when `policy=range`; `min` can be below motif length,
+        in which case Stage‑A trims to the max‑information window per candidate)
     - `trimming`
       - `window_length` (optional int > 0; trims PWM to a max‑information window before Stage‑A sampling)
       - `window_strategy`: `max_info` (window selection strategy)
@@ -123,7 +124,8 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
 - `type: pwm_artifact_set`
   - `paths` - list of per-motif JSON artifacts (one file per motif)
   - `sampling` (required Stage‑A config) - same fields as `pwm_meme`
-  - `overrides_by_motif_id` (optional dict) - per‑motif Stage‑A sampling overrides
+  - `overrides_by_motif_id` (optional dict) - per‑motif Stage‑A sampling overrides (deep‑merged
+    onto the base `sampling`, so partial overrides are allowed)
 - `type: usr_sequences`
   - `dataset` - USR dataset name
   - `root` - USR root path (required; no fallback)

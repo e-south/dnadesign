@@ -100,13 +100,18 @@ To keep all candidates for debugging, set:
 densegen.inputs[].sampling.keep_all_candidates_debug: true
 ```
 
-Then after `dense stage-a build-pool`, inspect candidate lengths:
+Then after `dense stage-a build-pool`, inspect candidate lengths (candidates are partitioned
+under `outputs/pools/candidates/<input_name>/`):
 
 ```bash
 python3 - <<'PY'
 import pandas as pd
 from pathlib import Path
-df = pd.read_parquet(Path("outputs/pools/candidates") / "candidates__baeR_SBWWTWKTYYYYMHDAWTSK.parquet")
+df = pd.read_parquet(
+    Path("outputs/pools/candidates")
+    / "lexA_cpxR_baeR_artifacts"
+    / "candidates__baeR_SBWWTWKTYYYYMHDAWTSK.parquet"
+)
 df["len"] = df["sequence"].str.len()
 print(df["len"].value_counts().sort_index())
 print(df[df["best_hit_score"] > 0]["len"].value_counts().sort_index())

@@ -168,8 +168,8 @@ DenseGen can materialize Stage‑A/Stage‑B artifacts without running the solve
 - `dense stage-a build-pool` writes:
   - `outputs/pools/pool_manifest.json`
   - `outputs/pools/<input>__pool.parquet`
-  - `outputs/pools/candidates/candidates__<label>.parquet` (when `keep_all_candidates_debug: true`)
-  - `outputs/pools/candidates/<label>__fimo.tsv` (when `keep_all_candidates_debug: true`)
+  - `outputs/pools/candidates/<input_name>/candidates__<label>.parquet` (when `keep_all_candidates_debug: true`)
+  - `outputs/pools/candidates/<input_name>/<label>__fimo.tsv` (when `keep_all_candidates_debug: true`)
   - `outputs/pools/candidates/candidates.parquet` + `candidates_summary.parquet` + `candidates_manifest.json`
     (overwritten by `stage-a build-pool --fresh` or `dense run --rebuild-stage-a`)
 - `dense stage-b build-libraries` writes:
