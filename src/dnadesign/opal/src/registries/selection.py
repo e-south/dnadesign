@@ -74,7 +74,7 @@ def _wrap_for_ctx_enforcement(name: str, fn: Callable[..., Any]) -> Callable[...
         if ctx is not None:
             # Ensure caller passed a PluginCtx for this plugin instance
             try:
-                ctx.precheck_requires()
+                ctx.precheck_requires(stage="selection")
             except Exception:
                 raise
         out = fn(
@@ -88,7 +88,7 @@ def _wrap_for_ctx_enforcement(name: str, fn: Callable[..., Any]) -> Callable[...
         )
         if ctx is not None:
             try:
-                ctx.postcheck_produces()
+                ctx.postcheck_produces(stage="selection")
             except Exception:
                 raise
         return out

@@ -68,7 +68,7 @@ def _assert_and_wrap(
         if contract is not None and ctx is None:
             raise ValueError(f"transform_x[{name}] requires ctx for contract enforcement.")
         if contract is not None and ctx is not None:
-            ctx.precheck_requires()
+            ctx.precheck_requires(stage="transform_x")
         X = fn(series, ctx=ctx)
         X = np.asarray(X, dtype=float)
         if X.ndim == 1:
@@ -78,7 +78,7 @@ def _assert_and_wrap(
         if not np.all(np.isfinite(X)):
             raise ValueError(f"transform_x[{name}] produced non-finite values.")
         if contract is not None and ctx is not None:
-            ctx.postcheck_produces()
+            ctx.postcheck_produces(stage="transform_x")
         return X
 
     return _wrapped

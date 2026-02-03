@@ -81,13 +81,13 @@ def _wrap_for_ctx_enforcement(name: str, fn: _ObjectiveFn) -> _ObjectiveFn:
     def _wrapped(*, y_pred, params: Dict[str, Any], ctx: PluginCtx | None = None, train_view=None):
         if ctx is not None:
             try:
-                ctx.precheck_requires()
+                ctx.precheck_requires(stage="objective")
             except Exception:
                 raise
         out = fn(y_pred=y_pred, params=params, ctx=ctx, train_view=train_view)
         if ctx is not None:
             try:
-                ctx.postcheck_produces()
+                ctx.postcheck_produces(stage="objective")
             except Exception:
                 raise
         return out

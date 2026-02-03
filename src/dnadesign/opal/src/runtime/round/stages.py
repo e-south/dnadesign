@@ -255,6 +255,11 @@ def stage_scoring(
             )
     Y_hat_fit = np.vstack(yhat_chunks) if yhat_chunks else np.zeros((0, y_dim), dtype=float)
 
+    contract = getattr(model, "__opal_contract__", None)
+    produces_by_stage = getattr(contract, "produces_by_stage", None) or {}
+    if produces_by_stage.get("predict"):
+        mctx.postcheck_produces(stage="predict")
+
     _log(
         req.verbose,
         f"[y-ops] inverting {len(yops_cfg)} op(s) for predictions: {([p.name for p in yops_cfg] or [])}",

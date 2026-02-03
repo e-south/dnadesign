@@ -62,10 +62,10 @@ def _wrap_for_ctx_enforcement(name: str, fn: Callable[..., Any]) -> Callable[...
         if contract is not None and ctx is None:
             raise ValueError(f"transform_y[{name}] requires ctx for contract enforcement.")
         if ctx is not None:
-            ctx.precheck_requires()
+            ctx.precheck_requires(stage="transform_y")
         out = fn(df_tidy, params, ctx=ctx)
         if ctx is not None:
-            ctx.postcheck_produces()
+            ctx.postcheck_produces(stage="transform_y")
         return out
 
     if contract is not None:
@@ -201,11 +201,11 @@ def run_y_ops_pipeline(
                 produces=spec.produces,
             )
             fit_ctx = ctx.for_plugin(category="yops", name=entry.name, contract=fit_contract)
-            fit_ctx.precheck_requires()
+            fit_ctx.precheck_requires(stage="fit_transform")
             # side-effect: write fitted stats into ctx under yops/<name>/*
             spec.fit_fn(Yt, params_obj, ctx=fit_ctx)
             Yt = np.asarray(spec.transform_fn(Yt, params_obj, ctx=fit_ctx), dtype=float)
-            fit_ctx.postcheck_produces()
+            fit_ctx.postcheck_produces(stage="fit_transform")
 
             names.append(entry.name)
             params_used.append(dict(params))
@@ -231,6 +231,6 @@ def run_y_ops_pipeline(
             produces=tuple(),
         )
         inv_ctx = ctx.for_plugin(category="yops", name=name, contract=inv_contract)
-        inv_ctx.precheck_requires()
+        inv_ctx.precheck_requires(stage="inverse")
         Yt = np.asarray(spec.inverse_fn(Yt, params_obj, ctx=inv_ctx), dtype=float)
     return Yt
