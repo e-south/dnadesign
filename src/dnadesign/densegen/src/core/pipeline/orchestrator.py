@@ -43,7 +43,6 @@ from ...config import (
 from ...utils import logging_utils
 from ...utils.logging_utils import install_native_stderr_filters
 from ...utils.sequence_utils import gc_fraction
-from ..artifacts.candidates import build_candidate_artifact, find_candidate_files, prepare_candidates_dir
 from ..artifacts.library import (
     LibraryArtifact,
     LibraryRecord,
@@ -51,15 +50,7 @@ from ..artifacts.library import (
     load_library_records,
     write_library_artifact,
 )
-from ..artifacts.pool import (
-    POOL_MODE_SEQUENCE,
-    POOL_MODE_TFBS,
-    PoolData,
-    _hash_file,
-    build_pool_artifact,
-    load_pool_data,
-    pool_status_by_input,
-)
+from ..artifacts.pool import POOL_MODE_SEQUENCE, POOL_MODE_TFBS, PoolData, _hash_file
 from ..artifacts.records import SolutionRecord
 from ..input_types import PWM_INPUT_TYPES
 from ..metadata import build_metadata
@@ -106,7 +97,7 @@ from .outputs import (
     _write_effective_config,
     _write_to_sinks,
 )
-from .plan_pools import PLAN_POOL_INPUT_TYPE, PlanPoolSpec, build_plan_pools
+from .plan_pools import PLAN_POOL_INPUT_TYPE, PlanPoolSpec
 from .progress import (
     _build_screen_dashboard,
     _format_progress_bar,
@@ -126,6 +117,7 @@ from .sequence_validation import (
     _promoter_windows,
     _validate_library_constraints,
 )
+from .stage_a_pools import prepare_stage_a_pools
 from .stage_b import (
     _compute_sampling_fraction,
     _compute_sampling_fraction_pairs,
@@ -203,12 +195,6 @@ class PipelineDeps:
     sink_factory: Callable[[DenseGenConfig, Path], Iterable[SinkBase]]
     optimizer: OptimizerAdapter
     pad: Callable[..., tuple[str, dict] | str]
-
-
-@dataclass(frozen=True)
-class PlanPoolSource:
-    name: str
-    type: str = PLAN_POOL_INPUT_TYPE
 
 
 def default_deps() -> PipelineDeps:
@@ -2048,104 +2034,29 @@ def run_pipeline(
         )
     except Exception:
         log.debug("Failed to write effective_config.json.", exc_info=True)
-    pool_dir = outputs_root / "pools"
-    pool_manifest = pool_dir / "pool_manifest.json"
-    pool_data: dict[str, PoolData] | None = None
-
-    if build_stage_a:
-        if candidate_logging:
-            try:
-                existed = prepare_candidates_dir(candidates_dir, overwrite=False)
-            except Exception as exc:
-                raise RuntimeError(f"Failed to prepare candidate artifacts directory: {exc}") from exc
-            if existed:
-                candidates_label = display_path(candidates_dir, run_root, absolute=False)
-                log.info(
-                    "Appending candidate artifacts under %s (use dense run --fresh to reset).",
-                    candidates_label,
-                )
-            else:
-                candidates_label = display_path(candidates_dir, run_root, absolute=False)
-                log.info("Candidate mining artifacts will be written to %s", candidates_label)
-        try:
-            _pool_artifact, pool_data = build_pool_artifact(
-                cfg=cfg,
-                cfg_path=loaded.path,
-                deps=deps,
-                rng=np_rng_stage_a,
-                outputs_root=outputs_root,
-                out_dir=pool_dir,
-                overwrite=True,
-            )
-        except Exception as exc:
-            raise RuntimeError(f"Failed to build Stage-A TFBS pools: {exc}") from exc
-        try:
-            _emit_event(
-                events_path,
-                event="POOL_BUILT",
-                payload={
-                    "inputs": [
-                        {
-                            "name": pool.name,
-                            "input_type": pool.input_type,
-                            "pool_mode": pool.pool_mode,
-                            "rows": int(pool.df.shape[0]) if pool.df is not None else int(len(pool.sequences)),
-                        }
-                        for pool in pool_data.values()
-                    ]
-                },
-            )
-        except Exception:
-            log.debug("Failed to emit POOL_BUILT event.", exc_info=True)
-
-    if not pool_manifest.exists():
-        raise RuntimeError(
-            "Stage-A pools missing or stale. Run `dense stage-a build-pool --fresh` to regenerate pools."
-        )
-    if not build_stage_a:
-        statuses = pool_status_by_input(cfg, loaded.path, run_root)
-        stale = [status for status in statuses.values() if status.state != "present"]
-        if stale:
-            labels = ", ".join(sorted({status.name for status in stale}))
-            raise RuntimeError(
-                "Stage-A pools missing or stale for: "
-                f"{labels}. Run `dense stage-a build-pool --fresh` to regenerate pools."
-            )
-    try:
-        _pool_artifact, pool_data = load_pool_data(pool_dir)
-    except Exception as exc:
-        raise RuntimeError(f"Failed to load existing Stage-A pool artifacts: {exc}") from exc
-    pool_label = display_path(pool_dir, run_root, absolute=False)
-    log.info("Using Stage-A pools from %s", pool_label)
+    stage_a_state = prepare_stage_a_pools(
+        cfg=cfg,
+        cfg_path=loaded.path,
+        run_root=run_root,
+        outputs_root=outputs_root,
+        rng=np_rng_stage_a,
+        build_stage_a=build_stage_a,
+        candidate_logging=candidate_logging,
+        candidates_dir=candidates_dir,
+        plan_items=pl,
+        events_path=events_path,
+        run_id=str(cfg.run.id),
+        deps=deps,
+    )
+    pool_data = stage_a_state.pool_data
+    plan_pools = stage_a_state.plan_pools
+    plan_pool_sources = stage_a_state.plan_pool_sources
+    source_cache.update(stage_a_state.source_cache)
 
     if resume and pool_data is None:
         raise RuntimeError(
             "resume=True requires existing Stage-A pools. Run dense stage-a build-pool first or rerun without resume."
         )
-    plan_pools = build_plan_pools(plan_items=pl, pool_data=pool_data)
-    plan_pool_sources = {plan_name: PlanPoolSource(name=spec.pool_name) for plan_name, spec in plan_pools.items()}
-    for spec in plan_pools.values():
-        source_cache[spec.pool_name] = spec.pool
-    if candidate_logging and build_stage_a:
-        candidate_files = find_candidate_files(candidates_dir)
-        if candidate_files:
-            try:
-                build_candidate_artifact(
-                    candidates_dir=candidates_dir,
-                    cfg_path=loaded.path,
-                    run_id=str(cfg.run.id),
-                    run_root=run_root,
-                    overwrite=True,
-                )
-            except Exception as exc:
-                raise RuntimeError(f"Failed to write candidate artifacts: {exc}") from exc
-        else:
-            candidates_label = display_path(candidates_dir, run_root, absolute=False)
-            log.warning(
-                "Candidate logging enabled but no candidate records were written under %s. "
-                "Check keep_all_candidates_debug and PWM inputs.",
-                candidates_label,
-            )
     library_records: dict[tuple[str, str], list[LibraryRecord]] | None = None
     library_cursor: dict[tuple[str, str], int] | None = None
     library_artifact: LibraryArtifact | None = None

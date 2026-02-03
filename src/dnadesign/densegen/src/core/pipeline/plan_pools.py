@@ -30,6 +30,12 @@ class PlanPoolSpec:
     pool: PoolData
 
 
+@dataclass(frozen=True)
+class PlanPoolSource:
+    name: str
+    type: str = PLAN_POOL_INPUT_TYPE
+
+
 def plan_pool_label(plan_name: str) -> str:
     return f"plan_pool__{safe_label(plan_name)}"
 
