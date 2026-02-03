@@ -21,7 +21,7 @@ from ...config import PWMSamplingConfig
 from ...core.artifacts.ids import hash_pwm_motif, hash_tfbs_id
 from ...core.run_paths import candidates_root
 from .base import BaseDataSource, resolve_path
-from .pwm_sampling import sample_pwm_sites, sampling_kwargs_from_config
+from .pwm_sampling import sample_pwm_sites, sampling_kwargs_from_config, validate_mmr_core_length
 from .stage_a_sampling_utils import normalize_background
 from .stage_a_types import PWMMotif
 
@@ -78,6 +78,16 @@ class PWMMatrixCSVDataSource(BaseDataSource):
         )
 
         sampling_kwargs = sampling_kwargs_from_config(self.sampling)
+        selection_cfg = sampling_kwargs.get("selection")
+        selection_policy = str(getattr(selection_cfg, "policy", None) or "top_score")
+        validate_mmr_core_length(
+            motif_id=motif.motif_id,
+            motif_width=len(motif.matrix),
+            selection_policy=selection_policy,
+            length_policy=str(sampling_kwargs.get("length_policy") or "exact"),
+            length_range=sampling_kwargs.get("length_range"),
+            trim_window_length=sampling_kwargs.get("trim_window_length"),
+        )
         bgfile = sampling_kwargs.get("bgfile")
         keep_all_candidates_debug = bool(sampling_kwargs.get("keep_all_candidates_debug", False))
         bgfile_path: Path | None = None

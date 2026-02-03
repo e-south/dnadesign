@@ -44,6 +44,44 @@ log = logging.getLogger(__name__)
 _BASES = np.array(["A", "C", "G", "T"])
 
 
+def validate_mmr_core_length(
+    *,
+    motif_id: str,
+    motif_width: int,
+    selection_policy: str,
+    length_policy: str,
+    length_range: Optional[Sequence[int]],
+    trim_window_length: Optional[int],
+) -> None:
+    policy = str(selection_policy or "top_score").lower()
+    if policy != "mmr":
+        return
+    length_policy_value = str(length_policy or "exact").lower()
+    if length_policy_value != "range":
+        return
+    if length_range is None or len(length_range) != 2:
+        raise ValueError("pwm.sampling.length.range must be provided when length.policy=range")
+    min_len = int(min(length_range))
+    max_len = int(max(length_range))
+    if trim_window_length is not None:
+        trim_len = int(trim_window_length)
+        if trim_len > motif_width:
+            raise ValueError(f"pwm.sampling.trimming.window_length={trim_len} exceeds motif width {motif_width}")
+        if trim_len > min_len:
+            raise ValueError(
+                "Stage-A MMR requires trim_window_length <= minimum length when length.policy=range "
+                "and min length is below the motif width. "
+                f"(motif={motif_id} width={motif_width} range={min_len}..{max_len} trim_window_length={trim_len})"
+            )
+    if min_len < motif_width and trim_window_length is None:
+        raise ValueError(
+            "Stage-A MMR requires a fixed trim window when length.policy=range and min length is below "
+            "the motif width. "
+            f"(motif={motif_id} width={motif_width} range={min_len}..{max_len}) "
+            "Set pwm.sampling.trimming.window_length to <= the minimum length or increase length.range."
+        )
+
+
 def sampling_kwargs_from_config(sampling: PWMSamplingConfig) -> dict:
     if not isinstance(sampling, PWMSamplingConfig):
         raise ValueError("pwm.sampling config must be a PWMSamplingConfig instance.")
@@ -207,14 +245,14 @@ def sample_pwm_sites(
             raise ValueError("selection.alpha must be in (0, 1].")
         if selection_pool is None:
             raise ValueError("selection.pool must be set when selection.policy=mmr.")
-        if length_policy == "range" and length_range is not None and len(length_range) == 2:
-            min_len = int(min(length_range))
-            if min_len < width:
-                raise ValueError(
-                    "Stage-A MMR requires a fixed trim window when length.policy=range "
-                    "and min length is below the motif width. Set pwm.sampling.trimming.window_length "
-                    "to <= the minimum length or increase length.range."
-                )
+    validate_mmr_core_length(
+        motif_id=motif.motif_id,
+        motif_width=original_width,
+        selection_policy=selection_policy,
+        length_policy=length_policy,
+        length_range=length_range,
+        trim_window_length=trim_window_length,
+    )
 
     include_matched_sequence = bool(include_matched_sequence)
     tier_fractions = list(resolve_tier_fractions(tier_fractions))
