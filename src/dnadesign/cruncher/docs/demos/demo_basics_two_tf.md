@@ -492,6 +492,8 @@ cruncher catalog export-densegen --set 1 --densegen-workspace demo_meme_three_tf
 `--densegen-workspace` accepts a workspace name (resolved under `src/dnadesign/densegen/workspaces`)
 or an absolute path, and writes under that workspace's `inputs/`. You can still provide `--out`,
 but the path must remain inside the target `inputs/` directory.
+`catalog export-densegen` removes existing artifact JSONs for the selected TFs by default; use
+`--no-clean` if you want to keep prior artifacts.
 
 Then point DenseGen configs at the exported files (`type: binding_sites`) or artifacts
 (`type: pwm_artifact_set`).

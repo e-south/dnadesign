@@ -219,6 +219,44 @@ def test_export_densegen_defaults_to_densegen_workspace(tmp_path: Path) -> None:
     assert (out_dir / "artifact_manifest.json").exists()
 
 
+def test_export_densegen_cleans_existing_tf_artifacts(tmp_path: Path) -> None:
+    densegen_ws = _write_densegen_workspace(tmp_path)
+    catalog_root = tmp_path / ".cruncher"
+    entry = CatalogEntry(
+        source="regulondb",
+        motif_id="RBM1",
+        tf_name="lexA",
+        kind="PFM",
+        has_matrix=True,
+        matrix_source="alignment",
+    )
+    CatalogIndex(entries={entry.key: entry}).save(catalog_root)
+    _write_prob_motif(
+        catalog_root / "normalized" / "motifs" / "regulondb" / "RBM1.json",
+        source="regulondb",
+        motif_id="RBM1",
+        tf_name="lexA",
+    )
+    out_dir = densegen_ws / "inputs" / "motif_artifacts"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    old_lexa = out_dir / "lexA__legacy__OLD1.json"
+    old_lexa.write_text("{}")
+    keep_cpxr = out_dir / "cpxR__legacy__KEEP1.json"
+    keep_cpxr.write_text("{}")
+
+    config_path = _write_config(tmp_path)
+    result = runner.invoke(
+        app,
+        ["catalog", "export-densegen", "--tf", "lexA", "--densegen-workspace", densegen_ws.name, str(config_path)],
+        color=False,
+    )
+
+    assert result.exit_code == 0, result.output
+    assert not old_lexa.exists()
+    assert keep_cpxr.exists()
+    assert list(out_dir.glob("lexA__*.json"))
+
+
 def test_export_sites_defaults_to_densegen_workspace(tmp_path: Path) -> None:
     densegen_ws = _write_densegen_workspace(tmp_path)
     catalog_root = tmp_path / ".cruncher"

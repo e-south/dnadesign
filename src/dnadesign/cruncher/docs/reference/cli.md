@@ -483,6 +483,8 @@ Examples:
 `catalog export-densegen` and `catalog export-sites` accept `--densegen-workspace` (workspace
 name under `src/dnadesign/densegen/workspaces/` or an absolute path). When provided, outputs
 default to the workspace `inputs/` locations and must stay within that directory.
+`catalog export-densegen` removes existing artifact JSONs for the selected TFs by default; use
+`--no-clean` to keep prior artifacts.
 
 ---
 

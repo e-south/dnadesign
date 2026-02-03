@@ -62,7 +62,7 @@ cruncher:
           name: Escherichia coli
           strain: K-12 MG1655
           assembly: NC_000913.3
-        citation: "Choudhary et al. 2020 (DOI: 10.1128/mSystems.00980-20)"
+        citation: "Choudhary et al. 2020 (DOI: 10.1128/mSystems.00980-20"
         source_url: https://doi.org/10.1128/mSystems.00980-20
         tags:
           assay: chip_exo
@@ -124,7 +124,7 @@ Logos are saved under `outputs/logos/catalog/` (the command prints the exact pat
 #### Export into a DenseGen workspace
 
 ```bash
-cruncher catalog export-densegen --set 1 --densegen-workspace demo_meme_three_tfs --overwrite -c "$CONFIG"
+cruncher catalog export-densegen --set 1 --densegen-workspace demo_meme_three_tfs -c "$CONFIG"
 cruncher catalog export-sites   --set 1 --densegen-workspace demo_meme_three_tfs --overwrite -c "$CONFIG"
 ```
 
@@ -134,6 +134,8 @@ which the DenseGen demo config references directly.
 
 If you regenerate motifs, make sure the DenseGen config points at the newly
 exported motif IDs (or update from `artifact_manifest.json`).
+`catalog export-densegen` removes existing artifact JSONs for the selected TFs
+by default; use `--no-clean` if you want to keep prior artifacts.
 
 ---
 

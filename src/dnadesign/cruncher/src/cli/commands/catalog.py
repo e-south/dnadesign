@@ -144,6 +144,22 @@ def _require_densegen_inputs_path(path: Path, *, inputs_root: Path, label: str) 
     return resolved
 
 
+def _remove_existing_artifacts(out_dir: Path, *, tf_names: Sequence[str]) -> int:
+    stems = {_safe_stem(name) for name in tf_names if name}
+    if not stems:
+        return 0
+    prefixes = {f"{stem}__" for stem in stems}
+    singles = {f"{stem}.json" for stem in stems}
+    removed = 0
+    for path in out_dir.glob("*.json"):
+        if path.name == "artifact_manifest.json":
+            continue
+        if path.name in singles or any(path.name.startswith(prefix) for prefix in prefixes):
+            path.unlink()
+            removed += 1
+    return removed
+
+
 def _logo_manifest_path(out_dir: Path) -> Path:
     return out_dir / RUN_META_DIR / LOGO_MANIFEST_NAME
 
@@ -1061,6 +1077,11 @@ def export_densegen(
         "--producer",
         help="Producer label for DenseGen artifacts.",
     ),
+    clean: bool = typer.Option(
+        True,
+        "--clean/--no-clean",
+        help="Remove existing motif artifacts for selected TFs before export.",
+    ),
     overwrite: bool = typer.Option(False, "--overwrite", help="Allow overwriting existing files."),
 ) -> None:
     try:
@@ -1101,6 +1122,11 @@ def export_densegen(
     catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
     out_dir = out_dir.resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    if clean:
+        removed = _remove_existing_artifacts(out_dir, tf_names=[target.tf_name for target in targets])
+        if removed:
+            console.print(f"[dim]Removed {removed} existing artifact(s) for selected TFs.[/]")
 
     manifest_entries: list[dict[str, object]] = []
     table = Table(title="DenseGen motif artifacts", header_style="bold")
