@@ -28,6 +28,12 @@ from ..config import RootConfig, resolve_run_root
 from .artifacts.pool import POOL_MODE_TFBS, load_pool_data
 from .motif_labels import input_motifs, motif_display_name
 from .pipeline.plan_pools import build_plan_pools, plan_pool_label
+from .record_values import (
+    coerce_list as _ensure_list,
+)
+from .record_values import (
+    coerce_list_of_dicts as _ensure_list_of_dicts,
+)
 from .run_manifest import load_run_manifest
 from .run_paths import (
     candidates_root,
@@ -44,59 +50,12 @@ def _dg(col: str) -> str:
     return col if col.startswith("densegen__") else f"densegen__{col}"
 
 
-def _as_py(val):
-    if hasattr(val, "as_py"):
-        return val.as_py()
-    return val
-
-
-def _ensure_list_of_dicts(val) -> list[dict]:
-    if val is None or (isinstance(val, float) and pd.isna(val)):
-        return []
-    val = _as_py(val)
-    if isinstance(val, str):
-        s = val.strip()
-        if (s.startswith("{") and s.endswith("}")) or (s.startswith("[") and s.endswith("]")):
-            try:
-                val = json.loads(s)
-            except Exception as exc:
-                raise ValueError(f"Failed to parse JSON list field: {s[:80]}") from exc
-    if isinstance(val, (list, tuple, np.ndarray)):
-        out: list[dict] = []
-        for item in list(val):
-            item = _as_py(item)
-            if not isinstance(item, dict):
-                raise ValueError("Expected list of dicts; found non-dict entries.")
-            out.append(item)
-        return out
-    raise ValueError(f"Expected list of dicts; got {type(val).__name__}.")
-
-
 def _solution_id(row: pd.Series) -> str:
     if "solution_id" in row and isinstance(row["solution_id"], str) and row["solution_id"]:
         return row["solution_id"]
     if "id" in row and isinstance(row["id"], str) and row["id"]:
         return row["id"]
     raise ValueError("Output records missing solution_id/id; regenerate outputs before reporting.")
-
-
-def _ensure_list(val: Any) -> list:
-    if val is None or (isinstance(val, float) and pd.isna(val)):
-        return []
-    val = _as_py(val)
-    if isinstance(val, str):
-        s = val.strip()
-        if (s.startswith("[") and s.endswith("]")) or (s.startswith("{") and s.endswith("}")):
-            try:
-                parsed = json.loads(s)
-                if isinstance(parsed, list):
-                    return list(parsed)
-            except Exception:
-                return []
-        return []
-    if isinstance(val, (list, tuple, np.ndarray)):
-        return list(val)
-    return []
 
 
 def _load_events(events_path: Path) -> pd.DataFrame:

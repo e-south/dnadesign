@@ -22,7 +22,8 @@ import numpy as np
 import pandas as pd
 
 from .artifacts.pool import POOL_MODE_TFBS, load_pool_data
-from .pipeline.plan_pools import build_plan_pools
+from .record_values import require_list as _ensure_list
+from .record_values import require_list_of_dicts as _ensure_list_of_dicts
 from .run_paths import run_outputs_root, run_tables_root
 
 RUN_METRICS_VERSION = "1.0"
@@ -134,49 +135,6 @@ def _assign_score_quantiles(df: pd.DataFrame, *, quantiles: int) -> pd.DataFrame
     return df
 
 
-def _ensure_list_of_dicts(value) -> list[dict]:
-    if value is None or (isinstance(value, float) and pd.isna(value)):
-        return []
-    if isinstance(value, str):
-        text = value.strip()
-        if not text:
-            return []
-        try:
-            parsed = json.loads(text)
-        except Exception as exc:
-            raise ValueError("used_tfbs_detail must be a list of dicts or JSON.") from exc
-        if isinstance(parsed, list):
-            if any(not isinstance(item, dict) for item in parsed):
-                raise ValueError("used_tfbs_detail JSON list must contain dicts.")
-            return list(parsed)
-        raise ValueError("used_tfbs_detail JSON must decode to a list.")
-    if isinstance(value, (list, np.ndarray)):
-        items = list(value)
-        if any(not isinstance(item, dict) for item in items):
-            raise ValueError("used_tfbs_detail list must contain dicts.")
-        return items
-    raise ValueError(f"used_tfbs_detail must be list[dict], got {type(value).__name__}.")
-
-
-def _ensure_list(value) -> list:
-    if value is None or (isinstance(value, float) and pd.isna(value)):
-        return []
-    if isinstance(value, str):
-        text = value.strip()
-        if not text:
-            return []
-        try:
-            parsed = json.loads(text)
-        except Exception as exc:
-            raise ValueError("Expected list data or JSON-encoded list.") from exc
-        if isinstance(parsed, list):
-            return list(parsed)
-        raise ValueError("Expected JSON list data.")
-    if isinstance(value, (list, tuple, np.ndarray)):
-        return list(value)
-    raise ValueError(f"Expected list data, got {type(value).__name__}.")
-
-
 def _load_events(events_path: Path) -> pd.DataFrame:
     rows = []
     for line in events_path.read_text().splitlines():
@@ -234,6 +192,8 @@ def _load_pool_frames(run_root: Path, *, cfg) -> tuple[pd.DataFrame | None, str 
     if not pool_data:
         return None, "empty_pool"
     plan_items = list(cfg.generation.resolve_plan() if hasattr(cfg.generation, "resolve_plan") else cfg.generation.plan)
+    from .pipeline.plan_pools import build_plan_pools
+
     plan_pools = build_plan_pools(plan_items=plan_items, pool_data=pool_data)
     frames: list[pd.DataFrame] = []
     for plan in plan_items:
