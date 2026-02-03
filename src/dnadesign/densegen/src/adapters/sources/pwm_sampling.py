@@ -21,14 +21,9 @@ import numpy as np
 
 from ...config import PWMMiningConfig, PWMSamplingConfig, PWMSelectionConfig
 from ...core.score_tiers import resolve_tier_fractions
-from .stage_a import (
-    PWMMotif,
-    PWMSamplingSummary,
-    StageAProgressManager,
-    TFBSMeta,
-    _PwmSamplingProgress,
-    run_stage_a_pipeline,
-)
+from .stage_a.stage_a_metadata import TFBSMeta
+from .stage_a.stage_a_pipeline import run_stage_a_pipeline
+from .stage_a.stage_a_progress import StageAProgressManager, _PwmSamplingProgress
 from .stage_a.stage_a_sampling_utils import (
     _background_cdf,
     _matrix_cdf,
@@ -42,6 +37,8 @@ from .stage_a.stage_a_sampling_utils import (
     score_sequence,
     select_pwm_window_by_length,
 )
+from .stage_a.stage_a_summary import PWMSamplingSummary
+from .stage_a.stage_a_types import PWMMotif
 
 log = logging.getLogger(__name__)
 _BASES = np.array(["A", "C", "G", "T"])

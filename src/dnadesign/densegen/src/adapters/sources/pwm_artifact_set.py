@@ -23,7 +23,7 @@ from ...core.run_paths import candidates_root
 from .base import BaseDataSource, resolve_path
 from .pwm_artifact import load_artifact
 from .pwm_sampling import sample_pwm_sites, sampling_kwargs_from_config, validate_mmr_core_length
-from .stage_a import StageAProgressManager
+from .stage_a.stage_a_progress import StageAProgressManager
 
 
 @dataclass

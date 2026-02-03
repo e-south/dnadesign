@@ -12,7 +12,7 @@ from .pwm_matrix_csv import PWMMatrixCSVDataSource
 from .pwm_meme import PWMMemeDataSource
 from .pwm_meme_set import PWMMemeSetDataSource
 from .sequence_library import SequenceLibraryDataSource
-from .stage_a import PWMMotif
+from .stage_a.stage_a_types import PWMMotif
 from .usr_sequences import USRSequencesDataSource
 
 __all__ = [

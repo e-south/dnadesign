@@ -38,14 +38,14 @@ from .pwm_fimo import (
 )
 from .pwm_jaspar import _parse_jaspar
 from .pwm_meme import _background_from_meta, _motif_to_pwm
-from .stage_a import (
-    PWMMotif,
+from .stage_a.stage_a_progress import _BackgroundSamplingProgress
+from .stage_a.stage_a_sampling_utils import (
     _background_cdf,
-    _BackgroundSamplingProgress,
     _pwm_theoretical_max_score,
     _sample_background_batch,
     build_log_odds,
 )
+from .stage_a.stage_a_types import PWMMotif
 
 log = logging.getLogger(__name__)
 
