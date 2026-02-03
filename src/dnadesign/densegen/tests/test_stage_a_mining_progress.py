@@ -114,6 +114,40 @@ def test_stage_a_progress_target_updates_in_render() -> None:
     assert "10/20" in text
 
 
+def test_stage_a_progress_renders_accept_rate_and_rejects() -> None:
+    state = {
+        "bg": stage_a_progress.StageAProgressState(
+            motif_id="neutral_bg",
+            backend="background",
+            phase="background",
+            generated=10,
+            target=100,
+            accepted=5,
+            accepted_target=20,
+            target_fraction=None,
+            tier_fractions=None,
+            elapsed=1.0,
+            batch_index=1,
+            batch_total=10,
+            show_tier_yield=False,
+            show_accept_rate=True,
+            show_rejects=True,
+            reject_fimo=1,
+            reject_kmer=2,
+            reject_gc=3,
+            reject_dup=4,
+        )
+    }
+    renderable = stage_a_progress._stage_a_live_render(state)
+    console = Console(width=140, record=True)
+    console.print(renderable)
+    text = console.export_text()
+    assert "accept %" in text
+    assert "rejects" in text
+    assert "50%" in text
+    assert "1/2/3/4" in text
+
+
 def test_stage_a_milestone_message_format() -> None:
     message = stage_a_progress._format_stage_a_milestone(
         motif_id="lexA",
@@ -161,6 +195,8 @@ def test_background_sampling_progress_uses_live_table(monkeypatch) -> None:
         state = list(progress._manager._state.values())
         assert state
         assert state[0].show_tier_yield is False
+        assert state[0].show_accept_rate is True
+        assert state[0].show_rejects is True
         progress.update(generated=10, accepted=2, batch_index=1, batch_total=10)
         progress.finish()
         assert progress._manager._live is None

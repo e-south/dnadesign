@@ -39,6 +39,12 @@ class StageAProgressState:
     batch_index: Optional[int]
     batch_total: Optional[int]
     show_tier_yield: bool = True
+    show_accept_rate: bool = False
+    show_rejects: bool = False
+    reject_fimo: Optional[int] = None
+    reject_kmer: Optional[int] = None
+    reject_gc: Optional[int] = None
+    reject_dup: Optional[int] = None
 
     def __post_init__(self) -> None:
         self.validate()
@@ -62,6 +68,18 @@ class StageAProgressState:
             raise ValueError("Stage-A target_fraction must be in (0, 1].")
         if not isinstance(self.show_tier_yield, bool):
             raise ValueError("Stage-A progress show_tier_yield must be a boolean.")
+        if not isinstance(self.show_accept_rate, bool):
+            raise ValueError("Stage-A progress show_accept_rate must be a boolean.")
+        if not isinstance(self.show_rejects, bool):
+            raise ValueError("Stage-A progress show_rejects must be a boolean.")
+        for name, value in (
+            ("reject_fimo", self.reject_fimo),
+            ("reject_kmer", self.reject_kmer),
+            ("reject_gc", self.reject_gc),
+            ("reject_dup", self.reject_dup),
+        ):
+            if value is not None and int(value) < 0:
+                raise ValueError(f"Stage-A progress {name} must be >= 0.")
 
 
 def _format_rate(rate: float) -> str:
@@ -81,6 +99,14 @@ def _format_tier_fraction_label(fractions: Sequence[float] | None) -> str:
         else:
             parts.append(str(round(pct, 3)).rstrip("0").rstrip("."))
     return "/".join(parts)
+
+
+def _format_percent(value: float) -> str:
+    if value >= 0.10:
+        return f"{value * 100:.0f}%"
+    if value >= 0.01:
+        return f"{value * 100:.1f}%"
+    return f"{value * 100:.2f}%"
 
 
 def _format_tier_yield(eligible_unique: int, *, fractions: Sequence[float] | None = None) -> str:
@@ -184,6 +210,8 @@ def _stage_a_live_render(state: dict[str, StageAProgressState]):
     table.add_column("phase")
     table.add_column("generated/limit", no_wrap=True, overflow="ellipsis", min_width=14)
     table.add_column("eligible_unique", no_wrap=True, overflow="ellipsis", min_width=18)
+    table.add_column("accept %", no_wrap=True, overflow="ellipsis", min_width=9)
+    table.add_column("rejects fimo/kmer/gc/dup", no_wrap=True, overflow="ellipsis", min_width=22)
     table.add_column("tier yield")
     table.add_column("batch")
     table.add_column("elapsed")
@@ -205,6 +233,16 @@ def _stage_a_live_render(state: dict[str, StageAProgressState]):
             eligible_label = f"{accepted}/{accepted_target} ({acc_pct}%)"
         else:
             eligible_label = str(accepted)
+        accept_rate_label = "-"
+        if row.show_accept_rate and accepted is not None and generated > 0:
+            accept_rate = min(1.0, float(accepted) / float(generated))
+            accept_rate_label = _format_percent(accept_rate)
+        rejects_label = "-"
+        if row.show_rejects:
+            rejects = [row.reject_fimo, row.reject_kmer, row.reject_gc, row.reject_dup]
+            if any(value is not None for value in rejects):
+                values = [int(value or 0) for value in rejects]
+                rejects_label = f"{values[0]}/{values[1]}/{values[2]}/{values[3]}"
         tier_fractions = row.tier_fractions
         tier_yield = _tier_yield_label(
             accepted=accepted,
@@ -223,6 +261,8 @@ def _stage_a_live_render(state: dict[str, StageAProgressState]):
             str(row.phase or "-"),
             gen_label,
             eligible_label,
+            accept_rate_label,
+            rejects_label,
             tier_yield,
             batch_label,
             elapsed_label,
@@ -275,6 +315,8 @@ class StageAProgressManager:
         target_fraction: Optional[float],
         tier_fractions: Sequence[float] | None,
         show_tier_yield: bool = True,
+        show_accept_rate: bool = False,
+        show_rejects: bool = False,
     ) -> bool:
         with self._lock:
             if not self._ensure_live():
@@ -293,6 +335,8 @@ class StageAProgressManager:
                 batch_index=None,
                 batch_total=None,
                 show_tier_yield=bool(show_tier_yield),
+                show_accept_rate=bool(show_accept_rate),
+                show_rejects=bool(show_rejects),
             )
             return True
 
@@ -308,6 +352,10 @@ class StageAProgressManager:
         batch_index: Optional[int] = None,
         batch_total: Optional[int] = None,
         phase: Optional[str] = None,
+        reject_fimo: Optional[int] = None,
+        reject_kmer: Optional[int] = None,
+        reject_gc: Optional[int] = None,
+        reject_dup: Optional[int] = None,
     ) -> None:
         with self._lock:
             row = self._state.get(key)
@@ -326,6 +374,14 @@ class StageAProgressManager:
                 row.batch_index = int(batch_index)
             if batch_total is not None:
                 row.batch_total = int(batch_total)
+            if reject_fimo is not None:
+                row.reject_fimo = int(reject_fimo)
+            if reject_kmer is not None:
+                row.reject_kmer = int(reject_kmer)
+            if reject_gc is not None:
+                row.reject_gc = int(reject_gc)
+            if reject_dup is not None:
+                row.reject_dup = int(reject_dup)
             row.validate()
             if self._live is None:
                 return
@@ -573,6 +629,8 @@ class _BackgroundSamplingProgress:
                 target_fraction=None,
                 tier_fractions=None,
                 show_tier_yield=False,
+                show_accept_rate=True,
+                show_rejects=True,
             )
 
     def update(
@@ -582,6 +640,10 @@ class _BackgroundSamplingProgress:
         accepted: int,
         batch_index: Optional[int] = None,
         batch_total: Optional[int] = None,
+        reject_fimo: Optional[int] = None,
+        reject_kmer: Optional[int] = None,
+        reject_gc: Optional[int] = None,
+        reject_dup: Optional[int] = None,
         force: bool = False,
     ) -> None:
         if not self._use_live:
@@ -602,6 +664,10 @@ class _BackgroundSamplingProgress:
             batch_index=batch_index,
             batch_total=batch_total,
             phase=self._phase,
+            reject_fimo=reject_fimo,
+            reject_kmer=reject_kmer,
+            reject_gc=reject_gc,
+            reject_dup=reject_dup,
         )
         self._last_update = now
 

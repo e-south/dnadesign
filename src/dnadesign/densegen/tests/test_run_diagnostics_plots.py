@@ -353,6 +353,31 @@ def _pool_manifest(tmp_path: Path, *, include_diversity: bool = False) -> TFBSPo
     return TFBSPoolArtifact.load(path)
 
 
+def _background_pool_manifest(tmp_path: Path) -> TFBSPoolArtifact:
+    pools_dir = tmp_path / "pools"
+    pools_dir.mkdir(parents=True, exist_ok=True)
+    manifest = {
+        "schema_version": "1.6",
+        "run_id": "demo",
+        "run_root": ".",
+        "config_path": "config.yaml",
+        "inputs": [
+            {
+                "name": "neutral_bg",
+                "type": "background_pool",
+                "pool_path": "neutral_bg__pool.parquet",
+                "rows": 4,
+                "columns": ["input_name", "tf", "tfbs", "tfbs_core", "tfbs_id"],
+                "pool_mode": "tfbs",
+                "stage_a_sampling": None,
+            }
+        ],
+    }
+    path = pools_dir / "pool_manifest.json"
+    path.write_text(json.dumps(manifest, indent=2, sort_keys=True))
+    return TFBSPoolArtifact.load(path)
+
+
 def test_plot_required_columns_for_new_plots() -> None:
     cols = _plot_required_columns(["placement_map", "tfbs_usage", "run_health"], {})
     assert cols == []
@@ -472,6 +497,32 @@ def test_plot_stage_a_summary(tmp_path: Path) -> None:
     assert Path(paths[0]).exists()
     assert Path(paths[1]).exists()
     assert Path(paths[2]).exists()
+
+
+def test_plot_stage_a_summary_includes_background_logo(tmp_path: Path) -> None:
+    matplotlib.use("Agg", force=True)
+    out_path = tmp_path / "stage_a_summary_bg.png"
+    pool_df = pd.DataFrame(
+        {
+            "input_name": ["neutral_bg"] * 4,
+            "tf": ["neutral_bg"] * 4,
+            "tfbs": ["AAAA", "AAAT", "AAAAA", "AAAAT"],
+            "tfbs_core": ["AAAA", "AAAT", "AAAAA", "AAAAT"],
+            "tfbs_id": ["a", "b", "c", "d"],
+        }
+    )
+    pools = {"neutral_bg": pool_df}
+    manifest = _background_pool_manifest(tmp_path)
+    paths = plot_stage_a_summary(
+        pd.DataFrame(),
+        out_path,
+        pools=pools,
+        pool_manifest=manifest,
+        style={},
+    )
+    assert paths
+    assert len(paths) == 1
+    assert Path(paths[0]).exists()
 
 
 def test_plot_stage_a_summary_requires_diversity(tmp_path: Path) -> None:

@@ -310,6 +310,10 @@ class BackgroundPoolDataSource(BaseDataSource):
         best_scores: dict[str, float | None] = {}
         generated = 0
         batch_index = 0
+        reject_fimo = 0
+        reject_kmer = 0
+        reject_gc = 0
+        reject_dup = 0
         batch_total = int(np.ceil(max_candidates / batch_size)) if batch_size > 0 else None
         progress = _BackgroundSamplingProgress(
             input_name=self.input_name,
@@ -336,17 +340,33 @@ class BackgroundPoolDataSource(BaseDataSource):
                         sequences[idx] = seq
                 generated += batch
 
+                before = len(sequences)
                 sequences = _filter_forbidden_kmers(sequences, forbid_kmers)
+                reject_kmer += before - len(sequences)
+                before = len(sequences)
                 sequences = _filter_gc(sequences, gc_min=gc_min, gc_max=gc_max)
-                sequences = [seq for seq in sequences if seq and seq not in seen]
+                reject_gc += before - len(sequences)
+                unique_sequences: list[str] = []
+                seen_batch: set[str] = set()
+                for seq in sequences:
+                    if not seq:
+                        continue
+                    if seq in seen or seq in seen_batch:
+                        reject_dup += 1
+                        continue
+                    seen_batch.add(seq)
+                    unique_sequences.append(seq)
+                sequences = unique_sequences
 
                 if fimo_cfg is not None and sequences:
+                    before = len(sequences)
                     sequences, scores = _run_fimo_exclusion(
                         motifs=motifs,
                         sequences=sequences,
                         allow_zero_hit_only=allow_zero_hit_only,
                         max_score_norm=max_score_norm,
                     )
+                    reject_fimo += before - len(sequences)
                     best_scores.update(scores)
 
                 for seq in sequences:
@@ -362,6 +382,10 @@ class BackgroundPoolDataSource(BaseDataSource):
                     accepted=len(accepted),
                     batch_index=batch_index,
                     batch_total=batch_total,
+                    reject_fimo=reject_fimo,
+                    reject_kmer=reject_kmer,
+                    reject_gc=reject_gc,
+                    reject_dup=reject_dup,
                 )
         finally:
             progress.finish()
