@@ -59,10 +59,8 @@ from ..run_paths import (
     inputs_manifest_path,
     run_manifest_path,
     run_outputs_root,
-    run_state_path,
     run_tables_root,
 )
-from ..run_state import RunState, load_run_state
 from ..runtime_policy import RuntimePolicy
 from ..seeding import derive_seed_map
 from .attempts import (
@@ -103,6 +101,7 @@ from .progress import (
     _summarize_tfbs_usage_stats,
 )
 from .resume_state import load_resume_state
+from .run_state_manager import assert_state_matches_outputs, init_run_state, write_run_state
 from .sequence_validation import (
     _apply_pad_offsets,
     _find_forbidden_kmer,
@@ -140,27 +139,6 @@ def _candidate_logging_enabled(cfg: DenseGenConfig) -> bool:
         if getattr(sampling, "keep_all_candidates_debug", False):
             return True
     return False
-
-
-def _write_run_state(
-    path: Path,
-    *,
-    run_id: str,
-    schema_version: str,
-    config_sha256: str,
-    run_root: str,
-    counts: dict[tuple[str, str], int],
-    created_at: str,
-) -> None:
-    state = RunState.from_counts(
-        run_id=run_id,
-        schema_version=schema_version,
-        config_sha256=config_sha256,
-        run_root=run_root,
-        counts=counts,
-        created_at=created_at,
-    )
-    state.write_json(path)
 
 
 def _plan_pool_input_meta(spec: PlanPoolSpec) -> dict:
@@ -2063,25 +2041,12 @@ def run_pipeline(
     library_records = library_state.records
     library_cursor = library_state.cursor
     ensure_run_meta_dir(run_root)
-    state_path = run_state_path(run_root)
-    state_created_at = datetime.now(timezone.utc).isoformat()
-    if state_path.exists():
-        try:
-            existing_state = load_run_state(state_path)
-        except Exception as exc:
-            raise RuntimeError(f"Failed to read run_state.json: {exc}") from exc
-        if existing_state.run_id and existing_state.run_id != cfg.run.id:
-            raise RuntimeError(
-                "Existing run_state.json was created with a different run_id. "
-                "Remove run_state.json or stage a new run root to start fresh."
-            )
-        if existing_state.config_sha256 and existing_state.config_sha256 != config_sha:
-            raise RuntimeError(
-                "Existing run_state.json was created with a different config. "
-                "Remove run_state.json or stage a new run root to start fresh."
-            )
-        if existing_state.created_at:
-            state_created_at = existing_state.created_at
+    state_ctx = init_run_state(
+        run_root=run_root,
+        run_id=str(cfg.run.id),
+        schema_version=str(cfg.schema_version),
+        config_sha256=config_sha,
+    )
 
     resume_state = load_resume_state(
         resume=resume,
@@ -2101,6 +2066,7 @@ def run_pipeline(
             total,
             len(existing_counts),
         )
+    assert_state_matches_outputs(state_path=state_ctx.path, existing_counts=existing_counts)
 
     def _accumulate_stats(key: tuple[str, str], stats: dict) -> None:
         if key not in plan_stats:
@@ -2150,24 +2116,15 @@ def run_pipeline(
         spec = plan_pools[item.name]
         state_counts[(spec.pool_name, item.name)] = int(existing_counts.get((spec.pool_name, item.name), 0))
 
-    if state_path.exists() and not existing_counts:
-        # run_state exists but no outputs; avoid accidental double-counting.
-        existing_state = load_run_state(state_path)
-        if existing_state.items and sum(item.generated for item in existing_state.items) > 0:
-            raise RuntimeError(
-                "run_state.json indicates prior progress, but no outputs were found. "
-                "Restore outputs or delete run_state.json before resuming."
-            )
-
     def _write_state() -> None:
-        _write_run_state(
-            state_path,
-            run_id=cfg.run.id,
+        write_run_state(
+            path=state_ctx.path,
+            run_id=str(cfg.run.id),
             schema_version=str(cfg.schema_version),
             config_sha256=config_sha,
             run_root=str(run_root),
             counts=state_counts,
-            created_at=state_created_at,
+            created_at=state_ctx.created_at,
         )
 
     _write_state()
