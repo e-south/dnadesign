@@ -94,7 +94,6 @@ def _dummy_meta() -> dict:
         "library_unique_tfbs_count": 0,
         "sequence_length": 4,
         "promoter_constraint": None,
-        "sampling_target_length": 0,
         "sampling_achieved_length": 0,
         "sampling_relaxed_cap": False,
         "sampling_final_cap": None,

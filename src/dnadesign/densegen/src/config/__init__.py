@@ -723,7 +723,6 @@ class SamplingConfig(BaseModel):
     library_source: Literal["build", "artifact"] = "build"
     library_artifact_path: Optional[str] = None
     library_size: int = 16
-    subsample_over_length_budget_by: int = 30
     library_sampling_strategy: Literal[
         "tf_balanced",
         "uniform_over_pairs",
@@ -734,16 +733,15 @@ class SamplingConfig(BaseModel):
     avoid_failed_motifs: bool = False
     failure_penalty_alpha: float = 0.5
     failure_penalty_power: float = 1.0
-    cover_all_regulators: bool = True
+    cover_all_regulators: bool = False
     unique_binding_sites: bool = True
     unique_binding_cores: bool = True
     max_sites_per_regulator: Optional[int] = None
     relax_on_exhaustion: bool = False
-    allow_incomplete_coverage: bool = False
-    iterative_max_libraries: int = 50
-    iterative_min_new_solutions: int = 1
+    iterative_max_libraries: int = 0
+    iterative_min_new_solutions: int = 0
 
-    @field_validator("subsample_over_length_budget_by", "library_size", "iterative_max_libraries")
+    @field_validator("library_size", "iterative_max_libraries", "iterative_min_new_solutions")
     @classmethod
     def _nonneg(cls, v: int):
         if v < 0:
@@ -764,13 +762,6 @@ class SamplingConfig(BaseModel):
             raise ValueError("library_size must be > 0")
         return v
 
-    @field_validator("iterative_min_new_solutions")
-    @classmethod
-    def _iter_min_new_ok(cls, v: int):
-        if v < 0:
-            raise ValueError("iterative_min_new_solutions must be >= 0")
-        return v
-
     @field_validator("coverage_boost_alpha", "coverage_boost_power", "failure_penalty_alpha", "failure_penalty_power")
     @classmethod
     def _coverage_boost_ok(cls, v: float, info):
@@ -784,6 +775,11 @@ class SamplingConfig(BaseModel):
     def _pool_strategy_rules(self):
         if self.pool_strategy == "iterative_subsample" and self.iterative_max_libraries <= 0:
             raise ValueError("iterative_max_libraries must be > 0 when pool_strategy=iterative_subsample")
+        if self.pool_strategy != "iterative_subsample":
+            if self.iterative_max_libraries > 0:
+                raise ValueError("iterative_max_libraries is only valid when pool_strategy=iterative_subsample")
+            if self.iterative_min_new_solutions > 0:
+                raise ValueError("iterative_min_new_solutions is only valid when pool_strategy=iterative_subsample")
         return self
 
     @model_validator(mode="after")
@@ -995,8 +991,7 @@ class RuntimeConfig(BaseModel):
     max_duplicate_solutions: int = 3
     stall_seconds_before_resample: int = 30
     stall_warning_every_seconds: int = 15
-    max_resample_attempts: int = 50
-    max_total_resamples: int = 500
+    max_consecutive_failures: int = 25
     max_seconds_per_plan: int = 0
     max_failed_solutions: int = 0
     leaderboard_every: int = 50
@@ -1009,8 +1004,7 @@ class RuntimeConfig(BaseModel):
         "max_duplicate_solutions",
         "stall_seconds_before_resample",
         "stall_warning_every_seconds",
-        "max_resample_attempts",
-        "max_total_resamples",
+        "max_consecutive_failures",
         "max_seconds_per_plan",
         "max_failed_solutions",
         "leaderboard_every",

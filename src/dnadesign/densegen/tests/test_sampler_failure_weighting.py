@@ -30,8 +30,6 @@ def test_failure_weighting_reduces_weight_for_failed_sites() -> None:
     sampler = TFSampler(df, rng)
     sampler.generate_binding_site_library(
         1,
-        sequence_length=10,
-        budget_overhead=0,
         sampling_strategy="coverage_weighted",
         usage_counts={},
         coverage_boost_alpha=0.0,

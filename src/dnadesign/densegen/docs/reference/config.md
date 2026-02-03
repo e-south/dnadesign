@@ -203,15 +203,13 @@ For conceptual behavior (what a library is, coverage/uniqueness enforcement, and
 - `avoid_failed_motifs` (bool; when true, down-weight TFBS that frequently fail solves)
 - `failure_penalty_alpha` (float >= 0; penalty strength for failed motifs)
 - `failure_penalty_power` (float > 0; penalty exponent for failed motifs)
-- `subsample_over_length_budget_by` (>= 0; reported as a target bp length)
-- `cover_all_regulators` (bool)
+- `cover_all_regulators` (bool; defaults to false)
 - `unique_binding_sites` (bool)
 - `unique_binding_cores` (bool; requires `tfbs_core` in pools)
 - `max_sites_per_regulator` (int > 0 or null)
 - `relax_on_exhaustion` (bool)
-- `allow_incomplete_coverage` (bool)
-- `iterative_max_libraries` (int > 0 when `pool_strategy=iterative_subsample`)
-- `iterative_min_new_solutions` (int >= 0)
+- `iterative_max_libraries` (int > 0; only valid when `pool_strategy=iterative_subsample`)
+- `iterative_min_new_solutions` (int >= 0; only valid when `pool_strategy=iterative_subsample`)
 
 Notes:
 - When `library_source: artifact`, DenseGen replays the libraries found in
@@ -244,7 +242,8 @@ Notes:
 - `min_count_per_tf` (int >= 0)
 - `max_duplicate_solutions`, `stall_seconds_before_resample`, `stall_warning_every_seconds`
   - `stall_seconds_before_resample` controls how long to wait with no new solutions before resampling; the timer resets on each new solution; `0` disables.
-- `max_resample_attempts`, `max_total_resamples`, `max_seconds_per_plan`, `max_failed_solutions`
+- `max_consecutive_failures`, `max_seconds_per_plan`, `max_failed_solutions`
+  - `max_consecutive_failures` stops the run after N consecutive libraries yield zero solutions; `0` disables.
 - `leaderboard_every` (int >= 0; 0 disables periodic leaderboard logs)
 - `checkpoint_every` (int >= 0; 0 disables run_state checkpoints)
 - `random_seed` (int)
@@ -341,8 +340,7 @@ densegen:
     max_duplicate_solutions: 3
     stall_seconds_before_resample: 30
     stall_warning_every_seconds: 15
-    max_resample_attempts: 3
-    max_total_resamples: 500
+    max_consecutive_failures: 25
     max_seconds_per_plan: 0
     max_failed_solutions: 0
     leaderboard_every: 50

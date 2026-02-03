@@ -101,8 +101,6 @@ class TFSampler:
         self,
         library_size: int,
         *,
-        sequence_length: int,
-        budget_overhead: int,
         required_tfbs: list[str] | None = None,
         required_tfs: list[str] | None = None,
         cover_all_tfs: bool = False,
@@ -110,7 +108,6 @@ class TFSampler:
         unique_binding_cores: bool = True,
         max_sites_per_tf: int | None = None,
         relax_on_exhaustion: bool = True,
-        allow_incomplete_coverage: bool = False,
         sampling_strategy: str = "tf_balanced",
         usage_counts: dict[tuple[str, str], int] | None = None,
         coverage_boost_alpha: float = 0.15,
@@ -322,14 +319,14 @@ class TFSampler:
         if cover_all_tfs:
             remaining_slots = library_size - len(sites)
             missing_tfs = [tf for tf in unique_tfs if used_per_tf.get(tf, 0) == 0]
-            if remaining_slots < len(missing_tfs) and not allow_incomplete_coverage:
+            if remaining_slots < len(missing_tfs):
                 raise ValueError(
                     "cover_all_regulators requires at least one site per TF, "
                     f"but library_size={library_size} is too small for {len(unique_tfs)} TFs. "
-                    "Increase library_size or set allow_incomplete_coverage=true."
+                    "Increase library_size or disable cover_all_regulators."
                 )
             if remaining_slots <= 0:
-                if missing_tfs and not allow_incomplete_coverage:
+                if missing_tfs:
                     raise ValueError(
                         "Required coverage cannot be satisfied given required_tfbs/required_tfs. "
                         "Increase library_size or relax coverage constraints."
@@ -343,8 +340,7 @@ class TFSampler:
                     continue
                 if _pick_for_tf(tf, reason="coverage", cap_override=None):
                     continue
-                if not allow_incomplete_coverage:
-                    raise ValueError(f"Failed to select a motif for TF '{tf}' while cover_all_regulators=true.")
+                raise ValueError(f"Failed to select a motif for TF '{tf}' while cover_all_regulators=true.")
 
         cap = max_sites_per_tf
         relaxed_cap = False
@@ -444,7 +440,6 @@ class TFSampler:
                 raise ValueError(f"Unknown library sampling strategy: {sampling_strategy}")
 
         info = {
-            "target_length": int(sequence_length + budget_overhead),
             "achieved_length": int(sum(len(s) for s in sites)),
             "relaxed_cap": bool(relaxed_cap),
             "final_cap": cap,

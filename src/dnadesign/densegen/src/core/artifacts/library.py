@@ -141,7 +141,6 @@ class LibraryRecord:
     pool_strategy: str | None
     library_sampling_strategy: str | None
     library_size: int
-    target_length: int | None
     achieved_length: int | None
     relaxed_cap: bool | None
     final_cap: int | None
@@ -156,7 +155,6 @@ class LibraryRecord:
             "pool_strategy": self.pool_strategy,
             "library_sampling_strategy": self.library_sampling_strategy,
             "library_size": int(self.library_size),
-            "target_length": self.target_length,
             "achieved_length": self.achieved_length,
             "relaxed_cap": self.relaxed_cap,
             "final_cap": self.final_cap,
@@ -262,7 +260,6 @@ def load_library_records(artifact: LibraryArtifact) -> dict[tuple[str, str], lis
         pool_strategy = row.get("pool_strategy")
         library_sampling_strategy = row.get("library_sampling_strategy")
         library_size = int(row.get("library_size") or len(library_tfbs))
-        target_length = row.get("target_length")
         achieved_length = row.get("achieved_length")
         relaxed_cap = row.get("relaxed_cap")
         final_cap = row.get("final_cap")
@@ -291,7 +288,6 @@ def load_library_records(artifact: LibraryArtifact) -> dict[tuple[str, str], lis
             pool_strategy=str(pool_strategy) if pool_strategy is not None else None,
             library_sampling_strategy=str(library_sampling_strategy) if library_sampling_strategy is not None else None,
             library_size=library_size,
-            target_length=int(target_length) if target_length is not None else None,
             achieved_length=int(achieved_length) if achieved_length is not None else None,
             relaxed_cap=bool(relaxed_cap) if relaxed_cap is not None else None,
             final_cap=int(final_cap) if final_cap is not None else None,

@@ -17,7 +17,6 @@ def test_write_library_artifact(tmp_path: Path) -> None:
             "pool_strategy": "subsample",
             "library_sampling_strategy": "tf_balanced",
             "library_size": 2,
-            "target_length": 20,
             "achieved_length": 18,
             "relaxed_cap": False,
             "final_cap": None,

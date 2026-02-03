@@ -12,8 +12,7 @@ def test_stall_timer_resets_on_progress() -> None:
         arrays_generated_before_resample=1,
         stall_seconds_before_resample=10,
         stall_warning_every_seconds=5,
-        max_resample_attempts=1,
-        max_total_resamples=1,
+        max_consecutive_failures=25,
         max_seconds_per_plan=0,
     )
 

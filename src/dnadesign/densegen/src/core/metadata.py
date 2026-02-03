@@ -171,7 +171,6 @@ def build_metadata(
         "library_unique_tfbs_count": library_unique_tfbs,
         "sequence_length": seq_len,
         "promoter_constraint": _promoter_constraint_name(fixed_elements),
-        "sampling_target_length": sampling_meta.get("target_length"),
         "sampling_achieved_length": sampling_meta.get("achieved_length"),
         "sampling_relaxed_cap": sampling_meta.get("relaxed_cap"),
         "sampling_final_cap": sampling_meta.get("final_cap"),

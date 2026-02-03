@@ -29,8 +29,6 @@ def test_unique_binding_cores_filters_duplicate_cores() -> None:
     sampler = TFSampler(df, rng=np.random.default_rng(1))
     sites, _meta, _labels, _info = sampler.generate_binding_site_library(
         library_size=2,
-        sequence_length=50,
-        budget_overhead=0,
         unique_binding_sites=False,
         unique_binding_cores=True,
         sampling_strategy="tf_balanced",
@@ -46,8 +44,6 @@ def test_unique_binding_cores_requires_core_column() -> None:
     with pytest.raises(ValueError, match="tfbs_core"):
         sampler.generate_binding_site_library(
             library_size=1,
-            sequence_length=50,
-            budget_overhead=0,
             unique_binding_sites=True,
             unique_binding_cores=True,
             sampling_strategy="tf_balanced",

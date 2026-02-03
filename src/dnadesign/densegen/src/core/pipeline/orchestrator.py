@@ -505,7 +505,6 @@ def _process_plan_for_source(
             "pool_strategy": sampling_info.get("pool_strategy"),
             "library_sampling_strategy": sampling_info.get("library_sampling_strategy"),
             "library_size": int(sampling_info.get("library_size") or len(library_tfbs)),
-            "target_length": sampling_info.get("target_length"),
             "achieved_length": sampling_info.get("achieved_length"),
             "relaxed_cap": sampling_info.get("relaxed_cap"),
             "final_cap": sampling_info.get("final_cap"),
@@ -580,10 +579,9 @@ def _process_plan_for_source(
     max_per_subsample = int(runtime_cfg.arrays_generated_before_resample)
     min_count_per_tf = int(runtime_cfg.min_count_per_tf)
     max_dupes = int(runtime_cfg.max_duplicate_solutions)
-    max_resample_attempts = int(runtime_cfg.max_resample_attempts)
     stall_seconds = int(runtime_cfg.stall_seconds_before_resample)
     stall_warn_every = int(runtime_cfg.stall_warning_every_seconds)
-    max_total_resamples = int(runtime_cfg.max_total_resamples)
+    max_consecutive_failures = int(runtime_cfg.max_consecutive_failures)
     max_seconds_per_plan = int(runtime_cfg.max_seconds_per_plan)
     max_failed_solutions = int(runtime_cfg.max_failed_solutions)
     leaderboard_every = int(runtime_cfg.leaderboard_every)
@@ -594,8 +592,7 @@ def _process_plan_for_source(
         arrays_generated_before_resample=max_per_subsample,
         stall_seconds_before_resample=stall_seconds,
         stall_warning_every_seconds=stall_warn_every,
-        max_resample_attempts=max_resample_attempts,
-        max_total_resamples=max_total_resamples,
+        max_consecutive_failures=max_consecutive_failures,
         max_seconds_per_plan=max_seconds_per_plan,
     )
 
@@ -656,6 +653,7 @@ def _process_plan_for_source(
 
     plan_start = time.monotonic()
     total_resamples = 0
+    consecutive_failures = 0
     failed_solutions = 0
     duplicate_records = 0
     stall_events = 0
@@ -1112,7 +1110,6 @@ def _process_plan_for_source(
     library_index = sampling_info.get("library_index")
     strategy_label = sampling_info.get("library_sampling_strategy", library_sampling_strategy)
     pool_label = sampling_info.get("pool_strategy")
-    target_len = sampling_info.get("target_length")
     achieved_len = sampling_info.get("achieved_length")
     header = f"Stage-B library for {source_label}/{plan_name}"
     if library_index is not None:
@@ -1120,21 +1117,19 @@ def _process_plan_for_source(
     if progress_style != "screen":
         if tf_summary:
             log.info(
-                "%s: %d motifs | TF counts: %s | target=%s achieved=%s pool=%s stage_b_sampling=%s",
+                "%s: %d motifs | TF counts: %s | library_bp=%s pool=%s stage_b_sampling=%s",
                 header,
                 len(library_for_opt),
                 tf_summary,
-                target_len,
                 achieved_len,
                 pool_label,
                 strategy_label,
             )
         else:
             log.info(
-                "%s: %d motifs | target=%s achieved=%s pool=%s stage_b_sampling=%s",
+                "%s: %d motifs | library_bp=%s pool=%s stage_b_sampling=%s",
                 header,
                 len(library_for_opt),
-                target_len,
                 achieved_len,
                 pool_label,
                 strategy_label,
@@ -1177,7 +1172,6 @@ def _process_plan_for_source(
         if policy.plan_timed_out(now=time.monotonic(), plan_started=plan_start):
             raise RuntimeError(f"[{source_label}/{plan_name}] Exceeded max_seconds_per_plan={max_seconds_per_plan}.")
         local_generated = 0
-        resamples_in_try = 0
 
         while local_generated < max_per_subsample and global_generated < quota:
             fingerprints = set()
@@ -1885,13 +1879,22 @@ def _process_plan_for_source(
                 if produced_this_library < iterative_min_new_solutions:
                     resample_reason = "min_new_solutions"
 
+            if produced_this_library == 0:
+                consecutive_failures += 1
+                if policy.max_consecutive_failures > 0 and consecutive_failures >= policy.max_consecutive_failures:
+                    raise RuntimeError(
+                        f"[{source_label}/{plan_name}] Exceeded max_consecutive_failures="
+                        f"{policy.max_consecutive_failures}."
+                    )
+            else:
+                consecutive_failures = 0
+
             # Resample
             if not policy.allow_resample():
                 raise RuntimeError(
                     f"[{source_label}/{plan_name}] pool_strategy={pool_strategy!r} does not allow Stage-B "
                     "resampling. Reduce quota or use iterative_subsample."
                 )
-            resamples_in_try += 1
             total_resamples += 1
             if events_path is not None:
                 try:
@@ -1909,20 +1912,6 @@ def _process_plan_for_source(
                     )
                 except Exception:
                     log.debug("Failed to emit RESAMPLE_TRIGGERED event.", exc_info=True)
-            if policy.max_total_resamples > 0 and total_resamples > policy.max_total_resamples:
-                raise RuntimeError(f"[{source_label}/{plan_name}] Exceeded max_total_resamples={max_total_resamples}.")
-            if resamples_in_try > policy.max_resample_attempts:
-                log.info(
-                    "[%s/%s] Reached max_resample_attempts (%d) for this subsample try "
-                    "(produced %d/%d here). Moving on.",
-                    source_label,
-                    plan_name,
-                    policy.max_resample_attempts,
-                    local_generated,
-                    max_per_subsample,
-                )
-                break
-
             if iterative_max_libraries > 0 and libraries_used >= iterative_max_libraries:
                 raise RuntimeError(
                     f"[{source_label}/{plan_name}] Exceeded iterative_max_libraries={iterative_max_libraries}."

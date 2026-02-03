@@ -89,7 +89,6 @@ def output_meta(*, library_hash: str, library_index: int) -> dict:
         "library_unique_tfbs_count": 2,
         "sequence_length": 10,
         "promoter_constraint": None,
-        "sampling_target_length": 0,
         "sampling_achieved_length": 0,
         "sampling_relaxed_cap": False,
         "sampling_final_cap": None,

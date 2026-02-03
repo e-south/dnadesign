@@ -115,7 +115,6 @@ def _write_libraries(tmp_path: Path) -> None:
                 "pool_strategy": "subsample",
                 "library_sampling_strategy": "coverage_weighted",
                 "library_size": 3,
-                "target_length": 40,
                 "achieved_length": 15,
                 "relaxed_cap": False,
                 "final_cap": None,

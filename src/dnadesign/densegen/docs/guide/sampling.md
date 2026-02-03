@@ -128,10 +128,9 @@ Additional Stage-B controls that commonly affect "it fails vs it works":
 
 - **Uniqueness + exhaustion**
   - `unique_binding_sites` / `unique_binding_cores` prevent duplicate sites in a library.
-  - `cover_all_regulators` attempts to include every regulator in the library at least once.
-  - If the pool cannot satisfy these constraints at `library_size`, behavior depends on:
-    - `relax_on_exhaustion` (relax constraints) and/or
-    - `allow_incomplete_coverage` (permit missing regulators).
+  - `cover_all_regulators` attempts to include every regulator in the library at least once (defaults to false).
+  - If the pool cannot satisfy these constraints at `library_size`, Stage‑B errors.
+  - `relax_on_exhaustion` only relaxes per‑TF caps (`max_sites_per_regulator`).
 - **Sampling strategies**
   - `tf_balanced`: balances sampling across regulators.
   - `uniform_over_pairs`: encourages pair coverage (useful when co-occurrence matters).
@@ -139,9 +138,12 @@ Additional Stage-B controls that commonly affect "it fails vs it works":
     down-weight motifs that frequently fail solves.
 
 Operational note: resampling is driven by runtime controls such as stalls/duplicate pressure
-(see `densegen.runtime.*`). When diagnosing a run, `placement_map` and
+and `runtime.max_consecutive_failures` (see `densegen.runtime.*`). When diagnosing a run, `placement_map` and
 `dense inspect run --events --library` are the fastest way to see whether the run is rebuilding
 libraries too often or sampling is exhausted.
+
+Stage‑B also requires the total bp in a sampled library to meet or exceed `generation.sequence_length`.
+If you see a "library_bp" error, increase `library_size` or supply longer motifs.
 
 For plan constraints and solver configuration, see `guide/generation.md`.
 

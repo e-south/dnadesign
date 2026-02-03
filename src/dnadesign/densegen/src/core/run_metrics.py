@@ -487,7 +487,6 @@ def build_run_metrics(*, cfg, run_root: Path) -> pd.DataFrame:
                 "fixed_bp_min": fixed_bp_min,
                 "slack_bp": slack,
                 "sequence_length": sequence_length,
-                "target_length": build.get("target_length"),
                 "achieved_length": build.get("achieved_length"),
                 "used_tfbs_unique": used_tfbs_unique,
                 "used_tf_count": used_tf_count,

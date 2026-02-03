@@ -127,15 +127,11 @@ def test_source_cache_reuses_loaded_inputs(tmp_path: Path) -> None:
                 "sampling": {
                     "pool_strategy": "subsample",
                     "library_size": 2,
-                    "subsample_over_length_budget_by": 0,
                     "library_sampling_strategy": "tf_balanced",
                     "cover_all_regulators": False,
                     "unique_binding_sites": True,
                     "max_sites_per_regulator": None,
                     "relax_on_exhaustion": False,
-                    "allow_incomplete_coverage": False,
-                    "iterative_max_libraries": 2,
-                    "iterative_min_new_solutions": 0,
                 },
                 "plan": [
                     {
@@ -153,8 +149,7 @@ def test_source_cache_reuses_loaded_inputs(tmp_path: Path) -> None:
                 "max_duplicate_solutions": 5,
                 "stall_seconds_before_resample": 10,
                 "stall_warning_every_seconds": 10,
-                "max_resample_attempts": 1,
-                "max_total_resamples": 1,
+                "max_consecutive_failures": 25,
                 "max_seconds_per_plan": 0,
                 "max_failed_solutions": 0,
                 "random_seed": 1,

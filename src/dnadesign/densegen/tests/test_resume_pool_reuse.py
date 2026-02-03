@@ -84,14 +84,10 @@ def _write_config(path: Path, input_path: Path) -> None:
                 "sampling": {
                     "pool_strategy": "full",
                     "library_size": 1,
-                    "subsample_over_length_budget_by": 0,
                     "cover_all_regulators": False,
                     "unique_binding_sites": True,
                     "max_sites_per_regulator": None,
                     "relax_on_exhaustion": False,
-                    "allow_incomplete_coverage": True,
-                    "iterative_max_libraries": 1,
-                    "iterative_min_new_solutions": 0,
                 },
                 "plan": [
                     {
@@ -117,8 +113,7 @@ def _write_config(path: Path, input_path: Path) -> None:
                 "max_duplicate_solutions": 1,
                 "stall_seconds_before_resample": 1,
                 "stall_warning_every_seconds": 1,
-                "max_resample_attempts": 1,
-                "max_total_resamples": 1,
+                "max_consecutive_failures": 25,
                 "max_seconds_per_plan": 0,
                 "max_failed_solutions": 0,
                 "random_seed": 1,

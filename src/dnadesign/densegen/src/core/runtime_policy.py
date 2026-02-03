@@ -13,8 +13,7 @@ class RuntimePolicy:
     arrays_generated_before_resample: int
     stall_seconds_before_resample: int
     stall_warning_every_seconds: int
-    max_resample_attempts: int
-    max_total_resamples: int
+    max_consecutive_failures: int
     max_seconds_per_plan: int
 
     def allow_resample(self) -> bool:

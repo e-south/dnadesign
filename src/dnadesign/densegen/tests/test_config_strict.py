@@ -86,6 +86,55 @@ def test_plots_format_defaults_to_pdf(tmp_path: Path) -> None:
     assert loaded.root.plots.format == "pdf"
 
 
+def test_sampling_defaults_cover_all_regulators_false(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    assert loaded.root.densegen.generation.sampling.cover_all_regulators is False
+
+
+def test_runtime_default_max_consecutive_failures(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    assert loaded.root.densegen.runtime.max_consecutive_failures == 25
+
+
+def test_allow_incomplete_coverage_rejected(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["generation"]["sampling"] = {"allow_incomplete_coverage": True}
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="allow_incomplete_coverage"):
+        load_config(cfg_path)
+
+
+def test_subsample_over_length_budget_rejected(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["generation"]["sampling"] = {"subsample_over_length_budget_by": 10}
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="subsample_over_length_budget_by"):
+        load_config(cfg_path)
+
+
+def test_iterative_settings_rejected_without_iterative_strategy(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["generation"]["sampling"] = {
+        "pool_strategy": "subsample",
+        "iterative_max_libraries": 3,
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="iterative_max_libraries"):
+        load_config(cfg_path)
+
+
+def test_runtime_resample_caps_rejected(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["runtime"] = {"max_resample_attempts": 1}
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="max_resample_attempts"):
+        load_config(cfg_path)
+
+
 def test_legacy_pwm_sampling_keys_rejected(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
     cfg["densegen"]["inputs"] = [

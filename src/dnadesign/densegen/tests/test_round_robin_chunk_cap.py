@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 
 import numpy as np
+import pytest
 import yaml
 
 from dnadesign.densegen.src.adapters.optimizer import OptimizerRun
@@ -104,15 +105,11 @@ def test_round_robin_chunk_cap_subsample(tmp_path: Path) -> None:
                 "sampling": {
                     "pool_strategy": "subsample",
                     "library_size": 2,
-                    "subsample_over_length_budget_by": 0,
                     "library_sampling_strategy": "tf_balanced",
                     "cover_all_regulators": False,
                     "unique_binding_sites": True,
                     "max_sites_per_regulator": None,
                     "relax_on_exhaustion": False,
-                    "allow_incomplete_coverage": False,
-                    "iterative_max_libraries": 5,
-                    "iterative_min_new_solutions": 0,
                 },
                 "plan": [
                     {
@@ -138,8 +135,7 @@ def test_round_robin_chunk_cap_subsample(tmp_path: Path) -> None:
                 "max_duplicate_solutions": 5,
                 "stall_seconds_before_resample": 10,
                 "stall_warning_every_seconds": 10,
-                "max_resample_attempts": 2,
-                "max_total_resamples": 2,
+                "max_consecutive_failures": 25,
                 "max_seconds_per_plan": 0,
                 "max_failed_solutions": 0,
                 "random_seed": 1,
@@ -223,15 +219,11 @@ def test_stall_detected_with_no_solutions(tmp_path: Path) -> None:
                 "sampling": {
                     "pool_strategy": "subsample",
                     "library_size": 2,
-                    "subsample_over_length_budget_by": 0,
                     "library_sampling_strategy": "tf_balanced",
                     "cover_all_regulators": False,
                     "unique_binding_sites": True,
                     "max_sites_per_regulator": None,
                     "relax_on_exhaustion": False,
-                    "allow_incomplete_coverage": False,
-                    "iterative_max_libraries": 1,
-                    "iterative_min_new_solutions": 0,
                 },
                 "plan": [
                     {
@@ -257,8 +249,7 @@ def test_stall_detected_with_no_solutions(tmp_path: Path) -> None:
                 "max_duplicate_solutions": 5,
                 "stall_seconds_before_resample": 1,
                 "stall_warning_every_seconds": 0,
-                "max_resample_attempts": 0,
-                "max_total_resamples": 0,
+                "max_consecutive_failures": 1,
                 "max_seconds_per_plan": 0,
                 "max_failed_solutions": 0,
                 "random_seed": 1,
@@ -310,31 +301,29 @@ def test_stall_detected_with_no_solutions(tmp_path: Path) -> None:
     )
 
     plan_item = loaded.root.densegen.generation.resolve_plan()[0]
-    produced, stats = _process_plan_for_source(
-        loaded.root.densegen.inputs[0],
-        plan_item,
-        loaded.root.densegen,
-        [sink],
-        chosen_solver="CBC",
-        deps=deps,
-        rng=random.Random(1),
-        np_rng=np.random.default_rng(1),
-        cfg_path=loaded.path,
-        run_id=loaded.root.densegen.run.id,
-        run_root=str(run_dir),
-        run_config_path="config.yaml",
-        run_config_sha256="sha",
-        random_seed=1,
-        dense_arrays_version=None,
-        dense_arrays_version_source="test",
-        show_tfbs=False,
-        show_solutions=False,
-        output_bio_type="dna",
-        output_alphabet="dna_4",
-        one_subsample_only=True,
-        already_generated=0,
-        inputs_manifest={},
-    )
-
-    assert produced == 0
-    assert stats["stall_events"] == 1
+    with pytest.raises(RuntimeError, match="max_consecutive_failures"):
+        _process_plan_for_source(
+            loaded.root.densegen.inputs[0],
+            plan_item,
+            loaded.root.densegen,
+            [sink],
+            chosen_solver="CBC",
+            deps=deps,
+            rng=random.Random(1),
+            np_rng=np.random.default_rng(1),
+            cfg_path=loaded.path,
+            run_id=loaded.root.densegen.run.id,
+            run_root=str(run_dir),
+            run_config_path="config.yaml",
+            run_config_sha256="sha",
+            random_seed=1,
+            dense_arrays_version=None,
+            dense_arrays_version_source="test",
+            show_tfbs=False,
+            show_solutions=False,
+            output_bio_type="dna",
+            output_alphabet="dna_4",
+            one_subsample_only=True,
+            already_generated=0,
+            inputs_manifest={},
+        )

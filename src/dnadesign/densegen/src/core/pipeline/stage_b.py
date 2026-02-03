@@ -120,6 +120,17 @@ def _min_fixed_elements_length(fixed_elements_dump: dict) -> int:
     return total
 
 
+def _require_library_bp(library: list[str], sequence_length: int) -> int:
+    total = sum(len(str(s)) for s in library)
+    if total < int(sequence_length):
+        raise ValueError(
+            "library_size selects too few total bp to cover sequence_length. "
+            f"library_bp={total} sequence_length={sequence_length}. "
+            "Increase library_size or provide longer motifs."
+        )
+    return total
+
+
 def select_group_members(
     *,
     groups: list,
@@ -306,14 +317,12 @@ def build_library_for_plan(
 ) -> tuple[list[str], list[str], list[str], dict]:
     pool_strategy = str(getattr(sampling_cfg, "pool_strategy", "subsample"))
     library_size = int(getattr(sampling_cfg, "library_size", 0))
-    subsample_over = int(getattr(sampling_cfg, "subsample_over_length_budget_by", 0))
     library_sampling_strategy = str(getattr(sampling_cfg, "library_sampling_strategy", "tf_balanced"))
-    cover_all_tfs = bool(getattr(sampling_cfg, "cover_all_regulators", True))
+    cover_all_tfs = bool(getattr(sampling_cfg, "cover_all_regulators", False))
     unique_binding_sites = bool(getattr(sampling_cfg, "unique_binding_sites", True))
     unique_binding_cores = bool(getattr(sampling_cfg, "unique_binding_cores", True))
     max_sites_per_tf = getattr(sampling_cfg, "max_sites_per_regulator", None)
     relax_on_exhaustion = bool(getattr(sampling_cfg, "relax_on_exhaustion", False))
-    allow_incomplete_coverage = bool(getattr(sampling_cfg, "allow_incomplete_coverage", False))
     iterative_max_libraries = int(getattr(sampling_cfg, "iterative_max_libraries", 0))
     iterative_min_new_solutions = int(getattr(sampling_cfg, "iterative_min_new_solutions", 0))
 
@@ -396,12 +405,12 @@ def build_library_for_plan(
                         f"min_count_by_regulator[{tf}]={min_count} exceeds available sites ({max_allowed}). "
                         "Increase library_size, relax min_count_by_regulator, or allow non-unique binding sites/cores."
                     )
-        if pool_strategy in {"subsample", "iterative_subsample"} and cover_all_tfs and not allow_incomplete_coverage:
+        if pool_strategy in {"subsample", "iterative_subsample"} and cover_all_tfs:
             if library_size > 0 and library_size < len(available_tfs):
                 raise ValueError(
                     "library_size is too small to cover all regulators. "
                     f"library_size={library_size} but available_tfs={len(available_tfs)}. "
-                    "Increase library_size or allow_incomplete_coverage."
+                    "Increase library_size or disable cover_all_regulators."
                 )
 
         failure_counts_by_tfbs: dict[tuple[str, str], int] | None = None
@@ -453,9 +462,9 @@ def build_library_for_plan(
             source_by_index = lib_df["source"].tolist() if "source" in lib_df.columns else None
             tfbs_id_by_index = lib_df["tfbs_id"].tolist() if "tfbs_id" in lib_df.columns else None
             motif_id_by_index = lib_df["motif_id"].tolist() if "motif_id" in lib_df.columns else None
+            library_bp = _require_library_bp(library, seq_len)
             info = {
-                "target_length": seq_len + subsample_over,
-                "achieved_length": sum(len(s) for s in library),
+                "achieved_length": library_bp,
                 "relaxed_cap": False,
                 "final_cap": None,
                 "pool_strategy": pool_strategy,
@@ -491,8 +500,6 @@ def build_library_for_plan(
                 )
         library, parts, reg_labels, info = sampler.generate_binding_site_library(
             library_size,
-            sequence_length=seq_len,
-            budget_overhead=subsample_over,
             required_tfbs=required_bias_motifs,
             required_tfs=required_tfs_for_library,
             cover_all_tfs=cover_all_tfs,
@@ -500,7 +507,6 @@ def build_library_for_plan(
             unique_binding_cores=unique_binding_cores,
             max_sites_per_tf=max_sites_per_tf,
             relax_on_exhaustion=relax_on_exhaustion,
-            allow_incomplete_coverage=allow_incomplete_coverage,
             sampling_strategy=library_sampling_strategy,
             usage_counts=usage_counts if library_sampling_strategy == "coverage_weighted" else None,
             coverage_boost_alpha=float(getattr(sampling_cfg, "coverage_boost_alpha", 0.15)),
@@ -510,6 +516,8 @@ def build_library_for_plan(
             failure_penalty_alpha=float(getattr(sampling_cfg, "failure_penalty_alpha", 0.5)),
             failure_penalty_power=float(getattr(sampling_cfg, "failure_penalty_power", 1.0)),
         )
+        library_bp = _require_library_bp(library, seq_len)
+        info["achieved_length"] = library_bp
         info.update(
             {
                 "pool_strategy": pool_strategy,
@@ -576,9 +584,9 @@ def build_library_for_plan(
             library = rng.sample(pool, take)
     tf_parts: list[str] = []
     reg_labels: list[str] = []
+    library_bp = _require_library_bp(library, seq_len)
     info = {
-        "target_length": seq_len + subsample_over,
-        "achieved_length": sum(len(s) for s in library),
+        "achieved_length": library_bp,
         "relaxed_cap": False,
         "final_cap": None,
         "pool_strategy": pool_strategy,

@@ -1132,14 +1132,10 @@ def _warn_full_pool_strategy(loaded) -> None:
         return
     ignored = [
         "library_size",
-        "subsample_over_length_budget_by",
         "library_sampling_strategy",
         "cover_all_regulators",
         "max_sites_per_regulator",
         "relax_on_exhaustion",
-        "allow_incomplete_coverage",
-        "iterative_max_libraries",
-        "iterative_min_new_solutions",
     ]
     console.print(
         "[yellow]Warning:[/] pool_strategy=full uses the entire input library; " + ", ".join(ignored) + " are ignored."
@@ -2007,28 +2003,22 @@ def inspect_config(
 
     sampling = cfg.generation.sampling
     sampling_table = make_table("setting", "value")
-    target_length = cfg.generation.sequence_length + int(sampling.subsample_over_length_budget_by)
     sampling_table.add_row("pool_strategy", str(sampling.pool_strategy))
     sampling_table.add_row("library_source", str(sampling.library_source))
     if sampling.library_source == "artifact":
         sampling_table.add_row("library_artifact_path", str(sampling.library_artifact_path))
     sampling_table.add_row("library_size", str(sampling.library_size))
     sampling_table.add_row("library_sampling_strategy", str(sampling.library_sampling_strategy))
-    sampling_table.add_row(
-        "subsample_over_length_budget_by",
-        f"{sampling.subsample_over_length_budget_by} (target={target_length} bp)",
-    )
     sampling_table.add_row("cover_all_regulators", str(sampling.cover_all_regulators))
     sampling_table.add_row("unique_binding_sites", str(sampling.unique_binding_sites))
     sampling_table.add_row("unique_binding_cores", str(sampling.unique_binding_cores))
     sampling_table.add_row("max_sites_per_regulator", str(sampling.max_sites_per_regulator))
     sampling_table.add_row("relax_on_exhaustion", str(sampling.relax_on_exhaustion))
-    sampling_table.add_row("allow_incomplete_coverage", str(sampling.allow_incomplete_coverage))
-    sampling_table.add_row("iterative_max_libraries", str(sampling.iterative_max_libraries))
-    sampling_table.add_row("iterative_min_new_solutions", str(sampling.iterative_min_new_solutions))
+    if sampling.pool_strategy == "iterative_subsample":
+        sampling_table.add_row("iterative_max_libraries", str(sampling.iterative_max_libraries))
+        sampling_table.add_row("iterative_min_new_solutions", str(sampling.iterative_min_new_solutions))
     sampling_table.add_row("arrays_generated_before_resample", str(cfg.runtime.arrays_generated_before_resample))
-    sampling_table.add_row("max_resample_attempts", str(cfg.runtime.max_resample_attempts))
-    sampling_table.add_row("max_total_resamples", str(cfg.runtime.max_total_resamples))
+    sampling_table.add_row("max_consecutive_failures", str(cfg.runtime.max_consecutive_failures))
     console.print("[bold]Stage-B library sampling[/]")
     console.print(sampling_table)
 
@@ -2528,7 +2518,6 @@ def stage_b_build_libraries(
                     raise typer.Exit(code=1)
                 libraries_built = int(info.get("library_index", libraries_built))
                 library_hash = str(info.get("library_hash") or "")
-                target_len = int(info.get("target_length") or 0)
                 achieved_len = int(info.get("achieved_length") or 0)
                 pool_strategy = str(info.get("pool_strategy") or sampling_cfg.pool_strategy)
                 sampling_strategy = str(info.get("library_sampling_strategy") or sampling_cfg.library_sampling_strategy)
@@ -2564,7 +2553,6 @@ def stage_b_build_libraries(
                     "pool_strategy": pool_strategy,
                     "library_sampling_strategy": sampling_strategy,
                     "library_size": int(info.get("library_size") or len(library)),
-                    "target_length": target_len,
                     "achieved_length": achieved_len,
                     "relaxed_cap": bool(info.get("relaxed_cap") or False),
                     "final_cap": info.get("final_cap"),
@@ -2687,15 +2675,6 @@ def stage_b_build_libraries(
             return "-"
         return f"{values.min():.0f}/{values.median():.0f}/{values.max():.0f}"
 
-    def _format_budget(series: pd.Series) -> str:
-        values = pd.to_numeric(series, errors="coerce").dropna()
-        if values.empty:
-            return "-"
-        uniq = sorted({int(val) for val in values})
-        if len(uniq) == 1:
-            return str(uniq[0])
-        return f"{uniq[0]}-{uniq[-1]}"
-
     def _format_strategy(series: pd.Series) -> str:
         values = [str(val).strip() for val in series.tolist() if val and str(val).strip()]
         uniq = sorted(set(values))
@@ -2712,7 +2691,6 @@ def stage_b_build_libraries(
         "sites (min/med/max)",
         "TFs (min/med/max)",
         "bp total (min/med/max)",
-        "bp budget",
         "sampling strategy",
     )
     for (input_name, plan_name), group in summary_df.groupby(["input_name", "plan_name"]):
@@ -2723,7 +2701,6 @@ def stage_b_build_libraries(
             _format_min_median_max(group["library_size"]),
             _format_min_median_max(group["unique_tf_count"]),
             _format_min_median_max(group["achieved_length"]),
-            _format_budget(group["target_length"]),
             _format_strategy(group["library_sampling_strategy"]),
         )
 
@@ -2733,7 +2710,6 @@ def stage_b_build_libraries(
         "Stage-B builds solver libraries from Stage-A pools (cached for `dense run`). "
         "Sites/TFs/bp totals summarize min/median/max across libraries."
     )
-    console.print("bp budget = sequence_length + subsample_over_length_budget_by.")
     console.print(f"libraries built now: {len(build_rows)}; libraries total: {libraries_total}")
     console.print(
         f":sparkles: [bold green]Library builds written[/]: "

@@ -57,7 +57,6 @@ def _meta_arrow_type(name: str, pa):
         "library_unique_tf_count",
         "library_unique_tfbs_count",
         "sequence_length",
-        "sampling_target_length",
         "sampling_achieved_length",
         "sampling_final_cap",
         "sampling_library_size",

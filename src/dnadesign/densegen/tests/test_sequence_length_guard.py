@@ -71,7 +71,7 @@ class _DummyAdapter:
 
 def test_sequence_length_guard_shorter_than_motif(tmp_path: Path) -> None:
     csv_path = tmp_path / "sites.csv"
-    csv_path.write_text("tf,tfbs\nTF1,AAAAA\n")
+    csv_path.write_text("tf,tfbs\nTF1,AAAAAAAA\n")
     cfg = {
         "densegen": {
             "schema_version": "2.8",
@@ -95,15 +95,11 @@ def test_sequence_length_guard_shorter_than_motif(tmp_path: Path) -> None:
                 "sampling": {
                     "pool_strategy": "full",
                     "library_size": 1,
-                    "subsample_over_length_budget_by": 0,
                     "library_sampling_strategy": "tf_balanced",
                     "cover_all_regulators": False,
                     "unique_binding_sites": True,
                     "max_sites_per_regulator": None,
                     "relax_on_exhaustion": False,
-                    "allow_incomplete_coverage": False,
-                    "iterative_max_libraries": 1,
-                    "iterative_min_new_solutions": 0,
                 },
                 "plan": [
                     {
@@ -129,8 +125,7 @@ def test_sequence_length_guard_shorter_than_motif(tmp_path: Path) -> None:
                 "max_duplicate_solutions": 5,
                 "stall_seconds_before_resample": 10,
                 "stall_warning_every_seconds": 10,
-                "max_resample_attempts": 1,
-                "max_total_resamples": 1,
+                "max_consecutive_failures": 25,
                 "max_seconds_per_plan": 0,
                 "max_failed_solutions": 0,
                 "random_seed": 1,
@@ -150,6 +145,84 @@ def test_sequence_length_guard_shorter_than_motif(tmp_path: Path) -> None:
         pad=lambda *args, **kwargs: "",
     )
     with pytest.raises(ValueError, match="sequence_length"):
+        run_pipeline(loaded, deps=deps, resume=False, build_stage_a=True)
+
+
+def test_sequence_length_guard_library_total_bp_too_small(tmp_path: Path) -> None:
+    csv_path = tmp_path / "sites.csv"
+    csv_path.write_text("tf,tfbs\nTF1,AAA\nTF2,CCC\n")
+    cfg = {
+        "densegen": {
+            "schema_version": "2.8",
+            "run": {"id": "demo", "root": "."},
+            "inputs": [
+                {
+                    "name": "demo",
+                    "type": "binding_sites",
+                    "path": str(csv_path),
+                    "format": "csv",
+                }
+            ],
+            "output": {
+                "targets": ["parquet"],
+                "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+                "parquet": {"path": "outputs/tables/dense_arrays.parquet"},
+            },
+            "generation": {
+                "sequence_length": 10,
+                "quota": 1,
+                "sampling": {
+                    "pool_strategy": "subsample",
+                    "library_size": 1,
+                    "library_sampling_strategy": "tf_balanced",
+                    "cover_all_regulators": False,
+                    "unique_binding_sites": True,
+                    "max_sites_per_regulator": None,
+                    "relax_on_exhaustion": False,
+                },
+                "plan": [
+                    {
+                        "name": "default",
+                        "quota": 1,
+                        "regulator_constraints": {
+                            "groups": [
+                                {
+                                    "name": "all",
+                                    "members": ["TF1", "TF2"],
+                                    "min_required": 1,
+                                }
+                            ]
+                        },
+                    }
+                ],
+            },
+            "solver": {"backend": "CBC", "strategy": "iterate"},
+            "runtime": {
+                "round_robin": False,
+                "arrays_generated_before_resample": 10,
+                "min_count_per_tf": 0,
+                "max_duplicate_solutions": 5,
+                "stall_seconds_before_resample": 10,
+                "stall_warning_every_seconds": 10,
+                "max_seconds_per_plan": 0,
+                "max_failed_solutions": 0,
+                "random_seed": 1,
+            },
+            "postprocess": {"pad": {"mode": "off"}},
+            "logging": {"log_dir": "outputs/logs", "level": "INFO"},
+        }
+    }
+    cfg_path = tmp_path / "cfg.yaml"
+    cfg_path.write_text(yaml.safe_dump(cfg))
+    loaded = load_config(cfg_path)
+    sink = _DummySink()
+    deps = PipelineDeps(
+        source_factory=data_source_factory,
+        sink_factory=lambda _cfg, _path: [sink],
+        optimizer=_DummyAdapter(),
+        pad=lambda *args, **kwargs: "",
+    )
+    with pytest.raises(ValueError, match="library_size"):
         run_pipeline(loaded, deps=deps, resume=False, build_stage_a=True)
 
 
@@ -179,15 +252,11 @@ def test_sequence_length_guard_required_regulators_min_length(tmp_path: Path) ->
                 "sampling": {
                     "pool_strategy": "full",
                     "library_size": 2,
-                    "subsample_over_length_budget_by": 0,
                     "library_sampling_strategy": "tf_balanced",
                     "cover_all_regulators": False,
                     "unique_binding_sites": True,
                     "max_sites_per_regulator": None,
                     "relax_on_exhaustion": False,
-                    "allow_incomplete_coverage": False,
-                    "iterative_max_libraries": 1,
-                    "iterative_min_new_solutions": 0,
                 },
                 "plan": [
                     {
@@ -213,8 +282,7 @@ def test_sequence_length_guard_required_regulators_min_length(tmp_path: Path) ->
                 "max_duplicate_solutions": 5,
                 "stall_seconds_before_resample": 10,
                 "stall_warning_every_seconds": 10,
-                "max_resample_attempts": 1,
-                "max_total_resamples": 1,
+                "max_consecutive_failures": 25,
                 "max_seconds_per_plan": 0,
                 "max_failed_solutions": 0,
                 "random_seed": 1,
@@ -239,7 +307,7 @@ def test_sequence_length_guard_required_regulators_min_length(tmp_path: Path) ->
 
 def test_sequence_length_guard_promoter_constraints_min_length(tmp_path: Path) -> None:
     csv_path = tmp_path / "sites.csv"
-    csv_path.write_text("tf,tfbs\nTF1,AAAAA\n")
+    csv_path.write_text("tf,tfbs\nTF1,AAAAAAAA\n")
     cfg = {
         "densegen": {
             "schema_version": "2.8",
@@ -263,15 +331,11 @@ def test_sequence_length_guard_promoter_constraints_min_length(tmp_path: Path) -
                 "sampling": {
                     "pool_strategy": "full",
                     "library_size": 1,
-                    "subsample_over_length_budget_by": 0,
                     "library_sampling_strategy": "tf_balanced",
                     "cover_all_regulators": False,
                     "unique_binding_sites": True,
                     "max_sites_per_regulator": None,
                     "relax_on_exhaustion": False,
-                    "allow_incomplete_coverage": False,
-                    "iterative_max_libraries": 1,
-                    "iterative_min_new_solutions": 0,
                 },
                 "plan": [
                     {
@@ -306,8 +370,7 @@ def test_sequence_length_guard_promoter_constraints_min_length(tmp_path: Path) -
                 "max_duplicate_solutions": 5,
                 "stall_seconds_before_resample": 10,
                 "stall_warning_every_seconds": 10,
-                "max_resample_attempts": 1,
-                "max_total_resamples": 1,
+                "max_consecutive_failures": 25,
                 "max_seconds_per_plan": 0,
                 "max_failed_solutions": 0,
                 "random_seed": 1,

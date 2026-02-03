@@ -56,7 +56,7 @@ def _write_stage_b_config(
                 parquet:
                   path: outputs/tables/dense_arrays.parquet
               generation:
-                sequence_length: 30
+                sequence_length: 8
                 quota: 1
                 sampling:
                   pool_strategy: subsample
