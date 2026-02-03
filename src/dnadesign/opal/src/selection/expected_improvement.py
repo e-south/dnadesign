@@ -42,13 +42,15 @@ def ei(
     if ids.shape[0] != scores.shape[0]:
         raise ValueError("ids and scores must have same length")
     
+    # Converting variance to standard deviation
+    std_devs = np.sqrt(std_devs)
     # Normalizing standard deviations to avoid extremely large EI values
-    std_devs = std_devs/np.max(std_devs)
+    norm_std_devs = std_devs/np.max(std_devs)
 
     max_score = np.nanmax(scores)
     diffs = scores - max_score
     z_vals = diffs / std_devs
-    scores = np.multiply(diffs, norm.cdf(z_vals)) + np.multiply(std_devs, norm.pdf(z_vals))
+    scores = np.multiply(diffs, norm.cdf(z_vals)) + np.multiply(norm_std_devs, norm.pdf(z_vals))
 
     maximize = str(objective).strip().lower().startswith("max")
 

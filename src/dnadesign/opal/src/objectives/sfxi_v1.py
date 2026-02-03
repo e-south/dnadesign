@@ -197,6 +197,11 @@ def sfxi_v1(
     # ---- creating scalar uncertainty ----
     if var is not None:
         # Starting with effect intensity (because it is a lot easier)
+        """
+        Treating effect intensity as log normally base 2 distributed:
+        variance = [exp(var) - 1]exp(var + 2mu)
+        work out how this actually works!
+        """
         y_lin = (np.exp2(y_pred[:, 4:8])*np.log(2))**2
         ind_var = np.multiply(y_lin, var[:, 4:8])
         wt_var = np.multiply(ind_var, w)

@@ -91,7 +91,6 @@ class GaussianProcessModel:
             raise RuntimeError("[gaussian_process] predict() before fit().")
         y = self._est.predict(X, return_std = std)
         y = np.asarray(y, dtype=float)
-        np.savetxt(r"\\wsl.localhost\Ubuntu\home\emarkert\Rotation3_MJD\Data_Sim\Test_IO\var.txt", y[1])
         if y.ndim == 1:
             y = y.reshape(-1, 1)
         return y
