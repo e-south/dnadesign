@@ -7,13 +7,17 @@ Below is a walkthrough that uses **Cruncher** commands to fetch binding sites fo
 ### Three-TF prep (lexA, cpxR, baeR)
 
 This workflow fetches TFBS, runs MEME discovery, and exports DenseGen-ready artifacts.
+It also documents provenance for the demo sources beyond RegulonDB.
 
 Assumptions for this example:
 
-- **lexA** and **cpxR** have local DAP-seq MEME files (demo_local_meme).
-- **baeR** is sourced from RegulonDB curated sites.
-- lexA/cpxR may also have curated RegulonDB sites; you can include them if you
-  want discovery to merge across sources.
+- **lexA** and **cpxR** have local DAP-seq MEME files (demo_local_meme) under
+  `src/dnadesign/cruncher/workspaces/densegen_prep_three_tf/inputs/local_motifs/`.
+- **baeR** comes from a processed ChIP-exo FASTA (Choudhary et al. 2020, DOI:
+  10.1128/mSystems.00980-20) stored in the sibling repo `dnadesign-data` under
+  `primary_literature/Choudhary_et_al/processed/BaeR_binding_sites.fasta`.
+- RegulonDB curated sites are used as a supplement (baeR by default; lexA/cpxR
+  optionally) so discovery can merge across sources.
 
 The dedicated config lives at `src/dnadesign/cruncher/workspaces/densegen_prep_three_tf/config.yaml`.
 
@@ -39,7 +43,7 @@ cruncher:
 
   ingest:
     regulondb:
-      curated_sites: true              # baeR curated sites
+      curated_sites: true              # curated RegulonDB sites
       ht_sites: false                  # keep HT off in this walkthrough
     local_sources:
       - source_id: demo_local_meme     # local DAP-seq MEME files
@@ -48,6 +52,21 @@ cruncher:
         format_map: {".txt": "MEME"}   # explicit parser mapping
         extract_sites: true            # include MEME BLOCKS sites
         tf_name_strategy: stem         # TF names from filenames
+    site_sources:
+      - source_id: baer_chip_exo
+        description: Choudhary et al. BaeR ChIP-exo binding sites (processed FASTA)
+        path: ../../../../../../dnadesign-data/primary_literature/Choudhary_et_al/processed/BaeR_binding_sites.fasta
+        tf_name: BaeR
+        record_kind: chip_exo
+        organism:
+          name: Escherichia coli
+          strain: K-12 MG1655
+          assembly: NC_000913.3
+        citation: "Choudhary et al. 2020 (DOI: 10.1128/mSystems.00980-20)"
+        source_url: https://doi.org/10.1128/mSystems.00980-20
+        tags:
+          assay: chip_exo
+          doi: 10.1128/mSystems.00980-20
 
   parse:
     plot:
@@ -74,7 +93,10 @@ cruncher() { pixi run cruncher -- "$@"; }
 cruncher fetch motifs --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
 cruncher fetch sites  --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
 
-# RegulonDB curated sites (baeR).
+# BaeR ChIP-exo sites (Choudhary et al. FASTA).
+cruncher fetch sites --source baer_chip_exo --tf baeR --update -c "$CONFIG"
+
+# RegulonDB curated sites (supplemental; merges with local sources).
 cruncher fetch sites --tf baeR --update -c "$CONFIG"
 
 # Optional: if you want lexA/cpxR discovery to include curated sites too.
@@ -94,8 +116,8 @@ cruncher lock -c "$CONFIG"
 ```
 
 If any TF has zero sites, `discover motifs` and `lock` will fail.
-Stop and resolve the missing source before proceeding (for example, add a
-local site set for baeR or adjust your RegulonDB query).
+Stop and resolve the missing source before proceeding (for example, verify the
+ChIP-exo FASTA path for baeR or adjust your RegulonDB query).
 
 Logos are saved under `outputs/logos/catalog/` (the command prints the exact path).
 
@@ -109,6 +131,9 @@ cruncher catalog export-sites   --set 1 --densegen-workspace demo_meme_three_tfs
 These commands write motif JSONs for **lexA**, **cpxR**, and **baeR** under
 `src/dnadesign/densegen/workspaces/demo_meme_three_tfs/inputs/motif_artifacts/`,
 which the DenseGen demo config references directly.
+
+If you regenerate motifs, make sure the DenseGen config points at the newly
+exported motif IDs (or update from `artifact_manifest.json`).
 
 ---
 

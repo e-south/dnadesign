@@ -12,7 +12,7 @@ densegen:
       paths:
         - inputs/motif_artifacts/lexA__meme_suite_meme__lexA_CTGTATAWAWWHACA.json
         - inputs/motif_artifacts/cpxR__meme_suite_meme__cpxR_MANWWHTTTAM.json
-        - inputs/motif_artifacts/baeR__meme_suite_meme__baeR_SBWWTWKTYYYYMHDAWTSK.json
+        - inputs/motif_artifacts/baeR__meme_suite_meme__baeR_WWDTYTCTSCMNNA.json
       sampling:
         strategy: stochastic
         n_sites: 200
@@ -77,7 +77,7 @@ densegen:
             - name: group_a
               members:
                 - cpxR_MANWWHTTTAM
-                - baeR_SBWWTWKTYYYYMHDAWTSK
+                - baeR_WWDTYTCTSCMNNA
               min_required: 1
             - name: group_b
               members:
