@@ -13,11 +13,19 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Sequence
 
-from dnadesign.cruncher.config.schema_v2 import IngestConfig, LocalMotifSourceConfig
+from dnadesign.cruncher.config.schema_v2 import (
+    IngestConfig,
+    LocalMotifSourceConfig,
+    LocalSiteSourceConfig,
+)
 from dnadesign.cruncher.ingest.adapters.base import SourceAdapter
 from dnadesign.cruncher.ingest.adapters.local import (
     LocalMotifAdapter,
     LocalMotifAdapterConfig,
+)
+from dnadesign.cruncher.ingest.adapters.local_sites import (
+    LocalSiteAdapter,
+    LocalSiteAdapterConfig,
 )
 from dnadesign.cruncher.ingest.adapters.regulondb import (
     RegulonDBAdapter,
@@ -92,6 +100,12 @@ def _resolve_root(root: Path, *, config_path: Path | None) -> Path:
     return (config_path.parent / root).resolve()
 
 
+def _resolve_path(path: Path, *, config_path: Path | None) -> Path:
+    if path.is_absolute() or config_path is None:
+        return path
+    return (config_path.parent / path).resolve()
+
+
 def _local_source_factory(
     src: LocalMotifSourceConfig,
     *,
@@ -145,6 +159,39 @@ def _local_source_factory(
     return _factory
 
 
+def _site_source_factory(
+    src: LocalSiteSourceConfig,
+    *,
+    config_path: Path | None,
+) -> AdapterFactory:
+    path = _resolve_path(src.path, config_path=config_path)
+    organism = None
+    if src.organism:
+        organism = OrganismRef(
+            taxon=src.organism.taxon,
+            name=src.organism.name,
+            strain=src.organism.strain,
+            assembly=src.organism.assembly,
+        )
+    adapter_config = LocalSiteAdapterConfig(
+        source_id=src.source_id,
+        path=path,
+        tf_name=src.tf_name,
+        organism=organism,
+        citation=src.citation,
+        license=src.license,
+        source_url=src.source_url,
+        source_version=src.source_version,
+        record_kind=src.record_kind,
+        tags=dict(src.tags),
+    )
+
+    def _factory(_config: IngestConfig) -> SourceAdapter:
+        return LocalSiteAdapter(adapter_config)
+
+    return _factory
+
+
 def default_registry(
     ingest_config: IngestConfig | None = None,
     *,
@@ -162,6 +209,16 @@ def default_registry(
                     src,
                     config_path=config_path,
                     extra_parser_modules=extra_parser_modules,
+                ),
+                description,
+            )
+        for src in ingest_config.site_sources:
+            description = src.description or f"Local sites at {src.path}"
+            registry.register(
+                src.source_id,
+                _site_source_factory(
+                    src,
+                    config_path=config_path,
                 ),
                 description,
             )

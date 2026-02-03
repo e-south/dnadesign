@@ -1458,6 +1458,44 @@ class LocalMotifSourceConfig(StrictBaseModel):
         return self
 
 
+class LocalSiteSourceConfig(StrictBaseModel):
+    source_id: str = Field(..., description="Unique identifier for the local site source.")
+    description: Optional[str] = Field(None, description="Human-readable description for the source list.")
+    path: Path = Field(..., description="Path to a FASTA file containing binding sites.")
+    tf_name: Optional[str] = Field(
+        None,
+        description="Optional TF name override (defaults to the FASTA header prefix).",
+    )
+    record_kind: Optional[str] = Field(
+        None,
+        description="Optional site-kind label stored in provenance tags (e.g., chip_exo).",
+    )
+    organism: Optional[OrganismConfig] = None
+    citation: Optional[str] = None
+    license: Optional[str] = None
+    source_url: Optional[str] = None
+    source_version: Optional[str] = None
+    tags: Dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("source_id")
+    @classmethod
+    def _check_source_id(cls, v: str) -> str:
+        source_id = str(v).strip()
+        if not source_id:
+            raise ValueError("site source_id must be a non-empty string")
+        return source_id
+
+    @field_validator("tf_name", "record_kind")
+    @classmethod
+    def _check_optional_text(cls, v: Optional[str], info) -> Optional[str]:
+        if v is None:
+            return None
+        value = str(v).strip()
+        if not value:
+            raise ValueError(f"{info.field_name} must be a non-empty string")
+        return value
+
+
 class RegulonDBConfig(StrictBaseModel):
     base_url: str = "https://regulondb.ccg.unam.mx/graphql"
     verify_ssl: bool = True
@@ -1533,6 +1571,10 @@ class IngestConfig(StrictBaseModel):
     local_sources: List[LocalMotifSourceConfig] = Field(
         default_factory=list,
         description="Local filesystem motif sources.",
+    )
+    site_sources: List[LocalSiteSourceConfig] = Field(
+        default_factory=list,
+        description="Local FASTA binding-site sources.",
     )
 
     @field_validator("genome_cache")

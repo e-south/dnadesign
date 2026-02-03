@@ -16,6 +16,14 @@ distribution (`score_scale: logp`, with `p_seq = 1 − (1 − p_win)^n_windows`)
 - **Output root**: `outputs/` (relative to the workspace; runs live under `outputs/<stage>/<run_name>/`)
 - **Motif flow**: fetch sites → discover MEME/STREME motifs → lock/sample using those matrices
 
+### Data provenance (demo inputs)
+
+This demo uses multiple local and remote sources so you can see how site merging works beyond RegulonDB:
+
+- **Local DAP-seq motifs + training sites**: O'Malley et al. 2021 (DOI: 10.1038/s41592-021-01312-2), bundled as MEME files under `inputs/local_motifs/` via the `demo_local_meme` source.
+- **Local BaeR ChIP-exo binding sites**: Choudhary et al. 2020 (DOI: 10.1128/mSystems.00980-20), processed FASTA in `dnadesign-data/primary_literature/Choudhary_et_al/processed/BaeR_binding_sites.fasta` ingested as a site-only source.
+- **Curated/HT sites**: RegulonDB (as configured under `ingest.regulondb`).
+
 ### Enter the demo workspace
 
 The demo workspace lives under `src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf/`.
