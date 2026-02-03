@@ -15,12 +15,12 @@ densegen:
         - inputs/motif_artifacts/baeR__meme_suite_meme__baeR_SBWWTWKTYYYYMHDAWTSK.json
       sampling:
         strategy: stochastic
-        n_sites: 250
+        n_sites: 200
         mining:
           batch_size: 5000
           budget:
             mode: fixed_candidates
-            candidates: 500000
+            candidates: 1000000
             growth_factor: 1.25
           log_every_batches: 1
         length:
@@ -53,7 +53,7 @@ densegen:
     quota: 12
     sampling:
       pool_strategy: subsample
-      library_size: 20
+      library_size: 10
       subsample_over_length_budget_by: 80
       library_sampling_strategy: coverage_weighted
       coverage_boost_alpha: 0.15

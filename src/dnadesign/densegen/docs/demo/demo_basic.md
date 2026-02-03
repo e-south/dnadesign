@@ -63,18 +63,15 @@ If you want DenseGen to verify your solver is reachable, `dense validate-config 
 > After you set `CONFIG` and the `dense()` wrapper, you can reset outputs and run the full path:
 
 ```bash
-dense campaign-reset -c "$CONFIG"  # remove outputs to start fresh
-dense validate-config --probe-solver -c "$CONFIG"
-dense stage-a build-pool --fresh -c "$CONFIG"
-dense run --fresh -c "$CONFIG"
-dense plot --only stage_a_summary,placement_map -c "$CONFIG"
+# Remove outputs to start the demo fresh
+dense campaign-reset -c "$CONFIG"
 ```
 
 ---
 
 ### 1. Enter the demo workspace
 
-This folder is a **self-contained workspace**: it has a `config.yaml` plus `inputs/` and an `outputs/` root.
+This folder is a self-contained workspace: it has a `config.yaml` plus `inputs/` and an `outputs/` root.
 
 Optional, but useful: print what the workspace thinks it will use.
 
@@ -108,15 +105,11 @@ What this does:
 
 ### 3. Build Stage‑A pools
 
-Stage‑A expects PWM artifact JSONs in the Cruncher export format. This demo ships
-prepopulated artifacts for **lexA**, **cpxR**, and **baeR** under
-`inputs/motif_artifacts/`. If you need to regenerate them (or understand the source
-mix), follow the Cruncher handoff workflow:
+Stage‑A expects PWM artifact JSONs in the Cruncher export format. This demo ships prepopulated artifacts for **lexA**, **cpxR**, and **baeR** under `inputs/motif_artifacts/`. If you need to regenerate them (or understand the source mix), follow the Cruncher handoff workflow:
 
 * `../workflows/cruncher_pwm_pipeline.md`
 
-That workflow uses MEME with **OOPS** (plus the `addone` prior) so sparse site sets
-produce stable PWMs without post-processing.
+That workflow uses MEME with **OOPS** (plus the `addone` prior) so sparse site sets produce stable PWMs without post-processing.
 
 ```bash
 dense stage-a build-pool --fresh -c "$CONFIG"
@@ -149,7 +142,7 @@ How to interpret common recap fields:
 ### 4. Run generation
 
 ```bash
-dense run -c "$CONFIG"
+dense run -c "$CONFIG" --fresh # or --resume
 ```
 
 What happens here:
