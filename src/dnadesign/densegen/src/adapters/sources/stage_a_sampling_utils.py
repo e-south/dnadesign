@@ -179,6 +179,7 @@ def _pwm_consensus_iupac(matrix: Sequence[dict[str, float]]) -> str:
         frozenset({"A", "C", "G", "T"}): "N",
     }
     consensus: list[str] = []
+    threshold = 0.25
     for row in matrix:
         probs = {base: float(row.get(base, 0.0)) for base in ("A", "C", "G", "T")}
         if any(val < 0 for val in probs.values()):
@@ -188,14 +189,10 @@ def _pwm_consensus_iupac(matrix: Sequence[dict[str, float]]) -> str:
             raise ValueError("PWM probabilities must sum to > 0 to compute IUPAC consensus.")
         for base in probs:
             probs[base] = probs[base] / total
-        max_prob = max(probs.values())
         tol = 1e-9
-        if max_prob >= 0.5 - tol:
-            selected = {base for base, val in probs.items() if abs(val - max_prob) <= tol}
-        else:
-            selected = {base for base, val in probs.items() if val >= 0.25 - tol}
-            if not selected:
-                selected = {max(probs.items(), key=lambda kv: kv[1])[0]}
+        selected = {base for base, val in probs.items() if val >= threshold - tol}
+        if not selected:
+            selected = {max(probs.items(), key=lambda kv: kv[1])[0]}
         code = iupac_map.get(frozenset(selected))
         if code is None:
             raise ValueError(f"Unsupported IUPAC consensus bases: {sorted(selected)}")

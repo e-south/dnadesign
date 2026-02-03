@@ -124,6 +124,7 @@ def _build_stage_a_diversity_figure(
         top_color = "#cfe8dc"
         diversified_color = "#7fbf9b"
         label_size = float(style.get("label_size", text_sizes["annotation"]))
+        axis_label_size = float(style.get("label_size", float(style.get("font_size", 13.0))))
         tick_size = text_sizes["annotation"] * 0.8
         for idx, reg in enumerate(regulators):
             hue = reg_colors.get(reg, "#4c78a8")
@@ -193,12 +194,12 @@ def _build_stage_a_diversity_figure(
             ax_left.set_xlim(x_min - 0.5, x_max + 0.5)
             ax_left.set_ylim(0.0, max(1.05 * float(np.max([y_base.max(), y_act.max()])), 0.4))
             ax_left.set_ylabel("")
-            tick_start = int(np.floor(x_min))
-            tick_end = int(np.ceil(x_max))
-            tick_step = 2 if tick_end - tick_start >= 2 else 1
-            ax_left.set_xticks(np.arange(tick_start, tick_end + 1, tick_step))
+            tick_vals = x_base
+            if x_base.size > 1:
+                tick_vals = x_base[::2]
+            ax_left.set_xticks(tick_vals)
             ax_left.tick_params(labelbottom=True)
-            ax_left.tick_params(axis="both", labelsize=tick_size)
+            ax_left.tick_params(axis="x", labelsize=tick_size)
             if idx == 0:
                 ax_left.legend(
                     handles=[base_line, act_line],
@@ -364,4 +365,6 @@ def _build_stage_a_diversity_figure(
             _apply_style(ax, style)
             if ax in axes_right and "right" in ax.spines:
                 ax.spines["right"].set_visible(True)
+        for ax in axes_left:
+            ax.tick_params(axis="y", labelsize=axis_label_size)
     return fig, axes_left, axes_right

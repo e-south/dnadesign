@@ -92,6 +92,27 @@ This parquet contains **only the retained set** (the output of the configured se
 When `selection.policy=mmr`, this is the diversified set. Plots may compare against a top-score
 baseline for diagnostics, but that baseline is not written as a separate pool.
 
+#### Candidate logging + length inspection
+
+To keep all candidates for debugging, set:
+
+```
+densegen.inputs[].sampling.keep_all_candidates_debug: true
+```
+
+Then after `dense stage-a build-pool`, inspect candidate lengths:
+
+```bash
+python3 - <<'PY'
+import pandas as pd
+from pathlib import Path
+df = pd.read_parquet(Path("outputs/pools/candidates") / "candidates__baeR_SBWWTWKTYYYYMHDAWTSK.parquet")
+df["len"] = df["sequence"].str.len()
+print(df["len"].value_counts().sort_index())
+print(df[df["best_hit_score"] > 0]["len"].value_counts().sort_index())
+PY
+```
+
 #### Tiers + MMR pool
 
 `sampling.tier_fractions` defines diagnostic tiers and the **rung ladder** for MMR pool selection.

@@ -597,6 +597,42 @@ def test_stage_a_diversity_nn_ticks_every_other(tmp_path: Path) -> None:
         fig.clf()
 
 
+def test_stage_a_diversity_y_tick_size_matches_xlabel(tmp_path: Path) -> None:
+    matplotlib.use("Agg", force=True)
+    manifest = _pool_manifest(tmp_path, include_diversity=True)
+    sampling = manifest.entry_for("demo_input").stage_a_sampling
+    assert sampling is not None
+    pool_df = pd.DataFrame(
+        {
+            "input_name": ["demo_input", "demo_input"],
+            "tf": ["TF_A", "TF_A"],
+            "tfbs_sequence": ["AAAA", "AAAAT"],
+            "tfbs_core": ["AAAA", "AAAT"],
+            "best_hit_score": [2.0, 1.5],
+            "tier": [0, 1],
+            "rank_within_regulator": [1, 2],
+            "selection_rank": [1, 2],
+            "nearest_selected_similarity": [0.0, 0.5],
+            "selection_score_norm": [1.0, 0.5],
+            "nearest_selected_distance_norm": [0.2, 0.4],
+        }
+    )
+    fig, axes_left, _axes_right = _build_stage_a_diversity_figure(
+        input_name="demo_input",
+        pool_df=pool_df,
+        sampling=sampling,
+        style={},
+    )
+    try:
+        fig.canvas.draw()
+        x_label_size = axes_left[-1].xaxis.label.get_size()
+        y_labels = [label for label in axes_left[0].yaxis.get_ticklabels() if label.get_text()]
+        assert y_labels
+        assert y_labels[0].get_size() == x_label_size
+    finally:
+        fig.clf()
+
+
 def test_stage_a_strata_omits_retained_cutoff_label(tmp_path: Path) -> None:
     matplotlib.use("Agg", force=True)
     manifest = _pool_manifest(tmp_path, include_diversity=True)

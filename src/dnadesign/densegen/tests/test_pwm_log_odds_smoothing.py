@@ -131,3 +131,10 @@ def test_pwm_iupac_consensus_from_pwm() -> None:
         {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
     ]
     assert _pwm_consensus_iupac(matrix) == "AMHN"
+
+
+def test_pwm_iupac_consensus_includes_secondary_bases() -> None:
+    matrix = [
+        {"A": 0.6, "C": 0.3, "G": 0.1, "T": 0.0},
+    ]
+    assert _pwm_consensus_iupac(matrix) == "M"
