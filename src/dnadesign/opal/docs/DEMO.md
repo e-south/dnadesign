@@ -225,6 +225,8 @@ uv run opal notebook run
 If you are *not* inside the campaign directory, pass `-c configs/campaign.yaml`.
 When multiple notebooks exist, `uv run opal notebook run` will prompt you to choose (TTY)
 or ask you to pass `--path` in non-interactive contexts.
+`opal notebook run` launches the interactive marimo editor and will block; for
+headless checks you can run `uv run marimo run --headless <notebook.py>` instead.
 
 The notebook loads campaign artifacts and label history from `records.parquet`,
 then gives you interactive filtering and plots for the selected run.
