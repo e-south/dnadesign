@@ -54,6 +54,7 @@ def _dummy_meta() -> dict:
         "min_count_per_tf": 0,
         "input_type": "binding_sites",
         "input_name": "demo",
+        "input_source_names": ["demo"],
         "input_path": "inputs.csv",
         "input_dataset": None,
         "input_root": None,

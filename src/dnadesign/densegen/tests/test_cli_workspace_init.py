@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/test_cli_workspace_init.py
+
+Workspace init and Stage-B guardrail tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import textwrap
@@ -55,6 +66,8 @@ def _write_min_config(path: Path) -> None:
                 plan:
                   - name: default
                     quota: 1
+                    sampling:
+                      include_inputs: [demo]
                     regulator_constraints:
                       groups: []
 

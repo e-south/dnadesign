@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import logging
+import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -36,6 +37,7 @@ from .pwm_fimo import (
 )
 from .pwm_jaspar import _parse_jaspar
 from .pwm_meme import _background_from_meta, _motif_to_pwm
+from .stage_a_progress import _BackgroundSamplingProgress
 from .stage_a_sampling_utils import (
     _background_cdf,
     _pwm_theoretical_max_score,
@@ -251,7 +253,7 @@ def _run_fimo_exclusion(
     score_map: dict[str, float | None] = {}
     for seq, score, norm in zip(sequences, max_scores, max_norms):
         if allow_zero_hit_only:
-            if score is not None and score > 0:
+            if score is not None:
                 continue
         else:
             if norm is not None and max_score_norm is not None and norm > max_score_norm:
@@ -294,7 +296,9 @@ class BackgroundPoolDataSource(BaseDataSource):
             allow_zero_hit_only = bool(fimo_cfg.allow_zero_hit_only)
             max_score_norm = fimo_cfg.max_score_norm
             if not self.pwm_inputs:
-                raise ValueError("background_pool.fimo_exclude requires at least one PWM input.")
+                raise ValueError(
+                    "background_pool.sampling.filters.fimo_exclude.pwms_input requires at least one PWM input."
+                )
             for pwm_input in self.pwm_inputs:
                 motifs.extend(_load_pwms_from_input(pwm_input, self.cfg_path))
             if not motifs:
@@ -305,41 +309,62 @@ class BackgroundPoolDataSource(BaseDataSource):
         seen: set[str] = set()
         best_scores: dict[str, float | None] = {}
         generated = 0
+        batch_index = 0
+        batch_total = int(np.ceil(max_candidates / batch_size)) if batch_size > 0 else None
+        progress = _BackgroundSamplingProgress(
+            input_name=self.input_name,
+            target=max_candidates,
+            accepted_target=target,
+            stream=sys.stdout,
+        )
+        if fimo_cfg is not None:
+            progress.set_phase("fimo")
 
-        while len(accepted) < target and generated < max_candidates:
-            remaining = max_candidates - generated
-            batch = min(batch_size, remaining)
-            lengths = _resolve_lengths(rng, count=batch, length_cfg=length_cfg)
-            length_groups: dict[int, list[int]] = {}
-            for idx, length in enumerate(lengths):
-                length_groups.setdefault(int(length), []).append(idx)
-            sequences = [""] * batch
-            for length, indices in length_groups.items():
-                seqs = _sample_background_batch(rng, background_cdf, count=len(indices), length=length)
-                for idx, seq in zip(indices, seqs):
-                    sequences[idx] = seq
-            generated += batch
+        try:
+            while len(accepted) < target and generated < max_candidates:
+                batch_index += 1
+                remaining = max_candidates - generated
+                batch = min(batch_size, remaining)
+                lengths = _resolve_lengths(rng, count=batch, length_cfg=length_cfg)
+                length_groups: dict[int, list[int]] = {}
+                for idx, length in enumerate(lengths):
+                    length_groups.setdefault(int(length), []).append(idx)
+                sequences = [""] * batch
+                for length, indices in length_groups.items():
+                    seqs = _sample_background_batch(rng, background_cdf, count=len(indices), length=length)
+                    for idx, seq in zip(indices, seqs):
+                        sequences[idx] = seq
+                generated += batch
 
-            sequences = _filter_forbidden_kmers(sequences, forbid_kmers)
-            sequences = _filter_gc(sequences, gc_min=gc_min, gc_max=gc_max)
-            sequences = [seq for seq in sequences if seq and seq not in seen]
+                sequences = _filter_forbidden_kmers(sequences, forbid_kmers)
+                sequences = _filter_gc(sequences, gc_min=gc_min, gc_max=gc_max)
+                sequences = [seq for seq in sequences if seq and seq not in seen]
 
-            if fimo_cfg is not None and sequences:
-                sequences, scores = _run_fimo_exclusion(
-                    motifs=motifs,
-                    sequences=sequences,
-                    allow_zero_hit_only=allow_zero_hit_only,
-                    max_score_norm=max_score_norm,
+                if fimo_cfg is not None and sequences:
+                    sequences, scores = _run_fimo_exclusion(
+                        motifs=motifs,
+                        sequences=sequences,
+                        allow_zero_hit_only=allow_zero_hit_only,
+                        max_score_norm=max_score_norm,
+                    )
+                    best_scores.update(scores)
+
+                for seq in sequences:
+                    if seq in seen:
+                        continue
+                    seen.add(seq)
+                    accepted.append(seq)
+                    if len(accepted) >= target:
+                        break
+
+                progress.update(
+                    generated=generated,
+                    accepted=len(accepted),
+                    batch_index=batch_index,
+                    batch_total=batch_total,
                 )
-                best_scores.update(scores)
-
-            for seq in sequences:
-                if seq in seen:
-                    continue
-                seen.add(seq)
-                accepted.append(seq)
-                if len(accepted) >= target:
-                    break
+        finally:
+            progress.finish()
 
         if len(accepted) < target:
             raise ValueError(

@@ -60,6 +60,7 @@ from ..artifacts.pool import (
     pool_status_by_input,
 )
 from ..artifacts.records import SolutionRecord
+from ..input_types import PWM_INPUT_TYPES
 from ..metadata import build_metadata
 from ..motif_labels import input_motifs, motif_display_name
 from ..postprocess import generate_pad
@@ -91,7 +92,6 @@ from .attempts import (
     _log_rejection,
 )
 from .inputs import (
-    PWM_INPUT_TYPES,
     _budget_attr,
     _build_input_manifest_entry,
     _input_metadata,

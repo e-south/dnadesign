@@ -42,7 +42,14 @@ MIN_CONFIG = {
         "generation": {
             "sequence_length": 10,
             "quota": 1,
-            "plan": [{"name": "default", "quota": 1, "regulator_constraints": {"groups": []}}],
+            "plan": [
+                {
+                    "name": "default",
+                    "quota": 1,
+                    "sampling": {"include_inputs": ["demo"]},
+                    "regulator_constraints": {"groups": []},
+                }
+            ],
         },
         "solver": {"backend": "CBC", "strategy": "iterate", "strands": "double"},
         "logging": {"log_dir": "outputs/logs"},
@@ -124,6 +131,7 @@ def test_pwm_artifact_set_partial_overrides_merge(tmp_path: Path) -> None:
             },
         }
     ]
+    cfg["densegen"]["generation"]["plan"][0]["sampling"]["include_inputs"] = ["demo_pwm"]
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
     loaded = load_config(cfg_path)
     inp = loaded.root.densegen.inputs[0]
@@ -245,6 +253,8 @@ def test_pad_mode_off_accepts_yaml_boolean(tmp_path: Path) -> None:
         plan:
           - name: default
             quota: 1
+            sampling:
+              include_inputs: [demo]
             regulator_constraints:
               groups: []
       solver:

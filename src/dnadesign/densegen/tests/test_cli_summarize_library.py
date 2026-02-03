@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/test_cli_summarize_library.py
+
+CLI summary tests for Stage-B library reports.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -10,6 +21,8 @@ from dnadesign.densegen.src.cli import app
 from dnadesign.densegen.src.core.run_manifest import PlanManifest, RunManifest
 from dnadesign.densegen.src.core.run_paths import ensure_run_meta_dir, run_manifest_path
 from dnadesign.densegen.tests.meta_fixtures import output_meta
+
+PLAN_POOL_LABEL = "plan_pool__demo_plan"
 
 
 def _write_config(path: Path) -> None:
@@ -37,6 +50,8 @@ def _write_config(path: Path) -> None:
             plan:
               - name: demo_plan
                 quota: 1
+                sampling:
+                  include_inputs: [demo_input]
                 regulator_constraints:
                   groups: []
           solver:
@@ -78,7 +93,7 @@ def test_summarize_library_grouping(tmp_path: Path) -> None:
                 "attempt_id": "a1",
                 "attempt_index": 1,
                 "run_id": "demo",
-                "input_name": "demo_input",
+                "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
                 "created_at": "2026-01-14T00:00:01+00:00",
                 "status": "success",
@@ -111,7 +126,7 @@ def test_summarize_library_grouping(tmp_path: Path) -> None:
                 "solution_id": "out1",
                 "attempt_id": "a1",
                 "run_id": "demo",
-                "input_name": "demo_input",
+                "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
                 "created_at": "2026-01-14T00:00:01+00:00",
                 "sequence": "ATGCATGCAT",
@@ -127,7 +142,7 @@ def test_summarize_library_grouping(tmp_path: Path) -> None:
     manifest = RunManifest(
         run_id="demo",
         created_at="2026-01-14T00:00:00+00:00",
-        schema_version="2.7",
+        schema_version="2.9",
         config_sha256="dummy",
         run_root=str(run_root),
         random_seed=123,
@@ -143,7 +158,7 @@ def test_summarize_library_grouping(tmp_path: Path) -> None:
         dense_arrays_version_source="unknown",
         items=[
             PlanManifest(
-                input_name="demo_input",
+                input_name=PLAN_POOL_LABEL,
                 plan_name="demo_plan",
                 generated=1,
                 duplicates_skipped=0,
@@ -193,7 +208,7 @@ def test_summarize_library_show_tfbs_flag(tmp_path: Path) -> None:
                 "attempt_id": "a1",
                 "attempt_index": 1,
                 "run_id": "demo",
-                "input_name": "demo_input",
+                "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
                 "created_at": "2026-01-14T00:00:01+00:00",
                 "status": "success",
@@ -220,7 +235,7 @@ def test_summarize_library_show_tfbs_flag(tmp_path: Path) -> None:
                 "attempt_id": "a2",
                 "attempt_index": 2,
                 "run_id": "demo",
-                "input_name": "demo_input",
+                "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
                 "created_at": "2026-01-14T00:00:02+00:00",
                 "status": "success",
@@ -253,7 +268,7 @@ def test_summarize_library_show_tfbs_flag(tmp_path: Path) -> None:
                 "solution_id": "out1",
                 "attempt_id": "a1",
                 "run_id": "demo",
-                "input_name": "demo_input",
+                "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
                 "created_at": "2026-01-14T00:00:01+00:00",
                 "sequence": "ATGCATGCAT",
@@ -265,7 +280,7 @@ def test_summarize_library_show_tfbs_flag(tmp_path: Path) -> None:
                 "solution_id": "out2",
                 "attempt_id": "a2",
                 "run_id": "demo",
-                "input_name": "demo_input",
+                "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
                 "created_at": "2026-01-14T00:00:02+00:00",
                 "sequence": "ATGCATGCAT",
@@ -280,7 +295,7 @@ def test_summarize_library_show_tfbs_flag(tmp_path: Path) -> None:
     manifest = RunManifest(
         run_id="demo",
         created_at="2026-01-14T00:00:00+00:00",
-        schema_version="2.7",
+        schema_version="2.9",
         config_sha256="dummy",
         run_root=str(run_root),
         random_seed=123,
@@ -296,7 +311,7 @@ def test_summarize_library_show_tfbs_flag(tmp_path: Path) -> None:
         dense_arrays_version_source="unknown",
         items=[
             PlanManifest(
-                input_name="demo_input",
+                input_name=PLAN_POOL_LABEL,
                 plan_name="demo_plan",
                 generated=2,
                 duplicates_skipped=0,

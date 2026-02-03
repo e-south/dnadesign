@@ -228,6 +228,7 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
                             {
                                 "name": "default",
                                 "quota": 1,
+                                "sampling": {"include_inputs": ["demo_pwm"]},
                                 "regulator_constraints": {"groups": []},
                             }
                         ],

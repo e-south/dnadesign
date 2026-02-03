@@ -21,6 +21,8 @@ import pandas as pd
 from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.core.run_metrics import build_run_metrics
 
+PLAN_POOL_LABEL = "plan_pool__demo_plan"
+
 
 def _write_config(tmp_path: Path) -> Path:
     cfg_path = tmp_path / "config.yaml"
@@ -49,6 +51,8 @@ def _write_config(tmp_path: Path) -> Path:
                 plan:
                   - name: demo_plan
                     quota: 1
+                    sampling:
+                      include_inputs: [demo_input]
                     regulator_constraints:
                       groups:
                         - name: all
@@ -74,6 +78,8 @@ def _write_pool_manifest(tmp_path: Path) -> None:
             "input_name": ["demo_input"] * 3,
             "tf": ["TF_A", "TF_A", "TF_B"],
             "tfbs": ["AAAA", "AAAAT", "CCCCCC"],
+            "motif_id": ["m1", "m1", "m2"],
+            "tfbs_id": ["id1", "id2", "id3"],
             "best_hit_score": [10.0, 8.0, 5.0],
             "tier": [0, 1, 2],
             "rank_within_regulator": [1, 2, 1],
@@ -107,7 +113,7 @@ def _write_libraries(tmp_path: Path) -> None:
         [
             {
                 "created_at": "2026-01-26T00:00:00+00:00",
-                "input_name": "demo_input",
+                "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
                 "library_index": 1,
                 "library_id": "hash1",
@@ -129,7 +135,7 @@ def _write_libraries(tmp_path: Path) -> None:
                 "library_id": "hash1",
                 "library_hash": "hash1",
                 "library_index": 1,
-                "input_name": "demo_input",
+                "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
                 "position": 0,
                 "tf": "TF_A",
@@ -143,7 +149,7 @@ def _write_libraries(tmp_path: Path) -> None:
                 "library_id": "hash1",
                 "library_hash": "hash1",
                 "library_index": 1,
-                "input_name": "demo_input",
+                "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
                 "position": 1,
                 "tf": "TF_A",
@@ -157,7 +163,7 @@ def _write_libraries(tmp_path: Path) -> None:
                 "library_id": "hash1",
                 "library_hash": "hash1",
                 "library_index": 1,
-                "input_name": "demo_input",
+                "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
                 "position": 2,
                 "tf": "TF_B",
@@ -182,7 +188,7 @@ def _write_attempts(tmp_path: Path) -> None:
                 "attempt_id": "a1",
                 "attempt_index": 1,
                 "run_id": "demo",
-                "input_name": "demo_input",
+                "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
                 "created_at": "2026-01-26T00:00:00+00:00",
                 "status": "success",
@@ -218,7 +224,7 @@ def _write_composition(tmp_path: Path) -> None:
             {
                 "solution_id": "s1",
                 "attempt_id": "a1",
-                "input_name": "demo_input",
+                "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
                 "library_index": 1,
                 "library_hash": "hash1",
@@ -238,7 +244,7 @@ def _write_composition(tmp_path: Path) -> None:
             {
                 "solution_id": "s1",
                 "attempt_id": "a1",
-                "input_name": "demo_input",
+                "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
                 "library_index": 1,
                 "library_hash": "hash1",
@@ -266,7 +272,7 @@ def _write_dense_arrays(tmp_path: Path) -> None:
     rows = pd.DataFrame(
         [
             {
-                "densegen__input_name": "demo_input",
+                "densegen__input_name": PLAN_POOL_LABEL,
                 "densegen__plan": "demo_plan",
                 "densegen__sampling_library_index": 1,
                 "densegen__sampling_library_hash": "hash1",
@@ -288,7 +294,7 @@ def _write_sampling_pressure_events(tmp_path: Path) -> None:
         {
             "event": "LIBRARY_SAMPLING_PRESSURE",
             "created_at": "2026-01-26T00:00:00+00:00",
-            "input_name": "demo_input",
+            "input_name": PLAN_POOL_LABEL,
             "plan_name": "demo_plan",
             "library_index": 1,
             "library_hash": "hash1",

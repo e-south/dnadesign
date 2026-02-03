@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/test_pool_append.py
+
+Stage-A pool append/overwrite behavior tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -42,6 +53,7 @@ def _write_config(path: Path, input_path: Path) -> None:
                     {
                         "name": "demo_plan",
                         "quota": 1,
+                        "sampling": {"include_inputs": ["demo_input"]},
                         "regulator_constraints": {
                             "groups": [
                                 {

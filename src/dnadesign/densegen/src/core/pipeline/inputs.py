@@ -16,15 +16,7 @@ from pathlib import Path
 import pandas as pd
 
 from ...config import resolve_relative_path
-
-PWM_INPUT_TYPES = {
-    "pwm_meme",
-    "pwm_meme_set",
-    "pwm_jaspar",
-    "pwm_matrix_csv",
-    "pwm_artifact",
-    "pwm_artifact_set",
-}
+from ..input_types import PWM_INPUT_TYPES
 
 
 def _resolve_input_paths(source_cfg, cfg_path: Path) -> list[str]:

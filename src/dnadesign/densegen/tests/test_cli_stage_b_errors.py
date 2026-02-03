@@ -66,6 +66,8 @@ def _write_stage_b_config(
                 plan:
                   - name: default
                     quota: 1
+                    sampling:
+                      include_inputs: [demo_input]
                     regulator_constraints:
                       groups:
                         - name: group_all
@@ -91,6 +93,8 @@ def _write_pool_manifest(tmp_path: Path) -> Path:
             "input_name": ["demo_input"] * 2,
             "tf": ["TF_A", "TF_B"],
             "tfbs": ["AAAA", "CCCC"],
+            "motif_id": ["m1", "m2"],
+            "tfbs_id": ["id1", "id2"],
             "tfbs_core": ["AAAA", "CCCC"],
             "best_hit_score": [5.0, 4.0],
             "tier": [0, 1],

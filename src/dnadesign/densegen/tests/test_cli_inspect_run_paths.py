@@ -19,6 +19,8 @@ from typer.testing import CliRunner
 from dnadesign.densegen.src.cli import app
 from dnadesign.densegen.tests.config_fixtures import write_minimal_config
 
+PLAN_POOL_LABEL = "plan_pool__demo_plan"
+
 
 def test_inspect_run_uses_relative_root(tmp_path: Path) -> None:
     cfg_path = tmp_path / "config.yaml"
@@ -45,7 +47,7 @@ def test_inspect_run_uses_relative_root(tmp_path: Path) -> None:
         "dense_arrays_version_source": "unknown",
         "items": [
             {
-                "input_name": "demo_input",
+                "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
                 "generated": 0,
                 "duplicates_skipped": 0,

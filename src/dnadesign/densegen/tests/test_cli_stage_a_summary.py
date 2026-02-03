@@ -167,6 +167,8 @@ def _write_stage_a_config(tmp_path: Path) -> Path:
                 plan:
                   - name: default
                     quota: 1
+                    sampling:
+                      include_inputs: [toy_sites]
                     regulator_constraints:
                       groups:
                         - name: all
@@ -246,6 +248,8 @@ def _write_pwm_stage_a_config(tmp_path: Path) -> Path:
                 plan:
                   - name: default
                     quota: 1
+                    sampling:
+                      include_inputs: [demo_pwm]
                     regulator_constraints:
                       groups: []
               solver:

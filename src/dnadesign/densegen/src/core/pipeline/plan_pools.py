@@ -116,7 +116,9 @@ def build_plan_pools(
 ) -> dict[str, PlanPoolSpec]:
     plan_pools: dict[str, PlanPoolSpec] = {}
     for plan in plan_items:
-        include_inputs = list(getattr(plan.sampling, "include_inputs", []) or [])
+        if not hasattr(plan, "include_inputs"):
+            raise ValueError(f"plan '{plan.name}' missing include_inputs for plan-scoped pools")
+        include_inputs = list(getattr(plan, "include_inputs") or [])
         pool = build_plan_pool(plan_name=str(plan.name), include_inputs=include_inputs, pool_data=pool_data)
         plan_pools[str(plan.name)] = PlanPoolSpec(
             plan_name=str(plan.name),

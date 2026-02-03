@@ -32,6 +32,7 @@ def _meta_arrow_type(name: str, pa):
         "used_tfbs",
         "used_tf_list",
         "input_pwm_ids",
+        "input_source_names",
         "required_regulators",
     }
     list_float = {"input_pwm_tier_fractions"}

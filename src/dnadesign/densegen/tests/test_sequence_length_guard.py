@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/test_sequence_length_guard.py
+
+Sequence-length guard tests for plan constraints and fixed elements.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -105,6 +116,7 @@ def test_sequence_length_guard_shorter_than_motif(tmp_path: Path) -> None:
                     {
                         "name": "default",
                         "quota": 1,
+                        "sampling": {"include_inputs": ["demo"]},
                         "regulator_constraints": {
                             "groups": [
                                 {
@@ -184,6 +196,7 @@ def test_sequence_length_guard_library_total_bp_too_small(tmp_path: Path) -> Non
                     {
                         "name": "default",
                         "quota": 1,
+                        "sampling": {"include_inputs": ["demo"]},
                         "regulator_constraints": {
                             "groups": [
                                 {
@@ -262,6 +275,7 @@ def test_sequence_length_guard_required_regulators_min_length(tmp_path: Path) ->
                     {
                         "name": "default",
                         "quota": 1,
+                        "sampling": {"include_inputs": ["demo"]},
                         "regulator_constraints": {
                             "groups": [
                                 {
@@ -341,6 +355,7 @@ def test_sequence_length_guard_promoter_constraints_min_length(tmp_path: Path) -
                     {
                         "name": "default",
                         "quota": 1,
+                        "sampling": {"include_inputs": ["demo"]},
                         "regulator_constraints": {
                             "groups": [
                                 {

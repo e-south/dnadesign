@@ -154,6 +154,8 @@ def _write_config(path: Path, *, plots_default: list[str]) -> None:
                 plan:
                   - name: demo_plan
                     quota: 1
+                    sampling:
+                      include_inputs: [demo_input]
                     regulator_constraints:
                       groups: []
               solver:

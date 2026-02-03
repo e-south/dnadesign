@@ -60,7 +60,7 @@ def _write_min_config(path: Path) -> None:
                   - name: default
                     quota: 1
                     sampling:
-                      include_inputs: [demo_input]
+                      include_inputs: [demo]
                     regulator_constraints:
                       groups:
                         - name: all
@@ -107,9 +107,10 @@ def test_validate_uses_cwd_config_when_missing_flag(tmp_path: Path) -> None:
         assert "Config is valid" in result.output
 
 
-def test_validate_missing_cwd_config_reports_actionable_error(tmp_path: Path) -> None:
+def test_validate_missing_cwd_config_uses_auto_detected_workspace(tmp_path: Path) -> None:
     with _chdir(tmp_path):
         runner = CliRunner()
         result = runner.invoke(app, ["validate-config"])
-        assert result.exit_code != 0, result.output
-        assert "No config found" in result.output
+        assert result.exit_code == 0, result.output
+        assert "Config not found in cwd; using" in result.output
+        assert "Config is valid" in result.output

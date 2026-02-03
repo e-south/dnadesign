@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/test_cli_library_limit_default.py
+
+CLI summary aggregation tests for library listings.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import json
@@ -8,6 +19,8 @@ from typer.testing import CliRunner
 
 from dnadesign.densegen.src.cli import app
 from dnadesign.densegen.tests.config_fixtures import write_minimal_config
+
+PLAN_POOL_LABEL = "plan_pool__demo_plan"
 
 
 def test_inspect_run_library_summary_is_aggregated(tmp_path: Path) -> None:
@@ -38,7 +51,7 @@ def test_inspect_run_library_summary_is_aggregated(tmp_path: Path) -> None:
         "dense_arrays_version_source": "unknown",
         "items": [
             {
-                "input_name": "demo_input",
+                "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
                 "generated": 0,
                 "duplicates_skipped": 0,
@@ -60,7 +73,7 @@ def test_inspect_run_library_summary_is_aggregated(tmp_path: Path) -> None:
                 "attempt_id": f"a{idx}",
                 "attempt_index": idx,
                 "run_id": "demo",
-                "input_name": "demo_input",
+                "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
                 "created_at": "2026-01-14T00:00:00+00:00",
                 "status": "success",

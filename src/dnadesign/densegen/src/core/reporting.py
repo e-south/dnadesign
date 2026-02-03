@@ -398,7 +398,9 @@ def collect_report_data(
     inputs_by_name = {inp.name: inp for inp in root_cfg.densegen.inputs}
     plan_items = list(root_cfg.densegen.generation.resolve_plan())
     for plan in plan_items:
-        include_inputs = list(plan.sampling.include_inputs or [])
+        include_inputs = list(getattr(plan, "include_inputs", []) or [])
+        if not include_inputs:
+            raise ValueError(f"plan '{plan.name}' is missing include_inputs for plan-scoped pooling")
         mapping: dict[str, str] = {}
         for input_name in include_inputs:
             inp = inputs_by_name.get(input_name)

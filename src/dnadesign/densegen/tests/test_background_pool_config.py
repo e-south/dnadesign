@@ -55,6 +55,8 @@ def test_background_pool_requires_schema_29(tmp_path: Path) -> None:
             plan:
               - name: demo_plan
                 quota: 1
+                sampling:
+                  include_inputs: [neutral_bg]
                 regulator_constraints:
                   groups: []
           solver:

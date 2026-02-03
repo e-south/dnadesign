@@ -20,6 +20,8 @@ from typer.testing import CliRunner
 from dnadesign.densegen.src.cli import app
 from dnadesign.densegen.tests.config_fixtures import write_minimal_config
 
+PLAN_POOL_LABEL = "plan_pool__demo_plan"
+
 
 def _write_attempts(path: Path) -> None:
     df = pd.DataFrame(
@@ -28,7 +30,7 @@ def _write_attempts(path: Path) -> None:
                 "attempt_id": "a1",
                 "attempt_index": 1,
                 "run_id": "demo",
-                "input_name": "demo_input",
+                "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
                 "created_at": "2026-01-14T00:00:01+00:00",
                 "status": "success",
@@ -82,7 +84,7 @@ def test_inspect_run_library_summary_hides_tfbs_sequences(tmp_path: Path) -> Non
         "dense_arrays_version_source": "unknown",
         "items": [
             {
-                "input_name": "demo_input",
+                "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
                 "generated": 1,
                 "duplicates_skipped": 0,

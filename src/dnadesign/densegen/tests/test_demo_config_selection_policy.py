@@ -15,6 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from dnadesign.densegen.src.config import load_config
+from dnadesign.densegen.src.core.input_types import PWM_INPUT_TYPES
 
 
 def _demo_config_path() -> Path:
@@ -26,6 +27,8 @@ def test_demo_config_declares_selection_policy() -> None:
     loaded = load_config(cfg_path)
     cfg = loaded.root.densegen
     for inp in cfg.inputs:
+        if inp.type not in PWM_INPUT_TYPES:
+            continue
         sampling = getattr(inp, "sampling", None)
         if sampling is None:
             continue

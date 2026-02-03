@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/test_resume_pool_reuse.py
+
+Resume-mode reuse and failure-count parsing tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -93,6 +104,7 @@ def _write_config(path: Path, input_path: Path) -> None:
                     {
                         "name": "default",
                         "quota": 1,
+                        "sampling": {"include_inputs": ["demo"]},
                         "regulator_constraints": {
                             "groups": [
                                 {
@@ -162,7 +174,7 @@ def test_load_failure_counts_handles_numpy_arrays(tmp_path: Path) -> None:
             {
                 "status": "failed",
                 "reason": "constraint",
-                "input_name": "demo_input",
+                "input_name": "plan_pool__demo_plan",
                 "plan_name": "demo_plan",
                 "library_tfbs": np.array(["AAA", "CCC"]),
                 "library_tfs": np.array(["TF1", "TF2"]),
@@ -172,5 +184,5 @@ def test_load_failure_counts_handles_numpy_arrays(tmp_path: Path) -> None:
     )
     df.to_parquet(tables_root / "attempts.parquet", index=False)
     counts = _load_failure_counts_from_attempts(outputs_root)
-    key = ("demo_input", "demo_plan", "TF1", "AAA", "site1")
+    key = ("plan_pool__demo_plan", "demo_plan", "TF1", "AAA", "site1")
     assert counts[key]["constraint"] == 1

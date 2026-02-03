@@ -116,6 +116,7 @@ def test_regulator_groups_filtering(tmp_path: Path) -> None:
                     {
                         "name": "default",
                         "quota": 1,
+                        "sampling": {"include_inputs": ["demo"]},
                         "regulator_constraints": {
                             "groups": [
                                 {

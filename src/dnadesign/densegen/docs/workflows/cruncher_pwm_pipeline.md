@@ -16,6 +16,8 @@ Assumptions for this example:
 - **baeR** comes from a processed ChIP-exo FASTA (Choudhary et al. 2020, DOI:
   10.1128/mSystems.00980-20) stored in the sibling repo `dnadesign-data` under
   `primary_literature/Choudhary_et_al/processed/BaeR_binding_sites.fasta`.
+  The FASTA already contains binding-site sequences; no additional genomic
+  coordinate processing is required.
 - RegulonDB curated sites are used as a supplement (baeR by default; lexA/cpxR
   optionally) so discovery can merge across sources.
 
@@ -145,6 +147,20 @@ by default; use `--no-clean` if you want to keep prior artifacts.
 - `type: binding_sites` for exported site tables (optional)
 
 See `reference/config.md` for exact fields.
+
+### DenseGen plan intent (demo_meme_three_tfs)
+
+The packaged DenseGen demo (`workspaces/demo_meme_three_tfs/config.yaml`) adds a
+`background_pool` input to generate neutral 16–20 bp parts via FIMO‑based negative
+selection against LexA/CpxR/BaeR PWMs. Plan‑scoped pooling then builds four libraries:
+
+- `controls` (background only)
+- `ethanol` (CpxR/BaeR + background)
+- `ciprofloxacin` (LexA + background)
+- `ethanol_ciprofloxacin` (LexA + CpxR/BaeR + background)
+
+This layout yields monotypic and heterotypic architectures while preventing
+unintended motif carryover between plans.
 
 ---
 

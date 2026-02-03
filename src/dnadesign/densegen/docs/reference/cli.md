@@ -106,13 +106,14 @@ Outputs:
 ---
 
 #### `dense stage-b build-libraries`
-Build Stage‑B libraries (one per input + plan) from Stage‑A pools.
+Build Stage‑B libraries (one per plan) from plan‑scoped pools derived from
+`generation.plan[].sampling.include_inputs`.
 
 Options:
 - `--out` — output directory relative to run root (default: `outputs/libraries`; must be inside `outputs/`).
 - `--pool` — pool directory from `stage-a build-pool` (defaults to `outputs/pools` in the workspace;
   must be inside `outputs/`).
-- `--input/-i` — input name(s) to build (defaults to all).
+- `--input/-i` — input name(s) to filter plan pools (defaults to all).
 - `--plan/-p` — plan item name(s) to build (defaults to all).
 - `--overwrite` — overwrite existing library artifacts (destructive).
 - `--append` — append new libraries to existing artifacts (cumulative). Requires that the existing
@@ -121,9 +122,11 @@ Options:
 Behavior:
 - If library artifacts exist and neither `--overwrite` nor `--append` is provided, the command exits
   non‑zero with an actionable error.
+- `--input` filters plans by membership: a plan is built only if its `include_inputs` contains all
+  requested input names.
 
 Output summary:
-- CLI output aggregates libraries per input/plan and reports min/median/max for sites, TF counts, and bp totals.
+- CLI output aggregates libraries per plan pool/plan and reports min/median/max for sites, TF counts, and bp totals.
 - Per-library details are written to the Parquet artifacts under `outputs/libraries/`.
 
 Outputs:

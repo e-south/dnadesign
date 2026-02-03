@@ -30,13 +30,15 @@ from dnadesign.densegen.src.viz.plot_stage_b_placement import (
 )
 from dnadesign.densegen.src.viz.plotting import _plot_required_columns, plot_stage_a_summary
 
+PLAN_POOL_LABEL = "plan_pool__demo_plan"
+
 
 def _composition_df() -> pd.DataFrame:
     return pd.DataFrame(
         [
             {
                 "solution_id": "s1",
-                "input_name": "demo_input",
+                "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
                 "library_index": 1,
                 "library_hash": "hash1",
@@ -48,7 +50,7 @@ def _composition_df() -> pd.DataFrame:
             },
             {
                 "solution_id": "s1",
-                "input_name": "demo_input",
+                "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
                 "library_index": 1,
                 "library_hash": "hash1",
@@ -60,7 +62,7 @@ def _composition_df() -> pd.DataFrame:
             },
             {
                 "solution_id": "s2",
-                "input_name": "demo_input",
+                "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
                 "library_index": 2,
                 "library_hash": "hash2",
@@ -80,13 +82,13 @@ def _dense_arrays_df() -> pd.DataFrame:
             {
                 "id": "s1",
                 "sequence": "TTGACACCCCTATAATGGGG",
-                "densegen__input_name": "demo_input",
+                "densegen__input_name": PLAN_POOL_LABEL,
                 "densegen__plan": "demo_plan",
             },
             {
                 "id": "s2",
                 "sequence": "TTGACAGGGGTATAATCCCC",
-                "densegen__input_name": "demo_input",
+                "densegen__input_name": PLAN_POOL_LABEL,
                 "densegen__plan": "demo_plan",
             },
         ]
@@ -130,7 +132,7 @@ def _events_df() -> pd.DataFrame:
             {
                 "event": "RESAMPLE_TRIGGERED",
                 "created_at": "2026-01-26T00:00:15+00:00",
-                "input_name": "demo_input",
+                "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
                 "library_index": 1,
                 "library_hash": "hash1",
@@ -392,8 +394,8 @@ def test_plot_placement_map(tmp_path: Path) -> None:
     )
     assert len(paths) == 2
     names = {Path(path).name for path in paths}
-    assert "placement_map__demo_input__demo_plan__occupancy.png" in names
-    assert "placement_map__demo_input__demo_plan__tfbs_allocation.png" in names
+    assert f"placement_map__{PLAN_POOL_LABEL}__demo_plan__occupancy.png" in names
+    assert f"placement_map__{PLAN_POOL_LABEL}__demo_plan__tfbs_allocation.png" in names
     for path in paths:
         path = Path(path)
         assert path.exists()

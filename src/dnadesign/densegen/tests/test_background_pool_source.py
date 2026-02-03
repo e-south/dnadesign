@@ -16,7 +16,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from dnadesign.densegen.src.adapters.sources.background_pool import BackgroundPoolDataSource
+from dnadesign.densegen.src.adapters.sources.background_pool import (
+    BackgroundPoolDataSource,
+    _run_fimo_exclusion,
+)
+from dnadesign.densegen.src.adapters.sources.stage_a_types import PWMMotif
 from dnadesign.densegen.src.config import (
     BackgroundPoolFiltersConfig,
     BackgroundPoolFimoExcludeConfig,
@@ -25,6 +29,9 @@ from dnadesign.densegen.src.config import (
     BackgroundPoolMiningConfig,
     BackgroundPoolSamplingConfig,
 )
+from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
+
+_FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
 
 def test_background_pool_requires_pwm_inputs(tmp_path: Path) -> None:
@@ -52,3 +59,27 @@ def test_background_pool_requires_pwm_inputs(tmp_path: Path) -> None:
     )
     with pytest.raises(ValueError, match="background_pool.*pwms_input"):
         src.load_data(rng=np.random.default_rng(0))
+
+
+@pytest.mark.skipif(
+    _FIMO_MISSING,
+    reason="fimo executable not available (run tests via `pixi run pytest` or set MEME_BIN).",
+)
+def test_background_pool_fimo_zero_hit_rejects_any_hit() -> None:
+    motif = PWMMotif(
+        motif_id="test_motif",
+        matrix=[
+            {"A": 0.97, "C": 0.01, "G": 0.01, "T": 0.01},
+            {"A": 0.97, "C": 0.01, "G": 0.01, "T": 0.01},
+            {"A": 0.97, "C": 0.01, "G": 0.01, "T": 0.01},
+            {"A": 0.97, "C": 0.01, "G": 0.01, "T": 0.01},
+        ],
+        background={"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+    )
+    accepted, _scores = _run_fimo_exclusion(
+        motifs=[motif],
+        sequences=["TTTT"],
+        allow_zero_hit_only=True,
+        max_score_norm=None,
+    )
+    assert accepted == []

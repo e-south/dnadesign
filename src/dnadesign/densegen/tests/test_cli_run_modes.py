@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/test_cli_run_modes.py
+
+CLI run-mode guardrail tests for DenseGen.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -33,6 +44,8 @@ def _write_config(run_root: Path) -> Path:
             plan:
               - name: demo_plan
                 quota: 1
+                sampling:
+                  include_inputs: [demo_input]
                 regulator_constraints:
                   groups:
                     - name: all
@@ -101,6 +114,8 @@ def _write_pwm_config(run_root: Path) -> Path:
             plan:
               - name: demo_plan
                 quota: 1
+                sampling:
+                  include_inputs: [demo_pwm]
                 regulator_constraints:
                   groups:
                     - name: all

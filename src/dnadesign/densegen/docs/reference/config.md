@@ -53,6 +53,25 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
   - `sequence_column` (default: `sequence`)
   - Empty or null sequences are errors
   - Sequences must be A/C/G/T only
+- `type: background_pool`
+  - Stage‑A negative selection (random DNA filtered to avoid TFBS hits)
+  - `sampling` (required):
+    - `n_sites` (int > 0)
+    - `mining`:
+      - `batch_size` (int > 0)
+      - `budget.candidates` (int > 0; fixed candidate count)
+    - `length`
+      - `policy`: `exact | range` (default: `range`)
+      - `range` or `exact` (required by policy)
+    - `uniqueness.key`: `sequence` (only option)
+    - `gc` (optional): `min`, `max` in [0, 1]
+    - `filters`
+      - `forbid_kmers`: list of A/C/G/T kmers to exclude
+      - `fimo_exclude` (optional):
+        - `pwms_input`: list of PWM input names to screen against
+        - `allow_zero_hit_only`: when true, reject any FIMO hit
+        - `max_score_norm`: required when `allow_zero_hit_only=false`
+  - FIMO resolves via `MEME_BIN` or PATH (pixi users should run `pixi run dense ...`).
 - `type: pwm_meme`
   - `path` - MEME PWM file
   - `motif_ids` (optional list) - choose motifs by ID
@@ -167,6 +186,7 @@ Outputs (tables), logs, and plots must resolve inside `outputs/` under `densegen
 - `plan` (required, non-empty)
   - Each item: `name`, and either `quota` or `fraction`
   - Mixing quotas and fractions across items is not allowed.
+  - `sampling.include_inputs` (required) - input names that feed the plan‑scoped pool.
   - `fixed_elements.promoter_constraints[]` supports `name`, `upstream`, `downstream`,
     `spacer_length`, `upstream_pos`, `downstream_pos`
   - Promoter motifs must be non-empty A/C/G/T strings (normalized to uppercase)
@@ -260,9 +280,18 @@ Notes:
 - `gc.mode`: `off | range | target`
 - `gc.min`, `gc.max` (floats in [0, 1]) — target GC range when `gc.mode=range`
 - `gc.target`, `gc.tolerance` (floats in [0, 1]) — target center and tolerance when `gc.mode=target`
-- `gc.min_pad_length` (int >= 0) — if the pad length is shorter than this value:
+  - `gc.min_pad_length` (int >= 0) — if the pad length is shorter than this value:
   - `strict` → error
   - `adaptive` → relax GC bounds to `[0, 1]` and record the relaxation
+
+---
+
+### `densegen.postprocess.validate_final_sequence`
+
+- `forbid_kmers_outside_promoter_windows.kmers` (required list)
+  - Rejects solutions containing these kmers outside the fixed promoter windows
+    defined in `fixed_elements.promoter_constraints`.
+  - Requires promoter constraints; if none are present, the run fails fast.
 
 ---
 
@@ -328,6 +357,8 @@ densegen:
     plan:
       - name: default
         quota: 100
+        sampling:
+          include_inputs: [demo]
 
   solver:
     backend: CBC

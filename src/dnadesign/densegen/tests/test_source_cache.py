@@ -137,6 +137,7 @@ def test_source_cache_reuses_loaded_inputs(tmp_path: Path) -> None:
                     {
                         "name": "default",
                         "quota": 2,
+                        "sampling": {"include_inputs": ["demo"]},
                         "regulator_constraints": {"groups": []},
                     }
                 ],

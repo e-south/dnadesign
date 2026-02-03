@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/test_reporting_library_summary_outputs.py
+
+Report-table coverage for library summary outputs.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,6 +19,8 @@ from dnadesign.densegen.src.adapters.outputs import OutputRecord, ParquetSink
 from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.core.reporting import collect_report_data
 from dnadesign.densegen.tests.meta_fixtures import output_meta
+
+PLAN_POOL_LABEL = "plan_pool__demo_plan"
 
 
 def _write_config(path: Path) -> None:
@@ -35,6 +48,8 @@ def _write_config(path: Path) -> None:
             plan:
               - name: demo_plan
                 quota: 1
+                sampling:
+                  include_inputs: [demo_input]
                 regulator_constraints:
                   groups: []
           solver:
@@ -74,7 +89,7 @@ def test_library_summary_outputs_filled(tmp_path: Path) -> None:
                 "attempt_id": "a1",
                 "attempt_index": 1,
                 "run_id": "demo",
-                "input_name": "demo_input",
+                "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
                 "created_at": "2026-01-14T00:00:01+00:00",
                 "status": "success",
@@ -100,7 +115,7 @@ def test_library_summary_outputs_filled(tmp_path: Path) -> None:
                 "attempt_id": "a2",
                 "attempt_index": 2,
                 "run_id": "demo",
-                "input_name": "demo_input",
+                "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
                 "created_at": "2026-01-14T00:00:02+00:00",
                 "status": "failed",

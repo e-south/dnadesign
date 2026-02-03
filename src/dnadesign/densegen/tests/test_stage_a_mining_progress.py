@@ -125,3 +125,45 @@ def test_stage_a_milestone_message_format() -> None:
     assert "lexA" in message
     assert "eligible_unique=10" in message
     assert "1.2s" in message
+
+
+def test_stage_a_tier_yield_hidden_when_disabled() -> None:
+    label = stage_a_progress._tier_yield_label(
+        accepted=10,
+        tier_fractions=[0.001, 0.01, 0.09],
+        show_tier_yield=False,
+    )
+    assert label == "-"
+    label = stage_a_progress._tier_yield_label(
+        accepted=10,
+        tier_fractions=[0.001, 0.01, 0.09],
+        show_tier_yield=True,
+    )
+    assert label != "-"
+
+
+def test_background_sampling_progress_uses_live_table(monkeypatch) -> None:
+    prev_enabled = logging_utils.is_progress_enabled()
+    prev_style = logging_utils.get_progress_style()
+    monkeypatch.setenv("PIXI_IN_SHELL", "1")
+    logging_utils.set_progress_enabled(True)
+    logging_utils.set_progress_style("screen")
+    stream = _BufferStream(isatty=True)
+    progress = stage_a_progress._BackgroundSamplingProgress(
+        input_name="neutral_bg",
+        target=100,
+        accepted_target=10,
+        stream=stream,
+    )
+    try:
+        assert progress._use_live is True
+        assert progress._manager is not None
+        state = list(progress._manager._state.values())
+        assert state
+        assert state[0].show_tier_yield is False
+        progress.update(generated=10, accepted=2, batch_index=1, batch_total=10)
+        progress.finish()
+        assert progress._manager._live is None
+    finally:
+        logging_utils.set_progress_enabled(prev_enabled)
+        logging_utils.set_progress_style(prev_style)

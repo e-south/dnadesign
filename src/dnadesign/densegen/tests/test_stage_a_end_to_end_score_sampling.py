@@ -75,6 +75,7 @@ def _write_config(tmp_path: Path) -> Path:
                             {
                                 "name": "default",
                                 "quota": 1,
+                                "sampling": {"include_inputs": ["demo_pwm"]},
                                 "regulator_constraints": {"groups": []},
                             }
                         ],

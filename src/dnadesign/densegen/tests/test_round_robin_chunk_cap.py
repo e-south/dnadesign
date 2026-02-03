@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/test_round_robin_chunk_cap.py
+
+Round-robin runtime guardrail tests for DenseGen.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import random
@@ -115,6 +126,7 @@ def test_round_robin_chunk_cap_subsample(tmp_path: Path) -> None:
                     {
                         "name": "default",
                         "quota": 5,
+                        "sampling": {"include_inputs": ["demo"]},
                         "regulator_constraints": {
                             "groups": [
                                 {
@@ -229,6 +241,7 @@ def test_stall_detected_with_no_solutions(tmp_path: Path) -> None:
                     {
                         "name": "default",
                         "quota": 1,
+                        "sampling": {"include_inputs": ["demo"]},
                         "regulator_constraints": {
                             "groups": [
                                 {

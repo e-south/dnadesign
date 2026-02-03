@@ -38,6 +38,7 @@ class StageAProgressState:
     elapsed: float
     batch_index: Optional[int]
     batch_total: Optional[int]
+    show_tier_yield: bool = True
 
     def __post_init__(self) -> None:
         self.validate()
@@ -59,6 +60,8 @@ class StageAProgressState:
             raise ValueError("Stage-A progress batch_total must be >= 0.")
         if self.target_fraction is not None and not (0.0 < float(self.target_fraction) <= 1.0):
             raise ValueError("Stage-A target_fraction must be in (0, 1].")
+        if not isinstance(self.show_tier_yield, bool):
+            raise ValueError("Stage-A progress show_tier_yield must be a boolean.")
 
 
 def _format_rate(rate: float) -> str:
@@ -85,6 +88,23 @@ def _format_tier_yield(eligible_unique: int, *, fractions: Sequence[float] | Non
         return "-"
     n0, n1, n2, _n3 = score_tier_counts(int(eligible_unique), fractions=fractions)
     return f"{n0}/{n1}/{n2}"
+
+
+def _tier_yield_label(
+    *,
+    accepted: Optional[int],
+    tier_fractions: Sequence[float] | None,
+    show_tier_yield: bool,
+) -> str:
+    if not show_tier_yield or accepted is None:
+        return "-"
+    tier_yield = _format_tier_yield(int(accepted), fractions=tier_fractions)
+    if tier_yield == "-":
+        return tier_yield
+    tier_label = _format_tier_fraction_label(tier_fractions)
+    if tier_label:
+        return f"{tier_label}={tier_yield}"
+    return tier_yield
 
 
 def _format_progress_bar(current: int, total: int, *, width: int = 12) -> str:
@@ -186,10 +206,11 @@ def _stage_a_live_render(state: dict[str, StageAProgressState]):
         else:
             eligible_label = str(accepted)
         tier_fractions = row.tier_fractions
-        tier_yield = _format_tier_yield(int(accepted), fractions=tier_fractions) if accepted is not None else "-"
-        tier_label = _format_tier_fraction_label(tier_fractions)
-        if tier_label and tier_yield != "-":
-            tier_yield = f"{tier_label}={tier_yield}"
+        tier_yield = _tier_yield_label(
+            accepted=accepted,
+            tier_fractions=tier_fractions,
+            show_tier_yield=row.show_tier_yield,
+        )
         elapsed_label = f"{max(0.0, float(elapsed)):.1f}s"
         rate = generated / elapsed if elapsed > 0 else 0.0
         rate_label = _format_rate(rate)
@@ -253,6 +274,7 @@ class StageAProgressManager:
         accepted_target: Optional[int],
         target_fraction: Optional[float],
         tier_fractions: Sequence[float] | None,
+        show_tier_yield: bool = True,
     ) -> bool:
         with self._lock:
             if not self._ensure_live():
@@ -270,6 +292,7 @@ class StageAProgressManager:
                 elapsed=0.0,
                 batch_index=None,
                 batch_total=None,
+                show_tier_yield=bool(show_tier_yield),
             )
             return True
 
@@ -508,3 +531,92 @@ class _PwmSamplingProgress:
         if not self._use_live and self._allow_carriage:
             self.stream.write("\n")
             self.stream.flush()
+
+
+class _BackgroundSamplingProgress:
+    def __init__(
+        self,
+        *,
+        input_name: str,
+        target: int,
+        accepted_target: int,
+        stream: TextIO,
+        manager: StageAProgressManager | None = None,
+        min_interval: float = 0.5,
+    ) -> None:
+        self.input_name = str(input_name)
+        self.target = int(target)
+        self.accepted_target = int(accepted_target)
+        self.stream = stream
+        self._manager = manager
+        self.min_interval = float(min_interval)
+        self._mode = str(logging_utils.get_progress_style())
+        tty = bool(getattr(self.stream, "isatty", lambda: False)())
+        self._enabled = bool(logging_utils.is_progress_enabled())
+        self._use_live = self._enabled and self._mode == "screen" and tty
+        self._live_key = f"{self.input_name}:{id(self)}"
+        self._phase: Optional[str] = "background"
+        self._start = time.monotonic()
+        self._last_update = self._start
+        if self._enabled:
+            logging_utils.set_progress_active(True)
+        if self._use_live:
+            if self._manager is None:
+                self._manager = StageAProgressManager(stream=self.stream)
+            self._use_live = self._manager.register(
+                key=self._live_key,
+                motif_id=self.input_name,
+                backend="background",
+                phase=self._phase,
+                target=int(self.target),
+                accepted_target=int(self.accepted_target),
+                target_fraction=None,
+                tier_fractions=None,
+                show_tier_yield=False,
+            )
+
+    def update(
+        self,
+        *,
+        generated: int,
+        accepted: int,
+        batch_index: Optional[int] = None,
+        batch_total: Optional[int] = None,
+        force: bool = False,
+    ) -> None:
+        if not self._use_live:
+            return
+        now = time.monotonic()
+        if not force and (now - self._last_update) < float(self.min_interval):
+            return
+        if self._manager is None:
+            raise RuntimeError("Stage-A progress manager missing for live update.")
+        elapsed = float(now - self._start)
+        self._manager.update(
+            key=self._live_key,
+            generated=int(generated),
+            accepted=int(accepted),
+            elapsed=elapsed,
+            target=int(self.target),
+            accepted_target=int(self.accepted_target),
+            batch_index=batch_index,
+            batch_total=batch_total,
+            phase=self._phase,
+        )
+        self._last_update = now
+
+    def set_phase(self, phase: Optional[str]) -> None:
+        self._phase = phase
+        if not self._use_live:
+            return
+        if self._manager is None:
+            raise RuntimeError("Stage-A progress manager missing for live phase update.")
+        self._manager.set_phase(key=self._live_key, phase=phase)
+
+    def finish(self) -> None:
+        if self._enabled:
+            logging_utils.set_progress_active(False)
+        if self._use_live:
+            if self._manager is None:
+                raise RuntimeError("Stage-A progress manager missing for live finish.")
+            self._manager.finish(key=self._live_key)
