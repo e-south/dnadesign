@@ -415,6 +415,53 @@ def test_roundctx_contract_accepts_stage_maps():
         pytest.fail(f"roundctx_contract should accept stage maps: {exc}")
 
 
+def test_roundctx_contract_rejects_base_produces_with_stage_maps():
+    with pytest.raises(ValueError):
+
+        @roundctx_contract(
+            category="model",
+            produces=["model/<self>/x_dim"],
+            produces_by_stage={"fit": ["model/<self>/x_dim"]},
+        )
+        def _dummy():
+            return None
+
+
+def test_stage_maps_require_declared_stage():
+    class _Dummy:
+        pass
+
+    dummy = _Dummy()
+    dummy.__opal_contract__ = _StageContract(
+        category="model",
+        requires=tuple(),
+        produces=tuple(),
+        requires_by_stage={"fit": ("core/round_index",)},
+        produces_by_stage={"fit": ("model/<self>/x_dim",)},
+    )
+    rctx = _rctx({"core/round_index": 0})
+    mctx = rctx.for_plugin(category="model", name="dummy", plugin=dummy)
+    with pytest.raises(RoundCtxContractError):
+        mctx.precheck_requires(stage="predict")
+
+
+def test_pluginctx_rejects_stage_maps_with_base_produces():
+    class _Dummy:
+        pass
+
+    dummy = _Dummy()
+    dummy.__opal_contract__ = _StageContract(
+        category="model",
+        requires=tuple(),
+        produces=("model/<self>/x_dim",),
+        requires_by_stage={"fit": ("core/round_index",)},
+        produces_by_stage={"fit": ("model/<self>/x_dim",)},
+    )
+    rctx = _rctx({"core/round_index": 0})
+    with pytest.raises(RoundCtxContractError):
+        rctx.for_plugin(category="model", name="dummy", plugin=dummy)
+
+
 def test_pluginctx_stage_requires_and_produces():
     class _Dummy:
         pass

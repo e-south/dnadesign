@@ -143,6 +143,8 @@ def roundctx_contract(
     prod = tuple(produces or ())
     req_stage = _normalize_stage_map(requires_by_stage, label="requires_by_stage")
     prod_stage = _normalize_stage_map(produces_by_stage, label="produces_by_stage")
+    if prod_stage is not None and prod:
+        raise ValueError("roundctx_contract: produces must be empty when produces_by_stage is provided")
 
     def _wrap(obj: Any) -> Any:
         setattr(
@@ -415,6 +417,14 @@ class PluginCtx:
     name: str
     contract: Contract
 
+    def __post_init__(self) -> None:
+        if self._has_stage_maps() and self.contract.produces:
+            raise RoundCtxContractError(
+                category=self.category,
+                name=self.name,
+                msg="stage-scoped contracts require produces to be empty; use produces_by_stage instead",
+            )
+
     def _expand(self, path: str) -> str:
         if "<self>" in path:
             path = path.replace("<self>", self.name)
@@ -427,6 +437,14 @@ class PluginCtx:
 
     def _has_stage_maps(self) -> bool:
         return bool(self.contract.requires_by_stage or self.contract.produces_by_stage)
+
+    def _stage_keys(self) -> Set[str]:
+        keys: Set[str] = set()
+        req = self.contract.requires_by_stage or {}
+        prod = self.contract.produces_by_stage or {}
+        keys.update(req.keys())
+        keys.update(prod.keys())
+        return keys
 
     def _require_stage(self, stage: Optional[str]) -> str:
         if self._has_stage_maps() and stage is None:
@@ -443,6 +461,12 @@ class PluginCtx:
                 name=self.name,
                 msg="stage must be a non-empty string",
             )
+        if self._has_stage_maps() and stage not in self._stage_keys():
+            raise RoundCtxContractError(
+                category=self.category,
+                name=self.name,
+                msg=f"stage '{stage}' not declared in contract stage maps",
+            )
         return stage
 
     def _stage_requires(self, stage: Optional[str]) -> List[str]:
@@ -458,7 +482,7 @@ class PluginCtx:
         if self._has_stage_maps():
             stage_key = self._require_stage(stage)
             stage_prod = (self.contract.produces_by_stage or {}).get(stage_key, tuple())
-            prods = list(self.contract.produces) + list(stage_prod)
+            prods = list(stage_prod)
         else:
             prods = list(self.contract.produces)
         return [self._expand(p) for p in prods]
