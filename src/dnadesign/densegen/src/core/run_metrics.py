@@ -12,7 +12,6 @@ Dunlop Lab
 
 from __future__ import annotations
 
-import json
 import math
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,6 +21,7 @@ import numpy as np
 import pandas as pd
 
 from .artifacts.pool import POOL_MODE_TFBS, load_pool_data
+from .event_log import load_events
 from .record_values import require_list as _ensure_list
 from .record_values import require_list_of_dicts as _ensure_list_of_dicts
 from .run_paths import run_outputs_root, run_tables_root
@@ -133,15 +133,6 @@ def _assign_score_quantiles(df: pd.DataFrame, *, quantiles: int) -> pd.DataFrame
         df.loc[sub.index, "score_quantile"] = [mapping[int(r)] for r in sub["_rank"].tolist()]
     df.drop(columns=["_rank", "_rank_max"], inplace=True)
     return df
-
-
-def _load_events(events_path: Path) -> pd.DataFrame:
-    rows = []
-    for line in events_path.read_text().splitlines():
-        if not line.strip():
-            continue
-        rows.append(json.loads(line))
-    return pd.DataFrame(rows)
 
 
 def _placements_from_dense_arrays(df: pd.DataFrame) -> pd.DataFrame:
@@ -258,7 +249,7 @@ def build_run_metrics(*, cfg, run_root: Path) -> pd.DataFrame:
     events_path = outputs_root / "meta" / "events.jsonl"
     events_df = pd.DataFrame()
     if events_path.exists():
-        events_df = _load_events(events_path)
+        events_df = load_events(events_path)
 
     pool_df, pool_status = _load_pool_frames(run_root, cfg=cfg)
     has_scores = False

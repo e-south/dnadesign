@@ -11,3 +11,4 @@
 - Split reporting into data and rendering modules; keep public facade stable.
 - Added shared record value coercion helpers and removed duplicated list parsing.
 - Fixed a run_metrics circular import by deferring plan_pools import to call site.
+- Added shared event log parsing helpers and removed duplicated event loaders.

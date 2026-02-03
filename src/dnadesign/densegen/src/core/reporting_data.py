@@ -12,7 +12,6 @@ Dunlop Lab
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 from dataclasses import dataclass
@@ -26,6 +25,7 @@ import pandas as pd
 from ..adapters.outputs import load_records_from_config
 from ..config import RootConfig, resolve_run_root
 from .artifacts.pool import POOL_MODE_TFBS, load_pool_data
+from .event_log import load_events
 from .motif_labels import input_motifs, motif_display_name
 from .pipeline.plan_pools import build_plan_pools, plan_pool_label
 from .record_values import (
@@ -56,21 +56,6 @@ def _solution_id(row: pd.Series) -> str:
     if "id" in row and isinstance(row["id"], str) and row["id"]:
         return row["id"]
     raise ValueError("Output records missing solution_id/id; regenerate outputs before reporting.")
-
-
-def _load_events(events_path: Path) -> pd.DataFrame:
-    if not events_path.exists():
-        return pd.DataFrame(columns=["event", "created_at", "input_name", "plan_name", "library_index", "library_hash"])
-    rows = []
-    for line in events_path.read_text().splitlines():
-        if not line.strip():
-            continue
-        try:
-            payload = json.loads(line)
-        except Exception:
-            continue
-        rows.append(payload)
-    return pd.DataFrame(rows)
 
 
 def _explode_used(df: pd.DataFrame) -> pd.DataFrame:
@@ -664,7 +649,7 @@ def collect_report_data(
     tables["attempts"] = attempts_df
 
     events_path = outputs_root / "meta" / "events.jsonl"
-    events_df = _load_events(events_path)
+    events_df = load_events(events_path, allow_missing=True)
     tables["events"] = events_df
 
     if include_combinatorics:
