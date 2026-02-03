@@ -95,6 +95,38 @@ class Contract:
     category: str
     requires: Tuple[str, ...]
     produces: Tuple[str, ...]
+    requires_by_stage: Optional[Dict[str, Tuple[str, ...]]] = None
+    produces_by_stage: Optional[Dict[str, Tuple[str, ...]]] = None
+
+
+def _assert_path_template(path: str) -> None:
+    sample = path.replace("<self>", "self")
+    _assert_path(sample)
+
+
+def _normalize_stage_map(
+    stage_map: Optional[Mapping[str, List[str]]], *, label: str
+) -> Optional[Dict[str, Tuple[str, ...]]]:
+    if stage_map is None:
+        return None
+    if not isinstance(stage_map, Mapping):
+        raise ValueError(f"roundctx_contract: {label} must be a mapping of stage -> list[path]")
+    out: Dict[str, Tuple[str, ...]] = {}
+    for stage, paths in stage_map.items():
+        if not isinstance(stage, str) or not stage.strip():
+            raise ValueError(f"roundctx_contract: {label} stage name must be a non-empty string")
+        if paths is None:
+            path_list: List[str] = []
+        elif isinstance(paths, (list, tuple)):
+            path_list = list(paths)
+        else:
+            raise ValueError(f"roundctx_contract: {label} for stage '{stage}' must be a list of paths")
+        for p in path_list:
+            if not isinstance(p, str) or not p.strip():
+                raise ValueError(f"roundctx_contract: {label} entries must be non-empty strings (stage '{stage}')")
+            _assert_path_template(p)
+        out[stage] = tuple(path_list)
+    return out
 
 
 def roundctx_contract(
@@ -102,17 +134,29 @@ def roundctx_contract(
     category: str,
     requires: Optional[List[str]] = None,
     produces: Optional[List[str]] = None,
+    requires_by_stage: Optional[Mapping[str, List[str]]] = None,
+    produces_by_stage: Optional[Mapping[str, List[str]]] = None,
 ):
     if category not in _ALLOWED_ROOTS - {"core"}:
         raise ValueError(f"roundctx_contract: invalid category={category!r}")
     req = tuple(requires or ())
     prod = tuple(produces or ())
+    req_stage = _normalize_stage_map(requires_by_stage, label="requires_by_stage")
+    prod_stage = _normalize_stage_map(produces_by_stage, label="produces_by_stage")
+    if prod_stage is not None and prod:
+        raise ValueError("roundctx_contract: produces must be empty when produces_by_stage is provided")
 
     def _wrap(obj: Any) -> Any:
         setattr(
             obj,
             "__opal_contract__",
-            Contract(category=category, requires=req, produces=prod),
+            Contract(
+                category=category,
+                requires=req,
+                produces=prod,
+                requires_by_stage=req_stage,
+                produces_by_stage=prod_stage,
+            ),
         )
         return obj
 
@@ -373,6 +417,14 @@ class PluginCtx:
     name: str
     contract: Contract
 
+    def __post_init__(self) -> None:
+        if self.contract.produces_by_stage is not None and self.contract.produces:
+            raise RoundCtxContractError(
+                category=self.category,
+                name=self.name,
+                msg="stage-scoped contracts require produces to be empty; use produces_by_stage instead",
+            )
+
     def _expand(self, path: str) -> str:
         if "<self>" in path:
             path = path.replace("<self>", self.name)
@@ -383,6 +435,54 @@ class PluginCtx:
         if not path.startswith(f"{self.category}/{self.name}/"):
             raise RoundCtxPathError(path, f"plugin may only write under '{self.category}/{self.name}/...'")
 
+    def _has_stage_maps(self) -> bool:
+        return bool(self.contract.requires_by_stage or self.contract.produces_by_stage)
+
+    def _require_stage(self, stage: Optional[str]) -> str:
+        if self._has_stage_maps() and stage is None:
+            raise RoundCtxContractError(
+                category=self.category,
+                name=self.name,
+                msg="stage is required for stage-scoped contract enforcement",
+            )
+        if stage is None:
+            return ""
+        if not isinstance(stage, str) or not stage.strip():
+            raise RoundCtxContractError(
+                category=self.category,
+                name=self.name,
+                msg="stage must be a non-empty string",
+            )
+        return stage
+
+    def _stage_requires(self, stage: Optional[str]) -> List[str]:
+        if self._has_stage_maps():
+            stage_key = self._require_stage(stage)
+            stage_req = (self.contract.requires_by_stage or {}).get(stage_key, tuple())
+            reqs = list(self.contract.requires) + list(stage_req)
+        else:
+            reqs = list(self.contract.requires)
+        return [self._expand(r) for r in reqs]
+
+    def _stage_produces(self, stage: Optional[str]) -> List[str]:
+        if self._has_stage_maps():
+            stage_key = self._require_stage(stage)
+            stage_prod = (self.contract.produces_by_stage or {}).get(stage_key, tuple())
+            prods = list(stage_prod)
+        else:
+            prods = list(self.contract.produces)
+        return [self._expand(p) for p in prods]
+
+    def _allowed_produces(self) -> Set[str]:
+        out: Set[str] = set()
+        for p in self.contract.produces:
+            out.add(self._expand(p))
+        stage_map = self.contract.produces_by_stage or {}
+        for paths in stage_map.values():
+            for p in paths:
+                out.add(self._expand(p))
+        return out
+
     def get(self, path: str, default: Any = None) -> Any:
         p = self._expand(path)
         val = self.round_ctx.get(p, default=default)
@@ -392,8 +492,7 @@ class PluginCtx:
     def set(self, path: str, value: Any) -> None:
         p = self._expand(path)
         self._ensure_own_namespace(p)
-        expanded_produces = [self._expand(x) for x in self.contract.produces]
-        if p not in expanded_produces:
+        if p not in self._allowed_produces():
             raise RoundCtxContractError(
                 category=self.category,
                 name=self.name,
@@ -403,10 +502,10 @@ class PluginCtx:
         self.round_ctx.set(p, value, allow_overwrite=False)
         self.round_ctx._audit.add_produced(self.category, self.name, p)
 
-    def precheck_requires(self) -> None:
+    def precheck_requires(self, stage: Optional[str] = None) -> None:
         missing: List[str] = []
-        for req in self.contract.requires:
-            p = self._expand(req)
+        for req in self._stage_requires(stage):
+            p = req
             try:
                 self.round_ctx.get(p)
             except KeyError:
@@ -414,10 +513,10 @@ class PluginCtx:
         if missing:
             raise RoundCtxContractError(category=self.category, name=self.name, missing_requires=missing)
 
-    def postcheck_produces(self) -> None:
+    def postcheck_produces(self, stage: Optional[str] = None) -> None:
         missing: List[str] = []
-        for prod in self.contract.produces:
-            p = self._expand(prod)
+        for prod in self._stage_produces(stage):
+            p = prod
             try:
                 self.round_ctx.get(p)
             except KeyError:

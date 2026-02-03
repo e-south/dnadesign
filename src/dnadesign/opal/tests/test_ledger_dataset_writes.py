@@ -114,3 +114,50 @@ def test_ledger_labels_writes_dataset_parts(tmp_path: Path) -> None:
     reader = LedgerReader(ws)
     labels_df = reader.read_labels()
     assert len(labels_df) == 1
+
+
+def test_run_pred_diagnostics_column_order_is_deterministic() -> None:
+    y_hat = np.array([[0.1], [0.2]])
+    y_obj = np.array([0.1, 0.2])
+    sel_emit = SelectionEmit(
+        ranks_competition=np.array([1, 2]),
+        selected_bool=np.array([True, False]),
+    )
+    diag = {
+        "effect_raw": np.array([1.0, 2.0]),
+        "effect_scaled": np.array([0.1, 0.2]),
+        "logic_fidelity": np.array([0.5, 0.6]),
+        "clip_lo_mask": np.array([0.0, 1.0]),
+        "clip_hi_mask": np.array([1.0, 0.0]),
+    }
+    run_pred = build_run_pred_events(
+        run_id="run-0",
+        as_of_round=0,
+        ids=["a", "b"],
+        sequences=["AAA", "BBB"],
+        y_hat_model=y_hat,
+        y_obj_scalar=y_obj,
+        y_dim=1,
+        y_hat_model_sd=None,
+        y_obj_scalar_sd=None,
+        obj_diagnostics=diag,
+        sel_emit=sel_emit,
+    )
+    expected = [
+        "event",
+        "run_id",
+        "as_of_round",
+        "id",
+        "sequence",
+        "pred__y_dim",
+        "pred__y_hat_model",
+        "pred__y_obj_scalar",
+        "sel__rank_competition",
+        "sel__is_selected",
+        "obj__logic_fidelity",
+        "obj__effect_raw",
+        "obj__effect_scaled",
+        "obj__clip_lo_mask",
+        "obj__clip_hi_mask",
+    ]
+    assert list(run_pred.columns) == expected

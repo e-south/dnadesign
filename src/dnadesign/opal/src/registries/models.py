@@ -80,7 +80,10 @@ def _wrap_model_for_ctx(name: str, model: Any) -> Any:
     if getattr(model, "__opal_ctx_wrapped__", False):
         return model
 
-    def _wrap_method(method_name: str) -> None:
+    def _has_stage_maps() -> bool:
+        return bool(getattr(contract, "requires_by_stage", None) or getattr(contract, "produces_by_stage", None))
+
+    def _wrap_method(method_name: str, *, stage: str, postcheck: bool = True) -> None:
         orig = getattr(model, method_name, None)
         if not callable(orig):
             return
@@ -88,16 +91,16 @@ def _wrap_model_for_ctx(name: str, model: Any) -> Any:
         def _wrapped(*args, **kwargs):
             ctx = kwargs.get("ctx")
             if ctx is not None:
-                ctx.precheck_requires()
+                ctx.precheck_requires(stage=stage)
             out = orig(*args, **kwargs)
-            if ctx is not None:
-                ctx.postcheck_produces()
+            if ctx is not None and postcheck:
+                ctx.postcheck_produces(stage=stage)
             return out
 
         setattr(model, method_name, _wrapped)
 
-    _wrap_method("fit")
-    _wrap_method("predict")
+    _wrap_method("fit", stage="fit", postcheck=True)
+    _wrap_method("predict", stage="predict", postcheck=not _has_stage_maps())
     setattr(model, "__opal_ctx_wrapped__", True)
     return model
 

@@ -126,8 +126,8 @@ Campaign
 Latest round
   r              : 0
   run_id         : r0-<timestamp>
-  n_train        : 6
-  n_scored       : 9
+  n_train        : <count>
+  n_scored       : <count>
   top_k requested: 5
   top_k effective: 5
   round_dir      : <repo>/src/dnadesign/opal/campaigns/demo/outputs/rounds/round_0
@@ -138,7 +138,7 @@ Latest round
 ```
 Runs
   - r=0, run_id=r0-<timestamp>, model=random_forest, objective=sfxi_v1,
-    selection=top_n, n_train=6, n_scored=9
+    selection=top_n, n_train=<count>, n_scored=<count>
   - (more runs appear here if you re-run with --resume; the round dir is wiped before the re-run)
 ```
 
@@ -157,11 +157,18 @@ Round log
 Stages
   - done
   - fit
+  - fit_start
+  - model_feature_importance
+  - objective_done
   - predict_batch
   - selection
+  - selection_done
   - yops_fit_transform
   - yops_inverse_done
 ```
+
+Stage lists depend on config; e.g., `model_feature_importance` appears only when
+`model.params.emit_feature_importance` is enabled.
 
 ---
 
@@ -218,6 +225,8 @@ uv run opal notebook run
 If you are *not* inside the campaign directory, pass `-c configs/campaign.yaml`.
 When multiple notebooks exist, `uv run opal notebook run` will prompt you to choose (TTY)
 or ask you to pass `--path` in non-interactive contexts.
+`opal notebook run` launches the interactive marimo editor and will block; for
+headless checks you can run `uv run marimo run --headless <notebook.py>` instead.
 
 The notebook loads campaign artifacts and label history from `records.parquet`,
 then gives you interactive filtering and plots for the selected run.
