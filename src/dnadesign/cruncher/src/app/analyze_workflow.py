@@ -3,7 +3,9 @@
 <cruncher project>
 src/dnadesign/cruncher/src/app/analyze_workflow.py
 
-Author(s): Eric J. South
+Analyze sampling runs and produce summary reports.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -11,9 +13,6 @@ from __future__ import annotations
 
 import json
 import logging
-import shutil
-import uuid
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -37,11 +36,34 @@ from dnadesign.cruncher.analysis.overlap import compute_overlap_tables
 from dnadesign.cruncher.analysis.parquet import read_parquet, write_parquet
 from dnadesign.cruncher.analysis.plot_registry import PLOT_SPECS
 from dnadesign.cruncher.analysis.report import ensure_report
+from dnadesign.cruncher.app.analyze.archive import (
+    _analysis_item_paths,
+    _analysis_signature,
+    _archive_existing_analysis,
+    _clear_latest_analysis,
+    _load_summary_id,
+    _load_summary_payload,
+    _prune_latest_analysis_artifacts,
+    _rewrite_manifest_paths,
+    _update_archived_summary,
+)
+from dnadesign.cruncher.app.analyze.diagnostics import _summarize_move_stats
+from dnadesign.cruncher.app.analyze.metadata import (
+    SampleMeta,
+    _analysis_id,
+    _auto_select_tf_pair,
+    _get_git_commit,
+    _get_version,
+    _load_pwms_from_config,
+    _resolve_git_dir,
+    _resolve_sample_meta,
+    _resolve_scoring_params,
+    _resolve_tf_pair,
+)
 from dnadesign.cruncher.app.run_service import list_runs
 from dnadesign.cruncher.artifacts.entries import (
     append_artifacts,
     artifact_entry,
-    normalize_artifacts,
 )
 from dnadesign.cruncher.artifacts.layout import (
     config_used_path,
@@ -50,450 +72,36 @@ from dnadesign.cruncher.artifacts.layout import (
     trace_path,
 )
 from dnadesign.cruncher.artifacts.manifest import load_manifest
-from dnadesign.cruncher.config.moves import resolve_move_config
-from dnadesign.cruncher.config.schema_v2 import AnalysisConfig, CruncherConfig, SampleMovesConfig
-from dnadesign.cruncher.core.pwm import PWM
-from dnadesign.cruncher.utils.hashing import sha256_bytes, sha256_path
+from dnadesign.cruncher.config.schema_v2 import CruncherConfig
+from dnadesign.cruncher.utils.hashing import sha256_path
 from dnadesign.cruncher.utils.paths import resolve_catalog_root
 from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
 
 logger = logging.getLogger(__name__)
 
-_ANALYSIS_ITEMS = (
-    "summary.json",
-    "report.json",
-    "report.md",
-    "analysis_used.yaml",
-    "plot_manifest.json",
-    "table_manifest.json",
-    "manifest.json",
-)
-
-
-def _analysis_item_paths(analysis_root: Path) -> list[Path]:
-    if not analysis_root.exists():
-        return []
-    return [p for p in analysis_root.iterdir() if p.name != "_archive"]
-
-
-def _prune_latest_analysis_artifacts(manifest: dict) -> None:
-    artifacts = normalize_artifacts(manifest.get("artifacts"))
-    pruned: list[dict[str, object]] = []
-    for item in artifacts:
-        path = str(item.get("path") or "")
-        norm_path = path.replace("\\", "/")
-        if norm_path == "analysis" or norm_path.startswith("analysis/"):
-            if not norm_path.startswith("analysis/_archive/"):
-                continue
-        pruned.append(item)
-    manifest["artifacts"] = pruned
-
-
-def _load_summary_id(analysis_root: Path) -> str | None:
-    summary_file = summary_path(analysis_root)
-    if not summary_file.exists():
-        return None
-    try:
-        payload = json.loads(summary_file.read_text())
-    except Exception as exc:
-        raise ValueError(f"analysis summary is not valid JSON: {summary_file}") from exc
-    if not isinstance(payload, dict):
-        raise ValueError(f"analysis summary must be a JSON object: {summary_file}")
-    analysis_id = payload.get("analysis_id")
-    if not isinstance(analysis_id, str) or not analysis_id:
-        raise ValueError(f"analysis summary missing analysis_id: {summary_file}")
-    return analysis_id
-
-
-def _load_summary_payload(analysis_root: Path) -> dict | None:
-    summary_file = summary_path(analysis_root)
-    if not summary_file.exists():
-        return None
-    try:
-        payload = json.loads(summary_file.read_text())
-    except Exception as exc:
-        raise ValueError(f"analysis summary is not valid JSON: {summary_file}") from exc
-    if not isinstance(payload, dict):
-        raise ValueError(f"analysis summary must be a JSON object: {summary_file}")
-    return payload
-
-
-def _analysis_signature(
-    *,
-    analysis_cfg: AnalysisConfig,
-    override_payload: dict[str, object] | None,
-    config_used_file: Path,
-    sequences_file: Path,
-    elites_file: Path,
-    trace_file: Path,
-) -> tuple[str, dict[str, object]]:
-    inputs: dict[str, object] = {
-        "config_used_sha256": sha256_path(config_used_file),
-        "sequences_sha256": sha256_path(sequences_file),
-        "elites_sha256": sha256_path(elites_file),
-        "analysis_layout_version": ANALYSIS_LAYOUT_VERSION,
-    }
-    if trace_file.exists():
-        inputs["trace_sha256"] = sha256_path(trace_file)
-    payload = {
-        "analysis": analysis_cfg.model_dump(),
-        "analysis_overrides": override_payload or {},
-        "inputs": inputs,
-    }
-    signature = sha256_bytes(json.dumps(payload, sort_keys=True).encode("utf-8"))
-    return signature, payload
-
-
-def _rewrite_manifest_paths(manifest: dict, analysis_id: str, moved_prefixes: list[str]) -> None:
-    artifacts = manifest.get("artifacts") or []
-    for item in artifacts:
-        if not isinstance(item, dict):
-            continue
-        path = str(item.get("path") or "")
-        for prefix in moved_prefixes:
-            old_prefix = f"analysis/{prefix}"
-            if path == old_prefix or path.startswith(old_prefix):
-                suffix = path[len(old_prefix) :]
-                item["path"] = f"analysis/_archive/{analysis_id}/{prefix}{suffix}"
-                break
-
-
-def _update_archived_summary(archive_root: Path, analysis_id: str, moved_prefixes: list[str]) -> None:
-    summary_file = summary_path(archive_root)
-    if not summary_file.exists():
-        return
-    payload = json.loads(summary_file.read_text())
-    if not isinstance(payload, dict):
-        raise ValueError(f"analysis summary must be a JSON object: {summary_file}")
-
-    def _rewrite_path(value: str) -> str:
-        for prefix in moved_prefixes:
-            old_prefix = f"analysis/{prefix}"
-            if value == old_prefix or value.startswith(old_prefix):
-                suffix = value[len(old_prefix) :]
-                return f"analysis/_archive/{analysis_id}/{prefix}{suffix}"
-        return value
-
-    for key in ("analysis_used", "plot_manifest", "table_manifest"):
-        raw = payload.get(key)
-        if isinstance(raw, str):
-            payload[key] = _rewrite_path(raw)
-
-    artifacts = payload.get("artifacts")
-    if isinstance(artifacts, list):
-        payload["artifacts"] = [_rewrite_path(item) if isinstance(item, str) else item for item in artifacts]
-
-    payload["analysis_dir"] = str(archive_root.resolve())
-    payload["archived_at"] = datetime.now(timezone.utc).isoformat()
-    summary_file.write_text(json.dumps(payload, indent=2))
-
-
-def _archive_existing_analysis(analysis_root: Path, manifest: dict, analysis_id: str) -> None:
-    archive_root = analysis_root / "_archive" / analysis_id
-    archive_root.mkdir(parents=True, exist_ok=True)
-    moved_prefixes: list[str] = []
-    for path in _analysis_item_paths(analysis_root):
-        if not path.exists():
-            continue
-        moved_prefixes.append(path.name + ("/" if path.is_dir() else ""))
-        shutil.move(str(path), archive_root / path.name)
-    if moved_prefixes:
-        _rewrite_manifest_paths(manifest, analysis_id, moved_prefixes)
-        _update_archived_summary(archive_root, analysis_id, moved_prefixes)
-
-
-def _clear_latest_analysis(analysis_root: Path) -> None:
-    for path in _analysis_item_paths(analysis_root):
-        if not path.exists():
-            continue
-        if path.is_dir():
-            shutil.rmtree(path)
-        else:
-            path.unlink()
-
-
-@dataclass(frozen=True)
-class SampleMeta:
-    optimizer_kind: str
-    chains: int
-    draws: int
-    tune: int
-    move_probs: dict[str, float]
-    cooling_kind: str
-    pwm_sum_threshold: float
-    bidirectional: bool
-    top_k: int
-    mode: str
-    dsdna_canonicalize: bool
-    dsdna_hamming: bool
-
-
-def _load_pwms_from_config(run_dir: Path) -> tuple[dict[str, PWM], dict]:
-    import numpy as np
-
-    config_path = config_used_path(run_dir)
-    if not config_path.exists():
-        raise FileNotFoundError(f"Missing meta/config_used.yaml in {run_dir}")
-    payload = yaml.safe_load(config_path.read_text()) or {}
-    cruncher_cfg = payload.get("cruncher")
-    if not isinstance(cruncher_cfg, dict):
-        raise ValueError("config_used.yaml missing top-level 'cruncher' section.")
-    pwms_info = cruncher_cfg.get("pwms_info")
-    if not isinstance(pwms_info, dict) or not pwms_info:
-        raise ValueError("config_used.yaml missing pwms_info; re-run `cruncher sample`.")
-    pwms: dict[str, PWM] = {}
-    for tf_name, info in pwms_info.items():
-        matrix = info.get("pwm_matrix")
-        if not matrix:
-            raise ValueError(f"config_used.yaml missing pwm_matrix for TF '{tf_name}'.")
-        pwms[tf_name] = PWM(name=tf_name, matrix=np.array(matrix, dtype=float))
-    return pwms, cruncher_cfg
-
-
-def _resolve_sample_meta(cfg: CruncherConfig, used_cfg: dict) -> SampleMeta:
-    if cfg.sample is None:
-        raise ValueError("sample section is required for analyze")
-    used_sample = used_cfg.get("sample") if isinstance(used_cfg, dict) else None
-    if not isinstance(used_sample, dict):
-        raise ValueError("config_used.yaml missing sample section; re-run `cruncher sample`.")
-
-    def _require(path: list[str], label: str) -> object:
-        cursor: object = used_sample
-        for key in path:
-            if not isinstance(cursor, dict) or key not in cursor:
-                raise ValueError(f"config_used.yaml missing sample.{label}; re-run `cruncher sample`.")
-            cursor = cursor[key]
-        return cursor
-
-    def _coerce_int(value: object, label: str) -> int:
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            raise ValueError(f"config_used.yaml sample.{label} must be an integer.")
-        if isinstance(value, float) and not value.is_integer():
-            raise ValueError(f"config_used.yaml sample.{label} must be an integer.")
-        return int(value)
-
-    def _coerce_float(value: object, label: str) -> float:
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            raise ValueError(f"config_used.yaml sample.{label} must be a number.")
-        return float(value)
-
-    optimizer_kind = str(_require(["optimizer", "name"], "optimizer.name"))
-    draws = _coerce_int(_require(["budget", "draws"], "budget.draws"), "budget.draws")
-    tune = _coerce_int(_require(["budget", "tune"], "budget.tune"), "budget.tune")
-    restarts = _coerce_int(_require(["budget", "restarts"], "budget.restarts"), "budget.restarts")
-    mode_val = _require(["mode"], "mode")
-    if not isinstance(mode_val, str):
-        raise ValueError("config_used.yaml sample.mode must be a string.")
-    bidirectional_val = _require(["objective", "bidirectional"], "objective.bidirectional")
-    if not isinstance(bidirectional_val, bool):
-        raise ValueError("config_used.yaml sample.objective.bidirectional must be a boolean.")
-    bidirectional = bidirectional_val
-    top_k = _coerce_int(_require(["elites", "k"], "elites.k"), "elites.k")
-    pwm_sum_threshold = _coerce_float(
-        _require(["elites", "filters", "pwm_sum_min"], "elites.filters.pwm_sum_min"),
-        "elites.filters.pwm_sum_min",
-    )
-    elites_cfg = used_sample.get("elites") if isinstance(used_sample, dict) else None
-    if not isinstance(elites_cfg, dict):
-        elites_cfg = {}
-    dsdna_canonicalize_val = elites_cfg.get("dsDNA_canonicalize", False)
-    if not isinstance(dsdna_canonicalize_val, bool):
-        raise ValueError("config_used.yaml sample.elites.dsDNA_canonicalize must be a boolean.")
-    dsdna_hamming_val = elites_cfg.get("dsDNA_hamming")
-    if dsdna_hamming_val is None:
-        dsdna_hamming_val = dsdna_canonicalize_val
-    if not isinstance(dsdna_hamming_val, bool):
-        raise ValueError("config_used.yaml sample.elites.dsDNA_hamming must be a boolean.")
-
-    moves_payload = _require(["moves"], "moves")
-    moves_cfg = SampleMovesConfig.model_validate(moves_payload)
-    move_probs = resolve_move_config(moves_cfg).move_probs
-
-    if optimizer_kind not in {"gibbs", "pt"}:
-        raise ValueError("config_used.yaml sample.optimizer.name must be 'gibbs' or 'pt'.")
-    if optimizer_kind == "gibbs":
-        chains = restarts
-        cooling_path = ["optimizers", "gibbs", "beta_schedule", "kind"]
-        cooling_kind = str(_require(cooling_path, "optimizers.gibbs.beta_schedule.kind"))
-    else:
-        ladder = _require(["optimizers", "pt", "beta_ladder"], "optimizers.pt.beta_ladder")
-        if not isinstance(ladder, dict):
-            raise ValueError("config_used.yaml sample.optimizers.pt.beta_ladder must be a mapping.")
-        cooling_kind = str(ladder.get("kind") or "")
-        if cooling_kind == "fixed":
-            chains = 1
-        else:
-            betas = ladder.get("betas")
-            n_temps = ladder.get("n_temps")
-            if isinstance(betas, list) and betas:
-                chains = len(betas)
-            elif isinstance(n_temps, int):
-                chains = int(n_temps)
-            else:
-                raise ValueError("config_used.yaml sample.optimizers.pt.beta_ladder must define betas or n_temps.")
-
-    return SampleMeta(
-        optimizer_kind=optimizer_kind,
-        chains=chains,
-        draws=draws,
-        tune=tune,
-        move_probs=move_probs,
-        cooling_kind=cooling_kind,
-        pwm_sum_threshold=pwm_sum_threshold,
-        bidirectional=bidirectional,
-        top_k=top_k,
-        mode=mode_val,
-        dsdna_canonicalize=dsdna_canonicalize_val,
-        dsdna_hamming=dsdna_hamming_val,
-    )
-
-
-def _resolve_scoring_params(used_cfg: dict) -> tuple[float, float | None]:
-    if not isinstance(used_cfg, dict):
-        raise ValueError("config_used.yaml is missing sample config; re-run `cruncher sample`.")
-    sample = used_cfg.get("sample")
-    if not isinstance(sample, dict):
-        raise ValueError("config_used.yaml missing sample section; re-run `cruncher sample`.")
-    objective = sample.get("objective")
-    if not isinstance(objective, dict):
-        raise ValueError("config_used.yaml missing sample.objective; re-run `cruncher sample`.")
-    scoring = objective.get("scoring")
-    if not isinstance(scoring, dict):
-        raise ValueError("config_used.yaml missing sample.objective.scoring; re-run `cruncher sample`.")
-    pseudocounts = scoring.get("pwm_pseudocounts")
-    if not isinstance(pseudocounts, (int, float)):
-        raise ValueError("config_used.yaml sample.objective.scoring.pwm_pseudocounts must be a number.")
-    log_odds_clip = scoring.get("log_odds_clip")
-    if log_odds_clip is not None and not isinstance(log_odds_clip, (int, float)):
-        raise ValueError("config_used.yaml sample.objective.scoring.log_odds_clip must be a number or null.")
-    return float(pseudocounts), float(log_odds_clip) if log_odds_clip is not None else None
-
-
-def _analysis_id() -> str:
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    suffix = uuid.uuid4().hex[:6]
-    return f"{stamp}_{suffix}"
-
-
-def _get_version() -> str | None:
-    try:
-        from importlib.metadata import version
-
-        return version("dnadesign")
-    except Exception:
-        return None
-
-
-def _resolve_git_dir(path: Path) -> Path | None:
-    git_path = path / ".git"
-    if not git_path.exists():
-        return None
-    if git_path.is_dir():
-        return git_path
-    if git_path.is_file():
-        try:
-            payload = git_path.read_text().strip()
-        except OSError:
-            return None
-        if payload.startswith("gitdir:"):
-            git_dir = payload.split(":", 1)[1].strip()
-            resolved = Path(git_dir)
-            if not resolved.is_absolute():
-                resolved = (git_path.parent / resolved).resolve()
-            if resolved.exists():
-                return resolved
-    return None
-
-
-def _get_git_commit(path: Path) -> str | None:
-    probe = path.resolve()
-    for _ in range(6):
-        git_dir = _resolve_git_dir(probe)
-        if git_dir is not None:
-            try:
-                head = (git_dir / "HEAD").read_text().strip()
-            except OSError:
-                return None
-            if head.startswith("ref:"):
-                ref = head.split(" ", 1)[1].strip()
-                ref_path = git_dir / ref
-                if ref_path.exists():
-                    try:
-                        return ref_path.read_text().strip()
-                    except OSError:
-                        return None
-            return head or None
-        if probe.parent == probe:
-            break
-        probe = probe.parent
-    return None
-
-
-def _resolve_tf_pair(
-    analysis_cfg: AnalysisConfig,
-    tf_names: list[str],
-    tf_pair_override: tuple[str, str] | None = None,
-) -> tuple[str, str] | None:
-    pair = tf_pair_override
-    if pair is None:
-        pair = analysis_cfg.tf_pair
-    if pair is None:
-        return None
-    if len(pair) != 2:
-        raise ValueError("analysis.tf_pair must contain exactly two TF names.")
-    x_tf, y_tf = pair
-    if x_tf not in tf_names or y_tf not in tf_names:
-        raise ValueError(f"analysis.tf_pair must reference TFs in {tf_names}.")
-    return x_tf, y_tf
-
-
-def _auto_select_tf_pair(
-    score_df: pd.DataFrame,
-    tf_names: list[str],
-) -> tuple[tuple[str, str] | None, str | None]:
-    if len(tf_names) < 2 or score_df.empty:
-        return None, "fewer than two TFs or empty score table"
-    cols = [f"score_{tf}" for tf in tf_names if f"score_{tf}" in score_df.columns]
-    if len(cols) < 2:
-        return None, "missing per-TF score columns"
-    medians = {tf: float(score_df[f"score_{tf}"].median()) for tf in tf_names if f"score_{tf}" in score_df.columns}
-    if len(medians) < 2:
-        return None, "insufficient score medians"
-    worst_tf = sorted(medians.items(), key=lambda item: (item[1], item[0]))[0][0]
-    corr = score_df[cols].corr()
-    corr_col = corr.get(f"score_{worst_tf}") if hasattr(corr, "get") else None
-    if corr_col is not None:
-        candidates = {}
-        for tf in tf_names:
-            if tf == worst_tf:
-                continue
-            key = f"score_{tf}"
-            if key not in corr_col.index:
-                continue
-            value = corr_col.get(key)
-            if value is None or not np.isfinite(value):
-                continue
-            candidates[tf] = float(value)
-        if candidates:
-            tradeoff_tf = sorted(candidates.items(), key=lambda item: (item[1], item[0]))[0][0]
-            return (worst_tf, tradeoff_tf), "worst-median TF paired with lowest correlation partner"
-    sorted_tfs = [tf for tf, _ in sorted(medians.items(), key=lambda item: (item[1], item[0]))]
-    if len(sorted_tfs) >= 2:
-        return (sorted_tfs[0], sorted_tfs[1]), "fallback to two lowest medians"
-    return None, "unable to select pair"
-
-
-def _summarize_move_stats(move_stats: list[dict[str, object]]) -> pd.DataFrame:
-    if not move_stats:
-        return pd.DataFrame()
-    df = pd.DataFrame(move_stats)
-    required = {"move_kind", "attempted", "accepted"}
-    if not required.issubset(df.columns):
-        return pd.DataFrame()
-    grouped = df.groupby("move_kind", as_index=False)[["attempted", "accepted"]].sum()
-    grouped["acceptance_rate"] = grouped["accepted"] / grouped["attempted"].replace(0, np.nan)
-    grouped["usage_fraction"] = grouped["attempted"] / grouped["attempted"].sum() if not grouped.empty else 0.0
-    return grouped
+__all__ = [
+    "SampleMeta",
+    "_analysis_id",
+    "_analysis_item_paths",
+    "_analysis_signature",
+    "_archive_existing_analysis",
+    "_auto_select_tf_pair",
+    "_clear_latest_analysis",
+    "_get_git_commit",
+    "_get_version",
+    "_load_pwms_from_config",
+    "_load_summary_id",
+    "_load_summary_payload",
+    "_prune_latest_analysis_artifacts",
+    "_resolve_git_dir",
+    "_resolve_sample_meta",
+    "_resolve_scoring_params",
+    "_resolve_tf_pair",
+    "_rewrite_manifest_paths",
+    "_summarize_move_stats",
+    "_update_archived_summary",
+    "run_analyze",
+]
 
 
 def run_analyze(
