@@ -38,6 +38,7 @@ import re
 import shutil
 import sys
 import tempfile
+from functools import partial
 from pathlib import Path
 from typing import Iterator, Optional
 
@@ -58,16 +59,24 @@ from .cli_commands.stage_b import register_stage_b_commands
 from .cli_commands.templates import resolve_template_dir as _resolve_template_dir_impl
 from .cli_commands.workspace import register_workspace_commands
 from .cli_sampling import format_selection_label
-from .config import (
-    ConfigError,
-    load_config,
-    resolve_outputs_scoped_path,
-    resolve_relative_path,
-    resolve_run_root,
+from .cli_setup import (
+    DEFAULT_CONFIG_FILENAME,
 )
+from .cli_setup import (
+    ensure_fimo_available as _ensure_fimo_available_impl,
+)
+from .cli_setup import (
+    load_config_or_exit as _load_config_or_exit_impl,
+)
+from .cli_setup import (
+    resolve_config_path as _resolve_config_path_impl,
+)
+from .cli_setup import (
+    resolve_outputs_path_or_exit as _resolve_outputs_path_or_exit_impl,
+)
+from .config import resolve_relative_path, resolve_run_root
 from .core.artifacts.pool import PoolData
 from .core.run_paths import display_path
-from .integrations.meme_suite import require_executable
 from .utils.logging_utils import install_native_stderr_filters
 from .utils.rich_style import make_table
 
@@ -85,9 +94,9 @@ _PYARROW_SYSCTL_PATTERN = re.compile(r"sysctlbyname failed for 'hw\.")
 log = logging.getLogger(__name__)
 install_native_stderr_filters(suppress_solver_messages=False)
 
-DEFAULT_CONFIG_FILENAME = "config.yaml"
 DEFAULT_CONFIG_MISSING_MESSAGE = (
-    "No config found. cd into a workspace containing config.yaml, or pass -c path/to/config.yaml."
+    f"No config found. cd into a workspace containing {DEFAULT_CONFIG_FILENAME}, "
+    f"or pass -c path/to/{DEFAULT_CONFIG_FILENAME}."
 )
 
 
@@ -119,12 +128,6 @@ def _suppress_pyarrow_sysctl_warnings() -> Iterator[None]:
         lines = [line for line in text.splitlines() if not _PYARROW_SYSCTL_PATTERN.search(line)]
         if lines:
             sys.stderr.write("\n".join(lines) + "\n")
-
-
-def _input_uses_fimo(input_cfg) -> bool:
-    if not str(getattr(input_cfg, "type", "")).startswith("pwm_"):
-        return False
-    return True
 
 
 def _candidate_logging_enabled(cfg, *, selected: set[str] | None = None) -> bool:
@@ -208,100 +211,6 @@ def _apply_stage_a_overrides(
             inp.overrides_by_motif_id = new_overrides
 
 
-def _ensure_fimo_available(cfg, *, strict: bool = True) -> None:
-    if not any(_input_uses_fimo(inp) for inp in cfg.inputs):
-        return
-    try:
-        require_executable("fimo", tool_path=None)
-    except FileNotFoundError as exc:
-        msg = f"FIMO is required for this config but was not found. {exc}"
-        if strict:
-            console.print(f"[bold red]{msg}[/]")
-            raise typer.Exit(code=1)
-        log.warning(msg)
-
-
-def _default_config_path() -> Path:
-    return Path.cwd() / DEFAULT_CONFIG_FILENAME
-
-
-def _find_config_in_parents(start: Path) -> Path | None:
-    try:
-        cursor = start.resolve()
-    except Exception:
-        cursor = start
-    for root in [cursor, *cursor.parents]:
-        candidate = root / DEFAULT_CONFIG_FILENAME
-        if candidate.exists():
-            return candidate
-    return None
-
-
-def _workspace_search_roots() -> list[Path]:
-    roots: list[Path] = []
-    env_root = os.environ.get("DENSEGEN_WORKSPACE_ROOT")
-    if env_root:
-        roots.append(Path(env_root))
-    pixi_root = os.environ.get("PIXI_PROJECT_ROOT")
-    if pixi_root:
-        roots.append(Path(pixi_root))
-    if not roots:
-        repo_root = _repo_root_from(Path(__file__).resolve())
-        if repo_root is not None:
-            roots.append(repo_root)
-    roots.append(Path.cwd())
-    seen: set[str] = set()
-    unique: list[Path] = []
-    for root in roots:
-        try:
-            key = str(root.resolve())
-        except Exception:
-            key = str(root)
-        if key in seen:
-            continue
-        seen.add(key)
-        unique.append(root)
-    return unique
-
-
-def _repo_root_from(start: Path) -> Path | None:
-    try:
-        cursor = start.resolve()
-    except Exception:
-        cursor = start
-    for root in [cursor, *cursor.parents]:
-        if (root / "pyproject.toml").exists() or (root / ".git").exists():
-            return root
-    return None
-
-
-def _auto_config_path() -> tuple[Path | None, list[Path]]:
-    candidates: list[Path] = []
-    for root in _workspace_search_roots():
-        for base in (
-            root / "src" / "dnadesign" / "densegen" / "workspaces",
-            root / "workspaces",
-        ):
-            if not base.exists():
-                continue
-            for path in sorted(base.glob(f"*/{DEFAULT_CONFIG_FILENAME}")):
-                candidates.append(path)
-    unique: list[Path] = []
-    seen: set[str] = set()
-    for path in candidates:
-        try:
-            key = str(path.resolve())
-        except Exception:
-            key = str(path)
-        if key in seen:
-            continue
-        seen.add(key)
-        unique.append(path)
-    if len(unique) == 1:
-        return unique[0], []
-    return None, unique
-
-
 def _workspace_command(command: str, *, cfg_path: Path | None = None, run_root: Path | None = None) -> str:
     root = run_root or (cfg_path.parent if cfg_path is not None else None)
     base = Path.cwd()
@@ -342,73 +251,6 @@ def _infer_input_name(inputs_cfg: list) -> str:
     return _sanitize_filename(str(name))
 
 
-def _resolve_config_path(ctx: typer.Context, override: Optional[Path]) -> tuple[Path, bool]:
-    if override is not None:
-        return Path(override), False
-    if ctx.obj:
-        ctx_path = ctx.obj.get("config_path")
-        if ctx_path is not None:
-            return Path(ctx_path), False
-    env_path = os.environ.get("DENSEGEN_CONFIG_PATH")
-    if env_path:
-        return Path(env_path), False
-    default_path = _default_config_path()
-    if default_path.exists():
-        return default_path, True
-    parent_path = _find_config_in_parents(Path.cwd())
-    if parent_path is not None:
-        return parent_path, False
-    auto_path, candidates = _auto_config_path()
-    if auto_path is not None:
-        console.print(
-            f"[bold yellow]Config not found in cwd; using[/] "
-            f"{_display_path(auto_path, Path.cwd(), absolute=False)} (auto-detected). "
-            "Pass -c to select a different workspace."
-        )
-        return auto_path, False
-    if candidates:
-        console.print("[bold red]Multiple workspace configs found; use -c to select one.[/]")
-        for path in candidates:
-            console.print(f" - {_display_path(path, Path.cwd(), absolute=False)}")
-        raise typer.Exit(code=1)
-    return default_path, True
-
-
-def _load_config_or_exit(
-    cfg_path: Path,
-    *,
-    missing_message: str | None = None,
-    absolute: bool = False,
-    display_root: Path | None = None,
-):
-    try:
-        return load_config(cfg_path)
-    except FileNotFoundError:
-        if missing_message:
-            console.print(f"[bold red]{missing_message}[/]")
-        else:
-            root = display_root or Path.cwd()
-            console.print(f"[bold red]Config file not found:[/] {_display_path(cfg_path, root, absolute=absolute)}")
-        raise typer.Exit(code=1)
-    except ConfigError as e:
-        console.print(f"[bold red]Config error:[/] {e}")
-        raise typer.Exit(code=1)
-
-
-def _resolve_outputs_path_or_exit(
-    cfg_path: Path,
-    run_root: Path,
-    value: str | os.PathLike,
-    *,
-    label: str,
-) -> Path:
-    try:
-        return resolve_outputs_scoped_path(cfg_path, run_root, value, label=label)
-    except ConfigError as exc:
-        console.print(f"[bold red]{exc}[/]")
-        raise typer.Exit(code=1)
-
-
 def _run_root_for(loaded) -> Path:
     return resolve_run_root(loaded.path, loaded.root.densegen.run.root)
 
@@ -425,8 +267,28 @@ def _short_hash(val: str, *, n: int = 8) -> str:
     return val[:n]
 
 
-def _display_path(path: Path, run_root: Path, *, absolute: bool) -> str:
+def _display_path(path: Path, run_root: Path, absolute: bool) -> str:
     return display_path(path, run_root, absolute=absolute)
+
+
+_resolve_config_path = partial(
+    _resolve_config_path_impl,
+    console=console,
+    display_path=_display_path,
+)
+_load_config_or_exit = partial(
+    _load_config_or_exit_impl,
+    console=console,
+    display_path=_display_path,
+)
+_resolve_outputs_path_or_exit = partial(
+    _resolve_outputs_path_or_exit_impl,
+    console=console,
+)
+_ensure_fimo_available = partial(
+    _ensure_fimo_available_impl,
+    console=console,
+)
 
 
 def _resolve_template_dir(*, template: Optional[Path], template_id: Optional[str]) -> Iterator[tuple[Path, Path]]:

@@ -26,7 +26,7 @@ from .stage_a_encoding import CoreEncodingStore
 from .stage_a_metadata import TFBSMeta
 from .stage_a_metrics import _mmr_objective, _tail_unique_slope
 from .stage_a_mining import mine_pwm_candidates
-from .stage_a_progress import _format_stage_a_milestone, _PwmSamplingProgress
+from .stage_a_progress import _PwmSamplingProgress, finalize_mining_phase, log_stage_a_milestone
 from .stage_a_sampling_utils import (
     _pwm_theoretical_max_score,
     _ranges_overlap,
@@ -430,24 +430,14 @@ def run_stage_a_pipeline(
         )
     eligible_unique = len(ranked)
     mining_audit = _tail_unique_slope(generated_by_batch, unique_by_batch, window=5)
-    if progress is not None:
-        progress.update(
-            generated=generated_total,
-            accepted=eligible_unique,
-            batch_index=batches if batches > 0 else None,
-            batch_total=None,
-            force=True,
-        )
-        progress.finish()
-    postprocess_start = time.monotonic()
-    log.info(
-        _format_stage_a_milestone(
-            motif_id=motif.motif_id,
-            phase="postprocess",
-            detail=(
-                f"eligible_unique={eligible_unique} collapsed={collapsed_by_core_identity} selection={selection_policy}"
-            ),
-        )
+    postprocess_start = finalize_mining_phase(
+        progress=progress,
+        motif_id=motif.motif_id,
+        generated=generated_total,
+        accepted=eligible_unique,
+        batches=batches,
+        selection_policy=selection_policy,
+        collapsed_by_core_identity=collapsed_by_core_identity,
     )
     ranked_pairs = [(cand.seq, cand.score) for cand in ranked]
     tiers = _assign_score_tiers(ranked_pairs, fractions=tier_fractions)
@@ -581,15 +571,13 @@ def run_stage_a_pipeline(
     if candidate_pool_size is None and candidate_pool:
         candidate_pool_size = len(candidate_pool)
     diversity_max_n = 2500
-    log.info(
-        _format_stage_a_milestone(
-            motif_id=motif.motif_id,
-            phase="diversity",
-            detail=(
-                f"top={len(top_candidates_cores)} diversified={len(diversified_candidates_cores)} "
-                f"global={len(top_candidates_global_cores)} cap={diversity_max_n}"
-            ),
-        )
+    log_stage_a_milestone(
+        motif_id=motif.motif_id,
+        phase="diversity",
+        detail=(
+            f"top={len(top_candidates_cores)} diversified={len(diversified_candidates_cores)} "
+            f"global={len(top_candidates_global_cores)} cap={diversity_max_n}"
+        ),
     )
     diversity_start = time.monotonic()
     diversity = _diversity_summary(
@@ -613,12 +601,10 @@ def run_stage_a_pipeline(
     )
     if diversity is None:
         raise ValueError("Stage-A diversity metrics missing; ensure core sequences are available.")
-    log.info(
-        _format_stage_a_milestone(
-            motif_id=motif.motif_id,
-            phase="diversity complete",
-            elapsed=time.monotonic() - diversity_start,
-        )
+    log_stage_a_milestone(
+        motif_id=motif.motif_id,
+        phase="diversity complete",
+        elapsed=time.monotonic() - diversity_start,
     )
     padding_audit = None
     if intended_core_by_seq:
@@ -718,12 +704,10 @@ def run_stage_a_pipeline(
     tier2_score = ranked[n0 + n1 + n2 - 1].score if n2 > 0 else None
     eligible_scores = [cand.score for cand in ranked]
     hist_edges, hist_counts = _build_score_hist(eligible_scores)
-    log.info(
-        _format_stage_a_milestone(
-            motif_id=motif.motif_id,
-            phase="postprocess complete",
-            elapsed=time.monotonic() - postprocess_start,
-        )
+    log_stage_a_milestone(
+        motif_id=motif.motif_id,
+        phase="postprocess complete",
+        elapsed=time.monotonic() - postprocess_start,
     )
     log.info(
         "FIMO yield for motif %s: eligible_unique=%d retained=%d",

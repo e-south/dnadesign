@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dnadesign.densegen.src import cli
+from dnadesign.densegen.src import cli, cli_setup
 
 
 class _Ctx:
@@ -31,7 +31,7 @@ def test_auto_config_path_single_workspace(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(root)
     monkeypatch.setenv("PIXI_PROJECT_ROOT", str(root))
 
-    path, candidates = cli._auto_config_path()
+    path, candidates = cli_setup._auto_config_path()
     assert candidates == []
     assert path == cfg
 
@@ -46,7 +46,7 @@ def test_auto_config_path_multiple_workspaces(tmp_path: Path, monkeypatch) -> No
     monkeypatch.chdir(root)
     monkeypatch.setenv("PIXI_PROJECT_ROOT", str(root))
 
-    path, candidates = cli._auto_config_path()
+    path, candidates = cli_setup._auto_config_path()
     assert path is None
     assert len(candidates) == 2
 

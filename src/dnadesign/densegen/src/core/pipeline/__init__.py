@@ -9,7 +9,8 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-from .orchestrator import PipelineDeps, default_deps, resolve_plan, run_pipeline, select_solver  # noqa: F401
+from .deps import PipelineDeps, default_deps  # noqa: F401
+from .orchestrator import resolve_plan, run_pipeline, select_solver  # noqa: F401
 
 __all__ = [
     "PipelineDeps",

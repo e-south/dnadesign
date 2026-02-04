@@ -23,7 +23,8 @@ from dnadesign.densegen.src.adapters.outputs import ParquetSink
 from dnadesign.densegen.src.adapters.sources import data_source_factory
 from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.core.pipeline.attempts import _load_failure_counts_from_attempts
-from dnadesign.densegen.src.core.pipeline.orchestrator import PipelineDeps, run_pipeline
+from dnadesign.densegen.src.core.pipeline.deps import PipelineDeps
+from dnadesign.densegen.src.core.pipeline.orchestrator import run_pipeline
 
 
 class _DummyOpt:

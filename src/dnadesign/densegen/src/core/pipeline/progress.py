@@ -12,8 +12,11 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import atexit
+import logging
 import math
+import time
 from collections import Counter
+from dataclasses import dataclass, field
 
 import numpy as np
 from rich.console import Console
@@ -21,6 +24,8 @@ from rich.live import Live
 from rich.panel import Panel
 
 from ...utils.rich_style import make_panel, make_table
+
+log = logging.getLogger(__name__)
 
 
 def _summarize_tf_counts(labels: list[str], max_items: int = 6) -> str:
@@ -323,6 +328,191 @@ def _build_screen_dashboard(
     if show_solutions and sequence_preview:
         table.add_row("sequence", sequence_preview)
     return make_panel(table, title="DenseGen progress")
+
+
+@dataclass
+class PlanProgressState:
+    last_screen_refresh: float = 0.0
+    cr_sum: float = 0.0
+    cr_count: int = 0
+    latest_failure_totals: str | None = None
+
+
+@dataclass
+class PlanProgressReporter:
+    source_label: str
+    plan_name: str
+    quota: int
+    max_per_subsample: int
+    progress_style: str
+    progress_every: int
+    progress_refresh_seconds: float
+    show_tfbs: bool
+    show_solutions: bool
+    print_visual: bool
+    dashboard: _ScreenDashboard | None
+    logger: logging.Logger = field(default_factory=lambda: log)
+    state: PlanProgressState = field(default_factory=PlanProgressState)
+
+    def record_solution(
+        self,
+        *,
+        global_generated: int,
+        local_generated: int,
+        library_index: int,
+        sol,
+        library_tfs: list[str],
+        library_tfbs: list[str],
+        used_tfbs_detail: list[dict],
+        used_tf_list: list[str],
+        final_seq: str,
+        counters,
+        duplicate_records: int,
+        duplicate_solutions: int,
+        failed_solutions: int,
+        stall_events: int,
+        usage_counts: dict[tuple[str, str], int],
+        tf_usage_counts: dict[str, int],
+        tf_usage_display: dict[str, int],
+        tfbs_usage_display: dict[tuple[str, str], int],
+    ) -> None:
+        if self.progress_style == "screen" and self.dashboard is not None:
+            now = time.monotonic()
+            if (now - self.state.last_screen_refresh) >= self.progress_refresh_seconds:
+                self.state.last_screen_refresh = now
+                bar = _format_progress_bar(global_generated, self.quota)
+                cr_now = float(sol.compression_ratio)
+                self.state.cr_sum += cr_now
+                self.state.cr_count += 1
+                cr_avg = self.state.cr_sum / max(self.state.cr_count, 1)
+                diversity_label = _summarize_diversity(
+                    usage_counts,
+                    tf_usage_counts,
+                    library_tfs=library_tfs,
+                    library_tfbs=library_tfbs,
+                )
+                renderable = _build_screen_dashboard(
+                    source_label=self.source_label,
+                    plan_name=self.plan_name,
+                    bar=bar,
+                    generated=int(global_generated),
+                    quota=int(self.quota),
+                    pct=float(global_generated) / float(self.quota) * 100.0,
+                    local_generated=int(local_generated),
+                    local_target=int(self.max_per_subsample),
+                    library_index=int(library_index),
+                    cr_now=cr_now,
+                    cr_avg=cr_avg,
+                    resamples=int(counters.total_resamples),
+                    dup_out=int(duplicate_records),
+                    dup_sol=int(duplicate_solutions),
+                    fails=int(failed_solutions),
+                    stalls=int(stall_events),
+                    failure_totals=self.state.latest_failure_totals,
+                    tf_usage=tf_usage_display,
+                    tfbs_usage=tfbs_usage_display,
+                    diversity_label=diversity_label,
+                    show_tfbs=self.show_tfbs,
+                    show_solutions=bool(self.print_visual),
+                    sequence_preview=final_seq if self.print_visual else None,
+                )
+                self.dashboard.update(renderable)
+
+        if self.progress_style == "stream" and global_generated % max(1, self.progress_every) == 0:
+            bar = _format_progress_bar(global_generated, self.quota)
+            pct = float(global_generated) / float(self.quota) * 100.0
+            if self.show_tfbs:
+                tf_label = _short_seq(str(used_tfbs_detail), max_len=80)
+            else:
+                tf_label = _summarize_tf_counts(used_tf_list)
+            cr_now = float(sol.compression_ratio)
+            self.state.cr_sum += cr_now
+            self.state.cr_count += 1
+            if self.print_visual:
+                self.logger.info(
+                    "[%s/%s] %s %d/%d (%.2f%%) (local %d/%d) CR=%.3f | TFBS %s | seq %s",
+                    self.source_label,
+                    self.plan_name,
+                    bar,
+                    global_generated,
+                    self.quota,
+                    pct,
+                    local_generated,
+                    self.max_per_subsample,
+                    cr_now if cr_now is not None else float("nan"),
+                    tf_label,
+                    final_seq,
+                )
+            elif self.show_solutions:
+                self.logger.info(
+                    "[%s/%s] %s %d/%d (%.2f%%) (local %d/%d) CR=%.3f | TFBS %s",
+                    self.source_label,
+                    self.plan_name,
+                    bar,
+                    global_generated,
+                    self.quota,
+                    pct,
+                    local_generated,
+                    self.max_per_subsample,
+                    cr_now if cr_now is not None else float("nan"),
+                    tf_label,
+                )
+            else:
+                self.logger.info(
+                    "[%s/%s] %s %d/%d (%.2f%%) (local %d/%d) CR=%.3f",
+                    self.source_label,
+                    self.plan_name,
+                    bar,
+                    global_generated,
+                    self.quota,
+                    pct,
+                    local_generated,
+                    self.max_per_subsample,
+                    cr_now if cr_now is not None else float("nan"),
+                )
+
+    def record_leaderboard(
+        self,
+        *,
+        global_generated: int,
+        counters,
+        duplicate_records: int,
+        duplicate_solutions: int,
+        failed_solutions: int,
+        stall_events: int,
+        failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]],
+        leaderboard_every: int,
+        log_snapshot,
+    ) -> None:
+        if leaderboard_every <= 0:
+            return
+        if global_generated % max(1, leaderboard_every) != 0:
+            return
+        failure_totals = _summarize_failure_totals(
+            failure_counts,
+            input_name=self.source_label,
+            plan_name=self.plan_name,
+        )
+        self.state.latest_failure_totals = failure_totals
+        if self.progress_style != "screen":
+            bar = _format_progress_bar(global_generated, self.quota)
+            pct = float(global_generated) / float(self.quota) * 100.0
+            self.logger.info(
+                "[%s/%s] Progress %s %d/%d (%.2f%%) | resamples=%d dup_out=%d dup_sol=%d fails=%d stalls=%d | %s",
+                self.source_label,
+                self.plan_name,
+                bar,
+                global_generated,
+                self.quota,
+                pct,
+                counters.total_resamples,
+                duplicate_records,
+                duplicate_solutions,
+                failed_solutions,
+                stall_events,
+                failure_totals,
+            )
+            log_snapshot()
 
 
 def _diversity_snapshot(

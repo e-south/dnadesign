@@ -204,6 +204,51 @@ def _format_stage_a_milestone(
     return message
 
 
+def log_stage_a_milestone(
+    *,
+    motif_id: str,
+    phase: str,
+    detail: Optional[str] = None,
+    elapsed: Optional[float] = None,
+) -> None:
+    log.info(
+        _format_stage_a_milestone(
+            motif_id=motif_id,
+            phase=phase,
+            detail=detail,
+            elapsed=elapsed,
+        )
+    )
+
+
+def finalize_mining_phase(
+    *,
+    progress: _PwmSamplingProgress | None,
+    motif_id: str,
+    generated: int,
+    accepted: int,
+    batches: int,
+    selection_policy: str,
+    collapsed_by_core_identity: int,
+) -> float:
+    if progress is not None:
+        progress.update(
+            generated=generated,
+            accepted=accepted,
+            batch_index=batches if batches > 0 else None,
+            batch_total=None,
+            force=True,
+        )
+        progress.finish()
+    postprocess_start = time.monotonic()
+    log_stage_a_milestone(
+        motif_id=motif_id,
+        phase="postprocess",
+        detail=f"eligible_unique={accepted} collapsed={collapsed_by_core_identity} selection={selection_policy}",
+    )
+    return postprocess_start
+
+
 def _stage_a_live_render(state: dict[str, StageAProgressState]):
     table = make_table(show_header=True, pad_edge=False)
     table.add_column("motif")

@@ -23,7 +23,9 @@ from dnadesign.densegen.src.adapters.optimizer import OptimizerRun
 from dnadesign.densegen.src.adapters.outputs.base import SinkBase
 from dnadesign.densegen.src.adapters.sources import data_source_factory
 from dnadesign.densegen.src.config import load_config
-from dnadesign.densegen.src.core.pipeline.orchestrator import PipelineDeps, _process_plan_for_source
+from dnadesign.densegen.src.core.pipeline.deps import PipelineDeps
+from dnadesign.densegen.src.core.pipeline.orchestrator import _process_plan_for_source
+from dnadesign.densegen.src.core.pipeline.plan_context import PlanExecutionState, PlanRunContext
 
 
 class _DummySink(SinkBase):
@@ -168,19 +170,15 @@ def test_round_robin_chunk_cap_subsample(tmp_path: Path) -> None:
         optimizer=_DummyAdapter(),
         pad=lambda *args, **kwargs: "",
     )
-
-    plan_item = loaded.root.densegen.generation.resolve_plan()[0]
-    produced, _stats = _process_plan_for_source(
-        loaded.root.densegen.inputs[0],
-        plan_item,
-        loaded.root.densegen,
-        [sink],
+    plan_context = PlanRunContext(
+        global_cfg=loaded.root.densegen,
+        sinks=[sink],
         chosen_solver="CBC",
         deps=deps,
         rng=random.Random(1),
         np_rng=np.random.default_rng(1),
         cfg_path=loaded.path,
-        run_id=loaded.root.densegen.run.id,
+        run_id=str(loaded.root.densegen.run.id),
         run_root=str(run_dir),
         run_config_path="config.yaml",
         run_config_sha256="sha",
@@ -191,9 +189,17 @@ def test_round_robin_chunk_cap_subsample(tmp_path: Path) -> None:
         show_solutions=False,
         output_bio_type="dna",
         output_alphabet="dna_4",
+    )
+    execution_state = PlanExecutionState(inputs_manifest={})
+
+    plan_item = loaded.root.densegen.generation.resolve_plan()[0]
+    produced, _stats = _process_plan_for_source(
+        loaded.root.densegen.inputs[0],
+        plan_item,
+        plan_context,
         one_subsample_only=True,
         already_generated=0,
-        inputs_manifest={},
+        execution_state=execution_state,
     )
 
     assert produced <= loaded.root.densegen.runtime.arrays_generated_before_resample
@@ -312,31 +318,35 @@ def test_stall_detected_with_no_solutions(tmp_path: Path) -> None:
         optimizer=_EmptyAdapter(),
         pad=lambda *args, **kwargs: "",
     )
+    plan_context = PlanRunContext(
+        global_cfg=loaded.root.densegen,
+        sinks=[sink],
+        chosen_solver="CBC",
+        deps=deps,
+        rng=random.Random(1),
+        np_rng=np.random.default_rng(1),
+        cfg_path=loaded.path,
+        run_id=str(loaded.root.densegen.run.id),
+        run_root=str(run_dir),
+        run_config_path="config.yaml",
+        run_config_sha256="sha",
+        random_seed=1,
+        dense_arrays_version=None,
+        dense_arrays_version_source="test",
+        show_tfbs=False,
+        show_solutions=False,
+        output_bio_type="dna",
+        output_alphabet="dna_4",
+    )
+    execution_state = PlanExecutionState(inputs_manifest={})
 
     plan_item = loaded.root.densegen.generation.resolve_plan()[0]
     with pytest.raises(RuntimeError, match="max_consecutive_failures"):
         _process_plan_for_source(
             loaded.root.densegen.inputs[0],
             plan_item,
-            loaded.root.densegen,
-            [sink],
-            chosen_solver="CBC",
-            deps=deps,
-            rng=random.Random(1),
-            np_rng=np.random.default_rng(1),
-            cfg_path=loaded.path,
-            run_id=loaded.root.densegen.run.id,
-            run_root=str(run_dir),
-            run_config_path="config.yaml",
-            run_config_sha256="sha",
-            random_seed=1,
-            dense_arrays_version=None,
-            dense_arrays_version_source="test",
-            show_tfbs=False,
-            show_solutions=False,
-            output_bio_type="dna",
-            output_alphabet="dna_4",
+            plan_context,
             one_subsample_only=True,
             already_generated=0,
-            inputs_manifest={},
+            execution_state=execution_state,
         )

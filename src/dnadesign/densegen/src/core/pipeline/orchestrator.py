@@ -21,16 +21,14 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Iterable, List
+from typing import List
 
 import numpy as np
 import pandas as pd
 from rich.console import Console
 
-from ...adapters.optimizer import DenseArraysAdapter, OptimizerAdapter
-from ...adapters.outputs import OutputRecord, SinkBase, build_sinks, resolve_bio_alphabet
-from ...adapters.sources import data_source_factory
-from ...adapters.sources.base import BaseDataSource
+from ...adapters.optimizer import OptimizerAdapter
+from ...adapters.outputs import resolve_bio_alphabet
 from ...config import (
     DenseGenConfig,
     LoadedConfig,
@@ -40,12 +38,10 @@ from ...config import (
 from ...utils import logging_utils
 from ...utils.logging_utils import install_native_stderr_filters
 from ...utils.sequence_utils import gc_fraction
-from ..artifacts.library import LibraryRecord
 from ..artifacts.pool import POOL_MODE_SEQUENCE, POOL_MODE_TFBS, PoolData
 from ..input_types import PWM_INPUT_TYPES
 from ..metadata import build_metadata
 from ..motif_labels import motif_display_name
-from ..postprocess import generate_pad
 from ..run_paths import (
     candidates_root,
     ensure_run_meta_dir,
@@ -62,6 +58,7 @@ from .attempts import (
     _load_existing_library_index,
     _log_rejection,
 )
+from .deps import PipelineDeps, default_deps
 from .inputs import (
     _budget_attr,
     _build_input_manifest_entry,
@@ -70,26 +67,11 @@ from .inputs import (
     _sampling_attr,
 )
 from .library_artifacts import prepare_library_source
-from .outputs import (
-    _assert_sink_alignment,
-    _emit_event,
-    _write_effective_config,
-    _write_to_sinks,
-)
+from .outputs import _assert_sink_alignment, _emit_event, _write_effective_config
+from .plan_context import PlanExecutionState, PlanRunContext
 from .plan_execution import run_plan_schedule
 from .plan_pools import PLAN_POOL_INPUT_TYPE, PlanPoolSpec
-from .progress import (
-    _build_screen_dashboard,
-    _format_progress_bar,
-    _ScreenDashboard,
-    _short_seq,
-    _summarize_diversity,
-    _summarize_failure_leaderboard,
-    _summarize_failure_totals,
-    _summarize_leaderboard,
-    _summarize_tf_counts,
-    _summarize_tfbs_usage_stats,
-)
+from .progress import PlanProgressReporter, _ScreenDashboard, _summarize_tf_counts
 from .resume_state import load_resume_state
 from .run_finalization import finalize_run_outputs
 from .run_setup import build_display_map_by_input, init_plan_stats, init_state_counts, validate_resume_outputs
@@ -100,6 +82,7 @@ from .sequence_validation import (
     _find_forbidden_kmer,
     _promoter_windows,
 )
+from .solution_outputs import record_solution_outputs
 from .stage_a_pools import prepare_stage_a_pools
 from .stage_b import (
     _compute_sampling_fraction,
@@ -150,23 +133,6 @@ def _plan_pool_input_meta(spec: PlanPoolSpec) -> dict:
     return meta
 
 
-@dataclass(frozen=True)
-class PipelineDeps:
-    source_factory: Callable[[object, Path], BaseDataSource]
-    sink_factory: Callable[[DenseGenConfig, Path], Iterable[SinkBase]]
-    optimizer: OptimizerAdapter
-    pad: Callable[..., tuple[str, dict] | str]
-
-
-def default_deps() -> PipelineDeps:
-    return PipelineDeps(
-        source_factory=data_source_factory,
-        sink_factory=build_sinks,
-        optimizer=DenseArraysAdapter(),
-        pad=generate_pad,
-    )
-
-
 def resolve_plan(loaded: LoadedConfig) -> List[ResolvedPlanItem]:
     return loaded.root.densegen.generation.resolve_plan()
 
@@ -196,47 +162,51 @@ def select_solver(
 def _process_plan_for_source(
     source_cfg,
     plan_item: ResolvedPlanItem,
-    global_cfg,
-    sinks,
+    context: PlanRunContext,
     *,
-    chosen_solver: str | None,
-    deps: PipelineDeps,
-    rng: random.Random,
-    np_rng: np.random.Generator,
-    cfg_path: Path,
-    run_id: str,
-    run_root: str,
-    run_config_path: str,
-    run_config_sha256: str,
-    random_seed: int,
-    dense_arrays_version: str | None,
-    dense_arrays_version_source: str,
-    show_tfbs: bool,
-    show_solutions: bool,
-    output_bio_type: str,
-    output_alphabet: str,
     one_subsample_only: bool = False,
     already_generated: int = 0,
-    inputs_manifest: dict[str, dict] | None = None,
-    existing_usage_counts: dict[tuple[str, str], int] | None = None,
-    state_counts: dict[tuple[str, str], int] | None = None,
-    checkpoint_every: int = 0,
-    write_state: Callable[[], None] | None = None,
-    site_failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]] | None = None,
-    source_cache: dict[str, PoolData] | None = None,
-    pool_override: PoolData | None = None,
-    input_meta_override: dict | None = None,
-    attempt_counters: dict[tuple[str, str], int] | None = None,
-    library_records: dict[tuple[str, str], list[LibraryRecord]] | None = None,
-    library_cursor: dict[tuple[str, str], int] | None = None,
-    library_source: str | None = None,
-    library_build_rows: list[dict] | None = None,
-    library_member_rows: list[dict] | None = None,
-    solution_rows: list[dict] | None = None,
-    composition_rows: list[dict] | None = None,
-    events_path: Path | None = None,
-    display_map_by_input: dict[str, dict[str, str]] | None = None,
+    execution_state: PlanExecutionState,
 ) -> tuple[int, dict]:
+    global_cfg = context.global_cfg
+    sinks = context.sinks
+    chosen_solver = context.chosen_solver
+    deps = context.deps
+    rng = context.rng
+    np_rng = context.np_rng
+    cfg_path = context.cfg_path
+    run_id = context.run_id
+    run_root = context.run_root
+    run_config_path = context.run_config_path
+    run_config_sha256 = context.run_config_sha256
+    random_seed = context.random_seed
+    dense_arrays_version = context.dense_arrays_version
+    dense_arrays_version_source = context.dense_arrays_version_source
+    show_tfbs = context.show_tfbs
+    show_solutions = context.show_solutions
+    output_bio_type = context.output_bio_type
+    output_alphabet = context.output_alphabet
+
+    inputs_manifest = execution_state.inputs_manifest
+    existing_usage_counts = execution_state.existing_usage_counts
+    state_counts = execution_state.state_counts
+    checkpoint_every = execution_state.checkpoint_every
+    write_state = execution_state.write_state
+    site_failure_counts = execution_state.site_failure_counts
+    source_cache = execution_state.source_cache
+    pool_override = execution_state.pool_override
+    input_meta_override = execution_state.input_meta_override
+    attempt_counters = execution_state.attempt_counters
+    library_records = execution_state.library_records
+    library_cursor = execution_state.library_cursor
+    library_source = execution_state.library_source
+    library_build_rows = execution_state.library_build_rows
+    library_member_rows = execution_state.library_member_rows
+    solution_rows = execution_state.solution_rows
+    composition_rows = execution_state.composition_rows
+    events_path = execution_state.events_path
+    display_map_by_input = execution_state.display_map_by_input
+
     source_label = source_cfg.name
     plan_name = plan_item.name
     quota = int(plan_item.quota)
@@ -315,8 +285,6 @@ def _process_plan_for_source(
             width = shutil.get_terminal_size(fallback=(140, 40)).columns
             screen_console = Console(file=sys.stdout, width=int(width), force_terminal=False)
             log.warning("progress_style=screen requires an interactive terminal; using static output.")
-    last_screen_refresh = 0.0
-    latest_failure_totals: str | None = None
     show_tfbs = bool(show_tfbs or getattr(log_cfg, "show_tfbs", False))
     show_solutions = bool(show_solutions or getattr(log_cfg, "show_solutions", False))
     dashboard = (
@@ -324,8 +292,20 @@ def _process_plan_for_source(
         if progress_style == "screen" and screen_console is not None
         else None
     )
-    cr_sum = 0.0
-    cr_count = 0
+    progress_reporter = PlanProgressReporter(
+        source_label=source_label,
+        plan_name=plan_name,
+        quota=int(quota),
+        max_per_subsample=int(max_per_subsample),
+        progress_style=progress_style,
+        progress_every=progress_every,
+        progress_refresh_seconds=progress_refresh_seconds,
+        show_tfbs=show_tfbs,
+        show_solutions=show_solutions,
+        print_visual=bool(print_visual),
+        dashboard=dashboard,
+        logger=log,
+    )
 
     policy_pad = str(pad_mode)
     policy_sampling = pool_strategy
@@ -621,16 +601,12 @@ def _process_plan_for_source(
         global_generated: int,
         quota: int,
     ) -> LibraryRunResult:
-        nonlocal cr_sum
-        nonlocal cr_count
         nonlocal duplicate_records
         nonlocal duplicate_solutions
         nonlocal failed_min_count_by_regulator
         nonlocal failed_min_count_per_tf
         nonlocal failed_required_regulators
         nonlocal failed_solutions
-        nonlocal last_screen_refresh
-        nonlocal latest_failure_totals
         library_for_opt = list(library_context.library_for_opt)
         tfbs_parts = list(library_context.tfbs_parts)
         regulator_labels = list(library_context.regulator_labels)
@@ -1087,101 +1063,45 @@ def _process_plan_for_source(
                 if not derived:
                     log.info("[%s/%s] Skipping solution; no metadata found", source_label, plan_name)
                     continue
-                record = OutputRecord.from_sequence(
-                    sequence=final_seq,
-                    meta=derived,
-                    source=source_label,
-                    bio_type=output_bio_type,
-                    alphabet=output_alphabet,
+                accepted = record_solution_outputs(
+                    sinks=sinks,
+                    final_seq=final_seq,
+                    derived=derived,
+                    source_label=source_label,
+                    plan_name=plan_name,
+                    output_bio_type=output_bio_type,
+                    output_alphabet=output_alphabet,
+                    tables_root=tables_root,
+                    run_id=run_id,
+                    next_attempt_index=_next_attempt_index,
+                    used_tf_counts=used_tf_counts,
+                    used_tf_list=used_tf_list,
+                    sampling_library_index=int(sampling_library_index),
+                    sampling_library_hash=str(sampling_library_hash),
+                    solver_status=solver_status,
+                    solver_objective=solver_objective,
+                    solver_solve_time_s=solver_solve_time_s,
+                    dense_arrays_version=dense_arrays_version,
+                    dense_arrays_version_source=dense_arrays_version_source,
+                    library_tfbs=library_tfbs,
+                    library_tfs=library_tfs,
+                    library_site_ids=library_site_ids,
+                    library_sources=library_sources,
+                    attempts_buffer=attempts_buffer,
+                    solution_rows=solution_rows,
+                    composition_rows=composition_rows,
+                    events_path=events_path,
+                    used_tfbs=used_tfbs,
+                    used_tfbs_detail=used_tfbs_detail,
                 )
 
-                if not _write_to_sinks(sinks, record):
+                if not accepted:
                     duplicate_records += 1
                     continue
 
                 global_generated += 1
                 local_generated += 1
                 produced_this_library += 1
-                attempts_buffer.append(
-                    {
-                        "created_at": derived.get("created_at"),
-                        "input_name": source_label,
-                        "plan_name": plan_name,
-                        "attempt_index": _next_attempt_index(),
-                        "status": "ok",
-                        "reason": None,
-                        "detail": None,
-                        "sequence": final_seq,
-                        "used_tf_counts": used_tf_counts,
-                        "used_tf_list": used_tf_list,
-                        "sampling_library_index": int(sampling_library_index),
-                        "sampling_library_hash": str(sampling_library_hash),
-                        "solver_status": solver_status,
-                        "solver_objective": solver_objective,
-                        "solver_solve_time_s": solver_solve_time_s,
-                        "dense_arrays_version": dense_arrays_version,
-                        "dense_arrays_version_source": dense_arrays_version_source,
-                        "library_tfbs": library_tfbs,
-                        "library_tfs": library_tfs,
-                        "library_site_ids": library_site_ids,
-                        "library_sources": library_sources,
-                    }
-                )
-                if solution_rows is not None:
-                    solution_rows.append(
-                        _append_attempt(
-                            tables_root,
-                            run_id=run_id,
-                            input_name=source_label,
-                            plan_name=plan_name,
-                            attempt_index=_next_attempt_index(),
-                            status="ok",
-                            reason=None,
-                            detail=None,
-                            sequence=final_seq,
-                            used_tf_counts=used_tf_counts,
-                            used_tf_list=used_tf_list,
-                            sampling_library_index=int(sampling_library_index),
-                            sampling_library_hash=str(sampling_library_hash),
-                            solver_status=solver_status,
-                            solver_objective=solver_objective,
-                            solver_solve_time_s=solver_solve_time_s,
-                            dense_arrays_version=dense_arrays_version,
-                            dense_arrays_version_source=dense_arrays_version_source,
-                            library_tfbs=library_tfbs,
-                            library_tfs=library_tfs,
-                            library_site_ids=library_site_ids,
-                            library_sources=library_sources,
-                            attempts_buffer=attempts_buffer,
-                        )
-                    )
-                if composition_rows is not None:
-                    composition_rows.append(
-                        {
-                            "input_name": source_label,
-                            "plan_name": plan_name,
-                            "library_index": int(sampling_library_index),
-                            "library_hash": str(sampling_library_hash),
-                            "sequence": final_seq,
-                            "used_tfbs": used_tfbs,
-                            "used_tfbs_detail": used_tfbs_detail,
-                        }
-                    )
-                if events_path is not None:
-                    try:
-                        _emit_event(
-                            events_path,
-                            event="SOLUTION_ACCEPTED",
-                            payload={
-                                "input_name": source_label,
-                                "plan_name": plan_name,
-                                "sequence": final_seq,
-                                "library_index": int(sampling_library_index),
-                                "library_hash": str(sampling_library_hash),
-                            },
-                        )
-                    except Exception:
-                        log.debug("Failed to emit SOLUTION_ACCEPTED event.", exc_info=True)
 
                 if checkpoint_every > 0 and global_generated % max(1, checkpoint_every) == 0:
                     _flush_attempts(tables_root, attempts_buffer)
@@ -1192,178 +1112,44 @@ def _process_plan_for_source(
                         if write_state is not None:
                             write_state()
 
-                if progress_style == "screen" and dashboard is not None:
-                    if (time.monotonic() - last_screen_refresh) >= progress_refresh_seconds:
-                        last_screen_refresh = time.monotonic()
-                        bar = _format_progress_bar(global_generated, quota)
-                        cr_now = float(sol.compression_ratio)
-                        cr_sum += cr_now
-                        cr_count += 1
-                        cr_avg = cr_sum / max(cr_count, 1)
-                        diversity_label = _summarize_diversity(
-                            usage_counts,
-                            tf_usage_counts,
-                            library_tfs=library_tfs,
-                            library_tfbs=library_tfbs,
-                        )
-                        renderable = _build_screen_dashboard(
-                            source_label=source_label,
-                            plan_name=plan_name,
-                            bar=bar,
-                            generated=int(global_generated),
-                            quota=int(quota),
-                            pct=float(global_generated) / float(quota) * 100.0,
-                            local_generated=int(local_generated),
-                            local_target=int(max_per_subsample),
-                            library_index=int(sampling_library_index),
-                            cr_now=cr_now,
-                            cr_avg=cr_avg,
-                            resamples=int(counters.total_resamples),
-                            dup_out=int(duplicate_records),
-                            dup_sol=int(duplicate_solutions),
-                            fails=int(failed_solutions),
-                            stalls=int(stall_events),
-                            failure_totals=latest_failure_totals,
-                            tf_usage=diagnostics.map_tf_usage(tf_usage_counts),
-                            tfbs_usage=diagnostics.map_tfbs_usage(usage_counts),
-                            diversity_label=diversity_label,
-                            show_tfbs=show_tfbs,
-                            show_solutions=bool(print_visual),
-                            sequence_preview=final_seq if print_visual else None,
-                        )
-                        dashboard.update(renderable)
-
-                if progress_style == "stream" and global_generated % max(1, progress_every) == 0:
-                    bar = _format_progress_bar(global_generated, quota)
-                    pct = float(global_generated) / float(quota) * 100.0
-                    if show_tfbs:
-                        tf_label = _short_seq(str(used_tfbs_detail), max_len=80)
-                    else:
-                        tf_label = _summarize_tf_counts(used_tf_list)
-                    cr_now = float(sol.compression_ratio)
-                    cr_sum += cr_now
-                    cr_count += 1
-                    if print_visual:
-                        log.info(
-                            "[%s/%s] %s %d/%d (%.2f%%) (local %d/%d) CR=%.3f | TFBS %s | seq %s",
-                            source_label,
-                            plan_name,
-                            bar,
-                            global_generated,
-                            quota,
-                            pct,
-                            local_generated,
-                            max_per_subsample,
-                            cr_now if cr_now is not None else float("nan"),
-                            tf_label,
-                            final_seq,
-                        )
-                    elif show_solutions:
-                        log.info(
-                            "[%s/%s] %s %d/%d (%.2f%%) (local %d/%d) CR=%.3f | TFBS %s",
-                            source_label,
-                            plan_name,
-                            bar,
-                            global_generated,
-                            quota,
-                            pct,
-                            local_generated,
-                            max_per_subsample,
-                            cr_now if cr_now is not None else float("nan"),
-                            tf_label,
-                        )
-                    else:
-                        log.info(
-                            "[%s/%s] %s %d/%d (%.2f%%) (local %d/%d) CR=%.3f",
-                            source_label,
-                            plan_name,
-                            bar,
-                            global_generated,
-                            quota,
-                            pct,
-                            local_generated,
-                            max_per_subsample,
-                            cr_now if cr_now is not None else float("nan"),
-                        )
-
-                if leaderboard_every > 0 and global_generated % max(1, leaderboard_every) == 0:
-                    failure_totals = _summarize_failure_totals(
-                        failure_counts,
-                        input_name=source_label,
-                        plan_name=plan_name,
+                progress_reporter.record_solution(
+                    global_generated=global_generated,
+                    local_generated=local_generated,
+                    library_index=int(sampling_library_index),
+                    sol=sol,
+                    library_tfs=library_tfs,
+                    library_tfbs=library_tfbs,
+                    used_tfbs_detail=used_tfbs_detail,
+                    used_tf_list=used_tf_list,
+                    final_seq=final_seq,
+                    counters=counters,
+                    duplicate_records=duplicate_records,
+                    duplicate_solutions=duplicate_solutions,
+                    failed_solutions=failed_solutions,
+                    stall_events=stall_events,
+                    usage_counts=usage_counts,
+                    tf_usage_counts=tf_usage_counts,
+                    tf_usage_display=diagnostics.map_tf_usage(tf_usage_counts),
+                    tfbs_usage_display=diagnostics.map_tfbs_usage(usage_counts),
+                )
+                progress_reporter.record_leaderboard(
+                    global_generated=global_generated,
+                    counters=counters,
+                    duplicate_records=duplicate_records,
+                    duplicate_solutions=duplicate_solutions,
+                    failed_solutions=failed_solutions,
+                    stall_events=stall_events,
+                    failure_counts=failure_counts,
+                    leaderboard_every=leaderboard_every,
+                    log_snapshot=diagnostics.log_snapshot,
+                )
+                if leaderboard_every > 0 and global_generated % max(1, leaderboard_every) == 0 and show_solutions:
+                    log.info(
+                        "[%s/%s] Example: %s",
+                        source_label,
+                        plan_name,
+                        final_seq,
                     )
-                    latest_failure_totals = failure_totals
-                    if progress_style != "screen":
-                        log.info(
-                            "[%s/%s] Progress %s %d/%d (%.2f%%) | resamples=%d dup_out=%d "
-                            "dup_sol=%d fails=%d stalls=%d | %s",
-                            source_label,
-                            plan_name,
-                            bar,
-                            global_generated,
-                            quota,
-                            pct,
-                            counters.total_resamples,
-                            duplicate_records,
-                            duplicate_solutions,
-                            failed_solutions,
-                            stall_events,
-                            failure_totals,
-                        )
-                        tf_usage_display = diagnostics.map_tf_usage(tf_usage_counts)
-                        tfbs_usage_display = diagnostics.map_tfbs_usage(usage_counts) if show_tfbs else usage_counts
-                        log.info(
-                            "[%s/%s] Leaderboard (TF): %s",
-                            source_label,
-                            plan_name,
-                            _summarize_leaderboard(tf_usage_display, top=5),
-                        )
-                        if show_tfbs:
-                            log.info(
-                                "[%s/%s] Leaderboard (TFBS): %s",
-                                source_label,
-                                plan_name,
-                                _summarize_leaderboard(tfbs_usage_display, top=5),
-                            )
-                        else:
-                            log.info(
-                                "[%s/%s] TFBS usage: %s",
-                                source_label,
-                                plan_name,
-                                _summarize_tfbs_usage_stats(usage_counts),
-                            )
-                        if show_tfbs:
-                            log.info(
-                                "[%s/%s] Failed TFBS: %s",
-                                source_label,
-                                plan_name,
-                                _summarize_failure_leaderboard(
-                                    failure_counts,
-                                    input_name=source_label,
-                                    plan_name=plan_name,
-                                    top=5,
-                                ),
-                            )
-                        elif failure_totals:
-                            log.info("[%s/%s] Failures: %s", source_label, plan_name, failure_totals)
-                        log.info(
-                            "[%s/%s] Diversity: %s",
-                            source_label,
-                            plan_name,
-                            _summarize_diversity(
-                                usage_counts,
-                                tf_usage_counts,
-                                library_tfs=library_tfs,
-                                library_tfbs=library_tfbs,
-                            ),
-                        )
-                    if show_solutions:
-                        log.info(
-                            "[%s/%s] Example: %s",
-                            source_label,
-                            plan_name,
-                            final_seq,
-                        )
 
                 if local_generated >= max_per_subsample or global_generated >= quota:
                     break
@@ -1710,38 +1496,28 @@ def run_pipeline(
 
     _write_state()
 
-    process_plan_args = {
-        "global_cfg": cfg,
-        "sinks": sinks,
-        "chosen_solver": chosen_solver,
-        "deps": deps,
-        "rng": rng,
-        "np_rng": np_rng_stage_b,
-        "cfg_path": loaded.path,
-        "run_id": cfg.run.id,
-        "run_root": run_root_str,
-        "run_config_path": run_cfg_path,
-        "run_config_sha256": config_sha,
-        "random_seed": seed,
-        "dense_arrays_version": dense_arrays_version,
-        "dense_arrays_version_source": dense_arrays_version_source,
-        "show_tfbs": show_tfbs,
-        "show_solutions": show_solutions,
-        "output_bio_type": output_bio_type,
-        "output_alphabet": output_alphabet,
-    }
-    plan_execution = run_plan_schedule(
-        plan_items=pl,
-        plan_pools=plan_pools,
-        plan_pool_sources=plan_pool_sources,
-        existing_counts=existing_counts,
-        round_robin=round_robin,
-        process_plan=_process_plan_for_source,
-        process_plan_args=process_plan_args,
-        accumulate_stats=_accumulate_stats,
-        plan_pool_input_meta=_plan_pool_input_meta,
-        inputs_manifest_entries=inputs_manifest_entries,
-        existing_usage_by_plan=existing_usage_by_plan,
+    plan_context = PlanRunContext(
+        global_cfg=cfg,
+        sinks=sinks,
+        chosen_solver=chosen_solver,
+        deps=deps,
+        rng=rng,
+        np_rng=np_rng_stage_b,
+        cfg_path=loaded.path,
+        run_id=str(cfg.run.id),
+        run_root=run_root_str,
+        run_config_path=run_cfg_path,
+        run_config_sha256=config_sha,
+        random_seed=seed,
+        dense_arrays_version=dense_arrays_version,
+        dense_arrays_version_source=dense_arrays_version_source,
+        show_tfbs=show_tfbs,
+        show_solutions=show_solutions,
+        output_bio_type=output_bio_type,
+        output_alphabet=output_alphabet,
+    )
+    execution_state = PlanExecutionState(
+        inputs_manifest=inputs_manifest_entries,
         state_counts=state_counts,
         checkpoint_every=checkpoint_every,
         write_state=_write_state,
@@ -1757,6 +1533,19 @@ def run_pipeline(
         composition_rows=composition_rows,
         events_path=events_path,
         display_map_by_input=display_map_by_input,
+    )
+    plan_execution = run_plan_schedule(
+        plan_items=pl,
+        plan_pools=plan_pools,
+        plan_pool_sources=plan_pool_sources,
+        existing_counts=existing_counts,
+        round_robin=round_robin,
+        process_plan=_process_plan_for_source,
+        plan_context=plan_context,
+        execution_state=execution_state,
+        accumulate_stats=_accumulate_stats,
+        plan_pool_input_meta=_plan_pool_input_meta,
+        existing_usage_by_plan=existing_usage_by_plan,
     )
     per_plan = plan_execution.per_plan
     total = plan_execution.total
