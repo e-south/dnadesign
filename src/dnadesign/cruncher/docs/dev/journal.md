@@ -25,3 +25,8 @@
 - Enforced early_stop.min_delta <= 0.1 for normalized-llr configs and added tests.
 - Enabled early_stop and analysis.extra_tables in demo config; demo now emits auto_opt_pilots table.
 - Updated docs (config, sampling guide, demo) to reflect learning metrics + early-stop guidance.
+- Auto-opt quality grading now uses trace draw counts + ESS ratio; short pilots are marked warn and ESS ratio only warns (no hard-fail).
+- Auto-opt candidate payload now records ess_ratio + trace_draws/expected to make pilot diagnostics scale-aware in auto_opt_pilots tables.
+- Reran demo_basics_two_tf with full default config; auto-opt selected PT with warnings and produced sample run lexA-cpxR_20260204_140346_cb1935.
+- Latest demo analysis warns only on low elite count (n_elites=1) and shows early-stop per-chain around draw 1500–1633.
+- Auto-opt pilot summary: PT swap_prob=0.15 + aggressive/boosted cooling yields top top_k_median; ESS ratios remain very low (~0.001) across grid.

@@ -487,14 +487,17 @@ def _assess_candidate_quality(
     if mode != "auto_opt":
         candidate.quality = "ok"
         return notes
-    rhat_ok = 1.15
-    rhat_fail = 1.30
-    ess_ok = 50
-    ess_fail = 10
-    unique_ok = 0.10
+    rhat_warn = 1.15
+    rhat_fail = 1.50
+    ess_ratio_warn = 0.10
+    ess_ratio_fail = 0.02
+    unique_warn = 0.10
     unique_fail = 0.0
 
     pilot_draws = None
+    pilot_draws_expected = None
+    pilot_chains = None
+    ess_ratio = None
     pilot_short = False
     if isinstance(candidate.diagnostics, dict):
         metrics = candidate.diagnostics.get("metrics")
@@ -502,38 +505,63 @@ def _assess_candidate_quality(
             trace = metrics.get("trace")
             if isinstance(trace, dict):
                 pilot_draws = trace.get("draws")
+                pilot_draws_expected = trace.get("draws_expected")
+                pilot_chains = trace.get("chains")
+                ess_ratio = trace.get("ess_ratio")
     try:
         pilot_draws = int(pilot_draws) if pilot_draws is not None else None
     except (TypeError, ValueError):
         pilot_draws = None
+    try:
+        pilot_draws_expected = int(pilot_draws_expected) if pilot_draws_expected is not None else None
+    except (TypeError, ValueError):
+        pilot_draws_expected = None
+    try:
+        pilot_chains = int(pilot_chains) if pilot_chains is not None else None
+    except (TypeError, ValueError):
+        pilot_chains = None
+    try:
+        ess_ratio = float(ess_ratio) if ess_ratio is not None else None
+    except (TypeError, ValueError):
+        ess_ratio = None
+
     pilot_min_draws = 200
-    if pilot_draws is not None and pilot_draws < pilot_min_draws:
+    pilot_min_fraction = 0.5
+    pilot_threshold = pilot_min_draws
+    if pilot_draws_expected is not None:
+        pilot_threshold = max(pilot_min_draws, int(round(pilot_draws_expected * pilot_min_fraction)))
+    if pilot_draws is not None and pilot_draws <= pilot_threshold:
         pilot_short = True
-        notes.append(f"pilot draws={pilot_draws} < {pilot_min_draws}; diagnostics are directional at short budgets")
+        notes.append(f"pilot draws={pilot_draws} <= {pilot_threshold}; diagnostics are directional at short budgets")
 
     quality = "ok"
+    if pilot_short:
+        quality = "warn"
+    if candidate.unique_fraction is not None:
+        if candidate.unique_fraction <= unique_fail:
+            quality = "fail"
+            notes.append(f"unique_fraction={candidate.unique_fraction:.2f} <= {unique_fail:.2f}")
+        elif candidate.unique_fraction < unique_warn and quality != "fail":
+            quality = "warn"
+            notes.append(f"unique_fraction={candidate.unique_fraction:.2f} < {unique_warn:.2f}")
     if not pilot_short:
         if candidate.rhat is not None:
             if candidate.rhat >= rhat_fail:
                 quality = "fail"
                 notes.append(f"rhat={candidate.rhat:.3f} >= {rhat_fail}")
-            elif candidate.rhat > rhat_ok:
+            elif candidate.rhat > rhat_warn:
                 quality = "warn"
-                notes.append(f"rhat={candidate.rhat:.3f} > {rhat_ok}")
-        if candidate.ess is not None:
-            if candidate.ess < ess_fail:
-                quality = "fail"
-                notes.append(f"ess={candidate.ess:.1f} < {ess_fail}")
-            elif candidate.ess < ess_ok and quality != "fail":
-                quality = "warn"
-                notes.append(f"ess={candidate.ess:.1f} < {ess_ok}")
-        if candidate.unique_fraction is not None:
-            if candidate.unique_fraction <= unique_fail:
-                quality = "fail"
-                notes.append(f"unique_fraction={candidate.unique_fraction:.2f} <= {unique_fail:.2f}")
-            elif candidate.unique_fraction < unique_ok and quality != "fail":
-                quality = "warn"
-                notes.append(f"unique_fraction={candidate.unique_fraction:.2f} < {unique_ok:.2f}")
+                notes.append(f"rhat={candidate.rhat:.3f} > {rhat_warn}")
+        if ess_ratio is None and candidate.ess is not None and pilot_draws is not None:
+            denom = pilot_draws
+            if candidate.kind != "pt":
+                denom *= pilot_chains or 1
+            if denom > 0:
+                ess_ratio = candidate.ess / float(denom)
+        if ess_ratio is not None and ess_ratio < ess_ratio_warn and quality != "fail":
+            quality = "warn"
+            threshold = ess_ratio_fail if ess_ratio <= ess_ratio_fail else ess_ratio_warn
+            notes.append(f"ess_ratio={ess_ratio:.3f} < {threshold:.2f}")
 
     candidate.quality = quality
     if quality == "warn" and not pilot_short:
@@ -704,7 +732,7 @@ def _run_auto_optimize_for_set(
                     pilot_run_dir,
                     kind,
                     budget=budget,
-                    mode=sample_cfg.mode,
+                    mode="auto_opt",
                     scorecard_top_k=auto_cfg.policy.scorecard.top_k,
                     cooling_boost=cooling_boost,
                     move_profile=move_profile,
@@ -1070,6 +1098,17 @@ def _run_auto_optimize_for_set(
             _format_run_path(best_marker_path, base=config_path.parent) if best_marker_path else "n/a",
         )
 
+    def _trace_metric(candidate: AutoOptCandidate, key: str) -> object | None:
+        if not isinstance(candidate.diagnostics, dict):
+            return None
+        metrics = candidate.diagnostics.get("metrics")
+        if not isinstance(metrics, dict):
+            return None
+        trace = metrics.get("trace")
+        if not isinstance(trace, dict):
+            return None
+        return trace.get(key)
+
     decision_payload = {
         "mode": "final",
         "selected": winner.kind,
@@ -1136,6 +1175,11 @@ def _run_auto_optimize_for_set(
                 "swap_rate": candidate.swap_rate,
                 "rhat": candidate.rhat,
                 "ess": candidate.ess,
+                "ess_ratio": _trace_metric(candidate, "ess_ratio"),
+                "trace_draws": _trace_metric(candidate, "draws"),
+                "trace_chains": _trace_metric(candidate, "chains"),
+                "trace_draws_expected": _trace_metric(candidate, "draws_expected"),
+                "trace_chains_expected": _trace_metric(candidate, "chains_expected"),
                 "unique_fraction": candidate.unique_fraction,
             }
             for candidate in all_candidates
@@ -1261,8 +1305,22 @@ def _evaluate_pilot_run(
         optimizer_stats=manifest.get("optimizer_stats", {}),
         sample_meta=sample_meta,
     )
-    metrics = diagnostics.get("metrics", {}) if isinstance(diagnostics, dict) else {}
+    diagnostics_payload = diagnostics if isinstance(diagnostics, dict) else {}
+    metrics = diagnostics_payload.get("metrics", {}) if isinstance(diagnostics_payload, dict) else {}
     trace_metrics = metrics.get("trace", {})
+    if isinstance(trace_metrics, dict):
+        trace_metrics = dict(trace_metrics)
+        expected_draws = manifest.get("draws")
+        expected_chains = manifest.get("chains")
+        if expected_draws is not None:
+            trace_metrics.setdefault("draws_expected", int(expected_draws))
+        if expected_chains is not None:
+            trace_metrics.setdefault("chains_expected", int(expected_chains))
+        metrics = dict(metrics)
+        metrics["trace"] = trace_metrics
+        diagnostics_payload = dict(diagnostics_payload)
+        diagnostics_payload["metrics"] = metrics
+    diagnostics = diagnostics_payload if isinstance(diagnostics_payload, dict) else diagnostics
     seq_metrics = metrics.get("sequences", {})
     elites_metrics = metrics.get("elites", {})
     optimizer_metrics = metrics.get("optimizer", {})
@@ -1411,6 +1469,33 @@ def _aggregate_candidate_runs(
         "replicates": [run.diagnostics for run in runs],
         "run_dirs": [str(path) for path in run_dirs],
     }
+    trace_keys = ("draws", "chains", "draws_expected", "chains_expected", "ess_ratio")
+    trace_metrics: dict[str, object] = {}
+    for key in trace_keys:
+        values: list[float] = []
+        for run in runs:
+            diag = run.diagnostics if isinstance(run.diagnostics, dict) else {}
+            metrics = diag.get("metrics") if isinstance(diag, dict) else None
+            if not isinstance(metrics, dict):
+                continue
+            trace = metrics.get("trace")
+            if not isinstance(trace, dict):
+                continue
+            value = trace.get(key)
+            if value is None:
+                continue
+            try:
+                values.append(float(value))
+            except (TypeError, ValueError):
+                continue
+        if values:
+            median_val = float(np.median(values))
+            if key in {"draws", "chains", "draws_expected", "chains_expected"}:
+                trace_metrics[key] = int(round(median_val))
+            else:
+                trace_metrics[key] = median_val
+    if trace_metrics:
+        diagnostics["metrics"] = {"trace": trace_metrics}
     best_run = max(
         runs,
         key=lambda run: (

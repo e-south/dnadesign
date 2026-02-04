@@ -71,6 +71,10 @@ Config knobs live under `sample.auto_opt` in `config.yaml` (see the config
 reference for full options). Auto‑opt also writes a pilot scorecard to
 `analysis/auto_opt_pilots.parquet` and a tradeoff plot to
 `analysis/plot__auto_opt_tradeoffs.<plot_format>` when available.
+The pilot scorecard includes `ess_ratio` and `trace_draws` so you can see
+whether pilots stopped early and how mixing scales with the draw count. If most
+candidates are `warn`, increase pilot budgets, relax early‑stop, or set
+`auto_opt.policy.allow_warn: true` so selection can proceed with explicit warnings.
 
 If enabled, `sample.auto_opt.length` probes multiple sequence lengths and
 compares them using the same objective‑aligned top‑K median score; use

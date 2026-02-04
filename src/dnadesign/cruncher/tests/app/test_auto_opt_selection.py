@@ -136,6 +136,35 @@ def test_auto_opt_scorecard_not_blocked_by_trace_metrics(tmp_path: Path) -> None
     assert notes == []
 
 
+def test_auto_opt_marks_short_draws_as_warn(tmp_path: Path) -> None:
+    auto_cfg = AutoOptConfig(length=AutoOptLengthConfig(enabled=False))
+    candidate = _candidate(
+        tmp_path,
+        "short_draws",
+        rhat=1.4,
+        ess=2.0,
+        diagnostics={"metrics": {"trace": {"draws": 500, "draws_expected": 2000, "ess_ratio": 0.001}}},
+    )
+
+    notes = _assess_candidate_quality(candidate, auto_cfg, mode="auto_opt")
+    assert candidate.quality == "warn"
+    assert any("pilot draws" in note for note in notes)
+
+
+def test_auto_opt_uses_ess_ratio_for_quality(tmp_path: Path) -> None:
+    auto_cfg = AutoOptConfig(length=AutoOptLengthConfig(enabled=False))
+    candidate = _candidate(
+        tmp_path,
+        "ess_ratio_fail",
+        rhat=1.01,
+        ess=80.0,
+        diagnostics={"metrics": {"trace": {"draws": 2000, "draws_expected": 2000, "ess_ratio": 0.015}}},
+    )
+
+    _assess_candidate_quality(candidate, auto_cfg, mode="auto_opt")
+    assert candidate.quality == "warn"
+
+
 def test_auto_opt_all_fail_allowed_when_requested(tmp_path: Path) -> None:
     auto_cfg = AutoOptConfig(length=AutoOptLengthConfig(enabled=False))
     candidate = _candidate(
