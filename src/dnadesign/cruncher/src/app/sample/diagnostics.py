@@ -19,6 +19,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from dnadesign.cruncher.config.schema_v2 import SampleConfig
 from dnadesign.cruncher.core.evaluator import SequenceEvaluator
 from dnadesign.cruncher.core.scoring import Scorer
 from dnadesign.cruncher.core.state import SequenceState
@@ -111,6 +112,13 @@ def resolve_dsdna_mode(*, elites_cfg: object, bidirectional: bool) -> bool:
     if mode == "false":
         return False
     raise ValueError(f"Unknown dsDNA mode '{mode}'.")
+
+
+def dsdna_equivalence_enabled(sample_cfg: SampleConfig) -> bool:
+    return resolve_dsdna_mode(
+        elites_cfg=sample_cfg.elites,
+        bidirectional=sample_cfg.objective.bidirectional,
+    )
 
 
 def _draw_scores_from_sequences(seq_df: pd.DataFrame) -> np.ndarray:

@@ -27,6 +27,7 @@ from dnadesign.cruncher.cli.config_resolver import (
 from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.utils.numba_cache import ensure_numba_cache_dir
+from dnadesign.cruncher.utils.paths import workspace_state_root
 
 console = Console()
 
@@ -150,7 +151,8 @@ def analyze(
             console.print("Hint: pairwise plots auto-pick a tf_pair; override with --tf-pair TF1,TF2.")
         return
     try:
-        ensure_numba_cache_dir(config_path.parent)
+        cache_dir = workspace_state_root(config_path) / "numba_cache"
+        ensure_numba_cache_dir(config_path.parent, cache_dir=cache_dir)
         from dnadesign.cruncher.app.analyze_workflow import run_analyze
 
         analysis_runs = run_analyze(

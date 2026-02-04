@@ -289,14 +289,10 @@ def _warm_start_seeds_from_elites(
     pad_with: str | None,
     max_seeds: int | None = None,
 ) -> list[np.ndarray]:
-    try:
-        elite_path = find_elites_parquet(run_dir)
-        elites_df = read_parquet(elite_path)
-    except Exception as exc:
-        logger.warning("Warm-start: unable to load elites from %s (%s).", run_dir, exc)
-        return []
+    elite_path = find_elites_parquet(run_dir)
+    elites_df = read_parquet(elite_path)
     if "sequence" not in elites_df.columns:
-        return []
+        raise ValueError(f"Warm-start requires a 'sequence' column in {elite_path}.")
     seeds: list[np.ndarray] = []
     for seq_str in elites_df["sequence"].astype(str).tolist():
         seq_arr = _encode_sequence_string(seq_str)
@@ -308,6 +304,11 @@ def _warm_start_seeds_from_elites(
             continue
         if max_seeds is not None and len(seeds) >= max_seeds:
             break
+    if not seeds:
+        raise ValueError(
+            "Warm-start found no usable elite sequences. "
+            f"Expected length {target_length} or {target_length - 1} in {elite_path}."
+        )
     return seeds
 
 

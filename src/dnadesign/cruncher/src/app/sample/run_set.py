@@ -35,6 +35,7 @@ from dnadesign.cruncher.app.sample.diagnostics import (
     _filter_elite_candidates,
     _norm_map_for_elites,
     _polish_sequence,
+    dsdna_equivalence_enabled,
     resolve_dsdna_mode,
 )
 from dnadesign.cruncher.app.sample.optimizer_config import (
@@ -408,13 +409,11 @@ def _run_sample_for_set(
             "score_scale='llr' is not comparable across PWMs in multi-TF runs. "
             "Consider normalized-llr or logp, or set objective.allow_unscaled_llr=true to silence this warning."
         )
-    if sample_cfg.objective.bidirectional and not (
-        sample_cfg.elites.dsDNA_canonicalize or sample_cfg.elites.dsDNA_hamming
-    ):
+    if sample_cfg.objective.bidirectional and not dsdna_equivalence_enabled(sample_cfg):
         logger.warning(
             "Bidirectional scoring is enabled but dsDNA equivalence is disabled "
             "(reverse complements will be treated as distinct for diversity/uniqueness). "
-            "Consider setting sample.elites.dsDNA_canonicalize=true."
+            "Consider setting sample.elites.selection.distance.dsDNA=true."
         )
 
     def _sum_combine(values):

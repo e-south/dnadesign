@@ -66,12 +66,16 @@ def temporary_numba_cache_dir(*, env_var: str = _NUMBA_CACHE_ENV) -> Iterator[Pa
                 numba_config.CACHE_DIR = prior_cache_dir
 
 
-def ensure_numba_cache_dir(anchor: Path, *, env_var: str = _NUMBA_CACHE_ENV) -> Path:
+def ensure_numba_cache_dir(
+    anchor: Path,
+    *,
+    cache_dir: Path | None = None,
+    env_var: str = _NUMBA_CACHE_ENV,
+) -> Path:
     """Ensure Numba cache directory is set and writable.
 
-    If env_var is set, it must point to a writable directory (created if missing).
-    Otherwise, use <workspace>/.cruncher/numba_cache, where workspace is the
-    directory passed as anchor.
+    If cache_dir is provided, use it (relative paths are resolved against anchor).
+    Otherwise, env_var must be set to a writable directory.
     """
     if anchor is None:
         raise ValueError("anchor is required")
@@ -79,12 +83,19 @@ def ensure_numba_cache_dir(anchor: Path, *, env_var: str = _NUMBA_CACHE_ENV) -> 
     if not anchor.is_dir():
         raise ValueError(f"anchor must be a directory: {anchor}")
 
-    cache_dir = _env_path(env_var)
-    if cache_dir is None:
-        cache_root = anchor / ".cruncher"
-        cache_dir = (cache_root / "numba_cache").resolve()
-        os.environ[env_var] = str(cache_dir)
-        logger.info("NUMBA cache dir not set; using %s", cache_dir)
+    env_path = _env_path(env_var)
+    if cache_dir is not None:
+        cache_dir = Path(cache_dir).expanduser()
+        if not cache_dir.is_absolute():
+            cache_dir = anchor / cache_dir
+        cache_dir = cache_dir.resolve()
+        if env_path is not None and env_path != cache_dir:
+            raise ValueError(f"{env_var} is set to {env_path}, which conflicts with cache_dir={cache_dir}.")
+    else:
+        if env_path is None:
+            raise RuntimeError(f"{env_var} must be set or cache_dir must be provided.")
+        cache_dir = env_path
+    os.environ[env_var] = str(cache_dir)
 
     try:
         cache_dir.mkdir(parents=True, exist_ok=True)

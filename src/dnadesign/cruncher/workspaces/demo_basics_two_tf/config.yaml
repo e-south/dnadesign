@@ -96,6 +96,9 @@ cruncher:
       enabled: true
       patience: 500
       min_delta: 0.01
+      require_min_unique: true
+      min_unique: 10
+      success_min_per_tf_norm: 0.70
     init:
       kind: random
       length: 30
@@ -113,11 +116,21 @@ cruncher:
     elites:
       k: 10
       min_hamming: 1
-      dsDNA_canonicalize: true
-      dsDNA_hamming: true
+      selection:
+        policy: mmr
+        pool_size: 1000
+        alpha: 0.85
+        relevance: min_per_tf_norm
+        relevance_norm: percentile
+        distance:
+          kind: tfbs_core_weighted
+          weights: tolerant
+          dsDNA: auto
+        min_distance: null
+        write_baselines: true
       filters:
         pwm_sum_min: 0.0
-        min_per_tf_norm: null
+        min_per_tf_norm: 0.70
         require_all_tfs_over_min_norm: true
     moves:
       profile: balanced
@@ -148,9 +161,11 @@ cruncher:
     auto_opt:
       enabled: true
       budget_levels: [2000, 3000]
-      replicates: 2
-      pt_swap_probs: [0.05, 0.15]
-      pt_ladder_sizes: [4, 6]
+      replicates: 1
+      move_profiles: [balanced]
+      cooling_boosts: [1.0]
+      pt_swap_probs: [0.10]
+      pt_ladder_sizes: [4]
       policy:
         allow_warn: true
     output:

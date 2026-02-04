@@ -15,8 +15,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from dnadesign.cruncher.app.sample.auto_opt import _warm_start_seeds_from_elites
 from dnadesign.cruncher.app.sample_workflow import _candidate_lengths, _warm_start_seeds_from_sequences
-from dnadesign.cruncher.artifacts.layout import sequences_path
+from dnadesign.cruncher.artifacts.layout import elites_path, sequences_path
 from dnadesign.cruncher.config.schema_v2 import (
     AutoOptConfig,
     AutoOptLengthConfig,
@@ -70,6 +71,63 @@ def test_warm_start_requires_sequences_file(tmp_path: Path) -> None:
     rng = np.random.default_rng(0)
     with pytest.raises(FileNotFoundError, match="sequences.parquet"):
         _warm_start_seeds_from_sequences(
+            run_dir,
+            target_length=4,
+            rng=rng,
+            pad_with="A",
+            max_seeds=None,
+        )
+
+
+def test_warm_start_requires_matching_sequences(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    seq_file = sequences_path(run_dir)
+    seq_file.parent.mkdir(parents=True, exist_ok=True)
+
+    df = pd.DataFrame({"sequence": ["AC", "TGCAAA"], "score_tfA": [1.0, 0.5]})
+    df.to_parquet(seq_file, engine="fastparquet")
+
+    rng = np.random.default_rng(0)
+    with pytest.raises(ValueError, match="Warm-start found no usable sequences"):
+        _warm_start_seeds_from_sequences(
+            run_dir,
+            target_length=4,
+            rng=rng,
+            pad_with="A",
+            max_seeds=None,
+        )
+
+
+def test_warm_start_elites_require_sequence_column(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    elite_file = elites_path(run_dir)
+    elite_file.parent.mkdir(parents=True, exist_ok=True)
+
+    df = pd.DataFrame({"rank": [1, 2], "score_tfA": [1.0, 0.5]})
+    df.to_parquet(elite_file, engine="fastparquet")
+
+    rng = np.random.default_rng(0)
+    with pytest.raises(ValueError, match="sequence"):
+        _warm_start_seeds_from_elites(
+            run_dir,
+            target_length=4,
+            rng=rng,
+            pad_with="A",
+            max_seeds=None,
+        )
+
+
+def test_warm_start_elites_require_matching_sequences(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    elite_file = elites_path(run_dir)
+    elite_file.parent.mkdir(parents=True, exist_ok=True)
+
+    df = pd.DataFrame({"sequence": ["AC", "TGCAAA"], "rank": [1, 2]})
+    df.to_parquet(elite_file, engine="fastparquet")
+
+    rng = np.random.default_rng(0)
+    with pytest.raises(ValueError, match="Warm-start found no usable elite sequences"):
+        _warm_start_seeds_from_elites(
             run_dir,
             target_length=4,
             rng=rng,
