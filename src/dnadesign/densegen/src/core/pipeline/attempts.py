@@ -152,27 +152,27 @@ def _load_failure_counts_from_attempts(
     if df.empty:
         return {}
     counts: dict[tuple[str, str, str, str, str | None], dict[str, int]] = {}
-    for _, row in df.iterrows():
-        status = str(row.get("status") or "")
+    for row in df.itertuples(index=False):
+        status = str(getattr(row, "status", "") or "")
         if status == "success":
             continue
-        reason = str(row.get("reason") or "unknown")
-        input_name = str(row.get("input_name") or "")
-        plan_name = str(row.get("plan_name") or "")
+        reason = str(getattr(row, "reason", None) or "unknown")
+        input_name = str(getattr(row, "input_name", None) or "")
+        plan_name = str(getattr(row, "plan_name", None) or "")
         library_tfbs = _coerce_attempt_list(
-            row.get("library_tfbs"),
+            getattr(row, "library_tfbs", None),
             field="library_tfbs",
             input_name=input_name,
             plan_name=plan_name,
         )
         library_tfs = _coerce_attempt_list(
-            row.get("library_tfs"),
+            getattr(row, "library_tfs", None),
             field="library_tfs",
             input_name=input_name,
             plan_name=plan_name,
         )
         library_site_ids = _coerce_attempt_list(
-            row.get("library_site_ids"),
+            getattr(row, "library_site_ids", None),
             field="library_site_ids",
             input_name=input_name,
             plan_name=plan_name,

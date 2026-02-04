@@ -1689,6 +1689,7 @@ def run_pipeline(
         )
     inputs = cfg.inputs
     inputs_by_name = {inp.name: inp for inp in inputs}
+    motifs_by_input: dict[str, list[tuple[str | None, str | None]]] = {}
     display_map_by_input: dict[str, dict[str, str]] = {}
     for item in pl:
         spec = plan_pools[item.name]
@@ -1697,7 +1698,11 @@ def run_pipeline(
             inp = inputs_by_name.get(input_name)
             if inp is None:
                 continue
-            for motif_id, name in input_motifs(inp, loaded.path):
+            motifs = motifs_by_input.get(input_name)
+            if motifs is None:
+                motifs = list(input_motifs(inp, loaded.path))
+                motifs_by_input[input_name] = motifs
+            for motif_id, name in motifs:
                 if motif_id and name and motif_id not in mapping:
                     mapping[motif_id] = name
         if mapping:
