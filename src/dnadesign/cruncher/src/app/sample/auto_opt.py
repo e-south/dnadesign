@@ -1563,7 +1563,6 @@ def _validate_auto_opt_candidates(
     *,
     allow_warn: bool,
 ) -> tuple[list[AutoOptCandidate], bool]:
-    _ = allow_warn
     if not candidates:
         raise ValueError("Auto-optimize did not produce any pilot candidates.")
     viable = [c for c in candidates if c.status != "fail"]
@@ -1572,6 +1571,20 @@ def _validate_auto_opt_candidates(
             "Auto-optimize failed: all pilot candidates failed catastrophic checks "
             "(missing scores or no movement). Re-run with larger budgets or fix the model inputs."
         )
+    if allow_warn:
+        viable = [c for c in viable if c.quality != "fail"]
+        if not viable:
+            raise ValueError(
+                "Auto-optimize failed: all pilot candidates failed quality checks. "
+                "Increase budgets/replicates or adjust diagnostics thresholds."
+            )
+    else:
+        viable = [c for c in viable if c.quality == "ok"]
+        if not viable:
+            raise ValueError(
+                "Auto-optimize failed: no candidates passed diagnostics without warnings. "
+                "Set auto_opt.policy.allow_warn=true or increase budgets/replicates."
+            )
     return viable, False
 
 

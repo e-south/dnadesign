@@ -439,7 +439,7 @@ Notes:
   `auto_opt.cooling_boosts`).
 - `auto_opt.beta_ladder_scales` adds additional PT beta ladder scale candidates (unioned with
   `auto_opt.cooling_boosts`).
-- Auto‑opt is **thresholdless**: it escalates through `auto_opt.budget_levels` (and configured `auto_opt.replicates`) until a confidence‑separated winner emerges. With `auto_opt.policy.allow_warn: true`, it will always pick the best available candidate at the maximum budget (recording low‑confidence warnings). With `allow_warn: false`, it fails fast if no confident winner emerges and suggests increasing budgets/replicates.
+- Auto‑opt is **thresholdless**: it escalates through `auto_opt.budget_levels` (and configured `auto_opt.replicates`) until a confidence‑separated winner emerges. With `auto_opt.policy.allow_warn: true`, it will pick the best available candidate at the maximum budget among those that pass diagnostics (recording low‑confidence warnings). With `allow_warn: false`, it fails fast if no confident winner emerges or if only warning‑level candidates remain, and suggests increasing budgets/replicates.
 - `early_stop` halts sampling when the best score fails to improve by `min_delta` for `patience` draws (per chain for Gibbs, per sweep for PT).
 - Auto-opt selection details are stored in each pilot's `meta/run_manifest.json`; `cruncher analyze` writes `analysis/auto_opt_pilots.parquet` and `analysis/plot__auto_opt_tradeoffs.<plot_format>`.
 - `sample.rng.deterministic=true` isolates a stable RNG stream per pilot config.

@@ -363,7 +363,7 @@ Each candidate dsDNA sequence is scored by scanning both strands for each PWM, t
 
 **Auto‑opt** runs short Gibbs + parallel tempering pilots to pick a robust optimizer/temperature ladder/budget so the final run is more performant. The demo config sweeps multiple PT swap probabilities and ladder sizes so you can compare mixing behavior across a small grid. The chosen pilot is recorded in `outputs/auto_opt/best_<run_group>.json`, and the final effective config is written to `outputs/sample/<run_name>/meta/config_used.yaml`. For diagnostics and tuning guidance, see the [sampling + analysis guide](../guides/sampling_and_analysis.md).
 
-This demo config sets `auto_opt.policy.allow_warn: true` so auto-opt will always pick a winner by the end of the configured budget levels, even if confidence is low (warnings are recorded). Set `allow_warn: false` to require a confidence-separated winner; if none emerges at the maximum configured budgets/replicates, auto-opt fails fast with guidance to increase `auto_opt.budget_levels` and/or `auto_opt.replicates`.
+This demo config sets `auto_opt.policy.allow_warn: true` so auto-opt will pick a winner by the end of the configured budget levels among candidates that pass diagnostics, even if confidence is low (warnings are recorded). Set `allow_warn: false` to require a confidence-separated winner; if none emerges at the maximum configured budgets/replicates (or only warning-level candidates remain), auto-opt fails fast with guidance to increase `auto_opt.budget_levels` and/or `auto_opt.replicates`.
 
 ```bash
 # Run sampling with auto-opt

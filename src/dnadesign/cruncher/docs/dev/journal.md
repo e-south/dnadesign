@@ -15,3 +15,8 @@
 - Updated docs to reflect strict analyze artifacts and warm-start requirements.
 - Reorganized tests into analysis/app/cli/core/ingest/store subfolders and fixed path-based tests.
 - Profiled demo_basics_two_tf with a reduced budget; font-cache build dominated the first run, with scoring/pvalue setup next.
+- Added analysis plan + manifest helpers to trim analyze_workflow and keep manifest writing cohesive.
+- Made fetch CLI default its source from motif_store.source_preference and documented the requirement.
+- Tightened auto-opt candidate validation: warn candidates now require allow_warn, and quality=fail is rejected.
+- Added a core import contract test to keep core free of artifacts/cli/filesystem dependencies.
+- Profiled `cruncher analyze --summary` (demo_basics_two_tf); runtime dominated by import overhead (~3s total).

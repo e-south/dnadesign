@@ -77,6 +77,8 @@ Note:
 
 * `--campaign` applies campaign selectors by default; use `--no-selectors` to fetch raw category TFs when the
   local catalog is empty.
+* `--source` defaults to the first available entry in `motif_store.source_preference` (skipping entries that are
+  not registered ingest sources); if the list is empty or none are available you must pass `--source` explicitly.
 
 ---
 
@@ -109,7 +111,7 @@ Examples:
 
 Common options:
 
-* `--tf`, `--motif-id`, `--campaign`, `--dataset-id`, `--limit`
+* `--tf`, `--motif-id`, `--campaign`, `--dataset-id`, `--limit`, `--source`
 * `--apply-selectors/--no-selectors` (campaigns)
 * `--hydrate` (hydrates missing sequences)
 * `--offline`, `--update`
@@ -126,6 +128,8 @@ Note:
 * `--hydrate` with no `--tf/--motif-id` hydrates all cached site sets by default.
 * `--campaign` applies campaign selectors by default; use `--no-selectors` to fetch raw category TFs when the
   local catalog is empty.
+* `--source` defaults to the first available entry in `motif_store.source_preference` (skipping entries that are
+  not registered ingest sources); if the list is empty or none are available you must pass `--source` explicitly.
 
 ---
 
@@ -327,7 +331,7 @@ Notes:
 
 * `sample.output.save_sequences: true` is required for later analysis.
 * `sample.output.trace.save: true` enables trace-based diagnostics.
-* Auto-opt is enabled by default: it runs short Gibbs + PT pilots, evaluates objective-aligned scores from draw-phase `combined_score_final` (top-K median), records diagnostics (warnings suppressed for very short pilots), then runs the best candidate. Selection is thresholdless and confidence-based; `auto_opt.policy.allow_warn: true` will always pick a winner at the max budget (logging low-confidence warnings).
+* Auto-opt is enabled by default: it runs short Gibbs + PT pilots, evaluates objective-aligned scores from draw-phase `combined_score_final` (top-K median), records diagnostics (warnings suppressed for very short pilots), then runs the best candidate. Selection is thresholdless and confidence-based; `auto_opt.policy.allow_warn: true` will pick a winner at the max budget among candidates that pass diagnostics (logging low-confidence warnings), and it still fails if all candidates fail quality checks.
 * `--no-auto-opt` is only valid when `sample.optimizer.name` is explicitly set to `gibbs` or `pt` and `auto_opt.enabled=false` in the config.
 * Auto-opt can take minutes; for a quick smoke test set `sample.optimizer.name=gibbs` (or `pt`) and disable `auto_opt.enabled`.
 * `--verbose` enables periodic progress logging; `--debug` enables very verbose debug logs.

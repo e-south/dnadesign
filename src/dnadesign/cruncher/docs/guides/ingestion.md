@@ -192,6 +192,8 @@ those sites (for example via `cruncher fetch sites --hydrate <config>`).
 - `cruncher fetch sites --hydrate <config>` -> hydrate missing sequences only (all cached site sets by default).
 - `cruncher fetch sites --dataset-id <id> <config>` -> pin a specific HT dataset
   (also enables HT access for this request).
+- `--source` defaults to the first available entry in `motif_store.source_preference` (skipping entries that are
+  not registered ingest sources); if the list is empty or none are available you must pass `--source` explicitly.
 - `--offline` validates cache without network.
 - `--update` forces refresh of cached artifacts.
 

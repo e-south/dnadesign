@@ -160,6 +160,18 @@ def test_auto_opt_requires_ok_candidates_unless_allow_warn(tmp_path: Path) -> No
     assert allow_fail is False
 
 
+def test_auto_opt_warn_requires_allow_warn(tmp_path: Path) -> None:
+    candidate = _candidate(tmp_path, "warn", status="warn", quality="warn", best_score=1.0)
+    with pytest.raises(ValueError, match="allow_warn"):
+        _validate_auto_opt_candidates([candidate], allow_warn=False)
+
+
+def test_auto_opt_rejects_failed_quality_even_with_allow_warn(tmp_path: Path) -> None:
+    candidate = _candidate(tmp_path, "fail", status="ok", quality="fail", best_score=1.0)
+    with pytest.raises(ValueError, match="quality"):
+        _validate_auto_opt_candidates([candidate], allow_warn=True)
+
+
 def test_auto_opt_missing_diagnostics_requires_allow_warn(tmp_path: Path) -> None:
     candidate = _candidate(
         tmp_path,
