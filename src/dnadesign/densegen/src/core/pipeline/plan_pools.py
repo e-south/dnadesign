@@ -16,8 +16,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from ...adapters.sources.stage_a.stage_a_paths import safe_label
 from ..artifacts.pool import POOL_MODE_SEQUENCE, POOL_MODE_TFBS, PoolData
+from ..stage_a.stage_a_paths import safe_label
 
 PLAN_POOL_INPUT_TYPE = "plan_pool"
 

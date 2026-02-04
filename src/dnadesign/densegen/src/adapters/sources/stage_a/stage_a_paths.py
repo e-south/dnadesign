@@ -3,14 +3,17 @@
 dnadesign
 src/dnadesign/densegen/src/adapters/sources/stage_a/stage_a_paths.py
 
-Stage-A filename-safe label helpers.
+Re-exports Stage-A module 'stage_a_paths' from core.stage_a.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-from __future__ import annotations
+from ....core.stage_a import stage_a_paths as _impl
 
+for _name, _value in _impl.__dict__.items():
+    if _name.startswith("__") and _name != "__all__":
+        continue
+    globals()[_name] = _value
 
-def safe_label(text: str) -> str:
-    return "".join(c if c.isalnum() or c in "-._" else "_" for c in str(text).strip()) or "stage_a"
+__all__ = getattr(_impl, "__all__", [])

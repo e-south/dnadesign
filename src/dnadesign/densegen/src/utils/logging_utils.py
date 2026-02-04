@@ -32,6 +32,7 @@ _PROGRESS_ENABLED = True
 _PROGRESS_ACTIVE = False
 _PROGRESS_VISIBLE = False
 _PROGRESS_STYLE = "stream"
+_LOGGING_CONSOLE: Console | None = None
 
 
 def set_progress_enabled(enabled: bool) -> None:
@@ -52,6 +53,15 @@ def set_progress_style(style: str) -> None:
 def get_progress_style() -> str:
     with _PROGRESS_LOCK:
         return str(_PROGRESS_STYLE)
+
+
+def set_logging_console(console: Console | None) -> None:
+    global _LOGGING_CONSOLE
+    _LOGGING_CONSOLE = console
+
+
+def get_logging_console() -> Console | None:
+    return _LOGGING_CONSOLE
 
 
 def is_progress_enabled() -> bool:
@@ -97,6 +107,21 @@ class FimoMiningBatchLogFilter(logging.Filter):
         if _STAGE_A_VERBOSE_RE.search(message):
             return False
         return True
+
+
+class FontToolsConsoleFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.name.startswith("fontTools") and record.levelno < logging.WARNING:
+            return False
+        return True
+
+
+def _configure_fonttools_logger() -> None:
+    logger = logging.getLogger("fontTools")
+    logger.setLevel(logging.DEBUG)
+    for handler in list(logger.handlers):
+        logger.removeHandler(handler)
+    logger.propagate = True
 
 
 class ProgressAwareStreamHandler(logging.StreamHandler):
@@ -280,8 +305,22 @@ def setup_logging(
 
     progress_enabled = is_progress_enabled()
     progress_style = get_progress_style()
-    console_stream = sys.stderr if progress_enabled and progress_style in {"screen", "stream"} else sys.stdout
-    console = Console(file=console_stream)
+    if progress_enabled and progress_style in {"screen", "stream"}:
+        if bool(getattr(sys.stderr, "isatty", lambda: False)()):
+            console_stream = sys.stderr
+        elif bool(getattr(sys.stdout, "isatty", lambda: False)()):
+            console_stream = sys.stdout
+        else:
+            console_stream = sys.stdout
+    else:
+        console_stream = sys.stdout
+    is_tty = bool(getattr(console_stream, "isatty", lambda: False)())
+    console = Console(
+        file=console_stream,
+        force_terminal=is_tty,
+        color_system="truecolor" if is_tty else None,
+    )
+    set_logging_console(console)
     sh = ProgressAwareRichHandler(
         console=console,
         show_time=True,
@@ -292,14 +331,17 @@ def setup_logging(
     )
     sh.setLevel(lvl)
     sh.addFilter(FimoMiningBatchLogFilter())
+    sh.addFilter(FontToolsConsoleFilter())
     root.addHandler(sh)
 
     if logfile:
         Path(logfile).parent.mkdir(parents=True, exist_ok=True)
         fh = logging.FileHandler(logfile, encoding="utf-8")
-        fh.setLevel(lvl)
+        fh.setLevel(logging.DEBUG)
         fh.setFormatter(fmt)
         root.addHandler(fh)
+
+    _configure_fonttools_logger()
 
     root.setLevel(lvl)
     logging.getLogger(__name__).info("Logging initialized (level=%s)", level)

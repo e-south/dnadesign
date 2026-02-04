@@ -127,3 +127,16 @@ def _update_usage_counts(
             continue
         key = (tf, tfbs)
         usage_counts[key] = int(usage_counts.get(key, 0)) + 1
+
+
+def _update_usage_summary(
+    usage_counts: dict[tuple[str, str], int],
+    tf_usage_counts: dict[str, int],
+    used_tfbs_detail: list[dict],
+) -> None:
+    _update_usage_counts(usage_counts, used_tfbs_detail)
+    for entry in used_tfbs_detail:
+        tf = str(entry.get("tf") or "").strip()
+        if not tf:
+            continue
+        tf_usage_counts[tf] = int(tf_usage_counts.get(tf, 0)) + 1

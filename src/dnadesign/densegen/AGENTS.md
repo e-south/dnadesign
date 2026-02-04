@@ -17,8 +17,8 @@ Supplement to repo-root `AGENTS.md` with `densegen`-specific locations + run sha
 
 ### Run ergonomics (explicit)
 - If run outputs already exist (e.g., `outputs/tables/attempts.parquet` or `outputs/meta/run_state.json`),
-  use `dense run --resume` to continue or `dense run --fresh` to clear outputs and start over.
-  Runs do not auto-resume.
+  `dense run` auto-resumes (same as `dense run --resume`); use `dense run --fresh` to clear outputs
+  and start over.
 
 ### Commands (copy/paste)
 DenseGen CLI is exposed as `dense` in this repo:

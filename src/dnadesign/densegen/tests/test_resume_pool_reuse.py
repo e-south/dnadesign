@@ -62,6 +62,7 @@ class _DummyAdapter:
         min_required_regulators=None,
         solver_time_limit_seconds=None,
         solver_threads=None,
+        extra_label=None,
     ):
         opt = _DummyOpt()
         sol1 = _DummySol(sequence="AAA", library=library, used_indices=[0])

@@ -353,6 +353,96 @@ def _pool_manifest(tmp_path: Path, *, include_diversity: bool = False) -> TFBSPo
     return TFBSPoolArtifact.load(path)
 
 
+def _pool_manifest_two_inputs(tmp_path: Path) -> TFBSPoolArtifact:
+    pools_dir = tmp_path / "pools"
+    pools_dir.mkdir(parents=True, exist_ok=True)
+    base_entry = {
+        "type": "binding_sites",
+        "rows": 2,
+        "columns": [
+            "input_name",
+            "tf",
+            "tfbs_sequence",
+            "tfbs_core",
+            "best_hit_score",
+            "tier",
+            "rank_within_regulator",
+            "selection_rank",
+            "nearest_selected_similarity",
+            "selection_score_norm",
+            "nearest_selected_distance_norm",
+        ],
+        "pool_mode": "tfbs",
+        "stage_a_sampling": {
+            "backend": "fimo",
+            "tier_scheme": "pct_0.1_1_9",
+            "eligibility_rule": "best_hit_score > 0 (and has at least one FIMO hit)",
+            "retention_rule": "top_n_sites_by_best_hit_score",
+            "fimo_thresh": 1.0,
+            "bgfile": None,
+            "background_source": "motif_background",
+            "eligible_score_hist": [
+                {
+                    "regulator": "TF_A",
+                    "pwm_consensus": "AAA",
+                    "pwm_consensus_iupac": "AAA",
+                    "pwm_consensus_score": 2.0,
+                    "pwm_theoretical_max_score": 2.0,
+                    "edges": [0.0, 1.0, 2.0],
+                    "counts": [1, 1],
+                    "tier0_score": 2.0,
+                    "tier1_score": 1.0,
+                    "tier2_score": 0.5,
+                    "tier_fractions": [0.001, 0.01, 0.09],
+                    "tier_fractions_source": "default",
+                    "generated": 10,
+                    "candidates_with_hit": 8,
+                    "eligible_raw": 6,
+                    "eligible_unique": 4,
+                    "retained": 2,
+                    "selection_policy": "mmr",
+                    "selection_alpha": 0.9,
+                    "selection_similarity": "weighted_hamming_tolerant",
+                    "selection_relevance_norm": "minmax_raw_score",
+                    "selection_pool_size_final": 20,
+                    "selection_pool_rung_fraction_used": 0.001,
+                    "selection_pool_min_score_norm_used": None,
+                    "selection_pool_capped": False,
+                    "selection_pool_cap_value": None,
+                    "mining_audit": None,
+                    "padding_audit": None,
+                }
+            ],
+        },
+    }
+    manifest = {
+        "schema_version": "1.6",
+        "run_id": "demo",
+        "run_root": ".",
+        "config_path": "config.yaml",
+        "inputs": [
+            dict(
+                base_entry,
+                name="demo_input",
+                pool_path="demo_input__pool.parquet",
+            ),
+            dict(
+                base_entry,
+                name="demo_input_b",
+                pool_path="demo_input_b__pool.parquet",
+            ),
+        ],
+    }
+    for entry in manifest["inputs"]:
+        consensus = entry["stage_a_sampling"]["eligible_score_hist"][0]["pwm_consensus"]
+        entry["stage_a_sampling"]["eligible_score_hist"][0]["diversity"] = _diversity_block(
+            core_len=len(str(consensus))
+        )
+    path = pools_dir / "pool_manifest.json"
+    path.write_text(json.dumps(manifest, indent=2, sort_keys=True))
+    return TFBSPoolArtifact.load(path)
+
+
 def _background_pool_manifest(tmp_path: Path) -> TFBSPoolArtifact:
     pools_dir = tmp_path / "pools"
     pools_dir.mkdir(parents=True, exist_ok=True)
@@ -497,6 +587,43 @@ def test_plot_stage_a_summary(tmp_path: Path) -> None:
     assert Path(paths[0]).exists()
     assert Path(paths[1]).exists()
     assert Path(paths[2]).exists()
+
+
+def test_plot_stage_a_summary_consolidates_inputs(tmp_path: Path) -> None:
+    matplotlib.use("Agg", force=True)
+    out_path = tmp_path / "stage_a_summary.png"
+    pool_df_a = pd.DataFrame(
+        {
+            "input_name": ["demo_input", "demo_input"],
+            "tf": ["TF_A", "TF_A"],
+            "tfbs_sequence": ["AAAA", "AAAAT"],
+            "tfbs_core": ["AAAA", "AAAT"],
+            "best_hit_score": [2.0, 1.5],
+            "tier": [0, 1],
+            "rank_within_regulator": [1, 2],
+            "selection_rank": [1, 2],
+            "nearest_selected_similarity": [0.0, 0.5],
+            "selection_score_norm": [1.0, 0.5],
+            "nearest_selected_distance_norm": [None, 0.5],
+        }
+    )
+    pool_df_b = pool_df_a.copy()
+    pool_df_b["input_name"] = "demo_input_b"
+    pools = {"demo_input": pool_df_a, "demo_input_b": pool_df_b}
+    manifest = _pool_manifest_two_inputs(tmp_path)
+    paths = plot_stage_a_summary(
+        pd.DataFrame(),
+        out_path,
+        pools=pools,
+        pool_manifest=manifest,
+        style={},
+    )
+    assert len(paths) == 3
+    names = {Path(path).name for path in paths}
+    assert "stage_a_summary__pool_tiers.png" in names
+    assert "stage_a_summary__yield_bias.png" in names
+    assert "stage_a_summary__diversity.png" in names
+    assert all("__demo_input" not in name for name in names)
 
 
 def test_plot_stage_a_summary_includes_background_logo(tmp_path: Path) -> None:

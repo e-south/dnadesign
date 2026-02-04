@@ -13,6 +13,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+import typer
+
 from dnadesign.densegen.src import cli, cli_setup
 
 
@@ -72,6 +75,5 @@ def test_resolve_config_path_prefers_parent_config(tmp_path: Path, monkeypatch) 
     child.mkdir()
     monkeypatch.chdir(child)
     ctx = _Ctx()
-    resolved, is_default = cli._resolve_config_path(ctx, None)
-    assert resolved == cfg
-    assert is_default is False
+    with pytest.raises(typer.Exit):
+        cli._resolve_config_path(ctx, None)

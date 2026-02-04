@@ -106,6 +106,42 @@ def _write_pool_manifest(tmp_path: Path) -> None:
     (pools_dir / "pool_manifest.json").write_text(json.dumps(manifest, indent=2))
 
 
+def _write_pool_manifest_with_nan_tier(tmp_path: Path) -> None:
+    pools_dir = tmp_path / "outputs" / "pools"
+    pools_dir.mkdir(parents=True, exist_ok=True)
+    df = pd.DataFrame(
+        {
+            "input_name": ["demo_input"] * 3,
+            "tf": ["TF_A", "TF_A", "TF_B"],
+            "tfbs": ["AAAA", "AAAAT", "CCCCCC"],
+            "motif_id": ["m1", "m1", "m2"],
+            "tfbs_id": ["id1", "id2", "id3"],
+            "best_hit_score": [10.0, 8.0, 5.0],
+            "tier": [0, math.nan, 2],
+            "rank_within_regulator": [1, 2, 1],
+        }
+    )
+    pool_path = pools_dir / "demo_input__pool.parquet"
+    df.to_parquet(pool_path, index=False)
+    manifest = {
+        "schema_version": "1.6",
+        "run_id": "demo",
+        "run_root": ".",
+        "config_path": "config.yaml",
+        "inputs": [
+            {
+                "name": "demo_input",
+                "type": "binding_sites",
+                "pool_path": "demo_input__pool.parquet",
+                "rows": int(len(df)),
+                "columns": list(df.columns),
+                "pool_mode": "tfbs",
+            }
+        ],
+    }
+    (pools_dir / "pool_manifest.json").write_text(json.dumps(manifest, indent=2))
+
+
 def _write_libraries(tmp_path: Path) -> None:
     libraries_dir = tmp_path / "outputs" / "libraries"
     libraries_dir.mkdir(parents=True, exist_ok=True)
@@ -343,6 +379,21 @@ def test_build_run_metrics_library_health(tmp_path: Path) -> None:
     assert set(tiers["tier"].tolist()) == {0, 1, 2}
     t0 = tiers[(tiers["tf"] == "TF_A") & (tiers["tier"] == 0)].iloc[0]
     assert t0["usage_rate"] == 1.0
+
+
+def test_build_run_metrics_skips_nan_tier(tmp_path: Path) -> None:
+    cfg_path = _write_config(tmp_path)
+    _write_pool_manifest_with_nan_tier(tmp_path)
+    _write_libraries(tmp_path)
+    _write_attempts(tmp_path)
+    _write_composition(tmp_path)
+
+    loaded = load_config(cfg_path)
+    metrics = build_run_metrics(cfg=loaded.root.densegen, run_root=tmp_path)
+
+    tiers = metrics[metrics["metric_group"] == "tier_enrichment"]
+    assert not tiers.empty
+    assert tiers["tier"].isna().sum() == 0
 
 
 def test_build_run_metrics_sampling_pressure(tmp_path: Path) -> None:

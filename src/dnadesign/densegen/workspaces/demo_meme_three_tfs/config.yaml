@@ -17,7 +17,7 @@ densegen:
           batch_size: 5000
           budget:
             mode: fixed_candidates
-            candidates: 1000000
+            candidates: 100000
             growth_factor: 1.25
           log_every_batches: 1
         length:
@@ -44,7 +44,7 @@ densegen:
           batch_size: 5000
           budget:
             mode: fixed_candidates
-            candidates: 1000000
+            candidates: 100000
             growth_factor: 1.25
           log_every_batches: 1
         length:
@@ -71,7 +71,7 @@ densegen:
           batch_size: 5000
           budget:
             mode: fixed_candidates
-            candidates: 1000000
+            candidates: 100000
             growth_factor: 1.25
           log_every_batches: 1
         length:
@@ -247,6 +247,13 @@ densegen:
     level: INFO
     suppress_solver_stderr: true
     print_visual: true
+    visuals:
+      tf_colors:
+        lexA: "#66C2A5"
+        cpxR: "#FC8D62"
+        baeR: "#8DA0CB"
+        background: "#B3B3B3"
+        sigma70_consensus: "#E78AC3"
     progress_style: screen
     progress_every: 1
     progress_refresh_seconds: 1.0

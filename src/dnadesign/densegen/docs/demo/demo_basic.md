@@ -181,7 +181,8 @@ How to interpret common recap fields:
 ### 4. Run generation
 
 ```bash
-dense run -c "$CONFIG" --fresh # or --resume
+dense run -c "$CONFIG" --resume
+# or --fresh
 ```
 
 What happens here:
@@ -332,6 +333,17 @@ dense validate-config --probe-solver -c "$CONFIG"
 
 If the probe fails, either install/configure your backend (CBC / GUROBI) or adjust `densegen.solver`
 in `config.yaml`.
+
+#### `run_state.json` was created with a different config
+
+If you edited `config.yaml` after a prior run, DenseGen will refuse to resume to avoid
+mixing outputs from incompatible configs.
+
+```bash
+dense run --fresh -c "$CONFIG"
+# or
+dense campaign-reset -c "$CONFIG"
+```
 
 #### “regulator group member not found” / regulator label mismatches
 

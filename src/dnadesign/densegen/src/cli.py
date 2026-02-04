@@ -47,7 +47,6 @@ import typer
 from rich.console import Console
 from rich.traceback import install as rich_traceback
 
-from .adapters.sources.stage_a.stage_a_summary import PWMSamplingSummary
 from .cli_commands.config import register_validate_command
 from .cli_commands.context import CliContext
 from .cli_commands.inspect import register_inspect_commands
@@ -77,6 +76,7 @@ from .cli_setup import (
 from .config import resolve_relative_path, resolve_run_root
 from .core.artifacts.pool import PoolData
 from .core.run_paths import display_path
+from .core.stage_a.stage_a_summary import PWMSamplingSummary
 from .utils.logging_utils import install_native_stderr_filters
 from .utils.rich_style import make_table
 
@@ -94,10 +94,7 @@ _PYARROW_SYSCTL_PATTERN = re.compile(r"sysctlbyname failed for 'hw\.")
 log = logging.getLogger(__name__)
 install_native_stderr_filters(suppress_solver_messages=False)
 
-DEFAULT_CONFIG_MISSING_MESSAGE = (
-    f"No config found. cd into a workspace containing {DEFAULT_CONFIG_FILENAME}, "
-    f"or pass -c path/to/{DEFAULT_CONFIG_FILENAME}."
-)
+DEFAULT_CONFIG_MISSING_MESSAGE = "Config path is required. Pass -c/--config or set DENSEGEN_CONFIG_PATH."
 
 
 @contextlib.contextmanager

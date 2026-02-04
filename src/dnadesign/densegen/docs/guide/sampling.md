@@ -166,8 +166,9 @@ and `runtime.max_consecutive_failures` (see `densegen.runtime.*`). When diagnosi
 `dense inspect run --events --library` are the fastest way to see whether the run is rebuilding
 libraries too often or sampling is exhausted.
 
-Stage‑B also requires the total bp in a sampled library to meet or exceed `generation.sequence_length`.
-If you see a "library_bp" error, increase `library_size` or supply longer motifs.
+Stage‑B warns when the total bp in a sampled library is below `generation.sequence_length`.
+Solver coverage may be limited in that case; increase `library_size` or supply longer motifs if you
+need full coverage.
 
 For plan constraints and solver configuration, see `guide/generation.md`.
 

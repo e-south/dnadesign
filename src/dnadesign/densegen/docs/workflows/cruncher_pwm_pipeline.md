@@ -152,7 +152,7 @@ See `reference/config.md` for exact fields.
 
 The packaged DenseGen demo (`workspaces/demo_meme_three_tfs/config.yaml`) adds a
 `background_pool` input to generate neutral 16–20 bp parts via FIMO‑based negative
-selection against LexA/CpxR/BaeR PWMs. Plan‑scoped pooling then builds four libraries:
+selection against LexA/CpxR/BaeR PWMs (p‑value threshold 1e‑4, both strands). Plan‑scoped pooling then builds four libraries:
 
 - `controls` (background only)
 - `ethanol` (CpxR/BaeR + background)

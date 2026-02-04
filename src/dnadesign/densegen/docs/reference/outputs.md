@@ -84,6 +84,7 @@ DenseGen writes `outputs/meta/events.jsonl` (JSON lines) with structured events 
 ### Run diagnostics table
 
 DenseGen writes `outputs/tables/run_metrics.parquet`, an aggregated diagnostics table built from pools, libraries, attempts, and composition. It powers the run-level plots and makes it easy to answer: which libraries were weak, which TFs were over/under-used, and whether top-scoring Stage-A sites were actually consumed.
+Tier-based metrics (e.g., tier enrichment) are computed only for PWM-derived pools with tier labels. Background pools do not carry tiers and are excluded from tier aggregations.
 
 ---
 
@@ -135,9 +136,11 @@ Optional / advanced:
 - `run_health` — attempts outcomes + failure composition. (Not a default plot; prefer `dense inspect run`.)
 - `tfbs_usage` — legacy TFBS allocation view (superseded by placement_map’s allocation plot).
 
-`stage_a_summary` writes multiple images per input, e.g.:
-`stage_a_summary__<input>.pdf`, `stage_a_summary__<input>__yield_bias.pdf`,
-and `stage_a_summary__<input>__diversity.pdf`.
+`stage_a_summary` consolidates PWM inputs into one image per plot type (one row per input),
+e.g. `stage_a_summary__pool_tiers.pdf`, `stage_a_summary__yield_bias.pdf`,
+and `stage_a_summary__diversity.pdf`.
+Background pools emit a separate logo image per background input
+(`stage_a_summary__<input>__background_logo.pdf`).
 
 `placement_map` writes two images per input/plan:
 `placement_map__<input>__<plan>__occupancy.pdf` and
@@ -171,7 +174,7 @@ DenseGen can materialize Stage‑A/Stage‑B artifacts without running the solve
   - `outputs/pools/candidates/<input_name>/candidates__<label>.parquet` (when `keep_all_candidates_debug: true`)
   - `outputs/pools/candidates/<input_name>/<label>__fimo.tsv` (when `keep_all_candidates_debug: true`)
   - `outputs/pools/candidates/candidates.parquet` + `candidates_summary.parquet` + `candidates_manifest.json`
-    (overwritten by `stage-a build-pool --fresh` or `dense run --rebuild-stage-a`)
+    (overwritten by `stage-a build-pool --fresh` or `dense run --fresh`)
 - `dense stage-b build-libraries` writes:
   - `outputs/libraries/library_builds.parquet`
   - `outputs/libraries/library_members.parquet`
@@ -196,8 +199,8 @@ Stage‑A pool rows include `best_hit_score`, `tier`, `rank_within_regulator` (1
 eligible_unique TFBS per regulator), and `tfbs_core` for core‑level uniqueness checks.
 
 Stage‑B expects Stage‑A pools (default `outputs/pools`). `dense run` reuses these pools by default
-and fails fast if they are missing or stale; rebuild them with `dense stage-a build-pool --fresh` or
-run with `dense run --rebuild-stage-a`.
+and rebuilds them if they are missing or stale; rebuild explicitly with `dense stage-a build-pool --fresh`
+or reset everything with `dense run --fresh`.
 
 ---
 

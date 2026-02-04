@@ -69,17 +69,21 @@ def test_background_pool_fimo_zero_hit_rejects_any_hit() -> None:
     motif = PWMMotif(
         motif_id="test_motif",
         matrix=[
-            {"A": 0.97, "C": 0.01, "G": 0.01, "T": 0.01},
-            {"A": 0.97, "C": 0.01, "G": 0.01, "T": 0.01},
-            {"A": 0.97, "C": 0.01, "G": 0.01, "T": 0.01},
-            {"A": 0.97, "C": 0.01, "G": 0.01, "T": 0.01},
+            {"A": 0.99, "C": 0.0033, "G": 0.0033, "T": 0.0034},
+            {"A": 0.99, "C": 0.0033, "G": 0.0033, "T": 0.0034},
+            {"A": 0.99, "C": 0.0033, "G": 0.0033, "T": 0.0034},
+            {"A": 0.99, "C": 0.0033, "G": 0.0033, "T": 0.0034},
+            {"A": 0.99, "C": 0.0033, "G": 0.0033, "T": 0.0034},
+            {"A": 0.99, "C": 0.0033, "G": 0.0033, "T": 0.0034},
+            {"A": 0.99, "C": 0.0033, "G": 0.0033, "T": 0.0034},
+            {"A": 0.99, "C": 0.0033, "G": 0.0033, "T": 0.0034},
         ],
         background={"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
     )
     accepted, _scores = _run_fimo_exclusion(
         motifs=[motif],
-        sequences=["TTTT"],
+        sequences=["AAAAAAAA", "TTTTTTTT", "CCCCCCCC"],
         allow_zero_hit_only=True,
         max_score_norm=None,
     )
-    assert accepted == []
+    assert accepted == ["CCCCCCCC"]

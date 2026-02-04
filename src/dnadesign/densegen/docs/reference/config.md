@@ -71,6 +71,7 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
         - `pwms_input`: list of PWM input names to screen against
         - `allow_zero_hit_only`: when true, reject any FIMO hit
         - `max_score_norm`: required when `allow_zero_hit_only=false`
+        - FIMO exclusion uses a p-value threshold of 1e-4 and scans both strands
   - FIMO resolves via `MEME_BIN` or PATH (pixi users should run `pixi run dense ...`).
 - `type: pwm_meme`
   - `path` - MEME PWM file
@@ -95,7 +96,7 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
       e.g., `A 0.25`); also used for Stage-A score normalization and MMR information-content weights
     - `keep_all_candidates_debug` (bool, default false) - write candidate Parquet logs to
       `outputs/pools/candidates/` for inspection (overwritten by `stage-a build-pool --fresh`
-      or `dense run --rebuild-stage-a`)
+      or `dense run --fresh`)
     - `include_matched_sequence` (bool, default true; must be true for PWM sampling) - include
       `fimo_matched_sequence` in TFBS outputs (config validation rejects false)
     - `tier_fractions` (optional list of three floats in (0, 1], non‑decreasing, sum ≤ 1.0; default
@@ -180,7 +181,8 @@ Outputs (tables), logs, and plots must resolve inside `outputs/` under `densegen
 ### `densegen.generation`
 
 - `sequence_length` (int > 0)
-- `sequence_length` must be >= the widest required motif (library TFBS or fixed elements)
+- `sequence_length` should be >= the widest required motif (library TFBS or fixed elements); if it
+  is shorter, Stage‑B records infeasibility and warns.
 - `quota` (int > 0)
 - `sampling` (Stage‑B; see below)
 - `plan` (required, non-empty)
@@ -301,15 +303,37 @@ Notes:
   `outputs/` under `densegen.run.root`).
 - `level` (e.g., `INFO`)
 - `suppress_solver_stderr` (bool)
-- `print_visual` (bool; controls ASCII placement visuals when `show_solutions` is enabled)
+- `print_visual` (bool; show dense-arrays ASCII placement visuals in progress output)
 - `progress_style`: `stream | summary | screen` (default `screen`)
   - `stream`: per‑sequence logs (controlled by `progress_every`)
   - `summary`: suppress per‑sequence logs; keep periodic leaderboard summaries
-  - `screen`: redraw a compact dashboard at `progress_refresh_seconds`
+  - `screen`: emit compact dashboard panels per update (append-only)
 - `progress_every` (int >= 0) - log/refresh interval in sequences (`0` disables per‑sequence logging)
 - `progress_refresh_seconds` (float > 0) - minimum seconds between screen refreshes
 - `show_tfbs` (bool) - include TFBS sequences in progress output
 - `show_solutions` (bool) - include full solution sequences in progress output
+- `visuals.tf_colors` (mapping; required when `print_visual: true`)
+  - Maps display TF label → Rich color string for colored label lines in the dense-arrays visual.
+    Use the display name shown in progress output (e.g., `lexA` for `lexA_CTGT...`,
+    `background` for `neutral_bg`).
+  - Missing TFs are an error (no fallback).
+  - If promoter constraints add fixed motifs to the optimizer library, include a color for the
+    fixed-elements label derived from `promoter_constraints[].name`. Multiple names are joined
+    with `+` in the order they appear (e.g., `sigma70_consensus+sigma54`).
+
+Example:
+
+```yaml
+densegen:
+  logging:
+    print_visual: true
+    visuals:
+      tf_colors:
+        lexA: "#66C2A5"
+        cpxR: "#FC8D62"
+        baeR: "#8DA0CB"
+        sigma70_consensus: "#E78AC3"
+```
 
 ---
 

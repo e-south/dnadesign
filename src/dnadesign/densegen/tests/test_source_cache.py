@@ -75,6 +75,7 @@ class _DummyAdapter:
         min_required_regulators=None,
         solver_time_limit_seconds=None,
         solver_threads=None,
+        extra_label=None,
     ):
         opt = _DummyOpt()
         seqs = ["AAA", "CCC"]

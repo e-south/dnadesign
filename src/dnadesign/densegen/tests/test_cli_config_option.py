@@ -97,20 +97,29 @@ def test_validate_reports_invalid_config(tmp_path: Path) -> None:
     assert "Config error" in result.output
 
 
-def test_validate_uses_cwd_config_when_missing_flag(tmp_path: Path) -> None:
+def test_validate_requires_explicit_config(tmp_path: Path) -> None:
     cfg_path = tmp_path / "config.yaml"
     _write_min_config(cfg_path)
     with _chdir(tmp_path):
         runner = CliRunner()
         result = runner.invoke(app, ["validate-config"])
+        assert result.exit_code != 0, result.output
+        assert "Config path is required" in result.output
+
+
+def test_validate_uses_env_config_when_missing_flag(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    _write_min_config(cfg_path)
+    with _chdir(tmp_path):
+        runner = CliRunner()
+        result = runner.invoke(app, ["validate-config"], env={"DENSEGEN_CONFIG_PATH": str(cfg_path)})
         assert result.exit_code == 0, result.output
         assert "Config is valid" in result.output
 
 
-def test_validate_missing_cwd_config_uses_auto_detected_workspace(tmp_path: Path) -> None:
+def test_validate_missing_config_reports_error(tmp_path: Path) -> None:
     with _chdir(tmp_path):
         runner = CliRunner()
         result = runner.invoke(app, ["validate-config"])
-        assert result.exit_code == 0, result.output
-        assert "Config not found in cwd; using" in result.output
-        assert "Config is valid" in result.output
+        assert result.exit_code != 0, result.output
+        assert "Config path is required" in result.output

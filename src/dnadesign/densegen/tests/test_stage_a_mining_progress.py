@@ -52,7 +52,9 @@ def test_stage_a_screen_progress_stream_for_non_tty() -> None:
         progress.update(generated=10, accepted=5)
         progress.finish()
         output = "".join(stream.data)
-        assert "PWM demo_motif" in output
+        assert "Stage-A mining" in output
+        assert "generated/limit" in output
+        assert "10/10" in output
         assert "\r" not in output
     finally:
         logging_utils.set_progress_enabled(prev_enabled)
@@ -200,6 +202,41 @@ def test_background_sampling_progress_uses_live_table(monkeypatch) -> None:
         progress.update(generated=10, accepted=2, batch_index=1, batch_total=10)
         progress.finish()
         assert progress._manager._live is None
+    finally:
+        logging_utils.set_progress_enabled(prev_enabled)
+        logging_utils.set_progress_style(prev_style)
+
+
+def test_background_sampling_progress_streams_for_non_tty() -> None:
+    prev_enabled = logging_utils.is_progress_enabled()
+    prev_style = logging_utils.get_progress_style()
+    logging_utils.set_progress_enabled(True)
+    logging_utils.set_progress_style("screen")
+    stream = _BufferStream(isatty=False)
+    progress = stage_a_progress._BackgroundSamplingProgress(
+        input_name="neutral_bg",
+        target=100,
+        accepted_target=10,
+        stream=stream,
+    )
+    try:
+        progress.update(
+            generated=10,
+            accepted=2,
+            batch_index=1,
+            batch_total=10,
+            reject_fimo=1,
+            reject_kmer=2,
+            reject_gc=3,
+            reject_dup=4,
+            force=True,
+        )
+        progress.finish()
+        output = "".join(stream.data)
+        assert "Stage-A mining" in output
+        assert "generated/limit" in output
+        assert "rejects" in output
+        assert "1/2/3/4" in output
     finally:
         logging_utils.set_progress_enabled(prev_enabled)
         logging_utils.set_progress_style(prev_style)

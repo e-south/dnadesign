@@ -340,6 +340,14 @@ def test_logging_dir_must_live_under_outputs(tmp_path: Path) -> None:
         load_config(cfg_path)
 
 
+def test_logging_visuals_required_for_print_visual(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["logging"]["print_visual"] = True
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="logging.visuals.tf_colors"):
+        load_config(cfg_path)
+
+
 def test_plots_dir_must_live_under_outputs(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
     cfg["plots"] = {"out_dir": "plots"}

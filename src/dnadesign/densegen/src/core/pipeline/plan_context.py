@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from ..artifacts.library import LibraryRecord
     from ..artifacts.pool import PoolData
     from .plan_execution import PlanKey
+    from .progress import _ScreenDashboard
 
 
 @dataclass(frozen=True)
@@ -55,8 +56,10 @@ class PlanExecutionState:
     inputs_manifest: dict[str, dict]
     existing_usage_counts: dict[tuple[str, str], int] | None = None
     state_counts: dict["PlanKey", int] | None = None
+    total_quota: int | None = None
     checkpoint_every: int = 0
     write_state: Callable[[], None] | None = None
+    shared_dashboard: "_ScreenDashboard" | None = None
     site_failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]] | None = None
     source_cache: dict[str, "PoolData"] | None = None
     pool_override: "PoolData" | None = None

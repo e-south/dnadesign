@@ -75,6 +75,7 @@ class _DummyAdapter:
         min_required_regulators=None,
         solver_time_limit_seconds=None,
         solver_threads=None,
+        extra_label=None,
     ):
         opt = _DummyOpt()
         seqs = ["AAA", "CCC", "GGG", "TTT", "AAC", "CCA"]
@@ -301,6 +302,7 @@ def test_stall_detected_with_no_solutions(tmp_path: Path) -> None:
             min_required_regulators=None,
             solver_time_limit_seconds=None,
             solver_threads=None,
+            extra_label=None,
         ):
             opt = _DummyOpt()
 

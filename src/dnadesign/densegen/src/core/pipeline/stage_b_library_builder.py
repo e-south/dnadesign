@@ -25,8 +25,6 @@ from ..artifacts.pool import PoolData
 from .outputs import _emit_event
 from .sequence_validation import _validate_library_constraints
 from .stage_b import (
-    _fixed_elements_dump,
-    _max_fixed_element_len,
     assess_library_feasibility,
     build_library_for_plan,
 )
@@ -79,8 +77,6 @@ class LibraryBuilder:
     def build_next(self, *, library_index_start: int) -> LibraryContext:
         pool_strategy = str(self.sampling_cfg.pool_strategy)
         library_sampling_strategy = str(self.sampling_cfg.library_sampling_strategy)
-        fixed_elements_dump = _fixed_elements_dump(self.plan_item.fixed_elements)
-        fixed_elements_max_len = _max_fixed_element_len(fixed_elements_dump)
         constraints = self.plan_item.regulator_constraints
         groups = list(constraints.groups or [])
         plan_min_count_by_regulator = dict(constraints.min_count_by_regulator or {})
@@ -154,27 +150,6 @@ class LibraryBuilder:
             sequence_length=self.seq_len,
         )
 
-        max_tfbs_len = max((len(str(m)) for m in library_tfbs), default=0)
-        required_len = max(max_tfbs_len, fixed_elements_max_len)
-        if self.seq_len < required_len:
-            raise ValueError(
-                "generation.sequence_length is shorter than the widest required motif "
-                f"(sequence_length={self.seq_len}, max_library_motif={max_tfbs_len}, "
-                f"max_fixed_element={fixed_elements_max_len}). "
-                "Increase densegen.generation.sequence_length or reduce motif lengths "
-                "(e.g., adjust Stage-A PWM sampling length.range or fixed-element motifs)."
-            )
-        if min_required_len > 0 and self.seq_len < min_required_len:
-            raise ValueError(
-                "generation.sequence_length is shorter than the minimum required length for constraints "
-                f"(sequence_length={self.seq_len}, min_required_length={min_required_len}, "
-                f"fixed_elements_min={min_breakdown['fixed_elements_min']}, "
-                f"per_tf_min={min_breakdown['per_tf_min']}, "
-                f"min_required_extra={min_breakdown['min_required_extra']}). "
-                "Increase densegen.generation.sequence_length or relax regulator_constraints, "
-                "min_count_by_regulator, or fixed-element constraints."
-            )
-
         return LibraryContext(
             library_for_opt=list(library_for_opt),
             tfbs_parts=list(tfbs_parts),
@@ -238,7 +213,7 @@ class LibraryBuilder:
                 f"Library artifact Stage-B sampling strategy mismatch for {self.source_label}/{self.plan_item.name}: "
                 f"artifact={record.library_sampling_strategy} config={library_sampling_strategy}."
             )
-        if pool_strategy != "full" and record.library_size != int(getattr(self.sampling_cfg, "library_size", 0)):
+        if pool_strategy != "full" and record.library_size != int(self.sampling_cfg.library_size):
             raise RuntimeError(
                 f"Library artifact size mismatch for {self.source_label}/{self.plan_item.name}: "
                 f"artifact={record.library_size} config={self.sampling_cfg.library_size}."
@@ -287,7 +262,7 @@ class LibraryBuilder:
         infeasible: bool,
         sequence_length: int,
     ) -> None:
-        if str(getattr(self.sampling_cfg, "library_source", "build")).lower() == "artifact":
+        if str(self.sampling_cfg.library_source).lower() == "artifact":
             return
         if self.library_build_rows is None or self.library_member_rows is None:
             return

@@ -342,7 +342,7 @@ def build_run_metrics(*, cfg, run_root: Path) -> pd.DataFrame:
             )
 
     if pool_lookup is not None and has_tiers:
-        pool_unique = pool_lookup[["input_name", "tf", "tfbs", "tier"]].drop_duplicates()
+        pool_unique = pool_lookup[["input_name", "tf", "tfbs", "tier"]].dropna(subset=["tier"]).drop_duplicates()
         if placements_df.empty:
             used_unique = pd.DataFrame(columns=["input_name", "tf", "tfbs"])
         else:

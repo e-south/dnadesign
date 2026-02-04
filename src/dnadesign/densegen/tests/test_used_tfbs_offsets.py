@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dnadesign.densegen.src.core.pipeline.sequence_validation import _apply_pad_offsets
-from dnadesign.densegen.src.core.pipeline.usage_tracking import _compute_used_tf_info
+from dnadesign.densegen.src.core.pipeline.usage_tracking import _compute_used_tf_info, _update_usage_summary
 
 
 class _DummySol:
@@ -42,3 +42,18 @@ def test_used_tfbs_offsets_shift_with_5prime_padding() -> None:
     assert updated[1]["length"] == 2
     assert updated[1]["end"] == 7
     assert updated[1]["pad_left"] == 3
+
+
+def test_update_usage_summary_counts_tf_and_tfbs() -> None:
+    usage_counts: dict[tuple[str, str], int] = {}
+    tf_usage_counts: dict[str, int] = {}
+    used_tfbs_detail = [
+        {"tf": "TF1", "tfbs": "AAA"},
+        {"tf": "TF1", "tfbs": "AAA"},
+        {"tf": "TF2", "tfbs": "CCC"},
+    ]
+
+    _update_usage_summary(usage_counts, tf_usage_counts, used_tfbs_detail)
+
+    assert usage_counts == {("TF1", "AAA"): 2, ("TF2", "CCC"): 1}
+    assert tf_usage_counts == {"TF1": 2, "TF2": 1}

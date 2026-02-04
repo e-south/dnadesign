@@ -15,6 +15,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.gridspec import SubplotSpec
 
 from ..utils.plot_style import format_regulator_label, stage_a_rcparams
 from .plot_common import _apply_style, _format_percent, _shared_x_cleanup, _style
@@ -27,6 +28,9 @@ def _build_stage_a_yield_bias_figure(
     pool_df: pd.DataFrame,
     sampling: dict,
     style: dict,
+    fig: mpl.figure.Figure | None = None,
+    slot: SubplotSpec | None = None,
+    title: str | None = None,
 ) -> tuple[mpl.figure.Figure, list[mpl.axes.Axes], list[mpl.axes.Axes], mpl.axes.Axes]:
     style = _style(style)
     style["seaborn_style"] = False
@@ -107,22 +111,31 @@ def _build_stage_a_yield_bias_figure(
     tick_size = text_sizes["annotation"] * 0.75
     title_pad = 12
     with mpl.rc_context(rc):
-        fig = plt.figure(figsize=(fig_width, fig_height), constrained_layout=False)
+        if fig is None:
+            fig = plt.figure(figsize=(fig_width, fig_height), constrained_layout=False)
         header_height = min(0.95, fig_height * 0.18)
         body_height = max(1.0, fig_height - header_height)
-        outer = fig.add_gridspec(
-            nrows=2,
-            ncols=1,
-            height_ratios=[header_height, body_height],
-            hspace=0.05,
-        )
+        if slot is None:
+            outer = fig.add_gridspec(
+                nrows=2,
+                ncols=1,
+                height_ratios=[header_height, body_height],
+                hspace=0.05,
+            )
+        else:
+            outer = slot.subgridspec(
+                nrows=2,
+                ncols=1,
+                height_ratios=[header_height, body_height],
+                hspace=0.05,
+            )
         ax_header = fig.add_subplot(outer[0, 0])
         ax_header.set_axis_off()
         ax_header.set_label("header")
         ax_header.text(
             0.5,
             0.74,
-            f"Stage-A yield & bias -- {input_name}",
+            title or f"Stage-A yield & bias -- {input_name}",
             ha="center",
             va="center",
             fontsize=text_sizes["fig_title"],

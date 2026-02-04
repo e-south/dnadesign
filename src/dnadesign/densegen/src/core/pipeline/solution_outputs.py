@@ -119,17 +119,18 @@ def record_solution_outputs(
             )
         )
     if composition_rows is not None:
-        composition_rows.append(
-            {
+        solution_id = record.id
+        for entry in used_tfbs_detail:
+            row = {
+                "solution_id": solution_id,
                 "input_name": source_label,
                 "plan_name": plan_name,
                 "library_index": int(sampling_library_index),
                 "library_hash": str(sampling_library_hash),
-                "sequence": final_seq,
-                "used_tfbs": used_tfbs,
-                "used_tfbs_detail": used_tfbs_detail,
             }
-        )
+            if isinstance(entry, dict):
+                row.update(entry)
+            composition_rows.append(row)
     if events_path is not None:
         try:
             _emit_event(

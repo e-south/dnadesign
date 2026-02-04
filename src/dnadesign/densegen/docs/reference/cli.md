@@ -23,14 +23,8 @@ DenseGen exposes a Typer CLI via `dense`. This page is an operator manual (comma
 ### Config resolution
 
 - `-c, --config PATH` — config YAML path (global or per‑command).
-- If `-c/--config` is omitted, DenseGen resolves config in this order:
-  1) `DENSEGEN_CONFIG_PATH` (if set)
-  2) `./config.yaml` in the current directory
-  3) nearest parent directory containing `config.yaml`
-  4) a single auto‑detected workspace (if exactly one match is found)
-- When auto‑detecting, the CLI prints the chosen config path and continues; if multiple workspaces are found,
-  it exits non‑zero and lists the candidates so you can pass `-c`.
-- If no config is found, the CLI exits non‑zero with an actionable error message.
+- If `-c/--config` is omitted, DenseGen requires `DENSEGEN_CONFIG_PATH` to be set.
+- If no explicit config is provided, the CLI exits non‑zero with an actionable error message.
 - Input paths resolve against the config file directory.
 - Outputs/tables/logs/plots/report must resolve inside `outputs/` under `densegen.run.root`.
 - Config files must include `densegen.schema_version` (currently `2.9`) and `densegen.run`.
@@ -156,7 +150,6 @@ Options:
 - `--no-plot` — skip auto‑plotting even if `plots` is configured in YAML.
 - `--fresh` — delete the workspace `outputs/` directory before running.
 - `--resume` — resume from existing outputs in the workspace.
-- `--rebuild-stage-a` — rebuild Stage‑A pools before running (required if pools are missing or stale).
 - `--log-file PATH` — override the log file path. Otherwise DenseGen writes to
   `logging.log_dir/<run_id>.log` inside the workspace. The override path must still resolve
   inside `outputs/` under `densegen.run.root`.
@@ -165,10 +158,10 @@ Options:
 
 Notes:
 - `dense run` requires Stage‑A pools under `outputs/pools` by default. If they are missing or stale,
-  run `dense stage-a build-pool --fresh` or pass `--rebuild-stage-a`.
+  it rebuilds them automatically. Use `dense stage-a build-pool --fresh` to force a rebuild.
 - Stage‑A sampling uses FIMO; ensure `fimo` is on PATH (e.g., via `pixi run`).
 - If the workspace already has run outputs (e.g., `outputs/tables/*.parquet` or
-  `outputs/meta/run_state.json`), you must choose `--resume` or `--fresh`.
+  `outputs/meta/run_state.json`), `dense run` resumes by default; use `--fresh` to reset outputs.
   Stage‑A/Stage‑B artifacts in `outputs/pools` or `outputs/libraries` do not trigger this guard.
 
 ---

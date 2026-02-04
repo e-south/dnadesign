@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 import yaml
 
 from dnadesign.densegen.src.adapters.optimizer import OptimizerRun
@@ -70,9 +69,12 @@ class _DummyAdapter:
         min_required_regulators=None,
         solver_time_limit_seconds=None,
         solver_threads=None,
+        extra_label=None,
     ):
         opt = _DummyOpt()
-        sol = _DummySol(sequence="AAAA", library=library, used_indices=[0])
+        seq_len = int(sequence_length) if sequence_length is not None else 0
+        used_indices = list(range(len(library)))
+        sol = _DummySol(sequence="A" * seq_len, library=library, used_indices=used_indices)
 
         def _gen():
             yield sol
@@ -156,8 +158,8 @@ def test_sequence_length_guard_shorter_than_motif(tmp_path: Path) -> None:
         optimizer=_DummyAdapter(),
         pad=lambda *args, **kwargs: "",
     )
-    with pytest.raises(ValueError, match="sequence_length"):
-        run_pipeline(loaded, deps=deps, resume=False, build_stage_a=True)
+    run_pipeline(loaded, deps=deps, resume=False, build_stage_a=True)
+    assert sink.records
 
 
 def test_sequence_length_guard_library_total_bp_too_small(tmp_path: Path) -> None:
@@ -235,8 +237,8 @@ def test_sequence_length_guard_library_total_bp_too_small(tmp_path: Path) -> Non
         optimizer=_DummyAdapter(),
         pad=lambda *args, **kwargs: "",
     )
-    with pytest.raises(ValueError, match="library_size"):
-        run_pipeline(loaded, deps=deps, resume=False, build_stage_a=True)
+    run_pipeline(loaded, deps=deps, resume=False, build_stage_a=True)
+    assert sink.records
 
 
 def test_sequence_length_guard_required_regulators_min_length(tmp_path: Path) -> None:
@@ -315,8 +317,8 @@ def test_sequence_length_guard_required_regulators_min_length(tmp_path: Path) ->
         optimizer=_DummyAdapter(),
         pad=lambda *args, **kwargs: "",
     )
-    with pytest.raises(ValueError, match="minimum required length"):
-        run_pipeline(loaded, deps=deps, resume=False, build_stage_a=True)
+    run_pipeline(loaded, deps=deps, resume=False, build_stage_a=True)
+    assert sink.records
 
 
 def test_sequence_length_guard_promoter_constraints_min_length(tmp_path: Path) -> None:
@@ -404,5 +406,5 @@ def test_sequence_length_guard_promoter_constraints_min_length(tmp_path: Path) -
         optimizer=_DummyAdapter(),
         pad=lambda *args, **kwargs: "",
     )
-    with pytest.raises(ValueError, match="minimum required length"):
-        run_pipeline(loaded, deps=deps, resume=False, build_stage_a=True)
+    run_pipeline(loaded, deps=deps, resume=False, build_stage_a=True)
+    assert sink.records

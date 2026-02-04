@@ -27,7 +27,8 @@ plan:
 ```
 
 Notes:
-- `generation.sequence_length` must fit all fixed elements and TFBS placements.
+- `generation.sequence_length` should fit all fixed elements and TFBS placements. If it is shorter,
+  Stage‑B records infeasibility and warns; solver coverage may be limited.
 - Group members must match the `tf` labels in the Stage-A pools.
 
 ---

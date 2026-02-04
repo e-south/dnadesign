@@ -140,26 +140,8 @@ def resolve_config_path(
     env_path = os.environ.get("DENSEGEN_CONFIG_PATH")
     if env_path:
         return Path(env_path), False
-    default_path = _default_config_path()
-    if default_path.exists():
-        return default_path, True
-    parent_path = _find_config_in_parents(Path.cwd())
-    if parent_path is not None:
-        return parent_path, False
-    auto_path, candidates = _auto_config_path()
-    if auto_path is not None:
-        console.print(
-            f"[bold yellow]Config not found in cwd; using[/] "
-            f"{display_path(auto_path, Path.cwd(), False)} (auto-detected). "
-            "Pass -c to select a different workspace."
-        )
-        return auto_path, False
-    if candidates:
-        console.print("[bold red]Multiple workspace configs found; use -c to select one.[/]")
-        for path in candidates:
-            console.print(f" - {display_path(path, Path.cwd(), False)}")
-        raise typer.Exit(code=1)
-    return default_path, True
+    console.print("[bold red]Config path is required.[/] Pass -c/--config or set DENSEGEN_CONFIG_PATH.")
+    raise typer.Exit(code=1)
 
 
 def load_config_or_exit(

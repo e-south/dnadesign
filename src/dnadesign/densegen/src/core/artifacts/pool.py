@@ -23,11 +23,11 @@ from typing import Iterable
 import pandas as pd
 
 from ...adapters.sources.background_pool import BackgroundPoolDataSource
-from ...adapters.sources.stage_a.stage_a_summary import PWMSamplingSummary
 from ...config import resolve_relative_path
 from ...core.stage_a_constants import FIMO_REPORT_THRESH
 from ...utils.logging_utils import install_native_stderr_filters
 from ..input_types import PWM_INPUT_TYPES
+from ..stage_a.stage_a_summary import PWMSamplingSummary
 from .ids import hash_tfbs_id
 
 POOL_SCHEMA_VERSION = "1.6"

@@ -15,6 +15,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.gridspec import SubplotSpec
 from matplotlib.patches import Patch
 
 from ..utils.plot_style import format_regulator_label, stage_a_rcparams
@@ -28,6 +29,9 @@ def _build_stage_a_strata_overview_figure(
     pool_df: pd.DataFrame,
     sampling: dict,
     style: dict,
+    fig: mpl.figure.Figure | None = None,
+    slot: SubplotSpec | None = None,
+    title: str | None = None,
 ) -> tuple[mpl.figure.Figure, list[mpl.axes.Axes], mpl.axes.Axes]:
     style = _style(style)
     style["seaborn_style"] = False
@@ -113,22 +117,31 @@ def _build_stage_a_strata_overview_figure(
     fig_width = float(style.get("figsize", (11, 4))[0])
     fig_height = max(3.8, 1.35 * n_regs + 1.2)
     with mpl.rc_context(rc):
-        fig = plt.figure(figsize=(fig_width, fig_height), constrained_layout=False)
+        if fig is None:
+            fig = plt.figure(figsize=(fig_width, fig_height), constrained_layout=False)
         header_height = min(0.95, fig_height * 0.18)
         body_height = max(1.0, fig_height - header_height)
-        outer = fig.add_gridspec(
-            nrows=2,
-            ncols=1,
-            height_ratios=[header_height, body_height],
-            hspace=0.05,
-        )
+        if slot is None:
+            outer = fig.add_gridspec(
+                nrows=2,
+                ncols=1,
+                height_ratios=[header_height, body_height],
+                hspace=0.05,
+            )
+        else:
+            outer = slot.subgridspec(
+                nrows=2,
+                ncols=1,
+                height_ratios=[header_height, body_height],
+                hspace=0.05,
+            )
         ax_header = fig.add_subplot(outer[0, 0])
         ax_header.set_axis_off()
         ax_header.set_label("header")
         ax_header.text(
             0.5,
             0.86,
-            f"Stage-A pool tiers -- {input_name}",
+            title or f"Stage-A pool tiers -- {input_name}",
             ha="center",
             va="center",
             fontsize=text_sizes["fig_title"],

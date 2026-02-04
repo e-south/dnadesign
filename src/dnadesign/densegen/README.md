@@ -56,10 +56,10 @@ Run the packaged demo workspace:
 # 1) Validate schema + solver availability
 dense validate-config --probe-solver -c "$CONFIG"
 
-# 2) Stage‑A: build TFBS pools (required before `dense run` unless you pass --rebuild-stage-a)
+# 2) Stage‑A: build TFBS pools (optional; `dense run --fresh` rebuilds these)
 dense stage-a build-pool --fresh -c "$CONFIG"
 
-# 3) Run generation (use --resume or --fresh if outputs already exist)
+# 3) Run generation (use --fresh to reset outputs; existing outputs auto-resume)
 #    By default, this auto-runs plots configured in `plots`; use --no-plot to skip.
 dense run -c "$CONFIG"
 
