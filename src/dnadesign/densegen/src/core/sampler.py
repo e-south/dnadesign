@@ -30,9 +30,9 @@ def compute_tf_weights(
     weight_by_tf: dict[str, float] = {}
     usage_count_by_tf: dict[str, int] = {}
     failure_count_by_tf: dict[str, int] = {}
-    for _, row in df.iterrows():
-        tf = str(row["tf"])
-        tfbs = str(row["tfbs"])
+    for row in df.itertuples(index=False):
+        tf = str(row.tf)
+        tfbs = str(row.tfbs)
         key = (tf, tfbs)
         count = int(usage_counts.get(key, 0)) if usage_counts else 0
         usage_count_by_tf[tf] = usage_count_by_tf.get(tf, 0) + count

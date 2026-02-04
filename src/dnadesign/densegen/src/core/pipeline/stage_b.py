@@ -77,11 +77,7 @@ def _fixed_elements_dump(fixed_elements) -> dict:
         if isinstance(pc, dict):
             pcs.append({k: pc.get(k) for k in keys})
 
-    sb_raw = dump.get("side_biases") or {}
-    if hasattr(sb_raw, "model_dump"):
-        sb_raw = sb_raw.model_dump()
-    left = list((sb_raw or {}).get("left") or [])
-    right = list((sb_raw or {}).get("right") or [])
+    left, right = _extract_side_biases(fixed_elements)
 
     return {"promoter_constraints": pcs, "side_biases": {"left": left, "right": right}}
 
