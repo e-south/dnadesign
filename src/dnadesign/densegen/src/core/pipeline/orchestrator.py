@@ -83,6 +83,7 @@ from .outputs import (
     _write_effective_config,
     _write_to_sinks,
 )
+from .plan_execution import run_plan_schedule
 from .plan_pools import PLAN_POOL_INPUT_TYPE, PlanPoolSpec
 from .progress import (
     _build_screen_dashboard,
@@ -1720,123 +1721,57 @@ def run_pipeline(
 
     _write_state()
 
-    if not round_robin:
-        for item in pl:
-            spec = plan_pools[item.name]
-            source_cfg = plan_pool_sources[item.name]
-            produced, stats = _process_plan_for_source(
-                source_cfg,
-                item,
-                cfg,
-                sinks,
-                chosen_solver=chosen_solver,
-                deps=deps,
-                rng=rng,
-                np_rng=np_rng_stage_b,
-                cfg_path=loaded.path,
-                run_id=cfg.run.id,
-                run_root=run_root_str,
-                run_config_path=run_cfg_path,
-                run_config_sha256=config_sha,
-                random_seed=seed,
-                dense_arrays_version=dense_arrays_version,
-                dense_arrays_version_source=dense_arrays_version_source,
-                show_tfbs=show_tfbs,
-                show_solutions=show_solutions,
-                output_bio_type=output_bio_type,
-                output_alphabet=output_alphabet,
-                one_subsample_only=False,
-                already_generated=int(existing_counts.get((spec.pool_name, item.name), 0)),
-                inputs_manifest=inputs_manifest_entries,
-                existing_usage_counts=existing_usage_by_plan.get((spec.pool_name, item.name)),
-                state_counts=state_counts,
-                checkpoint_every=checkpoint_every,
-                write_state=_write_state,
-                site_failure_counts=site_failure_counts,
-                source_cache=source_cache,
-                pool_override=spec.pool,
-                input_meta_override=_plan_pool_input_meta(spec),
-                attempt_counters=attempt_counters,
-                library_records=library_records,
-                library_cursor=library_cursor,
-                library_source=library_source,
-                library_build_rows=library_build_rows,
-                library_member_rows=library_member_rows,
-                solution_rows=solution_rows,
-                composition_rows=composition_rows,
-                events_path=events_path,
-                display_map_by_input=display_map_by_input,
-            )
-            per_plan[(spec.pool_name, item.name)] = per_plan.get((spec.pool_name, item.name), 0) + produced
-            total += produced
-            leaderboard_latest = stats.get("leaderboard_latest")
-            if leaderboard_latest is not None:
-                plan_leaderboards[(spec.pool_name, item.name)] = leaderboard_latest
-            _accumulate_stats((spec.pool_name, item.name), stats)
-    else:
-        produced_counts: dict[tuple[str, str], int] = dict(existing_counts)
-        done = False
-        while not done:
-            done = True
-            for item in pl:
-                spec = plan_pools[item.name]
-                key = (spec.pool_name, item.name)
-                current = produced_counts.get(key, 0)
-                quota = int(item.quota)
-                if current >= quota:
-                    continue
-                done = False
-                source_cfg = plan_pool_sources[item.name]
-                produced, stats = _process_plan_for_source(
-                    source_cfg,
-                    item,
-                    cfg,
-                    sinks,
-                    chosen_solver=chosen_solver,
-                    deps=deps,
-                    rng=rng,
-                    np_rng=np_rng_stage_b,
-                    cfg_path=loaded.path,
-                    run_id=cfg.run.id,
-                    run_root=run_root_str,
-                    run_config_path=run_cfg_path,
-                    run_config_sha256=config_sha,
-                    random_seed=seed,
-                    dense_arrays_version=dense_arrays_version,
-                    dense_arrays_version_source=dense_arrays_version_source,
-                    show_tfbs=show_tfbs,
-                    show_solutions=show_solutions,
-                    output_bio_type=output_bio_type,
-                    output_alphabet=output_alphabet,
-                    one_subsample_only=True,
-                    already_generated=current,
-                    inputs_manifest=inputs_manifest_entries,
-                    existing_usage_counts=existing_usage_by_plan.get((spec.pool_name, item.name)),
-                    state_counts=state_counts,
-                    checkpoint_every=checkpoint_every,
-                    write_state=_write_state,
-                    site_failure_counts=site_failure_counts,
-                    source_cache=source_cache,
-                    pool_override=spec.pool,
-                    input_meta_override=_plan_pool_input_meta(spec),
-                    attempt_counters=attempt_counters,
-                    library_records=library_records,
-                    library_cursor=library_cursor,
-                    library_source=library_source,
-                    library_build_rows=library_build_rows,
-                    library_member_rows=library_member_rows,
-                    solution_rows=solution_rows,
-                    composition_rows=composition_rows,
-                    events_path=events_path,
-                    display_map_by_input=display_map_by_input,
-                )
-                produced_counts[key] = current + produced
-                leaderboard_latest = stats.get("leaderboard_latest")
-                if leaderboard_latest is not None:
-                    plan_leaderboards[key] = leaderboard_latest
-                _accumulate_stats(key, stats)
-        per_plan = produced_counts
-        total = sum(per_plan.values())
+    process_plan_args = {
+        "global_cfg": cfg,
+        "sinks": sinks,
+        "chosen_solver": chosen_solver,
+        "deps": deps,
+        "rng": rng,
+        "np_rng": np_rng_stage_b,
+        "cfg_path": loaded.path,
+        "run_id": cfg.run.id,
+        "run_root": run_root_str,
+        "run_config_path": run_cfg_path,
+        "run_config_sha256": config_sha,
+        "random_seed": seed,
+        "dense_arrays_version": dense_arrays_version,
+        "dense_arrays_version_source": dense_arrays_version_source,
+        "show_tfbs": show_tfbs,
+        "show_solutions": show_solutions,
+        "output_bio_type": output_bio_type,
+        "output_alphabet": output_alphabet,
+    }
+    plan_execution = run_plan_schedule(
+        plan_items=pl,
+        plan_pools=plan_pools,
+        plan_pool_sources=plan_pool_sources,
+        existing_counts=existing_counts,
+        round_robin=round_robin,
+        process_plan=_process_plan_for_source,
+        process_plan_args=process_plan_args,
+        accumulate_stats=_accumulate_stats,
+        plan_pool_input_meta=_plan_pool_input_meta,
+        inputs_manifest_entries=inputs_manifest_entries,
+        existing_usage_by_plan=existing_usage_by_plan,
+        state_counts=state_counts,
+        checkpoint_every=checkpoint_every,
+        write_state=_write_state,
+        site_failure_counts=site_failure_counts,
+        source_cache=source_cache,
+        attempt_counters=attempt_counters,
+        library_records=library_records,
+        library_cursor=library_cursor,
+        library_source=library_source,
+        library_build_rows=library_build_rows,
+        library_member_rows=library_member_rows,
+        solution_rows=solution_rows,
+        composition_rows=composition_rows,
+        events_path=events_path,
+        display_map_by_input=display_map_by_input,
+    )
+    per_plan = plan_execution.per_plan
+    total = plan_execution.total
+    plan_leaderboards = plan_execution.plan_leaderboards
 
     for sink in sinks:
         sink.finalize()
