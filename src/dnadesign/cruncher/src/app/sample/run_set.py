@@ -640,6 +640,12 @@ def _run_sample_for_set(
                     draw_i_to_write = draw_i
                     draw_in_phase = draw_i - sample_cfg.budget.tune
                 seq_str = SequenceState(seq_arr).to_string()
+                norm_map = _norm_map_for_elites(
+                    seq_arr,
+                    per_tf_map,
+                    scorer=scorer,
+                    score_scale=sample_cfg.objective.score_scale,
+                )
                 row: dict[str, object] = {
                     "chain": int(chain_id),
                     "chain_1based": int(chain_id) + 1,
@@ -653,6 +659,7 @@ def _run_sample_for_set(
                 row["combined_score_final"] = float(
                     evaluator.combined_from_scores(per_tf_map, beta=beta_softmin_final, length=seq_arr.size)
                 )
+                row["min_norm"] = float(min(norm_map.values())) if norm_map else 0.0
                 for tf in tf_order:
                     row[f"score_{tf}"] = float(per_tf_map[tf])
                 yield row
@@ -759,6 +766,8 @@ def _run_sample_for_set(
     )
     mmr_meta_rows: list[dict[str, object]] | None = None
     mmr_summary: dict[str, object] | None = None
+    polish_trim_enabled = sample_cfg.output.polish.enabled or sample_cfg.output.trim.enabled
+    polish_applied = False
 
     # -------- select elites --------------------------------------------------
     kept_elites: list[_EliteCandidate] = []
@@ -794,6 +803,36 @@ def _run_sample_for_set(
                     elite_k,
                     elite_k,
                 )
+            mmr_pool = raw_elites
+            if polish_trim_enabled:
+                polish_applied = True
+                pool_size = max(selection_cfg.pool_size, elite_k)
+                if selection_cfg.relevance == "min_per_tf_norm":
+                    mmr_pool = sorted(
+                        raw_elites,
+                        key=lambda cand: (cand.min_norm, f"{cand.chain_id}:{cand.draw_idx}"),
+                        reverse=True,
+                    )[:pool_size]
+                else:
+                    mmr_pool = sorted(
+                        raw_elites,
+                        key=lambda cand: (cand.combined_score, f"{cand.chain_id}:{cand.draw_idx}"),
+                        reverse=True,
+                    )[:pool_size]
+                mmr_pool, passed_post_polish_filter, _ = _apply_polish_trim(
+                    mmr_pool,
+                    evaluator=evaluator,
+                    scorer=scorer,
+                    sample_cfg=sample_cfg,
+                    beta_softmin_final=beta_softmin_final,
+                    min_per_tf_norm=min_per_tf_norm,
+                    require_all=require_all,
+                    pwm_sum_min=pwm_sum_min,
+                    selection_policy=selection_policy,
+                    min_dist=min_dist,
+                    use_dsdna_hamming=use_dsdna_hamming,
+                    pwms=pwms,
+                )
             mmr_candidates = [
                 MmrCandidate(
                     seq_arr=cand.seq_arr,
@@ -805,7 +844,7 @@ def _run_sample_for_set(
                     per_tf_map=cand.per_tf_map,
                     norm_map=cand.norm_map,
                 )
-                for cand in raw_elites
+                for cand in mmr_pool
             ]
             core_maps = None
             if selection_cfg.distance.kind in {"tfbs_core_weighted", "tfbs_core_uniform"}:
@@ -842,7 +881,8 @@ def _run_sample_for_set(
                 "min_pairwise_distance": result.min_pairwise_distance,
             }
         kept_after_diversity_pre_polish = len(kept_elites)
-        passed_post_polish_filter = kept_after_diversity_pre_polish
+        if not polish_applied:
+            passed_post_polish_filter = kept_after_diversity_pre_polish
         kept_after_diversity_final = kept_after_diversity_pre_polish
     else:
         raise ValueError(f"Unknown elites.selection.policy '{selection_policy}'.")
@@ -854,7 +894,7 @@ def _run_sample_for_set(
             logger.warning("Elite filters removed all candidates; relax min_per_tf_norm/pwm_sum_min or min_distance.")
 
     # Optional deterministic polish + trimming
-    if kept_elites and (sample_cfg.output.polish.enabled or sample_cfg.output.trim.enabled):
+    if kept_elites and polish_trim_enabled and not polish_applied:
         kept_elites, passed_post_polish_filter, kept_after_diversity_final = _apply_polish_trim(
             kept_elites,
             evaluator=evaluator,

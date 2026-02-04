@@ -331,7 +331,7 @@ Notes:
 
 * `sample.output.save_sequences: true` is required for later analysis.
 * `sample.output.trace.save: true` enables trace-based diagnostics.
-* Auto-opt is enabled by default: it runs short Gibbs + PT pilots, evaluates objective-aligned scores from draw-phase `combined_score_final` (top-K median), records diagnostics (warnings suppressed for very short pilots), then runs the best candidate. Selection is thresholdless and confidence-based; `auto_opt.policy.allow_warn: true` will pick a winner at the max budget among candidates that pass diagnostics (logging low-confidence warnings), and it still fails if all candidates fail quality checks.
+* Auto-opt is enabled by default: it runs short Gibbs + PT pilots, evaluates the MMR scorecard (pilot_score from MMR elites; legacy top‑K median remains available), records diagnostics (warnings suppressed for very short pilots), then runs the best candidate. Selection is thresholdless and confidence-based; `auto_opt.policy.allow_warn: true` will pick a winner at the max budget among candidates that pass diagnostics (logging low-confidence warnings), and it still fails if all candidates fail quality checks.
 * `--no-auto-opt` is only valid when `sample.optimizer.name` is explicitly set to `gibbs` or `pt` and `auto_opt.enabled=false` in the config.
 * Auto-opt can take minutes; for a quick smoke test set `sample.optimizer.name=gibbs` (or `pt`) and disable `auto_opt.enabled`.
 * `--verbose` enables periodic progress logging; `--debug` enables very verbose debug logs.

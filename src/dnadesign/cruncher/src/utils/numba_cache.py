@@ -90,7 +90,7 @@ def ensure_numba_cache_dir(
             cache_dir = anchor / cache_dir
         cache_dir = cache_dir.resolve()
         if env_path is not None and env_path != cache_dir:
-            raise ValueError(f"{env_var} is set to {env_path}, which conflicts with cache_dir={cache_dir}.")
+            logger.warning("%s is set to %s; overriding with cache_dir=%s.", env_var, env_path, cache_dir)
     else:
         if env_path is None:
             raise RuntimeError(f"{env_var} must be set or cache_dir must be provided.")

@@ -29,6 +29,14 @@ class _ConstantEvaluator:
         _ = beta
         return 0.0
 
+    def combined_from_scores(
+        self, per_tf: dict[str, float], beta: float | None = None, *, length: int | None = None
+    ) -> float:
+        _ = per_tf
+        _ = beta
+        _ = length
+        return 0.0
+
     def evaluate(self, state: SequenceState, beta: float | None = None, *, length: int | None = None):
         _ = state
         _ = beta

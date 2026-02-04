@@ -47,8 +47,10 @@ def test_numba_cache_rejects_mismatched_env_var(tmp_path: Path, monkeypatch: pyt
     env_dir = tmp_path / "env_cache"
     override_dir = tmp_path / "override_cache"
     monkeypatch.setenv("NUMBA_CACHE_DIR", str(env_dir))
-    with pytest.raises(ValueError, match="NUMBA_CACHE_DIR"):
-        ensure_numba_cache_dir(tmp_path, cache_dir=override_dir)
+    cache_dir = ensure_numba_cache_dir(tmp_path, cache_dir=override_dir)
+    assert cache_dir == override_dir
+    assert override_dir.exists()
+    assert os.environ.get("NUMBA_CACHE_DIR") == str(override_dir)
 
 
 def test_numba_cache_requires_writable_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

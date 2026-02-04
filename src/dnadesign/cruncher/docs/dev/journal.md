@@ -30,3 +30,9 @@
 - Reran demo_basics_two_tf with full default config; auto-opt selected PT with warnings and produced sample run lexA-cpxR_20260204_140346_cb1935.
 - Latest demo analysis warns only on low elite count (n_elites=1) and shows early-stop per-chain around draw 1500–1633.
 - Auto-opt pilot summary: PT swap_prob=0.15 + aggressive/boosted cooling yields top top_k_median; ESS ratios remain very low (~0.001) across grid.
+- Added `min_norm` to sequences.parquet for fast per-draw consensus filtering.
+- Lowered demo `min_per_tf_norm` / `success_min_per_tf_norm` to 0.60 after inspecting draw percentiles (median ~0.28, 95th ~0.55) and unique counts.
+- Updated CLI docs to describe the MMR scorecard as the default auto-opt selector.
+- Allow NUMBA_CACHE_DIR overrides when an explicit cache_dir is provided (warn + overwrite) to keep CLI runs deterministic in workspaces.
+- Reordered MMR selection to run after polish/trim on the candidate pool so final elites preserve diversity (MMR meta now matches elites).
+- Reran demo_basics_two_tf after the MMR polish change: latest run lexA-cpxR_20260204_174159_fdeee2 produced 10 elites with 10 unique canonical sequences and unique_successes=24.

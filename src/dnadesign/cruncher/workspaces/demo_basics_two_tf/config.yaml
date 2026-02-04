@@ -98,7 +98,7 @@ cruncher:
       min_delta: 0.01
       require_min_unique: true
       min_unique: 10
-      success_min_per_tf_norm: 0.70
+      success_min_per_tf_norm: 0.60
     init:
       kind: random
       length: 30
@@ -130,7 +130,7 @@ cruncher:
         write_baselines: true
       filters:
         pwm_sum_min: 0.0
-        min_per_tf_norm: 0.70
+        min_per_tf_norm: 0.60
         require_all_tfs_over_min_norm: true
     moves:
       profile: balanced
