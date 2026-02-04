@@ -90,7 +90,6 @@ from .plan_pools import PLAN_POOL_INPUT_TYPE, PlanPoolSpec
 from .progress import (
     _build_screen_dashboard,
     _format_progress_bar,
-    _leaderboard_snapshot,
     _ScreenDashboard,
     _short_seq,
     _summarize_diversity,
@@ -102,6 +101,7 @@ from .progress import (
 )
 from .resume_state import load_resume_state
 from .run_state_manager import assert_state_matches_outputs, init_run_state, write_run_state
+from .sampling_diagnostics import SamplingDiagnostics
 from .sequence_validation import (
     _apply_pad_offsets,
     _find_forbidden_kmer,
@@ -258,20 +258,6 @@ def _process_plan_for_source(
         if label in display_map:
             return display_map[label]
         return motif_display_name(label, None)
-
-    def _map_tf_usage(counts: dict[str, int]) -> dict[str, int]:
-        mapped: dict[str, int] = {}
-        for tf, count in counts.items():
-            label = _display_tf_label(str(tf))
-            mapped[label] = mapped.get(label, 0) + int(count)
-        return mapped
-
-    def _map_tfbs_usage(counts: dict[tuple[str, str], int]) -> dict[tuple[str, str], int]:
-        mapped: dict[tuple[str, str], int] = {}
-        for (tf, tfbs), count in counts.items():
-            label = _display_tf_label(str(tf))
-            mapped[(label, str(tfbs))] = mapped.get((label, str(tfbs)), 0) + int(count)
-        return mapped
 
     def _next_attempt_index() -> int:
         key = (source_label, plan_name)
@@ -826,87 +812,21 @@ def _process_plan_for_source(
             "min_count_by_regulator, or fixed-element constraints."
         )
 
-    def _current_leaderboard_snapshot() -> dict[str, object]:
-        return _leaderboard_snapshot(
-            usage_counts,
-            tf_usage_counts,
-            failure_counts,
-            input_name=source_label,
-            plan_name=plan_name,
-            library_tfs=library_tfs,
-            library_tfbs=library_tfbs,
-        )
-
-    def _log_leaderboard_snapshot() -> None:
-        if progress_style == "screen":
-            return
-        tf_usage_display = _map_tf_usage(tf_usage_counts)
-        tfbs_usage_display = _map_tfbs_usage(usage_counts) if show_tfbs else usage_counts
-        log.info(
-            "[%s/%s] Leaderboard (TF): %s",
-            source_label,
-            plan_name,
-            _summarize_leaderboard(tf_usage_display, top=5),
-        )
-        if show_tfbs:
-            log.info(
-                "[%s/%s] Leaderboard (TFBS): %s",
-                source_label,
-                plan_name,
-                _summarize_leaderboard(tfbs_usage_display, top=5),
-            )
-            log.info(
-                "[%s/%s] Failed TFBS: %s",
-                source_label,
-                plan_name,
-                _summarize_failure_leaderboard(
-                    failure_counts,
-                    input_name=source_label,
-                    plan_name=plan_name,
-                    top=5,
-                ),
-            )
-        else:
-            log.info(
-                "[%s/%s] TFBS usage: %s",
-                source_label,
-                plan_name,
-                _summarize_tfbs_usage_stats(usage_counts),
-            )
-            failure_totals = _summarize_failure_totals(
-                failure_counts,
-                input_name=source_label,
-                plan_name=plan_name,
-            )
-            if failure_totals:
-                log.info("[%s/%s] Failures: %s", source_label, plan_name, failure_totals)
-        log.info(
-            "[%s/%s] Diversity: %s",
-            source_label,
-            plan_name,
-            _summarize_diversity(
-                usage_counts,
-                tf_usage_counts,
-                library_tfs=library_tfs,
-                library_tfbs=library_tfbs,
-            ),
-        )
-
-    def _record_site_failures(reason: str) -> None:
-        if not track_failures:
-            return
-        if not library_tfbs:
-            return
-        for idx, tfbs in enumerate(library_tfbs):
-            tf = library_tfs[idx] if idx < len(library_tfs) else ""
-            site_id = None
-            if library_site_ids and idx < len(library_site_ids):
-                raw = library_site_ids[idx]
-                if raw not in (None, "", "None"):
-                    site_id = str(raw)
-            key = (source_label, plan_name, tf, tfbs, site_id)
-            reasons = failure_counts.setdefault(key, {})
-            reasons[reason] = reasons.get(reason, 0) + 1
+    diagnostics = SamplingDiagnostics(
+        usage_counts=usage_counts,
+        tf_usage_counts=tf_usage_counts,
+        failure_counts=failure_counts,
+        source_label=source_label,
+        plan_name=plan_name,
+        display_tf_label=_display_tf_label,
+        progress_style=progress_style,
+        show_tfbs=show_tfbs,
+        track_failures=track_failures,
+        logger=log,
+        library_tfs=library_tfs,
+        library_tfbs=library_tfbs,
+        library_site_ids=library_site_ids,
+    )
 
     # Alignment (7): sampling_fraction uses unique TFBS strings and is bounded.
     sampling_fraction = _compute_sampling_fraction(
@@ -1098,7 +1018,7 @@ def _process_plan_for_source(
                         covers_all = False
                         failed_solutions += 1
                         failed_min_count_per_tf += 1
-                        _record_site_failures("min_count_per_tf")
+                        diagnostics.record_site_failures("min_count_per_tf")
                         attempt_index = _next_attempt_index()
                         _log_rejection(
                             tables_root,
@@ -1139,7 +1059,7 @@ def _process_plan_for_source(
                         covers_required = False
                         failed_solutions += 1
                         failed_required_regulators += 1
-                        _record_site_failures("required_regulators")
+                        diagnostics.record_site_failures("required_regulators")
                         attempt_index = _next_attempt_index()
                         _log_rejection(
                             tables_root,
@@ -1183,7 +1103,7 @@ def _process_plan_for_source(
                     if missing:
                         failed_solutions += 1
                         failed_min_count_by_regulator += 1
-                        _record_site_failures("min_count_by_regulator")
+                        diagnostics.record_site_failures("min_count_by_regulator")
                         attempt_index = _next_attempt_index()
                         _log_rejection(
                             tables_root,
@@ -1518,8 +1438,8 @@ def _process_plan_for_source(
                                 library_tfs=library_tfs,
                                 library_tfbs=library_tfbs,
                             )
-                            tf_usage_display = _map_tf_usage(tf_usage_counts)
-                            tfbs_usage_display = _map_tfbs_usage(usage_counts) if show_tfbs else usage_counts
+                            tf_usage_display = diagnostics.map_tf_usage(tf_usage_counts)
+                            tfbs_usage_display = diagnostics.map_tfbs_usage(usage_counts) if show_tfbs else usage_counts
                             seq_preview = _short_seq(final_seq, max_len=120) if show_solutions else None
                             dashboard.update(
                                 _build_screen_dashboard(
@@ -1622,8 +1542,8 @@ def _process_plan_for_source(
                             stall_events,
                             failure_totals,
                         )
-                        tf_usage_display = _map_tf_usage(tf_usage_counts)
-                        tfbs_usage_display = _map_tfbs_usage(usage_counts) if show_tfbs else usage_counts
+                        tf_usage_display = diagnostics.map_tf_usage(tf_usage_counts)
+                        tfbs_usage_display = diagnostics.map_tfbs_usage(usage_counts) if show_tfbs else usage_counts
                         log.info(
                             "[%s/%s] Leaderboard (TF): %s",
                             source_label,
@@ -1690,7 +1610,7 @@ def _process_plan_for_source(
 
             if produced_this_library == 0:
                 reason = "stall_no_solution" if stall_triggered else "no_solution"
-                _record_site_failures(reason)
+                diagnostics.record_site_failures(reason)
                 attempt_index = _next_attempt_index()
                 _append_attempt(
                     tables_root,
@@ -1790,6 +1710,11 @@ def _process_plan_for_source(
             library_sources = list(source_by_index) if source_by_index else []
             library_tfbs_ids = list(tfbs_id_by_index) if tfbs_id_by_index else []
             library_motif_ids = list(motif_id_by_index) if motif_id_by_index else []
+            diagnostics.update_library(
+                library_tfs=library_tfs,
+                library_tfbs=library_tfbs,
+                library_site_ids=library_site_ids,
+            )
             required_regulators = list(dict.fromkeys(sampling_info.get("required_regulators_selected") or []))
             if groups and not required_regulators:
                 raise RuntimeError(
@@ -1872,9 +1797,9 @@ def _process_plan_for_source(
                 state_counts[(source_label, plan_name)] = int(global_generated)
                 if write_state is not None:
                     write_state()
-            snapshot = _current_leaderboard_snapshot()
+            snapshot = diagnostics.snapshot()
             if global_generated >= quota and (usage_counts or tf_usage_counts or failure_counts):
-                _log_leaderboard_snapshot()
+                diagnostics.log_snapshot()
             if dashboard is not None:
                 dashboard.close()
             return produced_total_this_call, {
@@ -1900,9 +1825,9 @@ def _process_plan_for_source(
         state_counts[(source_label, plan_name)] = int(global_generated)
         if write_state is not None:
             write_state()
-    snapshot = _current_leaderboard_snapshot()
+    snapshot = diagnostics.snapshot()
     if usage_counts or tf_usage_counts or failure_counts:
-        _log_leaderboard_snapshot()
+        diagnostics.log_snapshot()
     if dashboard is not None:
         dashboard.close()
     return produced_total_this_call, {
