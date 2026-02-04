@@ -87,8 +87,9 @@ beta to stabilize acceptance.
 ### Length ladder (warm start)
 
 Ladder mode runs sequential lengths (L0..Lmax) with warm starts from the prior
-length's raw samples (`sequences.parquet`, elites as fallback). This avoids a
-biased "longer always wins" contest and makes length sweeps cheaper.
+length's raw samples (`sequences.parquet`). This avoids a biased "longer always
+wins" contest and makes length sweeps cheaper. Warm starts require
+`sample.output.save_sequences=true` (auto-opt pilots already enforce this).
 
 ```yaml
 sample:

@@ -10,3 +10,8 @@
 - Reviewed cruncher docs (architecture, internals spec, sampling guide, config reference) for no-fallback alignment.
 - Flagged explicit fallbacks (warm-start elites fallback, analyze partial outputs) as contradictions to "no fallbacks" goal.
 - Proposed follow-ups: make warm-start strict, fail analyze on missing artifacts unless explicitly allowed, and migrate tests to new app submodules.
+- Enforced warm-start to require sequences.parquet and removed elite fallbacks; missing seeds now error.
+- Analyze now errors if trace.nc is missing when trace-based diagnostics are requested.
+- Updated docs to reflect strict analyze artifacts and warm-start requirements.
+- Reorganized tests into analysis/app/cli/core/ingest/store subfolders and fixed path-based tests.
+- Profiled demo_basics_two_tf with a reduced budget; font-cache build dominated the first run, with scoring/pvalue setup next.

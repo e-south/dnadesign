@@ -416,9 +416,9 @@ def run_analyze(
         if trace_file.exists() and needs_trace:
             trace_idata = az.from_netcdf(trace_file)
         elif needs_trace:
-            logger.warning(
-                "Missing artifacts/trace.nc in %s; trace-based diagnostics will be skipped.",
-                sample_dir,
+            raise FileNotFoundError(
+                f"Missing artifacts/trace.nc in {sample_dir}. "
+                "Re-run `cruncher sample` with sample.output.trace.save=true."
             )
 
         analysis_root = sample_dir / "analysis"

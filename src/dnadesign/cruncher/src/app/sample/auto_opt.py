@@ -232,14 +232,18 @@ def _warm_start_seeds_from_sequences(
     pad_with: str | None,
     max_seeds: int | None = None,
 ) -> list[np.ndarray]:
+    seq_path = sequences_path(run_dir)
+    if not seq_path.exists():
+        raise FileNotFoundError(
+            f"Warm-start requires artifacts/sequences.parquet in {run_dir}. "
+            "Re-run `cruncher sample` with sample.output.save_sequences=true."
+        )
     try:
-        seq_path = sequences_path(run_dir)
         seq_df = read_parquet(seq_path)
     except Exception as exc:
-        logger.warning("Warm-start: unable to load sequences from %s (%s).", run_dir, exc)
-        return []
+        raise ValueError(f"Warm-start failed to read {seq_path}.") from exc
     if "sequence" not in seq_df.columns:
-        return []
+        raise ValueError(f"Warm-start requires a 'sequence' column in {seq_path}.")
     if "phase" in seq_df.columns:
         seq_df = seq_df[seq_df["phase"] == "draw"].copy()
 
@@ -270,6 +274,11 @@ def _warm_start_seeds_from_sequences(
         seeds.append(seq_arr)
         if max_seeds is not None and len(seeds) >= max_seeds:
             break
+    if not seeds:
+        raise ValueError(
+            "Warm-start found no usable sequences. "
+            f"Expected length {target_length} or {target_length - 1} in {seq_path}."
+        )
     return seeds
 
 
@@ -817,16 +826,6 @@ def _run_auto_optimize_for_set(
                     pad_with=sample_cfg.init.pad_with,
                     max_seeds=sample_cfg.elites.k,
                 )
-                if not init_seeds:
-                    init_seeds = _warm_start_seeds_from_elites(
-                        previous_best_run,
-                        target_length=length,
-                        rng=seed_rng,
-                        pad_with=sample_cfg.init.pad_with,
-                        max_seeds=sample_cfg.elites.k,
-                    )
-                if not init_seeds:
-                    logger.warning("Warm-start: no usable seeds for length %d; falling back to fresh init.", length)
             current_specs: list[AutoOptSpec] = []
             for spec in candidate_specs:
                 if spec.length == length:

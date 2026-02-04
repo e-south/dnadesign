@@ -232,7 +232,7 @@ Errors are explicit and actionable:
 
 - Missing lockfile → error (no implicit resolution)
 - Lockfile pwm_source mismatch → error (re-run lock)
-- Missing artifacts for analyze → warning + partial outputs
+- Missing artifacts for analyze → error (no partial outputs)
 - Invalid PWM / invalid sites → error
 - Ambiguous TF resolution → error
 - PWM-from-sites with low site count → error unless `allow_low_sites=true`

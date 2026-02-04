@@ -445,7 +445,7 @@ Notes:
 - `sample.rng.deterministic=true` isolates a stable RNG stream per pilot config.
 - `auto_opt.length` searches candidate lengths; compare lengths using the same objective‑aligned top‑K median score and use `auto_opt.length.prefer_shortest: true` to force the shortest winning length.
 - `auto_opt.length.mode=ladder` runs sequential lengths with warm starts; step must be 1.
-- `auto_opt.length.warm_start` seeds each length from the prior length's raw sequences (prefers `sequences.parquet`).
+- `auto_opt.length.warm_start` seeds each length from the prior length's raw sequences (`sequences.parquet`); it fails if sequences are unavailable.
 - `auto_opt.length.ladder_budget_scale` scales pilot budgets for intermediate ladder steps.
 - `auto_opt.allow_trim_polish_in_pilots` preserves trim/polish in pilots (off by default to keep lengths intact).
 - Ladder mode writes `analysis/length_ladder.csv` under the auto-opt pilot root.
@@ -518,6 +518,7 @@ Notes:
 - `mcmc_diagnostics=true` enables trace-based diagnostics and move/pt swap plots/tables.
 - If any MCMC diagnostic plots are explicitly set `true`, cruncher auto‑enables
   `mcmc_diagnostics` and records the adjustment in `analysis_used.yaml`.
+- Trace-based diagnostics require `output.trace.save=true`; analyze fails if `trace.nc` is missing.
 - Tier‑0 plots (dashboard + worst‑TF + overlap summaries) default to `true`;
   all other plot keys default to `false`. Use `cruncher analyze --plots all`
   to generate the full plot suite.
