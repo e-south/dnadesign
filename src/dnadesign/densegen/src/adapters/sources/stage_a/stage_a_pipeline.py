@@ -53,6 +53,7 @@ from .stage_a_summary import (
     _build_summary,
     _ranked_sequence_positions,
 )
+from .stage_a_tier_targets import evaluate_tier_target
 from .stage_a_types import PWMMotif
 
 log = logging.getLogger(__name__)
@@ -66,10 +67,11 @@ class StageAPipelineResult:
 
 
 def _evaluate_tier_target(*, n_sites: int, target_tier_fraction: float, eligible_unique: int) -> tuple[int, bool]:
-    if target_tier_fraction <= 0 or target_tier_fraction > 1:
-        raise ValueError("target_tier_fraction must be in (0, 1].")
-    required_unique = int(np.ceil(float(n_sites) / float(target_tier_fraction)))
-    return required_unique, int(eligible_unique) >= required_unique
+    return evaluate_tier_target(
+        n_sites=n_sites,
+        target_tier_fraction=target_tier_fraction,
+        eligible_unique=eligible_unique,
+    )
 
 
 def _cap_label(

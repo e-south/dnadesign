@@ -40,6 +40,7 @@ from .stage_a_sampling_utils import (
     build_log_odds,
     select_pwm_window_by_length,
 )
+from .stage_a_tier_targets import required_unique_for_tier_target
 from .stage_a_types import FimoCandidate, PWMMotif
 
 log = logging.getLogger(__name__)
@@ -447,7 +448,10 @@ def mine_pwm_candidates(
                     if budget_mode == "tier_target":
                         if budget_min_candidates is None or generated_total >= int(budget_min_candidates):
                             if budget_target_tier_fraction is not None:
-                                required_unique = int(np.ceil(float(n_sites) / float(budget_target_tier_fraction)))
+                                required_unique = required_unique_for_tier_target(
+                                    n_sites=n_sites,
+                                    target_tier_fraction=budget_target_tier_fraction,
+                                )
                                 if _eligible_unique_count() >= required_unique:
                                     break
                     if budget_max_candidates is not None and generated_total >= int(budget_max_candidates):
