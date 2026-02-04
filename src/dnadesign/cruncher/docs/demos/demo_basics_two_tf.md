@@ -365,6 +365,8 @@ Each candidate dsDNA sequence is scored by scanning both strands for each PWM, t
 
 This demo config sets `auto_opt.policy.allow_warn: true` so auto-opt will pick a winner by the end of the configured budget levels among candidates that pass diagnostics, even if confidence is low (warnings are recorded). Set `allow_warn: false` to require a confidence-separated winner; if none emerges at the maximum configured budgets/replicates (or only warning-level candidates remain), auto-opt fails fast with guidance to increase `auto_opt.budget_levels` and/or `auto_opt.replicates`.
 
+Early-stop is enabled in this demo (`patience: 500`, `min_delta: 0.01`) to cut off draws once scores stall. After `cruncher analyze`, inspect `analysis/report.md` or `analysis/objective_components.json` for the `learning` block, which records the best-score draw and a per-chain early-stop simulation. The demo also enables `analysis.extra_tables=true` so the auto-opt pilot scorecard is written to `analysis/auto_opt_pilots.parquet`.
+
 ```bash
 # Run sampling with auto-opt
 cruncher sample -c "$CONFIG"  # run sampling with auto-opt pilots

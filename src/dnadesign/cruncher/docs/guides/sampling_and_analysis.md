@@ -30,6 +30,9 @@ Outputs are recorded under each run’s `analysis/` folder. The canonical summar
 is `analysis/summary.json`, which links to plot/table manifests. The human‑readable
 entrypoint is `analysis/report.md` (machine‑readable `analysis/report.json`). A detailed
 inventory with “why” each artifact was generated is in `analysis/manifest.json`.
+`analysis/objective_components.json` includes a `learning` block with best-score
+draws, last improvement draw, and (when `early_stop` is configured) a per-chain
+early-stop simulation to help spot plateaus.
 
 ### Numba cache (required for fast diagnostics)
 

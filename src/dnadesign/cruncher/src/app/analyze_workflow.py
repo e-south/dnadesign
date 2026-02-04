@@ -492,6 +492,7 @@ def run_analyze(
             top_k=sample_meta.top_k,
             dsdna_canonicalize=sample_meta.dsdna_canonicalize,
             overlap_total_bp_median=overlap_summary.get("overlap_total_bp_median"),
+            early_stop=manifest.get("early_stop"),
         )
         objective_components_path.write_text(json.dumps(objective_components, indent=2))
 

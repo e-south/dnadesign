@@ -272,7 +272,7 @@ sample:
   early_stop:
     enabled: true
     patience: 500
-    min_delta: 0.5
+    min_delta: 0.01
   init:
     kind: random
     length: 30
@@ -440,7 +440,7 @@ Notes:
 - `auto_opt.beta_ladder_scales` adds additional PT beta ladder scale candidates (unioned with
   `auto_opt.cooling_boosts`).
 - Auto‑opt is **thresholdless**: it escalates through `auto_opt.budget_levels` (and configured `auto_opt.replicates`) until a confidence‑separated winner emerges. With `auto_opt.policy.allow_warn: true`, it will pick the best available candidate at the maximum budget among those that pass diagnostics (recording low‑confidence warnings). With `allow_warn: false`, it fails fast if no confident winner emerges or if only warning‑level candidates remain, and suggests increasing budgets/replicates.
-- `early_stop` halts sampling when the best score fails to improve by `min_delta` for `patience` draws (per chain for Gibbs, per sweep for PT).
+- `early_stop` halts sampling when the best score fails to improve by `min_delta` for `patience` draws (per chain for Gibbs, per sweep for PT). For `score_scale=normalized-llr` (0-1), `min_delta` must be <= 0.1; use ~0.01 to detect plateaus.
 - Auto-opt selection details are stored in each pilot's `meta/run_manifest.json`; `cruncher analyze` writes `analysis/auto_opt_pilots.parquet` and `analysis/plot__auto_opt_tradeoffs.<plot_format>`.
 - `sample.rng.deterministic=true` isolates a stable RNG stream per pilot config.
 - `auto_opt.length` searches candidate lengths; compare lengths using the same objective‑aligned top‑K median score and use `auto_opt.length.prefer_shortest: true` to force the shortest winning length.

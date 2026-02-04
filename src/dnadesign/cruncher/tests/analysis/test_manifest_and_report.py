@@ -180,3 +180,37 @@ def test_build_manifest_and_report(tmp_path: Path) -> None:
 
     report = json.loads((report_root / "report.json").read_text())
     assert report["run"]["run"] == "sample_test"
+
+
+def test_report_includes_learning_highlights(tmp_path: Path) -> None:
+    run_dir = tmp_path / "results" / "sample" / "sample_learning"
+    analysis_dir = analysis_root(run_dir)
+    analysis_dir.mkdir(parents=True, exist_ok=True)
+    summary_payload = {
+        "analysis_id": "analysis_learning",
+        "run": "sample_learning",
+        "tf_names": ["lexA"],
+        "diagnostics": {},
+        "objective_components": {
+            "learning": {
+                "best_score_draw": 5,
+                "best_score_chain": 1,
+                "last_improvement_draw": 4,
+                "plateau_draws": 2,
+                "early_stop": {
+                    "earliest_draw": 6,
+                    "stopped_chains": 1,
+                },
+            }
+        },
+        "overlap_summary": {},
+    }
+    summary_path(analysis_dir).write_text(json.dumps(summary_payload))
+
+    ensure_report(analysis_root=analysis_dir, summary_payload=summary_payload, refresh=True)
+
+    report = json.loads((analysis_dir / "report.json").read_text())
+    learning = report["highlights"]["learning"]
+    assert learning["best_score_draw"] == 5
+    assert learning["best_score_chain"] == 1
+    assert learning["early_stop_earliest_draw"] == 6

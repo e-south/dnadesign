@@ -93,7 +93,9 @@ cruncher:
       draws: 2000
       restarts: 4
     early_stop:
-      enabled: false
+      enabled: true
+      patience: 500
+      min_delta: 0.01
     init:
       kind: random
       length: 30
@@ -164,6 +166,7 @@ cruncher:
 
   analysis:
     runs: []
+    extra_tables: true
     tf_pair: [lexA, cpxR]
     plots:
       worst_tf_trace: true

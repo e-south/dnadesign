@@ -33,6 +33,7 @@ def _sample_block() -> dict:
         "mode": "sample",
         "rng": {"seed": 7, "deterministic": True},
         "budget": {"draws": 2, "tune": 1, "restarts": 1},
+        "early_stop": {"enabled": True, "patience": 10, "min_delta": 0.01},
         "init": {"kind": "random", "length": 12, "pad_with": "background"},
         "objective": {"bidirectional": True, "score_scale": "normalized-llr"},
         "elites": {"k": 1, "min_hamming": 0, "filters": {"pwm_sum_min": 0.0}},

@@ -152,6 +152,20 @@ def build_report_payload(
         "acceptance_rate_mh_tail": _safe_float((optimizer_metrics or {}).get("acceptance_rate_mh_tail")),
         "swap_acceptance_rate": _safe_float((optimizer_metrics or {}).get("swap_acceptance_rate")),
     }
+    highlights_learning = {}
+    if isinstance(objective_components, dict):
+        learning_payload = objective_components.get("learning")
+        if isinstance(learning_payload, dict):
+            early_payload = learning_payload.get("early_stop") if isinstance(learning_payload, dict) else None
+            early_payload = early_payload if isinstance(early_payload, dict) else {}
+            highlights_learning = {
+                "best_score_draw": _safe_int(learning_payload.get("best_score_draw")),
+                "best_score_chain": _safe_int(learning_payload.get("best_score_chain")),
+                "last_improvement_draw": _safe_int(learning_payload.get("last_improvement_draw")),
+                "plateau_draws": _safe_int(learning_payload.get("plateau_draws")),
+                "early_stop_earliest_draw": _safe_int(early_payload.get("earliest_draw")),
+                "early_stop_stopped_chains": _safe_int(early_payload.get("stopped_chains")),
+            }
 
     autopicks = None
     if isinstance(analysis_used_payload, dict):
@@ -190,6 +204,7 @@ def build_report_payload(
             "diversity": highlights_diversity,
             "overlap": highlights_overlap,
             "sampling": highlights_sampling,
+            "learning": highlights_learning,
         },
         "autopicks": autopicks,
         "paths": pointers,
@@ -213,6 +228,7 @@ def write_report_md(
     diversity = highlights.get("diversity") or {}
     overlap = highlights.get("overlap") or {}
     sampling = highlights.get("sampling") or {}
+    learning = highlights.get("learning") or {}
     warnings = payload.get("warnings") or []
     status = payload.get("status") or "unknown"
     pointers = payload.get("paths") or {}
@@ -228,6 +244,13 @@ def write_report_md(
             return f"{value:.4f}"
         return str(value)
 
+    best_score_draw = _fmt(learning.get("best_score_draw"))
+    best_score_chain = _fmt(learning.get("best_score_chain"))
+    last_improvement_draw = _fmt(learning.get("last_improvement_draw"))
+    plateau_draws = _fmt(learning.get("plateau_draws"))
+    early_stop_earliest_draw = _fmt(learning.get("early_stop_earliest_draw"))
+    early_stop_stopped_chains = _fmt(learning.get("early_stop_stopped_chains"))
+
     lines = [
         "# Cruncher Analysis Report",
         "",
@@ -241,13 +264,36 @@ def write_report_md(
         f"- Overlap bp median: {_fmt(overlap.get('overlap_total_bp_median'))}",
         f"- MH acceptance (tail): {_fmt(sampling.get('acceptance_rate_mh_tail'))}",
         f"- PT swap acceptance: {_fmt(sampling.get('swap_acceptance_rate'))}",
-        "",
-        "## Start here",
-        "",
-        f"- {pointers.get('start_here_plot') or 'plot__dashboard.<ext>'}",
-        f"- {pointers.get('diagnostics') or 'diagnostics.json'}",
-        f"- {pointers.get('objective_components') or 'objective_components.json'}",
     ]
+    if any(
+        learning.get(key) is not None
+        for key in (
+            "best_score_draw",
+            "best_score_chain",
+            "last_improvement_draw",
+            "plateau_draws",
+            "early_stop_earliest_draw",
+            "early_stop_stopped_chains",
+        )
+    ):
+        lines.extend(
+            [
+                f"- Best score draw: {best_score_draw} (chain {best_score_chain})",
+                f"- Last improvement draw: {last_improvement_draw}",
+                f"- Plateau draws: {plateau_draws}",
+                f"- Early-stop earliest draw: {early_stop_earliest_draw} (stopped chains: {early_stop_stopped_chains})",
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "## Start here",
+            "",
+            f"- {pointers.get('start_here_plot') or 'plot__dashboard.<ext>'}",
+            f"- {pointers.get('diagnostics') or 'diagnostics.json'}",
+            f"- {pointers.get('objective_components') or 'objective_components.json'}",
+        ]
+    )
     overlap_path = pointers.get("overlap_summary") or f"overlap_summary.{table_format}"
     elite_topk_path = pointers.get("elite_topk") or f"elite_topk.{table_format}"
     lines.extend([f"- {overlap_path}", f"- {elite_topk_path}"])

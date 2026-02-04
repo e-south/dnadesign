@@ -20,3 +20,8 @@
 - Tightened auto-opt candidate validation: warn candidates now require allow_warn, and quality=fail is rejected.
 - Added a core import contract test to keep core free of artifacts/cli/filesystem dependencies.
 - Profiled `cruncher analyze --summary` (demo_basics_two_tf); runtime dominated by import overhead (~3s total).
+- Audited demo_basics_two_tf outputs: auto_opt candidates=40 (20 specs x 2 budgets), 35 fail (ESS<10), 5 warn; winner selected via allow_warn. auto_opt outputs ~145M vs sample ~7.7M.
+- Added learning metrics to analysis objective components + report (best score draw, plateau, early-stop simulation).
+- Enforced early_stop.min_delta <= 0.1 for normalized-llr configs and added tests.
+- Enabled early_stop and analysis.extra_tables in demo config; demo now emits auto_opt_pilots table.
+- Updated docs (config, sampling guide, demo) to reflect learning metrics + early-stop guidance.

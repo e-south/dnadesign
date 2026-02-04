@@ -983,6 +983,11 @@ class SampleConfig(StrictBaseModel):
 
         if self.optimizer.name == "pt" and self.budget.restarts != 1:
             raise ValueError("PT does not support budget.restarts > 1; set sample.budget.restarts=1.")
+        if self.early_stop.enabled and self.objective.score_scale == "normalized-llr":
+            if self.early_stop.min_delta > 0.1:
+                raise ValueError(
+                    "sample.early_stop.min_delta must be <= 0.1 when objective.score_scale='normalized-llr'."
+                )
         return self
 
 

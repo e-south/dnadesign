@@ -24,6 +24,7 @@ def compute_objective_components(
     top_k: int | None = None,
     dsdna_canonicalize: bool | None = None,
     overlap_total_bp_median: float | None = None,
+    early_stop: dict[str, object] | None = None,
 ) -> dict[str, object]:
     tf_list = list(tf_names)
     df = sequences_df.copy()
@@ -80,5 +81,90 @@ def compute_objective_components(
             canon = df["sequence"].astype(str).map(canon_string)
             canon_unique = int(canon.nunique())
             result["unique_fraction_canonical"] = canon_unique / float(total) if total else None
+
+    learning: dict[str, object] = {}
+    required_cols = {"combined_score_final", "draw", "chain"}
+    if required_cols.issubset(df.columns) and not df.empty:
+        score_df = df[list(required_cols)].copy()
+        score_df["combined_score_final"] = pd.to_numeric(score_df["combined_score_final"], errors="coerce")
+        score_df["draw"] = pd.to_numeric(score_df["draw"], errors="coerce")
+        score_df["chain"] = pd.to_numeric(score_df["chain"], errors="coerce")
+        score_df = score_df.dropna(subset=["combined_score_final", "draw", "chain"])
+        if not score_df.empty:
+            best_idx = score_df["combined_score_final"].idxmax()
+            best_row = score_df.loc[best_idx]
+            best_draw = int(best_row["draw"])
+            best_chain = int(best_row["chain"])
+            max_draw = int(score_df["draw"].max())
+            learning["best_score_draw"] = best_draw
+            learning["best_score_chain"] = best_chain
+            learning["best_score_fraction"] = best_draw / float(max_draw) if max_draw > 0 else None
+
+            last_improve_by_chain: dict[int, int] = {}
+            for chain_value, chain_df in score_df.groupby("chain"):
+                chain_df = chain_df.sort_values("draw")
+                best_local = None
+                last_improve = None
+                for draw, score in chain_df[["draw", "combined_score_final"]].itertuples(index=False):
+                    draw_int = int(draw)
+                    if best_local is None or score > best_local:
+                        best_local = float(score)
+                        last_improve = draw_int
+                if last_improve is not None:
+                    last_improve_by_chain[int(chain_value)] = last_improve
+
+            if last_improve_by_chain:
+                last_improve_draw = max(last_improve_by_chain.values())
+                learning["last_improvement_draw"] = last_improve_draw
+                learning["plateau_draws"] = max_draw - last_improve_draw if max_draw >= last_improve_draw else 0
+
+            if isinstance(early_stop, dict):
+                enabled = bool(early_stop.get("enabled", False))
+                patience = int(early_stop.get("patience", 0) or 0)
+                min_delta = float(early_stop.get("min_delta", 0.0) or 0.0)
+                early_payload: dict[str, object] = {
+                    "enabled": enabled,
+                    "patience": patience,
+                    "min_delta": min_delta,
+                }
+                if enabled and patience > 0:
+                    per_chain: dict[str, object] = {}
+                    stop_draws: list[int] = []
+                    for chain_value, chain_df in score_df.groupby("chain"):
+                        chain_df = chain_df.sort_values("draw")
+                        best_local = None
+                        last_improve = None
+                        no_improve = 0
+                        stop_draw = None
+                        for draw, score in chain_df[["draw", "combined_score_final"]].itertuples(index=False):
+                            draw_int = int(draw)
+                            if best_local is None or score > best_local + min_delta:
+                                best_local = float(score)
+                                last_improve = draw_int
+                                no_improve = 0
+                            else:
+                                no_improve += 1
+                                if no_improve >= patience:
+                                    stop_draw = draw_int
+                                    break
+                        chain_max_draw = int(chain_df["draw"].max())
+                        plateau_draws = None
+                        if last_improve is not None:
+                            plateau_draws = chain_max_draw - last_improve if chain_max_draw >= last_improve else 0
+                        per_chain[str(int(chain_value))] = {
+                            "last_improvement_draw": last_improve,
+                            "early_stop_draw": stop_draw,
+                            "plateau_draws": plateau_draws,
+                        }
+                        if stop_draw is not None:
+                            stop_draws.append(stop_draw)
+                    early_payload["per_chain"] = per_chain
+                    early_payload["stopped_chains"] = len(stop_draws)
+                    early_payload["earliest_draw"] = min(stop_draws) if stop_draws else None
+                    early_payload["latest_draw"] = max(stop_draws) if stop_draws else None
+                learning["early_stop"] = early_payload
+
+    if learning:
+        result["learning"] = learning
 
     return result
