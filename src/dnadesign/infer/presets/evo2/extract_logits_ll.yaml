@@ -1,0 +1,24 @@
+id: evo2/extract_logits_ll
+kind: extract
+description: >
+  Extract mean-pooled logits (dim=1), log-likelihood mean, and log-likelihood sum.
+  Works with evo2_* models; configurable device/precision at CLI.
+
+model:
+  id: evo2_7b
+  precision: bf16
+  alphabet: dna
+
+outputs:
+  - id: logits_mean
+    fn: evo2.logits
+    params: { pool: { method: mean, dim: 1 } }
+    format: list
+  - id: ll_mean
+    fn: evo2.log_likelihood
+    params: { method: native, reduction: mean }
+    format: float
+  - id: ll_sum
+    fn: evo2.log_likelihood
+    params: { method: native, reduction: sum }
+    format: float

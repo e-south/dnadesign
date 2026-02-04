@@ -1,0 +1,10 @@
+# cluster/jobs/ldn_v1/analyze.yaml
+command: "analyze"
+params:
+  dataset: "60bp_dual_promoter_cpxR_LexA"
+  usr_root: "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr"
+  cluster_col: "cluster__ldn_v1"
+  preset: "analysis.promoter_set1"
+
+  # Optional override (otherwise: results/<FIT>/analysis/)
+  # out_dir: "results/ldn_v1/analysis"

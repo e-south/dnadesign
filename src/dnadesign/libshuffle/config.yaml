@@ -1,0 +1,62 @@
+# dnadesign/libshuffle/config.yaml
+
+libshuffle:
+  # I/O paths
+  input_pt_path: "densebatch_deg2tfbs_pipeline_tfbsfetcher_lexA_and_cpxR_n10000"
+  output_dir_prefix: "lexA_cpxR_60bp_draft"                    # batch_results/<prefix>_YYYYMMDD
+  subsample_size: 16
+  num_draws: 10000
+  random_seed: 42
+  with_replacement: false
+  max_attempts_per_draw: 10
+  evo2_metric_type: "cosine"                     # "l2", "log1p_l2", or "cosine"
+  literal_filters:
+    # - "jaccard"
+    # - "levenshtein"
+    - "hamming"
+  literal_min_bp_diff: 20                         # require at least x bp difference per subsample
+  min_tf_richness: 2
+  selection:
+    method: "max_min_latent"
+    latent_threshold:
+      type: "iqr"
+      factor: 1.5
+  billboard_core_metrics:
+    - tf_richness
+    - 1_minus_gini
+    - min_jaccard_dissimilarity
+    - min_tf_entropy
+    - min_motif_string_levenshtein
+    - min_nw_dissimilarity
+  # Which subsamples to save (IDs), in addition to the winner
+  save_selected: true
+  save_sublibraries: []                            # e.g. ["s_0001", "s_0010"]
+  plot:
+    scatter:
+      x: "mean_cosine"
+      y: "log1p_mean_euclidean"
+      # x: "mean_cosine"
+      # y: "log1p_mean_euclidean"
+      low_alpha: 0.25
+      high_alpha: 0.45
+      threshold_line: true
+      threshold:
+        type: "iqr"
+        factor: 1.5
+      colors:
+        base: purple
+        literal_drop:
+          jaccard: orange
+          levenshtein: red
+          literal: red
+        cluster_drop: orange
+        winner: purple
+      annotate_winner: true
+      annotate_ids: true
+      figsize: [5, 5]
+    kde:
+      figsize: [5, 5]
+    pairplot:
+      figsize: [8, 8]
+    hitzone:
+      figsize: [3, 6]

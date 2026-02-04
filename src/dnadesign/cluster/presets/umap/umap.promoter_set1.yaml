@@ -1,0 +1,47 @@
+# cluster/presets/umap/promoter_set1.yaml
+name: "umap.promoter_set1"
+kind: "umap"
+
+# UMAP knobs (algo)
+params:
+  neighbors: 15
+  min_dist: 0.10
+  metric: "euclidean"
+
+# Plotting block (can be overridden in job.plot or CLI)
+plot:
+  dims: [12, 9]
+  alpha: 0.45
+  size: 8.0                  # base size for non-highlight points
+  font_scale: 1.3
+
+  # Hues to render (one PNG per entry below)
+  color_by:
+    - "cluster"
+    - "gc_content"           # requires 'sequence'
+    - "seq_length"           # requires 'sequence'
+    - "highlight"            # dedicated highlight-only plot (gray bg + filled points)
+    - "numeric:infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__ll_mean"
+    - "numeric:obj__logic_fidelity"
+    - "numeric:obj__effect_scaled"
+    - "categorical:densegen__plan"
+    # Optional hue (requires 'cluster__<NAME>__intra_sim'; compute via cluster intra-sim)
+    # - "intra_sim"
+
+  # Legend controls (used for categorical hues & colorbars placement)
+  legend:
+    ncol: 1
+    bbox: [1.02, 1.0]
+    max_items: 40
+    frameon: false
+
+  # Overlay rings for highlighted ids on non-"highlight" hues
+  highlight:
+    overlay: true            # set false to stop drawing rings on other hues
+    size: 60.0               # ring size (independent from filled highlight plot)
+    alpha: 0.95
+    facecolor: "none"
+    edgecolor: "red"
+    linewidth: 0.9
+    marker: "o"
+    legend: false

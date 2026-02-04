@@ -1,0 +1,32 @@
+# cluster/jobs/ldn_v1/umap.yaml
+command: "umap"
+params:
+  dataset: "60bp_dual_promoter_cpxR_LexA"
+  usr_root: "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr"
+
+  name: "ldn_v1"   # must match an existing fit
+  x-col: "infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean"
+  preset: "umap.promoter_set1"
+
+  # Optional: highlight a specific set of ids (single-hue mode)
+  highlight: "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/opal/campaigns/prom60-etoh-cipro-andgate/outputs/ledger.labels/part-1e5a6a5834f14a22b7d5e2794b1a7b25.parquet"
+
+  # Optional OPAL join to satisfy numeric/categorical hues that refer to obj__/pred__/sel__ columns
+  opal_campaign: "prom60-etoh-cipro-andgate"
+  opal_as_of_round: 0
+  opal_fields:
+    - "obj__logic_fidelity"
+    - "obj__effect_scaled"
+
+  attach_coords: true
+  write: true
+  allow_overwrite: true
+
+# Lightweight plot overrides (reusable styling should live in presets)
+plot:
+  dims: [14, 10]
+  alpha: 0.6
+  size: 6.0
+  highlight:
+    overlay: true    # set to false if you do NOT want rings on other hues
+    size: 60.0       # size of the rings on other hues (independent from filled highlight plot)

@@ -1,0 +1,51 @@
+cruncher:
+  out_dir: outputs
+  regulator_sets:
+    - [lexA, cpxR, baeR]
+
+  motif_store:
+    source_preference: [meme_suite_meme, meme_suite_streme, demo_local_meme, regulondb]
+    combine_sites: true
+    site_window_lengths:
+      lexA: 20
+      cpxR: 20
+      baeR: 20
+
+  motif_discovery:
+    tool: meme
+    meme_mod: oops
+    meme_prior: addone
+    source_id: meme_suite_meme
+
+  ingest:
+    regulondb:
+      curated_sites: true
+      ht_sites: false
+    local_sources:
+      - source_id: demo_local_meme
+        root: inputs/local_motifs
+        patterns: ["*.txt"]
+        format_map: {".txt": "MEME"}
+        extract_sites: true
+        tf_name_strategy: stem
+    site_sources:
+      - source_id: baer_chip_exo
+        description: Choudhary et al. BaeR ChIP-exo binding sites (processed FASTA)
+        path: ../../../../../../dnadesign-data/primary_literature/Choudhary_et_al/processed/BaeR_binding_sites.fasta
+        tf_name: BaeR
+        record_kind: chip_exo
+        organism:
+          name: Escherichia coli
+          strain: K-12 MG1655
+          assembly: NC_000913.3
+        citation: "Choudhary et al. 2020 (DOI: 10.1128/mSystems.00980-20)"
+        source_url: https://doi.org/10.1128/mSystems.00980-20
+        tags:
+          assay: chip_exo
+          doi: 10.1128/mSystems.00980-20
+
+  parse:
+    plot:
+      logo: true
+      bits_mode: information
+      dpi: 150

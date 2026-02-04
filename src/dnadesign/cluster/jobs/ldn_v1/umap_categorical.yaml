@@ -1,0 +1,34 @@
+# cluster/jobs/ldn_v1/umap_categorical.yaml
+command: "umap"
+params:
+  dataset: "60bp_dual_promoter_cpxR_LexA"
+  usr_root: "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr"
+
+  name: "ldn_v1"
+  x-col: "infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean"
+  preset: "umap.promoter_set1"
+
+  # Categorical highlight: ids file must include a column we can color by
+  highlight: "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/opal/campaigns/prom60-etoh-cipro-andgate/outputs/ledger.labels/part-1e5a6a5834f14a22b7d5e2794b1a7b25.parquet"
+  highlight_hue_col: "observed_round"
+
+  # Optional OPAL joins (if your hues reference obj__/pred__/sel__ columns)
+  opal_campaign: "prom60-etoh-cipro-andgate"
+  opal_as_of_round: 0
+
+  attach_coords: true
+  write: true
+  allow_overwrite: true
+
+plot:
+  # Use a compact canvas but keep the right gutter for legends/colorbars
+  dims: [12, 9]
+  size: 6.0
+  alpha: 0.5
+
+  # Overlay rings on other hues colored by category
+  highlight:
+    overlay: true
+    legend: true             # show a legend entry for ring categories
+    size: 50.0               # ring size on other hues
+    palette: "tab20"         # or explicit mapping: { "0": "#1f77b4", "1": "#ff7f0e", ... }

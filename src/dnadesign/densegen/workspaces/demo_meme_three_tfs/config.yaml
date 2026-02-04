@@ -1,0 +1,258 @@
+# DenseGen demo: three TF motifs (LexA + CpxR + BaeR) with bounded PWM sampling.
+densegen:
+  schema_version: "2.9"
+  run:
+    id: demo_meme_three_tfs
+    root: "."
+
+  inputs:
+    # LexA + CpxR + BaeR artifacts exported from the Cruncher handoff workflow.
+    - name: lexA_pwm
+      type: pwm_artifact
+      path: inputs/motif_artifacts/lexA__meme_suite_meme__lexA_CTGTATAWAWWHACA.json
+      sampling:
+        strategy: stochastic
+        n_sites: 200
+        mining:
+          batch_size: 5000
+          budget:
+            mode: fixed_candidates
+            candidates: 1000000
+            growth_factor: 1.25
+          log_every_batches: 1
+        length:
+          policy: range
+          range: [16, 20]
+        uniqueness:
+          key: core
+        selection:
+          policy: mmr
+          rank_by: score_norm
+          alpha: 0.5
+          pool:
+            min_score_norm: 0.85
+            max_candidates: null
+            relevance_norm: minmax_raw_score
+        tier_fractions: [0.001, 0.01, 0.09]
+    - name: cpxR_pwm
+      type: pwm_artifact
+      path: inputs/motif_artifacts/cpxR__meme_suite_meme__cpxR_MANWWHTTTAM.json
+      sampling:
+        strategy: stochastic
+        n_sites: 200
+        mining:
+          batch_size: 5000
+          budget:
+            mode: fixed_candidates
+            candidates: 1000000
+            growth_factor: 1.25
+          log_every_batches: 1
+        length:
+          policy: range
+          range: [16, 20]
+        uniqueness:
+          key: core
+        selection:
+          policy: mmr
+          rank_by: score_norm
+          alpha: 0.5
+          pool:
+            min_score_norm: 0.85
+            max_candidates: null
+            relevance_norm: minmax_raw_score
+        tier_fractions: [0.001, 0.01, 0.09]
+    - name: baeR_pwm
+      type: pwm_artifact
+      path: inputs/motif_artifacts/baeR__meme_suite_meme__baeR_WWDTYTCTSCMNNA.json
+      sampling:
+        strategy: stochastic
+        n_sites: 200
+        mining:
+          batch_size: 5000
+          budget:
+            mode: fixed_candidates
+            candidates: 1000000
+            growth_factor: 1.25
+          log_every_batches: 1
+        length:
+          policy: range
+          range: [16, 20]
+        uniqueness:
+          key: core
+        selection:
+          policy: mmr
+          rank_by: score_norm
+          alpha: 0.5
+          pool:
+            min_score_norm: 0.85
+            max_candidates: null
+            relevance_norm: minmax_raw_score
+        tier_fractions: [0.001, 0.01, 0.09]
+    - name: neutral_bg
+      type: background_pool
+      sampling:
+        n_sites: 200
+        mining:
+          batch_size: 20000
+          budget:
+            mode: fixed_candidates
+            candidates: 5000000
+        length:
+          policy: range
+          range: [16, 20]
+        uniqueness:
+          key: sequence
+        gc:
+          min: 0.40
+          max: 0.60
+        filters:
+          fimo_exclude:
+            pwms_input: [lexA_pwm, cpxR_pwm, baeR_pwm]
+            allow_zero_hit_only: true
+          forbid_kmers: [TTGACA, TATAAT]
+
+  output:
+    targets: [parquet]
+    schema:
+      bio_type: dna
+      alphabet: dna_4
+    parquet:
+      path: outputs/tables/dense_arrays.parquet
+      deduplicate: true
+      chunk_size: 64
+
+  generation:
+    sequence_length: 60
+    quota: 48
+    sampling:
+      pool_strategy: subsample
+      library_size: 10
+      library_sampling_strategy: tf_balanced
+      unique_binding_sites: true
+      unique_binding_cores: true
+      max_sites_per_regulator: null
+      relax_on_exhaustion: false
+
+    plan:
+      - name: controls
+        quota: 12
+        sampling:
+          include_inputs: [neutral_bg]
+        fixed_elements:
+          promoter_constraints:
+            - name: sigma70_consensus
+              upstream: TTGACA
+              downstream: TATAAT
+              spacer_length: [16, 20]
+              upstream_pos: [0, 60]
+        regulator_constraints:
+          groups:
+            - name: control
+              members:
+                - neutral_bg
+              min_required: 1
+      - name: ethanol
+        quota: 12
+        sampling:
+          include_inputs: [cpxR_pwm, baeR_pwm, neutral_bg]
+        fixed_elements:
+          promoter_constraints:
+            - name: sigma70_consensus
+              upstream: TTGACA
+              downstream: TATAAT
+              spacer_length: [16, 20]
+              upstream_pos: [0, 60]
+        regulator_constraints:
+          groups:
+            - name: ethanol_response
+              members:
+                - cpxR_MANWWHTTTAM
+                - baeR_WWDTYTCTSCMNNA
+              min_required: 1
+      - name: ciprofloxacin
+        quota: 12
+        sampling:
+          include_inputs: [lexA_pwm, neutral_bg]
+        fixed_elements:
+          promoter_constraints:
+            - name: sigma70_consensus
+              upstream: TTGACA
+              downstream: TATAAT
+              spacer_length: [16, 20]
+              upstream_pos: [0, 60]
+        regulator_constraints:
+          groups:
+            - name: ciprofloxacin_response
+              members:
+                - lexA_CTGTATAWAWWHACA
+              min_required: 1
+      - name: ethanol_ciprofloxacin
+        quota: 12
+        sampling:
+          include_inputs: [lexA_pwm, cpxR_pwm, baeR_pwm, neutral_bg]
+        fixed_elements:
+          promoter_constraints:
+            - name: sigma70_consensus
+              upstream: TTGACA
+              downstream: TATAAT
+              spacer_length: [16, 20]
+              upstream_pos: [0, 60]
+        regulator_constraints:
+          groups:
+            - name: ethanol_response
+              members:
+                - cpxR_MANWWHTTTAM
+                - baeR_WWDTYTCTSCMNNA
+              min_required: 1
+            - name: ciprofloxacin_response
+              members:
+                - lexA_CTGTATAWAWWHACA
+              min_required: 1
+
+  solver:
+    backend: CBC
+    strategy: iterate
+    time_limit_seconds: 5
+
+  runtime:
+    round_robin: true
+    arrays_generated_before_resample: 2
+    min_count_per_tf: 0
+    max_duplicate_solutions: 3
+    stall_seconds_before_resample: 10
+    stall_warning_every_seconds: 10
+    max_consecutive_failures: 25
+    max_seconds_per_plan: 60
+    max_failed_solutions: 0
+    random_seed: 42
+
+  postprocess:
+    pad:
+      mode: adaptive
+      end: 5prime
+      gc:
+        mode: range
+        min: 0.40
+        max: 0.60
+        target: 0.50
+        tolerance: 0.10
+        min_pad_length: 0
+      max_tries: 2000
+    validate_final_sequence:
+      forbid_kmers_outside_promoter_windows:
+        kmers: [TTGACA, TATAAT]
+
+  logging:
+    log_dir: outputs/logs
+    level: INFO
+    suppress_solver_stderr: true
+    print_visual: true
+    progress_style: screen
+    progress_every: 1
+    progress_refresh_seconds: 1.0
+
+plots:
+  source: parquet
+  out_dir: outputs/plots
+  format: pdf
+  default: [stage_a_summary, placement_map]

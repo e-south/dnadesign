@@ -1,0 +1,71 @@
+# dnadesign/latdna/config.yaml
+
+latdna:
+  mode: analysis  # Set to "analysis" when running analysis
+  dry_run: false    # true for dry run (no files written)
+  # Generation Mode Settings
+  dense_array_for_generation: densebatch_test
+  sequence_length: 120
+  gc_content_range: [0.4, 0.6]
+  seed: 42
+  fixed_elements:
+    upstream_seq: "TTGACA"
+    downstream_seq: "TATAAT"
+    upstream_start: 70
+    spacer_range: [16, 18]
+  tiling:
+    step: 1
+  motifs:
+    crp:
+      - "AACCGTGCTCCCACTCGCAGTC"
+      - "ATTGGTGAGGAACTTAACAATA"
+    arca: "ATGTTAATAAAATGTTAA" # DAP-seq
+    lrp: "AATAACAGAATAAAATGCTGA" # DAP-seq
+    gadx: "AAAATATCAAAATCAGATAT"
+    iclr: "CGGAAACAATTTCCATTTT" # DAP-seq
+    arac: "AGGGGCGAATTATCTCTT"
+    gadw: "AAGTCGTTTTTCTGCTTAG"
+    rob: "GTTTTAGCATTTTGTGCTTTT" # DAP-seq
+    fadr: "TGGTCAGACCTGTTC" # DAP-seq
+    gals: "GTGTAAACGATTCCAC"
+    galr: "CTGTAACCGTTTCCAT"
+    yiau: "AAAAACAATATGTCGTTAT"
+    torr: "TGTCAATATCTGTTCATATCT" # DAP-seq
+    gade: "ATAGGCGTTTACTATATTGA"
+    dcur: "AAATTAATAATTAAGGG"
+    mlc: "ATTTTGATCTGCGAAATTAA" # DAP-seq
+    rutr: "TTTGACCATTTGGTC" # DAP-seq
+    fliz: "AAATTTGACTTAAGT" # DAP-seq
+    rbsr: "CGAAACGTTTCGCT" # DAP-seq
+    pepa: "ATTTGGTCCACTTTTTTCTGCTCGTTT"
+    glcc: "GGTCCTACCTGTGCA"
+  # Analysis Mode Settings (used when mode is "analysis")
+  analysis_inputs:
+    dense_batch: densebatch_test
+    latdna_batch: latdnabatch_20250405
+    seq_batch:
+      - seqbatch_ecocyc_28_promoters
+      - densebatch_deg2tfbs_pipeline_tfbsfetcher_heterotypic_all_TFs_n2500
+      - densebatch_deg2tfbs_pipeline_tfbsfetcher_heterotypic_M9_gluc_ace_top20_n2500
+      - densebatch_deg2tfbs_pipeline_tfbsfetcher_monotypic_ArcA_n2500
+      - densebatch_deg2tfbs_pipeline_tfbsfetcher_monotypic_CRP_n2500
+      - densebatch_deg2tfbs_pipeline_tfbsfetcher_monotypic_Lrp_n2500
+  metrics:
+    # - cosine
+    # - log1p_cosine
+    - sqrt_cosine
+    # - euclidean
+    - log1p_euclidean
+  group_by: all  # Options: "all" or "tf"
+  plots:
+    boxplot: true
+    save_path: "plots/latdna_analysis_20250405.png"
+    xtic_labels:
+      - "dense_test"
+      - "latdna"
+      - ecocyc_28
+      - hetero_all_TFs
+      - hetero_ace_top20
+      - mono_ArcA
+      - mono_CRP
+      - mono_Lrp

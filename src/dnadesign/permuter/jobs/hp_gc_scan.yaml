@@ -1,0 +1,71 @@
+job:
+  name: retron_hp_swap
+  bio_type: dna
+
+  input:
+    refs: "${JOB_DIR}/../inputs/refs.csv"
+    name_col: "ref_name"
+    seq_col: "sequence"
+    reference_sequence: "retron_Eco1_msr_msd_wt"
+
+  permute:
+    protocol: "scan_stem_loop"
+    params:
+      anchors:
+        left:  "ATGCGCACCCTTAGCGAGAGGTTTATCATTAAGGTCAACCTCTGGATGTTGTTTCGGCATCCTGCATTGAATCTGAGTTACTGTCTGT"
+        right: "CCCGTTTTTTCTGACGTAAGGGTGCGCA"
+      seed:
+        cap: "cgcctg"
+      program:
+        mode: rebuild
+        grow_from: cap
+        stem_len: {start: 4, stop: 32, step: 2}
+        rng_seed: 42
+        samples_per_length: 128
+        strata:
+          - id: gc30
+            label: GC≈30% (mm≈5%)
+            overrides: { gc_target: 0.30, mismatch_rate: 0.05 }
+          - id: gc50
+            label: GC≈50% (mm≈5%)
+            overrides: { gc_target: 0.50, mismatch_rate: 0.05 }
+          - id: gc70
+            label: GC≈70% (mm≈5%)
+            overrides: { gc_target: 0.70, mismatch_rate: 0.05 }
+
+      dedupe:
+        retry_per_length: 32
+
+  evaluate:
+    metrics:
+      - id: ll_mean
+        evaluator: evo2_ll
+        metric: log_likelihood
+        params:
+          model_id: evo2_7b
+          device: cuda:0
+          precision: bf16
+          alphabet: dna
+          reduction: mean
+    #   - id: ll_sum
+    #     evaluator: evo2_ll
+    #     metric: log_likelihood
+    #     params:
+    #       model_id: evo2_7b
+    #       device: cuda:0
+    #       precision: bf16
+    #       alphabet: dna
+    #       reduction: sum
+      # - id: fake_ll
+      #   evaluator: placeholder
+      #   metric: log_likelihood
+
+  output:
+    dir: "${JOB_DIR}/../results/retron_gc_scan"
+    layout: flat
+
+  plot:
+    which: ["hairpin_length_vs_metric"]
+    metric_id: ll_mean
+    size: {width: 9.5, height: 6.0}
+    font_scale: 1.15

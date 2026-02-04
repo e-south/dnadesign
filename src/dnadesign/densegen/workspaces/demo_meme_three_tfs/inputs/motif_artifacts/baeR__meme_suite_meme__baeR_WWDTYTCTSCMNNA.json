@@ -1,0 +1,214 @@
+{
+  "alphabet": "ACGT",
+  "background": {
+    "A": 0.2557442557442558,
+    "C": 0.2307692307692308,
+    "G": 0.2117882117882118,
+    "T": 0.3016983016983017
+  },
+  "checksums": {
+    "sha256_norm": "3b4cffd39b23c84ff02505dba1d90797f272e786b5b0bdacc06ab2e948e19a12",
+    "sha256_raw": "20f742e384535110b799d46ab261bce7be16771bf4e8abf03a00e7abdf993aae"
+  },
+  "length": 14,
+  "log_odds": [
+    {
+      "A": 69.0,
+      "C": -42.0,
+      "G": -103.0,
+      "T": 4.0
+    },
+    {
+      "A": 57.0,
+      "C": -116.0,
+      "G": -30.0,
+      "T": 19.0
+    },
+    {
+      "A": 43.0,
+      "C": -74.0,
+      "G": -30.0,
+      "T": 19.0
+    },
+    {
+      "A": -31.0,
+      "C": -174.0,
+      "G": -103.0,
+      "T": 104.0
+    },
+    {
+      "A": -189.0,
+      "C": 58.0,
+      "G": -162.0,
+      "T": 78.0
+    },
+    {
+      "A": -189.0,
+      "C": -42.0,
+      "G": -262.0,
+      "T": 126.0
+    },
+    {
+      "A": -131.0,
+      "C": 135.0,
+      "G": -262.0,
+      "T": -13.0
+    },
+    {
+      "A": -31.0,
+      "C": -42.0,
+      "G": -62.0,
+      "T": 68.0
+    },
+    {
+      "A": -289.0,
+      "C": 58.0,
+      "G": 108.0,
+      "T": -81.0
+    },
+    {
+      "A": -289.0,
+      "C": 151.0,
+      "G": -30.0,
+      "T": -113.0
+    },
+    {
+      "A": 91.0,
+      "C": 7.0,
+      "G": -30.0,
+      "T": -154.0
+    },
+    {
+      "A": 43.0,
+      "C": 7.0,
+      "G": -30.0,
+      "T": -32.0
+    },
+    {
+      "A": -9.0,
+      "C": 26.0,
+      "G": 38.0,
+      "T": -54.0
+    },
+    {
+      "A": 169.0,
+      "C": -174.0,
+      "G": -162.0,
+      "T": -313.0
+    }
+  ],
+  "matrix_semantics": "probabilities",
+  "motif_id": "baeR_WWDTYTCTSCMNNA",
+  "probabilities": [
+    {
+      "A": 0.44,
+      "C": 0.16,
+      "G": 0.08,
+      "T": 0.32
+    },
+    {
+      "A": 0.4,
+      "C": 0.08,
+      "G": 0.16,
+      "T": 0.36
+    },
+    {
+      "A": 0.36,
+      "C": 0.12,
+      "G": 0.16,
+      "T": 0.36
+    },
+    {
+      "A": 0.2,
+      "C": 0.04,
+      "G": 0.08,
+      "T": 0.68
+    },
+    {
+      "A": 0.04,
+      "C": 0.36,
+      "G": 0.04,
+      "T": 0.56
+    },
+    {
+      "A": 0.04,
+      "C": 0.16,
+      "G": 0.0,
+      "T": 0.8
+    },
+    {
+      "A": 0.08,
+      "C": 0.64,
+      "G": 0.0,
+      "T": 0.28
+    },
+    {
+      "A": 0.2,
+      "C": 0.16,
+      "G": 0.12,
+      "T": 0.52
+    },
+    {
+      "A": 0.0,
+      "C": 0.36,
+      "G": 0.48,
+      "T": 0.16
+    },
+    {
+      "A": 0.0,
+      "C": 0.72,
+      "G": 0.16,
+      "T": 0.12
+    },
+    {
+      "A": 0.52,
+      "C": 0.24,
+      "G": 0.16,
+      "T": 0.08
+    },
+    {
+      "A": 0.36,
+      "C": 0.24,
+      "G": 0.16,
+      "T": 0.24
+    },
+    {
+      "A": 0.24,
+      "C": 0.28,
+      "G": 0.28,
+      "T": 0.2
+    },
+    {
+      "A": 0.92,
+      "C": 0.04,
+      "G": 0.04,
+      "T": 0.0
+    }
+  ],
+  "producer": "cruncher",
+  "provenance": {
+    "citation": null,
+    "license": null,
+    "raw_artifact_paths": [
+      "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/.cruncher/discoveries/discover_baeR_20260203_103655_e51a8e/meme.txt"
+    ],
+    "retrieved_at": "2026-02-03T15:36:55.913563+00:00",
+    "source_url": null,
+    "source_version": null,
+    "tags": {}
+  },
+  "schema_version": "1.0",
+  "source": "meme_suite_meme",
+  "tags": {
+    "discovery_maxw": "45",
+    "discovery_minw": "14",
+    "discovery_nmotifs": "1",
+    "discovery_nsites": "25",
+    "discovery_run": "discover_baeR_20260203_103655_e51a8e",
+    "discovery_tool": "meme",
+    "discovery_tool_path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/.pixi/envs/default/bin/meme",
+    "discovery_tool_version": "5.5.9",
+    "matrix_source": "meme"
+  },
+  "tf_name": "baeR"
+}

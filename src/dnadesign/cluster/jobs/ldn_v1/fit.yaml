@@ -1,0 +1,19 @@
+# cluster/jobs/ldn_v1/fit.yaml
+command: "fit"
+params:
+  dataset: "60bp_dual_promoter_cpxR_LexA"
+  usr_root: "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/usr"
+
+  # Choose ONE of:
+  #  (a) a vector column (list<float> or JSON array string), or
+  #  (b) comma-separated numeric columns
+  x-col: "infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean"
+  # x-cols: "col1,col2,col3"
+
+  # Use a preset for algo knobs (neighbors, resolution, metric, ...)
+  preset: "fit.leiden.fine"
+  name: "ldn_v1"
+
+  # Apply changes
+  write: true
+  allow_overwrite: true

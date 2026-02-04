@@ -1,0 +1,33 @@
+job:
+  name: nt_scan_demo
+  bio_type: dna
+  input:
+    refs: "${JOB_DIR}/../inputs/refs.csv"
+    name_col: "ref_name"
+    seq_col: "sequence"
+  permute:
+    protocol: "scan_dna"
+    params:
+      regions: []            # full
+  evaluate:
+    metrics:
+      - id: llr_mean
+        evaluator: evo2_llr
+        metric: log_likelihood_ratio
+        params:
+          model_id: evo2_7b
+          device: cuda:0
+          precision: bf16
+          alphabet: dna
+          reduction: mean
+  output:
+    dir: "${JOB_DIR}/../results/nt_scan_demo"
+    layout: flat
+
+  plot:
+    which: ["position_scatter_and_heatmap", "metric_by_mutation_count"]
+    metric_id: llr_mean            # default metric for plotting
+    size:                          # optional, inches (width × height)
+      width: 9.0
+      height: 5.0
+    font_scale: 1.15               # multiply all fonts (0.5–3.0)

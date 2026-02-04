@@ -1,0 +1,126 @@
+densegen:
+  schema_version: '2.7'
+  run:
+    id: demo
+    root: .
+  inputs:
+  - name: lexA_cpxR_artifacts
+    type: pwm_artifact_set
+    paths:
+    - inputs/lexA__meme_suite_meme__lexA_CTGTATAWAWWHACA.json
+    - inputs/cpxR__meme_suite_meme__cpxR_MANWWHTTTAM.json
+    sampling:
+      strategy: stochastic
+      n_sites: 200
+      mining:
+        batch_size: 5000
+        budget:
+          mode: tier_target
+          target_tier_fraction: 0.001
+          max_candidates: 400000
+          max_seconds: 60
+          growth_factor: 1.25
+        log_every_batches: 1
+      length:
+        policy: range
+        range: [15, 20]
+      uniqueness:
+        key: core
+      selection:
+        policy: mmr
+        alpha: 0.9
+        shortlist_factor: 5
+        shortlist_min: 50
+        tier_widening:
+          enabled: true
+          ladder: [0.001, 0.01, 0.09, 1.0]
+  output:
+    targets:
+    - parquet
+    schema:
+      bio_type: dna
+      alphabet: dna_4
+    parquet:
+      path: outputs/tables/dense_arrays.parquet
+      deduplicate: true
+      chunk_size: 64
+  generation:
+    sequence_length: 60
+    quota: 12
+    sampling:
+      pool_strategy: subsample
+      library_size: 20
+      subsample_over_length_budget_by: 80
+      library_sampling_strategy: coverage_weighted
+      coverage_boost_alpha: 0.15
+      coverage_boost_power: 1.0
+      cover_all_regulators: true
+      unique_binding_sites: true
+      unique_binding_cores: true
+      max_sites_per_regulator: null
+      relax_on_exhaustion: false
+      allow_incomplete_coverage: false
+      iterative_max_libraries: 25
+      iterative_min_new_solutions: 1
+    plan:
+    - name: meme_demo
+      quota: 12
+      fixed_elements:
+        promoter_constraints:
+        - name: sigma70_consensus
+          upstream: TTGACA
+          downstream: TATAAT
+          spacer_length:
+          - 15
+          - 19
+          upstream_pos:
+          - 0
+          - 60
+      required_regulators:
+      - lexA_CTGTATAWAWWHACA
+      - cpxR_MANWWHTTTAM
+      min_required_regulators: 1
+  solver:
+    backend: CBC
+    strategy: iterate
+    time_limit_seconds: 5
+  runtime:
+    round_robin: true
+    arrays_generated_before_resample: 2
+    min_count_per_tf: 0
+    max_duplicate_solutions: 3
+    stall_seconds_before_resample: 10
+    stall_warning_every_seconds: 10
+    max_resample_attempts: 2
+    max_total_resamples: 50
+    max_seconds_per_plan: 60
+    max_failed_solutions: 0
+    random_seed: 42
+  postprocess:
+    pad:
+      mode: adaptive
+      end: 5prime
+      gc:
+        mode: range
+        min: 0.4
+        max: 0.6
+        target: 0.5
+        tolerance: 0.1
+        min_pad_length: 0
+      max_tries: 2000
+  logging:
+    log_dir: outputs/logs
+    level: INFO
+    suppress_solver_stderr: true
+    print_visual: false
+    progress_style: screen
+    progress_every: 1
+    progress_refresh_seconds: 1.0
+plots:
+  source: parquet
+  out_dir: outputs/plots
+  format: png
+  default:
+  - placement_map
+  - tfbs_usage
+  - run_health

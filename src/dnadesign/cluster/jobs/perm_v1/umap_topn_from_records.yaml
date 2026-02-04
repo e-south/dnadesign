@@ -1,0 +1,34 @@
+command: "umap"
+params:
+  file: "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/permuter/results/rt_combine_from_dms/records.parquet"
+  name: "perm_v1"
+  x-col: " permuter__observed__logits_mean"
+  preset: "umap.permuter"
+
+  # Top‑N directly from the same records.parquet
+  highlight_topn: 10
+  highlight_topn_col: "permuter__observed__llr_mean"
+  # highlight_topn_asc: true   # uncomment to pick the smallest N instead
+
+  attach_coords: false
+  write: true
+  allow_overwrite: true
+  inplace: true
+
+plot:
+  dims: [6, 6]
+  alpha: 0.15
+  color_by:
+    - "cluster"
+    - "categorical:permuter__mut_count"
+    - "highlight"
+  size: 12.0                # base size for non-highlight points
+  highlight:
+    size: 45.0              # size for points in the dedicated "highlight" plot
+    overlay: true           # draw rings on other hues
+    marker: "o"
+    facecolor: "none"       # "none" keeps overlay as a ring
+    ring: true              # when true, facecolor="none"; when false, filled markers
+    edgecolor: "red"
+    linewidth: 0.9
+    legend: false

@@ -1,0 +1,167 @@
+[build-system]
+requires = ["setuptools>=69", "wheel>=0.46.2", "setuptools_scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name            = "dnadesign"
+version         = "0.1.0"
+description     = "DNA sequence design pipelines and bioinformatics helpers."
+authors         = [{ name = "Eric South", email = "ericjohnsouth@gmail.com" }]
+readme          = "README.md"
+requires-python = ">=3.12,<3.13"
+
+dependencies = [
+  "arviz>=0.23.0",
+  "biopython",
+  "igraph",
+  "leidenalg",
+  "logomaker",
+  "matplotlib",
+  "numpy",
+  "openpyxl",
+  "ortools>=9.15.6755",
+  "pandas",
+  "pyarrow>=16",
+  "pydantic",
+  "pygments",
+  "pymc",
+  "python-levenshtein",
+  "pyyaml",
+  "rich",
+  "scanpy==1.10.3",
+  "seaborn",
+  "tqdm",
+  "typer",
+  "xlrd",
+  # Torch 2.8 includes the CVE-2025-3730 fix.
+  "torch>=2.8,<2.9; (sys_platform == 'darwin' and platform_machine == 'arm64') or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "dense-arrays",
+  "polars>=1.36.1",
+  "altair>=6.0.0",
+  "vegafusion>=2.0.3",
+  "vl-convert-python>=1.9.0",
+  "pysam>=0.23.3",
+  "netcdf4>=1.7.3",
+  "certifi>=2025.11.12",
+  "fastparquet>=2025.12.0",
+  "marimo",
+]
+
+[project.scripts]
+usr        = "dnadesign.usr.src.cli:main"
+opal       = "dnadesign.opal.src.cli:main"
+dense      = "dnadesign.densegen.src.cli:app"
+infer      = "dnadesign.infer.cli:app"
+cluster    = "dnadesign.cluster.src.cli.app:main"
+permuter   = "dnadesign.permuter.src.cli.app:main"
+mb         = "dnadesign.molbench.src.cli.app:cli"
+baserender = "dnadesign.baserender.src.cli:app"
+cruncher   = "dnadesign.cruncher.cli.app:app"
+
+[project.optional-dependencies]
+# GPU stack (Linux x86_64 only)
+infer-evo2 = [
+  # --- torch (GPU wheels via uv sources below)
+  "torch>=2.8,<2.9; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "torchvision>=0.23,<0.24; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "torchaudio>=2.8,<2.9; sys_platform == 'linux' and platform_machine == 'x86_64'",
+
+  # --- build helpers (required because we disable build isolation for flash-attn + TE-torch)
+  "pip; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "setuptools; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "wheel>=0.46.2; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "packaging; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "ninja; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "cmake>=3.18; sys_platform == 'linux' and platform_machine == 'x86_64'",
+
+  # --- kernels
+  # flash-attn commonly requires building against the torch in the env; install it w/o build isolation.
+  "flash-attn>=2.8.0.post2,<3; sys_platform == 'linux' and platform_machine == 'x86_64'",
+
+  # Transformer Engine: let it float within major=2.
+  # (TE is a prereq for Evo2; Evo2 requires TE>=2.0.0)
+  "transformer-engine[pytorch]>=2.0,<3; sys_platform == 'linux' and platform_machine == 'x86_64'",
+
+  # --- evo2
+  "evo2; sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+
+[dependency-groups]
+test = ["pytest>=8.2", "pytest-cov", "hypothesis>=6.100"]
+lint = ["ruff>=0.4", "pre-commit>=3.7"]
+dev  = [{ include-group = "test" }, { include-group = "lint" }]
+notebooks = [
+    "marimo>=0.19.5",
+    "openai>=2.14.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"dnadesign.cruncher.ingest.certs" = ["*.pem"]
+"dnadesign.densegen" = [
+  "workspaces/demo_meme_three_tfs/config.yaml",
+  "workspaces/demo_meme_three_tfs/inputs/*.txt",
+]
+
+[tool.pytest.ini_options]
+addopts = "-ra -q"
+testpaths = ["src/dnadesign"]
+pythonpath = ["src"]
+norecursedirs = ["*/archived/*", ".venv", "venv", "build", "dist", "*.egg-info"]
+markers = ["slow: sampling-heavy tests (>10 s)"]
+filterwarnings = [
+  "ignore:ArviZ is undergoing a major refactor.*:FutureWarning",
+  "ignore::FutureWarning:arviz.*",
+  "ignore:builtin type SwigPyPacked has no __module__ attribute:DeprecationWarning",
+  "ignore:builtin type SwigPyObject has no __module__ attribute:DeprecationWarning",
+  "ignore:builtin type swigvarlink has no __module__ attribute:DeprecationWarning",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["dnadesign"]
+
+[tool.uv]
+required-version = ">=0.9.18,<0.10"
+default-groups = []
+environments = [
+  "sys_platform == 'darwin'",
+  "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+
+# flash-attn + TE-torch must build against the same torch as the runtime env
+# uv supports this directly and will do a two-phase install so deps (torch, pip, etc.) land first
+no-build-isolation-package = ["flash-attn", "transformer-engine-torch"]
+
+# Help uv resolve flash-attn without trying to build it during the resolution step.
+[[tool.uv.dependency-metadata]]
+name = "flash-attn"
+requires-dist = ["torch", "einops"]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+dense-arrays = { git = "https://github.com/e-south/dense-arrays" }
+
+# When infer-evo2 is enabled, use CUDA 12.8 wheels for torch-family from PyTorch's CUDA index.
+torch = [
+  { index = "pytorch-cu128", extra = "infer-evo2", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+]
+torchvision = [
+  { index = "pytorch-cu128", extra = "infer-evo2", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+]
+torchaudio = [
+  { index = "pytorch-cu128", extra = "infer-evo2", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+]

@@ -1,0 +1,76 @@
+job:
+  name: retron_RT_combine_from_dms
+  bio_type: dna
+
+  input:
+    refs: "${JOB_DIR}/../inputs/refs.csv"
+    name_col: "ref_name"
+    seq_col: "sequence"
+    aa_col: "protein"  # optional; REF_AA.fa is handled by storage sidecar
+
+  permute:
+    protocol: "combine_aa"
+    params:
+      from_dataset: "${JOB_DIR}/../results/retron_Eco1_RT_wt_codon_scan/records.parquet"
+      codon_table: "${JOB_DIR}/../inputs/codon_tables/codon_ecoli.csv"
+      singles_metric_id: "llr_mean"
+
+      select:
+        mode: per_position_best
+        min_delta: 1e-12
+        disallow_negative_best: true
+        allowed_positions: ["30-85"]   # first 100 AA before ranking Top-K
+        exclude_positions: []
+        exclude_mutations: []
+        top_global: 30
+
+      combine:
+        k_min: 2
+        k_max: 5
+        budget_total: 100000
+        strategy: enumerate
+
+      codon_choice: "top"
+      rng_seed: 42
+
+  evaluate:
+    metrics:
+      - id: llr_mean
+        evaluator: evo2_llr
+        metric: log_likelihood_ratio
+        params:
+          model_id: evo2_7b
+          device: cuda:0
+          precision: bf16
+          alphabet: dna
+          reduction: mean
+          batch_size: 128
+      - id: logits_mean
+        evaluator: evo2_logits
+        metric: logits_mean
+        params:
+          model_id: evo2_7b
+          device: cuda:0
+          precision: bf16
+          alphabet: dna
+          batch_size: 64
+
+  output:
+    dir: "${JOB_DIR}/../results/rt_combine_from_dms"
+    layout: flat
+
+  plot:
+    which:
+      - ranked_variants
+      - synergy_scatter
+      - metric_by_mutation_count
+    metric_id: llr_mean
+    font_scale: 1.0
+    ranked_jitter: 0.18
+    ranked_point_size: 18
+    ranked_alpha: 0.45
+    ranked_cmap: "coolwarm"
+    sizes:
+      ranked_variants: { width: 12, height: 4 }   # wider & shorter
+      synergy_scatter: { width: 6, height: 6 }
+      metric_by_mutation_count: { width: 6, height: 6 }

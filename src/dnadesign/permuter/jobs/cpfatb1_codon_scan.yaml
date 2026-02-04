@@ -1,0 +1,44 @@
+job:
+  name: cpfatb1_codon_scan
+  bio_type: dna
+
+  input:
+    refs: "${JOB_DIR}/../inputs/refs.csv"
+    name_col: "ref_name"            # column name in refs.csv
+    seq_col: "sequence"             # column name with DNA sequence
+    aa_col: "protein"
+
+  permute:
+    protocol: "scan_codon"
+    params:
+      codon_table: "${JOB_DIR}/../inputs/codon_tables/codon_ecoli.csv"
+      # region_codons: [0, 100]     # optional [start,end) in codon units
+
+  evaluate:
+    metrics:
+      # log-likelihood ratio with reduction=mean → scalar column
+      - id: llr_mean
+        evaluator: evo2_llr
+        metric: log_likelihood_ratio
+        params:
+          model_id: evo2_7b
+          device: cuda:0
+          precision: bf16
+          alphabet: dna
+          reduction: mean
+
+  output:
+    dir: "${JOB_DIR}/../results/cpfatb1_codon_scan"
+    layout: flat
+
+  plot:
+    which:
+      - position_scatter_and_heatmap
+      - aa_category_effects
+      - metric_by_mutation_count
+    metric_id: llr_mean            # default metric for plotting
+    size:                          # optional, inches (width × height)
+      width: 30.0
+      height: 5.0
+    font_scale: 0.50               # multiply all fonts (0.5–3.0)
+    strip_every: 1                 # show all amino acids vs. skip some
