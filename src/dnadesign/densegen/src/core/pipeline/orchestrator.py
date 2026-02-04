@@ -45,7 +45,7 @@ from ..artifacts.library import LibraryRecord
 from ..artifacts.pool import POOL_MODE_SEQUENCE, POOL_MODE_TFBS, PoolData, _hash_file
 from ..input_types import PWM_INPUT_TYPES
 from ..metadata import build_metadata
-from ..motif_labels import input_motifs, motif_display_name
+from ..motif_labels import motif_display_name
 from ..postprocess import generate_pad
 from ..run_manifest import PlanManifest, RunManifest
 from ..run_metrics import write_run_metrics
@@ -97,6 +97,7 @@ from .progress import (
     _summarize_tfbs_usage_stats,
 )
 from .resume_state import load_resume_state
+from .run_setup import build_display_map_by_input, init_plan_stats, init_state_counts
 from .run_state_manager import assert_state_matches_outputs, init_run_state, write_run_state
 from .sampling_diagnostics import SamplingDiagnostics
 from .sequence_validation import (
@@ -1660,6 +1661,12 @@ def run_pipeline(
         )
     assert_state_matches_outputs(state_path=state_ctx.path, existing_counts=existing_counts)
 
+    plan_stats, plan_order = init_plan_stats(
+        plan_items=pl,
+        plan_pools=plan_pools,
+        existing_counts=existing_counts,
+    )
+
     def _accumulate_stats(key: tuple[str, str], stats: dict) -> None:
         if key not in plan_stats:
             plan_stats[key] = {
@@ -1687,31 +1694,18 @@ def run_pipeline(
             "round_robin=true with pool_strategy=iterative_subsample will rebuild libraries more frequently; "
             "expect higher runtime for multi-plan runs."
         )
-    inputs = cfg.inputs
-    inputs_by_name = {inp.name: inp for inp in inputs}
-    motifs_by_input: dict[str, list[tuple[str | None, str | None]]] = {}
-    display_map_by_input: dict[str, dict[str, str]] = {}
-    for item in pl:
-        spec = plan_pools[item.name]
-        mapping: dict[str, str] = {}
-        for input_name in spec.include_inputs:
-            inp = inputs_by_name.get(input_name)
-            if inp is None:
-                continue
-            motifs = motifs_by_input.get(input_name)
-            if motifs is None:
-                motifs = list(input_motifs(inp, loaded.path))
-                motifs_by_input[input_name] = motifs
-            for motif_id, name in motifs:
-                if motif_id and name and motif_id not in mapping:
-                    mapping[motif_id] = name
-        if mapping:
-            display_map_by_input[spec.pool_name] = mapping
+    display_map_by_input = build_display_map_by_input(
+        plan_items=pl,
+        plan_pools=plan_pools,
+        inputs=cfg.inputs,
+        cfg_path=loaded.path,
+    )
     checkpoint_every = int(cfg.runtime.checkpoint_every)
-    state_counts: dict[tuple[str, str], int] = {}
-    for item in pl:
-        spec = plan_pools[item.name]
-        state_counts[(spec.pool_name, item.name)] = int(existing_counts.get((spec.pool_name, item.name), 0))
+    state_counts = init_state_counts(
+        plan_items=pl,
+        plan_pools=plan_pools,
+        existing_counts=existing_counts,
+    )
 
     def _write_state() -> None:
         write_run_state(
@@ -1725,25 +1719,6 @@ def run_pipeline(
         )
 
     _write_state()
-    # Seed plan stats with any existing outputs to keep manifests aligned on resume.
-    for item in pl:
-        spec = plan_pools[item.name]
-        key = (spec.pool_name, item.name)
-        if key not in plan_stats:
-            plan_stats[key] = {
-                "generated": int(existing_counts.get(key, 0)),
-                "duplicates_skipped": 0,
-                "failed_solutions": 0,
-                "total_resamples": 0,
-                "libraries_built": 0,
-                "stall_events": 0,
-                "failed_min_count_per_tf": 0,
-                "failed_required_regulators": 0,
-                "failed_min_count_by_regulator": 0,
-                "failed_min_required_regulators": 0,
-                "duplicate_solutions": 0,
-            }
-            plan_order.append(key)
 
     if not round_robin:
         for item in pl:
