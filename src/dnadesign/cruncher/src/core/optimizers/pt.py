@@ -30,7 +30,7 @@ from dnadesign.cruncher.core.optimizers.policies import (
 from dnadesign.cruncher.core.optimizers.progress import ProgressAdapter, passthrough_progress
 from dnadesign.cruncher.core.optimizers.telemetry import NullTelemetry, OptimizerTelemetry
 from dnadesign.cruncher.core.scoring import LocalScanCache
-from dnadesign.cruncher.core.sequence import dsdna_hamming, hamming_distance, revcomp_int
+from dnadesign.cruncher.core.sequence import canon_int, dsdna_hamming, hamming_distance, revcomp_int
 from dnadesign.cruncher.core.state import SequenceState, make_seed
 
 logger = logging.getLogger(__name__)
@@ -62,6 +62,8 @@ class PTGibbsOptimizer(Optimizer):
         self.swap_prob: float = float(cfg["swap_prob"])
         self.bidirectional: bool = bool(cfg.get("bidirectional", False))
         self.dsdna_hamming: bool = bool(cfg.get("dsdna_hamming", False))
+        self.dsdna_canonicalize: bool = bool(cfg.get("dsdna_canonicalize", False))
+        self.score_scale: str = str(cfg.get("score_scale") or "")
         self.record_tune: bool = bool(cfg.get("record_tune", False))
         self.progress_bar: bool = bool(cfg.get("progress_bar", True))
         self.progress_every: int = int(cfg.get("progress_every", 0))
@@ -71,6 +73,11 @@ class PTGibbsOptimizer(Optimizer):
         self.early_stop_enabled = bool(early_cfg.get("enabled", False))
         self.early_stop_patience = int(early_cfg.get("patience", 0))
         self.early_stop_min_delta = float(early_cfg.get("min_delta", 0.0))
+        self.early_stop_require_min_unique = bool(early_cfg.get("require_min_unique", False))
+        self.early_stop_min_unique = int(early_cfg.get("min_unique", 0))
+        self.early_stop_success_min_norm = float(early_cfg.get("success_min_per_tf_norm", 0.0))
+        self.unique_successes: int | None = 0 if self.early_stop_require_min_unique else None
+        self._unique_success_set: set[str] | None = set() if self.early_stop_require_min_unique else None
         if self.early_stop_patience <= 0:
             self.early_stop_enabled = False
 
@@ -195,6 +202,9 @@ class PTGibbsOptimizer(Optimizer):
         self.swap_accepts = 0
         self.swap_attempts_by_pair = [0 for _ in range(max(0, C - 1))]
         self.swap_accepts_by_pair = [0 for _ in range(max(0, C - 1))]
+        if self._unique_success_set is not None:
+            self._unique_success_set.clear()
+            self.unique_successes = 0
 
         def _perturb_seed(seed_arr: np.ndarray, n_mutations: int) -> np.ndarray:
             """Return a lightly perturbed copy of the seed for swap-friendly PT starts."""
@@ -245,6 +255,27 @@ class PTGibbsOptimizer(Optimizer):
             self.all_scores.append(per_tf)
             self.all_meta.append((chain_id, draw_idx))
             return per_tf
+
+        def _record_unique_success(seq_arr: np.ndarray, per_tf: Dict[str, float]) -> None:
+            if self._unique_success_set is None:
+                return
+            if self.score_scale == "normalized-llr":
+                norm_values = list(per_tf.values())
+            else:
+                scorer = getattr(evaluator, "scorer", None)
+                if scorer is None:
+                    raise RuntimeError("early_stop.require_min_unique requires a scorer to compute normalized scores.")
+                norm_values = list(scorer.normalized_llr_map(seq_arr).values())
+            min_norm = min(norm_values) if norm_values else 0.0
+            if min_norm < self.early_stop_success_min_norm:
+                return
+            if self.dsdna_canonicalize:
+                key = SequenceState(canon_int(seq_arr)).to_string()
+            else:
+                key = SequenceState(seq_arr).to_string()
+            if key not in self._unique_success_set:
+                self._unique_success_set.add(key)
+                self.unique_successes = len(self._unique_success_set)
 
         stop_after_tune = bool(self.adaptive_swap_cfg.get("stop_after_tune", True))
 
@@ -415,6 +446,8 @@ class PTGibbsOptimizer(Optimizer):
 
             for c in range(C):
                 _record(c, T + d, chain_states[c], current_per_tf_maps[c])
+                if self._unique_success_set is not None:
+                    _record_unique_success(chain_states[c], current_per_tf_maps[c])
                 comb = current_scores[c]
                 chain_scores[c].append(comb)
                 if self.best_score is None or comb > self.best_score:
@@ -441,6 +474,11 @@ class PTGibbsOptimizer(Optimizer):
                 else:
                     no_improve += 1
                     if no_improve >= self.early_stop_patience:
+                        if (
+                            self.early_stop_require_min_unique
+                            and (self.unique_successes or 0) < self.early_stop_min_unique
+                        ):
+                            continue
                         logger.info(
                             "Early-stop: stalled for %d sweeps (min_delta=%.3f).",
                             self.early_stop_patience,
@@ -452,6 +490,7 @@ class PTGibbsOptimizer(Optimizer):
                                 "patience": self.early_stop_patience,
                                 "min_delta": self.early_stop_min_delta,
                                 "best_score": best_global,
+                                "unique_successes": self.unique_successes,
                             },
                         )
                         break
@@ -829,6 +868,7 @@ class PTGibbsOptimizer(Optimizer):
             "beta_min": beta_min,
             "beta_max_base": beta_max_base,
             "beta_max_final": beta_max_final,
+            "unique_successes": self.unique_successes,
             "move_stats": list(self.move_stats),
             "final_softmin_beta": self.final_softmin_beta(),
             "final_mcmc_beta": self.final_mcmc_beta(),

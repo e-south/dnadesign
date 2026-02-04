@@ -59,6 +59,7 @@ def build_analysis_manifests(
     elite_overlap_path: Path,
     diagnostics_path: Path,
     objective_components_path: Path,
+    elites_mmr_summary_path: Path | None,
     move_stats_summary_path: Path | None,
     move_stats_path: Path | None,
     pt_swap_pairs_path: Path | None,
@@ -113,7 +114,7 @@ def build_analysis_manifests(
                 "key": "auto_opt_tradeoffs",
                 "label": f"Auto-opt tradeoffs ({plot_format.upper()})",
                 "group": "auto_opt",
-                "description": "Balance vs top-K median score across auto-opt pilots.",
+                "description": "Balance vs auto-opt scorecard metric across auto-opt pilots.",
                 "requires": [],
                 "enabled": True,
                 "outputs": [
@@ -199,6 +200,15 @@ def build_analysis_manifests(
             },
         ]
     )
+    if elites_mmr_summary_path is not None:
+        tables_manifest_entries.append(
+            {
+                "key": "elites_mmr_summary",
+                "label": f"Elites MMR summary ({table_label_suffix})",
+                "path": str(elites_mmr_summary_path.relative_to(sample_dir)),
+                "exists": elites_mmr_summary_path.exists(),
+            }
+        )
     table_manifest = {
         "analysis_id": analysis_id,
         "created_at": created_at,
@@ -404,6 +414,16 @@ def build_analysis_manifests(
             ),
         ]
     )
+    if elites_mmr_summary_path is not None:
+        analysis_artifacts.append(
+            artifact_entry(
+                elites_mmr_summary_path,
+                sample_dir,
+                kind="table",
+                label=f"Elites MMR summary ({table_label_suffix})",
+                stage="analysis",
+            )
+        )
     if move_stats_summary_path is not None:
         analysis_artifacts.append(
             artifact_entry(

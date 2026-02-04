@@ -511,6 +511,9 @@ def summarize_sampling_diagnostics(
             if (swap_rate < thresholds["swap_low"] or swap_rate > thresholds["swap_high"]) and not pilot_short:
                 warnings.append(f"Swap acceptance {swap_rate:.2f} suggests poor PT mixing.")
                 _mark("warn")
+        unique_successes = _safe_int(optimizer_stats.get("unique_successes"))
+        if unique_successes is not None:
+            optimizer_metrics["unique_successes"] = unique_successes
     else:
         warnings.append("Optimizer stats missing from run manifest; acceptance checks skipped.")
         _mark("warn")

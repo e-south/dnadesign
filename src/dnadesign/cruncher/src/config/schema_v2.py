@@ -9,6 +9,7 @@ Author(s): Eric J. South
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Dict, List, Literal, Optional, Tuple, Union
 
@@ -17,6 +18,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 class StrictBaseModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+logger = logging.getLogger(__name__)
 
 
 class PlotConfig(StrictBaseModel):
@@ -931,6 +935,16 @@ class SampleElitesConfig(StrictBaseModel):
     def _set_dsdna_hamming_default(self) -> "SampleElitesConfig":
         if self.dsDNA_hamming is None:
             self.dsDNA_hamming = self.dsDNA_canonicalize
+        return self
+
+    @model_validator(mode="after")
+    def _warn_pool_size(self) -> "SampleElitesConfig":
+        if self.selection.policy == "mmr" and self.selection.pool_size < self.k:
+            logger.warning(
+                "sample.elites.selection.pool_size=%d < sample.elites.k=%d; MMR pool will be clamped.",
+                self.selection.pool_size,
+                self.k,
+            )
         return self
 
 

@@ -30,7 +30,7 @@ from dnadesign.cruncher.core.optimizers.policies import (
 from dnadesign.cruncher.core.optimizers.progress import ProgressAdapter, passthrough_progress
 from dnadesign.cruncher.core.optimizers.telemetry import NullTelemetry, OptimizerTelemetry
 from dnadesign.cruncher.core.scoring import LocalScanCache
-from dnadesign.cruncher.core.sequence import dsdna_hamming, hamming_distance, revcomp_int
+from dnadesign.cruncher.core.sequence import canon_int, dsdna_hamming, hamming_distance, revcomp_int
 from dnadesign.cruncher.core.state import SequenceState, make_seed
 
 logger = logging.getLogger(__name__)
@@ -73,6 +73,8 @@ class GibbsOptimizer(Optimizer):
         self.top_k = int(cfg["top_k"])
         self.bidirectional = bool(cfg.get("bidirectional", False))
         self.dsdna_hamming = bool(cfg.get("dsdna_hamming", False))
+        self.dsdna_canonicalize = bool(cfg.get("dsdna_canonicalize", False))
+        self.score_scale = str(cfg.get("score_scale") or "")
         self.record_tune = bool(cfg.get("record_tune", False))
         self.progress_bar = bool(cfg.get("progress_bar", True))
         self.progress_every = int(cfg.get("progress_every", 0))
@@ -82,6 +84,11 @@ class GibbsOptimizer(Optimizer):
         self.early_stop_enabled = bool(early_cfg.get("enabled", False))
         self.early_stop_patience = int(early_cfg.get("patience", 0))
         self.early_stop_min_delta = float(early_cfg.get("min_delta", 0.0))
+        self.early_stop_require_min_unique = bool(early_cfg.get("require_min_unique", False))
+        self.early_stop_min_unique = int(early_cfg.get("min_unique", 0))
+        self.early_stop_success_min_norm = float(early_cfg.get("success_min_per_tf_norm", 0.0))
+        self.unique_successes: int | None = 0 if self.early_stop_require_min_unique else None
+        self._unique_success_set: set[str] | None = set() if self.early_stop_require_min_unique else None
         if self.early_stop_patience <= 0:
             self.early_stop_enabled = False
 
@@ -216,6 +223,9 @@ class GibbsOptimizer(Optimizer):
         self.move_stats.clear()
         self.move_tally.clear()
         self.accept_tally.clear()
+        if self._unique_success_set is not None:
+            self._unique_success_set.clear()
+            self.unique_successes = 0
 
         global_iter = 0
         for c in range(chains):
@@ -384,6 +394,25 @@ class GibbsOptimizer(Optimizer):
                 self.all_meta.append((c, draw_i))
                 self.all_scores.append(per_tf_map)
                 chain_trace.append(combined_scalar)
+                if self._unique_success_set is not None:
+                    if self.score_scale == "normalized-llr":
+                        norm_values = list(per_tf_map.values())
+                    else:
+                        scorer = getattr(evaluator, "scorer", None)
+                        if scorer is None:
+                            raise RuntimeError(
+                                "early_stop.require_min_unique requires a scorer to compute normalized scores."
+                            )
+                        norm_values = list(scorer.normalized_llr_map(seq).values())
+                    min_norm = min(norm_values) if norm_values else 0.0
+                    if min_norm >= self.early_stop_success_min_norm:
+                        if self.dsdna_canonicalize:
+                            key = SequenceState(canon_int(seq)).to_string()
+                        else:
+                            key = SequenceState(seq).to_string()
+                        if key not in self._unique_success_set:
+                            self._unique_success_set.add(key)
+                            self.unique_successes = len(self._unique_success_set)
 
                 logger.debug(
                     "Chain %d draw %d: combined_scalar=%.6f, per_tf=%s",
@@ -419,6 +448,11 @@ class GibbsOptimizer(Optimizer):
                     else:
                         no_improve += 1
                         if no_improve >= self.early_stop_patience:
+                            if (
+                                self.early_stop_require_min_unique
+                                and (self.unique_successes or 0) < self.early_stop_min_unique
+                            ):
+                                continue
                             logger.info(
                                 "Early-stop: chain %d stalled for %d draws (min_delta=%.3f).",
                                 c + 1,
@@ -432,6 +466,7 @@ class GibbsOptimizer(Optimizer):
                                     "patience": self.early_stop_patience,
                                     "min_delta": self.early_stop_min_delta,
                                     "best_score": best_local,
+                                    "unique_successes": self.unique_successes,
                                 },
                             )
                             break
@@ -885,6 +920,7 @@ class GibbsOptimizer(Optimizer):
             "move_stats": list(self.move_stats),
             "final_softmin_beta": self.final_softmin_beta(),
             "final_mcmc_beta": self.final_mcmc_beta(),
+            "unique_successes": self.unique_successes,
         }
 
     def final_softmin_beta(self) -> float | None:

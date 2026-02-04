@@ -74,12 +74,18 @@ def _candidate(tmp_path: Path, name: str, **overrides) -> AutoOptCandidate:
         "quality": "ok",
         "warnings": [],
         "diagnostics": {},
+        "pilot_score": None,
+        "median_relevance_raw": None,
+        "mean_pairwise_distance": None,
+        "unique_successes": None,
     }
     payload.update(overrides)
     if "top_k_median_final" not in overrides and payload.get("best_score") is not None:
         payload["top_k_median_final"] = payload["best_score"]
     if "best_score_final" not in overrides and payload.get("best_score") is not None:
         payload["best_score_final"] = payload["best_score"]
+    if "pilot_score" not in overrides and payload.get("best_score") is not None:
+        payload["pilot_score"] = payload["best_score"]
     return AutoOptCandidate(**payload)
 
 
@@ -221,10 +227,16 @@ def test_auto_opt_missing_diagnostics_requires_allow_warn(tmp_path: Path) -> Non
 
 
 def test_auto_opt_aggregate_uses_best_run_dir(tmp_path: Path) -> None:
+    auto_cfg = AutoOptConfig(length=AutoOptLengthConfig(enabled=False))
     run_a = _candidate(tmp_path, "a", best_score=1.0, balance_median=0.2)
-    run_b = _candidate(tmp_path, "b", best_score=2.0, balance_median=0.1)
-    run_c = _candidate(tmp_path, "c", best_score=2.0, balance_median=0.5)
-    agg = _aggregate_candidate_runs([run_a, run_b, run_c], budget=200, scorecard_top_k=5)
+    run_b = _candidate(tmp_path, "b", best_score=2.0, median_relevance_raw=0.3)
+    run_c = _candidate(tmp_path, "c", best_score=2.0, median_relevance_raw=0.5)
+    agg = _aggregate_candidate_runs(
+        [run_a, run_b, run_c],
+        budget=200,
+        scorecard_metric=auto_cfg.policy.scorecard.metric,
+        scorecard_top_k=5,
+    )
     assert agg.run_dir == run_c.run_dir
 
 

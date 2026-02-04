@@ -53,7 +53,11 @@ cruncher --log-level DEBUG analyze --latest
 
 ### Auto‑optimize (default)
 
-Auto‑opt runs short **Gibbs** and **parallel tempering (PT)** pilots, evaluates objective‑aligned metrics from the draw phase (`combined_score_final`), and selects the best candidate using the top‑K median score (with a secondary max score tie‑breaker). Pilot diagnostics (R‑hat/ESS, acceptance summaries, diversity) are still recorded, but very short pilot budgets (<200 draws) suppress mixing warnings to avoid noise. Selection is **thresholdless** and driven by objective‑comparable metrics. Auto‑opt escalates through `budget_levels` (and the configured `replicates`) until a confidence‑separated winner emerges.
+Auto‑opt runs short **Gibbs** and **parallel tempering (PT)** pilots, scores each pilot with the auto‑opt scorecard, and selects the best candidate using a deterministic tie‑break. The default scorecard is **MMR‑based** (`auto_opt.policy.scorecard.metric=elites_mmr`): it computes MMR elites for each pilot and scores them with
+
+`pilot_score = median(relevance_raw among selected elites) + diversity_weight * mean_pairwise_distance`
+
+Relevance defaults to `min_per_tf_norm` (consensus‑like per TF). Tie‑breakers are `median_relevance_raw`, `mean_pairwise_distance`, then a deterministic candidate ID. Set `auto_opt.policy.scorecard.metric=legacy_topk_median` to restore the prior top‑K median selector (kept as a legacy diagnostic). Pilot diagnostics (R‑hat/ESS, acceptance summaries, diversity) are still recorded, but very short pilot budgets (<200 draws) suppress mixing warnings to avoid noise. Selection is **thresholdless** and driven by objective‑comparable metrics. Auto‑opt escalates through `budget_levels` (and the configured `replicates`) until a confidence‑separated winner emerges.
 
 `auto_opt.policy.allow_warn: true` means auto‑opt will pick a winner by the end of the configured budgets among candidates that pass diagnostics and record low‑confidence warnings if the separation is unclear. Set `allow_warn: false` to require a confidence‑separated winner; if none emerges at the maximum budgets/replicates (or only warning‑level candidates remain), auto‑opt fails fast with guidance to increase `auto_opt.budget_levels` and/or `auto_opt.replicates`. Pilots disable trim/polish by default to preserve length fidelity; override with `auto_opt.allow_trim_polish_in_pilots: true` if needed.
 Auto‑opt pilot runs are stored under `outputs/auto_opt/`.
@@ -68,7 +72,8 @@ If `optimizer.name=auto`, `--no-auto-opt` is not allowed; set `sample.optimizer.
 explicitly to `gibbs` or `pt` and disable `auto_opt.enabled` in your config.
 
 Config knobs live under `sample.auto_opt` in `config.yaml` (see the config
-reference for full options). Auto‑opt also writes a pilot scorecard to
+reference for full options). Auto‑opt also writes a pilot scorecard (including
+`pilot_score`, `median_relevance_raw`, `mean_pairwise_distance`) to
 `analysis/auto_opt_pilots.parquet` and a tradeoff plot to
 `analysis/plot__auto_opt_tradeoffs.<plot_format>` when available.
 The pilot scorecard includes `ess_ratio` and `trace_draws` so you can see
@@ -77,8 +82,8 @@ candidates are `warn`, increase pilot budgets, relax early‑stop, or set
 `auto_opt.policy.allow_warn: true` so selection can proceed with explicit warnings.
 
 If enabled, `sample.auto_opt.length` probes multiple sequence lengths and
-compares them using the same objective‑aligned top‑K median score; use
-`sample.auto_opt.length.prefer_shortest: true` to force the shortest winning length. Use
+compares them using the active scorecard metric (MMR `pilot_score` by default);
+use `sample.auto_opt.length.prefer_shortest: true` to force the shortest winning length. Use
 `sample.rng.deterministic=true` to lock pilot RNG streams per config.
 
 Length bias warning: max-over-offset scoring makes longer sequences look better
@@ -116,18 +121,25 @@ sample:
 Ladder runs write `analysis/length_ladder.csv` under the auto-opt pilot
 root with per‑length summary metrics.
 
-### Elites: filter → rank → diversify
+### Elites: filter → select (MMR by default)
 
 Elite selection is explicitly aligned with the optimization objective:
 
 1) **Filter (representativeness)** — gates candidates using normalized per‑TF
    scores: `sample.elites.filters.min_per_tf_norm` (recommended) and optional
    `pwm_sum_min` as a secondary threshold.
-2) **Rank (objective)** — sorts by the same combined score used by MCMC
-   (`combined_score_final`, soft‑min across TFs plus length penalty), then
-   `min_norm`, then `sum_norm`.
-3) **Diversify** — Hamming‑distance filter (`elites.min_hamming`), optionally
-   dsDNA‑aware via `elites.dsDNA_hamming=true`.
+2) **Select (policy)** —
+   - `policy=mmr` (default): build a filtered pool, score relevance (defaults to
+     `min_per_tf_norm`), then greedily select **K** with MMR using
+     `selection.alpha` (relevance vs diversity) and `selection.distance.kind`
+     (default `tfbs_core_weighted`). Use `selection.min_distance` for a hard
+     diversity floor.
+   - `policy=top_score` (legacy): rank by `combined_score_final` → `min_norm` →
+     `sum_norm`, then apply the Hamming filter (`elites.min_hamming`, optional
+     dsDNA via `elites.dsDNA_hamming=true`).
+3) **Baselines (optional)** — if `selection.write_baselines=true`, cruncher
+   also writes `artifacts/elites_top_score.parquet` and
+   `artifacts/elites_mmr_meta.parquet` for comparison.
 
 `pwm_sum_min` is not the objective; it is a representativeness gate.
 `combined_score_final` respects `objective.combine` (default `min`, or `sum`
@@ -170,8 +182,10 @@ Key signals:
 - PT traces record **post‑swap** states (per temperature chain) for clarity.
 - `trace.nc` contains draw phase only; `sample.output.trace.include_tune`
   controls whether tune samples appear in `sequences.parquet`.
-- When `sample.elites.dsDNA_canonicalize=true`, `sequences.parquet` includes a
-  `canonical_sequence` column and uniqueness metrics use that canonical form.
+- When dsDNA equivalence is enabled (`sample.elites.selection.distance.dsDNA=auto|true`
+  for MMR, or `sample.elites.dsDNA_canonicalize=true` for legacy top‑score),
+  `sequences.parquet` includes a `canonical_sequence` column and uniqueness
+  metrics use that canonical form.
 - `sequences.parquet` includes `chain_1based` and `draw_in_phase` to make
   plotting easier: `chain` remains 0‑based, `draw_idx` is the absolute sweep,
   and `draw_in_phase` is 0‑based within the phase (tune/draw).
@@ -179,7 +193,9 @@ Key signals:
   diversity (use `elites.dsDNA_canonicalize=true` to treat reverse complements
   as identical for uniqueness).
 - `objective_components.json` includes `unique_fraction_canonical` only when
-  `elites.dsDNA_canonicalize=true` is enabled.
+  dsDNA canonicalization is enabled.
+- MMR runs also write `analysis/elites_mmr_summary.parquet` with pool/alpha
+  metadata and diversity summaries.
 - `elites.balance_median` and `elites.diversity_hamming` summarize how well the
   top‑K elites balance TF scores and remain diverse.
 - PT runs: `optimizer.swap_acceptance_rate` near 0.05–0.40 is typical; very low

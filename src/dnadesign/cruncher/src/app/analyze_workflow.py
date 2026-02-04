@@ -73,6 +73,7 @@ from dnadesign.cruncher.artifacts.layout import (
 )
 from dnadesign.cruncher.artifacts.manifest import load_manifest
 from dnadesign.cruncher.config.schema_v2 import CruncherConfig
+from dnadesign.cruncher.core.sequence import canon_string
 from dnadesign.cruncher.utils.hashing import sha256_path
 from dnadesign.cruncher.utils.paths import resolve_catalog_root
 from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
@@ -496,6 +497,45 @@ def run_analyze(
         )
         objective_components_path.write_text(json.dumps(objective_components, indent=2))
 
+        elites_mmr_summary_path = None
+        mmr_summary_payload = elites_meta.get("mmr_summary") if isinstance(elites_meta, dict) else None
+        if isinstance(mmr_summary_payload, dict) and mmr_summary_payload:
+
+            def _canonical_unique_fraction(frame: pd.DataFrame) -> float | None:
+                if frame is None or frame.empty or "sequence" not in frame.columns:
+                    return None
+                total = int(len(frame))
+                if total == 0:
+                    return None
+                if "canonical_sequence" in frame.columns:
+                    unique = int(frame["canonical_sequence"].astype(str).nunique())
+                elif sample_meta.dsdna_canonicalize:
+                    unique = int(frame["sequence"].astype(str).map(canon_string).nunique())
+                else:
+                    unique = int(frame["sequence"].astype(str).nunique())
+                return unique / float(total)
+
+            draw_unique_fraction = objective_components.get("unique_fraction_canonical") or objective_components.get(
+                "unique_fraction_raw"
+            )
+            elite_unique_fraction = _canonical_unique_fraction(elites_df)
+            mmr_summary_row = {
+                "k": mmr_summary_payload.get("k"),
+                "alpha": mmr_summary_payload.get("alpha"),
+                "pool_size": mmr_summary_payload.get("pool_size"),
+                "median_relevance_raw": mmr_summary_payload.get("median_relevance_raw"),
+                "mean_pairwise_distance": mmr_summary_payload.get("mean_pairwise_distance"),
+                "min_pairwise_distance": mmr_summary_payload.get("min_pairwise_distance"),
+                "unique_fraction_canonical_draw": draw_unique_fraction,
+                "unique_fraction_canonical_elites": elite_unique_fraction,
+            }
+            elites_mmr_summary_path = tables_dir / f"elites_mmr_summary.{table_ext}"
+            mmr_summary_df = pd.DataFrame([mmr_summary_row])
+            if table_ext == "parquet":
+                write_parquet(mmr_summary_df, elites_mmr_summary_path)
+            else:
+                mmr_summary_df.to_csv(elites_mmr_summary_path, index=False)
+
         move_stats_path = None
         move_stats_df = None
         move_stats_summary_path = None
@@ -569,7 +609,16 @@ def run_analyze(
                         df_auto_table.to_csv(auto_opt_table_path, index=False)
                 if analysis_cfg.extra_plots:
                     df_auto = pd.DataFrame(candidates)
-                    score_col = "top_k_median_final" if "top_k_median_final" in df_auto.columns else "best_score"
+                    score_metric = None
+                    auto_cfg_payload = auto_opt_payload.get("auto_opt_config")
+                    if isinstance(auto_cfg_payload, dict):
+                        score_metric = auto_cfg_payload.get("scorecard_metric")
+                    if score_metric == "elites_mmr":
+                        score_col = "pilot_score"
+                        score_label = "Pilot score (MMR)"
+                    else:
+                        score_col = "top_k_median_final" if "top_k_median_final" in df_auto.columns else "best_score"
+                        score_label = "Top-K median score (final beta)"
                     required_cols = {score_col, "balance_median"}
                     if required_cols.issubset({col for col in df_auto.columns}):
                         df_auto = df_auto.dropna(subset=[score_col, "balance_median"])
@@ -591,13 +640,15 @@ def run_analyze(
                                 alpha=0.85,
                             )
                             ax.set_xlabel("Balance (median min normalized)")
-                            ax.set_ylabel("Top-K median score (final beta)")
+                            ax.set_ylabel(score_label)
                             ax.set_title("Auto-opt tradeoffs")
                             if colors is not None:
                                 fig.colorbar(scatter, ax=ax, label="Length")
                             fig.tight_layout()
                             savefig(fig, auto_opt_plot_path, dpi=plot_dpi, png_compress_level=png_compress_level)
                             plt.close(fig)
+                    elif score_metric == "elites_mmr":
+                        logger.warning("Auto-opt tradeoff plot skipped: pilot_score missing from scorecard.")
 
         enabled_specs = [spec for spec in PLOT_SPECS if getattr(plots, spec.key, False)]
         if enabled_specs:
@@ -1026,6 +1077,7 @@ def run_analyze(
             elite_overlap_path=elite_overlap_path,
             diagnostics_path=diagnostics_path,
             objective_components_path=objective_components_path,
+            elites_mmr_summary_path=elites_mmr_summary_path,
             move_stats_summary_path=move_stats_summary_path,
             move_stats_path=move_stats_path,
             pt_swap_pairs_path=pt_swap_pairs_path,

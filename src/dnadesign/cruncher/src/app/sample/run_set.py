@@ -477,6 +477,11 @@ def _run_sample_for_set(
     logger.debug("  SequenceEvaluator.scale = %r", evaluator._scale)
     logger.debug("  SequenceEvaluator.combiner = %r", evaluator._combiner)
 
+    dsdna_mode_for_opt = resolve_dsdna_mode(
+        elites_cfg=sample_cfg.elites,
+        bidirectional=sample_cfg.objective.bidirectional,
+    )
+
     # 3) FLATTEN optimizer config for Gibbs/PT
     moves = resolve_move_config(sample_cfg.moves)
     opt_cfg: dict[str, object] = {
@@ -487,6 +492,8 @@ def _run_sample_for_set(
         "top_k": sample_cfg.elites.k,
         "bidirectional": sample_cfg.objective.bidirectional,
         "dsdna_hamming": bool(sample_cfg.elites.dsDNA_hamming),
+        "dsdna_canonicalize": dsdna_mode_for_opt,
+        "score_scale": sample_cfg.objective.score_scale,
         "record_tune": sample_cfg.output.trace.include_tune,
         "progress_bar": sample_cfg.ui.progress_bar,
         "progress_every": sample_cfg.ui.progress_every,

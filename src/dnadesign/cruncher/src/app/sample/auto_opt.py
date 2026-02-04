@@ -873,7 +873,12 @@ def _run_auto_optimize_for_set(
                     unique_successes=None,
                 )
             runs.append(candidate)
-        return _aggregate_candidate_runs(runs, budget=budget, scorecard_top_k=auto_cfg.policy.scorecard.top_k)
+        return _aggregate_candidate_runs(
+            runs,
+            budget=budget,
+            scorecard_metric=auto_cfg.policy.scorecard.metric,
+            scorecard_top_k=auto_cfg.policy.scorecard.top_k,
+        )
 
     def _log_candidate(candidate: AutoOptCandidate, *, label: str) -> None:
         diag_status = "n/a"
@@ -1591,6 +1596,7 @@ def _aggregate_candidate_runs(
     runs: list[AutoOptCandidate],
     *,
     budget: int,
+    scorecard_metric: str,
     scorecard_top_k: int,
 ) -> AutoOptCandidate:
     if not runs:
@@ -1651,14 +1657,35 @@ def _aggregate_candidate_runs(
                 trace_metrics[key] = median_val
     if trace_metrics:
         diagnostics["metrics"] = {"trace": trace_metrics}
-    best_run = max(
-        runs,
-        key=lambda run: (
-            float(run.top_k_median_final) if run.top_k_median_final is not None else float("-inf"),
-            float(run.best_score_final) if run.best_score_final is not None else float("-inf"),
-            float(run.balance_median) if run.balance_median is not None else float("-inf"),
-        ),
-    )
+
+    def _score(run: AutoOptCandidate) -> float:
+        if scorecard_metric == "elites_mmr":
+            return float(run.pilot_score) if run.pilot_score is not None else float("-inf")
+        return float(run.top_k_median_final) if run.top_k_median_final is not None else float("-inf")
+
+    def _metric_or_neg(value: float | None) -> float:
+        return float(value) if value is not None else float("-inf")
+
+    if scorecard_metric == "elites_mmr":
+        best_run = max(
+            runs,
+            key=lambda run: (
+                _score(run),
+                _metric_or_neg(run.median_relevance_raw),
+                _metric_or_neg(run.mean_pairwise_distance),
+                str(run.run_dir),
+            ),
+        )
+    else:
+        best_run = max(
+            runs,
+            key=lambda run: (
+                _score(run),
+                _metric_or_neg(run.best_score_final),
+                _metric_or_neg(run.balance_median),
+                str(run.run_dir),
+            ),
+        )
 
     pooled_scores: list[np.ndarray] = []
     manifests: list[dict[str, object]] = []
@@ -1687,14 +1714,16 @@ def _aggregate_candidate_runs(
     if combined_scores.size:
         top_k_median_final = _top_k_median_from_scores(combined_scores, scorecard_top_k)
         best_score_final = float(np.max(combined_scores))
-        best_score = pilot_score if pilot_score is not None else top_k_median_final
     else:
         top_k_median_final = _median([run.top_k_median_final for run in runs])
         best_score_final = max(
             [float(run.best_score_final) for run in runs if run.best_score_final is not None],
             default=None,
         )
-        best_score = pilot_score if pilot_score is not None else top_k_median_final
+    if scorecard_metric == "elites_mmr":
+        best_score = pilot_score
+    else:
+        best_score = top_k_median_final
     bootstrap_ci: tuple[float, float] | None = None
     if combined_scores.size:
         seed = _pooled_bootstrap_seed(manifests=manifests, kind=kind, length=length, budget=budget)

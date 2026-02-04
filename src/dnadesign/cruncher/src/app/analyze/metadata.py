@@ -112,14 +112,41 @@ def _resolve_sample_meta(cfg: CruncherConfig, used_cfg: dict) -> SampleMeta:
     elites_cfg = used_sample.get("elites") if isinstance(used_sample, dict) else None
     if not isinstance(elites_cfg, dict):
         elites_cfg = {}
-    dsdna_canonicalize_val = elites_cfg.get("dsDNA_canonicalize", False)
-    if not isinstance(dsdna_canonicalize_val, bool):
-        raise ValueError("config_used.yaml sample.elites.dsDNA_canonicalize must be a boolean.")
-    dsdna_hamming_val = elites_cfg.get("dsDNA_hamming")
-    if dsdna_hamming_val is None:
-        dsdna_hamming_val = dsdna_canonicalize_val
-    if not isinstance(dsdna_hamming_val, bool):
-        raise ValueError("config_used.yaml sample.elites.dsDNA_hamming must be a boolean.")
+    selection_cfg = elites_cfg.get("selection") if isinstance(elites_cfg, dict) else None
+    policy = "top_score"
+    if isinstance(selection_cfg, dict):
+        policy_val = selection_cfg.get("policy")
+        if policy_val is not None and not isinstance(policy_val, str):
+            raise ValueError("config_used.yaml sample.elites.selection.policy must be a string.")
+        if policy_val:
+            policy = policy_val
+
+    if policy == "top_score":
+        dsdna_canonicalize_val = elites_cfg.get("dsDNA_canonicalize", False)
+        if not isinstance(dsdna_canonicalize_val, bool):
+            raise ValueError("config_used.yaml sample.elites.dsDNA_canonicalize must be a boolean.")
+        dsdna_hamming_val = elites_cfg.get("dsDNA_hamming")
+        if dsdna_hamming_val is None:
+            dsdna_hamming_val = dsdna_canonicalize_val
+        if not isinstance(dsdna_hamming_val, bool):
+            raise ValueError("config_used.yaml sample.elites.dsDNA_hamming must be a boolean.")
+    else:
+        distance_cfg = selection_cfg.get("distance") if isinstance(selection_cfg, dict) else None
+        ds_mode = "auto"
+        if isinstance(distance_cfg, dict):
+            ds_mode_val = distance_cfg.get("dsDNA", "auto")
+            if not isinstance(ds_mode_val, str):
+                raise ValueError("config_used.yaml sample.elites.selection.distance.dsDNA must be a string.")
+            ds_mode = ds_mode_val
+        if ds_mode == "auto":
+            dsdna_canonicalize_val = bidirectional
+        elif ds_mode == "true":
+            dsdna_canonicalize_val = True
+        elif ds_mode == "false":
+            dsdna_canonicalize_val = False
+        else:
+            raise ValueError("config_used.yaml sample.elites.selection.distance.dsDNA must be auto|true|false.")
+        dsdna_hamming_val = bool(dsdna_canonicalize_val)
 
     moves_payload = _require(["moves"], "moves")
     moves_cfg = SampleMovesConfig.model_validate(moves_payload)

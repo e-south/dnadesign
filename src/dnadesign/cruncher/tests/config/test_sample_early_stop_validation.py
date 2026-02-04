@@ -47,3 +47,15 @@ def test_early_stop_min_delta_rejects_large_normalized_llr() -> None:
 def test_early_stop_min_delta_accepts_small_normalized_llr() -> None:
     cfg = _build_sample_config(min_delta=0.05)
     assert cfg.early_stop.min_delta == 0.05
+
+
+def test_early_stop_requires_min_unique_when_enabled() -> None:
+    with pytest.raises(ValueError, match="min_unique"):
+        SampleEarlyStopConfig(
+            enabled=True,
+            patience=10,
+            min_delta=0.01,
+            require_min_unique=True,
+            min_unique=0,
+            success_min_per_tf_norm=0.8,
+        )

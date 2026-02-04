@@ -273,6 +273,9 @@ sample:
     enabled: true
     patience: 500
     min_delta: 0.01
+    require_min_unique: false
+    min_unique: 20
+    success_min_per_tf_norm: 0.80
   init:
     kind: random
     length: 30
@@ -295,6 +298,18 @@ sample:
     min_hamming: 1
     dsDNA_canonicalize: false
     dsDNA_hamming: null
+    selection:
+      policy: mmr
+      pool_size: 1000
+      alpha: 0.85
+      relevance: min_per_tf_norm
+      relevance_norm: percentile
+      distance:
+        kind: tfbs_core_weighted
+        weights: tolerant
+        dsDNA: auto
+      min_distance: null
+      write_baselines: true
     filters:
       pwm_sum_min: 0.0
       min_per_tf_norm: null
@@ -373,7 +388,11 @@ sample:
       allow_warn: false
       cooling_boost: 5.0
       scorecard:
+        metric: elites_mmr
+        k: 20
+        alpha: 0.85
         top_k: 10
+      diversity_weight: 0.25
   output:
     save_sequences: true
     include_consensus_in_elites: false
@@ -408,10 +427,17 @@ Notes:
   distribution under a 0‑order background to compute a tail p‑value for the
   best window, then converts to a sequence‑level p via
   `p_seq = 1 − (1 − p_win)^n_windows` before reporting `−log10(p_seq)`.
-- `elites.min_hamming` is the Hamming-distance filter for elites (0 disables). If `output.trim.enabled=true` yields variable lengths, the distance is computed over the shared prefix plus the length difference.
-- `elites.k` controls how many sequences are retained before diversity filtering (0 = keep all).
-- `elites.dsDNA_canonicalize=true` treats reverse complements as identical when computing unique fractions and (optionally) stores `canonical_sequence` in elites.
-- `elites.dsDNA_hamming=true` computes diversity using min(hamming(seq, rc(seq))) per pair.
+- `elites.k` controls how many sequences are retained after selection (0 = keep all).
+- `elites.selection.policy=mmr` selects K elites via MMR (default); `policy=top_score` restores the legacy rank+Hamming filter.
+- `elites.selection.pool_size` defines the candidate pool size for MMR (warns if < k).
+- `elites.selection.alpha` controls relevance vs diversity (1.0 = relevance-only).
+- `elites.selection.distance.kind` chooses the distance metric (`tfbs_core_weighted` default).
+- `elites.selection.distance.dsDNA=auto` treats reverse complements as identical when `objective.bidirectional=true`.
+- `elites.selection.min_distance` enforces a hard diversity floor (null disables).
+- `elites.selection.write_baselines=true` writes baseline tables (`elites_top_score.parquet`, `elites_mmr_meta.parquet`).
+- `elites.min_hamming` is the legacy Hamming-distance filter (only used when `selection.policy=top_score`). If `output.trim.enabled=true` yields variable lengths, the distance is computed over the shared prefix plus the length difference.
+- `elites.dsDNA_canonicalize=true` treats reverse complements as identical when computing unique fractions (legacy top-score path).
+- `elites.dsDNA_hamming=true` computes diversity using min(hamming(seq, rc(seq))) per pair (legacy top-score path).
 - `objective.scoring.pwm_pseudocounts` smooths matrix-derived PWMs (set to 0 for raw matrices).
 - `objective.scoring.log_odds_clip` caps log-odds magnitudes (use to avoid extreme cliffs).
 - `objective.length_penalty_lambda` subtracts `lambda * (L - L_ref)` from combined scores (mitigates length bias; `L_ref` defaults to auto_opt.length.min_length or max PWM length).
@@ -426,7 +452,7 @@ Notes:
 - `optimizers.gibbs.schedule_scope` controls whether the beta schedule is applied per chain (`per_chain`) or across all chains (`global`). Global schedules require `apply_during: all`.
 - `optimizers.pt.beta_ladder` defines the temperature ladder; PT does not support `budget.restarts>1` (use ladder size for chain count).
 - `adaptive_beta` tunes Gibbs acceptance (B/M moves) toward a target band; `ladder_adapt` tunes PT ladder scale.
-- `auto_opt` runs short Gibbs + PT pilots, evaluates objective‑aligned scores from draw‑phase `combined_score_final`, logs the decision, and runs a final sample using the selected optimizer.
+- `auto_opt` runs short Gibbs + PT pilots, evaluates the scorecard metric (MMR `pilot_score` by default), logs the decision, and runs a final sample using the selected optimizer.
 - Auto-opt pilots always write `trace.nc` + `sequences.parquet` (required for diagnostics) and are stored under `outputs/auto_opt/`.
 - The selected pilot is recorded in `outputs/auto_opt/best_<run_group>.json` (run_group is the TF slug; it uses a `setN_` prefix only when multiple regulator sets are configured) and marked with a leading `*` in `cruncher runs list`.
 - Auto-opt is enabled by default when `optimizer.name=auto`; to disable, set `sample.optimizer.name` to `gibbs` or `pt` and set `auto_opt.enabled: false`.
@@ -440,17 +466,20 @@ Notes:
 - `auto_opt.beta_ladder_scales` adds additional PT beta ladder scale candidates (unioned with
   `auto_opt.cooling_boosts`).
 - Auto‑opt is **thresholdless**: it escalates through `auto_opt.budget_levels` (and configured `auto_opt.replicates`) until a confidence‑separated winner emerges. With `auto_opt.policy.allow_warn: true`, it will pick the best available candidate at the maximum budget among those that pass diagnostics (recording low‑confidence warnings). With `allow_warn: false`, it fails fast if no confident winner emerges or if only warning‑level candidates remain, and suggests increasing budgets/replicates.
-- `early_stop` halts sampling when the best score fails to improve by `min_delta` for `patience` draws (per chain for Gibbs, per sweep for PT). For `score_scale=normalized-llr` (0-1), `min_delta` must be <= 0.1; use ~0.01 to detect plateaus.
+- `early_stop` halts sampling when the best score fails to improve by `min_delta` for `patience` draws (per chain for Gibbs, per sweep for PT). If `require_min_unique=true`, early-stop can only trigger after `min_unique` canonical successes above `success_min_per_tf_norm`. For `score_scale=normalized-llr` (0-1), `min_delta` must be <= 0.1; use ~0.01 to detect plateaus.
 - Auto-opt selection details are stored in each pilot's `meta/run_manifest.json`; `cruncher analyze` writes `analysis/auto_opt_pilots.parquet` and `analysis/plot__auto_opt_tradeoffs.<plot_format>`.
 - Auto-opt candidate quality uses trace draw counts and ESS ratios (`ess_ratio = ESS / draws`) to grade pilots. If a pilot stops early (draws ≤ ~50% of expected), diagnostics are treated as directional and the candidate is marked `warn`. These metrics are recorded in `auto_opt_pilots.<table_format>` as `ess_ratio`, `trace_draws`, `trace_draws_expected`, `trace_chains`, and `trace_chains_expected`.
 - `sample.rng.deterministic=true` isolates a stable RNG stream per pilot config.
-- `auto_opt.length` searches candidate lengths; compare lengths using the same objective‑aligned top‑K median score and use `auto_opt.length.prefer_shortest: true` to force the shortest winning length.
+- `auto_opt.length` searches candidate lengths; compare lengths using the active scorecard metric and use `auto_opt.length.prefer_shortest: true` to force the shortest winning length.
 - `auto_opt.length.mode=ladder` runs sequential lengths with warm starts; step must be 1.
 - `auto_opt.length.warm_start` seeds each length from the prior length's raw sequences (`sequences.parquet`); it fails if sequences are unavailable.
 - `auto_opt.length.ladder_budget_scale` scales pilot budgets for intermediate ladder steps.
 - `auto_opt.allow_trim_polish_in_pilots` preserves trim/polish in pilots (off by default to keep lengths intact).
 - Ladder mode writes `analysis/length_ladder.csv` under the auto-opt pilot root.
-- `auto_opt.policy.scorecard.top_k` controls how many draw‑phase scores are used for the top‑K median metric.
+- `auto_opt.policy.scorecard.metric` selects `elites_mmr` (default) or `legacy_topk_median`.
+- `auto_opt.policy.scorecard.k` controls how many elites are used for the MMR scorecard.
+- `auto_opt.policy.diversity_weight` weights the diversity term in `pilot_score`.
+- `auto_opt.policy.scorecard.top_k` controls how many draw‑phase scores are used for the legacy top‑K median metric.
 - `auto_opt.keep_pilots` controls pilot retention after selection: `all` keeps everything, `ok` keeps candidates that did not fail catastrophic checks (plus the selected pilot), and `best` keeps only the selected pilot.
 - `moves.overrides.move_schedule` interpolates between `moves.overrides.move_probs` (start) and `move_schedule.end` (end).
 - `moves.overrides.target_worst_tf_prob` biases proposals toward the current worst TF window (0 disables).
