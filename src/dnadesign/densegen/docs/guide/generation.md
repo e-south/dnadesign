@@ -1,135 +1,81 @@
-## Generation and constraints
+## Generation (Stage-B + constraints)
 
-Generation is driven by a plan. Each plan item is a constraint bucket with a quota or fraction,
-and DenseGen enforces fixed motifs and regulator requirements through the dense-arrays solver.
+Generation is driven by a **plan**. Each plan item defines how many sequences to build and which
+regulators must appear. Stage-B sampling builds solver libraries from Stage-A pools, and the
+dense-arrays solver assembles sequences subject to constraints.
 
-### Contents
-- [Plan definition](#plan-definition) - quota/fraction rules and plan item shape.
-- [Promoter constraints](#promoter-constraints) - fixed motifs and spacing.
-- [Side biases](#side-biases-positional-preferences) - left/right placement preferences.
-- [Solver strategy](#solver-strategy) - solution ordering and backend selection.
-- [Sampling controls](#sampling-controls) - how libraries are built and resampled.
-- [Regulator constraints](#regulator-constraints) - per-plan requirements and validation.
+Use `reference/config.md` for exact fields.
 
 ---
 
-### Plan definition
+### Plan definition (minimal)
 
-- Each plan item has a `name` and either `quota` or `fraction`.
-- Mixing quotas and fractions across items is not allowed.
+Each plan item has a `name` and either `quota` or `fraction`.
 
 ```yaml
 plan:
   - name: sigma70
     quota: 200
-    required_regulators: ["LexA", "CpxR"]
-    min_required_regulators: 2
-    min_count_by_regulator:
-      LexA: 2
-    fixed_elements:
-      promoter_constraints:
-        - upstream: "TTGACA"
-          downstream: "TATAAT"
-          spacer_length: [16, 18]
+    regulator_constraints:
+      groups:
+        - name: core
+          members: ["LexA", "CpxR"]
+          min_required: 2
+      min_count_by_regulator:
+        LexA: 1
+        CpxR: 1
 ```
-Note: `generation.sequence_length` must be at least as long as the widest motif in the library
-or fixed elements; DenseGen fails fast if a motif cannot fit.
+
+Notes:
+- `generation.sequence_length` must fit all fixed elements and TFBS placements.
+- Group members must match the `tf` labels in the Stage-A pools.
 
 ---
 
-### Promoter constraints
+### Fixed elements
 
-Use `fixed_elements.promoter_constraints` to enforce fixed motifs and spacing. Motifs must be
-A/C/G/T only.
+Two common constraint types:
 
-Fields:
-- `upstream`, `downstream` (motif strings)
-- `spacer_length: [min, max]`
-- `upstream_pos`, `downstream_pos` (optional ranges)
-
----
-
-### Side biases (positional preferences)
-
-Use `fixed_elements.side_biases` to bias motifs toward the left or right of the sequence.
+- **Promoter constraints**: fixed motifs + spacing.
+- **Side biases**: bias specific motifs toward left/right.
 
 ```yaml
 fixed_elements:
+  promoter_constraints:
+    - upstream: "TTGACA"
+      downstream: "TATAAT"
+      spacer_length: [15, 19]
   side_biases:
-    left: ["GAAATAACATAATTGA", "TTATATTTTACCCATTT"]
-    right: ["CATAAGAAAAA", "CATTCATTTG"]
+    left: ["GAAATAACATAATTGA"]
+    right: ["CATAAGAAAAA"]
 ```
 
-Rules:
-- Motifs must be A/C/G/T only.
-- Motifs must exist in the sampled library (DenseGen fails fast if missing).
-- A motif cannot appear in both `left` and `right`.
+Motifs must be A/C/G/T only. DenseGen fails fast if fixed motifs cannot be placed.
 
 ---
 
-### Solver strategy
+### Stage-B sampling (summary)
 
-DenseGen exposes dense-arrays solution modes via `solver.strategy`:
+Stage-B sampling lives under `densegen.generation.sampling`.
+It builds solver libraries from Stage-A pools and is the only stage that resamples during a run.
 
-- `iterate` - yield solutions in descending score.
-- `diverse` - yield solutions with diversity-biased ordering.
-- `optimal` - only the best solution per library.
-- `approximate` - heuristic solution per library (no solver options; backend optional).
-- `strands` - `single | double` (default: `double`).
+See `guide/sampling.md` for the Stage-B overview.
+
+---
+
+### Solver strategy (summary)
+
+DenseGen exposes dense-arrays strategies via `solver.strategy`:
+`iterate`, `diverse`, `optimal`, or `approximate`.
+
+DenseGen fails fast if the chosen solver backend is unavailable.
 
 ```yaml
 solver:
   backend: CBC
   strategy: diverse
-  options: ["Threads=8", "TimeLimit=10"]
-  strands: double
+  time_limit_seconds: 10
 ```
-
----
-
-### Sampling controls
-
-`generation.sampling` controls how binding-site libraries are built (pool strategy, coverage,
-uniqueness, caps, and relaxation). DenseGen records sampling policy and outcomes in metadata.
-
-Key fields:
-- `pool_strategy`: `full | subsample | iterative_subsample`
-- `library_size` (used for subsample strategies)
-- `library_sampling_strategy` (`tf_balanced | uniform_over_pairs | coverage_weighted`)
-- `coverage_boost_alpha`, `coverage_boost_power` (used with `coverage_weighted`)
-- `avoid_failed_motifs`, `failure_penalty_alpha`, `failure_penalty_power` (optional penalties for motifs tied to failed solves)
-- `cover_all_regulators`, `unique_binding_sites`, `max_sites_per_regulator`
-- `iterative_max_libraries`, `iterative_min_new_solutions`
-
-Notes:
-- `pool_strategy: full` uses a single library (no resampling) and ignores `library_size`, `subsample_over_length_budget_by`,
-  and related sampling caps/strategies (DenseGen warns in `dense validate`/`dense plan`).
-- Under schema `2.2+`, `subsample` can resample reactively on stalls/duplicate guards.
-- `iterative_subsample` resamples proactively after `arrays_generated_before_resample` or when a
-  library under-produces.
-- `unique_binding_sites` enforces uniqueness at the regulator+sequence pair level.
-- `coverage_weighted` dynamically boosts underused TFBS based on the run’s usage counts.
-- `avoid_failed_motifs: true` down-weights TFBS that repeatedly appear in failed solve attempts (tracked in attempts.parquet).
-
----
-
-### Regulator constraints
-
-DenseGen supports three regulator constraint modes per plan item:
-
-- `required_regulators`: when `min_required_regulators` is **unset**, enforce at least one site
-  per listed regulator (**all-of**, applied to final sequences).
-- `min_required_regulators`: when set, enforce at least K distinct regulators in the **final
-  sequence**. If `required_regulators` is provided, it becomes the candidate set (k-of-n).
-  If `required_regulators` is empty, the constraint applies to the full regulator pool.
-- `min_count_by_regulator`: enforce per-regulator minimum counts.
-
-Solver strategies (`iterate|diverse|optimal`) enforce these constraints at the solver level;
-`approximate` runs are validated in the pipeline to keep behavior consistent.
-
-Notes:
-- `min_count_by_regulator` takes precedence over the global `runtime.min_count_per_tf`
-  for listed regulators (DenseGen uses the maximum of the two).
 
 ---
 

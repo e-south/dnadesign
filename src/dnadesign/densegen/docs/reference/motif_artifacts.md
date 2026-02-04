@@ -1,10 +1,22 @@
 ## Motif artifact contract (JSON)
 
-DenseGen can consume **per-motif JSON artifacts** that encode a single PWM. This keeps
-DenseGen decoupled from parsing code: any producer (Cruncher or external tooling) can
-emit the contract, and DenseGen only reads the artifact path specified in `config.yaml`.
-Cruncher produces these artifacts via `cruncher catalog export-densegen`
-(implemented in `cruncher/src/app/motif_artifacts.py`).
+DenseGen can consume **per‑motif JSON artifacts** that encode a single PWM. This keeps DenseGen decoupled from parsing code e.g., from Cruncher, and DenseGen only reads the artifact path specified in `config.yaml`. Cruncher produces these artifacts via `cruncher catalog export-densegen` (implemented in `cruncher/src/app/motif_artifacts.py`).
+
+### Contents
+- [Context](#context) - why artifacts exist and where they fit.
+- [Core principles](#core-principles) - contract invariants.
+- [Required fields](#required-fields) - strict JSON keys.
+- [Scoring semantics](#scoring-semantics) - log‑odds + background.
+- [Example artifact](#example-artifact) - minimal JSON payload.
+- [Config usage](#config-usage) - Stage‑A sampling entry point.
+
+---
+
+### Context
+
+Artifact‑first PWM inputs are a decoupling contract: producers generate stable, versioned JSON, and DenseGen consumes them. This enables independent producers, reproducible ingestion, and clear provenance. DenseGen uses these artifacts in **Stage‑A sampling** to build TFBS pools from the PWM matrices.
+
+---
 
 ### Core principles
 
@@ -12,6 +24,8 @@ Cruncher produces these artifacts via `cruncher catalog export-densegen`
 - **JSON-first**, no sidecar schema files.
 - **Strict, fail-fast validation** to keep runs deterministic.
 - **Both probabilities and log-odds** are required.
+
+---
 
 ### Required fields
 
@@ -30,15 +44,19 @@ Optional keys (ignored by DenseGen but recommended for provenance):
 
 - `tf_name`, `source`, `organism`, `provenance`, `checksums`, `tags`, `length`
 
+---
+
 ### Scoring semantics
 
-DenseGen scores sampled candidates using **PWM log-odds** with the provided background.
-Probabilities are used for sequence generation; log-odds are used for scoring and
-thresholding.
+DenseGen scores sampled candidates via **FIMO log-odds** using the PWM probabilities and
+background. The `log_odds` field is validated and stored for provenance, but scoring is
+performed by FIMO on the motif probabilities.
 
-Log-odds values must be **finite** (no infinities). DenseGen assumes log-odds are
-computed with the natural log (ln) of `p/background`. If your matrices contain zeros,
-apply pseudocounts before emitting artifacts.
+Log-odds values must be **finite** (no infinities). Provide log-odds as **log2(p/bg)**
+to align with FIMO’s score scale. If your matrices contain zeros, apply pseudocounts
+before emitting artifacts.
+
+---
 
 ### Example artifact
 
@@ -56,33 +74,41 @@ apply pseudocounts before emitting artifacts.
     {"A": 0.1, "C": 0.1, "G": 0.7, "T": 0.1}
   ],
   "log_odds": [
-    {"A": 1.1632, "C": -0.9163, "G": -1.6094, "T": -1.6094},
-    {"A": -0.9163, "C": 1.0296, "G": -0.9163, "T": -0.9163},
-    {"A": -0.9163, "C": -0.9163, "G": 1.0296, "T": -0.9163}
+    {"A": 1.6781, "C": -1.3219, "G": -2.3219, "T": -2.3219},
+    {"A": -1.3219, "C": 1.4854, "G": -1.3219, "T": -1.3219},
+    {"A": -1.3219, "C": -1.3219, "G": 1.4854, "T": -1.3219}
   ],
   "provenance": {"source_url": "https://example.org", "citation": "Example et al. 2025"}
 }
 ```
 
+---
+
 ### Config usage
 
-In `config.yaml`, reference the artifact explicitly and set sampling behavior there:
+In `config.yaml`, reference the artifact explicitly and set **Stage‑A sampling** behavior there:
 
 ```yaml
 inputs:
   - name: lexA
     type: pwm_artifact
     path: inputs/artifacts/lexA.json
-    sampling:
+    sampling:  # Stage‑A sampling
       strategy: stochastic
       n_sites: 200
-      oversample_factor: 5
-      score_percentile: 90
-      length_policy: exact
+      mining:
+        batch_size: 5000
+        budget:
+          mode: tier_target
+          target_tier_fraction: 0.001
+          max_candidates: 200000
+      length:
+        policy: exact
 ```
 
-Exact length is the default. To enable variable length, set `length_policy: range` and
-provide `length_range: [min, max]` where `min >= motif_length`.
+Exact length is the default. To enable variable length, set `length.policy: range` and
+provide `length.range: [min, max]`. If `min` is below the motif length, Stage‑A trims to the
+max‑information window per candidate (and MMR requires a fixed trimming window length).
 
 ---
 

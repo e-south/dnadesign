@@ -11,8 +11,8 @@ from .pwm_jaspar import PWMJasparDataSource
 from .pwm_matrix_csv import PWMMatrixCSVDataSource
 from .pwm_meme import PWMMemeDataSource
 from .pwm_meme_set import PWMMemeSetDataSource
-from .pwm_sampling import PWMMotif
 from .sequence_library import SequenceLibraryDataSource
+from .stage_a.stage_a_types import PWMMotif
 from .usr_sequences import USRSequencesDataSource
 
 __all__ = [

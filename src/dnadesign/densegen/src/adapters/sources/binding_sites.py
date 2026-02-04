@@ -19,6 +19,7 @@ from typing import Optional
 
 import pandas as pd
 
+from ...core.artifacts.ids import hash_label_motif, hash_tfbs_id
 from .base import BaseDataSource, infer_format, resolve_path
 
 log = logging.getLogger(__name__)
@@ -57,7 +58,7 @@ class BindingSitesDataSource(BaseDataSource):
             return pd.read_excel(path)
         raise ValueError(f"Unsupported binding_sites.format: {fmt}")
 
-    def load_data(self, *, rng=None):
+    def load_data(self, *, rng=None, outputs_root: Path | None = None, run_id: str | None = None):
         data_path = resolve_path(self.cfg_path, self.path)
         if not (data_path.exists() and data_path.is_file()):
             raise FileNotFoundError(f"Binding sites file not found. Looked here:\n  - {data_path}")
@@ -106,7 +107,8 @@ class BindingSitesDataSource(BaseDataSource):
             dup_count = int(dup_mask.sum())
             log.warning(
                 "Binding sites input contains %d duplicate regulator/binding-site pairs in %s. "
-                "Duplicates are retained; set generation.sampling.unique_binding_sites=true to dedupe at sampling.",
+                "Duplicates are retained; set generation.sampling.unique_binding_sites=true or "
+                "generation.sampling.unique_binding_cores=true to dedupe at Stage-B sampling.",
                 dup_count,
                 data_path,
             )
@@ -120,10 +122,22 @@ class BindingSitesDataSource(BaseDataSource):
             )
 
         out = pd.DataFrame({"tf": tf_clean, "tfbs": seq_clean})
+        out["tfbs_core"] = seq_clean
         if site_id_col:
             out["site_id"] = df[site_id_col].astype(str).str.strip()
         if source_col:
             out["source"] = df[source_col].astype(str).str.strip()
+
+        motif_id_map = {tf: hash_label_motif(label=tf, source_kind="binding_sites") for tf in tf_clean.unique()}
+        out["motif_id"] = tf_clean.map(motif_id_map)
+        out["tfbs_id"] = [
+            hash_tfbs_id(
+                motif_id=motif_id_map[tf],
+                sequence=seq,
+                scoring_backend="binding_sites",
+            )
+            for tf, seq in zip(tf_clean.tolist(), seq_clean.tolist())
+        ]
 
         out = out.reset_index(drop=True)
         source_default = str(data_path)
@@ -133,4 +147,4 @@ class BindingSitesDataSource(BaseDataSource):
         else:
             src_list = [source_default] * len(out)
         entries = list(zip(out["tf"].tolist(), out["tfbs"].tolist(), src_list))
-        return entries, out
+        return entries, out, None

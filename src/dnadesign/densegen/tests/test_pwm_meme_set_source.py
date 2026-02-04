@@ -1,3 +1,16 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/test_pwm_meme_set_source.py
+
+PWM MEME set data source sampling tests.
+
+Dunlop Lab.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -6,6 +19,10 @@ import numpy as np
 import pytest
 
 from dnadesign.densegen.src.adapters.sources import PWMMemeSetDataSource
+from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
+from dnadesign.densegen.tests.pwm_sampling_fixtures import fixed_candidates_mining, sampling_config
+
+_FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
 
 def _meme_text(motif_id: str) -> str:
@@ -24,6 +41,10 @@ letter-probability matrix: alength= 4 w= 3 nsites= 20 E= 0
 """
 
 
+@pytest.mark.skipif(
+    _FIMO_MISSING,
+    reason="fimo executable not available (run tests via `pixi run pytest` or set MEME_BIN).",
+)
 def test_pwm_meme_set_sampling(tmp_path: Path) -> None:
     meme_a = tmp_path / "lexA.meme"
     meme_b = tmp_path / "cpxR.meme"
@@ -33,16 +54,15 @@ def test_pwm_meme_set_sampling(tmp_path: Path) -> None:
     ds = PWMMemeSetDataSource(
         paths=[str(meme_a), str(meme_b)],
         cfg_path=tmp_path / "config.yaml",
+        input_name="demo_input",
         motif_ids=["lexA", "cpxR"],
-        sampling={
-            "strategy": "stochastic",
-            "n_sites": 3,
-            "oversample_factor": 3,
-            "score_threshold": -10.0,
-            "score_percentile": None,
-        },
+        sampling=sampling_config(
+            n_sites=3,
+            strategy="stochastic",
+            mining=fixed_candidates_mining(batch_size=10, candidates=60),
+        ),
     )
-    entries, df = ds.load_data(rng=np.random.default_rng(0))
+    entries, df, _summaries = ds.load_data(rng=np.random.default_rng(0))
     assert len(entries) == 6
     assert set(df["tf"].tolist()) == {"lexA", "cpxR"}
 
@@ -56,14 +76,13 @@ def test_pwm_meme_set_duplicate_motif_ids(tmp_path: Path) -> None:
     ds = PWMMemeSetDataSource(
         paths=[str(meme_a), str(meme_b)],
         cfg_path=tmp_path / "config.yaml",
+        input_name="demo_input",
         motif_ids=None,
-        sampling={
-            "strategy": "stochastic",
-            "n_sites": 1,
-            "oversample_factor": 2,
-            "score_threshold": -10.0,
-            "score_percentile": None,
-        },
+        sampling=sampling_config(
+            n_sites=1,
+            strategy="stochastic",
+            mining=fixed_candidates_mining(batch_size=10, candidates=10),
+        ),
     )
     with pytest.raises(ValueError, match="Duplicate motif_id"):
         ds.load_data(rng=np.random.default_rng(1))

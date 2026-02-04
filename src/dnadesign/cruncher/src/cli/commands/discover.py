@@ -103,6 +103,37 @@ def _write_fasta(path: Path, sequences: Iterable[str]) -> int:
     return count
 
 
+def build_meme_command(
+    *,
+    exe: Path,
+    fasta_path: Path,
+    run_dir: Path,
+    minw: int,
+    maxw: int,
+    nmotifs: int,
+    meme_mod: str | None,
+    meme_prior: str | None,
+) -> list[str]:
+    cmd = [
+        str(exe),
+        str(fasta_path),
+        "-dna",
+        "-oc",
+        str(run_dir),
+        "-minw",
+        str(minw),
+        "-maxw",
+        str(maxw),
+        "-nmotifs",
+        str(nmotifs),
+    ]
+    if meme_mod:
+        cmd.extend(["-mod", str(meme_mod)])
+    if meme_prior:
+        cmd.extend(["-prior", str(meme_prior)])
+    return cmd
+
+
 def _write_discover_manifest(
     *,
     run_dir: Path,
@@ -278,6 +309,11 @@ def discover_motifs(
         "--meme-mod",
         help="MEME -mod setting: oops, zoops, or anr (MEME only).",
     ),
+    meme_prior: str | None = typer.Option(
+        None,
+        "--meme-prior",
+        help="MEME -prior setting: dirichlet, dmix, mega, megap, or addone (MEME only).",
+    ),
 ) -> None:
     try:
         config_path = resolve_config_path(config_option or config)
@@ -295,6 +331,7 @@ def discover_motifs(
     maxw = maxw if maxw is not None else cfg.motif_discovery.maxw
     nmotifs = nmotifs or cfg.motif_discovery.nmotifs
     meme_mod = meme_mod or cfg.motif_discovery.meme_mod
+    meme_prior = meme_prior or cfg.motif_discovery.meme_prior
     streme_threshold = cfg.motif_discovery.min_sequences_for_streme
     window_sites = cfg.motif_discovery.window_sites if window_sites is None else window_sites
     replace_existing = cfg.motif_discovery.replace_existing if replace_existing is None else replace_existing
@@ -313,6 +350,10 @@ def discover_motifs(
         raise typer.BadParameter("--meme-mod must be oops, zoops, or anr.")
     if meme_mod is not None:
         meme_mod = meme_mod.lower()
+    if meme_prior is not None and meme_prior.lower() not in {"dirichlet", "dmix", "mega", "megap", "addone"}:
+        raise typer.BadParameter("--meme-prior must be dirichlet, dmix, mega, megap, or addone.")
+    if meme_prior is not None:
+        meme_prior = meme_prior.lower()
 
     resolved_source_id = source_id or cfg.motif_discovery.source_id
     try:
@@ -435,21 +476,16 @@ def discover_motifs(
             ]
             output_path = run_dir / "streme.txt"
         else:
-            cmd = [
-                str(exe),
-                str(fasta_path),
-                "-dna",
-                "-oc",
-                str(run_dir),
-                "-minw",
-                str(resolved_minw),
-                "-maxw",
-                str(resolved_maxw),
-                "-nmotifs",
-                str(nmotifs),
-            ]
-            if meme_mod:
-                cmd.extend(["-mod", meme_mod])
+            cmd = build_meme_command(
+                exe=Path(exe),
+                fasta_path=fasta_path,
+                run_dir=run_dir,
+                minw=resolved_minw,
+                maxw=resolved_maxw,
+                nmotifs=nmotifs,
+                meme_mod=meme_mod,
+                meme_prior=meme_prior,
+            )
             output_path = run_dir / "meme.txt"
 
         version = tool_version(Path(exe))

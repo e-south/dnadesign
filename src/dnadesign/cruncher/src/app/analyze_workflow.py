@@ -34,7 +34,7 @@ from dnadesign.cruncher.analysis.layout import (
 )
 from dnadesign.cruncher.analysis.objective import compute_objective_components
 from dnadesign.cruncher.analysis.overlap import compute_overlap_tables
-from dnadesign.cruncher.analysis.parquet import read_parquet
+from dnadesign.cruncher.analysis.parquet import read_parquet, write_parquet
 from dnadesign.cruncher.analysis.plot_registry import PLOT_SPECS
 from dnadesign.cruncher.analysis.report import ensure_report
 from dnadesign.cruncher.app.run_service import list_runs
@@ -977,8 +977,8 @@ def run_analyze(
         overlap_summary_path = tables_dir / f"overlap_summary.{table_ext}"
         elite_overlap_path = tables_dir / f"elite_overlap.{table_ext}"
         if table_ext == "parquet":
-            overlap_summary_df.to_parquet(overlap_summary_path, engine="fastparquet", index=False)
-            elite_overlap_df.to_parquet(elite_overlap_path, engine="fastparquet", index=False)
+            write_parquet(overlap_summary_df, overlap_summary_path)
+            write_parquet(elite_overlap_df, elite_overlap_path)
         else:
             overlap_summary_df.to_csv(overlap_summary_path, index=False)
             elite_overlap_df.to_csv(elite_overlap_path, index=False)
@@ -1041,13 +1041,13 @@ def run_analyze(
             if move_stats_summary_df is not None and not move_stats_summary_df.empty:
                 move_stats_summary_path = tables_dir / f"move_stats_summary.{table_ext}"
                 if table_ext == "parquet":
-                    move_stats_summary_df.to_parquet(move_stats_summary_path, engine="fastparquet", index=False)
+                    write_parquet(move_stats_summary_df, move_stats_summary_path)
                 else:
                     move_stats_summary_df.to_csv(move_stats_summary_path, index=False)
             if analysis_cfg.extra_tables and move_stats_df is not None:
                 move_stats_path = tables_dir / f"move_stats.{table_ext}"
                 if table_ext == "parquet":
-                    move_stats_df.to_parquet(move_stats_path, engine="fastparquet", index=False)
+                    write_parquet(move_stats_df, move_stats_path)
                 else:
                     move_stats_df.to_csv(move_stats_path, index=False)
 
@@ -1083,7 +1083,7 @@ def run_analyze(
                     pt_swap_pairs_df = pd.DataFrame(rows)
                     pt_swap_pairs_path = tables_dir / f"pt_swap_pairs.{table_ext}"
                     if table_ext == "parquet":
-                        pt_swap_pairs_df.to_parquet(pt_swap_pairs_path, engine="fastparquet", index=False)
+                        write_parquet(pt_swap_pairs_df, pt_swap_pairs_path)
                     else:
                         pt_swap_pairs_df.to_csv(pt_swap_pairs_path, index=False)
 
@@ -1097,7 +1097,7 @@ def run_analyze(
                     auto_opt_table_path = tables_dir / f"auto_opt_pilots.{table_ext}"
                     df_auto_table = pd.DataFrame(candidates)
                     if table_ext == "parquet":
-                        df_auto_table.to_parquet(auto_opt_table_path, engine="fastparquet", index=False)
+                        write_parquet(df_auto_table, auto_opt_table_path)
                     else:
                         df_auto_table.to_csv(auto_opt_table_path, index=False)
                 if analysis_cfg.extra_plots:

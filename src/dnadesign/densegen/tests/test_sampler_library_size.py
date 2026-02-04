@@ -7,10 +7,12 @@ from dnadesign.densegen.src.core.sampler import TFSampler
 
 
 def _sample_df() -> pd.DataFrame:
+    tfbs = ["AAA", "CCC", "GGG", "TTT", "AAC", "CCA"]
     return pd.DataFrame(
         {
             "tf": ["TF1", "TF1", "TF1", "TF2", "TF2", "TF2"],
-            "tfbs": ["AAA", "CCC", "GGG", "TTT", "AAC", "CCA"],
+            "tfbs": tfbs,
+            "tfbs_core": tfbs,
         }
     )
 
@@ -20,8 +22,6 @@ def test_generate_binding_site_library_exact_size() -> None:
     sampler = TFSampler(df, np.random.default_rng(0))
     sites, meta, labels, info = sampler.generate_binding_site_library(
         4,
-        sequence_length=3,
-        budget_overhead=0,
         cover_all_tfs=True,
         unique_binding_sites=True,
         relax_on_exhaustion=False,
@@ -38,8 +38,6 @@ def test_generate_binding_site_library_required_tfs() -> None:
     sampler = TFSampler(df, np.random.default_rng(1))
     sites, meta, labels, _info = sampler.generate_binding_site_library(
         3,
-        sequence_length=3,
-        budget_overhead=0,
         required_tfs=["TF2"],
         cover_all_tfs=False,
         unique_binding_sites=True,

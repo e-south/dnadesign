@@ -136,6 +136,12 @@ def summary(
     else:
         rendered = "-"
     table.add_row("ingest.local_sources", rendered)
+    site_sources = summary["ingest"].get("site_sources") or []
+    if site_sources:
+        rendered = ", ".join(f"{src['source_id']}@{src['path']}" for src in site_sources)
+    else:
+        rendered = "-"
+    table.add_row("ingest.site_sources", rendered)
     table.add_row(
         "ingest.regulondb.curated_sites",
         str(summary["ingest"]["regulondb"]["curated_sites"]),

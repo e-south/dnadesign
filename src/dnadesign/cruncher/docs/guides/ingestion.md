@@ -111,6 +111,30 @@ Use `source_url` plus `tags` to keep provenance, and swap in your own on‑disk 
 
 ---
 
+### Local binding-site FASTA sources
+
+Local site sources register binding-site sequences from a FASTA file as a first‑class source. Each header line
+should start with a TF name, followed by `|`‑separated metadata. The sequence lines are used directly.
+
+Example config (BaeR ChIP-exo FASTA on disk):
+
+```yaml
+ingest:
+  site_sources:
+    - source_id: baer_chip_exo
+      description: Choudhary et al. BaeR ChIP-exo binding sites (processed FASTA)
+      path: /path/to/dnadesign-data/primary_literature/Choudhary_et_al/processed/BaeR_binding_sites.fasta
+      tf_name: BaeR
+      record_kind: chip_exo
+      citation: "Choudhary et al. 2020 (DOI: 10.1128/mSystems.00980-20)"
+      source_url: https://doi.org/10.1128/mSystems.00980-20
+      tags:
+        assay: chip_exo
+        doi: 10.1128/mSystems.00980-20
+```
+
+---
+
 ### Curated TF binding sites
 
 Curated binding sites are fetched from the regulon datamart and cached as `SiteInstance` records. If you set `ingest.regulondb.motif_matrix_source: alignment`, **cruncher** uses the alignment payload when present; otherwise it fails fast.

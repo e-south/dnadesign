@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from dnadesign.densegen.src.adapters.outputs.base import AlignmentDigest
-from dnadesign.densegen.src.core.pipeline import _assert_sink_alignment
+from dnadesign.densegen.src.core.pipeline.outputs import _assert_sink_alignment
 
 
 class DummySinkA:

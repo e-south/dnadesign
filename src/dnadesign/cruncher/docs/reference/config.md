@@ -128,6 +128,7 @@ motif_discovery:
   maxw: null                      # maximum motif width (auto from site lengths if unset)
   nmotifs: 1                      # motifs per TF
   meme_mod: null                  # optional MEME -mod setting: oops | zoops | anr
+  meme_prior: null                # optional MEME -prior setting: dirichlet | dmix | mega | megap | addone
   min_sequences_for_streme: 50    # auto threshold
   source_id: meme_suite           # catalog source ID
   replace_existing: true          # replace prior discovered motifs for same TF/source
@@ -198,6 +199,21 @@ ingest:
         title: "Persistence and plasticity in bacterial gene regulation"
         association: "TF-gene interactions"
         comments: "DAP-seq (DNA affinity purification sequencing) motifs across 354 TFs in 48 bacteria (~17,000 binding maps)."
+  site_sources:
+    - source_id: baer_chip_exo
+      description: Choudhary et al. BaeR ChIP-exo binding sites (processed FASTA)
+      path: /path/to/dnadesign-data/primary_literature/Choudhary_et_al/processed/BaeR_binding_sites.fasta
+      tf_name: BaeR
+      record_kind: chip_exo
+      organism:
+        name: Escherichia coli
+        strain: K-12 MG1655
+        assembly: NC_000913.3
+      citation: "Choudhary et al. 2020 (DOI: 10.1128/mSystems.00980-20)"
+      source_url: https://doi.org/10.1128/mSystems.00980-20
+      tags:
+        assay: chip_exo
+        doi: 10.1128/mSystems.00980-20
 ```
 
 Notes:
@@ -212,6 +228,9 @@ Notes:
   files can be parsed. Missing mappings fail fast.
 - Local sources provide motif matrices by default. For MEME text output, set
   `extract_sites=true` to parse BLOCKS sites (training-set occurrences).
+- `site_sources` adds local FASTA binding-site sources.
+  Headers should start with a TF name (e.g., `BaeR|peak_0|NC_000913.3:1-5|strand=-|...`).
+  `record_kind` becomes the cached `site_kind` label for filtering or display.
 - `meme_motif_selector` selects a motif from multi-motif MEME files (by name match,
   MEME-1, numeric index, or exact label). Use this to disambiguate multi-motif files.
 - For DAP-seq local datasets (DNA affinity purification sequencing), see the
@@ -385,6 +404,10 @@ Notes:
 - `objective.bidirectional=true` scores both strands (reverse complement) when scanning PWMs.
 - `objective.combine` controls how per-TF scores are combined (`min` for weakest-TF optimization, `sum` for sum-based).
 - `objective.allow_unscaled_llr=true` allows `score_scale=llr` in multi-TF runs (otherwise validation fails).
+- `objective.score_scale=logp` is FIMO‑like: it uses a DP‑derived null
+  distribution under a 0‑order background to compute a tail p‑value for the
+  best window, then converts to a sequence‑level p via
+  `p_seq = 1 − (1 − p_win)^n_windows` before reporting `−log10(p_seq)`.
 - `elites.min_hamming` is the Hamming-distance filter for elites (0 disables). If `output.trim.enabled=true` yields variable lengths, the distance is computed over the shared prefix plus the length difference.
 - `elites.k` controls how many sequences are retained before diversity filtering (0 = keep all).
 - `elites.dsDNA_canonicalize=true` treats reverse complements as identical when computing unique fractions and (optionally) stores `canonical_sequence` in elites.

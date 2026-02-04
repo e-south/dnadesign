@@ -16,3 +16,7 @@ def read_parquet(path: Path):
     import pandas as pd
 
     return pd.read_parquet(path, engine="fastparquet")
+
+
+def write_parquet(df, path: Path) -> None:
+    df.to_parquet(path, engine="pyarrow", index=False)

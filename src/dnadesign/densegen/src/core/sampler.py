@@ -16,6 +16,37 @@ import numpy as np
 import pandas as pd
 
 
+def compute_tf_weights(
+    df: pd.DataFrame,
+    *,
+    usage_counts: dict[tuple[str, str], int] | None,
+    coverage_boost_alpha: float,
+    coverage_boost_power: float,
+    failure_counts: dict[tuple[str, str], int] | None,
+    avoid_failed_motifs: bool,
+    failure_penalty_alpha: float,
+    failure_penalty_power: float,
+) -> tuple[dict[str, float], dict[str, int], dict[str, int]]:
+    weight_by_tf: dict[str, float] = {}
+    usage_count_by_tf: dict[str, int] = {}
+    failure_count_by_tf: dict[str, int] = {}
+    for row in df.itertuples(index=False):
+        tf = str(row.tf)
+        tfbs = str(row.tfbs)
+        key = (tf, tfbs)
+        count = int(usage_counts.get(key, 0)) if usage_counts else 0
+        usage_count_by_tf[tf] = usage_count_by_tf.get(tf, 0) + count
+        weight = 1.0 + float(coverage_boost_alpha) / ((1.0 + count) ** float(coverage_boost_power))
+        if avoid_failed_motifs and failure_counts is not None:
+            fails = int(failure_counts.get(key, 0))
+            failure_count_by_tf[tf] = failure_count_by_tf.get(tf, 0) + fails
+            if fails > 0:
+                penalty = 1.0 + float(failure_penalty_alpha) * float(fails)
+                weight = weight / (penalty ** float(failure_penalty_power))
+        weight_by_tf[tf] = weight_by_tf.get(tf, 0.0) + float(weight)
+    return weight_by_tf, usage_count_by_tf, failure_count_by_tf
+
+
 class TFSampler:
     """
     Sampler for binding-site tables (DataFrame with 'tf' and 'tfbs').
@@ -66,192 +97,17 @@ class TFSampler:
                 )
             )
 
-    def generate_binding_site_subsample(
-        self,
-        sequence_length: int,
-        budget_overhead: int,
-        *,
-        required_tfbs: list[str] | None = None,
-        required_tfs: list[str] | None = None,
-        cover_all_tfs: bool = False,
-        unique_binding_sites: bool = True,
-        max_sites_per_tf: int | None = None,
-        relax_on_exhaustion: bool = True,
-        allow_incomplete_coverage: bool = False,
-    ) -> tuple[list, list, list, dict]:
-        """
-        Build a motif library whose total length >= sequence_length + budget_overhead.
-
-        Returns
-        -------
-        sites, tfbs_parts, regulator_labels, info
-
-        - If cover_all_tfs=True, we first ensure >=1 TFBS per every unique TF.
-        - unique_binding_sites=True prevents duplicate (TF, TFBS) pairs.
-        - max_sites_per_tf caps per-TF TFBS AFTER coverage is satisfied (None = no cap).
-        - If we cannot meet the length budget without violating these rules and
-          relax_on_exhaustion=True, we gradually relax the cap to avoid stalling.
-        - With strict policies, failures raise ValueError (no fallback).
-        """
-        target = sequence_length + budget_overhead
-        sites: list[str] = []
-        meta: list[str] = []
-        labels: list[str] = []
-        site_ids: list[str | None] = []
-        sources: list[str | None] = []
-        seen_tfbs = set()  # for unique_binding_sites (tf, tfbs)
-        used_per_tf: dict[str, int] = {}
-
-        has_site_id = "site_id" in self.df.columns
-        has_source = "source" in self.df.columns
-
-        def _append_provenance(row) -> None:
-            site_ids.append(str(row["site_id"]) if has_site_id else None)
-            sources.append(str(row["source"]) if has_source else None)
-
-        unique_tfs = self.df["tf"].unique().tolist()
-        self.rng.shuffle(unique_tfs)
-        total_unique_tfbs = len(self.df.drop_duplicates(["tf", "tfbs"]))
-
-        required = [s.strip().upper() for s in (required_tfbs or []) if str(s).strip()]
-        if len(set(required)) != len(required):
-            raise ValueError("required_tfbs must be unique")
-        if required:
-            available_tfbs = set(self.df["tfbs"].tolist())
-            missing = [m for m in required if m not in available_tfbs]
-            if missing:
-                preview = ", ".join(missing[:10])
-                raise ValueError(f"Required TFBS motifs not found in input: {preview}")
-
-        required_tf_list = [str(t).strip() for t in (required_tfs or []) if str(t).strip()]
-        if len(set(required_tf_list)) != len(required_tf_list):
-            raise ValueError("required_tfs must be unique")
-        if required_tf_list:
-            available = set(self.df["tf"].tolist())
-            missing_tfs = [t for t in required_tf_list if t not in available]
-            if missing_tfs:
-                preview = ", ".join(missing_tfs[:10])
-                raise ValueError(f"Required regulators not found in input: {preview}")
-
-        def _pick_for_tf(tf: str) -> bool:
-            group = self.df[self.df["tf"] == tf]
-            # try a few draws to satisfy uniqueness if requested
-            for _ in range(min(20, len(group))):
-                row = group.sample(n=1, random_state=int(self.rng.integers(1_000_000)))
-                tfbs = row["tfbs"].iloc[0]
-                key = (tf, tfbs)
-                if (not unique_binding_sites) or (key not in seen_tfbs):
-                    sites.append(tfbs)
-                    meta.append(f"{tf}:{tfbs}")
-                    labels.append(tf)
-                    _append_provenance(row.iloc[0])
-                    seen_tfbs.add(key)
-                    used_per_tf[tf] = used_per_tf.get(tf, 0) + 1
-                    return True
-            return False  # couldn’t find a new TFBS that met uniqueness
-
-        def _add_required_tfbs() -> None:
-            if not required:
-                return
-            for motif in required:
-                rows = self.df[self.df["tfbs"] == motif]
-                if rows.empty:
-                    raise ValueError(f"Required TFBS motif not found in input: {motif}")
-                row = rows.iloc[0]
-                tf = row["tf"]
-                sites.append(motif)
-                meta.append(f"{tf}:{motif}")
-                labels.append(tf)
-                _append_provenance(row)
-                seen_tfbs.add((tf, motif))
-                used_per_tf[tf] = used_per_tf.get(tf, 0) + 1
-
-        def _add_required_tfs() -> None:
-            if not required_tf_list:
-                return
-            for tf in required_tf_list:
-                if used_per_tf.get(tf, 0) > 0:
-                    continue
-                if not _pick_for_tf(tf):
-                    raise ValueError(f"Failed to select a motif for required regulator '{tf}'")
-
-        _add_required_tfbs()
-        _add_required_tfs()
-
-        # 1) coverage pass: ensure >=1 TFBS per TF
-        if cover_all_tfs:
-            missing = []
-            for tf in unique_tfs:
-                if not _pick_for_tf(tf):
-                    missing.append(tf)
-            if missing and not allow_incomplete_coverage:
-                raise ValueError(
-                    f"Failed to cover all TFs (missing {len(missing)}). "
-                    "Allow incomplete coverage or relax uniqueness constraints."
-                )
-
-        # 2) expand until we meet/exceed target length
-        cap = max_sites_per_tf
-        relaxed_cap = False
-        while sum(len(s) for s in sites) < target:
-            progressed = False
-            # cycle through TFs to add more sites within per-TF caps
-            for tf in unique_tfs:
-                if cap is not None and used_per_tf.get(tf, 0) >= cap:
-                    continue
-                if _pick_for_tf(tf):
-                    progressed = True
-                if sum(len(s) for s in sites) >= target:
-                    break
-
-            if progressed:
-                continue
-
-            if unique_binding_sites and len(seen_tfbs) >= total_unique_tfbs:
-                raise ValueError(
-                    "Unique TFBS pool exhausted before meeting target length. "
-                    "Reduce target length/budget or allow duplicates."
-                )
-
-            if relax_on_exhaustion and cap is not None:
-                cap += 1
-                relaxed_cap = True
-                continue
-            if relax_on_exhaustion and cap is None:
-                raise ValueError(
-                    "Sampling stalled with max_sites_per_regulator unset. "
-                    "Reduce target length/budget, disable unique_binding_sites, or add more input sites."
-                )
-
-            raise ValueError(
-                "Could not meet target length with current sampling constraints. "
-                "Enable relax_on_exhaustion or loosen caps."
-            )
-
-        info = {
-            "target_length": int(target),
-            "achieved_length": int(sum(len(s) for s in sites)),
-            "relaxed_cap": bool(relaxed_cap),
-            "final_cap": cap,
-            "site_id_by_index": site_ids if has_site_id else None,
-            "source_by_index": sources if has_source else None,
-        }
-
-        return sites, meta, labels, info
-
     def generate_binding_site_library(
         self,
         library_size: int,
         *,
-        sequence_length: int,
-        budget_overhead: int,
         required_tfbs: list[str] | None = None,
         required_tfs: list[str] | None = None,
         cover_all_tfs: bool = False,
         unique_binding_sites: bool = True,
+        unique_binding_cores: bool = True,
         max_sites_per_tf: int | None = None,
         relax_on_exhaustion: bool = True,
-        allow_incomplete_coverage: bool = False,
         sampling_strategy: str = "tf_balanced",
         usage_counts: dict[tuple[str, str], int] | None = None,
         coverage_boost_alpha: float = 0.15,
@@ -275,14 +131,43 @@ class TFSampler:
         df = self.df
         if unique_binding_sites:
             df = df.drop_duplicates(["tf", "tfbs"]).reset_index(drop=True)
+        if unique_binding_cores:
+            if "tfbs_core" not in df.columns:
+                raise ValueError(
+                    "unique_binding_cores=true requires a 'tfbs_core' column in the input data. "
+                    "Provide tfbs_core in the pool or disable unique_binding_cores."
+                )
 
         has_site_id = "site_id" in df.columns
         has_source = "source" in df.columns
+        has_tfbs_id = "tfbs_id" in df.columns
+        has_motif_id = "motif_id" in df.columns
         total_unique_tfbs = len(df.drop_duplicates(["tf", "tfbs"]))
+        total_unique_cores = len(df.drop_duplicates(["tf", "tfbs_core"])) if unique_binding_cores else total_unique_tfbs
 
         unique_tfs = sorted(df["tf"].unique().tolist())
         if not unique_tfs:
             raise ValueError("No regulators found in input.")
+
+        weight_by_tf: dict[str, float] | None = None
+        weight_fraction_by_tf: dict[str, float] | None = None
+        usage_count_by_tf: dict[str, int] | None = None
+        failure_count_by_tf: dict[str, int] | None = None
+        if sampling_strategy == "coverage_weighted":
+            weight_by_tf, usage_count_by_tf, failure_count_by_tf = compute_tf_weights(
+                df,
+                usage_counts=usage_counts,
+                coverage_boost_alpha=coverage_boost_alpha,
+                coverage_boost_power=coverage_boost_power,
+                failure_counts=failure_counts,
+                avoid_failed_motifs=avoid_failed_motifs,
+                failure_penalty_alpha=failure_penalty_alpha,
+                failure_penalty_power=failure_penalty_power,
+            )
+            total_weight = sum(weight_by_tf.values()) if weight_by_tf else 0.0
+            weight_fraction_by_tf = {
+                tf: (float(val) / total_weight if total_weight > 0 else 0.0) for tf, val in (weight_by_tf or {}).items()
+            }
 
         required = [str(s).strip().upper() for s in (required_tfbs or []) if str(s).strip()]
         if len(set(required)) != len(required):
@@ -313,7 +198,10 @@ class TFSampler:
         reasons: list[str] = []
         site_ids: list[str | None] = []
         sources: list[str | None] = []
+        tfbs_ids: list[str | None] = []
+        motif_ids: list[str | None] = []
         seen_tfbs = set()
+        seen_cores = set()
         used_per_tf: dict[str, int] = {}
 
         def _append_row(row, reason: str) -> bool:
@@ -322,14 +210,23 @@ class TFSampler:
             key = (tf, tfbs)
             if unique_binding_sites and key in seen_tfbs:
                 return False
+            if unique_binding_cores:
+                core = str(row["tfbs_core"])
+                core_key = (tf, core)
+                if core_key in seen_cores:
+                    return False
             sites.append(tfbs)
             meta.append(f"{tf}:{tfbs}")
             labels.append(tf)
             reasons.append(reason)
             seen_tfbs.add(key)
+            if unique_binding_cores:
+                seen_cores.add((tf, str(row["tfbs_core"])))
             used_per_tf[tf] = used_per_tf.get(tf, 0) + 1
             site_ids.append(str(row["site_id"]) if has_site_id else None)
             sources.append(str(row["source"]) if has_source else None)
+            tfbs_ids.append(str(row["tfbs_id"]) if has_tfbs_id else None)
+            motif_ids.append(str(row["motif_id"]) if has_motif_id else None)
             return True
 
         def _pick_for_tf(tf: str, *, reason: str, cap_override: int | None = None) -> bool:
@@ -351,6 +248,10 @@ class TFSampler:
                     key = (str(row["tf"]), str(row["tfbs"]))
                     if unique_binding_sites and key in seen_tfbs:
                         continue
+                    if unique_binding_cores:
+                        core_key = (str(row["tf"]), str(row["tfbs_core"]))
+                        if core_key in seen_cores:
+                            continue
                     count = int(usage_counts.get(key, 0)) if usage_counts else 0
                     weight = 1.0 + float(coverage_boost_alpha) / ((1.0 + count) ** float(coverage_boost_power))
                     if avoid_failed_motifs and failure_counts is not None:
@@ -387,6 +288,10 @@ class TFSampler:
                 key = (str(row["tf"]), str(row["tfbs"]))
                 if unique_binding_sites and key in seen_tfbs:
                     continue
+                if unique_binding_cores:
+                    core_key = (str(row["tf"]), str(row["tfbs_core"]))
+                    if core_key in seen_cores:
+                        continue
                 if _append_row(row, reason):
                     return True
             return False
@@ -397,7 +302,11 @@ class TFSampler:
             if rows.empty:
                 raise ValueError(f"Required TFBS motif not found in input: {motif}")
             row = rows.sort_values(["tf", "tfbs"]).iloc[0]
-            _append_row(row, "required_tfbs")
+            if not _append_row(row, "required_tfbs"):
+                raise ValueError(
+                    "Required TFBS motifs conflict with uniqueness constraints. "
+                    "Disable unique_binding_cores or remove duplicate cores from required_tfbs."
+                )
 
         # Required regulators (at least one per TF)
         for tf in required_tf_list:
@@ -410,14 +319,14 @@ class TFSampler:
         if cover_all_tfs:
             remaining_slots = library_size - len(sites)
             missing_tfs = [tf for tf in unique_tfs if used_per_tf.get(tf, 0) == 0]
-            if remaining_slots < len(missing_tfs) and not allow_incomplete_coverage:
+            if remaining_slots < len(missing_tfs):
                 raise ValueError(
                     "cover_all_regulators requires at least one site per TF, "
                     f"but library_size={library_size} is too small for {len(unique_tfs)} TFs. "
-                    "Increase library_size or set allow_incomplete_coverage=true."
+                    "Increase library_size or disable cover_all_regulators."
                 )
             if remaining_slots <= 0:
-                if missing_tfs and not allow_incomplete_coverage:
+                if missing_tfs:
                     raise ValueError(
                         "Required coverage cannot be satisfied given required_tfbs/required_tfs. "
                         "Increase library_size or relax coverage constraints."
@@ -431,8 +340,7 @@ class TFSampler:
                     continue
                 if _pick_for_tf(tf, reason="coverage", cap_override=None):
                     continue
-                if not allow_incomplete_coverage:
-                    raise ValueError(f"Failed to select a motif for TF '{tf}' while cover_all_regulators=true.")
+                raise ValueError(f"Failed to select a motif for TF '{tf}' while cover_all_regulators=true.")
 
         cap = max_sites_per_tf
         relaxed_cap = False
@@ -456,6 +364,11 @@ class TFSampler:
                     raise ValueError(
                         "Unique TFBS pool exhausted before reaching library_size. "
                         "Reduce library_size or allow duplicates."
+                    )
+                if unique_binding_cores and len(seen_cores) >= total_unique_cores:
+                    raise ValueError(
+                        "Unique TFBS core pool exhausted before reaching library_size. "
+                        "Reduce library_size, disable unique_binding_cores, or add more input sites."
                     )
                 if relax_on_exhaustion and cap is not None:
                     cap += 1
@@ -495,6 +408,11 @@ class TFSampler:
                         "Unique TFBS pool exhausted before reaching library_size. "
                         "Reduce library_size or allow duplicates."
                     )
+                if unique_binding_cores and len(seen_cores) >= total_unique_cores:
+                    raise ValueError(
+                        "Unique TFBS core pool exhausted before reaching library_size. "
+                        "Reduce library_size, disable unique_binding_cores, or add more input sites."
+                    )
                 if relax_on_exhaustion and cap is not None:
                     cap += 1
                     relaxed_cap = True
@@ -522,12 +440,17 @@ class TFSampler:
                 raise ValueError(f"Unknown library sampling strategy: {sampling_strategy}")
 
         info = {
-            "target_length": int(sequence_length + budget_overhead),
             "achieved_length": int(sum(len(s) for s in sites)),
             "relaxed_cap": bool(relaxed_cap),
             "final_cap": cap,
             "site_id_by_index": site_ids if has_site_id else None,
             "source_by_index": sources if has_source else None,
+            "tfbs_id_by_index": tfbs_ids if has_tfbs_id else None,
+            "motif_id_by_index": motif_ids if has_motif_id else None,
             "selection_reason_by_index": reasons,
+            "sampling_weight_by_tf": weight_by_tf,
+            "sampling_weight_fraction_by_tf": weight_fraction_by_tf,
+            "sampling_usage_count_by_tf": usage_count_by_tf,
+            "sampling_failure_count_by_tf": failure_count_by_tf,
         }
         return sites, meta, labels, info

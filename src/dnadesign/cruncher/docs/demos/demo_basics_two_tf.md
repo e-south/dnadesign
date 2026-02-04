@@ -4,6 +4,13 @@
 
 **cruncher** scores each TF by the best PWM match anywhere in the candidate sequence on either strand, then optimizes the min/soft‑min across TFs so the weakest TF improves. It explores sequence space with Gibbs + parallel tempering (MCMC) and returns a diverse elite set (unique up to reverse‑complement) plus diagnostics for stability/mixing. Motif overlap is allowed and treated as informative structure in analysis.
 
+Scoring is **FIMO-like** (internal implementation): for each PWM, cruncher builds
+log‑odds scores against a 0‑order background, scans all windows to find the best
+hit (optionally bidirectional), and optionally converts that best hit to a
+p‑value via a DP‑derived null distribution (`score_scale: logp`). For `logp`,
+the tail probability for the best window becomes a sequence‑level p via
+`p_seq = 1 − (1 − p_win)^n_windows`.
+
 **Terminology:**
 
 - **sites** = training binding sequences
@@ -175,11 +182,11 @@ After changing `combine_sites` or `site_kinds`, re-run `cruncher lock` so parse/
 
 ---
 
-### Discover motifs from merged sites (MEME/STREME)
+### Discover motifs from merged sites (MEME preferred)
 
 Optional: run discovery if you want to **rebuild a single aligned PWM per TF from cached sites** (useful when sites have mixed lengths or come from multiple sources). If you already trust the packaged matrices, skip to **Inspect candidate PWMs + logos** (or go straight to `lock`).
 
-If you fetched binding sites from multiple sources and want a single aligned PWM per TF (e.g., to reconcile different site lengths), run MEME Suite on the combined site sets. This creates new motif matrices under `motif_discovery.source_id` (default `meme_suite_streme`, or override with `--source-id`).
+If you fetched binding sites from multiple sources and want a single aligned PWM per TF (e.g., to reconcile different site lengths), run MEME Suite on the combined site sets. This creates new motif matrices under `motif_discovery.source_id` (default `meme_suite_meme`, or override with `--source-id`).
 
 Key points:
 
@@ -191,18 +198,18 @@ Key points:
 # Verify discovery prerequisites
 cruncher discover check -c "$CONFIG"  # verify MEME Suite availability + inputs
 
-# Run STREME discovery
-cruncher discover motifs --tf lexA --tf cpxR --tool streme --source-id meme_suite_streme -c "$CONFIG"  # discover PWMs from sites
+# Run MEME discovery (OOPS + addone prior)
+cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --meme-prior addone --source-id meme_suite_meme -c "$CONFIG"  # discover PWMs from sites
 
 # Confirm discovered motifs in catalog
-cruncher catalog list --source meme_suite_streme -c "$CONFIG"  # verify new motif entries
+cruncher catalog list --source meme_suite_meme -c "$CONFIG"  # verify new motif entries
 ```
 
-Discovery prints a short table (TF, tool, motif ID, length) and stores full outputs under the shared catalog root (e.g., `.../.cruncher/discoveries/`). Tip: if each sequence represents one site, prefer MEME and set `--meme-mod oops`.
+Discovery prints a short table (TF, tool, motif ID, length) and stores full outputs under the shared catalog root (e.g., `.../.cruncher/discoveries/`). STREME remains an option if you prefer it:
 
 ```bash
-# Run MEME discovery (OOPS)
-cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --source-id meme_suite_meme -c "$CONFIG"  # discover PWMs with MEME
+# Optional: STREME discovery
+cruncher discover motifs --tf lexA --tf cpxR --tool streme --source-id meme_suite_streme -c "$CONFIG"
 ```
 
 This demo config already prefers MEME motifs for optimization: `pwm_source: matrix` with `source_preference: [meme_suite_meme, meme_suite_streme, ...]`. After discovery, continue to the optional trimming/inspection steps below, then lock so parse/sample use the new motifs.
@@ -476,11 +483,17 @@ Export the binding-site superset and the selected motifs for DenseGen runs:
 
 ```bash
 # Export binding sites (CSV/Parquet) for DenseGen binding_sites inputs
-cruncher catalog export-sites --set 1 --out /tmp/densegen_sites.csv -c "$CONFIG"
+cruncher catalog export-sites --set 1 --densegen-workspace demo_meme_three_tfs -c "$CONFIG"
 
 # Export per-motif JSON artifacts for DenseGen PWM artifact inputs
-cruncher catalog export-densegen --set 1 --out /tmp/densegen_pwms -c "$CONFIG"
+cruncher catalog export-densegen --set 1 --densegen-workspace demo_meme_three_tfs -c "$CONFIG"
 ```
+
+`--densegen-workspace` accepts a workspace name (resolved under `src/dnadesign/densegen/workspaces`)
+or an absolute path, and writes under that workspace's `inputs/`. You can still provide `--out`,
+but the path must remain inside the target `inputs/` directory.
+`catalog export-densegen` removes existing artifact JSONs for the selected TFs by default; use
+`--no-clean` if you want to keep prior artifacts.
 
 Then point DenseGen configs at the exported files (`type: binding_sites`) or artifacts
 (`type: pwm_artifact_set`).

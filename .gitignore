@@ -196,11 +196,13 @@ src/dnadesign/densegen/src/adapters/outputs/**/*.pyc
 # DenseGen workspaces: ignore everything by default, allow demo + README
 src/dnadesign/densegen/workspaces/**
 !src/dnadesign/densegen/workspaces/README.md
-!src/dnadesign/densegen/workspaces/demo_meme_two_tf/
-!src/dnadesign/densegen/workspaces/demo_meme_two_tf/config.yaml
-!src/dnadesign/densegen/workspaces/demo_meme_two_tf/inputs/
-!src/dnadesign/densegen/workspaces/demo_meme_two_tf/inputs/*.txt
-!src/dnadesign/densegen/workspaces/demo_meme_two_tf/inputs/*.meme
+!src/dnadesign/densegen/workspaces/demo_meme_three_tfs/
+!src/dnadesign/densegen/workspaces/demo_meme_three_tfs/config.yaml
+!src/dnadesign/densegen/workspaces/demo_meme_three_tfs/inputs/
+!src/dnadesign/densegen/workspaces/demo_meme_three_tfs/inputs/*.txt
+!src/dnadesign/densegen/workspaces/demo_meme_three_tfs/inputs/*.meme
+!src/dnadesign/densegen/workspaces/demo_meme_three_tfs/inputs/motif_artifacts/
+!src/dnadesign/densegen/workspaces/demo_meme_three_tfs/inputs/motif_artifacts/*.json
 
 # Legacy DenseGen runs (ignored to avoid local artifact noise)
 src/dnadesign/densegen/runs/**

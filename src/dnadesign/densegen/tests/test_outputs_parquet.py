@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/test_outputs_parquet.py
+
+Parquet output metadata contract tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -11,7 +22,7 @@ from dnadesign.densegen.src.adapters.outputs import OutputRecord, ParquetSink
 
 def _dummy_meta() -> dict:
     return {
-        "schema_version": "2.3",
+        "schema_version": "2.9",
         "run_id": "demo",
         "run_root": ".",
         "run_config_path": "config.yaml",
@@ -19,12 +30,13 @@ def _dummy_meta() -> dict:
         "created_at": "2026-01-14T00:00:00+00:00",
         "length": 4,
         "random_seed": 0,
-        "policy_gc_fill": "off",
+        "policy_pad": "off",
         "policy_sampling": "subsample",
         "policy_solver": "iterate",
         "solver_backend": "CBC",
         "solver_strategy": "iterate",
-        "solver_options": [],
+        "solver_time_limit_seconds": None,
+        "solver_threads": None,
         "solver_strands": "double",
         "dense_arrays_version": None,
         "dense_arrays_version_source": "unknown",
@@ -42,6 +54,7 @@ def _dummy_meta() -> dict:
         "min_count_per_tf": 0,
         "input_type": "binding_sites",
         "input_name": "demo",
+        "input_source_names": ["demo"],
         "input_path": "inputs.csv",
         "input_dataset": None,
         "input_root": None,
@@ -54,10 +67,26 @@ def _dummy_meta() -> dict:
         "sampling_fraction": None,
         "sampling_fraction_pairs": 0.5,
         "input_pwm_strategy": None,
-        "input_pwm_score_threshold": None,
-        "input_pwm_score_percentile": None,
+        "input_pwm_mining_batch_size": None,
+        "input_pwm_mining_log_every_batches": None,
+        "input_pwm_budget_mode": None,
+        "input_pwm_budget_candidates": None,
+        "input_pwm_budget_target_tier_fraction": None,
+        "input_pwm_budget_max_candidates": None,
+        "input_pwm_budget_max_seconds": None,
+        "input_pwm_budget_min_candidates": None,
+        "input_pwm_budget_growth_factor": None,
+        "input_pwm_bgfile": None,
+        "input_pwm_keep_all_candidates_debug": None,
+        "input_pwm_include_matched_sequence": None,
         "input_pwm_n_sites": None,
-        "input_pwm_oversample_factor": None,
+        "input_pwm_tier_fractions": None,
+        "input_pwm_uniqueness_key": None,
+        "input_pwm_selection_policy": None,
+        "input_pwm_selection_alpha": None,
+        "input_pwm_selection_pool_min_score_norm": None,
+        "input_pwm_selection_pool_max_candidates": None,
+        "input_pwm_selection_pool_relevance_norm": None,
         "fixed_elements": {"promoter_constraints": [], "side_biases": {"left": [], "right": []}},
         "visual": "",
         "compression_ratio": None,
@@ -66,7 +95,6 @@ def _dummy_meta() -> dict:
         "library_unique_tfbs_count": 0,
         "sequence_length": 4,
         "promoter_constraint": None,
-        "sampling_target_length": 0,
         "sampling_achieved_length": 0,
         "sampling_relaxed_cap": False,
         "sampling_final_cap": None,
@@ -81,16 +109,18 @@ def _dummy_meta() -> dict:
         "min_required_regulators": None,
         "min_count_by_regulator": [],
         "covers_required_regulators": True,
-        "gap_fill_used": False,
-        "gap_fill_bases": None,
-        "gap_fill_end": None,
-        "gap_fill_gc_min": None,
-        "gap_fill_gc_max": None,
-        "gap_fill_gc_target_min": None,
-        "gap_fill_gc_target_max": None,
-        "gap_fill_gc_actual": None,
-        "gap_fill_relaxed": None,
-        "gap_fill_attempts": None,
+        "pad_used": False,
+        "pad_bases": None,
+        "pad_end": None,
+        "pad_gc_mode": None,
+        "pad_gc_min": None,
+        "pad_gc_max": None,
+        "pad_gc_target_min": None,
+        "pad_gc_target_max": None,
+        "pad_gc_actual": None,
+        "pad_relaxed": None,
+        "pad_relaxed_reason": None,
+        "pad_attempts": None,
         "gc_total": 0.5,
         "gc_core": 0.5,
     }
@@ -107,6 +137,25 @@ def test_parquet_sink_writes_file(tmp_path: Path) -> None:
     rec = OutputRecord.from_sequence(
         sequence="ATGC",
         meta=_dummy_meta(),
+        source="src",
+        bio_type="dna",
+        alphabet="dna_4",
+    )
+    assert sink.add(rec) is True
+    sink.finalize()
+    assert _count_rows(out_file) == 1
+
+
+def test_parquet_sink_accepts_pwm_tier_fractions(tmp_path: Path) -> None:
+    out_file = tmp_path / "dense_arrays.parquet"
+    sink = ParquetSink(path=str(out_file), chunk_size=1)
+    meta = _dummy_meta()
+    meta["input_pwm_tier_fractions"] = [0.001, 0.01, 0.09]
+    meta["input_pwm_selection_pool_relevance_norm"] = "minmax_raw_score"
+    meta["input_pwm_selection_pool_min_score_norm"] = 0.85
+    rec = OutputRecord.from_sequence(
+        sequence="ATGC",
+        meta=meta,
         source="src",
         bio_type="dna",
         alphabet="dna_4",

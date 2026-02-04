@@ -1,272 +1,207 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-dnadesign/densegen/adapters/sources/pwm_sampling.py
+dnadesign
+src/dnadesign/densegen/src/adapters/sources/pwm_sampling.py
 
-Shared PWM sampling utilities.
+Shared Stage-A PWM sampling utilities.
+Dunlop Lab.
 
 Module Author(s): Eric J. South
-Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
 
 import logging
-import time
-from dataclasses import dataclass
-from typing import List, Optional, Sequence, Tuple
+import sys
+from pathlib import Path
+from typing import List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
-SMOOTHING_ALPHA = 1e-6
+from ...config import PWMMiningConfig, PWMSamplingConfig, PWMSelectionConfig
+from ...core.score_tiers import resolve_tier_fractions
+from .stage_a.stage_a_metadata import TFBSMeta
+from .stage_a.stage_a_pipeline import run_stage_a_pipeline
+from .stage_a.stage_a_progress import StageAProgressManager, _PwmSamplingProgress
+from .stage_a.stage_a_sampling_utils import (
+    _background_cdf,
+    _matrix_cdf,
+    _pwm_consensus,
+    _pwm_consensus_iupac,
+    _pwm_theoretical_max_score,
+    _sample_from_background_cdf,
+    _select_pwm_window,
+    build_log_odds,
+    parse_bgfile,
+    score_sequence,
+    select_pwm_window_by_length,
+)
+from .stage_a.stage_a_summary import PWMSamplingSummary
+from .stage_a.stage_a_types import PWMMotif
+
 log = logging.getLogger(__name__)
+_BASES = np.array(["A", "C", "G", "T"])
 
 
-@dataclass(frozen=True)
-class PWMMotif:
-    motif_id: str
-    matrix: List[dict[str, float]]  # per-position A/C/G/T probabilities
-    background: dict[str, float]
-    log_odds: Optional[List[dict[str, float]]] = None
-
-
-def normalize_background(bg: Optional[dict[str, float]]) -> dict[str, float]:
-    if not bg:
-        return {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
-    total = sum(bg.values())
-    if total <= 0:
-        raise ValueError("Background frequencies must sum to > 0.")
-    return {k: float(v) / total for k, v in bg.items()}
-
-
-def build_log_odds(
-    matrix: List[dict[str, float]],
-    background: dict[str, float],
+def validate_mmr_core_length(
     *,
-    smoothing_alpha: float = SMOOTHING_ALPHA,
-) -> List[dict[str, float]]:
-    # Alignment (3): smooth PWM probabilities to avoid -inf log-odds on zeros.
-    bg = normalize_background(background)
-    log_odds: List[dict[str, float]] = []
-    for row in matrix:
-        lod_row: dict[str, float] = {}
-        for base in ("A", "C", "G", "T"):
-            p = float(row.get(base, 0.0))
-            b = float(bg.get(base, 0.0))
-            if smoothing_alpha > 0.0:
-                p = (1.0 - smoothing_alpha) * p + smoothing_alpha * b
-            if p <= 0.0 or b <= 0.0:
-                lod_row[base] = float("-inf")
-            else:
-                lod_row[base] = float(np.log(p / b))
-        log_odds.append(lod_row)
-    return log_odds
-
-
-def score_sequence(
-    seq: str,
-    matrix: List[dict[str, float]],
-    *,
-    log_odds: Optional[List[dict[str, float]]] = None,
-    background: Optional[dict[str, float]] = None,
-) -> float:
-    score = 0.0
-    if log_odds is None:
-        if background is None:
-            background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
-        log_odds = build_log_odds(matrix, background)
-    for base, probs in zip(seq, log_odds):
-        lod = probs.get(base, float("-inf"))
-        if lod == float("-inf"):
-            return float("-inf")
-        score += float(lod)
-    return score
-
-
-def sample_sequence_from_background(rng: np.random.Generator, probs: dict[str, float], length: int) -> str:
-    bases = ["A", "C", "G", "T"]
-    weights = np.array([probs[b] for b in bases], dtype=float)
-    weights = weights / weights.sum()
-    idx = rng.choice(len(bases), size=length, replace=True, p=weights)
-    return "".join(bases[i] for i in idx)
-
-
-def sample_sequence_from_pwm(rng: np.random.Generator, matrix: List[dict[str, float]]) -> str:
-    seq = []
-    for probs in matrix:
-        bases = ["A", "C", "G", "T"]
-        weights = np.array([probs[b] for b in bases], dtype=float)
-        weights = weights / weights.sum()
-        seq.append(bases[int(rng.choice(len(bases), p=weights))])
-    return "".join(seq)
-
-
-def _matrix_array(matrix: List[dict[str, float]]) -> np.ndarray:
-    rows = []
-    for row in matrix:
-        rows.append(
-            [
-                float(row.get("A", 0.0)),
-                float(row.get("C", 0.0)),
-                float(row.get("G", 0.0)),
-                float(row.get("T", 0.0)),
-            ]
-        )
-    return np.asarray(rows, dtype=float)
-
-
-def _information_bits(matrix: np.ndarray) -> float:
-    p = matrix + 1e-9
-    return float((2 + (p * np.log2(p)).sum(axis=1)).sum())
-
-
-def _select_pwm_window(
-    *,
-    matrix: List[dict[str, float]],
-    log_odds: List[dict[str, float]],
-    length: int,
-    strategy: str,
-) -> tuple[List[dict[str, float]], List[dict[str, float]], int, float]:
-    if length < 1:
-        raise ValueError("pwm.sampling.trim_window_length must be >= 1")
-    if length > len(matrix):
-        raise ValueError(f"pwm.sampling.trim_window_length={length} exceeds motif width {len(matrix)}")
-    if strategy != "max_info":
-        raise ValueError("pwm.sampling.trim_window_strategy must be 'max_info'")
-    if length == len(matrix):
-        return matrix, log_odds, 0, 0.0
-    arr = _matrix_array(matrix)
-    best_start = 0
-    best_score = float("-inf")
-    last_start = len(matrix) - length
-    for start in range(last_start + 1):
-        window = arr[start : start + length]
-        score = _information_bits(window)
-        if score > best_score:
-            best_score = score
-            best_start = start
-    return (
-        matrix[best_start : best_start + length],
-        log_odds[best_start : best_start + length],
-        best_start,
-        best_score,
-    )
-
-
-def select_by_score(
-    candidates: List[Tuple[str, float]],
-    *,
-    n_sites: int,
-    threshold: Optional[float],
-    percentile: Optional[float],
-    keep_low: bool,
-    context: Optional[dict] = None,
-) -> List[str]:
-    scores = np.array([s for _, s in candidates], dtype=float)
-    if threshold is None:
-        cutoff = np.percentile(scores, float(percentile))  # type: ignore[arg-type]
-    else:
-        cutoff = float(threshold)
-    if context is not None:
-        if threshold is None and percentile is not None:
-            context = dict(context)
-            context["score_label"] = f"percentile={percentile} (cutoff={cutoff:.4g})"
-        elif threshold is not None:
-            context = dict(context)
-            context["score_label"] = f"threshold={threshold}"
-    if keep_low:
-        picked = [seq for seq, score in candidates if score <= cutoff]
-    else:
-        picked = [seq for seq, score in candidates if score >= cutoff]
-    unique = list(dict.fromkeys(picked))
-    if len(unique) < n_sites:
-        unique_total = len({seq for seq, _ in candidates})
-        if context is None:
+    motif_id: str,
+    motif_width: int,
+    selection_policy: str,
+    length_policy: str,
+    length_range: Optional[Sequence[int]],
+    trim_window_length: Optional[int],
+) -> None:
+    policy = str(selection_policy or "top_score").lower()
+    if policy != "mmr":
+        return
+    length_policy_value = str(length_policy or "exact").lower()
+    if length_policy_value != "range":
+        return
+    if length_range is None or len(length_range) != 2:
+        raise ValueError("pwm.sampling.length.range must be provided when length.policy=range")
+    min_len = int(min(length_range))
+    max_len = int(max(length_range))
+    if trim_window_length is not None:
+        trim_len = int(trim_window_length)
+        if trim_len > motif_width:
+            raise ValueError(f"pwm.sampling.trimming.window_length={trim_len} exceeds motif width {motif_width}")
+        if trim_len > min_len:
             raise ValueError(
-                f"PWM sampling produced {len(unique)} unique sites after filtering; "
-                f"need {n_sites}. Adjust thresholds or oversample_factor."
+                "Stage-A MMR requires trim_window_length <= minimum length when length.policy=range "
+                "and min length is below the motif width. "
+                f"(motif={motif_id} width={motif_width} range={min_len}..{max_len} trim_window_length={trim_len})"
             )
-        msg_lines = [
-            (
-                "PWM sampling failed for motif "
-                f"'{context.get('motif_id')}' "
-                f"(width={context.get('width')}, strategy={context.get('strategy')}, "
-                f"length={context.get('length_label')}, window={context.get('window_label')}, "
-                f"score={context.get('score_label')})."
-            ),
-            (
-                f"Requested n_sites={context.get('n_sites')} oversample_factor={context.get('oversample_factor')} "
-                f"-> candidates requested={context.get('requested_candidates')} "
-                f"generated={context.get('generated_candidates')}"
-                f"{context.get('cap_label')}."
-            ),
-            (f"Unique candidates before filtering={unique_total}, after filtering={len(unique)} (need {n_sites})."),
-        ]
-        if context.get("length_observed"):
-            msg_lines.append(f"Observed candidate lengths={context.get('length_observed')}.")
-        suggestions = [
-            "reduce n_sites",
-            "lower score_percentile (e.g., 90 → 80)",
-            "increase oversample_factor",
-        ]
-        if context.get("cap_applied"):
-            suggestions.append("increase max_candidates (cap was hit)")
-        if context.get("time_limited"):
-            suggestions.append("increase max_seconds (time limit was hit)")
-        if context.get("width") is not None and int(context.get("width")) <= 6:
-            suggestions.append("try length_policy=range with a longer length_range")
-        msg_lines.append("Try next: " + "; ".join(suggestions) + ".")
-        raise ValueError(" ".join(msg_lines))
-    return unique[:n_sites]
+    if min_len < motif_width and trim_window_length is None:
+        raise ValueError(
+            "Stage-A MMR requires a fixed trim window when length.policy=range and min length is below "
+            "the motif width. "
+            f"(motif={motif_id} width={motif_width} range={min_len}..{max_len}) "
+            "Set pwm.sampling.trimming.window_length to <= the minimum length or increase length.range."
+        )
+
+
+def sampling_kwargs_from_config(sampling: PWMSamplingConfig) -> dict:
+    if not isinstance(sampling, PWMSamplingConfig):
+        raise ValueError("pwm.sampling config must be a PWMSamplingConfig instance.")
+    mining = sampling.mining
+    length_cfg = sampling.length
+    trimming_cfg = sampling.trimming
+    uniqueness_cfg = sampling.uniqueness
+    return {
+        "strategy": str(sampling.strategy),
+        "n_sites": int(sampling.n_sites),
+        "mining": mining,
+        "bgfile": sampling.bgfile,
+        "keep_all_candidates_debug": bool(sampling.keep_all_candidates_debug),
+        "include_matched_sequence": bool(sampling.include_matched_sequence),
+        "tier_fractions": sampling.tier_fractions,
+        "uniqueness_key": str(uniqueness_cfg.key),
+        "selection": sampling.selection,
+        "length_policy": str(length_cfg.policy),
+        "length_range": length_cfg.range,
+        "trim_window_length": trimming_cfg.window_length,
+        "trim_window_strategy": str(trimming_cfg.window_strategy),
+    }
 
 
 def sample_pwm_sites(
     rng: np.random.Generator,
     motif: PWMMotif,
     *,
+    input_name: Optional[str] = None,
+    motif_hash: str | None = None,
+    run_id: str | None = None,
     strategy: str,
     n_sites: int,
-    oversample_factor: int,
-    max_candidates: Optional[int] = None,
-    max_seconds: Optional[float] = None,
-    score_threshold: Optional[float],
-    score_percentile: Optional[float],
+    mining: PWMMiningConfig,
+    bgfile: Optional[str | Path] = None,
+    keep_all_candidates_debug: bool = False,
+    include_matched_sequence: bool = True,
+    uniqueness_key: str = "sequence",
+    selection: PWMSelectionConfig,
+    debug_output_dir: Optional[Path] = None,
+    debug_label: Optional[str] = None,
     length_policy: str = "exact",
     length_range: Optional[Sequence[int]] = None,
     trim_window_length: Optional[int] = None,
     trim_window_strategy: str = "max_info",
-) -> List[str]:
+    tier_fractions: Optional[Sequence[float]] = None,
+    progress_manager: StageAProgressManager | None = None,
+    return_metadata: bool = False,
+    return_summary: bool = False,
+) -> Union[
+    List[str],
+    Tuple[List[str], dict[str, TFBSMeta]],
+    Tuple[List[str], PWMSamplingSummary],
+    Tuple[List[str], dict[str, TFBSMeta], Optional[PWMSamplingSummary]],
+]:
     if n_sites <= 0:
         raise ValueError("n_sites must be > 0")
-    if oversample_factor <= 0:
-        raise ValueError("oversample_factor must be > 0")
-    if max_seconds is not None and float(max_seconds) <= 0:
-        raise ValueError("max_seconds must be > 0 when set")
-    if (score_threshold is None) == (score_percentile is None):
-        raise ValueError("PWM sampling requires exactly one of score_threshold or score_percentile")
+    if not isinstance(mining, PWMMiningConfig):
+        raise ValueError("pwm.sampling.mining must be a PWMMiningConfig instance.")
+    if not isinstance(selection, PWMSelectionConfig):
+        raise ValueError("pwm.sampling.selection must be a PWMSelectionConfig instance.")
+    scoring_backend = "fimo"
+    uniqueness_key = str(uniqueness_key or "sequence").lower()
+    if uniqueness_key not in {"sequence", "core"}:
+        raise ValueError(f"Stage-A PWM sampling uniqueness.key must be 'sequence' or 'core', got '{uniqueness_key}'.")
+    if keep_all_candidates_debug and run_id is None:
+        raise ValueError("Stage-A PWM sampling keep_all_candidates_debug requires run_id to be set.")
     if strategy == "consensus" and n_sites != 1:
-        raise ValueError("PWM sampling strategy 'consensus' requires n_sites=1")
+        raise ValueError("Stage-A PWM sampling strategy 'consensus' requires n_sites=1")
 
-    keep_low = strategy == "background"
     width = len(motif.matrix)
+    original_width = width
     if width <= 0:
         raise ValueError(f"PWM motif '{motif.motif_id}' has zero width.")
     if length_policy not in {"exact", "range"}:
-        raise ValueError(f"Unsupported pwm length_policy: {length_policy}")
-    log_odds = motif.log_odds or build_log_odds(motif.matrix, motif.background)
+        raise ValueError(f"Unsupported pwm length.policy: {length_policy}")
+    effective_background = motif.background
+    if bgfile is not None:
+        effective_background = parse_bgfile(bgfile)
+    if effective_background != motif.background:
+        motif = PWMMotif(
+            motif_id=motif.motif_id,
+            matrix=motif.matrix,
+            background=effective_background,
+            log_odds=motif.log_odds,
+        )
+    log_odds = build_log_odds(motif.matrix, effective_background, smoothing_alpha=0.0)
     window_label = "full"
+    trim_window_start = None
+    trim_window_score = None
     if trim_window_length is not None:
+        trim_window_length = int(trim_window_length)
+        log.info(
+            "Stage-A PWM trim configured for motif %s: window_length=%d strategy=%s width=%d",
+            motif.motif_id,
+            trim_window_length,
+            trim_window_strategy,
+            original_width,
+        )
         matrix, log_odds, window_start, window_score = _select_pwm_window(
             matrix=motif.matrix,
             log_odds=log_odds,
             length=int(trim_window_length),
             strategy=str(trim_window_strategy),
         )
+        trim_window_start = int(window_start)
+        trim_window_score = float(window_score)
         width = len(matrix)
         window_label = f"{width}@{window_start}"
+        if width != original_width:
+            log.info(
+                "Stage-A PWM trim applied for motif %s: width %d -> %d (start=%d, score=%.3f)",
+                motif.motif_id,
+                original_width,
+                width,
+                trim_window_start,
+                trim_window_score,
+            )
         log.debug(
-            "PWM sampling trimmed motif %s to window length %d (start=%d, score=%.3f).",
+            "Stage-A PWM sampling trimmed motif %s to window length %d (start=%d, score=%.3f).",
             motif.motif_id,
             width,
             window_start,
@@ -274,142 +209,325 @@ def sample_pwm_sites(
         )
     else:
         matrix = motif.matrix
+    matrix_cdf = _matrix_cdf(matrix)
+    background_cdf = _background_cdf(effective_background)
+    pwm_consensus = _pwm_consensus(matrix)
+    pwm_consensus_iupac = _pwm_consensus_iupac(matrix)
+    pwm_consensus_score = score_sequence(
+        pwm_consensus,
+        matrix,
+        log_odds=log_odds,
+        background=effective_background,
+    )
+    pwm_theoretical_max_score = _pwm_theoretical_max_score(log_odds)
 
-    score_label = f"threshold={score_threshold}" if score_threshold is not None else f"percentile={score_percentile}"
+    score_label = "best_hit_score"
     length_label = str(length_policy)
     if length_policy == "range" and length_range is not None and len(length_range) == 2:
         length_label = f"{length_policy}({length_range[0]}..{length_range[1]})"
 
-    def _select(
-        candidates: List[Tuple[str, float]],
-        *,
-        length_obs: str,
-        cap_applied: bool,
-        requested: int,
-        generated: int,
-        time_limited: bool,
-    ):
-        cap_label = ""
-        if cap_applied and max_candidates is not None:
-            cap_label = f" (capped by max_candidates={max_candidates})"
-        if time_limited and max_seconds is not None:
-            cap_label = f"{cap_label}; max_seconds={max_seconds}" if cap_label else f" (max_seconds={max_seconds})"
-        return select_by_score(
-            candidates,
-            n_sites=n_sites,
-            threshold=score_threshold,
-            percentile=score_percentile,
-            keep_low=keep_low,
-            context={
-                "motif_id": motif.motif_id,
-                "width": width,
-                "strategy": strategy,
-                "length_label": length_label,
-                "window_label": window_label,
-                "length_observed": length_obs,
-                "score_label": score_label,
-                "n_sites": n_sites,
-                "oversample_factor": oversample_factor,
-                "requested_candidates": requested,
-                "generated_candidates": generated,
-                "cap_applied": cap_applied,
-                "cap_label": cap_label,
-                "time_limited": time_limited,
-            },
+    selection_policy = str(selection.policy or "top_score").lower()
+    if selection_policy not in {"top_score", "mmr"}:
+        raise ValueError(f"Stage-A selection.policy must be 'top_score' or 'mmr', got '{selection_policy}'.")
+    selection_alpha = float(selection.alpha)
+    selection_pool_min_score_norm = None
+    selection_pool_max_candidates = None
+    selection_relevance_norm = None
+    selection_pool = selection.pool if selection_policy == "mmr" else None
+    if selection_pool is not None:
+        selection_pool_min_score_norm = selection_pool.min_score_norm
+        selection_pool_max_candidates = selection_pool.max_candidates
+        selection_relevance_norm = str(selection_pool.relevance_norm)
+    selection_rank_by = str(selection.rank_by or "score")
+    if selection_policy == "mmr":
+        selection_alpha = float(selection_alpha)
+        if selection_alpha <= 0.0 or selection_alpha > 1.0:
+            raise ValueError("selection.alpha must be in (0, 1].")
+        if selection_pool is None:
+            raise ValueError("selection.pool must be set when selection.policy=mmr.")
+    validate_mmr_core_length(
+        motif_id=motif.motif_id,
+        motif_width=original_width,
+        selection_policy=selection_policy,
+        length_policy=length_policy,
+        length_range=length_range,
+        trim_window_length=trim_window_length,
+    )
+
+    include_matched_sequence = bool(include_matched_sequence)
+    tier_fractions = list(resolve_tier_fractions(tier_fractions))
+    tier_fractions_source = "sampling.tier_fractions" if tier_fractions else "default"
+
+    budget = mining.budget
+    budget_mode = str(budget.mode or "fixed_candidates").lower()
+    if budget_mode not in {"tier_target", "fixed_candidates"}:
+        raise ValueError(
+            f"pwm.sampling.mining.budget.mode must be 'tier_target' or 'fixed_candidates', got '{budget_mode}'."
         )
+    budget_target_tier_fraction = budget.target_tier_fraction
+    budget_candidates = budget.candidates
+    budget_max_candidates = budget.max_candidates
+    budget_min_candidates = budget.min_candidates
+    budget_max_seconds = budget.max_seconds
+    budget_growth_factor = float(budget.growth_factor)
+    if budget_max_candidates is not None and int(budget_max_candidates) <= 0:
+        raise ValueError("pwm.sampling.mining.budget.max_candidates must be > 0 when set.")
+    if budget_min_candidates is not None and int(budget_min_candidates) <= 0:
+        raise ValueError("pwm.sampling.mining.budget.min_candidates must be > 0 when set.")
+    if (
+        budget_min_candidates is not None
+        and budget_max_candidates is not None
+        and int(budget_min_candidates) > int(budget_max_candidates)
+    ):
+        raise ValueError("pwm.sampling.mining.budget.min_candidates must be <= max_candidates.")
+    if budget_max_seconds is not None and float(budget_max_seconds) <= 0:
+        raise ValueError("pwm.sampling.mining.budget.max_seconds must be > 0 when set.")
+    if budget_growth_factor <= 1.0:
+        raise ValueError("pwm.sampling.mining.budget.growth_factor must be > 1.0")
+    if budget_mode == "fixed_candidates":
+        if budget_candidates is None:
+            raise ValueError("pwm.sampling.mining.budget.candidates must be set when mode=fixed_candidates.")
+        if int(budget_candidates) <= 0:
+            raise ValueError("pwm.sampling.mining.budget.candidates must be > 0.")
+    else:
+        if budget_target_tier_fraction is None:
+            raise ValueError("pwm.sampling.mining.budget.target_tier_fraction is required for mode=tier_target.")
+        if float(budget_target_tier_fraction) <= 0 or float(budget_target_tier_fraction) > 1:
+            raise ValueError("pwm.sampling.mining.budget.target_tier_fraction must be in (0, 1].")
+        if budget_max_candidates is None and budget_max_seconds is None:
+            raise ValueError("pwm.sampling.mining.budget.mode=tier_target requires max_candidates or max_seconds.")
+
+    progress_target_fraction = None
+    progress_accepted_target = None
+    if budget_mode == "tier_target" and budget_target_tier_fraction is not None:
+        progress_target_fraction = float(budget_target_tier_fraction)
+        progress_accepted_target = int(np.ceil(float(n_sites) / progress_target_fraction))
 
     def _resolve_length() -> int:
         if length_policy == "exact":
             return width
         if length_range is None or len(length_range) != 2:
-            raise ValueError("pwm.sampling.length_range must be provided when length_policy=range")
+            raise ValueError("pwm.sampling.length.range must be provided when length.policy=range")
         lo, hi = int(length_range[0]), int(length_range[1])
         if lo <= 0 or hi <= 0:
-            raise ValueError("pwm.sampling.length_range values must be > 0")
+            raise ValueError("pwm.sampling.length.range values must be > 0")
         if lo > hi:
-            raise ValueError("pwm.sampling.length_range must be min <= max")
-        if lo < width:
-            raise ValueError(f"pwm.sampling.length_range min must be >= motif width ({width}), got {lo}")
+            raise ValueError("pwm.sampling.length.range must be min <= max")
         return int(rng.integers(lo, hi + 1))
 
-    def _embed_with_background(seq: str, target_len: int) -> str:
+    def _embed_with_background(seq: str, target_len: int) -> tuple[str, int]:
         if target_len == len(seq):
-            return seq
+            return seq, 0
         extra = target_len - len(seq)
         left_len = int(rng.integers(0, extra + 1))
         right_len = extra - left_len
-        left = sample_sequence_from_background(rng, motif.background, left_len)
-        right = sample_sequence_from_background(rng, motif.background, right_len)
-        return f"{left}{seq}{right}"
+        left = _sample_from_background_cdf(rng, background_cdf, left_len)
+        right = _sample_from_background_cdf(rng, background_cdf, right_len)
+        return f"{left}{seq}{right}", int(left_len)
+
+    progress: _PwmSamplingProgress | None = None
+    mining_batch_size = int(mining.batch_size)
+    mining_log_every = int(mining.log_every_batches)
 
     if strategy == "consensus":
-        seq = "".join(max(row.items(), key=lambda kv: kv[1])[0] for row in matrix)
+        progress = _PwmSamplingProgress(
+            motif_id=motif.motif_id,
+            backend=scoring_backend,
+            target=1,
+            accepted_target=progress_accepted_target,
+            stream=sys.stdout,
+            tier_fractions=tier_fractions,
+            manager=progress_manager,
+            target_fraction=progress_target_fraction,
+        )
         target_len = _resolve_length()
-        full_seq = _embed_with_background(seq, target_len)
-        score = score_sequence(seq, matrix, log_odds=log_odds, background=motif.background)
-        return _select(
-            [(full_seq, score)],
-            length_obs=str(target_len),
-            cap_applied=False,
+        if length_policy == "range" and length_range is not None and target_len < width:
+            window = select_pwm_window_by_length(
+                matrix=matrix,
+                log_odds=log_odds,
+                length=int(target_len),
+                strategy=str(trim_window_strategy),
+            )
+            matrix = window.matrix
+            log_odds = window.log_odds
+            width = len(matrix)
+            if window_label == "full":
+                window_label = f"{width}@{window.start}"
+            else:
+                window_label = f"{window_label}|{width}@{window.start}"
+            matrix_cdf = _matrix_cdf(matrix)
+            pwm_consensus = _pwm_consensus(matrix)
+            pwm_consensus_iupac = _pwm_consensus_iupac(matrix)
+            pwm_consensus_score = score_sequence(
+                pwm_consensus,
+                matrix,
+                log_odds=log_odds,
+                background=effective_background,
+            )
+            pwm_theoretical_max_score = _pwm_theoretical_max_score(log_odds)
+        seq = str(pwm_consensus)
+        full_seq, left_len = _embed_with_background(seq, target_len)
+        intended_start = int(left_len) + 1
+        intended_stop = int(left_len) + int(width)
+        result = run_stage_a_pipeline(
+            rng=rng,
+            motif=motif,
+            matrix=matrix,
+            background_cdf=background_cdf,
+            matrix_cdf=matrix_cdf,
+            width=width,
+            strategy=strategy,
+            length_policy=length_policy,
+            length_range=length_range,
+            mining_batch_size=mining_batch_size,
+            mining_log_every=mining_log_every,
+            budget_mode=budget_mode,
+            budget_growth_factor=budget_growth_factor,
+            budget_max_candidates=budget_max_candidates,
+            budget_min_candidates=budget_min_candidates,
+            budget_max_seconds=budget_max_seconds,
+            budget_target_tier_fraction=budget_target_tier_fraction,
+            n_candidates=1,
             requested=1,
-            generated=1,
-            time_limited=False,
+            n_sites=n_sites,
+            bgfile=Path(bgfile) if bgfile is not None else None,
+            keep_all_candidates_debug=keep_all_candidates_debug,
+            include_matched_sequence=include_matched_sequence,
+            debug_output_dir=debug_output_dir,
+            debug_label=debug_label,
+            motif_hash=motif_hash,
+            input_name=input_name,
+            run_id=run_id,
+            scoring_backend=scoring_backend,
+            uniqueness_key=uniqueness_key,
+            progress=progress,
+            selection_policy=selection_policy,
+            selection_rank_by=selection_rank_by,
+            selection_alpha=selection_alpha,
+            selection_pool_min_score_norm=selection_pool_min_score_norm,
+            selection_pool_max_candidates=selection_pool_max_candidates,
+            selection_relevance_norm=selection_relevance_norm,
+            tier_fractions=tier_fractions,
+            tier_fractions_source=tier_fractions_source,
+            pwm_consensus=pwm_consensus,
+            pwm_consensus_iupac=pwm_consensus_iupac,
+            pwm_consensus_score=pwm_consensus_score,
+            pwm_theoretical_max_score=pwm_theoretical_max_score,
+            length_label=length_label,
+            window_label=window_label,
+            trim_window_length=trim_window_length,
+            trim_window_strategy=str(trim_window_strategy) if trim_window_length is not None else None,
+            trim_window_start=trim_window_start,
+            trim_window_score=trim_window_score,
+            score_label=score_label,
+            return_summary=return_summary,
+            provided_sequences=[full_seq],
+            intended_core_by_seq={full_seq: (intended_start, intended_stop)},
+            core_offset_by_seq={full_seq: int(left_len)},
         )
+        selected = result.sequences
+        meta = result.meta_by_seq
+        summary = result.summary
+        if return_summary and summary is None:
+            raise ValueError("Stage-A summary missing from pipeline result.")
+        if return_metadata and return_summary:
+            return selected, meta, summary
+        if return_metadata:
+            return selected, meta
+        if return_summary:
+            return selected, summary
+        return selected
 
-    requested_candidates = max(1, n_sites * oversample_factor)
-    n_candidates = requested_candidates
-    cap_applied = False
-    if max_candidates is not None:
-        cap_val = int(max_candidates)
-        if cap_val <= 0:
-            raise ValueError("max_candidates must be > 0 when set")
-        if requested_candidates > cap_val:
-            n_candidates = cap_val
-            cap_applied = True
-            log.warning(
-                "PWM sampling capped candidate generation for motif %s: requested=%d max_candidates=%d",
-                motif.motif_id,
-                requested_candidates,
-                cap_val,
-            )
-    n_candidates = max(1, n_candidates)
-    candidates: List[Tuple[str, float]] = []
-    lengths: List[int] = []
-    start = time.monotonic()
-    time_limited = False
-    for _ in range(n_candidates):
-        if max_seconds is not None and candidates:
-            if (time.monotonic() - start) >= float(max_seconds):
-                time_limited = True
-                break
-        target_len = _resolve_length()
-        lengths.append(int(target_len))
-        if strategy == "background":
-            core = sample_sequence_from_background(rng, motif.background, width)
-        else:
-            core = sample_sequence_from_pwm(rng, matrix)
-        full_seq = _embed_with_background(core, target_len)
-        candidates.append(
-            (
-                full_seq,
-                score_sequence(core, matrix, log_odds=log_odds, background=motif.background),
-            )
-        )
-    if time_limited:
-        log.warning(
-            "PWM sampling hit max_seconds for motif %s: generated=%d requested=%d",
-            motif.motif_id,
-            len(candidates),
-            requested_candidates,
-        )
-    length_obs = "-"
-    if lengths:
-        length_obs = f"{min(lengths)}..{max(lengths)}" if min(lengths) != max(lengths) else str(lengths[0])
-    return _select(
-        candidates,
-        length_obs=length_obs,
-        cap_applied=cap_applied,
-        requested=requested_candidates,
-        generated=len(candidates),
-        time_limited=time_limited,
+    if budget_mode == "fixed_candidates":
+        requested_candidates = max(1, int(budget_candidates))
+    else:
+        base_target = int(mining.batch_size)
+        if budget_min_candidates is not None:
+            base_target = max(int(base_target), int(budget_min_candidates))
+        requested_candidates = max(1, int(base_target))
+        if budget_max_candidates is not None:
+            requested_candidates = min(requested_candidates, int(budget_max_candidates))
+    n_candidates = max(1, int(requested_candidates))
+    if budget_mode == "fixed_candidates":
+        progress_target = int(budget_candidates)
+    elif budget_max_candidates is not None:
+        progress_target = int(budget_max_candidates)
+    elif budget_max_seconds is not None:
+        progress_target = 0
+    else:
+        progress_target = int(requested_candidates)
+    progress = _PwmSamplingProgress(
+        motif_id=motif.motif_id,
+        backend=scoring_backend,
+        target=progress_target,
+        accepted_target=progress_accepted_target,
+        stream=sys.stdout,
+        tier_fractions=tier_fractions,
+        manager=progress_manager,
+        target_fraction=progress_target_fraction,
     )
+    result = run_stage_a_pipeline(
+        rng=rng,
+        motif=motif,
+        matrix=matrix,
+        background_cdf=background_cdf,
+        matrix_cdf=matrix_cdf,
+        width=width,
+        strategy=strategy,
+        length_policy=length_policy,
+        length_range=length_range,
+        mining_batch_size=mining_batch_size,
+        mining_log_every=mining_log_every,
+        budget_mode=budget_mode,
+        budget_growth_factor=budget_growth_factor,
+        budget_max_candidates=budget_max_candidates,
+        budget_min_candidates=budget_min_candidates,
+        budget_max_seconds=budget_max_seconds,
+        budget_target_tier_fraction=budget_target_tier_fraction,
+        n_candidates=n_candidates,
+        requested=requested_candidates,
+        n_sites=n_sites,
+        bgfile=Path(bgfile) if bgfile is not None else None,
+        keep_all_candidates_debug=keep_all_candidates_debug,
+        include_matched_sequence=include_matched_sequence,
+        debug_output_dir=debug_output_dir,
+        debug_label=debug_label,
+        motif_hash=motif_hash,
+        input_name=input_name,
+        run_id=run_id,
+        scoring_backend=scoring_backend,
+        uniqueness_key=uniqueness_key,
+        progress=progress,
+        selection_policy=selection_policy,
+        selection_rank_by=selection_rank_by,
+        selection_alpha=selection_alpha,
+        selection_pool_min_score_norm=selection_pool_min_score_norm,
+        selection_pool_max_candidates=selection_pool_max_candidates,
+        selection_relevance_norm=selection_relevance_norm,
+        tier_fractions=tier_fractions,
+        tier_fractions_source=tier_fractions_source,
+        pwm_consensus=pwm_consensus,
+        pwm_consensus_iupac=pwm_consensus_iupac,
+        pwm_consensus_score=pwm_consensus_score,
+        pwm_theoretical_max_score=pwm_theoretical_max_score,
+        length_label=length_label,
+        window_label=window_label,
+        trim_window_length=trim_window_length,
+        trim_window_strategy=str(trim_window_strategy) if trim_window_length is not None else None,
+        trim_window_start=trim_window_start,
+        trim_window_score=trim_window_score,
+        score_label=score_label,
+        return_summary=return_summary,
+    )
+    selected = result.sequences
+    meta = result.meta_by_seq
+    summary = result.summary
+    if return_summary and summary is None:
+        raise ValueError("Stage-A summary missing from pipeline result.")
+    if return_metadata and return_summary:
+        return selected, meta, summary
+    if return_metadata:
+        return selected, meta
+    if return_summary:
+        return selected, summary
+    return selected

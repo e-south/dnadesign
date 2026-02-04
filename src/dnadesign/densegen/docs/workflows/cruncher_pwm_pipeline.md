@@ -1,73 +1,166 @@
-## Cruncher to DenseGen PWM workflow (artifact-first)
+## Cruncher to DenseGen (PWM handoff)
 
-This workflow demonstrates a decoupled path where Cruncher exports PWM artifacts
-and DenseGen consumes them via `pwm_artifact_set`. The DenseGen config remains the
-single source of truth for runtime sampling behavior.
+Below is a walkthrough that uses **Cruncher** commands to fetch binding sites for select transcription factors. **Cruncher** then exports per-motif JSON artifacts which DenseGen consumes for Stage-A PWM sampling.
 
-### 1) Ensure Cruncher has motifs cached
+---
 
-Use the demo workspace if you want a reproducible example:
+### Three-TF prep (lexA, cpxR, baeR)
 
-```bash
-uv run cruncher fetch motifs --source demo_local_meme --tf lexA --tf cpxR -c src/dnadesign/cruncher/workspaces/demo_basics_two_tf/config.yaml
-```
+This workflow fetches TFBS, runs MEME discovery, and exports DenseGen-ready artifacts.
+It also documents provenance for the demo sources beyond RegulonDB.
 
-### 2) Export DenseGen motif artifacts (one file per motif)
+Assumptions for this example:
 
-```bash
-uv run cruncher catalog export-densegen \
-  -c src/dnadesign/cruncher/workspaces/demo_basics_two_tf/config.yaml \
-  --tf lexA --tf cpxR --source demo_local_meme \
-  --out /path/to/densegen-run/inputs/motif_artifacts \
-  --background record \
-  --pseudocount 0.01
-```
+- **lexA** and **cpxR** have local DAP-seq MEME files (demo_local_meme) under
+  `src/dnadesign/cruncher/workspaces/densegen_prep_three_tf/inputs/local_motifs/`.
+- **baeR** comes from a processed ChIP-exo FASTA (Choudhary et al. 2020, DOI:
+  10.1128/mSystems.00980-20) stored in the sibling repo `dnadesign-data` under
+  `primary_literature/Choudhary_et_al/processed/BaeR_binding_sites.fasta`.
+  The FASTA already contains binding-site sequences; no additional genomic
+  coordinate processing is required.
+- RegulonDB curated sites are used as a supplement (baeR by default; lexA/cpxR
+  optionally) so discovery can merge across sources.
 
-This writes per-motif JSON files plus an `artifact_manifest.json` for inspection. Any directory
-works; keeping artifacts under the DenseGen run `inputs/` directory keeps the workspace
-self-contained.
-
-### 3) Point DenseGen at the artifacts
+The dedicated config lives at `src/dnadesign/cruncher/workspaces/densegen_prep_three_tf/config.yaml`.
 
 ```yaml
-densegen:
-inputs:
-    - name: lexA_cpxR
-      type: pwm_artifact_set
-      paths:
-        - inputs/motif_artifacts/demo_local_meme__lexA.json
-        - inputs/motif_artifacts/demo_local_meme__cpxR.json
-      sampling:
-        strategy: stochastic
-        n_sites: 80
-        oversample_factor: 10
-        score_percentile: 90
-        length_policy: exact
+cruncher:
+  out_dir: outputs  # workspace-local outputs
+  regulator_sets:  # three TFs for discovery + export
+    - [lexA, cpxR, baeR]
+
+  motif_store:
+    source_preference: [meme_suite_meme, meme_suite_streme, demo_local_meme, regulondb]
+    combine_sites: true                # merge per-TF sites across sources for discovery
+    site_window_lengths:               # fixed windows if site-derived PWMs are used
+      lexA: 20  # bp window
+      cpxR: 20  # bp window
+      baeR: 20  # bp window
+
+  motif_discovery:
+    tool: meme                         # prefer MEME explicitly
+    meme_mod: oops                     # each site is one motif
+    meme_prior: addone                 # stabilize sparse site sets
+    source_id: meme_suite_meme         # must match source_preference
+
+  ingest:
+    regulondb:
+      curated_sites: true              # curated RegulonDB sites
+      ht_sites: false                  # keep HT off in this walkthrough
+    local_sources:
+      - source_id: demo_local_meme     # local DAP-seq MEME files
+        root: inputs/local_motifs      # demo motifs directory
+        patterns: ["*.txt"]            # MEME text files
+        format_map: {".txt": "MEME"}   # explicit parser mapping
+        extract_sites: true            # include MEME BLOCKS sites
+        tf_name_strategy: stem         # TF names from filenames
+    site_sources:
+      - source_id: baer_chip_exo
+        description: Choudhary et al. BaeR ChIP-exo binding sites (processed FASTA)
+        path: ../../../../../../dnadesign-data/primary_literature/Choudhary_et_al/processed/BaeR_binding_sites.fasta
+        tf_name: BaeR
+        record_kind: chip_exo
+        organism:
+          name: Escherichia coli
+          strain: K-12 MG1655
+          assembly: NC_000913.3
+        citation: "Choudhary et al. 2020 (DOI: 10.1128/mSystems.00980-20"
+        source_url: https://doi.org/10.1128/mSystems.00980-20
+        tags:
+          assay: chip_exo
+          doi: 10.1128/mSystems.00980-20
+
+  parse:
+    plot:
+      logo: true                       # enable PWM logos for parse
+      bits_mode: information           # logo scale
+      dpi: 150                         # plot resolution
 ```
 
-PWM sampling is stochastic. Under schema `2.2+`, `pool_strategy: subsample` will resample
-reactively on stalls/duplicate guards, while `iterative_subsample` resamples proactively
-after `arrays_generated_before_resample` or when a library under-produces.
-
-### 4) Run DenseGen
+#### Fetch sources + run MEME
 
 ```bash
-uv run dense validate -c path/to/config.yaml
-uv run dense describe -c path/to/config.yaml
-uv run dense run -c path/to/config.yaml --no-plot
+# Option A: cd into the dedicated cruncher workspace
+cd src/dnadesign/cruncher/workspaces/densegen_prep_three_tf
+CONFIG="$PWD/config.yaml"
+
+# Option B: run from anywhere in the repo
+# CONFIG=src/dnadesign/cruncher/workspaces/densegen_prep_three_tf/config.yaml
+
+# Use pixi as the default runner (avoid alias collisions).
+unalias cruncher 2>/dev/null
+cruncher() { pixi run cruncher -- "$@"; }
+
+# Local DAP-seq motifs + sites (lexA/cpxR only).
+cruncher fetch motifs --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
+cruncher fetch sites  --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
+
+# BaeR ChIP-exo sites (Choudhary et al. FASTA).
+cruncher fetch sites --source baer_chip_exo --tf baeR --update -c "$CONFIG"
+
+# RegulonDB curated sites (supplemental; merges with local sources).
+cruncher fetch sites --tf baeR --update -c "$CONFIG"
+
+# Optional: if you want lexA/cpxR discovery to include curated sites too.
+# cruncher fetch sites --tf lexA --tf cpxR --update -c "$CONFIG"
+
+# Verify MEME Suite before discovery.
+cruncher doctor -c "$CONFIG"
+
+# MEME discovery (preferred) so all three TFs have consistent PWMs.
+cruncher discover motifs --tf lexA --tf cpxR --tf baeR --tool meme --meme-mod oops --meme-prior addone --source-id meme_suite_meme -c "$CONFIG"
+
+# Render PWM logos for grounding/QA.
+cruncher catalog logos --source meme_suite_meme --set 1 -c "$CONFIG"
+
+# Pin exact motif IDs/hashes for reproducibility.
+cruncher lock -c "$CONFIG"
 ```
 
-### Captured output (excerpt)
+If any TF has zero sites, `discover motifs` and `lock` will fail.
+Stop and resolve the missing source before proceeding (for example, verify the
+ChIP-exo FASTA path for baeR or adjust your RegulonDB query).
 
-```
-INFO | dnadesign.densegen.src.core.pipeline | PWM input sampling for lexA_cpxR: motifs=2 | sites=lexA x 80, cpxR x 80 | strategy=stochastic | score=percentile=90 | oversample=10 | length=exact
-INFO | dnadesign.densegen.src.core.pipeline | Library for lexA_cpxR/lexA_cpxR: 16 motifs | TF counts: lexA x 8, cpxR x 8 | target=180 achieved=192 pool=subsample
-INFO | dnadesign.densegen.src.core.pipeline | [lexA_cpxR/lexA_cpxR] 8/8 (100.00%) (local 8/8) CR=1.050 | seq ...
+Logos are saved under `outputs/logos/catalog/` (the command prints the exact path).
+
+#### Export into a DenseGen workspace
+
+```bash
+cruncher catalog export-densegen --set 1 --densegen-workspace demo_meme_three_tfs -c "$CONFIG"
+cruncher catalog export-sites   --set 1 --densegen-workspace demo_meme_three_tfs --overwrite -c "$CONFIG"
 ```
 
-DenseGen writes `outputs/meta/inputs_manifest.json` plus run-scoped library artifacts under `outputs/`
-(`outputs/attempts.parquet`),
-capturing resolved PWM sampling settings and the exact TFBS library offered to the solver.
+These commands write motif JSONs for **lexA**, **cpxR**, and **baeR** under
+`src/dnadesign/densegen/workspaces/demo_meme_three_tfs/inputs/motif_artifacts/`,
+which the DenseGen demo config references directly.
+
+If you regenerate motifs, make sure the DenseGen config points at the newly
+exported motif IDs (or update from `artifact_manifest.json`).
+`catalog export-densegen` removes existing artifact JSONs for the selected TFs
+by default; use `--no-clean` if you want to keep prior artifacts.
+
+---
+
+### DenseGen inputs
+
+- `type: pwm_artifact_set` for PWM artifacts
+- `type: binding_sites` for exported site tables (optional)
+
+See `reference/config.md` for exact fields.
+
+### DenseGen plan intent (demo_meme_three_tfs)
+
+The packaged DenseGen demo (`workspaces/demo_meme_three_tfs/config.yaml`) adds a
+`background_pool` input to generate neutral 16–20 bp parts via FIMO‑based negative
+selection against LexA/CpxR/BaeR PWMs. Plan‑scoped pooling then builds four libraries:
+
+- `controls` (background only)
+- `ethanol` (CpxR/BaeR + background)
+- `ciprofloxacin` (LexA + background)
+- `ethanol_ciprofloxacin` (LexA + CpxR/BaeR + background)
+
+This layout yields monotypic and heterotypic architectures while preventing
+unintended motif carryover between plans.
 
 ---
 

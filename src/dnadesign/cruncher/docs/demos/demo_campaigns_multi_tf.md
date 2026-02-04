@@ -4,12 +4,25 @@
 
 This demo walks through a process of running category-based sequence optimization campaigns, with a focus on campaign selection (site counts + PWM quality), derived configs, and multi-TF runs.
 
+Scoring is **FIMO-like** (internal implementation): cruncher uses PWM log‑odds
+scanning against a 0‑order background, takes the best window per TF (optionally
+both strands), and can convert that best hit to a p‑value via a DP‑derived null
+distribution (`score_scale: logp`, with `p_seq = 1 − (1 − p_win)^n_windows`).
+
 ### Demo instance
 
 - **Workspace**: `src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf/`
 - **Config**: `config.yaml`
 - **Output root**: `outputs/` (relative to the workspace; runs live under `outputs/<stage>/<run_name>/`)
 - **Motif flow**: fetch sites → discover MEME/STREME motifs → lock/sample using those matrices
+
+### Data provenance (demo inputs)
+
+This demo uses multiple local and remote sources so you can see how site merging works beyond RegulonDB:
+
+- **Local DAP-seq motifs + training sites**: O'Malley et al. 2021 (DOI: 10.1038/s41592-021-01312-2), bundled as MEME files under `inputs/local_motifs/` via the `demo_local_meme` source.
+- **Local BaeR ChIP-exo binding sites**: Choudhary et al. 2020 (DOI: 10.1128/mSystems.00980-20), processed FASTA in `dnadesign-data/primary_literature/Choudhary_et_al/processed/BaeR_binding_sites.fasta` ingested as a site-only source.
+- **Curated/HT sites**: RegulonDB (as configured under `ingest.regulondb`).
 
 ### Enter the demo workspace
 
@@ -134,10 +147,10 @@ Use `--keep-existing` to retain historical runs.
 ```bash
 cruncher discover check -c "$CONFIG"
 cruncher discover motifs --tf lexA --tf cpxR --tool streme --source-id meme_suite_streme -c "$CONFIG"
-cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --source-id meme_suite_meme -c "$CONFIG"
+cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --meme-prior addone --source-id meme_suite_meme -c "$CONFIG"
 ```
 
-Tip: if each sequence represents one site, prefer MEME with `--meme-mod oops`.
+Tip: if each sequence represents one site, prefer MEME with `--meme-mod oops` and `--meme-prior addone`.
 
 How to read the outputs:
 

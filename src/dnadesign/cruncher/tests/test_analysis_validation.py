@@ -21,7 +21,7 @@ from pydantic import ValidationError
 from dnadesign.cruncher.analysis.per_pwm import gather_per_pwm_scores
 from dnadesign.cruncher.analysis.plots.diagnostics import make_pair_idata
 from dnadesign.cruncher.analysis.plots.scatter import _normalize_threshold_points, plot_scatter
-from dnadesign.cruncher.analysis.plots.summary import write_elite_topk
+from dnadesign.cruncher.analysis.plots.summary import write_elite_topk, write_score_summary
 from dnadesign.cruncher.app.analyze_workflow import _get_git_commit
 from dnadesign.cruncher.artifacts.layout import elites_path, manifest_path, sequences_path
 from dnadesign.cruncher.config.load import load_config
@@ -314,3 +314,15 @@ def test_normalize_threshold_points_scales_values() -> None:
     points = [(2.0, 6.0, "a"), (1.0, 3.0, "b")]
     normalized = _normalize_threshold_points(points, cons_x=2.0, cons_y=3.0)
     assert normalized == [(1.0, 2.0, "a"), (0.5, 1.0, "b")]
+
+
+def test_write_score_summary_handles_pyarrow_strings(tmp_path: Path) -> None:
+    score_df = pd.DataFrame({"score_lexA": [0.1, 0.2], "score_cpxR": [0.3, 0.4]})
+    out_path = tmp_path / "score_summary.parquet"
+    previous = pd.options.mode.string_storage
+    pd.options.mode.string_storage = "pyarrow"
+    try:
+        write_score_summary(score_df, ["lexA", "cpxR"], out_path)
+    finally:
+        pd.options.mode.string_storage = previous
+    assert out_path.exists()

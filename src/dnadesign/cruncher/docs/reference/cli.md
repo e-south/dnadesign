@@ -475,8 +475,16 @@ Examples:
 * `cruncher catalog pwms <config>`
 * `cruncher catalog pwms --set 1 <config>`
 * `cruncher catalog export-sites --set 1 --out densegen/sites.csv <config>`
+* `cruncher catalog export-sites --set 1 --densegen-workspace demo_meme_three_tfs <config>`
 * `cruncher catalog export-densegen --set 1 --out densegen/pwms <config>`
+* `cruncher catalog export-densegen --set 1 --densegen-workspace demo_meme_three_tfs <config>`
 * `cruncher catalog logos --set 1 <config>`
+
+`catalog export-densegen` and `catalog export-sites` accept `--densegen-workspace` (workspace
+name under `src/dnadesign/densegen/workspaces/` or an absolute path). When provided, outputs
+default to the workspace `inputs/` locations and must stay within that directory.
+`catalog export-densegen` removes existing artifact JSONs for the selected TFs by default; use
+`--no-clean` to keep prior artifacts.
 
 ---
 
@@ -503,8 +511,9 @@ Examples:
 * `cruncher discover motifs --tf lexA --tf cpxR --tool streme <config>`
 * `cruncher discover motifs --tf lexA --tf cpxR --tool meme <config>`
 * `cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops <config>`
+* `cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --meme-prior addone <config>`
 * `cruncher discover motifs --tf lexA --tf cpxR --tool streme --source-id meme_suite_streme <config>`
-* `cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --source-id meme_suite_meme <config>`
+* `cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --meme-prior addone --source-id meme_suite_meme <config>`
 * `cruncher discover motifs --tf lexA --tool streme --replace-existing <config>`
 * `cruncher discover motifs --tool-path /opt/meme/bin --tool streme <config>`
 * `cruncher discover check <config>`
@@ -525,6 +534,7 @@ Notes:
 * By default discovery replaces previous discovered motifs for the same TF/source
   (`motif_discovery.replace_existing=true`). Pass `--keep-existing` to retain historical runs.
 * `--meme-mod` applies to MEME only; use it when each sequence is expected to contain one site.
+* `--meme-prior` applies to MEME only; `addone` is a good default for sparse site sets.
 * Use `--tool-path` or the `MEME_BIN` environment variable to point at a specific install.
   Relative `--tool-path` values resolve from the config file location.
 * MEME Suite is a system dependency; install `streme`/`meme` via your system package manager,

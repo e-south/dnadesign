@@ -18,8 +18,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, List
 
+from ...config import PWMSamplingConfig
+from ...core.artifacts.ids import hash_pwm_motif, hash_tfbs_id
+from ...core.run_paths import candidates_root
 from .base import BaseDataSource, resolve_path
-from .pwm_sampling import PWMMotif, normalize_background, sample_pwm_sites
+from .pwm_sampling import sample_pwm_sites, sampling_kwargs_from_config, validate_mmr_core_length
+from .stage_a.stage_a_sampling_utils import normalize_background
+from .stage_a.stage_a_types import PWMMotif
 
 _SUPPORTED_SCHEMA_VERSIONS = {"1.0"}
 _BASES = ("A", "C", "G", "T")
@@ -150,54 +155,110 @@ def load_artifact(path: Path) -> PWMMotif:
 class PWMArtifactDataSource(BaseDataSource):
     path: str
     cfg_path: Path
-    sampling: dict
+    sampling: PWMSamplingConfig
+    input_name: str
 
-    def load_data(self, *, rng=None):
+    def load_data(self, *, rng=None, outputs_root: Path | None = None, run_id: str | None = None):
         if rng is None:
-            raise ValueError("PWM sampling requires an RNG; pass the pipeline RNG explicitly.")
+            raise ValueError("Stage-A PWM sampling requires an RNG; pass the pipeline RNG explicitly.")
         artifact_path = resolve_path(self.cfg_path, self.path)
         if not (artifact_path.exists() and artifact_path.is_file()):
             raise FileNotFoundError(f"PWM artifact not found. Looked here:\n  - {artifact_path}")
 
         motif = _load_artifact(artifact_path)
+        motif_hash = hash_pwm_motif(
+            motif_label=motif.motif_id,
+            matrix=motif.matrix,
+            background=motif.background,
+            source_kind="pwm_artifact",
+        )
 
-        sampling = dict(self.sampling or {})
-        strategy = str(sampling.get("strategy", "stochastic"))
-        n_sites = int(sampling.get("n_sites"))
-        oversample_factor = int(sampling.get("oversample_factor", 10))
-        max_candidates = sampling.get("max_candidates")
-        max_seconds = sampling.get("max_seconds")
-        threshold = sampling.get("score_threshold")
-        percentile = sampling.get("score_percentile")
-        length_policy = str(sampling.get("length_policy", "exact"))
-        length_range = sampling.get("length_range")
-        trim_window_length = sampling.get("trim_window_length")
-        trim_window_strategy = sampling.get("trim_window_strategy", "max_info")
+        sampling_kwargs = sampling_kwargs_from_config(self.sampling)
+        selection_cfg = sampling_kwargs.get("selection")
+        selection_policy = str(getattr(selection_cfg, "policy", None) or "top_score")
+        validate_mmr_core_length(
+            motif_id=motif.motif_id,
+            motif_width=len(motif.matrix),
+            selection_policy=selection_policy,
+            length_policy=str(sampling_kwargs.get("length_policy") or "exact"),
+            length_range=sampling_kwargs.get("length_range"),
+            trim_window_length=sampling_kwargs.get("trim_window_length"),
+        )
+        bgfile = sampling_kwargs.get("bgfile")
+        keep_all_candidates_debug = bool(sampling_kwargs.get("keep_all_candidates_debug", False))
+        bgfile_path: Path | None = None
+        if bgfile is not None:
+            bgfile_path = resolve_path(self.cfg_path, str(bgfile))
+            if not (bgfile_path.exists() and bgfile_path.is_file()):
+                raise FileNotFoundError(f"Stage-A PWM sampling bgfile not found. Looked here:\n  - {bgfile_path}")
+        debug_output_dir: Path | None = None
+        if keep_all_candidates_debug:
+            if outputs_root is None:
+                raise ValueError("keep_all_candidates_debug requires outputs_root to be set.")
+            if run_id is None:
+                raise ValueError("keep_all_candidates_debug requires run_id to be set.")
+            debug_output_dir = candidates_root(Path(outputs_root), run_id) / self.input_name
 
-        selected = sample_pwm_sites(
+        return_meta = True
+        result = sample_pwm_sites(
             rng,
             motif,
-            strategy=strategy,
-            n_sites=n_sites,
-            oversample_factor=oversample_factor,
-            max_candidates=max_candidates,
-            max_seconds=max_seconds,
-            score_threshold=threshold,
-            score_percentile=percentile,
-            length_policy=length_policy,
-            length_range=length_range,
-            trim_window_length=trim_window_length,
-            trim_window_strategy=str(trim_window_strategy),
+            input_name=self.input_name,
+            motif_hash=motif_hash,
+            run_id=run_id,
+            mining=sampling_kwargs["mining"],
+            bgfile=bgfile_path,
+            keep_all_candidates_debug=keep_all_candidates_debug,
+            include_matched_sequence=sampling_kwargs["include_matched_sequence"],
+            uniqueness_key=sampling_kwargs["uniqueness_key"],
+            selection=sampling_kwargs["selection"],
+            debug_output_dir=debug_output_dir,
+            debug_label=f"{artifact_path.stem}__{motif.motif_id}",
+            length_policy=sampling_kwargs["length_policy"],
+            length_range=sampling_kwargs["length_range"],
+            trim_window_length=sampling_kwargs["trim_window_length"],
+            trim_window_strategy=str(sampling_kwargs["trim_window_strategy"]),
+            return_metadata=return_meta,
+            return_summary=True,
+            strategy=str(sampling_kwargs["strategy"]),
+            n_sites=int(sampling_kwargs["n_sites"]),
         )
+        if return_meta:
+            selected, meta_by_seq, summary = result  # type: ignore[misc]
+        else:
+            selected, summary = result  # type: ignore[assignment]
+            meta_by_seq = {}
 
         entries = [(motif.motif_id, seq, str(artifact_path)) for seq in selected]
         import pandas as pd
 
-        df_out = pd.DataFrame(
-            {
-                "tf": [motif.motif_id] * len(selected),
-                "tfbs": selected,
-                "source": [str(artifact_path)] * len(selected),
+        rows = []
+        scoring_backend = "fimo"
+        for seq in selected:
+            meta = meta_by_seq[seq] if return_meta else None
+            start = meta.fimo_start if meta is not None else None
+            stop = meta.fimo_stop if meta is not None else None
+            strand = meta.fimo_strand if meta is not None else None
+            tfbs_id = hash_tfbs_id(
+                motif_id=motif_hash,
+                sequence=seq,
+                scoring_backend=scoring_backend,
+                matched_start=int(start) if start is not None else None,
+                matched_stop=int(stop) if stop is not None else None,
+                matched_strand=str(strand) if strand is not None else None,
+            )
+            row = {
+                "tf": motif.motif_id,
+                "tfbs": seq,
+                "regulator_id": motif.motif_id,
+                "tfbs_sequence": seq,
+                "source": str(artifact_path),
+                "motif_id": motif_hash,
+                "tfbs_id": tfbs_id,
             }
-        )
-        return entries, df_out
+            if meta is not None:
+                row.update(meta.to_dict())
+            rows.append(row)
+        df_out = pd.DataFrame(rows)
+        summaries = [summary] if summary is not None else []
+        return entries, df_out, summaries

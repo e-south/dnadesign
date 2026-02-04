@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dnadesign.densegen.src.core.pipeline import _compute_sampling_fraction, _compute_sampling_fraction_pairs
+from dnadesign.densegen.src.core.pipeline.stage_b import _compute_sampling_fraction, _compute_sampling_fraction_pairs
 
 
 def test_sampling_fraction_bounded_with_duplicates() -> None:

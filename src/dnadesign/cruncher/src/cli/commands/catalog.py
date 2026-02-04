@@ -10,6 +10,7 @@ Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -46,7 +47,7 @@ from dnadesign.cruncher.store.catalog_store import CatalogMotifStore
 from dnadesign.cruncher.store.motif_store import MotifRef
 from dnadesign.cruncher.utils.hashing import sha256_bytes, sha256_lines, sha256_path
 from dnadesign.cruncher.utils.paths import resolve_catalog_root
-from dnadesign.cruncher.viz.logos import logo_subtitle, site_entries_for_logo
+from dnadesign.cruncher.viz.logos import logo_subtitle, logo_title, site_entries_for_logo
 from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
 
 app = typer.Typer(no_args_is_help=True, help="Query or inspect cached motifs and binding sites.")
@@ -93,6 +94,70 @@ def _dedupe(values: Sequence[str]) -> list[str]:
         output.append(value)
         seen.add(value)
     return output
+
+
+def _densegen_workspaces_root(config_path: Path) -> Path | None:
+    for parent in (config_path.parent, *config_path.parents):
+        candidate = parent / "src" / "dnadesign" / "densegen" / "workspaces"
+        if candidate.is_dir():
+            return candidate.resolve()
+    return None
+
+
+def _resolve_densegen_workspace(selector: str, *, config_path: Path) -> Path:
+    raw = str(selector or "").strip()
+    if not raw:
+        raise typer.BadParameter("--densegen-workspace must be a non-empty string.")
+    candidate = Path(raw).expanduser()
+    looks_like_path = candidate.is_absolute() or any(sep in raw for sep in (os.sep, os.altsep) if sep)
+    if looks_like_path or candidate.exists():
+        resolved = candidate
+        if not resolved.is_absolute():
+            resolved = (Path.cwd() / resolved).resolve()
+    else:
+        root = _densegen_workspaces_root(config_path)
+        if root is None:
+            raise typer.BadParameter(
+                "Unable to locate DenseGen workspaces root relative to the cruncher config. "
+                "Pass --densegen-workspace as an absolute path."
+            )
+        resolved = (root / raw).resolve()
+    if not resolved.exists():
+        raise typer.BadParameter(f"DenseGen workspace not found: {resolved}")
+    if not resolved.is_dir():
+        raise typer.BadParameter(f"DenseGen workspace is not a directory: {resolved}")
+    config_candidate = resolved / "config.yaml"
+    if not config_candidate.is_file():
+        raise typer.BadParameter(f"DenseGen workspace missing config.yaml: {config_candidate}")
+    inputs_root = resolved / "inputs"
+    if not inputs_root.is_dir():
+        raise typer.BadParameter(f"DenseGen workspace missing inputs/ directory: {inputs_root}")
+    return resolved
+
+
+def _require_densegen_inputs_path(path: Path, *, inputs_root: Path, label: str) -> Path:
+    resolved = path.resolve()
+    try:
+        resolved.relative_to(inputs_root.resolve())
+    except ValueError as exc:
+        raise typer.BadParameter(f"{label} must be under {inputs_root} when --densegen-workspace is set.") from exc
+    return resolved
+
+
+def _remove_existing_artifacts(out_dir: Path, *, tf_names: Sequence[str]) -> int:
+    stems = {_safe_stem(name) for name in tf_names if name}
+    if not stems:
+        return 0
+    prefixes = {f"{stem}__" for stem in stems}
+    singles = {f"{stem}.json" for stem in stems}
+    removed = 0
+    for path in out_dir.glob("*.json"):
+        if path.name == "artifact_manifest.json":
+            continue
+        if path.name in singles or any(path.name.startswith(prefix) for prefix in prefixes):
+            path.unlink()
+            removed += 1
+    return removed
 
 
 def _logo_manifest_path(out_dir: Path) -> Path:
@@ -986,8 +1051,13 @@ def export_densegen(
         "--source",
         help="Limit TF resolution to a single source adapter.",
     ),
-    out_dir: Path = typer.Option(
-        ...,
+    densegen_workspace: str | None = typer.Option(
+        None,
+        "--densegen-workspace",
+        help="DenseGen workspace name or path (defaults --out to inputs/motif_artifacts).",
+    ),
+    out_dir: Path | None = typer.Option(
+        None,
         "--out",
         "-o",
         help="Directory to write DenseGen motif artifacts.",
@@ -1007,6 +1077,11 @@ def export_densegen(
         "--producer",
         help="Producer label for DenseGen artifacts.",
     ),
+    clean: bool = typer.Option(
+        True,
+        "--clean/--no-clean",
+        help="Remove existing motif artifacts for selected TFs before export.",
+    ),
     overwrite: bool = typer.Option(False, "--overwrite", help="Allow overwriting existing files."),
 ) -> None:
     try:
@@ -1019,6 +1094,16 @@ def export_densegen(
         raise typer.BadParameter("--background must be 'record', 'uniform', or 'matrix'.")
     if not producer.strip():
         raise typer.BadParameter("--producer must be a non-empty string.")
+    densegen_root = None
+    if densegen_workspace:
+        densegen_root = _resolve_densegen_workspace(densegen_workspace, config_path=config_path)
+        inputs_root = densegen_root / "inputs"
+        if out_dir is None:
+            out_dir = inputs_root / "motif_artifacts"
+        else:
+            out_dir = _require_densegen_inputs_path(out_dir, inputs_root=inputs_root, label="--out")
+    if out_dir is None:
+        raise typer.BadParameter("--out is required when --densegen-workspace is not set.")
 
     try:
         targets, catalog = _resolve_targets(
@@ -1037,6 +1122,11 @@ def export_densegen(
     catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
     out_dir = out_dir.resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    if clean:
+        removed = _remove_existing_artifacts(out_dir, tf_names=[target.tf_name for target in targets])
+        if removed:
+            console.print(f"[dim]Removed {removed} existing artifact(s) for selected TFs.[/]")
 
     manifest_entries: list[dict[str, object]] = []
     table = Table(title="DenseGen motif artifacts", header_style="bold")
@@ -1117,8 +1207,13 @@ def export_sites(
         "--source",
         help="Limit TF resolution to a single source adapter.",
     ),
-    out_path: Path = typer.Option(
-        ...,
+    densegen_workspace: str | None = typer.Option(
+        None,
+        "--densegen-workspace",
+        help="DenseGen workspace name or path (defaults --out to inputs/densegen_sites.parquet).",
+    ),
+    out_path: Path | None = typer.Option(
+        None,
         "--out",
         "-o",
         help="Output file path (.csv or .parquet).",
@@ -1136,6 +1231,16 @@ def export_sites(
         console.print(str(exc))
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
+    densegen_root = None
+    if densegen_workspace:
+        densegen_root = _resolve_densegen_workspace(densegen_workspace, config_path=config_path)
+        inputs_root = densegen_root / "inputs"
+        if out_path is None:
+            out_path = inputs_root / "densegen_sites.parquet"
+        else:
+            out_path = _require_densegen_inputs_path(out_path, inputs_root=inputs_root, label="--out")
+    if out_path is None:
+        raise typer.BadParameter("--out is required when --densegen-workspace is not set.")
 
     try:
         targets, catalog = _resolve_site_targets(
@@ -1152,6 +1257,7 @@ def export_sites(
         raise typer.Exit(code=1)
 
     out_path = out_path.resolve()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     if out_path.exists():
         if out_path.is_dir():
             console.print(f"[red]Output path is a directory:[/] {out_path}")
@@ -1350,12 +1456,18 @@ def logos(
                 combine_sites=cfg.motif_store.combine_sites,
                 site_kinds=cfg.motif_store.site_kinds,
             )
+            title = logo_title(
+                tf_name=target.tf_name,
+                motif_id=target.entry.motif_id,
+                nsites=pwm.nsites,
+            )
             stem = _safe_stem(f"{target.tf_name}_{target.entry.source}_{target.entry.motif_id}")
             out_path = out_base / f"{stem}_logo.png"
             plot_pwm(
                 pwm,
                 mode=resolved_bits_mode,
                 out=out_path,
+                title=title,
                 dpi=resolved_dpi,
                 subtitle=f"sites: {subtitle}" if cfg.motif_store.pwm_source == "sites" else subtitle,
             )

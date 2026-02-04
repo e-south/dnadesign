@@ -40,6 +40,23 @@ def summarize_config(cfg: CruncherConfig) -> Dict[str, Any]:
                 "organism": src.organism.model_dump() if src.organism else None,
             }
         )
+    site_sources = []
+    for src in cfg.ingest.site_sources:
+        site_sources.append(
+            {
+                "source_id": src.source_id,
+                "description": src.description,
+                "path": str(src.path),
+                "tf_name": src.tf_name,
+                "record_kind": src.record_kind,
+                "tags": src.tags,
+                "citation": src.citation,
+                "license": src.license,
+                "source_url": src.source_url,
+                "source_version": src.source_version,
+                "organism": src.organism.model_dump() if src.organism else None,
+            }
+        )
     summary: Dict[str, Any] = {
         "out_dir": str(cfg.out_dir),
         "regulator_sets": cfg.regulator_sets,
@@ -104,6 +121,7 @@ def summarize_config(cfg: CruncherConfig) -> Dict[str, Any]:
                 "ht_binding_mode": cfg.ingest.regulondb.ht_binding_mode,
             },
             "local_sources": local_sources,
+            "site_sources": site_sources,
         },
     }
     if cfg.sample is None:

@@ -100,6 +100,10 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "dnadesign.cruncher.ingest.certs" = ["*.pem"]
+"dnadesign.densegen" = [
+  "workspaces/demo_meme_three_tfs/config.yaml",
+  "workspaces/demo_meme_three_tfs/inputs/*.txt",
+]
 
 [tool.pytest.ini_options]
 addopts = "-ra -q"
@@ -109,6 +113,7 @@ norecursedirs = ["*/archived/*", ".venv", "venv", "build", "dist", "*.egg-info"]
 markers = ["slow: sampling-heavy tests (>10 s)"]
 filterwarnings = [
   "ignore:ArviZ is undergoing a major refactor.*:FutureWarning",
+  "ignore::FutureWarning:arviz.*",
   "ignore:builtin type SwigPyPacked has no __module__ attribute:DeprecationWarning",
   "ignore:builtin type SwigPyObject has no __module__ attribute:DeprecationWarning",
   "ignore:builtin type swigvarlink has no __module__ attribute:DeprecationWarning",

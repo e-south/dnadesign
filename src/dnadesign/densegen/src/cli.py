@@ -6,14 +6,18 @@ dnadesign/densegen/cli.py
 Typer/Rich CLI entrypoint for DenseGen.
 
 Commands:
-  - validate : Validate YAML config (schema + sanity).
-  - plan     : Show resolved per-constraint quota plan.
-  - stage    : Scaffold a new workspace with config.yaml + subfolders.
-  - run      : Execute generation pipeline; optionally auto-plot.
-  - plot     : Generate plots from outputs using config YAML.
-  - ls-plots : List available plot names and descriptions.
-  - summarize : Print an outputs/meta/run_manifest.json summary table.
-  - report   : Generate audit-grade report tables for a run.
+  - validate-config : Validate YAML config (schema + sanity).
+  - inspect inputs  : Show resolved inputs + Stage-A PWM sampling.
+  - inspect plan    : Show resolved per-constraint quota plan.
+  - inspect config  : Describe resolved config (inputs/outputs/solver).
+  - inspect run     : Summarize run manifest or list workspaces.
+  - workspace init  : Scaffold a new workspace with config.yaml + subfolders.
+  - stage-a build-pool : Build Stage-A TFBS pools from inputs.
+  - stage-b build-libraries : Build Stage-B libraries from pools/inputs.
+  - run             : Execute generation pipeline; optionally auto-plot.
+  - plot            : Generate plots from outputs using config YAML.
+  - ls-plots         : List available plot names and descriptions.
+  - report          : Generate audit-grade report tables for a run.
 
 Run:
   python -m dnadesign.densegen.src.cli --help
@@ -27,40 +31,73 @@ from __future__ import annotations
 
 import contextlib
 import io
+import logging
 import os
 import platform
 import re
 import shutil
 import sys
 import tempfile
+from functools import partial
 from pathlib import Path
 from typing import Iterator, Optional
 
-import pandas as pd
+import numpy as np
 import typer
-import yaml
 from rich.console import Console
-from rich.table import Table
 from rich.traceback import install as rich_traceback
 
-from .config import (
-    LATEST_SCHEMA_VERSION,
-    ConfigError,
-    load_config,
-    resolve_relative_path,
-    resolve_run_root,
-    resolve_run_scoped_path,
+from .adapters.sources.stage_a.stage_a_summary import PWMSamplingSummary
+from .cli_commands.config import register_validate_command
+from .cli_commands.context import CliContext
+from .cli_commands.inspect import register_inspect_commands
+from .cli_commands.plots import register_plot_commands
+from .cli_commands.report import register_report_command
+from .cli_commands.run import register_run_commands
+from .cli_commands.stage_a import register_stage_a_commands
+from .cli_commands.stage_b import register_stage_b_commands
+from .cli_commands.templates import resolve_template_dir as _resolve_template_dir_impl
+from .cli_commands.workspace import register_workspace_commands
+from .cli_sampling import format_selection_label
+from .cli_setup import (
+    DEFAULT_CONFIG_FILENAME,
 )
-from .core.pipeline import resolve_plan, run_pipeline
-from .core.reporting import collect_report_data, write_report
-from .core.run_manifest import load_run_manifest
-from .core.run_paths import run_manifest_path, run_state_path
-from .core.run_state import load_run_state
-from .utils.logging_utils import install_native_stderr_filters, setup_logging
+from .cli_setup import (
+    ensure_fimo_available as _ensure_fimo_available_impl,
+)
+from .cli_setup import (
+    load_config_or_exit as _load_config_or_exit_impl,
+)
+from .cli_setup import (
+    resolve_config_path as _resolve_config_path_impl,
+)
+from .cli_setup import (
+    resolve_outputs_path_or_exit as _resolve_outputs_path_or_exit_impl,
+)
+from .config import resolve_relative_path, resolve_run_root
+from .core.artifacts.pool import PoolData
+from .core.run_paths import display_path
+from .utils.logging_utils import install_native_stderr_filters
+from .utils.rich_style import make_table
+
+
+def _build_console() -> Console:
+    if getattr(sys.stdout, "isatty", lambda: False)():
+        return Console()
+    width = shutil.get_terminal_size(fallback=(140, 40)).columns
+    return Console(width=int(width))
+
 
 rich_traceback(show_locals=False)
-console = Console()
+console = _build_console()
 _PYARROW_SYSCTL_PATTERN = re.compile(r"sysctlbyname failed for 'hw\.")
+log = logging.getLogger(__name__)
+install_native_stderr_filters(suppress_solver_messages=False)
+
+DEFAULT_CONFIG_MISSING_MESSAGE = (
+    f"No config found. cd into a workspace containing {DEFAULT_CONFIG_FILENAME}, "
+    f"or pass -c path/to/{DEFAULT_CONFIG_FILENAME}."
+)
 
 
 @contextlib.contextmanager
@@ -93,22 +130,105 @@ def _suppress_pyarrow_sysctl_warnings() -> Iterator[None]:
             sys.stderr.write("\n".join(lines) + "\n")
 
 
-# ----------------- local path helpers -----------------
-def _densegen_root_from(file_path: Path) -> Path:
-    return file_path.resolve().parent.parent
+def _candidate_logging_enabled(cfg, *, selected: set[str] | None = None) -> bool:
+    for inp in cfg.inputs:
+        if selected is not None and inp.name not in selected:
+            continue
+        sampling = getattr(inp, "sampling", None)
+        if sampling is None:
+            continue
+        if getattr(sampling, "keep_all_candidates_debug", False):
+            return True
+    return False
 
 
-DENSEGEN_ROOT = _densegen_root_from(Path(__file__))
-DEFAULT_WORKSPACES_ROOT = DENSEGEN_ROOT / "workspaces"
+def _apply_stage_a_overrides(
+    cfg,
+    *,
+    selected: set[str] | None,
+    n_sites: int | None,
+    batch_size: int | None,
+    max_seconds: float | None,
+) -> None:
+    if n_sites is None and batch_size is None and max_seconds is None:
+        return
+    for inp in cfg.inputs:
+        if selected is not None and inp.name not in selected:
+            continue
+        if not str(getattr(inp, "type", "")).startswith("pwm_"):
+            continue
+        sampling = getattr(inp, "sampling", None)
+        if sampling is None:
+            continue
+        sampling_updates: dict = {}
+        budget_updates: dict = {}
+        if n_sites is not None:
+            sampling_updates["n_sites"] = n_sites
+        mining_updates: dict = {}
+        if batch_size is not None:
+            mining_updates["batch_size"] = batch_size
+        if max_seconds is not None:
+            budget_updates["max_seconds"] = max_seconds
+        if mining_updates:
+            mining = sampling.mining
+            if mining is None:
+                raise typer.BadParameter("Stage-A sampling mining config is required for overrides")
+            sampling_updates["mining"] = mining.model_copy(update=mining_updates)
+        if budget_updates:
+            mining = sampling_updates.get("mining", sampling.mining)
+            if mining is None or getattr(mining, "budget", None) is None:
+                raise typer.BadParameter("Stage-A sampling mining.budget is required for overrides")
+            budget = mining.budget
+            mining_updates = dict(getattr(mining, "model_dump", lambda **_: {})()) or {}
+            mining_updates["budget"] = budget.model_copy(update=budget_updates)
+            sampling_updates["mining"] = mining.model_copy(update=mining_updates)
+        if sampling_updates:
+            inp.sampling = sampling.model_copy(update=sampling_updates)
+        overrides = getattr(inp, "overrides_by_motif_id", None)
+        if isinstance(overrides, dict) and overrides:
+            new_overrides = {}
+            for motif_id, override in overrides.items():
+                override_updates: dict = {}
+                override_budget_updates: dict = {}
+                if n_sites is not None:
+                    override_updates["n_sites"] = n_sites
+                if mining_updates:
+                    mining = override.mining
+                    if mining is None:
+                        raise typer.BadParameter("Stage-A sampling mining config is required for overrides")
+                    override_updates["mining"] = mining.model_copy(update=mining_updates)
+                if override_budget_updates:
+                    mining = override_updates.get("mining", override.mining)
+                    if mining is None or getattr(mining, "budget", None) is None:
+                        raise typer.BadParameter("Stage-A sampling mining.budget is required for overrides")
+                    budget = mining.budget
+                    mining_updates = dict(getattr(mining, "model_dump", lambda **_: {})()) or {}
+                    mining_updates["budget"] = budget.model_copy(update=override_budget_updates)
+                    override_updates["mining"] = mining.model_copy(update=mining_updates)
+                if override_updates:
+                    override = override.model_copy(update=override_updates)
+                new_overrides[motif_id] = override
+            inp.overrides_by_motif_id = new_overrides
 
 
-def _default_config_path() -> Path:
-    # Prefer a realistic, self-contained MEME demo config inside the package tree.
-    return DENSEGEN_ROOT / "workspaces" / "demo_meme_two_tf" / "config.yaml"
-
-
-def _default_template_path() -> Path:
-    return DENSEGEN_ROOT / "workspaces" / "demo_meme_two_tf" / "config.yaml"
+def _workspace_command(command: str, *, cfg_path: Path | None = None, run_root: Path | None = None) -> str:
+    root = run_root or (cfg_path.parent if cfg_path is not None else None)
+    base = Path.cwd()
+    if root is not None:
+        try:
+            root_resolved = root.resolve()
+        except Exception:
+            root_resolved = root
+        if root_resolved == base.resolve():
+            return command
+        candidate = root / DEFAULT_CONFIG_FILENAME
+        if candidate.exists():
+            root_label = display_path(root, base, absolute=False)
+            return f"cd {root_label} && {command}"
+    if cfg_path is not None:
+        cfg_label = display_path(cfg_path, base, absolute=False)
+        return f"{command} -c {cfg_label}"
+    return command
 
 
 # ----------------- schema & helpers -----------------
@@ -131,25 +251,6 @@ def _infer_input_name(inputs_cfg: list) -> str:
     return _sanitize_filename(str(name))
 
 
-def _resolve_config_path(ctx: typer.Context, override: Optional[Path]) -> Path:
-    if override is not None:
-        return override
-    if ctx.obj and "config_path" in ctx.obj:
-        return Path(ctx.obj["config_path"])
-    return _default_config_path()
-
-
-def _load_config_or_exit(cfg_path: Path):
-    try:
-        return load_config(cfg_path)
-    except FileNotFoundError:
-        console.print(f"[bold red]Config file not found:[/] {cfg_path}")
-        raise typer.Exit(code=1)
-    except ConfigError as e:
-        console.print(f"[bold red]Config error:[/] {e}")
-        raise typer.Exit(code=1)
-
-
 def _run_root_for(loaded) -> Path:
     return resolve_run_root(loaded.path, loaded.root.densegen.run.root)
 
@@ -160,24 +261,332 @@ def _count_files(path: Path, pattern: str = "*") -> int:
     return sum(1 for p in path.glob(pattern) if p.is_file())
 
 
-def _ensure_mpl_cache_dir() -> None:
-    if os.environ.get("MPLCONFIGDIR"):
-        return
-    cache_root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
-    target = cache_root / "densegen" / "matplotlib"
-    try:
-        target.mkdir(parents=True, exist_ok=True)
-        os.environ["MPLCONFIGDIR"] = str(target)
-    except Exception:
-        tmp = Path(os.getenv("TMPDIR") or "/tmp") / "densegen-matplotlib"
-        tmp.mkdir(parents=True, exist_ok=True)
-        os.environ["MPLCONFIGDIR"] = str(tmp)
-
-
 def _short_hash(val: str, *, n: int = 8) -> str:
     if not val:
         return "-"
     return val[:n]
+
+
+def _display_path(path: Path, run_root: Path, absolute: bool) -> str:
+    return display_path(path, run_root, absolute=absolute)
+
+
+_resolve_config_path = partial(
+    _resolve_config_path_impl,
+    console=console,
+    display_path=_display_path,
+)
+_load_config_or_exit = partial(
+    _load_config_or_exit_impl,
+    console=console,
+    display_path=_display_path,
+)
+_resolve_outputs_path_or_exit = partial(
+    _resolve_outputs_path_or_exit_impl,
+    console=console,
+)
+_ensure_fimo_available = partial(
+    _ensure_fimo_available_impl,
+    console=console,
+)
+
+
+def _resolve_template_dir(*, template: Optional[Path], template_id: Optional[str]) -> Iterator[tuple[Path, Path]]:
+    return _resolve_template_dir_impl(
+        template=template,
+        template_id=template_id,
+        console=console,
+        display_path=_display_path,
+        default_config_filename=DEFAULT_CONFIG_FILENAME,
+    )
+
+
+def _format_sampling_ratio(value: int, target: int | None) -> str:
+    if target is None or target <= 0:
+        return str(int(value))
+    return f"{int(value)}/{int(target)}"
+
+
+def _format_count(value: int | None) -> str:
+    if value is None:
+        return "-"
+    return f"{int(value):,}"
+
+
+def _format_ratio(count: int | None, total: int | None) -> str:
+    if count is None:
+        return "-"
+    if total is None or int(total) <= 0:
+        return _format_count(count)
+    pct = 100.0 * float(count) / float(total)
+    return f"{_format_count(count)} ({pct:.0f}%)"
+
+
+def _format_sampling_lengths(
+    *,
+    min_len: int | None,
+    median_len: float | None,
+    mean_len: float | None,
+    max_len: int | None,
+    count: int | None,
+) -> str:
+    if count is None:
+        return "-"
+    if min_len is None or median_len is None or mean_len is None or max_len is None:
+        return f"{int(count)}/-/-/-/-"
+    return f"{int(count)}/{int(min_len)}/{median_len:.1f}/{mean_len:.1f}/{int(max_len)}"
+
+
+def _format_score_stats(
+    *,
+    min_score: float | None,
+    median_score: float | None,
+    mean_score: float | None,
+    max_score: float | None,
+) -> str:
+    if min_score is None or median_score is None or mean_score is None or max_score is None:
+        return "-"
+    return f"{min_score:.2f}/{median_score:.2f}/{mean_score:.2f}/{max_score:.2f}"
+
+
+def _format_diversity_value(value: float | None, *, show_sign: bool = False) -> str:
+    if value is None:
+        return "-"
+    if show_sign:
+        return f"{float(value):+.2f}"
+    return f"{float(value):.2f}"
+
+
+def _format_score_norm_summary(summary) -> str:
+    if summary is None:
+        return "-"
+    top = getattr(summary, "top_candidates", None)
+    diversified = getattr(summary, "diversified_candidates", None)
+    if top is None or diversified is None:
+        return "-"
+    return (
+        f"top {float(top.min):.2f}/{float(top.median):.2f}/{float(top.max):.2f} | "
+        f"div {float(diversified.min):.2f}/{float(diversified.median):.2f}/{float(diversified.max):.2f}"
+    )
+
+
+def _format_score_norm_triplet(summary, *, label: str) -> str:
+    if summary is None:
+        return "-"
+    block = getattr(summary, label, None)
+    if block is None:
+        return "-"
+    return f"{float(block.min):.2f}/{float(block.median):.2f}/{float(block.max):.2f}"
+
+
+def _format_tier_counts(eligible: list[int] | None, retained: list[int] | None) -> str:
+    if not eligible or not retained:
+        raise ValueError("Stage-A tier counts are required.")
+    if len(eligible) != len(retained):
+        raise ValueError("Stage-A tier counts length mismatch.")
+    parts = []
+    for idx in range(len(eligible)):
+        parts.append(f"t{idx} {int(eligible[idx])}/{int(retained[idx])}")
+    return " | ".join(parts)
+
+
+def _format_tier_fraction_label(fraction: float) -> str:
+    return f"{float(fraction) * 100:.3f}%"
+
+
+def _stage_a_sampling_rows(
+    pool_data: dict[str, PoolData],
+) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for pool in pool_data.values():
+        summaries = pool.summaries or []
+        if summaries:
+            for summary in summaries:
+                if not isinstance(summary, PWMSamplingSummary):
+                    continue
+                input_name = summary.input_name or pool.name
+                if summary.generated is None:
+                    raise ValueError("Stage-A summary missing generated count.")
+                if not summary.regulator:
+                    raise ValueError("Stage-A summary missing regulator.")
+                regulator = summary.regulator
+                if summary.candidates_with_hit is None:
+                    raise ValueError("Stage-A summary missing candidates_with_hit.")
+                if summary.eligible_raw is None:
+                    raise ValueError("Stage-A summary missing eligible_raw.")
+                if summary.eligible_unique is None:
+                    raise ValueError("Stage-A summary missing eligible_unique.")
+                if summary.retained is None:
+                    raise ValueError("Stage-A summary missing retained count.")
+                if summary.eligible_tier_counts is None or summary.retained_tier_counts is None:
+                    raise ValueError("Stage-A summary missing tier counts.")
+                if len(summary.eligible_tier_counts) != len(summary.retained_tier_counts):
+                    raise ValueError("Stage-A summary tier counts length mismatch.")
+                if summary.tier_fractions is None:
+                    raise ValueError("Stage-A summary missing tier fractions.")
+                tier_fractions = list(summary.tier_fractions)
+                if len(summary.retained_tier_counts) not in {len(tier_fractions), len(tier_fractions) + 1}:
+                    raise ValueError("Stage-A summary tier fraction/count length mismatch.")
+                if summary.selection_policy is None:
+                    raise ValueError("Stage-A summary missing selection policy.")
+                if summary.diversity is None:
+                    raise ValueError("Stage-A diversity summary missing.")
+                candidates = _format_count(summary.generated)
+                has_hit = _format_ratio(summary.candidates_with_hit, summary.generated)
+                eligible_raw = _format_ratio(summary.eligible_raw, summary.generated)
+                eligible_unique = _format_ratio(summary.eligible_unique, summary.eligible_raw)
+                retained = _format_count(summary.retained)
+                tier_target = "-"
+                if summary.tier_target_fraction is not None:
+                    frac = float(summary.tier_target_fraction)
+                    frac_label = f"{frac:.3%}"
+                    if summary.tier_target_met is True:
+                        tier_target = f"{frac_label} met"
+                    elif summary.tier_target_met is False:
+                        tier_target = f"{frac_label} unmet"
+                selection_label = format_selection_label(
+                    policy=str(summary.selection_policy),
+                    alpha=summary.selection_alpha,
+                    relevance_norm=summary.selection_relevance_norm or "minmax_raw_score",
+                )
+                tier_counts = _format_tier_counts(summary.eligible_tier_counts, summary.retained_tier_counts)
+                tier_fill = "-"
+                if summary.retained_tier_counts:
+                    tier_labels = [_format_tier_fraction_label(frac) for frac in tier_fractions]
+                    if len(summary.retained_tier_counts) == len(tier_fractions) + 1:
+                        tier_labels.append("rest")
+                    last_idx = None
+                    for idx, val in enumerate(summary.retained_tier_counts):
+                        if int(val) > 0:
+                            last_idx = idx
+                    if last_idx is not None:
+                        tier_fill = tier_labels[last_idx]
+                length_label = _format_sampling_lengths(
+                    min_len=summary.retained_len_min,
+                    median_len=summary.retained_len_median,
+                    mean_len=summary.retained_len_mean,
+                    max_len=summary.retained_len_max,
+                    count=summary.retained,
+                )
+                score_label = _format_score_stats(
+                    min_score=summary.retained_score_min,
+                    median_score=summary.retained_score_median,
+                    mean_score=summary.retained_score_mean,
+                    max_score=summary.retained_score_max,
+                )
+                diversity = summary.diversity
+                core_hamming = diversity.core_hamming
+                pairwise = core_hamming.pairwise
+                if pairwise is None:
+                    raise ValueError("Stage-A diversity missing pairwise summary.")
+                top_pairwise = pairwise.top_candidates
+                diversified_pairwise = pairwise.diversified_candidates
+                if int(diversified_pairwise.n_pairs) <= 0 or int(top_pairwise.n_pairs) <= 0:
+                    pairwise_top_label = "n/a"
+                    pairwise_div_label = "n/a"
+                else:
+                    pairwise_top_label = _format_diversity_value(top_pairwise.median)
+                    pairwise_div_label = _format_diversity_value(diversified_pairwise.median)
+                score_block = diversity.score_quantiles
+                if score_block.top_candidates is None or score_block.diversified_candidates is None:
+                    raise ValueError("Stage-A diversity missing top/diversified score quantiles.")
+                score_norm_top = _format_score_norm_triplet(diversity.score_norm_summary, label="top_candidates")
+                score_norm_div = _format_score_norm_triplet(
+                    diversity.score_norm_summary, label="diversified_candidates"
+                )
+                if diversity.set_overlap_fraction is None or diversity.set_overlap_swaps is None:
+                    raise ValueError("Stage-A diversity missing overlap stats.")
+                diversity_overlap = f"{float(diversity.set_overlap_fraction) * 100:.1f}%"
+                diversity_swaps = str(int(diversity.set_overlap_swaps))
+                if diversity.candidate_pool_size is None:
+                    raise ValueError("Stage-A diversity missing pool size.")
+                pool_label = str(int(diversity.candidate_pool_size))
+                pool_source = "-"
+                if summary.selection_pool_capped:
+                    pool_label = f"{pool_label}*"
+                    if summary.selection_pool_cap_value is not None:
+                        pool_source = f"cap={int(summary.selection_pool_cap_value)}"
+                elif summary.selection_pool_rung_fraction_used is not None:
+                    pool_source = f"rung={float(summary.selection_pool_rung_fraction_used) * 100:.3f}%"
+                diversity_pool = pool_label
+                rows.append(
+                    {
+                        "input_name": str(input_name),
+                        "regulator": str(regulator),
+                        "generated": candidates,
+                        "has_hit": has_hit,
+                        "eligible_raw": eligible_raw,
+                        "eligible_unique": eligible_unique,
+                        "retained": retained,
+                        "tier_fill": tier_fill,
+                        "tier_counts": tier_counts,
+                        "tier_target": tier_target,
+                        "selection": selection_label,
+                        "score": score_label,
+                        "length": length_label,
+                        "pairwise_top": pairwise_top_label,
+                        "pairwise_div": pairwise_div_label,
+                        "score_norm_top": score_norm_top,
+                        "score_norm_div": score_norm_div,
+                        "set_overlap": diversity_overlap,
+                        "set_swaps": diversity_swaps,
+                        "diversity_pool": diversity_pool,
+                        "diversity_pool_source": pool_source,
+                        "tier0_score": summary.tier0_score,
+                        "tier1_score": summary.tier1_score,
+                        "tier2_score": summary.tier2_score,
+                    }
+                )
+            continue
+        total = len(pool.sequences)
+        lengths = [len(seq) for seq in pool.sequences]
+        if lengths:
+            arr = np.asarray(lengths, dtype=float)
+            length_label = _format_sampling_lengths(
+                min_len=int(arr.min()),
+                median_len=float(np.median(arr)),
+                mean_len=float(arr.mean()),
+                max_len=int(arr.max()),
+                count=int(total),
+            )
+        else:
+            length_label = _format_sampling_lengths(
+                min_len=None,
+                median_len=None,
+                mean_len=None,
+                max_len=None,
+                count=int(total),
+            )
+        rows.append(
+            {
+                "input_name": str(pool.name),
+                "regulator": "-",
+                "generated": _format_count(total),
+                "has_hit": _format_ratio(total, total),
+                "eligible_raw": _format_ratio(total, total),
+                "eligible_unique": _format_ratio(total, total),
+                "retained": _format_count(total),
+                "tier_fill": "-",
+                "tier_counts": "-",
+                "tier_target": "-",
+                "selection": "-",
+                "score": "-",
+                "length": length_label,
+                "pairwise_top": "-",
+                "pairwise_div": "-",
+                "score_norm_top": "-",
+                "score_norm_div": "-",
+                "set_overlap": "-",
+                "set_swaps": "-",
+                "diversity_pool": "-",
+                "diversity_pool_source": "-",
+                "tier0_score": None,
+                "tier1_score": None,
+                "tier2_score": None,
+            }
+        )
+    rows.sort(key=lambda row: (row["input_name"], row["regulator"]))
+    return rows
 
 
 def _list_dir_entries(path: Path, *, limit: int = 10) -> list[str]:
@@ -209,13 +618,33 @@ def _collect_missing_input_paths(loaded, cfg_path: Path) -> list[Path]:
     return missing
 
 
+def _collect_relative_input_paths_from_raw(dense_cfg: dict) -> list[str]:
+    rel_paths: list[str] = []
+    inputs_cfg = dense_cfg.get("inputs") or []
+    for inp in inputs_cfg:
+        if not isinstance(inp, dict):
+            continue
+        raw_path = inp.get("path")
+        if isinstance(raw_path, str) and raw_path.strip():
+            if not Path(raw_path).is_absolute():
+                rel_paths.append(raw_path)
+        raw_paths = inp.get("paths")
+        if isinstance(raw_paths, list):
+            for path in raw_paths:
+                if isinstance(path, str) and path.strip():
+                    if not Path(path).is_absolute():
+                        rel_paths.append(path)
+    return rel_paths
+
+
 def _render_missing_input_hint(cfg_path: Path, loaded, exc: Exception) -> None:
     console.print(f"[bold red]Input error:[/] {exc}")
+    run_root = _run_root_for(loaded)
     missing = _collect_missing_input_paths(loaded, cfg_path)
     if missing:
         console.print("[bold]Missing inputs[/]:")
         for path in missing[:6]:
-            console.print(f"  - {path}")
+            console.print(f"  - {_display_path(path, run_root, absolute=False)}")
             parent = path.parent
             siblings = []
             if parent.exists() and parent.is_dir():
@@ -229,22 +658,30 @@ def _render_missing_input_hint(cfg_path: Path, loaded, exc: Exception) -> None:
 
     hints = []
     if (cfg_path.parent / "inputs").exists():
-        hints.append("If this is a staged run dir, use `dense stage --copy-inputs` or copy files into run/inputs.")
-    missing_str = " ".join(str(p) for p in missing)
-    demo_paths = (
-        "cruncher/workspaces/demo_basics_two_tf",
-        "cruncher/workspaces/demo_campaigns_multi_tf",
-    )
-    if any(path in missing_str for path in demo_paths):
         hints.append(
-            "To regenerate Cruncher demo motifs: "
-            "cruncher fetch motifs --source demo_local_meme --tf lexA --tf cpxR --update -c <CONFIG>; "
-            "cruncher lock -c <CONFIG>; cruncher parse -c <CONFIG>; cruncher sample --no-auto-opt -c <CONFIG>"
+            "If this is a staged run dir, use `dense workspace init --copy-inputs` or copy files into run/inputs."
         )
     if hints:
         console.print("[bold]Next steps[/]:")
         for hint in hints:
             console.print(f"  - {hint}")
+
+
+def _render_output_schema_hint(exc: Exception) -> bool:
+    msg = str(exc)
+    if "Existing Parquet schema does not match the current DenseGen schema" in msg:
+        console.print(f"[bold red]Output schema mismatch:[/] {msg}")
+        console.print("[bold]Next steps[/]:")
+        console.print("  - Remove outputs/tables/dense_arrays.parquet and outputs/meta/_densegen_ids.sqlite, or")
+        console.print("  - Stage a fresh workspace with `dense workspace init --copy-inputs` and re-run.")
+        return True
+    if "Output sinks are out of sync before run" in msg:
+        console.print(f"[bold red]Output sink mismatch:[/] {msg}")
+        console.print("[bold]Next steps[/]:")
+        console.print("  - Remove stale outputs so sinks align, or")
+        console.print("  - Run with a single output target to rebuild from scratch.")
+        return True
+    return False
 
 
 def _warn_pwm_sampling_configs(loaded, cfg_path: Path) -> None:
@@ -255,15 +692,6 @@ def _warn_pwm_sampling_configs(loaded, cfg_path: Path) -> None:
         if sampling is None:
             continue
         n_sites = getattr(sampling, "n_sites", None)
-        oversample = getattr(sampling, "oversample_factor", None)
-        max_candidates = getattr(sampling, "max_candidates", None)
-        if isinstance(n_sites, int) and isinstance(oversample, int) and max_candidates is not None:
-            requested = n_sites * oversample
-            if requested > int(max_candidates):
-                warnings.append(
-                    f"{getattr(inp, 'name', src_type)}: requested candidates ({requested}) exceeds max_candidates "
-                    f"({max_candidates}); sampling will be capped."
-                )
         # Width preflight (best-effort)
         if src_type in {"pwm_meme", "pwm_jaspar", "pwm_matrix_csv"} and isinstance(n_sites, int):
             widths = {}
@@ -302,10 +730,10 @@ def _warn_pwm_sampling_configs(loaded, cfg_path: Path) -> None:
                 if width <= 6 and n_sites > 200:
                     warnings.append(
                         f"{getattr(inp, 'name', src_type)}:{motif_id} width={width} with n_sites={n_sites} "
-                        "may fail uniqueness; consider reducing n_sites or using length_policy=range."
+                        "may fail uniqueness; consider reducing n_sites or using length.policy=range."
                     )
     if warnings:
-        console.print("[yellow]PWM sampling warnings:[/]")
+        console.print("[yellow]Stage-A PWM sampling warnings:[/]")
         for warn in warnings:
             console.print(f"  - {warn}")
 
@@ -316,83 +744,14 @@ def _warn_full_pool_strategy(loaded) -> None:
         return
     ignored = [
         "library_size",
-        "subsample_over_length_budget_by",
         "library_sampling_strategy",
         "cover_all_regulators",
         "max_sites_per_regulator",
         "relax_on_exhaustion",
-        "allow_incomplete_coverage",
-        "iterative_max_libraries",
-        "iterative_min_new_solutions",
     ]
     console.print(
         "[yellow]Warning:[/] pool_strategy=full uses the entire input library; " + ", ".join(ignored) + " are ignored."
     )
-
-
-def _list_workspaces_table(workspaces_root: Path, *, limit: int, show_all: bool) -> Table:
-    workspace_dirs = sorted([p for p in workspaces_root.iterdir() if p.is_dir()], key=lambda p: p.name)
-    if limit and limit > 0:
-        workspace_dirs = workspace_dirs[: int(limit)]
-
-    table = Table("workspace", "id", "config", "parquet", "plots", "logs", "status")
-    for run_dir in workspace_dirs:
-        cfg_path = run_dir / "config.yaml"
-        if not show_all and not cfg_path.exists():
-            continue
-
-        run_id = run_dir.name
-        status = "ok"
-        parquet_count = "-"
-        plots_count = _count_files(run_dir / "outputs", pattern="*")
-        logs_count = _count_files(run_dir / "logs", pattern="*")
-
-        if cfg_path.exists():
-            try:
-                loaded = load_config(cfg_path)
-                run_id = loaded.root.densegen.run.id
-                run_root = resolve_run_root(cfg_path, loaded.root.densegen.run.root)
-                if loaded.root.densegen.output.parquet is not None:
-                    pq_dir = resolve_run_scoped_path(
-                        cfg_path,
-                        run_root,
-                        loaded.root.densegen.output.parquet.path,
-                        label="output.parquet.path",
-                    )
-                    parquet_count = _count_files(pq_dir, pattern="*.parquet")
-                plots_count = _count_files(
-                    resolve_run_scoped_path(
-                        cfg_path,
-                        run_root,
-                        loaded.root.plots.out_dir if loaded.root.plots else "outputs",
-                        label="plots.out_dir",
-                    ),
-                    pattern="*",
-                )
-                logs_count = _count_files(
-                    resolve_run_scoped_path(
-                        cfg_path,
-                        run_root,
-                        loaded.root.densegen.logging.log_dir,
-                        label="logging.log_dir",
-                    ),
-                    pattern="*",
-                )
-            except Exception:
-                status = "invalid"
-        else:
-            status = "missing config.yaml"
-
-        table.add_row(
-            run_dir.name,
-            run_id,
-            str(cfg_path) if cfg_path.exists() else "-",
-            str(parquet_count),
-            str(plots_count),
-            str(logs_count),
-            status,
-        )
-    return table
 
 
 # ----------------- Typer CLI -----------------
@@ -401,777 +760,75 @@ app = typer.Typer(
     no_args_is_help=True,
     help="DenseGen — Dense Array Generator (Typer/Rich CLI)",
 )
+inspect_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Inspect configs, inputs, and runs.")
+stage_a_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Stage-A helpers (input TFBS pools).")
+stage_b_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Stage-B helpers (library sampling).")
+workspace_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Workspace scaffolding.")
+
+app.add_typer(inspect_app, name="inspect")
+app.add_typer(stage_a_app, name="stage-a")
+app.add_typer(stage_b_app, name="stage-b")
+app.add_typer(workspace_app, name="workspace")
+
+cli_context = CliContext(
+    console=console,
+    make_table=make_table,
+    display_path=_display_path,
+    resolve_config_path=_resolve_config_path,
+    load_config_or_exit=_load_config_or_exit,
+    run_root_for=_run_root_for,
+    list_dir_entries=_list_dir_entries,
+    workspace_command=_workspace_command,
+    suppress_pyarrow_sysctl_warnings=_suppress_pyarrow_sysctl_warnings,
+    resolve_outputs_path_or_exit=_resolve_outputs_path_or_exit,
+    warn_full_pool_strategy=_warn_full_pool_strategy,
+    default_config_missing_message=DEFAULT_CONFIG_MISSING_MESSAGE,
+)
+register_inspect_commands(inspect_app, context=cli_context)
+register_report_command(app, context=cli_context)
+register_validate_command(
+    app,
+    context=cli_context,
+    warn_pwm_sampling_configs=_warn_pwm_sampling_configs,
+    ensure_fimo_available=_ensure_fimo_available,
+)
+register_plot_commands(app, context=cli_context)
+register_workspace_commands(
+    workspace_app,
+    context=cli_context,
+    resolve_template_dir=_resolve_template_dir,
+    sanitize_filename=_sanitize_filename,
+    collect_relative_input_paths_from_raw=_collect_relative_input_paths_from_raw,
+)
+register_stage_a_commands(
+    stage_a_app,
+    context=cli_context,
+    apply_stage_a_overrides=_apply_stage_a_overrides,
+    ensure_fimo_available=_ensure_fimo_available,
+    candidate_logging_enabled=_candidate_logging_enabled,
+    stage_a_sampling_rows=_stage_a_sampling_rows,
+)
+register_stage_b_commands(stage_b_app, context=cli_context, short_hash=_short_hash)
+register_run_commands(
+    app,
+    context=cli_context,
+    render_missing_input_hint=_render_missing_input_hint,
+    render_output_schema_hint=_render_output_schema_hint,
+    ensure_fimo_available=_ensure_fimo_available,
+)
 
 
 @app.callback()
 def _root(
     ctx: typer.Context,
-    config: Path = typer.Option(
-        _default_config_path(),
+    config: Optional[Path] = typer.Option(
+        None,
         "--config",
         "-c",
-        help="Path to config YAML (can also be passed per command).",
+        help="Path to config YAML (defaults to ./config.yaml in the current directory).",
     ),
 ):
     ctx.obj = {"config_path": config}
-
-
-@app.command(help="Validate the config YAML (schema + sanity).")
-def validate(
-    ctx: typer.Context,
-    probe_solver: bool = typer.Option(False, help="Also probe the solver backend."),
-    config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
-):
-    cfg_path = _resolve_config_path(ctx, config)
-    loaded = _load_config_or_exit(cfg_path)
-    _warn_pwm_sampling_configs(loaded, cfg_path)
-    _warn_full_pool_strategy(loaded)
-    if probe_solver:
-        from .adapters.optimizer import DenseArraysAdapter
-        from .core.pipeline import select_solver_strict
-
-        solver_cfg = loaded.root.densegen.solver
-        select_solver_strict(
-            solver_cfg.backend,
-            DenseArraysAdapter(),
-            strategy=str(solver_cfg.strategy),
-        )
-    console.print(":white_check_mark: [bold green]Config is valid.[/]")
-
-
-@app.command("ls-plots", help="List available plot names and descriptions.")
-def ls_plots():
-    from .viz.plot_registry import PLOT_SPECS
-
-    table = Table("plot", "description")
-    for name, meta in PLOT_SPECS.items():
-        table.add_row(name, meta["description"])
-    console.print(table)
-
-
-@app.command(help="Stage a new workspace with config.yaml and standard subfolders.")
-def stage(
-    run_id: str = typer.Option(..., "--id", "-i", help="Run identifier (directory name)."),
-    root: Path = typer.Option(DEFAULT_WORKSPACES_ROOT, "--root", help="Workspaces root directory."),
-    template: Optional[Path] = typer.Option(None, "--template", help="Template config YAML to copy."),
-    copy_inputs: bool = typer.Option(False, help="Copy file-based inputs into workspace/inputs and rewrite paths."),
-):
-    run_id_clean = _sanitize_filename(run_id)
-    if run_id_clean != run_id:
-        console.print(f"[yellow]Sanitized run id:[/] {run_id} -> {run_id_clean}")
-    run_dir = (root / run_id_clean).resolve()
-    if run_dir.exists():
-        console.print(f"[bold red]Run directory already exists:[/] {run_dir}")
-        raise typer.Exit(code=1)
-
-    template_path = template or _default_template_path()
-    if not template_path.exists():
-        console.print(f"[bold red]Template config not found:[/] {template_path}")
-        raise typer.Exit(code=1)
-
-    run_dir.mkdir(parents=True, exist_ok=False)
-    (run_dir / "inputs").mkdir(parents=True, exist_ok=True)
-    (run_dir / "outputs" / "logs").mkdir(parents=True, exist_ok=True)
-    (run_dir / "outputs" / "meta").mkdir(parents=True, exist_ok=True)
-
-    raw = yaml.safe_load(template_path.read_text())
-    if not isinstance(raw, dict):
-        console.print("[bold red]Template config must be a YAML mapping.[/]")
-        raise typer.Exit(code=1)
-
-    dense = raw.setdefault("densegen", {})
-    dense["schema_version"] = LATEST_SCHEMA_VERSION
-    run_block = dense.get("run") or {}
-    run_block["id"] = run_id_clean
-    run_block["root"] = "."
-    dense["run"] = run_block
-
-    output = dense.get("output") or {}
-    if "parquet" in output and isinstance(output.get("parquet"), dict):
-        output["parquet"]["path"] = "outputs/dense_arrays.parquet"
-    if "usr" in output and isinstance(output.get("usr"), dict):
-        output["usr"]["root"] = "outputs/usr"
-    dense["output"] = output
-
-    logging_cfg = dense.get("logging") or {}
-    logging_cfg["log_dir"] = "outputs/logs"
-    dense["logging"] = logging_cfg
-
-    if "plots" in raw and isinstance(raw.get("plots"), dict):
-        raw["plots"]["out_dir"] = "outputs"
-
-    if copy_inputs:
-        inputs_cfg = dense.get("inputs") or []
-        for inp in inputs_cfg:
-            if not isinstance(inp, dict):
-                continue
-            if "path" in inp:
-                src = resolve_relative_path(template_path, inp["path"])
-                if not src.exists() or not src.is_file():
-                    console.print(f"[bold red]Input file not found:[/] {src}")
-                    raise typer.Exit(code=1)
-                dest = run_dir / "inputs" / src.name
-                if dest.exists():
-                    console.print(f"[bold red]Input file already exists:[/] {dest}")
-                    raise typer.Exit(code=1)
-                shutil.copy2(src, dest)
-                inp["path"] = str(Path("inputs") / src.name)
-            if "paths" in inp and isinstance(inp["paths"], list):
-                new_paths: list[str] = []
-                for path in inp["paths"]:
-                    src = resolve_relative_path(template_path, path)
-                    if not src.exists() or not src.is_file():
-                        console.print(f"[bold red]Input file not found:[/] {src}")
-                        raise typer.Exit(code=1)
-                    dest = run_dir / "inputs" / src.name
-                    if dest.exists():
-                        console.print(f"[bold red]Input file already exists:[/] {dest}")
-                        raise typer.Exit(code=1)
-                    shutil.copy2(src, dest)
-                    new_paths.append(str(Path("inputs") / src.name))
-                inp["paths"] = new_paths
-
-    config_path = run_dir / "config.yaml"
-    config_path.write_text(yaml.safe_dump(raw, sort_keys=False))
-    console.print(f":sparkles: [bold green]Workspace staged[/]: {config_path}")
-
-
-@app.command(help="Summarize a run manifest.")
-def summarize(
-    ctx: typer.Context,
-    run: Optional[Path] = typer.Option(None, "--run", "-r", help="Run directory (defaults to config run root)."),
-    root: Optional[Path] = typer.Option(None, "--root", help="Workspaces root directory (lists workspaces)."),
-    limit: int = typer.Option(0, "--limit", help="Limit workspaces displayed when using --root (0 = all)."),
-    show_all: bool = typer.Option(False, "--all", help="Include directories without config.yaml when using --root."),
-    config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show failure breakdown columns."),
-    library: bool = typer.Option(False, "--library", help="Include offered-vs-used library summaries."),
-    top: int = typer.Option(10, "--top", help="Rows to show for library summaries."),
-    by_library: bool = typer.Option(True, "--by-library/--no-by-library", help="Group library summaries per build."),
-    top_per_tf: Optional[int] = typer.Option(None, "--top-per-tf", help="Limit TFBS rows per TF when summarizing."),
-    show_library_hash: bool = typer.Option(
-        True,
-        "--show-library-hash/--short-library-hash",
-        help="Show full library hash (or short hash if disabled).",
-    ),
-):
-    if root is not None and run is not None:
-        console.print("[bold red]Choose either --root or --run, not both.[/]")
-        raise typer.Exit(code=1)
-    if root is not None:
-        workspaces_root = root.resolve()
-        if not workspaces_root.exists() or not workspaces_root.is_dir():
-            console.print(f"[bold red]Workspaces root not found:[/] {workspaces_root}")
-            raise typer.Exit(code=1)
-        console.print(_list_workspaces_table(workspaces_root, limit=limit, show_all=show_all))
-        return
-    cfg_path = None
-    loaded = None
-    if run is None:
-        cfg_path = _resolve_config_path(ctx, config)
-        loaded = _load_config_or_exit(cfg_path)
-        run_root = _run_root_for(loaded)
-    else:
-        run_root = run
-        if library:
-            cfg_path = run_root / "config.yaml"
-            if not cfg_path.exists():
-                console.print(
-                    f"[bold red]Config not found for --library:[/] {cfg_path}. "
-                    "Provide --config or run summarize without --library."
-                )
-                raise typer.Exit(code=1)
-            loaded = _load_config_or_exit(cfg_path)
-    manifest_path = run_manifest_path(run_root)
-    if not manifest_path.exists():
-        state_path = run_state_path(run_root)
-        if state_path.exists():
-            state = load_run_state(state_path)
-            console.print("[yellow]Run manifest missing; showing checkpointed run_state.[/]")
-            console.print(
-                f"[bold]Run:[/] {state.run_id}  [bold]Root:[/] {state.run_root}  "
-                f"[bold]Schema:[/] {state.schema_version}  [bold]Config:[/] {state.config_sha256[:8]}…"
-            )
-            table = Table("input", "plan", "generated")
-            for item in state.items:
-                table.add_row(item.input_name, item.plan_name, str(item.generated))
-            console.print(table)
-            console.print("[bold]Next steps[/]:")
-            console.print(f"  - dense run -c {cfg_path or run_root / 'config.yaml'}")
-            return
-
-        console.print(f"[bold red]Run manifest not found:[/] {manifest_path}")
-        entries = _list_dir_entries(run_root, limit=8)
-        if entries:
-            console.print(f"[bold]Run root contents[/]: {', '.join(entries)}")
-        console.print("[bold]Next steps[/]:")
-        console.print(f"  - dense run -c {cfg_path or run_root / 'config.yaml'}")
-        raise typer.Exit(code=1)
-
-    manifest = load_run_manifest(manifest_path)
-    schema_label = manifest.schema_version or "-"
-    dense_arrays_label = manifest.dense_arrays_version or "-"
-    dense_arrays_source = manifest.dense_arrays_version_source or "-"
-    if dense_arrays_label != "-" and dense_arrays_source != "-":
-        dense_arrays_label = f"{dense_arrays_label} ({dense_arrays_source})"
-    console.print(
-        f"[bold]Run:[/] {manifest.run_id}  [bold]Root:[/] {manifest.run_root}  "
-        f"[bold]Schema:[/] {schema_label}  [bold]dense-arrays:[/] {dense_arrays_label}"
-    )
-    if verbose:
-        table = Table(
-            "input",
-            "plan",
-            "generated",
-            "dup_out",
-            "dup_sol",
-            "failed",
-            "fail_tf",
-            "fail_req",
-            "fail_min",
-            "fail_k",
-            "resamples",
-            "libraries",
-            "stalls",
-        )
-    else:
-        table = Table("input", "plan", "generated", "duplicates", "failed", "resamples", "libraries", "stalls")
-    for item in manifest.items:
-        if verbose:
-            table.add_row(
-                item.input_name,
-                item.plan_name,
-                str(item.generated),
-                str(item.duplicates_skipped),
-                str(item.duplicate_solutions),
-                str(item.failed_solutions),
-                str(item.failed_min_count_per_tf),
-                str(item.failed_required_regulators),
-                str(item.failed_min_count_by_regulator),
-                str(item.failed_min_required_regulators),
-                str(item.total_resamples),
-                str(item.libraries_built),
-                str(item.stall_events),
-            )
-        else:
-            table.add_row(
-                item.input_name,
-                item.plan_name,
-                str(item.generated),
-                str(item.duplicates_skipped),
-                str(item.failed_solutions),
-                str(item.total_resamples),
-                str(item.libraries_built),
-                str(item.stall_events),
-            )
-    console.print(table)
-
-    if library:
-        if loaded is None or cfg_path is None:
-            console.print("[bold red]Config is required for --library summaries.[/]")
-            raise typer.Exit(code=1)
-        with _suppress_pyarrow_sysctl_warnings():
-            try:
-                bundle = collect_report_data(loaded.root, cfg_path, include_combinatorics=False)
-            except Exception as exc:
-                console.print(f"[bold red]Failed to build library summaries:[/] {exc}")
-                entries = _list_dir_entries(run_root, limit=8)
-                if entries:
-                    console.print(f"[bold]Run root contents[/]: {', '.join(entries)}")
-                console.print("[bold]Next steps[/]:")
-                console.print(f"  - dense run -c {cfg_path}")
-                raise typer.Exit(code=1)
-
-        offered_vs_used_tf = bundle.tables.get("offered_vs_used_tf")
-        offered_vs_used_tfbs = bundle.tables.get("offered_vs_used_tfbs")
-        library_summary = bundle.tables.get("library_summary", pd.DataFrame())
-
-        library_hashes = set()
-        if isinstance(library_summary, pd.DataFrame) and not library_summary.empty:
-            library_hashes = set(library_summary.get("library_hash", []))
-        elif isinstance(offered_vs_used_tf, pd.DataFrame):
-            library_hashes = set(offered_vs_used_tf.get("library_hash", []))
-
-        lib_table = Table(
-            "library_index",
-            "library_hash",
-            "input",
-            "plan",
-            "size",
-            "achieved/target",
-            "outputs",
-        )
-        sampling_cfg = loaded.root.densegen.generation.sampling
-        target_len = loaded.root.densegen.generation.sequence_length + int(sampling_cfg.subsample_over_length_budget_by)
-
-        if isinstance(library_summary, pd.DataFrame) and not library_summary.empty:
-            for _, row in library_summary.sort_values("library_index").iterrows():
-                lib_hash = str(row.get("library_hash") or "")
-                lib_hash_disp = lib_hash if show_library_hash else _short_hash(lib_hash)
-                achieved = row.get("total_bp")
-                achieved_label = f"{int(achieved)}/{target_len}" if achieved is not None else f"-/{target_len}"
-                lib_table.add_row(
-                    str(int(row.get("library_index") or 0)),
-                    lib_hash_disp or "-",
-                    str(row.get("input_name") or "-"),
-                    str(row.get("plan_name") or "-"),
-                    str(int(row.get("size") or 0)),
-                    achieved_label,
-                    str(int(row.get("outputs") or 0)),
-                )
-        elif library_hashes:
-            for lib_hash in sorted(library_hashes):
-                lib_hash_disp = lib_hash if show_library_hash else _short_hash(lib_hash)
-                lib_table.add_row("-", lib_hash_disp, "-", "-", "-", f"-/{target_len}", "0")
-        else:
-            console.print("[yellow]No library attempts found (outputs/attempts.parquet missing).[/]")
-            entries = _list_dir_entries(run_root, limit=8)
-            if entries:
-                console.print(f"[bold]Run root contents[/]: {', '.join(entries)}")
-            console.print("[bold]Next steps[/]:")
-            console.print(f"  - dense run -c {cfg_path}")
-        console.print("[bold]Library build summary[/]")
-        console.print(lib_table)
-
-        if not isinstance(offered_vs_used_tf, pd.DataFrame) or offered_vs_used_tf.empty:
-            console.print("[yellow]No offered/used TF data found (attempts missing).[/]")
-            return
-
-        def _fmt_hash(val: str) -> str:
-            return val if show_library_hash else _short_hash(val)
-
-        def _render_tf_tables(lib_hash: str) -> None:
-            sub_tf = offered_vs_used_tf[offered_vs_used_tf["library_hash"] == lib_hash]
-            if sub_tf.empty:
-                return
-            tf_table = Table("library", "tf", "offered", "used", "utilization_any")
-            top_rows = sub_tf.sort_values("used_placements", ascending=False).head(top)
-            for _, row in top_rows.iterrows():
-                tf_table.add_row(
-                    _fmt_hash(lib_hash),
-                    str(row.get("tf")),
-                    str(int(row.get("offered_instances", 0))),
-                    str(int(row.get("used_placements", 0))),
-                    f"{float(row.get('utilization_any', 0.0)):.2f}",
-                )
-            console.print(f"[bold]Top {top} TFs by used placements (per library)[/]")
-            console.print(tf_table)
-
-        def _render_tfbs_tables(lib_hash: str) -> None:
-            if not isinstance(offered_vs_used_tfbs, pd.DataFrame) or offered_vs_used_tfbs.empty:
-                return
-            sub_tfbs = offered_vs_used_tfbs[offered_vs_used_tfbs["library_hash"] == lib_hash]
-            if sub_tfbs.empty:
-                return
-            if top_per_tf:
-                top_tf = offered_vs_used_tf[offered_vs_used_tf["library_hash"] == lib_hash]
-                top_tf = top_tf.sort_values("used_placements", ascending=False).head(top)
-                top_tf_names = set(top_tf["tf"].tolist())
-                tfbs_table = Table("library", "tf", "tfbs", "offered", "used", "note")
-                for tf, group in sub_tfbs.groupby("tf"):
-                    if tf not in top_tf_names:
-                        continue
-                    group_sorted = group.sort_values("used_placements", ascending=False)
-                    head = group_sorted.head(top_per_tf)
-                    omitted = max(0, len(group_sorted) - len(head))
-                    for i, (_, row) in enumerate(head.iterrows()):
-                        note = ""
-                        if i == len(head) - 1 and omitted > 0:
-                            note = f"(+{omitted} more)"
-                        tfbs_table.add_row(
-                            _fmt_hash(lib_hash),
-                            str(tf),
-                            str(row.get("tfbs")),
-                            str(int(row.get("offered_instances", 0))),
-                            str(int(row.get("used_placements", 0))),
-                            note,
-                        )
-                console.print(f"[bold]Top TFBS per TF (per library; top={top} TFs, top_per_tf={top_per_tf})[/]")
-                console.print(tfbs_table)
-            else:
-                tfbs_table = Table("library", "tf", "tfbs", "offered", "used")
-                top_tfbs = sub_tfbs.sort_values("used_placements", ascending=False).head(top)
-                for _, row in top_tfbs.iterrows():
-                    tfbs_table.add_row(
-                        _fmt_hash(lib_hash),
-                        str(row.get("tf")),
-                        str(row.get("tfbs")),
-                        str(int(row.get("offered_instances", 0))),
-                        str(int(row.get("used_placements", 0))),
-                    )
-                console.print(f"[bold]Top {top} TFBS by used placements (per library)[/]")
-                console.print(tfbs_table)
-
-        if by_library and isinstance(library_summary, pd.DataFrame) and not library_summary.empty:
-            for _, row in library_summary.sort_values("library_index").iterrows():
-                lib_hash = str(row.get("library_hash") or "")
-                lib_index = int(row.get("library_index") or 0)
-                console.print(f"[bold]Library {lib_index}[/]: {_fmt_hash(lib_hash)}")
-                _render_tf_tables(lib_hash)
-                _render_tfbs_tables(lib_hash)
-        elif by_library and library_hashes:
-            for lib_hash in sorted(library_hashes):
-                console.print(f"[bold]Library[/]: {_fmt_hash(lib_hash)}")
-                _render_tf_tables(lib_hash)
-                _render_tfbs_tables(lib_hash)
-        else:
-            tf_table = Table("library_hash", "tf", "offered", "used", "utilization_any")
-            top_rows = offered_vs_used_tf.sort_values("used_placements", ascending=False).head(top)
-            for _, row in top_rows.iterrows():
-                lib_hash = str(row.get("library_hash") or "")
-                tf_table.add_row(
-                    _fmt_hash(lib_hash),
-                    str(row.get("tf")),
-                    str(int(row.get("offered_instances", 0))),
-                    str(int(row.get("used_placements", 0))),
-                    f"{float(row.get('utilization_any', 0.0)):.2f}",
-                )
-            console.print(f"[bold]Top {top} TFs by used placements (all libraries)[/]")
-            console.print(tf_table)
-
-            if isinstance(offered_vs_used_tfbs, pd.DataFrame) and not offered_vs_used_tfbs.empty:
-                tfbs_table = Table("library_hash", "tf", "tfbs", "offered", "used")
-                top_tfbs = offered_vs_used_tfbs.sort_values("used_placements", ascending=False).head(top)
-                for _, row in top_tfbs.iterrows():
-                    lib_hash = str(row.get("library_hash") or "")
-                    tfbs_table.add_row(
-                        _fmt_hash(lib_hash),
-                        str(row.get("tf")),
-                        str(row.get("tfbs")),
-                        str(int(row.get("offered_instances", 0))),
-                        str(int(row.get("used_placements", 0))),
-                    )
-                console.print(f"[bold]Top {top} TFBS by used placements (all libraries)[/]")
-                console.print(tfbs_table)
-
-
-@app.command(help="Generate audit-grade report summary for a run.")
-def report(
-    ctx: typer.Context,
-    config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
-    out: str = typer.Option("outputs", "--out", help="Output directory (relative to run root)."),
-):
-    cfg_path = _resolve_config_path(ctx, config)
-    loaded = _load_config_or_exit(cfg_path)
-    try:
-        with _suppress_pyarrow_sysctl_warnings():
-            write_report(
-                loaded.root,
-                cfg_path,
-                out_dir=out,
-            )
-    except FileNotFoundError as exc:
-        console.print(f"[bold red]Report failed:[/] {exc}")
-        run_root = _run_root_for(loaded)
-        entries = _list_dir_entries(run_root, limit=8)
-        if entries:
-            console.print(f"[bold]Run root contents[/]: {', '.join(entries)}")
-        console.print("[bold]Next steps[/]:")
-        console.print(f"  - dense run -c {cfg_path}")
-        raise typer.Exit(code=1)
-    run_root = _run_root_for(loaded)
-    out_dir = resolve_run_scoped_path(cfg_path, run_root, out, label="report.out")
-    console.print(f":sparkles: [bold green]Report written[/]: {out_dir}")
-    console.print("[bold]Outputs[/]: report.json, report.md")
-
-
-@app.command(help="Show the resolved per-constraint quota plan.")
-def plan(
-    ctx: typer.Context,
-    config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
-):
-    cfg_path = _resolve_config_path(ctx, config)
-    loaded = _load_config_or_exit(cfg_path)
-    _warn_full_pool_strategy(loaded)
-    pl = resolve_plan(loaded)
-    table = Table("name", "quota", "has promoter_constraints")
-    for item in pl:
-        pcs = item.fixed_elements.promoter_constraints
-        table.add_row(item.name, str(item.quota), "yes" if pcs else "no")
-    console.print(table)
-
-
-@app.command(help="Describe resolved config, inputs, outputs, and solver details.")
-def describe(
-    ctx: typer.Context,
-    show_constraints: bool = typer.Option(False, help="Print full fixed elements per plan item."),
-    probe_solver: bool = typer.Option(False, help="Probe the solver backend before reporting."),
-    config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
-):
-    cfg_path = _resolve_config_path(ctx, config)
-    loaded = _load_config_or_exit(cfg_path)
-    root = loaded.root
-    cfg = root.densegen
-    run_root = _run_root_for(loaded)
-
-    if probe_solver:
-        from .adapters.optimizer import DenseArraysAdapter
-        from .core.pipeline import select_solver_strict
-
-        select_solver_strict(cfg.solver.backend, DenseArraysAdapter(), strategy=str(cfg.solver.strategy))
-
-    console.print(f"[bold]Config[/]: {cfg_path}")
-    console.print(f"[bold]Run[/]: id={cfg.run.id} root={run_root}")
-
-    inputs = Table("name", "type", "source")
-    for inp in cfg.inputs:
-        if hasattr(inp, "path"):
-            src = str(resolve_relative_path(loaded.path, inp.path))
-        elif hasattr(inp, "paths"):
-            resolved = [str(resolve_relative_path(loaded.path, p)) for p in getattr(inp, "paths") or []]
-            src = f"{len(resolved)} files"
-            if resolved:
-                src = f"{len(resolved)} files ({resolved[0]})"
-        elif hasattr(inp, "dataset"):
-            src = f"{inp.dataset} (root={resolve_relative_path(loaded.path, inp.root)})"
-        else:
-            src = "-"
-        inputs.add_row(inp.name, inp.type, src)
-    console.print(inputs)
-
-    # Alignment (8): make two-stage sampling explicit in CLI describe output.
-    pwm_inputs = [
-        inp
-        for inp in cfg.inputs
-        if getattr(inp, "type", "")
-        in {
-            "pwm_meme",
-            "pwm_meme_set",
-            "pwm_jaspar",
-            "pwm_matrix_csv",
-            "pwm_artifact",
-            "pwm_artifact_set",
-        }
-    ]
-    if pwm_inputs:
-        pwm_table = Table(
-            "name",
-            "motifs",
-            "n_sites",
-            "strategy",
-            "score",
-            "oversample",
-            "max_candidates",
-            "max_seconds",
-            "length",
-        )
-        for inp in pwm_inputs:
-            sampling = getattr(inp, "sampling", None)
-            if sampling is None:
-                continue
-            if inp.type == "pwm_matrix_csv":
-                motif_label = str(getattr(inp, "motif_id", "-"))
-            elif inp.type in {"pwm_meme", "pwm_meme_set", "pwm_jaspar"}:
-                motif_ids = getattr(inp, "motif_ids", None) or []
-                motif_label = ", ".join(motif_ids) if motif_ids else "all"
-                if inp.type == "pwm_meme_set":
-                    file_count = len(getattr(inp, "paths", []) or [])
-                    motif_label = f"{motif_label} ({file_count} files)"
-            elif inp.type == "pwm_artifact_set":
-                motif_label = f"{len(getattr(inp, 'paths', []) or [])} artifacts"
-            else:
-                motif_label = "from artifact"
-            score_label = "-"
-            if sampling.score_threshold is not None:
-                score_label = f"threshold={sampling.score_threshold}"
-            elif sampling.score_percentile is not None:
-                score_label = f"percentile={sampling.score_percentile}"
-            length_label = str(sampling.length_policy)
-            if sampling.length_policy == "range" and sampling.length_range is not None:
-                length_label = f"range({sampling.length_range[0]}..{sampling.length_range[1]})"
-            pwm_table.add_row(
-                inp.name,
-                motif_label,
-                str(sampling.n_sites),
-                str(sampling.strategy),
-                score_label,
-                str(sampling.oversample_factor),
-                str(sampling.max_candidates) if sampling.max_candidates is not None else "-",
-                str(sampling.max_seconds) if sampling.max_seconds is not None else "-",
-                length_label,
-            )
-        console.print("[bold]Input-stage PWM sampling[/]")
-        console.print(pwm_table)
-        console.print(
-            "  -> Produces the realized TFBS pool (input_tfbs_count), captured in inputs_manifest.json after runs."
-        )
-
-    plan_table = Table(
-        "name",
-        "quota/fraction",
-        "promoter_constraints",
-        "side_biases",
-        "required_regulators",
-        "min_required_regulators",
-        "min_count_by_regulator",
-    )
-    for item in cfg.generation.resolve_plan():
-        pcs = item.fixed_elements.promoter_constraints
-        left = item.fixed_elements.side_biases.left if item.fixed_elements.side_biases else []
-        right = item.fixed_elements.side_biases.right if item.fixed_elements.side_biases else []
-        bias_count = len(set(left)) + len(set(right))
-        req_count = len(item.required_regulators or [])
-        min_req = item.min_required_regulators if item.min_required_regulators is not None else "-"
-        min_count_regs = len(item.min_count_by_regulator or {})
-        quota = str(item.quota) if item.quota is not None else f"{item.fraction:.3f}"
-        plan_table.add_row(
-            item.name,
-            quota,
-            str(len(pcs)),
-            str(bias_count),
-            str(req_count),
-            str(min_req),
-            str(min_count_regs),
-        )
-    console.print(plan_table)
-
-    if show_constraints:
-        for item in cfg.generation.resolve_plan():
-            console.print(f"[bold]{item.name}[/]")
-            pcs = item.fixed_elements.promoter_constraints
-            if pcs:
-                for pc in pcs:
-                    console.print(
-                        f"  promoter: upstream={pc.upstream} downstream={pc.downstream} "
-                        f"spacer_length={pc.spacer_length} upstream_pos={pc.upstream_pos} "
-                        f"downstream_pos={pc.downstream_pos}"
-                    )
-            sb = item.fixed_elements.side_biases
-            if sb:
-                if sb.left:
-                    console.print(f"  side_biases.left: {', '.join(sb.left)}")
-                if sb.right:
-                    console.print(f"  side_biases.right: {', '.join(sb.right)}")
-            if item.required_regulators:
-                console.print(f"  required_regulators: {', '.join(item.required_regulators)}")
-
-    outputs = Table("target", "path")
-    for target in cfg.output.targets:
-        if target == "parquet":
-            parquet_path = resolve_run_scoped_path(
-                loaded.path,
-                run_root,
-                cfg.output.parquet.path,
-                label="output.parquet.path",
-            )
-            outputs.add_row(
-                "parquet",
-                str(parquet_path),
-            )
-        elif target == "usr":
-            usr_root = resolve_run_scoped_path(loaded.path, run_root, cfg.output.usr.root, label="output.usr.root")
-            outputs.add_row("usr", f"{cfg.output.usr.dataset} (root={usr_root})")
-        else:
-            outputs.add_row(target, "-")
-    console.print(outputs)
-
-    solver = Table("backend", "strategy", "options", "strands")
-    backend_display = str(cfg.solver.backend) if cfg.solver.backend is not None else "-"
-    solver.add_row(backend_display, str(cfg.solver.strategy), str(len(cfg.solver.options)), str(cfg.solver.strands))
-    console.print(solver)
-
-    sampling = cfg.generation.sampling
-    sampling_table = Table("setting", "value")
-    target_length = cfg.generation.sequence_length + int(sampling.subsample_over_length_budget_by)
-    sampling_table.add_row("pool_strategy", str(sampling.pool_strategy))
-    sampling_table.add_row("library_size", str(sampling.library_size))
-    sampling_table.add_row("library_sampling_strategy", str(sampling.library_sampling_strategy))
-    sampling_table.add_row(
-        "subsample_over_length_budget_by",
-        f"{sampling.subsample_over_length_budget_by} (target={target_length} bp)",
-    )
-    sampling_table.add_row("cover_all_regulators", str(sampling.cover_all_regulators))
-    sampling_table.add_row("unique_binding_sites", str(sampling.unique_binding_sites))
-    sampling_table.add_row("max_sites_per_regulator", str(sampling.max_sites_per_regulator))
-    sampling_table.add_row("relax_on_exhaustion", str(sampling.relax_on_exhaustion))
-    sampling_table.add_row("allow_incomplete_coverage", str(sampling.allow_incomplete_coverage))
-    sampling_table.add_row("iterative_max_libraries", str(sampling.iterative_max_libraries))
-    sampling_table.add_row("iterative_min_new_solutions", str(sampling.iterative_min_new_solutions))
-    sampling_table.add_row("arrays_generated_before_resample", str(cfg.runtime.arrays_generated_before_resample))
-    sampling_table.add_row("max_resample_attempts", str(cfg.runtime.max_resample_attempts))
-    sampling_table.add_row("max_total_resamples", str(cfg.runtime.max_total_resamples))
-    console.print("[bold]Solver-stage library sampling[/]")
-    console.print(sampling_table)
-
-    gap = cfg.postprocess.gap_fill
-    console.print(
-        "[bold]Gap fill[/]: "
-        f"mode={gap.mode} end={gap.end} gc=[{gap.gc_min:.2f}, {gap.gc_max:.2f}] "
-        f"max_tries={gap.max_tries}"
-    )
-    log_dir = resolve_run_scoped_path(loaded.path, run_root, cfg.logging.log_dir, label="logging.log_dir")
-    console.print(f"[bold]Logging[/]: dir={log_dir} level={cfg.logging.level}")
-
-    if root.plots:
-        out_dir = resolve_run_scoped_path(loaded.path, run_root, root.plots.out_dir, label="plots.out_dir")
-        console.print(f"[bold]Plots[/]: source={root.plots.source} out_dir={out_dir}")
-    else:
-        console.print("[bold]Plots[/]: none")
-
-
-@app.command(help="Run generation for the job. Optionally auto-run plots declared in YAML.")
-def run(
-    ctx: typer.Context,
-    no_plot: bool = typer.Option(False, help="Do not auto-run plots even if configured."),
-    log_file: Optional[Path] = typer.Option(None, help="Override logfile path."),
-    config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
-):
-    cfg_path = _resolve_config_path(ctx, config)
-    loaded = _load_config_or_exit(cfg_path)
-    root = loaded.root
-    cfg = root.densegen
-    run_root = _run_root_for(loaded)
-
-    # Logging setup
-    log_cfg = cfg.logging
-    log_dir = resolve_run_scoped_path(loaded.path, run_root, Path(log_cfg.log_dir), label="logging.log_dir")
-    default_logfile = log_dir / f"{cfg.run.id}.log"
-    if log_file is not None:
-        logfile = resolve_run_scoped_path(loaded.path, run_root, log_file, label="logging.log_file")
-    else:
-        logfile = default_logfile
-    setup_logging(
-        level=log_cfg.level,
-        logfile=str(logfile),
-        suppress_solver_stderr=bool(log_cfg.suppress_solver_stderr),
-    )
-
-    # Plan & solver
-    pl = resolve_plan(loaded)
-    console.print("[bold]Quota plan[/]: " + ", ".join(f"{p.name}={p.quota}" for p in pl))
-    try:
-        run_pipeline(loaded)
-    except FileNotFoundError as exc:
-        _render_missing_input_hint(cfg_path, loaded, exc)
-        raise typer.Exit(code=1)
-
-    console.print(":tada: [bold green]Run complete[/].")
-
-    # Auto-plot if configured
-    if not no_plot and root.plots:
-        _ensure_mpl_cache_dir()
-        install_native_stderr_filters()
-        from .viz.plotting import run_plots_from_config
-
-        console.print("[bold]Generating plots...[/]")
-        run_plots_from_config(root, loaded.path)
-        console.print(":bar_chart: [bold green]Plots written.[/]")
-
-
-@app.command(help="Generate plots from outputs according to YAML. Use --only to select plots.")
-def plot(
-    ctx: typer.Context,
-    only: Optional[str] = typer.Option(None, help="Comma-separated plot names (subset of available plots)."),
-    config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
-):
-    cfg_path = _resolve_config_path(ctx, config)
-    loaded = _load_config_or_exit(cfg_path)
-    _ensure_mpl_cache_dir()
-    install_native_stderr_filters()
-    from .viz.plotting import run_plots_from_config
-
-    run_plots_from_config(loaded.root, loaded.path, only=only)
-    console.print(":bar_chart: [bold green]Plots written.[/]")
 
 
 if __name__ == "__main__":

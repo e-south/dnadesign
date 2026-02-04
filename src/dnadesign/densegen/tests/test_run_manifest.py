@@ -31,12 +31,17 @@ def test_run_manifest_roundtrip(tmp_path) -> None:
     manifest = RunManifest(
         run_id="demo_run",
         created_at="2026-01-16T12:00:00Z",
-        schema_version="2.1",
+        schema_version="2.7",
         config_sha256="abc123",
-        run_root="/tmp/demo",
+        run_root="outputs",
+        random_seed=42,
+        seed_stage_a=101,
+        seed_stage_b=202,
+        seed_solver=303,
         solver_backend="CBC",
         solver_strategy="iterate",
-        solver_options=[],
+        solver_time_limit_seconds=5.0,
+        solver_threads=2,
         solver_strands="double",
         dense_arrays_version="0.0.0",
         dense_arrays_version_source="lock",
@@ -46,9 +51,12 @@ def test_run_manifest_roundtrip(tmp_path) -> None:
     path = run_manifest_path(tmp_path)
     manifest.write_json(path)
     loaded = load_run_manifest(path)
-    assert loaded.schema_version == "2.1"
+    assert loaded.schema_version == "2.7"
     assert loaded.dense_arrays_version == "0.0.0"
     assert loaded.dense_arrays_version_source == "lock"
     assert loaded.items[0].failed_min_count_per_tf == 1
     assert loaded.items[0].duplicate_solutions == 3
     assert loaded.items[0].leaderboard_latest is not None
+    assert loaded.random_seed == 42
+    assert loaded.solver_time_limit_seconds == 5.0
+    assert loaded.solver_threads == 2

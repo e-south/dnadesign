@@ -50,7 +50,7 @@ class SequenceLibraryDataSource(BaseDataSource):
             return pq.read_table(path).to_pandas()
         raise ValueError(f"Unsupported sequence_library.format: {fmt}")
 
-    def load_data(self, *, rng=None):
+    def load_data(self, *, rng=None, outputs_root: Path | None = None, run_id: str | None = None):
         data_path = resolve_path(self.cfg_path, self.path)
         if not (data_path.exists() and data_path.is_file()):
             raise FileNotFoundError(f"Sequence library file not found. Looked here:\n  - {data_path}")
@@ -78,4 +78,4 @@ class SequenceLibraryDataSource(BaseDataSource):
         if invalid_rows:
             preview = ", ".join(str(i) for i in invalid_rows[:10])
             raise ValueError(f"Invalid sequences in {data_path} (rows: {preview}). DenseGen requires A/C/G/T only.")
-        return seqs, None
+        return seqs, None, None

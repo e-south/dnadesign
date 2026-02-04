@@ -17,28 +17,39 @@ from pathlib import Path
 from typing import Any
 
 from ...core.metadata_schema import META_FIELDS, validate_metadata
+from ...utils.logging_utils import install_native_stderr_filters
 from .base import DEFAULT_NAMESPACE, AlignmentDigest, SinkBase
-from .id_index import IdIndex
+from .id_index import INDEX_FILENAME, IdIndex
 from .record import OutputRecord
+
+install_native_stderr_filters(suppress_solver_messages=False)
 
 
 def _meta_arrow_type(name: str, pa):
     list_str = {
-        "solver_options",
         "tf_list",
         "tfbs_parts",
         "used_tfbs",
         "used_tf_list",
         "input_pwm_ids",
+        "input_source_names",
         "required_regulators",
     }
+    list_float = {"input_pwm_tier_fractions"}
+    list_int = set()
     int_fields = {
         "length",
         "random_seed",
+        "solver_threads",
         "min_count_per_tf",
         "min_required_regulators",
         "input_pwm_n_sites",
-        "input_pwm_oversample_factor",
+        "input_pwm_mining_batch_size",
+        "input_pwm_mining_log_every_batches",
+        "input_pwm_budget_candidates",
+        "input_pwm_budget_max_candidates",
+        "input_pwm_budget_min_candidates",
+        "input_pwm_selection_pool_max_candidates",
         "input_row_count",
         "input_tf_count",
         "input_tfbs_count",
@@ -47,48 +58,59 @@ def _meta_arrow_type(name: str, pa):
         "library_unique_tf_count",
         "library_unique_tfbs_count",
         "sequence_length",
-        "sampling_target_length",
         "sampling_achieved_length",
         "sampling_final_cap",
         "sampling_library_size",
         "sampling_iterative_max_libraries",
         "sampling_iterative_min_new_solutions",
         "sampling_library_index",
-        "gap_fill_bases",
-        "gap_fill_attempts",
+        "pad_bases",
+        "pad_attempts",
     }
     float_fields = {
         "compression_ratio",
-        "input_pwm_score_threshold",
-        "input_pwm_score_percentile",
+        "input_pwm_budget_target_tier_fraction",
+        "input_pwm_budget_max_seconds",
+        "input_pwm_budget_growth_factor",
+        "input_pwm_selection_alpha",
+        "input_pwm_selection_pool_min_score_norm",
         "sampling_fraction",
         "sampling_fraction_pairs",
-        "gap_fill_gc_min",
-        "gap_fill_gc_max",
-        "gap_fill_gc_target_min",
-        "gap_fill_gc_target_max",
-        "gap_fill_gc_actual",
+        "pad_gc_min",
+        "pad_gc_max",
+        "pad_gc_target_min",
+        "pad_gc_target_max",
+        "pad_gc_actual",
         "gc_total",
         "gc_core",
         "solver_objective",
         "solver_solve_time_s",
+        "solver_time_limit_seconds",
     }
     bool_fields = {
         "covers_all_tfs_in_solution",
         "covers_required_regulators",
         "sampling_relaxed_cap",
-        "gap_fill_used",
-        "gap_fill_relaxed",
+        "pad_used",
+        "pad_relaxed",
+        "input_pwm_keep_all_candidates_debug",
+        "input_pwm_include_matched_sequence",
     }
 
     if name in list_str:
         return pa.list_(pa.string())
+    if name in list_float:
+        return pa.list_(pa.float64())
+    if name in list_int:
+        return pa.list_(pa.int64())
     if name == "used_tfbs_detail":
         return pa.list_(
             pa.struct(
                 [
                     pa.field("tf", pa.string()),
                     pa.field("tfbs", pa.string()),
+                    pa.field("motif_id", pa.string()),
+                    pa.field("tfbs_id", pa.string()),
                     pa.field("orientation", pa.string()),
                     pa.field("offset", pa.int64()),
                     pa.field("offset_raw", pa.int64()),
@@ -245,6 +267,7 @@ class ParquetSink(SinkBase):
         alphabet: str = "dna_4",
         deduplicate: bool = True,
         chunk_size: int = 2048,
+        index_path: str | Path | None = None,
     ):
         self.final_path = Path(path)
         if self.final_path.exists() and self.final_path.is_dir():
@@ -260,7 +283,9 @@ class ParquetSink(SinkBase):
         self._seen_ids: set[str] = set()
         self._schema = None
         self._buf: list[dict[str, Any]] = []
-        self._index = IdIndex(self.final_path.parent)
+        if index_path is None:
+            index_path = self.final_path.parent / INDEX_FILENAME
+        self._index = IdIndex(Path(index_path))
         self._part_glob = f"{self.final_path.stem}__part-*.parquet"
 
         if self.final_path.exists():
