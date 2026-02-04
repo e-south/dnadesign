@@ -113,6 +113,9 @@ def load_manifest(run_dir: Path) -> Dict[str, Any]:
         )
         if existing:
             hint += f" Existing meta files: {', '.join(existing[:10])}."
-        hint += " Re-run sampling (fast path): `cruncher sample --no-auto-opt -c <CONFIG>`."
+        hint += (
+            " Re-run sampling: set sample.optimizer.name explicitly (gibbs or pt) and run "
+            "`cruncher sample -c <CONFIG>`."
+        )
         raise FileNotFoundError(f"{hint} (run: {run_dir})")
     return json.loads(path.read_text())

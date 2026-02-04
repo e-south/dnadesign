@@ -69,7 +69,7 @@ cruncher parse
 cruncher sample
 
 # Auto-opt can take minutes; for a quick demo run:
-# cruncher sample --no-auto-opt  # forces gibbs if optimizer.name=auto
+# cruncher sample --no-auto-opt  # requires optimizer.name=gibbs|pt (auto is not allowed)
 
 # Diagnostics + plots (defaults to latest run)
 cruncher analyze

@@ -429,7 +429,7 @@ Notes:
 - `auto_opt` runs short Gibbs + PT pilots, evaluates objective‑aligned scores from draw‑phase `combined_score_final`, logs the decision, and runs a final sample using the selected optimizer.
 - Auto-opt pilots always write `trace.nc` + `sequences.parquet` (required for diagnostics) and are stored under `outputs/auto_opt/`.
 - The selected pilot is recorded in `outputs/auto_opt/best_<run_group>.json` (run_group is the TF slug; it uses a `setN_` prefix only when multiple regulator sets are configured) and marked with a leading `*` in `cruncher runs list`.
-- Auto-opt is enabled by default when `optimizer.name=auto`; set `auto_opt.enabled: false` or pass `--no-auto-opt` to disable.
+- Auto-opt is enabled by default when `optimizer.name=auto`; to disable, set `sample.optimizer.name` to `gibbs` or `pt` and set `auto_opt.enabled: false`.
 - `auto_opt.cooling_boosts` and `auto_opt.move_profiles` expand the pilot search space beyond length/kind
 - `auto_opt.pt_swap_probs` adds PT swap probability candidates (defaults to the configured `optimizers.pt.swap_prob`).
 - `auto_opt.pt_ladder_sizes` adds PT ladder size candidates (uses the current ladder size when unset; requires a geometric ladder if you want to grow beyond a fixed `betas` list).

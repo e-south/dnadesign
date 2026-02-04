@@ -20,7 +20,7 @@ from dnadesign.cruncher.utils.numba_cache import (
 )
 
 
-def test_numba_cache_defaults_to_cruncher_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_numba_cache_defaults_to_workspace_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     (repo_root / "pyproject.toml").write_text('[project]\nname = "dnadesign"\n')
@@ -30,30 +30,30 @@ def test_numba_cache_defaults_to_cruncher_root(tmp_path: Path, monkeypatch: pyte
     workspace.mkdir(parents=True)
     monkeypatch.delenv("NUMBA_CACHE_DIR", raising=False)
     cache_dir = ensure_numba_cache_dir(workspace)
-    expected = cruncher_root / ".cruncher" / "numba_cache"
+    expected = workspace / ".cruncher" / "numba_cache"
     assert cache_dir == expected
     assert expected.exists()
     assert os.environ.get("NUMBA_CACHE_DIR") == str(expected)
 
 
-def test_numba_cache_falls_back_to_repo_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_numba_cache_defaults_without_repo_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo_root = tmp_path / "repo"
-    repo_root.mkdir()
-    (repo_root / "pyproject.toml").write_text('[project]\nname = "dnadesign"\n')
     workspace = repo_root / "workspaces" / "demo"
     workspace.mkdir(parents=True)
     monkeypatch.delenv("NUMBA_CACHE_DIR", raising=False)
     cache_dir = ensure_numba_cache_dir(workspace)
-    expected = repo_root / ".cruncher" / "numba_cache"
+    expected = workspace / ".cruncher" / "numba_cache"
     assert cache_dir == expected
     assert expected.exists()
     assert os.environ.get("NUMBA_CACHE_DIR") == str(expected)
 
 
-def test_numba_cache_errors_without_repo_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_numba_cache_accepts_workspace_anchor(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("NUMBA_CACHE_DIR", raising=False)
-    with pytest.raises(RuntimeError):
-        ensure_numba_cache_dir(tmp_path)
+    cache_dir = ensure_numba_cache_dir(tmp_path)
+    expected = tmp_path / ".cruncher" / "numba_cache"
+    assert cache_dir == expected
+    assert expected.exists()
 
 
 def test_numba_cache_respects_env_var(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

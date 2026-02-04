@@ -15,9 +15,7 @@ from typing import Any, Dict, List, Tuple
 
 import arviz as az
 import numpy as np
-from tqdm import tqdm
 
-from dnadesign.cruncher.artifacts.status import RunStatusWriter
 from dnadesign.cruncher.core.optimizers.base import Optimizer
 from dnadesign.cruncher.core.optimizers.cooling import make_beta_scheduler
 from dnadesign.cruncher.core.optimizers.helpers import _replace_block, slide_window, swap_block
@@ -29,6 +27,8 @@ from dnadesign.cruncher.core.optimizers.policies import (
     move_probs_array,
     targeted_start,
 )
+from dnadesign.cruncher.core.optimizers.progress import ProgressAdapter, passthrough_progress
+from dnadesign.cruncher.core.optimizers.telemetry import NullTelemetry, OptimizerTelemetry
 from dnadesign.cruncher.core.scoring import LocalScanCache
 from dnadesign.cruncher.core.sequence import dsdna_hamming, hamming_distance, revcomp_int
 from dnadesign.cruncher.core.state import SequenceState, make_seed
@@ -51,7 +51,8 @@ class GibbsOptimizer(Optimizer):
         *,
         init_cfg: Any,
         pwms: Dict[str, Any],
-        status_writer: RunStatusWriter | None = None,
+        telemetry: OptimizerTelemetry | None = None,
+        progress: ProgressAdapter | None = None,
     ):
         """
         evaluator: SequenceEvaluator
@@ -75,7 +76,8 @@ class GibbsOptimizer(Optimizer):
         self.record_tune = bool(cfg.get("record_tune", False))
         self.progress_bar = bool(cfg.get("progress_bar", True))
         self.progress_every = int(cfg.get("progress_every", 0))
-        self.status_writer = status_writer
+        self.telemetry = telemetry or NullTelemetry()
+        self.progress = progress or passthrough_progress
         early_cfg = cfg.get("early_stop") or {}
         self.early_stop_enabled = bool(early_cfg.get("enabled", False))
         self.early_stop_patience = int(early_cfg.get("patience", 0))
@@ -257,7 +259,7 @@ class GibbsOptimizer(Optimizer):
             )
 
             # ─── Phase 1: Burn‐in (record each state; draw_i = 0..tune−1) ───
-            for b in tqdm(
+            for b in self.progress(
                 range(tune),
                 desc=f"chain{c + 1} burn‐in",
                 leave=False,
@@ -324,7 +326,7 @@ class GibbsOptimizer(Optimizer):
             logger.debug("Chain %d: burn‐in complete. Starting sampling", c + 1)
 
             # ─── Phase 2: Sampling (record each state; draw_i = tune..tune+draws−1) ───
-            for d in tqdm(
+            for d in self.progress(
                 range(draws),
                 desc=f"chain{c + 1} sampling",
                 leave=False,
@@ -423,16 +425,15 @@ class GibbsOptimizer(Optimizer):
                                 self.early_stop_patience,
                                 self.early_stop_min_delta,
                             )
-                            if self.status_writer is not None:
-                                self.status_writer.update(
-                                    status_message="early_stop",
-                                    early_stop={
-                                        "chain": c + 1,
-                                        "patience": self.early_stop_patience,
-                                        "min_delta": self.early_stop_min_delta,
-                                        "best_score": best_local,
-                                    },
-                                )
+                            self.telemetry.update(
+                                status_message="early_stop",
+                                early_stop={
+                                    "chain": c + 1,
+                                    "patience": self.early_stop_patience,
+                                    "min_delta": self.early_stop_min_delta,
+                                    "best_score": best_local,
+                                },
+                            )
                             break
 
             chain_scores.append(chain_trace)
@@ -828,25 +829,24 @@ class GibbsOptimizer(Optimizer):
             acc_label,
             score_blob,
         )
-        if self.status_writer is not None:
-            self.status_writer.update(
-                phase=phase,
-                chain=chain_idx + 1,
-                step=step,
-                total=total,
-                progress_pct=round(pct, 2),
-                acceptance_rate=acceptance_rate,
-                acceptance_rate_mh=acceptance_rate_mh,
-                acceptance_rate_all=acceptance_rate_all,
-                beta=beta,
-                beta_softmin=beta_softmin,
-                current_score=current_score,
-                score_mean=score_mean,
-                score_std=score_std,
-                best_score=self.best_score,
-                best_chain=(self.best_meta[0] + 1) if self.best_meta else None,
-                best_draw=(self.best_meta[1]) if self.best_meta else None,
-            )
+        self.telemetry.update(
+            phase=phase,
+            chain=chain_idx + 1,
+            step=step,
+            total=total,
+            progress_pct=round(pct, 2),
+            acceptance_rate=acceptance_rate,
+            acceptance_rate_mh=acceptance_rate_mh,
+            acceptance_rate_all=acceptance_rate_all,
+            beta=beta,
+            beta_softmin=beta_softmin,
+            current_score=current_score,
+            score_mean=score_mean,
+            score_std=score_std,
+            best_score=self.best_score,
+            best_chain=(self.best_meta[0] + 1) if self.best_meta else None,
+            best_draw=(self.best_meta[1]) if self.best_meta else None,
+        )
 
     def stats(self) -> Dict[str, object]:
         totals = dict(self.move_tally)

@@ -327,9 +327,9 @@ Notes:
 
 * `sample.output.save_sequences: true` is required for later analysis.
 * `sample.output.trace.save: true` enables trace-based diagnostics.
-* Auto-opt is enabled by default: it runs short Gibbs + PT pilots, evaluates objective-aligned scores from draw-phase `combined_score_final` (top-K median), records diagnostics (warnings suppressed for very short pilots), then runs the best candidate. Selection is thresholdless and confidence-based; `auto_opt.policy.allow_warn: true` will always pick a winner at the max budget (logging low-confidence warnings). Use `--no-auto-opt` to disable.
-* `--no-auto-opt` overrides `optimizer.name=auto` to `gibbs` with a warning; set `sample.optimizer.name` explicitly to silence the fallback.
-* Auto-opt can take minutes; use `--no-auto-opt` when you need a quick smoke test.
+* Auto-opt is enabled by default: it runs short Gibbs + PT pilots, evaluates objective-aligned scores from draw-phase `combined_score_final` (top-K median), records diagnostics (warnings suppressed for very short pilots), then runs the best candidate. Selection is thresholdless and confidence-based; `auto_opt.policy.allow_warn: true` will always pick a winner at the max budget (logging low-confidence warnings).
+* `--no-auto-opt` is only valid when `sample.optimizer.name` is explicitly set to `gibbs` or `pt` and `auto_opt.enabled=false` in the config.
+* Auto-opt can take minutes; for a quick smoke test set `sample.optimizer.name=gibbs` (or `pt`) and disable `auto_opt.enabled`.
 * `--verbose` enables periodic progress logging; `--debug` enables very verbose debug logs.
 * Auto-opt selection details are recorded in each pilot's `meta/run_manifest.json`; `cruncher analyze` writes `analysis/auto_opt_pilots.parquet` for the latest run. The selected pilot is also recorded in `outputs/auto_opt/best_<run_group>.json` (run_group is the TF slug; it uses a `setN_` prefix only when multiple regulator sets are configured) and marked with a leading `*` in `cruncher runs list`.
 

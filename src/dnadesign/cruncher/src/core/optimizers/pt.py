@@ -15,9 +15,7 @@ from typing import Any, Dict, List, Tuple
 
 import arviz as az
 import numpy as np
-from tqdm import tqdm
 
-from dnadesign.cruncher.artifacts.status import RunStatusWriter
 from dnadesign.cruncher.core.optimizers.base import Optimizer
 from dnadesign.cruncher.core.optimizers.cooling import make_beta_ladder, make_beta_scheduler
 from dnadesign.cruncher.core.optimizers.helpers import _replace_block, slide_window, swap_block
@@ -29,6 +27,8 @@ from dnadesign.cruncher.core.optimizers.policies import (
     move_probs_array,
     targeted_start,
 )
+from dnadesign.cruncher.core.optimizers.progress import ProgressAdapter, passthrough_progress
+from dnadesign.cruncher.core.optimizers.telemetry import NullTelemetry, OptimizerTelemetry
 from dnadesign.cruncher.core.scoring import LocalScanCache
 from dnadesign.cruncher.core.sequence import dsdna_hamming, hamming_distance, revcomp_int
 from dnadesign.cruncher.core.state import SequenceState, make_seed
@@ -48,7 +48,8 @@ class PTGibbsOptimizer(Optimizer):
         *,
         pwms: Dict[str, Any],
         init_cfg: Any,
-        status_writer: RunStatusWriter | None = None,
+        telemetry: OptimizerTelemetry | None = None,
+        progress: ProgressAdapter | None = None,
     ) -> None:
         super().__init__(evaluator, cfg, rng)
 
@@ -64,7 +65,8 @@ class PTGibbsOptimizer(Optimizer):
         self.record_tune: bool = bool(cfg.get("record_tune", False))
         self.progress_bar: bool = bool(cfg.get("progress_bar", True))
         self.progress_every: int = int(cfg.get("progress_every", 0))
-        self.status_writer = status_writer
+        self.telemetry = telemetry or NullTelemetry()
+        self.progress = progress or passthrough_progress
         early_cfg = cfg.get("early_stop") or {}
         self.early_stop_enabled = bool(early_cfg.get("enabled", False))
         self.early_stop_patience = int(early_cfg.get("patience", 0))
@@ -247,7 +249,7 @@ class PTGibbsOptimizer(Optimizer):
         stop_after_tune = bool(self.adaptive_swap_cfg.get("stop_after_tune", True))
 
         # Burn‑in sweeps (record like Gibbs for consistency)
-        for t in tqdm(range(T), desc="burn-in", leave=False, disable=not self.progress_bar):
+        for t in self.progress(range(T), desc="burn-in", leave=False, disable=not self.progress_bar):
             sweep_idx = t
             beta_softmin = self.softmin_of(sweep_idx) if self.softmin_of else None
             move_probs = self.move_schedule.probs(sweep_idx / max(self.total_sweeps - 1, 1))
@@ -333,7 +335,7 @@ class PTGibbsOptimizer(Optimizer):
         # Sampling sweeps + swap attempts
         no_improve = 0
         best_global: float | None = None
-        for d in tqdm(range(D), desc="sampling", leave=False, disable=not self.progress_bar):
+        for d in self.progress(range(D), desc="sampling", leave=False, disable=not self.progress_bar):
             sweep_idx = T + d
             beta_softmin = self.softmin_of(sweep_idx) if self.softmin_of else None
             move_probs = self.move_schedule.probs(sweep_idx / max(self.total_sweeps - 1, 1))
@@ -444,15 +446,14 @@ class PTGibbsOptimizer(Optimizer):
                             self.early_stop_patience,
                             self.early_stop_min_delta,
                         )
-                        if self.status_writer is not None:
-                            self.status_writer.update(
-                                status_message="early_stop",
-                                early_stop={
-                                    "patience": self.early_stop_patience,
-                                    "min_delta": self.early_stop_min_delta,
-                                    "best_score": best_global,
-                                },
-                            )
+                        self.telemetry.update(
+                            status_message="early_stop",
+                            early_stop={
+                                "patience": self.early_stop_patience,
+                                "min_delta": self.early_stop_min_delta,
+                                "best_score": best_global,
+                            },
+                        )
                         break
 
         logger.debug("PT optimisation finished. Move utilisation: %s", dict(self.move_tally))
@@ -756,28 +757,27 @@ class PTGibbsOptimizer(Optimizer):
             swap_rate,
             score_blob,
         )
-        if self.status_writer is not None:
-            self.status_writer.update(
-                phase=phase,
-                step=step,
-                total=total,
-                progress_pct=round(pct, 2),
-                acceptance_rate=acceptance_rate,
-                acceptance_rate_mh=acceptance_rate_mh,
-                acceptance_rate_all=acceptance_rate_all,
-                swap_accepts=self.swap_accepts,
-                swap_attempts=self.swap_attempts,
-                swap_rate=swap_rate,
-                current_score=current_score,
-                score_mean=score_mean,
-                score_std=score_std,
-                beta_softmin=beta_softmin,
-                beta_min=min(self.beta_ladder) if self.beta_ladder else None,
-                beta_max=max(self.beta_ladder) if self.beta_ladder else None,
-                best_score=self.best_score,
-                best_chain=(self.best_meta[0] + 1) if self.best_meta else None,
-                best_draw=(self.best_meta[1]) if self.best_meta else None,
-            )
+        self.telemetry.update(
+            phase=phase,
+            step=step,
+            total=total,
+            progress_pct=round(pct, 2),
+            acceptance_rate=acceptance_rate,
+            acceptance_rate_mh=acceptance_rate_mh,
+            acceptance_rate_all=acceptance_rate_all,
+            swap_accepts=self.swap_accepts,
+            swap_attempts=self.swap_attempts,
+            swap_rate=swap_rate,
+            current_score=current_score,
+            score_mean=score_mean,
+            score_std=score_std,
+            beta_softmin=beta_softmin,
+            beta_min=min(self.beta_ladder) if self.beta_ladder else None,
+            beta_max=max(self.beta_ladder) if self.beta_ladder else None,
+            best_score=self.best_score,
+            best_chain=(self.best_meta[0] + 1) if self.best_meta else None,
+            best_draw=(self.best_meta[1]) if self.best_meta else None,
+        )
 
     def stats(self) -> Dict[str, object]:
         totals = dict(self.move_tally)

@@ -14,7 +14,7 @@ cruncher lock
 
 # Optimization (auto‑opt is on by default)
 cruncher sample
-# Optional: skip pilots (forces gibbs if optimizer.name=auto; set optimizer.name=gibbs|pt to choose)
+# Optional: skip pilots (requires optimizer.name=gibbs|pt and auto_opt.enabled=false)
 cruncher sample --no-auto-opt
 
 # Diagnostics + plots (writes analysis/report.json + analysis/report.md)
@@ -34,9 +34,8 @@ inventory with “why” each artifact was generated is in `analysis/manifest.js
 ### Numba cache (required for fast diagnostics)
 
 Cruncher uses ArviZ + Numba for trace diagnostics. If `NUMBA_CACHE_DIR` is not set, cruncher
-sets it to `<repo>/src/dnadesign/cruncher/.cruncher/numba_cache` (repo root discovered via
-`pyproject.toml` or `.git`; falls back to `<repo>/.cruncher/numba_cache` if the cruncher dir
-is missing) and requires it to be writable. To override:
+sets it to `<workspace>/.cruncher/numba_cache` (relative to the config workspace) and
+requires it to be writable. To override:
 
 ```bash
 export NUMBA_CACHE_DIR=/path/to/writable/cache
@@ -62,8 +61,8 @@ to `gibbs` or `pt` in your config):
 ```bash
 cruncher sample --no-auto-opt
 ```
-If `optimizer.name=auto`, `--no-auto-opt` forces a Gibbs run and logs a warning; set
-`sample.optimizer.name` explicitly to choose the optimizer.
+If `optimizer.name=auto`, `--no-auto-opt` is not allowed; set `sample.optimizer.name`
+explicitly to `gibbs` or `pt` and disable `auto_opt.enabled` in your config.
 
 Config knobs live under `sample.auto_opt` in `config.yaml` (see the config
 reference for full options). Auto‑opt also writes a pilot scorecard to

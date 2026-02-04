@@ -31,6 +31,7 @@ import yaml
 from dnadesign.cruncher.analysis.diagnostics import summarize_sampling_diagnostics
 from dnadesign.cruncher.analysis.elites import find_elites_parquet
 from dnadesign.cruncher.analysis.parquet import read_parquet
+from dnadesign.cruncher.app.progress import progress_adapter
 from dnadesign.cruncher.app.run_service import (
     drop_run_index_entries,
     update_run_index_from_manifest,
@@ -40,6 +41,7 @@ from dnadesign.cruncher.app.target_service import (
     has_blocking_target_errors,
     target_statuses,
 )
+from dnadesign.cruncher.app.telemetry import RunTelemetry
 from dnadesign.cruncher.artifacts.entries import artifact_entry
 from dnadesign.cruncher.artifacts.layout import (
     build_run_dir,
@@ -2375,6 +2377,8 @@ def _run_sample_for_set(
             "auto_opt": auto_opt_meta,
         },
     )
+    telemetry = RunTelemetry(status_writer)
+    progress = progress_adapter(sample_cfg.ui.progress_bar)
     update_run_index_from_status(
         config_path,
         out_dir,
@@ -2544,7 +2548,8 @@ def _run_sample_for_set(
         rng=rng,
         pwms=pwms,
         init_cfg=sample_cfg.init,
-        status_writer=status_writer,
+        telemetry=telemetry,
+        progress=progress,
     )
 
     # 5) RUN the MCMC sampling
@@ -3142,13 +3147,10 @@ def run_sample(
             else:
                 auto_cfg = None
                 if sample_cfg.optimizer.name == "auto":
-                    fallback = "gibbs"
-                    logger.info(
-                        "Auto-opt disabled by flag; using optimizer.name='%s' because sample.optimizer.name='auto'. "
-                        "Set sample.optimizer.name to gibbs/pt to avoid this override.",
-                        fallback,
+                    raise ValueError(
+                        "Auto-opt disabled by flag, but sample.optimizer.name='auto' is not allowed. "
+                        "Set sample.optimizer.name to 'gibbs' or 'pt' (or remove --no-auto-opt)."
                     )
-                    sample_cfg.optimizer.name = fallback
         use_auto_opt = sample_cfg.optimizer.name == "auto" and auto_cfg is not None and auto_cfg.enabled
         groups = regulator_sets(cfg.regulator_sets)
         set_count = len(groups)

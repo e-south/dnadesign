@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/tests/test_missing_manifest_hint.py
+
+Validate manifest-missing hints for interrupted runs.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -17,5 +28,6 @@ def test_missing_run_manifest_hint(tmp_path: Path) -> None:
         load_manifest(run_dir)
     msg = str(exc.value).lower()
     assert "interrupted" in msg
-    assert "--no-auto-opt" in msg
+    assert "sample.optimizer.name" in msg
+    assert "cruncher sample" in msg
     assert "dummy.json" in msg

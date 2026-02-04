@@ -101,8 +101,7 @@ Workspace state (per workspace `.cruncher/`):
 Tooling caches:
 
 - Matplotlib caches in `<catalog_root>/.mplcache/` unless `MPLCONFIGDIR` is set.
-- Numba JIT cache defaults to `<repo>/src/dnadesign/cruncher/.cruncher/numba_cache` (or `<repo>/.cruncher/numba_cache`)
-  unless `NUMBA_CACHE_DIR` is set.
+- Numba JIT cache defaults to `<workspace>/.cruncher/numba_cache` unless `NUMBA_CACHE_DIR` is set.
 
 ---
 
