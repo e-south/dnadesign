@@ -135,6 +135,10 @@ def test_pwm_artifact_rejects_nonfinite_log_odds(tmp_path: Path) -> None:
         ds.load_data(rng=np.random.default_rng(0))
 
 
+@pytest.mark.skipif(
+    _FIMO_MISSING,
+    reason="fimo executable not available (run tests via `pixi run pytest` or set MEME_BIN).",
+)
 def test_pwm_sampling_shortfall_includes_motif_id(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     artifact_path = tmp_path / "motif.json"
     _write_artifact(artifact_path)
