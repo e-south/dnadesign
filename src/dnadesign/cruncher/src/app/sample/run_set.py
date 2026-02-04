@@ -35,6 +35,7 @@ from dnadesign.cruncher.app.sample.diagnostics import (
     _filter_elite_candidates,
     _norm_map_for_elites,
     _polish_sequence,
+    resolve_dsdna_mode,
 )
 from dnadesign.cruncher.app.sample.optimizer_config import (
     _effective_chain_count,
@@ -48,7 +49,10 @@ from dnadesign.cruncher.artifacts.layout import (
     build_run_dir,
     config_used_path,
     elites_json_path,
+    elites_mmr_meta_path,
+    elites_mmr_path,
     elites_path,
+    elites_top_score_path,
     elites_yaml_path,
     ensure_run_dirs,
     live_metrics_path,
@@ -66,12 +70,220 @@ from dnadesign.cruncher.core.evaluator import SequenceEvaluator
 from dnadesign.cruncher.core.labels import format_regulator_slug
 from dnadesign.cruncher.core.optimizers.cooling import make_beta_scheduler
 from dnadesign.cruncher.core.scoring import Scorer
+from dnadesign.cruncher.core.selection.mmr import MmrCandidate, select_mmr_elites, tfbs_cores_from_scorer
 from dnadesign.cruncher.core.sequence import canon_int, dsdna_hamming, hamming_distance
 from dnadesign.cruncher.core.state import SequenceState
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
 from dnadesign.cruncher.utils.paths import resolve_catalog_root, resolve_lock_path
 
 logger = logging.getLogger(__name__)
+
+
+def _select_top_score_elites(
+    raw_elites: list[_EliteCandidate],
+    *,
+    elite_k: int,
+    min_dist: int,
+    use_dsdna_hamming: bool,
+) -> tuple[list[_EliteCandidate], int]:
+    sorted_elites = sorted(
+        raw_elites,
+        key=lambda cand: _elite_rank_key(cand.combined_score, cand.min_norm, cand.sum_norm),
+        reverse=True,
+    )
+    if elite_k > 0 and len(sorted_elites) > elite_k:
+        sorted_elites = sorted_elites[:elite_k]
+    dist_fn = dsdna_hamming if use_dsdna_hamming else hamming_distance
+    kept: list[_EliteCandidate] = []
+    kept_seqs: list[np.ndarray] = []
+    for cand in sorted_elites:
+        seq_arr = cand.seq_arr
+        if all(dist_fn(seq_arr, s) >= min_dist for s in kept_seqs):
+            kept.append(cand)
+            kept_seqs.append(seq_arr)
+    return kept, len(sorted_elites)
+
+
+def _apply_polish_trim(
+    candidates: list[_EliteCandidate],
+    *,
+    evaluator: SequenceEvaluator,
+    scorer: Scorer,
+    sample_cfg: SampleConfig,
+    beta_softmin_final: float | None,
+    min_per_tf_norm: float | None,
+    require_all: bool,
+    pwm_sum_min: float,
+    selection_policy: str,
+    min_dist: int,
+    use_dsdna_hamming: bool,
+    pwms: dict[str, object],
+) -> tuple[list[_EliteCandidate], int, int]:
+    if not candidates:
+        return [], 0, 0
+    max_w = max(pwm.length for pwm in pwms.values())
+    polish_cfg = sample_cfg.output.polish
+    polish_cap = polish_cfg.max_elites
+
+    def _trim(seq_arr: np.ndarray) -> np.ndarray:
+        L = seq_arr.size
+        min_start = L
+        max_end = 0
+        for tf_name in scorer.tf_names:
+            _llr, offset, strand = scorer.best_llr(seq_arr, tf_name)
+            width = scorer.pwm_width(tf_name)
+            if strand == "-":
+                offset = L - width - offset
+            min_start = min(min_start, offset)
+            max_end = max(max_end, offset + width)
+        start = max(0, min_start - sample_cfg.output.trim.padding)
+        end = min(L, max_end + sample_cfg.output.trim.padding)
+        if end - start < max_w:
+            raise ValueError(
+                "Trimmed length would be shorter than the widest PWM "
+                f"(trimmed={end - start}, max_w={max_w}). "
+                "Increase output.trim.padding or disable output.trim."
+            )
+        trimmed = seq_arr[start:end].copy()
+        if sample_cfg.output.trim.require_non_decreasing:
+            old_score = evaluator.combined(SequenceState(seq_arr), beta=beta_softmin_final)
+            new_score = evaluator.combined(SequenceState(trimmed), beta=beta_softmin_final)
+            if new_score < old_score:
+                return seq_arr
+        return trimmed
+
+    updated: list[_EliteCandidate] = []
+    for idx, cand in enumerate(candidates):
+        seq_new = cand.seq_arr
+        if sample_cfg.output.polish.enabled and (polish_cap is None or idx < polish_cap):
+            seq_new = _polish_sequence(
+                seq_new,
+                evaluator=evaluator,
+                beta_softmin_final=beta_softmin_final,
+                max_rounds=polish_cfg.max_rounds,
+                improvement_tol=polish_cfg.improvement_tol,
+                max_evals=polish_cfg.max_evals,
+            )
+        if sample_cfg.output.trim.enabled:
+            seq_new = _trim(seq_new)
+        per_tf_map = evaluator(SequenceState(seq_new))
+        norm_map = _norm_map_for_elites(
+            seq_new,
+            per_tf_map,
+            scorer=scorer,
+            score_scale=sample_cfg.objective.score_scale,
+        )
+        min_norm = min(norm_map.values()) if norm_map else 0.0
+        sum_norm = float(sum(norm_map.values()))
+        combined_score = evaluator.combined_from_scores(
+            per_tf_map,
+            beta=beta_softmin_final,
+            length=seq_new.size,
+        )
+        updated.append(
+            _EliteCandidate(
+                seq_arr=seq_new,
+                chain_id=cand.chain_id,
+                draw_idx=cand.draw_idx,
+                combined_score=float(combined_score),
+                min_norm=float(min_norm),
+                sum_norm=float(sum_norm),
+                per_tf_map=per_tf_map,
+                norm_map=norm_map,
+            )
+        )
+
+    updated = _filter_elite_candidates(
+        updated,
+        min_per_tf_norm=min_per_tf_norm,
+        require_all_tfs_over_min_norm=require_all,
+        pwm_sum_min=pwm_sum_min,
+    )
+    passed_post_polish_filter = len(updated)
+    if selection_policy == "top_score":
+        updated.sort(
+            key=lambda cand: _elite_rank_key(cand.combined_score, cand.min_norm, cand.sum_norm),
+            reverse=True,
+        )
+        kept: list[_EliteCandidate] = []
+        kept_seqs: list[np.ndarray] = []
+        dist_fn = dsdna_hamming if use_dsdna_hamming else hamming_distance
+        for cand in updated:
+            seq_arr = cand.seq_arr
+            if all(dist_fn(seq_arr, s) >= min_dist for s in kept_seqs):
+                kept.append(cand)
+                kept_seqs.append(seq_arr)
+        return kept, passed_post_polish_filter, len(kept)
+    return updated, passed_post_polish_filter, len(updated)
+
+
+def _build_elite_entries(
+    candidates: list[_EliteCandidate],
+    *,
+    scorer: Scorer,
+    sample_cfg: SampleConfig,
+    want_consensus: bool,
+    want_canonical: bool,
+    meta_source: str,
+) -> list[dict[str, object]]:
+    entries: list[dict[str, object]] = []
+    for rank, cand in enumerate(candidates, 1):
+        seq_arr = cand.seq_arr
+        seq_str = SequenceState(seq_arr).to_string()
+        canonical_seq = None
+        if want_canonical:
+            canonical_seq = SequenceState(canon_int(seq_arr)).to_string()
+        per_tf_details: dict[str, dict[str, object]] = {}
+        norm_map = cand.norm_map
+        per_tf_map = cand.per_tf_map
+
+        for tf_name in scorer.tf_names:
+            raw_llr, offset, strand = scorer.best_llr(seq_arr, tf_name)
+            width = scorer.pwm_width(tf_name)
+            if strand == "-":
+                offset = len(seq_arr) - width - offset
+            start_pos = offset + 1
+            strand_label = f"{strand}1"
+            motif_diag = f"{start_pos}_[{strand_label}]_{width}"
+            if want_consensus:
+                consensus = scorer.consensus_sequence(tf_name)
+            else:
+                consensus = None
+            per_tf_details[tf_name] = {
+                "raw_llr": float(raw_llr),
+                "offset": offset,
+                "strand": strand,
+                "width": width,
+                "motif_diagram": motif_diag,
+                "scaled_score": float(per_tf_map[tf_name]),
+                "normalized_llr": float(norm_map.get(tf_name, 0.0)),
+            }
+            if want_consensus:
+                per_tf_details[tf_name]["consensus"] = consensus
+
+        entry = {
+            "id": str(uuid.uuid4()),
+            "sequence": seq_str,
+            "rank": rank,
+            "norm_sum": cand.sum_norm,
+            "min_norm": cand.min_norm,
+            "sum_norm": cand.sum_norm,
+            "combined_score_final": cand.combined_score,
+            "chain": cand.chain_id,
+            "chain_1based": cand.chain_id + 1,
+            "draw_idx": cand.draw_idx,
+            "draw_in_phase": cand.draw_idx - sample_cfg.budget.tune
+            if cand.draw_idx >= sample_cfg.budget.tune
+            else cand.draw_idx,
+            "per_tf": per_tf_details,
+            "meta_type": "mcmc-elite",
+            "meta_source": meta_source,
+            "meta_date": datetime.now(timezone.utc).isoformat(),
+        }
+        if want_canonical:
+            entry["canonical_sequence"] = canonical_seq
+        entries.append(entry)
+    return entries
 
 
 def _resolve_final_softmin_beta(optimizer: object, sample_cfg: SampleConfig) -> float | None:
@@ -403,7 +615,11 @@ def _run_sample_for_set(
     ):
         seq_parquet = sequences_path(out_dir)
         tf_order = sorted(tfs)
-        want_canonical_all = bool(sample_cfg.elites.dsDNA_canonicalize)
+        dsdna_mode = resolve_dsdna_mode(
+            elites_cfg=sample_cfg.elites,
+            bidirectional=sample_cfg.objective.bidirectional,
+        )
+        want_canonical_all = bool(dsdna_mode)
 
         def _sequence_rows() -> Iterable[dict[str, object]]:
             for (chain_id, draw_i), seq_arr, per_tf_map in zip(
@@ -528,213 +744,158 @@ def _run_sample_for_set(
         p50_min, p90_min = np.percentile(min_norms, [50, 90])
         logger.debug("Normalised-min percentiles |  median %.2f   90%% %.2f", p50_min, p90_min)
 
-    # -------- rank raw_elites by objective ----------------------------------
-    raw_elites.sort(
-        key=lambda cand: _elite_rank_key(cand.combined_score, cand.min_norm, cand.sum_norm),
-        reverse=True,
-    )
+    selection_cfg = sample_cfg.elites.selection
+    selection_policy = selection_cfg.policy
     elite_k = int(sample_cfg.elites.k or 0)
-    if elite_k > 0 and len(raw_elites) > elite_k:
-        raw_elites = raw_elites[:elite_k]
+    dsdna_mode = resolve_dsdna_mode(
+        elites_cfg=sample_cfg.elites,
+        bidirectional=sample_cfg.objective.bidirectional,
+    )
+    mmr_meta_rows: list[dict[str, object]] | None = None
+    mmr_summary: dict[str, object] | None = None
 
-    # -------- apply diversity filter ----------------------------------------
+    # -------- select elites --------------------------------------------------
     kept_elites: list[_EliteCandidate] = []
-    kept_seqs: list[np.ndarray] = []
-    dist_fn = dsdna_hamming if use_dsdna_hamming else hamming_distance
+    kept_after_diversity_pre_polish = 0
+    passed_post_polish_filter = 0
+    kept_after_diversity_final = 0
 
-    for cand in raw_elites:
-        seq_arr = cand.seq_arr
-        if all(dist_fn(seq_arr, s) >= min_dist for s in kept_seqs):
-            kept_elites.append(cand)
-            kept_seqs.append(seq_arr)
-
-    if min_dist > 0:
-        logger.debug(
-            "Diversity filter (≥%d mismatches): kept %d / %d candidates",
-            min_dist,
-            len(kept_elites),
-            len(raw_elites),
+    if selection_policy == "top_score":
+        kept_elites, sorted_count = _select_top_score_elites(
+            raw_elites,
+            elite_k=elite_k,
+            min_dist=min_dist,
+            use_dsdna_hamming=use_dsdna_hamming,
         )
+        if min_dist > 0:
+            logger.debug(
+                "Diversity filter (≥%d mismatches): kept %d / %d candidates",
+                min_dist,
+                len(kept_elites),
+                sorted_count,
+            )
+        kept_after_diversity_pre_polish = len(kept_elites)
+        passed_post_polish_filter = kept_after_diversity_pre_polish
+        kept_after_diversity_final = kept_after_diversity_pre_polish
+    elif selection_policy == "mmr":
+        if elite_k <= 0:
+            kept_elites = []
+        else:
+            if selection_cfg.pool_size < elite_k:
+                logger.warning(
+                    "MMR pool_size=%d < elites.k=%d; using pool_size=%d.",
+                    selection_cfg.pool_size,
+                    elite_k,
+                    elite_k,
+                )
+            mmr_candidates = [
+                MmrCandidate(
+                    seq_arr=cand.seq_arr,
+                    chain_id=cand.chain_id,
+                    draw_idx=cand.draw_idx,
+                    combined_score=cand.combined_score,
+                    min_norm=cand.min_norm,
+                    sum_norm=cand.sum_norm,
+                    per_tf_map=cand.per_tf_map,
+                    norm_map=cand.norm_map,
+                )
+                for cand in raw_elites
+            ]
+            core_maps = None
+            if selection_cfg.distance.kind in {"tfbs_core_weighted", "tfbs_core_uniform"}:
+                core_maps = {}
+                for cand in mmr_candidates:
+                    core_maps[f"{cand.chain_id}:{cand.draw_idx}"] = tfbs_cores_from_scorer(
+                        cand.seq_arr,
+                        scorer=scorer,
+                        tf_names=scorer.tf_names,
+                    )
+            result = select_mmr_elites(
+                mmr_candidates,
+                k=elite_k,
+                pool_size=selection_cfg.pool_size,
+                alpha=selection_cfg.alpha,
+                relevance=selection_cfg.relevance,
+                relevance_norm=selection_cfg.relevance_norm,
+                distance_kind=selection_cfg.distance.kind,
+                distance_weights=selection_cfg.distance.weights,
+                min_distance=selection_cfg.min_distance,
+                dsdna=dsdna_mode,
+                tf_names=scorer.tf_names,
+                pwms=pwms,
+                core_maps=core_maps,
+            )
+            kept_elites = result.selected
+            mmr_meta_rows = result.meta
+            mmr_summary = {
+                "pool_size": selection_cfg.pool_size,
+                "k": elite_k,
+                "alpha": selection_cfg.alpha,
+                "median_relevance_raw": result.median_relevance_raw,
+                "mean_pairwise_distance": result.mean_pairwise_distance,
+                "min_pairwise_distance": result.min_pairwise_distance,
+            }
+        kept_after_diversity_pre_polish = len(kept_elites)
+        passed_post_polish_filter = kept_after_diversity_pre_polish
+        kept_after_diversity_final = kept_after_diversity_pre_polish
     else:
-        kept_elites = raw_elites  # no filtering
-
-    kept_after_diversity_pre_polish = len(kept_elites)
-    passed_post_polish_filter = kept_after_diversity_pre_polish
-    kept_after_diversity_final = kept_after_diversity_pre_polish
+        raise ValueError(f"Unknown elites.selection.policy '{selection_policy}'.")
 
     if not kept_elites and (pwm_sum_min > 0 or min_per_tf_norm is not None):
-        logger.warning("Elite filters removed all candidates; relax min_per_tf_norm/pwm_sum_min or min_hamming.")
+        if selection_policy == "top_score":
+            logger.warning("Elite filters removed all candidates; relax min_per_tf_norm/pwm_sum_min or min_hamming.")
+        else:
+            logger.warning("Elite filters removed all candidates; relax min_per_tf_norm/pwm_sum_min or min_distance.")
 
     # Optional deterministic polish + trimming
     if kept_elites and (sample_cfg.output.polish.enabled or sample_cfg.output.trim.enabled):
-        max_w = max(pwm.length for pwm in pwms.values())
-        polish_cfg = sample_cfg.output.polish
-        polish_cap = polish_cfg.max_elites
-
-        def _trim(seq_arr: np.ndarray) -> np.ndarray:
-            L = seq_arr.size
-            min_start = L
-            max_end = 0
-            for tf_name in scorer.tf_names:
-                _llr, offset, strand = scorer.best_llr(seq_arr, tf_name)
-                width = scorer.pwm_width(tf_name)
-                if strand == "-":
-                    offset = L - width - offset
-                min_start = min(min_start, offset)
-                max_end = max(max_end, offset + width)
-            start = max(0, min_start - sample_cfg.output.trim.padding)
-            end = min(L, max_end + sample_cfg.output.trim.padding)
-            if end - start < max_w:
-                raise ValueError(
-                    "Trimmed length would be shorter than the widest PWM "
-                    f"(trimmed={end - start}, max_w={max_w}). "
-                    "Increase output.trim.padding or disable output.trim."
-                )
-            trimmed = seq_arr[start:end].copy()
-            if sample_cfg.output.trim.require_non_decreasing:
-                old_score = evaluator.combined(SequenceState(seq_arr), beta=beta_softmin_final)
-                new_score = evaluator.combined(SequenceState(trimmed), beta=beta_softmin_final)
-                if new_score < old_score:
-                    return seq_arr
-            return trimmed
-
-        updated: list[_EliteCandidate] = []
-        for idx, cand in enumerate(kept_elites):
-            seq_new = cand.seq_arr
-            if sample_cfg.output.polish.enabled and (polish_cap is None or idx < polish_cap):
-                seq_new = _polish_sequence(
-                    seq_new,
-                    evaluator=evaluator,
-                    beta_softmin_final=beta_softmin_final,
-                    max_rounds=polish_cfg.max_rounds,
-                    improvement_tol=polish_cfg.improvement_tol,
-                    max_evals=polish_cfg.max_evals,
-                )
-            if sample_cfg.output.trim.enabled:
-                seq_new = _trim(seq_new)
-            per_tf_map = evaluator(SequenceState(seq_new))
-            norm_map = _norm_map_for_elites(
-                seq_new,
-                per_tf_map,
-                scorer=scorer,
-                score_scale=sample_cfg.objective.score_scale,
-            )
-            min_norm = min(norm_map.values()) if norm_map else 0.0
-            sum_norm = float(sum(norm_map.values()))
-            combined_score = evaluator.combined_from_scores(
-                per_tf_map,
-                beta=beta_softmin_final,
-                length=seq_new.size,
-            )
-            updated.append(
-                _EliteCandidate(
-                    seq_arr=seq_new,
-                    chain_id=cand.chain_id,
-                    draw_idx=cand.draw_idx,
-                    combined_score=float(combined_score),
-                    min_norm=float(min_norm),
-                    sum_norm=float(sum_norm),
-                    per_tf_map=per_tf_map,
-                    norm_map=norm_map,
-                )
-            )
-
-        updated = _filter_elite_candidates(
-            updated,
+        kept_elites, passed_post_polish_filter, kept_after_diversity_final = _apply_polish_trim(
+            kept_elites,
+            evaluator=evaluator,
+            scorer=scorer,
+            sample_cfg=sample_cfg,
+            beta_softmin_final=beta_softmin_final,
             min_per_tf_norm=min_per_tf_norm,
-            require_all_tfs_over_min_norm=require_all,
+            require_all=require_all,
             pwm_sum_min=pwm_sum_min,
+            selection_policy=selection_policy,
+            min_dist=min_dist,
+            use_dsdna_hamming=use_dsdna_hamming,
+            pwms=pwms,
         )
-        passed_post_polish_filter = len(updated)
-        updated.sort(
-            key=lambda cand: _elite_rank_key(cand.combined_score, cand.min_norm, cand.sum_norm),
-            reverse=True,
-        )
-        kept_elites = []
-        kept_seqs = []
-        for cand in updated:
-            seq_arr = cand.seq_arr
-            if all(dist_fn(seq_arr, s) >= min_dist for s in kept_seqs):
-                kept_elites.append(cand)
-                kept_seqs.append(seq_arr)
-        kept_after_diversity_final = len(kept_elites)
         if not kept_elites and (pwm_sum_min > 0 or min_per_tf_norm is not None):
-            logger.warning(
-                "Post-polish/trim filters removed all candidates; relax min_per_tf_norm/pwm_sum_min or min_hamming."
-            )
+            if selection_policy == "top_score":
+                logger.warning(
+                    "Post-polish/trim filters removed all candidates; relax min_per_tf_norm/pwm_sum_min or min_hamming."
+                )
+            else:
+                logger.warning("Post-polish/trim filters removed all candidates; relax min_per_tf_norm/pwm_sum_min.")
 
     # serialise elites
-    elites: list[dict[str, object]] = []
     want_cons = bool(sample_cfg.output.include_consensus_in_elites)
+    want_canonical = bool(dsdna_mode)
+    elites = _build_elite_entries(
+        kept_elites,
+        scorer=scorer,
+        sample_cfg=sample_cfg,
+        want_consensus=want_cons,
+        want_canonical=want_canonical,
+        meta_source=out_dir.name,
+    )
 
-    want_canonical = bool(sample_cfg.elites.dsDNA_canonicalize)
-    for rank, cand in enumerate(kept_elites, 1):
-        seq_arr = cand.seq_arr
-        seq_str = SequenceState(seq_arr).to_string()
-        canonical_seq = None
-        if want_canonical:
-            canonical_seq = SequenceState(canon_int(seq_arr)).to_string()
-        per_tf_details: dict[str, dict[str, object]] = {}
-        norm_map = cand.norm_map
-        per_tf_map = cand.per_tf_map
-
-        for tf_name in scorer.tf_names:
-            # best site in this *sequence*
-            raw_llr, offset, strand = scorer.best_llr(seq_arr, tf_name)
-            width = scorer.pwm_width(tf_name)
-            if strand == "-":
-                offset = len(seq_arr) - width - offset
-            start_pos = offset + 1
-            strand_label = f"{strand}1"
-            motif_diag = f"{start_pos}_[{strand_label}]_{width}"
-
-            # OPTIONAL – consensus of the PWM (window only, no padding)
-            if want_cons:
-                consensus = scorer.consensus_sequence(tf_name)
-            else:
-                consensus = None
-
-            per_tf_details[tf_name] = {
-                "raw_llr": float(raw_llr),
-                "offset": offset,
-                "strand": strand,
-                "width": width,
-                "motif_diagram": motif_diag,
-                "scaled_score": float(per_tf_map[tf_name]),
-                "normalized_llr": float(norm_map.get(tf_name, 0.0)),
-            }
-            if want_cons:
-                per_tf_details[tf_name]["consensus"] = consensus
-
-        entry = {
-            "id": str(uuid.uuid4()),
-            "sequence": seq_str,
-            "rank": rank,
-            "norm_sum": cand.sum_norm,
-            "min_norm": cand.min_norm,
-            "sum_norm": cand.sum_norm,
-            "combined_score_final": cand.combined_score,
-            "chain": cand.chain_id,
-            "chain_1based": cand.chain_id + 1,
-            "draw_idx": cand.draw_idx,
-            "draw_in_phase": cand.draw_idx - sample_cfg.budget.tune
-            if cand.draw_idx >= sample_cfg.budget.tune
-            else cand.draw_idx,
-            "per_tf": per_tf_details,
-            "meta_type": "mcmc-elite",
-            "meta_source": out_dir.name,
-            "meta_date": datetime.now(timezone.utc).isoformat(),
-        }
-        if want_canonical:
-            entry["canonical_sequence"] = canonical_seq
-        elites.append(entry)
-
+    if selection_policy == "mmr":
+        dist_label = "min_distance"
+        dist_value = selection_cfg.min_distance
+    else:
+        dist_label = "min_dist"
+        dist_value = min_dist
     run_logger(
-        "Final elite count: %d (pwm_sum_min=%s, min_per_tf_norm=%s, min_dist=%d)",
+        "Final elite count: %d (pwm_sum_min=%s, min_per_tf_norm=%s, %s=%s)",
         len(elites),
         f"{pwm_sum_min:.2f}" if pwm_sum_min else "off",
         f"{min_per_tf_norm:.2f}" if min_per_tf_norm is not None else "off",
-        min_dist,
+        dist_label,
+        f"{dist_value:.2f}" if isinstance(dist_value, (int, float)) else "off",
     )
 
     tf_label = format_regulator_slug(tfs)
@@ -742,8 +903,8 @@ def _run_sample_for_set(
     # 1)  parquet payload ----------------------------------------------------
     parquet_path = elites_path(out_dir)
 
-    def _elite_rows() -> Iterable[dict[str, object]]:
-        for entry in elites:
+    def _elite_rows_from(entries: list[dict[str, object]]) -> Iterable[dict[str, object]]:
+        for entry in entries:
             row = dict(entry)
             per_tf = row.pop("per_tf", None)
             if per_tf is not None:
@@ -754,12 +915,68 @@ def _run_sample_for_set(
             yield row
 
     elite_schema = _elite_parquet_schema(tfs, include_canonical=want_canonical)
-    _write_parquet_rows(parquet_path, _elite_rows(), chunk_size=2000, schema=elite_schema)
+    _write_parquet_rows(parquet_path, _elite_rows_from(elites), chunk_size=2000, schema=elite_schema)
     logger.debug("Saved elites Parquet -> %s", parquet_path.relative_to(out_dir.parent))
 
     json_path = elites_json_path(out_dir)
     json_path.write_text(json.dumps(elites, indent=2))
     logger.debug("Saved elites JSON -> %s", json_path.relative_to(out_dir.parent))
+
+    baseline_entries: list[dict[str, object]] | None = None
+    mmr_path = None
+    mmr_meta_path = None
+    top_score_path = None
+    if selection_policy == "mmr" and selection_cfg.write_baselines:
+        mmr_path = elites_mmr_path(out_dir)
+        if mmr_path != parquet_path:
+            _write_parquet_rows(mmr_path, _elite_rows_from(elites), chunk_size=2000, schema=elite_schema)
+            logger.debug("Saved elites MMR Parquet -> %s", mmr_path.relative_to(out_dir.parent))
+        if mmr_meta_rows:
+            mmr_meta_path = elites_mmr_meta_path(out_dir)
+            _write_parquet_rows(mmr_meta_path, mmr_meta_rows, chunk_size=2000)
+            logger.debug("Saved elites MMR meta -> %s", mmr_meta_path.relative_to(out_dir.parent))
+        baseline_candidates, _ = _select_top_score_elites(
+            raw_elites,
+            elite_k=elite_k,
+            min_dist=min_dist,
+            use_dsdna_hamming=use_dsdna_hamming,
+        )
+        if baseline_candidates and (sample_cfg.output.polish.enabled or sample_cfg.output.trim.enabled):
+            baseline_candidates, _, _ = _apply_polish_trim(
+                baseline_candidates,
+                evaluator=evaluator,
+                scorer=scorer,
+                sample_cfg=sample_cfg,
+                beta_softmin_final=beta_softmin_final,
+                min_per_tf_norm=min_per_tf_norm,
+                require_all=require_all,
+                pwm_sum_min=pwm_sum_min,
+                selection_policy="top_score",
+                min_dist=min_dist,
+                use_dsdna_hamming=use_dsdna_hamming,
+                pwms=pwms,
+            )
+        if baseline_candidates:
+            baseline_entries = _build_elite_entries(
+                baseline_candidates,
+                scorer=scorer,
+                sample_cfg=sample_cfg,
+                want_consensus=want_cons,
+                want_canonical=bool(sample_cfg.elites.dsDNA_canonicalize),
+                meta_source=out_dir.name,
+            )
+            top_score_path = elites_top_score_path(out_dir)
+            baseline_schema = _elite_parquet_schema(
+                tfs,
+                include_canonical=bool(sample_cfg.elites.dsDNA_canonicalize),
+            )
+            _write_parquet_rows(
+                top_score_path,
+                _elite_rows_from(baseline_entries),
+                chunk_size=2000,
+                schema=baseline_schema,
+            )
+            logger.debug("Saved elites top-score Parquet -> %s", top_score_path.relative_to(out_dir.parent))
 
     # 2)  .yaml run-metadata -----------------------------------------------
     meta = {
@@ -768,9 +985,12 @@ def _run_sample_for_set(
         "threshold_norm_sum": pwm_sum_min,
         "min_per_tf_norm": min_per_tf_norm,
         "require_all_tfs_over_min_norm": require_all,
-        "min_hamming_dist": min_dist,
+        "selection_policy": selection_policy,
+        "selection": selection_cfg.model_dump(),
+        "min_hamming_dist": min_dist if selection_policy == "top_score" else None,
+        "min_distance": selection_cfg.min_distance if selection_policy == "mmr" else None,
         "dsdna_canonicalize": want_canonical,
-        "dsdna_hamming": use_dsdna_hamming,
+        "dsdna_hamming": use_dsdna_hamming if selection_policy == "top_score" else None,
         "total_draws_seen": total_draws_seen,
         "passed_pre_filter": len(raw_elites),
         "kept_after_diversity_pre_polish": kept_after_diversity_pre_polish,
@@ -790,6 +1010,8 @@ def _run_sample_for_set(
     if elites:
         lengths = [len(entry["sequence"]) for entry in elites]
         meta["sequence_length_trimmed"] = {"min": min(lengths), "max": max(lengths)}
+    if mmr_summary is not None:
+        meta["mmr_summary"] = mmr_summary
     yaml_path = elites_yaml_path(out_dir)
     with yaml_path.open("w") as fh:
         yaml.safe_dump(meta, fh, sort_keys=False)
@@ -820,6 +1042,36 @@ def _run_sample_for_set(
             ),
         ]
     )
+    if mmr_path is not None:
+        artifacts.append(
+            artifact_entry(
+                mmr_path,
+                out_dir,
+                kind="table",
+                label="Elite sequences (MMR baseline)",
+                stage=stage,
+            )
+        )
+    if top_score_path is not None:
+        artifacts.append(
+            artifact_entry(
+                top_score_path,
+                out_dir,
+                kind="table",
+                label="Elite sequences (top-score baseline)",
+                stage=stage,
+            )
+        )
+    if mmr_meta_path is not None:
+        artifacts.append(
+            artifact_entry(
+                mmr_meta_path,
+                out_dir,
+                kind="table",
+                label="Elite MMR selection metadata",
+                stage=stage,
+            )
+        )
 
     # 10) RUN MANIFEST (for reporting + provenance)
     catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)

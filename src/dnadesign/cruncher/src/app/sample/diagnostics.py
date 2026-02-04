@@ -97,6 +97,22 @@ def _elite_rank_key(combined_score: float, min_norm: float, sum_norm: float) -> 
     return (combined_score, min_norm, sum_norm)
 
 
+def resolve_dsdna_mode(*, elites_cfg: object, bidirectional: bool) -> bool:
+    selection = getattr(elites_cfg, "selection", None)
+    policy = getattr(selection, "policy", "top_score") if selection is not None else "top_score"
+    if policy == "top_score":
+        return bool(getattr(elites_cfg, "dsDNA_canonicalize", False))
+    distance = getattr(selection, "distance", None)
+    mode = getattr(distance, "dsDNA", "auto") if distance is not None else "auto"
+    if mode == "auto":
+        return bool(bidirectional)
+    if mode == "true":
+        return True
+    if mode == "false":
+        return False
+    raise ValueError(f"Unknown dsDNA mode '{mode}'.")
+
+
 def _draw_scores_from_sequences(seq_df: pd.DataFrame) -> np.ndarray:
     if "combined_score_final" not in seq_df.columns:
         return np.array([], dtype=float)

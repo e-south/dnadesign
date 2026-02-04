@@ -469,7 +469,24 @@ class AutoOptToleranceConfig(StrictBaseModel):
 
 
 class AutoOptScorecardConfig(StrictBaseModel):
+    metric: Literal["elites_mmr", "legacy_topk_median"] = "elites_mmr"
+    k: int = 20
+    alpha: float = 0.85
     top_k: int = 10
+
+    @field_validator("alpha")
+    @classmethod
+    def _check_alpha(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v <= 0 or v > 1:
+            raise ValueError("auto_opt.scorecard.alpha must be in (0, 1]")
+        return float(v)
+
+    @field_validator("k")
+    @classmethod
+    def _check_k(cls, v: int) -> int:
+        if not isinstance(v, int) or v < 1:
+            raise ValueError("auto_opt.scorecard.k must be >= 1")
+        return v
 
     @field_validator("top_k")
     @classmethod
@@ -483,12 +500,20 @@ class AutoOptPolicyConfig(StrictBaseModel):
     allow_warn: bool = False
     cooling_boost: float = 5.0
     scorecard: AutoOptScorecardConfig = Field(default_factory=AutoOptScorecardConfig)
+    diversity_weight: float = 0.25
 
     @field_validator("cooling_boost")
     @classmethod
     def _check_retry_factors(cls, v: float) -> float:
         if not isinstance(v, (int, float)) or v < 1:
             raise ValueError("auto_opt.policy.cooling_boost must be >= 1")
+        return float(v)
+
+    @field_validator("diversity_weight")
+    @classmethod
+    def _check_diversity_weight(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v < 0:
+            raise ValueError("auto_opt.policy.diversity_weight must be >= 0")
         return float(v)
 
 
@@ -766,6 +791,9 @@ class SampleEarlyStopConfig(StrictBaseModel):
     enabled: bool = True
     patience: int = 500
     min_delta: float = 0.5
+    require_min_unique: bool = False
+    min_unique: int = 20
+    success_min_per_tf_norm: float = 0.80
 
     @field_validator("patience")
     @classmethod
@@ -780,6 +808,26 @@ class SampleEarlyStopConfig(StrictBaseModel):
         if not isinstance(v, (int, float)) or v < 0:
             raise ValueError("sample.early_stop.min_delta must be >= 0")
         return float(v)
+
+    @field_validator("min_unique")
+    @classmethod
+    def _check_min_unique(cls, v: int) -> int:
+        if not isinstance(v, int) or v < 0:
+            raise ValueError("sample.early_stop.min_unique must be >= 0")
+        return v
+
+    @field_validator("success_min_per_tf_norm")
+    @classmethod
+    def _check_success_min_per_tf_norm(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v < 0 or v > 1:
+            raise ValueError("sample.early_stop.success_min_per_tf_norm must be between 0 and 1")
+        return float(v)
+
+    @model_validator(mode="after")
+    def _check_require_min_unique(self) -> "SampleEarlyStopConfig":
+        if self.require_min_unique and self.min_unique < 1:
+            raise ValueError("sample.early_stop.min_unique must be >= 1 when require_min_unique=true")
+        return self
 
 
 class SampleObjectiveConfig(StrictBaseModel):
@@ -824,10 +872,51 @@ class EliteFiltersConfig(StrictBaseModel):
         return float(v)
 
 
+class SampleElitesSelectionDistanceConfig(StrictBaseModel):
+    kind: Literal["tfbs_core_weighted", "tfbs_core_uniform", "sequence_hamming"] = "tfbs_core_weighted"
+    weights: Literal["tolerant", "uniform"] = "tolerant"
+    dsDNA: Literal["auto", "true", "false"] = "auto"
+
+
+class SampleElitesSelectionConfig(StrictBaseModel):
+    policy: Literal["mmr", "top_score"] = "mmr"
+    pool_size: int = 1000
+    alpha: float = 0.85
+    relevance: Literal["min_per_tf_norm", "combined_score_final"] = "min_per_tf_norm"
+    relevance_norm: Literal["percentile", "minmax"] = "percentile"
+    distance: SampleElitesSelectionDistanceConfig = SampleElitesSelectionDistanceConfig()
+    min_distance: float | None = None
+    write_baselines: bool = True
+
+    @field_validator("pool_size")
+    @classmethod
+    def _check_pool_size(cls, v: int) -> int:
+        if not isinstance(v, int) or v < 1:
+            raise ValueError("sample.elites.selection.pool_size must be >= 1")
+        return v
+
+    @field_validator("alpha")
+    @classmethod
+    def _check_alpha(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v <= 0 or v > 1:
+            raise ValueError("sample.elites.selection.alpha must be in (0, 1]")
+        return float(v)
+
+    @field_validator("min_distance")
+    @classmethod
+    def _check_min_distance(cls, v: float | None) -> float | None:
+        if v is None:
+            return v
+        if not isinstance(v, (int, float)) or v < 0 or v > 1:
+            raise ValueError("sample.elites.selection.min_distance must be between 0 and 1 or null")
+        return float(v)
+
+
 class SampleElitesConfig(StrictBaseModel):
     k: int = 10
     min_hamming: int = 1
     filters: EliteFiltersConfig = EliteFiltersConfig()
+    selection: SampleElitesSelectionConfig = SampleElitesSelectionConfig()
     dsDNA_canonicalize: bool = False
     dsDNA_hamming: bool | None = None
 

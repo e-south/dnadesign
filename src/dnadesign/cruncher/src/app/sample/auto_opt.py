@@ -39,6 +39,7 @@ from dnadesign.cruncher.app.sample.diagnostics import (
     _draw_scores_from_sequences,
     _pooled_bootstrap_seed,
     _top_k_median_from_scores,
+    resolve_dsdna_mode,
 )
 from dnadesign.cruncher.app.sample.optimizer_config import (
     _boost_beta_ladder,
@@ -60,6 +61,12 @@ from dnadesign.cruncher.artifacts.manifest import load_manifest
 from dnadesign.cruncher.config.moves import resolve_move_config
 from dnadesign.cruncher.config.schema_v2 import AutoOptConfig, CruncherConfig, SampleConfig
 from dnadesign.cruncher.core.pwm import PWM
+from dnadesign.cruncher.core.selection.mmr import (
+    compute_core_distance,
+    compute_position_weights,
+    compute_sequence_distance,
+    tfbs_cores_from_hits,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +103,10 @@ class AutoOptCandidate:
     quality: str
     warnings: list[str]
     diagnostics: dict[str, object]
+    pilot_score: float | None
+    median_relevance_raw: float | None
+    mean_pairwise_distance: float | None
+    unique_successes: int | None
 
 
 @dataclass(frozen=True)
@@ -177,6 +188,82 @@ def _encode_sequence_string(seq: str) -> np.ndarray:
         return np.array([_BASE_TO_INT[ch] for ch in clean], dtype=np.int8)
     except KeyError as exc:
         raise ValueError(f"Invalid base in sequence '{seq}'") from exc
+
+
+def _scorecard_elite_subset(elites_df, *, k: int):
+    if elites_df is None or elites_df.empty:
+        return elites_df
+    if "rank" in elites_df.columns:
+        return elites_df.nsmallest(min(int(k), len(elites_df)), "rank")
+    return elites_df.head(min(int(k), len(elites_df)))
+
+
+def _mmr_scorecard_from_elites(
+    elites_df,
+    *,
+    tf_names: list[str],
+    selection_cfg: object,
+    auto_cfg: AutoOptConfig,
+    pwms: dict[str, PWM],
+    dsdna_mode: bool,
+) -> tuple[float | None, float | None, float | None]:
+    if elites_df is None or elites_df.empty:
+        return None, None, None
+    k = auto_cfg.policy.scorecard.k
+    subset = _scorecard_elite_subset(elites_df, k=k)
+    relevance = getattr(selection_cfg, "relevance", "min_per_tf_norm")
+    if relevance == "combined_score_final":
+        col = "combined_score_final"
+    else:
+        col = "min_norm"
+    if col not in subset.columns:
+        raise ValueError(f"Missing '{col}' column in elites.parquet for auto-opt scorecard.")
+    relevance_vals = subset[col].astype(float).to_numpy()
+    if relevance_vals.size == 0:
+        return None, None, None
+    median_relevance_raw = float(np.median(relevance_vals))
+
+    distance_cfg = getattr(selection_cfg, "distance", None)
+    if distance_cfg is None:
+        distance_kind = "sequence_hamming"
+        weights_kind = "uniform"
+    else:
+        distance_kind = getattr(distance_cfg, "kind", "sequence_hamming")
+        weights_kind = getattr(distance_cfg, "weights", "uniform")
+    distances: list[float] = []
+
+    if distance_kind == "sequence_hamming":
+        seqs = [_encode_sequence_string(str(seq)) for seq in subset["sequence"].astype(str).tolist()]
+        for idx, seq_a in enumerate(seqs):
+            for seq_b in seqs[idx + 1 :]:
+                distances.append(compute_sequence_distance(seq_a, seq_b, dsdna=dsdna_mode))
+    else:
+        weights_by_tf: dict[str, np.ndarray] = {}
+        for tf in tf_names:
+            pwm = pwms.get(tf)
+            if pwm is None:
+                raise ValueError(f"Missing PWM for TF '{tf}'.")
+            if distance_kind == "tfbs_core_uniform":
+                weights_by_tf[tf] = np.ones(pwm.length, dtype=float)
+            else:
+                weights_by_tf[tf] = compute_position_weights(pwm, weights=weights_kind)
+        cores = []
+        for _, row in subset.iterrows():
+            if "per_tf_json" in row and isinstance(row["per_tf_json"], str):
+                per_tf_hits = json.loads(row["per_tf_json"])
+            else:
+                per_tf_hits = row.get("per_tf")
+            if not isinstance(per_tf_hits, dict):
+                raise ValueError("Missing per_tf metadata for TFBS core distance in elites.parquet.")
+            seq_arr = _encode_sequence_string(str(row["sequence"]))
+            cores.append(tfbs_cores_from_hits(seq_arr, per_tf_hits=per_tf_hits, tf_names=tf_names))
+        for idx, core_a in enumerate(cores):
+            for core_b in cores[idx + 1 :]:
+                distances.append(compute_core_distance(core_a, core_b, weights=weights_by_tf, tf_names=tf_names))
+
+    mean_pairwise_distance = float(np.mean(distances)) if distances else 0.0
+    pilot_score = median_relevance_raw + auto_cfg.policy.diversity_weight * mean_pairwise_distance
+    return pilot_score, median_relevance_raw, mean_pairwise_distance
 
 
 def _sample_insert_base(pad_with: str | None, rng: np.random.Generator) -> np.int8:
@@ -731,6 +818,10 @@ def _run_auto_optimize_for_set(
                 candidate = _evaluate_pilot_run(
                     pilot_run_dir,
                     kind,
+                    pilot_cfg=pilot_cfg,
+                    auto_cfg=auto_cfg,
+                    pwms=pwms,
+                    tf_names=tfs,
                     budget=budget,
                     mode="auto_opt",
                     scorecard_top_k=auto_cfg.policy.scorecard.top_k,
@@ -776,6 +867,10 @@ def _run_auto_optimize_for_set(
                     quality="fail",
                     warnings=[str(exc)],
                     diagnostics={},
+                    pilot_score=None,
+                    median_relevance_raw=None,
+                    mean_pairwise_distance=None,
+                    unique_successes=None,
                 )
             runs.append(candidate)
         return _aggregate_candidate_runs(runs, budget=budget, scorecard_top_k=auto_cfg.policy.scorecard.top_k)
@@ -790,8 +885,8 @@ def _run_auto_optimize_for_set(
         logger.debug(
             (
                 "Auto-opt %s %s L=%s B=%s beta=%s move=%s swap=%s ladder=%s moveset=%s: "
-                "scorecard=%s diagnostics=%s top_k_median=%s best=%s balance=%s diversity=%s rhat=%s ess=%s "
-                "unique_fraction=%s"
+                "scorecard=%s diagnostics=%s pilot_score=%s top_k_median=%s best=%s balance=%s diversity=%s "
+                "rhat=%s ess=%s unique_fraction=%s"
             ),
             label,
             candidate.kind,
@@ -804,6 +899,7 @@ def _run_auto_optimize_for_set(
             move_probs_label,
             candidate.quality,
             diag_status,
+            f"{candidate.pilot_score:.3f}" if candidate.pilot_score is not None else "n/a",
             f"{candidate.top_k_median_final:.3f}" if candidate.top_k_median_final is not None else "n/a",
             f"{candidate.best_score_final:.3f}" if candidate.best_score_final is not None else "n/a",
             f"{candidate.balance_median:.3f}" if candidate.balance_median is not None else "n/a",
@@ -917,10 +1013,14 @@ def _run_auto_optimize_for_set(
             ranked_length = _rank_auto_opt_candidates(length_final_candidates, auto_cfg)
             best_for_length = ranked_length[0]
             previous_best_run = best_for_length.run_dir
+            score_metric = auto_cfg.policy.scorecard.metric
+            best_score_value = (
+                best_for_length.pilot_score if score_metric == "elites_mmr" else best_for_length.top_k_median_final
+            )
             length_summary_rows.append(
                 {
                     "length": length,
-                    "best_score": best_for_length.top_k_median_final,
+                    "best_score": best_score_value,
                     "balance": best_for_length.balance_median,
                     "diversity": best_for_length.diversity,
                     "unique_fraction": best_for_length.unique_fraction,
@@ -1009,8 +1109,8 @@ def _run_auto_optimize_for_set(
     if winner.quality == "ok":
         logger.info(
             (
-                "Auto-optimize selected %s L=%s move=%s beta=%s swap=%s ladder=%s (top_k_median=%s, best=%s, "
-                "balance=%s, rhat=%s, ess=%s, unique_fraction=%s)."
+                "Auto-optimize selected %s L=%s move=%s beta=%s swap=%s ladder=%s "
+                "(pilot_score=%s top_k_median=%s, best=%s, balance=%s, rhat=%s, ess=%s, unique_fraction=%s)."
             ),
             winner.kind,
             winner.length if winner.length is not None else "n/a",
@@ -1018,6 +1118,7 @@ def _run_auto_optimize_for_set(
             f"{winner.cooling_boost:g}",
             f"{winner.swap_prob:g}" if winner.swap_prob is not None else "n/a",
             str(winner.ladder_size) if winner.ladder_size is not None else "n/a",
+            f"{winner.pilot_score:.3f}" if winner.pilot_score is not None else "n/a",
             f"{winner.top_k_median_final:.3f}" if winner.top_k_median_final is not None else "n/a",
             f"{winner.best_score_final:.3f}" if winner.best_score_final is not None else "n/a",
             f"{winner.balance_median:.3f}" if winner.balance_median is not None else "n/a",
@@ -1029,7 +1130,7 @@ def _run_auto_optimize_for_set(
         logger.warning(
             (
                 "Auto-optimize selected %s L=%s move=%s beta=%s swap=%s ladder=%s "
-                "(quality=%s top_k_median=%s, best=%s, balance=%s, rhat=%s, "
+                "(quality=%s pilot_score=%s top_k_median=%s, best=%s, balance=%s, rhat=%s, "
                 "ess=%s, unique_fraction=%s)."
             ),
             winner.kind,
@@ -1039,6 +1140,7 @@ def _run_auto_optimize_for_set(
             f"{winner.swap_prob:g}" if winner.swap_prob is not None else "n/a",
             str(winner.ladder_size) if winner.ladder_size is not None else "n/a",
             winner.quality,
+            f"{winner.pilot_score:.3f}" if winner.pilot_score is not None else "n/a",
             f"{winner.top_k_median_final:.3f}" if winner.top_k_median_final is not None else "n/a",
             f"{winner.best_score_final:.3f}" if winner.best_score_final is not None else "n/a",
             f"{winner.balance_median:.3f}" if winner.balance_median is not None else "n/a",
@@ -1075,11 +1177,14 @@ def _run_auto_optimize_for_set(
     if notes:
         logger.info("Auto-opt final overrides: %s", "; ".join(notes))
     length_aware = auto_cfg.length.enabled and len({c.length for c in all_candidates if c.length is not None}) > 1
-    ranking_label = (
-        "top_k_median -> best_score_final -> balance -> diversity -> improvement"
-        if length_aware
-        else "top_k_median -> best_score_final -> balance -> diversity -> improvement"
-    )
+    if auto_cfg.policy.scorecard.metric == "elites_mmr":
+        ranking_label = "pilot_score -> median_relevance_raw -> mean_pairwise_distance -> status"
+    else:
+        ranking_label = (
+            "top_k_median -> best_score_final -> balance -> diversity -> improvement"
+            if length_aware
+            else "top_k_median -> best_score_final -> balance -> diversity -> improvement"
+        )
     logger.info("Auto-opt selection ranking: %s.", ranking_label)
     logger.info("Auto-opt final config: %s", _format_auto_opt_config_summary(final_cfg))
     pilot_root = all_candidates[0].run_dir.parent if all_candidates else None
@@ -1127,6 +1232,10 @@ def _run_auto_optimize_for_set(
         "config_summary": _format_auto_opt_config_summary(final_cfg),
         "selected_config": _selected_config_payload(final_cfg),
         "selection_metrics": {
+            "pilot_score": winner.pilot_score,
+            "median_relevance_raw": winner.median_relevance_raw,
+            "mean_pairwise_distance": winner.mean_pairwise_distance,
+            "unique_successes": winner.unique_successes,
             "top_k_median_final": winner.top_k_median_final,
             "best_score_final": winner.best_score_final,
             "top_k_ci_low": winner.top_k_ci_low,
@@ -1140,7 +1249,11 @@ def _run_auto_optimize_for_set(
             "keep_pilots": auto_cfg.keep_pilots,
             "prefer_simpler_if_close": auto_cfg.prefer_simpler_if_close,
             "tolerance": auto_cfg.tolerance.model_dump(),
+            "scorecard_metric": auto_cfg.policy.scorecard.metric,
+            "scorecard_k": auto_cfg.policy.scorecard.k,
+            "scorecard_alpha": auto_cfg.policy.scorecard.alpha,
             "scorecard_top_k": auto_cfg.policy.scorecard.top_k,
+            "diversity_weight": auto_cfg.policy.diversity_weight,
             "move_profiles": auto_cfg.move_profiles,
             "pt_swap_probs": auto_cfg.pt_swap_probs,
             "pt_ladder_sizes": auto_cfg.pt_ladder_sizes,
@@ -1162,6 +1275,10 @@ def _run_auto_optimize_for_set(
                 "status": candidate.status,
                 "quality": candidate.quality,
                 "best_score": candidate.best_score,
+                "pilot_score": candidate.pilot_score,
+                "median_relevance_raw": candidate.median_relevance_raw,
+                "mean_pairwise_distance": candidate.mean_pairwise_distance,
+                "unique_successes": candidate.unique_successes,
                 "top_k_median_final": candidate.top_k_median_final,
                 "best_score_final": candidate.best_score_final,
                 "top_k_ci_low": candidate.top_k_ci_low,
@@ -1244,6 +1361,10 @@ def _evaluate_pilot_run(
     run_dir: Path,
     kind: str,
     *,
+    pilot_cfg: SampleConfig,
+    auto_cfg: AutoOptConfig,
+    pwms: dict[str, PWM],
+    tf_names: list[str],
     scorecard_top_k: int | None = None,
     budget: int | None = None,
     mode: str | None = None,
@@ -1265,14 +1386,36 @@ def _evaluate_pilot_run(
     elite_path = find_elites_parquet(run_dir)
     seq_df = read_parquet(seq_path)
     elites_df = read_parquet(elite_path)
-    tf_names = [m["tf_name"] for m in manifest.get("motifs", [])]
+    tf_names = list(tf_names)
     top_k = scorecard_top_k
     if top_k is None:
         top_k = int(manifest.get("top_k") or 10)
     draw_scores = _draw_scores_from_sequences(seq_df)
     top_k_median_final = _top_k_median_from_scores(draw_scores, top_k)
     best_score_final = float(np.max(draw_scores)) if draw_scores.size else None
-    best_score = top_k_median_final
+    scorecard_metric = auto_cfg.policy.scorecard.metric
+    selection_cfg = pilot_cfg.elites.selection
+    dsdna_mode = resolve_dsdna_mode(
+        elites_cfg=pilot_cfg.elites,
+        bidirectional=pilot_cfg.objective.bidirectional,
+    )
+    pilot_score = None
+    median_relevance_raw = None
+    mean_pairwise_distance = None
+    if scorecard_metric == "elites_mmr":
+        if selection_cfg.policy != "mmr":
+            raise ValueError("auto_opt.scorecard.metric=elites_mmr requires sample.elites.selection.policy=mmr.")
+        pilot_score, median_relevance_raw, mean_pairwise_distance = _mmr_scorecard_from_elites(
+            elites_df,
+            tf_names=tf_names,
+            selection_cfg=selection_cfg,
+            auto_cfg=auto_cfg,
+            pwms=pwms,
+            dsdna_mode=dsdna_mode,
+        )
+        best_score = pilot_score
+    else:
+        best_score = top_k_median_final
     bootstrap_ci: tuple[float, float] | None = None
     if draw_scores.size:
         seed = _bootstrap_seed(manifest=manifest, run_dir=run_dir, kind=kind)
@@ -1292,10 +1435,9 @@ def _evaluate_pilot_run(
     if mode is not None:
         sample_meta["mode"] = mode
     sample_meta["optimizer_kind"] = kind
-    elites_cfg = manifest.get("elites")
-    if isinstance(elites_cfg, dict):
-        sample_meta["dsdna_canonicalize"] = elites_cfg.get("dsDNA_canonicalize", False)
-        sample_meta["dsdna_hamming"] = elites_cfg.get("dsDNA_hamming", False)
+    sample_meta["dsdna_canonicalize"] = dsdna_mode
+    if selection_cfg.policy == "top_score":
+        sample_meta["dsdna_hamming"] = bool(pilot_cfg.elites.dsDNA_hamming)
     diagnostics = summarize_sampling_diagnostics(
         trace_idata=trace_idata,
         sequences_df=seq_df,
@@ -1341,6 +1483,11 @@ def _evaluate_pilot_run(
             acceptance_m = acc.get("M")
         acceptance_mh = optimizer_metrics.get("acceptance_rate_mh")
         delta_frac_zero_mh = optimizer_metrics.get("delta_frac_zero_mh")
+    unique_successes = None
+    if isinstance(optimizer_metrics, dict):
+        raw_unique = optimizer_metrics.get("unique_successes")
+        if isinstance(raw_unique, (int, float)):
+            unique_successes = int(raw_unique)
     swap_rate = optimizer_metrics.get("swap_acceptance_rate") if isinstance(optimizer_metrics, dict) else None
     warnings = diagnostics.get("warnings", []) if isinstance(diagnostics, dict) else []
     status = "ok"
@@ -1353,6 +1500,10 @@ def _evaluate_pilot_run(
     if draw_scores.size == 0:
         warnings = list(warnings)
         warnings.append("Missing pilot metric: combined_score_final draw-phase values.")
+        status = "fail"
+    if scorecard_metric == "elites_mmr" and pilot_score is None:
+        warnings = list(warnings)
+        warnings.append("Missing pilot metric: elites_mmr scorecard unavailable.")
         status = "fail"
 
     unique_draws: int | None = None
@@ -1429,6 +1580,10 @@ def _evaluate_pilot_run(
         quality=status,
         warnings=warnings,
         diagnostics=diagnostics if isinstance(diagnostics, dict) else {},
+        pilot_score=pilot_score,
+        median_relevance_raw=median_relevance_raw,
+        mean_pairwise_distance=mean_pairwise_distance,
+        unique_successes=unique_successes,
     )
 
 
@@ -1528,17 +1683,18 @@ def _aggregate_candidate_runs(
             manifests.append(manifest)
 
     combined_scores = np.concatenate(pooled_scores) if pooled_scores else np.array([], dtype=float)
+    pilot_score = _median([run.pilot_score for run in runs])
     if combined_scores.size:
         top_k_median_final = _top_k_median_from_scores(combined_scores, scorecard_top_k)
         best_score_final = float(np.max(combined_scores))
-        best_score = top_k_median_final
+        best_score = pilot_score if pilot_score is not None else top_k_median_final
     else:
         top_k_median_final = _median([run.top_k_median_final for run in runs])
         best_score_final = max(
             [float(run.best_score_final) for run in runs if run.best_score_final is not None],
             default=None,
         )
-        best_score = top_k_median_final
+        best_score = pilot_score if pilot_score is not None else top_k_median_final
     bootstrap_ci: tuple[float, float] | None = None
     if combined_scores.size:
         seed = _pooled_bootstrap_seed(manifests=manifests, kind=kind, length=length, budget=budget)
@@ -1584,6 +1740,10 @@ def _aggregate_candidate_runs(
         quality=status,
         warnings=warnings,
         diagnostics=diagnostics,
+        pilot_score=_median([run.pilot_score for run in runs]),
+        median_relevance_raw=_median([run.median_relevance_raw for run in runs]),
+        mean_pairwise_distance=_median([run.mean_pairwise_distance for run in runs]),
+        unique_successes=_median([run.unique_successes for run in runs]),
     )
 
 
@@ -1591,30 +1751,42 @@ def _rank_auto_opt_candidates(
     candidates: list[AutoOptCandidate],
     auto_cfg: AutoOptConfig,
 ) -> list[AutoOptCandidate]:
-    ranked: list[tuple[tuple[float, float, float, float, float, float, float], AutoOptCandidate]] = []
+    ranked: list[tuple[tuple[object, ...], AutoOptCandidate]] = []
     status_rank = {"ok": 2, "warn": 1, "fail": 0}
     for candidate in candidates:
-        score = candidate.top_k_median_final if candidate.top_k_median_final is not None else candidate.best_score
-        if score is None:
-            score = float("-inf")
-        secondary = (
-            candidate.best_score_final
-            if candidate.best_score_final is not None
-            else (candidate.best_score if candidate.best_score is not None else float("-inf"))
-        )
-        balance = candidate.balance_median if candidate.balance_median is not None else float("-inf")
-        diversity = candidate.diversity if candidate.diversity is not None else float("-inf")
-        improvement = candidate.improvement if candidate.improvement is not None else float("-inf")
-        unique_fraction = candidate.unique_fraction if candidate.unique_fraction is not None else float("-inf")
-        rank = (
-            float(score),
-            float(secondary),
-            float(balance),
-            float(diversity),
-            float(improvement),
-            float(unique_fraction),
-            float(status_rank.get(candidate.quality, status_rank.get(candidate.status, 0))),
-        )
+        metric = auto_cfg.policy.scorecard.metric
+        status_value = float(status_rank.get(candidate.quality, status_rank.get(candidate.status, 0)))
+        candidate_id = str(candidate.run_dir)
+        if metric == "elites_mmr":
+            score = candidate.pilot_score if candidate.pilot_score is not None else float("-inf")
+            median_rel = candidate.median_relevance_raw if candidate.median_relevance_raw is not None else float("-inf")
+            mean_dist = (
+                candidate.mean_pairwise_distance if candidate.mean_pairwise_distance is not None else float("-inf")
+            )
+            rank = (float(score), float(median_rel), float(mean_dist), status_value, candidate_id)
+        else:
+            score = candidate.top_k_median_final if candidate.top_k_median_final is not None else candidate.best_score
+            if score is None:
+                score = float("-inf")
+            secondary = (
+                candidate.best_score_final
+                if candidate.best_score_final is not None
+                else (candidate.best_score if candidate.best_score is not None else float("-inf"))
+            )
+            balance = candidate.balance_median if candidate.balance_median is not None else float("-inf")
+            diversity = candidate.diversity if candidate.diversity is not None else float("-inf")
+            improvement = candidate.improvement if candidate.improvement is not None else float("-inf")
+            unique_fraction = candidate.unique_fraction if candidate.unique_fraction is not None else float("-inf")
+            rank = (
+                float(score),
+                float(secondary),
+                float(balance),
+                float(diversity),
+                float(improvement),
+                float(unique_fraction),
+                status_value,
+                candidate_id,
+            )
         ranked.append((rank, candidate))
     ranked.sort(key=lambda item: item[0], reverse=True)
     return [item[1] for item in ranked]
@@ -1698,7 +1870,13 @@ def _select_auto_opt_candidate(
 
     if auto_cfg.prefer_simpler_if_close and winner.kind == "pt":
         gibbs = [c for c in ranked if c.kind == "gibbs"]
-        if gibbs and winner.top_k_median_final is not None and gibbs[0].top_k_median_final is not None:
-            if gibbs[0].top_k_median_final >= winner.top_k_median_final - auto_cfg.tolerance.score:
-                return gibbs[0]
+        metric = auto_cfg.policy.scorecard.metric
+        if gibbs:
+            if metric == "elites_mmr":
+                if winner.pilot_score is not None and gibbs[0].pilot_score is not None:
+                    if gibbs[0].pilot_score >= winner.pilot_score - auto_cfg.tolerance.score:
+                        return gibbs[0]
+            elif winner.top_k_median_final is not None and gibbs[0].top_k_median_final is not None:
+                if gibbs[0].top_k_median_final >= winner.top_k_median_final - auto_cfg.tolerance.score:
+                    return gibbs[0]
     return winner
