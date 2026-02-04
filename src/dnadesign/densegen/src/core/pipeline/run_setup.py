@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Iterable
 
 from ..motif_labels import input_motifs
+from ..run_paths import display_path
 
 
 def build_display_map_by_input(
@@ -88,3 +89,25 @@ def init_state_counts(
         spec = plan_pools[item.name]
         state_counts[(spec.pool_name, item.name)] = int(counts.get((spec.pool_name, item.name), 0))
     return state_counts
+
+
+def validate_resume_outputs(
+    *,
+    resume: bool,
+    existing_outputs: bool,
+    outputs_root: Path,
+    run_root: Path,
+) -> None:
+    if resume:
+        if not existing_outputs:
+            outputs_label = display_path(outputs_root, run_root, absolute=False)
+            raise RuntimeError(
+                f"resume=True requested but no outputs were found under {outputs_label}. "
+                "Start a fresh run or remove resume=True."
+            )
+    else:
+        if existing_outputs:
+            outputs_label = display_path(outputs_root, run_root, absolute=False)
+            raise RuntimeError(
+                f"Existing outputs found under {outputs_label}. Explicit resume is required to continue this run."
+            )

@@ -48,7 +48,6 @@ from ..motif_labels import motif_display_name
 from ..postprocess import generate_pad
 from ..run_paths import (
     candidates_root,
-    display_path,
     ensure_run_meta_dir,
     has_existing_run_outputs,
     run_outputs_root,
@@ -93,7 +92,7 @@ from .progress import (
 )
 from .resume_state import load_resume_state
 from .run_finalization import finalize_run_outputs
-from .run_setup import build_display_map_by_input, init_plan_stats, init_state_counts
+from .run_setup import build_display_map_by_input, init_plan_stats, init_state_counts, validate_resume_outputs
 from .run_state_manager import assert_state_matches_outputs, init_run_state, write_run_state
 from .sampling_diagnostics import SamplingDiagnostics
 from .sequence_validation import (
@@ -1533,19 +1532,12 @@ def run_pipeline(
     outputs_root = run_outputs_root(run_root)
     tables_root = run_tables_root(run_root)
     existing_outputs = has_existing_run_outputs(run_root)
-    if resume:
-        if not existing_outputs:
-            outputs_label = display_path(outputs_root, run_root, absolute=False)
-            raise RuntimeError(
-                f"resume=True requested but no outputs were found under {outputs_label}. "
-                "Start a fresh run or remove resume=True."
-            )
-    else:
-        if existing_outputs:
-            outputs_label = display_path(outputs_root, run_root, absolute=False)
-            raise RuntimeError(
-                f"Existing outputs found under {outputs_label}. Explicit resume is required to continue this run."
-            )
+    validate_resume_outputs(
+        resume=resume,
+        existing_outputs=existing_outputs,
+        outputs_root=outputs_root,
+        run_root=run_root,
+    )
 
     # Seed
     seed = int(cfg.runtime.random_seed)
