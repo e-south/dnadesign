@@ -12,7 +12,6 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import os
 import random
@@ -42,20 +41,16 @@ from ...utils import logging_utils
 from ...utils.logging_utils import install_native_stderr_filters
 from ...utils.sequence_utils import gc_fraction
 from ..artifacts.library import LibraryRecord
-from ..artifacts.pool import POOL_MODE_SEQUENCE, POOL_MODE_TFBS, PoolData, _hash_file
+from ..artifacts.pool import POOL_MODE_SEQUENCE, POOL_MODE_TFBS, PoolData
 from ..input_types import PWM_INPUT_TYPES
 from ..metadata import build_metadata
 from ..motif_labels import motif_display_name
 from ..postprocess import generate_pad
-from ..run_manifest import PlanManifest, RunManifest
-from ..run_metrics import write_run_metrics
 from ..run_paths import (
     candidates_root,
     display_path,
     ensure_run_meta_dir,
     has_existing_run_outputs,
-    inputs_manifest_path,
-    run_manifest_path,
     run_outputs_root,
     run_tables_root,
 )
@@ -75,10 +70,9 @@ from .inputs import (
     _mining_attr,
     _sampling_attr,
 )
-from .library_artifacts import prepare_library_source, write_library_artifacts
+from .library_artifacts import prepare_library_source
 from .outputs import (
     _assert_sink_alignment,
-    _consolidate_parts,
     _emit_event,
     _write_effective_config,
     _write_to_sinks,
@@ -98,6 +92,7 @@ from .progress import (
     _summarize_tfbs_usage_stats,
 )
 from .resume_state import load_resume_state
+from .run_finalization import finalize_run_outputs
 from .run_setup import build_display_map_by_input, init_plan_stats, init_state_counts
 from .run_state_manager import assert_state_matches_outputs, init_run_state, write_run_state
 from .sampling_diagnostics import SamplingDiagnostics
@@ -1776,117 +1771,31 @@ def run_pipeline(
     for sink in sinks:
         sink.finalize()
 
-    outputs_root = run_outputs_root(run_root)
-    tables_root = run_tables_root(run_root)
-    _consolidate_parts(tables_root, part_glob="attempts_part-*.parquet", final_name="attempts.parquet")
-    _consolidate_parts(tables_root, part_glob="solutions_part-*.parquet", final_name="solutions.parquet")
-
-    pool_manifest_hash = None
-    pool_manifest_path = outputs_root / "pools" / "pool_manifest.json"
-    if pool_manifest_path.exists():
-        pool_manifest_hash = _hash_file(pool_manifest_path)
-    elif library_artifact is not None and library_artifact.pool_manifest_hash:
-        pool_manifest_hash = library_artifact.pool_manifest_hash
-
-    write_library_artifacts(
+    finalize_run_outputs(
+        cfg=cfg,
+        run_root=run_root,
+        run_root_str=run_root_str,
+        cfg_path=loaded.path,
+        config_sha=config_sha,
+        seed=seed,
+        seeds=seeds,
+        chosen_solver=chosen_solver,
+        solver_time_limit_seconds=solver_time_limit_seconds,
+        solver_threads=solver_threads,
+        dense_arrays_version=dense_arrays_version,
+        dense_arrays_version_source=dense_arrays_version_source,
+        plan_stats=plan_stats,
+        plan_order=plan_order,
+        plan_leaderboards=plan_leaderboards,
+        plan_pools=plan_pools,
+        plan_items=pl,
+        inputs_manifest_entries=inputs_manifest_entries,
         library_source=library_source,
         library_artifact=library_artifact,
         library_build_rows=library_build_rows,
         library_member_rows=library_member_rows,
-        outputs_root=outputs_root,
-        cfg_path=loaded.path,
-        run_id=str(cfg.run.id),
-        run_root=run_root,
-        config_hash=config_sha,
-        pool_manifest_hash=pool_manifest_hash,
+        composition_rows=composition_rows,
     )
-
-    if composition_rows:
-        composition_path = tables_root / "composition.parquet"
-        existing_rows: list[dict] = []
-        if composition_path.exists():
-            try:
-                existing_rows = pd.read_parquet(composition_path).to_dict("records")
-            except Exception:
-                log.warning("Failed to read existing composition.parquet; overwriting.", exc_info=True)
-                existing_rows = []
-        existing_keys = {
-            (str(row.get("solution_id") or ""), int(row.get("placement_index") or 0)) for row in existing_rows
-        }
-        new_rows = [
-            row
-            for row in composition_rows
-            if (str(row.get("solution_id") or ""), int(row.get("placement_index") or 0)) not in existing_keys
-        ]
-        pd.DataFrame(existing_rows + new_rows).to_parquet(composition_path, index=False)
-
-    try:
-        write_run_metrics(cfg=cfg, run_root=run_root)
-    except Exception as exc:
-        raise RuntimeError(f"Failed to write run_metrics.parquet: {exc}") from exc
-
-    manifest_items = [
-        PlanManifest(
-            input_name=key[0],
-            plan_name=key[1],
-            generated=plan_stats[key]["generated"],
-            duplicates_skipped=plan_stats[key]["duplicates_skipped"],
-            failed_solutions=plan_stats[key]["failed_solutions"],
-            total_resamples=plan_stats[key]["total_resamples"],
-            libraries_built=plan_stats[key]["libraries_built"],
-            stall_events=plan_stats[key]["stall_events"],
-            failed_min_count_per_tf=plan_stats[key]["failed_min_count_per_tf"],
-            failed_required_regulators=plan_stats[key]["failed_required_regulators"],
-            failed_min_count_by_regulator=plan_stats[key]["failed_min_count_by_regulator"],
-            failed_min_required_regulators=plan_stats[key]["failed_min_required_regulators"],
-            duplicate_solutions=plan_stats[key]["duplicate_solutions"],
-            leaderboard_latest=plan_leaderboards.get(key),
-        )
-        for key in plan_order
-    ]
-    manifest = RunManifest(
-        run_id=cfg.run.id,
-        created_at=datetime.now(timezone.utc).isoformat(),
-        schema_version=str(cfg.schema_version),
-        config_sha256=config_sha,
-        run_root=run_root_str,
-        random_seed=seed,
-        seed_stage_a=seeds.get("stage_a"),
-        seed_stage_b=seeds.get("stage_b"),
-        seed_solver=seeds.get("solver"),
-        solver_backend=chosen_solver,
-        solver_strategy=str(cfg.solver.strategy),
-        solver_time_limit_seconds=solver_time_limit_seconds,
-        solver_threads=solver_threads,
-        solver_strands=str(cfg.solver.strands),
-        dense_arrays_version=dense_arrays_version,
-        dense_arrays_version_source=dense_arrays_version_source,
-        items=manifest_items,
-    )
-    manifest_path = run_manifest_path(run_root)
-    manifest.write_json(manifest_path)
-
-    if inputs_manifest_entries:
-        manifest_inputs: list[dict] = []
-        for item in pl:
-            spec = plan_pools[item.name]
-            entry = inputs_manifest_entries.get(spec.pool_name)
-            if entry is not None:
-                manifest_inputs.append(entry)
-        payload = {
-            "schema_version": str(cfg.schema_version),
-            "run_id": cfg.run.id,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "config_sha256": config_sha,
-            "inputs": manifest_inputs,
-            "library_sampling": cfg.generation.sampling.model_dump(),
-        }
-        inputs_manifest = inputs_manifest_path(run_root)
-        inputs_manifest.write_text(json.dumps(payload, indent=2, sort_keys=True))
-        log.info(
-            "Inputs manifest written: %s",
-            display_path(inputs_manifest, run_root, absolute=False),
-        )
 
     _write_state()
 
