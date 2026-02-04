@@ -7,3 +7,6 @@
 - Add core-import contract test and update docs to match strict behavior.
 - Extracted sample workflow helpers into app/sample/* modules and slimmed app/sample_workflow to orchestration + re-exports.
 - Split analysis helpers into app/analyze/* modules and kept app/analyze_workflow as the entrypoint.
+- Reviewed cruncher docs (architecture, internals spec, sampling guide, config reference) for no-fallback alignment.
+- Flagged explicit fallbacks (warm-start elites fallback, analyze partial outputs) as contradictions to "no fallbacks" goal.
+- Proposed follow-ups: make warm-start strict, fail analyze on missing artifacts unless explicitly allowed, and migrate tests to new app submodules.
