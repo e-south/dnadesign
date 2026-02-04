@@ -38,7 +38,6 @@ import re
 import shutil
 import sys
 import tempfile
-from importlib import resources
 from pathlib import Path
 from typing import Iterator, Optional
 
@@ -56,6 +55,7 @@ from .cli_commands.report import register_report_command
 from .cli_commands.run import register_run_commands
 from .cli_commands.stage_a import register_stage_a_commands
 from .cli_commands.stage_b import register_stage_b_commands
+from .cli_commands.templates import resolve_template_dir as _resolve_template_dir_impl
 from .cli_commands.workspace import register_workspace_commands
 from .cli_sampling import format_selection_label
 from .config import (
@@ -89,9 +89,6 @@ DEFAULT_CONFIG_FILENAME = "config.yaml"
 DEFAULT_CONFIG_MISSING_MESSAGE = (
     "No config found. cd into a workspace containing config.yaml, or pass -c path/to/config.yaml."
 )
-PACKAGED_TEMPLATES: dict[str, str] = {
-    "demo_meme_three_tfs": "workspaces/demo_meme_three_tfs",
-}
 
 
 @contextlib.contextmanager
@@ -122,58 +119,6 @@ def _suppress_pyarrow_sysctl_warnings() -> Iterator[None]:
         lines = [line for line in text.splitlines() if not _PYARROW_SYSCTL_PATTERN.search(line)]
         if lines:
             sys.stderr.write("\n".join(lines) + "\n")
-
-
-# ----------------- local path helpers -----------------
-def _list_packaged_template_ids() -> list[str]:
-    return sorted(PACKAGED_TEMPLATES.keys())
-
-
-@contextlib.contextmanager
-def _resolve_template_dir(
-    *,
-    template: Optional[Path],
-    template_id: Optional[str],
-) -> Iterator[tuple[Path, Path]]:
-    if template and template_id:
-        console.print("[bold red]Choose either --template or --template-id, not both.[/]")
-        raise typer.Exit(code=1)
-    if template_id:
-        rel_dir = PACKAGED_TEMPLATES.get(template_id)
-        if not rel_dir:
-            available = ", ".join(_list_packaged_template_ids()) or "-"
-            console.print(f"[bold red]Unknown template id:[/] {template_id}")
-            console.print(f"[bold]Available template ids:[/] {available}")
-            raise typer.Exit(code=1)
-        package_root = resources.files("dnadesign.densegen")
-        template_dir = package_root.joinpath(rel_dir)
-        if not template_dir.exists():
-            console.print(f"[bold red]Packaged template not found:[/] {rel_dir}")
-            raise typer.Exit(code=1)
-        with resources.as_file(template_dir) as resolved:
-            config_path = Path(resolved) / DEFAULT_CONFIG_FILENAME
-            if not config_path.exists():
-                console.print(
-                    f"[bold red]Template config not found:[/] {_display_path(config_path, Path.cwd(), absolute=False)}"
-                )
-                raise typer.Exit(code=1)
-            yield Path(resolved), config_path
-        return
-    if template is None:
-        console.print("[bold red]No template provided.[/] Use --template-id or --template.")
-        raise typer.Exit(code=1)
-    template_path = template.expanduser().resolve()
-    if not template_path.exists():
-        console.print(
-            f"[bold red]Template config not found:[/] {_display_path(template_path, Path.cwd(), absolute=False)}"
-        )
-        raise typer.Exit(code=1)
-    if not template_path.is_file():
-        console.print(
-            f"[bold red]Template path is not a file:[/] {_display_path(template_path, Path.cwd(), absolute=False)}"
-        )
-        raise typer.Exit(code=1)
-    yield template_path.parent, template_path
 
 
 def _input_uses_fimo(input_cfg) -> bool:
@@ -482,6 +427,16 @@ def _short_hash(val: str, *, n: int = 8) -> str:
 
 def _display_path(path: Path, run_root: Path, *, absolute: bool) -> str:
     return display_path(path, run_root, absolute=absolute)
+
+
+def _resolve_template_dir(*, template: Optional[Path], template_id: Optional[str]) -> Iterator[tuple[Path, Path]]:
+    return _resolve_template_dir_impl(
+        template=template,
+        template_id=template_id,
+        console=console,
+        display_path=_display_path,
+        default_config_filename=DEFAULT_CONFIG_FILENAME,
+    )
 
 
 def _format_sampling_ratio(value: int, target: int | None) -> str:
