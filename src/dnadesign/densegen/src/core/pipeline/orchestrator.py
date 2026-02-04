@@ -1368,6 +1368,8 @@ def _process_plan_for_source(
                 if local_generated >= max_per_subsample or global_generated >= quota:
                     break
 
+            break
+
         if produced_this_library == 0 and not stall_triggered and stall_seconds > 0:
             now = time.monotonic()
             if (now - last_progress) >= stall_seconds:

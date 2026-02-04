@@ -96,11 +96,6 @@ class StageBSampler:
             produced_total_this_call += int(result.produced)
             global_generated = int(result.global_generated)
 
-            if one_subsample_only:
-                break
-            if global_generated >= self.quota or result.produced >= self.max_per_subsample:
-                break
-
             if result.produced == 0:
                 reason = "stall_no_solution" if result.stall_triggered else "no_solution"
                 if on_no_solution is not None:
@@ -134,6 +129,11 @@ class StageBSampler:
                     )
             else:
                 consecutive_failures = 0
+
+            if one_subsample_only:
+                break
+            if global_generated >= self.quota or result.produced >= self.max_per_subsample:
+                break
 
             if not self.policy.allow_resample():
                 raise RuntimeError(
