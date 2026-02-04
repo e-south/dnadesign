@@ -56,6 +56,7 @@ from .cli_commands.context import CliContext
 from .cli_commands.inspect import register_inspect_commands
 from .cli_commands.report import register_report_command
 from .cli_render import stage_a_plan_table, stage_a_recap_tables
+from .cli_sampling import format_selection_label, stage_a_plan_rows
 from .config import (
     LATEST_SCHEMA_VERSION,
     ConfigError,
@@ -315,6 +316,10 @@ def _workspace_search_roots() -> list[Path]:
     pixi_root = os.environ.get("PIXI_PROJECT_ROOT")
     if pixi_root:
         roots.append(Path(pixi_root))
+    if not roots:
+        repo_root = _repo_root_from(Path(__file__).resolve())
+        if repo_root is not None:
+            roots.append(repo_root)
     roots.append(Path.cwd())
     seen: set[str] = set()
     unique: list[Path] = []
@@ -328,6 +333,17 @@ def _workspace_search_roots() -> list[Path]:
         seen.add(key)
         unique.append(root)
     return unique
+
+
+def _repo_root_from(start: Path) -> Path | None:
+    try:
+        cursor = start.resolve()
+    except Exception:
+        cursor = start
+    for root in [cursor, *cursor.parents]:
+        if (root / "pyproject.toml").exists() or (root / ".git").exists():
+            return root
+    return None
 
 
 def _auto_config_path() -> tuple[Path | None, list[Path]]:
@@ -577,30 +593,6 @@ def _format_tier_fraction_label(fraction: float) -> str:
     return f"{float(fraction) * 100:.3f}%"
 
 
-def _format_selection_label(
-    *,
-    policy: str,
-    alpha: float | None = None,
-    relevance_norm: str | None = None,
-    max_candidates: int | None = None,
-) -> str:
-    selection_policy = str(policy or "top_score")
-    if selection_policy != "mmr":
-        return selection_policy
-    if alpha is None:
-        raise ValueError("MMR selection alpha is required.")
-    parts: list[str] = []
-    if alpha is not None:
-        parts.append(f"a={float(alpha):.2f}")
-    if relevance_norm and relevance_norm != "minmax_raw_score":
-        parts.append(f"rel={relevance_norm}")
-    if max_candidates is not None:
-        parts.append(f"cap={int(max_candidates)}")
-    if not parts:
-        return "mmr"
-    return f"mmr({','.join(parts)})"
-
-
 def _stage_a_sampling_rows(
     pool_data: dict[str, PoolData],
 ) -> list[dict[str, object]]:
@@ -651,7 +643,7 @@ def _stage_a_sampling_rows(
                         tier_target = f"{frac_label} met"
                     elif summary.tier_target_met is False:
                         tier_target = f"{frac_label} unmet"
-                selection_label = _format_selection_label(
+                selection_label = format_selection_label(
                     policy=str(summary.selection_policy),
                     alpha=summary.selection_alpha,
                     relevance_norm=summary.selection_relevance_norm or "minmax_raw_score",
@@ -793,82 +785,6 @@ def _stage_a_sampling_rows(
             }
         )
     rows.sort(key=lambda row: (row["input_name"], row["regulator"]))
-    return rows
-
-
-def _stage_a_plan_rows(
-    cfg,
-    cfg_path: Path,
-    selected_inputs: set[str] | None,
-    *,
-    show_motif_ids: bool,
-) -> list[dict[str, str]]:
-    rows: list[dict[str, str]] = []
-    for inp in cfg.inputs:
-        if selected_inputs and inp.name not in selected_inputs:
-            continue
-        input_type = str(inp.type)
-        if not input_type.startswith("pwm_"):
-            continue
-        sampling = getattr(inp, "sampling", None)
-        base_n_sites = getattr(sampling, "n_sites", None) if sampling else None
-
-        motifs = input_motifs(inp, cfg_path)
-        overrides = getattr(inp, "overrides_by_motif_id", None) if input_type == "pwm_artifact_set" else None
-        for motif_id, display_name in motifs:
-            effective_sampling = sampling
-            if overrides and motif_id in overrides:
-                override = overrides.get(motif_id)
-                if override is not None:
-                    effective_sampling = override
-            reg_n_sites = getattr(effective_sampling, "n_sites", base_n_sites) if effective_sampling else base_n_sites
-            length_cfg = getattr(effective_sampling, "length", None) if effective_sampling else None
-            length_policy = str(getattr(length_cfg, "policy", "-")) if length_cfg else "-"
-            length_range = getattr(length_cfg, "range", None) if length_cfg else None
-            length_label = length_policy
-            if length_policy == "range" and length_range:
-                length_label = f"range({length_range[0]}..{length_range[1]})"
-            mining_cfg = getattr(effective_sampling, "mining", None) if effective_sampling else None
-            budget = getattr(mining_cfg, "budget", None) if mining_cfg else None
-            budget_label = "-"
-            if budget is not None:
-                mode = getattr(budget, "mode", None)
-                if mode == "fixed_candidates":
-                    budget_label = f"fixed={getattr(budget, 'candidates', '-')}"
-                elif mode == "tier_target":
-                    target_frac = getattr(budget, "target_tier_fraction", None)
-                    tier_label = "-" if target_frac is None else f"{float(target_frac) * 100:.3f}%"
-                    budget_label = (
-                        f"tier={tier_label}"
-                        f" max_candidates={getattr(budget, 'max_candidates', '-')}"
-                        f" max_seconds={getattr(budget, 'max_seconds', '-')}"
-                    )
-            uniqueness_cfg = getattr(effective_sampling, "uniqueness", None) if effective_sampling else None
-            uniqueness_label = str(getattr(uniqueness_cfg, "key", "-"))
-            selection_cfg = getattr(effective_sampling, "selection", None) if effective_sampling else None
-            selection_policy = str(getattr(selection_cfg, "policy", "top_score"))
-            selection_alpha = getattr(selection_cfg, "alpha", None)
-            pool_cfg = getattr(selection_cfg, "pool", None) if selection_cfg is not None else None
-            selection_label = _format_selection_label(
-                policy=selection_policy,
-                alpha=selection_alpha,
-                relevance_norm=getattr(pool_cfg, "relevance_norm", None) if pool_cfg is not None else None,
-                max_candidates=getattr(pool_cfg, "max_candidates", None) if pool_cfg is not None else None,
-            )
-            label = motif_id if show_motif_ids else display_name
-            rows.append(
-                {
-                    "input": str(inp.name),
-                    "tf": str(label),
-                    "retain": str(reg_n_sites) if reg_n_sites is not None else "-",
-                    "budget": budget_label,
-                    "eligibility": "best_hit_score>0",
-                    "selection": selection_label,
-                    "uniqueness": uniqueness_label,
-                    "length": length_label,
-                }
-            )
-    rows.sort(key=lambda row: (row["input"], row["tf"]))
     return rows
 
 
@@ -1097,7 +1013,10 @@ def validate_config(
     )
     _warn_pwm_sampling_configs(loaded, cfg_path)
     _warn_full_pool_strategy(loaded)
-    _ensure_fimo_available(loaded.root.densegen, strict=True)
+    explicit_cfg = bool(
+        config or (ctx.obj and ctx.obj.get("config_path") is not None) or os.environ.get("DENSEGEN_CONFIG_PATH")
+    )
+    _ensure_fimo_available(loaded.root.densegen, strict=explicit_cfg)
     if probe_solver:
         from .adapters.optimizer import DenseArraysAdapter
         from .core.pipeline import select_solver
@@ -1357,7 +1276,7 @@ def stage_a_build_pool(
                 f"[yellow]Appending to existing candidate artifacts under {candidates_dir} (use --fresh to reset).[/]"
             )
 
-    plan_rows = _stage_a_plan_rows(
+    plan_rows = stage_a_plan_rows(
         cfg,
         cfg_path,
         selected if selected else None,

@@ -85,6 +85,7 @@ from .outputs import (
 )
 from .plan_pools import PLAN_POOL_INPUT_TYPE, PlanPoolSpec
 from .progress import (
+    _build_screen_dashboard,
     _format_progress_bar,
     _ScreenDashboard,
     _short_seq,
@@ -646,6 +647,7 @@ def _process_plan_for_source(
         library_sources = list(library_context.library_sources)
         required_regulators = list(library_context.required_regulators)
         min_required_regulators = None
+        tf_list_from_library = sorted(set(regulator_labels)) if regulator_labels else []
         site_id_by_index = sampling_info.get("site_id_by_index")
         source_by_index = sampling_info.get("source_by_index")
         tfbs_id_by_index = sampling_info.get("tfbs_id_by_index")
@@ -803,7 +805,6 @@ def _process_plan_for_source(
                     tfbs_id_by_index,
                     motif_id_by_index,
                 )
-                tf_list_from_library = sorted(set(regulator_labels)) if regulator_labels else []
                 solver_status = getattr(sol, "status", None)
                 if solver_status is not None:
                     solver_status = str(solver_status)
@@ -1065,13 +1066,22 @@ def _process_plan_for_source(
                     used_tfbs_detail=used_tfbs_detail,
                     used_tf_counts=used_tf_counts,
                     used_tf_list=used_tf_list,
-                    min_required_regulators=min_required_regulators,
-                    covers_all=bool(covers_all),
-                    covers_required=bool(covers_required),
                     min_count_per_tf=min_count_per_tf,
+                    covers_all_tfs_in_solution=bool(covers_all),
+                    required_regulators=required_regulators,
+                    min_required_regulators=min_required_regulators,
                     min_count_by_regulator=plan_min_count_by_regulator,
+                    covers_required_regulators=bool(covers_required),
                     gc_core=gc_core,
                     gc_total=gc_total,
+                    input_row_count=input_row_count,
+                    input_tf_count=input_tf_count,
+                    input_tfbs_count=input_tfbs_count,
+                    input_tf_tfbs_pair_count=input_tf_tfbs_pair_count,
+                    sampling_fraction=sampling_fraction,
+                    sampling_fraction_pairs=sampling_fraction_pairs,
+                    sampling_library_index=int(sampling_library_index),
+                    sampling_library_hash=str(sampling_library_hash),
                     solver_status=solver_status,
                     solver_objective=solver_objective,
                     solver_solve_time_s=solver_solve_time_s,
@@ -1081,14 +1091,13 @@ def _process_plan_for_source(
                 if not derived:
                     log.info("[%s/%s] Skipping solution; no metadata found", source_label, plan_name)
                     continue
-                record = OutputRecord(
+                record = OutputRecord.from_sequence(
                     sequence=final_seq,
-                    metadata=derived,
+                    meta=derived,
+                    source=source_label,
+                    bio_type=output_bio_type,
+                    alphabet=output_alphabet,
                 )
-                if output_alphabet:
-                    record.alphabet = output_alphabet
-                if output_bio_type:
-                    record.bio_type = output_bio_type
 
                 if not _write_to_sinks(sinks, record):
                     duplicate_records += 1
@@ -1155,6 +1164,8 @@ def _process_plan_for_source(
                         {
                             "input_name": source_label,
                             "plan_name": plan_name,
+                            "library_index": int(sampling_library_index),
+                            "library_hash": str(sampling_library_hash),
                             "sequence": final_seq,
                             "used_tfbs": used_tfbs,
                             "used_tfbs_detail": used_tfbs_detail,
@@ -1188,32 +1199,43 @@ def _process_plan_for_source(
                 if progress_style == "screen" and dashboard is not None:
                     if (time.monotonic() - last_screen_refresh) >= progress_refresh_seconds:
                         last_screen_refresh = time.monotonic()
-                        library_label = f"{source_label}/{plan_name}"
                         bar = _format_progress_bar(global_generated, quota)
                         cr_now = float(sol.compression_ratio)
                         cr_sum += cr_now
                         cr_count += 1
                         cr_avg = cr_sum / max(cr_count, 1)
-                        fail_label = latest_failure_totals or "-"
                         diversity_label = _summarize_diversity(
                             usage_counts,
                             tf_usage_counts,
                             library_tfs=library_tfs,
                             library_tfbs=library_tfbs,
                         )
-                        dashboard.update(
-                            title=library_label,
-                            progress=bar,
-                            progress_pct=float(global_generated) / float(quota),
-                            local_progress=int(local_generated),
-                            local_quota=int(max_per_subsample),
-                            compression_ratio=cr_now,
-                            compression_ratio_avg=cr_avg,
-                            duplicates=int(duplicate_solutions),
-                            failures=fail_label,
-                            diversity=diversity_label,
-                            sequence=final_seq if print_visual else None,
+                        renderable = _build_screen_dashboard(
+                            source_label=source_label,
+                            plan_name=plan_name,
+                            bar=bar,
+                            generated=int(global_generated),
+                            quota=int(quota),
+                            pct=float(global_generated) / float(quota) * 100.0,
+                            local_generated=int(local_generated),
+                            local_target=int(max_per_subsample),
+                            library_index=int(sampling_library_index),
+                            cr_now=cr_now,
+                            cr_avg=cr_avg,
+                            resamples=int(counters.total_resamples),
+                            dup_out=int(duplicate_records),
+                            dup_sol=int(duplicate_solutions),
+                            fails=int(failed_solutions),
+                            stalls=int(stall_events),
+                            failure_totals=latest_failure_totals,
+                            tf_usage=diagnostics.map_tf_usage(tf_usage_counts),
+                            tfbs_usage=diagnostics.map_tfbs_usage(usage_counts),
+                            diversity_label=diversity_label,
+                            show_tfbs=show_tfbs,
+                            show_solutions=bool(print_visual),
+                            sequence_preview=final_seq if print_visual else None,
                         )
+                        dashboard.update(renderable)
 
                 if progress_style == "stream" and global_generated % max(1, progress_every) == 0:
                     bar = _format_progress_bar(global_generated, quota)

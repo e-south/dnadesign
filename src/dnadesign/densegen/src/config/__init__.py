@@ -37,6 +37,7 @@ from .generation import (
 )
 from .inputs import (
     BackgroundPoolFiltersConfig,
+    BackgroundPoolFimoExcludeConfig,
     BackgroundPoolGCConfig,
     BackgroundPoolInput,
     BackgroundPoolLengthConfig,
@@ -80,6 +81,7 @@ from .solver import SolverConfig
 
 __all__ = [
     "BackgroundPoolFiltersConfig",
+    "BackgroundPoolFimoExcludeConfig",
     "BackgroundPoolGCConfig",
     "BackgroundPoolInput",
     "BackgroundPoolLengthConfig",

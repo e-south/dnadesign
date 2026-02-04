@@ -18,6 +18,8 @@ from typing import Optional
 import pandas as pd
 import typer
 
+from ..cli_render import stage_a_plan_table
+from ..cli_sampling import stage_a_plan_rows
 from ..config import load_config, resolve_outputs_scoped_path, resolve_relative_path, resolve_run_root
 from ..core.artifacts.pool import pool_status_by_input
 from ..core.event_log import load_events
@@ -503,6 +505,11 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
             )
         context.console.print(plan_table)
 
+        stage_a_rows = stage_a_plan_rows(cfg, loaded.path, None, show_motif_ids=False)
+        if stage_a_rows:
+            context.console.print("[bold]Stage-A plan[/]")
+            context.console.print(stage_a_plan_table(stage_a_rows))
+
         if show_constraints:
             for item in cfg.generation.resolve_plan():
                 context.console.print(f"[bold]{item.name}[/]")
@@ -522,7 +529,7 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
                         context.console.print(f"  side_biases.right: {', '.join(sb.right)}")
 
         solver = context.make_table("backend", "strategy", "time_limit", "threads", "strands")
-        time_limit = "-" if cfg.solver.time_limit is None else str(cfg.solver.time_limit)
+        time_limit = "-" if cfg.solver.time_limit_seconds is None else str(cfg.solver.time_limit_seconds)
         threads = "-" if cfg.solver.threads is None else str(cfg.solver.threads)
         backend_display = str(cfg.solver.backend)
         solver.add_row(backend_display, str(cfg.solver.strategy), time_limit, threads, str(cfg.solver.strands))

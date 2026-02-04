@@ -157,11 +157,18 @@ def select_group_members(
             total = float(weights.sum())
             if total <= 0:
                 raise ValueError(f"Regulator group '{group.name}' has no sampling weight.")
-            weights = weights / total
-            chosen = np_rng.choice(len(members), size=int(group.min_required), replace=False, p=weights)
+            if group.min_required == len(members):
+                selected = sorted(members)
+            else:
+                weights = weights / total
+                chosen = np_rng.choice(len(members), size=int(group.min_required), replace=False, p=weights)
+                selected = sorted([members[int(i)] for i in chosen])
         else:
-            chosen = np_rng.choice(len(members), size=int(group.min_required), replace=False)
-        selected = sorted([members[int(i)] for i in chosen])
+            if group.min_required == len(members):
+                selected = sorted(members)
+            else:
+                chosen = np_rng.choice(len(members), size=int(group.min_required), replace=False)
+                selected = sorted([members[int(i)] for i in chosen])
         selection[group.name] = selected
         required_members.extend(selected)
     return required_members, selection

@@ -172,6 +172,43 @@ def _placements_from_dense_arrays(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _placements_from_composition(df: pd.DataFrame) -> pd.DataFrame:
+    required = {
+        "input_name",
+        "plan_name",
+        "library_index",
+        "library_hash",
+        "used_tfbs_detail",
+    }
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"composition.parquet missing required columns: {sorted(missing)}")
+    rows: list[dict] = []
+    for _, row in df.iterrows():
+        input_name = str(row.get("input_name") or "")
+        plan_name = str(row.get("plan_name") or "")
+        if not input_name or not plan_name:
+            raise ValueError("composition.parquet missing input_name/plan_name metadata.")
+        library_index = int(row.get("library_index") or 0)
+        library_hash = str(row.get("library_hash") or "")
+        for item in _ensure_list_of_dicts(row.get("used_tfbs_detail")):
+            tf = str(item.get("tf") or "").strip()
+            tfbs = str(item.get("tfbs") or "").strip()
+            if not tf or not tfbs:
+                continue
+            rows.append(
+                {
+                    "input_name": input_name,
+                    "plan_name": plan_name,
+                    "library_index": library_index,
+                    "library_hash": library_hash,
+                    "tf": tf,
+                    "tfbs": tfbs,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
 def _load_pool_frames(run_root: Path, *, cfg) -> tuple[pd.DataFrame | None, str | None]:
     pool_dir = run_outputs_root(run_root) / "pools"
     if not pool_dir.exists():
@@ -240,8 +277,12 @@ def build_run_metrics(*, cfg, run_root: Path) -> pd.DataFrame:
     placement_source = "none"
     placements_df = pd.DataFrame()
     if not composition_df.empty:
-        placements_df = composition_df.copy()
-        placement_source = "composition"
+        if "tf" in composition_df.columns and "tfbs" in composition_df.columns:
+            placements_df = composition_df.copy()
+            placement_source = "composition"
+        elif "used_tfbs_detail" in composition_df.columns:
+            placements_df = _placements_from_composition(composition_df)
+            placement_source = "composition"
     elif not dense_arrays_df.empty:
         placements_df = _placements_from_dense_arrays(dense_arrays_df)
         placement_source = "dense_arrays"
