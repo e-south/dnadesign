@@ -12,18 +12,15 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import logging
-import shutil
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, Callable
 
 import numpy as np
 
-from dnadesign.cruncher.app.run_service import drop_run_index_entries
 from dnadesign.cruncher.app.sample.resources import _lockmap_for, _store
-from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json, atomic_write_yaml
+from dnadesign.cruncher.artifacts.atomic_write import atomic_write_yaml
 from dnadesign.cruncher.artifacts.layout import config_used_path
-from dnadesign.cruncher.config.moves import resolve_move_config
 from dnadesign.cruncher.config.schema_v2 import CruncherConfig, SampleConfig
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.store.motif_store import MotifRef
@@ -167,62 +164,3 @@ def _format_run_path(path: Path, *, base: Path) -> str:
         return str(path.relative_to(base))
     except ValueError:
         return str(path)
-
-
-def _auto_opt_best_marker_path(pilot_root: Path, *, run_group: str) -> Path:
-    suffix = run_group or "best"
-    return pilot_root / f"best_{suffix}.json"
-
-
-def _write_auto_opt_best_marker(pilot_root: Path, payload: dict[str, object], *, run_group: str) -> Path:
-    path = _auto_opt_best_marker_path(pilot_root, run_group=run_group)
-    atomic_write_json(path, payload)
-    return path
-
-
-def _prune_auto_opt_runs(
-    *,
-    config_path: Path,
-    pilot_root: Path,
-    candidates: list[object],
-    winner: object,
-    keep_mode: str,
-    catalog_root: Path | str | None,
-) -> list[str]:
-    if keep_mode == "all":
-        return []
-    keep_dirs: set[Path] = {winner.run_dir}
-    if keep_mode == "ok":
-        for candidate in candidates:
-            if candidate.quality == "ok":
-                keep_dirs.update(candidate.run_dirs)
-    keep_names: set[str] = {path.name for path in keep_dirs}
-    remove_dirs: list[Path] = []
-    for candidate in candidates:
-        for run_dir in candidate.run_dirs:
-            if run_dir.name not in keep_names:
-                remove_dirs.append(run_dir)
-    removed_names: list[str] = []
-    for run_dir in remove_dirs:
-        if not run_dir.exists():
-            continue
-        if pilot_root not in run_dir.parents:
-            logger.warning("Auto-opt prune skipped unexpected path: %s", run_dir)
-            continue
-        shutil.rmtree(run_dir)
-        removed_names.append(run_dir.name)
-    if removed_names:
-        drop_run_index_entries(config_path, removed_names, catalog_root=catalog_root)
-    return removed_names
-
-
-def _selected_config_payload(cfg: SampleConfig) -> dict[str, object]:
-    return {
-        "optimizer": cfg.optimizer.name,
-        "objective": cfg.objective.model_dump(),
-        "optimizers": cfg.optimizers.model_dump(),
-        "moves": resolve_move_config(cfg.moves).model_dump(),
-        "init_length": cfg.init.length,
-        "budget": cfg.budget.model_dump(),
-        "elites": cfg.elites.model_dump(),
-    }

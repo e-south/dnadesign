@@ -13,96 +13,33 @@ from __future__ import annotations
 
 from typing import Any
 
-import numpy as np
+from dnadesign.cruncher.config.schema_v2 import AdaptiveSwapConfig
 
-from dnadesign.cruncher.config.moves import resolve_move_config
-from dnadesign.cruncher.config.schema_v2 import (
-    BetaLadderFixed,
-    BetaLadderGeometric,
-    SampleConfig,
-)
-
-
-def _default_beta_ladder(chains: int, beta_min: float, beta_max: float) -> list[float]:
-    if chains < 2:
-        raise ValueError("PT beta ladder requires at least 2 chains")
-    if beta_min <= 0 or beta_max <= 0:
-        raise ValueError("PT geometric ladder requires beta_min>0 and beta_max>0")
-    ladder = np.geomspace(beta_min, beta_max, chains, dtype=float)
-    return [float(beta) for beta in ladder]
+DEFAULT_BETA_LADDER: list[float] = [0.2, 1.0, 5.0, 25.0]
+DEFAULT_SWAP_PROB: float = 0.10
+DEFAULT_ADAPTIVE_SWAP: dict[str, object] = AdaptiveSwapConfig(
+    enabled=True,
+    target_swap=0.25,
+    window=50,
+    k=0.50,
+    min_scale=0.25,
+    max_scale=50.0,
+    stop_after_tune=True,
+).model_dump()
 
 
-def _resolve_beta_ladder(pt_cfg) -> tuple[list[float], list[str]]:
-    notes: list[str] = []
-    ladder = pt_cfg.beta_ladder
-    if isinstance(ladder, BetaLadderFixed):
-        return [float(ladder.beta)], notes
-    if isinstance(ladder, BetaLadderGeometric):
-        if ladder.betas is not None:
-            return [float(b) for b in ladder.betas], notes
-        notes.append("derived PT beta ladder from beta_min/beta_max/n_temps")
-        return _default_beta_ladder(int(ladder.n_temps), float(ladder.beta_min), float(ladder.beta_max)), notes
-    raise ValueError("Unsupported beta_ladder configuration")
-
-
-def _resolve_optimizer_kind(sample_cfg: SampleConfig) -> str:
-    kind = sample_cfg.optimizer.name
-    if kind == "auto":
-        raise ValueError("sample.optimizer.name must be 'pt' for a concrete run.")
-    if kind != "pt":
-        raise ValueError("sample.optimizer.name must be 'pt'.")
+def _resolve_optimizer_kind() -> str:
     return "pt"
 
 
-def _effective_chain_count(sample_cfg: SampleConfig, *, kind: str) -> int:
-    if kind == "pt":
-        ladder, _ = _resolve_beta_ladder(sample_cfg.optimizers.pt)
-        return len(ladder)
-    raise ValueError(f"Unknown optimizer kind '{kind}'")
+def _effective_chain_count() -> int:
+    return len(DEFAULT_BETA_LADDER)
 
 
-def _boost_beta_ladder(ladder: Any, factor: float) -> tuple[Any, list[str]]:
-    if factor <= 1:
-        return ladder, []
-    notes = [f"boosted PT beta ladder by x{factor:g} for stabilization"]
-    if isinstance(ladder, BetaLadderFixed):
-        return BetaLadderFixed(beta=float(ladder.beta) * factor), notes
-    if isinstance(ladder, BetaLadderGeometric):
-        if ladder.betas is not None:
-            betas = [float(b) * factor for b in ladder.betas]
-            return BetaLadderGeometric(betas=betas), notes
-        return BetaLadderGeometric(
-            beta_min=float(ladder.beta_min) * factor,
-            beta_max=float(ladder.beta_max) * factor,
-            n_temps=int(ladder.n_temps),
-        ), notes
-    return ladder, notes
-
-
-def _format_beta_ladder_summary(pt_cfg: object) -> str:
-    betas, _ = _resolve_beta_ladder(pt_cfg)
-    if isinstance(pt_cfg.beta_ladder, BetaLadderFixed):
-        return f"fixed({betas[0]:g})"
-    beta = ",".join(f"{b:g}" for b in betas)
-    return f"geometric([{beta}])"
-
-
-def _format_move_probs(move_probs: dict[str, float]) -> str:
-    parts = [f"{key}={val:.2f}" for key, val in move_probs.items() if val > 0]
-    return ",".join(parts) if parts else "none"
-
-
-def _format_auto_opt_config_summary(cfg: SampleConfig) -> str:
-    kind = cfg.optimizer.name
-    moves = _format_move_probs(resolve_move_config(cfg.moves).move_probs)
-    combine = cfg.objective.combine or ("sum" if cfg.objective.score_scale == "consensus-neglop-sum" else "min")
-    if kind != "pt":
-        raise ValueError("sample.optimizer.name must be 'pt' for auto-opt summaries.")
-    cooling = _format_beta_ladder_summary(cfg.optimizers.pt)
-    chains = len(_resolve_beta_ladder(cfg.optimizers.pt)[0])
-    cooling = f"{cooling} swap_prob={cfg.optimizers.pt.swap_prob:g}"
-    return (
-        f"optimizer={kind} scorer={cfg.objective.score_scale} "
-        f"combine={combine} length={cfg.init.length} chains={chains} tune={cfg.budget.tune} draws={cfg.budget.draws} "
-        f"cooling={cooling} moves={moves} progress_every={cfg.ui.progress_every}"
-    )
+def _resolve_pt_defaults() -> dict[str, Any]:
+    return {
+        "kind": "geometric",
+        "beta": list(DEFAULT_BETA_LADDER),
+        "swap_prob": DEFAULT_SWAP_PROB,
+        "adaptive_swap": dict(DEFAULT_ADAPTIVE_SWAP),
+    }

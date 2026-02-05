@@ -38,11 +38,6 @@ def sample(
         "-c",
         help="Path to cruncher config.yaml (overrides positional CONFIG).",
     ),
-    auto_opt: bool | None = typer.Option(
-        None,
-        "--auto-opt/--no-auto-opt",
-        help="Run auto-optimization pilots (PT) and select the best candidate.",
-    ),
     verbose: bool = typer.Option(
         False,
         "--verbose",
@@ -74,7 +69,7 @@ def sample(
         ensure_numba_cache_dir(config_path.parent, cache_dir=cache_dir)
         from dnadesign.cruncher.app.sample_workflow import run_sample
 
-        run_sample(cfg, config_path, auto_opt_override=auto_opt)
+        run_sample(cfg, config_path)
     except (RuntimeError, ValueError, FileNotFoundError) as exc:
         console.print(f"Error: {exc}")
         console.print("Hint: run cruncher fetch + lock, then cruncher sample <config>.")

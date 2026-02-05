@@ -59,7 +59,7 @@ class GibbsOptimizer(Optimizer):
         cfg: flattened config dict (keys include 'draws','tune','chains', etc.)
         rng: numpy.random.Generator
 
-        init_cfg: Original InitConfig (with kind, length, pad_with, regulator)
+        init_cfg: Original InitConfig (kind, pad_with, regulator)
         pwms: full dict of {tf_name: PWM} for seeding
         """
         super().__init__(evaluator, cfg, rng)
@@ -71,6 +71,7 @@ class GibbsOptimizer(Optimizer):
         self.chains = int(cfg["chains"])
         self.min_dist = int(cfg["min_dist"])
         self.top_k = int(cfg["top_k"])
+        self.sequence_length = int(cfg["sequence_length"])
         self.bidirectional = bool(cfg.get("bidirectional", False))
         self.dsdna_hamming = bool(cfg.get("dsdna_hamming", False))
         self.dsdna_canonicalize = bool(cfg.get("dsdna_canonicalize", False))
@@ -235,7 +236,7 @@ class GibbsOptimizer(Optimizer):
                 SequenceState(seed_arr)
                 seq = seed_arr.copy()
             else:
-                seed_state = make_seed(self.init_cfg, self.pwms, rng)
+                seed_state = make_seed(self.init_cfg, self.pwms, rng, sequence_length=self.sequence_length)
                 seq = seed_state.seq.copy()  # numpy array (L,)
             state = SequenceState(seq)
             scan_cache: LocalScanCache | None = None

@@ -30,14 +30,12 @@ def _base_config() -> dict:
             "sample": {
                 "mode": "sample",
                 "rng": {"seed": 7, "deterministic": True},
-                "budget": {"draws": 2, "tune": 1},
-                "init": {"kind": "random", "length": 12, "pad_with": "background"},
+                "sequence_length": 12,
+                "compute": {"total_sweeps": 4, "adapt_sweep_frac": 0.25},
+                "init": {"kind": "random", "pad_with": "background"},
                 "objective": {"bidirectional": True, "score_scale": "normalized-llr"},
-                "elites": {"k": 1, "filters": {"pwm_sum_min": 0.0}, "selection": {"policy": "mmr"}},
+                "elites": {"k": 1, "min_per_tf_norm": 0.0, "mmr_alpha": 0.85},
                 "moves": {"profile": "balanced"},
-                "optimizer": {"name": "pt"},
-                "optimizers": {"pt": {"beta_ladder": {"kind": "geometric", "betas": [1.0, 0.5]}, "swap_prob": 0.1}},
-                "auto_opt": {"enabled": False},
                 "output": {"trace": {"save": False}, "save_sequences": True},
                 "ui": {"progress_bar": False, "progress_every": 0},
             },
@@ -56,6 +54,11 @@ def _write_config(tmp_path: Path, payload: dict) -> Path:
     [
         (("cruncher", "sample", "output", "trim"), {"enabled": True}),
         (("cruncher", "sample", "output", "polish"), {"enabled": True}),
+        (("cruncher", "sample", "budget"), {"draws": 2, "tune": 1}),
+        (("cruncher", "sample", "optimizer"), {"name": "pt"}),
+        (("cruncher", "sample", "optimizers"), {"pt": {"swap_prob": 0.1}}),
+        (("cruncher", "sample", "auto_opt"), {"enabled": True}),
+        (("cruncher", "sample", "init", "length"), 12),
         (("cruncher", "sample", "auto_opt", "length"), {"enabled": True}),
         (("cruncher", "sample", "auto_opt", "pt_ladder_sizes"), [2]),
         (("cruncher", "sample", "auto_opt", "beta_ladder_scales"), [1.0]),
@@ -70,6 +73,8 @@ def _write_config(tmp_path: Path, payload: dict) -> Path:
         (("cruncher", "sample", "elites", "min_hamming"), 0),
         (("cruncher", "sample", "elites", "dsDNA_canonicalize"), True),
         (("cruncher", "sample", "elites", "dsDNA_hamming"), True),
+        (("cruncher", "sample", "elites", "selection"), {"policy": "mmr"}),
+        (("cruncher", "sample", "elites", "filters"), {"min_per_tf_norm": 0.5}),
         (("cruncher", "sample", "elites", "selection", "distance"), {"kind": "sequence_hamming"}),
         (("cruncher", "sample", "elites", "selection", "relevance_norm"), "percentile"),
         (("cruncher", "sample", "elites", "selection", "min_distance"), 0.1),
@@ -92,23 +97,3 @@ def test_removed_keys_are_rejected(tmp_path: Path, path: tuple[str, ...], value:
         load_config(config_path)
 
     assert any(err.get("type") == "extra_forbidden" for err in exc.value.errors())
-
-
-def test_gibbs_optimizer_name_is_rejected(tmp_path: Path) -> None:
-    config = _base_config()
-    config["cruncher"]["sample"]["optimizer"]["name"] = "gibbs"
-    config_path = _write_config(tmp_path, config)
-
-    with pytest.raises(ValidationError):
-        load_config(config_path)
-
-
-def test_auto_opt_requires_positive_elites_k(tmp_path: Path) -> None:
-    config = _base_config()
-    config["cruncher"]["sample"]["optimizer"]["name"] = "auto"
-    config["cruncher"]["sample"]["auto_opt"]["enabled"] = True
-    config["cruncher"]["sample"]["elites"]["k"] = 0
-    config_path = _write_config(tmp_path, config)
-
-    with pytest.raises(ValidationError, match="elites.k"):
-        load_config(config_path)

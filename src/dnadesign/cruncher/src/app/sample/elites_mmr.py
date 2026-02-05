@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import logging
+import math
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -52,10 +53,8 @@ def build_elite_pool(
     sample_cfg: SampleConfig,
     beta_softmin_final: float | None,
 ) -> ElitePoolResult:
-    filters = sample_cfg.elites.filters
-    min_per_tf_norm = filters.min_per_tf_norm
-    require_all = filters.require_all_tfs_over_min_norm
-    pwm_sum_min = filters.pwm_sum_min
+    min_per_tf_norm = sample_cfg.elites.min_per_tf_norm
+    require_all = sample_cfg.elites.require_all_tfs_over_min_norm
     raw_elites: list[_EliteCandidate] = []
     norm_sums: list[float] = []
     min_norms: list[float] = []
@@ -78,10 +77,8 @@ def build_elite_pool(
         if not _elite_filter_passes(
             norm_map=norm_map,
             min_norm=min_norm,
-            sum_norm=sum_norm,
             min_per_tf_norm=min_per_tf_norm,
             require_all_tfs_over_min_norm=require_all,
-            pwm_sum_min=pwm_sum_min,
         ):
             continue
 
@@ -120,20 +117,14 @@ def select_elites_mmr(
     pwms: dict[str, PWM],
     dsdna_mode: bool,
 ) -> EliteSelectionResult:
-    selection_cfg = sample_cfg.elites.selection
+    mmr_alpha = sample_cfg.elites.mmr_alpha
     kept_elites: list[_EliteCandidate] = []
     kept_after_mmr = 0
     mmr_meta_rows: list[dict[str, object]] | None = None
     mmr_summary: dict[str, object] | None = None
 
     if elite_k > 0 and raw_elites:
-        if selection_cfg.pool_size < elite_k:
-            logger.warning(
-                "MMR pool_size=%d < elites.k=%d; using pool_size=%d.",
-                selection_cfg.pool_size,
-                elite_k,
-                elite_k,
-            )
+        pool_size = max(200, min(5000, 200 * elite_k))
         mmr_candidates = [
             MmrCandidate(
                 seq_arr=cand.seq_arr,
@@ -148,19 +139,11 @@ def select_elites_mmr(
             for cand in raw_elites
         ]
         raw_by_id = {f"{cand.chain_id}:{cand.draw_idx}": cand for cand in raw_elites}
-        pool_size = max(selection_cfg.pool_size, elite_k)
-        if selection_cfg.relevance == "min_per_tf_norm":
-            mmr_pool = sorted(
-                mmr_candidates,
-                key=lambda cand: (cand.min_norm, f"{cand.chain_id}:{cand.draw_idx}"),
-                reverse=True,
-            )[:pool_size]
-        else:
-            mmr_pool = sorted(
-                mmr_candidates,
-                key=lambda cand: (cand.combined_score, f"{cand.chain_id}:{cand.draw_idx}"),
-                reverse=True,
-            )[:pool_size]
+        mmr_pool = sorted(
+            mmr_candidates,
+            key=lambda cand: (cand.min_norm, f"{cand.chain_id}:{cand.draw_idx}"),
+            reverse=True,
+        )[:pool_size]
         core_maps = {
             f"{cand.chain_id}:{cand.draw_idx}": tfbs_cores_from_scorer(
                 cand.seq_arr,
@@ -172,9 +155,9 @@ def select_elites_mmr(
         result = select_mmr_elites(
             mmr_pool,
             k=elite_k,
-            pool_size=selection_cfg.pool_size,
-            alpha=selection_cfg.alpha,
-            relevance=selection_cfg.relevance,
+            pool_size=pool_size,
+            alpha=mmr_alpha,
+            relevance="min_per_tf_norm",
             dsdna=dsdna_mode,
             tf_names=scorer.tf_names,
             pwms=pwms,
@@ -184,9 +167,9 @@ def select_elites_mmr(
         kept_after_mmr = len(kept_elites)
         mmr_meta_rows = result.meta
         mmr_summary = {
-            "pool_size": selection_cfg.pool_size,
+            "pool_size": pool_size,
             "k": elite_k,
-            "alpha": selection_cfg.alpha,
+            "alpha": mmr_alpha,
             "median_relevance_raw": result.median_relevance_raw,
             "mean_pairwise_distance": result.mean_pairwise_distance,
             "min_pairwise_distance": result.min_pairwise_distance,
@@ -210,6 +193,7 @@ def build_elite_entries(
     meta_source: str,
 ) -> list[dict[str, object]]:
     entries: list[dict[str, object]] = []
+    adapt_sweeps = int(math.ceil(sample_cfg.compute.total_sweeps * sample_cfg.compute.adapt_sweep_frac))
     for rank, cand in enumerate(candidates, 1):
         seq_arr = cand.seq_arr
         seq_str = SequenceState(seq_arr).to_string()
@@ -255,9 +239,7 @@ def build_elite_entries(
             "chain": cand.chain_id,
             "chain_1based": cand.chain_id + 1,
             "draw_idx": cand.draw_idx,
-            "draw_in_phase": cand.draw_idx - sample_cfg.budget.tune
-            if cand.draw_idx >= sample_cfg.budget.tune
-            else cand.draw_idx,
+            "draw_in_phase": cand.draw_idx - adapt_sweeps if cand.draw_idx >= adapt_sweeps else cand.draw_idx,
             "per_tf": per_tf_details,
             "meta_type": "mcmc-elite",
             "meta_source": meta_source,

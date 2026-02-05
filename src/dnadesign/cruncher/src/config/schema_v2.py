@@ -10,6 +10,7 @@ Author(s): Eric J. South
 from __future__ import annotations
 
 import logging
+import math
 from pathlib import Path
 from typing import Dict, List, Literal, Optional, Tuple, Union
 
@@ -299,190 +300,10 @@ class AdaptiveSwapConfig(StrictBaseModel):
         return self
 
 
-class BetaLadderFixed(StrictBaseModel):
-    kind: Literal["fixed"] = "fixed"
-    beta: float = 1.0
-
-    @field_validator("beta")
-    @classmethod
-    def _check_beta(cls, v: float) -> float:
-        if not isinstance(v, (int, float)) or v <= 0:
-            raise ValueError("beta_ladder.beta must be > 0")
-        return float(v)
-
-
-class BetaLadderGeometric(StrictBaseModel):
-    kind: Literal["geometric"] = "geometric"
-    betas: Optional[List[float]] = None
-    beta_min: Optional[float] = None
-    beta_max: Optional[float] = None
-    n_temps: Optional[int] = None
-
-    @field_validator("betas")
-    @classmethod
-    def _check_betas(cls, v: Optional[List[float]]) -> Optional[List[float]]:
-        if v is None:
-            return v
-        if len(v) < 2:
-            raise ValueError("beta_ladder.betas must contain at least 2 values")
-        if any(beta <= 0 for beta in v):
-            raise ValueError("beta_ladder.betas values must be > 0")
-        return v
-
-    @field_validator("beta_min", "beta_max")
-    @classmethod
-    def _check_beta_bounds(cls, v: Optional[float], info) -> Optional[float]:
-        if v is None:
-            return v
-        if not isinstance(v, (int, float)) or v <= 0:
-            raise ValueError(f"beta_ladder.{info.field_name} must be > 0")
-        return float(v)
-
-    @field_validator("n_temps")
-    @classmethod
-    def _check_n_temps(cls, v: Optional[int]) -> Optional[int]:
-        if v is None:
-            return v
-        if not isinstance(v, int) or v < 2:
-            raise ValueError("beta_ladder.n_temps must be >= 2")
-        return v
-
-    @model_validator(mode="after")
-    def _validate_inputs(self) -> "BetaLadderGeometric":
-        if self.betas is not None:
-            if self.beta_min is not None or self.beta_max is not None or self.n_temps is not None:
-                raise ValueError("beta_ladder: provide either betas or (beta_min,beta_max,n_temps), not both.")
-            return self
-        if self.beta_min is None or self.beta_max is None or self.n_temps is None:
-            raise ValueError("beta_ladder requires betas or beta_min/beta_max/n_temps")
-        if self.beta_min > self.beta_max:
-            raise ValueError("beta_ladder.beta_min must be <= beta_ladder.beta_max")
-        return self
-
-
-BetaLadderConfig = Union[BetaLadderFixed, BetaLadderGeometric]
-
-
-class PTOptimizerConfig(StrictBaseModel):
-    beta_ladder: BetaLadderConfig = Field(default_factory=lambda: BetaLadderGeometric(betas=[0.2, 1.0, 5.0, 25.0]))
-    swap_prob: float = 0.10
-    ladder_adapt: AdaptiveSwapConfig = AdaptiveSwapConfig()
-
-    @field_validator("swap_prob")
-    @classmethod
-    def _check_swap_prob(cls, v: float) -> float:
-        if not isinstance(v, (int, float)) or v < 0 or v > 1:
-            raise ValueError("optimizers.pt.swap_prob must be between 0 and 1")
-        return float(v)
-
-
-class OptimizersConfig(StrictBaseModel):
-    pt: PTOptimizerConfig = PTOptimizerConfig()
-
-
-class OptimizerSelectionConfig(StrictBaseModel):
-    name: Literal["auto", "pt"] = "auto"
-
-
-class AutoOptScorecardConfig(StrictBaseModel):
-    alpha: float = 0.85
-
-    @field_validator("alpha")
-    @classmethod
-    def _check_alpha(cls, v: float) -> float:
-        if not isinstance(v, (int, float)) or v <= 0 or v > 1:
-            raise ValueError("auto_opt.scorecard.alpha must be in (0, 1]")
-        return float(v)
-
-
-class AutoOptPolicyConfig(StrictBaseModel):
-    allow_warn: bool = False
-    scorecard: AutoOptScorecardConfig = Field(default_factory=AutoOptScorecardConfig)
-    diversity_weight: float = 0.25
-
-    @field_validator("diversity_weight")
-    @classmethod
-    def _check_diversity_weight(cls, v: float) -> float:
-        if not isinstance(v, (int, float)) or v < 0:
-            raise ValueError("auto_opt.policy.diversity_weight must be >= 0")
-        return float(v)
-
-
-class AutoOptConfig(StrictBaseModel):
-    enabled: bool = True
-    budget_levels: List[int] = Field(default_factory=lambda: [2000, 3000])
-    replicates: int = 1
-    keep_pilots: Literal["all", "ok", "best"] = "ok"
-    cooling_boosts: List[float] = Field(default_factory=lambda: [1.0, 2.0])
-    pt_swap_probs: List[float] = Field(default_factory=list)
-    move_profiles: List[Literal["balanced", "local", "global", "aggressive"]] = Field(
-        default_factory=lambda: ["balanced", "aggressive"]
-    )
-    policy: AutoOptPolicyConfig = AutoOptPolicyConfig()
-
-    @field_validator("budget_levels")
-    @classmethod
-    def _check_budget_levels(cls, v: List[int]) -> List[int]:
-        if not isinstance(v, list) or not v:
-            raise ValueError("auto_opt.budget_levels must be a non-empty list of integers")
-        cleaned: list[int] = []
-        for item in v:
-            if not isinstance(item, int) or item < 4:
-                raise ValueError("auto_opt.budget_levels entries must be >= 4")
-            cleaned.append(item)
-        return cleaned
-
-    @field_validator("cooling_boosts")
-    @classmethod
-    def _check_cooling_boosts(cls, v: List[float]) -> List[float]:
-        if not isinstance(v, list) or not v:
-            raise ValueError("auto_opt.cooling_boosts must be a non-empty list of numbers")
-        cleaned: list[float] = []
-        for item in v:
-            if not isinstance(item, (int, float)) or float(item) <= 0:
-                raise ValueError("auto_opt.cooling_boosts entries must be > 0")
-            cleaned.append(float(item))
-        return cleaned
-
-    @field_validator("pt_swap_probs")
-    @classmethod
-    def _check_pt_swap_probs(cls, v: List[float]) -> List[float]:
-        if not isinstance(v, list):
-            raise ValueError("auto_opt.pt_swap_probs must be a list of numbers")
-        cleaned: list[float] = []
-        for item in v:
-            if not isinstance(item, (int, float)) or float(item) < 0 or float(item) > 1:
-                raise ValueError("auto_opt.pt_swap_probs entries must be between 0 and 1")
-            cleaned.append(float(item))
-        return cleaned
-
-    @field_validator("move_profiles")
-    @classmethod
-    def _check_move_profiles(cls, v: List[str]) -> List[str]:
-        if not isinstance(v, list) or not v:
-            raise ValueError("auto_opt.move_profiles must be a non-empty list")
-        return v
-
-    @field_validator("replicates")
-    @classmethod
-    def _check_positive_ints(cls, v: int, info) -> int:
-        if not isinstance(v, int) or v < 1:
-            raise ValueError(f"auto_opt.{info.field_name} must be >= 1")
-        return v
-
-
 class InitConfig(StrictBaseModel):
     kind: Literal["random", "consensus", "consensus_mix"]
-    length: int
     regulator: Optional[str] = None
     pad_with: Optional[Literal["background", "A", "C", "G", "T"]] = "background"
-
-    @field_validator("length")
-    @classmethod
-    def _check_length_positive(cls, v: int) -> int:
-        if v < 1:
-            raise ValueError("init.length must be >= 1")
-        return v
 
     @model_validator(mode="after")
     def _check_fields_for_modes(self) -> "InitConfig":
@@ -527,16 +348,23 @@ class SampleRngConfig(StrictBaseModel):
         return v
 
 
-class SampleBudgetConfig(StrictBaseModel):
-    tune: int
-    draws: int
+class SampleComputeConfig(StrictBaseModel):
+    total_sweeps: int
+    adapt_sweep_frac: float
 
-    @field_validator("tune", "draws")
+    @field_validator("total_sweeps")
     @classmethod
-    def _check_non_negative(cls, v: int, info) -> int:
-        if not isinstance(v, int) or v < 0:
-            raise ValueError(f"sample.budget.{info.field_name} must be a non-negative integer")
+    def _check_total_sweeps(cls, v: int) -> int:
+        if not isinstance(v, int) or v < 1:
+            raise ValueError("sample.compute.total_sweeps must be >= 1")
         return v
+
+    @field_validator("adapt_sweep_frac")
+    @classmethod
+    def _check_adapt_sweep_frac(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v <= 0 or v > 1:
+            raise ValueError("sample.compute.adapt_sweep_frac must be in (0, 1]")
+        return float(v)
 
 
 class SampleEarlyStopConfig(StrictBaseModel):
@@ -602,70 +430,34 @@ class SampleObjectiveConfig(StrictBaseModel):
         return float(v)
 
 
-class EliteFiltersConfig(StrictBaseModel):
-    pwm_sum_min: float = 0.0
+class SampleElitesConfig(StrictBaseModel):
+    k: int = 10
     min_per_tf_norm: float | None = None
     require_all_tfs_over_min_norm: bool = True
+    mmr_alpha: float = 0.85
 
-    @field_validator("pwm_sum_min")
+    @field_validator("k")
     @classmethod
-    def _check_pwm_sum_min(cls, v: float) -> float:
-        if not isinstance(v, (int, float)) or v < 0:
-            raise ValueError("sample.elites.filters.pwm_sum_min must be >= 0")
-        return float(v)
+    def _check_elite_ints(cls, v: int, info) -> int:
+        if not isinstance(v, int) or v < 1:
+            raise ValueError(f"sample.elites.{info.field_name} must be >= 1")
+        return v
 
     @field_validator("min_per_tf_norm")
     @classmethod
     def _check_min_per_tf_norm(cls, v: float | None) -> float | None:
         if v is None:
             return v
-        if not isinstance(v, (int, float)) or v < 0:
-            raise ValueError("sample.elites.filters.min_per_tf_norm must be >= 0")
+        if not isinstance(v, (int, float)) or v < 0 or v > 1:
+            raise ValueError("sample.elites.min_per_tf_norm must be between 0 and 1")
         return float(v)
 
-
-class SampleElitesSelectionConfig(StrictBaseModel):
-    policy: Literal["mmr"] = "mmr"
-    pool_size: int = 1000
-    alpha: float = 0.85
-    relevance: Literal["min_per_tf_norm", "combined_score_final"] = "min_per_tf_norm"
-
-    @field_validator("pool_size")
+    @field_validator("mmr_alpha")
     @classmethod
-    def _check_pool_size(cls, v: int) -> int:
-        if not isinstance(v, int) or v < 1:
-            raise ValueError("sample.elites.selection.pool_size must be >= 1")
-        return v
-
-    @field_validator("alpha")
-    @classmethod
-    def _check_alpha(cls, v: float) -> float:
+    def _check_mmr_alpha(cls, v: float) -> float:
         if not isinstance(v, (int, float)) or v <= 0 or v > 1:
-            raise ValueError("sample.elites.selection.alpha must be in (0, 1]")
+            raise ValueError("sample.elites.mmr_alpha must be in (0, 1]")
         return float(v)
-
-
-class SampleElitesConfig(StrictBaseModel):
-    k: int = 10
-    filters: EliteFiltersConfig = EliteFiltersConfig()
-    selection: SampleElitesSelectionConfig = SampleElitesSelectionConfig()
-
-    @field_validator("k")
-    @classmethod
-    def _check_elite_ints(cls, v: int, info) -> int:
-        if not isinstance(v, int) or v < 0:
-            raise ValueError(f"sample.elites.{info.field_name} must be a non-negative integer")
-        return v
-
-    @model_validator(mode="after")
-    def _warn_pool_size(self) -> "SampleElitesConfig":
-        if self.selection.policy == "mmr" and self.selection.pool_size < self.k:
-            logger.warning(
-                "sample.elites.selection.pool_size=%d < sample.elites.k=%d; MMR pool will be clamped.",
-                self.selection.pool_size,
-                self.k,
-            )
-        return self
 
 
 class MoveOverridesConfig(StrictBaseModel):
@@ -767,29 +559,31 @@ class SampleUiConfig(StrictBaseModel):
 class SampleConfig(StrictBaseModel):
     mode: Literal["optimize", "sample"] = "optimize"
     rng: SampleRngConfig = SampleRngConfig()
-    budget: SampleBudgetConfig
+    sequence_length: int
+    compute: SampleComputeConfig
     early_stop: SampleEarlyStopConfig = SampleEarlyStopConfig()
     init: InitConfig
     objective: SampleObjectiveConfig = SampleObjectiveConfig()
     elites: SampleElitesConfig = SampleElitesConfig()
     moves: SampleMovesConfig = SampleMovesConfig()
-    optimizer: OptimizerSelectionConfig = OptimizerSelectionConfig()
-    optimizers: OptimizersConfig = OptimizersConfig()
-    auto_opt: AutoOptConfig | None = AutoOptConfig()
     output: SampleOutputConfig = SampleOutputConfig()
     ui: SampleUiConfig = SampleUiConfig()
 
-    @model_validator(mode="after")
-    def _validate_optimizer_settings(self) -> "SampleConfig":
-        if self.optimizer.name == "auto":
-            if self.auto_opt is None or not self.auto_opt.enabled:
-                raise ValueError("sample.optimizer.name='auto' requires auto_opt.enabled=true")
-            if self.elites.k < 1:
-                raise ValueError("sample.elites.k must be >= 1 when optimizer.name='auto'")
-        else:
-            if self.auto_opt is not None and self.auto_opt.enabled:
-                raise ValueError("auto_opt.enabled must be false when optimizer.name is not 'auto'")
+    @field_validator("sequence_length")
+    @classmethod
+    def _check_sequence_length(cls, v: int) -> int:
+        if not isinstance(v, int) or v < 1:
+            raise ValueError("sample.sequence_length must be >= 1")
+        return v
 
+    @model_validator(mode="after")
+    def _validate_sample_settings(self) -> "SampleConfig":
+        adapt_sweeps = int(math.ceil(self.compute.total_sweeps * self.compute.adapt_sweep_frac))
+        if self.compute.total_sweeps - adapt_sweeps < 1:
+            raise ValueError(
+                "sample.compute.total_sweeps must leave at least 1 draw after adaptation; "
+                "increase total_sweeps or reduce adapt_sweep_frac."
+            )
         if self.early_stop.enabled and self.objective.score_scale == "normalized-llr":
             if self.early_stop.min_delta > 0.1:
                 raise ValueError(

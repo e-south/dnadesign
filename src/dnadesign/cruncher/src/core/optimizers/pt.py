@@ -59,6 +59,7 @@ class PTGibbsOptimizer(Optimizer):
         self.chains: int = int(cfg["chains"])
         self.min_dist: int = int(cfg["min_dist"])
         self.top_k: int = int(cfg["top_k"])
+        self.sequence_length: int = int(cfg["sequence_length"])
         self.swap_prob: float = float(cfg["swap_prob"])
         self.bidirectional: bool = bool(cfg.get("bidirectional", False))
         self.dsdna_canonicalize: bool = bool(cfg.get("dsdna_canonicalize", False))
@@ -221,7 +222,7 @@ class PTGibbsOptimizer(Optimizer):
             return mutated
 
         # Seed each chain (shared seed + small perturbations for swap-friendly PT starts).
-        base_seed = make_seed(self.init_cfg, self.pwms, rng).seq.copy()
+        base_seed = make_seed(self.init_cfg, self.pwms, rng, sequence_length=self.sequence_length).seq.copy()
         chain_states = [base_seed.copy() for _ in range(C)]
         if C > 1:
             n_mutations = max(1, int(round(base_seed.size * 0.02)))

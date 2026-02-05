@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import math
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -50,7 +51,6 @@ def prepare_run_layout(
     include_set_index: bool,
     stage: str,
     run_kind: str | None,
-    auto_opt_meta: dict[str, object] | None,
     chain_count: int,
     optimizer_kind: str,
 ) -> RunLayout:
@@ -79,7 +79,6 @@ def prepare_run_layout(
             "regulator_set": {"index": set_index, "tfs": tfs, "count": set_count},
             "run_group": run_group,
             "run_kind": run_kind,
-            "auto_opt": auto_opt_meta,
         },
     )
     update_run_index_from_status(
@@ -88,10 +87,14 @@ def prepare_run_layout(
         status_writer.payload,
         catalog_root=cfg.motif_store.catalog_root,
     )
+    total_sweeps = sample_cfg.compute.total_sweeps
+    adapt_sweeps = int(math.ceil(total_sweeps * sample_cfg.compute.adapt_sweep_frac))
+    draws = total_sweeps - adapt_sweeps
     status_writer.update(
         status_message="loading_pwms",
-        draws=sample_cfg.budget.draws,
-        tune=sample_cfg.budget.tune,
+        total_sweeps=total_sweeps,
+        adapt_sweeps=adapt_sweeps,
+        draws=draws,
         chains=chain_count,
         optimizer=optimizer_kind,
     )
@@ -113,7 +116,6 @@ def write_run_manifest_and_update(
     set_count: int,
     run_group: str,
     run_kind: str | None,
-    auto_opt_meta: dict[str, object] | None,
     stage: str,
     run_dir: Path,
     lockmap: dict[str, object],
@@ -154,20 +156,23 @@ def write_run_manifest_and_update(
         run_dir=run_dir,
         artifacts=artifacts,
         extra={
-            "sequence_length": sample_cfg.init.length,
+            "sequence_length": sample_cfg.sequence_length,
             "seed": sample_cfg.rng.seed,
             "seed_effective": sample_cfg.rng.seed + set_index - 1,
             "record_tune": sample_cfg.output.trace.include_tune,
             "save_trace": sample_cfg.output.trace.save,
-            "tune": sample_cfg.budget.tune,
-            "draws": sample_cfg.budget.draws,
+            "total_sweeps": sample_cfg.compute.total_sweeps,
+            "adapt_sweeps": int(math.ceil(sample_cfg.compute.total_sweeps * sample_cfg.compute.adapt_sweep_frac)),
+            "draws": int(
+                sample_cfg.compute.total_sweeps
+                - math.ceil(sample_cfg.compute.total_sweeps * sample_cfg.compute.adapt_sweep_frac)
+            ),
             "early_stop": sample_cfg.early_stop.model_dump(),
             "top_k": sample_cfg.elites.k,
             "elites": sample_cfg.elites.model_dump(),
             "regulator_set": {"index": set_index, "tfs": tfs, "count": set_count},
             "run_group": run_group,
             "run_kind": run_kind,
-            "auto_opt": auto_opt_meta,
             "objective": {
                 "score_scale": sample_cfg.objective.score_scale,
                 "combine": combine_resolved,
@@ -177,7 +182,6 @@ def write_run_manifest_and_update(
             },
             "optimizer": {
                 "kind": optimizer_kind,
-                "pt": sample_cfg.optimizers.pt.model_dump(),
             },
             "optimizer_stats": optimizer.stats() if hasattr(optimizer, "stats") else {},
             "objective_schedule_summary": optimizer.objective_schedule_summary()

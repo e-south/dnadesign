@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
@@ -30,8 +31,8 @@ from dnadesign.cruncher.app.sample.elites_mmr import (
 )
 from dnadesign.cruncher.app.sample.optimizer_config import (
     _effective_chain_count,
-    _resolve_beta_ladder,
     _resolve_optimizer_kind,
+    _resolve_pt_defaults,
 )
 from dnadesign.cruncher.app.sample.resources import _load_pwms_for_set
 from dnadesign.cruncher.app.sample.run_layout import prepare_run_layout, write_run_manifest_and_update
@@ -48,7 +49,7 @@ from dnadesign.cruncher.artifacts.layout import (
     trace_path,
 )
 from dnadesign.cruncher.config.moves import resolve_move_config
-from dnadesign.cruncher.config.schema_v2 import BetaLadderFixed, CruncherConfig, SampleConfig
+from dnadesign.cruncher.config.schema_v2 import CruncherConfig, SampleConfig
 from dnadesign.cruncher.core.evaluator import SequenceEvaluator
 from dnadesign.cruncher.core.labels import format_regulator_slug
 from dnadesign.cruncher.core.optimizers.cooling import make_beta_scheduler
@@ -77,7 +78,7 @@ def _resolve_final_softmin_beta(optimizer: object, sample_cfg: SampleConfig) -> 
             pass
     softmin_cfg = sample_cfg.objective.softmin
     if softmin_cfg.enabled:
-        total = sample_cfg.budget.tune + sample_cfg.budget.draws
+        total = sample_cfg.compute.total_sweeps
         softmin_sched = {k: v for k, v in softmin_cfg.model_dump().items() if k in ("kind", "beta", "stages")}
         return make_beta_scheduler(softmin_sched, total)(total - 1)
     return None
@@ -87,11 +88,11 @@ def _assert_init_length_fits_pwms(sample_cfg: SampleConfig, pwms: dict[str, PWM]
     if not pwms:
         raise ValueError("No PWMs available for sampling.")
     max_w = max(pwm.length for pwm in pwms.values())
-    if sample_cfg.init.length < max_w:
+    if sample_cfg.sequence_length < max_w:
         names = ", ".join(f"{tf}:{pwms[tf].length}" for tf in sorted(pwms))
         raise ValueError(
-            f"init.length={sample_cfg.init.length} is shorter than the widest PWM (max={max_w}). "
-            f"Per-TF lengths: {names}. Increase sample.init.length or trim PWMs via "
+            f"sequence_length={sample_cfg.sequence_length} is shorter than the widest PWM (max={max_w}). "
+            f"Per-TF lengths: {names}. Increase sample.sequence_length or trim PWMs via "
             "motif_store.pwm_window_lengths (with pwm_window_strategy=max_info)."
         )
 
@@ -108,14 +109,13 @@ def _run_sample_for_set(
     sample_cfg: SampleConfig,
     stage: str = "sample",
     run_kind: str | None = None,
-    auto_opt_meta: dict[str, object] | None = None,
 ) -> Path:
     """
     Run MCMC sampler, save config/meta plus artifacts (trace.nc, sequences.parquet, elites.*).
     Each chain gets its own independent seed (random/consensus/consensus_mix).
     """
-    optimizer_kind = _resolve_optimizer_kind(sample_cfg)
-    chain_count = _effective_chain_count(sample_cfg, kind=optimizer_kind)
+    optimizer_kind = _resolve_optimizer_kind()
+    chain_count = _effective_chain_count()
     layout = prepare_run_layout(
         cfg=cfg,
         config_path=config_path,
@@ -126,7 +126,6 @@ def _run_sample_for_set(
         include_set_index=include_set_index,
         stage=stage,
         run_kind=run_kind,
-        auto_opt_meta=auto_opt_meta,
         chain_count=chain_count,
         optimizer_kind=optimizer_kind,
     )
@@ -153,6 +152,15 @@ def _run_sample_for_set(
             )
 
     _assert_init_length_fits_pwms(sample_cfg, pwms)
+
+    total_sweeps = sample_cfg.compute.total_sweeps
+    adapt_sweeps = int(math.ceil(total_sweeps * sample_cfg.compute.adapt_sweep_frac))
+    draws = total_sweeps - adapt_sweeps
+    if draws < 1:
+        raise ValueError(
+            f"compute.total_sweeps={total_sweeps} with adapt_sweep_frac={sample_cfg.compute.adapt_sweep_frac:g} "
+            "leaves no draws after adaptation. Increase total_sweeps or lower adapt_sweep_frac."
+        )
 
     # 2) INSTANTIATE SCORER and SequenceEvaluator
     scale = sample_cfg.objective.score_scale
@@ -198,7 +206,7 @@ def _run_sample_for_set(
     length_penalty_lambda = sample_cfg.objective.length_penalty_lambda
     length_penalty_ref = None
     if length_penalty_lambda > 0:
-        length_penalty_ref = sample_cfg.init.length
+        length_penalty_ref = sample_cfg.sequence_length
     evaluator = SequenceEvaluator(
         pwms=pwms,
         scale=scale,
@@ -225,11 +233,12 @@ def _run_sample_for_set(
     # 3) FLATTEN optimizer config for PT
     moves = resolve_move_config(sample_cfg.moves)
     opt_cfg: dict[str, object] = {
-        "draws": sample_cfg.budget.draws,
-        "tune": sample_cfg.budget.tune,
+        "draws": draws,
+        "tune": adapt_sweeps,
         "chains": chain_count,
         "min_dist": 0,
         "top_k": sample_cfg.elites.k,
+        "sequence_length": sample_cfg.sequence_length,
         "bidirectional": sample_cfg.objective.bidirectional,
         "dsdna_canonicalize": dsdna_mode_for_opt,
         "score_scale": sample_cfg.objective.score_scale,
@@ -241,18 +250,9 @@ def _run_sample_for_set(
         "softmin": sample_cfg.objective.softmin.model_dump(),
     }
     if optimizer_kind == "pt":
-        ladder_cfg = sample_cfg.optimizers.pt.beta_ladder
-        betas, ladder_notes = _resolve_beta_ladder(sample_cfg.optimizers.pt)
-        if ladder_notes:
-            logger.info("PT ladder notes: %s", "; ".join(ladder_notes))
-        if isinstance(ladder_cfg, BetaLadderFixed):
-            opt_cfg["kind"] = "fixed"
-            opt_cfg["beta"] = float(betas[0])
-        else:
-            opt_cfg["kind"] = "geometric"
-            opt_cfg["beta"] = betas
-        opt_cfg["swap_prob"] = sample_cfg.optimizers.pt.swap_prob
-        opt_cfg["adaptive_swap"] = sample_cfg.optimizers.pt.ladder_adapt.model_dump()
+        pt_cfg = _resolve_pt_defaults()
+        opt_cfg.update(pt_cfg)
+        betas = pt_cfg.get("beta") or []
         logger.debug("β-ladder (%d levels): %s", len(betas), ", ".join(f"{b:g}" for b in betas))
     else:
         raise ValueError("Unsupported optimizer; only 'pt' is allowed.")
@@ -362,14 +362,14 @@ def _run_sample_for_set(
             for (chain_id, draw_i), seq_arr, per_tf_map in zip(
                 optimizer.all_meta, optimizer.all_samples, optimizer.all_scores
             ):
-                if draw_i < sample_cfg.budget.tune:
+                if draw_i < adapt_sweeps:
                     phase = "tune"
                     draw_i_to_write = draw_i
                     draw_in_phase = draw_i
                 else:
                     phase = "draw"
                     draw_i_to_write = draw_i
-                    draw_in_phase = draw_i - sample_cfg.budget.tune
+                    draw_in_phase = draw_i - adapt_sweeps
                 seq_str = SequenceState(seq_arr).to_string()
                 norm_map = _norm_map_for_elites(
                     seq_arr,
@@ -413,10 +413,8 @@ def _run_sample_for_set(
         )
 
     # 9) BUILD elites list — filter (representativeness), rank (objective), diversify
-    filters = sample_cfg.elites.filters
-    min_per_tf_norm = filters.min_per_tf_norm
-    require_all = filters.require_all_tfs_over_min_norm
-    pwm_sum_min = filters.pwm_sum_min
+    min_per_tf_norm = sample_cfg.elites.min_per_tf_norm
+    require_all = sample_cfg.elites.require_all_tfs_over_min_norm
     pool_result = build_elite_pool(
         optimizer=optimizer,
         evaluator=evaluator,
@@ -433,15 +431,7 @@ def _run_sample_for_set(
     if norm_sums:
         p50, p90 = np.percentile(norm_sums, [50, 90])
         n_tf = scorer.pwm_count
-        avg_thr_pct = 100 * pwm_sum_min / n_tf if n_tf else 0.0
         logger.debug("Normalised-sum percentiles  |  median %.2f   90%% %.2f", p50, p90)
-        if pwm_sum_min > 0:
-            logger.debug(
-                "Threshold %.2f ⇒ ~%.0f%%-of-consensus on average per TF (%d regulators)",
-                pwm_sum_min,
-                avg_thr_pct,
-                n_tf,
-            )
         logger.debug(
             "Typical draw: med %.2f (≈ %.0f%%/TF); top-10%% %.2f (≈ %.0f%%/TF)",
             p50,
@@ -453,7 +443,6 @@ def _run_sample_for_set(
         p50_min, p90_min = np.percentile(min_norms, [50, 90])
         logger.debug("Normalised-min percentiles |  median %.2f   90%% %.2f", p50_min, p90_min)
 
-    selection_cfg = sample_cfg.elites.selection
     elite_k = int(sample_cfg.elites.k or 0)
     dsdna_mode = resolve_dsdna_mode(
         elites_cfg=sample_cfg.elites,
@@ -477,8 +466,8 @@ def _run_sample_for_set(
     mmr_meta_rows = selection_result.mmr_meta_rows
     mmr_summary = selection_result.mmr_summary
 
-    if not kept_elites and (pwm_sum_min > 0 or min_per_tf_norm is not None):
-        logger.warning("Elite filters removed all candidates; relax min_per_tf_norm or pwm_sum_min.")
+    if not kept_elites and min_per_tf_norm is not None:
+        logger.warning("Elite filters removed all candidates; relax min_per_tf_norm.")
 
     # serialise elites
     want_cons = bool(sample_cfg.output.include_consensus_in_elites)
@@ -493,9 +482,8 @@ def _run_sample_for_set(
     )
 
     run_logger(
-        "Final elite count: %d (pwm_sum_min=%s, min_per_tf_norm=%s)",
+        "Final elite count: %d (min_per_tf_norm=%s)",
         len(elites),
-        f"{pwm_sum_min:.2f}" if pwm_sum_min else "off",
         f"{min_per_tf_norm:.2f}" if min_per_tf_norm is not None else "off",
     )
 
@@ -533,11 +521,10 @@ def _run_sample_for_set(
     meta = {
         "generated": datetime.now(timezone.utc).isoformat(),
         "n_elites": len(elites),
-        "threshold_norm_sum": pwm_sum_min,
         "min_per_tf_norm": min_per_tf_norm,
         "require_all_tfs_over_min_norm": require_all,
         "selection_policy": "mmr",
-        "selection": selection_cfg.model_dump(),
+        "mmr_alpha": sample_cfg.elites.mmr_alpha,
         "dsdna_canonicalize": want_canonical,
         "total_draws_seen": total_draws_seen,
         "passed_pre_filter": len(raw_elites),
@@ -548,7 +535,7 @@ def _run_sample_for_set(
             "chain is 0-based; chain_1based is 1-based; draw_idx is absolute sweep; draw_in_phase is phase-relative"
         ),
         "tf_label": tf_label,
-        "sequence_length": sample_cfg.init.length,
+        "sequence_length": sample_cfg.sequence_length,
         #  you can inline the full cfg if you prefer – this keeps it concise
         "config_file": str(config_used_path(out_dir).resolve()),
         "regulator_set": {"index": set_index, "tfs": tfs},
@@ -619,7 +606,6 @@ def _run_sample_for_set(
         set_count=set_count,
         run_group=run_group,
         run_kind=run_kind,
-        auto_opt_meta=auto_opt_meta,
         stage=stage,
         run_dir=out_dir,
         lockmap=lockmap,

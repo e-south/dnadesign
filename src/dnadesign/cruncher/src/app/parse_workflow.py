@@ -282,7 +282,7 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
             run_dir=run_dir,
             artifacts=[],
             extra={
-                "sequence_length": cfg.sample.init.length if cfg.sample else None,
+                "sequence_length": cfg.sample.sequence_length if cfg.sample else None,
                 "regulator_set": {"index": set_index, "tfs": tfs, "count": set_count},
                 "run_group": run_group,
                 "parse_signature": signature,

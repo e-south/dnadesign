@@ -119,20 +119,26 @@ class SequenceState:
         return int(self.seq.size)
 
 
-def make_seed(cfg_init: Any, pwms: Dict[str, PWM], rng: np.random.Generator) -> SequenceState:
+def make_seed(
+    cfg_init: Any,
+    pwms: Dict[str, PWM],
+    rng: np.random.Generator,
+    *,
+    sequence_length: int,
+) -> SequenceState:
     """
     Return an initial SequenceState based on cfg_init.kind. Three modes:
 
-      • “random”: uniform-random DNA sequence of length = cfg_init.length.
+      • “random”: uniform-random DNA sequence of length = sequence_length.
 
-      • “consensus”: embed one PWM's consensus (argmax) into background of length = cfg_init.length.
+      • “consensus”: embed one PWM's consensus (argmax) into background of length = sequence_length.
 
       • “consensus_mix”: randomly choose “random” or choose one PWM's consensus to embed.
     """
     kind = getattr(cfg_init, "kind", None)
-    length = int(getattr(cfg_init, "length", 0))
+    length = int(sequence_length)
     if length < 1:
-        raise ValueError(f"cfg_init.length must be ≥ 1, got {length}")
+        raise ValueError(f"sequence_length must be ≥ 1, got {length}")
 
     if kind == "random":
         return SequenceState.random(length, rng)
