@@ -275,6 +275,8 @@ def build_run_events(
         y_obj_scalar_sd=y_obj_scalar_sd,
         obj_diagnostics=score.diag,
         sel_emit=sel_emit,
+        uq_scalar = score.uq_scalar,
+        scores = score.scores,
     )
 
     run_meta_event = build_run_meta_event(

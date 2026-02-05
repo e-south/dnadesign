@@ -241,6 +241,7 @@ def stage_scoring(
         for bi, i in enumerate(range(0, total, max(1, sbatch))):
             sl = slice(i, i + sbatch)
             batch_X = X_pool[sl]
+            # BUG IS HERE
             yhat_chunks.append(model.predict(batch_X, ctx=mctx))
             prog.advance(int(batch_X.shape[0]))
             append_round_log_event(
@@ -276,7 +277,7 @@ def stage_scoring(
     )
     if Y_hat.shape[1] != y_dim:
         raise OpalError(f"Predicted Y dimension mismatch: expected {y_dim}, got {Y_hat.shape[1]}")
-
+    
     rctx.set_core("core/labels_as_of_round", int(req.as_of_round))
     obj_name = cfg.objective.objective.name
     obj_params = dict(cfg.objective.objective.params)
@@ -302,7 +303,11 @@ def stage_scoring(
                 yield self._Y[i, :]
 
     tv = _TrainView(Y_train, R_train, int(req.as_of_round))
-    obj_res = obj_fn(y_pred=Y_hat, params=obj_params, ctx=octx, train_view=tv)
+    try:
+        sd = mctx.get("model/<self>/std_devs", None)
+    except:
+        sd = None
+    obj_res = obj_fn(y_pred=Y_hat, params=obj_params, var = sd, ctx=octx, train_view=tv)
     y_obj_scalar = np.asarray(obj_res.score, dtype=float).ravel()
     if y_obj_scalar.size != len(id_order_pool):
         raise OpalError(f"Objective produced {y_obj_scalar.size} scores for {len(id_order_pool)} candidates.")
@@ -393,6 +398,10 @@ def stage_scoring(
 
     sel_fn = get_selection(sel_name, sel_params)
     sctx = rctx.for_plugin(category="selection", name=sel_name, plugin=sel_fn)
+    try:
+        sq = octx.get("objective/<self>/scalar_uncertainty", None)
+    except:
+        sq = None
     raw_sel = sel_fn(
         ids=np.array(id_order_pool),
         scores=y_obj_scalar,
@@ -400,6 +409,7 @@ def stage_scoring(
         tie_handling=tie_handling,
         objective=mode,
         ctx=sctx,
+        scalar_uncertainty=sq,
     )
     sel_norm = normalize_selection_result(
         raw_sel,
@@ -473,4 +483,6 @@ def stage_scoring(
         selected_effective=selected_effective,
         top_k=top_k,
         obj_sha=obj_sha,
+        scores = raw_sel["score"],
+        uq_scalar = sq
     )

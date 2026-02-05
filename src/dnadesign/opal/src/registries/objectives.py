@@ -78,7 +78,7 @@ def _wrap_for_ctx_enforcement(name: str, fn: _ObjectiveFn) -> _ObjectiveFn:
     """
     contract = getattr(fn, "__opal_contract__", None)
 
-    def _wrapped(*, y_pred, params: Dict[str, Any], ctx: PluginCtx | None = None, train_view=None):
+    def _wrapped(*, y_pred, params: Dict[str, Any], var, ctx: PluginCtx | None = None, train_view=None):
         if ctx is not None:
             try:
                 ctx.precheck_requires(stage="objective")

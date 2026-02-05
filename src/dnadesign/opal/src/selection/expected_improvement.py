@@ -25,6 +25,8 @@ def ei(
     top_k: int,  # not used here; registry will use it
     objective: str = "maximize",
     tie_handling: str = "competition_rank",  # not used here; registry will use it
+    alpha: float = 1,
+    beta: float = 1,
     ctx=None,
     **_,
 ):
@@ -37,21 +39,24 @@ def ei(
     """
 
     ids = np.asarray(ids, dtype = str)
-    scores = np.asarray(scores, dtype=float)
+    preds = np.asarray(scores, dtype=float)
     std_devs = np.asarray(scalar_uncertainty, dtype=float)
-    if ids.shape[0] != scores.shape[0]:
-        raise ValueError("ids and scores must have same length")
+    if ids.shape[0] != preds.shape[0]:
+        raise ValueError("ids and predictions must have same length")
     
     # Converting variance to standard deviation
     std_devs = np.sqrt(std_devs)
     # Normalizing standard deviations to avoid extremely large EI values
-    norm_std_devs = std_devs/np.max(std_devs)
+    norm_std_devs = std_devs/np.nanmax(std_devs)
 
-    max_score = np.nanmax(scores)
-    diffs = scores - max_score
+    max_sfxi = np.nanmax(preds)
+    diffs = preds - max_sfxi
     z_vals = diffs / std_devs
-    scores = np.multiply(diffs, norm.cdf(z_vals)) + np.multiply(norm_std_devs, norm.pdf(z_vals))
-
+    scores = alpha*np.multiply(diffs, norm.cdf(z_vals)) + beta*np.multiply(norm_std_devs, norm.pdf(z_vals))
+    norm_scores = (scores - np.nanmin(scores))
+    norm_scores = norm_scores / np.nanmax(norm_scores)
+    scores = norm_scores
+    
     maximize = str(objective).strip().lower().startswith("max")
 
     # Build a primary sort key so that np.lexsort can always sort ASC,
@@ -59,6 +64,6 @@ def ei(
     primary = np.where(np.isfinite(scores), -scores if maximize else scores, np.inf)  # sink non-finite
 
     # lexsort uses the *last* key as primary → (ids, primary)
-    order_idx = np.lexsort((ids, primary)).astype(int)
+    order_idx = np.lexsort((ids, preds, primary)).astype(int)
 
     return {"order_idx": order_idx, "score": scores}

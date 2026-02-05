@@ -100,6 +100,8 @@ class ScoreBundle:
     selected_effective: int
     top_k: int
     obj_sha: str
+    scores: np.ndarray
+    uq_scalar: np.ndarray
 
 
 @dataclass(frozen=True)

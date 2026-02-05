@@ -551,6 +551,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         },
     )
 
+
     run_id, _, rctx = build_round_ctx(
         cfg=cfg,
         as_of_round=int(req.as_of_round),
@@ -569,6 +570,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         tctx=tctx,
         rctx=rctx,
     )
+
 
     score = stage_scoring(
         inputs=inputs,

@@ -27,12 +27,13 @@ class FitMetrics:
 
 @roundctx_contract(
     category="model",
-    requires=[],
-    produces=[
-        "model/<self>/x_dim",
+    requires_by_stage={"fit":[], "predict":[]},
+    produces_by_stage={
+        "fit": ["model/<self>/x_dim",
         "model/<self>/y_dim",
-        "model/<self>/fit_metrics",
-    ],
+        "model/<self>/fit_metrics",],
+        "predict":["model/<self>/std_devs",]
+    },
 )
 
 @register_model("gaussian_process")
@@ -86,11 +87,14 @@ class GaussianProcessModel:
 
         return FitMetrics(kernal_lml=kernal_lml)
 
-    def predict(self, X: np.ndarray, std = False, *, ctx=None) -> np.ndarray:
+    def predict(self, X: np.ndarray, std = True, *, ctx=None) -> np.ndarray:
         if self._est is None:
             raise RuntimeError("[gaussian_process] predict() before fit().")
-        y = self._est.predict(X, return_std = std)
+        y, sd = self._est.predict(X, return_std = std)
         y = np.asarray(y, dtype=float)
+        sd = np.asarray(sd, dtype=float)
+        if ctx is not None:
+            ctx.set("model/<self>/std_devs", sd)
         if y.ndim == 1:
             y = y.reshape(-1, 1)
         return y
