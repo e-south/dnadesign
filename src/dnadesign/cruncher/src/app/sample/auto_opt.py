@@ -11,10 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -30,6 +27,22 @@ from dnadesign.cruncher.app.sample.artifacts import (
     _selected_config_payload,
     _write_auto_opt_best_marker,
 )
+from dnadesign.cruncher.app.sample.auto_opt_candidates import (
+    _budget_to_tune_draws,  # noqa: F401
+    _build_final_sample_cfg,
+    _build_pilot_sample_cfg,
+    _pilot_budget_levels,
+    _stable_pilot_seed,
+)
+from dnadesign.cruncher.app.sample.auto_opt_models import AutoOptCandidate, AutoOptSpec
+from dnadesign.cruncher.app.sample.auto_opt_scorecard import (
+    _assess_candidate_quality,
+    _confidence_from_candidates,
+    _mmr_scorecard_from_elites,
+    _rank_auto_opt_candidates,
+    _select_auto_opt_candidate,
+    _validate_auto_opt_candidates,
+)
 from dnadesign.cruncher.app.sample.diagnostics import (
     _bootstrap_seed,
     _bootstrap_seed_payload,
@@ -40,7 +53,6 @@ from dnadesign.cruncher.app.sample.diagnostics import (
     resolve_dsdna_mode,
 )
 from dnadesign.cruncher.app.sample.optimizer_config import (
-    _boost_beta_ladder,
     _format_auto_opt_config_summary,
     _format_move_probs,
     _resolve_beta_ladder,
@@ -54,391 +66,10 @@ from dnadesign.cruncher.artifacts.layout import (
     trace_path,
 )
 from dnadesign.cruncher.artifacts.manifest import load_manifest
-from dnadesign.cruncher.config.moves import resolve_move_config
 from dnadesign.cruncher.config.schema_v2 import AutoOptConfig, CruncherConfig, SampleConfig
 from dnadesign.cruncher.core.pwm import PWM
-from dnadesign.cruncher.core.selection.mmr import (
-    compute_core_distance,
-    compute_position_weights,
-    tfbs_cores_from_hits,
-)
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class AutoOptCandidate:
-    kind: str
-    length: int | None
-    budget: int | None
-    cooling_boost: float
-    move_profile: str
-    swap_prob: float | None
-    ladder_size: int | None
-    move_probs: dict[str, float] | None
-    move_probs_label: str | None
-    run_dir: Path
-    run_dirs: list[Path]
-    best_score: float | None
-    top_k_median_final: float | None
-    best_score_final: float | None
-    top_k_ci_low: float | None
-    top_k_ci_high: float | None
-    rhat: float | None
-    ess: float | None
-    unique_fraction: float | None
-    balance_median: float | None
-    diversity: float | None
-    improvement: float | None
-    acceptance_b: float | None
-    acceptance_m: float | None
-    acceptance_mh: float | None
-    swap_rate: float | None
-    status: str
-    quality: str
-    warnings: list[str]
-    diagnostics: dict[str, object]
-    pilot_score: float | None
-    median_relevance_raw: float | None
-    mean_pairwise_distance: float | None
-    unique_successes: int | None
-
-
-@dataclass(frozen=True)
-class AutoOptSpec:
-    kind: str
-    length: int
-    move_profile: str
-    cooling_boost: float
-    swap_prob: float | None = None
-    ladder_size: int | None = None
-    move_probs: dict[str, float] | None = None
-    move_probs_label: str | None = None
-
-
-def _stable_pilot_seed(
-    *,
-    pilot_cfg: SampleConfig,
-    tfs: list[str],
-    lockmap: dict[str, object],
-    label: str,
-    kind: str,
-) -> int:
-    moves = resolve_move_config(pilot_cfg.moves)
-    payload = {
-        "label": label,
-        "kind": kind,
-        "seed": pilot_cfg.rng.seed,
-        "mode": pilot_cfg.mode,
-        "objective": pilot_cfg.objective.model_dump(),
-        "init": pilot_cfg.init.model_dump(),
-        "budget": pilot_cfg.budget.model_dump(),
-        "elites": pilot_cfg.elites.model_dump(),
-        "moves": moves.model_dump(),
-        "optimizer": pilot_cfg.optimizer.model_dump(),
-        "optimizers": pilot_cfg.optimizers.model_dump(),
-        "tfs": sorted(tfs),
-        "locks": {tf: lockmap[tf].sha256 for tf in sorted(tfs)},
-    }
-    blob = json.dumps(payload, sort_keys=True).encode("utf-8")
-    digest = hashlib.sha256(blob).hexdigest()
-    return int(digest[:8], 16)
-
-
-_BASE_TO_INT = {"A": 0, "C": 1, "G": 2, "T": 3}
-
-
-def _encode_sequence_string(seq: str) -> np.ndarray:
-    clean = seq.strip().upper()
-    try:
-        return np.array([_BASE_TO_INT[ch] for ch in clean], dtype=np.int8)
-    except KeyError as exc:
-        raise ValueError(f"Invalid base in sequence '{seq}'") from exc
-
-
-def _scorecard_elite_subset(elites_df, *, k: int):
-    if elites_df is None or elites_df.empty:
-        return elites_df
-    if "rank" in elites_df.columns:
-        return elites_df.nsmallest(min(int(k), len(elites_df)), "rank")
-    return elites_df.head(min(int(k), len(elites_df)))
-
-
-def _mmr_scorecard_from_elites(
-    elites_df,
-    *,
-    tf_names: list[str],
-    selection_cfg: object,
-    auto_cfg: AutoOptConfig,
-    pwms: dict[str, PWM],
-) -> tuple[float | None, float | None, float | None]:
-    if elites_df is None or elites_df.empty:
-        return None, None, None
-    k = auto_cfg.policy.scorecard.k
-    subset = _scorecard_elite_subset(elites_df, k=k)
-    relevance = getattr(selection_cfg, "relevance", "min_per_tf_norm")
-    if relevance == "combined_score_final":
-        col = "combined_score_final"
-    else:
-        col = "min_norm"
-    if col not in subset.columns:
-        raise ValueError(f"Missing '{col}' column in elites.parquet for auto-opt scorecard.")
-    relevance_vals = subset[col].astype(float).to_numpy()
-    if relevance_vals.size == 0:
-        return None, None, None
-    median_relevance_raw = float(np.median(relevance_vals))
-
-    distances: list[float] = []
-    weights_by_tf: dict[str, np.ndarray] = {}
-    for tf in tf_names:
-        pwm = pwms.get(tf)
-        if pwm is None:
-            raise ValueError(f"Missing PWM for TF '{tf}'.")
-        weights_by_tf[tf] = compute_position_weights(pwm)
-    cores = []
-    for _, row in subset.iterrows():
-        if "per_tf_json" in row and isinstance(row["per_tf_json"], str):
-            per_tf_hits = json.loads(row["per_tf_json"])
-        else:
-            per_tf_hits = row.get("per_tf")
-        if not isinstance(per_tf_hits, dict):
-            raise ValueError("Missing per_tf metadata for TFBS core distance in elites.parquet.")
-        seq_arr = _encode_sequence_string(str(row["sequence"]))
-        cores.append(tfbs_cores_from_hits(seq_arr, per_tf_hits=per_tf_hits, tf_names=tf_names))
-    for idx, core_a in enumerate(cores):
-        for core_b in cores[idx + 1 :]:
-            distances.append(compute_core_distance(core_a, core_b, weights=weights_by_tf, tf_names=tf_names))
-
-    mean_pairwise_distance = float(np.mean(distances)) if distances else 0.0
-    pilot_score = median_relevance_raw + auto_cfg.policy.diversity_weight * mean_pairwise_distance
-    return pilot_score, median_relevance_raw, mean_pairwise_distance
-
-
-def _pilot_budget_levels(base_cfg: SampleConfig, auto_cfg: AutoOptConfig) -> list[int]:
-    base_total = base_cfg.budget.tune + base_cfg.budget.draws
-    if base_total < 4:
-        raise ValueError("auto_opt requires sample.budget.tune+draws >= 4")
-    budgets = sorted({min(level, base_total) for level in auto_cfg.budget_levels})
-    budgets = [b for b in budgets if b >= 4]
-    if not budgets:
-        raise ValueError("auto_opt.budget_levels produced no valid pilot budgets")
-    return budgets
-
-
-def _budget_to_tune_draws(base_cfg: SampleConfig, total_sweeps: int) -> tuple[int, int]:
-    base_total = base_cfg.budget.tune + base_cfg.budget.draws
-    ratio = base_cfg.budget.tune / base_total if base_total > 0 else 0.0
-    tune = int(round(total_sweeps * ratio))
-    draws = total_sweeps - tune
-    if draws < 4:
-        draws = 4
-        tune = max(0, total_sweeps - draws)
-    return tune, draws
-
-
-def _build_pilot_sample_cfg(
-    base_cfg: SampleConfig,
-    *,
-    kind: str,
-    total_sweeps: int,
-    cooling_boost: float = 1.0,
-    move_profile: str | None = None,
-    swap_prob: float | None = None,
-    move_probs: dict[str, float] | None = None,
-) -> tuple[SampleConfig, list[str]]:
-    notes: list[str] = []
-    pilot = base_cfg.model_copy(deep=True)
-    tune, draws = _budget_to_tune_draws(base_cfg, total_sweeps)
-    pilot.budget.tune = tune
-    pilot.budget.draws = draws
-    if base_cfg.budget.tune != tune or base_cfg.budget.draws != draws:
-        notes.append("overrode tune/draws for pilot budget")
-
-    pilot.output.trace.save = True
-    if not base_cfg.output.trace.save:
-        notes.append("enabled output.trace.save for pilot diagnostics")
-    pilot.output.save_sequences = True
-    if not base_cfg.output.save_sequences:
-        notes.append("enabled output.save_sequences for pilot diagnostics")
-    pilot.output.trace.include_tune = False
-    if base_cfg.output.trace.include_tune:
-        notes.append("disabled output.trace.include_tune for pilots")
-    pilot.output.live_metrics = False
-    if base_cfg.output.live_metrics:
-        notes.append("disabled output.live_metrics for pilots")
-    pilot.ui.progress_bar = False
-    pilot.ui.progress_every = 0
-
-    pilot.optimizer.name = kind
-    if kind != "pt":
-        raise ValueError("auto-opt pilots only support optimizer.name='pt'")
-    if pilot.budget.restarts != 1:
-        pilot.budget.restarts = 1
-        notes.append("forced budget.restarts=1 for PT pilots")
-
-    if move_profile is not None and pilot.moves.profile != move_profile:
-        pilot.moves.profile = move_profile
-        notes.append(f"set moves.profile={move_profile} for pilots")
-    if move_probs is not None:
-        pilot.moves.overrides.move_probs = dict(move_probs)
-        notes.append("set moves.overrides.move_probs for pilots")
-
-    ladder = pilot.optimizers.pt.ladder_adapt
-    if not ladder.enabled:
-        ladder.enabled = True
-        notes.append("enabled optimizers.pt.ladder_adapt for pilots")
-    if ladder.target_swap != 0.25:
-        ladder.target_swap = 0.25
-        notes.append("set ladder_adapt.target_swap=0.25 for pilots")
-    if ladder.window != 50:
-        ladder.window = 50
-        notes.append("set ladder_adapt.window=50 for pilots")
-    if ladder.k != 0.5:
-        ladder.k = 0.5
-        notes.append("set ladder_adapt.k=0.5 for pilots")
-    if ladder.max_scale != 50.0:
-        ladder.max_scale = 50.0
-        notes.append("set ladder_adapt.max_scale=50.0 for pilots")
-    if swap_prob is not None and pilot.optimizers.pt.swap_prob != float(swap_prob):
-        pilot.optimizers.pt.swap_prob = float(swap_prob)
-        notes.append(f"set optimizers.pt.swap_prob={pilot.optimizers.pt.swap_prob:g} for pilots")
-
-    if cooling_boost != 1:
-        ladder_cfg = pilot.optimizers.pt.beta_ladder
-        boosted, boost_notes = _boost_beta_ladder(ladder_cfg, cooling_boost)
-        pilot.optimizers.pt.beta_ladder = boosted
-        notes.extend(boost_notes)
-
-    return pilot, notes
-
-
-def _build_final_sample_cfg(
-    base_cfg: SampleConfig,
-    *,
-    kind: str,
-    cooling_boost: float = 1.0,
-    move_profile: str | None = None,
-    swap_prob: float | None = None,
-    move_probs: dict[str, float] | None = None,
-) -> tuple[SampleConfig, list[str]]:
-    notes: list[str] = []
-    final_cfg = base_cfg.model_copy(deep=True)
-    final_cfg.optimizer.name = kind
-    if kind != "pt":
-        raise ValueError("auto-opt final runs only support optimizer.name='pt'")
-    if final_cfg.budget.restarts != 1:
-        final_cfg.budget.restarts = 1
-        notes.append("forced budget.restarts=1 for PT final run")
-    if cooling_boost != 1:
-        ladder_cfg = final_cfg.optimizers.pt.beta_ladder
-        boosted, boost_notes = _boost_beta_ladder(ladder_cfg, cooling_boost)
-        final_cfg.optimizers.pt.beta_ladder = boosted
-        notes.extend(boost_notes)
-    if move_profile is not None and final_cfg.moves.profile != move_profile:
-        final_cfg.moves.profile = move_profile
-        notes.append(f"set moves.profile={move_profile} from auto-opt selection")
-    if move_probs is not None:
-        final_cfg.moves.overrides.move_probs = dict(move_probs)
-        notes.append("set moves.overrides.move_probs from auto-opt selection")
-    if swap_prob is not None and final_cfg.optimizers.pt.swap_prob != float(swap_prob):
-        final_cfg.optimizers.pt.swap_prob = float(swap_prob)
-        notes.append(f"set optimizers.pt.swap_prob={final_cfg.optimizers.pt.swap_prob:g} from auto-opt selection")
-    return final_cfg, notes
-
-
-def _assess_candidate_quality(
-    candidate: AutoOptCandidate,
-    auto_cfg: AutoOptConfig,
-    *,
-    mode: str,
-) -> list[str]:
-    notes: list[str] = []
-    if candidate.status == "fail":
-        candidate.quality = "fail"
-        return notes
-    if mode != "auto_opt":
-        candidate.quality = "ok"
-        return notes
-    rhat_warn = 1.15
-    rhat_fail = 1.50
-    ess_ratio_warn = 0.10
-    ess_ratio_fail = 0.02
-    unique_warn = 0.10
-    unique_fail = 0.0
-
-    pilot_draws = None
-    pilot_draws_expected = None
-    pilot_chains = None
-    ess_ratio = None
-    pilot_short = False
-    if isinstance(candidate.diagnostics, dict):
-        metrics = candidate.diagnostics.get("metrics")
-        if isinstance(metrics, dict):
-            trace = metrics.get("trace")
-            if isinstance(trace, dict):
-                pilot_draws = trace.get("draws")
-                pilot_draws_expected = trace.get("draws_expected")
-                pilot_chains = trace.get("chains")
-                ess_ratio = trace.get("ess_ratio")
-    try:
-        pilot_draws = int(pilot_draws) if pilot_draws is not None else None
-    except (TypeError, ValueError):
-        pilot_draws = None
-    try:
-        pilot_draws_expected = int(pilot_draws_expected) if pilot_draws_expected is not None else None
-    except (TypeError, ValueError):
-        pilot_draws_expected = None
-    try:
-        pilot_chains = int(pilot_chains) if pilot_chains is not None else None
-    except (TypeError, ValueError):
-        pilot_chains = None
-    try:
-        ess_ratio = float(ess_ratio) if ess_ratio is not None else None
-    except (TypeError, ValueError):
-        ess_ratio = None
-
-    pilot_min_draws = 200
-    pilot_min_fraction = 0.5
-    pilot_threshold = pilot_min_draws
-    if pilot_draws_expected is not None:
-        pilot_threshold = max(pilot_min_draws, int(round(pilot_draws_expected * pilot_min_fraction)))
-    if pilot_draws is not None and pilot_draws <= pilot_threshold:
-        pilot_short = True
-        notes.append(f"pilot draws={pilot_draws} <= {pilot_threshold}; diagnostics are directional at short budgets")
-
-    quality = "ok"
-    if pilot_short:
-        quality = "warn"
-    if candidate.unique_fraction is not None:
-        if candidate.unique_fraction <= unique_fail:
-            quality = "fail"
-            notes.append(f"unique_fraction={candidate.unique_fraction:.2f} <= {unique_fail:.2f}")
-        elif candidate.unique_fraction < unique_warn and quality != "fail":
-            quality = "warn"
-            notes.append(f"unique_fraction={candidate.unique_fraction:.2f} < {unique_warn:.2f}")
-    if not pilot_short:
-        if candidate.rhat is not None:
-            if candidate.rhat >= rhat_fail:
-                quality = "fail"
-                notes.append(f"rhat={candidate.rhat:.3f} >= {rhat_fail}")
-            elif candidate.rhat > rhat_warn:
-                quality = "warn"
-                notes.append(f"rhat={candidate.rhat:.3f} > {rhat_warn}")
-        if ess_ratio is None and candidate.ess is not None and pilot_draws is not None:
-            denom = pilot_draws
-            if candidate.kind != "pt":
-                denom *= pilot_chains or 1
-            if denom > 0:
-                ess_ratio = candidate.ess / float(denom)
-        if ess_ratio is not None and ess_ratio < ess_ratio_warn and quality != "fail":
-            quality = "warn"
-            threshold = ess_ratio_fail if ess_ratio <= ess_ratio_fail else ess_ratio_warn
-            notes.append(f"ess_ratio={ess_ratio:.3f} < {threshold:.2f}")
-
-    candidate.quality = quality
-    if quality == "warn" and not pilot_short:
-        notes.append("pilot diagnostics are weak; consider increasing budgets or beta schedules")
-    return notes
 
 
 def _run_auto_optimize_for_set(
@@ -1340,91 +971,3 @@ def _aggregate_candidate_runs(
         mean_pairwise_distance=_median([run.mean_pairwise_distance for run in runs]),
         unique_successes=_median([run.unique_successes for run in runs]),
     )
-
-
-def _rank_auto_opt_candidates(
-    candidates: list[AutoOptCandidate],
-) -> list[AutoOptCandidate]:
-    ranked: list[tuple[tuple[object, ...], AutoOptCandidate]] = []
-    status_rank = {"ok": 2, "warn": 1, "fail": 0}
-    for candidate in candidates:
-        status_value = float(status_rank.get(candidate.quality, status_rank.get(candidate.status, 0)))
-        candidate_id = str(candidate.run_dir)
-        score = candidate.pilot_score if candidate.pilot_score is not None else float("-inf")
-        median_rel = candidate.median_relevance_raw if candidate.median_relevance_raw is not None else float("-inf")
-        mean_dist = candidate.mean_pairwise_distance if candidate.mean_pairwise_distance is not None else float("-inf")
-        rank = (float(score), float(median_rel), float(mean_dist), status_value, candidate_id)
-        ranked.append((rank, candidate))
-    ranked.sort(key=lambda item: item[0], reverse=True)
-    return [item[1] for item in ranked]
-
-
-def _confidence_from_candidates(
-    candidates: list[AutoOptCandidate],
-) -> tuple[str, AutoOptCandidate | None, AutoOptCandidate | None]:
-    if not candidates:
-        return "low", None, None
-    ranked = _rank_auto_opt_candidates(candidates)
-    best = ranked[0]
-    if len(ranked) == 1:
-        return "high" if best.quality == "ok" else "medium", best, None
-    second = ranked[1]
-    if best.top_k_ci_low is None or second.top_k_ci_high is None:
-        ci_separated = False
-    else:
-        ci_separated = best.top_k_ci_low > second.top_k_ci_high
-    confidence_level = "high" if ci_separated else "low"
-    if best.quality == "warn" and confidence_level == "high":
-        confidence_level = "medium"
-    if best.quality != "ok" and confidence_level == "high":
-        confidence_level = "medium"
-    return confidence_level, best, second
-
-
-def _validate_auto_opt_candidates(
-    candidates: list[AutoOptCandidate],
-    *,
-    allow_warn: bool,
-) -> tuple[list[AutoOptCandidate], bool]:
-    if not candidates:
-        raise ValueError("Auto-optimize did not produce any pilot candidates.")
-    viable = [c for c in candidates if c.status != "fail"]
-    if not viable:
-        raise ValueError(
-            "Auto-optimize failed: all pilot candidates failed catastrophic checks "
-            "(missing scores or no movement). Re-run with larger budgets or fix the model inputs."
-        )
-    if allow_warn:
-        viable = [c for c in viable if c.quality != "fail"]
-        if not viable:
-            raise ValueError(
-                "Auto-optimize failed: all pilot candidates failed quality checks. "
-                "Increase budgets/replicates or adjust diagnostics thresholds."
-            )
-    else:
-        viable = [c for c in viable if c.quality == "ok"]
-        if not viable:
-            raise ValueError(
-                "Auto-optimize failed: no candidates passed diagnostics without warnings. "
-                "Set auto_opt.policy.allow_warn=true or increase budgets/replicates."
-            )
-    return viable, False
-
-
-def _select_auto_opt_candidate(
-    candidates: list[AutoOptCandidate],
-    *,
-    allow_fail: bool = False,
-) -> AutoOptCandidate:
-    if not candidates:
-        raise ValueError("Auto-optimize did not produce any pilot candidates")
-
-    ok_candidates = [c for c in candidates if c.status != "fail"]
-    if not ok_candidates and allow_fail:
-        ok_candidates = list(candidates)
-
-    ranked = _rank_auto_opt_candidates(ok_candidates)
-    winner = ranked[0]
-    if winner.status == "fail" and not allow_fail:
-        raise ValueError("Auto-optimize failed: all pilot candidates reported missing diagnostics.")
-    return winner

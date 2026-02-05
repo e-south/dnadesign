@@ -13,8 +13,6 @@ from __future__ import annotations
 
 import json
 import logging
-import shutil
-import uuid
 from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,16 +21,13 @@ import numpy as np
 import yaml
 
 from dnadesign.cruncher.app.progress import progress_adapter
-from dnadesign.cruncher.app.run_service import (
-    update_run_index_from_manifest,
-    update_run_index_from_status,
-)
+from dnadesign.cruncher.app.run_service import update_run_index_from_status
 from dnadesign.cruncher.app.sample.artifacts import _elite_parquet_schema, _save_config, _write_parquet_rows
-from dnadesign.cruncher.app.sample.diagnostics import (
-    _elite_filter_passes,
-    _EliteCandidate,
-    _norm_map_for_elites,
-    resolve_dsdna_mode,
+from dnadesign.cruncher.app.sample.diagnostics import _norm_map_for_elites, resolve_dsdna_mode
+from dnadesign.cruncher.app.sample.elites_mmr import (
+    build_elite_entries,
+    build_elite_pool,
+    select_elites_mmr,
 )
 from dnadesign.cruncher.app.sample.optimizer_config import (
     _effective_chain_count,
@@ -40,25 +35,18 @@ from dnadesign.cruncher.app.sample.optimizer_config import (
     _resolve_optimizer_kind,
 )
 from dnadesign.cruncher.app.sample.resources import _load_pwms_for_set
+from dnadesign.cruncher.app.sample.run_layout import prepare_run_layout, write_run_manifest_and_update
 from dnadesign.cruncher.app.telemetry import RunTelemetry
 from dnadesign.cruncher.artifacts.entries import artifact_entry
 from dnadesign.cruncher.artifacts.layout import (
-    build_run_dir,
     config_used_path,
     elites_json_path,
     elites_mmr_meta_path,
     elites_path,
     elites_yaml_path,
-    ensure_run_dirs,
-    live_metrics_path,
-    manifest_path,
-    run_group_label,
     sequences_path,
-    status_path,
     trace_path,
 )
-from dnadesign.cruncher.artifacts.manifest import build_run_manifest, write_manifest
-from dnadesign.cruncher.artifacts.status import RunStatusWriter
 from dnadesign.cruncher.config.moves import resolve_move_config
 from dnadesign.cruncher.config.schema_v2 import BetaLadderFixed, CruncherConfig, SampleConfig
 from dnadesign.cruncher.core.evaluator import SequenceEvaluator
@@ -66,82 +54,10 @@ from dnadesign.cruncher.core.labels import format_regulator_slug
 from dnadesign.cruncher.core.optimizers.cooling import make_beta_scheduler
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.core.scoring import Scorer
-from dnadesign.cruncher.core.selection.mmr import MmrCandidate, select_mmr_elites, tfbs_cores_from_scorer
 from dnadesign.cruncher.core.sequence import canon_int
 from dnadesign.cruncher.core.state import SequenceState
-from dnadesign.cruncher.store.catalog_index import CatalogIndex
-from dnadesign.cruncher.utils.paths import resolve_catalog_root, resolve_lock_path
 
 logger = logging.getLogger(__name__)
-
-
-def _build_elite_entries(
-    candidates: list[_EliteCandidate],
-    *,
-    scorer: Scorer,
-    sample_cfg: SampleConfig,
-    want_consensus: bool,
-    want_canonical: bool,
-    meta_source: str,
-) -> list[dict[str, object]]:
-    entries: list[dict[str, object]] = []
-    for rank, cand in enumerate(candidates, 1):
-        seq_arr = cand.seq_arr
-        seq_str = SequenceState(seq_arr).to_string()
-        canonical_seq = None
-        if want_canonical:
-            canonical_seq = SequenceState(canon_int(seq_arr)).to_string()
-        per_tf_details: dict[str, dict[str, object]] = {}
-        norm_map = cand.norm_map
-        per_tf_map = cand.per_tf_map
-
-        for tf_name in scorer.tf_names:
-            raw_llr, offset, strand = scorer.best_llr(seq_arr, tf_name)
-            width = scorer.pwm_width(tf_name)
-            if strand == "-":
-                offset = len(seq_arr) - width - offset
-            start_pos = offset + 1
-            strand_label = f"{strand}1"
-            motif_diag = f"{start_pos}_[{strand_label}]_{width}"
-            if want_consensus:
-                consensus = scorer.consensus_sequence(tf_name)
-            else:
-                consensus = None
-            per_tf_details[tf_name] = {
-                "raw_llr": float(raw_llr),
-                "offset": offset,
-                "strand": strand,
-                "width": width,
-                "motif_diagram": motif_diag,
-                "scaled_score": float(per_tf_map[tf_name]),
-                "normalized_llr": float(norm_map.get(tf_name, 0.0)),
-            }
-            if want_consensus:
-                per_tf_details[tf_name]["consensus"] = consensus
-
-        entry = {
-            "id": str(uuid.uuid4()),
-            "sequence": seq_str,
-            "rank": rank,
-            "norm_sum": cand.sum_norm,
-            "min_norm": cand.min_norm,
-            "sum_norm": cand.sum_norm,
-            "combined_score_final": cand.combined_score,
-            "chain": cand.chain_id,
-            "chain_1based": cand.chain_id + 1,
-            "draw_idx": cand.draw_idx,
-            "draw_in_phase": cand.draw_idx - sample_cfg.budget.tune
-            if cand.draw_idx >= sample_cfg.budget.tune
-            else cand.draw_idx,
-            "per_tf": per_tf_details,
-            "meta_type": "mcmc-elite",
-            "meta_source": meta_source,
-            "meta_date": datetime.now(timezone.utc).isoformat(),
-        }
-        if want_canonical:
-            entry["canonical_sequence"] = canonical_seq
-        entries.append(entry)
-    return entries
 
 
 def _resolve_final_softmin_beta(optimizer: object, sample_cfg: SampleConfig) -> float | None:
@@ -170,14 +86,7 @@ def _resolve_final_softmin_beta(optimizer: object, sample_cfg: SampleConfig) -> 
 def _assert_init_length_fits_pwms(sample_cfg: SampleConfig, pwms: dict[str, PWM]) -> None:
     if not pwms:
         raise ValueError("No PWMs available for sampling.")
-    max_w = max(pwm.length for pwm in pwms.values())
-    if sample_cfg.init.length < max_w:
-        names = ", ".join(f"{tf}:{pwms[tf].length}" for tf in sorted(pwms))
-        raise ValueError(
-            f"init.length={sample_cfg.init.length} is shorter than the widest PWM (max={max_w}). "
-            f"Per-TF lengths: {names}. Increase sample.init.length or trim PWMs via "
-            "motif_store.pwm_window_lengths (with pwm_window_strategy=max_info)."
-        )
+    _assert_init_length_fits_pwms(sample_cfg, pwms)
 
 
 def _run_sample_for_set(
@@ -200,55 +109,32 @@ def _run_sample_for_set(
     Each chain gets its own independent seed (random/consensus/consensus_mix) unless
     init_seeds are provided for warm-started runs.
     """
-    base_out = config_path.parent / Path(cfg.out_dir)
-    base_out.mkdir(parents=True, exist_ok=True)
-    out_dir = build_run_dir(
+    optimizer_kind = _resolve_optimizer_kind(sample_cfg)
+    chain_count = _effective_chain_count(sample_cfg, kind=optimizer_kind)
+    layout = prepare_run_layout(
+        cfg=cfg,
         config_path=config_path,
-        out_dir=cfg.out_dir,
-        stage=stage,
+        sample_cfg=sample_cfg,
         tfs=tfs,
         set_index=set_index,
+        set_count=set_count,
         include_set_index=include_set_index,
+        stage=stage,
+        run_kind=run_kind,
+        auto_opt_meta=auto_opt_meta,
+        chain_count=chain_count,
+        optimizer_kind=optimizer_kind,
     )
-    ensure_run_dirs(out_dir, meta=True, artifacts=True, live=sample_cfg.output.live_metrics)
-    run_group = run_group_label(tfs, set_index, include_set_index=include_set_index)
+    out_dir = layout.run_dir
+    run_group = layout.run_group
+    stage_label = layout.stage_label
     run_logger = logger.debug if stage == "auto_opt" else logger.info
-    stage_label = stage.upper().replace("_", "-")
     run_logger("=== RUN %s: %s ===", stage_label, out_dir)
     logger.debug("Full sample config: %s", sample_cfg.model_dump_json())
 
-    metrics_path = live_metrics_path(out_dir) if sample_cfg.output.live_metrics else None
-    optimizer_kind = _resolve_optimizer_kind(sample_cfg)
-    chain_count = _effective_chain_count(sample_cfg, kind=optimizer_kind)
-    status_writer = RunStatusWriter(
-        path=status_path(out_dir),
-        stage=stage,
-        run_dir=out_dir,
-        metrics_path=metrics_path,
-        payload={
-            "config_path": str(config_path.resolve()),
-            "status_message": "initializing",
-            "regulator_set": {"index": set_index, "tfs": tfs, "count": set_count},
-            "run_group": run_group,
-            "run_kind": run_kind,
-            "auto_opt": auto_opt_meta,
-        },
-    )
+    status_writer = layout.status_writer
     telemetry = RunTelemetry(status_writer)
     progress = progress_adapter(sample_cfg.ui.progress_bar)
-    update_run_index_from_status(
-        config_path,
-        out_dir,
-        status_writer.payload,
-        catalog_root=cfg.motif_store.catalog_root,
-    )
-    status_writer.update(
-        status_message="loading_pwms",
-        draws=sample_cfg.budget.draws,
-        tune=sample_cfg.budget.tune,
-        chains=chain_count,
-        optimizer=optimizer_kind,
-    )
 
     # 1) LOAD all required PWMs
     pwms = _load_pwms_for_set(cfg=cfg, config_path=config_path, tfs=tfs, lockmap=lockmap)
@@ -535,52 +421,17 @@ def _run_sample_for_set(
     min_per_tf_norm = filters.min_per_tf_norm
     require_all = filters.require_all_tfs_over_min_norm
     pwm_sum_min = filters.pwm_sum_min
-    raw_elites: list[_EliteCandidate] = []
-    norm_sums: list[float] = []
-    min_norms: list[float] = []
-    total_draws_seen = len(optimizer.all_samples)
-
-    for (chain_id, draw_idx), seq_arr, per_tf_map in zip(
-        optimizer.all_meta, optimizer.all_samples, optimizer.all_scores
-    ):
-        norm_map = _norm_map_for_elites(
-            seq_arr,
-            per_tf_map,
-            scorer=scorer,
-            score_scale=sample_cfg.objective.score_scale,
-        )
-        min_norm = min(norm_map.values()) if norm_map else 0.0
-        sum_norm = float(sum(norm_map.values()))
-        norm_sums.append(sum_norm)
-        min_norms.append(min_norm)
-
-        if not _elite_filter_passes(
-            norm_map=norm_map,
-            min_norm=min_norm,
-            sum_norm=sum_norm,
-            min_per_tf_norm=min_per_tf_norm,
-            require_all_tfs_over_min_norm=require_all,
-            pwm_sum_min=pwm_sum_min,
-        ):
-            continue
-
-        combined_score = evaluator.combined_from_scores(
-            per_tf_map,
-            beta=beta_softmin_final,
-            length=seq_arr.size,
-        )
-        raw_elites.append(
-            _EliteCandidate(
-                seq_arr=seq_arr,
-                chain_id=chain_id,
-                draw_idx=draw_idx,
-                combined_score=float(combined_score),
-                min_norm=float(min_norm),
-                sum_norm=float(sum_norm),
-                per_tf_map=per_tf_map,
-                norm_map=norm_map,
-            )
-        )
+    pool_result = build_elite_pool(
+        optimizer=optimizer,
+        evaluator=evaluator,
+        scorer=scorer,
+        sample_cfg=sample_cfg,
+        beta_softmin_final=beta_softmin_final,
+    )
+    raw_elites = pool_result.raw_elites
+    norm_sums = pool_result.norm_sums
+    min_norms = pool_result.min_norms
+    total_draws_seen = pool_result.total_draws_seen
 
     # -------- percentile diagnostics ----------------------------------------
     if norm_sums:
@@ -617,74 +468,18 @@ def _run_sample_for_set(
     mmr_meta_path: Path | None = None
 
     # -------- select elites --------------------------------------------------
-    kept_elites: list[_EliteCandidate] = []
-    kept_after_mmr = 0
-
-    if elite_k > 0 and raw_elites:
-        if selection_cfg.pool_size < elite_k:
-            logger.warning(
-                "MMR pool_size=%d < elites.k=%d; using pool_size=%d.",
-                selection_cfg.pool_size,
-                elite_k,
-                elite_k,
-            )
-        mmr_candidates = [
-            MmrCandidate(
-                seq_arr=cand.seq_arr,
-                chain_id=cand.chain_id,
-                draw_idx=cand.draw_idx,
-                combined_score=cand.combined_score,
-                min_norm=cand.min_norm,
-                sum_norm=cand.sum_norm,
-                per_tf_map=cand.per_tf_map,
-                norm_map=cand.norm_map,
-            )
-            for cand in raw_elites
-        ]
-        raw_by_id = {f"{cand.chain_id}:{cand.draw_idx}": cand for cand in raw_elites}
-        pool_size = max(selection_cfg.pool_size, elite_k)
-        if selection_cfg.relevance == "min_per_tf_norm":
-            mmr_pool = sorted(
-                mmr_candidates,
-                key=lambda cand: (cand.min_norm, f"{cand.chain_id}:{cand.draw_idx}"),
-                reverse=True,
-            )[:pool_size]
-        else:
-            mmr_pool = sorted(
-                mmr_candidates,
-                key=lambda cand: (cand.combined_score, f"{cand.chain_id}:{cand.draw_idx}"),
-                reverse=True,
-            )[:pool_size]
-        core_maps = {
-            f"{cand.chain_id}:{cand.draw_idx}": tfbs_cores_from_scorer(
-                cand.seq_arr,
-                scorer=scorer,
-                tf_names=scorer.tf_names,
-            )
-            for cand in mmr_pool
-        }
-        result = select_mmr_elites(
-            mmr_pool,
-            k=elite_k,
-            pool_size=selection_cfg.pool_size,
-            alpha=selection_cfg.alpha,
-            relevance=selection_cfg.relevance,
-            dsdna=dsdna_mode,
-            tf_names=scorer.tf_names,
-            pwms=pwms,
-            core_maps=core_maps,
-        )
-        kept_elites = [raw_by_id[f"{cand.chain_id}:{cand.draw_idx}"] for cand in result.selected]
-        kept_after_mmr = len(kept_elites)
-        mmr_meta_rows = result.meta
-        mmr_summary = {
-            "pool_size": selection_cfg.pool_size,
-            "k": elite_k,
-            "alpha": selection_cfg.alpha,
-            "median_relevance_raw": result.median_relevance_raw,
-            "mean_pairwise_distance": result.mean_pairwise_distance,
-            "min_pairwise_distance": result.min_pairwise_distance,
-        }
+    selection_result = select_elites_mmr(
+        raw_elites=raw_elites,
+        elite_k=elite_k,
+        sample_cfg=sample_cfg,
+        scorer=scorer,
+        pwms=pwms,
+        dsdna_mode=dsdna_mode,
+    )
+    kept_elites = selection_result.kept_elites
+    kept_after_mmr = selection_result.kept_after_mmr
+    mmr_meta_rows = selection_result.mmr_meta_rows
+    mmr_summary = selection_result.mmr_summary
 
     if not kept_elites and (pwm_sum_min > 0 or min_per_tf_norm is not None):
         logger.warning("Elite filters removed all candidates; relax min_per_tf_norm or pwm_sum_min.")
@@ -692,7 +487,7 @@ def _run_sample_for_set(
     # serialise elites
     want_cons = bool(sample_cfg.output.include_consensus_in_elites)
     want_canonical = bool(dsdna_mode)
-    elites = _build_elite_entries(
+    elites = build_elite_entries(
         kept_elites,
         scorer=scorer,
         sample_cfg=sample_cfg,
@@ -805,70 +600,25 @@ def _run_sample_for_set(
         )
 
     # 10) RUN MANIFEST (for reporting + provenance)
-    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
-    catalog = CatalogIndex.load(catalog_root)
-    lock_path = resolve_lock_path(config_path)
-    lock_snapshot_path = manifest_path(out_dir).parent / "lockfile.json"
-    lock_snapshot_path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        shutil.copy2(lock_path, lock_snapshot_path)
-    except Exception as exc:  # pragma: no cover - filesystem dependent
-        raise ValueError(f"Failed to snapshot lockfile for run: {lock_snapshot_path}") from exc
-    manifest = build_run_manifest(
-        stage=stage,
+    manifest_path_out = write_run_manifest_and_update(
         cfg=cfg,
         config_path=config_path,
-        lock_path=lock_snapshot_path,
-        lockmap={tf: lockmap[tf] for tf in tfs},
-        catalog=catalog,
+        sample_cfg=sample_cfg,
+        tfs=tfs,
+        set_index=set_index,
+        set_count=set_count,
+        run_group=run_group,
+        run_kind=run_kind,
+        auto_opt_meta=auto_opt_meta,
+        stage=stage,
         run_dir=out_dir,
+        lockmap=lockmap,
         artifacts=artifacts,
-        extra={
-            "sequence_length": sample_cfg.init.length,
-            "seed": sample_cfg.rng.seed,
-            "seed_effective": sample_cfg.rng.seed + set_index - 1,
-            "record_tune": sample_cfg.output.trace.include_tune,
-            "save_trace": sample_cfg.output.trace.save,
-            "tune": sample_cfg.budget.tune,
-            "draws": sample_cfg.budget.draws,
-            "restarts": sample_cfg.budget.restarts,
-            "early_stop": sample_cfg.early_stop.model_dump(),
-            "top_k": sample_cfg.elites.k,
-            "elites": sample_cfg.elites.model_dump(),
-            "regulator_set": {"index": set_index, "tfs": tfs, "count": set_count},
-            "run_group": run_group,
-            "run_kind": run_kind,
-            "auto_opt": auto_opt_meta,
-            "objective": {
-                "score_scale": sample_cfg.objective.score_scale,
-                "combine": combine_resolved,
-                "bidirectional": sample_cfg.objective.bidirectional,
-                "softmin": sample_cfg.objective.softmin.model_dump(),
-                "softmin_beta_final_resolved": beta_softmin_final,
-            },
-            "optimizer": {
-                "kind": optimizer_kind,
-                "pt": sample_cfg.optimizers.pt.model_dump(),
-            },
-            "optimizer_stats": optimizer.stats() if hasattr(optimizer, "stats") else {},
-            "objective_schedule_summary": optimizer.objective_schedule_summary()
-            if hasattr(optimizer, "objective_schedule_summary")
-            else {},
-        },
-    )
-    manifest_path_out = write_manifest(out_dir, manifest)
-    update_run_index_from_manifest(
-        config_path,
-        out_dir,
-        manifest,
-        catalog_root=cfg.motif_store.catalog_root,
+        optimizer=optimizer,
+        optimizer_kind=optimizer_kind,
+        combine_resolved=combine_resolved,
+        beta_softmin_final=beta_softmin_final,
+        status_writer=status_writer,
     )
     logger.debug("Wrote run manifest -> %s", manifest_path_out.relative_to(out_dir.parent))
-    status_writer.finish(status="completed", artifacts=artifacts)
-    update_run_index_from_status(
-        config_path,
-        out_dir,
-        status_writer.payload,
-        catalog_root=cfg.motif_store.catalog_root,
-    )
     return out_dir

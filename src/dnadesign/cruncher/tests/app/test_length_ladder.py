@@ -22,9 +22,9 @@ def test_pilot_budget_levels_clamp_to_base_total() -> None:
         budget=SampleBudgetConfig(tune=10, draws=10, restarts=1),
         init=InitConfig(kind="random", length=12),
     )
-    auto_cfg = AutoOptConfig(budget_levels=[2, 10, 25])
+    auto_cfg = AutoOptConfig(budget_levels=[4, 10, 25])
     budgets = _pilot_budget_levels(base_cfg, auto_cfg)
-    assert budgets == [10, 20]
+    assert budgets == [4, 10, 20]
 
 
 def test_budget_to_tune_draws_reserves_min_draws() -> None:
@@ -43,5 +43,5 @@ def test_pilot_budget_levels_rejects_tiny_base_budget() -> None:
         init=InitConfig(kind="random", length=12),
     )
     auto_cfg = AutoOptConfig(budget_levels=[4])
-    with pytest.raises(ValueError, match="tune\+draws"):
+    with pytest.raises(ValueError, match=r"tune\+draws"):
         _pilot_budget_levels(base_cfg, auto_cfg)
