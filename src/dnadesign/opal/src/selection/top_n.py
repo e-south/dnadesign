@@ -49,4 +49,4 @@ def top_n(
     # lexsort uses the *last* key as primary → (ids, primary)
     order_idx = np.lexsort((ids, primary)).astype(int)
 
-    return {"order_idx": order_idx}
+    return {"order_idx": order_idx, "score": scores}
