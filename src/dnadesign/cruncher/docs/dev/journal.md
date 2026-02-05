@@ -71,3 +71,4 @@
 - Raised default auto-opt pilot budgets to 2000/3000 and aligned the multi-TF demo workspace to match.
 - Added auto-opt confidence highlights to analysis reports and CLI summaries so pilots are easier to interpret at a glance.
 - Updated sampling/CLI/demo docs to state `elites.k` drives the scorecard size and to guide pilots when elites fall short.
+- Added a v3 single-path schema design: `sequence_length`, `compute.total_sweeps`, and `compute.adapt_sweep_frac` with explicit numeric elite gates (`min_per_tf_norm`, `mmr_alpha`), removing pilot grids and inference-style tune/draws.
