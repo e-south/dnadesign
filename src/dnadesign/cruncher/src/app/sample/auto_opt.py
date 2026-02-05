@@ -167,7 +167,6 @@ def _run_auto_optimize_for_set(
                 "seed": pilot_cfg.rng.seed,
                 "draws": pilot_cfg.budget.draws,
                 "tune": pilot_cfg.budget.tune,
-                "restarts": pilot_cfg.budget.restarts,
                 "budget": budget,
                 "replicate": rep + 1,
                 "cooling_boost": cooling_boost,

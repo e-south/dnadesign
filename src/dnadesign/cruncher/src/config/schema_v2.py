@@ -538,20 +538,12 @@ class SampleRngConfig(StrictBaseModel):
 class SampleBudgetConfig(StrictBaseModel):
     tune: int
     draws: int
-    restarts: int = 1
 
     @field_validator("tune", "draws")
     @classmethod
     def _check_non_negative(cls, v: int, info) -> int:
         if not isinstance(v, int) or v < 0:
             raise ValueError(f"sample.budget.{info.field_name} must be a non-negative integer")
-        return v
-
-    @field_validator("restarts")
-    @classmethod
-    def _check_restarts(cls, v: int) -> int:
-        if not isinstance(v, int) or v < 1:
-            raise ValueError("sample.budget.restarts must be >= 1")
         return v
 
 
@@ -804,8 +796,6 @@ class SampleConfig(StrictBaseModel):
             if self.auto_opt is not None and self.auto_opt.enabled:
                 raise ValueError("auto_opt.enabled must be false when optimizer.name is not 'auto'")
 
-        if self.optimizer.name == "pt" and self.budget.restarts != 1:
-            raise ValueError("PT does not support budget.restarts > 1; set sample.budget.restarts=1.")
         if self.early_stop.enabled and self.objective.score_scale == "normalized-llr":
             if self.early_stop.min_delta > 0.1:
                 raise ValueError(

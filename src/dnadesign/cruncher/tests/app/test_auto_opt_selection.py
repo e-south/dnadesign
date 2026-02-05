@@ -238,7 +238,7 @@ def test_auto_opt_aggregate_uses_best_run_dir(tmp_path: Path) -> None:
 
 def test_auto_opt_final_applies_cooling_boost() -> None:
     sample_cfg = SampleConfig(
-        budget=SampleBudgetConfig(tune=10, draws=10, restarts=2),
+        budget=SampleBudgetConfig(tune=10, draws=10),
         init=InitConfig(kind="random", length=10),
     )
 

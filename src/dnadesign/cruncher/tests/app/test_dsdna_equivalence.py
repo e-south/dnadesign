@@ -18,7 +18,7 @@ from dnadesign.cruncher.config.schema_v2 import InitConfig, SampleBudgetConfig, 
 def _sample_cfg(*, bidirectional: bool) -> SampleConfig:
     objective = SampleObjectiveConfig(bidirectional=bidirectional)
     return SampleConfig(
-        budget=SampleBudgetConfig(tune=1, draws=1, restarts=1),
+        budget=SampleBudgetConfig(tune=1, draws=1),
         init=InitConfig(kind="random", length=12),
         objective=objective,
     )

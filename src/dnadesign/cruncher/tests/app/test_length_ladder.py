@@ -19,7 +19,7 @@ from dnadesign.cruncher.config.schema_v2 import AutoOptConfig, InitConfig, Sampl
 
 def test_pilot_budget_levels_clamp_to_base_total() -> None:
     base_cfg = SampleConfig(
-        budget=SampleBudgetConfig(tune=10, draws=10, restarts=1),
+        budget=SampleBudgetConfig(tune=10, draws=10),
         init=InitConfig(kind="random", length=12),
     )
     auto_cfg = AutoOptConfig(budget_levels=[4, 10, 25])
@@ -29,7 +29,7 @@ def test_pilot_budget_levels_clamp_to_base_total() -> None:
 
 def test_budget_to_tune_draws_reserves_min_draws() -> None:
     base_cfg = SampleConfig(
-        budget=SampleBudgetConfig(tune=1, draws=1, restarts=1),
+        budget=SampleBudgetConfig(tune=1, draws=1),
         init=InitConfig(kind="random", length=12),
     )
     tune, draws = _budget_to_tune_draws(base_cfg, total_sweeps=6)
@@ -39,7 +39,7 @@ def test_budget_to_tune_draws_reserves_min_draws() -> None:
 
 def test_pilot_budget_levels_rejects_tiny_base_budget() -> None:
     base_cfg = SampleConfig(
-        budget=SampleBudgetConfig(tune=1, draws=1, restarts=1),
+        budget=SampleBudgetConfig(tune=1, draws=1),
         init=InitConfig(kind="random", length=12),
     )
     auto_cfg = AutoOptConfig(budget_levels=[4])

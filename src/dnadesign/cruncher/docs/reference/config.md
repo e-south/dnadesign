@@ -268,7 +268,6 @@ sample:
   budget:
     tune: 200
     draws: 500
-    restarts: 2
   early_stop:
     enabled: true
     patience: 500
@@ -391,7 +390,7 @@ Notes:
 - `output.include_consensus_in_elites` adds per-TF PWM consensus strings to elites metadata.
 - `objective.softmin` controls the min-approximation hardness separately from MCMC temperature.
 - `optimizers.pt.beta_ladder.kind=geometric` uses geometric spacing in beta (via `beta_min`/`beta_max` or explicit `betas`).
-- `optimizers.pt.beta_ladder` defines the temperature ladder; PT does not support `budget.restarts>1` (use ladder size for chain count).
+- `optimizers.pt.beta_ladder` defines the temperature ladder; use ladder size for chain count.
 - `auto_opt` runs short PT pilots, evaluates the MMR scorecard (`pilot_score`), logs the decision, and runs a final sample using PT.
 - Auto-opt pilots always write `trace.nc` + `sequences.parquet` (required for diagnostics) and are stored under `outputs/auto_opt/`.
 - The selected pilot is recorded in `outputs/auto_opt/best_<run_group>.json` (run_group is the TF slug; it uses a `setN_` prefix only when multiple regulator sets are configured) and marked with a leading `*` in `cruncher runs list`.
@@ -399,6 +398,7 @@ Notes:
 - `auto_opt.cooling_boosts`, `auto_opt.move_profiles`, and `auto_opt.pt_swap_probs` expand the pilot search space (cooling boosts scale the PT ladder).
 - Auto‑opt is **thresholdless**: it escalates through `auto_opt.budget_levels` (and configured `auto_opt.replicates`) until a confidence‑separated winner emerges. With `auto_opt.policy.allow_warn: true`, it will pick the best available candidate at the maximum budget among those that pass diagnostics (recording low‑confidence warnings). With `allow_warn: false`, it fails fast if no confident winner emerges or if only warning‑level candidates remain, and suggests increasing budgets/replicates.
 - `early_stop` halts sampling when the best score fails to improve by `min_delta` for `patience` sweeps. If `require_min_unique=true`, early-stop can only trigger after `min_unique` canonical successes above `success_min_per_tf_norm`. For `score_scale=normalized-llr` (0-1), `min_delta` must be <= 0.1; use ~0.01 to detect plateaus.
+- `budget` is defined by `tune` and `draws`; PT chain count is controlled by `optimizers.pt.beta_ladder`.
 - Auto-opt selection details are stored in each pilot's `meta/run_manifest.json`; `cruncher analyze` writes `analysis/auto_opt_pilots.parquet` and `analysis/plot__auto_opt_tradeoffs.<plot_format>`.
 - Auto-opt candidate quality uses trace draw counts and ESS ratios (`ess_ratio = ESS / draws`) to grade pilots. If a pilot stops early (draws ≤ ~50% of expected), diagnostics are treated as directional and the candidate is marked `warn`. These metrics are recorded in `auto_opt_pilots.<table_format>` as `ess_ratio`, `trace_draws`, `trace_draws_expected`, `trace_chains`, and `trace_chains_expected`.
 - `sample.rng.deterministic=true` isolates a stable RNG stream per pilot config.
@@ -413,8 +413,6 @@ PT starting point (optional; uses a beta ladder):
 sample:
   optimizer:
     name: pt
-  budget:
-    restarts: 1
   optimizers:
     pt:
       beta_ladder:

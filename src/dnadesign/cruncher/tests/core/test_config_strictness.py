@@ -39,12 +39,11 @@ def _sample_block(
     *,
     optimizer_name: str,
     pt_ladder: dict | None = None,
-    restarts: int = 1,
 ) -> dict:
     return {
         "mode": "sample",
         "rng": {"seed": 7, "deterministic": True},
-        "budget": {"draws": 2, "tune": 1, "restarts": restarts},
+        "budget": {"draws": 2, "tune": 1},
         "init": {"kind": "random", "length": 12, "pad_with": "background"},
         "objective": {"bidirectional": True, "score_scale": "llr"},
         "elites": {"k": 1, "filters": {"pwm_sum_min": 0.0}},
@@ -245,18 +244,3 @@ def test_auto_opt_pt_ladder_sizes_rejects_oversized_betas(tmp_path: Path) -> Non
         load_config(config_path)
 
     assert any(err.get("type") == "extra_forbidden" for err in exc.value.errors())
-
-
-def test_pt_requires_restarts_one(tmp_path: Path) -> None:
-    config = _base_config()
-    config["cruncher"]["sample"] = _sample_block(
-        optimizer_name="pt",
-        pt_ladder={"kind": "fixed", "beta": 1.0},
-        restarts=4,
-    )
-    config_path = _write_config(tmp_path, config)
-
-    with pytest.raises(ValidationError) as exc:
-        load_config(config_path)
-
-    assert any("budget.restarts" in str(err.get("msg")) for err in exc.value.errors())

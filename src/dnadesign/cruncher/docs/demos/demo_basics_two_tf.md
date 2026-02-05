@@ -436,7 +436,7 @@ cruncher runs show 20260114_131314_c2b4ce -c "$CONFIG"  # list artifacts for a r
 Key artifacts include `meta/config_used.yaml`, `artifacts/sequences.parquet`,
 `artifacts/trace.nc` (if enabled), and `artifacts/elites.*`.
 
-Runtime scales with `budget.draws`, `budget.tune`, and `budget.restarts` in the config; adjust them to match your runtime/quality budget.
+Runtime scales with `budget.draws` and `budget.tune` in the config; adjust them to match your runtime/quality budget.
 
 ---
 

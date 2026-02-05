@@ -95,7 +95,7 @@ def test_sample_cli_smoke_matrix(tmp_path: Path) -> None:
             "sample": {
                 "mode": "sample",
                 "rng": {"seed": 3, "deterministic": True},
-                "budget": {"draws": 2, "tune": 1, "restarts": 1},
+                "budget": {"draws": 2, "tune": 1},
                 "early_stop": {"enabled": False},
                 "init": {"kind": "random", "length": 6, "pad_with": "background"},
                 "objective": {"bidirectional": True, "score_scale": "normalized-llr"},

@@ -28,7 +28,7 @@ from dnadesign.cruncher.config.schema_v2 import (
 
 def _base_sample_config(*, elites_selection: SampleElitesSelectionConfig | None = None) -> SampleConfig:
     payload = {
-        "budget": SampleBudgetConfig(draws=2, tune=1, restarts=1),
+        "budget": SampleBudgetConfig(draws=2, tune=1),
         "early_stop": SampleEarlyStopConfig(enabled=True, patience=10, min_delta=0.05),
         "init": InitConfig(kind="random", length=6),
         "objective": SampleObjectiveConfig(score_scale="normalized-llr"),

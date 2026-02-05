@@ -61,7 +61,7 @@ def _make_config() -> CruncherConfig:
         sample=SampleConfig(
             mode="sample",
             rng=SampleRngConfig(seed=1, deterministic=True),
-            budget=SampleBudgetConfig(draws=2, tune=1, restarts=1),
+            budget=SampleBudgetConfig(draws=2, tune=1),
             init=InitConfig(kind="random", length=6),
             objective=SampleObjectiveConfig(bidirectional=True, score_scale="llr"),
             elites=SampleElitesConfig(k=1),

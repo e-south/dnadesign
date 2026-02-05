@@ -76,7 +76,7 @@ def test_sample_abort_marks_run_status(tmp_path: Path, monkeypatch: pytest.Monke
             "sample": {
                 "mode": "optimize",
                 "rng": {"seed": 11, "deterministic": True},
-                "budget": {"draws": 1, "tune": 1, "restarts": 1},
+                "budget": {"draws": 1, "tune": 1},
                 "init": {"kind": "random", "length": 6, "pad_with": "background"},
                 "objective": {"bidirectional": True, "score_scale": "llr"},
                 "elites": {"k": 1, "filters": {"pwm_sum_min": 0.0}},

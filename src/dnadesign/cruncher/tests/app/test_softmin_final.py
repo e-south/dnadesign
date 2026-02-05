@@ -83,7 +83,7 @@ def test_resolve_final_softmin_beta_uses_optimizer_value() -> None:
         )
     )
     sample_cfg = SampleConfig(
-        budget=SampleBudgetConfig(tune=1, draws=1, restarts=1),
+        budget=SampleBudgetConfig(tune=1, draws=1),
         init=InitConfig(kind="random", length=4),
         objective=objective,
     )

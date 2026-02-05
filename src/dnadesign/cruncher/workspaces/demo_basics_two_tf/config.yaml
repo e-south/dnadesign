@@ -91,7 +91,6 @@ cruncher:
     budget:
       tune: 1000
       draws: 2000
-      restarts: 4
     early_stop:
       enabled: true
       patience: 500

@@ -33,7 +33,7 @@ def _sample_block(*, save_trace: bool, top_k: int, draws: int = 2, tune: int = 1
     return {
         "mode": "sample",
         "rng": {"seed": 7, "deterministic": True},
-        "budget": {"draws": draws, "tune": tune, "restarts": 1},
+        "budget": {"draws": draws, "tune": tune},
         "early_stop": {"enabled": True, "patience": 10, "min_delta": 0.01},
         "init": {"kind": "random", "length": 12, "pad_with": "background"},
         "objective": {

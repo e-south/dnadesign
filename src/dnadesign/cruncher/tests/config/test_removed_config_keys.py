@@ -30,7 +30,7 @@ def _base_config() -> dict:
             "sample": {
                 "mode": "sample",
                 "rng": {"seed": 7, "deterministic": True},
-                "budget": {"draws": 2, "tune": 1, "restarts": 1},
+                "budget": {"draws": 2, "tune": 1},
                 "init": {"kind": "random", "length": 12, "pad_with": "background"},
                 "objective": {"bidirectional": True, "score_scale": "normalized-llr"},
                 "elites": {"k": 1, "filters": {"pwm_sum_min": 0.0}, "selection": {"policy": "mmr"}},
@@ -72,6 +72,7 @@ def _write_config(tmp_path: Path, payload: dict) -> Path:
         (("cruncher", "sample", "elites", "selection", "distance"), {"kind": "sequence_hamming"}),
         (("cruncher", "sample", "elites", "selection", "relevance_norm"), "percentile"),
         (("cruncher", "sample", "elites", "selection", "min_distance"), 0.1),
+        (("cruncher", "sample", "budget", "restarts"), 2),
     ],
 )
 def test_removed_keys_are_rejected(tmp_path: Path, path: tuple[str, ...], value: object) -> None:

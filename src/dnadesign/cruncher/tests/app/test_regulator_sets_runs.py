@@ -81,7 +81,7 @@ def test_sample_runs_split_by_regulator_set(tmp_path: Path) -> None:
             "sample": {
                 "mode": "sample",
                 "rng": {"seed": 11, "deterministic": True},
-                "budget": {"draws": 1, "tune": 1, "restarts": 1},
+                "budget": {"draws": 1, "tune": 1},
                 "init": {"kind": "random", "length": 6, "pad_with": "background"},
                 "objective": {"bidirectional": True, "score_scale": "llr"},
                 "elites": {"k": 1, "filters": {"pwm_sum_min": 0.0}},

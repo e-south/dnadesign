@@ -165,7 +165,6 @@ def summary(
         table.add_row("rng.deterministic", str(sample["rng"]["deterministic"]))
         table.add_row("budget.tune", str(sample["budget"]["tune"]))
         table.add_row("budget.draws", str(sample["budget"]["draws"]))
-        table.add_row("budget.restarts", str(sample["budget"]["restarts"]))
         table.add_row("init.kind", sample["init"]["kind"])
         table.add_row("init.length", str(sample["init"]["length"]))
         table.add_row("init.regulator", str(sample["init"].get("regulator")))

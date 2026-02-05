@@ -106,9 +106,6 @@ def _build_pilot_sample_cfg(
     pilot.optimizer.name = kind
     if kind != "pt":
         raise ValueError("auto-opt pilots only support optimizer.name='pt'")
-    if pilot.budget.restarts != 1:
-        pilot.budget.restarts = 1
-        notes.append("forced budget.restarts=1 for PT pilots")
 
     if move_profile is not None and pilot.moves.profile != move_profile:
         pilot.moves.profile = move_profile
@@ -160,9 +157,6 @@ def _build_final_sample_cfg(
     final_cfg.optimizer.name = kind
     if kind != "pt":
         raise ValueError("auto-opt final runs only support optimizer.name='pt'")
-    if final_cfg.budget.restarts != 1:
-        final_cfg.budget.restarts = 1
-        notes.append("forced budget.restarts=1 for PT final run")
     if cooling_boost != 1:
         ladder_cfg = final_cfg.optimizers.pt.beta_ladder
         boosted, boost_notes = _boost_beta_ladder(ladder_cfg, cooling_boost)

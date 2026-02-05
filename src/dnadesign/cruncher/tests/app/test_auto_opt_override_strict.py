@@ -38,7 +38,7 @@ def test_no_auto_opt_override_requires_explicit_optimizer(tmp_path: Path, monkey
             "sample": {
                 "mode": "optimize",
                 "rng": {"seed": 11, "deterministic": True},
-                "budget": {"draws": 1, "tune": 1, "restarts": 1},
+                "budget": {"draws": 1, "tune": 1},
                 "init": {"kind": "random", "length": 6, "pad_with": "background"},
                 "objective": {"bidirectional": True, "score_scale": "llr"},
                 "elites": {"k": 1, "filters": {"pwm_sum_min": 0.0}},

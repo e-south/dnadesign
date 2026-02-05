@@ -42,7 +42,7 @@ def test_get_run_accepts_path(tmp_path: Path) -> None:
             "sample": {
                 "mode": "sample",
                 "rng": {"seed": 1, "deterministic": True},
-                "budget": {"draws": 1, "tune": 1, "restarts": 1},
+                "budget": {"draws": 1, "tune": 1},
                 "init": {"kind": "random", "length": 6, "pad_with": "background"},
                 "objective": {"bidirectional": True, "score_scale": "llr"},
                 "elites": {"k": 1, "filters": {"pwm_sum_min": 0.0}},

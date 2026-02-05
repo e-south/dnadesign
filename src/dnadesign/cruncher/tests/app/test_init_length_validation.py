@@ -30,7 +30,7 @@ from dnadesign.cruncher.core.pwm import PWM
 
 def _sample_config(*, length: int) -> SampleConfig:
     return SampleConfig(
-        budget=SampleBudgetConfig(draws=2, tune=1, restarts=1),
+        budget=SampleBudgetConfig(draws=2, tune=1),
         early_stop=SampleEarlyStopConfig(enabled=False, min_delta=0.01),
         init=InitConfig(kind="random", length=length),
         objective=SampleObjectiveConfig(score_scale="normalized-llr"),

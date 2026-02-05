@@ -149,7 +149,6 @@ def write_run_manifest_and_update(
             "save_trace": sample_cfg.output.trace.save,
             "tune": sample_cfg.budget.tune,
             "draws": sample_cfg.budget.draws,
-            "restarts": sample_cfg.budget.restarts,
             "early_stop": sample_cfg.early_stop.model_dump(),
             "top_k": sample_cfg.elites.k,
             "elites": sample_cfg.elites.model_dump(),
