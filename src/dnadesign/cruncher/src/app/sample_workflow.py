@@ -24,7 +24,7 @@ from dnadesign.cruncher.app.target_service import (
     target_statuses,
 )
 from dnadesign.cruncher.artifacts.layout import config_used_path
-from dnadesign.cruncher.config.schema_v2 import CruncherConfig
+from dnadesign.cruncher.config.schema_v3 import CruncherConfig
 from dnadesign.cruncher.core.labels import regulator_sets
 from dnadesign.cruncher.utils.paths import resolve_catalog_root
 from dnadesign.cruncher.viz.mpl import ensure_mpl_cache

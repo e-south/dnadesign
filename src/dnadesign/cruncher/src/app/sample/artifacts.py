@@ -21,7 +21,7 @@ import numpy as np
 from dnadesign.cruncher.app.sample.resources import _lockmap_for, _store
 from dnadesign.cruncher.artifacts.atomic_write import atomic_write_yaml
 from dnadesign.cruncher.artifacts.layout import config_used_path
-from dnadesign.cruncher.config.schema_v2 import CruncherConfig, SampleConfig
+from dnadesign.cruncher.config.schema_v3 import CruncherConfig, SampleConfig
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.store.motif_store import MotifRef
 

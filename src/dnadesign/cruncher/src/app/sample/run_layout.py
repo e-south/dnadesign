@@ -11,7 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import math
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,7 +25,7 @@ from dnadesign.cruncher.artifacts.layout import (
 )
 from dnadesign.cruncher.artifacts.manifest import build_run_manifest, write_manifest
 from dnadesign.cruncher.artifacts.status import RunStatusWriter
-from dnadesign.cruncher.config.schema_v2 import CruncherConfig, SampleConfig
+from dnadesign.cruncher.config.schema_v3 import CruncherConfig, SampleConfig
 from dnadesign.cruncher.core.pvalue import logodds_cache_info
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
 from dnadesign.cruncher.utils.paths import resolve_catalog_root, resolve_lock_path
@@ -87,9 +86,9 @@ def prepare_run_layout(
         status_writer.payload,
         catalog_root=cfg.motif_store.catalog_root,
     )
-    total_sweeps = sample_cfg.compute.total_sweeps
-    adapt_sweeps = int(math.ceil(total_sweeps * sample_cfg.compute.adapt_sweep_frac))
-    draws = total_sweeps - adapt_sweeps
+    adapt_sweeps = int(sample_cfg.budget.tune)
+    draws = int(sample_cfg.budget.draws)
+    total_sweeps = adapt_sweeps + draws
     status_writer.update(
         status_message="loading_pwms",
         total_sweeps=total_sweeps,
@@ -124,6 +123,8 @@ def write_run_manifest_and_update(
     optimizer_kind: str,
     combine_resolved: str,
     beta_softmin_final: float | None,
+    min_per_tf_norm: float | None,
+    min_per_tf_norm_auto: dict[str, object] | None,
     status_writer: RunStatusWriter,
 ) -> Path:
     catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
@@ -157,19 +158,17 @@ def write_run_manifest_and_update(
         artifacts=artifacts,
         extra={
             "sequence_length": sample_cfg.sequence_length,
-            "seed": sample_cfg.rng.seed,
-            "seed_effective": sample_cfg.rng.seed + set_index - 1,
-            "record_tune": sample_cfg.output.trace.include_tune,
-            "save_trace": sample_cfg.output.trace.save,
-            "total_sweeps": sample_cfg.compute.total_sweeps,
-            "adapt_sweeps": int(math.ceil(sample_cfg.compute.total_sweeps * sample_cfg.compute.adapt_sweep_frac)),
-            "draws": int(
-                sample_cfg.compute.total_sweeps
-                - math.ceil(sample_cfg.compute.total_sweeps * sample_cfg.compute.adapt_sweep_frac)
-            ),
-            "early_stop": sample_cfg.early_stop.model_dump(),
+            "seed": sample_cfg.seed,
+            "seed_effective": sample_cfg.seed + set_index - 1,
+            "record_tune": sample_cfg.output.include_tune_in_sequences,
+            "save_trace": sample_cfg.output.save_trace,
+            "total_sweeps": int(sample_cfg.budget.tune + sample_cfg.budget.draws),
+            "adapt_sweeps": int(sample_cfg.budget.tune),
+            "draws": int(sample_cfg.budget.draws),
             "top_k": sample_cfg.elites.k,
             "elites": sample_cfg.elites.model_dump(),
+            "elites_min_per_tf_norm_resolved": min_per_tf_norm,
+            "elites_min_per_tf_norm_auto": min_per_tf_norm_auto,
             "regulator_set": {"index": set_index, "tfs": tfs, "count": set_count},
             "run_group": run_group,
             "run_kind": run_kind,

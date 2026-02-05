@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from dnadesign.cruncher.config.schema_v2 import SampleConfig
+from dnadesign.cruncher.config.schema_v3 import SampleConfig
 from dnadesign.cruncher.core.scoring import Scorer
 
 
@@ -29,6 +29,7 @@ class _EliteCandidate:
     sum_norm: float
     per_tf_map: dict[str, float]
     norm_map: dict[str, float]
+    per_tf_hits: dict[str, dict[str, object]]
 
 
 def _norm_map_for_elites(
@@ -50,8 +51,10 @@ def _elite_filter_passes(
     *,
     norm_map: dict[str, float],
     min_norm: float,
+    sum_norm: float,
     min_per_tf_norm: float | None,
     require_all_tfs_over_min_norm: bool,
+    pwm_sum_min: float,
 ) -> bool:
     if min_per_tf_norm is not None:
         if require_all_tfs_over_min_norm:
@@ -60,6 +63,8 @@ def _elite_filter_passes(
         else:
             if min_norm < min_per_tf_norm:
                 return False
+    if pwm_sum_min > 0 and sum_norm < pwm_sum_min:
+        return False
     return True
 
 
@@ -69,4 +74,4 @@ def resolve_dsdna_mode(*, elites_cfg: object, bidirectional: bool) -> bool:
 
 
 def dsdna_equivalence_enabled(sample_cfg: SampleConfig) -> bool:
-    return resolve_dsdna_mode(elites_cfg=sample_cfg.elites, bidirectional=sample_cfg.objective.bidirectional)
+    return bool(sample_cfg.objective.bidirectional)

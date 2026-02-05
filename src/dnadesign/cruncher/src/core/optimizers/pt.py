@@ -47,7 +47,7 @@ class PTGibbsOptimizer(Optimizer):
         rng: np.random.Generator,
         *,
         pwms: Dict[str, Any],
-        init_cfg: Any,
+        init_cfg: Any | None,
         telemetry: OptimizerTelemetry | None = None,
         progress: ProgressAdapter | None = None,
     ) -> None:
@@ -60,7 +60,7 @@ class PTGibbsOptimizer(Optimizer):
         self.min_dist: int = int(cfg["min_dist"])
         self.top_k: int = int(cfg["top_k"])
         self.sequence_length: int = int(cfg["sequence_length"])
-        self.swap_prob: float = float(cfg["swap_prob"])
+        self.swap_stride: int = int(cfg.get("swap_stride", 1))
         self.bidirectional: bool = bool(cfg.get("bidirectional", False))
         self.dsdna_canonicalize: bool = bool(cfg.get("dsdna_canonicalize", False))
         self.score_scale: str = str(cfg.get("score_scale") or "")
@@ -142,6 +142,8 @@ class PTGibbsOptimizer(Optimizer):
         # References needed during optimisation
         self.pwms = pwms
         self.init_cfg = init_cfg
+        if self.swap_stride < 1:
+            raise ValueError("swap_stride must be >= 1")
 
         # Cache consensus and per-row probabilities for insertion moves
         self._insertion_consensus: Dict[str, np.ndarray] = {}
@@ -222,7 +224,10 @@ class PTGibbsOptimizer(Optimizer):
             return mutated
 
         # Seed each chain (shared seed + small perturbations for swap-friendly PT starts).
-        base_seed = make_seed(self.init_cfg, self.pwms, rng, sequence_length=self.sequence_length).seq.copy()
+        if self.init_cfg is None:
+            base_seed = SequenceState.random(self.sequence_length, rng).seq.copy()
+        else:
+            base_seed = make_seed(self.init_cfg, self.pwms, rng, sequence_length=self.sequence_length).seq.copy()
         chain_states = [base_seed.copy() for _ in range(C)]
         if C > 1:
             n_mutations = max(1, int(round(base_seed.size * 0.02)))
@@ -315,10 +320,8 @@ class PTGibbsOptimizer(Optimizer):
                 )
 
             # Optional swap attempts during tune (for adaptive swap calibration)
-            if self.adaptive_swap_enabled:
+            if self.adaptive_swap_enabled and (sweep_idx % self.swap_stride) == 0:
                 for c in range(C - 1):
-                    if rng.random() >= self.swap_prob:
-                        continue
                     self.swap_attempts += 1
                     self.swap_attempts_by_pair[c] += 1
                     s0, s1 = chain_states[c], chain_states[c + 1]
@@ -403,38 +406,37 @@ class PTGibbsOptimizer(Optimizer):
                 )
 
             # Pair‑wise swaps
-            for c in range(C - 1):
-                if rng.random() >= self.swap_prob:
-                    continue
-                self.swap_attempts += 1
-                self.swap_attempts_by_pair[c] += 1
-                s0, s1 = chain_states[c], chain_states[c + 1]
-                β0, β1 = self.beta_ladder[c], self.beta_ladder[c + 1]
-                f0 = current_scores[c]
-                f1 = current_scores[c + 1]
-                Δ = (β1 - β0) * (f0 - f1)
-                accepted = False
-                if Δ >= 0 or np.log(rng.random()) < Δ:
-                    chain_states[c], chain_states[c + 1] = s1, s0  # swap in‑place
-                    chain_state_objs[c], chain_state_objs[c + 1] = (
-                        chain_state_objs[c + 1],
-                        chain_state_objs[c],
-                    )
-                    scan_caches[c], scan_caches[c + 1] = scan_caches[c + 1], scan_caches[c]
-                    current_scores[c], current_scores[c + 1] = current_scores[c + 1], current_scores[c]
-                    current_per_tf_maps[c], current_per_tf_maps[c + 1] = (
-                        current_per_tf_maps[c + 1],
-                        current_per_tf_maps[c],
-                    )
-                    self.swap_accepts += 1
-                    self.swap_accepts_by_pair[c] += 1
-                    accepted = True
-                if self.swap_controller is not None:
-                    self.swap_controller.record(accepted)
-                    if not stop_after_tune:
-                        self.swap_controller.update_scale()
-            if self.swap_controller is not None and stop_after_tune:
-                self.swap_controller.update_scale()
+            if (sweep_idx % self.swap_stride) == 0:
+                for c in range(C - 1):
+                    self.swap_attempts += 1
+                    self.swap_attempts_by_pair[c] += 1
+                    s0, s1 = chain_states[c], chain_states[c + 1]
+                    β0, β1 = self.beta_ladder[c], self.beta_ladder[c + 1]
+                    f0 = current_scores[c]
+                    f1 = current_scores[c + 1]
+                    Δ = (β1 - β0) * (f0 - f1)
+                    accepted = False
+                    if Δ >= 0 or np.log(rng.random()) < Δ:
+                        chain_states[c], chain_states[c + 1] = s1, s0  # swap in‑place
+                        chain_state_objs[c], chain_state_objs[c + 1] = (
+                            chain_state_objs[c + 1],
+                            chain_state_objs[c],
+                        )
+                        scan_caches[c], scan_caches[c + 1] = scan_caches[c + 1], scan_caches[c]
+                        current_scores[c], current_scores[c + 1] = current_scores[c + 1], current_scores[c]
+                        current_per_tf_maps[c], current_per_tf_maps[c + 1] = (
+                            current_per_tf_maps[c + 1],
+                            current_per_tf_maps[c],
+                        )
+                        self.swap_accepts += 1
+                        self.swap_accepts_by_pair[c] += 1
+                        accepted = True
+                    if self.swap_controller is not None:
+                        self.swap_controller.record(accepted)
+                        if not stop_after_tune:
+                            self.swap_controller.update_scale()
+                if self.swap_controller is not None and stop_after_tune:
+                    self.swap_controller.update_scale()
 
             for c in range(C):
                 _record(c, T + d, chain_states[c], current_per_tf_maps[c])
@@ -497,6 +499,10 @@ class PTGibbsOptimizer(Optimizer):
                     scores.extend([float("nan")] * (max_len - len(scores)))
         score_arr = np.asarray(chain_scores, dtype=float)  # (C, D)
         self.trace_idata = az.from_dict(posterior={"score": score_arr})
+
+        if self.top_k <= 0:
+            self.elites_meta = []
+            return []
 
         # Rank all recorded sequences by combined fitness
         beta_softmin_final = self.softmin_of(self.total_sweeps - 1) if self.softmin_of else None

@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import logging
-import math
 from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,16 +22,11 @@ import numpy as np
 from dnadesign.cruncher.app.progress import progress_adapter
 from dnadesign.cruncher.app.run_service import update_run_index_from_status
 from dnadesign.cruncher.app.sample.artifacts import _elite_parquet_schema, _save_config, _write_parquet_rows
-from dnadesign.cruncher.app.sample.diagnostics import _norm_map_for_elites, resolve_dsdna_mode
+from dnadesign.cruncher.app.sample.diagnostics import _norm_map_for_elites
 from dnadesign.cruncher.app.sample.elites_mmr import (
     build_elite_entries,
     build_elite_pool,
     select_elites_mmr,
-)
-from dnadesign.cruncher.app.sample.optimizer_config import (
-    _effective_chain_count,
-    _resolve_optimizer_kind,
-    _resolve_pt_defaults,
 )
 from dnadesign.cruncher.app.sample.resources import _load_pwms_for_set
 from dnadesign.cruncher.app.sample.run_layout import prepare_run_layout, write_run_manifest_and_update
@@ -49,7 +43,7 @@ from dnadesign.cruncher.artifacts.layout import (
     trace_path,
 )
 from dnadesign.cruncher.config.moves import resolve_move_config
-from dnadesign.cruncher.config.schema_v2 import CruncherConfig, SampleConfig
+from dnadesign.cruncher.config.schema_v3 import CruncherConfig, SampleConfig
 from dnadesign.cruncher.core.evaluator import SequenceEvaluator
 from dnadesign.cruncher.core.labels import format_regulator_slug
 from dnadesign.cruncher.core.optimizers.cooling import make_beta_scheduler
@@ -78,9 +72,12 @@ def _resolve_final_softmin_beta(optimizer: object, sample_cfg: SampleConfig) -> 
             pass
     softmin_cfg = sample_cfg.objective.softmin
     if softmin_cfg.enabled:
-        total = sample_cfg.compute.total_sweeps
-        softmin_sched = {k: v for k, v in softmin_cfg.model_dump().items() if k in ("kind", "beta", "stages")}
-        return make_beta_scheduler(softmin_sched, total)(total - 1)
+        total = int(sample_cfg.budget.tune + sample_cfg.budget.draws)
+        if softmin_cfg.schedule == "fixed":
+            sched = {"kind": "fixed", "beta": float(softmin_cfg.beta_end)}
+        else:
+            sched = {"kind": "linear", "beta": (float(softmin_cfg.beta_start), float(softmin_cfg.beta_end))}
+        return make_beta_scheduler(sched, total)(total - 1)
     return None
 
 
@@ -95,6 +92,42 @@ def _assert_init_length_fits_pwms(sample_cfg: SampleConfig, pwms: dict[str, PWM]
             f"Per-TF lengths: {names}. Increase sample.sequence_length or trim PWMs via "
             "motif_store.pwm_window_lengths (with pwm_window_strategy=max_info)."
         )
+
+
+def _resolve_min_per_tf_norm(
+    *,
+    sample_cfg: SampleConfig,
+    scorer: Scorer,
+    seed: int,
+    sequence_length: int,
+) -> tuple[float | None, dict[str, object] | None]:
+    cfg_value = sample_cfg.elites.filter.min_per_tf_norm
+    if cfg_value is None:
+        return None, None
+    if cfg_value != "auto":
+        return float(cfg_value), None
+    if sample_cfg.objective.score_scale != "normalized-llr":
+        raise ValueError("elites.filter.min_per_tf_norm='auto' requires objective.score_scale='normalized-llr'.")
+    rng = np.random.default_rng(seed)
+    n_samples = 2048
+    quantile = 0.995
+    margin = 0.01
+    mins: list[float] = []
+    for _ in range(n_samples):
+        seq = SequenceState.random(sequence_length, rng).seq
+        norm_map = scorer.normalized_llr_map(seq)
+        mins.append(float(min(norm_map.values()) if norm_map else 0.0))
+    q_val = float(np.quantile(np.asarray(mins, dtype=float), quantile))
+    threshold = min(0.9, max(0.0, q_val + margin))
+    meta = {
+        "method": "random_baseline_quantile",
+        "quantile": quantile,
+        "margin": margin,
+        "n": n_samples,
+        "seed": int(seed),
+        "value": float(threshold),
+    }
+    return float(threshold), meta
 
 
 def _run_sample_for_set(
@@ -114,8 +147,8 @@ def _run_sample_for_set(
     Run MCMC sampler, save config/meta plus artifacts (trace.nc, sequences.parquet, elites.*).
     Each chain gets its own independent seed (random/consensus/consensus_mix).
     """
-    optimizer_kind = _resolve_optimizer_kind()
-    chain_count = _effective_chain_count()
+    optimizer_kind = "pt"
+    chain_count = int(sample_cfg.pt.n_temps)
     layout = prepare_run_layout(
         cfg=cfg,
         config_path=config_path,
@@ -138,30 +171,14 @@ def _run_sample_for_set(
 
     status_writer = layout.status_writer
     telemetry = RunTelemetry(status_writer)
-    progress = progress_adapter(sample_cfg.ui.progress_bar)
+    progress = progress_adapter(True)
 
     # 1) LOAD all required PWMs
     pwms = _load_pwms_for_set(cfg=cfg, config_path=config_path, tfs=tfs, lockmap=lockmap)
 
-    if sample_cfg.init.kind == "consensus":
-        regulator = sample_cfg.init.regulator
-        if regulator not in tfs:
-            raise ValueError(
-                f"init.regulator='{regulator}' is not in regulator_sets[{set_index}] ({tfs}). "
-                "Use a regulator within the active set or switch to init.kind='consensus_mix'."
-            )
-
     _assert_init_length_fits_pwms(sample_cfg, pwms)
-
-    total_sweeps = sample_cfg.compute.total_sweeps
-    adapt_sweeps = int(math.ceil(total_sweeps * sample_cfg.compute.adapt_sweep_frac))
-    draws = total_sweeps - adapt_sweeps
-    if draws < 1:
-        raise ValueError(
-            f"compute.total_sweeps={total_sweeps} with adapt_sweep_frac={sample_cfg.compute.adapt_sweep_frac:g} "
-            "leaves no draws after adaptation. Increase total_sweeps or lower adapt_sweep_frac."
-        )
-
+    adapt_sweeps = int(sample_cfg.budget.tune)
+    draws = int(sample_cfg.budget.draws)
     # 2) INSTANTIATE SCORER and SequenceEvaluator
     scale = sample_cfg.objective.score_scale
     combine_cfg = sample_cfg.objective.combine
@@ -203,10 +220,6 @@ def _run_sample_for_set(
         pseudocounts=sample_cfg.objective.scoring.pwm_pseudocounts,
         log_odds_clip=sample_cfg.objective.scoring.log_odds_clip,
     )
-    length_penalty_lambda = sample_cfg.objective.length_penalty_lambda
-    length_penalty_ref = None
-    if length_penalty_lambda > 0:
-        length_penalty_ref = sample_cfg.sequence_length
     evaluator = SequenceEvaluator(
         pwms=pwms,
         scale=scale,
@@ -216,8 +229,6 @@ def _run_sample_for_set(
         background=(0.25, 0.25, 0.25, 0.25),
         pseudocounts=sample_cfg.objective.scoring.pwm_pseudocounts,
         log_odds_clip=sample_cfg.objective.scoring.log_odds_clip,
-        length_penalty_lambda=length_penalty_lambda,
-        length_penalty_ref=length_penalty_ref,
     )
 
     logger.debug("Scorer and SequenceEvaluator instantiated")
@@ -225,37 +236,42 @@ def _run_sample_for_set(
     logger.debug("  SequenceEvaluator.scale = %r", evaluator._scale)
     logger.debug("  SequenceEvaluator.combiner = %r", evaluator._combiner)
 
-    dsdna_mode_for_opt = resolve_dsdna_mode(
-        elites_cfg=sample_cfg.elites,
-        bidirectional=sample_cfg.objective.bidirectional,
-    )
+    dsdna_mode_for_opt = bool(sample_cfg.objective.bidirectional)
 
     # 3) FLATTEN optimizer config for PT
     moves = resolve_move_config(sample_cfg.moves)
+    softmin_cfg = sample_cfg.objective.softmin
+    if softmin_cfg.schedule == "fixed":
+        softmin_sched = {"kind": "fixed", "beta": float(softmin_cfg.beta_end)}
+    else:
+        softmin_sched = {"kind": "linear", "beta": (float(softmin_cfg.beta_start), float(softmin_cfg.beta_end))}
+    pt_cfg = sample_cfg.pt
+    beta_min = 1.0 / float(pt_cfg.temp_max)
+    if chain_count == 1:
+        betas = [beta_min]
+    else:
+        betas = list(np.geomspace(beta_min, 1.0, chain_count))
     opt_cfg: dict[str, object] = {
         "draws": draws,
         "tune": adapt_sweeps,
         "chains": chain_count,
         "min_dist": 0,
-        "top_k": sample_cfg.elites.k,
+        "top_k": 0,
         "sequence_length": sample_cfg.sequence_length,
         "bidirectional": sample_cfg.objective.bidirectional,
         "dsdna_canonicalize": dsdna_mode_for_opt,
         "score_scale": sample_cfg.objective.score_scale,
-        "record_tune": sample_cfg.output.trace.include_tune,
-        "progress_bar": sample_cfg.ui.progress_bar,
-        "progress_every": sample_cfg.ui.progress_every,
-        "early_stop": sample_cfg.early_stop.model_dump(),
+        "record_tune": sample_cfg.output.include_tune_in_sequences,
+        "progress_bar": True,
+        "progress_every": 0,
+        "swap_stride": int(pt_cfg.swap_stride),
+        "kind": "geometric",
+        "beta": betas,
+        "adaptive_swap": pt_cfg.adapt.model_dump(),
         **moves.model_dump(),
-        "softmin": sample_cfg.objective.softmin.model_dump(),
+        "softmin": {"enabled": softmin_cfg.enabled, **softmin_sched},
     }
-    if optimizer_kind == "pt":
-        pt_cfg = _resolve_pt_defaults()
-        opt_cfg.update(pt_cfg)
-        betas = pt_cfg.get("beta") or []
-        logger.debug("β-ladder (%d levels): %s", len(betas), ", ".join(f"{b:g}" for b in betas))
-    else:
-        raise ValueError("Unsupported optimizer; only 'pt' is allowed.")
+    logger.debug("β-ladder (%d levels): %s", len(betas), ", ".join(f"{b:g}" for b in betas))
 
     logger.debug("Optimizer config flattened: %s", opt_cfg)
 
@@ -264,13 +280,13 @@ def _run_sample_for_set(
 
     optimizer_factory = get_optimizer(optimizer_kind)
     run_logger("Instantiating optimizer: %s", optimizer_kind)
-    rng = np.random.default_rng(sample_cfg.rng.seed + set_index - 1)
+    rng = np.random.default_rng(sample_cfg.seed + set_index - 1)
     optimizer = optimizer_factory(
         evaluator=evaluator,
         cfg=opt_cfg,
         rng=rng,
         pwms=pwms,
-        init_cfg=sample_cfg.init,
+        init_cfg=None,
         telemetry=telemetry,
         progress=progress,
     )
@@ -323,7 +339,7 @@ def _run_sample_for_set(
     ]
 
     # 7) SAVE trace.nc
-    if sample_cfg.output.trace.save and hasattr(optimizer, "trace_idata") and optimizer.trace_idata is not None:
+    if sample_cfg.output.save_trace and hasattr(optimizer, "trace_idata") and optimizer.trace_idata is not None:
         from dnadesign.cruncher.artifacts.traces import save_trace
 
         save_trace(optimizer.trace_idata, trace_path(out_dir))
@@ -337,8 +353,8 @@ def _run_sample_for_set(
             )
         )
         logger.debug("Saved MCMC trace -> %s", trace_path(out_dir).relative_to(out_dir.parent))
-    elif not sample_cfg.output.trace.save:
-        logger.debug("Skipping trace.nc (sample.output.trace.save=false)")
+    elif not sample_cfg.output.save_trace:
+        logger.debug("Skipping trace.nc (sample.output.save_trace=false)")
 
     # Resolve final soft-min beta for elite ranking (from optimizer schedule)
     beta_softmin_final: float | None = _resolve_final_softmin_beta(optimizer, sample_cfg)
@@ -352,24 +368,23 @@ def _run_sample_for_set(
     ):
         seq_parquet = sequences_path(out_dir)
         tf_order = sorted(tfs)
-        dsdna_mode = resolve_dsdna_mode(
-            elites_cfg=sample_cfg.elites,
-            bidirectional=sample_cfg.objective.bidirectional,
-        )
-        want_canonical_all = bool(dsdna_mode)
+        want_canonical_all = bool(sample_cfg.objective.bidirectional)
+        record_tune = bool(sample_cfg.output.include_tune_in_sequences)
 
         def _sequence_rows() -> Iterable[dict[str, object]]:
             for (chain_id, draw_i), seq_arr, per_tf_map in zip(
                 optimizer.all_meta, optimizer.all_samples, optimizer.all_scores
             ):
-                if draw_i < adapt_sweeps:
+                if not record_tune and draw_i < adapt_sweeps:
+                    continue
+                if record_tune and draw_i < adapt_sweeps:
                     phase = "tune"
                     draw_i_to_write = draw_i
                     draw_in_phase = draw_i
                 else:
                     phase = "draw"
                     draw_i_to_write = draw_i
-                    draw_in_phase = draw_i - adapt_sweeps
+                    draw_in_phase = draw_i - adapt_sweeps if record_tune else draw_i
                 seq_str = SequenceState(seq_arr).to_string()
                 norm_map = _norm_map_for_elites(
                     seq_arr,
@@ -413,13 +428,21 @@ def _run_sample_for_set(
         )
 
     # 9) BUILD elites list — filter (representativeness), rank (objective), diversify
-    min_per_tf_norm = sample_cfg.elites.min_per_tf_norm
-    require_all = sample_cfg.elites.require_all_tfs_over_min_norm
+    baseline_seed = int(sample_cfg.seed + set_index - 1)
+    min_per_tf_norm, auto_norm_meta = _resolve_min_per_tf_norm(
+        sample_cfg=sample_cfg,
+        scorer=scorer,
+        seed=baseline_seed,
+        sequence_length=sample_cfg.sequence_length,
+    )
+    require_all = bool(sample_cfg.elites.filter.require_all_tfs)
     pool_result = build_elite_pool(
         optimizer=optimizer,
         evaluator=evaluator,
         scorer=scorer,
         sample_cfg=sample_cfg,
+        min_per_tf_norm=min_per_tf_norm,
+        require_all_tfs=require_all,
         beta_softmin_final=beta_softmin_final,
     )
     raw_elites = pool_result.raw_elites
@@ -444,10 +467,13 @@ def _run_sample_for_set(
         logger.debug("Normalised-min percentiles |  median %.2f   90%% %.2f", p50_min, p90_min)
 
     elite_k = int(sample_cfg.elites.k or 0)
-    dsdna_mode = resolve_dsdna_mode(
-        elites_cfg=sample_cfg.elites,
-        bidirectional=sample_cfg.objective.bidirectional,
-    )
+    dsdna_mode = bool(sample_cfg.objective.bidirectional)
+    pool_size_cfg = sample_cfg.elites.select.pool_size
+    if pool_size_cfg == "auto":
+        pool_size = max(200, min(5000, 200 * max(elite_k, 1)))
+        pool_size = min(pool_size, len(raw_elites)) if raw_elites else pool_size
+    else:
+        pool_size = int(pool_size_cfg)
     mmr_meta_rows: list[dict[str, object]] | None = None
     mmr_summary: dict[str, object] | None = None
     mmr_meta_path: Path | None = None
@@ -456,7 +482,8 @@ def _run_sample_for_set(
     selection_result = select_elites_mmr(
         raw_elites=raw_elites,
         elite_k=elite_k,
-        sample_cfg=sample_cfg,
+        alpha=sample_cfg.elites.select.alpha,
+        pool_size=pool_size,
         scorer=scorer,
         pwms=pwms,
         dsdna_mode=dsdna_mode,
@@ -470,7 +497,7 @@ def _run_sample_for_set(
         logger.warning("Elite filters removed all candidates; relax min_per_tf_norm.")
 
     # serialise elites
-    want_cons = bool(sample_cfg.output.include_consensus_in_elites)
+    want_cons = False
     want_canonical = bool(dsdna_mode)
     elites = build_elite_entries(
         kept_elites,
@@ -499,8 +526,8 @@ def _run_sample_for_set(
             if per_tf is not None:
                 row["per_tf_json"] = json.dumps(per_tf, sort_keys=True)
                 for tf_name, details in per_tf.items():
-                    row[f"score_{tf_name}"] = details.get("scaled_score")
-                    row[f"norm_{tf_name}"] = details.get("normalized_llr")
+                    row[f"score_{tf_name}"] = details.get("best_score_scaled")
+                    row[f"norm_{tf_name}"] = details.get("best_score_norm")
             yield row
 
     elite_schema = _elite_parquet_schema(tfs, include_canonical=want_canonical)
@@ -524,13 +551,14 @@ def _run_sample_for_set(
         "min_per_tf_norm": min_per_tf_norm,
         "require_all_tfs_over_min_norm": require_all,
         "selection_policy": "mmr",
-        "mmr_alpha": sample_cfg.elites.mmr_alpha,
+        "mmr_alpha": sample_cfg.elites.select.alpha,
         "dsdna_canonicalize": want_canonical,
         "total_draws_seen": total_draws_seen,
         "passed_pre_filter": len(raw_elites),
         "kept_after_mmr": kept_after_mmr,
         "objective_combine": combine_resolved,
         "softmin_beta_final_resolved": beta_softmin_final,
+        "pool_size": pool_size,
         "indexing_note": (
             "chain is 0-based; chain_1based is 1-based; draw_idx is absolute sweep; draw_in_phase is phase-relative"
         ),
@@ -540,6 +568,8 @@ def _run_sample_for_set(
         "config_file": str(config_used_path(out_dir).resolve()),
         "regulator_set": {"index": set_index, "tfs": tfs},
     }
+    if auto_norm_meta is not None:
+        meta["min_per_tf_norm_auto"] = auto_norm_meta
     if isinstance(optimizer_stats, dict) and optimizer_stats:
 
         def _float_list(value: object) -> list[float] | None:
@@ -614,6 +644,8 @@ def _run_sample_for_set(
         optimizer_kind=optimizer_kind,
         combine_resolved=combine_resolved,
         beta_softmin_final=beta_softmin_final,
+        min_per_tf_norm=min_per_tf_norm,
+        min_per_tf_norm_auto=auto_norm_meta,
         status_writer=status_writer,
     )
     logger.debug("Wrote run manifest -> %s", manifest_path_out.relative_to(out_dir.parent))

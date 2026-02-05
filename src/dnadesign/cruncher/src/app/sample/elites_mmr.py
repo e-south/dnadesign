@@ -12,17 +12,16 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import logging
-import math
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from dnadesign.cruncher.app.sample.diagnostics import _elite_filter_passes, _EliteCandidate, _norm_map_for_elites
-from dnadesign.cruncher.config.schema_v2 import SampleConfig
+from dnadesign.cruncher.config.schema_v3 import SampleConfig
 from dnadesign.cruncher.core.evaluator import SequenceEvaluator
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.core.scoring import Scorer
-from dnadesign.cruncher.core.selection.mmr import MmrCandidate, select_mmr_elites, tfbs_cores_from_scorer
+from dnadesign.cruncher.core.selection.mmr import MmrCandidate, select_mmr_elites, tfbs_cores_from_hits
 from dnadesign.cruncher.core.sequence import canon_int
 from dnadesign.cruncher.core.state import SequenceState
 
@@ -51,10 +50,10 @@ def build_elite_pool(
     evaluator: SequenceEvaluator,
     scorer: Scorer,
     sample_cfg: SampleConfig,
+    min_per_tf_norm: float | None,
+    require_all_tfs: bool,
     beta_softmin_final: float | None,
 ) -> ElitePoolResult:
-    min_per_tf_norm = sample_cfg.elites.min_per_tf_norm
-    require_all = sample_cfg.elites.require_all_tfs_over_min_norm
     raw_elites: list[_EliteCandidate] = []
     norm_sums: list[float] = []
     min_norms: list[float] = []
@@ -77,8 +76,10 @@ def build_elite_pool(
         if not _elite_filter_passes(
             norm_map=norm_map,
             min_norm=min_norm,
+            sum_norm=sum_norm,
             min_per_tf_norm=min_per_tf_norm,
-            require_all_tfs_over_min_norm=require_all,
+            require_all_tfs_over_min_norm=require_all_tfs,
+            pwm_sum_min=float(sample_cfg.elites.filter.pwm_sum_min),
         ):
             continue
 
@@ -87,6 +88,14 @@ def build_elite_pool(
             beta=beta_softmin_final,
             length=seq_arr.size,
         )
+        per_tf_hits: dict[str, dict[str, object]] = {}
+        for tf_name in scorer.tf_names:
+            hit = scorer.best_hit(seq_arr, tf_name)
+            per_tf_hits[tf_name] = {
+                **hit,
+                "best_score_scaled": float(per_tf_map[tf_name]),
+                "best_score_norm": float(norm_map.get(tf_name, 0.0)),
+            }
         raw_elites.append(
             _EliteCandidate(
                 seq_arr=seq_arr,
@@ -97,6 +106,7 @@ def build_elite_pool(
                 sum_norm=float(sum_norm),
                 per_tf_map=per_tf_map,
                 norm_map=norm_map,
+                per_tf_hits=per_tf_hits,
             )
         )
 
@@ -112,19 +122,19 @@ def select_elites_mmr(
     *,
     raw_elites: list[_EliteCandidate],
     elite_k: int,
-    sample_cfg: SampleConfig,
+    alpha: float,
+    pool_size: int,
     scorer: Scorer,
     pwms: dict[str, PWM],
     dsdna_mode: bool,
 ) -> EliteSelectionResult:
-    mmr_alpha = sample_cfg.elites.mmr_alpha
     kept_elites: list[_EliteCandidate] = []
     kept_after_mmr = 0
     mmr_meta_rows: list[dict[str, object]] | None = None
     mmr_summary: dict[str, object] | None = None
 
     if elite_k > 0 and raw_elites:
-        pool_size = max(200, min(5000, 200 * elite_k))
+        pool_size = max(1, pool_size)
         mmr_candidates = [
             MmrCandidate(
                 seq_arr=cand.seq_arr,
@@ -145,9 +155,9 @@ def select_elites_mmr(
             reverse=True,
         )[:pool_size]
         core_maps = {
-            f"{cand.chain_id}:{cand.draw_idx}": tfbs_cores_from_scorer(
+            f"{cand.chain_id}:{cand.draw_idx}": tfbs_cores_from_hits(
                 cand.seq_arr,
-                scorer=scorer,
+                per_tf_hits=raw_by_id[f"{cand.chain_id}:{cand.draw_idx}"].per_tf_hits,
                 tf_names=scorer.tf_names,
             )
             for cand in mmr_pool
@@ -156,7 +166,7 @@ def select_elites_mmr(
             mmr_pool,
             k=elite_k,
             pool_size=pool_size,
-            alpha=mmr_alpha,
+            alpha=alpha,
             relevance="min_per_tf_norm",
             dsdna=dsdna_mode,
             tf_names=scorer.tf_names,
@@ -169,7 +179,7 @@ def select_elites_mmr(
         mmr_summary = {
             "pool_size": pool_size,
             "k": elite_k,
-            "alpha": mmr_alpha,
+            "alpha": alpha,
             "median_relevance_raw": result.median_relevance_raw,
             "mean_pairwise_distance": result.mean_pairwise_distance,
             "min_pairwise_distance": result.min_pairwise_distance,
@@ -193,7 +203,8 @@ def build_elite_entries(
     meta_source: str,
 ) -> list[dict[str, object]]:
     entries: list[dict[str, object]] = []
-    adapt_sweeps = int(math.ceil(sample_cfg.compute.total_sweeps * sample_cfg.compute.adapt_sweep_frac))
+    adapt_sweeps = int(sample_cfg.budget.tune)
+    record_tune = bool(sample_cfg.output.include_tune_in_sequences)
     for rank, cand in enumerate(candidates, 1):
         seq_arr = cand.seq_arr
         seq_str = SequenceState(seq_arr).to_string()
@@ -201,15 +212,17 @@ def build_elite_entries(
         if want_canonical:
             canonical_seq = SequenceState(canon_int(seq_arr)).to_string()
         per_tf_details: dict[str, dict[str, object]] = {}
-        norm_map = cand.norm_map
-        per_tf_map = cand.per_tf_map
 
         for tf_name in scorer.tf_names:
-            raw_llr, offset, strand = scorer.best_llr(seq_arr, tf_name)
-            width = scorer.pwm_width(tf_name)
-            if strand == "-":
-                offset = len(seq_arr) - width - offset
-            start_pos = offset + 1
+            hit = cand.per_tf_hits.get(tf_name)
+            if not isinstance(hit, dict):
+                raise ValueError(f"Missing best-hit metadata for TF '{tf_name}'.")
+            offset = hit.get("offset")
+            width = hit.get("width")
+            strand = hit.get("strand")
+            if not isinstance(offset, int) or not isinstance(width, int) or not isinstance(strand, str):
+                raise ValueError(f"Invalid best-hit metadata for TF '{tf_name}'.")
+            start_pos = int(offset) + 1
             strand_label = f"{strand}1"
             motif_diag = f"{start_pos}_[{strand_label}]_{width}"
             if want_consensus:
@@ -217,16 +230,15 @@ def build_elite_entries(
             else:
                 consensus = None
             per_tf_details[tf_name] = {
-                "raw_llr": float(raw_llr),
-                "offset": offset,
-                "strand": strand,
-                "width": width,
+                **hit,
                 "motif_diagram": motif_diag,
-                "scaled_score": float(per_tf_map[tf_name]),
-                "normalized_llr": float(norm_map.get(tf_name, 0.0)),
             }
             if want_consensus:
                 per_tf_details[tf_name]["consensus"] = consensus
+
+        draw_in_phase = cand.draw_idx
+        if record_tune and cand.draw_idx >= adapt_sweeps:
+            draw_in_phase = cand.draw_idx - adapt_sweeps
 
         entry = {
             "id": str(uuid.uuid4()),
@@ -239,7 +251,7 @@ def build_elite_entries(
             "chain": cand.chain_id,
             "chain_1based": cand.chain_id + 1,
             "draw_idx": cand.draw_idx,
-            "draw_in_phase": cand.draw_idx - adapt_sweeps if cand.draw_idx >= adapt_sweeps else cand.draw_idx,
+            "draw_in_phase": draw_in_phase,
             "per_tf": per_tf_details,
             "meta_type": "mcmc-elite",
             "meta_source": meta_source,

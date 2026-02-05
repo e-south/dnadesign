@@ -183,6 +183,10 @@ class CatalogConfig(StrictBaseModel):
             raise ValueError("catalog.pseudocounts must be >= 0")
         return float(v)
 
+    @property
+    def catalog_root(self) -> Path:
+        return self.root
+
 
 class DiscoverConfig(StrictBaseModel):
     enabled: bool = False
@@ -591,7 +595,7 @@ class SampleOutputConfig(StrictBaseModel):
 
 class SampleConfig(StrictBaseModel):
     seed: int
-    length: int
+    sequence_length: int
     budget: SampleBudgetConfig
     objective: SampleObjectiveConfig = SampleObjectiveConfig()
     moves: SampleMovesConfig = SampleMovesConfig()
@@ -606,11 +610,11 @@ class SampleConfig(StrictBaseModel):
             raise ValueError("sample.seed must be a non-negative integer")
         return v
 
-    @field_validator("length")
+    @field_validator("sequence_length")
     @classmethod
-    def _check_length(cls, v: int) -> int:
+    def _check_sequence_length(cls, v: int) -> int:
         if not isinstance(v, int) or v < 1:
-            raise ValueError("sample.length must be >= 1")
+            raise ValueError("sample.sequence_length must be >= 1")
         return v
 
 

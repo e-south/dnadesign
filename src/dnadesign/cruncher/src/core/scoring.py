@@ -17,6 +17,8 @@ import numpy as np
 
 from dnadesign.cruncher.core.pvalue import logodds_to_p_lookup
 from dnadesign.cruncher.core.pwm import PWM
+from dnadesign.cruncher.core.sequence import revcomp_int
+from dnadesign.cruncher.core.state import SequenceState
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +31,9 @@ def _best_hit_from_llrs(
     width: int,
     prefer_strand: str = "+",
     eps: float = 1.0e-12,
-) -> Tuple[float, int, str]:
+) -> Tuple[float, int, str, str]:
     if llrs_fwd.size == 0:
-        return float("-inf"), 0, prefer_strand
+        return float("-inf"), 0, prefer_strand, "empty"
 
     fwd_max = float(np.max(llrs_fwd))
     fwd_offsets = np.flatnonzero(np.abs(llrs_fwd - fwd_max) <= eps)
@@ -43,7 +45,7 @@ def _best_hit_from_llrs(
     best_start = fwd_start
 
     if llrs_rev is None:
-        return best_score, best_offset, best_strand
+        return best_score, best_offset, best_strand, "max_forward"
 
     rev_max = float(np.max(llrs_rev))
     rev_offsets = np.flatnonzero(np.abs(llrs_rev - rev_max) <= eps)
@@ -57,13 +59,17 @@ def _best_hit_from_llrs(
         rev_start = int(seq_len - width - rev_offset)
 
     if rev_max > best_score + eps:
-        return rev_max, rev_offset, "-"
+        return rev_max, rev_offset, "-", "max_reverse"
     if abs(rev_max - best_score) <= eps:
         if rev_start < best_start:
-            return rev_max, rev_offset, "-"
+            return rev_max, rev_offset, "-", "tie_leftmost"
         if rev_start == best_start and prefer_strand == "-":
-            return rev_max, rev_offset, "-"
-    return best_score, best_offset, best_strand
+            return rev_max, rev_offset, "-", "tie_prefer_strand"
+    if abs(rev_max - best_score) <= eps and rev_start == best_start and prefer_strand == "+":
+        return best_score, best_offset, best_strand, "tie_prefer_strand"
+    if abs(rev_max - best_score) <= eps and rev_start > best_start:
+        return best_score, best_offset, best_strand, "tie_leftmost"
+    return best_score, best_offset, best_strand, "max_forward"
 
 
 @dataclass(slots=True)
@@ -231,7 +237,7 @@ class Scorer:
         info: _PWMInfo,
         *,
         rev: np.ndarray | None = None,
-    ) -> Tuple[float, int, str]:
+    ) -> Tuple[float, int, str, str]:
         """
         Scan a numeric‐encoded sequence to find the best raw LLR (and its offset & strand).
         """
@@ -251,7 +257,7 @@ class Scorer:
                 rev = (3 - seq)[::-1]
             llrs_rev = _scan(rev)
 
-        best_llr, best_offset, best_strand = _best_hit_from_llrs(
+        best_llr, best_offset, best_strand, tiebreak = _best_hit_from_llrs(
             llrs_fwd,
             llrs_rev,
             seq_len=L,
@@ -265,7 +271,7 @@ class Scorer:
             best_offset,
             best_strand,
         )
-        return best_llr, best_offset, best_strand
+        return best_llr, best_offset, best_strand, tiebreak
 
     def _info(self, tf: str) -> _PWMInfo:
         info = self._cache.get(tf)
@@ -295,7 +301,35 @@ class Scorer:
 
     def best_llr(self, seq: np.ndarray, tf: str) -> Tuple[float, int, str]:
         info = self._info(tf)
-        return self._best_llr_and_location(seq, info)
+        raw_llr, offset, strand, _ = self._best_llr_and_location(seq, info)
+        return raw_llr, offset, strand
+
+    def best_hit(self, seq: np.ndarray, tf: str) -> Dict[str, object]:
+        info = self._info(tf)
+        rev = (3 - seq)[::-1] if self.bidirectional else None
+        raw_llr, offset, strand, tiebreak = self._best_llr_and_location(seq, info, rev=rev)
+        width = int(info.width)
+        if strand == "-":
+            start = int(seq.size - width - offset)
+        else:
+            start = int(offset)
+        window = np.asarray(seq, dtype=np.int8)[start : start + width]
+        if window.size != width:
+            raise ValueError(f"Best-hit window out of bounds for TF '{tf}'.")
+        if strand == "-":
+            core = revcomp_int(window)
+        else:
+            core = window
+        return {
+            "best_score_raw": float(raw_llr),
+            "offset": int(start),
+            "best_start": int(start),
+            "strand": str(strand),
+            "width": int(width),
+            "best_window_seq": SequenceState(window).to_string(),
+            "best_core_seq": SequenceState(core).to_string(),
+            "best_hit_tiebreak": str(tiebreak),
+        }
 
     def normalized_llr_map(self, seq: np.ndarray) -> Dict[str, float]:
         out: Dict[str, float] = {}
@@ -328,7 +362,7 @@ class Scorer:
         logger.debug("compute_all_per_pwm: seq_length=%d, scale=%s", seq_length, self.scale)
         rev = (3 - seq)[::-1] if self.bidirectional else None
         for tf, info in self._cache.items():
-            raw_llr, offset, strand = self._best_llr_and_location(seq, info, rev=rev)
+            raw_llr, offset, strand, _ = self._best_llr_and_location(seq, info, rev=rev)
 
             if self.scale == "llr":
                 out[tf] = float(raw_llr)
