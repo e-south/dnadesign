@@ -65,11 +65,8 @@ cruncher catalog logos --set 1
 # Optional: validate locked motifs
 cruncher parse
 
-# Optimization (auto-optimize is enabled by default)
+# Optimization (fixed-length PT)
 cruncher sample
-
-# Auto-opt can take minutes; for a quick demo run:
-# cruncher sample --no-auto-opt  # requires optimizer.name=pt (auto is not allowed)
 
 # Diagnostics + plots (defaults to latest run)
 cruncher analyze
@@ -97,7 +94,7 @@ Notes:
 2. [Two‑TF demo (end‑to‑end)](docs/demos/demo_basics_two_tf.md)
 3. [Campaign demo (multi‑TF)](docs/demos/demo_campaigns_multi_tf.md)
 4. [MEME Suite setup](docs/guides/meme_suite.md)
-5. [Sampling + analysis (auto‑optimize)](docs/guides/sampling_and_analysis.md)
+5. [Sampling + analysis](docs/guides/sampling_and_analysis.md)
 6. [Configure your project](docs/reference/config.md)
 7. [Ingesting and caching data](docs/guides/ingestion.md)
 8. [CLI reference](docs/reference/cli.md)

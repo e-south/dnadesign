@@ -132,7 +132,6 @@ Each configured regulator set produces **separate** runs, grouped by stage. Run 
 
 - `outputs/parse/lexA-cpxR_20260101_143210_f3a9d2/`
 - `outputs/sample/lexA-cpxR_20260101_143512_a91c0e/`
-- `outputs/auto_opt/lexA-cpxR_20260101_143530_91acb1/` (auto-opt pilots)
 - `outputs/logos/catalog/lexA-cpxR_20260101_143210_f3a9d2/` *(prefix `setN_` only when multiple regulator sets are configured)*
 
 ---

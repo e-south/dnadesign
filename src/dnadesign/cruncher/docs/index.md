@@ -23,7 +23,7 @@ Each demo maps to a workspace: `demo_basics_two_tf`, `demo_campaigns_multi_tf`.
 
 - [Ingesting and caching data](guides/ingestion.md)
 - [MEME Suite setup](guides/meme_suite.md)
-- [Sampling + analysis (auto‑optimize)](guides/sampling_and_analysis.md)
+- [Sampling + analysis](guides/sampling_and_analysis.md)
 
 ## References (how things work)
 

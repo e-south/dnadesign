@@ -138,12 +138,19 @@ cruncher:
     rng:
       seed: 42
       deterministic: true
-    budget:
-      tune: 1000
-      draws: 2000
+    sequence_length: 30
+    compute:
+      total_sweeps: 8000
+      adapt_sweep_frac: 0.34
+    early_stop:
+      enabled: true
+      patience: 500
+      min_delta: 0.01
+      require_min_unique: true
+      min_unique: 10
+      success_min_per_tf_norm: 0.30
     init:
       kind: random
-      length: 30
       pad_with: background
     objective:
       bidirectional: true
@@ -157,8 +164,9 @@ cruncher:
         beta: [0.5, 10.0]
     elites:
       k: 5
-      filters:
-        pwm_sum_min: 0.0
+      min_per_tf_norm: 0.30
+      require_all_tfs_over_min_norm: true
+      mmr_alpha: 0.85
     moves:
       profile: balanced
       overrides:
@@ -170,18 +178,6 @@ cruncher:
           S: 0.35
           B: 0.30
           M: 0.35
-    optimizer:
-      name: auto
-    optimizers:
-      pt:
-        beta_ladder:
-          kind: geometric
-          betas: [0.2, 1.0, 5.0, 25.0]
-        swap_prob: 0.10
-    auto_opt:
-      enabled: true
-      budget_levels: [2000, 3000]
-      replicates: 1
     output:
       save_sequences: true
       include_consensus_in_elites: false

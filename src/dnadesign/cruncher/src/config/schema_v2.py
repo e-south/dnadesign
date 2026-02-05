@@ -337,7 +337,7 @@ class SampleRngConfig(StrictBaseModel):
     seed: int = Field(42, description="Random seed for reproducible sampling.")
     deterministic: bool = Field(
         True,
-        description="If true, auto-opt pilots derive deterministic seeds from config + locks.",
+        description="If true, sampling RNG streams derive deterministic seeds from config + locks.",
     )
 
     @field_validator("seed")

@@ -132,8 +132,9 @@ If a TF cannot be uniquely resolved, **cruncher** errors immediately. Analyze op
 
 ### MCMC optimization spec
 
-- Deterministic RNG via `sample.rng.seed` (and `sample.rng.deterministic=true` for stable pilot seeding).
+- Deterministic RNG via `sample.rng.seed` (and `sample.rng.deterministic=true` for stable run seeding).
 - Burn-in storage is optional via `sample.output.trace.include_tune` (default: false, affects sequences.parquet only).
+- Fixed-length sampling: `sample.sequence_length` must be >= the widest PWM length.
 - Optimizer registry supports `pt` (parallel tempering).
 - Each optimizer reports:
   - move tallies
@@ -163,8 +164,6 @@ Each run directory contains:
 - `analysis/analysis_used.yaml` — analysis settings used
 - `analysis/plot_manifest.json` — plot registry and generated outputs
 - `analysis/table_manifest.json` — table registry and generated outputs
-- `analysis/auto_opt_pilots.parquet` — pilot scorecard (when auto-opt runs)
-- `analysis/plot__auto_opt_tradeoffs.<plot_format>` — balance vs best-score tradeoffs (when auto-opt runs)
 - `analysis/_archive/<analysis_id>/` — optional archived analyses (when enabled)
 - `live/metrics.jsonl` — live sampling progress (when enabled)
 - `analysis/report.json` + `analysis/report.md` — summary (from `cruncher analyze`)

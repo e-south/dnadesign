@@ -271,7 +271,7 @@ Notes:
 
 ### sample
 
-Sampling and optimizer settings.
+Sampling settings.
 
 ```yaml
 sample:
@@ -279,9 +279,10 @@ sample:
   rng:
     seed: 42
     deterministic: true
-  budget:
-    tune: 200
-    draws: 500
+  sequence_length: 30
+  compute:
+    total_sweeps: 3000
+    adapt_sweep_frac: 0.34
   early_stop:
     enabled: true
     patience: 500
@@ -291,7 +292,6 @@ sample:
     success_min_per_tf_norm: 0.80
   init:
     kind: random
-    length: 30
     pad_with: background
   objective:
     bidirectional: true
@@ -308,15 +308,9 @@ sample:
     length_penalty_lambda: 0.0
   elites:
     k: 5
-    selection:
-      policy: mmr
-      pool_size: 1000
-      alpha: 0.85
-      relevance: min_per_tf_norm
-    filters:
-      pwm_sum_min: 0.0
-      min_per_tf_norm: null
-      require_all_tfs_over_min_norm: true
+    min_per_tf_norm: null
+    require_all_tfs_over_min_norm: true
+    mmr_alpha: 0.85
   moves:
     profile: balanced
     overrides:
@@ -331,35 +325,6 @@ sample:
         L: 0.03
         W: 0.01
         I: 0.01
-  optimizer:
-    name: auto          # auto | pt
-  optimizers:
-    pt:
-      beta_ladder:
-        kind: geometric
-        betas: [0.05, 0.1, 0.2, 0.4]
-      swap_prob: 0.10
-      ladder_adapt:
-        enabled: false
-        target_swap: 0.25
-        window: 50
-        k: 0.50
-        min_scale: 0.25
-        max_scale: 4.0
-        stop_after_tune: true
-  auto_opt:
-    enabled: true
-    budget_levels: [2000, 3000]
-    replicates: 1
-    keep_pilots: ok
-    cooling_boosts: [1.0, 2.0]
-    pt_swap_probs: []
-    move_profiles: [balanced, aggressive]
-    policy:
-      allow_warn: false
-      scorecard:
-        alpha: 0.85
-      diversity_weight: 0.25
   output:
     save_sequences: true
     include_consensus_in_elites: false
@@ -376,8 +341,9 @@ Notes:
 - `output.save_sequences=true` is required for `analyze` and `report`.
 - `output.trace.save=true` is required for trace-based plots and `report`.
 - `output.live_metrics=true` writes `live/metrics.jsonl` with progress snapshots (used by `cruncher runs watch`).
-- `output.trace.include_tune=true` includes burn-in samples in `sequences.parquet` (trace.nc always contains draws only).
+- `output.trace.include_tune=true` includes adaptation samples in `sequences.parquet` (trace.nc always contains draws only).
 - `sequences.parquet` includes `min_per_tf_norm` (alias of `min_norm`) for the per‑TF normalized minimum.
+- `sample.rng.deterministic=true` derives a stable RNG stream from config + locks.
 - `objective.bidirectional=true` scores both strands (reverse complement) when scanning PWMs.
 - When `objective.bidirectional=true`, dsDNA equivalence is always on for uniqueness and MMR selection (reverse complements are treated as identical).
 - Best‑hit tie‑breaking is deterministic: highest score wins, then smallest start index, then `+` strand.
@@ -389,57 +355,27 @@ Notes:
   `p_seq = 1 − (1 − p_win)^n_windows` before reporting `−log10(p_seq)`.
   When `objective.bidirectional=true`, `n_windows` counts both strands
   (effective tests = `2 * (L − w + 1)`).
-- `sample.init.length` is fixed for sampling and must be >= the widest PWM length.
-- `elites.k` controls how many sequences are retained after selection (0 = keep all).
-- `elites.selection.policy=mmr` is the only supported policy and uses TFBS‑core MMR distance.
+- `sample.sequence_length` is fixed for sampling and must be >= the widest PWM length.
+- Cruncher runs are fixed-length only; there is no trim/polish or length ladder in the schema.
+- `sample.compute.total_sweeps` is the total sweep budget across adaptation + draws.
+- `sample.compute.adapt_sweep_frac` controls the adaptation share; draws are the remainder.
+- `sample.compute.adapt_sweep_frac` must leave at least one draw (validation fails otherwise).
+- `elites.k` controls how many sequences are retained after selection (must be >= 1).
 - TFBS‑core MMR behavior: for each sequence we extract the best‑hit window for each TF (oriented to the PWM); when comparing two sequences we compute same‑TF core distances (e.g., LexA vs LexA, CpxR vs CpxR) and then average across TFs. We never compare different TFs within the same sequence.
 - “Tolerant” weights mean low‑information PWM positions are weighted more when measuring diversity (`weight = 1 - info_norm`), preserving consensus‑critical positions while encouraging diversity at flexible bases.
-- `elites.selection.pool_size` defines the candidate pool size for MMR (warns if < k).
-- `elites.selection.alpha` controls relevance vs diversity (1.0 = relevance-only).
+- `elites.mmr_alpha` controls relevance vs diversity (1.0 = relevance-only).
 - `objective.scoring.pwm_pseudocounts` smooths matrix-derived PWMs (set to 0 for raw matrices).
 - `objective.scoring.log_odds_clip` caps log-odds magnitudes (use to avoid extreme cliffs).
-- `objective.length_penalty_lambda` subtracts `lambda * (L - init.length)` from combined scores (mitigates length bias).
-- `elites.filters.pwm_sum_min` filters elites by summed normalized scores (0 keeps all; optional secondary gate).
-- `elites.filters.min_per_tf_norm` filters elites by per-TF normalized minimum. With `normalized-llr`,
+- `objective.length_penalty_lambda` subtracts `lambda * (L - sequence_length)` from combined scores (mitigates length bias).
+- `elites.min_per_tf_norm` filters elites by per-TF normalized minimum. With `normalized-llr`,
   0.0–1.0 corresponds to background‑like → consensus‑like; values around 0.05–0.2 are a common starting band.
-- `elites.filters.require_all_tfs_over_min_norm` controls whether the per‑TF threshold must be met by every TF.
+- `elites.require_all_tfs_over_min_norm` controls whether the per‑TF threshold must be met by every TF.
 - `output.include_consensus_in_elites` adds per-TF PWM consensus strings to elites metadata.
 - `objective.softmin` controls the min-approximation hardness separately from MCMC temperature.
-- `optimizers.pt.beta_ladder.kind=geometric` uses geometric spacing in beta (via `beta_min`/`beta_max` or explicit `betas`).
-- `optimizers.pt.beta_ladder` defines the temperature ladder; use ladder size for chain count.
-- `auto_opt` runs short PT pilots, evaluates the MMR scorecard (`pilot_score`), logs the decision, and runs a final sample using PT.
-- Auto-opt pilots always write `trace.nc` + `sequences.parquet` (required for diagnostics) and are stored under `outputs/auto_opt/`.
-- The selected pilot is recorded in `outputs/auto_opt/best_<run_group>.json` (run_group is the TF slug; it uses a `setN_` prefix only when multiple regulator sets are configured) and marked with a leading `*` in `cruncher runs list`.
-- Auto-opt is enabled by default when `optimizer.name=auto`; to disable, set `sample.optimizer.name` to `pt` and set `auto_opt.enabled: false`.
-- `auto_opt.cooling_boosts`, `auto_opt.move_profiles`, and `auto_opt.pt_swap_probs` expand the pilot search space (cooling boosts scale the PT ladder).
-- Auto‑opt is **thresholdless**: it escalates through `auto_opt.budget_levels` (and configured `auto_opt.replicates`) until a confidence‑separated winner emerges. With `auto_opt.policy.allow_warn: true`, it will pick the best available candidate at the maximum budget among those that pass diagnostics (recording low‑confidence warnings). With `allow_warn: false`, it fails fast if no confident winner emerges or if only warning‑level candidates remain, and suggests increasing budgets/replicates.
 - `early_stop` halts sampling when the best score fails to improve by `min_delta` for `patience` sweeps. If `require_min_unique=true`, early-stop can only trigger after `min_unique` canonical successes above `success_min_per_tf_norm`. For `score_scale=normalized-llr` (0-1), `min_delta` must be <= 0.1; use ~0.01 to detect plateaus.
-- `budget` is defined by `tune` and `draws`; PT chain count is controlled by `optimizers.pt.beta_ladder`.
-- Auto-opt selection details are stored in each pilot's `meta/run_manifest.json`; `cruncher analyze` writes `analysis/auto_opt_pilots.parquet` and `analysis/plot__auto_opt_tradeoffs.<plot_format>`.
-- Auto-opt candidate quality uses trace draw counts and ESS ratios (`ess_ratio = ESS / draws`) to grade pilots. If a pilot stops early (draws ≤ ~50% of expected), diagnostics are treated as directional and the candidate is marked `warn`. These metrics are recorded in `auto_opt_pilots.<table_format>` as `ess_ratio`, `trace_draws`, `trace_draws_expected`, `trace_chains`, and `trace_chains_expected`.
-- `sample.rng.deterministic=true` isolates a stable RNG stream per pilot config.
-- `elites.k` controls how many sequences are retained after selection; auto-opt uses this value for the MMR scorecard size and requires `elites.k >= 1` when `optimizer.name=auto`.
-- `auto_opt.policy.diversity_weight` weights the diversity term in `pilot_score`.
-- `auto_opt.keep_pilots` controls pilot retention after selection: `all` keeps everything, `ok` keeps candidates that did not fail catastrophic checks (plus the selected pilot), and `best` keeps only the selected pilot.
 - `moves.overrides.move_schedule` interpolates between `moves.overrides.move_probs` (start) and `move_schedule.end` (end).
 - `moves.overrides.target_worst_tf_prob` biases proposals toward the current worst TF window (0 disables).
 - `moves.overrides.insertion_consensus_prob` controls whether insertion moves use consensus vs PWM sampling.
-PT starting point (optional; uses a beta ladder):
-```yaml
-sample:
-  optimizer:
-    name: pt
-  optimizers:
-    pt:
-      beta_ladder:
-        kind: geometric
-        betas: [0.2, 0.4, 0.7, 1.0]
-      swap_prob: 0.20
-```
-Tuning hints (use `analysis/diagnostics.json` and `analysis/report.json`):
-- Low ESS / high R-hat → increase `budget.draws`/`budget.tune` first; PT can help but is not always better.
-- PT swap acceptance < ~0.05 → widen the beta ladder or increase `swap_prob`.
-- Very high/low block or multi-site acceptance → adjust move ranges or cooling strength.
 
 ### analysis
 
@@ -481,7 +417,7 @@ Notes:
 - `extra_plots=true` enables non-Tier‑0 plots (scatter, pairwise, score histograms, overlap strand combos).
 - If any non‑Tier‑0 plot keys are explicitly set `true` under `analysis.plots`, cruncher
   auto‑enables `extra_plots` and records the adjustment in `analysis_used.yaml`.
-- `extra_tables=true` enables optional tables like auto-opt pilots and per-PWM scatter tables.
+- `extra_tables=true` enables optional tables like per-PWM scatter tables and MMR summary tables.
 - `mcmc_diagnostics=true` enables trace-based diagnostics and move/pt swap plots/tables.
 - If any MCMC diagnostic plots are explicitly set `true`, cruncher auto‑enables
   `mcmc_diagnostics` and records the adjustment in `analysis_used.yaml`.
@@ -499,7 +435,7 @@ Notes:
 - `table_format` defaults to `parquet` and controls analysis table extensions.
 - `scatter_scale` supports `llr`, `z`, `logp`, `normalized-llr`, or `consensus-neglop-sum`.
 - `scatter_style` toggles scatter styling (`edges` or `thresholds`).
-- `scatter_style=thresholds` requires `scatter_scale=llr` and uses `sample.elites.filters.pwm_sum_min` for the x+y cutoff.
+- `scatter_style=thresholds` requires `scatter_scale=llr` and uses `2 * sample.elites.min_per_tf_norm` for the x+y cutoff.
 - `plot_format` selects the single output format for all plots (`png`, `pdf`, or `svg`).
 - `plot_dpi` and `png_compress_level` control plot output size.
 - Threshold plots normalize per-TF LLRs by each PWM's consensus LLR (axes are 0-1).

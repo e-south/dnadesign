@@ -18,7 +18,7 @@
 
 - Reduce evaluation cost for single-base moves (incremental rescoring rather than full rescans).
 - Consolidate PT diagnostics into a single summary block with cold-chain-only ESS conventions.
-- Add a compact per-run “optimizer health” summary that mirrors the CLI warnings used by auto-opt.
+- Add a compact per-run “optimizer health” summary that mirrors the CLI diagnostics used in reports.
 
 ## Performance notes
 

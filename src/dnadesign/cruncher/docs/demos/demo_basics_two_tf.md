@@ -39,7 +39,6 @@ This demo is intentionally linear: cache inputs, choose/lock PWMs, validate, sam
 > cruncher lock   -c "$CONFIG"
 > cruncher parse  -c "$CONFIG"
 > cruncher sample -c "$CONFIG"
-> # For a quick run: cruncher sample --no-auto-opt -c "$CONFIG" (requires optimizer.name=pt)
 > cruncher analyze -c "$CONFIG"
 > cruncher analyze --summary -c "$CONFIG"
 > ```
@@ -348,26 +347,21 @@ Re-running parse with the same config + lock fingerprint reuses existing outputs
 
 ### Sample (MCMC optimization)
 
-Each candidate dsDNA sequence is scored by scanning both strands for each PWM, taking the best match per TF, then optimizing the min/soft‑min across TFs (raise the weakest TF). Sampling length is fixed by `sample.init.length` and must be at least the widest PWM; shorter lengths force overlap and typically reduce per‑TF scores. The goal is not a single winner: **cruncher** returns a diverse elite set.
+Each candidate dsDNA sequence is scored by scanning both strands for each PWM, taking the best match per TF, then optimizing the min/soft‑min across TFs (raise the weakest TF). Sampling length is fixed by `sample.sequence_length` and must be at least the widest PWM; shorter lengths force overlap and typically reduce per‑TF scores. The goal is not a single winner: **cruncher** returns a diverse elite set.
 
 Current MMR behavior (TFBS‑core mode) is:
 - For each sequence in the candidate pool, we extract the best‑hit window for each TF (e.g., LexA core, CpxR core), orient each core to its PWM.
 - When comparing two sequences, we compute LexA‑core vs LexA‑core and CpxR‑core vs CpxR‑core Hamming distances (weighted per PWM position), then average across TFs.
 - We never compare LexA vs CpxR within the same sequence.
 
-**Auto‑opt** runs short parallel tempering (PT) pilots and scores each pilot with the MMR scorecard to pick a robust ladder/budget so the final run is more performant. Auto‑opt uses `elites.k` as the scorecard size, so set `elites.k` to the number of final sequences you want. If pilots produce fewer than `elites.k` elites, increase pilot budgets or relax the `min_per_tf_norm` gate. The demo config sweeps multiple PT swap probabilities and ladder sizes so you can compare mixing behavior across a small grid. The chosen pilot is recorded in `outputs/auto_opt/best_<run_group>.json`, and the final effective config is written to `outputs/sample/<run_name>/meta/config_used.yaml`. For diagnostics and tuning guidance, see the [sampling + analysis guide](../guides/sampling_and_analysis.md).
+“Tolerant” weights emphasize low‑information PWM positions to preserve consensus‑critical bases while encouraging diversity. When `objective.bidirectional=true`, MMR deduplicates by canonical sequence so reverse complements (including palindromes) count as the same identity.
 
-This demo config sets `auto_opt.policy.allow_warn: true` so auto-opt will pick a winner by the end of the configured budget levels among candidates that pass diagnostics, even if confidence is low (warnings are recorded). Set `allow_warn: false` to require a confidence-separated winner; if none emerges at the maximum configured budgets/replicates (or only warning-level candidates remain), auto-opt fails fast with guidance to increase `auto_opt.budget_levels` and/or `auto_opt.replicates`.
-
-Early-stop is enabled in this demo (`patience: 500`, `min_delta: 0.01`) to cut off draws once scores stall. After `cruncher analyze`, inspect `analysis/report.md` or `analysis/objective_components.json` for the `learning` block, which records the best-score draw and a per-chain early-stop simulation. The demo also enables `analysis.extra_tables=true` so the auto-opt pilot scorecard is written to `analysis/auto_opt_pilots.parquet`.
-Use `cruncher analyze --summary` to print a one-line auto-opt confidence summary alongside the main metrics.
+This demo uses `compute.total_sweeps=6000` with `compute.adapt_sweep_frac=0.34` so adaptation ends after the first ~2040 sweeps and the remainder are draws.
+Early-stop is enabled in this demo (`patience: 500`, `min_delta: 0.01`) to cut off draws once scores stall. After `cruncher analyze`, inspect `analysis/report.md` or `analysis/objective_components.json` for the `learning` block, which records the best-score sweep and a per-chain early-stop simulation.
 
 ```bash
-# Run sampling with auto-opt
-cruncher sample -c "$CONFIG"  # run sampling with auto-opt pilots
-
-# Run sampling without pilots
-cruncher sample --no-auto-opt -c "$CONFIG"  # skip pilots (requires optimizer.name=pt)
+# Run sampling
+cruncher sample -c "$CONFIG"
 
 # Run sampling with verbose logs
 cruncher sample --verbose -c "$CONFIG"  # stream periodic status logs
@@ -390,12 +384,9 @@ Example output (runs list, abridged):
 ┃ Name                     ┃ Stage    ┃ Status    ┃ Created    ┃ Motifs ┃ Regulator set  ┃ PWM source ┃
 ┡━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━┩
 │ lexA-cpxR_20260114_155026_a5622e   │ sample   │ completed │ 2026-01-14 │ 2      │ lexA,cpxR       │ matrix     │
-│ *lexA-cpxR_20260114_155007_9a3c1f  │ auto_opt │ completed │ 2026-01-14 │ 2      │ lexA,cpxR       │ matrix     │
 │ lexA-cpxR_20260114_144521_29fb6f   │ parse    │ completed │ 2026-01-14 │ 2      │ lexA,cpxR       │ matrix     │
 └──────────────────────────┴──────────┴───────────┴────────────┴────────┴────────────────┴────────────┘
 ```
-
-Auto‑opt pilot runs also appear here under the `auto_opt` stage. If a run was interrupted and still shows `running`, mark it stale:
 
 ```bash
 # Mark stale runs as aborted
@@ -426,7 +417,7 @@ cruncher runs show 20260114_131314_c2b4ce -c "$CONFIG"  # list artifacts for a r
 Key artifacts include `meta/config_used.yaml`, `artifacts/sequences.parquet`,
 `artifacts/trace.nc` (if enabled), and `artifacts/elites.*`.
 
-Runtime scales with `budget.draws` and `budget.tune` in the config; adjust them to match your runtime/quality budget.
+Runtime scales with `compute.total_sweeps` and the `adapt_sweep_frac` split; adjust them to match your runtime/quality budget.
 
 ---
 
@@ -436,7 +427,7 @@ Use analysis to answer three questions:
 
 1. **Did we raise the weakest TF?** (look at per‑TF scores and the min/soft‑min objective distribution)
 2. **Did we keep diversity?** (unique sequences *up to reverse‑complement*, avoid a single collapsed cluster)
-3. **Did the sampler mix?** (trace/tempering diagnostics; poor mixing usually means you should rerun with auto‑opt or increase budgets)
+3. **Did the sampler mix?** (trace/tempering diagnostics; poor mixing usually means you should increase sweeps or adjust the move profile)
 
 Motif overlap/co‑localization is allowed; use the overlap/structure plots to see *how* the PWMs are being jointly satisfied.
 

@@ -324,7 +324,6 @@ Network:
 Example:
 
 * `cruncher sample <config>`
-* `cruncher sample --no-auto-opt <config>`
 * `cruncher sample --verbose <config>`
 * `cruncher sample --debug <config>`
 
@@ -336,11 +335,8 @@ Notes:
 
 * `sample.output.save_sequences: true` is required for later analysis.
 * `sample.output.trace.save: true` enables trace-based diagnostics.
-* Auto-opt is enabled by default: it runs short PT pilots, evaluates the MMR scorecard (`pilot_score` from MMR elites using `elites.k`), records diagnostics (warnings suppressed for very short pilots), then runs the best candidate. Selection is thresholdless and confidence-based; `auto_opt.policy.allow_warn: true` will pick a winner at the max budget among candidates that pass diagnostics (logging low-confidence warnings), and it still fails if all candidates fail quality checks.
-* `--no-auto-opt` is only valid when `sample.optimizer.name` is explicitly set to `pt` and `auto_opt.enabled=false` in the config.
-* Auto-opt can take minutes; for a quick smoke test set `sample.optimizer.name=pt` and disable `auto_opt.enabled`.
+* Sampling uses the internal parallel tempering kernel; there is no optimizer selection in the config.
 * `--verbose` enables periodic progress logging; `--debug` enables very verbose debug logs.
-* Auto-opt selection details are recorded in each pilot's `meta/run_manifest.json`; `cruncher analyze` writes `analysis/auto_opt_pilots.parquet` for the latest run. The selected pilot is also recorded in `outputs/auto_opt/best_<run_group>.json` (run_group is the TF slug; it uses a `setN_` prefix only when multiple regulator sets are configured) and marked with a leading `*` in `cruncher runs list`.
 
 ---
 
@@ -387,7 +383,7 @@ Note:
 
 * Analyze is idempotent for identical inputs + analysis config; if the current summary signature matches,
   it reports that analysis is already up to date and skips re-running plots/tables.
-* Use `cruncher analyze --summary` to print the highlights from `analysis/report.json`, including the auto-opt confidence line when auto-opt was used.
+* Use `cruncher analyze --summary` to print the highlights from `analysis/report.json`.
 
 ---
 
@@ -725,7 +721,7 @@ Network:
 
 * no (run artifacts only)
 
-* `runs list <config>` — list run folders (optionally filter by stage). Auto-opt pilots marked with a leading `*` indicate the selected candidate.
+* `runs list <config>` — list run folders (optionally filter by stage).
 * `runs show <config> <run>` — show manifest + artifacts (run name or run dir)
 * `runs latest <config> --set-index 1` — print most recent run for a regulator set
 * `runs best <config> --set-index 1` — print best run by `best_score` for a regulator set
@@ -782,6 +778,10 @@ Network:
 Example:
 
 * `cruncher optimizers list`
+
+Note:
+
+* Cruncher uses parallel tempering internally; this list is informational for kernel development.
 
 ---
 
