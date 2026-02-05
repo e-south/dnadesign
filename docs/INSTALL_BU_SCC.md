@@ -9,6 +9,10 @@ What you get:
 - `uv sync --locked` → CPU-safe base environment (macOS/Linux).
 - `uv sync --locked --extra infer-evo2` → full inference stack including Evo2.
 
+Notifications:
+
+- See `docs/notify.md` for webhook notification patterns that work on SCC and other clusters.
+
 #### 0. Get onto the right kind of node
 
 Evo2 FP8 support requires **Compute Capability 8.9+** (Ada/Hopper/Blackwell). On SCC, request a GPU node accordingly. SCC Interactive Session Resource Request Example:

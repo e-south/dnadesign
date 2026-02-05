@@ -51,6 +51,7 @@ dependencies = [
 usr        = "dnadesign.usr.src.cli:main"
 opal       = "dnadesign.opal.src.cli:main"
 dense      = "dnadesign.densegen.src.cli:app"
+notify     = "dnadesign.notify.cli:app"
 infer      = "dnadesign.infer.cli:app"
 cluster    = "dnadesign.cluster.src.cli.app:main"
 permuter   = "dnadesign.permuter.src.cli.app:main"
