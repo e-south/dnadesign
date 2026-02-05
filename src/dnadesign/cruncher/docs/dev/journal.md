@@ -67,3 +67,7 @@
 - Persisted effective PT ladder details in elites metadata and added tests for p-seq math, tie-breaking, atomic writes, and PT stats.
 - Added Contents TOCs across docs and aligned demo/reference text with current fixed-length PT behavior.
 - Ran cruncher tests and the two-TF demo flow (fetch → lock → parse → sample → analyze); removed an ArviZ warning by increasing draws in the regulator set test and clarified dashboard-only plot outputs in the sampling guide.
+- Removed auto-opt scorecard `k` as a config knob; auto-opt now derives the scorecard size from `elites.k` and fails fast if `elites.k < 1` when optimizer is auto.
+- Raised default auto-opt pilot budgets to 2000/3000 and aligned the multi-TF demo workspace to match.
+- Added auto-opt confidence highlights to analysis reports and CLI summaries so pilots are easier to interpret at a glance.
+- Updated sampling/CLI/demo docs to state `elites.k` drives the scorecard size and to guide pilots when elites fall short.

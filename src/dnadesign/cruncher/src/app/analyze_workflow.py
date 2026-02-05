@@ -216,6 +216,7 @@ def run_analyze(
         if run_name != run_info.name:
             logger.debug("Run path override: %s", run_name)
         manifest = load_manifest(sample_dir)
+        auto_opt_payload = manifest.get("auto_opt") if isinstance(manifest, dict) else None
         if manifest.get("stage") != "sample":
             raise ValueError(f"Run '{run_name}' is not a sample run (stage={manifest.get('stage')})")
         lock_path_raw = manifest.get("lockfile_path")
@@ -307,6 +308,7 @@ def run_analyze(
                     analysis_root=analysis_root,
                     summary_payload=existing_summary,
                     analysis_used_payload=analysis_used_payload,
+                    auto_opt_payload=auto_opt_payload,
                 )
                 summary_file = summary_path(analysis_root)
                 if summary_file.exists():
@@ -1149,6 +1151,7 @@ def run_analyze(
             objective_components=objective_components,
             overlap_summary=overlap_summary,
             analysis_used_payload=analysis_used_payload,
+            auto_opt_payload=auto_opt_payload,
             refresh=True,
         )
         summary_payload["report_json"] = str(report_json.relative_to(sample_dir))

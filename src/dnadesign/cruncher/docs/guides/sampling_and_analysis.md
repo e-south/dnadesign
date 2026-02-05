@@ -63,7 +63,7 @@ Auto‑opt runs short **parallel tempering (PT)** pilots, scores each pilot with
 
 `pilot_score = median(relevance_raw among selected elites) + diversity_weight * mean_pairwise_distance`
 
-Relevance defaults to `min_per_tf_norm` (consensus‑like per TF). Tie‑breakers are `median_relevance_raw`, `mean_pairwise_distance`, then a deterministic candidate ID. Pilot diagnostics (R‑hat/ESS, acceptance summaries, diversity) are still recorded, but very short pilot budgets (<200 draws) suppress mixing warnings to avoid noise. Selection is **thresholdless** and driven by objective‑comparable metrics. Auto‑opt escalates through `budget_levels` (and the configured `replicates`) until a confidence‑separated winner emerges.
+Relevance defaults to `min_per_tf_norm` (consensus‑like per TF). Auto‑opt uses `elites.k` as the scorecard size, so set `elites.k` to the number of final sequences you want to return (and keep `elites.k >= 1` when `optimizer.name=auto`). Tie‑breakers are `median_relevance_raw`, `mean_pairwise_distance`, then a deterministic candidate ID. Pilot diagnostics (R‑hat/ESS, acceptance summaries, diversity) are still recorded, but very short pilot budgets (<200 draws) suppress mixing warnings to avoid noise. Selection is **thresholdless** and driven by objective‑comparable metrics. Auto‑opt escalates through `budget_levels` (and the configured `replicates`) until a confidence‑separated winner emerges.
 
 `auto_opt.policy.allow_warn: true` means auto‑opt will pick a winner by the end of the configured budgets among candidates that pass diagnostics and record low‑confidence warnings if the separation is unclear. Set `allow_warn: false` to require a confidence‑separated winner; if none emerges at the maximum budgets/replicates (or only warning‑level candidates remain), auto‑opt fails fast with guidance to increase `auto_opt.budget_levels` and/or `auto_opt.replicates`. Auto‑opt pilot runs are stored under `outputs/auto_opt/`.
 
@@ -81,10 +81,14 @@ reference for full options). Auto‑opt also writes a pilot scorecard (including
 `pilot_score`, `median_relevance_raw`, `mean_pairwise_distance`) to
 `analysis/auto_opt_pilots.parquet` and a tradeoff plot to
 `analysis/plot__auto_opt_tradeoffs.<plot_format>` when available.
+`analysis/report.md` and `cruncher analyze --summary` include an auto‑opt confidence line.
 The pilot scorecard includes `ess_ratio` and `trace_draws` so you can see
 whether pilots stopped early and how mixing scales with the draw count. If most
 candidates are `warn`, increase pilot budgets, relax early‑stop, or set
 `auto_opt.policy.allow_warn: true` so selection can proceed with explicit warnings.
+If pilots produce fewer than `elites.k` elites, auto‑opt will warn—raise budgets,
+reduce `elites.filters.min_per_tf_norm`, or increase `sample.init.length` until
+the target count is reachable.
 
 Length bias warning: max-over-offset scoring makes longer sequences look better
 even under random background. If you manually compare lengths, prefer normalized scales

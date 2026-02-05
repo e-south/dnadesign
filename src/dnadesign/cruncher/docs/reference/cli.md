@@ -336,7 +336,7 @@ Notes:
 
 * `sample.output.save_sequences: true` is required for later analysis.
 * `sample.output.trace.save: true` enables trace-based diagnostics.
-* Auto-opt is enabled by default: it runs short PT pilots, evaluates the MMR scorecard (`pilot_score` from MMR elites), records diagnostics (warnings suppressed for very short pilots), then runs the best candidate. Selection is thresholdless and confidence-based; `auto_opt.policy.allow_warn: true` will pick a winner at the max budget among candidates that pass diagnostics (logging low-confidence warnings), and it still fails if all candidates fail quality checks.
+* Auto-opt is enabled by default: it runs short PT pilots, evaluates the MMR scorecard (`pilot_score` from MMR elites using `elites.k`), records diagnostics (warnings suppressed for very short pilots), then runs the best candidate. Selection is thresholdless and confidence-based; `auto_opt.policy.allow_warn: true` will pick a winner at the max budget among candidates that pass diagnostics (logging low-confidence warnings), and it still fails if all candidates fail quality checks.
 * `--no-auto-opt` is only valid when `sample.optimizer.name` is explicitly set to `pt` and `auto_opt.enabled=false` in the config.
 * Auto-opt can take minutes; for a quick smoke test set `sample.optimizer.name=pt` and disable `auto_opt.enabled`.
 * `--verbose` enables periodic progress logging; `--debug` enables very verbose debug logs.
@@ -387,7 +387,7 @@ Note:
 
 * Analyze is idempotent for identical inputs + analysis config; if the current summary signature matches,
   it reports that analysis is already up to date and skips re-running plots/tables.
-* Use `cruncher analyze --summary` to print the highlights from `analysis/report.json`.
+* Use `cruncher analyze --summary` to print the highlights from `analysis/report.json`, including the auto-opt confidence line when auto-opt was used.
 
 ---
 

@@ -94,6 +94,7 @@ def _run_auto_optimize_for_set(
     pt_swap_probs = list(dict.fromkeys(auto_cfg.pt_swap_probs or [sample_cfg.optimizers.pt.swap_prob]))
     ladder, _ = _resolve_beta_ladder(sample_cfg.optimizers.pt)
     ladder_size = len(ladder)
+    scorecard_k = int(sample_cfg.elites.k)
     pt_scales = sorted(set(cooling_boosts))
     logger.info("Auto-opt fixed length: %s", length)
     logger.info("Auto-opt budget levels: %s", ", ".join(str(b) for b in budgets))
@@ -101,6 +102,7 @@ def _run_auto_optimize_for_set(
     logger.info("Auto-opt pt beta scales: %s", ", ".join(f"{b:g}" for b in pt_scales))
     logger.info("Auto-opt PT swap_probs: %s", ", ".join(f"{p:g}" for p in pt_swap_probs))
     logger.info("Auto-opt PT ladder size: %s", ladder_size)
+    logger.info("Auto-opt scorecard k (elites.k): %s", scorecard_k)
     logger.info("Auto-opt keep_pilots: %s", auto_cfg.keep_pilots)
     candidate_specs: list[AutoOptSpec] = []
     for move_profile in move_profiles:
@@ -250,7 +252,7 @@ def _run_auto_optimize_for_set(
         return _aggregate_candidate_runs(
             runs,
             budget=budget,
-            scorecard_k=auto_cfg.policy.scorecard.k,
+            scorecard_k=scorecard_k,
         )
 
     def _log_candidate(candidate: AutoOptCandidate, *, label: str) -> None:
@@ -505,8 +507,9 @@ def _run_auto_optimize_for_set(
             "budget_levels": auto_cfg.budget_levels,
             "replicates": auto_cfg.replicates,
             "keep_pilots": auto_cfg.keep_pilots,
-            "scorecard_k": auto_cfg.policy.scorecard.k,
+            "scorecard_k": scorecard_k,
             "scorecard_alpha": auto_cfg.policy.scorecard.alpha,
+            "scorecard_metric": "elites_mmr",
             "diversity_weight": auto_cfg.policy.diversity_weight,
             "move_profiles": auto_cfg.move_profiles,
             "pt_swap_probs": auto_cfg.pt_swap_probs,
@@ -638,7 +641,7 @@ def _evaluate_pilot_run(
     seq_df = read_parquet(seq_path)
     elites_df = read_parquet(elite_path)
     tf_names = list(tf_names)
-    top_k = int(auto_cfg.policy.scorecard.k)
+    top_k = int(pilot_cfg.elites.k)
     draw_scores = _draw_scores_from_sequences(seq_df)
     top_k_median_final = _top_k_median_from_scores(draw_scores, top_k)
     best_score_final = float(np.max(draw_scores)) if draw_scores.size else None
@@ -657,6 +660,7 @@ def _evaluate_pilot_run(
         tf_names=tf_names,
         selection_cfg=selection_cfg,
         auto_cfg=auto_cfg,
+        scorecard_k=top_k,
         pwms=pwms,
     )
     best_score = pilot_score
@@ -767,6 +771,12 @@ def _evaluate_pilot_run(
                 "High MH acceptance with nontrivial Δscore suggests beta too low or moves too conservative. "
                 "Increase beta schedule or move sizes."
             )
+    if top_k > 0 and len(elites_df) < top_k:
+        warnings = list(warnings)
+        warnings.append(
+            f"Pilot elites={len(elites_df)} < elites.k={top_k}; "
+            "increase pilot budgets or relax elites.filters.min_per_tf_norm."
+        )
 
     return AutoOptCandidate(
         kind=kind,

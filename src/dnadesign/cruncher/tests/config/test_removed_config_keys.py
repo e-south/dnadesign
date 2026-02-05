@@ -65,6 +65,7 @@ def _write_config(tmp_path: Path, payload: dict) -> Path:
         (("cruncher", "sample", "auto_opt", "prefer_simpler_if_close"), True),
         (("cruncher", "sample", "auto_opt", "tolerance"), {"score": 0.1}),
         (("cruncher", "sample", "auto_opt", "policy", "scorecard", "metric"), "elites_mmr"),
+        (("cruncher", "sample", "auto_opt", "policy", "scorecard", "k"), 10),
         (("cruncher", "sample", "auto_opt", "policy", "scorecard", "top_k"), 10),
         (("cruncher", "sample", "elites", "min_hamming"), 0),
         (("cruncher", "sample", "elites", "dsDNA_canonicalize"), True),
@@ -99,4 +100,15 @@ def test_gibbs_optimizer_name_is_rejected(tmp_path: Path) -> None:
     config_path = _write_config(tmp_path, config)
 
     with pytest.raises(ValidationError):
+        load_config(config_path)
+
+
+def test_auto_opt_requires_positive_elites_k(tmp_path: Path) -> None:
+    config = _base_config()
+    config["cruncher"]["sample"]["optimizer"]["name"] = "auto"
+    config["cruncher"]["sample"]["auto_opt"]["enabled"] = True
+    config["cruncher"]["sample"]["elites"]["k"] = 0
+    config_path = _write_config(tmp_path, config)
+
+    with pytest.raises(ValidationError, match="elites.k"):
         load_config(config_path)

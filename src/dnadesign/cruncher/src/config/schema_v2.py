@@ -385,7 +385,6 @@ class OptimizerSelectionConfig(StrictBaseModel):
 
 
 class AutoOptScorecardConfig(StrictBaseModel):
-    k: int = 20
     alpha: float = 0.85
 
     @field_validator("alpha")
@@ -394,13 +393,6 @@ class AutoOptScorecardConfig(StrictBaseModel):
         if not isinstance(v, (int, float)) or v <= 0 or v > 1:
             raise ValueError("auto_opt.scorecard.alpha must be in (0, 1]")
         return float(v)
-
-    @field_validator("k")
-    @classmethod
-    def _check_k(cls, v: int) -> int:
-        if not isinstance(v, int) or v < 1:
-            raise ValueError("auto_opt.scorecard.k must be >= 1")
-        return v
 
 
 class AutoOptPolicyConfig(StrictBaseModel):
@@ -418,7 +410,7 @@ class AutoOptPolicyConfig(StrictBaseModel):
 
 class AutoOptConfig(StrictBaseModel):
     enabled: bool = True
-    budget_levels: List[int] = Field(default_factory=lambda: [200, 800])
+    budget_levels: List[int] = Field(default_factory=lambda: [2000, 3000])
     replicates: int = 1
     keep_pilots: Literal["all", "ok", "best"] = "ok"
     cooling_boosts: List[float] = Field(default_factory=lambda: [1.0, 2.0])
@@ -792,6 +784,8 @@ class SampleConfig(StrictBaseModel):
         if self.optimizer.name == "auto":
             if self.auto_opt is None or not self.auto_opt.enabled:
                 raise ValueError("sample.optimizer.name='auto' requires auto_opt.enabled=true")
+            if self.elites.k < 1:
+                raise ValueError("sample.elites.k must be >= 1 when optimizer.name='auto'")
         else:
             if self.auto_opt is not None and self.auto_opt.enabled:
                 raise ValueError("auto_opt.enabled must be false when optimizer.name is not 'auto'")

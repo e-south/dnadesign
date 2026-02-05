@@ -88,6 +88,7 @@ def build_report_payload(
     objective_components: dict | None = None,
     overlap_summary: dict | None = None,
     analysis_used_payload: dict | None = None,
+    auto_opt_payload: dict | None = None,
 ) -> dict[str, object]:
     diagnostics_payload = diagnostics_payload or summary_payload.get("diagnostics")
     objective_components = objective_components or summary_payload.get("objective_components")
@@ -168,6 +169,22 @@ def build_report_payload(
                 "early_stop_stopped_chains": _safe_int(early_payload.get("stopped_chains")),
             }
 
+    highlights_auto_opt = {}
+    if isinstance(auto_opt_payload, dict):
+        selection_metrics = auto_opt_payload.get("selection_metrics")
+        selection_metrics = selection_metrics if isinstance(selection_metrics, dict) else {}
+        auto_opt_cfg = auto_opt_payload.get("auto_opt_config")
+        auto_opt_cfg = auto_opt_cfg if isinstance(auto_opt_cfg, dict) else {}
+        highlights_auto_opt = {
+            "confidence": auto_opt_payload.get("selection_confidence"),
+            "quality": auto_opt_payload.get("selection_quality"),
+            "pilot_score": _safe_float(selection_metrics.get("pilot_score")),
+            "median_relevance_raw": _safe_float(selection_metrics.get("median_relevance_raw")),
+            "mean_pairwise_distance": _safe_float(selection_metrics.get("mean_pairwise_distance")),
+            "scorecard_k": _safe_int(auto_opt_cfg.get("scorecard_k")),
+            "budget_levels": auto_opt_cfg.get("budget_levels"),
+        }
+
     autopicks = None
     if isinstance(analysis_used_payload, dict):
         autopicks = analysis_used_payload.get("analysis_autopicks")
@@ -207,6 +224,7 @@ def build_report_payload(
             "overlap": highlights_overlap,
             "sampling": highlights_sampling,
             "learning": highlights_learning,
+            "auto_opt": highlights_auto_opt,
         },
         "autopicks": autopicks,
         "paths": pointers,
@@ -231,6 +249,7 @@ def write_report_md(
     overlap = highlights.get("overlap") or {}
     sampling = highlights.get("sampling") or {}
     learning = highlights.get("learning") or {}
+    auto_opt = highlights.get("auto_opt") or {}
     warnings = payload.get("warnings") or []
     status = payload.get("status") or "unknown"
     pointers = payload.get("paths") or {}
@@ -252,6 +271,16 @@ def write_report_md(
     plateau_draws = _fmt(learning.get("plateau_draws"))
     early_stop_earliest_draw = _fmt(learning.get("early_stop_earliest_draw"))
     early_stop_stopped_chains = _fmt(learning.get("early_stop_stopped_chains"))
+    auto_opt_confidence = auto_opt.get("confidence") or "n/a"
+    auto_opt_quality = auto_opt.get("quality") or "n/a"
+    auto_opt_pilot_score = _fmt(auto_opt.get("pilot_score"))
+    auto_opt_scorecard_k = _fmt(auto_opt.get("scorecard_k"))
+    auto_opt_budgets = auto_opt.get("budget_levels")
+    if isinstance(auto_opt_budgets, list):
+        auto_opt_budgets_label = ", ".join(str(item) for item in auto_opt_budgets)
+    else:
+        auto_opt_budgets_label = "n/a"
+    has_auto_opt = isinstance(auto_opt, dict) and any(value is not None for value in auto_opt.values())
 
     lines = [
         "# Cruncher Analysis Report",
@@ -285,6 +314,14 @@ def write_report_md(
                 f"- Plateau draws: {plateau_draws}",
                 f"- Early-stop earliest draw: {early_stop_earliest_draw} (stopped chains: {early_stop_stopped_chains})",
             ]
+        )
+    if has_auto_opt:
+        lines.insert(
+            6,
+            (
+                f"- Auto-opt confidence: {auto_opt_confidence} (quality={auto_opt_quality}, "
+                f"pilot_score={auto_opt_pilot_score}, k={auto_opt_scorecard_k}, budgets=[{auto_opt_budgets_label}])"
+            ),
         )
     lines.extend(
         [
@@ -344,6 +381,7 @@ def ensure_report(
     objective_components: dict | None = None,
     overlap_summary: dict | None = None,
     analysis_used_payload: dict | None = None,
+    auto_opt_payload: dict | None = None,
     refresh: bool = False,
 ) -> tuple[Path, Path]:
     report_json = report_json_path(analysis_root)
@@ -368,6 +406,7 @@ def ensure_report(
         objective_components=objective_components,
         overlap_summary=overlap_summary,
         analysis_used_payload=analysis_used_payload,
+        auto_opt_payload=auto_opt_payload,
     )
     write_report_json(report_json, payload)
     write_report_md(report_md, payload, analysis_root=analysis_root)

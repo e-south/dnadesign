@@ -355,11 +355,12 @@ Current MMR behavior (TFBS‑core mode) is:
 - When comparing two sequences, we compute LexA‑core vs LexA‑core and CpxR‑core vs CpxR‑core Hamming distances (weighted per PWM position), then average across TFs.
 - We never compare LexA vs CpxR within the same sequence.
 
-**Auto‑opt** runs short parallel tempering (PT) pilots and scores each pilot with the MMR scorecard to pick a robust ladder/budget so the final run is more performant. The demo config sweeps multiple PT swap probabilities and ladder sizes so you can compare mixing behavior across a small grid. The chosen pilot is recorded in `outputs/auto_opt/best_<run_group>.json`, and the final effective config is written to `outputs/sample/<run_name>/meta/config_used.yaml`. For diagnostics and tuning guidance, see the [sampling + analysis guide](../guides/sampling_and_analysis.md).
+**Auto‑opt** runs short parallel tempering (PT) pilots and scores each pilot with the MMR scorecard to pick a robust ladder/budget so the final run is more performant. Auto‑opt uses `elites.k` as the scorecard size, so set `elites.k` to the number of final sequences you want. If pilots produce fewer than `elites.k` elites, increase pilot budgets or relax the `min_per_tf_norm` gate. The demo config sweeps multiple PT swap probabilities and ladder sizes so you can compare mixing behavior across a small grid. The chosen pilot is recorded in `outputs/auto_opt/best_<run_group>.json`, and the final effective config is written to `outputs/sample/<run_name>/meta/config_used.yaml`. For diagnostics and tuning guidance, see the [sampling + analysis guide](../guides/sampling_and_analysis.md).
 
 This demo config sets `auto_opt.policy.allow_warn: true` so auto-opt will pick a winner by the end of the configured budget levels among candidates that pass diagnostics, even if confidence is low (warnings are recorded). Set `allow_warn: false` to require a confidence-separated winner; if none emerges at the maximum configured budgets/replicates (or only warning-level candidates remain), auto-opt fails fast with guidance to increase `auto_opt.budget_levels` and/or `auto_opt.replicates`.
 
 Early-stop is enabled in this demo (`patience: 500`, `min_delta: 0.01`) to cut off draws once scores stall. After `cruncher analyze`, inspect `analysis/report.md` or `analysis/objective_components.json` for the `learning` block, which records the best-score draw and a per-chain early-stop simulation. The demo also enables `analysis.extra_tables=true` so the auto-opt pilot scorecard is written to `analysis/auto_opt_pilots.parquet`.
+Use `cruncher analyze --summary` to print a one-line auto-opt confidence summary alongside the main metrics.
 
 ```bash
 # Run sampling with auto-opt

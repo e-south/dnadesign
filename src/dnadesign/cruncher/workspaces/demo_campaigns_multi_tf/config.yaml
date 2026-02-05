@@ -180,7 +180,7 @@ cruncher:
         swap_prob: 0.10
     auto_opt:
       enabled: true
-      budget_levels: [200, 800]
+      budget_levels: [2000, 3000]
       replicates: 1
     output:
       save_sequences: true

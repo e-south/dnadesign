@@ -268,6 +268,11 @@ cruncher runs latest --stage sample --set-index 1 -c "$CONFIG"
 cruncher runs best --stage sample --set-index 1 -c "$CONFIG"
 ```
 
+Auto‑opt uses `elites.k` as the scorecard size; if pilots produce fewer than `elites.k`
+elites, raise pilot budgets or relax `elites.filters.min_per_tf_norm` so the target
+count is reachable. Use `cruncher analyze --summary` to print the auto‑opt confidence
+line alongside the main metrics.
+
 For diagnostics and tuning guidance, see the
 [sampling + analysis guide](../guides/sampling_and_analysis.md).
 

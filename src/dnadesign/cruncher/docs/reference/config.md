@@ -349,7 +349,7 @@ sample:
         stop_after_tune: true
   auto_opt:
     enabled: true
-    budget_levels: [200, 800]
+    budget_levels: [2000, 3000]
     replicates: 1
     keep_pilots: ok
     cooling_boosts: [1.0, 2.0]
@@ -358,7 +358,6 @@ sample:
     policy:
       allow_warn: false
       scorecard:
-        k: 20
         alpha: 0.85
       diversity_weight: 0.25
   output:
@@ -419,7 +418,7 @@ Notes:
 - Auto-opt selection details are stored in each pilot's `meta/run_manifest.json`; `cruncher analyze` writes `analysis/auto_opt_pilots.parquet` and `analysis/plot__auto_opt_tradeoffs.<plot_format>`.
 - Auto-opt candidate quality uses trace draw counts and ESS ratios (`ess_ratio = ESS / draws`) to grade pilots. If a pilot stops early (draws ≤ ~50% of expected), diagnostics are treated as directional and the candidate is marked `warn`. These metrics are recorded in `auto_opt_pilots.<table_format>` as `ess_ratio`, `trace_draws`, `trace_draws_expected`, `trace_chains`, and `trace_chains_expected`.
 - `sample.rng.deterministic=true` isolates a stable RNG stream per pilot config.
-- `auto_opt.policy.scorecard.k` controls how many elites are used for the MMR scorecard.
+- `elites.k` controls how many sequences are retained after selection; auto-opt uses this value for the MMR scorecard size and requires `elites.k >= 1` when `optimizer.name=auto`.
 - `auto_opt.policy.diversity_weight` weights the diversity term in `pilot_score`.
 - `auto_opt.keep_pilots` controls pilot retention after selection: `all` keeps everything, `ok` keeps candidates that did not fail catastrophic checks (plus the selected pilot), and `best` keeps only the selected pilot.
 - `moves.overrides.move_schedule` interpolates between `moves.overrides.move_probs` (start) and `move_schedule.end` (end).

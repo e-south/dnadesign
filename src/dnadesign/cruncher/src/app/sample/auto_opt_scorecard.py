@@ -49,12 +49,12 @@ def _mmr_scorecard_from_elites(
     tf_names: list[str],
     selection_cfg: object,
     auto_cfg: AutoOptConfig,
+    scorecard_k: int,
     pwms: dict[str, PWM],
 ) -> tuple[float | None, float | None, float | None]:
     if elites_df is None or elites_df.empty:
         return None, None, None
-    k = auto_cfg.policy.scorecard.k
-    subset = _scorecard_elite_subset(elites_df, k=k)
+    subset = _scorecard_elite_subset(elites_df, k=scorecard_k)
     relevance = getattr(selection_cfg, "relevance", "min_per_tf_norm")
     if relevance == "combined_score_final":
         col = "combined_score_final"
