@@ -17,6 +17,7 @@ from pathlib import Path
 import yaml
 
 from dnadesign.cruncher.analysis.layout import report_json_path, report_md_path
+from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json, atomic_write_text
 
 
 def _load_json(path: Path) -> dict | None:
@@ -215,7 +216,7 @@ def build_report_payload(
 
 def write_report_json(report_path: Path, payload: dict[str, object]) -> None:
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(json.dumps(payload, indent=2, allow_nan=False))
+    atomic_write_json(report_path, payload, allow_nan=False)
 
 
 def write_report_md(
@@ -332,7 +333,7 @@ def write_report_md(
     lines.extend(["", "## Artifact index", ""] + [f"- {item}" for item in artifact_index])
 
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text("\n".join(lines))
+    atomic_write_text(report_path, "\n".join(lines))
 
 
 def ensure_report(

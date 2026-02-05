@@ -59,3 +59,25 @@ def test_consensus_neglogp_cached_by_length() -> None:
     assert seq1.size in info.consensus_neglogp_by_len
     assert seq2.size in info.consensus_neglogp_by_len
     assert info.consensus_neglogp_by_len[seq1.size] != info.consensus_neglogp_by_len[seq2.size]
+
+
+def test_best_llr_tie_breaks_leftmost_offset() -> None:
+    matrix = np.full((2, 4), 0.25, dtype=float)
+    pwm = PWM(name="tfA", matrix=matrix)
+    scorer = Scorer({"tfA": pwm}, bidirectional=False, scale="llr")
+    seq = np.array([0, 1, 2, 3, 0], dtype=np.int8)
+    best_llr, offset, strand = scorer.best_llr(seq, "tfA")
+    assert best_llr == pytest.approx(0.0, abs=1.0e-6)
+    assert offset == 0
+    assert strand == "+"
+
+
+def test_best_llr_tie_prefers_smaller_start_then_plus() -> None:
+    matrix = np.full((2, 4), 0.25, dtype=float)
+    pwm = PWM(name="tfA", matrix=matrix)
+    scorer = Scorer({"tfA": pwm}, bidirectional=True, scale="llr")
+    seq = np.array([0, 1, 2, 3, 0, 1], dtype=np.int8)
+    best_llr, offset, strand = scorer.best_llr(seq, "tfA")
+    assert best_llr == pytest.approx(0.0, abs=1.0e-6)
+    assert offset == 0
+    assert strand == "+"

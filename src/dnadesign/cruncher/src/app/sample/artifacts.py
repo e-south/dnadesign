@@ -11,7 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import json
 import logging
 import shutil
 from collections.abc import Iterable
@@ -19,10 +18,10 @@ from pathlib import Path
 from typing import Any, Callable
 
 import numpy as np
-import yaml
 
 from dnadesign.cruncher.app.run_service import drop_run_index_entries
 from dnadesign.cruncher.app.sample.resources import _lockmap_for, _store
+from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json, atomic_write_yaml
 from dnadesign.cruncher.artifacts.layout import config_used_path
 from dnadesign.cruncher.config.moves import resolve_move_config
 from dnadesign.cruncher.config.schema_v2 import CruncherConfig, SampleConfig
@@ -84,8 +83,7 @@ def _save_config(
 
     data["pwms_info"] = pwms_info
     data["active_regulator_set"] = {"index": set_index, "tfs": tfs}
-    with cfg_path.open("w") as fh:
-        yaml.safe_dump({"cruncher": data}, fh, sort_keys=False, default_flow_style=False)
+    atomic_write_yaml(cfg_path, {"cruncher": data}, sort_keys=False, default_flow_style=False)
     log_fn = log_fn or logger.info
     log_fn("Wrote config_used.yaml to %s", cfg_path.relative_to(batch_dir.parent))
 
@@ -100,31 +98,40 @@ def _write_parquet_rows(
     import pyarrow as pa
     import pyarrow.parquet as pq
 
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
     writer: pq.ParquetWriter | None = None
     buffer: list[dict[str, object]] = []
     count = 0
-    for row in rows:
-        buffer.append(row)
-        if len(buffer) < chunk_size:
-            continue
-        table = pa.Table.from_pylist(buffer)
-        if writer is None:
-            writer = pq.ParquetWriter(str(path), table.schema)
-        writer.write_table(table)
-        count += len(buffer)
-        buffer.clear()
-    if buffer:
-        table = pa.Table.from_pylist(buffer)
-        if writer is None:
-            writer = pq.ParquetWriter(str(path), table.schema)
-        writer.write_table(table)
-        count += len(buffer)
-    if writer is not None:
-        writer.close()
-    elif schema is not None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        empty = pa.Table.from_pylist([], schema=schema)
-        pq.write_table(empty, str(path))
+    try:
+        for row in rows:
+            buffer.append(row)
+            if len(buffer) < chunk_size:
+                continue
+            table = pa.Table.from_pylist(buffer)
+            if writer is None:
+                writer = pq.ParquetWriter(str(tmp_path), table.schema)
+            writer.write_table(table)
+            count += len(buffer)
+            buffer.clear()
+        if buffer:
+            table = pa.Table.from_pylist(buffer)
+            if writer is None:
+                writer = pq.ParquetWriter(str(tmp_path), table.schema)
+            writer.write_table(table)
+            count += len(buffer)
+        if writer is not None:
+            writer.close()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp_path.replace(path)
+        elif schema is not None:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            empty = pa.Table.from_pylist([], schema=schema)
+            pq.write_table(empty, str(tmp_path))
+            tmp_path.replace(path)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
     return count
 
 
@@ -169,8 +176,7 @@ def _auto_opt_best_marker_path(pilot_root: Path, *, run_group: str) -> Path:
 
 def _write_auto_opt_best_marker(pilot_root: Path, payload: dict[str, object], *, run_group: str) -> Path:
     path = _auto_opt_best_marker_path(pilot_root, run_group=run_group)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2))
+    atomic_write_json(path, payload)
     return path
 
 

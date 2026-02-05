@@ -46,7 +46,10 @@ def _norm_map_for_elites(
     score_scale: str,
 ) -> dict[str, float]:
     if score_scale.lower() == "normalized-llr":
-        return {tf: float(per_tf_map.get(tf, 0.0)) for tf in scorer.tf_names}
+        missing = [tf for tf in scorer.tf_names if tf not in per_tf_map]
+        if missing:
+            raise ValueError(f"Per-TF scores missing for normalized-llr: {missing}")
+        return {tf: float(per_tf_map[tf]) for tf in scorer.tf_names}
     return scorer.normalized_llr_map(seq_arr)
 
 
@@ -179,6 +182,7 @@ def _pooled_bootstrap_seed(
     replicates: list[dict[str, object]] = []
     for manifest in manifests:
         auto_meta = manifest.get("auto_opt") or {}
+        regulator_set = manifest.get("regulator_set") or {}
         replicates.append(
             {
                 "seed": manifest.get("seed"),
@@ -187,6 +191,7 @@ def _pooled_bootstrap_seed(
                 "budget": auto_meta.get("budget"),
                 "replicate": auto_meta.get("replicate"),
                 "length": manifest.get("sequence_length"),
+                "tfs": regulator_set.get("tfs"),
             }
         )
     payload = {

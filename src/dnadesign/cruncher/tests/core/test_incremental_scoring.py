@@ -151,3 +151,52 @@ def test_pt_beta_ladder_anchor_scale() -> None:
     ladder = opt._scaled_beta_ladder(10.0)
     assert np.isclose(ladder[0], 0.2)
     assert np.isclose(ladder[-1], 16.0)
+
+
+def test_pt_stats_report_effective_beta_ladder() -> None:
+    class _Eval:
+        scorer = SimpleNamespace(scale="llr")
+
+        def __call__(self, state: SequenceState) -> dict[str, float]:
+            return {"tf": float(state.seq.sum())}
+
+        def combined_from_scores(self, per_tf, beta=None, length=None):
+            return float(next(iter(per_tf.values())))
+
+        def evaluate(self, state: SequenceState, beta=None, length=None):
+            return {"tf": float(state.seq.sum())}, float(state.seq.sum())
+
+    cfg = {
+        "draws": 1,
+        "tune": 0,
+        "chains": 4,
+        "min_dist": 0,
+        "top_k": 1,
+        "swap_prob": 0.0,
+        "record_tune": False,
+        "progress_bar": False,
+        "progress_every": 0,
+        "early_stop": {},
+        "block_len_range": (1, 1),
+        "multi_k_range": (1, 1),
+        "slide_max_shift": 1,
+        "swap_len_range": (1, 1),
+        "move_probs": {"S": 1.0, "B": 0.0, "M": 0.0, "L": 0.0, "W": 0.0, "I": 0.0},
+        "kind": "geometric",
+        "beta": [0.2, 0.4, 0.8, 1.6],
+        "softmin": {"enabled": False},
+        "adaptive_swap": {"enabled": False},
+    }
+
+    opt = PTGibbsOptimizer(
+        evaluator=_Eval(),
+        cfg=cfg,
+        rng=np.random.default_rng(0),
+        pwms={},
+        init_cfg=SimpleNamespace(kind="random", length=4, pad_with="background", regulator=None),
+    )
+    opt.beta_ladder = opt._scaled_beta_ladder(5.0)
+    stats = opt.stats()
+    assert stats["beta_ladder_final"] == opt.beta_ladder
+    assert stats["beta_max_final"] == max(opt.beta_ladder)
+    assert stats["final_mcmc_beta"] == max(opt.beta_ladder)

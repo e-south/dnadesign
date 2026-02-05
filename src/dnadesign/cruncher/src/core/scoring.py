@@ -21,6 +21,51 @@ from dnadesign.cruncher.core.pwm import PWM
 logger = logging.getLogger(__name__)
 
 
+def _best_hit_from_llrs(
+    llrs_fwd: np.ndarray,
+    llrs_rev: np.ndarray | None,
+    *,
+    seq_len: int,
+    width: int,
+    prefer_strand: str = "+",
+    eps: float = 1.0e-12,
+) -> Tuple[float, int, str]:
+    if llrs_fwd.size == 0:
+        return float("-inf"), 0, prefer_strand
+
+    fwd_max = float(np.max(llrs_fwd))
+    fwd_offsets = np.flatnonzero(np.abs(llrs_fwd - fwd_max) <= eps)
+    fwd_offset = int(np.min(fwd_offsets)) if fwd_offsets.size else int(np.argmax(llrs_fwd))
+    fwd_start = int(fwd_offset)
+    best_score = fwd_max
+    best_offset = fwd_offset
+    best_strand = "+"
+    best_start = fwd_start
+
+    if llrs_rev is None:
+        return best_score, best_offset, best_strand
+
+    rev_max = float(np.max(llrs_rev))
+    rev_offsets = np.flatnonzero(np.abs(llrs_rev - rev_max) <= eps)
+    if rev_offsets.size:
+        rev_starts = seq_len - width - rev_offsets
+        best_rev_idx = int(np.argmin(rev_starts))
+        rev_offset = int(rev_offsets[best_rev_idx])
+        rev_start = int(rev_starts[best_rev_idx])
+    else:
+        rev_offset = int(np.argmax(llrs_rev))
+        rev_start = int(seq_len - width - rev_offset)
+
+    if rev_max > best_score + eps:
+        return rev_max, rev_offset, "-"
+    if abs(rev_max - best_score) <= eps:
+        if rev_start < best_start:
+            return rev_max, rev_offset, "-"
+        if rev_start == best_start and prefer_strand == "-":
+            return rev_max, rev_offset, "-"
+    return best_score, best_offset, best_strand
+
+
 @dataclass(slots=True)
 class _PWMInfo:
     """
@@ -149,18 +194,26 @@ class Scorer:
         idx = np.clip(idx, 0, info.tail_p.size - 1)
         return float(info.tail_p[idx])
 
+    @staticmethod
+    def _p_seq_from_p_win(p_win: float, n_offsets: int, *, bidirectional: bool) -> float:
+        n_offsets = max(1, int(n_offsets))
+        n_tests = n_offsets * (2 if bidirectional else 1)
+        log_term = np.log1p(-float(p_win))
+        return float(-np.expm1(float(n_tests) * log_term))
+
     def _per_pwm_neglogp(self, raw_llr: float, info: _PWMInfo, seq_length: int) -> float:
         """
         Compute −log10(p_seq) for a single PWM:
           p_win = P(X ≥ raw_llr) on one window,
           n_win = max(1, seq_length − width + 1),
-          p_seq = 1 − (1 − p_win)^n_win,
+          p_seq = 1 − (1 − p_win)^n_tests,
+          where n_tests = n_win (forward-only) or 2 * n_win (bidirectional).
           return −log10(p_seq).
         """
         w = info.width
         p_win = self._interp_tail_p(raw_llr, info)
         n_win = max(1, seq_length - w + 1)
-        p_seq = 1.0 - (1.0 - p_win) ** n_win
+        p_seq = self._p_seq_from_p_win(p_win, n_win, bidirectional=self.bidirectional)
         p_seq = max(p_seq, 1e-300)
         neglogp = -np.log10(p_seq)
         logger.debug(
@@ -186,21 +239,25 @@ class Scorer:
         if L < w:
             return float("-inf"), 0, "+"
 
-        def _scan(arr: np.ndarray, strand_label: str) -> Tuple[float, int, str]:
+        def _scan(arr: np.ndarray) -> np.ndarray:
             windows = np.lib.stride_tricks.sliding_window_view(arr, w)
             # windows shape: (L - w + 1, w)
-            llrs = info.lom[np.arange(w)[:, None], windows.T].sum(axis=0)
-            best_offset = int(np.argmax(llrs))
-            best_llr = float(llrs[best_offset])
-            return best_llr, best_offset, strand_label
+            return info.lom[np.arange(w)[:, None], windows.T].sum(axis=0)
 
-        best_llr, best_offset, best_strand = _scan(seq, "+")
+        llrs_fwd = _scan(seq)
+        llrs_rev = None
         if self.bidirectional:
             if rev is None:
                 rev = (3 - seq)[::-1]
-            rev_llr, rev_offset, rev_strand = _scan(rev, "-")
-            if rev_llr > best_llr:
-                best_llr, best_offset, best_strand = rev_llr, rev_offset, rev_strand
+            llrs_rev = _scan(rev)
+
+        best_llr, best_offset, best_strand = _best_hit_from_llrs(
+            llrs_fwd,
+            llrs_rev,
+            seq_len=L,
+            width=w,
+            prefer_strand="+",
+        )
 
         logger.debug(
             "    BEST_LLR: best_llr=%.3f at offset=%d, strand=%s",

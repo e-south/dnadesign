@@ -15,6 +15,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
 
+from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json
+
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -82,8 +84,7 @@ class RunStatusWriter:
         self._append_metrics(event="finish")
 
     def write(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(self.payload, indent=2))
+        atomic_write_json(self.path, self.payload)
 
     def _append_metrics(self, *, event: str) -> None:
         if self.metrics_path is None:

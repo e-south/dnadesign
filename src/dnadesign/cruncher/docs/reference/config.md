@@ -367,12 +367,15 @@ Notes:
 - `sequences.parquet` includes `min_per_tf_norm` (alias of `min_norm`) for the per‑TF normalized minimum.
 - `objective.bidirectional=true` scores both strands (reverse complement) when scanning PWMs.
 - When `objective.bidirectional=true`, dsDNA equivalence is always on for uniqueness and MMR selection (reverse complements are treated as identical).
+- Best‑hit tie‑breaking is deterministic: highest score wins, then smallest start index, then `+` strand.
 - `objective.combine` controls how per-TF scores are combined (`min` for weakest-TF optimization, `sum` for sum-based).
 - `objective.allow_unscaled_llr=true` allows `score_scale=llr` in multi-TF runs (otherwise validation fails).
 - `objective.score_scale=logp` is FIMO‑like: it uses a DP‑derived null
   distribution under a 0‑order background to compute a tail p‑value for the
   best window, then converts to a sequence‑level p via
   `p_seq = 1 − (1 − p_win)^n_windows` before reporting `−log10(p_seq)`.
+  When `objective.bidirectional=true`, `n_windows` counts both strands
+  (effective tests = `2 * (L − w + 1)`).
 - `sample.init.length` is fixed for sampling and must be >= the widest PWM length; there is no trim/polish or length ladder.
 - `elites.k` controls how many sequences are retained after selection (0 = keep all).
 - `elites.selection.policy=mmr` is the only supported policy and uses TFBS‑core MMR distance.

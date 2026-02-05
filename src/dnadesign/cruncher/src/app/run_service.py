@@ -10,6 +10,7 @@ Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Optional
@@ -350,4 +351,13 @@ def load_run_status(run_dir: Path) -> Optional[dict]:
     status_file = status_path(run_dir)
     if not status_file.exists():
         return None
-    return json.loads(status_file.read_text())
+    attempts = 3
+    delay_s = 0.05
+    for attempt in range(attempts):
+        try:
+            return json.loads(status_file.read_text())
+        except (json.JSONDecodeError, OSError) as exc:
+            if attempt >= attempts - 1:
+                raise ValueError(f"Failed to read run status at {status_file}") from exc
+            time.sleep(delay_s * (attempt + 1))
+    return None

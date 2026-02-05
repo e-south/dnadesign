@@ -7,7 +7,8 @@ This demo walks through a process of running category-based sequence optimizatio
 Scoring is **FIMO-like** (internal implementation): cruncher uses PWM log‑odds
 scanning against a 0‑order background, takes the best window per TF (optionally
 both strands), and can convert that best hit to a p‑value via a DP‑derived null
-distribution (`score_scale: logp`, with `p_seq = 1 − (1 − p_win)^n_windows`).
+distribution (`score_scale: logp`, with `p_seq = 1 − (1 − p_win)^n_windows`;
+bidirectional scans count both strands as `2 * (L − w + 1)` tests).
 
 ### Demo instance
 

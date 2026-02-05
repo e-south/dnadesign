@@ -18,7 +18,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
-import yaml
 
 from dnadesign.cruncher.app.progress import progress_adapter
 from dnadesign.cruncher.app.run_service import update_run_index_from_status
@@ -37,6 +36,7 @@ from dnadesign.cruncher.app.sample.optimizer_config import (
 from dnadesign.cruncher.app.sample.resources import _load_pwms_for_set
 from dnadesign.cruncher.app.sample.run_layout import prepare_run_layout, write_run_manifest_and_update
 from dnadesign.cruncher.app.telemetry import RunTelemetry
+from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json, atomic_write_yaml
 from dnadesign.cruncher.artifacts.entries import artifact_entry
 from dnadesign.cruncher.artifacts.layout import (
     config_used_path,
@@ -520,7 +520,7 @@ def _run_sample_for_set(
     logger.debug("Saved elites Parquet -> %s", parquet_path.relative_to(out_dir.parent))
 
     json_path = elites_json_path(out_dir)
-    json_path.write_text(json.dumps(elites, indent=2))
+    atomic_write_json(json_path, elites)
     logger.debug("Saved elites JSON -> %s", json_path.relative_to(out_dir.parent))
 
     if mmr_meta_rows:
@@ -529,6 +529,7 @@ def _run_sample_for_set(
         logger.debug("Saved elites MMR meta -> %s", mmr_meta_path.relative_to(out_dir.parent))
 
     # 2)  .yaml run-metadata -----------------------------------------------
+    optimizer_stats = optimizer.stats() if hasattr(optimizer, "stats") else {}
     meta = {
         "generated": datetime.now(timezone.utc).isoformat(),
         "n_elites": len(elites),
@@ -552,11 +553,24 @@ def _run_sample_for_set(
         "config_file": str(config_used_path(out_dir).resolve()),
         "regulator_set": {"index": set_index, "tfs": tfs},
     }
+    if isinstance(optimizer_stats, dict) and optimizer_stats:
+
+        def _float_list(value: object) -> list[float] | None:
+            if not isinstance(value, (list, tuple)):
+                return None
+            return [float(item) for item in value]
+
+        meta["beta_ladder_base"] = _float_list(optimizer_stats.get("beta_ladder_base"))
+        meta["beta_ladder_final"] = _float_list(optimizer_stats.get("beta_ladder_final"))
+        beta_scale = optimizer_stats.get("beta_ladder_scale_final")
+        meta["beta_ladder_scale_final"] = float(beta_scale) if beta_scale is not None else None
+        meta["beta_ladder_scale_mode"] = optimizer_stats.get("beta_ladder_scale_mode")
+        final_beta = optimizer_stats.get("final_mcmc_beta")
+        meta["final_mcmc_beta"] = float(final_beta) if final_beta is not None else None
     if mmr_summary is not None:
         meta["mmr_summary"] = mmr_summary
     yaml_path = elites_yaml_path(out_dir)
-    with yaml_path.open("w") as fh:
-        yaml.safe_dump(meta, fh, sort_keys=False)
+    atomic_write_yaml(yaml_path, meta, sort_keys=False)
     logger.debug("Saved metadata -> %s", yaml_path.relative_to(out_dir.parent))
 
     artifacts.extend(

@@ -32,6 +32,7 @@ from dnadesign.cruncher.app.run_service import (
     rebuild_run_index,
     update_run_index_from_status,
 )
+from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json
 from dnadesign.cruncher.artifacts.entries import normalize_artifacts
 from dnadesign.cruncher.artifacts.layout import live_metrics_path, status_path
 from dnadesign.cruncher.cli.config_resolver import (
@@ -197,7 +198,11 @@ def list_runs_cmd(
         console.print(str(exc))
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
-    runs = list_runs(cfg, config_path, stage=stage)
+    try:
+        runs = list_runs(cfg, config_path, stage=stage)
+    except ValueError as exc:
+        console.print(f"Error reading run metadata: {exc}")
+        raise typer.Exit(code=1)
     if not runs:
         console.print("No runs found.")
         console.print("Hint: run cruncher sample <config> or cruncher parse <config> to create a run.")
@@ -389,7 +394,11 @@ def latest_run_cmd(
         console.print(str(exc))
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
-    runs = list_runs(cfg, config_path, stage=stage)
+    try:
+        runs = list_runs(cfg, config_path, stage=stage)
+    except ValueError as exc:
+        console.print(f"Error reading run metadata: {exc}")
+        raise typer.Exit(code=1)
     if set_index is not None:
         runs = [run for run in runs if (run.regulator_set or {}).get("index") == set_index]
     if not runs:
@@ -441,7 +450,11 @@ def best_run_cmd(
         console.print(str(exc))
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
-    runs = list_runs(cfg, config_path, stage=stage)
+    try:
+        runs = list_runs(cfg, config_path, stage=stage)
+    except ValueError as exc:
+        console.print(f"Error reading run metadata: {exc}")
+        raise typer.Exit(code=1)
     if set_index is not None:
         runs = [run for run in runs if (run.regulator_set or {}).get("index") == set_index]
     if not runs:
@@ -453,7 +466,11 @@ def best_run_cmd(
     for run in runs:
         score = run.best_score
         if score is None:
-            status_payload = load_run_status(run.run_dir)
+            try:
+                status_payload = load_run_status(run.run_dir)
+            except ValueError as exc:
+                console.print(f"Error reading run status: {exc}")
+                raise typer.Exit(code=1)
             if status_payload is not None:
                 score = status_payload.get("best_score")
         if score is None:
@@ -545,7 +562,11 @@ def clean_runs_cmd(
         console.print("Error: --older-than-hours must be >= 0.")
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
-    runs = list_runs(cfg, config_path)
+    try:
+        runs = list_runs(cfg, config_path)
+    except ValueError as exc:
+        console.print(f"Error reading run metadata: {exc}")
+        raise typer.Exit(code=1)
     if not runs:
         console.print("No runs found.")
         raise typer.Exit(code=1)
@@ -557,7 +578,11 @@ def clean_runs_cmd(
     for run in runs:
         if run.status != "running":
             continue
-        status_payload = load_run_status(run.run_dir)
+        try:
+            status_payload = load_run_status(run.run_dir)
+        except ValueError as exc:
+            console.print(f"Error reading run status: {exc}")
+            raise typer.Exit(code=1)
         last_update = None
         if status_payload is not None:
             last_update = _parse_timestamp(
@@ -609,8 +634,7 @@ def clean_runs_cmd(
         payload["updated_at"] = now_iso
         payload["finished_at"] = now_iso
         status_file = status_path(run_dir)
-        status_file.parent.mkdir(parents=True, exist_ok=True)
-        status_file.write_text(json.dumps(payload, indent=2))
+        atomic_write_json(status_file, payload)
         update_run_index_from_status(
             config_path,
             run_dir,
@@ -665,7 +689,11 @@ def watch_run_cmd(
         console.print(f"Error: {exc}")
         console.print("Hint: use cruncher runs list (or add --config <path>) to see available runs.")
         raise typer.Exit(code=1)
-    status = load_run_status(run.run_dir)
+    try:
+        status = load_run_status(run.run_dir)
+    except ValueError as exc:
+        console.print(f"Error reading run status: {exc}")
+        raise typer.Exit(code=1)
     if status is None:
         console.print(f"No meta/run_status.json found for run '{run_name}'.")
         console.print("Hint: watch is only available for active runs writing meta/run_status.json.")
@@ -735,7 +763,11 @@ def watch_run_cmd(
     tick = 0
     with Live(_render(status), refresh_per_second=4, console=console) as live:
         while True:
-            status = load_run_status(run.run_dir)
+            try:
+                status = load_run_status(run.run_dir)
+            except ValueError as exc:
+                console.print(f"Error reading run status: {exc}")
+                raise typer.Exit(code=1)
             if status is None:
                 console.print("meta/run_status.json missing.")
                 break

@@ -61,6 +61,7 @@ from dnadesign.cruncher.app.analyze.metadata import (
 )
 from dnadesign.cruncher.app.analyze.plan import resolve_analysis_plan
 from dnadesign.cruncher.app.run_service import list_runs
+from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json, atomic_write_yaml
 from dnadesign.cruncher.artifacts.entries import (
     append_artifacts,
     artifact_entry,
@@ -312,7 +313,7 @@ def run_analyze(
                     if "report_json" not in existing_summary or "report_md" not in existing_summary:
                         existing_summary["report_json"] = str(report_json.relative_to(sample_dir))
                         existing_summary["report_md"] = str(report_md.relative_to(sample_dir))
-                        summary_file.write_text(json.dumps(existing_summary, indent=2))
+                        atomic_write_json(summary_file, existing_summary)
                 analysis_manifest_file = analysis_manifest_path(analysis_root)
                 if analysis_manifest_file.exists():
                     manifest_payload = json.loads(analysis_manifest_file.read_text())
@@ -341,7 +342,7 @@ def run_analyze(
                             continue
                         artifacts.append(entry)
                     manifest_payload["artifacts"] = artifacts
-                    analysis_manifest_file.write_text(json.dumps(manifest_payload, indent=2))
+                    atomic_write_json(analysis_manifest_file, manifest_payload)
                 report_artifacts = [
                     artifact_entry(
                         report_json,
@@ -482,7 +483,7 @@ def run_analyze(
             overlap_summary=overlap_summary,
         )
         diagnostics_path = tables_dir / "diagnostics.json"
-        diagnostics_path.write_text(json.dumps(diagnostics_summary, indent=2))
+        atomic_write_json(diagnostics_path, diagnostics_summary)
         if diagnostics_summary.get("warnings"):
             logger.warning(
                 "Diagnostics warnings detected (%d). See %s.",
@@ -499,7 +500,7 @@ def run_analyze(
             overlap_total_bp_median=overlap_summary.get("overlap_total_bp_median"),
             early_stop=manifest.get("early_stop"),
         )
-        objective_components_path.write_text(json.dumps(objective_components, indent=2))
+        atomic_write_json(objective_components_path, objective_components)
 
         elites_mmr_summary_path = None
         mmr_summary_payload = elites_meta.get("mmr_summary") if isinstance(elites_meta, dict) else None
@@ -687,7 +688,7 @@ def run_analyze(
         if auto_adjustments:
             analysis_used_payload["analysis_auto_adjustments"] = auto_adjustments
         analysis_used_file.parent.mkdir(parents=True, exist_ok=True)
-        analysis_used_file.write_text(yaml.safe_dump(analysis_used_payload, sort_keys=False))
+        atomic_write_yaml(analysis_used_file, analysis_used_payload, sort_keys=False)
 
         # ── diagnostics ───────────────────────────────────────────────────────
         if plots.trace:
@@ -1152,7 +1153,7 @@ def run_analyze(
         )
         summary_payload["report_json"] = str(report_json.relative_to(sample_dir))
         summary_payload["report_md"] = str(report_md.relative_to(sample_dir))
-        summary_file.write_text(json.dumps(summary_payload, indent=2))
+        atomic_write_json(summary_file, summary_payload)
         analysis_manifest_entries.append(
             {
                 "path": str(summary_file.relative_to(sample_dir)),
@@ -1183,7 +1184,7 @@ def run_analyze(
             ]
         )
         analysis_manifest_payload["artifacts"] = analysis_manifest_entries
-        analysis_manifest_file.write_text(json.dumps(analysis_manifest_payload, indent=2))
+        atomic_write_json(analysis_manifest_file, analysis_manifest_payload)
         artifacts.append(
             artifact_entry(
                 summary_file,

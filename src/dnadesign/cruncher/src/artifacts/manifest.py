@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
+from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json
 from dnadesign.cruncher.artifacts.layout import manifest_path
 from dnadesign.cruncher.config.schema_v2 import CruncherConfig
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
@@ -95,8 +96,7 @@ def build_run_manifest(
 def write_manifest(run_dir: Path, manifest: Dict[str, Any]) -> Path:
     run_dir.mkdir(parents=True, exist_ok=True)
     path = manifest_path(run_dir)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(manifest, indent=2))
+    atomic_write_json(path, manifest)
     return path
 
 

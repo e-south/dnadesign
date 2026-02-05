@@ -9,7 +9,8 @@ log‑odds scores against a 0‑order background, scans all windows to find the 
 hit (optionally bidirectional), and optionally converts that best hit to a
 p‑value via a DP‑derived null distribution (`score_scale: logp`). For `logp`,
 the tail probability for the best window becomes a sequence‑level p via
-`p_seq = 1 − (1 − p_win)^n_windows`.
+`p_seq = 1 − (1 − p_win)^n_windows`. When bidirectional, `n_windows` counts both
+strands (`2 * (L − w + 1)`).
 
 **Terminology:**
 
