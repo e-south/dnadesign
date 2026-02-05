@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-src/dnadesign/usr/src/config.py
+dnadesign
+dnadesign/src/dnadesign/usr/src/config.py
+
+Remote configuration loading and validation for USR.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -17,12 +19,6 @@ from typing import Dict, Optional
 import yaml
 
 from .errors import RemoteConfigError
-
-_DEFAULT_SEARCH = [
-    Path("./usr/remotes.yaml"),
-    Path.home() / ".config" / "usr" / "remotes.yaml",
-    Path.home() / ".usr" / "remotes.yaml",
-]
 
 
 @dataclass(frozen=True)
@@ -57,9 +53,9 @@ def _load_yaml(path: Path) -> Dict:
         with path.open("r", encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
     except FileNotFoundError:
-        return {}
-    except Exception as e:
-        raise RemoteConfigError(f"Failed to read config {path}: {e}")
+        raise RemoteConfigError(f"Remote config not found: {path}")
+    except (OSError, yaml.YAMLError) as e:
+        raise RemoteConfigError(f"Failed to read config {path}: {e}") from e
 
 
 def _dump_yaml(path: Path, obj: Dict) -> None:
@@ -68,14 +64,17 @@ def _dump_yaml(path: Path, obj: Dict) -> None:
         yaml.safe_dump(obj, f, sort_keys=True)
 
 
+def default_config_path() -> Path:
+    return Path(__file__).resolve().parents[1] / "remotes.yaml"
+
+
 def locate_config(custom: Optional[Path] = None) -> Path:
     if custom:
         return custom
-    for p in _DEFAULT_SEARCH:
-        if p.exists():
-            return p
-    # default to repo-local path
-    return _DEFAULT_SEARCH[0]
+    env_path = os.getenv("USR_REMOTES_PATH")
+    if env_path:
+        return Path(env_path).expanduser()
+    raise RemoteConfigError("USR_REMOTES_PATH is required for remotes configuration.")
 
 
 def load_all(custom: Optional[Path] = None) -> Dict[str, SSHRemoteConfig]:

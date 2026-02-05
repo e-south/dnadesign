@@ -31,8 +31,8 @@ def _install_stderr_filter(needles: Iterable[str]) -> None:
     # Duplicate the current stderr FD (respects OS-level redirection).
     try:
         orig_fd = os.dup(2)
-    except Exception:
-        return
+    except OSError as e:
+        raise RuntimeError("Failed to duplicate stderr for filtering.") from e
 
     r_fd, w_fd = os.pipe()
     os.dup2(w_fd, 2)
@@ -59,35 +59,44 @@ def _install_stderr_filter(needles: Iterable[str]) -> None:
                     text = buf.decode(errors="replace")
                     if not _line_matches(text, needles):
                         os.write(orig_fd, buf)
-        except Exception:
-            # Fail open: restore direct writes if filtering fails.
-            try:
-                os.dup2(orig_fd, 2)
-            except Exception:
-                pass
+        except OSError as e:
+            os.dup2(orig_fd, 2)
+            raise RuntimeError("stderr filter failed while reading.") from e
 
     t = threading.Thread(target=_reader, daemon=True, name="usr-stderr-filter")
     t.start()
     setattr(sys, "_usr_stderr_filter_installed", True)
 
 
+def _parse_env_flag(name: str) -> bool | None:
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return None
+    flag = raw.strip().lower()
+    if flag in {"1", "true", "yes"}:
+        return True
+    if flag in {"0", "false", "no"}:
+        return False
+    raise ValueError(f"{name} must be 0/1/true/false/yes/no.")
+
+
+def should_filter_pyarrow_sysctl() -> bool:
+    if sys.platform != "darwin":
+        return False
+    suppress = _parse_env_flag("USR_SUPPRESS_PYARROW_SYSCTL")
+    if suppress is not None:
+        return suppress
+    show = _parse_env_flag("USR_SHOW_PYARROW_SYSCTL")
+    if show is not None:
+        return not show
+    return True
+
+
 def maybe_install_pyarrow_sysctl_filter() -> None:
     """
     Suppress noisy PyArrow sysctlbyname warnings on macOS.
-    Default behavior: only when stderr is a TTY.
-    Override with USR_SUPPRESS_PYARROW_SYSCTL=1 to force suppression in non-TTY contexts,
-    or USR_SUPPRESS_PYARROW_SYSCTL=0 to disable suppression entirely.
+    Default suppress on macOS, opt-out with USR_SHOW_PYARROW_SYSCTL=1.
+    Back-compat: USR_SUPPRESS_PYARROW_SYSCTL=1/0 takes precedence when set.
     """
-    if sys.platform != "darwin":
-        return
-    flag_raw = os.getenv("USR_SUPPRESS_PYARROW_SYSCTL")
-    flag = flag_raw.strip().lower() if flag_raw is not None else ""
-    if flag_raw is None or flag == "":
-        try:
-            if not sys.stderr.isatty():
-                return
-        except Exception:
-            return
-    elif flag in {"0", "false", "no"}:
-        return
-    _install_stderr_filter(_PYARROW_SYSCTL_MATCH)
+    if should_filter_pyarrow_sysctl():
+        _install_stderr_filter(_PYARROW_SYSCTL_MATCH)

@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-src/dnadesign/usr/src/ui.py
+dnadesign
+dnadesign/src/dnadesign/usr/src/ui.py
+
+Rendering helpers for CLI tables and diff views.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -9,7 +11,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Optional
+from numbers import Integral
+from typing import Any, Callable, Iterable, Optional
 
 import pandas as pd
 
@@ -35,7 +38,7 @@ def _require_rich() -> Any:
         from rich.console import Console
 
         return Console()
-    except Exception as e:
+    except ImportError as e:
         raise RuntimeError("Rich requested but not available. Install 'rich' or pass --no-rich.") from e
 
 
@@ -43,7 +46,7 @@ def _align_for_dtype(dtype: Any) -> str:
     try:
         if pd.api.types.is_numeric_dtype(dtype):
             return "right"
-    except Exception:
+    except (TypeError, ValueError):
         pass
     return "left"
 
@@ -71,6 +74,43 @@ def render_table_rich(
         border_style="dim",
         caption_style="italic dim",
     )
+    formatters: dict[str, Callable[[object], str]] = {}
+    min_widths: dict[str, int] = {}
+    numeric_cols: set[str] = set()
+
+    for name in df.columns:
+        dtype = df[name].dtype
+        is_numeric = False
+        try:
+            is_numeric = _pd.api.types.is_numeric_dtype(dtype)
+        except (TypeError, ValueError):
+            is_numeric = False
+
+        if is_numeric:
+            numeric_cols.add(str(name))
+
+            def _fmt(v: object) -> str:
+                if v is None:
+                    return ""
+                if isinstance(v, bool):
+                    return str(v)
+                if isinstance(v, Integral):
+                    return f"{int(v):,}"
+                return str(v)
+
+            fmt = _fmt
+        else:
+
+            def _fmt_text(v: object) -> str:
+                return "" if v is None else str(v)
+
+            fmt = _fmt_text
+
+        formatters[str(name)] = fmt
+        if is_numeric:
+            formatted = [fmt(v) for v in df[name].tolist()]
+            min_widths[str(name)] = max(len(str(name)), *(len(v) for v in formatted))
+
     for name in df.columns:
         dtype = df[name].dtype
         align = _align_for_dtype(dtype)
@@ -83,13 +123,23 @@ def render_table_rich(
                 col_style = "bright_cyan"
             else:
                 col_style = "magenta"
-        except Exception:
+        except (TypeError, ValueError):
             pass
-        table.add_column(str(name), justify=align, no_wrap=True, overflow="fold", style=col_style)
+        col_name = str(name)
+        overflow = "ellipsis" if col_name in numeric_cols else "fold"
+        min_width = min_widths.get(col_name)
+        table.add_column(
+            col_name,
+            justify=align,
+            no_wrap=True,
+            overflow=overflow,
+            min_width=min_width,
+            style=col_style,
+        )
     for _, row in df.iterrows():
         cells = []
-        for v in row.tolist():
-            s = str(v) if v is not None else ""
+        for name, v in zip(df.columns, row.tolist()):
+            s = formatters[str(name)](v)
             # cap visual noise
             if len(s) > max_colwidth:
                 s = s[: max_colwidth - 1] + "…"
@@ -168,6 +218,7 @@ def render_diff_rich(s: DiffSummary) -> None:
     console.print(cols)
     console.print(
         f"meta.md mtime: {s.meta_local_mtime or '-'} → {s.meta_remote_mtime or '-'}\n"
+        f"verify: {s.verify_mode}\n"
         f".events.log: local={s.events_local_lines} remote={s.events_remote_lines} (+{max(0, s.events_remote_lines - s.events_local_lines)})\n"  # noqa
         f"_snapshots: remote_count={s.snapshots.count} newer_than_local={s.snapshots.newer_than_local}"
     )

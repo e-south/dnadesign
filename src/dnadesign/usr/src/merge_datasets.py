@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-src/dnadesign/usr/src/merge_datasets.py
+dnadesign
+dnadesign/src/dnadesign/usr/src/merge_datasets.py
+
+USR dataset merge logic and conflict handling.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -10,16 +12,20 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+from contextlib import nullcontext
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import pyarrow as pa
+import pyarrow.parquet as pq
 
 from .dataset import Dataset
 from .errors import SchemaError, ValidationError
-from .io import append_event, read_parquet, write_parquet_atomic
+from .events import record_event
+from .io import PARQUET_COMPRESSION, iter_parquet_batches, now_utc, write_parquet_atomic_batches
+from .locks import dataset_write_lock
 from .schema import REQUIRED_COLUMNS
 
 # -------------------- public enums & preview --------------------
@@ -60,12 +66,12 @@ _ESSENTIAL = [k for k, _ in REQUIRED_COLUMNS]
 _ESSENTIAL_SET = set(_ESSENTIAL)
 
 
-def _ordered_fields(tbl: pa.Table) -> List[pa.Field]:
-    return [tbl.schema.field(i) for i in range(tbl.num_columns)]
+def _ordered_fields(schema: pa.Schema) -> List[pa.Field]:
+    return [schema.field(i) for i in range(schema.num_fields)]
 
 
-def _field_map(tbl: pa.Table):
-    return {f.name: f for f in tbl.schema}
+def _field_map(schema: pa.Schema):
+    return {f.name: f for f in schema}
 
 
 def _casefold_keys(tbl: pa.Table) -> set[tuple[str, str]]:
@@ -115,7 +121,7 @@ def _coerce_jsonish_to_type(col: "pa.ChunkedArray | pa.Array", target_type: pa.D
                 return None
             try:
                 return int(s)
-            except Exception:
+            except (TypeError, ValueError, OverflowError):
                 return int(float(s))  # allow "3.0"
         return None if _is_nullish(v) else int(v)
 
@@ -157,7 +163,7 @@ def _coerce_jsonish_to_type(col: "pa.ChunkedArray | pa.Array", target_type: pa.D
                 return None
             try:
                 return json.loads(s)
-            except Exception as e:
+            except (TypeError, ValueError) as e:
                 raise SchemaError(f"Column '{colname}': failed to parse JSON: {e}")
         return v
 
@@ -184,7 +190,7 @@ def _coerce_jsonish_to_type(col: "pa.ChunkedArray | pa.Array", target_type: pa.D
     return pa.array([None if _is_nullish(v) else v for v in vals], type=target_type)
 
 
-def _ensure_columns_same(dest: pa.Table, src: pa.Table) -> List[pa.Field]:
+def _ensure_columns_same(dest: pa.Schema, src: pa.Schema) -> List[pa.Field]:
     """
     Require exact same column names and Arrow types (order can differ).
     Return a consistent ordered schema (use destination order).
@@ -206,7 +212,7 @@ def _ensure_columns_same(dest: pa.Table, src: pa.Table) -> List[pa.Field]:
     return _ordered_fields(dest)
 
 
-def _union_columns(dest: pa.Table, src: pa.Table) -> Tuple[List[pa.Field], int, int]:
+def _union_columns(dest: pa.Schema, src: pa.Schema) -> Tuple[List[pa.Field], int, int]:
     """
     Allow column union. Overlapping names must have the same Arrow type.
     Schema order: essential columns first (in USR order), then the rest
@@ -276,6 +282,53 @@ def _index_map(values: List[str]) -> dict:
     return {v: i for i, v in enumerate(values)}
 
 
+def _apply_schema_casts(schema: pa.Schema, casts: Dict[str, pa.DataType]) -> pa.Schema:
+    if not casts:
+        return schema
+    fields: List[pa.Field] = []
+    for f in schema:
+        if f.name in casts:
+            fields.append(pa.field(f.name, casts[f.name], nullable=True))
+        else:
+            fields.append(f)
+    return pa.schema(fields)
+
+
+def _duckdb_type_for_arrow(dtype: pa.DataType) -> str:
+    if pa.types.is_string(dtype):
+        return "VARCHAR"
+    if pa.types.is_boolean(dtype):
+        return "BOOLEAN"
+    if pa.types.is_int8(dtype):
+        return "TINYINT"
+    if pa.types.is_int16(dtype):
+        return "SMALLINT"
+    if pa.types.is_int32(dtype):
+        return "INTEGER"
+    if pa.types.is_int64(dtype):
+        return "BIGINT"
+    if pa.types.is_uint8(dtype):
+        return "UTINYINT"
+    if pa.types.is_uint16(dtype):
+        return "USMALLINT"
+    if pa.types.is_uint32(dtype):
+        return "UINTEGER"
+    if pa.types.is_uint64(dtype):
+        return "UBIGINT"
+    if pa.types.is_float32(dtype):
+        return "FLOAT"
+    if pa.types.is_float64(dtype):
+        return "DOUBLE"
+    if pa.types.is_timestamp(dtype):
+        return "TIMESTAMP"
+    raise SchemaError(f"Unsupported Arrow type for DuckDB cast: {dtype}")
+
+
+def _sql_ident(name: str) -> str:
+    escaped = str(name).replace('"', '""')
+    return f'"{escaped}"'
+
+
 # -------------------- core merge --------------------
 def merge_usr_to_usr(
     *,
@@ -290,146 +343,193 @@ def merge_usr_to_usr(
     note: str = "",
     overlap_coercion: str = "none",  # "none" | "to-dest"
     avoid_casefold_dups: bool = True,
+    maintenance: bool = False,
 ) -> MergePreview:
     """
     Merge rows from a source USR dataset into a destination dataset.
     See CLI help for options. Returns a MergePreview with counts.
     """
+    if not maintenance:
+        raise SchemaError("merge is a maintenance-only operation.")
     ds_dest = Dataset(root, dest)
     ds_src = Dataset(root, src)
-    dest_tbl = read_parquet(ds_dest.records_path)
-    src_tbl = read_parquet(ds_src.records_path)
+    lock_ctx = dataset_write_lock(ds_dest.dir) if not dry_run else nullcontext()
+    with lock_ctx:
+        dest_pf = pq.ParquetFile(str(ds_dest.records_path))
+        src_pf = pq.ParquetFile(str(ds_src.records_path))
+        dest_schema = dest_pf.schema_arrow
+        src_schema = src_pf.schema_arrow
 
-    coercion_notes: List[str] = []
+        dest_rows_before = int(dest_pf.metadata.num_rows)
+        src_rows = int(src_pf.metadata.num_rows)
 
-    # ---- Optional: coerce overlapping columns in src to dest types ----
-    if overlap_coercion == "to-dest":
-        overlap = set(dest_tbl.schema.names).intersection(set(src_tbl.schema.names))
+        if overlap_coercion not in {"none", "to-dest"}:
+            raise SchemaError(f"Unsupported overlap coercion '{overlap_coercion}'.")
+
+        coercion_notes: List[str] = []
+        overlap = set(dest_schema.names).intersection(set(src_schema.names))
+        overlap_casts: Dict[str, pa.DataType] = {}
+
         for name in overlap:
-            d_field = dest_tbl.schema.field(name)
-            s_field = src_tbl.schema.field(name)
+            d_field = dest_schema.field(name)
+            s_field = src_schema.field(name)
             if d_field.type.equals(s_field.type):
                 continue
-            try:
-                coerced = _coerce_jsonish_to_type(src_tbl.column(name), d_field.type, name)
-                idx = src_tbl.schema.get_field_index(name)
-                src_tbl = src_tbl.set_column(idx, pa.field(name, d_field.type, nullable=True), coerced)
-                coercion_notes.append(f"{name}: {s_field.type} → {d_field.type}")
-            except Exception as e:
-                raise SchemaError(
-                    f"Overlapping column '{name}' has different types ({s_field.type} vs {d_field.type}) "
-                    f"and coercion failed: {e}"
+            if overlap_coercion == "none":
+                raise SchemaError(f"Overlapping column '{name}' has different types: {d_field.type} vs {s_field.type}")
+            _duckdb_type_for_arrow(d_field.type)
+            overlap_casts[name] = d_field.type
+            coercion_notes.append(f"{name}: {s_field.type} → {d_field.type}")
+
+        src_schema_adjusted = _apply_schema_casts(src_schema, overlap_casts)
+
+        if columns_mode == MergeColumnsMode.REQUIRE_SAME:
+            fields = _ensure_columns_same(dest_schema, src_schema_adjusted)
+        else:
+            fields, _, _ = _union_columns(dest_schema, src_schema_adjusted)
+        fields = _restrict_to_subset(fields, columns_subset)
+
+        columns_total = len(fields)
+        overlapping_columns = len(set(dest_schema.names).intersection(set(src_schema.names)))
+
+        try:
+            import duckdb  # type: ignore
+        except ImportError as e:
+            raise SchemaError("duckdb is required for merge-datasets (install duckdb).") from e
+
+        con = duckdb.connect()
+        try:
+            dest_sql = str(ds_dest.records_path).replace("'", "''")
+            src_sql = str(ds_src.records_path).replace("'", "''")
+            con.execute(f"CREATE TEMP VIEW dest AS SELECT * FROM read_parquet('{dest_sql}')")
+            src_exprs: List[str] = []
+            for name in src_schema.names:
+                ident = _sql_ident(name)
+                if name in overlap_casts:
+                    dtype = _duckdb_type_for_arrow(overlap_casts[name])
+                    src_exprs.append(f"CAST({ident} AS {dtype}) AS {ident}")
+                else:
+                    src_exprs.append(ident)
+            src_select = ", ".join(src_exprs) if src_exprs else "*"
+            con.execute(f"CREATE TEMP VIEW src AS SELECT {src_select} FROM read_parquet('{src_sql}')")
+
+            if avoid_casefold_dups:
+                con.execute(
+                    "CREATE TEMP VIEW dest_casefold AS SELECT lower(bio_type) AS bt, upper(sequence) AS seq FROM dest"
                 )
+                con.execute(
+                    "CREATE TEMP VIEW src_filtered AS "
+                    "SELECT s.* FROM src s "
+                    "LEFT JOIN dest_casefold d "
+                    "ON lower(s.bio_type)=d.bt AND upper(s.sequence)=d.seq "
+                    "WHERE d.bt IS NULL"
+                )
+            else:
+                con.execute("CREATE TEMP VIEW src_filtered AS SELECT * FROM src")
 
-    # ------------- (existing) schema reconciliation -------------
-    if columns_mode == MergeColumnsMode.REQUIRE_SAME:
-        fields = _ensure_columns_same(dest_tbl, src_tbl)
-    else:
-        fields, total_cols, overlap_count = _union_columns(dest_tbl, src_tbl)
-        # we keep these for the preview later
-    fields = _restrict_to_subset(fields, columns_subset)
+            duplicates_total = int(
+                con.execute("SELECT COUNT(*) FROM src_filtered s JOIN dest d USING (id)").fetchone()[0]
+            )
 
-    # Build aligned tables with the chosen field order
-    names = [f.name for f in fields]
-    d_aligned = dest_tbl.select(names)
+            duplicates_skipped = 0
+            duplicates_replaced = 0
 
-    # For missing columns in either side, add NULL arrays
-    def _ensure_all_columns(tbl: pa.Table, fields: List[pa.Field]) -> pa.Table:
-        present = set(tbl.schema.names)
-        out = tbl
-        for f in fields:
-            if f.name not in present:
-                out = out.add_column(out.num_columns, f, pa.nulls(tbl.num_rows, type=f.type))
-        return out.select([f.name for f in fields])
+            if duplicate_policy == MergePolicy.ERROR and duplicates_total:
+                raise ValidationError(f"{duplicates_total} duplicate id(s) present in src.")
 
-    d_aligned = _ensure_all_columns(d_aligned, fields)
-    s_aligned = _ensure_all_columns(src_tbl.select([c for c in src_tbl.schema.names if c in names]), fields)
+            if duplicate_policy == MergePolicy.PREFER_SRC:
+                con.execute(
+                    "CREATE TEMP VIEW dest_final AS "
+                    "SELECT d.* FROM dest d LEFT JOIN src_filtered s USING (id) "
+                    "WHERE s.id IS NULL"
+                )
+                con.execute("CREATE TEMP VIEW src_final AS SELECT * FROM src_filtered")
+                duplicates_replaced = duplicates_total
+                dest_rel = "dest_final"
+            else:
+                con.execute(
+                    "CREATE TEMP VIEW src_final AS "
+                    "SELECT s.* FROM src_filtered s LEFT JOIN dest d USING (id) "
+                    "WHERE d.id IS NULL"
+                )
+                if duplicate_policy in (MergePolicy.SKIP, MergePolicy.PREFER_DEST):
+                    duplicates_skipped = duplicates_total
+                dest_rel = "dest"
 
-    # -------- drop source rows whose (bio_type, upper(sequence)) already exist in dest --------
-    if avoid_casefold_dups:
-        dest_cf = _casefold_keys(d_aligned)
-        s_bt = [str(x) for x in s_aligned.column("bio_type").to_pylist()]
-        s_sq = [str(x) for x in s_aligned.column("sequence").to_pylist()]
-        keep_mask_cf = [(b.lower(), s.upper()) not in dest_cf for b, s in zip(s_bt, s_sq)]
-        if not all(keep_mask_cf):
-            s_aligned = s_aligned.filter(pa.array(keep_mask_cf))
+            def _select_exprs(existing: set[str]) -> str:
+                exprs: List[str] = []
+                for f in fields:
+                    if f.name in existing:
+                        exprs.append(_sql_ident(f.name))
+                    else:
+                        exprs.append(f"NULL AS {_sql_ident(f.name)}")
+                return ", ".join(exprs)
 
-    # ------- duplicate policy by id -------
-    dest_ids = set(d_aligned.column("id").to_pylist())
-    src_ids = s_aligned.column("id").to_pylist()
-    keep_mask = [rid not in dest_ids for rid in src_ids]
-    duplicates_total = len(src_ids) - sum(keep_mask)
-    duplicates_skipped = duplicates_replaced = 0
+            dest_select = _select_exprs(set(dest_schema.names))
+            src_select = _select_exprs(set(src_schema_adjusted.names))
+            union_query = f"SELECT {dest_select} FROM {dest_rel} UNION ALL SELECT {src_select} FROM src_final"
 
-    if duplicate_policy == MergePolicy.ERROR and duplicates_total:
-        raise ValidationError(f"{duplicates_total} duplicate id(s) present in src.")
-    if duplicate_policy in (MergePolicy.SKIP, MergePolicy.ERROR):
-        # simple filter
-        s_kept = s_aligned.filter(pa.array(keep_mask))
-        duplicates_skipped = duplicates_total
-        combined = pa.concat_tables([d_aligned, s_kept], promote_options="default")
-    else:
-        # prefer-src or prefer-dest (replace semantics)
-        # Build a map from id -> row index for destination
-        pos = {rid: i for i, rid in enumerate(d_aligned.column("id").to_pylist())}
-        base = d_aligned
-        if duplicate_policy == MergePolicy.PREFER_SRC:
-            # replace dest rows with src rows where duplicate
-            for i, rid in enumerate(src_ids):
-                j = pos.get(rid)
-                if j is not None:
-                    # overwrite each column value at j with src row i
-                    for col_idx, f in enumerate(fields):
-                        col = base.column(col_idx).to_pylist()
-                        col[j] = s_aligned.column(col_idx)[i].as_py()
-                        base = base.set_column(col_idx, f, pa.array(col, type=f.type))
-            duplicates_replaced = duplicates_total
-            # append only new rows from src
-            keep_new = [rid not in dest_ids for rid in src_ids]
-            combined = pa.concat_tables([base, s_aligned.filter(pa.array(keep_new))], promote_options="default")
-        else:  # prefer-dest: drop duplicates from src entirely
-            s_kept = s_aligned.filter(pa.array(keep_mask))
-            duplicates_skipped = duplicates_total
-            combined = pa.concat_tables([base, s_kept], promote_options="default")
+            dest_rows_after = int(con.execute(f"SELECT COUNT(*) FROM ({union_query})").fetchone()[0])
+            new_rows = int(dest_rows_after - dest_rows_before)
 
-    # ----- finalize + write (or dry-run) -----
-    dest_rows_before = d_aligned.num_rows
-    src_rows = src_tbl.num_rows
-    new_rows = combined.num_rows - dest_rows_before
-    dest_rows_after = combined.num_rows
-    columns_total = len(fields)
-    overlapping_columns = len(set(dest_tbl.schema.names).intersection(set(src_tbl.schema.names)))
+            if not dry_run:
+                tmp_path = ds_dest.records_path.with_suffix(".merge.parquet")
+                tmp_sql = str(tmp_path).replace("'", "''")
+                compression = PARQUET_COMPRESSION.upper()
+                con.execute(f"COPY ({union_query}) TO '{tmp_sql}' (FORMAT PARQUET, COMPRESSION '{compression}')")
 
-    if not dry_run:
-        write_parquet_atomic(combined, ds_dest.records_path, ds_dest.snapshot_dir)
-        payload = {
-            "action": "merge_datasets",
-            "dest": dest,
-            "src": src,
-            "duplicate_policy": duplicate_policy.value,
-            "columns_mode": columns_mode.value,
-            "rows_src": src_rows,
-            "duplicates_total": duplicates_total,
-            "duplicates_skipped": duplicates_skipped,
-            "duplicates_replaced": duplicates_replaced,
-            "rows_added": new_rows,
-            "columns_total": columns_total,
-            "overlapping_columns": overlapping_columns,
-            "note": note,
-        }
-        if coercion_notes:
-            payload["overlap_coercions"] = coercion_notes
-        append_event(ds_dest.events_path, payload)
+                pf_tmp = pq.ParquetFile(str(tmp_path))
+                schema = pf_tmp.schema_arrow
+                metadata = ds_dest._base_metadata(created_at=now_utc())
 
-    return MergePreview(
-        dest_rows_before=dest_rows_before,
-        src_rows=src_rows,
-        duplicates_total=duplicates_total,
-        duplicates_skipped=duplicates_skipped,
-        duplicates_replaced=duplicates_replaced,
-        duplicate_policy=duplicate_policy,
-        new_rows=new_rows,
-        dest_rows_after=dest_rows_after,
-        columns_total=columns_total,
-        overlapping_columns=overlapping_columns,
-    )
+                def _batches():
+                    for batch in iter_parquet_batches(tmp_path, columns=None):
+                        yield batch
+
+                write_parquet_atomic_batches(
+                    _batches(),
+                    schema,
+                    ds_dest.records_path,
+                    ds_dest.snapshot_dir,
+                    metadata=metadata,
+                )
+                tmp_path.unlink(missing_ok=True)
+
+                payload = {
+                    "dest": dest,
+                    "src": src,
+                    "duplicate_policy": duplicate_policy.value,
+                    "columns_mode": columns_mode.value,
+                    "rows_src": src_rows,
+                    "duplicates_total": duplicates_total,
+                    "duplicates_skipped": duplicates_skipped,
+                    "duplicates_replaced": duplicates_replaced,
+                    "rows_added": new_rows,
+                    "columns_total": columns_total,
+                    "overlapping_columns": overlapping_columns,
+                    "note": note,
+                }
+                if coercion_notes:
+                    payload["overlap_coercions"] = coercion_notes
+                record_event(
+                    ds_dest.events_path,
+                    "merge_datasets",
+                    dataset=ds_dest.name,
+                    args=payload,
+                    target_path=ds_dest.records_path,
+                )
+        finally:
+            con.close()
+
+        return MergePreview(
+            dest_rows_before=dest_rows_before,
+            src_rows=src_rows,
+            duplicates_total=duplicates_total,
+            duplicates_skipped=duplicates_skipped,
+            duplicates_replaced=duplicates_replaced,
+            duplicate_policy=duplicate_policy,
+            new_rows=new_rows,
+            dest_rows_after=dest_rows_after,
+            columns_total=columns_total,
+            overlapping_columns=overlapping_columns,
+        )

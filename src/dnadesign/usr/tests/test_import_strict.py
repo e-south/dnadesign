@@ -63,3 +63,34 @@ def test_import_invalid_sequence_reports_alphabet_error(tmp_path: Path) -> None:
     rows = [{"sequence": "NNNN", "bio_type": "dna", "alphabet": "dna_4"}]
     with pytest.raises(AlphabetError):
         ds.import_rows(rows)
+
+
+def test_import_invalid_bio_type_is_error(tmp_path: Path) -> None:
+    ds = _init_dataset(tmp_path)
+    rows = [{"sequence": "ACGT", "bio_type": "DNA", "alphabet": "dna_4"}]
+    with pytest.raises(SchemaError):
+        ds.import_rows(rows)
+
+
+def test_import_invalid_alphabet_for_bio_type_is_error(tmp_path: Path) -> None:
+    ds = _init_dataset(tmp_path)
+    rows = [{"sequence": "ACGT", "bio_type": "dna", "alphabet": "protein_20"}]
+    with pytest.raises(AlphabetError):
+        ds.import_rows(rows)
+
+
+def test_import_rna_and_protein_sequences(tmp_path: Path) -> None:
+    ds = _init_dataset(tmp_path)
+    rows = [
+        {"sequence": "ACGU", "bio_type": "rna", "alphabet": "rna_4"},
+        {"sequence": "ACDEFGHIKLMNPQRSTVWY", "bio_type": "protein", "alphabet": "protein_20"},
+    ]
+    n = ds.import_rows(rows)
+    assert n == 2
+
+
+def test_import_rna_rejects_thymine(tmp_path: Path) -> None:
+    ds = _init_dataset(tmp_path)
+    rows = [{"sequence": "ACGT", "bio_type": "rna", "alphabet": "rna_4"}]
+    with pytest.raises(AlphabetError):
+        ds.import_rows(rows)

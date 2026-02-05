@@ -218,6 +218,8 @@ src/dnadesign/densegen/runs/**
 
 # USR datasets (large, not for git)
 src/dnadesign/usr/datasets/**
+!src/dnadesign/usr/datasets/
+!src/dnadesign/usr/datasets/README.md
 
 # Common local project dirs
 /campaigns/

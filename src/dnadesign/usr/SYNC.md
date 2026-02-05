@@ -62,9 +62,10 @@ exit
 
 Run from your laptop in the repo where your dataset lives.
 
-**CLI-based config (writes `~/.config/usr/remotes.yaml` if none exists):**
+**CLI-based config (writes to the file at `USR_REMOTES_PATH`, which is required):**
 
 ```bash
+export USR_REMOTES_PATH="$HOME/.config/dnadesign/usr-remotes.yaml"
 usr remotes add cluster --type ssh \
   --host scc1.bu.edu --user esouth \
   --base-dir /project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets
@@ -81,7 +82,7 @@ usr remotes show cluster
 **File-based config (alternative):**
 
 ```yaml
-# usr/remotes.yaml
+# $USR_REMOTES_PATH
 remotes:
   cluster:
     type: ssh
@@ -98,6 +99,10 @@ If you set `ssh_key_env`, export it before running `usr`:
 export USR_SSH_KEY="$HOME/.ssh/id_ed25519"
 ```
 
+**Config requirement**
+
+* `USR_REMOTES_PATH` must be set; there is no repo-local fallback.
+
 ---
 
 ### 3) Everyday sync
@@ -107,20 +112,20 @@ export USR_SSH_KEY="$HOME/.ssh/id_ed25519"
 **Preview differences:**
 
 ```bash
-usr diff my_usr_dataset --remote cluster
+usr diff densegen/my_usr_dataset --remote cluster
 # or: usr status my_usr_dataset --remote cluster
 ```
 
 **Pull cluster → local:**
 
 ```bash
-usr pull my_usr_dataset --from cluster -y
+usr pull densegen/my_usr_dataset --from cluster -y
 ```
 
 **Push local → cluster:**
 
 ```bash
-usr push my_usr_dataset --to cluster -y
+usr push densegen/my_usr_dataset --to cluster -y
 ```
 
 **Useful flags**
@@ -129,6 +134,7 @@ usr push my_usr_dataset --to cluster -y
 * `--primary-only` transfers only `records.parquet`
 * `--skip-snapshots` excludes `_snapshots/`
 * `--dry-run` shows what would copy without copying
+* `--verify {auto,hash,size,parquet}` controls verification strength
 
 ---
 
@@ -139,7 +145,7 @@ Use FILE mode when you want to sync a single file outside a canonical USR datase
 1. Make sure the remote knows both the datasets base and your repo root:
 
 ```yaml
-# usr/remotes.yaml
+# $USR_REMOTES_PATH
 remotes:
   cluster:
     type: ssh
@@ -171,21 +177,23 @@ usr pull permuter/run42/records.parquet --remote cluster \
 3. Dataset‑folder convenience:
 
 ```bash
-cd usr/datasets/my_usr_dataset
+cd usr/datasets/densegen/my_usr_dataset
 usr diff --remote cluster
 usr pull --remote cluster -y
 ```
 
 **Verification behavior (both modes)**
-Transfers are verified automatically. Preference order:
+Transfers are verified automatically. `--verify auto` uses this preference order:
 
 * **SHA‑256** (if available on both ends)
 * file **size**
-* for Parquet files (and if `pyarrow` is available), **rows/cols**
-  If a check can’t be performed, you’ll get a clear error.
+* for Parquet files, **rows/cols** (requires Python + `pyarrow` on the remote host)
+
+If a fallback is used in `auto`, USR prints a warning. You can force strict modes with
+`--verify hash`, `--verify size`, or `--verify parquet` (which will error if unavailable).
 
 > Environment variable for FILE mode:
-> `DNADESIGN_REPO_ROOT` can supply your local repo root if not passed via `--repo-root` and not present in `remotes.yaml`.
+> `DNADESIGN_REPO_ROOT` can supply your local repo root if not passed via `--repo-root` and not present in the `USR_REMOTES_PATH` config.
 
 ---
 
