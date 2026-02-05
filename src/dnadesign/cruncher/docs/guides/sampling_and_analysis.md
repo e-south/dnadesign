@@ -132,9 +132,9 @@ patterns from elites (best-hit windows per TF) and reports:
 - `analysis/overlap_summary.parquet` — TF-pair overlap rates, overlap bp stats,
   strand-combo counts, and `overlap_bp_hist` (bins+counts).
 - `analysis/elite_overlap.parquet` — per-elite overlap totals and pair counts.
-- `analysis/plot__overlap_heatmap.<plot_format>` — heatmap of overlap rates.
-- `analysis/plot__overlap_bp_distribution.<plot_format>` — distribution of overlap bp.
-- Optional: `plot__overlap_strand_combos.png` + `plot__motif_offset_rug.png`.
+- When `analysis.dashboard_only=false`, overlap plots are also written:
+  `plot__overlap_heatmap.<plot_format>` and `plot__overlap_bp_distribution.<plot_format>`.
+- Optional: `plot__overlap_strand_combos.png` + `plot__motif_offset_rug.png` (when enabled).
 
 These are descriptive only; overlap is not penalized by default.
 
@@ -147,7 +147,8 @@ Diagnostics are written to:
 - `analysis/joint_metrics.parquet`
 - `analysis/objective_components.json`
 - `analysis/plot__dashboard.<plot_format>`
-- `analysis/plot__worst_tf_trace.<plot_format>` / `plot__worst_tf_identity.<plot_format>`
+- When `analysis.dashboard_only=false`, also write
+  `plot__worst_tf_trace.<plot_format>` / `plot__worst_tf_identity.<plot_format>`.
 
 Key signals:
 

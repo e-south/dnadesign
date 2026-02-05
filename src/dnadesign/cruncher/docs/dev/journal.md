@@ -66,3 +66,4 @@
 - Added atomic artifact writes (status/manifest/config, parquet, analysis summaries) and retry-on-read for run status with clear CLI errors.
 - Persisted effective PT ladder details in elites metadata and added tests for p-seq math, tie-breaking, atomic writes, and PT stats.
 - Added Contents TOCs across docs and aligned demo/reference text with current fixed-length PT behavior.
+- Ran cruncher tests and the two-TF demo flow (fetch → lock → parse → sample → analyze); removed an ArviZ warning by increasing draws in the regulator set test and clarified dashboard-only plot outputs in the sampling guide.
