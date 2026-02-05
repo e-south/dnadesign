@@ -1,45 +1,33 @@
-## cruncher demo 1
+# Cruncher demo 1
+
+
+## Contents
+- [Demo setup](#demo-setup)
+- [Preview sources and inventories](#preview-sources-and-inventories)
+- [Fetch local DAP-seq motifs + binding sites](#fetch-local-dap-seq-motifs-binding-sites)
+- [Fetch binding sites (RegulonDB, network)](#fetch-binding-sites-regulondb-network)
+- [Verify cache (pre-lock)](#verify-cache-pre-lock)
+- [Combine curated + DAP-seq sites for discovery](#combine-curated-dap-seq-sites-for-discovery)
+- [Discover motifs from merged sites (MEME preferred)](#discover-motifs-from-merged-sites-meme-preferred)
+- [Inspect candidate PWMs + logos (pre-lock)](#inspect-candidate-pwms-logos-pre-lock)
+- [Select motif source + lock](#select-motif-source-lock)
+- [Inspect cached entries and targets (post-lock)](#inspect-cached-entries-and-targets-post-lock)
+- [Parse workflow (validate locked motifs)](#parse-workflow-validate-locked-motifs)
+- [Sample (MCMC optimization)](#sample-mcmc-optimization)
 
 **Design short dsDNA sequences that satisfy two PWMs at once.**
 
 **cruncher** scores each TF by the best PWM match anywhere in the candidate sequence on either strand, then optimizes the min/soft‑min across TFs so the weakest TF improves. It explores sequence space with parallel tempering (MCMC) and returns a diverse elite set (unique up to reverse‑complement) selected via TFBS‑core MMR, plus diagnostics for stability/mixing. Motif overlap is allowed and treated as informative structure in analysis.
 
-Scoring is **FIMO-like** (internal implementation): for each PWM, cruncher builds
-log‑odds scores against a 0‑order background, scans all windows to find the best
-hit (optionally bidirectional), and optionally converts that best hit to a
-p‑value via a DP‑derived null distribution (`score_scale: logp`). For `logp`,
-the tail probability for the best window becomes a sequence‑level p via
-`p_seq = 1 − (1 − p_win)^n_windows`. When bidirectional, `n_windows` counts both
-strands (`2 * (L − w + 1)`).
+Scoring is **FIMO-like** (internal implementation): for each PWM, cruncher builds log‑odds scores against a 0‑order background, scans all windows to find the best hit (optionally bidirectional), and optionally converts that best hit to a p‑value via a DP‑derived null distribution (`score_scale: logp`). For `logp`, the tail probability for the best window becomes a sequence‑level p via `p_seq = 1 − (1 − p_win)^n_windows`. When bidirectional, `n_windows` counts both strands (`2 * (L − w + 1)`).
+
+This demo is intentionally linear: cache inputs, choose/lock PWMs, validate, sample, and analyze. Each step writes artifacts consumed by the next.
 
 **Terminology:**
 
 - **sites** = training binding sequences
 - **PWMs/matrices** = scoring models
 - **lock** pins the exact matrices used for scoring.
-
-### Contents
-
-- [Demo setup](#demo-setup)
-- Core workflow
-  - [Preview sources and inventories](#preview-sources-and-inventories)
-  - [Fetch local DAP-seq motifs + binding sites](#fetch-local-dap-seq-motifs--binding-sites)
-  - [Fetch binding sites (RegulonDB, network)](#fetch-binding-sites-regulondb-network)
-    - [Optional: HT-only or combined site modes (RegulonDB)](#optional-ht-only-or-combined-site-modes-regulondb)
-  - [Verify cache (pre-lock)](#verify-cache-pre-lock)
-  - [Combine curated + DAP-seq sites for discovery](#combine-curated--dap-seq-sites-for-discovery)
-  - [Discover motifs from merged sites (MEME/STREME)](#discover-motifs-from-merged-sites-memestreme)
-    - [Optional: trim aligned PWMs to a fixed window](#optional-trim-aligned-pwms-to-a-fixed-window)
-  - [Inspect candidate PWMs + logos (pre-lock)](#inspect-candidate-pwms--logos-pre-lock)
-    - [Optional: local motifs or alignment matrices](#optional-local-motifs-or-alignment-matrices)
-  - [Select motif source + lock](#select-motif-source--lock)
-  - [Inspect cached entries and targets (post-lock)](#inspect-cached-entries-and-targets-post-lock)
-  - [Parse workflow (validate locked motifs)](#parse-workflow-validate-locked-motifs)
-- [Sample (MCMC optimization)](#sample-mcmc-optimization)
-    - [Run artifacts + performance snapshot](#run-artifacts--performance-snapshot)
-    - [Analyze + report](#analyze--report)
-    - [Optional: live analysis notebook](#optional-live-analysis-notebook)
-  - [Bridge to DenseGen](#bridge-to-densegen)
 
 ---
 
@@ -56,7 +44,7 @@ strands (`2 * (L − w + 1)`).
 > cruncher analyze --summary -c "$CONFIG"
 > ```
 >
-> Continue below for a more in depth guide.
+> Continue below for a more in‑depth guide.
 
 ### Demo setup
 
@@ -213,11 +201,11 @@ Discovery prints a short table (TF, tool, motif ID, length) and stores full outp
 cruncher discover motifs --tf lexA --tf cpxR --tool streme --source-id meme_suite_streme -c "$CONFIG"
 ```
 
-This demo config already prefers MEME motifs for optimization: `pwm_source: matrix` with `source_preference: [meme_suite_meme, meme_suite_streme, ...]`. After discovery, continue to the optional trimming/inspection steps below, then lock so parse/sample use the new motifs.
+This demo config already prefers MEME motifs for optimization: `pwm_source: matrix` with `source_preference: [meme_suite_meme, meme_suite_streme, ...]`. After discovery, inspect candidate PWMs (and optionally set PWM window lengths) before locking so parse/sample use the new motifs.
 
 ---
 
-#### Optional: trim aligned PWMs to a fixed window
+#### Optional: set PWM window lengths
 
 If optimization needs a shorter PWM, set `pwm_window_lengths` to select the highest-information contiguous window before sampling:
 
@@ -308,7 +296,7 @@ Example output:
 <workspace>/.cruncher/locks/config.lock.json
 ```
 
-Think of `lock` as the “commit”: it freezes the exact motif IDs + hashes used for scoring. Re‑run it after discovery, after changing `source_preference`, or after changing any PWM windowing/trimming settings.
+Think of `lock` as the “commit”: it freezes the exact motif IDs + hashes used for scoring. Re‑run it after discovery, after changing `source_preference`, or after changing any PWM windowing settings.
 
 Lockfiles are required for `parse`, `sample`, and `targets status`. If you add new motifs (e.g., after `discover motifs`) or change `motif_store` preferences, re-run `lock` to refresh the pinned motif IDs and hashes.
 
@@ -360,7 +348,7 @@ Re-running parse with the same config + lock fingerprint reuses existing outputs
 
 ### Sample (MCMC optimization)
 
-Each candidate dsDNA sequence is scored by scanning both strands for each PWM, taking the best match per TF, then optimizing the min/soft‑min across TFs (raise the weakest TF). The goal is not a single winner: **cruncher** returns a diverse elite set.
+Each candidate dsDNA sequence is scored by scanning both strands for each PWM, taking the best match per TF, then optimizing the min/soft‑min across TFs (raise the weakest TF). Sampling length is fixed by `sample.init.length` and must be at least the widest PWM; shorter lengths force overlap and typically reduce per‑TF scores. The goal is not a single winner: **cruncher** returns a diverse elite set.
 
 Current MMR behavior (TFBS‑core mode) is:
 - For each sequence in the candidate pool, we extract the best‑hit window for each TF (e.g., LexA core, CpxR core), orient each core to its PWM.

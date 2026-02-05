@@ -1,14 +1,29 @@
-## cruncher demo 2
+# Cruncher demo 2
 
-**Jointly maximizing a sequence based on >2 TFs, categories, and campaigns.**
 
-This demo walks through a process of running category-based sequence optimization campaigns, with a focus on campaign selection (site counts + PWM quality), derived configs, and multi-TF runs.
+## Contents
+- [Demo instance](#demo-instance)
+- [Data provenance (demo inputs)](#data-provenance-demo-inputs)
+- [Enter the demo workspace](#enter-the-demo-workspace)
+- [Campaigns configured in the demo workspace](#campaigns-configured-in-the-demo-workspace)
+- [Inspect categories and campaign expansion (optional)](#inspect-categories-and-campaign-expansion-optional)
+- [Validate campaign definitions (no cache required)](#validate-campaign-definitions-no-cache-required)
+- [Fetch curated sites for campaign TFs](#fetch-curated-sites-for-campaign-tfs)
+- [Inspect cached inventory + group stats](#inspect-cached-inventory-group-stats)
+- [Evaluate PWM quality (information content)](#evaluate-pwm-quality-information-content)
+- [Optional: align sites with MEME Suite (recommended before multi-source metrics)](#optional-align-sites-with-meme-suite-recommended-before-multi-source-metrics)
+- [Apply selectors and generate a derived config](#apply-selectors-and-generate-a-derived-config)
+- [Run a multi-TF optimization (baseline run)](#run-a-multi-tf-optimization-baseline-run)
+- [Inspect run artifacts and outputs](#inspect-run-artifacts-and-outputs)
+- [Render PWM logos (visual QA)](#render-pwm-logos-visual-qa)
+- [Analyze + report (pairwise plots)](#analyze-report-pairwise-plots)
+- [Open the run notebook (optional, real-time exploration)](#open-the-run-notebook-optional-real-time-exploration)
+- [Optional: campaign-level summary](#optional-campaign-level-summary)
+- [Notes](#notes)
+- [Where outputs live](#where-outputs-live)
+- [See also](#see-also)
 
-Scoring is **FIMO-like** (internal implementation): cruncher uses PWM log‑odds
-scanning against a 0‑order background, takes the best window per TF (optionally
-both strands), and can convert that best hit to a p‑value via a DP‑derived null
-distribution (`score_scale: logp`, with `p_seq = 1 − (1 − p_win)^n_windows`;
-bidirectional scans count both strands as `2 * (L − w + 1)` tests).
+This demo shows how to expand regulator categories into campaigns, run multi‑TF sampling, and aggregate results across runs.
 
 ### Demo instance
 

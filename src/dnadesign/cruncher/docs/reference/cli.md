@@ -1,10 +1,15 @@
 ## cruncher CLI
 
-Most commands operate relative to a `config.yaml` file; some (notably `cruncher notebook`) operate on a run directory. You can pass `--config/-c` globally (before the command). With pixi (`pixi run cruncher -- ...`), place `-c/--config` after the subcommand because pixi inserts `--`. By default, paths render relative to the workspace root.
 
-> Network access occurs in fetch and remote inventory commands (for example, `cruncher fetch ...`, `cruncher sources summary --scope remote`, `cruncher sources datasets`). Some workflows (such as site hydration via NCBI) also use the network depending on your config. Use `--offline` where supported to force cache‑only behavior.
+## Contents
+- [cruncher CLI](#cruncher-cli)
+- [Workspace discovery and config resolution](#workspace-discovery-and-config-resolution)
+- [Quick command map](#quick-command-map)
+- [Core lifecycle commands](#core-lifecycle-commands)
+- [Discovery and inspection](#discovery-and-inspection)
+- [Global options](#global-options)
 
----
+This reference summarizes the Cruncher CLI surface, grouped by lifecycle stage and workflow.
 
 ### Workspace discovery and config resolution
 
@@ -446,7 +451,7 @@ Example:
 Inspect cached motifs and site sets.
 
 Use `catalog pwms` to compute PWMs from cached matrices or binding sites and
-survey their lengths/bit scores (and any trimmed window), and `catalog logos` to render PNG logos for the
+survey their lengths/bit scores (including any configured PWM window), and `catalog logos` to render PNG logos for the
 same selection criteria.
 
 Inputs:

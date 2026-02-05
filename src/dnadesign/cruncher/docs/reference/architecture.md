@@ -1,7 +1,16 @@
 ## cruncher architecture
 
-**cruncher** is structured so that data access, sequence optimization logic, and the CLI can evolve independently.
 
+## Contents
+- [cruncher architecture](#cruncher-architecture)
+- [Run lifecycle](#run-lifecycle)
+- [Layers and responsibilities](#layers-and-responsibilities)
+- [On-disk layout](#on-disk-layout)
+- [Run artifacts](#run-artifacts)
+- [Reproducibility boundaries](#reproducibility-boundaries)
+- [Extensibility points](#extensibility-points)
+
+This doc describes the Cruncher run lifecycle, module boundaries, and on-disk artifacts.
 
 ### Run lifecycle
 

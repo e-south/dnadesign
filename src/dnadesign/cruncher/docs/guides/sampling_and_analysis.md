@@ -1,8 +1,18 @@
 ## Sampling + analysis (auto‑optimize)
 
-This guide shows the minimal end‑to‑end CLI flow for sampling and analysis, plus
-how auto‑opt picks a stable optimizer by default. For a one‑page happy path,
-see the top‑level cruncher README.
+
+## Contents
+- [Sampling + analysis (auto‑optimize)](#sampling-analysis-autooptimize)
+- [End‑to‑end (one regulator set)](#endtoend-one-regulator-set)
+- [Numba cache (required for fast diagnostics)](#numba-cache-required-for-fast-diagnostics)
+- [Auto‑optimize (default)](#autooptimize-default)
+- [Elites: filter → select (MMR by default)](#elites-filter-select-mmr-by-default)
+- [Motif overlap metrics (feature, not a failure)](#motif-overlap-metrics-feature-not-a-failure)
+- [Diagnostics quick read](#diagnostics-quick-read)
+- [Run selection + paths](#run-selection-paths)
+- [Tuning essentials (when diagnostics warn)](#tuning-essentials-when-diagnostics-warn)
+
+This guide explains how to run sampling, interpret diagnostics, and read the analysis artifacts.
 
 ### End‑to‑end (one regulator set)
 

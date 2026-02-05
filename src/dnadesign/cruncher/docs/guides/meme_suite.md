@@ -1,6 +1,15 @@
 ## MEME Suite dependency
 
-`cruncher discover` uses the MEME Suite CLI tools (`streme`, `meme`). These are system-level dependencies (not Python), so they are installed outside of `uv`. The recommended UX is to run **cruncher** via **pixi**, which puts MEME on `PATH` while `uv` remains the Python source of truth.
+
+## Contents
+- [MEME Suite dependency](#meme-suite-dependency)
+- [Install with pixi (recommended)](#install-with-pixi-recommended)
+- [Choose MEME vs STREME](#choose-meme-vs-streme)
+- [Compare outputs (optional)](#compare-outputs-optional)
+- [If you don't use pixi](#if-you-dont-use-pixi)
+- [Alternative: official MEME Suite installer](#alternative-official-meme-suite-installer)
+
+This guide explains how to install MEME Suite and choose between MEME and STREME for motif discovery.
 
 ### Install with pixi (recommended)
 

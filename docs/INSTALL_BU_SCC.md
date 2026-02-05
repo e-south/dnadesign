@@ -1,13 +1,8 @@
 ## Installing `dnadesign` on the BU SCC (GPU / Evo 2)
 
-Some pipelines in `dnadesign` are designed to run on a [shared computing cluster](https://www.bu.edu/tech/support/research/system-usage/connect-scc/scc-ondemand/), such as solving dense arrays with [Gurobi](https://www.gurobi.com/), or running inference with [Evo 2](https://github.com/ArcInstitute/evo2), which requires access to CUDA and GPUs.
 
-A GPU inference stack is specified in the `pyproject.toml` as an optional extra (`infer-evo2`) and is Linux-only.
-
-What you get:
-
-- `uv sync --locked` → CPU-safe base environment (macOS/Linux).
-- `uv sync --locked --extra infer-evo2` → full inference stack including Evo2.
+## Contents
+- [Installing `dnadesign` on the BU SCC (GPU / Evo 2)](#installing-dnadesign-on-the-bu-scc-gpu-evo-2)
 
 #### 0. Get onto the right kind of node
 

@@ -1,10 +1,21 @@
 # Stage-A Sampling UX + Strata Overview Plot
 
-Date: 2026-01-25
-Status: accepted
 
-Note: This plan is historical and includes legacy p-value-based semantics. The current
-Stage-A behavior is score-only and documented in src/dnadesign/densegen/docs/guide/sampling.md.
+## Contents
+- [Context](#context)
+- [Goals](#goals)
+- [Non-goals](#non-goals)
+- [Proposed Changes](#proposed-changes)
+- [1) Stage-A plan block (pre-run)](#1-stage-a-plan-block-pre-run)
+- [2) Stage-A recap table (post-run)](#2-stage-a-recap-table-post-run)
+- [3) Persist eligible bin counts in pool_manifest](#3-persist-eligible-bin-counts-in-pool_manifest)
+- [4) Canonical composite plot](#4-canonical-composite-plot)
+- [5) Remove redundant plots](#5-remove-redundant-plots)
+- [Data Flow / Ownership](#data-flow-ownership)
+- [Error Handling](#error-handling)
+- [Testing Plan](#testing-plan)
+- [Docs / Demo Updates](#docs-demo-updates)
+- [Breaking Changes](#breaking-changes)
 
 ## Context
 Stage-A PWM sampling (FIMO backend) already records per-regulator p-value strata and retention, but the CLI output and plots are hard to interpret. Users need immediate, low-noise feedback on the configured strata/retain depth before sampling begins, and a canonical visualization that shows eligible-vs-retained behavior without relying on debug logs. Existing plots (`stage_a_pvalue_strat_hist`, `stage_a_length_hist`) are partial, redundant, and not aligned with the desired narrative.

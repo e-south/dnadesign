@@ -1,5 +1,20 @@
 # Stage-A Summary Plot Doc Alignment Design
 
+
+## Contents
+- [Context](#context)
+- [Goal](#goal)
+- [Scope](#scope)
+- [Non-Goals](#non-goals)
+- [Recommended Approach (A)](#recommended-approach-a)
+- [Proposed Changes](#proposed-changes)
+- [1) Canonical narrative in sampling.md](#1-canonical-narrative-in-samplingmd)
+- [2) Remove interpretive duplication elsewhere](#2-remove-interpretive-duplication-elsewhere)
+- [3) Drift prevention note](#3-drift-prevention-note)
+- [Validation](#validation)
+- [Risks](#risks)
+- [Rollout](#rollout)
+
 ## Context
 Stage-A produces a three-figure plot bundle (`stage_a_summary`) that is used to explain sampling quality, yield, and diversity behavior. The current narrative is scattered across multiple docs, and the didactic takeaways can drift from what the plots actually show. The goal is to make the documentation semantically aligned with the visuals and keep it aligned over time.
 

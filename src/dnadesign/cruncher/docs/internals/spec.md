@@ -1,23 +1,19 @@
 ## cruncher for developers
 
-This document defines the end-to-end requirements and architecture for **cruncher**. It is intended as a build and review guide for engineers working on ingestion, optimization, and UX.
 
-### Contents
-
-1. [Goals](#goals)
-2. [Architecture](#architecture)
-3. [Registries](#registries)
-4. [Data model](#data-model)
-5. [Cache layout](#cache-layout)
-6. [Lockfiles](#lockfiles)
-7. [PWM creation strategy](#pwm-creation-strategy)
-8. [MCMC optimization spec](#mcmc-optimization-spec)
-9. [Outputs and reporting](#outputs-and-reporting)
-10. [CLI contract](#cli-contract)
-11. [Error handling](#error-handling)
-12. [Testing plan](#testing-plan)
-
----
+## Contents
+- [cruncher for developers](#cruncher-for-developers)
+- [Goals](#goals)
+- [Architecture](#architecture)
+- [Data model](#data-model)
+- [Cache layout](#cache-layout)
+- [Lockfiles](#lockfiles)
+- [PWM creation strategy](#pwm-creation-strategy)
+- [MCMC optimization spec](#mcmc-optimization-spec)
+- [Outputs and reporting](#outputs-and-reporting)
+- [CLI contract](#cli-contract)
+- [Error handling](#error-handling)
+- [Testing plan](#testing-plan)
 
 ### Goals
 
@@ -125,7 +121,7 @@ If a TF cannot be uniquely resolved, **cruncher** errors immediately. Analyze op
 - `motif_store.combine_sites=true` concatenates site sets for a TF before PWM creation (explicit opt‑in).
 - When `combine_sites=true`, lockfiles hash the full set of site files used for that TF, so cache changes require re-locking.
 - HT site sets with variable lengths require per‑TF/per‑dataset window lengths via `motif_store.site_window_lengths`.
-- If optimization requires a shorter PWM, set `motif_store.pwm_window_lengths` to trim to the highest‑information sub-window.
+- If optimization requires a shorter PWM, set `motif_store.pwm_window_lengths` to select the highest‑information window.
 - Fail if fewer than `min_sites_for_pwm` binding sites are available (unless `allow_low_sites=true`).
 - All PWMs are validated (shape Lx4, rows sum to 1, non-negative).
 - De novo alignment/discovery is handled via MEME Suite (`cruncher discover motifs`) and stored as catalog matrices.

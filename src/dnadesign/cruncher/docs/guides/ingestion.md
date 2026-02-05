@@ -1,6 +1,22 @@
 ## cruncher ingestion
 
-Ingestion is how **cruncher** discovers and caches motif matrices and binding sites from external sources.
+
+## Contents
+- [cruncher ingestion](#cruncher-ingestion)
+- [How ingestion works](#how-ingestion-works)
+- [Cache layout](#cache-layout)
+- [General normalization rules](#general-normalization-rules)
+- [RegulonDB](#regulondb)
+- [Local motif directories](#local-motif-directories)
+- [Local binding-site FASTA sources](#local-binding-site-fasta-sources)
+- [Curated TF binding sites](#curated-tf-binding-sites)
+- [High-throughput datasets](#high-throughput-datasets)
+- [Hydration](#hydration)
+- [Fetching data](#fetching-data)
+- [PWM creation strategy](#pwm-creation-strategy)
+- [Common issues](#common-issues)
+
+This guide describes how Cruncher ingests, normalizes, and caches motif and site data.
 
 ### How ingestion works
 

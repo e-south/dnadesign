@@ -1,6 +1,20 @@
 ## cruncher config
 
-This page explains the `config.yaml` and how each block maps to the **cruncher** lifecycle. The YAML root key is `cruncher`, the CLI chooses *what* runs (fetch, lock, sample, analyze), the config defines *how* each stage behaves.
+
+## Contents
+- [cruncher config](#cruncher-config)
+- [Root settings](#root-settings)
+- [Categories and campaigns](#categories-and-campaigns)
+- [io](#io)
+- [motif_store](#motif_store)
+- [motif_discovery](#motif_discovery)
+- [ingest](#ingest)
+- [parse](#parse)
+- [sample](#sample)
+- [analysis](#analysis)
+- [Inspect resolved config](#inspect-resolved-config)
+
+This reference lists the current Cruncher config schema and documents how each block maps to runtime behavior.
 
 ### Root settings
 
@@ -93,7 +107,7 @@ motif_store:
   dataset_map: {}                 # TF -> dataset ID
   site_window_lengths: {}         # TF or dataset:<id> -> length (bp)
   site_window_center: midpoint    # midpoint | summit
-  pwm_window_lengths: {}          # TF or dataset:<id> -> PWM trim length (bp)
+  pwm_window_lengths: {}          # TF or dataset:<id> -> PWM window length (bp)
   pwm_window_strategy: max_info   # max_info
   min_sites_for_pwm: 2
   allow_low_sites: false
@@ -376,7 +390,7 @@ Notes:
   `p_seq = 1 − (1 − p_win)^n_windows` before reporting `−log10(p_seq)`.
   When `objective.bidirectional=true`, `n_windows` counts both strands
   (effective tests = `2 * (L − w + 1)`).
-- `sample.init.length` is fixed for sampling and must be >= the widest PWM length; there is no trim/polish or length ladder.
+- `sample.init.length` is fixed for sampling and must be >= the widest PWM length.
 - `elites.k` controls how many sequences are retained after selection (0 = keep all).
 - `elites.selection.policy=mmr` is the only supported policy and uses TFBS‑core MMR distance.
 - TFBS‑core MMR behavior: for each sequence we extract the best‑hit window for each TF (oriented to the PWM); when comparing two sequences we compute same‑TF core distances (e.g., LexA vs LexA, CpxR vs CpxR) and then average across TFs. We never compare different TFs within the same sequence.

@@ -1,80 +1,77 @@
 # Cruncher MMR + Config Simplification Design (2026-02-04)
 
+## Contents
+- [Intent](#intent)
+- [Scope](#scope)
+- [MMR behavior](#mmr-behavior)
+- [Diversity weights](#diversity-weights)
+- [Config invariants](#config-invariants)
+- [Behavior](#behavior)
+- [Tests](#tests)
+- [Docs](#docs)
+- [Performance note](#performance-note)
+
 ## Intent
 
-Cruncher should produce reproducible, high-scoring, diverse TF-binding sequences with assertive, no-fallback behavior. This design simplifies configuration, removes ambiguous knobs, and hardens fixed-length behavior while aligning MMR selection with the objective (consensus-like per TF).
+Cruncher produces reproducible, high-scoring, diverse TF-binding sequences with assertive, no-fallback behavior. This design keeps configuration minimal, enforces fixed-length sampling, and aligns MMR selection with the objective (consensus-like per TF).
 
 ## Scope
 
 In scope:
-- Remove trim/polish and length auto-opt to enforce fixed-length runs.
-- Make MMR the only elite selection policy (canonical, TFBS-core, tolerant weights).
-- PT-only optimization in config/CLI (Gibbs hidden for now).
-- Schema hard-breaks with explicit errors for removed keys.
-- Tests and docs aligned with new behavior.
+- Fixed-length sampling with explicit validation.
+- MMR as the canonical elite selection policy (TFBS-core, tolerant weights).
+- Parallel tempering as the optimizer surface in config/CLI.
+- Schema hard errors for unsupported keys.
+- Tests and docs aligned with current behavior.
 
 Out of scope:
 - Changing MCMC acceptance kernels.
 - New objective functions or spacing penalties.
 - Deep performance refactors beyond safe reuse/caching notes.
 
-## MMR Behavior (Document Explicitly)
+## MMR behavior
 
 MMR compares candidate sequences across the elite pool, not motif-to-motif within the same sequence:
-- For each sequence in the candidate pool, extract the best-hit window for each TF (e.g., LexA core, CpxR core), orient to PWM.
-- When comparing two sequences, compute LexA-core vs LexA-core and CpxR-core vs CpxR-core weighted Hamming distances, then average across TFs.
-- Never compare LexA vs CpxR within the same sequence.
+- For each sequence in the candidate pool, extract the best-hit window for each TF (e.g., LexA core, CpxR core) and orient to the PWM.
+- When comparing two sequences, compute same-TF core distances (LexA vs LexA, CpxR vs CpxR) and average across TFs.
+- Different TFs are never compared within the same sequence.
 
-## Diversity Weights (Hard-Coded)
+## Diversity weights
 
-Use TFBS-core weighted distance with **tolerant** weights:
+TFBS-core distance uses tolerant weights:
 - weight = 1 - info_norm per PWM position.
 - This preserves consensus-critical positions and encourages diversity where motifs are flexible.
 
-## Config Changes (Hard Break)
+## Config invariants
 
-Remove:
-- `sample.output.trim.*`
-- `sample.output.polish.*`
-- `sample.auto_opt.length.*`
-- `sample.elites.min_hamming`
-- `sample.elites.dsDNA_hamming`
-- `sample.elites.selection.distance.*`
-- `sample.elites.selection.relevance_norm`
-- `optimizer.name = gibbs`
+- `sample.init.length` is enforced and must be >= the widest PWM length.
+- Elite selection uses MMR with TFBS-core distance and deterministic tie-breaks.
+- Bidirectional scoring implies dsDNA canonicalization for uniqueness and elite selection.
+- Parallel tempering is the only optimizer exposed via configuration.
 
-Enforce:
-- `sample.init.length >= max_pwm_width` (schema + runtime)
-- MMR canonicalization when `objective.bidirectional=true`
+## Behavior
 
-## Behavior Changes
-
-- PT is the only optimizer selectable via config/CLI.
-- No warm-start or auto-disable fallbacks for removed features.
-- Fixed-length is explicit: trimming/polishing are not available.
-
-## Refactors
-
-- Split `app/sample/auto_opt.py` into candidate generation, scoring/selection, and orchestration.
-- Split `app/sample/run_set.py` into run layout, candidate pool construction, MMR selection/metadata, and manifest writing.
+- No warm-start or auto-disable behavior is used.
+- Fixed-length sampling is explicit and consistent across runs.
+- Auto-opt remains a PT pilot selector with deterministic scorecard tie-breaks.
 
 ## Tests
 
-- Config validation tests reject removed keys.
-- CLI smoke test: minimal two-TF demo run with tiny budgets.
+- Config validation tests reject unsupported keys.
+- CLI smoke test for a minimal two-TF demo run with tiny budgets.
 - Fixed-length validation test (length < max PWM width hard errors).
 
 ## Docs
 
 Update:
-- `docs/guides/sampling_and_analysis.md`
-- `docs/reference/config.md`
+- `src/dnadesign/cruncher/docs/guides/sampling_and_analysis.md`
+- `src/dnadesign/cruncher/docs/reference/config.md`
 
 Include:
-- Fixed-length requirement and removal of trim/polish/length auto-opt.
+- Fixed-length requirements.
 - MMR TFBS-core behavior and tolerant-weight explanation.
-- PT-only optimizer selection.
+- PT-only optimizer behavior.
 
-## Performance Note
+## Performance note
 
 Profiling shows PWM DP table construction dominates short runs. Consider safe scorer reuse across auto-opt pilots in a later pass.

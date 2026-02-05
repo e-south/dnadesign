@@ -1,5 +1,10 @@
 # cruncher dev journal
 
+
+## Contents
+- [2026-02-04](#2026-02-04)
+- [2026-02-05](#2026-02-05)
+
 ## 2026-02-04
 - Start refactor to remove core I/O dependencies and progress UI from optimizers.
 - Enforce strict no-fallback behaviors (numba cache location, auto-opt override).
@@ -34,17 +39,17 @@
 - Lowered demo `min_per_tf_norm` / `success_min_per_tf_norm` to 0.60 after inspecting draw percentiles (median ~0.28, 95th ~0.55) and unique counts.
 - Updated CLI docs to describe the MMR scorecard as the default auto-opt selector.
 - Allow NUMBA_CACHE_DIR overrides when an explicit cache_dir is provided (warn + overwrite) to keep CLI runs deterministic in workspaces.
-- Reordered MMR selection to run after polish/trim on the candidate pool so final elites preserve diversity (MMR meta now matches elites).
-- Reran demo_basics_two_tf after the MMR polish change: latest run lexA-cpxR_20260204_174159_fdeee2 produced 10 elites with 10 unique canonical sequences and unique_successes=24.
-- Design Section 4 plan of action: (1) audit + prune config schema (remove trim/polish, auto_opt.length, min_hamming, dsDNA_hamming, selection.distance.*, relevance_norm; enforce init.length >= max PWM width; canonicalize MMR when bidirectional), (2) behavior cleanup (PT-only; remove trim/polish/warm-start paths, no auto-disable), (3) refactor cohesion (split auto_opt and run_set by responsibility), (4) tests (reject removed keys, CLI smoke test, fixed-length vs max PWM), (5) docs alignment (sampling/config docs; MMR TFBS-core behavior), (6) performance sanity (note scorer DP caching; no core kernel changes now).
+- Reordered MMR selection to run after final candidate pool assembly so final elites preserve diversity (MMR meta now matches elites).
+- Reran demo_basics_two_tf after the MMR ordering change: latest run lexA-cpxR_20260204_174159_fdeee2 produced 10 elites with 10 unique canonical sequences and unique_successes=24.
+- Design Section 4 plan of action: (1) audit + prune config schema to essential knobs (enforce init.length >= max PWM width; canonicalize MMR when bidirectional), (2) behavior cleanup (PT-only, no auto-disable paths), (3) refactor cohesion (split auto_opt and run_set by responsibility), (4) tests (CLI smoke test, fixed-length vs max PWM), (5) docs alignment (sampling/config docs; MMR TFBS-core behavior), (6) performance sanity (note scorer DP caching; no core kernel changes now).
 
 ## 2026-02-05
-- Brainstorming: Intent + Plan of Action (200-300 words). Cruncher's intent is to generate short, fixed-length DNA sequences that jointly satisfy multiple PWMs while returning a diverse elite set, with diversity defined across sequences rather than within a sequence's motif windows. The MCMC kernel should remain unchanged; selection, scoring, and stopping should be assertive and predictable. The hard-break simplification focuses on removing soft knobs and hidden fallbacks so users can reason about outcomes with minimal configuration. Plan of action: first, prune config schema to remove non-essential knobs: trim/polish, all auto_opt.length.*, legacy elite diversity toggles, and distance/normalization variants. Canonicalization becomes a deterministic consequence of objective.bidirectional. Enforce sample.init.length >= max PWM width at runtime and document this as a hard invariant. Second, behavior cleanup removes any residual "auto-disable" or warm-start paths and locks the optimizer to PT only. Third, improve cohesion by splitting app/sample/auto_opt.py into candidate generation, scoring/selection, and orchestration, and splitting app/sample/run_set.py into run layout, candidate pool creation, MMR selection/metadata, and manifest writing. Fourth, add tests that reject removed keys, assert fixed-length constraints, and include a CLI smoke test using the two-TF demo. Fifth, align docs (sampling + config) to state: fixed length is explicit, MMR is TFBS-core across sequences, and canonicalization is automatic with bidirectional scoring. Sixth, add lightweight profiling to identify hot paths, with an eye toward reusing scorer caches across pilots without touching the kernel.
+- Brainstorming: Intent + Plan of Action (200-300 words). Cruncher's intent is to generate short, fixed-length DNA sequences that jointly satisfy multiple PWMs while returning a diverse elite set, with diversity defined across sequences rather than within a sequence's motif windows. The MCMC kernel should remain unchanged; selection, scoring, and stopping should be assertive and predictable. The hard-break simplification focuses on keeping only essential knobs so users can reason about outcomes with minimal configuration. Plan of action: first, prune config schema to essential knobs and enforce sample.init.length >= max PWM width with canonical MMR under bidirectional scoring. Second, behavior cleanup removes auto-disable or warm-start paths and keeps the optimizer PT-only. Third, improve cohesion by splitting app/sample/auto_opt.py into candidate generation, scoring/selection, and orchestration, and splitting app/sample/run_set.py into run layout, candidate pool creation, MMR selection/metadata, and manifest writing. Fourth, add tests that assert fixed-length constraints and include a CLI smoke test using the two-TF demo. Fifth, align docs (sampling + config) to state fixed length, TFBS-core MMR behavior, and canonicalization under bidirectional scoring. Sixth, add lightweight profiling to identify hot paths, with an eye toward reusing scorer caches across pilots without touching the kernel.
 - Fixed a recursion bug in `_assert_init_length_fits_pwms` and centralized the max-PWM length check.
 - Removed warm-start seed injection in PT; chains now always start from a shared seed plus small perturbations.
 - Dropped `dsdna_hamming` from analysis metadata; diversity metrics now follow `dsdna_canonicalize`.
 - Removed unused MMR sequence-distance export and updated tests to align with the slimmer API.
-- Reworked the polish test to assert the helper is removed (no trim/polish fallback).
+- Reworked the sequence-normalization test to assert the helper is absent.
 - Added a minimal CLI smoke test that runs a two-TF matrix sample with tiny budgets.
 - Tightened analysis fixtures to include explicit MMR selection policy and fixed demo config indentation.
 - Added `min_per_tf_norm` to sequences.parquet and asserted it in the CLI smoke test.
@@ -60,3 +65,4 @@
 - Hardened bidirectional logp correction (counts both strands) and codified deterministic best-hit tie-breaking.
 - Added atomic artifact writes (status/manifest/config, parquet, analysis summaries) and retry-on-read for run status with clear CLI errors.
 - Persisted effective PT ladder details in elites metadata and added tests for p-seq math, tie-breaking, atomic writes, and PT stats.
+- Added Contents TOCs across docs and aligned demo/reference text with current fixed-length PT behavior.

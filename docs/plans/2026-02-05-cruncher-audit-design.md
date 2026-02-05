@@ -1,5 +1,15 @@
 # Cruncher Audit Design (2026-02-05)
 
+
+## Contents
+- [Intent](#intent)
+- [Scope](#scope)
+- [Audit Method](#audit-method)
+- [Deliverables](#deliverables)
+- [Change Boundaries](#change-boundaries)
+- [Invariants to Enforce](#invariants-to-enforce)
+- [Verification (expected)](#verification-expected)
+
 ## Intent
 Audit Cruncher end-to-end with a pragmatic, no-fallback posture: high cohesion/low coupling, explicit invariants, and docs that match real behavior. Focus on PT-only sampling, fixed-length constraints, and MMR canonical elites. Prioritize clear, didactic documentation and workspace config alignment over broad test expansion.
 
@@ -31,15 +41,15 @@ Out:
 - **Verification commands**: explicit commands to reproduce tests and CLI flow.
 
 ## Change Boundaries
-- Tests only where they protect critical invariants (e.g., fixed length vs max PWM width, CLI smoke path). Avoid tests that only assert absence of removed knobs unless they prevent silent misconfiguration.
+- Tests only where they protect critical invariants (e.g., fixed length vs max PWM width, CLI smoke path). Avoid test bloat beyond essential invariant protection.
 - Plots should remain minimal and meaningful. Remove stale or misleading plots; add only if clearly actionable.
 - Any caching or reuse must be explicit, deterministic, and documented (no hidden fallbacks).
 
 ## Invariants to Enforce
 - `sample.init.length >= max_pwm_width` is a hard requirement.
-- PT-only execution; no Gibbs paths.
+- PT-only execution across CLI/config.
 - MMR is canonical when bidirectional scoring is enabled.
-- No trim/polish and no auto-opt length ladders.
+- Auto-opt uses PT pilots and fixed-length sampling.
 
 ## Verification (expected)
 - `uv run pytest -q`

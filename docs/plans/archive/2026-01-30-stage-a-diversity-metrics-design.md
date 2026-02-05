@@ -1,7 +1,15 @@
 # Stage-A Diversity Metrics + Plot Redesign
 
-Date: 2026-01-30
-Status: accepted
+
+## Contents
+- [Context](#context)
+- [Goals](#goals)
+- [Non-goals](#non-goals)
+- [Decisions](#decisions)
+- [Metric definitions](#metric-definitions)
+- [Plot changes](#plot-changes)
+- [Testing plan](#testing-plan)
+- [Docs updates](#docs-updates)
 
 ## Context
 Stage-A diversity diagnostics currently show minimal change when MMR is score-dominated, but the plots and
