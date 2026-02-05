@@ -463,6 +463,9 @@ def run_analyze(
             "cooling_kind": sample_meta.cooling_kind,
             "dsdna_canonicalize": sample_meta.dsdna_canonicalize,
         }
+        pvalue_cache = manifest.get("pvalue_cache")
+        if isinstance(pvalue_cache, dict):
+            sample_meta_payload["pvalue_cache"] = pvalue_cache
         if isinstance(manifest.get("early_stop"), dict):
             sample_meta_payload["early_stop"] = manifest.get("early_stop")
         diagnostics_summary = summarize_sampling_diagnostics(

@@ -190,6 +190,18 @@ def summarize_sampling_diagnostics(
                 )
                 _mark("warn")
 
+    if isinstance(sample_meta, dict):
+        pvalue_cache = sample_meta.get("pvalue_cache")
+        if isinstance(pvalue_cache, dict):
+            cache_payload = {
+                "hits": _safe_int(pvalue_cache.get("hits")),
+                "misses": _safe_int(pvalue_cache.get("misses")),
+                "maxsize": _safe_int(pvalue_cache.get("maxsize")),
+                "currsize": _safe_int(pvalue_cache.get("currsize")),
+            }
+            if any(value is not None for value in cache_payload.values()):
+                metrics["pvalue_cache"] = cache_payload
+
     if mode:
         metrics["mode"] = mode
     if optimizer_kind:

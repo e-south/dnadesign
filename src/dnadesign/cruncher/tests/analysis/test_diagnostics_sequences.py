@@ -57,3 +57,18 @@ def test_diagnostics_warn_when_unique_successes_below_min() -> None:
     )
     warnings = diagnostics.get("warnings") or []
     assert any("unique successes" in warning for warning in warnings)
+
+
+def test_diagnostics_includes_pvalue_cache_stats() -> None:
+    diagnostics = summarize_sampling_diagnostics(
+        trace_idata=None,
+        sequences_df=None,
+        elites_df=pd.DataFrame(),
+        tf_names=["tf1"],
+        optimizer={},
+        optimizer_stats={},
+        sample_meta={"pvalue_cache": {"hits": 2, "misses": 1, "maxsize": 256, "currsize": 3}},
+        trace_required=False,
+    )
+    metrics = diagnostics["metrics"]
+    assert metrics["pvalue_cache"] == {"hits": 2, "misses": 1, "maxsize": 256, "currsize": 3}

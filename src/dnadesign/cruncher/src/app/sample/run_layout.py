@@ -26,6 +26,7 @@ from dnadesign.cruncher.artifacts.layout import (
 from dnadesign.cruncher.artifacts.manifest import build_run_manifest, write_manifest
 from dnadesign.cruncher.artifacts.status import RunStatusWriter
 from dnadesign.cruncher.config.schema_v2 import CruncherConfig, SampleConfig
+from dnadesign.cruncher.core.pvalue import logodds_cache_info
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
 from dnadesign.cruncher.utils.paths import resolve_catalog_root, resolve_lock_path
 
@@ -132,6 +133,17 @@ def write_run_manifest_and_update(
         shutil.copy2(lock_path, lock_snapshot_path)
     except Exception as exc:  # pragma: no cover - filesystem dependent
         raise ValueError(f"Failed to snapshot lockfile for run: {lock_snapshot_path}") from exc
+
+    cache_info = logodds_cache_info()
+    pvalue_cache = None
+    if cache_info is not None:
+        pvalue_cache = {
+            "hits": int(cache_info.hits),
+            "misses": int(cache_info.misses),
+            "maxsize": int(cache_info.maxsize) if cache_info.maxsize is not None else None,
+            "currsize": int(cache_info.currsize),
+        }
+
     manifest = build_run_manifest(
         stage=stage,
         cfg=cfg,
@@ -171,6 +183,7 @@ def write_run_manifest_and_update(
             "objective_schedule_summary": optimizer.objective_schedule_summary()
             if hasattr(optimizer, "objective_schedule_summary")
             else {},
+            "pvalue_cache": pvalue_cache,
         },
     )
     manifest_path_out = write_manifest(run_dir, manifest)
