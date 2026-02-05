@@ -9,27 +9,7 @@ Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dnadesign.cruncher.app.sample_workflow import _elite_filter_passes
-
-
-def test_elite_filter_backward_compat_pwm_sum_only() -> None:
-    norm_map = {"tf1": 0.1, "tf2": 0.1}
-    assert _elite_filter_passes(
-        norm_map=norm_map,
-        min_norm=0.1,
-        sum_norm=0.2,
-        min_per_tf_norm=None,
-        require_all_tfs_over_min_norm=True,
-        pwm_sum_min=0.2,
-    )
-    assert not _elite_filter_passes(
-        norm_map=norm_map,
-        min_norm=0.1,
-        sum_norm=0.19,
-        min_per_tf_norm=None,
-        require_all_tfs_over_min_norm=True,
-        pwm_sum_min=0.2,
-    )
+from dnadesign.cruncher.app.sample.diagnostics import _elite_filter_passes
 
 
 def test_elite_filter_min_per_tf_norm() -> None:
@@ -37,18 +17,14 @@ def test_elite_filter_min_per_tf_norm() -> None:
     assert not _elite_filter_passes(
         norm_map=norm_map,
         min_norm=0.05,
-        sum_norm=0.25,
         min_per_tf_norm=0.1,
         require_all_tfs_over_min_norm=True,
-        pwm_sum_min=0.0,
     )
     assert not _elite_filter_passes(
         norm_map=norm_map,
         min_norm=0.05,
-        sum_norm=0.25,
         min_per_tf_norm=0.1,
         require_all_tfs_over_min_norm=False,
-        pwm_sum_min=0.0,
     )
 
 
@@ -56,16 +32,12 @@ def test_elite_filter_reapplies_min_per_tf_norm() -> None:
     assert _elite_filter_passes(
         norm_map={"tf1": 0.5},
         min_norm=0.5,
-        sum_norm=0.5,
         min_per_tf_norm=0.4,
         require_all_tfs_over_min_norm=True,
-        pwm_sum_min=0.0,
     )
     assert not _elite_filter_passes(
         norm_map={"tf1": 0.1},
         min_norm=0.1,
-        sum_norm=0.1,
         min_per_tf_norm=0.4,
         require_all_tfs_over_min_norm=True,
-        pwm_sum_min=0.0,
     )

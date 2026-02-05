@@ -42,10 +42,11 @@ def test_get_run_accepts_path(tmp_path: Path) -> None:
             "sample": {
                 "mode": "sample",
                 "rng": {"seed": 1, "deterministic": True},
-                "budget": {"draws": 1, "tune": 1},
-                "init": {"kind": "random", "length": 6, "pad_with": "background"},
+                "sequence_length": 6,
+                "compute": {"total_sweeps": 2, "adapt_sweep_frac": 0.5},
+                "init": {"kind": "random", "pad_with": "background"},
                 "objective": {"bidirectional": True, "score_scale": "llr"},
-                "elites": {"k": 1, "filters": {"pwm_sum_min": 0.0}},
+                "elites": {"k": 1, "min_per_tf_norm": None, "mmr_alpha": 0.85},
                 "moves": {
                     "profile": "balanced",
                     "overrides": {
@@ -56,9 +57,6 @@ def test_get_run_accepts_path(tmp_path: Path) -> None:
                         "move_probs": {"S": 1.0, "B": 0.0, "M": 0.0},
                     },
                 },
-                "optimizer": {"name": "pt"},
-                "optimizers": {"pt": {"beta_ladder": {"kind": "geometric", "betas": [1.0, 0.5]}}},
-                "auto_opt": {"enabled": False},
                 "output": {"trace": {"save": False}, "save_sequences": True},
                 "ui": {"progress_bar": False, "progress_every": 0},
             },
@@ -99,7 +97,7 @@ def test_drop_run_index_entries(tmp_path: Path) -> None:
     config_path.write_text("cruncher: {}")
     payload = {
         "run_a": {"stage": "sample", "run_dir": str(tmp_path / "run_a")},
-        "run_b": {"stage": "auto_opt", "run_dir": str(tmp_path / "run_b")},
+        "run_b": {"stage": "sample", "run_dir": str(tmp_path / "run_b")},
     }
     save_run_index(config_path, payload, catalog_root=".cruncher")
     removed = drop_run_index_entries(config_path, ["run_b"], catalog_root=".cruncher")

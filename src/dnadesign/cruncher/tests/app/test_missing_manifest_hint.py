@@ -28,6 +28,5 @@ def test_missing_run_manifest_hint(tmp_path: Path) -> None:
         load_manifest(run_dir)
     msg = str(exc.value).lower()
     assert "interrupted" in msg
-    assert "sample.optimizer.name" in msg
     assert "cruncher sample" in msg
     assert "dummy.json" in msg

@@ -45,18 +45,6 @@ from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.utils.paths import resolve_catalog_root
 from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
 
-
-def _auto_opt_best_run_name(stage_dir: Path, run_group: str | None) -> str | None:
-    if not run_group:
-        return None
-    best_path = stage_dir / f"best_{run_group}.json"
-    if not best_path.exists():
-        return None
-    payload = json.loads(best_path.read_text())
-    selected = payload.get("selected_candidate") or {}
-    return selected.get("pilot_run")
-
-
 app = typer.Typer(no_args_is_help=True, help="List, inspect, or watch past run artifacts.")
 console = Console()
 
@@ -210,10 +198,6 @@ def list_runs_cmd(
     if json_output:
         payload = []
         for run in runs:
-            is_best = False
-            if run.stage == "auto_opt":
-                best_name = _auto_opt_best_run_name(run.run_dir.parent, run.run_group)
-                is_best = best_name == run.name
             payload.append(
                 {
                     "name": run.name,
@@ -226,7 +210,6 @@ def list_runs_cmd(
                     "regulator_set": run.regulator_set,
                     "run_dir": str(run.run_dir),
                     "artifacts": run.artifacts,
-                    "auto_opt_best": is_best,
                 }
             )
         typer.echo(json.dumps(payload, indent=2))
@@ -250,10 +233,6 @@ def list_runs_cmd(
             else:
                 reg_label = ",".join(tfs)
         name = run.name
-        if run.stage == "auto_opt":
-            best_name = _auto_opt_best_run_name(run.run_dir.parent, run.run_group)
-            if best_name == run.name:
-                name = f"*{run.name}"
         table.add_row(
             name,
             run.stage,

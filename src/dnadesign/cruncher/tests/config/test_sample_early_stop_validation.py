@@ -14,11 +14,8 @@ from __future__ import annotations
 import pytest
 
 from dnadesign.cruncher.config.schema_v2 import (
-    AutoOptConfig,
     InitConfig,
-    OptimizersConfig,
-    OptimizerSelectionConfig,
-    SampleBudgetConfig,
+    SampleComputeConfig,
     SampleConfig,
     SampleEarlyStopConfig,
     SampleObjectiveConfig,
@@ -27,13 +24,11 @@ from dnadesign.cruncher.config.schema_v2 import (
 
 def _build_sample_config(*, min_delta: float) -> SampleConfig:
     return SampleConfig(
-        budget=SampleBudgetConfig(draws=2, tune=1),
+        sequence_length=6,
+        compute=SampleComputeConfig(total_sweeps=3, adapt_sweep_frac=0.34),
         early_stop=SampleEarlyStopConfig(enabled=True, patience=10, min_delta=min_delta),
-        init=InitConfig(kind="random", length=6),
+        init=InitConfig(kind="random"),
         objective=SampleObjectiveConfig(score_scale="normalized-llr"),
-        optimizer=OptimizerSelectionConfig(name="pt"),
-        optimizers=OptimizersConfig(),
-        auto_opt=AutoOptConfig(enabled=False),
     )
 
 

@@ -132,7 +132,7 @@ def _run_sample_for_set(
     out_dir = layout.run_dir
     run_group = layout.run_group
     stage_label = layout.stage_label
-    run_logger = logger.debug if stage == "auto_opt" else logger.info
+    run_logger = logger.info
     run_logger("=== RUN %s: %s ===", stage_label, out_dir)
     logger.debug("Full sample config: %s", sample_cfg.model_dump_json())
 

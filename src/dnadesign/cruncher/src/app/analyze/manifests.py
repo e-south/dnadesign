@@ -63,8 +63,6 @@ def build_analysis_manifests(
     move_stats_summary_path: Path | None,
     move_stats_path: Path | None,
     pt_swap_pairs_path: Path | None,
-    auto_opt_table_path: Path | None,
-    auto_opt_plot_path: Path | None,
     table_ext: str,
 ) -> AnalysisManifestBundle:
     plot_manifest = {
@@ -108,37 +106,6 @@ def build_analysis_manifests(
                 "generated": enabled_flag and any(out["exists"] for out in outputs),
             }
         )
-    if auto_opt_plot_path is not None:
-        plot_manifest["plots"].append(
-            {
-                "key": "auto_opt_tradeoffs",
-                "label": f"Auto-opt tradeoffs ({plot_format.upper()})",
-                "group": "auto_opt",
-                "description": "Balance vs auto-opt scorecard metric across auto-opt pilots.",
-                "requires": [],
-                "enabled": True,
-                "outputs": [
-                    {
-                        "path": str(auto_opt_plot_path.relative_to(sample_dir)),
-                        "exists": auto_opt_plot_path.exists(),
-                    }
-                ],
-                "missing_outputs": []
-                if auto_opt_plot_path.exists()
-                else [str(auto_opt_plot_path.relative_to(sample_dir))],
-                "generated": auto_opt_plot_path.exists(),
-            }
-        )
-        plot_artifacts.append(
-            artifact_entry(
-                auto_opt_plot_path,
-                sample_dir,
-                kind="plot",
-                label=f"Auto-opt tradeoffs ({plot_format.upper()})",
-                stage="analysis",
-            )
-        )
-
     plot_manifest_file = plot_manifest_path(analysis_root)
     plot_manifest_file.parent.mkdir(parents=True, exist_ok=True)
     plot_manifest_file.write_text(json.dumps(plot_manifest, indent=2))
@@ -241,15 +208,6 @@ def build_analysis_manifests(
                 "exists": pt_swap_pairs_path.exists(),
             }
         )
-    if auto_opt_table_path is not None:
-        table_manifest["tables"].append(
-            {
-                "key": "auto_opt_pilots",
-                "label": f"Auto-opt pilot scorecard ({table_label_suffix})",
-                "path": str(auto_opt_table_path.relative_to(sample_dir)),
-                "exists": auto_opt_table_path.exists(),
-            }
-        )
     table_manifest_file = table_manifest_path(analysis_root)
     table_manifest_file.parent.mkdir(parents=True, exist_ok=True)
     table_manifest_file.write_text(json.dumps(table_manifest, indent=2))
@@ -266,8 +224,6 @@ def build_analysis_manifests(
             return "mcmc_diagnostics"
         if key in {"move_stats_summary"}:
             return "default"
-        if key in {"auto_opt_pilots"}:
-            return "extra_tables"
         if key in {"per_pwm"}:
             return "scatter_pwm"
         return "default"
@@ -451,16 +407,6 @@ def build_analysis_manifests(
                 sample_dir,
                 kind="table",
                 label=f"PT swap by pair ({table_label_suffix})",
-                stage="analysis",
-            )
-        )
-    if auto_opt_table_path is not None:
-        analysis_artifacts.append(
-            artifact_entry(
-                auto_opt_table_path,
-                sample_dir,
-                kind="table",
-                label=f"Auto-opt pilot scorecard ({table_label_suffix})",
                 stage="analysis",
             )
         )

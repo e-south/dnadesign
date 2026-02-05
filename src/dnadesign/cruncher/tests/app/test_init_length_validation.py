@@ -16,11 +16,8 @@ import pytest
 
 from dnadesign.cruncher.app.sample.run_set import _assert_init_length_fits_pwms
 from dnadesign.cruncher.config.schema_v2 import (
-    AutoOptConfig,
     InitConfig,
-    OptimizersConfig,
-    OptimizerSelectionConfig,
-    SampleBudgetConfig,
+    SampleComputeConfig,
     SampleConfig,
     SampleEarlyStopConfig,
     SampleObjectiveConfig,
@@ -30,13 +27,11 @@ from dnadesign.cruncher.core.pwm import PWM
 
 def _sample_config(*, length: int) -> SampleConfig:
     return SampleConfig(
-        budget=SampleBudgetConfig(draws=2, tune=1),
+        sequence_length=length,
+        compute=SampleComputeConfig(total_sweeps=3, adapt_sweep_frac=0.34),
         early_stop=SampleEarlyStopConfig(enabled=False, min_delta=0.01),
-        init=InitConfig(kind="random", length=length),
+        init=InitConfig(kind="random"),
         objective=SampleObjectiveConfig(score_scale="normalized-llr"),
-        optimizer=OptimizerSelectionConfig(name="pt"),
-        optimizers=OptimizersConfig(),
-        auto_opt=AutoOptConfig(enabled=False),
     )
 
 

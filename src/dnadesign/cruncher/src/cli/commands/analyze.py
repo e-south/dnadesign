@@ -193,22 +193,12 @@ def analyze(
                     diversity = highlights.get("diversity", {})
                     overlap = highlights.get("overlap", {})
                     sampling = highlights.get("sampling", {})
-                    auto_opt = highlights.get("auto_opt", {})
                     console.print("Summary:")
                     console.print(f"  status: {status}  warnings: {len(warnings) if isinstance(warnings, list) else 0}")
                     console.print(
                         f"  best_score_final: {objective.get('best_score_final')}  "
                         f"top_k_median_final: {objective.get('top_k_median_final')}"
                     )
-                    if isinstance(auto_opt, dict) and any(value is not None for value in auto_opt.values()):
-                        budgets = auto_opt.get("budget_levels")
-                        budget_label = ",".join(str(item) for item in budgets) if isinstance(budgets, list) else "n/a"
-                        console.print(
-                            "  auto_opt_confidence: "
-                            f"{auto_opt.get('confidence')}  quality: {auto_opt.get('quality')}  "
-                            f"pilot_score: {auto_opt.get('pilot_score')}  k: {auto_opt.get('scorecard_k')}  "
-                            f"budgets: [{budget_label}]"
-                        )
                     console.print(
                         f"  unique_fraction: {diversity.get('unique_fraction')}  n_elites: {diversity.get('n_elites')}"
                     )

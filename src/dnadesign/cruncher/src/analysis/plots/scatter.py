@@ -57,7 +57,7 @@ def plot_scatter(
     out_dir: Path,
     *,
     bidirectional: bool,
-    pwm_sum_threshold: float,
+    sum_threshold: float,
     annotation: str,
     output_format: str = "png",
     elites_df: pd.DataFrame | None = None,
@@ -183,7 +183,7 @@ def plot_scatter(
         bidirectional=bidirectional,
         pseudocounts=pseudocounts,
         log_odds_clip=log_odds_clip,
-        pwm_sum_threshold=pwm_sum_threshold,
+        sum_threshold=sum_threshold,
         annotation=annotation,
         out_path=out_path,
         dpi=dpi,
@@ -215,7 +215,7 @@ def _draw_scatter_figure(
     bidirectional: bool,
     pseudocounts: float,
     log_odds_clip: float | None,
-    pwm_sum_threshold: float,
+    sum_threshold: float,
     annotation: str,
     out_path: Path,
     *,
@@ -304,7 +304,7 @@ def _draw_scatter_figure(
 
     # 3) “THRESHOLDS” STYLE (unchanged layering; background then highlights)
     elif style == "thresholds":
-        thr = pwm_sum_threshold
+        thr = sum_threshold
 
         # (i) consensus LLRs — still in raw-LLR scale
         raw_scorer = Scorer(

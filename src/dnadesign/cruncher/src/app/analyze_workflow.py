@@ -130,7 +130,6 @@ def run_analyze(
 
     from dnadesign.cruncher.analysis.diagnostics import summarize_sampling_diagnostics
     from dnadesign.cruncher.analysis.per_pwm import gather_per_pwm_scores
-    from dnadesign.cruncher.analysis.plots._savefig import savefig
     from dnadesign.cruncher.analysis.plots.dashboard import plot_dashboard
     from dnadesign.cruncher.analysis.plots.diagnostics import (
         make_pair_idata,
@@ -216,7 +215,6 @@ def run_analyze(
         if run_name != run_info.name:
             logger.debug("Run path override: %s", run_name)
         manifest = load_manifest(sample_dir)
-        auto_opt_payload = manifest.get("auto_opt") if isinstance(manifest, dict) else None
         if manifest.get("stage") != "sample":
             raise ValueError(f"Run '{run_name}' is not a sample run (stage={manifest.get('stage')})")
         lock_path_raw = manifest.get("lockfile_path")
@@ -234,16 +232,23 @@ def run_analyze(
         # ── reconstruct PWMs from config_used.yaml for reproducibility ───────
         pwms, used_cfg = _load_pwms_from_config(sample_dir)
         tf_names = list(pwms.keys())
-        sample_meta = _resolve_sample_meta(cfg, used_cfg)
+        sample_meta = _resolve_sample_meta(cfg, used_cfg, manifest)
         scoring_pseudocounts, scoring_log_odds_clip = _resolve_scoring_params(used_cfg)
         bidirectional = sample_meta.bidirectional
         used_sample = used_cfg.get("sample") if isinstance(used_cfg, dict) else None
+        min_per_tf_norm = None
         if isinstance(used_sample, dict):
             trace_cfg = used_sample.get("output", {}).get("trace", {})
             if isinstance(trace_cfg, dict) and trace_cfg.get("include_tune"):
                 logger.warning(
                     "sample.output.trace.include_tune affects sequences.parquet only; trace.nc contains draw samples."
                 )
+            elites_cfg = used_sample.get("elites") or {}
+            if isinstance(elites_cfg, dict):
+                min_per_tf_norm = elites_cfg.get("min_per_tf_norm")
+        sum_threshold = 0.0
+        if isinstance(min_per_tf_norm, (int, float)):
+            sum_threshold = float(min_per_tf_norm) * 2.0
 
         # ── locate elites parquet file ──────────────────────────────────────
         from dnadesign.cruncher.analysis.elites import find_elites_parquet
@@ -308,7 +313,6 @@ def run_analyze(
                     analysis_root=analysis_root,
                     summary_payload=existing_summary,
                     analysis_used_payload=analysis_used_payload,
-                    auto_opt_payload=auto_opt_payload,
                 )
                 summary_file = summary_path(analysis_root)
                 if summary_file.exists():
@@ -460,7 +464,6 @@ def run_analyze(
             "draws": sample_meta.draws,
             "tune": sample_meta.tune,
             "top_k": sample_meta.top_k,
-            "pwm_sum_threshold": sample_meta.pwm_sum_threshold,
             "bidirectional": sample_meta.bidirectional,
             "move_probs": sample_meta.move_probs,
             "cooling_kind": sample_meta.cooling_kind,
@@ -600,62 +603,6 @@ def run_analyze(
                         write_parquet(pt_swap_pairs_df, pt_swap_pairs_path)
                     else:
                         pt_swap_pairs_df.to_csv(pt_swap_pairs_path, index=False)
-
-        auto_opt_table_path = None
-        auto_opt_plot_path = None
-        auto_opt_payload = manifest.get("auto_opt")
-        if isinstance(auto_opt_payload, dict):
-            candidates = auto_opt_payload.get("candidates")
-            if isinstance(candidates, list) and candidates:
-                if analysis_cfg.extra_tables:
-                    auto_opt_table_path = tables_dir / f"auto_opt_pilots.{table_ext}"
-                    df_auto_table = pd.DataFrame(candidates)
-                    if table_ext == "parquet":
-                        write_parquet(df_auto_table, auto_opt_table_path)
-                    else:
-                        df_auto_table.to_csv(auto_opt_table_path, index=False)
-                if analysis_cfg.extra_plots:
-                    df_auto = pd.DataFrame(candidates)
-                    score_metric = None
-                    auto_cfg_payload = auto_opt_payload.get("auto_opt_config")
-                    if isinstance(auto_cfg_payload, dict):
-                        score_metric = auto_cfg_payload.get("scorecard_metric")
-                    if score_metric == "elites_mmr":
-                        score_col = "pilot_score"
-                        score_label = "Pilot score (MMR)"
-                    else:
-                        score_col = "top_k_median_final" if "top_k_median_final" in df_auto.columns else "best_score"
-                        score_label = "Top-K median score (final beta)"
-                    required_cols = {score_col, "balance_median"}
-                    if required_cols.issubset({col for col in df_auto.columns}):
-                        df_auto = df_auto.dropna(subset=[score_col, "balance_median"])
-                        if not df_auto.empty:
-                            import matplotlib.pyplot as plt
-
-                            auto_opt_plot_path = _plot_path("auto_opt_tradeoffs")
-                            fig, ax = plt.subplots(figsize=(6, 4))
-                            lengths = df_auto.get("length")
-                            colors = None
-                            if lengths is not None and lengths.notna().any():
-                                colors = lengths.astype(float)
-                            scatter = ax.scatter(
-                                df_auto["balance_median"],
-                                df_auto[score_col],
-                                c=colors,
-                                cmap="viridis" if colors is not None else None,
-                                s=50,
-                                alpha=0.85,
-                            )
-                            ax.set_xlabel("Balance (median min normalized)")
-                            ax.set_ylabel(score_label)
-                            ax.set_title("Auto-opt tradeoffs")
-                            if colors is not None:
-                                fig.colorbar(scatter, ax=ax, label="Length")
-                            fig.tight_layout()
-                            savefig(fig, auto_opt_plot_path, dpi=plot_dpi, png_compress_level=png_compress_level)
-                            plt.close(fig)
-                    elif score_metric == "elites_mmr":
-                        logger.warning("Auto-opt tradeoff plot skipped: pilot_score missing from scorecard.")
 
         enabled_specs = [spec for spec in PLOT_SPECS if getattr(plots, spec.key, False)]
         if enabled_specs:
@@ -870,7 +817,7 @@ def run_analyze(
                     per_pwm_path=per_pwm_path,
                     out_dir=plots_dir,
                     bidirectional=bidirectional,
-                    pwm_sum_threshold=sample_meta.pwm_sum_threshold,
+                    sum_threshold=sum_threshold,
                     annotation=annotation,
                     output_format=plot_format,
                     elites_df=elites_df,
@@ -1088,8 +1035,6 @@ def run_analyze(
             move_stats_summary_path=move_stats_summary_path,
             move_stats_path=move_stats_path,
             pt_swap_pairs_path=pt_swap_pairs_path,
-            auto_opt_table_path=auto_opt_table_path,
-            auto_opt_plot_path=auto_opt_plot_path,
             table_ext=table_ext,
         )
         plot_manifest_file = manifest_bundle.plot_manifest_file
@@ -1151,7 +1096,6 @@ def run_analyze(
             objective_components=objective_components,
             overlap_summary=overlap_summary,
             analysis_used_payload=analysis_used_payload,
-            auto_opt_payload=auto_opt_payload,
             refresh=True,
         )
         summary_payload["report_json"] = str(report_json.relative_to(sample_dir))

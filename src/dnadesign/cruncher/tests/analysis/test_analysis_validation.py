@@ -32,11 +32,12 @@ def _sample_block() -> dict:
     return {
         "mode": "sample",
         "rng": {"seed": 7, "deterministic": True},
-        "budget": {"draws": 2, "tune": 1},
+        "sequence_length": 12,
+        "compute": {"total_sweeps": 3, "adapt_sweep_frac": 0.34},
         "early_stop": {"enabled": True, "patience": 10, "min_delta": 0.01},
-        "init": {"kind": "random", "length": 12, "pad_with": "background"},
+        "init": {"kind": "random", "pad_with": "background"},
         "objective": {"bidirectional": True, "score_scale": "normalized-llr"},
-        "elites": {"k": 1, "filters": {"pwm_sum_min": 0.0}},
+        "elites": {"k": 1, "min_per_tf_norm": None, "mmr_alpha": 0.85},
         "moves": {
             "profile": "balanced",
             "overrides": {
@@ -47,9 +48,6 @@ def _sample_block() -> dict:
                 "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
             },
         },
-        "optimizer": {"name": "pt"},
-        "optimizers": {"pt": {"beta_ladder": {"kind": "geometric", "betas": [1.0, 0.5]}}},
-        "auto_opt": {"enabled": False},
         "output": {"trace": {"save": False}, "save_sequences": True},
         "ui": {"progress_bar": False, "progress_every": 0},
     }
@@ -306,7 +304,7 @@ def test_plot_scatter_requires_score_columns(tmp_path: Path) -> None:
             per_pwm_path=per_pwm_path,
             out_dir=run_dir / "plots",
             bidirectional=True,
-            pwm_sum_threshold=0.0,
+            sum_threshold=0.0,
             annotation="",
         )
 

@@ -38,7 +38,6 @@ class SampleMeta:
     tune: int
     move_probs: dict[str, float]
     cooling_kind: str
-    pwm_sum_threshold: float
     bidirectional: bool
     top_k: int
     mode: str
@@ -65,7 +64,7 @@ def _load_pwms_from_config(run_dir: Path) -> tuple[dict[str, PWM], dict]:
     return pwms, cruncher_cfg
 
 
-def _resolve_sample_meta(cfg: CruncherConfig, used_cfg: dict) -> SampleMeta:
+def _resolve_sample_meta(cfg: CruncherConfig, used_cfg: dict, manifest: dict) -> SampleMeta:
     if cfg.sample is None:
         raise ValueError("sample section is required for analyze")
     used_sample = used_cfg.get("sample") if isinstance(used_cfg, dict) else None
@@ -92,9 +91,17 @@ def _resolve_sample_meta(cfg: CruncherConfig, used_cfg: dict) -> SampleMeta:
             raise ValueError(f"config_used.yaml sample.{label} must be a number.")
         return float(value)
 
-    optimizer_kind = str(_require(["optimizer", "name"], "optimizer.name"))
-    draws = _coerce_int(_require(["budget", "draws"], "budget.draws"), "budget.draws")
-    tune = _coerce_int(_require(["budget", "tune"], "budget.tune"), "budget.tune")
+    optimizer_kind = str(manifest.get("optimizer", {}).get("kind") or "pt")
+    total_sweeps = _coerce_int(
+        _require(["compute", "total_sweeps"], "compute.total_sweeps"),
+        "compute.total_sweeps",
+    )
+    adapt_frac = _coerce_float(
+        _require(["compute", "adapt_sweep_frac"], "compute.adapt_sweep_frac"), "compute.adapt_sweep_frac"
+    )
+    adapt_sweeps = int(np.ceil(total_sweeps * adapt_frac))
+    draws = int(total_sweeps - adapt_sweeps)
+    tune = int(adapt_sweeps)
     mode_val = _require(["mode"], "mode")
     if not isinstance(mode_val, str):
         raise ValueError("config_used.yaml sample.mode must be a string.")
@@ -103,24 +110,6 @@ def _resolve_sample_meta(cfg: CruncherConfig, used_cfg: dict) -> SampleMeta:
         raise ValueError("config_used.yaml sample.objective.bidirectional must be a boolean.")
     bidirectional = bidirectional_val
     top_k = _coerce_int(_require(["elites", "k"], "elites.k"), "elites.k")
-    pwm_sum_threshold = _coerce_float(
-        _require(["elites", "filters", "pwm_sum_min"], "elites.filters.pwm_sum_min"),
-        "elites.filters.pwm_sum_min",
-    )
-    elites_cfg = used_sample.get("elites") if isinstance(used_sample, dict) else None
-    if not isinstance(elites_cfg, dict):
-        elites_cfg = {}
-    selection_cfg = elites_cfg.get("selection") if isinstance(elites_cfg, dict) else None
-    policy = "top_score"
-    if isinstance(selection_cfg, dict):
-        policy_val = selection_cfg.get("policy")
-        if policy_val is not None and not isinstance(policy_val, str):
-            raise ValueError("config_used.yaml sample.elites.selection.policy must be a string.")
-        if policy_val:
-            policy = policy_val
-
-    if policy != "mmr":
-        raise ValueError("config_used.yaml sample.elites.selection.policy must be 'mmr'.")
     dsdna_canonicalize_val = bidirectional
 
     moves_payload = _require(["moves"], "moves")
@@ -128,22 +117,15 @@ def _resolve_sample_meta(cfg: CruncherConfig, used_cfg: dict) -> SampleMeta:
     move_probs = resolve_move_config(moves_cfg).move_probs
 
     if optimizer_kind != "pt":
-        raise ValueError("config_used.yaml sample.optimizer.name must be 'pt'.")
-    ladder = _require(["optimizers", "pt", "beta_ladder"], "optimizers.pt.beta_ladder")
-    if not isinstance(ladder, dict):
-        raise ValueError("config_used.yaml sample.optimizers.pt.beta_ladder must be a mapping.")
-    cooling_kind = str(ladder.get("kind") or "")
-    if cooling_kind == "fixed":
-        chains = 1
-    else:
-        betas = ladder.get("betas")
-        n_temps = ladder.get("n_temps")
-        if isinstance(betas, list) and betas:
-            chains = len(betas)
-        elif isinstance(n_temps, int):
-            chains = int(n_temps)
-        else:
-            raise ValueError("config_used.yaml sample.optimizers.pt.beta_ladder must define betas or n_temps.")
+        raise ValueError("run manifest optimizer.kind must be 'pt'.")
+    optimizer_stats = manifest.get("optimizer_stats") if isinstance(manifest, dict) else None
+    beta_ladder = []
+    if isinstance(optimizer_stats, dict):
+        ladder_payload = optimizer_stats.get("beta_ladder_final")
+        if isinstance(ladder_payload, list):
+            beta_ladder = ladder_payload
+    chains = len(beta_ladder) if beta_ladder else 1
+    cooling_kind = "fixed" if chains <= 1 else "geometric"
 
     return SampleMeta(
         optimizer_kind=optimizer_kind,
@@ -152,7 +134,6 @@ def _resolve_sample_meta(cfg: CruncherConfig, used_cfg: dict) -> SampleMeta:
         tune=tune,
         move_probs=move_probs,
         cooling_kind=cooling_kind,
-        pwm_sum_threshold=pwm_sum_threshold,
         bidirectional=bidirectional,
         top_k=top_k,
         mode=mode_val,

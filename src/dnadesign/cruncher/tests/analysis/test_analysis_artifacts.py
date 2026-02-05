@@ -30,12 +30,15 @@ from dnadesign.cruncher.utils.hashing import sha256_path
 
 
 def _sample_block(*, save_trace: bool, top_k: int, draws: int = 2, tune: int = 1) -> dict:
+    total_sweeps = draws + tune
+    adapt_sweep_frac = tune / float(total_sweeps)
     return {
         "mode": "sample",
         "rng": {"seed": 7, "deterministic": True},
-        "budget": {"draws": draws, "tune": tune},
+        "sequence_length": 12,
+        "compute": {"total_sweeps": total_sweeps, "adapt_sweep_frac": adapt_sweep_frac},
         "early_stop": {"enabled": True, "patience": 10, "min_delta": 0.01},
-        "init": {"kind": "random", "length": 12, "pad_with": "background"},
+        "init": {"kind": "random", "pad_with": "background"},
         "objective": {
             "bidirectional": True,
             "score_scale": "normalized-llr",
@@ -43,8 +46,8 @@ def _sample_block(*, save_trace: bool, top_k: int, draws: int = 2, tune: int = 1
         },
         "elites": {
             "k": top_k,
-            "filters": {"pwm_sum_min": 0.0},
-            "selection": {"policy": "mmr"},
+            "min_per_tf_norm": None,
+            "mmr_alpha": 0.85,
         },
         "moves": {
             "profile": "balanced",
@@ -56,9 +59,6 @@ def _sample_block(*, save_trace: bool, top_k: int, draws: int = 2, tune: int = 1
                 "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
             },
         },
-        "optimizer": {"name": "pt"},
-        "optimizers": {"pt": {"beta_ladder": {"kind": "geometric", "betas": [1.0, 0.5]}}},
-        "auto_opt": {"enabled": False},
         "output": {"trace": {"save": save_trace}, "save_sequences": True},
         "ui": {"progress_bar": False, "progress_every": 0},
     }

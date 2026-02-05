@@ -25,16 +25,13 @@ from dnadesign.cruncher.artifacts.layout import (
 )
 from dnadesign.cruncher.artifacts.manifest import build_run_manifest, write_manifest
 from dnadesign.cruncher.config.schema_v2 import (
-    AutoOptConfig,
     CruncherConfig,
     IngestConfig,
     InitConfig,
     MotifStoreConfig,
-    OptimizersConfig,
-    OptimizerSelectionConfig,
     ParseConfig,
     PlotConfig,
-    SampleBudgetConfig,
+    SampleComputeConfig,
     SampleConfig,
     SampleElitesConfig,
     SampleMovesConfig,
@@ -61,14 +58,12 @@ def _make_config() -> CruncherConfig:
         sample=SampleConfig(
             mode="sample",
             rng=SampleRngConfig(seed=1, deterministic=True),
-            budget=SampleBudgetConfig(draws=2, tune=1),
-            init=InitConfig(kind="random", length=6),
+            sequence_length=6,
+            compute=SampleComputeConfig(total_sweeps=3, adapt_sweep_frac=0.34),
+            init=InitConfig(kind="random"),
             objective=SampleObjectiveConfig(bidirectional=True, score_scale="llr"),
             elites=SampleElitesConfig(k=1),
             moves=SampleMovesConfig(),
-            optimizer=OptimizerSelectionConfig(name="pt"),
-            optimizers=OptimizersConfig(),
-            auto_opt=AutoOptConfig(enabled=False),
         ),
         analysis=None,
     )

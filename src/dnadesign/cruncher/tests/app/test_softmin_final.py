@@ -16,7 +16,7 @@ import numpy as np
 from dnadesign.cruncher.app.sample_workflow import _resolve_final_softmin_beta
 from dnadesign.cruncher.config.schema_v2 import (
     InitConfig,
-    SampleBudgetConfig,
+    SampleComputeConfig,
     SampleConfig,
     SampleObjectiveConfig,
     SoftminConfig,
@@ -83,8 +83,9 @@ def test_resolve_final_softmin_beta_uses_optimizer_value() -> None:
         )
     )
     sample_cfg = SampleConfig(
-        budget=SampleBudgetConfig(tune=1, draws=1),
-        init=InitConfig(kind="random", length=4),
+        sequence_length=4,
+        compute=SampleComputeConfig(total_sweeps=2, adapt_sweep_frac=0.5),
+        init=InitConfig(kind="random"),
         objective=objective,
     )
 

@@ -81,10 +81,11 @@ def test_sample_runs_split_by_regulator_set(tmp_path: Path) -> None:
             "sample": {
                 "mode": "sample",
                 "rng": {"seed": 11, "deterministic": True},
-                "budget": {"draws": 2, "tune": 1},
-                "init": {"kind": "random", "length": 6, "pad_with": "background"},
+                "sequence_length": 6,
+                "compute": {"total_sweeps": 3, "adapt_sweep_frac": 0.34},
+                "init": {"kind": "random", "pad_with": "background"},
                 "objective": {"bidirectional": True, "score_scale": "llr"},
-                "elites": {"k": 1, "filters": {"pwm_sum_min": 0.0}},
+                "elites": {"k": 1, "min_per_tf_norm": None, "mmr_alpha": 0.85},
                 "moves": {
                     "profile": "balanced",
                     "overrides": {
@@ -95,9 +96,6 @@ def test_sample_runs_split_by_regulator_set(tmp_path: Path) -> None:
                         "move_probs": {"S": 1.0, "B": 0.0, "M": 0.0},
                     },
                 },
-                "optimizer": {"name": "pt"},
-                "optimizers": {"pt": {"beta_ladder": {"kind": "geometric", "betas": [1.0, 0.5]}}},
-                "auto_opt": {"enabled": False},
                 "output": {"trace": {"save": False}, "save_sequences": True},
                 "ui": {"progress_bar": False, "progress_every": 0},
             },

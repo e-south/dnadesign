@@ -35,18 +35,15 @@ def _write_config(tmp_path: Path, config: dict) -> Path:
     return config_path
 
 
-def _sample_block(
-    *,
-    optimizer_name: str,
-    pt_ladder: dict | None = None,
-) -> dict:
+def _sample_block(*, total_sweeps: int = 3, adapt_sweep_frac: float = 0.34) -> dict:
     return {
         "mode": "sample",
         "rng": {"seed": 7, "deterministic": True},
-        "budget": {"draws": 2, "tune": 1},
-        "init": {"kind": "random", "length": 12, "pad_with": "background"},
+        "sequence_length": 12,
+        "compute": {"total_sweeps": total_sweeps, "adapt_sweep_frac": adapt_sweep_frac},
+        "init": {"kind": "random", "pad_with": "background"},
         "objective": {"bidirectional": True, "score_scale": "llr"},
-        "elites": {"k": 1, "filters": {"pwm_sum_min": 0.0}},
+        "elites": {"k": 1, "min_per_tf_norm": None},
         "moves": {
             "profile": "balanced",
             "overrides": {
@@ -57,14 +54,6 @@ def _sample_block(
                 "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
             },
         },
-        "optimizer": {"name": optimizer_name},
-        "optimizers": {
-            "pt": {
-                "beta_ladder": pt_ladder or {"kind": "geometric", "betas": [1.0, 0.5]},
-                "swap_prob": 0.1,
-            },
-        },
-        "auto_opt": {"enabled": optimizer_name == "auto"},
         "output": {"trace": {"save": False}, "save_sequences": True},
     }
 
@@ -85,7 +74,7 @@ def test_unknown_top_level_key_is_rejected(tmp_path: Path) -> None:
 def test_multi_tf_llr_requires_allow_unscaled(tmp_path: Path) -> None:
     config = _base_config()
     config["cruncher"]["regulator_sets"] = [["lexA", "cpxR"]]
-    config["cruncher"]["sample"] = _sample_block(optimizer_name="pt")
+    config["cruncher"]["sample"] = _sample_block()
     config_path = _write_config(tmp_path, config)
     with pytest.raises(ValidationError, match="allow_unscaled_llr"):
         load_config(config_path)
@@ -178,69 +167,3 @@ def test_genome_cache_must_be_workspace_relative(tmp_path: Path, genome_cache: s
         load_config(config_path)
 
     assert any(err.get("loc") == ("cruncher", "ingest", "genome_cache") for err in exc.value.errors())
-
-
-def test_gibbs_optimizer_is_rejected(tmp_path: Path) -> None:
-    config = _base_config()
-    config["cruncher"]["sample"] = _sample_block(optimizer_name="gibbs")
-    config_path = _write_config(tmp_path, config)
-
-    with pytest.raises(ValidationError) as exc:
-        load_config(config_path)
-
-    assert any("optimizer" in str(err.get("loc")) or "gibbs" in str(err.get("msg")) for err in exc.value.errors())
-
-
-def test_gibbs_optimizer_block_is_rejected(tmp_path: Path) -> None:
-    config = _base_config()
-    config["cruncher"]["sample"] = _sample_block(optimizer_name="pt")
-    config["cruncher"]["sample"]["optimizers"]["gibbs"] = {"beta_schedule": {"kind": "fixed", "beta": 1.0}}
-    config_path = _write_config(tmp_path, config)
-
-    with pytest.raises(ValidationError) as exc:
-        load_config(config_path)
-
-    assert any(err.get("type") == "extra_forbidden" for err in exc.value.errors())
-
-
-def test_pt_rejects_missing_ladder_params(tmp_path: Path) -> None:
-    config = _base_config()
-    config["cruncher"]["sample"] = _sample_block(
-        optimizer_name="pt",
-        pt_ladder={"kind": "geometric"},
-    )
-    config_path = _write_config(tmp_path, config)
-
-    with pytest.raises(ValidationError) as exc:
-        load_config(config_path)
-
-    assert any(
-        "beta_ladder requires betas or beta_min/beta_max/n_temps" in str(err.get("msg")) for err in exc.value.errors()
-    )
-
-
-def test_auto_opt_pt_ladder_sizes_requires_geometric_ladder(tmp_path: Path) -> None:
-    config = _base_config()
-    config["cruncher"]["sample"] = _sample_block(
-        optimizer_name="auto",
-        pt_ladder={"kind": "fixed", "beta": 1.0},
-    )
-    config["cruncher"]["sample"]["auto_opt"]["pt_ladder_sizes"] = [2]
-    config_path = _write_config(tmp_path, config)
-
-    with pytest.raises(ValidationError) as exc:
-        load_config(config_path)
-
-    assert any(err.get("type") == "extra_forbidden" for err in exc.value.errors())
-
-
-def test_auto_opt_pt_ladder_sizes_rejects_oversized_betas(tmp_path: Path) -> None:
-    config = _base_config()
-    config["cruncher"]["sample"] = _sample_block(optimizer_name="auto")
-    config["cruncher"]["sample"]["auto_opt"]["pt_ladder_sizes"] = [3]
-    config_path = _write_config(tmp_path, config)
-
-    with pytest.raises(ValidationError) as exc:
-        load_config(config_path)
-
-    assert any(err.get("type") == "extra_forbidden" for err in exc.value.errors())

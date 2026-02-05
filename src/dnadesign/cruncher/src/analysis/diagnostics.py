@@ -153,8 +153,6 @@ def summarize_sampling_diagnostics(
         "unique_fraction_warn": 0.20,
         "balance_index_warn": 0.50,
     }
-    pilot_short = False
-    pilot_warn_draws_min = 200
 
     def _mark(level: str) -> None:
         nonlocal status
@@ -267,17 +265,12 @@ def summarize_sampling_diagnostics(
                 n_chains, n_draws = int(score_arr.shape[0]), int(score_arr.shape[1])
                 trace_metrics["chains"] = n_chains
                 trace_metrics["draws"] = n_draws
-                if mode == "auto_opt" and n_draws < pilot_warn_draws_min:
-                    pilot_short = True
-                    trace_metrics["pilot_short"] = True
-                    trace_metrics["pilot_warn_draws_min"] = pilot_warn_draws_min
                 pt_mixing = optimizer_kind == "pt"
                 if pt_mixing:
                     trace_metrics["mixing_note"] = "PT ladder: R-hat/ESS computed on cold chain only."
                     if n_draws < 4:
-                        if not pilot_short:
-                            warnings.append(f"ESS requires ≥4 draws (got {n_draws}).")
-                            _mark("warn")
+                        warnings.append(f"ESS requires ≥4 draws (got {n_draws}).")
+                        _mark("warn")
                     else:
                         try:
                             import arviz as az
@@ -303,13 +296,11 @@ def summarize_sampling_diagnostics(
                                 _mark("warn")
                 else:
                     if n_chains < 2:
-                        if not pilot_short:
-                            warnings.append(f"R-hat requires ≥2 chains (got {n_chains}).")
-                            _mark("warn")
+                        warnings.append(f"R-hat requires ≥2 chains (got {n_chains}).")
+                        _mark("warn")
                     if n_draws < 4:
-                        if not pilot_short:
-                            warnings.append(f"ESS requires ≥4 draws (got {n_draws}).")
-                            _mark("warn")
+                        warnings.append(f"ESS requires ≥4 draws (got {n_draws}).")
+                        _mark("warn")
                     if n_chains >= 2 and n_draws >= 4:
                         try:
                             import arviz as az
@@ -390,7 +381,7 @@ def summarize_sampling_diagnostics(
         if total > 0 and unique is not None:
             unique_fraction = unique / float(total)
             seq_metrics["unique_fraction"] = unique_fraction
-            if unique_fraction < thresholds["unique_fraction_warn"] and not pilot_short:
+            if unique_fraction < thresholds["unique_fraction_warn"]:
                 warnings.append(f"Unique sequence fraction {unique_fraction:.2f} is low; sampler may be stuck.")
                 _mark("warn")
     elif sequences_df is not None:
@@ -505,12 +496,12 @@ def summarize_sampling_diagnostics(
         acc_m = _safe_float(acc.get("M"))
         if acc_b is not None:
             optimizer_metrics.setdefault("acceptance_rate", {})["B"] = acc_b
-            if (acc_b < thresholds["acceptance_low"] or acc_b > thresholds["acceptance_high"]) and not pilot_short:
+            if acc_b < thresholds["acceptance_low"] or acc_b > thresholds["acceptance_high"]:
                 warnings.append(f"Block-move acceptance {acc_b:.2f} is outside typical bounds.")
                 _mark("warn")
         if acc_m is not None:
             optimizer_metrics.setdefault("acceptance_rate", {})["M"] = acc_m
-            if (acc_m < thresholds["acceptance_low"] or acc_m > thresholds["acceptance_high"]) and not pilot_short:
+            if acc_m < thresholds["acceptance_low"] or acc_m > thresholds["acceptance_high"]:
                 warnings.append(f"Multi-site acceptance {acc_m:.2f} is outside typical bounds.")
                 _mark("warn")
         acc_mh = _safe_float(optimizer_stats.get("acceptance_rate_mh"))
@@ -526,9 +517,7 @@ def summarize_sampling_diagnostics(
                 optimizer_metrics["acceptance_rate_mh_tail"] = tail_rate
                 optimizer_metrics["acceptance_rate_mh_tail_window"] = tail_window
                 optimizer_metrics["acceptance_rate_mh_tail_sweeps"] = tail_total
-                if (
-                    tail_rate < thresholds["acceptance_low"] or tail_rate > thresholds["acceptance_high"]
-                ) and not pilot_short:
+                if tail_rate < thresholds["acceptance_low"] or tail_rate > thresholds["acceptance_high"]:
                     warnings.append(
                         f"Tail MH acceptance {tail_rate:.2f} is outside typical bounds (window={tail_window})."
                     )
@@ -536,7 +525,7 @@ def summarize_sampling_diagnostics(
         swap_rate = _safe_float(optimizer_stats.get("swap_acceptance_rate"))
         if swap_rate is not None:
             optimizer_metrics["swap_acceptance_rate"] = swap_rate
-            if (swap_rate < thresholds["swap_low"] or swap_rate > thresholds["swap_high"]) and not pilot_short:
+            if swap_rate < thresholds["swap_low"] or swap_rate > thresholds["swap_high"]:
                 warnings.append(f"Swap acceptance {swap_rate:.2f} suggests poor PT mixing.")
                 _mark("warn")
         unique_successes = _safe_int(optimizer_stats.get("unique_successes"))
