@@ -32,7 +32,7 @@ entrypoint is `analysis/report.md` (machine‑readable `analysis/report.json`). 
 inventory with “why” each artifact was generated is in `analysis/manifest.json`.
 `analysis/objective_components.json` includes a `learning` block with best-score
 draws, last improvement draw, and (when `early_stop` is configured) a per-chain
-early-stop simulation to help spot plateaus.
+plateau simulation to help spot stalls (gated by `require_min_unique` when enabled).
 
 ### Numba cache (required for fast diagnostics)
 
@@ -150,8 +150,10 @@ Key signals:
 - When `objective.bidirectional=true`, `sequences.parquet` includes a
   `canonical_sequence` column and uniqueness metrics use that canonical form.
 - `sequences.parquet` includes `chain_1based` and `draw_in_phase` to make
-  plotting easier: `chain` remains 0‑based, `draw_idx` is the absolute sweep,
+  plotting easier: `chain` remains 0‑based, `draw` is the absolute sweep,
   and `draw_in_phase` is 0‑based within the phase (tune/draw).
+- `sequences.parquet` includes `min_per_tf_norm` (alias of `min_norm`) for the
+  per‑TF minimum in normalized scales.
 - `sequences.unique_fraction` low values suggest chain collapse or lack of
   diversity (increase draws or tighten selection filters).
 - `objective_components.json` includes `unique_fraction_canonical` only when
@@ -162,9 +164,9 @@ Key signals:
   top‑K elites balance TF scores and remain diverse.
 - PT runs: `optimizer.swap_acceptance_rate` near 0.05–0.40 is typical; very low
   values often mean a poor temperature ladder.
-- Acceptance metrics: Gibbs `S` moves are always accepted. Auto‑opt uses the
-  MH‑only aggregate rate (`optimizer.acceptance_rate_mh`) for scorecards; per‑move
-  `acceptance_rate.B/M` are still reported for debugging. Diagnostics also report
+- Acceptance metrics: auto‑opt uses the MH‑only aggregate rate
+  (`optimizer.acceptance_rate_mh`) for scorecards; per‑move acceptance rates are
+  still reported for debugging. Diagnostics also report
   `optimizer.acceptance_rate_mh_tail` (MH acceptance over the tail window).
 
 Plot defaults are intentionally lightweight (Tier‑0 only, including the dashboard).

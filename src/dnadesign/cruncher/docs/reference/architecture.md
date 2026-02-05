@@ -26,7 +26,7 @@ Core contract:
 - PWM representation and validation
 - scoring / evaluator logic
 - sequence state and move operators
-- optimizer kernels (e.g., Gibbs, parallel tempering)
+- optimizer kernels (parallel tempering)
 - No I/O (no filesystem, no network)
 
 #### `ingest/` (ports/adapters)

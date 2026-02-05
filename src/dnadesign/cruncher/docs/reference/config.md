@@ -365,6 +365,7 @@ Notes:
 - `output.trace.save=true` is required for trace-based plots and `report`.
 - `output.live_metrics=true` writes `live/metrics.jsonl` with progress snapshots (used by `cruncher runs watch`).
 - `output.trace.include_tune=true` includes burn-in samples in `sequences.parquet` (trace.nc always contains draws only).
+- `sequences.parquet` includes `min_per_tf_norm` (alias of `min_norm`) for the per‑TF normalized minimum.
 - `objective.bidirectional=true` scores both strands (reverse complement) when scanning PWMs.
 - When `objective.bidirectional=true`, dsDNA equivalence is always on for uniqueness and MMR selection (reverse complements are treated as identical).
 - `objective.combine` controls how per-TF scores are combined (`min` for weakest-TF optimization, `sum` for sum-based).

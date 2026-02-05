@@ -46,3 +46,10 @@
 - Removed unused MMR sequence-distance export and updated tests to align with the slimmer API.
 - Reworked the polish test to assert the helper is removed (no trim/polish fallback).
 - Added a minimal CLI smoke test that runs a two-TF matrix sample with tiny budgets.
+- Tightened analysis fixtures to include explicit MMR selection policy and fixed demo config indentation.
+- Added `min_per_tf_norm` to sequences.parquet and asserted it in the CLI smoke test.
+- Gated early-stop reporting on unique-success requirements and surfaced a diagnostics warning when unique_successes < min_unique.
+- Lowered demo `min_per_tf_norm` / `success_min_per_tf_norm` to 0.40 and reran demo_basics_two_tf; elites now populate (n=10) and early-stop triggers cleanly.
+- Ran the demo end-to-end (fetch motifs/sites → lock → parse → sample → analyze) using the workspace config.
+- Profiled `cruncher sample` on demo_basics_two_tf; dominant cost is PWM log-odds → p-value lookup construction (`core/pvalue.py`), with scorer init next (candidate for cross-pilot cache reuse).
+- Updated docs (demo, sampling guide, config reference, architecture) to reflect PT-only language, TFBS-core MMR behavior, and sequences column naming.
