@@ -7,8 +7,13 @@ Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
+from functools import lru_cache
+
 import numpy as np
 from numba import njit
+
+_LOGODDS_SCALE = 1000.0 / np.log(2.0)
+_LOGODDS_CACHE_MAXSIZE = 256
 
 
 @njit
@@ -34,16 +39,20 @@ def _dp_convolve(lom_int: np.ndarray, bg: np.ndarray, offset: int, length: int) 
     return probs
 
 
-def logodds_to_p_lookup(lom: np.ndarray, bg: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Compute exact tail p-values for a log-odds matrix under a zero-order background,
-    with the DP convolution accelerated by Numba.
-    """
-    # 1) Scale log-odds to integer resolution
-    scale = 1000.0 / np.log(2.0)
-    lom_int = np.round(lom * scale).astype(np.int32)
+def _bg_key(bg: np.ndarray) -> tuple[float, float, float, float]:
+    arr = np.asarray(bg, dtype=float)
+    if arr.shape != (4,):
+        raise ValueError("background must be a length-4 probability vector")
+    return tuple(float(x) for x in arr)
 
-    # 2) Determine total score bounds
+
+@lru_cache(maxsize=_LOGODDS_CACHE_MAXSIZE)
+def _logodds_lookup_cached(
+    lom_bytes: bytes,
+    shape: tuple[int, int],
+    bg_tuple: tuple[float, float, float, float],
+) -> tuple[np.ndarray, np.ndarray]:
+    lom_int = np.frombuffer(lom_bytes, dtype=np.int32).reshape(shape)
     min_per_col = lom_int.min(axis=1)
     max_per_col = lom_int.max(axis=1)
     total_min = int(min_per_col.sum())
@@ -52,13 +61,25 @@ def logodds_to_p_lookup(lom: np.ndarray, bg: np.ndarray) -> tuple[np.ndarray, np
     offset = -int(min_per_col.min())
     length = total_max - total_min + 1
 
-    # 3) Build null distribution in one Numba call
-    probs = _dp_convolve(lom_int, bg, offset, length)
-
-    # 4) Compute tail probabilities P(X >= k)
+    probs = _dp_convolve(lom_int, np.asarray(bg_tuple, dtype=float), offset, length)
     tail_p = probs[::-1].cumsum()[::-1]
-
-    # 5) Map integer indices back to float scores
-    scores = np.arange(total_min, total_max + 1) / scale
-
+    scores = np.arange(total_min, total_max + 1) / _LOGODDS_SCALE
     return scores, tail_p
+
+
+def logodds_cache_info():  # pragma: no cover - thin wrapper
+    return _logodds_lookup_cached.cache_info()
+
+
+def clear_logodds_cache() -> None:  # pragma: no cover - thin wrapper
+    _logodds_lookup_cached.cache_clear()
+
+
+def logodds_to_p_lookup(lom: np.ndarray, bg: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Compute exact tail p-values for a log-odds matrix under a zero-order background,
+    with the DP convolution accelerated by Numba.
+    """
+    # 1) Scale log-odds to integer resolution
+    lom_int = np.round(lom * _LOGODDS_SCALE).astype(np.int32)
+    return _logodds_lookup_cached(lom_int.tobytes(), lom_int.shape, _bg_key(bg))
