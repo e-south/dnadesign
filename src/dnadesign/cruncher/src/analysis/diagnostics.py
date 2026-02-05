@@ -16,7 +16,6 @@ import numpy as np
 import pandas as pd
 
 from dnadesign.cruncher.analysis.overlap import compute_overlap_tables
-from dnadesign.cruncher.core.sequence import canon_string
 
 
 def _safe_float(value: object) -> float | None:
@@ -61,15 +60,6 @@ def _sequence_frame(draw_df: pd.DataFrame) -> pd.DataFrame:
     if "phase" in draw_df.columns:
         draw_df = draw_df[draw_df["phase"] == "draw"].copy()
     return draw_df
-
-
-def _revcomp_str(seq: str) -> str:
-    comp = {"A": "T", "C": "G", "G": "C", "T": "A"}
-    return "".join(comp[ch] for ch in reversed(seq))
-
-
-def _hamming_str(a: str, b: str) -> float:
-    return float(sum(c0 != c1 for c0, c1 in zip(a, b))) / float(len(a)) if a else 0.0
 
 
 def _acceptance_tail_from_move_stats(
@@ -169,24 +159,7 @@ def summarize_sampling_diagnostics(
     if optimizer_kind is None and isinstance(optimizer, dict):
         optimizer_kind = optimizer.get("kind") if isinstance(optimizer.get("kind"), str) else optimizer_kind
     optimizer_kind = str(optimizer_kind).lower() if optimizer_kind else None
-    dsdna_canonicalize = bool(sample_meta.get("dsdna_canonicalize")) if sample_meta else False
-    early_stop_cfg = sample_meta.get("early_stop") if isinstance(sample_meta, dict) else None
-
-    if isinstance(early_stop_cfg, dict):
-        require_min_unique = bool(early_stop_cfg.get("require_min_unique", False))
-        min_unique = int(early_stop_cfg.get("min_unique", 0) or 0)
-        if require_min_unique and min_unique > 0:
-            unique_successes = None
-            if isinstance(optimizer_stats, dict):
-                raw_unique = optimizer_stats.get("unique_successes")
-                if isinstance(raw_unique, (int, float)):
-                    unique_successes = int(raw_unique)
-            if unique_successes is None or unique_successes < min_unique:
-                warnings.append(
-                    "Early-stop requires %d unique successes but only %d were observed."
-                    % (min_unique, unique_successes or 0)
-                )
-                _mark("warn")
+    has_canonical = bool(sample_meta.get("dsdna_canonicalize")) if sample_meta else False
 
     if isinstance(sample_meta, dict):
         pvalue_cache = sample_meta.get("pvalue_cache")
@@ -370,9 +343,6 @@ def summarize_sampling_diagnostics(
             unique = int(draw_df["canonical_sequence"].astype(str).nunique())
             seq_metrics["unique_sequences_canonical"] = unique
             seq_metrics["unique_sequences_raw"] = int(draw_df["sequence"].astype(str).nunique())
-        elif dsdna_canonicalize:
-            canon = draw_df["sequence"].astype(str).map(canon_string)
-            unique = int(canon.nunique())
         else:
             unique = int(draw_df["sequence"].astype(str).nunique())
         seq_metrics["n_sequences"] = total
@@ -445,24 +415,8 @@ def summarize_sampling_diagnostics(
                 )
             elites_metrics["normalized_balance_median"] = _safe_float(np.nanmedian(norm_balance))
             elites_metrics["normalized_min_median"] = _safe_float(np.nanmedian(norm_min))
-        if "sequence" in subset.columns:
-            seqs = subset["sequence"].astype(str).tolist()
-            if len(seqs) >= 2:
-                total = 0.0
-                count = 0
-                for i in range(len(seqs)):
-                    for j in range(i + 1, len(seqs)):
-                        s0, s1 = seqs[i], seqs[j]
-                        if len(s0) != len(s1):
-                            continue
-                        if dsdna_canonicalize:
-                            dist = min(_hamming_str(s0, s1), _hamming_str(_revcomp_str(s0), s1))
-                        else:
-                            dist = _hamming_str(s0, s1)
-                        total += dist
-                        count += 1
-                if count:
-                    elites_metrics["diversity_hamming"] = _safe_float(total / count)
+        if has_canonical and "canonical_sequence" in subset.columns:
+            elites_metrics["unique_elites_canonical"] = int(subset["canonical_sequence"].astype(str).nunique())
         if overlap_summary is not None:
             overlap_rate_median = overlap_summary.get("overlap_rate_median")
             overlap_total_bp_median = overlap_summary.get("overlap_total_bp_median")

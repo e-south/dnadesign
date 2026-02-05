@@ -16,7 +16,7 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-ANALYSIS_LAYOUT_VERSION = "v7"
+ANALYSIS_LAYOUT_VERSION = "v8"
 ANALYSIS_DIR_NAME = "analysis"
 ARCHIVE_DIR_NAME = "_archive"
 MANIFEST_FILE_NAME = "manifest.json"

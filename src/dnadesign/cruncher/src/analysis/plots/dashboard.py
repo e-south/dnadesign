@@ -16,7 +16,6 @@ from typing import Iterable
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
 
 from dnadesign.cruncher.analysis.plots._savefig import savefig
 
@@ -36,40 +35,78 @@ def plot_dashboard(
     sequences_df: pd.DataFrame,
     elites_df: pd.DataFrame,
     tf_names: Iterable[str],
-    overlap_summary_df: pd.DataFrame | None,
-    elite_overlap_df: pd.DataFrame | None,
     out_path: Path,
     *,
     dpi: int,
     png_compress_level: int,
 ) -> None:
     tf_list = list(tf_names)
-    sns.set_style("ticks", {"axes.grid": False})
+    plt.style.use("seaborn-v0_8-ticks")
     fig, axes = plt.subplots(2, 2, figsize=(10, 8))
-    ax_trace, ax_worst, ax_heat, ax_overlap = axes.flatten()
+    ax_learning, ax_elites, ax_unique, ax_worst = axes.flatten()
 
-    # ── worst-TF trace ──────────────────────────────────────────────────────
     df = sequences_df.copy()
     if "phase" in df.columns:
-        df = df[df["phase"] == "draw"]
+        df = df[df["phase"] == "draw"].copy()
     score_cols = _score_columns(tf_list)
-    if not score_cols or any(col not in df.columns for col in score_cols) or df.empty:
-        _empty_panel(ax_trace, "Worst-TF trace unavailable")
+
+    # ── learning curve ─────────────────────────────────────────────────────
+    if "combined_score_final" not in df.columns or df.empty:
+        _empty_panel(ax_learning, "Learning curve unavailable")
     else:
         df = df.copy()
-        df["min_score"] = df[score_cols].min(axis=1)
-        if "chain" in df.columns and "draw" in df.columns:
-            for _, chain_df in df.groupby("chain"):
-                ax_trace.plot(chain_df["draw"], chain_df["min_score"], alpha=0.4)
-            median_by_draw = df.groupby("draw")["min_score"].median()
-            ax_trace.plot(median_by_draw.index, median_by_draw.values, color="black", linewidth=1.8)
+        df["combined_score_final"] = pd.to_numeric(df["combined_score_final"], errors="coerce")
+        df = df.dropna(subset=["combined_score_final"])
+        if df.empty:
+            _empty_panel(ax_learning, "Learning curve unavailable")
         else:
-            ax_trace.plot(df["min_score"].to_numpy(), alpha=0.7)
-        ax_trace.set_title("Worst-TF trace (min score)")
-        ax_trace.set_xlabel("Draw")
-        ax_trace.set_ylabel("Min scaled score")
+            best_by_draw = df.groupby("draw")["combined_score_final"].max().sort_index()
+            cummax = best_by_draw.cummax()
+            ax_learning.plot(cummax.index, cummax.values, color="#4c78a8", linewidth=2.0)
+            ax_learning.set_title("Best score vs draw")
+            ax_learning.set_xlabel("Draw")
+            ax_learning.set_ylabel("Best combined score")
 
-    # ── worst-TF frequency ──────────────────────────────────────────────────
+    # ── elite score snapshot ───────────────────────────────────────────────
+    if elites_df is None or elites_df.empty or "min_norm" not in elites_df.columns:
+        _empty_panel(ax_elites, "Elite score summary unavailable")
+    else:
+        elite_min = pd.to_numeric(elites_df["min_norm"], errors="coerce").dropna()
+        if elite_min.empty:
+            _empty_panel(ax_elites, "Elite score summary unavailable")
+        else:
+            ax_elites.boxplot(elite_min.to_numpy(), vert=True, patch_artist=True)
+            ax_elites.set_title("Elite min-per-TF norm")
+            ax_elites.set_ylabel("Min-per-TF norm")
+            ax_elites.set_xticks([])
+
+    # ── unique fraction ────────────────────────────────────────────────────
+    if df.empty or "sequence" not in df.columns:
+        _empty_panel(ax_unique, "Unique fraction unavailable")
+    else:
+        total = int(len(df))
+        if total == 0:
+            _empty_panel(ax_unique, "Unique fraction unavailable")
+        else:
+            if "canonical_sequence" in df.columns:
+                unique = int(df["canonical_sequence"].astype(str).nunique())
+            else:
+                unique = int(df["sequence"].astype(str).nunique())
+            frac = unique / float(total)
+            ax_unique.bar(["unique"], [frac], color="#72b7b2")
+            ax_unique.set_ylim(0.0, 1.0)
+            ax_unique.set_title("Unique fraction")
+            ax_unique.set_ylabel("Fraction")
+            ax_unique.text(
+                0,
+                min(frac + 0.05, 0.95),
+                f"{unique}/{total}",
+                ha="center",
+                va="bottom",
+                fontsize=9,
+            )
+
+    # ── worst-TF identity ──────────────────────────────────────────────────
     if not score_cols or any(col not in df.columns for col in score_cols) or df.empty:
         _empty_panel(ax_worst, "Worst-TF identity unavailable")
     else:
@@ -77,37 +114,11 @@ def plot_dashboard(
         worst_idx = np.argmin(scores, axis=1)
         worst_labels = [tf_list[idx] for idx in worst_idx]
         counts = pd.Series(worst_labels).value_counts().reindex(tf_list, fill_value=0)
-        ax_worst.bar(counts.index, counts.values, color="#4c78a8")
-        ax_worst.set_title("Worst-TF frequency")
+        ax_worst.bar(counts.index, counts.values, color="#f58518")
+        ax_worst.set_title("Worst-TF identity")
         ax_worst.set_xlabel("TF")
         ax_worst.set_ylabel("Count")
         ax_worst.tick_params(axis="x", rotation=25)
-
-    # ── overlap heatmap ─────────────────────────────────────────────────────
-    if overlap_summary_df is None or overlap_summary_df.empty or not tf_list:
-        _empty_panel(ax_heat, "Overlap heatmap unavailable")
-    else:
-        matrix = pd.DataFrame(0.0, index=tf_list, columns=tf_list)
-        for _, row in overlap_summary_df.iterrows():
-            tf_i = row.get("tf_i")
-            tf_j = row.get("tf_j")
-            if tf_i not in matrix.index or tf_j not in matrix.columns:
-                continue
-            rate = row.get("overlap_rate")
-            if isinstance(rate, (int, float)):
-                matrix.loc[tf_i, tf_j] = float(rate)
-                matrix.loc[tf_j, tf_i] = float(rate)
-        sns.heatmap(matrix, cmap="mako", vmin=0.0, vmax=1.0, square=True, ax=ax_heat, cbar=False)
-        ax_heat.set_title("Overlap rate")
-
-    # ── overlap distribution ────────────────────────────────────────────────
-    if elite_overlap_df is None or elite_overlap_df.empty:
-        _empty_panel(ax_overlap, "Overlap distribution unavailable")
-    else:
-        sns.histplot(elite_overlap_df["overlap_total_bp"], bins=20, kde=True, ax=ax_overlap)
-        ax_overlap.set_title("Overlap bp per elite")
-        ax_overlap.set_xlabel("Total overlap bp")
-        ax_overlap.set_ylabel("Count")
 
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)

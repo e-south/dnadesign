@@ -17,16 +17,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import yaml
 
 from dnadesign.cruncher.artifacts.layout import config_used_path
-from dnadesign.cruncher.config.moves import resolve_move_config
-from dnadesign.cruncher.config.schema_v2 import (
-    AnalysisConfig,
-    CruncherConfig,
-    SampleMovesConfig,
-)
+from dnadesign.cruncher.config.schema_v3 import CruncherConfig
 from dnadesign.cruncher.core.pwm import PWM
 
 
@@ -36,12 +30,9 @@ class SampleMeta:
     chains: int
     draws: int
     tune: int
-    move_probs: dict[str, float]
-    cooling_kind: str
     bidirectional: bool
     top_k: int
     mode: str
-    dsdna_canonicalize: bool
 
 
 def _load_pwms_from_config(run_dir: Path) -> tuple[dict[str, PWM], dict]:
@@ -67,57 +58,22 @@ def _load_pwms_from_config(run_dir: Path) -> tuple[dict[str, PWM], dict]:
 def _resolve_sample_meta(cfg: CruncherConfig, used_cfg: dict, manifest: dict) -> SampleMeta:
     if cfg.sample is None:
         raise ValueError("sample section is required for analyze")
-    used_sample = used_cfg.get("sample") if isinstance(used_cfg, dict) else None
-    if not isinstance(used_sample, dict):
-        raise ValueError("config_used.yaml missing sample section; re-run `cruncher sample`.")
+    if not isinstance(used_cfg, dict):
+        raise ValueError("config_used.yaml missing cruncher config; re-run `cruncher sample`.")
 
-    def _require(path: list[str], label: str) -> object:
-        cursor: object = used_sample
-        for key in path:
-            if not isinstance(cursor, dict) or key not in cursor:
-                raise ValueError(f"config_used.yaml missing sample.{label}; re-run `cruncher sample`.")
-            cursor = cursor[key]
-        return cursor
+    optimizer_payload = manifest.get("optimizer") if isinstance(manifest, dict) else None
+    optimizer_kind = "pt"
+    if isinstance(optimizer_payload, dict):
+        optimizer_kind = str(optimizer_payload.get("kind") or "pt")
 
-    def _coerce_int(value: object, label: str) -> int:
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            raise ValueError(f"config_used.yaml sample.{label} must be an integer.")
-        if isinstance(value, float) and not value.is_integer():
-            raise ValueError(f"config_used.yaml sample.{label} must be an integer.")
-        return int(value)
+    draws = int(manifest.get("draws") or 0)
+    tune = int(manifest.get("adapt_sweeps") or 0)
+    top_k = int(manifest.get("top_k") or 0)
+    objective_payload = manifest.get("objective") if isinstance(manifest, dict) else None
+    bidirectional = False
+    if isinstance(objective_payload, dict):
+        bidirectional = bool(objective_payload.get("bidirectional"))
 
-    def _coerce_float(value: object, label: str) -> float:
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            raise ValueError(f"config_used.yaml sample.{label} must be a number.")
-        return float(value)
-
-    optimizer_kind = str(manifest.get("optimizer", {}).get("kind") or "pt")
-    total_sweeps = _coerce_int(
-        _require(["compute", "total_sweeps"], "compute.total_sweeps"),
-        "compute.total_sweeps",
-    )
-    adapt_frac = _coerce_float(
-        _require(["compute", "adapt_sweep_frac"], "compute.adapt_sweep_frac"), "compute.adapt_sweep_frac"
-    )
-    adapt_sweeps = int(np.ceil(total_sweeps * adapt_frac))
-    draws = int(total_sweeps - adapt_sweeps)
-    tune = int(adapt_sweeps)
-    mode_val = _require(["mode"], "mode")
-    if not isinstance(mode_val, str):
-        raise ValueError("config_used.yaml sample.mode must be a string.")
-    bidirectional_val = _require(["objective", "bidirectional"], "objective.bidirectional")
-    if not isinstance(bidirectional_val, bool):
-        raise ValueError("config_used.yaml sample.objective.bidirectional must be a boolean.")
-    bidirectional = bidirectional_val
-    top_k = _coerce_int(_require(["elites", "k"], "elites.k"), "elites.k")
-    dsdna_canonicalize_val = bidirectional
-
-    moves_payload = _require(["moves"], "moves")
-    moves_cfg = SampleMovesConfig.model_validate(moves_payload)
-    move_probs = resolve_move_config(moves_cfg).move_probs
-
-    if optimizer_kind != "pt":
-        raise ValueError("run manifest optimizer.kind must be 'pt'.")
     optimizer_stats = manifest.get("optimizer_stats") if isinstance(manifest, dict) else None
     beta_ladder = []
     if isinstance(optimizer_stats, dict):
@@ -125,41 +81,16 @@ def _resolve_sample_meta(cfg: CruncherConfig, used_cfg: dict, manifest: dict) ->
         if isinstance(ladder_payload, list):
             beta_ladder = ladder_payload
     chains = len(beta_ladder) if beta_ladder else 1
-    cooling_kind = "fixed" if chains <= 1 else "geometric"
 
     return SampleMeta(
         optimizer_kind=optimizer_kind,
         chains=chains,
         draws=draws,
         tune=tune,
-        move_probs=move_probs,
-        cooling_kind=cooling_kind,
         bidirectional=bidirectional,
         top_k=top_k,
-        mode=mode_val,
-        dsdna_canonicalize=dsdna_canonicalize_val,
+        mode="pt",
     )
-
-
-def _resolve_scoring_params(used_cfg: dict) -> tuple[float, float | None]:
-    if not isinstance(used_cfg, dict):
-        raise ValueError("config_used.yaml is missing sample config; re-run `cruncher sample`.")
-    sample = used_cfg.get("sample")
-    if not isinstance(sample, dict):
-        raise ValueError("config_used.yaml missing sample section; re-run `cruncher sample`.")
-    objective = sample.get("objective")
-    if not isinstance(objective, dict):
-        raise ValueError("config_used.yaml missing sample.objective; re-run `cruncher sample`.")
-    scoring = objective.get("scoring")
-    if not isinstance(scoring, dict):
-        raise ValueError("config_used.yaml missing sample.objective.scoring; re-run `cruncher sample`.")
-    pseudocounts = scoring.get("pwm_pseudocounts")
-    if not isinstance(pseudocounts, (int, float)):
-        raise ValueError("config_used.yaml sample.objective.scoring.pwm_pseudocounts must be a number.")
-    log_odds_clip = scoring.get("log_odds_clip")
-    if log_odds_clip is not None and not isinstance(log_odds_clip, (int, float)):
-        raise ValueError("config_used.yaml sample.objective.scoring.log_odds_clip must be a number or null.")
-    return float(pseudocounts), float(log_odds_clip) if log_odds_clip is not None else None
 
 
 def _analysis_id() -> str:
@@ -196,81 +127,3 @@ def _resolve_git_dir(path: Path) -> Path | None:
             if resolved.exists():
                 return resolved
     return None
-
-
-def _get_git_commit(path: Path) -> str | None:
-    probe = path.resolve()
-    for _ in range(6):
-        git_dir = _resolve_git_dir(probe)
-        if git_dir is not None:
-            try:
-                head = (git_dir / "HEAD").read_text().strip()
-            except OSError:
-                return None
-            if head.startswith("ref:"):
-                ref = head.split(" ", 1)[1].strip()
-                ref_path = git_dir / ref
-                if ref_path.exists():
-                    try:
-                        return ref_path.read_text().strip()
-                    except OSError:
-                        return None
-            return head or None
-        if probe.parent == probe:
-            break
-        probe = probe.parent
-    return None
-
-
-def _resolve_tf_pair(
-    analysis_cfg: AnalysisConfig,
-    tf_names: list[str],
-    tf_pair_override: tuple[str, str] | None = None,
-) -> tuple[str, str] | None:
-    pair = tf_pair_override
-    if pair is None:
-        pair = analysis_cfg.tf_pair
-    if pair is None:
-        return None
-    if len(pair) != 2:
-        raise ValueError("analysis.tf_pair must contain exactly two TF names.")
-    x_tf, y_tf = pair
-    if x_tf not in tf_names or y_tf not in tf_names:
-        raise ValueError(f"analysis.tf_pair must reference TFs in {tf_names}.")
-    return x_tf, y_tf
-
-
-def _auto_select_tf_pair(
-    score_df: pd.DataFrame,
-    tf_names: list[str],
-) -> tuple[tuple[str, str] | None, str | None]:
-    if len(tf_names) < 2 or score_df.empty:
-        return None, "fewer than two TFs or empty score table"
-    cols = [f"score_{tf}" for tf in tf_names if f"score_{tf}" in score_df.columns]
-    if len(cols) < 2:
-        return None, "missing per-TF score columns"
-    medians = {tf: float(score_df[f"score_{tf}"].median()) for tf in tf_names if f"score_{tf}" in score_df.columns}
-    if len(medians) < 2:
-        return None, "insufficient score medians"
-    worst_tf = sorted(medians.items(), key=lambda item: (item[1], item[0]))[0][0]
-    corr = score_df[cols].corr()
-    corr_col = corr.get(f"score_{worst_tf}") if hasattr(corr, "get") else None
-    if corr_col is not None:
-        candidates = {}
-        for tf in tf_names:
-            if tf == worst_tf:
-                continue
-            key = f"score_{tf}"
-            if key not in corr_col.index:
-                continue
-            value = corr_col.get(key)
-            if value is None or not np.isfinite(value):
-                continue
-            candidates[tf] = float(value)
-        if candidates:
-            tradeoff_tf = sorted(candidates.items(), key=lambda item: (item[1], item[0]))[0][0]
-            return (worst_tf, tradeoff_tf), "worst-median TF paired with lowest correlation partner"
-    sorted_tfs = [tf for tf, _ in sorted(medians.items(), key=lambda item: (item[1], item[0]))]
-    if len(sorted_tfs) >= 2:
-        return (sorted_tfs[0], sorted_tfs[1]), "fallback to two lowest medians"
-    return None, "unable to select pair"
