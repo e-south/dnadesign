@@ -41,7 +41,11 @@ def _sample_block(*, save_trace: bool, top_k: int, draws: int = 2, tune: int = 1
             "score_scale": "normalized-llr",
             "scoring": {"pwm_pseudocounts": 0.1, "log_odds_clip": None},
         },
-        "elites": {"k": top_k, "filters": {"pwm_sum_min": 0.0}},
+        "elites": {
+            "k": top_k,
+            "filters": {"pwm_sum_min": 0.0},
+            "selection": {"policy": "mmr"},
+        },
         "moves": {
             "profile": "balanced",
             "overrides": {

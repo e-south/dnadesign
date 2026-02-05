@@ -463,6 +463,8 @@ def run_analyze(
             "cooling_kind": sample_meta.cooling_kind,
             "dsdna_canonicalize": sample_meta.dsdna_canonicalize,
         }
+        if isinstance(manifest.get("early_stop"), dict):
+            sample_meta_payload["early_stop"] = manifest.get("early_stop")
         diagnostics_summary = summarize_sampling_diagnostics(
             trace_idata=trace_idata,
             sequences_df=seq_df,

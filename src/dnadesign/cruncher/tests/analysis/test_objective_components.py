@@ -68,3 +68,36 @@ def test_objective_components_learning_metrics() -> None:
     early_stop = learning.get("early_stop") or {}
     assert early_stop["enabled"] is True
     assert early_stop["per_chain"]["1"]["early_stop_draw"] == 1
+
+
+def test_objective_components_early_stop_requires_unique_successes() -> None:
+    df = pd.DataFrame(
+        {
+            "phase": ["draw", "draw", "draw"],
+            "chain": [0, 0, 0],
+            "draw": [0, 1, 2],
+            "combined_score_final": [0.2, 0.2, 0.2],
+            "score_tfA": [0.2, 0.2, 0.2],
+            "score_tfB": [0.2, 0.2, 0.2],
+            "sequence": ["AA", "AA", "AA"],
+        }
+    )
+
+    result = compute_objective_components(
+        df,
+        ["tfA", "tfB"],
+        top_k=1,
+        dsdna_canonicalize=False,
+        early_stop={
+            "enabled": True,
+            "patience": 1,
+            "min_delta": 0.0,
+            "require_min_unique": True,
+            "min_unique": 2,
+            "success_min_per_tf_norm": 0.5,
+        },
+    )
+
+    early_stop = (result.get("learning") or {}).get("early_stop") or {}
+    assert early_stop.get("eligible") is False
+    assert early_stop.get("earliest_draw") is None

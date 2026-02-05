@@ -98,7 +98,7 @@ cruncher:
       min_delta: 0.01
       require_min_unique: true
       min_unique: 10
-      success_min_per_tf_norm: 0.60
+      success_min_per_tf_norm: 0.40
     init:
       kind: random
       length: 30
@@ -116,13 +116,13 @@ cruncher:
     elites:
       k: 10
       selection:
-      policy: mmr
-      pool_size: 1000
-      alpha: 0.85
-      relevance: min_per_tf_norm
+        policy: mmr
+        pool_size: 1000
+        alpha: 0.85
+        relevance: min_per_tf_norm
       filters:
         pwm_sum_min: 0.0
-        min_per_tf_norm: 0.60
+        min_per_tf_norm: 0.40
         require_all_tfs_over_min_norm: true
     moves:
       profile: balanced
@@ -169,11 +169,5 @@ cruncher:
     runs: []
     extra_tables: true
     tf_pair: [lexA, cpxR]
-    plots:
-      worst_tf_trace: true
-      worst_tf_identity: true
-      elite_filter_waterfall: true
-      overlap_heatmap: true
-      overlap_bp_distribution: true
     scatter_scale: llr
     subsampling_epsilon: 10.0

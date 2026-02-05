@@ -172,6 +172,23 @@ def summarize_sampling_diagnostics(
         optimizer_kind = optimizer.get("kind") if isinstance(optimizer.get("kind"), str) else optimizer_kind
     optimizer_kind = str(optimizer_kind).lower() if optimizer_kind else None
     dsdna_canonicalize = bool(sample_meta.get("dsdna_canonicalize")) if sample_meta else False
+    early_stop_cfg = sample_meta.get("early_stop") if isinstance(sample_meta, dict) else None
+
+    if isinstance(early_stop_cfg, dict):
+        require_min_unique = bool(early_stop_cfg.get("require_min_unique", False))
+        min_unique = int(early_stop_cfg.get("min_unique", 0) or 0)
+        if require_min_unique and min_unique > 0:
+            unique_successes = None
+            if isinstance(optimizer_stats, dict):
+                raw_unique = optimizer_stats.get("unique_successes")
+                if isinstance(raw_unique, (int, float)):
+                    unique_successes = int(raw_unique)
+            if unique_successes is None or unique_successes < min_unique:
+                warnings.append(
+                    "Early-stop requires %d unique successes but only %d were observed."
+                    % (min_unique, unique_successes or 0)
+                )
+                _mark("warn")
 
     if mode:
         metrics["mode"] = mode

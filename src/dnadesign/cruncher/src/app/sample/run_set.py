@@ -390,7 +390,9 @@ def _run_sample_for_set(
                 row["combined_score_final"] = float(
                     evaluator.combined_from_scores(per_tf_map, beta=beta_softmin_final, length=seq_arr.size)
                 )
-                row["min_norm"] = float(min(norm_map.values())) if norm_map else 0.0
+                min_norm = float(min(norm_map.values())) if norm_map else 0.0
+                row["min_norm"] = min_norm
+                row["min_per_tf_norm"] = min_norm
                 for tf in tf_order:
                     row[f"score_{tf}"] = float(per_tf_map[tf])
                 yield row

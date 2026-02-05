@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pandas as pd
 import yaml
 from typer.testing import CliRunner
 
@@ -129,3 +130,8 @@ def test_sample_cli_smoke_matrix(tmp_path: Path) -> None:
     assert result.exit_code == 0
     sample_runs = _find_runs(tmp_path / "runs" / "sample")
     assert sample_runs
+    seq_path = sample_runs[0] / "artifacts" / "sequences.parquet"
+    seq_df = pd.read_parquet(seq_path)
+    assert "min_per_tf_norm" in seq_df.columns
+    assert "min_norm" in seq_df.columns
+    assert (seq_df["min_per_tf_norm"] == seq_df["min_norm"]).all()

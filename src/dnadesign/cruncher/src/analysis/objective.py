@@ -54,9 +54,11 @@ def compute_objective_components(
                 result["top_k_median_final"] = float(np.median(top_scores))
 
     score_cols = [f"score_{tf}" for tf in tf_list]
+    min_norm_series = None
     if score_cols and all(col in df.columns for col in score_cols) and not df.empty:
         scores = df[score_cols].to_numpy(dtype=float)
         min_scaled = np.min(scores, axis=1)
+        min_norm_series = pd.Series(min_scaled, index=df.index)
         if min_scaled.size:
             result["median_min_scaled_tf"] = float(np.median(min_scaled))
             result["p10_min_scaled_tf"] = float(np.percentile(min_scaled, 10))
@@ -127,7 +129,37 @@ def compute_objective_components(
                     "patience": patience,
                     "min_delta": min_delta,
                 }
-                if enabled and patience > 0:
+                require_min_unique = bool(early_stop.get("require_min_unique", False))
+                min_unique = int(early_stop.get("min_unique", 0) or 0)
+                success_min_norm = float(early_stop.get("success_min_per_tf_norm", 0.0) or 0.0)
+                eligible = True
+                unique_successes = None
+                if require_min_unique and min_unique > 0:
+                    if "min_per_tf_norm" in df.columns:
+                        min_norm_series = pd.to_numeric(df["min_per_tf_norm"], errors="coerce")
+                    elif "min_norm" in df.columns:
+                        min_norm_series = pd.to_numeric(df["min_norm"], errors="coerce")
+                    if min_norm_series is not None:
+                        success_mask = min_norm_series >= success_min_norm
+                        if "canonical_sequence" in df.columns:
+                            unique_successes = int(df.loc[success_mask, "canonical_sequence"].astype(str).nunique())
+                        elif dsdna_canonicalize:
+                            canon = df.loc[success_mask, "sequence"].astype(str).map(canon_string)
+                            unique_successes = int(canon.nunique())
+                        elif "sequence" in df.columns:
+                            unique_successes = int(df.loc[success_mask, "sequence"].astype(str).nunique())
+                        else:
+                            unique_successes = 0
+                    else:
+                        unique_successes = 0
+                    eligible = unique_successes >= min_unique if unique_successes is not None else False
+                    early_payload["require_min_unique"] = True
+                    early_payload["min_unique"] = min_unique
+                    early_payload["success_min_per_tf_norm"] = success_min_norm
+                    early_payload["unique_successes"] = unique_successes
+                    early_payload["eligible"] = eligible
+
+                if enabled and patience > 0 and (not require_min_unique or eligible):
                     per_chain: dict[str, object] = {}
                     stop_draws: list[int] = []
                     for chain_value, chain_df in score_df.groupby("chain"):
