@@ -116,11 +116,10 @@ cruncher:
     elites:
       k: 10
       selection:
-        policy: mmr
-        pool_size: 1000
-        alpha: 0.85
-        relevance: min_per_tf_norm
-        min_distance: null
+      policy: mmr
+      pool_size: 1000
+      alpha: 0.85
+      relevance: min_per_tf_norm
       filters:
         pwm_sum_min: 0.0
         min_per_tf_norm: 0.60

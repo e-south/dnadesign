@@ -71,13 +71,18 @@ def _write_config(tmp_path: Path, payload: dict) -> Path:
         (("cruncher", "sample", "elites", "dsDNA_hamming"), True),
         (("cruncher", "sample", "elites", "selection", "distance"), {"kind": "sequence_hamming"}),
         (("cruncher", "sample", "elites", "selection", "relevance_norm"), "percentile"),
+        (("cruncher", "sample", "elites", "selection", "min_distance"), 0.1),
     ],
 )
 def test_removed_keys_are_rejected(tmp_path: Path, path: tuple[str, ...], value: object) -> None:
     config = _base_config()
     node = config
     for key in path[:-1]:
-        node = node[key]
+        next_node = node.get(key)
+        if not isinstance(next_node, dict):
+            next_node = {}
+            node[key] = next_node
+        node = next_node
     node[path[-1]] = value
     config_path = _write_config(tmp_path, config)
 

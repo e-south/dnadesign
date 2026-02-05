@@ -95,11 +95,16 @@ Elite selection is explicitly aligned with the optimization objective:
    `pwm_sum_min` as a secondary threshold.
 2) **Select (MMR only)** — build a filtered pool, score relevance (defaults to
    `min_per_tf_norm`), then greedily select **K** with MMR using
-   `selection.alpha` (relevance vs diversity) and `selection.min_distance` for a
-   hard diversity floor. TFBS‑core MMR compares same‑TF best‑hit cores across
-   sequences (LexA vs LexA, CpxR vs CpxR), averages across TFs, and never compares
-   different TFs within the same sequence. “Tolerant” weights emphasize low‑information
-   PWM positions to preserve consensus‑critical bases while encouraging diversity.
+   `selection.alpha` (relevance vs diversity). Current MMR behavior (TFBS‑core mode) is:
+   - For each sequence in the candidate pool, extract the best‑hit window for each TF
+     and orient each core to its PWM.
+   - When comparing two sequences, compute LexA‑core vs LexA‑core and CpxR‑core vs
+     CpxR‑core Hamming distances (weighted per PWM position), then average across TFs.
+   - We never compare LexA vs CpxR within the same sequence.
+   “Tolerant” weights emphasize low‑information PWM positions to preserve consensus‑critical
+   bases while encouraging diversity.
+   When `objective.bidirectional=true`, MMR deduplicates by canonical sequence so reverse
+   complements (including palindromes) count as the same identity.
 
 `pwm_sum_min` is not the objective; it is a representativeness gate.
 `combined_score_final` respects `objective.combine` (default `min`, or `sum`
@@ -201,6 +206,6 @@ If auto‑opt selects a run but diagnostics are weak, try:
 For full settings, see the config reference.
 
 Quick decision guide:
-- **Low unique_fraction** → increase draws or raise `elites.filters.min_per_tf_norm` / `elites.selection.min_distance`.
+- **Low unique_fraction** → increase draws or relax `elites.filters.min_per_tf_norm`.
 - **Very low swap acceptance (PT)** → adjust `pt.beta_ladder` (gentler spacing).
 - **Weak worst‑TF trace** → increase `objective.softmin.beta_end` or normalize scores.

@@ -645,7 +645,6 @@ class SampleElitesSelectionConfig(StrictBaseModel):
     pool_size: int = 1000
     alpha: float = 0.85
     relevance: Literal["min_per_tf_norm", "combined_score_final"] = "min_per_tf_norm"
-    min_distance: float | None = None
 
     @field_validator("pool_size")
     @classmethod
@@ -659,15 +658,6 @@ class SampleElitesSelectionConfig(StrictBaseModel):
     def _check_alpha(cls, v: float) -> float:
         if not isinstance(v, (int, float)) or v <= 0 or v > 1:
             raise ValueError("sample.elites.selection.alpha must be in (0, 1]")
-        return float(v)
-
-    @field_validator("min_distance")
-    @classmethod
-    def _check_min_distance(cls, v: float | None) -> float | None:
-        if v is None:
-            return v
-        if not isinstance(v, (int, float)) or v < 0 or v > 1:
-            raise ValueError("sample.elites.selection.min_distance must be between 0 and 1 or null")
         return float(v)
 
 

@@ -205,7 +205,6 @@ def select_mmr_elites(
     pool_size: int,
     alpha: float,
     relevance: str,
-    min_distance: float | None,
     dsdna: bool,
     tf_names: Sequence[str] | None = None,
     pwms: dict[str, PWM] | None = None,
@@ -340,8 +339,6 @@ def select_mmr_elites(
                     nearest_dist = dist
                     nearest_id = _candidate_id(sel)
             nearest_distance = min(distances) if distances else 0.0
-            if min_distance is not None and nearest_distance < min_distance:
-                continue
             nearest_similarity = 1.0 - nearest_distance
             utility = alpha * relevance_scaled[idx] - (1.0 - alpha) * nearest_similarity
             if best_utility is None or utility > best_utility:

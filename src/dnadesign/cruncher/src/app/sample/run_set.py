@@ -669,7 +669,6 @@ def _run_sample_for_set(
             pool_size=selection_cfg.pool_size,
             alpha=selection_cfg.alpha,
             relevance=selection_cfg.relevance,
-            min_distance=selection_cfg.min_distance,
             dsdna=dsdna_mode,
             tf_names=scorer.tf_names,
             pwms=pwms,
@@ -688,7 +687,7 @@ def _run_sample_for_set(
         }
 
     if not kept_elites and (pwm_sum_min > 0 or min_per_tf_norm is not None):
-        logger.warning("Elite filters removed all candidates; relax min_per_tf_norm/pwm_sum_min or min_distance.")
+        logger.warning("Elite filters removed all candidates; relax min_per_tf_norm or pwm_sum_min.")
 
     # serialise elites
     want_cons = bool(sample_cfg.output.include_consensus_in_elites)
@@ -703,11 +702,10 @@ def _run_sample_for_set(
     )
 
     run_logger(
-        "Final elite count: %d (pwm_sum_min=%s, min_per_tf_norm=%s, min_distance=%s)",
+        "Final elite count: %d (pwm_sum_min=%s, min_per_tf_norm=%s)",
         len(elites),
         f"{pwm_sum_min:.2f}" if pwm_sum_min else "off",
         f"{min_per_tf_norm:.2f}" if min_per_tf_norm is not None else "off",
-        f"{selection_cfg.min_distance:.2f}" if isinstance(selection_cfg.min_distance, (int, float)) else "off",
     )
 
     tf_label = format_regulator_slug(tfs)
@@ -748,7 +746,6 @@ def _run_sample_for_set(
         "require_all_tfs_over_min_norm": require_all,
         "selection_policy": "mmr",
         "selection": selection_cfg.model_dump(),
-        "min_distance": selection_cfg.min_distance,
         "dsdna_canonicalize": want_canonical,
         "total_draws_seen": total_draws_seen,
         "passed_pre_filter": len(raw_elites),

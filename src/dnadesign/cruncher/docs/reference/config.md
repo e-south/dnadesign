@@ -300,7 +300,6 @@ sample:
       pool_size: 1000
       alpha: 0.85
       relevance: min_per_tf_norm
-      min_distance: null
     filters:
       pwm_sum_min: 0.0
       min_per_tf_norm: null
@@ -381,7 +380,6 @@ Notes:
 - “Tolerant” weights mean low‑information PWM positions are weighted more when measuring diversity (`weight = 1 - info_norm`), preserving consensus‑critical positions while encouraging diversity at flexible bases.
 - `elites.selection.pool_size` defines the candidate pool size for MMR (warns if < k).
 - `elites.selection.alpha` controls relevance vs diversity (1.0 = relevance-only).
-- `elites.selection.min_distance` enforces a hard diversity floor (null disables).
 - `objective.scoring.pwm_pseudocounts` smooths matrix-derived PWMs (set to 0 for raw matrices).
 - `objective.scoring.log_odds_clip` caps log-odds magnitudes (use to avoid extreme cliffs).
 - `objective.length_penalty_lambda` subtracts `lambda * (L - init.length)` from combined scores (mitigates length bias).

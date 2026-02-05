@@ -48,7 +48,6 @@ def test_elites_selection_defaults() -> None:
     assert selection.pool_size == 1000
     assert selection.alpha == pytest.approx(0.85)
     assert selection.relevance == "min_per_tf_norm"
-    assert selection.min_distance is None
 
 
 def test_elites_selection_alpha_must_be_positive() -> None:
