@@ -43,13 +43,13 @@ def _candidate(seq: str, *, chain: int, draw: int, combined: float, min_norm: fl
     )
 
 
-def test_position_weights_tolerant_differs_from_uniform() -> None:
+def test_position_weights_emphasize_low_info_positions() -> None:
     pwm = _pwm("tf", [[0.99, 0.003, 0.003, 0.004], [0.25, 0.25, 0.25, 0.25]])
-    tolerant = compute_position_weights(pwm, weights="tolerant")
-    uniform = compute_position_weights(pwm, weights="uniform")
-    assert tolerant.shape == uniform.shape
-    assert not np.allclose(tolerant, uniform)
-    assert tolerant[0] < tolerant[1]
+    weights = compute_position_weights(pwm)
+    assert weights.shape == (2,)
+    assert weights[0] < weights[1]
+    assert np.all(weights >= 0.0)
+    assert np.all(weights <= 1.0)
 
 
 def test_core_distance_is_normalized() -> None:
@@ -81,11 +81,11 @@ def test_mmr_selection_is_deterministic() -> None:
         pool_size=3,
         alpha=0.8,
         relevance="min_per_tf_norm",
-        relevance_norm="percentile",
-        distance_kind="sequence_hamming",
-        distance_weights="uniform",
         min_distance=None,
         dsdna=False,
+        tf_names=["tf"],
+        pwms={"tf": _pwm("tf", [[0.25, 0.25, 0.25, 0.25]] * 4)},
+        core_maps={f"{cand.chain_id}:{cand.draw_idx}": {"tf": cand.seq_arr} for cand in candidates},
     )
     selection_two = select_mmr_elites(
         candidates,
@@ -93,11 +93,11 @@ def test_mmr_selection_is_deterministic() -> None:
         pool_size=3,
         alpha=0.8,
         relevance="min_per_tf_norm",
-        relevance_norm="percentile",
-        distance_kind="sequence_hamming",
-        distance_weights="uniform",
         min_distance=None,
         dsdna=False,
+        tf_names=["tf"],
+        pwms={"tf": _pwm("tf", [[0.25, 0.25, 0.25, 0.25]] * 4)},
+        core_maps={f"{cand.chain_id}:{cand.draw_idx}": {"tf": cand.seq_arr} for cand in candidates},
     )
     ids_one = [row["candidate_id"] for row in selection_one.meta]
     ids_two = [row["candidate_id"] for row in selection_two.meta]
@@ -116,11 +116,11 @@ def test_mmr_dedupes_reverse_complements() -> None:
         pool_size=3,
         alpha=0.7,
         relevance="min_per_tf_norm",
-        relevance_norm="percentile",
-        distance_kind="sequence_hamming",
-        distance_weights="uniform",
         min_distance=None,
         dsdna=True,
+        tf_names=["tf"],
+        pwms={"tf": _pwm("tf", [[0.25, 0.25, 0.25, 0.25]] * 4)},
+        core_maps={f"{cand.chain_id}:{cand.draw_idx}": {"tf": cand.seq_arr} for cand in candidates},
     )
     selected = [row["sequence"] for row in result.meta]
     assert len(selected) == 2

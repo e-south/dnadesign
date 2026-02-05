@@ -138,14 +138,13 @@ If a TF cannot be uniquely resolved, **cruncher** errors immediately. Analyze op
 
 - Deterministic RNG via `sample.rng.seed` (and `sample.rng.deterministic=true` for stable pilot seeding).
 - Burn-in storage is optional via `sample.output.trace.include_tune` (default: false, affects sequences.parquet only).
-- Optimizer registry supports `gibbs` and `pt` out of the box.
+- Optimizer registry supports `pt` (parallel tempering).
 - Each optimizer reports:
   - move tallies
   - acceptance ratios for B/M moves
   - PT swap acceptance rates
-- Cooling and soft-min schedules are independent; `optimizers.gibbs.apply_during` controls whether annealing happens during tune only or all sweeps.
-- `optimizers.gibbs.schedule_scope` selects per‑chain vs global cooling schedules (global spans all chains and requires `apply_during=all`).
-- Optional adaptive controllers tune Gibbs acceptance or PT ladder scale toward target bands.
+- Cooling (PT ladder) and soft-min schedules are independent.
+- Optional adaptive controllers tune the PT ladder scale toward target swap acceptance.
 - Move policies support slide/swap/insertion moves plus optional “worst TF” targeting and move scheduling.
 
 ---

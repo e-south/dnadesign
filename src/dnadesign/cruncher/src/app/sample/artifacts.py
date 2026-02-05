@@ -11,7 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import csv
 import json
 import logging
 import shutil
@@ -31,19 +30,6 @@ from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.store.motif_store import MotifRef
 
 logger = logging.getLogger(__name__)
-
-
-def _write_length_ladder_table(rows: list[dict[str, object]], *, pilot_root: Path) -> Path:
-    analysis_dir = pilot_root / "analysis"
-    analysis_dir.mkdir(parents=True, exist_ok=True)
-    out_path = analysis_dir / "length_ladder.csv"
-    fieldnames = ["length", "best_score", "balance", "diversity", "unique_fraction", "runtime_sec"]
-    with out_path.open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
-        writer.writeheader()
-        for row in rows:
-            writer.writerow({key: row.get(key) for key in fieldnames})
-    return out_path
 
 
 def _save_config(

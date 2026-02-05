@@ -115,19 +115,12 @@ cruncher:
         beta: [0.5, 10.0]
     elites:
       k: 10
-      min_hamming: 1
       selection:
         policy: mmr
         pool_size: 1000
         alpha: 0.85
         relevance: min_per_tf_norm
-        relevance_norm: percentile
-        distance:
-          kind: tfbs_core_weighted
-          weights: tolerant
-          dsDNA: auto
         min_distance: null
-        write_baselines: true
       filters:
         pwm_sum_min: 0.0
         min_per_tf_norm: 0.60
@@ -146,11 +139,6 @@ cruncher:
     optimizer:
       name: auto
     optimizers:
-      gibbs:
-        beta_schedule:
-          kind: linear
-          beta: [1.0, 20.0]
-        apply_during: tune
       pt:
         beta_ladder:
           kind: geometric
@@ -165,7 +153,6 @@ cruncher:
       move_profiles: [balanced]
       cooling_boosts: [1.0]
       pt_swap_probs: [0.10]
-      pt_ladder_sizes: [4]
       policy:
         allow_warn: true
     output:

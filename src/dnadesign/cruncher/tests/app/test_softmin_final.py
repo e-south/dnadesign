@@ -21,7 +21,7 @@ from dnadesign.cruncher.config.schema_v2 import (
     SampleObjectiveConfig,
     SoftminConfig,
 )
-from dnadesign.cruncher.core.optimizers.gibbs import GibbsOptimizer
+from dnadesign.cruncher.core.optimizers.pt import PTGibbsOptimizer
 
 
 class _DummyEvaluator:
@@ -31,11 +31,12 @@ class _DummyEvaluator:
 
 def _base_cfg() -> dict:
     return {
-        "draws": 1,
-        "tune": 1,
-        "chains": 2,
+        "draws": 2,
+        "tune": 2,
+        "chains": 1,
         "min_dist": 0,
         "top_k": 1,
+        "swap_prob": 0.0,
         "record_tune": False,
         "progress_bar": False,
         "progress_every": 0,
@@ -47,10 +48,11 @@ def _base_cfg() -> dict:
         "move_probs": {"S": 1.0, "B": 0.0, "M": 0.0, "L": 0.0, "W": 0.0, "I": 0.0},
         "kind": "fixed",
         "beta": 1.0,
+        "softmin": {"enabled": False},
     }
 
 
-def test_gibbs_final_softmin_beta_respects_schedule_scope() -> None:
+def test_pt_final_softmin_beta_respects_schedule() -> None:
     cfg = _base_cfg()
     cfg["softmin"] = {
         "enabled": True,
@@ -62,21 +64,14 @@ def test_gibbs_final_softmin_beta_respects_schedule_scope() -> None:
     }
 
     init_cfg = SimpleNamespace(kind="random", length=4, pad_with="background", regulator=None)
-    per_chain = GibbsOptimizer(
+    optimizer = PTGibbsOptimizer(
         evaluator=_DummyEvaluator(),
-        cfg={**cfg, "schedule_scope": "per_chain", "apply_during": "all"},
+        cfg=cfg,
         rng=np.random.default_rng(0),
         init_cfg=init_cfg,
         pwms={},
     )
-    global_scope = GibbsOptimizer(
-        evaluator=_DummyEvaluator(),
-        cfg={**cfg, "schedule_scope": "global", "apply_during": "all"},
-        rng=np.random.default_rng(0),
-        init_cfg=init_cfg,
-        pwms={},
-    )
-    assert global_scope.final_softmin_beta() > per_chain.final_softmin_beta()
+    assert optimizer.final_softmin_beta() == 5.0
 
 
 def test_resolve_final_softmin_beta_uses_optimizer_value() -> None:

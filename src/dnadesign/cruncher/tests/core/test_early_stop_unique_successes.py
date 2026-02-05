@@ -15,7 +15,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from dnadesign.cruncher.core.optimizers.gibbs import GibbsOptimizer
+from dnadesign.cruncher.core.optimizers.pt import PTGibbsOptimizer
 from dnadesign.cruncher.core.state import SequenceState
 
 
@@ -44,7 +44,7 @@ class _ConstantEvaluator:
         return {"tf": 0.0}, 0.0
 
 
-def test_gibbs_early_stop_waits_for_unique_successes() -> None:
+def test_pt_early_stop_waits_for_unique_successes() -> None:
     rng = np.random.default_rng(0)
     evaluator = _ConstantEvaluator()
     cfg = {
@@ -53,6 +53,7 @@ def test_gibbs_early_stop_waits_for_unique_successes() -> None:
         "chains": 1,
         "min_dist": 0,
         "top_k": 1,
+        "swap_prob": 0.0,
         "bidirectional": False,
         "dsdna_hamming": False,
         "dsdna_canonicalize": False,
@@ -79,12 +80,12 @@ def test_gibbs_early_stop_waits_for_unique_successes() -> None:
         "init_seeds": [np.zeros(4, dtype=np.int8)],
     }
     init_cfg = SimpleNamespace(kind="random", length=4, pad_with="background", regulator=None)
-    optimizer = GibbsOptimizer(
+    optimizer = PTGibbsOptimizer(
         evaluator=evaluator,
         cfg=cfg,
         rng=rng,
-        init_cfg=init_cfg,
         pwms={},
+        init_cfg=init_cfg,
     )
 
     optimizer.optimise()

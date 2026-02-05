@@ -246,7 +246,7 @@ lists `meme_suite_meme`/`meme_suite_streme` first in `source_preference`.
 cruncher lock -c "$CONFIG"
 cruncher parse -c "$CONFIG"
 cruncher sample -c "$CONFIG"
-cruncher sample --no-auto-opt -c "$CONFIG"  # requires optimizer.name=gibbs|pt
+cruncher sample --no-auto-opt -c "$CONFIG"  # requires optimizer.name=pt
 cruncher runs list --stage sample -c "$CONFIG"
 cruncher runs latest --stage sample --set-index 1 -c "$CONFIG"
 cruncher runs best --stage sample --set-index 1 -c "$CONFIG"

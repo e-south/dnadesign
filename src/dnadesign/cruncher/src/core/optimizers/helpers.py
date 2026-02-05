@@ -63,6 +63,6 @@ def swap_block(seq: np.ndarray, a: int, b: int, length: int):
 def _replace_block(seq: np.ndarray, start: int, length: int, new_block: np.ndarray):
     """
     Replace `seq[start:start+length]` in-place with `new_block`.
-    Used by GibbsOptimizer for the “B” move.
+    Used by optimizers for the “B” move.
     """
     seq[start : start + length] = new_block

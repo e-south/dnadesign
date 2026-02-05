@@ -71,31 +71,6 @@ def _elite_filter_passes(
     return True
 
 
-def _filter_elite_candidates(
-    candidates: list[_EliteCandidate],
-    *,
-    min_per_tf_norm: float | None,
-    require_all_tfs_over_min_norm: bool,
-    pwm_sum_min: float,
-) -> list[_EliteCandidate]:
-    filtered: list[_EliteCandidate] = []
-    for cand in candidates:
-        if _elite_filter_passes(
-            norm_map=cand.norm_map,
-            min_norm=cand.min_norm,
-            sum_norm=cand.sum_norm,
-            min_per_tf_norm=min_per_tf_norm,
-            require_all_tfs_over_min_norm=require_all_tfs_over_min_norm,
-            pwm_sum_min=pwm_sum_min,
-        ):
-            filtered.append(cand)
-    return filtered
-
-
-def _elite_rank_key(combined_score: float, min_norm: float, sum_norm: float) -> tuple[float, float, float]:
-    return (combined_score, min_norm, sum_norm)
-
-
 def resolve_dsdna_mode(*, elites_cfg: object, bidirectional: bool) -> bool:
     _ = elites_cfg
     return bool(bidirectional)

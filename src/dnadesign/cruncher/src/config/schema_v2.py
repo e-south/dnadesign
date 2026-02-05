@@ -152,46 +152,6 @@ class MoveScheduleConfig(StrictBaseModel):
         return self
 
 
-class CoolingFixed(StrictBaseModel):
-    kind: Literal["fixed"] = "fixed"
-    beta: float = 1.0
-
-    @field_validator("beta")
-    @classmethod
-    def _check_positive_beta(cls, v: float) -> float:
-        if v <= 0:
-            raise ValueError("Fixed cooling beta must be > 0")
-        return v
-
-
-class CoolingLinear(StrictBaseModel):
-    kind: Literal["linear"] = "linear"
-    beta: Tuple[float, float]
-
-    @field_validator("beta")
-    @classmethod
-    def _two_positive(cls, v: Tuple[float, float]) -> Tuple[float, float]:
-        if len(v) != 2:
-            raise ValueError("Linear cooling.beta must be length-2 [beta_start, beta_end]")
-        if v[0] <= 0 or v[1] <= 0:
-            raise ValueError("Both β_start and β_end must be > 0")
-        return v
-
-
-class CoolingGeometric(StrictBaseModel):
-    kind: Literal["geometric"] = "geometric"
-    beta: List[float]
-
-    @field_validator("beta")
-    @classmethod
-    def _check_list_positive(cls, v: List[float]) -> List[float]:
-        if not isinstance(v, list) or len(v) < 2:
-            raise ValueError("Geometric cooling.beta must be a list of at least two positive floats")
-        if any(x <= 0 for x in v):
-            raise ValueError("All entries in geometric β list must be > 0")
-        return v
-
-
 class CoolingStage(StrictBaseModel):
     sweeps: int
     beta: float
@@ -200,33 +160,15 @@ class CoolingStage(StrictBaseModel):
     @classmethod
     def _check_sweeps(cls, v: int) -> int:
         if not isinstance(v, int) or v <= 0:
-            raise ValueError("cooling.stages.sweeps must be a positive integer")
+            raise ValueError("softmin.stages.sweeps must be a positive integer")
         return v
 
     @field_validator("beta")
     @classmethod
     def _check_beta(cls, v: float) -> float:
         if not isinstance(v, (int, float)) or v <= 0:
-            raise ValueError("cooling.stages.beta must be > 0")
+            raise ValueError("softmin.stages.beta must be > 0")
         return float(v)
-
-
-class CoolingPiecewise(StrictBaseModel):
-    kind: Literal["piecewise"] = "piecewise"
-    stages: List[CoolingStage]
-
-    @field_validator("stages")
-    @classmethod
-    def _check_stages(cls, v: List[CoolingStage]) -> List[CoolingStage]:
-        if not isinstance(v, list) or len(v) < 2:
-            raise ValueError("Piecewise cooling.stages must contain at least two stages")
-        sweeps = [stage.sweeps for stage in v]
-        if sweeps != sorted(sweeps):
-            raise ValueError("Piecewise cooling.stages must be sorted by increasing sweeps")
-        return v
-
-
-CoolingConfig = Union[CoolingFixed, CoolingLinear, CoolingGeometric, CoolingPiecewise]
 
 
 class SoftminConfig(StrictBaseModel):

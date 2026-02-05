@@ -50,7 +50,7 @@ the tail probability for the best window becomes a sequence‑level p via
 > cruncher lock   -c "$CONFIG"
 > cruncher parse  -c "$CONFIG"
 > cruncher sample -c "$CONFIG"
-> # For a quick run: cruncher sample --no-auto-opt -c "$CONFIG" (requires optimizer.name=gibbs|pt)
+> # For a quick run: cruncher sample --no-auto-opt -c "$CONFIG" (requires optimizer.name=pt)
 > cruncher analyze -c "$CONFIG"
 > cruncher analyze --summary -c "$CONFIG"
 > ```
@@ -372,7 +372,7 @@ Early-stop is enabled in this demo (`patience: 500`, `min_delta: 0.01`) to cut o
 cruncher sample -c "$CONFIG"  # run sampling with auto-opt pilots
 
 # Run sampling without pilots
-cruncher sample --no-auto-opt -c "$CONFIG"  # skip pilots (requires optimizer.name=gibbs|pt)
+cruncher sample --no-auto-opt -c "$CONFIG"  # skip pilots (requires optimizer.name=pt)
 
 # Run sampling with verbose logs
 cruncher sample --verbose -c "$CONFIG"  # stream periodic status logs

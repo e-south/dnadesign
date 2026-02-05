@@ -13,7 +13,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from dnadesign.cruncher.core.optimizers.gibbs import GibbsOptimizer
+from dnadesign.cruncher.core.optimizers.pt import PTGibbsOptimizer
 from dnadesign.cruncher.core.state import SequenceState
 
 
@@ -36,6 +36,7 @@ def test_move_stats_length_matches_sweeps() -> None:
         "chains": 1,
         "min_dist": 0,
         "top_k": 1,
+        "swap_prob": 0.0,
         "record_tune": False,
         "progress_bar": False,
         "progress_every": 0,
@@ -48,16 +49,14 @@ def test_move_stats_length_matches_sweeps() -> None:
         "kind": "fixed",
         "beta": 1.0,
         "softmin": {"enabled": False},
-        "schedule_scope": "per_chain",
-        "apply_during": "all",
     }
     init_cfg = SimpleNamespace(kind="random", length=4, pad_with="background", regulator=None)
-    optimizer = GibbsOptimizer(
+    optimizer = PTGibbsOptimizer(
         evaluator=_DummyEvaluator(),
         cfg=cfg,
         rng=np.random.default_rng(0),
-        init_cfg=init_cfg,
         pwms={},
+        init_cfg=init_cfg,
     )
     optimizer.optimise()
     stats = optimizer.stats()

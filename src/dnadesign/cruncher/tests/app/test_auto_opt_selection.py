@@ -33,7 +33,6 @@ from dnadesign.cruncher.app.sample_workflow import (
 )
 from dnadesign.cruncher.config.schema_v2 import (
     AutoOptConfig,
-    AutoOptLengthConfig,
     InitConfig,
     SampleBudgetConfig,
     SampleConfig,
@@ -44,7 +43,7 @@ def _candidate(tmp_path: Path, name: str, **overrides) -> AutoOptCandidate:
     run_dir = tmp_path / name
     run_dir.mkdir()
     payload = {
-        "kind": "gibbs",
+        "kind": "pt",
         "length": 10,
         "budget": 200,
         "cooling_boost": 1.0,
@@ -89,26 +88,26 @@ def _candidate(tmp_path: Path, name: str, **overrides) -> AutoOptCandidate:
     return AutoOptCandidate(**payload)
 
 
-def test_auto_opt_prefers_shortest_length(tmp_path: Path) -> None:
-    auto_cfg = AutoOptConfig(length=AutoOptLengthConfig(enabled=True, prefer_shortest=True))
-    cand_short = _candidate(tmp_path, "short", length=10, best_score=1.0)
-    cand_long = _candidate(tmp_path, "long", length=12, best_score=10.0, balance_median=0.9)
-
-    winner = _select_auto_opt_candidate([cand_short, cand_long], auto_cfg)
-    assert winner.length == 10
-
-
-def test_auto_opt_length_ranking_prefers_best_score(tmp_path: Path) -> None:
-    auto_cfg = AutoOptConfig(length=AutoOptLengthConfig(enabled=True, prefer_shortest=False))
-    cand_short = _candidate(tmp_path, "short", length=10, best_score=1.0, balance_median=0.9)
-    cand_long = _candidate(tmp_path, "long", length=12, best_score=10.0, balance_median=0.2)
-
-    winner = _select_auto_opt_candidate([cand_short, cand_long], auto_cfg)
-    assert winner.length == 12
+def test_auto_opt_ranking_tiebreaks_on_relevance(tmp_path: Path) -> None:
+    cand_low = _candidate(
+        tmp_path,
+        "low",
+        pilot_score=0.5,
+        median_relevance_raw=0.2,
+        mean_pairwise_distance=0.9,
+    )
+    cand_high = _candidate(
+        tmp_path,
+        "high",
+        pilot_score=0.5,
+        median_relevance_raw=0.3,
+        mean_pairwise_distance=0.1,
+    )
+    winner = _select_auto_opt_candidate([cand_low, cand_high])
+    assert winner.run_dir == cand_high.run_dir
 
 
 def test_auto_opt_prefers_best_score_over_quality(tmp_path: Path) -> None:
-    auto_cfg = AutoOptConfig(length=AutoOptLengthConfig(enabled=False))
     cand_ok = _candidate(tmp_path, "ok", balance_median=0.2, best_score=1.0, quality="ok", status="ok")
     cand_warn = _candidate(
         tmp_path,
@@ -119,12 +118,12 @@ def test_auto_opt_prefers_best_score_over_quality(tmp_path: Path) -> None:
         status="warn",
     )
 
-    winner = _select_auto_opt_candidate([cand_warn, cand_ok], auto_cfg)
+    winner = _select_auto_opt_candidate([cand_warn, cand_ok])
     assert winner.best_score == 5.0
 
 
 def test_auto_opt_scorecard_not_blocked_by_trace_metrics(tmp_path: Path) -> None:
-    auto_cfg = AutoOptConfig(length=AutoOptLengthConfig(enabled=False))
+    auto_cfg = AutoOptConfig()
     candidate = _candidate(
         tmp_path,
         "no_block",
@@ -143,7 +142,7 @@ def test_auto_opt_scorecard_not_blocked_by_trace_metrics(tmp_path: Path) -> None
 
 
 def test_auto_opt_marks_short_draws_as_warn(tmp_path: Path) -> None:
-    auto_cfg = AutoOptConfig(length=AutoOptLengthConfig(enabled=False))
+    auto_cfg = AutoOptConfig()
     candidate = _candidate(
         tmp_path,
         "short_draws",
@@ -158,7 +157,7 @@ def test_auto_opt_marks_short_draws_as_warn(tmp_path: Path) -> None:
 
 
 def test_auto_opt_uses_ess_ratio_for_quality(tmp_path: Path) -> None:
-    auto_cfg = AutoOptConfig(length=AutoOptLengthConfig(enabled=False))
+    auto_cfg = AutoOptConfig()
     candidate = _candidate(
         tmp_path,
         "ess_ratio_fail",
@@ -172,7 +171,6 @@ def test_auto_opt_uses_ess_ratio_for_quality(tmp_path: Path) -> None:
 
 
 def test_auto_opt_all_fail_allowed_when_requested(tmp_path: Path) -> None:
-    auto_cfg = AutoOptConfig(length=AutoOptLengthConfig(enabled=False))
     candidate = _candidate(
         tmp_path,
         "fail",
@@ -184,7 +182,7 @@ def test_auto_opt_all_fail_allowed_when_requested(tmp_path: Path) -> None:
         unique_fraction=None,
     )
 
-    winner = _select_auto_opt_candidate([candidate], auto_cfg, allow_fail=True)
+    winner = _select_auto_opt_candidate([candidate], allow_fail=True)
     assert winner.status == "fail"
 
 
@@ -227,15 +225,13 @@ def test_auto_opt_missing_diagnostics_requires_allow_warn(tmp_path: Path) -> Non
 
 
 def test_auto_opt_aggregate_uses_best_run_dir(tmp_path: Path) -> None:
-    auto_cfg = AutoOptConfig(length=AutoOptLengthConfig(enabled=False))
-    run_a = _candidate(tmp_path, "a", best_score=1.0, balance_median=0.2)
-    run_b = _candidate(tmp_path, "b", best_score=2.0, median_relevance_raw=0.3)
-    run_c = _candidate(tmp_path, "c", best_score=2.0, median_relevance_raw=0.5)
+    run_a = _candidate(tmp_path, "a", pilot_score=1.0, median_relevance_raw=0.2)
+    run_b = _candidate(tmp_path, "b", pilot_score=2.0, median_relevance_raw=0.3)
+    run_c = _candidate(tmp_path, "c", pilot_score=2.0, median_relevance_raw=0.5)
     agg = _aggregate_candidate_runs(
         [run_a, run_b, run_c],
         budget=200,
-        scorecard_metric=auto_cfg.policy.scorecard.metric,
-        scorecard_top_k=5,
+        scorecard_k=5,
     )
     assert agg.run_dir == run_c.run_dir
 
@@ -246,16 +242,17 @@ def test_auto_opt_final_applies_cooling_boost() -> None:
         init=InitConfig(kind="random", length=10),
     )
 
-    final_cfg, notes = _build_final_sample_cfg(sample_cfg, kind="gibbs", cooling_boost=2.0)
-    assert final_cfg.optimizers.gibbs.beta_schedule.beta == (2.0, 40.0)
-    assert any("boosted cooling" in note for note in notes)
+    final_cfg, notes = _build_final_sample_cfg(sample_cfg, kind="pt", cooling_boost=2.0)
+    ladder = final_cfg.optimizers.pt.beta_ladder
+    assert ladder.betas == [0.4, 2.0, 10.0, 50.0]
+    assert any("boosted PT beta ladder" in note for note in notes)
 
 
 def test_auto_opt_best_marker_written(tmp_path: Path) -> None:
     payload = {
-        "selected_candidate": {"kind": "gibbs", "length": 10, "pilot_run": "pilot_1"},
+        "selected_candidate": {"kind": "pt", "length": 10, "pilot_run": "pilot_1"},
         "final_sample_run": "sample_1",
-        "config_summary": "optimizer=gibbs",
+        "config_summary": "optimizer=pt",
     }
     marker_path = _write_auto_opt_best_marker(tmp_path, payload, run_group="lexA-cpxR")
     assert marker_path.exists()
@@ -303,16 +300,16 @@ def test_bootstrap_seed_deterministic_across_run_dirs(tmp_path: Path) -> None:
         "seed": 123,
         "sequence_length": 10,
         "regulator_set": {"tfs": ["lexA", "cpxR"]},
-        "auto_opt": {"attempt": 1, "candidate": "gibbs", "budget": 200, "replicate": 0},
+        "auto_opt": {"attempt": 1, "candidate": "pt", "budget": 200, "replicate": 0},
     }
-    seed_a = _bootstrap_seed(manifest=manifest, run_dir=tmp_path / "run_a", kind="gibbs")
-    seed_b = _bootstrap_seed(manifest=manifest, run_dir=tmp_path / "run_b", kind="gibbs")
+    seed_a = _bootstrap_seed(manifest=manifest, run_dir=tmp_path / "run_a", kind="pt")
+    seed_b = _bootstrap_seed(manifest=manifest, run_dir=tmp_path / "run_b", kind="pt")
     assert seed_a == seed_b
 
 
 def test_pooled_bootstrap_seed_independent_of_order() -> None:
     manifest_a = {"seed": 1, "sequence_length": 10, "auto_opt": {"replicate": 0}}
     manifest_b = {"seed": 2, "sequence_length": 10, "auto_opt": {"replicate": 1}}
-    seed_ab = _pooled_bootstrap_seed(manifests=[manifest_a, manifest_b], kind="gibbs", length=10, budget=200)
-    seed_ba = _pooled_bootstrap_seed(manifests=[manifest_b, manifest_a], kind="gibbs", length=10, budget=200)
+    seed_ab = _pooled_bootstrap_seed(manifests=[manifest_a, manifest_b], kind="pt", length=10, budget=200)
+    seed_ba = _pooled_bootstrap_seed(manifests=[manifest_b, manifest_a], kind="pt", length=10, budget=200)
     assert seed_ab == seed_ba

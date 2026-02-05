@@ -13,7 +13,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from dnadesign.cruncher.core.optimizers.gibbs import GibbsOptimizer
+from dnadesign.cruncher.core.optimizers.pt import PTGibbsOptimizer
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.core.state import SequenceState
 
@@ -49,6 +49,7 @@ def test_insertion_can_reverse_complement() -> None:
         "chains": 1,
         "min_dist": 0,
         "top_k": 1,
+        "swap_prob": 0.0,
         "bidirectional": True,
         "record_tune": False,
         "progress_bar": False,
@@ -65,24 +66,23 @@ def test_insertion_can_reverse_complement() -> None:
         "insertion_consensus_prob": 1.0,
     }
     init_cfg = SimpleNamespace(kind="random", length=2, pad_with="background", regulator=None)
-    optimizer = GibbsOptimizer(
+    optimizer = PTGibbsOptimizer(
         evaluator=evaluator,
         cfg=cfg,
         rng=np.random.default_rng(0),
-        init_cfg=init_cfg,
         pwms=pwms,
+        init_cfg=init_cfg,
     )
     seq = np.array([0, 0], dtype=np.int8)
     state = SequenceState(seq)
     current = evaluator.combined(state, beta=None)
     rng = _FixedRNG()
-    optimizer._perform_single_move(
+    optimizer._single_chain_move(
         seq,
         current,
         1.0,
         None,
         evaluator,
-        cfg,
         rng,
         np.array([0.0, 0.0, 0.0, 0.0, 0.0, 1.0]),
         state=state,

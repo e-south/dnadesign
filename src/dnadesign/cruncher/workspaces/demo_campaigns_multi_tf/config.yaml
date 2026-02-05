@@ -158,7 +158,6 @@ cruncher:
         beta: [0.5, 10.0]
     elites:
       k: 5
-      min_hamming: 1
       filters:
         pwm_sum_min: 0.0
     moves:
@@ -175,11 +174,6 @@ cruncher:
     optimizer:
       name: auto
     optimizers:
-      gibbs:
-        beta_schedule:
-          kind: linear
-          beta: [1.0, 20.0]
-        apply_during: tune
       pt:
         beta_ladder:
           kind: geometric

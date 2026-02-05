@@ -64,6 +64,7 @@ from dnadesign.cruncher.config.schema_v2 import BetaLadderFixed, CruncherConfig,
 from dnadesign.cruncher.core.evaluator import SequenceEvaluator
 from dnadesign.cruncher.core.labels import format_regulator_slug
 from dnadesign.cruncher.core.optimizers.cooling import make_beta_scheduler
+from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.core.scoring import Scorer
 from dnadesign.cruncher.core.selection.mmr import MmrCandidate, select_mmr_elites, tfbs_cores_from_scorer
 from dnadesign.cruncher.core.sequence import canon_int
@@ -164,6 +165,19 @@ def _resolve_final_softmin_beta(optimizer: object, sample_cfg: SampleConfig) -> 
         softmin_sched = {k: v for k, v in softmin_cfg.model_dump().items() if k in ("kind", "beta", "stages")}
         return make_beta_scheduler(softmin_sched, total)(total - 1)
     return None
+
+
+def _assert_init_length_fits_pwms(sample_cfg: SampleConfig, pwms: dict[str, PWM]) -> None:
+    if not pwms:
+        raise ValueError("No PWMs available for sampling.")
+    max_w = max(pwm.length for pwm in pwms.values())
+    if sample_cfg.init.length < max_w:
+        names = ", ".join(f"{tf}:{pwms[tf].length}" for tf in sorted(pwms))
+        raise ValueError(
+            f"init.length={sample_cfg.init.length} is shorter than the widest PWM (max={max_w}). "
+            f"Per-TF lengths: {names}. Increase sample.init.length or trim PWMs via "
+            "motif_store.pwm_window_lengths (with pwm_window_strategy=max_info)."
+        )
 
 
 def _run_sample_for_set(
@@ -324,7 +338,7 @@ def _run_sample_for_set(
         bidirectional=sample_cfg.objective.bidirectional,
     )
 
-    # 3) FLATTEN optimizer config for Gibbs/PT
+    # 3) FLATTEN optimizer config for PT
     moves = resolve_move_config(sample_cfg.moves)
     opt_cfg: dict[str, object] = {
         "draws": sample_cfg.budget.draws,
@@ -365,7 +379,7 @@ def _run_sample_for_set(
 
     logger.debug("Optimizer config flattened: %s", opt_cfg)
 
-    # 4) INSTANTIATE OPTIMIZER (Gibbs or PT), passing in init_cfg and pwms
+    # 4) INSTANTIATE OPTIMIZER (PT), passing in init_cfg and pwms
     from dnadesign.cruncher.core.optimizers.registry import get_optimizer
 
     optimizer_factory = get_optimizer(optimizer_kind)

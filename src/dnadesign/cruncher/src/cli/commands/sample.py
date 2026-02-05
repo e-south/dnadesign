@@ -41,7 +41,7 @@ def sample(
     auto_opt: bool | None = typer.Option(
         None,
         "--auto-opt/--no-auto-opt",
-        help="Run auto-optimization pilots (Gibbs + PT) and select the best candidate.",
+        help="Run auto-optimization pilots (PT) and select the best candidate.",
     ),
     verbose: bool = typer.Option(
         False,
