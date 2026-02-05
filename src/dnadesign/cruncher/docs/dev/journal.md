@@ -53,3 +53,4 @@
 - Ran the demo end-to-end (fetch motifs/sites → lock → parse → sample → analyze) using the workspace config.
 - Profiled `cruncher sample` on demo_basics_two_tf; dominant cost is PWM log-odds → p-value lookup construction (`core/pvalue.py`), with scorer init next (candidate for cross-pilot cache reuse).
 - Updated docs (demo, sampling guide, config reference, architecture) to reflect PT-only language, TFBS-core MMR behavior, and sequences column naming.
+- Added audit design doc for Cruncher end-to-end review (docs/plans/2026-02-05-cruncher-audit-design.md), emphasizing PT-only, fixed-length invariants, MMR canonical selection, and doc/workspace alignment over test bloat.
