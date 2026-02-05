@@ -129,7 +129,7 @@ def build_run_pred_events(
         "pred__y_dim": [int(y_dim)] * n,
         "pred__y_hat_model": [list(map(float, row)) for row in y_hat_model],
         "pred__y_obj_scalar": list(map(float, y_obj_scalar)),
-        "pred__scalar_var": list(map(float, uq_scalar)),
+        "pred__scalar_var": [float(uq_scalar[i]) if uq_scalar is not None else None for i in range(n)],
         "scores": list(map(float, scores)),
         "sel__rank_competition": sel_emit.ranks_competition.astype(int).tolist(),
         "sel__is_selected": sel_emit.selected_bool.astype(bool).tolist(),
