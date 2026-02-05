@@ -86,7 +86,14 @@ def _resolve_final_softmin_beta(optimizer: object, sample_cfg: SampleConfig) -> 
 def _assert_init_length_fits_pwms(sample_cfg: SampleConfig, pwms: dict[str, PWM]) -> None:
     if not pwms:
         raise ValueError("No PWMs available for sampling.")
-    _assert_init_length_fits_pwms(sample_cfg, pwms)
+    max_w = max(pwm.length for pwm in pwms.values())
+    if sample_cfg.init.length < max_w:
+        names = ", ".join(f"{tf}:{pwms[tf].length}" for tf in sorted(pwms))
+        raise ValueError(
+            f"init.length={sample_cfg.init.length} is shorter than the widest PWM (max={max_w}). "
+            f"Per-TF lengths: {names}. Increase sample.init.length or trim PWMs via "
+            "motif_store.pwm_window_lengths (with pwm_window_strategy=max_info)."
+        )
 
 
 def _run_sample_for_set(
@@ -102,12 +109,10 @@ def _run_sample_for_set(
     stage: str = "sample",
     run_kind: str | None = None,
     auto_opt_meta: dict[str, object] | None = None,
-    init_seeds: list[np.ndarray] | None = None,
 ) -> Path:
     """
     Run MCMC sampler, save config/meta plus artifacts (trace.nc, sequences.parquet, elites.*).
-    Each chain gets its own independent seed (random/consensus/consensus_mix) unless
-    init_seeds are provided for warm-started runs.
+    Each chain gets its own independent seed (random/consensus/consensus_mix).
     """
     optimizer_kind = _resolve_optimizer_kind(sample_cfg)
     chain_count = _effective_chain_count(sample_cfg, kind=optimizer_kind)
@@ -147,14 +152,7 @@ def _run_sample_for_set(
                 "Use a regulator within the active set or switch to init.kind='consensus_mix'."
             )
 
-    max_w = max(pwm.length for pwm in pwms.values())
-    if sample_cfg.init.length < max_w:
-        names = ", ".join(f"{tf}:{pwms[tf].length}" for tf in sorted(pwms))
-        raise ValueError(
-            f"init.length={sample_cfg.init.length} is shorter than the widest PWM (max={max_w}). "
-            f"Per-TF lengths: {names}. Increase sample.init.length or trim PWMs via "
-            "motif_store.pwm_window_lengths (with pwm_window_strategy=max_info)."
-        )
+    _assert_init_length_fits_pwms(sample_cfg, pwms)
 
     # 2) INSTANTIATE SCORER and SequenceEvaluator
     scale = sample_cfg.objective.score_scale
@@ -233,7 +231,6 @@ def _run_sample_for_set(
         "min_dist": 0,
         "top_k": sample_cfg.elites.k,
         "bidirectional": sample_cfg.objective.bidirectional,
-        "dsdna_hamming": False,
         "dsdna_canonicalize": dsdna_mode_for_opt,
         "score_scale": sample_cfg.objective.score_scale,
         "record_tune": sample_cfg.output.trace.include_tune,
@@ -243,9 +240,6 @@ def _run_sample_for_set(
         **moves.model_dump(),
         "softmin": sample_cfg.objective.softmin.model_dump(),
     }
-    if init_seeds:
-        opt_cfg["init_seeds"] = init_seeds
-
     if optimizer_kind == "pt":
         ladder_cfg = sample_cfg.optimizers.pt.beta_ladder
         betas, ladder_notes = _resolve_beta_ladder(sample_cfg.optimizers.pt)

@@ -55,8 +55,16 @@ def test_pt_records_post_swap(monkeypatch) -> None:
         "adaptive_swap": {"enabled": False},
         "target_worst_tf_prob": 0.0,
         "target_window_pad": 0,
-        "init_seeds": [np.array([0], dtype=np.int8), np.array([3], dtype=np.int8)],
     }
+    seed_rng = np.random.default_rng(0)
+    base_seed = seed_rng.integers(0, 4, size=1, dtype=np.int8)
+    positions = seed_rng.choice(base_seed.size, size=1, replace=False)
+    current = int(base_seed[positions[0]])
+    pick = int(seed_rng.integers(0, 3))
+    if pick >= current:
+        pick += 1
+    mutated = base_seed.copy()
+    mutated[positions[0]] = np.int8(pick)
 
     opt = PTGibbsOptimizer(
         evaluator=evaluator,
@@ -98,4 +106,4 @@ def test_pt_records_post_swap(monkeypatch) -> None:
     opt.optimise()
 
     first_draw = {chain: seq for (chain, draw_idx), seq in zip(opt.all_meta, opt.all_samples) if draw_idx == 0}
-    assert first_draw[0][0] == 3  # chain 0 should contain swapped-in state after first swap
+    assert int(first_draw[0][0]) == int(mutated[0])  # chain 0 should contain swapped-in state after first swap

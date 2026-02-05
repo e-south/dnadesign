@@ -43,7 +43,6 @@ class SampleMeta:
     top_k: int
     mode: str
     dsdna_canonicalize: bool
-    dsdna_hamming: bool
 
 
 def _load_pwms_from_config(run_dir: Path) -> tuple[dict[str, PWM], dict]:
@@ -123,7 +122,6 @@ def _resolve_sample_meta(cfg: CruncherConfig, used_cfg: dict) -> SampleMeta:
     if policy != "mmr":
         raise ValueError("config_used.yaml sample.elites.selection.policy must be 'mmr'.")
     dsdna_canonicalize_val = bidirectional
-    dsdna_hamming_val = bool(dsdna_canonicalize_val)
 
     moves_payload = _require(["moves"], "moves")
     moves_cfg = SampleMovesConfig.model_validate(moves_payload)
@@ -159,7 +157,6 @@ def _resolve_sample_meta(cfg: CruncherConfig, used_cfg: dict) -> SampleMeta:
         top_k=top_k,
         mode=mode_val,
         dsdna_canonicalize=dsdna_canonicalize_val,
-        dsdna_hamming=dsdna_hamming_val,
     )
 
 

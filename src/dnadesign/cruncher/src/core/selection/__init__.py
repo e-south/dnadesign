@@ -14,7 +14,6 @@ from dnadesign.cruncher.core.selection.mmr import (
     MmrSelectionResult,
     compute_core_distance,
     compute_position_weights,
-    compute_sequence_distance,
     select_mmr_elites,
 )
 
@@ -23,6 +22,5 @@ __all__ = [
     "MmrSelectionResult",
     "compute_core_distance",
     "compute_position_weights",
-    "compute_sequence_distance",
     "select_mmr_elites",
 ]

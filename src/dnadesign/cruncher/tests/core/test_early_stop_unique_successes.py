@@ -55,7 +55,6 @@ def test_pt_early_stop_waits_for_unique_successes() -> None:
         "top_k": 1,
         "swap_prob": 0.0,
         "bidirectional": False,
-        "dsdna_hamming": False,
         "dsdna_canonicalize": False,
         "score_scale": "normalized-llr",
         "record_tune": False,
@@ -77,7 +76,6 @@ def test_pt_early_stop_waits_for_unique_successes() -> None:
         "kind": "fixed",
         "beta": 1.0,
         "softmin": {"enabled": False},
-        "init_seeds": [np.zeros(4, dtype=np.int8)],
     }
     init_cfg = SimpleNamespace(kind="random", length=4, pad_with="background", regulator=None)
     optimizer = PTGibbsOptimizer(

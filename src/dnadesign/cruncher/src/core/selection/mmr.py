@@ -17,7 +17,7 @@ from typing import Sequence
 import numpy as np
 
 from dnadesign.cruncher.core.pwm import PWM
-from dnadesign.cruncher.core.sequence import canon_int, dsdna_hamming, hamming_distance, revcomp_int
+from dnadesign.cruncher.core.sequence import canon_int, revcomp_int
 from dnadesign.cruncher.core.state import SequenceState
 
 
@@ -56,15 +56,6 @@ def compute_position_weights(pwm: PWM) -> np.ndarray:
     else:
         info_norm = (info - min_info) / (max_info - min_info)
     return 1.0 - info_norm
-
-
-def compute_sequence_distance(a: np.ndarray, b: np.ndarray, *, dsdna: bool) -> float:
-    if dsdna:
-        dist = dsdna_hamming(a, b)
-    else:
-        dist = hamming_distance(a, b)
-    denom = max(int(len(a)), int(len(b)), 1)
-    return float(dist) / float(denom)
 
 
 def compute_core_distance(

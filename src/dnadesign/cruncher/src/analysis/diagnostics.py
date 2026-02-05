@@ -172,7 +172,6 @@ def summarize_sampling_diagnostics(
         optimizer_kind = optimizer.get("kind") if isinstance(optimizer.get("kind"), str) else optimizer_kind
     optimizer_kind = str(optimizer_kind).lower() if optimizer_kind else None
     dsdna_canonicalize = bool(sample_meta.get("dsdna_canonicalize")) if sample_meta else False
-    dsdna_hamming = bool(sample_meta.get("dsdna_hamming")) if sample_meta else False
 
     if mode:
         metrics["mode"] = mode
@@ -436,7 +435,7 @@ def summarize_sampling_diagnostics(
                         s0, s1 = seqs[i], seqs[j]
                         if len(s0) != len(s1):
                             continue
-                        if dsdna_hamming:
+                        if dsdna_canonicalize:
                             dist = min(_hamming_str(s0, s1), _hamming_str(_revcomp_str(s0), s1))
                         else:
                             dist = _hamming_str(s0, s1)

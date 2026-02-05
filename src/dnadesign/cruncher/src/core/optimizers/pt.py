@@ -30,7 +30,7 @@ from dnadesign.cruncher.core.optimizers.policies import (
 from dnadesign.cruncher.core.optimizers.progress import ProgressAdapter, passthrough_progress
 from dnadesign.cruncher.core.optimizers.telemetry import NullTelemetry, OptimizerTelemetry
 from dnadesign.cruncher.core.scoring import LocalScanCache
-from dnadesign.cruncher.core.sequence import canon_int, dsdna_hamming, hamming_distance, revcomp_int
+from dnadesign.cruncher.core.sequence import canon_int, hamming_distance, revcomp_int
 from dnadesign.cruncher.core.state import SequenceState, make_seed
 
 logger = logging.getLogger(__name__)
@@ -61,7 +61,6 @@ class PTGibbsOptimizer(Optimizer):
         self.top_k: int = int(cfg["top_k"])
         self.swap_prob: float = float(cfg["swap_prob"])
         self.bidirectional: bool = bool(cfg.get("bidirectional", False))
-        self.dsdna_hamming: bool = bool(cfg.get("dsdna_hamming", False))
         self.dsdna_canonicalize: bool = bool(cfg.get("dsdna_canonicalize", False))
         self.score_scale: str = str(cfg.get("score_scale") or "")
         self.record_tune: bool = bool(cfg.get("record_tune", False))
@@ -142,7 +141,6 @@ class PTGibbsOptimizer(Optimizer):
         # References needed during optimisation
         self.pwms = pwms
         self.init_cfg = init_cfg
-        self.init_seeds: List[np.ndarray] = list(cfg.get("init_seeds") or [])
 
         # Cache consensus and per-row probabilities for insertion moves
         self._insertion_consensus: Dict[str, np.ndarray] = {}
@@ -222,20 +220,13 @@ class PTGibbsOptimizer(Optimizer):
                 mutated[pos] = np.int8(pick)
             return mutated
 
-        # Seed each chain (warm-start seeds preferred; else shared seed + small perturbations)
-        if self.init_seeds:
-            chain_states = []
-            for c in range(C):
-                seed_arr = np.asarray(self.init_seeds[c % len(self.init_seeds)], dtype=np.int8)
-                SequenceState(seed_arr)
-                chain_states.append(seed_arr.copy())
-        else:
-            base_seed = make_seed(self.init_cfg, self.pwms, rng).seq.copy()
-            chain_states = [base_seed.copy() for _ in range(C)]
-            if C > 1:
-                n_mutations = max(1, int(round(base_seed.size * 0.02)))
-                for c in range(1, C):
-                    chain_states[c] = _perturb_seed(base_seed, n_mutations)
+        # Seed each chain (shared seed + small perturbations for swap-friendly PT starts).
+        base_seed = make_seed(self.init_cfg, self.pwms, rng).seq.copy()
+        chain_states = [base_seed.copy() for _ in range(C)]
+        if C > 1:
+            n_mutations = max(1, int(round(base_seed.size * 0.02)))
+            for c in range(1, C):
+                chain_states[c] = _perturb_seed(base_seed, n_mutations)
         chain_state_objs: List[SequenceState] = [SequenceState(chain_states[c]) for c in range(C)]
         scan_caches: List[LocalScanCache | None] = []
         scorer = getattr(evaluator, "scorer", None)
@@ -514,7 +505,7 @@ class PTGibbsOptimizer(Optimizer):
             ranked.append((val, seq.copy(), idx))
         ranked.sort(key=lambda x: x[0], reverse=True)
 
-        dist_fn = dsdna_hamming if self.dsdna_hamming else hamming_distance
+        dist_fn = hamming_distance
         elites: List[SequenceState] = []
         picked_idx: List[int] = []
         for val, seq, idx in ranked:

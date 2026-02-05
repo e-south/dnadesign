@@ -462,7 +462,6 @@ def run_analyze(
             "move_probs": sample_meta.move_probs,
             "cooling_kind": sample_meta.cooling_kind,
             "dsdna_canonicalize": sample_meta.dsdna_canonicalize,
-            "dsdna_hamming": sample_meta.dsdna_hamming,
         }
         diagnostics_summary = summarize_sampling_diagnostics(
             trace_idata=trace_idata,

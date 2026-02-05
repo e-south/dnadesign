@@ -130,7 +130,6 @@ def _run_auto_optimize_for_set(
         ladder_size: int | None = None,
         move_probs: dict[str, float] | None = None,
         move_probs_label: str | None = None,
-        init_seeds: list[np.ndarray] | None = None,
     ) -> AutoOptCandidate:
         runs: list[AutoOptCandidate] = []
         for rep in range(auto_cfg.replicates):
@@ -190,7 +189,6 @@ def _run_auto_optimize_for_set(
                 stage="auto_opt",
                 run_kind=f"auto_opt_{label}_{kind}_L{pilot_cfg.init.length}_B{budget}_R{rep + 1}",
                 auto_opt_meta=pilot_meta,
-                init_seeds=init_seeds,
             )
             try:
                 candidate = _evaluate_pilot_run(
