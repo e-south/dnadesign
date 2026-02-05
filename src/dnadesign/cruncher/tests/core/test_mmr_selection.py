@@ -19,7 +19,6 @@ from dnadesign.cruncher.core.selection.mmr import (
     MmrCandidate,
     compute_core_distance,
     compute_position_weights,
-    compute_sequence_distance,
     select_mmr_elites,
 )
 
@@ -58,14 +57,6 @@ def test_core_distance_is_normalized() -> None:
     cores_b = {"tf": np.array([0, 1, 3], dtype=np.int8)}
     dist = compute_core_distance(cores_a, cores_b, weights=weights, tf_names=["tf"])
     assert dist == pytest.approx(1.0 / 3.0)
-    assert 0.0 <= dist <= 1.0
-
-
-def test_sequence_distance_is_normalized() -> None:
-    a = np.array([0, 1, 2, 3], dtype=np.int8)
-    b = np.array([0, 1, 1, 3], dtype=np.int8)
-    dist = compute_sequence_distance(a, b, dsdna=False)
-    assert dist == pytest.approx(1.0 / 4.0)
     assert 0.0 <= dist <= 1.0
 
 
