@@ -56,21 +56,17 @@ from dnadesign.cruncher.app.sample.diagnostics import (
     _EliteCandidate,
     _filter_elite_candidates,
     _norm_map_for_elites,
-    _polish_sequence,
     _pooled_bootstrap_seed,
     _top_k_median_from_scores,
     _top_k_median_from_sequences,
 )
 from dnadesign.cruncher.app.sample.optimizer_config import (
     _boost_beta_ladder,
-    _boost_cooling,
     _default_beta_ladder,
     _effective_chain_count,
     _format_auto_opt_config_summary,
     _format_beta_ladder_summary,
-    _format_cooling_summary,
     _format_move_probs,
-    _resize_beta_ladder,
     _resolve_beta_ladder,
     _resolve_optimizer_kind,
 )
@@ -100,7 +96,6 @@ __all__ = [
     "_bootstrap_seed_payload",
     "_bootstrap_top_k_ci",
     "_boost_beta_ladder",
-    "_boost_cooling",
     "_budget_to_tune_draws",
     "_build_final_sample_cfg",
     "_build_pilot_sample_cfg",
@@ -115,20 +110,17 @@ __all__ = [
     "_filter_elite_candidates",
     "_format_auto_opt_config_summary",
     "_format_beta_ladder_summary",
-    "_format_cooling_summary",
     "_format_move_probs",
     "_format_run_path",
     "_load_pwms_for_set",
     "_lockmap_for",
     "_norm_map_for_elites",
     "_pilot_budget_levels",
-    "_polish_sequence",
     "_pooled_bootstrap_seed",
     "_prune_auto_opt_runs",
     "_resolve_beta_ladder",
     "_resolve_final_softmin_beta",
     "_resolve_optimizer_kind",
-    "_resize_beta_ladder",
     "_run_auto_optimize_for_set",
     "_run_sample_for_set",
     "_save_config",
@@ -194,7 +186,7 @@ def run_sample(
                 if sample_cfg.optimizer.name == "auto":
                     raise ValueError(
                         "Auto-opt disabled by flag, but sample.optimizer.name='auto' is not allowed. "
-                        "Set sample.optimizer.name to 'gibbs' or 'pt' (or remove --no-auto-opt)."
+                        "Set sample.optimizer.name to 'pt' (or remove --no-auto-opt)."
                     )
         use_auto_opt = sample_cfg.optimizer.name == "auto" and auto_cfg is not None and auto_cfg.enabled
         groups = regulator_sets(cfg.regulator_sets)

@@ -19,9 +19,6 @@ from dnadesign.cruncher.config.moves import resolve_move_config
 from dnadesign.cruncher.config.schema_v2 import (
     BetaLadderFixed,
     BetaLadderGeometric,
-    CoolingFixed,
-    CoolingLinear,
-    CoolingPiecewise,
     SampleConfig,
 )
 
@@ -51,32 +48,17 @@ def _resolve_beta_ladder(pt_cfg) -> tuple[list[float], list[str]]:
 def _resolve_optimizer_kind(sample_cfg: SampleConfig) -> str:
     kind = sample_cfg.optimizer.name
     if kind == "auto":
-        raise ValueError("sample.optimizer.name must be 'gibbs' or 'pt' for a concrete run.")
-    return kind
+        raise ValueError("sample.optimizer.name must be 'pt' for a concrete run.")
+    if kind != "pt":
+        raise ValueError("sample.optimizer.name must be 'pt'.")
+    return "pt"
 
 
 def _effective_chain_count(sample_cfg: SampleConfig, *, kind: str) -> int:
-    if kind == "gibbs":
-        return sample_cfg.budget.restarts
     if kind == "pt":
         ladder, _ = _resolve_beta_ladder(sample_cfg.optimizers.pt)
         return len(ladder)
     raise ValueError(f"Unknown optimizer kind '{kind}'")
-
-
-def _boost_cooling(cooling: Any, factor: float) -> tuple[Any, list[str]]:
-    if factor <= 1:
-        return cooling, []
-    notes = [f"boosted cooling by x{factor:g} for stabilization"]
-    if isinstance(cooling, CoolingLinear):
-        beta = [float(cooling.beta[0]) * factor, float(cooling.beta[1]) * factor]
-        return CoolingLinear(beta=beta), notes
-    if isinstance(cooling, CoolingFixed):
-        return CoolingFixed(beta=float(cooling.beta) * factor), notes
-    if isinstance(cooling, CoolingPiecewise):
-        stages = [{"sweeps": stage.sweeps, "beta": float(stage.beta) * factor} for stage in cooling.stages]
-        return CoolingPiecewise(stages=stages), notes
-    return cooling, notes
 
 
 def _boost_beta_ladder(ladder: Any, factor: float) -> tuple[Any, list[str]]:
@@ -97,54 +79,6 @@ def _boost_beta_ladder(ladder: Any, factor: float) -> tuple[Any, list[str]]:
     return ladder, notes
 
 
-def _resize_beta_ladder(ladder: Any, n_temps: int | None) -> tuple[Any, list[str]]:
-    if n_temps is None:
-        return ladder, []
-    if n_temps < 2:
-        raise ValueError("auto_opt.pt_ladder_sizes entries must be >= 2")
-    notes = [f"set PT ladder size={n_temps} for pilots"]
-    if isinstance(ladder, BetaLadderFixed):
-        raise ValueError("auto_opt.pt_ladder_sizes requires beta_ladder.kind='geometric' (fixed ladder).")
-    if isinstance(ladder, BetaLadderGeometric):
-        if ladder.betas is not None:
-            betas = [float(b) for b in ladder.betas]
-            if n_temps > len(betas):
-                raise ValueError(
-                    "auto_opt.pt_ladder_sizes exceeds available betas; "
-                    "provide a geometric beta_ladder with beta_min/beta_max/n_temps."
-                )
-            if n_temps == len(betas):
-                return ladder, []
-            if n_temps == 2:
-                idx = [0, len(betas) - 1]
-            else:
-                idx = [int(round(x)) for x in np.linspace(0, len(betas) - 1, n_temps)]
-                idx = sorted(set(idx))
-                if len(idx) < n_temps:
-                    extras = [i for i in range(len(betas)) if i not in idx]
-                    idx.extend(extras[: n_temps - len(idx)])
-            resized = [betas[i] for i in idx[:n_temps]]
-            return BetaLadderGeometric(betas=resized), notes
-        return BetaLadderGeometric(
-            beta_min=float(ladder.beta_min),
-            beta_max=float(ladder.beta_max),
-            n_temps=int(n_temps),
-        ), notes
-    return ladder, notes
-
-
-def _format_cooling_summary(cooling: object) -> str:
-    if isinstance(cooling, CoolingLinear):
-        beta0, beta1 = cooling.beta
-        return f"linear({beta0:g}->{beta1:g})"
-    if isinstance(cooling, CoolingFixed):
-        return f"fixed({cooling.beta:g})"
-    if isinstance(cooling, CoolingPiecewise):
-        stages = ",".join(f"{stage.sweeps}@{stage.beta:g}" for stage in cooling.stages)
-        return f"piecewise([{stages}])"
-    return str(cooling)
-
-
 def _format_beta_ladder_summary(pt_cfg: object) -> str:
     betas, _ = _resolve_beta_ladder(pt_cfg)
     if isinstance(pt_cfg.beta_ladder, BetaLadderFixed):
@@ -162,13 +96,11 @@ def _format_auto_opt_config_summary(cfg: SampleConfig) -> str:
     kind = cfg.optimizer.name
     moves = _format_move_probs(resolve_move_config(cfg.moves).move_probs)
     combine = cfg.objective.combine or ("sum" if cfg.objective.score_scale == "consensus-neglop-sum" else "min")
-    if kind == "gibbs":
-        cooling = _format_cooling_summary(cfg.optimizers.gibbs.beta_schedule)
-        chains = cfg.budget.restarts
-    else:
-        cooling = _format_beta_ladder_summary(cfg.optimizers.pt)
-        chains = len(_resolve_beta_ladder(cfg.optimizers.pt)[0])
-        cooling = f"{cooling} swap_prob={cfg.optimizers.pt.swap_prob:g}"
+    if kind != "pt":
+        raise ValueError("sample.optimizer.name must be 'pt' for auto-opt summaries.")
+    cooling = _format_beta_ladder_summary(cfg.optimizers.pt)
+    chains = len(_resolve_beta_ladder(cfg.optimizers.pt)[0])
+    cooling = f"{cooling} swap_prob={cfg.optimizers.pt.swap_prob:g}"
     return (
         f"optimizer={kind} scorer={cfg.objective.score_scale} "
         f"combine={combine} length={cfg.init.length} chains={chains} tune={cfg.budget.tune} draws={cfg.budget.draws} "

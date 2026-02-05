@@ -15,8 +15,6 @@ import pytest
 
 from dnadesign.cruncher.config.schema_v2 import (
     AutoOptConfig,
-    CoolingLinear,
-    GibbsOptimizerConfig,
     InitConfig,
     OptimizersConfig,
     OptimizerSelectionConfig,
@@ -34,8 +32,8 @@ def _base_sample_config(*, elites_selection: SampleElitesSelectionConfig | None 
         "early_stop": SampleEarlyStopConfig(enabled=True, patience=10, min_delta=0.05),
         "init": InitConfig(kind="random", length=6),
         "objective": SampleObjectiveConfig(score_scale="normalized-llr"),
-        "optimizer": OptimizerSelectionConfig(name="gibbs"),
-        "optimizers": OptimizersConfig(gibbs=GibbsOptimizerConfig(beta_schedule=CoolingLinear(beta=(0.1, 0.2)))),
+        "optimizer": OptimizerSelectionConfig(name="pt"),
+        "optimizers": OptimizersConfig(),
         "auto_opt": AutoOptConfig(enabled=False),
     }
     if elites_selection is not None:
@@ -49,9 +47,8 @@ def test_elites_selection_defaults() -> None:
     assert selection.policy == "mmr"
     assert selection.pool_size == 1000
     assert selection.alpha == pytest.approx(0.85)
-    assert selection.distance.kind == "tfbs_core_weighted"
-    assert selection.distance.weights == "tolerant"
-    assert selection.distance.dsDNA == "auto"
+    assert selection.relevance == "min_per_tf_norm"
+    assert selection.min_distance is None
 
 
 def test_elites_selection_alpha_must_be_positive() -> None:

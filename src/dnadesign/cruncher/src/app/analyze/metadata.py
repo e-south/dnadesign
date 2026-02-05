@@ -96,7 +96,6 @@ def _resolve_sample_meta(cfg: CruncherConfig, used_cfg: dict) -> SampleMeta:
     optimizer_kind = str(_require(["optimizer", "name"], "optimizer.name"))
     draws = _coerce_int(_require(["budget", "draws"], "budget.draws"), "budget.draws")
     tune = _coerce_int(_require(["budget", "tune"], "budget.tune"), "budget.tune")
-    restarts = _coerce_int(_require(["budget", "restarts"], "budget.restarts"), "budget.restarts")
     mode_val = _require(["mode"], "mode")
     if not isinstance(mode_val, str):
         raise ValueError("config_used.yaml sample.mode must be a string.")
@@ -121,59 +120,32 @@ def _resolve_sample_meta(cfg: CruncherConfig, used_cfg: dict) -> SampleMeta:
         if policy_val:
             policy = policy_val
 
-    if policy == "top_score":
-        dsdna_canonicalize_val = elites_cfg.get("dsDNA_canonicalize", False)
-        if not isinstance(dsdna_canonicalize_val, bool):
-            raise ValueError("config_used.yaml sample.elites.dsDNA_canonicalize must be a boolean.")
-        dsdna_hamming_val = elites_cfg.get("dsDNA_hamming")
-        if dsdna_hamming_val is None:
-            dsdna_hamming_val = dsdna_canonicalize_val
-        if not isinstance(dsdna_hamming_val, bool):
-            raise ValueError("config_used.yaml sample.elites.dsDNA_hamming must be a boolean.")
-    else:
-        distance_cfg = selection_cfg.get("distance") if isinstance(selection_cfg, dict) else None
-        ds_mode = "auto"
-        if isinstance(distance_cfg, dict):
-            ds_mode_val = distance_cfg.get("dsDNA", "auto")
-            if not isinstance(ds_mode_val, str):
-                raise ValueError("config_used.yaml sample.elites.selection.distance.dsDNA must be a string.")
-            ds_mode = ds_mode_val
-        if ds_mode == "auto":
-            dsdna_canonicalize_val = bidirectional
-        elif ds_mode == "true":
-            dsdna_canonicalize_val = True
-        elif ds_mode == "false":
-            dsdna_canonicalize_val = False
-        else:
-            raise ValueError("config_used.yaml sample.elites.selection.distance.dsDNA must be auto|true|false.")
-        dsdna_hamming_val = bool(dsdna_canonicalize_val)
+    if policy != "mmr":
+        raise ValueError("config_used.yaml sample.elites.selection.policy must be 'mmr'.")
+    dsdna_canonicalize_val = bidirectional
+    dsdna_hamming_val = bool(dsdna_canonicalize_val)
 
     moves_payload = _require(["moves"], "moves")
     moves_cfg = SampleMovesConfig.model_validate(moves_payload)
     move_probs = resolve_move_config(moves_cfg).move_probs
 
-    if optimizer_kind not in {"gibbs", "pt"}:
-        raise ValueError("config_used.yaml sample.optimizer.name must be 'gibbs' or 'pt'.")
-    if optimizer_kind == "gibbs":
-        chains = restarts
-        cooling_path = ["optimizers", "gibbs", "beta_schedule", "kind"]
-        cooling_kind = str(_require(cooling_path, "optimizers.gibbs.beta_schedule.kind"))
+    if optimizer_kind != "pt":
+        raise ValueError("config_used.yaml sample.optimizer.name must be 'pt'.")
+    ladder = _require(["optimizers", "pt", "beta_ladder"], "optimizers.pt.beta_ladder")
+    if not isinstance(ladder, dict):
+        raise ValueError("config_used.yaml sample.optimizers.pt.beta_ladder must be a mapping.")
+    cooling_kind = str(ladder.get("kind") or "")
+    if cooling_kind == "fixed":
+        chains = 1
     else:
-        ladder = _require(["optimizers", "pt", "beta_ladder"], "optimizers.pt.beta_ladder")
-        if not isinstance(ladder, dict):
-            raise ValueError("config_used.yaml sample.optimizers.pt.beta_ladder must be a mapping.")
-        cooling_kind = str(ladder.get("kind") or "")
-        if cooling_kind == "fixed":
-            chains = 1
+        betas = ladder.get("betas")
+        n_temps = ladder.get("n_temps")
+        if isinstance(betas, list) and betas:
+            chains = len(betas)
+        elif isinstance(n_temps, int):
+            chains = int(n_temps)
         else:
-            betas = ladder.get("betas")
-            n_temps = ladder.get("n_temps")
-            if isinstance(betas, list) and betas:
-                chains = len(betas)
-            elif isinstance(n_temps, int):
-                chains = int(n_temps)
-            else:
-                raise ValueError("config_used.yaml sample.optimizers.pt.beta_ladder must define betas or n_temps.")
+            raise ValueError("config_used.yaml sample.optimizers.pt.beta_ladder must define betas or n_temps.")
 
     return SampleMeta(
         optimizer_kind=optimizer_kind,

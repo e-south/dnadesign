@@ -132,9 +132,7 @@ def plot_elite_filter_waterfall(
     stages = [
         ("total_draws_seen", "Total draws"),
         ("passed_pre_filter", "Filter pass"),
-        ("kept_after_diversity_pre_polish", "Diversity pre-polish"),
-        ("passed_post_polish_filter", "Filter post-polish"),
-        ("kept_after_diversity_final", "Diversity final"),
+        ("kept_after_mmr", "MMR elites"),
     ]
     values = []
     labels = []

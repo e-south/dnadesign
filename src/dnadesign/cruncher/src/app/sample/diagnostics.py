@@ -20,9 +20,7 @@ import numpy as np
 import pandas as pd
 
 from dnadesign.cruncher.config.schema_v2 import SampleConfig
-from dnadesign.cruncher.core.evaluator import SequenceEvaluator
 from dnadesign.cruncher.core.scoring import Scorer
-from dnadesign.cruncher.core.state import SequenceState
 
 _AUTO_OPT_BOOTSTRAP_SAMPLES = 300
 _AUTO_OPT_BOOTSTRAP_PCT = (5.0, 95.0)
@@ -99,26 +97,12 @@ def _elite_rank_key(combined_score: float, min_norm: float, sum_norm: float) -> 
 
 
 def resolve_dsdna_mode(*, elites_cfg: object, bidirectional: bool) -> bool:
-    selection = getattr(elites_cfg, "selection", None)
-    policy = getattr(selection, "policy", "top_score") if selection is not None else "top_score"
-    if policy == "top_score":
-        return bool(getattr(elites_cfg, "dsDNA_canonicalize", False))
-    distance = getattr(selection, "distance", None)
-    mode = getattr(distance, "dsDNA", "auto") if distance is not None else "auto"
-    if mode == "auto":
-        return bool(bidirectional)
-    if mode == "true":
-        return True
-    if mode == "false":
-        return False
-    raise ValueError(f"Unknown dsDNA mode '{mode}'.")
+    _ = elites_cfg
+    return bool(bidirectional)
 
 
 def dsdna_equivalence_enabled(sample_cfg: SampleConfig) -> bool:
-    return resolve_dsdna_mode(
-        elites_cfg=sample_cfg.elites,
-        bidirectional=sample_cfg.objective.bidirectional,
-    )
+    return resolve_dsdna_mode(elites_cfg=sample_cfg.elites, bidirectional=sample_cfg.objective.bidirectional)
 
 
 def _draw_scores_from_sequences(seq_df: pd.DataFrame) -> np.ndarray:
@@ -237,49 +221,3 @@ def _pooled_bootstrap_seed(
         "replicates": sorted(replicates, key=lambda item: json.dumps(item, sort_keys=True)),
     }
     return _bootstrap_seed_payload(payload)
-
-
-def _polish_sequence(
-    seq_arr: np.ndarray,
-    *,
-    evaluator: SequenceEvaluator,
-    beta_softmin_final: float | None,
-    max_rounds: int,
-    improvement_tol: float,
-    max_evals: int | None,
-) -> np.ndarray:
-    seq = seq_arr.copy()
-    evals = 0
-
-    def _score() -> float:
-        nonlocal evals
-        evals += 1
-        return evaluator.combined(SequenceState(seq), beta=beta_softmin_final)
-
-    best_score = _score()
-    for _ in range(max_rounds):
-        improved = False
-        for i in range(seq.size):
-            old_base = seq[i]
-            best_base = old_base
-            best_local = best_score
-            for b in range(4):
-                if b == old_base:
-                    continue
-                seq[i] = b
-                score = _score()
-                if score > best_local + improvement_tol:
-                    best_local = score
-                    best_base = b
-                if max_evals is not None and evals >= max_evals:
-                    seq[i] = best_base
-                    return seq
-            seq[i] = best_base
-            if best_base != old_base:
-                best_score = best_local
-                improved = True
-            if max_evals is not None and evals >= max_evals:
-                return seq
-        if not improved:
-            break
-    return seq

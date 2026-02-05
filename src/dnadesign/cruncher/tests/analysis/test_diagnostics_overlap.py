@@ -44,7 +44,7 @@ def test_diagnostics_uses_overlap_summary(monkeypatch) -> None:
         optimizer=None,
         optimizer_stats=None,
         mode="sample",
-        optimizer_kind="gibbs",
+        optimizer_kind="pt",
         sample_meta={"top_k": 1},
         trace_required=False,
         overlap_summary=overlap_summary,

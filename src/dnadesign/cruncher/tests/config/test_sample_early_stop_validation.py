@@ -15,8 +15,6 @@ import pytest
 
 from dnadesign.cruncher.config.schema_v2 import (
     AutoOptConfig,
-    CoolingLinear,
-    GibbsOptimizerConfig,
     InitConfig,
     OptimizersConfig,
     OptimizerSelectionConfig,
@@ -33,8 +31,8 @@ def _build_sample_config(*, min_delta: float) -> SampleConfig:
         early_stop=SampleEarlyStopConfig(enabled=True, patience=10, min_delta=min_delta),
         init=InitConfig(kind="random", length=6),
         objective=SampleObjectiveConfig(score_scale="normalized-llr"),
-        optimizer=OptimizerSelectionConfig(name="gibbs"),
-        optimizers=OptimizersConfig(gibbs=GibbsOptimizerConfig(beta_schedule=CoolingLinear(beta=(0.1, 0.2)))),
+        optimizer=OptimizerSelectionConfig(name="pt"),
+        optimizers=OptimizersConfig(),
         auto_opt=AutoOptConfig(enabled=False),
     )
 

@@ -14,12 +14,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from dnadesign.cruncher.app.sample.auto_opt import AutoOptCandidate, _rank_auto_opt_candidates
-from dnadesign.cruncher.config.schema_v2 import AutoOptConfig, AutoOptPolicyConfig, AutoOptScorecardConfig
 
 
 def _candidate(*, pilot_score: float | None, top_k_median: float | None) -> AutoOptCandidate:
     return AutoOptCandidate(
-        kind="gibbs",
+        kind="pt",
         length=10,
         budget=10,
         cooling_boost=1.0,
@@ -57,14 +56,7 @@ def _candidate(*, pilot_score: float | None, top_k_median: float | None) -> Auto
 
 
 def test_auto_opt_ranking_uses_mmr_scorecard() -> None:
-    auto_cfg = AutoOptConfig(
-        enabled=True,
-        policy=AutoOptPolicyConfig(
-            scorecard=AutoOptScorecardConfig(metric="elites_mmr", k=2, alpha=0.8),
-            diversity_weight=0.25,
-        ),
-    )
     candidate_a = _candidate(pilot_score=0.5, top_k_median=0.9)
     candidate_b = _candidate(pilot_score=0.6, top_k_median=0.1)
-    ranked = _rank_auto_opt_candidates([candidate_a, candidate_b], auto_cfg)
+    ranked = _rank_auto_opt_candidates([candidate_a, candidate_b])
     assert ranked[0].pilot_score == 0.6

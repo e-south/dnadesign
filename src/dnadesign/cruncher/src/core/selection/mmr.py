@@ -45,12 +45,8 @@ class MmrSelectionResult:
     min_pairwise_distance: float | None
 
 
-def compute_position_weights(pwm: PWM, *, weights: str) -> np.ndarray:
+def compute_position_weights(pwm: PWM) -> np.ndarray:
     matrix = np.asarray(pwm.matrix, dtype=float)
-    if weights == "uniform":
-        return np.ones(matrix.shape[0], dtype=float)
-    if weights != "tolerant":
-        raise ValueError(f"Unknown weights kind '{weights}' (expected 'tolerant' or 'uniform').")
     p = matrix + 1.0e-9
     info = 2.0 + np.sum(p * np.log2(p), axis=1)
     min_info = float(np.min(info))
@@ -186,25 +182,18 @@ def _percentile_ranks(values: Sequence[float]) -> list[float]:
 def _pairwise_distances(
     selected: list[MmrCandidate],
     *,
-    distance_kind: str,
-    dsdna: bool,
     tf_names: Sequence[str],
-    weights_by_tf: dict[str, np.ndarray] | None,
-    core_maps: dict[str, dict[str, np.ndarray]] | None,
+    weights_by_tf: dict[str, np.ndarray],
+    core_maps: dict[str, dict[str, np.ndarray]],
 ) -> list[float]:
     if len(selected) < 2:
         return []
     distances: list[float] = []
     for idx, cand_a in enumerate(selected):
         for cand_b in selected[idx + 1 :]:
-            if distance_kind == "sequence_hamming":
-                dist = compute_sequence_distance(cand_a.seq_arr, cand_b.seq_arr, dsdna=dsdna)
-            else:
-                if core_maps is None or weights_by_tf is None:
-                    raise ValueError("core maps and weights are required for TFBS core distance.")
-                core_a = core_maps[_candidate_id(cand_a)]
-                core_b = core_maps[_candidate_id(cand_b)]
-                dist = compute_core_distance(core_a, core_b, weights=weights_by_tf, tf_names=tf_names)
+            core_a = core_maps[_candidate_id(cand_a)]
+            core_b = core_maps[_candidate_id(cand_b)]
+            dist = compute_core_distance(core_a, core_b, weights=weights_by_tf, tf_names=tf_names)
             distances.append(dist)
     return distances
 
@@ -216,9 +205,6 @@ def select_mmr_elites(
     pool_size: int,
     alpha: float,
     relevance: str,
-    relevance_norm: str,
-    distance_kind: str,
-    distance_weights: str,
     min_distance: float | None,
     dsdna: bool,
     tf_names: Sequence[str] | None = None,
@@ -285,36 +271,19 @@ def select_mmr_elites(
         else:
             raise ValueError(f"Unknown relevance '{relevance}'.")
 
-    if relevance_norm == "percentile":
-        relevance_scaled = _percentile_ranks(relevance_raw)
-    elif relevance_norm == "minmax":
-        min_val = float(np.min(relevance_raw))
-        max_val = float(np.max(relevance_raw))
-        if max_val - min_val <= 0:
-            relevance_scaled = [1.0] * len(relevance_raw)
-        else:
-            relevance_scaled = [(val - min_val) / (max_val - min_val) for val in relevance_raw]
-    else:
-        raise ValueError(f"Unknown relevance_norm '{relevance_norm}'.")
+    relevance_scaled = _percentile_ranks(relevance_raw)
 
     tf_names_resolved: Sequence[str] = tf_names or []
-    weights_by_tf: dict[str, np.ndarray] | None = None
-    if distance_kind in {"tfbs_core_weighted", "tfbs_core_uniform"}:
-        if tf_names is None or pwms is None:
-            raise ValueError("tf_names and pwms are required for TFBS core distances.")
-        weights_by_tf = {}
-        for tf in tf_names_resolved:
-            pwm = pwms.get(tf)
-            if pwm is None:
-                raise ValueError(f"Missing PWM for TF '{tf}'.")
-            if distance_kind == "tfbs_core_uniform":
-                weights_by_tf[tf] = np.ones(pwm.length, dtype=float)
-            else:
-                weights_by_tf[tf] = compute_position_weights(pwm, weights=distance_weights)
-        if core_maps is None:
-            raise ValueError("core_maps are required for TFBS core distances.")
-    elif distance_kind != "sequence_hamming":
-        raise ValueError(f"Unknown distance_kind '{distance_kind}'.")
+    if tf_names is None or pwms is None:
+        raise ValueError("tf_names and pwms are required for TFBS core distances.")
+    if core_maps is None:
+        raise ValueError("core_maps are required for TFBS core distances.")
+    weights_by_tf: dict[str, np.ndarray] = {}
+    for tf in tf_names_resolved:
+        pwm = pwms.get(tf)
+        if pwm is None:
+            raise ValueError(f"Missing PWM for TF '{tf}'.")
+        weights_by_tf[tf] = compute_position_weights(pwm)
 
     selected: list[MmrCandidate] = []
     selected_ids: set[str] = set()
@@ -355,34 +324,21 @@ def select_mmr_elites(
             cand_id = _candidate_id(cand)
             if cand_id in selected_ids:
                 continue
-            if distance_kind == "sequence_hamming":
-                distances = []
-                nearest_id = None
-                nearest_dist = None
-                for sel in selected:
-                    dist = compute_sequence_distance(cand.seq_arr, sel.seq_arr, dsdna=dsdna)
-                    distances.append(dist)
-                    if nearest_dist is None or dist < nearest_dist:
-                        nearest_dist = dist
-                        nearest_id = _candidate_id(sel)
-            else:
-                if core_maps is None or weights_by_tf is None:
-                    raise ValueError("core maps and weights are required for TFBS core distances.")
-                core_cand = core_maps[_candidate_id(cand)]
-                distances = []
-                nearest_id = None
-                nearest_dist = None
-                for sel in selected:
-                    dist = compute_core_distance(
-                        core_cand,
-                        core_maps[_candidate_id(sel)],
-                        weights=weights_by_tf,
-                        tf_names=tf_names_resolved,
-                    )
-                    distances.append(dist)
-                    if nearest_dist is None or dist < nearest_dist:
-                        nearest_dist = dist
-                        nearest_id = _candidate_id(sel)
+            core_cand = core_maps[_candidate_id(cand)]
+            distances = []
+            nearest_id = None
+            nearest_dist = None
+            for sel in selected:
+                dist = compute_core_distance(
+                    core_cand,
+                    core_maps[_candidate_id(sel)],
+                    weights=weights_by_tf,
+                    tf_names=tf_names_resolved,
+                )
+                distances.append(dist)
+                if nearest_dist is None or dist < nearest_dist:
+                    nearest_dist = dist
+                    nearest_id = _candidate_id(sel)
             nearest_distance = min(distances) if distances else 0.0
             if min_distance is not None and nearest_distance < min_distance:
                 continue
@@ -426,8 +382,6 @@ def select_mmr_elites(
 
     pairwise = _pairwise_distances(
         selected,
-        distance_kind=distance_kind,
-        dsdna=dsdna,
         tf_names=tf_names_resolved,
         weights_by_tf=weights_by_tf,
         core_maps=core_maps,

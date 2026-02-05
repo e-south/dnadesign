@@ -421,24 +421,6 @@ class BetaLadderGeometric(StrictBaseModel):
 BetaLadderConfig = Union[BetaLadderFixed, BetaLadderGeometric]
 
 
-class GibbsOptimizerConfig(StrictBaseModel):
-    beta_schedule: CoolingConfig = Field(default_factory=lambda: CoolingLinear(beta=[1.0, 20.0]))
-    apply_during: Literal["tune", "all"] = "tune"
-    schedule_scope: Literal["per_chain", "global"] = "per_chain"
-    adaptive_beta: AdaptiveBetaConfig = AdaptiveBetaConfig()
-
-    @model_validator(mode="after")
-    def _validate_beta_schedule(self) -> "GibbsOptimizerConfig":
-        if self.beta_schedule.kind == "geometric":
-            raise ValueError("optimizers.gibbs.beta_schedule does not support kind='geometric'")
-        if self.schedule_scope == "global" and self.apply_during == "tune":
-            raise ValueError(
-                "optimizers.gibbs.schedule_scope='global' requires apply_during='all' "
-                "(global schedules span tune+draws across all chains)."
-            )
-        return self
-
-
 class PTOptimizerConfig(StrictBaseModel):
     beta_ladder: BetaLadderConfig = Field(default_factory=lambda: BetaLadderGeometric(betas=[0.2, 1.0, 5.0, 25.0]))
     swap_prob: float = 0.10
@@ -453,30 +435,16 @@ class PTOptimizerConfig(StrictBaseModel):
 
 
 class OptimizersConfig(StrictBaseModel):
-    gibbs: GibbsOptimizerConfig = GibbsOptimizerConfig()
     pt: PTOptimizerConfig = PTOptimizerConfig()
 
 
 class OptimizerSelectionConfig(StrictBaseModel):
-    name: Literal["auto", "gibbs", "pt"] = "auto"
-
-
-class AutoOptToleranceConfig(StrictBaseModel):
-    score: float = 0.01
-
-    @field_validator("score")
-    @classmethod
-    def _check_score(cls, v: float) -> float:
-        if not isinstance(v, (int, float)) or v < 0:
-            raise ValueError("auto_opt.tolerance.score must be >= 0")
-        return float(v)
+    name: Literal["auto", "pt"] = "auto"
 
 
 class AutoOptScorecardConfig(StrictBaseModel):
-    metric: Literal["elites_mmr", "legacy_topk_median"] = "elites_mmr"
     k: int = 20
     alpha: float = 0.85
-    top_k: int = 10
 
     @field_validator("alpha")
     @classmethod
@@ -492,26 +460,11 @@ class AutoOptScorecardConfig(StrictBaseModel):
             raise ValueError("auto_opt.scorecard.k must be >= 1")
         return v
 
-    @field_validator("top_k")
-    @classmethod
-    def _check_top_k(cls, v: int) -> int:
-        if not isinstance(v, int) or v < 1:
-            raise ValueError("auto_opt.scorecard.top_k must be >= 1")
-        return v
-
 
 class AutoOptPolicyConfig(StrictBaseModel):
     allow_warn: bool = False
-    cooling_boost: float = 5.0
     scorecard: AutoOptScorecardConfig = Field(default_factory=AutoOptScorecardConfig)
     diversity_weight: float = 0.25
-
-    @field_validator("cooling_boost")
-    @classmethod
-    def _check_retry_factors(cls, v: float) -> float:
-        if not isinstance(v, (int, float)) or v < 1:
-            raise ValueError("auto_opt.policy.cooling_boost must be >= 1")
-        return float(v)
 
     @field_validator("diversity_weight")
     @classmethod
@@ -521,65 +474,16 @@ class AutoOptPolicyConfig(StrictBaseModel):
         return float(v)
 
 
-class AutoOptLengthConfig(StrictBaseModel):
-    enabled: bool = False
-    mode: Literal["grid", "ladder"] = "grid"
-    min_length: Optional[int] = None
-    max_length: Optional[int] = None
-    step: int = 2
-    max_candidates: int = 4
-    prefer_shortest: bool = True
-    warm_start: bool = True
-    ladder_budget_scale: float = 0.5
-
-    @field_validator("min_length", "max_length")
-    @classmethod
-    def _check_length(cls, v: Optional[int]) -> Optional[int]:
-        if v is None:
-            return v
-        if not isinstance(v, int) or v < 1:
-            raise ValueError("auto_opt.length min/max must be positive integers or null")
-        return v
-
-    @field_validator("step", "max_candidates")
-    @classmethod
-    def _check_positive(cls, v: int) -> int:
-        if not isinstance(v, int) or v < 1:
-            raise ValueError("auto_opt.length step/max_candidates must be >= 1")
-        return v
-
-    @field_validator("ladder_budget_scale")
-    @classmethod
-    def _check_ladder_budget_scale(cls, v: float) -> float:
-        if not isinstance(v, (int, float)) or v <= 0:
-            raise ValueError("auto_opt.length.ladder_budget_scale must be > 0")
-        return float(v)
-
-    @model_validator(mode="after")
-    def _check_ladder_mode(self) -> "AutoOptLengthConfig":
-        if self.mode == "ladder" and self.step != 1:
-            raise ValueError("auto_opt.length.step must be 1 when mode='ladder'")
-        return self
-
-
 class AutoOptConfig(StrictBaseModel):
     enabled: bool = True
     budget_levels: List[int] = Field(default_factory=lambda: [200, 800])
     replicates: int = 1
     keep_pilots: Literal["all", "ok", "best"] = "ok"
-    allow_trim_polish_in_pilots: bool = False
-    prefer_simpler_if_close: bool = True
     cooling_boosts: List[float] = Field(default_factory=lambda: [1.0, 2.0])
-    beta_schedule_scales: List[float] = Field(default_factory=list)
-    beta_ladder_scales: List[float] = Field(default_factory=list)
     pt_swap_probs: List[float] = Field(default_factory=list)
-    pt_ladder_sizes: List[int] = Field(default_factory=list)
-    gibbs_move_probs: List[Dict[Literal["S", "B", "M", "L", "W", "I"], float]] = Field(default_factory=list)
     move_profiles: List[Literal["balanced", "local", "global", "aggressive"]] = Field(
         default_factory=lambda: ["balanced", "aggressive"]
     )
-    tolerance: AutoOptToleranceConfig = AutoOptToleranceConfig()
-    length: AutoOptLengthConfig = Field(default_factory=AutoOptLengthConfig)
     policy: AutoOptPolicyConfig = AutoOptPolicyConfig()
 
     @field_validator("budget_levels")
@@ -615,44 +519,6 @@ class AutoOptConfig(StrictBaseModel):
         for item in v:
             if not isinstance(item, (int, float)) or float(item) < 0 or float(item) > 1:
                 raise ValueError("auto_opt.pt_swap_probs entries must be between 0 and 1")
-            cleaned.append(float(item))
-        return cleaned
-
-    @field_validator("pt_ladder_sizes")
-    @classmethod
-    def _check_pt_ladder_sizes(cls, v: List[int]) -> List[int]:
-        if not isinstance(v, list):
-            raise ValueError("auto_opt.pt_ladder_sizes must be a list of integers")
-        cleaned: list[int] = []
-        for item in v:
-            if not isinstance(item, int) or item < 2:
-                raise ValueError("auto_opt.pt_ladder_sizes entries must be >= 2")
-            cleaned.append(int(item))
-        return cleaned
-
-    @field_validator("gibbs_move_probs")
-    @classmethod
-    def _check_gibbs_move_probs(cls, v: List[Dict[str, float]]) -> List[Dict[str, float]]:
-        if not isinstance(v, list):
-            raise ValueError("auto_opt.gibbs_move_probs must be a list of move-prob maps")
-        cleaned: list[Dict[str, float]] = []
-        for idx, item in enumerate(v):
-            if not isinstance(item, dict):
-                raise ValueError("auto_opt.gibbs_move_probs entries must be move-prob maps")
-            cleaned.append(MoveConfig._normalize_move_probs(item, label=f"auto_opt.gibbs_move_probs[{idx}]"))
-        return cleaned
-
-    @field_validator("beta_schedule_scales", "beta_ladder_scales")
-    @classmethod
-    def _check_beta_scales(cls, v: List[float], info) -> List[float]:
-        if v is None:
-            return []
-        if not isinstance(v, list):
-            raise ValueError(f"auto_opt.{info.field_name} must be a list of numbers")
-        cleaned: list[float] = []
-        for item in v:
-            if not isinstance(item, (int, float)) or float(item) <= 0:
-                raise ValueError(f"auto_opt.{info.field_name} entries must be > 0")
             cleaned.append(float(item))
         return cleaned
 
@@ -710,50 +576,6 @@ class ScoringConfig(StrictBaseModel):
         if not isinstance(v, (int, float)) or v <= 0:
             raise ValueError("scoring.log_odds_clip must be a positive number or null")
         return float(v)
-
-
-class TrimConfig(StrictBaseModel):
-    enabled: bool = True
-    padding: int = 1
-    require_non_decreasing: bool = True
-
-    @field_validator("padding")
-    @classmethod
-    def _check_padding(cls, v: int) -> int:
-        if not isinstance(v, int) or v < 0:
-            raise ValueError("trim.padding must be a non-negative integer")
-        return v
-
-
-class PolishConfig(StrictBaseModel):
-    enabled: bool = True
-    max_rounds: int = 2
-    improvement_tol: float = 0.0
-    max_elites: int | None = 50
-    max_evals: int | None = None
-
-    @field_validator("max_rounds")
-    @classmethod
-    def _check_rounds(cls, v: int) -> int:
-        if not isinstance(v, int) or v < 1:
-            raise ValueError("polish.max_rounds must be >= 1")
-        return v
-
-    @field_validator("improvement_tol")
-    @classmethod
-    def _check_tol(cls, v: float) -> float:
-        if not isinstance(v, (int, float)) or v < 0:
-            raise ValueError("polish.improvement_tol must be >= 0")
-        return float(v)
-
-    @field_validator("max_elites", "max_evals")
-    @classmethod
-    def _check_caps(cls, v: int | None, info) -> int | None:
-        if v is None:
-            return v
-        if not isinstance(v, int) or v < 1:
-            raise ValueError(f"polish.{info.field_name} must be >= 1 or null")
-        return v
 
 
 class SampleRngConfig(StrictBaseModel):
@@ -876,21 +698,12 @@ class EliteFiltersConfig(StrictBaseModel):
         return float(v)
 
 
-class SampleElitesSelectionDistanceConfig(StrictBaseModel):
-    kind: Literal["tfbs_core_weighted", "tfbs_core_uniform", "sequence_hamming"] = "tfbs_core_weighted"
-    weights: Literal["tolerant", "uniform"] = "tolerant"
-    dsDNA: Literal["auto", "true", "false"] = "auto"
-
-
 class SampleElitesSelectionConfig(StrictBaseModel):
-    policy: Literal["mmr", "top_score"] = "mmr"
+    policy: Literal["mmr"] = "mmr"
     pool_size: int = 1000
     alpha: float = 0.85
     relevance: Literal["min_per_tf_norm", "combined_score_final"] = "min_per_tf_norm"
-    relevance_norm: Literal["percentile", "minmax"] = "percentile"
-    distance: SampleElitesSelectionDistanceConfig = SampleElitesSelectionDistanceConfig()
     min_distance: float | None = None
-    write_baselines: bool = True
 
     @field_validator("pool_size")
     @classmethod
@@ -918,24 +731,15 @@ class SampleElitesSelectionConfig(StrictBaseModel):
 
 class SampleElitesConfig(StrictBaseModel):
     k: int = 10
-    min_hamming: int = 1
     filters: EliteFiltersConfig = EliteFiltersConfig()
     selection: SampleElitesSelectionConfig = SampleElitesSelectionConfig()
-    dsDNA_canonicalize: bool = False
-    dsDNA_hamming: bool | None = None
 
-    @field_validator("k", "min_hamming")
+    @field_validator("k")
     @classmethod
     def _check_elite_ints(cls, v: int, info) -> int:
         if not isinstance(v, int) or v < 0:
             raise ValueError(f"sample.elites.{info.field_name} must be a non-negative integer")
         return v
-
-    @model_validator(mode="after")
-    def _set_dsdna_hamming_default(self) -> "SampleElitesConfig":
-        if self.dsDNA_hamming is None:
-            self.dsDNA_hamming = self.dsDNA_canonicalize
-        return self
 
     @model_validator(mode="after")
     def _warn_pool_size(self) -> "SampleElitesConfig":
@@ -1030,8 +834,6 @@ class SampleOutputConfig(StrictBaseModel):
     include_consensus_in_elites: bool = False
     live_metrics: bool = True
     trace: SampleOutputTraceConfig = SampleOutputTraceConfig()
-    trim: TrimConfig = TrimConfig()
-    polish: PolishConfig = PolishConfig()
 
 
 class SampleUiConfig(StrictBaseModel):
@@ -1069,20 +871,6 @@ class SampleConfig(StrictBaseModel):
         else:
             if self.auto_opt is not None and self.auto_opt.enabled:
                 raise ValueError("auto_opt.enabled must be false when optimizer.name is not 'auto'")
-
-        if self.auto_opt is not None and self.auto_opt.enabled:
-            ladder_sizes = list(self.auto_opt.pt_ladder_sizes or [])
-            if ladder_sizes:
-                ladder = self.optimizers.pt.beta_ladder
-                if isinstance(ladder, BetaLadderFixed):
-                    raise ValueError("auto_opt.pt_ladder_sizes requires beta_ladder.kind='geometric' (fixed ladder).")
-                if isinstance(ladder, BetaLadderGeometric) and ladder.betas is not None:
-                    max_size = max(ladder_sizes)
-                    if max_size > len(ladder.betas):
-                        raise ValueError(
-                            "auto_opt.pt_ladder_sizes exceeds available betas; "
-                            "provide a geometric beta_ladder with beta_min/beta_max/n_temps."
-                        )
 
         if self.optimizer.name == "pt" and self.budget.restarts != 1:
             raise ValueError("PT does not support budget.restarts > 1; set sample.budget.restarts=1.")

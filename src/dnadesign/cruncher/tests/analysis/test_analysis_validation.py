@@ -36,7 +36,7 @@ def _sample_block() -> dict:
         "early_stop": {"enabled": True, "patience": 10, "min_delta": 0.01},
         "init": {"kind": "random", "length": 12, "pad_with": "background"},
         "objective": {"bidirectional": True, "score_scale": "normalized-llr"},
-        "elites": {"k": 1, "min_hamming": 0, "filters": {"pwm_sum_min": 0.0}},
+        "elites": {"k": 1, "filters": {"pwm_sum_min": 0.0}},
         "moves": {
             "profile": "balanced",
             "overrides": {
@@ -47,8 +47,8 @@ def _sample_block() -> dict:
                 "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
             },
         },
-        "optimizer": {"name": "gibbs"},
-        "optimizers": {"gibbs": {"beta_schedule": {"kind": "fixed", "beta": 1.0}, "apply_during": "tune"}},
+        "optimizer": {"name": "pt"},
+        "optimizers": {"pt": {"beta_ladder": {"kind": "geometric", "betas": [1.0, 0.5]}}},
         "auto_opt": {"enabled": False},
         "output": {"trace": {"save": False}, "save_sequences": True},
         "ui": {"progress_bar": False, "progress_every": 0},

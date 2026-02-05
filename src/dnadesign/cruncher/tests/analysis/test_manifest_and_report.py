@@ -26,9 +26,7 @@ from dnadesign.cruncher.artifacts.layout import (
 from dnadesign.cruncher.artifacts.manifest import build_run_manifest, write_manifest
 from dnadesign.cruncher.config.schema_v2 import (
     AutoOptConfig,
-    CoolingLinear,
     CruncherConfig,
-    GibbsOptimizerConfig,
     IngestConfig,
     InitConfig,
     MotifStoreConfig,
@@ -66,10 +64,10 @@ def _make_config() -> CruncherConfig:
             budget=SampleBudgetConfig(draws=2, tune=1, restarts=1),
             init=InitConfig(kind="random", length=6),
             objective=SampleObjectiveConfig(bidirectional=True, score_scale="llr"),
-            elites=SampleElitesConfig(k=1, min_hamming=1),
+            elites=SampleElitesConfig(k=1),
             moves=SampleMovesConfig(),
-            optimizer=OptimizerSelectionConfig(name="gibbs"),
-            optimizers=OptimizersConfig(gibbs=GibbsOptimizerConfig(beta_schedule=CoolingLinear(beta=(0.1, 0.2)))),
+            optimizer=OptimizerSelectionConfig(name="pt"),
+            optimizers=OptimizersConfig(),
             auto_opt=AutoOptConfig(enabled=False),
         ),
         analysis=None,

@@ -38,9 +38,8 @@ def _write_config(tmp_path: Path, config: dict) -> Path:
 def _sample_block(
     *,
     optimizer_name: str,
-    gibbs_schedule: dict | None = None,
     pt_ladder: dict | None = None,
-    restarts: int = 2,
+    restarts: int = 1,
 ) -> dict:
     return {
         "mode": "sample",
@@ -48,7 +47,7 @@ def _sample_block(
         "budget": {"draws": 2, "tune": 1, "restarts": restarts},
         "init": {"kind": "random", "length": 12, "pad_with": "background"},
         "objective": {"bidirectional": True, "score_scale": "llr"},
-        "elites": {"k": 1, "min_hamming": 0, "filters": {"pwm_sum_min": 0.0}},
+        "elites": {"k": 1, "filters": {"pwm_sum_min": 0.0}},
         "moves": {
             "profile": "balanced",
             "overrides": {
@@ -61,10 +60,6 @@ def _sample_block(
         },
         "optimizer": {"name": optimizer_name},
         "optimizers": {
-            "gibbs": {
-                "beta_schedule": gibbs_schedule or {"kind": "linear", "beta": [0.1, 0.2]},
-                "apply_during": "tune",
-            },
             "pt": {
                 "beta_ladder": pt_ladder or {"kind": "geometric", "betas": [1.0, 0.5]},
                 "swap_prob": 0.1,
@@ -91,7 +86,7 @@ def test_unknown_top_level_key_is_rejected(tmp_path: Path) -> None:
 def test_multi_tf_llr_requires_allow_unscaled(tmp_path: Path) -> None:
     config = _base_config()
     config["cruncher"]["regulator_sets"] = [["lexA", "cpxR"]]
-    config["cruncher"]["sample"] = _sample_block(optimizer_name="gibbs")
+    config["cruncher"]["sample"] = _sample_block(optimizer_name="pt")
     config_path = _write_config(tmp_path, config)
     with pytest.raises(ValidationError, match="allow_unscaled_llr"):
         load_config(config_path)
@@ -186,31 +181,27 @@ def test_genome_cache_must_be_workspace_relative(tmp_path: Path, genome_cache: s
     assert any(err.get("loc") == ("cruncher", "ingest", "genome_cache") for err in exc.value.errors())
 
 
-def test_gibbs_rejects_geometric_cooling(tmp_path: Path) -> None:
-    config = _base_config()
-    config["cruncher"]["sample"] = _sample_block(
-        optimizer_name="gibbs",
-        gibbs_schedule={"kind": "geometric", "beta": [1.0, 0.5]},
-    )
-    config_path = _write_config(tmp_path, config)
-
-    with pytest.raises(ValidationError) as exc:
-        load_config(config_path)
-
-    assert any("gibbs" in str(err.get("msg")) for err in exc.value.errors())
-
-
-def test_gibbs_global_schedule_requires_apply_all(tmp_path: Path) -> None:
+def test_gibbs_optimizer_is_rejected(tmp_path: Path) -> None:
     config = _base_config()
     config["cruncher"]["sample"] = _sample_block(optimizer_name="gibbs")
-    config["cruncher"]["sample"]["optimizers"]["gibbs"]["schedule_scope"] = "global"
-    config["cruncher"]["sample"]["optimizers"]["gibbs"]["apply_during"] = "tune"
     config_path = _write_config(tmp_path, config)
 
     with pytest.raises(ValidationError) as exc:
         load_config(config_path)
 
-    assert any("schedule_scope" in str(err.get("msg")) for err in exc.value.errors())
+    assert any("optimizer" in str(err.get("loc")) or "gibbs" in str(err.get("msg")) for err in exc.value.errors())
+
+
+def test_gibbs_optimizer_block_is_rejected(tmp_path: Path) -> None:
+    config = _base_config()
+    config["cruncher"]["sample"] = _sample_block(optimizer_name="pt")
+    config["cruncher"]["sample"]["optimizers"]["gibbs"] = {"beta_schedule": {"kind": "fixed", "beta": 1.0}}
+    config_path = _write_config(tmp_path, config)
+
+    with pytest.raises(ValidationError) as exc:
+        load_config(config_path)
+
+    assert any(err.get("type") == "extra_forbidden" for err in exc.value.errors())
 
 
 def test_pt_rejects_missing_ladder_params(tmp_path: Path) -> None:
@@ -241,7 +232,7 @@ def test_auto_opt_pt_ladder_sizes_requires_geometric_ladder(tmp_path: Path) -> N
     with pytest.raises(ValidationError) as exc:
         load_config(config_path)
 
-    assert any("requires beta_ladder.kind='geometric'" in str(err.get("msg")) for err in exc.value.errors())
+    assert any(err.get("type") == "extra_forbidden" for err in exc.value.errors())
 
 
 def test_auto_opt_pt_ladder_sizes_rejects_oversized_betas(tmp_path: Path) -> None:
@@ -253,7 +244,7 @@ def test_auto_opt_pt_ladder_sizes_rejects_oversized_betas(tmp_path: Path) -> Non
     with pytest.raises(ValidationError) as exc:
         load_config(config_path)
 
-    assert any("auto_opt.pt_ladder_sizes exceeds available betas" in str(err.get("msg")) for err in exc.value.errors())
+    assert any(err.get("type") == "extra_forbidden" for err in exc.value.errors())
 
 
 def test_pt_requires_restarts_one(tmp_path: Path) -> None:

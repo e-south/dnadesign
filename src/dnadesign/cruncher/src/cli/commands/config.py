@@ -172,10 +172,12 @@ def summary(
         table.add_row("objective.score_scale", sample["objective"]["score_scale"])
         table.add_row("objective.bidirectional", str(sample["objective"]["bidirectional"]))
         table.add_row("elites.k", str(sample["elites"]["k"]))
-        table.add_row("elites.min_hamming", str(sample["elites"]["min_hamming"]))
         table.add_row("elites.filters.pwm_sum_min", str(sample["elites"]["filters"]["pwm_sum_min"]))
+        table.add_row(
+            "elites.selection.min_distance",
+            str(sample["elites"]["selection"].get("min_distance")),
+        )
         table.add_row("optimizer.name", sample["optimizer"]["name"])
-        table.add_row("optimizers.gibbs.beta_schedule", str(sample["optimizers"]["gibbs"]["beta_schedule"]))
         table.add_row("optimizers.pt.beta_ladder", str(sample["optimizers"]["pt"]["beta_ladder"]))
         table.add_row("optimizers.pt.swap_prob", str(sample["optimizers"]["pt"]["swap_prob"]))
         table.add_row("output.trace.save", str(sample["output"]["trace"]["save"]))

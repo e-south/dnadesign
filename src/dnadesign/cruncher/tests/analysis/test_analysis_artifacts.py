@@ -41,7 +41,7 @@ def _sample_block(*, save_trace: bool, top_k: int, draws: int = 2, tune: int = 1
             "score_scale": "normalized-llr",
             "scoring": {"pwm_pseudocounts": 0.1, "log_odds_clip": None},
         },
-        "elites": {"k": top_k, "min_hamming": 0, "filters": {"pwm_sum_min": 0.0}},
+        "elites": {"k": top_k, "filters": {"pwm_sum_min": 0.0}},
         "moves": {
             "profile": "balanced",
             "overrides": {
@@ -52,8 +52,8 @@ def _sample_block(*, save_trace: bool, top_k: int, draws: int = 2, tune: int = 1
                 "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
             },
         },
-        "optimizer": {"name": "gibbs"},
-        "optimizers": {"gibbs": {"beta_schedule": {"kind": "fixed", "beta": 1.0}, "apply_during": "tune"}},
+        "optimizer": {"name": "pt"},
+        "optimizers": {"pt": {"beta_ladder": {"kind": "geometric", "betas": [1.0, 0.5]}}},
         "auto_opt": {"enabled": False},
         "output": {"trace": {"save": save_trace}, "save_sequences": True},
         "ui": {"progress_bar": False, "progress_every": 0},

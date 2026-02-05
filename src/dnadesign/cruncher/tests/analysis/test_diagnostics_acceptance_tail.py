@@ -25,9 +25,9 @@ def test_acceptance_tail_from_move_stats() -> None:
         sequences_df=pd.DataFrame({"sequence": []}),
         elites_df=pd.DataFrame(),
         tf_names=["tfA"],
-        optimizer={"kind": "gibbs"},
+        optimizer={"kind": "pt"},
         optimizer_stats={"move_stats": move_stats},
-        optimizer_kind="gibbs",
+        optimizer_kind="pt",
     )
     optimizer_metrics = diagnostics["metrics"]["optimizer"]
     assert optimizer_metrics["acceptance_rate_mh_tail"] == 0.5

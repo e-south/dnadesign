@@ -113,14 +113,6 @@ def elites_path(run_dir: Path) -> Path:
     return run_dir / RUN_ARTIFACTS_DIR / "elites.parquet"
 
 
-def elites_top_score_path(run_dir: Path) -> Path:
-    return run_dir / RUN_ARTIFACTS_DIR / "elites_top_score.parquet"
-
-
-def elites_mmr_path(run_dir: Path) -> Path:
-    return run_dir / RUN_ARTIFACTS_DIR / "elites_mmr.parquet"
-
-
 def elites_mmr_meta_path(run_dir: Path) -> Path:
     return run_dir / RUN_ARTIFACTS_DIR / "elites_mmr_meta.parquet"
 

@@ -13,7 +13,6 @@ from dataclasses import dataclass
 from typing import Callable, Dict
 
 from dnadesign.cruncher.core.optimizers.base import Optimizer
-from dnadesign.cruncher.core.optimizers.gibbs import GibbsOptimizer
 from dnadesign.cruncher.core.optimizers.pt import PTGibbsOptimizer
 
 OptimizerFactory = Callable[..., Optimizer]
@@ -55,9 +54,4 @@ def list_optimizer_specs() -> list[OptimizerSpec]:
 
 
 # Built-ins
-register_optimizer(
-    "gibbs",
-    GibbsOptimizer,
-    "Single-chain Gibbs sampler with block/multi-site/slide moves.",
-)
 register_optimizer("pt", PTGibbsOptimizer, "Parallel-tempered Gibbs sampler with swap diagnostics.")
