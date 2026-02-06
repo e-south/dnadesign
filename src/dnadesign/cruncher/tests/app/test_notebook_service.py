@@ -25,7 +25,20 @@ def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
     manifest_file.write_text(json.dumps({"artifacts": [], "config_path": ""}))
     (analysis_dir / "summary.json").write_text(json.dumps({"tf_names": ["LexA"], "analysis_id": analysis_id}))
     (analysis_dir / "plot_manifest.json").write_text(json.dumps({"plots": []}))
-    (analysis_dir / "table_manifest.json").write_text(json.dumps({"tables": []}))
+    (analysis_dir / "table_manifest.json").write_text(
+        json.dumps(
+            {
+                "tables": [
+                    {"key": "scores_summary", "path": "table__scores__summary.parquet", "exists": True},
+                    {"key": "metrics_joint", "path": "table__metrics__joint.parquet", "exists": True},
+                    {"key": "elites_topk", "path": "table__elites__topk.parquet", "exists": True},
+                ]
+            }
+        )
+    )
+    (analysis_dir / "table__scores__summary.parquet").write_text("placeholder")
+    (analysis_dir / "table__metrics__joint.parquet").write_text("placeholder")
+    (analysis_dir / "table__elites__topk.parquet").write_text("placeholder")
 
     monkeypatch.setattr(notebook_service, "ensure_marimo", lambda: None)
 
@@ -38,9 +51,9 @@ def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
     assert "Refresh analysis list" in content
     assert "plot_options" in content
     assert "table_manifest.json" in content
-    assert "table__scores__summary" in content
-    assert "table__metrics__joint" in content
-    assert "table__elites__topk" in content
+    assert "scores_summary" in content
+    assert "metrics_joint" in content
+    assert "elites_topk" in content
     assert "Missing JSON at" in content
     assert "per_pwm_scores" not in content
     assert "joint_metrics." not in content
@@ -87,3 +100,21 @@ def test_generate_notebook_rejects_latest_and_analysis_id(tmp_path, monkeypatch)
 
     with pytest.raises(ValueError, match="analysis-id|latest"):
         notebook_service.generate_notebook(run_dir, analysis_id="20250101T000000Z", latest=True)
+
+
+def test_generate_notebook_requires_table_manifest_contract_keys(tmp_path, monkeypatch) -> None:
+    run_dir = tmp_path / "run"
+    analysis_id = "20250101T000000Z_test"
+    analysis_dir = run_dir / "analysis"
+    analysis_dir.mkdir(parents=True)
+    manifest_file = manifest_path(run_dir)
+    manifest_file.parent.mkdir(parents=True, exist_ok=True)
+    manifest_file.write_text(json.dumps({"artifacts": [], "config_path": ""}))
+    (analysis_dir / "summary.json").write_text(json.dumps({"tf_names": ["LexA"], "analysis_id": analysis_id}))
+    (analysis_dir / "plot_manifest.json").write_text(json.dumps({"plots": []}))
+    (analysis_dir / "table_manifest.json").write_text(json.dumps({"tables": []}))
+
+    monkeypatch.setattr(notebook_service, "ensure_marimo", lambda: None)
+
+    with pytest.raises(FileNotFoundError, match="analysis table manifest missing required table keys"):
+        notebook_service.generate_notebook(run_dir, latest=True)

@@ -17,6 +17,7 @@ from dnadesign.cruncher.analysis.layout import (
     load_table_manifest,
     plot_manifest_path,
     resolve_analysis_dir,
+    resolve_required_table_paths,
     summary_path,
     table_manifest_path,
 )
@@ -71,6 +72,10 @@ def _validate_notebook_inputs(analysis_dir: Path) -> None:
     if not isinstance(plots, list):
         raise ValueError("plot_manifest.json must include a 'plots' list.")
     load_table_manifest(table_manifest_file, required=True)
+    resolve_required_table_paths(
+        analysis_dir,
+        keys=("scores_summary", "metrics_joint", "elites_topk"),
+    )
 
 
 def _record_notebook_artifact(
@@ -253,8 +258,8 @@ def _(analysis_entries, analysis_picker, _load_json, Path):
 @app.cell
 def _(analysis_dir, _load_json, run_dir):
     from dnadesign.cruncher.analysis.layout import plot_manifest_path as analysis_plot_manifest_path
+    from dnadesign.cruncher.analysis.layout import resolve_required_table_paths as analysis_resolve_required_table_paths
     from dnadesign.cruncher.analysis.layout import table_manifest_path as analysis_table_manifest_path
-    from dnadesign.cruncher.analysis.layout import table_paths_by_key as analysis_table_paths_by_key
     from dnadesign.cruncher.artifacts.layout import manifest_path as run_manifest_path
 
     manifest_path = run_manifest_path(run_dir)
@@ -267,7 +272,10 @@ def _(analysis_dir, _load_json, run_dir):
     table_paths = {{}}
     table_paths_error = None
     try:
-        table_paths = analysis_table_paths_by_key(analysis_dir)
+        table_paths = analysis_resolve_required_table_paths(
+            analysis_dir,
+            keys=("scores_summary", "metrics_joint", "elites_topk"),
+        )
     except Exception as exc:
         table_paths_error = str(exc)
     return (
@@ -286,7 +294,9 @@ def _(analysis_dir, _load_json, run_dir):
 
 
 @app.cell
-def _(analysis_dir, pd, table_paths):
+def _(analysis_dir, mo, pd, table_paths, table_paths_error):
+    if table_paths_error:
+        mo.stop(True, mo.md(f"Table contract error: {{table_paths_error}}"))
 
     def _read_table(path):
         if not path.exists():
@@ -295,11 +305,11 @@ def _(analysis_dir, pd, table_paths):
             return pd.read_parquet(path)
         return pd.read_csv(path)
 
-    summary_table_path = table_paths.get("scores_summary", analysis_dir / "table__scores__summary.parquet")
+    summary_table_path = table_paths["scores_summary"]
     summary_df = _read_table(summary_table_path)
-    joint_metrics_path = table_paths.get("metrics_joint", analysis_dir / "table__metrics__joint.parquet")
+    joint_metrics_path = table_paths["metrics_joint"]
     joint_metrics_df = _read_table(joint_metrics_path)
-    topk_path = table_paths.get("elites_topk", analysis_dir / "table__elites__topk.parquet")
+    topk_path = table_paths["elites_topk"]
     topk_df = _read_table(topk_path)
     return summary_df, summary_table_path, joint_metrics_df, joint_metrics_path, topk_df, topk_path
 

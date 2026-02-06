@@ -336,6 +336,7 @@ Notes:
 
 * `sample.output.save_sequences: true` is required for later analysis.
 * `sample.output.save_trace: true` enables trace-based diagnostics.
+* `sample.output.save_trace: false` skips ArviZ trace construction and reduces sample runtime/memory overhead.
 * Sampling uses the internal parallel tempering kernel; there is no optimizer selection in the config.
 * `--verbose` enables periodic progress logging; `--debug` enables very verbose debug logs.
 
@@ -409,7 +410,7 @@ Notes:
 
 * requires `marimo` to be installed (for example: `uv add --group notebooks marimo`)
 * useful when you want interactive slicing/filtering beyond static plots
-* strict artifact contract: requires `analysis/summary.json` + `analysis/plot_manifest.json` to exist and parse, and `analysis/summary.json` must include a non-empty `tf_names` list
+* strict artifact contract: requires `analysis/summary.json`, `analysis/plot_manifest.json`, and `analysis/table_manifest.json` to exist and parse, `analysis/summary.json` must include a non-empty `tf_names` list, and `table_manifest.json` must provide `scores_summary`, `metrics_joint`, and `elites_topk` entries with existing files
 * plot output status is refreshed from disk so missing files are shown accurately
 * the Refresh button re-scans analysis entries and updates plot/table status without restarting marimo
 * the notebook infers `run_dir` from its location; keep it under `<run_dir>/analysis/` or regenerate it
@@ -733,7 +734,8 @@ Network:
 * `runs repair-index <config>` — validate and optionally remove index entries missing run directories/manifests (`--apply`)
 * `runs clean <config> --stale` — mark stale `running` runs as `aborted` (use `--drop` to remove from the index)
 * `runs prune <config>` — archive old runs under `<out_dir>/_archive/<stage>/<YYYY-MM>/` with deterministic retention (`--keep-latest`, `--older-than-days`; dry-run unless `--apply`)
-  * prune requires a valid run index; run `runs repair-index --apply` first if invalid entries are reported
+  * use `--repair-index` to drop invalid run-index entries before pruning
+  * without `--repair-index`, prune requires a valid run index and exits with an actionable repair command
 
 Tip: inside a workspace you can drop the config argument entirely (for example,
 `cruncher runs show <run>` or `cruncher runs list`).

@@ -306,3 +306,69 @@ def test_runs_prune_fails_with_actionable_error_on_invalid_index_entries(tmp_pat
     assert result.exit_code != 0
     assert "invalid run index entries" in result.output.lower()
     assert "runs repair-index --apply" in result.output
+
+
+def test_runs_prune_can_auto_repair_invalid_index_entries(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    config = {
+        "cruncher": {
+            "schema_version": 3,
+            "workspace": {"out_dir": "runs", "regulator_sets": [["lexA"]]},
+            "catalog": {"root": str(catalog_root), "pwm_source": "matrix", "source_preference": ["regulondb"]},
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    now = datetime.now(timezone.utc)
+    old_time = (now - timedelta(days=40)).isoformat()
+    run_old = tmp_path / "runs" / "sample" / "run_old"
+    run_invalid = tmp_path / "runs" / "sample" / "run_invalid"
+    run_old.mkdir(parents=True, exist_ok=True)
+    run_invalid.mkdir(parents=True, exist_ok=True)
+    _write_sample_manifest(run_old, created_at=old_time)
+
+    save_run_index(
+        config_path,
+        {
+            "run_old": {
+                "stage": "sample",
+                "status": "completed",
+                "run_dir": str(run_old.resolve()),
+                "created_at": old_time,
+            },
+            "run_invalid": {
+                "stage": "sample",
+                "status": "aborted",
+                "run_dir": str(run_invalid.resolve()),
+                "created_at": old_time,
+            },
+        },
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "runs",
+            "prune",
+            "--stage",
+            "sample",
+            "--keep-latest",
+            "0",
+            "--older-than-days",
+            "0",
+            "--repair-index",
+            "--apply",
+            str(config_path),
+        ],
+        color=False,
+    )
+    assert result.exit_code == 0
+    assert "Removed 1 invalid run index entry before prune." in result.output
+    archive_bucket = datetime.fromisoformat(old_time).strftime("%Y-%m")
+    archive_dir = tmp_path / "runs" / "_archive" / "sample" / archive_bucket
+    assert not run_old.exists()
+    assert (archive_dir / "run_old").exists()
+    run_index = load_run_index(config_path)
+    assert "run_old" not in run_index
+    assert "run_invalid" not in run_index

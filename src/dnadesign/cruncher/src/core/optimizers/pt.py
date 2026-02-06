@@ -9,11 +9,11 @@ Author(s): Eric J. South
 
 from __future__ import annotations
 
+import importlib
 import logging
 from collections import Counter
 from typing import Any, Dict, List, Tuple
 
-import arviz as az
 import numpy as np
 
 from dnadesign.cruncher.core.optimizers.base import Optimizer
@@ -67,6 +67,7 @@ class PTGibbsOptimizer(Optimizer):
         self.record_tune: bool = bool(cfg.get("record_tune", False))
         self.progress_bar: bool = bool(cfg.get("progress_bar", True))
         self.progress_every: int = int(cfg.get("progress_every", 0))
+        self.build_trace: bool = bool(cfg.get("build_trace", True))
         self.telemetry = telemetry or NullTelemetry()
         self.progress = progress or passthrough_progress
         early_cfg = cfg.get("early_stop") or {}
@@ -443,12 +444,12 @@ class PTGibbsOptimizer(Optimizer):
                 if self._unique_success_set is not None:
                     _record_unique_success(chain_states[c], current_per_tf_maps[c])
                 comb = current_scores[c]
-                chain_scores[c].append(comb)
+                if self.build_trace:
+                    chain_scores[c].append(comb)
                 if self.best_score is None or comb > self.best_score:
                     self.best_score = comb
                     self.best_meta = (c, T + d)
 
-            current_scores = [scores[-1] for scores in chain_scores if scores]
             score_mean = float(np.mean(current_scores)) if current_scores else None
             score_std = float(np.std(current_scores)) if current_scores else None
             current_best = float(max(current_scores)) if current_scores else None
@@ -491,14 +492,18 @@ class PTGibbsOptimizer(Optimizer):
 
         logger.debug("PT optimisation finished. Move utilisation: %s", dict(self.move_tally))
 
-        # Build ArviZ trace from draw phase only
-        if chain_scores:
-            max_len = max(len(scores) for scores in chain_scores)
-            for scores in chain_scores:
-                if len(scores) < max_len:
-                    scores.extend([float("nan")] * (max_len - len(scores)))
-        score_arr = np.asarray(chain_scores, dtype=float)  # (C, D)
-        self.trace_idata = az.from_dict(posterior={"score": score_arr})
+        # Build ArviZ trace from draw phase only when trace output is enabled.
+        if self.build_trace:
+            if chain_scores:
+                max_len = max(len(scores) for scores in chain_scores)
+                for scores in chain_scores:
+                    if len(scores) < max_len:
+                        scores.extend([float("nan")] * (max_len - len(scores)))
+            score_arr = np.asarray(chain_scores, dtype=float)  # (C, D)
+            az = importlib.import_module("arviz")
+            self.trace_idata = az.from_dict(posterior={"score": score_arr})
+        else:
+            self.trace_idata = None
 
         if self.top_k <= 0:
             self.elites_meta = []

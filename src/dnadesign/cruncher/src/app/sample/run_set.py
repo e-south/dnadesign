@@ -377,6 +377,7 @@ def _run_sample_for_set(
         "dsdna_canonicalize": dsdna_mode_for_opt,
         "score_scale": sample_cfg.objective.score_scale,
         "record_tune": sample_cfg.output.include_tune_in_sequences,
+        "build_trace": bool(sample_cfg.output.save_trace),
         "progress_bar": True,
         "progress_every": 0,
         "swap_stride": int(pt_cfg.swap_stride),

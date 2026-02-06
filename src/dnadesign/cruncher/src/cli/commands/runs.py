@@ -719,6 +719,11 @@ def prune_runs_cmd(
         "--older-than-days",
         help="Only archive runs at least this many days old (set 0 to ignore age).",
     ),
+    repair_index: bool = typer.Option(
+        False,
+        "--repair-index",
+        help="Drop invalid run index entries before pruning.",
+    ),
     apply: bool = typer.Option(False, "--apply", help="Move candidate runs into stage archive."),
 ) -> None:
     try:
@@ -736,9 +741,16 @@ def prune_runs_cmd(
     index_issues = find_invalid_run_index_entries(config_path, stage=stage, catalog_root=cfg.catalog.catalog_root)
     if index_issues:
         console.print(_render_index_issue_table(index_issues, title="Invalid run index entries"))
-        console.print("Error: run index contains invalid run index entries.")
-        console.print("Fix: run `cruncher runs repair-index --apply` and re-run prune.")
-        raise typer.Exit(code=1)
+        if not repair_index:
+            console.print("Error: run index contains invalid run index entries.")
+            console.print("Fix: run `cruncher runs repair-index --apply` and re-run prune.")
+            raise typer.Exit(code=1)
+        removed = drop_run_index_entries(
+            config_path,
+            [issue.run_name for issue in index_issues],
+            catalog_root=cfg.catalog.catalog_root,
+        )
+        console.print(f"Removed {removed} invalid run index entr{'y' if removed == 1 else 'ies'} before prune.")
     try:
         runs = list_runs(cfg, config_path, stage=stage)
     except ValueError as exc:
