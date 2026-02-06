@@ -464,9 +464,17 @@ def _run_sample_for_set(
                 "sequence": seq_str,
                 "baseline_seed": baseline_seed,
                 "baseline_n": baseline_n,
+                "seed": baseline_seed,
+                "n_samples": baseline_n,
                 "sequence_length": sample_cfg.sequence_length,
+                "length": sample_cfg.sequence_length,
                 "score_scale": sample_cfg.objective.score_scale,
                 "bidirectional": bool(sample_cfg.objective.bidirectional),
+                "bg_model": "uniform",
+                "bg_a": 0.25,
+                "bg_c": 0.25,
+                "bg_g": 0.25,
+                "bg_t": 0.25,
             }
             if baseline_canonical:
                 row["canonical_sequence"] = SequenceState(canon_int(seq_arr)).to_string()

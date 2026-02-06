@@ -76,7 +76,7 @@ Analysis writes a curated, orthogonal suite of plots and tables (no plot boolean
 Sampling artifacts consumed by analysis:
 
 - `artifacts/elites_hits.parquet` (per-elite, per-TF best-hit/core metadata)
-- `artifacts/random_baseline.parquet` (baseline cloud for trajectory plots)
+- `artifacts/random_baseline.parquet` (baseline cloud for trajectory plots; includes seed, n_samples, length, score_scale, bidirectional, background model)
 
 Plots (always generated when data is available):
 
@@ -93,7 +93,7 @@ Use `analysis/report.md` for a narrative view and `analysis/summary.json` for ma
 Key signals:
 
 - `diagnostics.status`: `ok|warn|fail` summary.
-- `trace.rhat` and `trace.ess_ratio` (if `trace.nc` exists) indicate sampling health for the cold chain.
+- `trace.rhat` and `trace.ess_ratio` (if `trace.nc` exists) are directional indicators of sampling health for the cold chain.
 - `objective_components.unique_fraction_canonical` is present only when canonicalization is enabled.
 - `elites_mmr_summary` and `elites_nn_distance` indicate diversity strength and collapse risk.
 

@@ -66,6 +66,8 @@ def build_trajectory_points(
     score_cols = _score_columns(tf_names)
     cols = [c for c in ("draw", "phase", "chain") if c in df.columns] + score_cols
     out = df[cols].copy()
+    if "draw" in out.columns:
+        out["sweep"] = out["draw"].astype(int)
     out["x"] = x
     out["y"] = y
     out["x_metric"] = x_metric

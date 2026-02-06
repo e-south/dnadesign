@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 
 from dnadesign.cruncher.analysis.overlap import compute_overlap_tables
+from dnadesign.cruncher.core.sequence import identity_key
 
 
 def _safe_float(value: object) -> float | None:
@@ -263,10 +264,10 @@ def summarize_sampling_diagnostics(
                         trace_metrics["ess_ratio"] = ess_ratio
                         if mode == "sample":
                             if ess_ratio <= thresholds["ess_ratio_fail"]:
-                                warnings.append(f"ESS ratio {ess_ratio:.3f} suggests failed mixing.")
+                                warnings.append(f"Directional ESS ratio {ess_ratio:.3f} suggests failed mixing.")
                                 _mark("fail")
                             elif ess_ratio < thresholds["ess_ratio_warn"]:
-                                warnings.append(f"ESS ratio {ess_ratio:.3f} is low; consider longer runs.")
+                                warnings.append(f"Directional ESS ratio {ess_ratio:.3f} is low; consider longer runs.")
                                 _mark("warn")
                 else:
                     if n_chains < 2:
@@ -290,10 +291,10 @@ def summarize_sampling_diagnostics(
                         trace_metrics["rhat"] = rhat
                         if mode == "sample":
                             if rhat >= thresholds["rhat_fail"]:
-                                warnings.append(f"R-hat={rhat:.3f} suggests failed mixing.")
+                                warnings.append(f"Directional R-hat={rhat:.3f} suggests failed mixing.")
                                 _mark("fail")
                             elif rhat > thresholds["rhat_warn"]:
-                                warnings.append(f"R-hat={rhat:.3f} indicates weak mixing.")
+                                warnings.append(f"Directional R-hat={rhat:.3f} indicates weak mixing.")
                                 _mark("warn")
                     if ess is not None:
                         trace_metrics["ess"] = ess
@@ -302,10 +303,10 @@ def summarize_sampling_diagnostics(
                         trace_metrics["ess_ratio"] = ess_ratio
                         if mode == "sample":
                             if ess_ratio <= thresholds["ess_ratio_fail"]:
-                                warnings.append(f"ESS ratio {ess_ratio:.3f} suggests failed mixing.")
+                                warnings.append(f"Directional ESS ratio {ess_ratio:.3f} suggests failed mixing.")
                                 _mark("fail")
                             elif ess_ratio < thresholds["ess_ratio_warn"]:
-                                warnings.append(f"ESS ratio {ess_ratio:.3f} is low; consider longer runs.")
+                                warnings.append(f"Directional ESS ratio {ess_ratio:.3f} is low; consider longer runs.")
                                 _mark("warn")
 
                 flat = score_arr.reshape(-1)
@@ -340,8 +341,12 @@ def summarize_sampling_diagnostics(
         draw_df = _sequence_frame(sequences_df)
         total = int(len(draw_df))
         unique = None
-        if "canonical_sequence" in draw_df.columns:
-            unique = int(draw_df["canonical_sequence"].astype(str).nunique())
+        if has_canonical:
+            source = (
+                draw_df["canonical_sequence"] if "canonical_sequence" in draw_df.columns else draw_df["sequence"]
+            ).astype(str)
+            keys = source.map(lambda seq: identity_key(seq, bidirectional=True))
+            unique = int(keys.nunique())
             seq_metrics["unique_sequences_canonical"] = unique
             seq_metrics["unique_sequences_raw"] = int(draw_df["sequence"].astype(str).nunique())
         else:
@@ -416,8 +421,12 @@ def summarize_sampling_diagnostics(
                 )
             elites_metrics["normalized_balance_median"] = _safe_float(np.nanmedian(norm_balance))
             elites_metrics["normalized_min_median"] = _safe_float(np.nanmedian(norm_min))
-        if has_canonical and "canonical_sequence" in subset.columns:
-            elites_metrics["unique_elites_canonical"] = int(subset["canonical_sequence"].astype(str).nunique())
+        if has_canonical:
+            source = (
+                subset["canonical_sequence"] if "canonical_sequence" in subset.columns else subset["sequence"]
+            ).astype(str)
+            keys = source.map(lambda seq: identity_key(seq, bidirectional=True))
+            elites_metrics["unique_elites_canonical"] = int(keys.nunique())
         if overlap_summary is not None:
             overlap_rate_median = overlap_summary.get("overlap_rate_median")
             overlap_total_bp_median = overlap_summary.get("overlap_total_bp_median")

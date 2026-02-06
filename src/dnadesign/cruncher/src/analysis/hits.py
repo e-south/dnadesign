@@ -18,12 +18,24 @@ import pandas as pd
 from dnadesign.cruncher.analysis.parquet import read_parquet
 
 REQUIRED_HITS_COLUMNS = {
-    "elite_id",
-    "tf",
+    "best_core_offset",
+    "best_core_seq",
+    "best_score_norm",
+    "best_score_raw",
+    "best_score_scaled",
     "best_start",
     "best_strand",
-    "best_core_seq",
+    "best_window_seq",
+    "core_def_hash",
+    "core_width",
+    "draw_idx",
+    "elite_id",
+    "pwm_hash",
+    "pwm_ref",
     "pwm_width",
+    "rank",
+    "tf",
+    "tiebreak_rule",
 }
 
 

@@ -111,6 +111,19 @@ def _write_basic_run_artifacts(
         {
             "sequence": ["ACGTACGTACGT", "TGCATGCATGCA", "AACCGGTTAACC"],
             "canonical_sequence": ["ACGTACGTACGT", "TGCATGCATGCA", "AACCGGTTAACC"],
+            "baseline_seed": 7,
+            "baseline_n": 3,
+            "seed": 7,
+            "n_samples": 3,
+            "sequence_length": 12,
+            "length": 12,
+            "score_scale": "normalized-llr",
+            "bidirectional": True,
+            "bg_model": "uniform",
+            "bg_a": 0.25,
+            "bg_c": 0.25,
+            "bg_g": 0.25,
+            "bg_t": 0.25,
             **baseline_scores,
         }
     )
@@ -137,10 +150,23 @@ def _write_basic_run_artifacts(
             {
                 "elite_id": "elite-1",
                 "tf": tf,
+                "rank": 1,
+                "chain": 0,
+                "draw_idx": 0,
                 "best_start": idx * 4,
+                "best_core_offset": idx * 4,
                 "best_strand": "+",
+                "best_window_seq": "ACGT",
                 "best_core_seq": "ACGT",
+                "best_score_raw": 1.0,
+                "best_score_scaled": 1.0,
+                "best_score_norm": 1.0,
+                "tiebreak_rule": "max_leftmost_plus",
+                "pwm_ref": f"demo:{tf}",
+                "pwm_hash": "sha256",
                 "pwm_width": 4,
+                "core_width": 4,
+                "core_def_hash": "corehash",
             }
         )
     hits_df = pd.DataFrame(hits_rows)
@@ -243,6 +269,56 @@ def test_analyze_creates_analysis_run_and_manifest_updates(tmp_path: Path) -> No
     assert analysis_runs_repeat
     summary_after = json.loads((analysis_dir / "summary.json").read_text())
     assert summary_after.get("analysis_id")
+
+
+def test_analyze_fails_on_hits_schema_mismatch(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    config = _base_config(
+        catalog_root=catalog_root,
+        regulator_sets=[["lexA", "cpxR"]],
+        sample=_sample_block(save_trace=False, top_k=1),
+        analysis={
+            "run_selector": "explicit",
+            "runs": ["sample_bad_hits"],
+            "pairwise": ["lexA", "cpxR"],
+            "plot_format": "png",
+            "plot_dpi": 72,
+            "table_format": "parquet",
+            "max_points": 2000,
+        },
+    )
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    run_dir = _make_sample_run_dir(tmp_path, "sample_bad_hits")
+
+    lock_dir = tmp_path / ".cruncher" / "locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = lock_dir / "config.lock.json"
+    lock_path.write_text("{}")
+    lock_sha = sha256_path(lock_path)
+
+    _write_basic_run_artifacts(
+        run_dir=run_dir,
+        config=config,
+        config_path=config_path,
+        lock_path=lock_path,
+        lock_sha=lock_sha,
+        tf_names=["lexA", "cpxR"],
+        include_trace=False,
+        top_k=1,
+        draws=2,
+        tune=1,
+    )
+
+    hits_path = elites_hits_path(run_dir)
+    hits_df = pd.read_parquet(hits_path, engine="fastparquet")
+    hits_df = hits_df.drop(columns=["best_score_raw"])
+    hits_df.to_parquet(hits_path, engine="fastparquet")
+
+    cfg = load_config(config_path)
+    with pytest.raises(ValueError, match="elites_hits.parquet missing required columns"):
+        run_analyze(cfg, config_path)
 
 
 def test_analyze_defaults_to_latest_when_runs_empty(tmp_path: Path) -> None:

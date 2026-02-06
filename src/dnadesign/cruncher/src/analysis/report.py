@@ -265,6 +265,7 @@ def write_report_md(
         f"- Overlap bp median: {_fmt(overlap.get('overlap_total_bp_median'))}",
         f"- MH acceptance (tail): {_fmt(sampling.get('acceptance_rate_mh_tail'))}",
         f"- PT swap acceptance: {_fmt(sampling.get('swap_acceptance_rate'))}",
+        "- Trace diagnostics: directional indicators only (not convergence proofs).",
     ]
     if any(
         learning.get(key) is not None

@@ -25,6 +25,7 @@ from dnadesign.cruncher.analysis.diagnostics import summarize_sampling_diagnosti
 from dnadesign.cruncher.analysis.diversity import (
     compute_elite_distance_matrix,
     compute_elites_nn_distance_table,
+    representative_elite_ids,
     summarize_elite_distances,
 )
 from dnadesign.cruncher.analysis.hits import load_elites_hits
@@ -71,6 +72,7 @@ from dnadesign.cruncher.artifacts.layout import (
 )
 from dnadesign.cruncher.artifacts.manifest import load_manifest, write_manifest
 from dnadesign.cruncher.config.schema_v3 import CruncherConfig
+from dnadesign.cruncher.core.sequence import identity_key
 from dnadesign.cruncher.utils.hashing import sha256_path
 from dnadesign.cruncher.utils.paths import resolve_catalog_root
 from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
@@ -156,13 +158,22 @@ def _write_table(df: pd.DataFrame, path: Path) -> None:
         df.to_csv(path, index=False)
 
 
-def _write_analysis_used(path: Path, analysis_cfg: dict[str, object], analysis_id: str, run_name: str) -> None:
+def _write_analysis_used(
+    path: Path,
+    analysis_cfg: dict[str, object],
+    analysis_id: str,
+    run_name: str,
+    *,
+    extras: dict[str, object] | None = None,
+) -> None:
     payload = {
         "analysis": analysis_cfg,
         "analysis_id": analysis_id,
         "run": run_name,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
+    if extras:
+        payload.update(extras)
     atomic_write_yaml(path, payload, sort_keys=False, default_flow_style=False)
 
 
@@ -173,24 +184,59 @@ def _summarize_elites_mmr(
     elites_meta: dict[str, object],
     tf_names: list[str],
     pwms: dict[str, object],
+    *,
+    bidirectional: bool,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    identity_mode = "canonical" if "canonical_sequence" in sequences_df.columns else "raw"
-    nn_df = compute_elites_nn_distance_table(hits_df, tf_names, pwms, identity_mode=identity_mode)
-    elite_ids, dist = compute_elite_distance_matrix(hits_df, tf_names, pwms)
+    identity_mode = "canonical" if bidirectional else "raw"
+    identity_by_elite_id: dict[str, str] = {}
+    rank_by_elite_id: dict[str, int] = {}
+    if elites_df is not None and not elites_df.empty and "id" in elites_df.columns:
+        seq_series = elites_df["sequence"].astype(str)
+        if bidirectional and "canonical_sequence" in elites_df.columns:
+            seq_series = elites_df["canonical_sequence"].astype(str)
+        identity_by_elite_id = {
+            str(elite_id): identity_key(seq, bidirectional=bidirectional)
+            for elite_id, seq in zip(elites_df["id"].astype(str), seq_series)
+        }
+        if "rank" in elites_df.columns:
+            rank_by_elite_id = {
+                str(elite_id): int(rank)
+                for elite_id, rank in zip(elites_df["id"].astype(str), elites_df["rank"])
+                if rank is not None
+            }
+        else:
+            rank_by_elite_id = {str(elite_id): idx for idx, elite_id in enumerate(elites_df["id"].astype(str))}
+
+    nn_df = compute_elites_nn_distance_table(
+        hits_df,
+        tf_names,
+        pwms,
+        identity_mode=identity_mode,
+        identity_by_elite_id=identity_by_elite_id or None,
+        rank_by_elite_id=rank_by_elite_id or None,
+    )
+    rep_by_identity = representative_elite_ids(identity_by_elite_id, rank_by_elite_id) if identity_by_elite_id else {}
+    hits_for_dist = hits_df
+    if rep_by_identity:
+        keep_ids = set(rep_by_identity.values())
+        hits_for_dist = hits_df[hits_df["elite_id"].isin(keep_ids)].copy()
+    elite_ids, dist = compute_elite_distance_matrix(hits_for_dist, tf_names, pwms)
     dist_summary = summarize_elite_distances(dist)
     min_norm = pd.to_numeric(elites_df.get("min_norm"), errors="coerce") if "min_norm" in elites_df.columns else None
     median_relevance_raw = float(min_norm.median()) if min_norm is not None and not min_norm.empty else None
     draw_df = sequences_df[sequences_df.get("phase") == "draw"] if "phase" in sequences_df.columns else sequences_df
     unique_draws = None
-    if "canonical_sequence" in draw_df.columns:
-        unique_draws = draw_df["canonical_sequence"].astype(str).nunique()
-    elif "sequence" in draw_df.columns:
-        unique_draws = draw_df["sequence"].astype(str).nunique()
+    if "sequence" in draw_df.columns:
+        source = draw_df["sequence"].astype(str)
+        if bidirectional and "canonical_sequence" in draw_df.columns:
+            source = draw_df["canonical_sequence"].astype(str)
+        unique_draws = source.map(lambda seq: identity_key(seq, bidirectional=bidirectional)).nunique()
     unique_elites = None
-    if "canonical_sequence" in elites_df.columns:
-        unique_elites = elites_df["canonical_sequence"].astype(str).nunique()
-    elif "sequence" in elites_df.columns:
-        unique_elites = elites_df["sequence"].astype(str).nunique()
+    if "sequence" in elites_df.columns:
+        source = elites_df["sequence"].astype(str)
+        if bidirectional and "canonical_sequence" in elites_df.columns:
+            source = elites_df["canonical_sequence"].astype(str)
+        unique_elites = source.map(lambda seq: identity_key(seq, bidirectional=bidirectional)).nunique()
     summary = {
         "k": int(elites_meta.get("n_elites") or len(elites_df)),
         "alpha": elites_meta.get("mmr_alpha"),
@@ -301,7 +347,6 @@ def run_analyze(
         )
 
         analysis_used_file = analysis_used_path(tmp_root)
-        _write_analysis_used(analysis_used_file, analysis_cfg.model_dump(mode="json"), analysis_id, run_name)
 
         sequences_file = sequences_path(run_dir)
         elites_file = elites_path(run_dir)
@@ -392,13 +437,43 @@ def run_analyze(
         )
         _write_json(objective_path, objective_components)
 
-        elites_mmr_df, nn_df = _summarize_elites_mmr(elites_df, hits_df, sequences_df, elites_meta, tf_names, pwms)
+        elites_mmr_df, nn_df = _summarize_elites_mmr(
+            elites_df,
+            hits_df,
+            sequences_df,
+            elites_meta,
+            tf_names,
+            pwms,
+            bidirectional=bool(sample_meta.bidirectional),
+        )
         _write_table(elites_mmr_df, elites_mmr_path)
         _write_table(nn_df, nn_distance_path)
 
         plot_format = analysis_cfg.plot_format
         plot_dpi = analysis_cfg.plot_dpi
         plot_kwargs = {"dpi": plot_dpi, "png_compress_level": 9}
+
+        score_scale_from_run = None
+        sample_payload = used_cfg.get("sample") if isinstance(used_cfg, dict) else None
+        if isinstance(sample_payload, dict):
+            objective_payload = sample_payload.get("objective")
+            if isinstance(objective_payload, dict):
+                score_scale_from_run = objective_payload.get("score_scale")
+        plot_score_scale_used = str(score_scale_from_run) if score_scale_from_run else None
+        focus_pair = _select_tf_pair(tf_names, analysis_cfg.pairwise)
+
+        _write_analysis_used(
+            analysis_used_file,
+            analysis_cfg.model_dump(mode="json"),
+            analysis_id,
+            run_name,
+            extras={
+                "plot_score_scale_used": plot_score_scale_used,
+                "score_scale_from_run": score_scale_from_run,
+                "tf_pair_mode": analysis_cfg.pairwise,
+                "tf_pair_selected": list(focus_pair) if focus_pair else None,
+            },
+        )
 
         plot_entries: list[dict[str, object]] = []
         plot_artifacts: list[dict[str, object]] = []
@@ -438,19 +513,13 @@ def run_analyze(
             _record_plot("run_dashboard", plot_dashboard_path, False, str(exc))
 
         plot_trajectory_path = tmp_root / f"plot__opt__trajectory.{plot_format}"
-        score_scale = None
-        sample_payload = used_cfg.get("sample") if isinstance(used_cfg, dict) else None
-        if isinstance(sample_payload, dict):
-            objective_payload = sample_payload.get("objective")
-            if isinstance(objective_payload, dict):
-                score_scale = objective_payload.get("score_scale")
         try:
             plot_opt_trajectory(
                 trajectory_df,
                 baseline_df,
                 tf_names,
                 plot_trajectory_path,
-                score_scale=str(score_scale) if score_scale else None,
+                score_scale=plot_score_scale_used,
                 **plot_kwargs,
             )
             _record_plot("opt_trajectory", plot_trajectory_path, True, None)
@@ -466,7 +535,6 @@ def run_analyze(
 
         plot_overlap_path = tmp_root / f"plot__overlap__panel.{plot_format}"
         try:
-            focus_pair = _select_tf_pair(tf_names, analysis_cfg.pairwise)
             plot_overlap_panel(
                 overlap_summary_df,
                 elite_overlap_df,

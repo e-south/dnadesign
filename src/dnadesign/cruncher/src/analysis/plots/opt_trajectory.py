@@ -110,7 +110,9 @@ def plot_opt_trajectory(
 
     ax.set_xlabel(_axis_label(x_metric, score_scale))
     ax.set_ylabel(_axis_label(y_metric, score_scale))
-    ax.set_title("Optimization trajectory")
+    tf_label = ", ".join(str(tf) for tf in tf_names)
+    scale_label = f", scale={score_scale}" if score_scale else ""
+    ax.set_title(f"Optimization trajectory ({tf_label}{scale_label}; cold chain)")
     ax.legend(frameon=False, fontsize=8)
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)

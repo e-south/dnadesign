@@ -104,16 +104,59 @@ def compute_elite_distance_matrix(
     return elite_ids, dist
 
 
+def _representative_by_identity(
+    identity_by_elite_id: dict[str, str],
+    rank_by_elite_id: dict[str, int] | None,
+) -> dict[str, str]:
+    rep_by_identity: dict[str, str] = {}
+    for elite_id, identity in identity_by_elite_id.items():
+        rep = rep_by_identity.get(identity)
+        if rep is None:
+            rep_by_identity[identity] = elite_id
+            continue
+        if rank_by_elite_id is None:
+            if elite_id < rep:
+                rep_by_identity[identity] = elite_id
+            continue
+        rank_new = rank_by_elite_id.get(elite_id)
+        rank_old = rank_by_elite_id.get(rep)
+        if rank_new is None or rank_old is None:
+            if elite_id < rep:
+                rep_by_identity[identity] = elite_id
+            continue
+        if rank_new < rank_old:
+            rep_by_identity[identity] = elite_id
+    return rep_by_identity
+
+
+def representative_elite_ids(
+    identity_by_elite_id: dict[str, str],
+    rank_by_elite_id: dict[str, int] | None = None,
+) -> dict[str, str]:
+    if not identity_by_elite_id:
+        return {}
+    return _representative_by_identity(identity_by_elite_id, rank_by_elite_id)
+
+
 def compute_elites_nn_distance_table(
     hits_df: pd.DataFrame,
     tf_names: Iterable[str],
     pwms: dict[str, PWM],
     *,
     identity_mode: str,
+    identity_by_elite_id: dict[str, str] | None = None,
+    rank_by_elite_id: dict[str, int] | None = None,
 ) -> pd.DataFrame:
+    rep_by_identity: dict[str, str] | None = None
+    if identity_by_elite_id:
+        rep_by_identity = _representative_by_identity(identity_by_elite_id, rank_by_elite_id)
+        keep_ids = set(rep_by_identity.values())
+        hits_df = hits_df[hits_df["elite_id"].isin(keep_ids)].copy()
+
     elite_ids, dist = compute_elite_distance_matrix(hits_df, tf_names, pwms)
     if dist.size == 0:
         return pd.DataFrame(columns=["elite_id", "nn_dist", "mean_dist", "min_dist", "identity_mode"])
+
     rows: list[dict[str, object]] = []
     for i, elite_id in enumerate(elite_ids):
         row_dist = dist[i, :].astype(float)
@@ -135,7 +178,22 @@ def compute_elites_nn_distance_table(
                 "identity_mode": identity_mode,
             }
         )
-    return pd.DataFrame(rows)
+    nn_df = pd.DataFrame(rows)
+    if not identity_by_elite_id or not rep_by_identity:
+        return nn_df
+    metrics_by_rep = {str(row["elite_id"]): row for row in nn_df.to_dict(orient="records")}
+    expanded_rows: list[dict[str, object]] = []
+    for elite_id, identity in identity_by_elite_id.items():
+        rep_id = rep_by_identity.get(identity)
+        if rep_id is None:
+            continue
+        metrics = metrics_by_rep.get(str(rep_id))
+        if metrics is None:
+            continue
+        row = dict(metrics)
+        row["elite_id"] = elite_id
+        expanded_rows.append(row)
+    return pd.DataFrame(expanded_rows)
 
 
 def summarize_elite_distances(dist: np.ndarray) -> dict[str, float | None]:
