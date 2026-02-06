@@ -210,8 +210,8 @@ def build_report_payload(
         "elites_mmr_summary": _table_path(analysis_root, "elites_mmr_summary", table_format),
         "overlap_summary": _table_path(analysis_root, "overlap_pair_summary", table_format),
         "elite_topk": _table_path(analysis_root, "elites_topk", table_format),
-        "plot_manifest": _path_if_exists(analysis_root, "plots/manifest.json"),
-        "table_manifest": _path_if_exists(analysis_root, "tables/manifest.json"),
+        "plot_manifest": _path_if_exists(analysis_root, "plot_manifest.json"),
+        "table_manifest": _path_if_exists(analysis_root, "table_manifest.json"),
     }
 
     payload: dict[str, object] = {
@@ -338,8 +338,8 @@ def write_report_md(
         pointers.get("elites_mmr_summary") or None,
         overlap_path,
         elite_topk_path,
-        "plots/manifest.json",
-        "tables/manifest.json",
+        "plot_manifest.json",
+        "table_manifest.json",
     ]
     artifact_index = [item for item in artifact_index if item]
     move_summary = _table_path(analysis_root, "move_stats_summary", table_format)

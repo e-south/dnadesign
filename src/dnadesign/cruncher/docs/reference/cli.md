@@ -244,8 +244,8 @@ Notes:
 
 * `--metrics` requires a local catalog; fetch motifs/sites first.
 * `--skip-missing` skips runs missing required `analysis/table_manifest.json` entries/files for
-  `scores_summary` and `metrics_joint` (typically `analysis/table__scores__summary.parquet` and
-  `analysis/table__metrics__joint.parquet`).
+  `scores_summary` and `metrics_joint` (typically `analysis/tables/scores_summary.parquet` and
+  `analysis/tables/metrics_joint.parquet`).
 * With site-derived PWMs, `--metrics` also requires `catalog.site_window_lengths`
   for TFs with variable site lengths. Use `--no-metrics` if you haven't set them.
 
@@ -373,13 +373,13 @@ Preconditions:
 
 Outputs:
 
-* tables: `analysis/table__scores__summary.parquet`, `analysis/table__elites__topk.parquet`,
-  `analysis/table__metrics__joint.parquet`, `analysis/table__opt__trajectory_points.parquet`,
-  `analysis/table__diagnostics__summary.json`, `analysis/table__objective__components.json`,
-  `analysis/table__elites__mmr_summary.parquet`, `analysis/table__elites__nn_distance.parquet`
-* plots: `analysis/plot__run__summary.<plot_format>`, `analysis/plot__opt__trajectory.<plot_format>`,
-  `analysis/plot__elites__nn_distance.<plot_format>`, `analysis/plot__overlap__panel.<plot_format>`,
-  `analysis/plot__health__panel.<plot_format>` (trace only)
+* tables: `analysis/tables/scores_summary.parquet`, `analysis/tables/elites_topk.parquet`,
+  `analysis/tables/metrics_joint.parquet`, `analysis/tables/opt_trajectory_points.parquet`,
+  `analysis/tables/diagnostics_summary.json`, `analysis/tables/objective_components.json`,
+  `analysis/tables/elites_mmr_summary.parquet`, `analysis/tables/elites_nn_distance.parquet`
+* plots: `analysis/plots/run_summary.<plot_format>`, `analysis/plots/opt_trajectory.<plot_format>`,
+  `analysis/plots/elites_nn_distance.<plot_format>`, `analysis/plots/overlap_panel.<plot_format>`,
+  `analysis/plots/health_panel.<plot_format>` (trace only)
 * reports: `analysis/report.json`, `analysis/report.md`
 * summaries: `analysis/summary.json`, `analysis/manifest.json`, `analysis/plot_manifest.json`, `analysis/table_manifest.json`
 

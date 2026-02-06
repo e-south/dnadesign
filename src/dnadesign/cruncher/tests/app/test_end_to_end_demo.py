@@ -326,11 +326,11 @@ def test_demo_campaign_pair_local_only_generates_plots(tmp_path: Path) -> None:
     assert sample_runs
     latest_run = sorted(sample_runs)[-1]
     analysis_dir = latest_run / "analysis"
-    assert (analysis_dir / "plot__run__summary.png").exists()
-    assert (analysis_dir / "plot__opt__trajectory.png").exists()
-    assert (analysis_dir / "plot__elites__nn_distance.png").exists()
-    assert (analysis_dir / "plot__overlap__panel.png").exists()
-    assert (analysis_dir / "plot__health__panel.png").exists()
+    assert (analysis_dir / "plots" / "run_summary.png").exists()
+    assert (analysis_dir / "plots" / "opt_trajectory.png").exists()
+    assert (analysis_dir / "plots" / "elites_nn_distance.png").exists()
+    assert (analysis_dir / "plots" / "overlap_panel.png").exists()
+    assert (analysis_dir / "plots" / "health_panel.png").exists()
 
     campaign_roots = [child for child in (workspace / "outputs" / "campaigns").iterdir() if child.is_dir()]
     assert campaign_roots

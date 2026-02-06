@@ -43,6 +43,9 @@ def build_analysis_manifests(
     table_entries: list[dict[str, object]],
     analysis_artifacts: list[dict[str, object]],
 ) -> AnalysisManifestBundle:
+    if not analysis_used_file.is_relative_to(analysis_root):
+        raise ValueError("analysis_used_file must be inside analysis_root")
+
     plot_manifest = {
         "analysis_id": analysis_id,
         "created_at": created_at,
@@ -65,9 +68,9 @@ def build_analysis_manifests(
         "analysis_id": analysis_id,
         "created_at": created_at,
         "analysis_layout_version": ANALYSIS_LAYOUT_VERSION,
-        "analysis_used": str(analysis_used_file.relative_to(analysis_root.parent)),
-        "plot_manifest": str(plot_manifest_file.relative_to(analysis_root.parent)),
-        "table_manifest": str(table_manifest_file.relative_to(analysis_root.parent)),
+        "analysis_used": str(analysis_used_file.relative_to(analysis_root)),
+        "plot_manifest": str(plot_manifest_file.relative_to(analysis_root)),
+        "table_manifest": str(table_manifest_file.relative_to(analysis_root)),
         "artifacts": analysis_artifacts,
     }
     analysis_manifest_file = analysis_manifest_path(analysis_root)

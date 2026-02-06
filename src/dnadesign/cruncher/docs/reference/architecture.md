@@ -142,7 +142,9 @@ A typical **sample** run directory contains:
 
 - `meta/` - manifests, config_used, live status snapshots
 - `artifacts/` - sequences, trace (if enabled), elites exports
-- `analysis/` - plots, tables, manifests, and reports
+- `analysis/` - analysis metadata at root (`summary`, `report`, manifests)
+- `analysis/plots/` - curated plot outputs
+- `analysis/tables/` - curated table outputs
 - `live/` - streaming metrics (if enabled)
 - `analysis/summary.json` - canonical analysis summary
 - `analysis/report.json` + `analysis/report.md` - analysis report outputs from `cruncher analyze`

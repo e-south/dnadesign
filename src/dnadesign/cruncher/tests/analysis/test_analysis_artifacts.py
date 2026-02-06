@@ -308,10 +308,10 @@ def test_analyze_creates_analysis_run_and_manifest_updates(tmp_path: Path) -> No
     assert (analysis_dir / "summary.json").exists()
     assert (analysis_dir / "manifest.json").exists()
     assert (analysis_dir / "manifest.json").exists()
-    assert (analysis_dir / "table__scores__summary.parquet").exists()
-    assert (analysis_dir / "table__metrics__joint.parquet").exists()
-    assert (analysis_dir / "table__diagnostics__summary.json").exists()
-    assert (analysis_dir / "table__opt__trajectory_points.parquet").exists()
+    assert (analysis_dir / "tables" / "scores_summary.parquet").exists()
+    assert (analysis_dir / "tables" / "metrics_joint.parquet").exists()
+    assert (analysis_dir / "tables" / "diagnostics_summary.json").exists()
+    assert (analysis_dir / "tables" / "opt_trajectory_points.parquet").exists()
 
     table_manifest = json.loads((analysis_dir / "table_manifest.json").read_text())
     keys = {entry.get("key") for entry in table_manifest.get("tables", [])}
@@ -728,8 +728,8 @@ def test_analyze_opt_trajectory_multi_tf(tmp_path: Path) -> None:
     assert analysis_runs
 
     analysis_dir = analysis_runs[0]
-    assert (analysis_dir / "plot__run__summary.png").exists()
-    assert (analysis_dir / "plot__opt__trajectory.png").exists()
+    assert (analysis_dir / "plots" / "run_summary.png").exists()
+    assert (analysis_dir / "plots" / "opt_trajectory.png").exists()
 
 
 def test_analyze_opt_trajectory_single_tf(tmp_path: Path) -> None:
@@ -777,8 +777,8 @@ def test_analyze_opt_trajectory_single_tf(tmp_path: Path) -> None:
     assert analysis_runs
 
     analysis_dir = analysis_runs[0]
-    assert (analysis_dir / "plot__run__summary.png").exists()
-    assert (analysis_dir / "plot__opt__trajectory.png").exists()
+    assert (analysis_dir / "plots" / "run_summary.png").exists()
+    assert (analysis_dir / "plots" / "opt_trajectory.png").exists()
 
 
 def test_analyze_without_trace_when_no_trace_plots(tmp_path: Path) -> None:
@@ -875,7 +875,7 @@ def test_analyze_missing_trace_with_mcmc_diagnostics(tmp_path: Path) -> None:
     analysis_runs = run_analyze(cfg, config_path)
     assert analysis_runs
     analysis_dir = analysis_runs[0]
-    diagnostics = json.loads((analysis_dir / "table__diagnostics__summary.json").read_text())
+    diagnostics = json.loads((analysis_dir / "tables" / "diagnostics_summary.json").read_text())
     trace_metrics = diagnostics.get("metrics", {}).get("trace", {})
     assert trace_metrics.get("rhat") is None
 

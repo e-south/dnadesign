@@ -102,6 +102,8 @@ Analysis writes:
 - `analysis/summary.json`
 - `analysis/report.md` and `analysis/report.json`
 - `analysis/plot_manifest.json` and `analysis/table_manifest.json`
+- `analysis/plots/` (curated figures)
+- `analysis/tables/` (curated tabular artifacts)
 
 ## Config mapping
 

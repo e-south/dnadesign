@@ -62,16 +62,16 @@ When `objective.bidirectional=true`, canonicalization is automatic: reverse comp
 
 Analysis writes a curated, orthogonal suite of plots and tables (no plot booleans). Key artifacts include:
 
-- `table__scores__summary.parquet`
-- `table__elites__topk.parquet`
-- `table__metrics__joint.parquet`
-- `table__opt__trajectory_points.parquet`
-- `table__overlap__pair_summary.parquet`
-- `table__overlap__per_elite.parquet`
-- `table__diagnostics__summary.json`
-- `table__objective__components.json`
-- `table__elites__mmr_summary.parquet`
-- `table__elites__nn_distance.parquet`
+- `analysis/tables/scores_summary.parquet`
+- `analysis/tables/elites_topk.parquet`
+- `analysis/tables/metrics_joint.parquet`
+- `analysis/tables/opt_trajectory_points.parquet`
+- `analysis/tables/overlap_pair_summary.parquet`
+- `analysis/tables/overlap_per_elite.parquet`
+- `analysis/tables/diagnostics_summary.json`
+- `analysis/tables/objective_components.json`
+- `analysis/tables/elites_mmr_summary.parquet`
+- `analysis/tables/elites_nn_distance.parquet`
 
 Sampling artifacts consumed by analysis:
 
@@ -81,11 +81,11 @@ Sampling artifacts consumed by analysis:
 
 Plots (always generated when data is available):
 
-- `plot__run__summary.*`
-- `plot__opt__trajectory.*`
-- `plot__elites__nn_distance.*`
-- `plot__overlap__panel.*`
-- `plot__health__panel.*` (only if `trace.nc` exists)
+- `analysis/plots/run_summary.*`
+- `analysis/plots/opt_trajectory.*`
+- `analysis/plots/elites_nn_distance.*`
+- `analysis/plots/overlap_panel.*`
+- `analysis/plots/health_panel.*` (only if `trace.nc` exists)
 
 ## Diagnostics quick read
 

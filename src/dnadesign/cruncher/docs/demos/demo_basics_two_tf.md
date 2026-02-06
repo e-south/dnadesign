@@ -83,8 +83,10 @@ Key files:
 - `analysis/summary.json`
 - `analysis/report.md`
 - `analysis/report.json`
-- curated plots: `analysis/plot__run__summary.*`, `analysis/plot__opt__trajectory.*`, `analysis/plot__elites__nn_distance.*`,
-  `analysis/plot__overlap__panel.*` (and `analysis/plot__health__panel.*` if a trace is present)
+- curated plots: `analysis/plots/run_summary.*`, `analysis/plots/opt_trajectory.*`,
+  `analysis/plots/elites_nn_distance.*`, `analysis/plots/overlap_panel.*`
+  (and `analysis/plots/health_panel.*` if a trace is present)
+- analysis tables live in `analysis/tables/` (for example `scores_summary.parquet` and `metrics_joint.parquet`)
 - elite hit metadata: `artifacts/elites_hits.parquet`
 - random baseline cloud: `artifacts/random_baseline.parquet`
 - random baseline hits: `artifacts/random_baseline_hits.parquet`

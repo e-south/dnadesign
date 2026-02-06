@@ -29,16 +29,17 @@ def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
         json.dumps(
             {
                 "tables": [
-                    {"key": "scores_summary", "path": "table__scores__summary.parquet", "exists": True},
-                    {"key": "metrics_joint", "path": "table__metrics__joint.parquet", "exists": True},
-                    {"key": "elites_topk", "path": "table__elites__topk.parquet", "exists": True},
+                    {"key": "scores_summary", "path": "tables/scores_summary.parquet", "exists": True},
+                    {"key": "metrics_joint", "path": "tables/metrics_joint.parquet", "exists": True},
+                    {"key": "elites_topk", "path": "tables/elites_topk.parquet", "exists": True},
                 ]
             }
         )
     )
-    (analysis_dir / "table__scores__summary.parquet").write_text("placeholder")
-    (analysis_dir / "table__metrics__joint.parquet").write_text("placeholder")
-    (analysis_dir / "table__elites__topk.parquet").write_text("placeholder")
+    (analysis_dir / "tables").mkdir(parents=True, exist_ok=True)
+    (analysis_dir / "tables" / "scores_summary.parquet").write_text("placeholder")
+    (analysis_dir / "tables" / "metrics_joint.parquet").write_text("placeholder")
+    (analysis_dir / "tables" / "elites_topk.parquet").write_text("placeholder")
 
     monkeypatch.setattr(notebook_service, "ensure_marimo", lambda: None)
 

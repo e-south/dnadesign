@@ -161,19 +161,20 @@ def test_campaign_summarize_cli(tmp_path: Path) -> None:
                 {
                     "analysis_id": "analysis-1",
                     "tables": [
-                        {"key": "scores_summary", "path": "table__scores__summary.parquet", "exists": True},
-                        {"key": "metrics_joint", "path": "table__metrics__joint.parquet", "exists": True},
+                        {"key": "scores_summary", "path": "tables/scores_summary.parquet", "exists": True},
+                        {"key": "metrics_joint", "path": "tables/metrics_joint.parquet", "exists": True},
                     ],
                 }
             )
         )
+        (run_dir / "analysis" / "tables").mkdir(parents=True, exist_ok=True)
         score_summary_df = pd.DataFrame(
             [
                 {"tf": tfs[0], "mean": 1.0, "median": 1.0, "std": 0.1, "min": 0.8, "max": 1.2},
                 {"tf": tfs[1], "mean": 0.9, "median": 0.9, "std": 0.1, "min": 0.7, "max": 1.1},
             ]
         )
-        score_summary_df.to_parquet(run_dir / "analysis" / "table__scores__summary.parquet", index=False)
+        score_summary_df.to_parquet(run_dir / "analysis" / "tables" / "scores_summary.parquet", index=False)
         joint_metrics_df = pd.DataFrame(
             [
                 {
@@ -187,7 +188,7 @@ def test_campaign_summarize_cli(tmp_path: Path) -> None:
                 }
             ]
         )
-        joint_metrics_df.to_parquet(run_dir / "analysis" / "table__metrics__joint.parquet", index=False)
+        joint_metrics_df.to_parquet(run_dir / "analysis" / "tables" / "metrics_joint.parquet", index=False)
         manifest_path = run_dir / "meta" / "run_manifest.json"
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_text(
@@ -262,18 +263,19 @@ def test_campaign_summarize_uses_table_manifest_contract(tmp_path: Path) -> None
             {
                 "analysis_id": "analysis-1",
                 "tables": [
-                    {"key": "scores_summary", "path": "table__scores__summary.parquet", "exists": True},
-                    {"key": "metrics_joint", "path": "table__metrics__joint.parquet", "exists": True},
+                    {"key": "scores_summary", "path": "tables/scores_summary.parquet", "exists": True},
+                    {"key": "metrics_joint", "path": "tables/metrics_joint.parquet", "exists": True},
                 ],
             }
         )
     )
+    (analysis_dir / "tables").mkdir(parents=True, exist_ok=True)
     pd.DataFrame(
         [
             {"tf": tfs[0], "mean": 1.0, "median": 1.0, "std": 0.1, "min": 0.8, "max": 1.2},
             {"tf": tfs[1], "mean": 0.9, "median": 0.9, "std": 0.1, "min": 0.7, "max": 1.1},
         ]
-    ).to_parquet(analysis_dir / "table__scores__summary.parquet", index=False)
+    ).to_parquet(analysis_dir / "tables" / "scores_summary.parquet", index=False)
     pd.DataFrame(
         [
             {
@@ -286,7 +288,7 @@ def test_campaign_summarize_uses_table_manifest_contract(tmp_path: Path) -> None
                 "pareto_fraction": 0.5,
             }
         ]
-    ).to_parquet(analysis_dir / "table__metrics__joint.parquet", index=False)
+    ).to_parquet(analysis_dir / "tables" / "metrics_joint.parquet", index=False)
     manifest_path = run_dir / "meta" / "run_manifest.json"
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps({"stage": "sample", "run_dir": str(run_dir), "regulator_set": {"tfs": tfs}}))
