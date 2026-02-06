@@ -8,16 +8,17 @@
 - [Run artifacts](#run-artifacts)
 - [Reproducibility boundaries](#reproducibility-boundaries)
 - [Extensibility points](#extensibility-points)
+- [Related docs](#related-docs)
 
 This doc describes the Cruncher run lifecycle, module boundaries, and on-disk artifacts.
 
 ### Run lifecycle
 
-1. **fetch** → cache motifs/sites and update `catalog.json`
-2. **lock** → resolve TFs to exact cached artifacts (`<workspace>/.cruncher/locks/<config>.lock.json`)
-3. **parse** *(optional)* → validate cached PWMs (no logo rendering)
-4. **sample** → run MCMC and write sequences/trace + manifests
-5. **analyze** → plots/tables + report from sample artifacts (offline, written in analysis root)
+1. **fetch** -> cache motifs/sites and update `catalog.json`
+2. **lock** -> resolve TFs to exact cached artifacts (`<workspace>/.cruncher/locks/<config>.lock.json`)
+3. **parse** *(optional)* -> validate cached PWMs (no logo rendering)
+4. **sample** -> run MCMC and write sequences/trace + manifests
+5. **analyze** -> plots/tables + report from sample artifacts (offline, written in analysis root)
 
 ---
 
@@ -26,7 +27,7 @@ This doc describes the Cruncher run lifecycle, module boundaries, and on-disk ar
 Core contract:
 
 - **Network access is explicit** (fetch and remote inventory).
-- The **store** is the only persistence layer (project‑local).
+- The **store** is the only persistence layer (project-local).
 - The **core** (PWM scoring + optimizers) is pure compute (no I/O).
 - **Analyze** reads run artifacts only and can run offline.
 
@@ -40,11 +41,11 @@ Core contract:
 #### `ingest/` (ports/adapters)
 - source adapters (RegulonDB first)
 - normalization into canonical records (motifs + sites)
-- optional hydration (coordinates → sequences) via genome providers
+- optional hydration (coordinates -> sequences) via genome providers
 
 #### `store/` (local persistence)
-- the on-disk catalog (what’s cached)
-- lockfiles (what’s pinned)
+- the on-disk catalog (what's cached)
+- lockfiles (what's pinned)
 - run index (what runs exist)
 
 #### `analysis/` (analysis + diagnostics)
@@ -105,9 +106,9 @@ discoveries/          # MEME/STREME discovery runs
 .mplcache/            # Matplotlib cache (MPLCONFIGDIR)
 ```
 
-- `catalog.json` is the “what do we have cached?” index.
+- `catalog.json` is the "what do we have cached?" index.
 - `catalog.root` can be absolute or relative to the cruncher root (`src/dnadesign/cruncher`); relative paths must not include `..`.
-- By default the catalog cache is shared across workspaces (`src/dnadesign/cruncher/.cruncher`); locks/run_index live in each workspace’s `.cruncher/`.
+- By default the catalog cache is shared across workspaces (`src/dnadesign/cruncher/.cruncher`); locks/run_index live in each workspace's `.cruncher/`.
 
 #### Workspace state (per workspace `.cruncher/`)
 
@@ -117,7 +118,7 @@ locks/<config>.lock.json
 run_index.json
 ```
 
-- `locks/<config>.lock.json` pins TF names → exact cached artifacts + hashes.
+- `locks/<config>.lock.json` pins TF names -> exact cached artifacts + hashes.
 - `run_index.json` tracks run folders for `cruncher runs ...` within that workspace.
 
 #### Tooling caches
@@ -139,13 +140,13 @@ Each configured regulator set produces **separate** runs, grouped by stage. Run 
 
 A typical **sample** run directory contains:
 
-- `meta/` — manifests, config_used, live status snapshots
-- `artifacts/` — sequences, trace (if enabled), elites exports
-- `analysis/` — plots, tables, manifests, and reports
-- `live/` — streaming metrics (if enabled)
-- `analysis/summary.json` — canonical analysis summary
-- `analysis/report.json` + `analysis/report.md` — analysis report outputs from `cruncher analyze`
-- `analysis/plot_manifest.json` + `analysis/table_manifest.json` — artifact inventories
+- `meta/` - manifests, config_used, live status snapshots
+- `artifacts/` - sequences, trace (if enabled), elites exports
+- `analysis/` - plots, tables, manifests, and reports
+- `live/` - streaming metrics (if enabled)
+- `analysis/summary.json` - canonical analysis summary
+- `analysis/report.json` + `analysis/report.md` - analysis report outputs from `cruncher analyze`
+- `analysis/plot_manifest.json` + `analysis/table_manifest.json` - artifact inventories
 
 ---
 
@@ -167,5 +168,10 @@ A typical **sample** run directory contains:
 - **Analysis plots:** add a plot implementation and register it in the analysis plot registry.
 
 ---
+
+### Related docs
+
+- [Intent + lifecycle](../guides/intent_and_lifecycle.md)
+- [Config reference](config.md)
 
 @e-south

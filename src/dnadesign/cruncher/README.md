@@ -20,12 +20,16 @@ A typical workflow looks like:
 3. Generate synthetic sequences (e.g., via [MCMC](https://en.wikipedia.org/wiki/Markov_chain_Monte_Carlo)) using the locked motifs.
 4. Analyze / visualize / report from run artifacts.
 
-Scoring is **FIMO-like**: cruncher builds log-odds PWMs against a 0‑order
+Cruncher optimizes short, fixed-length sequences to co-satisfy multiple TF PWMs and
+returns a diverse elite set using TFBS-core MMR. For the full intent, lifecycle,
+and config/architecture mapping, see `docs/guides/intent_and_lifecycle.md`.
+
+Scoring is **FIMO-like**: cruncher builds log-odds PWMs against a 0-order
 background, scans each candidate sequence to find the best window per TF
-(optionally bidirectional), and can scale that best hit to a p‑value using a
-DP‑derived null distribution (`score_scale: logp`). For `logp`, the tail
-probability for the best window is converted to a sequence‑level p via
-`p_seq = 1 − (1 − p_win)^n_windows`. This is an internal implementation; cruncher
+(optionally bidirectional), and can scale that best hit to a p-value using a
+DP-derived null distribution (`score_scale: logp`). For `logp`, the tail
+probability for the best window is converted to a sequence-level p via
+`p_seq = 1 - (1 - p_win)^n_windows`. This is an internal implementation; cruncher
 does not call the FIMO binary.
 
 ---
@@ -74,25 +78,21 @@ cruncher analyze
 # Optional: print a concise summary to stdout
 cruncher analyze --summary
 
-# Optional: generate all plots
-# cruncher analyze --plots all
 ```
 
 ---
 
 Notes:
-- Analysis writes a canonical summary to `analysis/summary.json`, a human‑readable
+- Analysis writes a canonical summary to `analysis/summary.json`, a human-readable
   entrypoint to `analysis/report.md`, and a detailed artifact manifest to
   `analysis/manifest.json`.
-- `trace.nc` contains draw phase only; `sample.output.trace.include_tune` controls
-  whether tune samples appear in `sequences.parquet`.
 - Motif overlap is a feature, not a failure; overlap plots are descriptive only.
 
 ### More documentation
 
 1. [Documentation index](docs/index.md)
-2. [Two‑TF demo (end‑to‑end)](docs/demos/demo_basics_two_tf.md)
-3. [Campaign demo (multi‑TF)](docs/demos/demo_campaigns_multi_tf.md)
+2. [Two-TF demo (end-to-end)](docs/demos/demo_basics_two_tf.md)
+3. [Campaign demo (multi-TF)](docs/demos/demo_campaigns_multi_tf.md)
 4. [MEME Suite setup](docs/guides/meme_suite.md)
 5. [Sampling + analysis](docs/guides/sampling_and_analysis.md)
 6. [Configure your project](docs/reference/config.md)

@@ -1,4 +1,4 @@
-# Two‑TF demo (end‑to‑end)
+# Two-TF demo (end-to-end)
 
 ## Contents
 - [Overview](#overview)
@@ -12,7 +12,7 @@
 
 ## Overview
 
-This demo designs fixed‑length sequences that satisfy two PWMs (LexA + CpxR). It follows the full lifecycle:
+This demo designs fixed-length sequences that satisfy two PWMs (LexA + CpxR). It follows the full lifecycle:
 
 1. cache inputs
 2. lock
@@ -20,7 +20,9 @@ This demo designs fixed‑length sequences that satisfy two PWMs (LexA + CpxR). 
 4. sample
 5. analyze
 
-Cruncher scores each TF by the best PWM match anywhere in the sequence on either strand (when `objective.bidirectional=true`). It optimizes the weakest TF by default (`objective.combine=min`) and selects diverse elites via TFBS‑core MMR.
+Cruncher scores each TF by the best PWM match anywhere in the sequence on either strand (when `objective.bidirectional=true`). It optimizes the weakest TF by default (`objective.combine=min`) and selects diverse elites via TFBS-core MMR.
+
+For the full intent, lifecycle, and config mapping, see [Intent + lifecycle](../guides/intent_and_lifecycle.md).
 
 ## Demo setup
 
@@ -85,6 +87,7 @@ Key files:
   `analysis/plot__overlap__panel.*` (and `analysis/plot__health__panel.*` if a trace is present)
 - elite hit metadata: `artifacts/elites_hits.parquet`
 - random baseline cloud: `artifacts/random_baseline.parquet`
+- random baseline hits: `artifacts/random_baseline_hits.parquet`
 
 ## Optional: motif discovery
 
@@ -101,5 +104,6 @@ Discovery writes new motif matrices into the catalog and requires MEME Suite.
 ## Related docs
 
 - [Config reference](../reference/config.md)
+- [Intent + lifecycle](../guides/intent_and_lifecycle.md)
 - [Sampling + analysis](../guides/sampling_and_analysis.md)
 - [CLI reference](../reference/cli.md)

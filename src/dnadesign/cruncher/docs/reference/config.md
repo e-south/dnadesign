@@ -283,5 +283,6 @@ cruncher config summary -c path/to/config.yaml
 ## Related docs
 
 - [Sampling + analysis](../guides/sampling_and_analysis.md)
+- [Intent + lifecycle](../guides/intent_and_lifecycle.md)
 - [CLI reference](cli.md)
 - [Architecture and artifacts](architecture.md)

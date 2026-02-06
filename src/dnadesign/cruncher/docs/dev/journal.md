@@ -34,7 +34,7 @@
 - Auto-opt quality grading now uses trace draw counts + ESS ratio; short pilots are marked warn and ESS ratio only warns (no hard-fail).
 - Auto-opt candidate payload now records ess_ratio + trace_draws/expected to make pilot diagnostics scale-aware in auto_opt_pilots tables.
 - Reran demo_basics_two_tf with full default config; auto-opt selected PT with warnings and produced sample run lexA-cpxR_20260204_140346_cb1935.
-- Latest demo analysis warns only on low elite count (n_elites=1) and shows early-stop per-chain around draw 1500–1633.
+- Latest demo analysis warns only on low elite count (n_elites=1) and shows early-stop per-chain around draw 1500-1633.
 - Auto-opt pilot summary: PT swap_prob=0.15 + aggressive/boosted cooling yields top top_k_median; ESS ratios remain very low (~0.001) across grid.
 - Added `min_norm` to sequences.parquet for fast per-draw consensus filtering.
 - Lowered demo `min_per_tf_norm` / `success_min_per_tf_norm` to 0.60 after inspecting draw percentiles (median ~0.28, 95th ~0.55) and unique counts.
@@ -56,18 +56,18 @@
 - Added `min_per_tf_norm` to sequences.parquet and asserted it in the CLI smoke test.
 - Gated early-stop reporting on unique-success requirements and surfaced a diagnostics warning when unique_successes < min_unique.
 - Lowered demo `min_per_tf_norm` / `success_min_per_tf_norm` to 0.40 and reran demo_basics_two_tf; elites now populate (n=10) and early-stop triggers cleanly.
-- Ran the demo end-to-end (fetch motifs/sites → lock → parse → sample → analyze) using the workspace config.
-- Profiled `cruncher sample` on demo_basics_two_tf; dominant cost is PWM log-odds → p-value lookup construction (`core/pvalue.py`), with scorer init next (candidate for cross-pilot cache reuse).
+- Ran the demo end-to-end (fetch motifs/sites -> lock -> parse -> sample -> analyze) using the workspace config.
+- Profiled `cruncher sample` on demo_basics_two_tf; dominant cost is PWM log-odds -> p-value lookup construction (`core/pvalue.py`), with scorer init next (candidate for cross-pilot cache reuse).
 - Updated docs (demo, sampling guide, config reference, architecture) to reflect PT-only language, TFBS-core MMR behavior, and sequences column naming.
 - Removed sample.budget.restarts from schema/config/code to eliminate PT-only fallback overrides; updated tests, docs, and demo configs accordingly.
-- Added an in-memory LRU cache for PWM log-odds → p-value lookup tables (core/pvalue.py) to reuse DP results across auto-opt pilots; added a minimal cache-hit test.
+- Added an in-memory LRU cache for PWM log-odds -> p-value lookup tables (core/pvalue.py) to reuse DP results across auto-opt pilots; added a minimal cache-hit test.
 - Added audit design doc for Cruncher end-to-end review (docs/plans/2026-02-05-cruncher-audit-design.md), emphasizing PT-only, fixed-length invariants, MMR canonical selection, and doc/workspace alignment over test bloat.
 - Recorded p-value cache hit/miss stats in run manifests and surfaced them in diagnostics metrics for transparency.
 - Hardened bidirectional logp correction (counts both strands) and codified deterministic best-hit tie-breaking.
 - Added atomic artifact writes (status/manifest/config, parquet, analysis summaries) and retry-on-read for run status with clear CLI errors.
 - Persisted effective PT ladder details in elites metadata and added tests for p-seq math, tie-breaking, atomic writes, and PT stats.
 - Added Contents TOCs across docs and aligned demo/reference text with current fixed-length PT behavior.
-- Ran cruncher tests and the two-TF demo flow (fetch → lock → parse → sample → analyze); removed an ArviZ warning by increasing draws in the regulator set test and clarified dashboard-only plot outputs in the sampling guide.
+- Ran cruncher tests and the two-TF demo flow (fetch -> lock -> parse -> sample -> analyze); removed an ArviZ warning by increasing draws in the regulator set test and clarified dashboard-only plot outputs in the sampling guide.
 - Removed auto-opt scorecard `k` as a config knob; auto-opt now derives the scorecard size from `elites.k` and fails fast if `elites.k < 1` when optimizer is auto.
 - Raised default auto-opt pilot budgets to 2000/3000 and aligned the multi-TF demo workspace to match.
 - Added auto-opt confidence highlights to analysis reports and CLI summaries so pilots are easier to interpret at a glance.
@@ -85,3 +85,4 @@
 - Updated analysis workflow and plot registry to use baseline NN references, new plot names, and health-only diagnostics.
 - Simplified overlap plotting to a single panel figure with best-hit labels and readability rules.
 - Updated analysis tests and docs to match the new plot suite and baseline artifacts.
+- Added an intent + lifecycle guide and linked it from docs index, demo, config, and architecture references.
