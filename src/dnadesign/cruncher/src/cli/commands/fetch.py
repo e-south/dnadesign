@@ -64,21 +64,21 @@ def _resolve_fetch_source(
             if selected in available_sources:
                 if skipped:
                     logger.info(
-                        "Using source '%s' from motif_store.source_preference (skipped unavailable: %s).",
+                        "Using source '%s' from cruncher.catalog.source_preference (skipped unavailable: %s).",
                         selected,
                         ", ".join(skipped),
                     )
                 else:
-                    logger.info("Using source '%s' from motif_store.source_preference.", selected)
+                    logger.info("Using source '%s' from cruncher.catalog.source_preference.", selected)
                 return selected
             skipped.append(selected)
         raise typer.BadParameter(
-            "No motif_store.source_preference entries are available for fetching. "
-            "Pass --source from `cruncher sources list` or update motif_store.source_preference."
+            "No cruncher.catalog.source_preference entries are available for fetching. "
+            "Pass --source from `cruncher sources list` or update cruncher.catalog.source_preference."
         )
     raise typer.BadParameter(
-        "--source is required when motif_store.source_preference is empty. "
-        "Set motif_store.source_preference or pass --source."
+        "--source is required when cruncher.catalog.source_preference is empty. "
+        "Set cruncher.catalog.source_preference or pass --source."
     )
 
 
@@ -181,7 +181,7 @@ def motifs(
     source: str | None = typer.Option(
         None,
         "--source",
-        help="Source adapter to query (defaults to motif_store.source_preference[0]).",
+        help="Source adapter to query (defaults to cruncher.catalog.source_preference[0]).",
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="List matching motifs without caching."),
     limit: Optional[int] = typer.Option(None, "--limit", help="Limit remote matches (dry-run only)."),
@@ -232,11 +232,11 @@ def motifs(
         available_sources = {spec.source_id for spec in registry.list_sources()}
         source = _resolve_fetch_source(
             source,
-            cfg.motif_store.source_preference,
+            cfg.catalog.source_preference,
             available_sources=available_sources,
         )
         adapter = registry.create(source, cfg.ingest)
-        catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+        catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
         if dry_run:
             if not effective_tfs:
                 raise typer.BadParameter("--dry-run requires at least one --tf or --campaign.")
@@ -315,7 +315,7 @@ def sites(
     source: str | None = typer.Option(
         None,
         "--source",
-        help="Source adapter to query (defaults to motif_store.source_preference[0]).",
+        help="Source adapter to query (defaults to cruncher.catalog.source_preference[0]).",
     ),
     limit: Optional[int] = typer.Option(None, "--limit", help="Optional limit on sites per TF."),
     dataset_id: Optional[str] = typer.Option(
@@ -387,7 +387,7 @@ def sites(
         available_sources = {spec.source_id for spec in registry.list_sources()}
         source = _resolve_fetch_source(
             source,
-            cfg.motif_store.source_preference,
+            cfg.catalog.source_preference,
             available_sources=available_sources,
         )
         ingest_cfg = cfg.ingest
@@ -396,7 +396,7 @@ def sites(
             ingest_cfg.regulondb.ht_sites = True
             console.print("Note: enabling HT dataset access for this request (--dataset-id).")
         adapter = registry.create(source, ingest_cfg)
-        catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+        catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
         if dry_run:
             if not effective_tfs:
                 raise typer.BadParameter("--dry-run requires --tf or --campaign to resolve HT datasets.")

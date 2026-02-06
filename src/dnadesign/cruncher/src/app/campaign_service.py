@@ -125,7 +125,7 @@ def validate_campaign(
     catalog = None
     store: Optional[CatalogMotifStore] = None
     if needs_catalog:
-        catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+        catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
         if not catalog_root.exists():
             errors.append(
                 f"Catalog root not found at {catalog_root}. Run `cruncher fetch motifs/sites` before validation."
@@ -135,16 +135,16 @@ def validate_campaign(
             if campaign.selectors.min_info_bits is not None:
                 store = CatalogMotifStore(
                     catalog_root,
-                    pwm_source=cfg.motif_store.pwm_source,
-                    site_kinds=cfg.motif_store.site_kinds,
-                    combine_sites=cfg.motif_store.combine_sites,
-                    site_window_lengths=cfg.motif_store.site_window_lengths,
-                    site_window_center=cfg.motif_store.site_window_center,
-                    pwm_window_lengths=cfg.motif_store.pwm_window_lengths,
-                    pwm_window_strategy=cfg.motif_store.pwm_window_strategy,
-                    min_sites_for_pwm=cfg.motif_store.min_sites_for_pwm,
-                    allow_low_sites=cfg.motif_store.allow_low_sites,
-                    pseudocounts=cfg.motif_store.pseudocounts,
+                    pwm_source=cfg.catalog.pwm_source,
+                    site_kinds=cfg.catalog.site_kinds,
+                    combine_sites=cfg.catalog.combine_sites,
+                    site_window_lengths=cfg.catalog.site_window_lengths,
+                    site_window_center=cfg.catalog.site_window_center,
+                    pwm_window_lengths=cfg.catalog.pwm_window_lengths,
+                    pwm_window_strategy=cfg.catalog.pwm_window_strategy,
+                    min_sites_for_pwm=cfg.catalog.min_sites_for_pwm,
+                    allow_low_sites=cfg.catalog.allow_low_sites,
+                    pseudocounts=cfg.catalog.pseudocounts,
                 )
 
     if errors:
@@ -173,13 +173,13 @@ def validate_campaign(
                 entry = select_catalog_entry(
                     catalog=catalog,
                     tf_name=tf_name,
-                    pwm_source=cfg.motif_store.pwm_source,
-                    site_kinds=cfg.motif_store.site_kinds,
-                    combine_sites=cfg.motif_store.combine_sites,
-                    source_preference=campaign.selectors.source_preference or cfg.motif_store.source_preference,
-                    dataset_preference=campaign.selectors.dataset_preference or cfg.motif_store.dataset_preference,
-                    dataset_map=cfg.motif_store.dataset_map,
-                    allow_ambiguous=cfg.motif_store.allow_ambiguous,
+                    pwm_source=cfg.catalog.pwm_source,
+                    site_kinds=cfg.catalog.site_kinds,
+                    combine_sites=cfg.catalog.combine_sites,
+                    source_preference=campaign.selectors.source_preference or cfg.catalog.source_preference,
+                    dataset_preference=campaign.selectors.dataset_preference or cfg.catalog.dataset_preference,
+                    dataset_map=cfg.catalog.dataset_map,
+                    allow_ambiguous=cfg.catalog.allow_ambiguous,
                 )
                 metric = _build_metrics(
                     entry=entry,
@@ -187,8 +187,8 @@ def validate_campaign(
                     store=store,
                     selectors=campaign.selectors,
                     include_metrics=include_metrics,
-                    combine_sites=cfg.motif_store.combine_sites,
-                    site_kinds=cfg.motif_store.site_kinds,
+                    combine_sites=cfg.catalog.combine_sites,
+                    site_kinds=cfg.catalog.site_kinds,
                 )
                 if include_metrics:
                     metrics[tf_name] = metric
@@ -327,7 +327,7 @@ def collect_campaign_metrics(
     source_preference: Optional[list[str]] = None,
     dataset_preference: Optional[list[str]] = None,
 ) -> Dict[str, RegulatorMetrics]:
-    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     if not catalog_root.exists():
         raise ValueError(
             f"Catalog root not found at {catalog_root}. Run `cruncher fetch motifs/sites` before campaign metrics."
@@ -335,43 +335,43 @@ def collect_campaign_metrics(
     catalog = CatalogIndex.load(catalog_root)
     store = CatalogMotifStore(
         catalog_root,
-        pwm_source=cfg.motif_store.pwm_source,
-        site_kinds=cfg.motif_store.site_kinds,
-        combine_sites=cfg.motif_store.combine_sites,
-        site_window_lengths=cfg.motif_store.site_window_lengths,
-        site_window_center=cfg.motif_store.site_window_center,
-        pwm_window_lengths=cfg.motif_store.pwm_window_lengths,
-        pwm_window_strategy=cfg.motif_store.pwm_window_strategy,
-        min_sites_for_pwm=cfg.motif_store.min_sites_for_pwm,
-        allow_low_sites=cfg.motif_store.allow_low_sites,
-        pseudocounts=cfg.motif_store.pseudocounts,
+        pwm_source=cfg.catalog.pwm_source,
+        site_kinds=cfg.catalog.site_kinds,
+        combine_sites=cfg.catalog.combine_sites,
+        site_window_lengths=cfg.catalog.site_window_lengths,
+        site_window_center=cfg.catalog.site_window_center,
+        pwm_window_lengths=cfg.catalog.pwm_window_lengths,
+        pwm_window_strategy=cfg.catalog.pwm_window_strategy,
+        min_sites_for_pwm=cfg.catalog.min_sites_for_pwm,
+        allow_low_sites=cfg.catalog.allow_low_sites,
+        pseudocounts=cfg.catalog.pseudocounts,
     )
     metrics: Dict[str, RegulatorMetrics] = {}
     for tf_name in sorted({name for name in tf_names if name}):
         entry = select_catalog_entry(
             catalog=catalog,
             tf_name=tf_name,
-            pwm_source=cfg.motif_store.pwm_source,
-            site_kinds=cfg.motif_store.site_kinds,
-            combine_sites=cfg.motif_store.combine_sites,
-            source_preference=source_preference or cfg.motif_store.source_preference,
-            dataset_preference=dataset_preference or cfg.motif_store.dataset_preference,
-            dataset_map=cfg.motif_store.dataset_map,
-            allow_ambiguous=cfg.motif_store.allow_ambiguous,
+            pwm_source=cfg.catalog.pwm_source,
+            site_kinds=cfg.catalog.site_kinds,
+            combine_sites=cfg.catalog.combine_sites,
+            source_preference=source_preference or cfg.catalog.source_preference,
+            dataset_preference=dataset_preference or cfg.catalog.dataset_preference,
+            dataset_map=cfg.catalog.dataset_map,
+            allow_ambiguous=cfg.catalog.allow_ambiguous,
         )
         pwm = store.get_pwm(MotifRef(source=entry.source, motif_id=entry.motif_id))
         info_bits = pwm.information_bits()
         site_count, site_total, site_kind = _resolve_site_counts(
             catalog=catalog,
             entry=entry,
-            combine_sites=cfg.motif_store.combine_sites,
-            site_kinds=cfg.motif_store.site_kinds,
+            combine_sites=cfg.catalog.combine_sites,
+            site_kinds=cfg.catalog.site_kinds,
         )
         dataset_id = _resolve_dataset_id(
             catalog=catalog,
             entry=entry,
-            combine_sites=cfg.motif_store.combine_sites,
-            site_kinds=cfg.motif_store.site_kinds,
+            combine_sites=cfg.catalog.combine_sites,
+            site_kinds=cfg.catalog.site_kinds,
         )
         metrics[tf_name] = RegulatorMetrics(
             tf_name=entry.tf_name,
@@ -429,7 +429,7 @@ def _apply_selectors(
     categories: Dict[str, list[str]],
     include_metrics: bool,
 ) -> tuple[Dict[str, list[str]], Dict[str, RegulatorMetrics]]:
-    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     if not catalog_root.exists():
         raise ValueError(
             f"Catalog root not found at {catalog_root}. Run `cruncher fetch motifs/sites` before campaign selection."
@@ -439,16 +439,16 @@ def _apply_selectors(
     if campaign.selectors.min_info_bits is not None:
         store = CatalogMotifStore(
             catalog_root,
-            pwm_source=cfg.motif_store.pwm_source,
-            site_kinds=cfg.motif_store.site_kinds,
-            combine_sites=cfg.motif_store.combine_sites,
-            site_window_lengths=cfg.motif_store.site_window_lengths,
-            site_window_center=cfg.motif_store.site_window_center,
-            pwm_window_lengths=cfg.motif_store.pwm_window_lengths,
-            pwm_window_strategy=cfg.motif_store.pwm_window_strategy,
-            min_sites_for_pwm=cfg.motif_store.min_sites_for_pwm,
-            allow_low_sites=cfg.motif_store.allow_low_sites,
-            pseudocounts=cfg.motif_store.pseudocounts,
+            pwm_source=cfg.catalog.pwm_source,
+            site_kinds=cfg.catalog.site_kinds,
+            combine_sites=cfg.catalog.combine_sites,
+            site_window_lengths=cfg.catalog.site_window_lengths,
+            site_window_center=cfg.catalog.site_window_center,
+            pwm_window_lengths=cfg.catalog.pwm_window_lengths,
+            pwm_window_strategy=cfg.catalog.pwm_window_strategy,
+            min_sites_for_pwm=cfg.catalog.min_sites_for_pwm,
+            allow_low_sites=cfg.catalog.allow_low_sites,
+            pseudocounts=cfg.catalog.pseudocounts,
         )
 
     selected: Dict[str, list[str]] = {}
@@ -460,13 +460,13 @@ def _apply_selectors(
             entry = select_catalog_entry(
                 catalog=catalog,
                 tf_name=tf_name,
-                pwm_source=cfg.motif_store.pwm_source,
-                site_kinds=cfg.motif_store.site_kinds,
-                combine_sites=cfg.motif_store.combine_sites,
-                source_preference=campaign.selectors.source_preference or cfg.motif_store.source_preference,
-                dataset_preference=campaign.selectors.dataset_preference or cfg.motif_store.dataset_preference,
-                dataset_map=cfg.motif_store.dataset_map,
-                allow_ambiguous=cfg.motif_store.allow_ambiguous,
+                pwm_source=cfg.catalog.pwm_source,
+                site_kinds=cfg.catalog.site_kinds,
+                combine_sites=cfg.catalog.combine_sites,
+                source_preference=campaign.selectors.source_preference or cfg.catalog.source_preference,
+                dataset_preference=campaign.selectors.dataset_preference or cfg.catalog.dataset_preference,
+                dataset_map=cfg.catalog.dataset_map,
+                allow_ambiguous=cfg.catalog.allow_ambiguous,
             )
             metric = _build_metrics(
                 entry=entry,
@@ -474,8 +474,8 @@ def _apply_selectors(
                 store=store,
                 selectors=campaign.selectors,
                 include_metrics=include_metrics,
-                combine_sites=cfg.motif_store.combine_sites,
-                site_kinds=cfg.motif_store.site_kinds,
+                combine_sites=cfg.catalog.combine_sites,
+                site_kinds=cfg.catalog.site_kinds,
             )
             if _passes_selectors(metric, campaign.selectors):
                 filtered.append(tf_name)

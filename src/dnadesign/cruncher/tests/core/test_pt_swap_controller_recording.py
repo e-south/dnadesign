@@ -38,6 +38,7 @@ def test_pt_swap_controller_records_each_attempt() -> None:
         "chains": chains,
         "min_dist": 0,
         "top_k": 1,
+        "sequence_length": 4,
         "swap_prob": 1.0,
         "bidirectional": False,
         "record_tune": False,

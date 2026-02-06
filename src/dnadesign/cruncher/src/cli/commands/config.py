@@ -90,7 +90,11 @@ def summary(
     except ConfigResolutionError as exc:
         console.print(str(exc))
         raise typer.Exit(code=1)
-    cfg = load_config(config_path)
+    try:
+        cfg = load_config(config_path)
+    except (ValueError, FileNotFoundError, OSError) as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1)
     summary = summarize_config(cfg)
 
     table = Table(title="Cruncher config summary", header_style="bold")

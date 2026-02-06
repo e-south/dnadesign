@@ -25,6 +25,7 @@ def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
     manifest_file.write_text(json.dumps({"artifacts": [], "config_path": ""}))
     (analysis_dir / "summary.json").write_text(json.dumps({"tf_names": ["LexA"], "analysis_id": analysis_id}))
     (analysis_dir / "plot_manifest.json").write_text(json.dumps({"plots": []}))
+    (analysis_dir / "table_manifest.json").write_text(json.dumps({"tables": []}))
 
     monkeypatch.setattr(notebook_service, "ensure_marimo", lambda: None)
 
@@ -36,8 +37,15 @@ def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
     assert "analysis_dir = notebook_path.parent" in content
     assert "Refresh analysis list" in content
     assert "plot_options" in content
+    assert "table_manifest.json" in content
+    assert "table__scores__summary" in content
+    assert "table__metrics__joint" in content
+    assert "table__elites__topk" in content
     assert "Missing JSON at" in content
-    assert "scatter controls disabled" in content
+    assert "per_pwm_scores" not in content
+    assert "joint_metrics." not in content
+    assert "score_summary." not in content
+    assert "elite_topk." not in content
     assert "Text output" in content
     assert "mo.ui.pyplot" not in content
     assert str(run_dir) not in content
@@ -53,15 +61,11 @@ def test_generate_notebook_strict_requires_summary(tmp_path, monkeypatch) -> Non
 
     monkeypatch.setattr(notebook_service, "ensure_marimo", lambda: None)
 
-    try:
-        notebook_service.generate_notebook(run_dir, latest=True, strict=True)
-    except FileNotFoundError as exc:
-        assert "Missing analysis summary" in str(exc)
-    else:
-        raise AssertionError("Expected strict notebook generation to fail when summary is missing.")
+    with pytest.raises(FileNotFoundError, match="Missing analysis summary"):
+        notebook_service.generate_notebook(run_dir, latest=True)
 
 
-def test_generate_notebook_lenient_allows_missing_summary(tmp_path, monkeypatch) -> None:
+def test_generate_notebook_rejects_lenient_mode(tmp_path, monkeypatch) -> None:
     run_dir = tmp_path / "run"
     analysis_dir = run_dir / "analysis"
     analysis_dir.mkdir(parents=True)
@@ -72,11 +76,8 @@ def test_generate_notebook_lenient_allows_missing_summary(tmp_path, monkeypatch)
 
     monkeypatch.setattr(notebook_service, "ensure_marimo", lambda: None)
 
-    notebook_path = notebook_service.generate_notebook(run_dir, latest=True, strict=False)
-    assert notebook_path.exists()
-    content = notebook_path.read_text()
-    assert "list_analysis_entries_verbose" in content
-    assert "analysis_dir = notebook_path.parent" in content
+    with pytest.raises((TypeError, ValueError), match="strict|lenient"):
+        notebook_service.generate_notebook(run_dir, latest=True, strict=False)  # type: ignore[call-arg]
 
 
 def test_generate_notebook_rejects_latest_and_analysis_id(tmp_path, monkeypatch) -> None:

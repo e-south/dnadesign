@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from dnadesign.cruncher.app.sample_workflow import _norm_map_for_elites
+from dnadesign.cruncher.app.sample.diagnostics import _norm_map_for_elites
 
 
 class DummyScorer:

@@ -18,7 +18,7 @@ from dnadesign.cruncher.app.target_service import (
     target_candidates_fuzzy,
     target_statuses,
 )
-from dnadesign.cruncher.config.schema_v2 import CruncherConfig, IngestConfig, MotifStoreConfig, ParseConfig, PlotConfig
+from dnadesign.cruncher.config.schema_v3 import CatalogConfig, CruncherConfig, WorkspaceConfig
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 
 
@@ -39,17 +39,18 @@ def _config(
 ) -> CruncherConfig:
     regulator_sets = regulator_sets or [["lexA", "oxyR"]]
     return CruncherConfig(
-        out_dir=Path("out"),
-        regulator_sets=regulator_sets,
-        motif_store=MotifStoreConfig(
-            catalog_root=(tmp_path / ".cruncher"),
+        schema_version=3,
+        workspace=WorkspaceConfig(
+            out_dir=Path("out"),
+            regulator_sets=regulator_sets,
+        ),
+        catalog=CatalogConfig(
+            root=(tmp_path / ".cruncher"),
             pwm_source=pwm_source,
             min_sites_for_pwm=min_sites,
             allow_low_sites=allow_low_sites,
             combine_sites=combine_sites,
         ),
-        ingest=IngestConfig(),
-        parse=ParseConfig(plot=PlotConfig(logo=False, bits_mode="information", dpi=100)),
         sample=None,
         analysis=None,
     )

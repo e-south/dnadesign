@@ -56,6 +56,14 @@ class RunInfo:
         )
 
 
+@dataclass(frozen=True)
+class RunIndexIssue:
+    run_name: str
+    stage: str
+    run_dir: Path
+    reason: str
+
+
 def run_index_path(config_path: Path, catalog_root: Path | str | None = None) -> Path:
     return resolve_run_index_path(config_path)
 
@@ -91,6 +99,52 @@ def drop_run_index_entries(
     if removed:
         save_run_index(config_path, index, catalog_root)
     return removed
+
+
+def find_invalid_run_index_entries(
+    config_path: Path,
+    *,
+    stage: str | None = None,
+    catalog_root: Path | str | None = None,
+) -> list[RunIndexIssue]:
+    index = load_run_index(config_path, catalog_root)
+    issues: list[RunIndexIssue] = []
+    for run_name, payload in index.items():
+        run_stage = str(payload.get("stage") or "unknown")
+        if stage is not None and run_stage != stage:
+            continue
+        run_dir_raw = payload.get("run_dir") or payload.get("run_dir_guess")
+        if not run_dir_raw:
+            issues.append(
+                RunIndexIssue(
+                    run_name=run_name,
+                    stage=run_stage,
+                    run_dir=Path(run_name),
+                    reason="missing run_dir",
+                )
+            )
+            continue
+        run_dir = Path(str(run_dir_raw)).expanduser()
+        if not run_dir.exists():
+            issues.append(
+                RunIndexIssue(
+                    run_name=run_name,
+                    stage=run_stage,
+                    run_dir=run_dir,
+                    reason="missing run directory",
+                )
+            )
+            continue
+        if not manifest_path(run_dir).exists():
+            issues.append(
+                RunIndexIssue(
+                    run_name=run_name,
+                    stage=run_stage,
+                    run_dir=run_dir,
+                    reason="missing meta/run_manifest.json",
+                )
+            )
+    return issues
 
 
 def _iter_run_dirs(stage_dir: Path) -> list[Path]:
@@ -209,11 +263,11 @@ def rebuild_run_index(cfg: CruncherConfig, config_path: Path) -> Path:
                     entry = _merge_payload(entry, _updates_from_status(status_payload))
                 entry.setdefault("run_dir_guess", str(child.resolve()))
                 index[child.name] = entry
-    return save_run_index(config_path, index, cfg.motif_store.catalog_root)
+    return save_run_index(config_path, index, cfg.catalog.catalog_root)
 
 
 def list_runs(cfg: CruncherConfig, config_path: Path, *, stage: Optional[str] = None) -> list[RunInfo]:
-    index = load_run_index(config_path, cfg.motif_store.catalog_root)
+    index = load_run_index(config_path, cfg.catalog.catalog_root)
     runs: list[RunInfo] = []
     if index:
         out_dir = config_path.parent / cfg.out_dir
@@ -314,7 +368,7 @@ def get_run(cfg: CruncherConfig, config_path: Path, run_name: str) -> RunInfo:
             regulator_set=payload.get("regulator_set"),
             run_group=payload.get("run_group"),
         )
-    index = load_run_index(config_path, cfg.motif_store.catalog_root)
+    index = load_run_index(config_path, cfg.catalog.catalog_root)
     if index and run_name in index:
         return RunInfo.from_payload(run_name, index[run_name])
     out_dir = config_path.parent / cfg.out_dir

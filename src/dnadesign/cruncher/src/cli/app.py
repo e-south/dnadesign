@@ -10,7 +10,6 @@ Author(s): Eric J. South
 from __future__ import annotations
 
 import os
-import warnings
 from pathlib import Path
 
 import typer
@@ -67,7 +66,6 @@ def main(
     ),
 ) -> None:
     """Design short DNA sequences that score highly across multiple TF motifs."""
-    warnings.filterwarnings("ignore", category=FutureWarning, module=r"arviz(\..*)?")
     configure_logging(log_level)
     if config:
         os.environ[CONFIG_ENV_VAR] = str(config)

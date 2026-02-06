@@ -295,7 +295,7 @@ def summary(
     combined_summary: dict | None = None
 
     if scope in {"cache", "both"}:
-        catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+        catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
         cache_summary = summarize_cache(catalog_root, source=source)
         payload["cache"] = cache_summary
         if output_format == "table" and view == "split":

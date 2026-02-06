@@ -24,47 +24,26 @@ from dnadesign.cruncher.artifacts.layout import (
     trace_path,
 )
 from dnadesign.cruncher.artifacts.manifest import build_run_manifest, write_manifest
-from dnadesign.cruncher.config.schema_v2 import (
-    CruncherConfig,
-    IngestConfig,
-    InitConfig,
-    MotifStoreConfig,
-    ParseConfig,
-    PlotConfig,
-    SampleComputeConfig,
-    SampleConfig,
-    SampleElitesConfig,
-    SampleMovesConfig,
-    SampleObjectiveConfig,
-    SampleRngConfig,
-)
+from dnadesign.cruncher.config.schema_v3 import CatalogConfig, CruncherConfig, WorkspaceConfig
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 from dnadesign.cruncher.store.lockfile import LockedMotif
 
 
 def _make_config() -> CruncherConfig:
     return CruncherConfig(
-        out_dir=Path("results"),
-        regulator_sets=[["lexA"]],
-        motif_store=MotifStoreConfig(
-            catalog_root=Path(".cruncher"),
+        schema_version=3,
+        workspace=WorkspaceConfig(
+            out_dir=Path("results"),
+            regulator_sets=[["lexA"]],
+        ),
+        catalog=CatalogConfig(
+            root=Path(".cruncher"),
             source_preference=["regulondb"],
             allow_ambiguous=False,
             pwm_source="matrix",
             min_sites_for_pwm=2,
         ),
-        ingest=IngestConfig(),
-        parse=ParseConfig(plot=PlotConfig(logo=False, bits_mode="information", dpi=100)),
-        sample=SampleConfig(
-            mode="sample",
-            rng=SampleRngConfig(seed=1, deterministic=True),
-            sequence_length=6,
-            compute=SampleComputeConfig(total_sweeps=3, adapt_sweep_frac=0.34),
-            init=InitConfig(kind="random"),
-            objective=SampleObjectiveConfig(bidirectional=True, score_scale="llr"),
-            elites=SampleElitesConfig(k=1),
-            moves=SampleMovesConfig(),
-        ),
+        sample=None,
         analysis=None,
     )
 
@@ -75,7 +54,7 @@ def test_build_manifest_and_report(tmp_path: Path) -> None:
     config_path.write_text("dummy: config")
 
     catalog_root = tmp_path / ".cruncher"
-    cfg.motif_store.catalog_root = catalog_root
+    cfg.catalog.root = catalog_root
     entry = CatalogEntry(
         source="regulondb",
         motif_id="RBM0001",

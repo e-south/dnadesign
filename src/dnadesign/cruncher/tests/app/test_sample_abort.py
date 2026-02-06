@@ -62,28 +62,33 @@ def test_sample_abort_marks_run_status(tmp_path: Path, monkeypatch: pytest.Monke
     }
     config = {
         "cruncher": {
-            "out_dir": "results",
-            "regulator_sets": [["lexA"]],
-            "motif_store": {
-                "catalog_root": str(catalog_root),
+            "schema_version": 3,
+            "workspace": {"out_dir": "results", "regulator_sets": [["lexA"]]},
+            "catalog": {
+                "root": str(catalog_root),
                 "source_preference": ["regulondb"],
                 "allow_ambiguous": False,
                 "pwm_source": "matrix",
                 "min_sites_for_pwm": 1,
                 "allow_low_sites": True,
             },
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
             "sample": {
-                "mode": "optimize",
-                "rng": {"seed": 11, "deterministic": True},
+                "seed": 11,
                 "sequence_length": 6,
-                "compute": {"total_sweeps": 2, "adapt_sweep_frac": 0.5},
-                "init": {"kind": "random", "pad_with": "background"},
-                "objective": {"bidirectional": True, "score_scale": "llr"},
-                "elites": {"k": 1, "min_per_tf_norm": None, "mmr_alpha": 0.85},
+                "budget": {"tune": 1, "draws": 1},
+                "objective": {"bidirectional": True, "score_scale": "llr", "combine": "min"},
+                "elites": {
+                    "k": 1,
+                    "filter": {"min_per_tf_norm": None, "require_all_tfs": True, "pwm_sum_min": 0.0},
+                    "select": {"alpha": 0.85, "pool_size": "auto"},
+                },
                 "moves": {"profile": "balanced", "overrides": {"move_probs": {"S": 1.0, "B": 0.0, "M": 0.0}}},
-                "output": {"trace": {"save": False}, "save_sequences": False},
-                "ui": {"progress_bar": False, "progress_every": 0},
+                "output": {
+                    "save_trace": False,
+                    "save_sequences": False,
+                    "include_tune_in_sequences": False,
+                    "live_metrics": False,
+                },
             },
         }
     }

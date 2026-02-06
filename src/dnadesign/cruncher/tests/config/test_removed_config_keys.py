@@ -23,21 +23,26 @@ from dnadesign.cruncher.config.load import load_config
 def _base_config() -> dict:
     return {
         "cruncher": {
-            "out_dir": "runs",
-            "regulator_sets": [["lexA", "cpxR"]],
-            "motif_store": {"catalog_root": ".cruncher", "pwm_source": "matrix"},
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
+            "schema_version": 3,
+            "workspace": {"out_dir": "runs", "regulator_sets": [["lexA", "cpxR"]]},
+            "catalog": {"root": ".cruncher", "pwm_source": "matrix"},
             "sample": {
-                "mode": "sample",
-                "rng": {"seed": 7, "deterministic": True},
+                "seed": 7,
                 "sequence_length": 12,
-                "compute": {"total_sweeps": 4, "adapt_sweep_frac": 0.25},
-                "init": {"kind": "random", "pad_with": "background"},
-                "objective": {"bidirectional": True, "score_scale": "normalized-llr"},
-                "elites": {"k": 1, "min_per_tf_norm": 0.0, "mmr_alpha": 0.85},
+                "budget": {"tune": 1, "draws": 3},
+                "objective": {"bidirectional": True, "score_scale": "normalized-llr", "combine": "min"},
+                "elites": {
+                    "k": 1,
+                    "filter": {"min_per_tf_norm": 0.0, "require_all_tfs": True, "pwm_sum_min": 0.0},
+                    "select": {"alpha": 0.85, "pool_size": "auto"},
+                },
                 "moves": {"profile": "balanced"},
-                "output": {"trace": {"save": False}, "save_sequences": True},
-                "ui": {"progress_bar": False, "progress_every": 0},
+                "output": {
+                    "save_trace": False,
+                    "save_sequences": True,
+                    "include_tune_in_sequences": False,
+                    "live_metrics": False,
+                },
             },
         }
     }
@@ -52,9 +57,10 @@ def _write_config(tmp_path: Path, payload: dict) -> Path:
 @pytest.mark.parametrize(
     "path,value",
     [
+        (("cruncher", "motif_store"), {"catalog_root": ".cruncher", "pwm_source": "matrix"}),
+        (("cruncher", "parse"), {"plot": {"logo": False}}),
         (("cruncher", "sample", "output", "trim"), {"enabled": True}),
         (("cruncher", "sample", "output", "polish"), {"enabled": True}),
-        (("cruncher", "sample", "budget"), {"draws": 2, "tune": 1}),
         (("cruncher", "sample", "optimizer"), {"name": "pt"}),
         (("cruncher", "sample", "optimizers"), {"pt": {"swap_prob": 0.1}}),
         (("cruncher", "sample", "auto_opt"), {"enabled": True}),

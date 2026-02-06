@@ -12,9 +12,8 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from dnadesign.cruncher.app.sample.diagnostics import dsdna_equivalence_enabled
-from dnadesign.cruncher.config.schema_v2 import (
-    InitConfig,
-    SampleComputeConfig,
+from dnadesign.cruncher.config.schema_v3 import (
+    SampleBudgetConfig,
     SampleConfig,
     SampleObjectiveConfig,
 )
@@ -23,9 +22,9 @@ from dnadesign.cruncher.config.schema_v2 import (
 def _sample_cfg(*, bidirectional: bool) -> SampleConfig:
     objective = SampleObjectiveConfig(bidirectional=bidirectional)
     return SampleConfig(
+        seed=7,
         sequence_length=12,
-        compute=SampleComputeConfig(total_sweeps=2, adapt_sweep_frac=0.5),
-        init=InitConfig(kind="random"),
+        budget=SampleBudgetConfig(tune=1, draws=1),
         objective=objective,
     )
 

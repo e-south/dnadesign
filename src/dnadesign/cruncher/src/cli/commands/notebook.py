@@ -25,11 +25,6 @@ def notebook(
     analysis_id: str | None = typer.Option(None, "--analysis-id", help="Analysis ID to load."),
     latest: bool = typer.Option(False, "--latest", help="Use the latest analysis run."),
     force: bool = typer.Option(False, "--force", help="Overwrite existing notebook file."),
-    strict: bool = typer.Option(
-        True,
-        "--strict/--lenient",
-        help="Fail if summary.json or plot_manifest.json is missing or invalid.",
-    ),
 ) -> None:
     """Generate a marimo notebook scaffold for an analysis run."""
     try:
@@ -38,7 +33,6 @@ def notebook(
             analysis_id=analysis_id,
             latest=latest,
             force=force,
-            strict=strict,
         )
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         console.print(f"Error: {exc}")

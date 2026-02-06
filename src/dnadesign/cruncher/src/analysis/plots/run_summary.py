@@ -84,14 +84,21 @@ def plot_run_summary(
     out_path: Path,
     *,
     optimizer_stats: dict[str, object] | None,
+    include_swap_summary: bool,
+    min_per_tf_norm_filter: float | None,
     score_scale: str | None,
     dpi: int,
     png_compress_level: int,
 ) -> None:
     tf_list = list(tf_names)
     plt.style.use("seaborn-v0_8-ticks")
-    fig, axes = plt.subplots(2, 2, figsize=(10, 8))
-    ax_learning, ax_dist, ax_div, ax_swap = axes.flatten()
+    if include_swap_summary:
+        fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+        ax_learning, ax_dist, ax_div, ax_swap = axes.flatten()
+    else:
+        fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+        ax_learning, ax_dist, ax_div = axes
+        ax_swap = None
 
     # ── Tile A: best-so-far min-TF score ──────────────────────────────────
     df = sequences_df.copy()
@@ -144,6 +151,14 @@ def plot_run_summary(
             ax_dist.hist(baseline_min, bins=20, color="#c9c9c9", alpha=0.7, label="baseline")
             if elite_min is not None and not elite_min.empty:
                 ax_dist.hist(elite_min, bins=20, color="#4c78a8", alpha=0.7, label="elites")
+            if min_per_tf_norm_filter is not None:
+                ax_dist.axvline(
+                    float(min_per_tf_norm_filter),
+                    color="#333333",
+                    linestyle="--",
+                    linewidth=1.2,
+                    label="min_per_tf_norm filter",
+                )
             ax_dist.set_title("Elite vs baseline (min-per-TF)")
             ax_dist.set_xlabel(f"Min-per-TF ({score_scale})" if score_scale else "Min-per-TF")
             ax_dist.set_ylabel("Count")
@@ -178,8 +193,9 @@ def plot_run_summary(
             )
             ax_div.set_title("Elite diversity")
 
-    # ── Tile D: PT swap acceptance summary ────────────────────────────────
-    _plot_swap_summary(ax_swap, optimizer_stats)
+    # ── Tile D (optional): PT swap acceptance summary ─────────────────────
+    if include_swap_summary and ax_swap is not None:
+        _plot_swap_summary(ax_swap, optimizer_stats)
 
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)

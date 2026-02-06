@@ -39,6 +39,8 @@ def plot_overlap_panel(
 
     sns.set_style("ticks", {"axes.grid": False})
     n_tf = len(tf_list)
+    n_elites = int(elite_overlap_df["id"].nunique()) if "id" in elite_overlap_df.columns else int(len(elite_overlap_df))
+    n_pairs = int(len(summary_df))
     if n_tf <= 8:
         fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
         ax_heat, ax_hist = axes
@@ -79,8 +81,17 @@ def plot_overlap_panel(
     fig.text(
         0.99,
         0.01,
-        "Best-hit windows only; overlap is descriptive.",
+        "best-hit windows only; descriptive overlap",
         ha="right",
+        va="bottom",
+        fontsize=8,
+        color="#555555",
+    )
+    fig.text(
+        0.01,
+        0.01,
+        f"n_elites={n_elites}; n_pairs={n_pairs}",
+        ha="left",
         va="bottom",
         fontsize=8,
         color="#555555",

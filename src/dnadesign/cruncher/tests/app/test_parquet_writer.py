@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pyarrow.parquet as pq
 
-from dnadesign.cruncher.app.sample_workflow import _elite_parquet_schema, _write_parquet_rows
+from dnadesign.cruncher.app.sample.artifacts import _elite_parquet_schema, _write_parquet_rows
 
 
 def test_write_parquet_rows_creates_empty_elites(tmp_path) -> None:

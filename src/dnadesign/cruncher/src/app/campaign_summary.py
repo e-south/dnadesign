@@ -24,6 +24,7 @@ from dnadesign.cruncher.analysis.layout import (
     load_summary,
     report_json_path,
     resolve_analysis_dir,
+    resolve_required_table_paths,
     summary_path,
 )
 from dnadesign.cruncher.analysis.parquet import read_parquet
@@ -86,7 +87,7 @@ def summarize_campaign(
     pd, _ = _load_pandas_numpy()
     if top_k < 1:
         raise ValueError("top_k must be >= 1")
-    ensure_mpl_cache(resolve_catalog_root(config_path, cfg.motif_store.catalog_root))
+    ensure_mpl_cache(resolve_catalog_root(config_path, cfg.catalog.catalog_root))
     expansion = expand_campaign(
         cfg=cfg,
         config_path=config_path,
@@ -298,22 +299,18 @@ def _summarize_run(
                 f"Run '{run_dir.name}' analysis tf_names do not match regulator_set ({tf_names} vs {tfs})."
             )
 
-    analysis_cfg = summary.get("analysis_config") if isinstance(summary, dict) else {}
-    table_format = "parquet"
-    if isinstance(analysis_cfg, dict):
-        table_format = analysis_cfg.get("table_format") or table_format
-    score_summary_path = analysis_dir / f"score_summary.{table_format}"
-    joint_metrics_path = analysis_dir / f"joint_metrics.{table_format}"
-    if not score_summary_path.exists() or not joint_metrics_path.exists():
-        missing = []
-        if not score_summary_path.exists():
-            missing.append(str(score_summary_path))
-        if not joint_metrics_path.exists():
-            missing.append(str(joint_metrics_path))
-        message = f"Run '{run_dir.name}' missing required analysis tables: {', '.join(missing)}"
+    try:
+        table_paths = resolve_required_table_paths(
+            analysis_dir,
+            keys=("scores_summary", "metrics_joint"),
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        message = f"Run '{run_dir.name}' missing required analysis tables: {exc}"
         if skip_missing:
             return None, message
-        raise FileNotFoundError(message)
+        raise FileNotFoundError(message) from exc
+    score_summary_path = table_paths["scores_summary"]
+    joint_metrics_path = table_paths["metrics_joint"]
 
     if score_summary_path.suffix == ".parquet":
         score_df = read_parquet(score_summary_path)

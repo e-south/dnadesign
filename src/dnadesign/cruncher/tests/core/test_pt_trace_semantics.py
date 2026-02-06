@@ -39,6 +39,7 @@ def test_pt_records_post_swap(monkeypatch) -> None:
         "chains": chains,
         "min_dist": 0,
         "top_k": 1,
+        "sequence_length": 1,
         "swap_prob": 1.0,
         "record_tune": False,
         "progress_bar": False,

@@ -26,22 +26,22 @@ logger = logging.getLogger(__name__)
 
 def _store(cfg: CruncherConfig, config_path: Path):
     return CatalogMotifStore(
-        resolve_catalog_root(config_path, cfg.motif_store.catalog_root),
-        pwm_source=cfg.motif_store.pwm_source,
-        site_kinds=cfg.motif_store.site_kinds,
-        combine_sites=cfg.motif_store.combine_sites,
-        site_window_lengths=cfg.motif_store.site_window_lengths,
-        site_window_center=cfg.motif_store.site_window_center,
-        pwm_window_lengths=cfg.motif_store.pwm_window_lengths,
-        pwm_window_strategy=cfg.motif_store.pwm_window_strategy,
-        min_sites_for_pwm=cfg.motif_store.min_sites_for_pwm,
-        allow_low_sites=cfg.motif_store.allow_low_sites,
-        pseudocounts=cfg.motif_store.pseudocounts,
+        resolve_catalog_root(config_path, cfg.catalog.catalog_root),
+        pwm_source=cfg.catalog.pwm_source,
+        site_kinds=cfg.catalog.site_kinds,
+        combine_sites=cfg.catalog.combine_sites,
+        site_window_lengths=cfg.catalog.site_window_lengths,
+        site_window_center=cfg.catalog.site_window_center,
+        pwm_window_lengths=cfg.catalog.pwm_window_lengths,
+        pwm_window_strategy=cfg.catalog.pwm_window_strategy,
+        min_sites_for_pwm=cfg.catalog.min_sites_for_pwm,
+        allow_low_sites=cfg.catalog.allow_low_sites,
+        pseudocounts=cfg.catalog.pseudocounts,
     )
 
 
 def _lockmap_for(cfg: CruncherConfig, config_path: Path) -> dict[str, object]:
-    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     lock_path = resolve_lock_path(config_path)
     if not lock_path.exists():
         raise ValueError(f"Lockfile is required: {lock_path}. Run `cruncher lock {config_path.name}`.")
@@ -49,15 +49,15 @@ def _lockmap_for(cfg: CruncherConfig, config_path: Path) -> dict[str, object]:
     required = {tf for group in cfg.regulator_sets for tf in group}
     validate_lockfile(
         lockfile,
-        expected_pwm_source=cfg.motif_store.pwm_source,
-        expected_site_kinds=cfg.motif_store.site_kinds,
-        expected_combine_sites=cfg.motif_store.combine_sites,
+        expected_pwm_source=cfg.catalog.pwm_source,
+        expected_site_kinds=cfg.catalog.site_kinds,
+        expected_combine_sites=cfg.catalog.combine_sites,
         required_tfs=required,
     )
     verify_lockfile_hashes(
         lockfile=lockfile,
         catalog_root=catalog_root,
-        expected_pwm_source=cfg.motif_store.pwm_source,
+        expected_pwm_source=cfg.catalog.pwm_source,
     )
     return lockfile.resolved
 

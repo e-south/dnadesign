@@ -27,9 +27,9 @@ def _axis_label(metric: str, score_scale: str | None) -> str:
     if metric.startswith("score_"):
         label = f"{metric.replace('score_', '')} score"
     elif metric == "worst_tf_score":
-        label = "worst TF score"
+        label = "worst-TF score"
     elif metric == "second_worst_tf_score":
-        label = "second-worst TF score"
+        label = "2nd-worst TF score"
     else:
         label = metric
     if score_scale:

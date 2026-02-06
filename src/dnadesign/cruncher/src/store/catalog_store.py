@@ -98,7 +98,7 @@ def iter_site_sequences(
                     if not allow_variable_lengths and len(lengths) > 1:
                         raise ValueError(
                             f"Site lengths vary for TF '{site_entry.tf_name}'. "
-                            "Set motif_store.site_window_lengths to build a PWM."
+                            "Set cruncher.catalog.site_window_lengths to build a PWM."
                         )
                 else:
                     seq = window_sequence(seq, window_length, center=site_window_center)

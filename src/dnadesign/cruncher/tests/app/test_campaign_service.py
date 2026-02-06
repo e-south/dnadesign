@@ -22,31 +22,27 @@ from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 def _base_config() -> dict:
     return {
         "cruncher": {
-            "out_dir": "runs",
-            "regulator_sets": [],
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
+            "schema_version": 3,
+            "workspace": {"out_dir": "runs", "regulator_sets": [["A"]], "regulator_categories": {}},
+            "catalog": {"root": ".cruncher", "pwm_source": "matrix"},
         }
     }
 
 
 def test_campaign_expansion_within_across(tmp_path: Path) -> None:
     config = _base_config()
-    config["cruncher"].update(
+    config["cruncher"]["workspace"]["regulator_categories"] = {
+        "CatA": ["A", "B"],
+        "CatB": ["C", "D"],
+    }
+    config["cruncher"]["campaigns"] = [
         {
-            "regulator_categories": {
-                "CatA": ["A", "B"],
-                "CatB": ["C", "D"],
-            },
-            "campaigns": [
-                {
-                    "name": "demo",
-                    "categories": ["CatA", "CatB"],
-                    "within_category": {"sizes": [2]},
-                    "across_categories": {"sizes": [2], "max_per_category": 1},
-                }
-            ],
+            "name": "demo",
+            "categories": ["CatA", "CatB"],
+            "within_category": {"sizes": [2]},
+            "across_categories": {"sizes": [2], "max_per_category": 1},
         }
-    )
+    ]
     config_path = tmp_path / "config.yaml"
     config_path.write_text(yaml.safe_dump(config))
 
@@ -65,27 +61,24 @@ def test_campaign_expansion_within_across(tmp_path: Path) -> None:
 
 def test_campaign_overlap_disallowed(tmp_path: Path) -> None:
     config = _base_config()
-    config["cruncher"].update(
+    config["cruncher"]["workspace"]["regulator_categories"] = {
+        "CatA": ["A", "B"],
+        "CatB": ["B", "C"],
+    }
+    config["cruncher"]["campaigns"] = [
         {
-            "regulator_categories": {
-                "CatA": ["A", "B"],
-                "CatB": ["B", "C"],
-            },
-            "campaigns": [
-                {
-                    "name": "demo",
-                    "categories": ["CatA", "CatB"],
-                    "within_category": {"sizes": [2]},
-                    "allow_overlap": False,
-                }
-            ],
+            "name": "demo",
+            "categories": ["CatA", "CatB"],
+            "within_category": {"sizes": [2]},
+            "allow_overlap": False,
         }
-    )
+    ]
     config_path = tmp_path / "config.yaml"
     config_path.write_text(yaml.safe_dump(config))
 
+    cfg = load_config(config_path)
     with pytest.raises(ValueError, match="forbids overlaps"):
-        load_config(config_path)
+        expand_campaign(cfg=cfg, config_path=config_path, campaign_name="demo")
 
 
 def test_campaign_selectors_min_site_count(tmp_path: Path) -> None:
@@ -112,20 +105,16 @@ def test_campaign_selectors_min_site_count(tmp_path: Path) -> None:
     index.save(catalog_root)
 
     config = _base_config()
-    config["cruncher"].update(
+    config["cruncher"]["catalog"] = {"root": str(catalog_root), "pwm_source": "sites"}
+    config["cruncher"]["workspace"]["regulator_categories"] = {"CatA": ["LexA", "CpxR"]}
+    config["cruncher"]["campaigns"] = [
         {
-            "motif_store": {"catalog_root": str(catalog_root), "pwm_source": "sites"},
-            "regulator_categories": {"CatA": ["LexA", "CpxR"]},
-            "campaigns": [
-                {
-                    "name": "filter",
-                    "categories": ["CatA"],
-                    "within_category": {"sizes": [1]},
-                    "selectors": {"min_site_count": 2},
-                }
-            ],
+            "name": "filter",
+            "categories": ["CatA"],
+            "within_category": {"sizes": [1]},
+            "selectors": {"min_site_count": 2},
         }
-    )
+    ]
     config_path = tmp_path / "config.yaml"
     config_path.write_text(yaml.safe_dump(config))
 

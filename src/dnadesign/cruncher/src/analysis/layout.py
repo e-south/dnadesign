@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +70,73 @@ def load_summary(path: Path, *, required: bool = False) -> Optional[dict]:
     if not isinstance(payload, dict):
         raise ValueError(f"analysis summary must be a JSON object: {path}")
     return payload
+
+
+def load_table_manifest(path: Path, *, required: bool = False) -> Optional[dict]:
+    if not path.exists():
+        if required:
+            raise FileNotFoundError(f"Missing analysis table manifest: {path}")
+        return None
+    try:
+        payload = json.loads(path.read_text())
+    except Exception as exc:
+        raise ValueError(f"Invalid analysis table manifest JSON at {path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"analysis table manifest must be a JSON object: {path}")
+    tables = payload.get("tables")
+    if not isinstance(tables, list):
+        raise ValueError(f"analysis table manifest must include a 'tables' list: {path}")
+    return payload
+
+
+def table_paths_by_key(analysis_root: Path) -> dict[str, Path]:
+    manifest = load_table_manifest(table_manifest_path(analysis_root), required=True)
+    if manifest is None:
+        return {}
+    tables = manifest.get("tables")
+    if not isinstance(tables, list):
+        raise ValueError(f"analysis table manifest must include a 'tables' list: {table_manifest_path(analysis_root)}")
+    resolved: dict[str, Path] = {}
+    for idx, entry in enumerate(tables):
+        if not isinstance(entry, dict):
+            raise ValueError(
+                f"analysis table manifest contains a non-object table entry at index {idx}: "
+                f"{table_manifest_path(analysis_root)}"
+            )
+        key = entry.get("key")
+        rel_path = entry.get("path")
+        if not isinstance(key, str) or not key:
+            raise ValueError(
+                f"analysis table manifest table entry at index {idx} has invalid key: "
+                f"{table_manifest_path(analysis_root)}"
+            )
+        if not isinstance(rel_path, str) or not rel_path:
+            raise ValueError(
+                f"analysis table manifest table entry '{key}' has invalid path: {table_manifest_path(analysis_root)}"
+            )
+        if key in resolved:
+            raise ValueError(
+                f"analysis table manifest has duplicate table key '{key}': {table_manifest_path(analysis_root)}"
+            )
+        resolved[key] = analysis_root / rel_path
+    return resolved
+
+
+def resolve_required_table_paths(analysis_root: Path, *, keys: Sequence[str]) -> dict[str, Path]:
+    required_keys = [str(key) for key in keys]
+    paths_by_key = table_paths_by_key(analysis_root)
+    missing_keys = [key for key in required_keys if key not in paths_by_key]
+    if missing_keys:
+        raise FileNotFoundError(
+            "analysis table manifest missing required table keys: "
+            + ", ".join(sorted(missing_keys))
+            + f" ({table_manifest_path(analysis_root)})"
+        )
+    resolved = {key: paths_by_key[key] for key in required_keys}
+    missing_files = [f"{key}={path}" for key, path in resolved.items() if not path.exists()]
+    if missing_files:
+        raise FileNotFoundError("analysis table manifest references missing table files: " + ", ".join(missing_files))
+    return resolved
 
 
 def current_summary(run_dir: Path) -> Optional[dict]:

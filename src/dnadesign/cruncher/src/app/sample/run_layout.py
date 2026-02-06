@@ -16,6 +16,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dnadesign.cruncher.app.run_service import update_run_index_from_manifest, update_run_index_from_status
+from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json
+from dnadesign.cruncher.artifacts.entries import artifact_entry
 from dnadesign.cruncher.artifacts.layout import (
     build_run_dir,
     ensure_run_dirs,
@@ -37,6 +39,45 @@ class RunLayout:
     run_group: str
     stage_label: str
     status_writer: RunStatusWriter
+
+
+def _materialize_optimizer_stats(
+    run_dir: Path,
+    optimizer_stats: object,
+    *,
+    stage: str,
+) -> tuple[dict[str, object], list[dict[str, object]], str | None]:
+    if optimizer_stats is None:
+        return {}, [], None
+    if not isinstance(optimizer_stats, dict):
+        raise ValueError("optimizer.stats() must return a dictionary when present.")
+    manifest_stats: dict[str, object] = dict(optimizer_stats)
+    if "move_stats" not in manifest_stats:
+        return manifest_stats, [], None
+    move_stats = manifest_stats.pop("move_stats")
+    if move_stats is None:
+        return manifest_stats, [], None
+    if not isinstance(move_stats, list):
+        raise ValueError("optimizer.stats()['move_stats'] must be a list.")
+    rel_path = Path("artifacts") / "optimizer_move_stats.json"
+    sidecar_path = run_dir / rel_path
+    sidecar_path.parent.mkdir(parents=True, exist_ok=True)
+    atomic_write_json(sidecar_path, {"move_stats": move_stats})
+    manifest_stats["move_stats_path"] = str(rel_path)
+    manifest_stats["move_stats_rows"] = len(move_stats)
+    return (
+        manifest_stats,
+        [
+            artifact_entry(
+                sidecar_path,
+                run_dir,
+                kind="metadata",
+                label="Optimizer move stats (JSON)",
+                stage=stage,
+            )
+        ],
+        str(rel_path),
+    )
 
 
 def prepare_run_layout(
@@ -84,7 +125,7 @@ def prepare_run_layout(
         config_path,
         run_dir,
         status_writer.payload,
-        catalog_root=cfg.motif_store.catalog_root,
+        catalog_root=cfg.catalog.catalog_root,
     )
     adapt_sweeps = int(sample_cfg.budget.tune)
     draws = int(sample_cfg.budget.draws)
@@ -127,7 +168,7 @@ def write_run_manifest_and_update(
     min_per_tf_norm_auto: dict[str, object] | None,
     status_writer: RunStatusWriter,
 ) -> Path:
-    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     catalog = CatalogIndex.load(catalog_root)
     lock_path = resolve_lock_path(config_path)
     lock_snapshot_path = manifest_path(run_dir).parent / "lockfile.json"
@@ -147,6 +188,15 @@ def write_run_manifest_and_update(
             "currsize": int(cache_info.currsize),
         }
 
+    optimizer_stats = optimizer.stats() if hasattr(optimizer, "stats") else {}
+    manifest_optimizer_stats, optimizer_stat_artifacts, optimizer_stats_path = _materialize_optimizer_stats(
+        run_dir,
+        optimizer_stats,
+        stage=stage,
+    )
+    manifest_artifacts = list(artifacts)
+    manifest_artifacts.extend(optimizer_stat_artifacts)
+
     manifest = build_run_manifest(
         stage=stage,
         cfg=cfg,
@@ -155,7 +205,7 @@ def write_run_manifest_and_update(
         lockmap={tf: lockmap[tf] for tf in tfs},
         catalog=catalog,
         run_dir=run_dir,
-        artifacts=artifacts,
+        artifacts=manifest_artifacts,
         extra={
             "sequence_length": sample_cfg.sequence_length,
             "seed": sample_cfg.seed,
@@ -177,12 +227,13 @@ def write_run_manifest_and_update(
                 "combine": combine_resolved,
                 "bidirectional": sample_cfg.objective.bidirectional,
                 "softmin": sample_cfg.objective.softmin.model_dump(),
-                "softmin_beta_final_resolved": beta_softmin_final,
+                "softmin_final_beta_used": beta_softmin_final,
             },
             "optimizer": {
                 "kind": optimizer_kind,
             },
-            "optimizer_stats": optimizer.stats() if hasattr(optimizer, "stats") else {},
+            "optimizer_stats": manifest_optimizer_stats,
+            "optimizer_stats_path": optimizer_stats_path,
             "objective_schedule_summary": optimizer.objective_schedule_summary()
             if hasattr(optimizer, "objective_schedule_summary")
             else {},
@@ -194,13 +245,13 @@ def write_run_manifest_and_update(
         config_path,
         run_dir,
         manifest,
-        catalog_root=cfg.motif_store.catalog_root,
+        catalog_root=cfg.catalog.catalog_root,
     )
-    status_writer.finish(status="completed", artifacts=artifacts)
+    status_writer.finish(status="completed", artifacts=manifest_artifacts)
     update_run_index_from_status(
         config_path,
         run_dir,
         status_writer.payload,
-        catalog_root=cfg.motif_store.catalog_root,
+        catalog_root=cfg.catalog.catalog_root,
     )
     return manifest_path_out

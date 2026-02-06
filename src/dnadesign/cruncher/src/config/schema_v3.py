@@ -1023,14 +1023,6 @@ class CruncherConfig(StrictBaseModel):
     def regulator_categories(self) -> Dict[str, List[str]]:
         return self.workspace.regulator_categories
 
-    @property
-    def motif_store(self) -> CatalogConfig:
-        return self.catalog
-
-    @property
-    def motif_discovery(self) -> DiscoverConfig:
-        return self.discover
-
 
 class CruncherRoot(StrictBaseModel):
     cruncher: CruncherConfig

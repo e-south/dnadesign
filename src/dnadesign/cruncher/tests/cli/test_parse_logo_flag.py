@@ -48,10 +48,9 @@ def test_parse_skips_logos_when_disabled(tmp_path: Path) -> None:
 
     config = {
         "cruncher": {
-            "out_dir": "runs",
-            "regulator_sets": [["lexA"]],
-            "motif_store": {"catalog_root": str(catalog_root), "pwm_source": "matrix"},
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
+            "schema_version": 3,
+            "workspace": {"out_dir": "runs", "regulator_sets": [["lexA"]]},
+            "catalog": {"root": str(catalog_root), "pwm_source": "matrix"},
         }
     }
     config_path = tmp_path / "config.yaml"
@@ -107,10 +106,9 @@ def test_parse_is_idempotent_when_inputs_match(tmp_path: Path) -> None:
 
     config = {
         "cruncher": {
-            "out_dir": "runs",
-            "regulator_sets": [["lexA"]],
-            "motif_store": {"catalog_root": str(catalog_root), "pwm_source": "matrix"},
-            "parse": {"plot": {"logo": True, "bits_mode": "information", "dpi": 72}},
+            "schema_version": 3,
+            "workspace": {"out_dir": "runs", "regulator_sets": [["lexA"]]},
+            "catalog": {"root": str(catalog_root), "pwm_source": "matrix"},
         }
     }
     config_path = tmp_path / "config.yaml"

@@ -88,22 +88,27 @@ def test_sample_cli_smoke_matrix(tmp_path: Path) -> None:
 
     config = {
         "cruncher": {
-            "out_dir": "runs",
-            "regulator_sets": [["lexA", "cpxR"]],
-            "motif_store": {"catalog_root": str(catalog_root), "pwm_source": "matrix"},
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
+            "schema_version": 3,
+            "workspace": {"out_dir": "runs", "regulator_sets": [["lexA", "cpxR"]]},
+            "catalog": {"root": str(catalog_root), "pwm_source": "matrix"},
             "sample": {
-                "mode": "sample",
-                "rng": {"seed": 3, "deterministic": True},
+                "seed": 3,
                 "sequence_length": 6,
-                "compute": {"total_sweeps": 3, "adapt_sweep_frac": 0.34},
-                "early_stop": {"enabled": False},
-                "init": {"kind": "random", "pad_with": "background"},
-                "objective": {"bidirectional": True, "score_scale": "normalized-llr"},
-                "elites": {"k": 1, "min_per_tf_norm": None, "mmr_alpha": 0.85},
+                "budget": {"tune": 1, "draws": 2},
+                "pt": {"n_temps": 2, "temp_max": 10.0},
+                "objective": {"bidirectional": True, "score_scale": "normalized-llr", "combine": "min"},
+                "elites": {
+                    "k": 1,
+                    "filter": {"min_per_tf_norm": None, "require_all_tfs": True, "pwm_sum_min": 0.0},
+                    "select": {"alpha": 0.85, "pool_size": "auto"},
+                },
                 "moves": {"profile": "balanced"},
-                "output": {"trace": {"save": False}, "save_sequences": True},
-                "ui": {"progress_bar": False, "progress_every": 0},
+                "output": {
+                    "save_trace": False,
+                    "save_sequences": True,
+                    "include_tune_in_sequences": False,
+                    "live_metrics": False,
+                },
             },
         }
     }

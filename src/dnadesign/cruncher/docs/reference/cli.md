@@ -243,7 +243,9 @@ Outputs:
 Notes:
 
 * `--metrics` requires a local catalog; fetch motifs/sites first.
-* `--skip-missing` skips runs missing `analysis/joint_metrics.parquet` or `analysis/score_summary.parquet`.
+* `--skip-missing` skips runs missing required `analysis/table_manifest.json` entries/files for
+  `scores_summary` and `metrics_joint` (typically `analysis/table__scores__summary.parquet` and
+  `analysis/table__metrics__joint.parquet`).
 * With site-derived PWMs, `--metrics` also requires `catalog.site_window_lengths`
   for TFs with variable site lengths. Use `--no-metrics` if you haven't set them.
 
@@ -297,7 +299,7 @@ Precondition:
 
 Notes:
 
-* Logos are rendered via `cruncher catalog logos`; its defaults come from `parse.plot.bits_mode` and `parse.plot.dpi`.
+* Logos are rendered via `cruncher catalog logos`; default logo settings are `--bits-mode information` and `--dpi 150`.
 * `cruncher parse` always uses the lockfile to pin exact motif IDs/hashes.
   If you add new motifs (e.g., via `discover motifs`) or change `catalog` preferences,
   re-run `cruncher lock <config>` to refresh what parse will use.
@@ -333,7 +335,7 @@ Precondition:
 Notes:
 
 * `sample.output.save_sequences: true` is required for later analysis.
-* `sample.output.trace.save: true` enables trace-based diagnostics.
+* `sample.output.save_trace: true` enables trace-based diagnostics.
 * Sampling uses the internal parallel tempering kernel; there is no optimizer selection in the config.
 * `--verbose` enables periodic progress logging; `--debug` enables very verbose debug logs.
 
@@ -407,18 +409,15 @@ Notes:
 
 * requires `marimo` to be installed (for example: `uv add --group notebooks marimo`)
 * useful when you want interactive slicing/filtering beyond static plots
-* strict by default: requires `analysis/summary.json` + `analysis/plot_manifest.json` to exist and parse, and `analysis/summary.json` must include a non-empty `tf_names` list
-* pass `--lenient` to generate anyway (warnings appear in the Overview tab)
-* when `analysis/summary.json` is missing, lenient mode falls back to `analysis/` as an unindexed entry
+* strict artifact contract: requires `analysis/summary.json` + `analysis/plot_manifest.json` to exist and parse, and `analysis/summary.json` must include a non-empty `tf_names` list
 * plot output status is refreshed from disk so missing files are shown accurately
 * the Refresh button re-scans analysis entries and updates plot/table status without restarting marimo
 * the notebook infers `run_dir` from its location; keep it under `<run_dir>/analysis/` or regenerate it
-* text outputs (for example, `diag__convergence.txt`) render inline in the Plots tab
-* if running in lenient mode and `analysis/summary.json` lacks `tf_names`, scatter controls are disabled with an inline warning
+* plots are loaded from `analysis/plot_manifest.json`; the curated keys are `run_summary`, `opt_trajectory`, `elites_nn_distance`, plus optional `overlap_panel` and `health_panel` entries when generated
 * the notebook includes:
   * Overview tab with run metadata and explicit warnings for missing/invalid analysis artifacts
-  * Tables tab with a Top-K slider and a per-PWM data explorer
-  * Plots tab with TF dropdowns, chain/draw range controls, and inline plot previews
+  * Tables tab with a Top-K slider and per-table previews from `analysis/table_manifest.json`
+  * Plots tab with inline previews and generated/skipped status from `analysis/plot_manifest.json`
 
 ---
 
@@ -686,6 +685,10 @@ Network:
 
 * `cache stats <config>` — counts of cached motifs and site sets
 * `cache verify <config>` — verify cache paths exist on disk
+* `cache clean <config>` — list generated `__pycache__` / `.pytest_cache` directories (dry-run by default; use `--apply` to delete)
+  * default scan scope is package root (`src/dnadesign/cruncher/`)
+  * use `--scope workspace|package|repo` to change scan scope
+  * use `--root <dir>` to scan an explicit directory (overrides `--scope`)
 
 ---
 
@@ -727,7 +730,10 @@ Network:
 * `runs best <config> --set-index 1` — print best run by `best_score` for a regulator set
 * `runs watch <config> <run>` — live progress snapshot (run name or run dir; reads `meta/run_status.json`, optionally `live/metrics.jsonl`)
 * `runs rebuild-index <config>` — rebuild `<workspace>/.cruncher/run_index.json`
+* `runs repair-index <config>` — validate and optionally remove index entries missing run directories/manifests (`--apply`)
 * `runs clean <config> --stale` — mark stale `running` runs as `aborted` (use `--drop` to remove from the index)
+* `runs prune <config>` — archive old runs under `<out_dir>/_archive/<stage>/<YYYY-MM>/` with deterministic retention (`--keep-latest`, `--older-than-days`; dry-run unless `--apply`)
+  * prune requires a valid run index; run `runs repair-index --apply` first if invalid entries are reported
 
 Tip: inside a workspace you can drop the config argument entirely (for example,
 `cruncher runs show <run>` or `cruncher runs list`).

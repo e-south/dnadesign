@@ -45,14 +45,16 @@ from dnadesign.cruncher.utils.paths import resolve_lock_path
 
 def _sample_block() -> dict:
     return {
-        "mode": "sample",
-        "rng": {"seed": 7, "deterministic": True},
+        "seed": 7,
         "sequence_length": 12,
-        "compute": {"total_sweeps": 3, "adapt_sweep_frac": 0.34},
-        "early_stop": {"enabled": True, "patience": 10, "min_delta": 0.01},
-        "init": {"kind": "random", "pad_with": "background"},
-        "objective": {"bidirectional": True, "score_scale": "normalized-llr"},
-        "elites": {"k": 1, "min_per_tf_norm": None, "mmr_alpha": 0.85},
+        "budget": {"tune": 1, "draws": 2},
+        "pt": {"n_temps": 2, "temp_max": 10.0},
+        "objective": {"bidirectional": True, "score_scale": "normalized-llr", "combine": "min"},
+        "elites": {
+            "k": 1,
+            "filter": {"min_per_tf_norm": None, "require_all_tfs": True, "pwm_sum_min": 0.0},
+            "select": {"alpha": 0.85, "pool_size": "auto"},
+        },
         "moves": {
             "profile": "balanced",
             "overrides": {
@@ -63,8 +65,12 @@ def _sample_block() -> dict:
                 "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
             },
         },
-        "output": {"trace": {"save": False}, "save_sequences": True},
-        "ui": {"progress_bar": False, "progress_every": 0},
+        "output": {
+            "save_trace": False,
+            "save_sequences": True,
+            "include_tune_in_sequences": False,
+            "live_metrics": False,
+        },
     }
 
 
@@ -97,10 +103,10 @@ def test_end_to_end_sites_pipeline(tmp_path: Path) -> None:
     catalog_root = tmp_path / ".cruncher"
     config = {
         "cruncher": {
-            "out_dir": "results",
-            "regulator_sets": [["lexA", "cpxR"]],
-            "motif_store": {
-                "catalog_root": str(catalog_root),
+            "schema_version": 3,
+            "workspace": {"out_dir": "results", "regulator_sets": [["lexA", "cpxR"]]},
+            "catalog": {
+                "root": str(catalog_root),
                 "source_preference": ["regulondb"],
                 "allow_ambiguous": False,
                 "pwm_source": "sites",
@@ -123,7 +129,6 @@ def test_end_to_end_sites_pipeline(tmp_path: Path) -> None:
                     "uppercase_binding_site_only": True,
                 }
             },
-            "parse": {"plot": {"logo": True, "bits_mode": "information", "dpi": 72}},
             "sample": _sample_block(),
         }
     }
@@ -189,10 +194,10 @@ def test_demo_workspace_cli_without_config(tmp_path: Path, monkeypatch: pytest.M
     catalog_root = workspace / ".cruncher"
     config = {
         "cruncher": {
-            "out_dir": "runs",
-            "regulator_sets": [["lexA", "cpxR"]],
-            "motif_store": {
-                "catalog_root": str(catalog_root),
+            "schema_version": 3,
+            "workspace": {"out_dir": "runs", "regulator_sets": [["lexA", "cpxR"]]},
+            "catalog": {
+                "root": str(catalog_root),
                 "source_preference": ["regulondb"],
                 "allow_ambiguous": False,
                 "pwm_source": "sites",
@@ -215,7 +220,6 @@ def test_demo_workspace_cli_without_config(tmp_path: Path, monkeypatch: pytest.M
                     "uppercase_binding_site_only": True,
                 }
             },
-            "parse": {"plot": {"logo": True, "bits_mode": "information", "dpi": 72}},
             "sample": _sample_block(),
         }
     }

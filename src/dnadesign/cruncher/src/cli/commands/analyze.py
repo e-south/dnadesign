@@ -24,7 +24,8 @@ from dnadesign.cruncher.cli.config_resolver import (
 from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.utils.numba_cache import ensure_numba_cache_dir
-from dnadesign.cruncher.utils.paths import workspace_state_root
+from dnadesign.cruncher.utils.paths import resolve_catalog_root, workspace_state_root
+from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
 
 console = Console()
 
@@ -63,6 +64,7 @@ def analyze(
     try:
         cache_dir = workspace_state_root(config_path) / "numba_cache"
         ensure_numba_cache_dir(config_path.parent, cache_dir=cache_dir)
+        ensure_mpl_cache(resolve_catalog_root(config_path, cfg.catalog.catalog_root))
         from dnadesign.cruncher.app.analyze_workflow import run_analyze
 
         analysis_runs = run_analyze(
@@ -127,5 +129,7 @@ def analyze(
                 "not found under",
             )
         ):
-            console.print("Hint: set analysis.runs, pass --run, or use --latest.")
+            has_embedded_hint = "analysis.runs" in lowered and "--run" in lowered and "--latest" in lowered
+            if not has_embedded_hint:
+                console.print("Hint: set analysis.runs, pass --run, or use --latest.")
         raise typer.Exit(code=1)

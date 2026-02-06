@@ -20,9 +20,9 @@ runner = CliRunner()
 def test_sources_list_includes_local_sources(tmp_path: Path) -> None:
     config = {
         "cruncher": {
-            "out_dir": "runs",
-            "regulator_sets": [["lexA"]],
-            "motif_store": {"catalog_root": ".cruncher"},
+            "schema_version": 3,
+            "workspace": {"out_dir": "runs", "regulator_sets": [["lexA"]]},
+            "catalog": {"root": ".cruncher"},
             "ingest": {
                 "local_sources": [
                     {
@@ -33,7 +33,6 @@ def test_sources_list_includes_local_sources(tmp_path: Path) -> None:
                     }
                 ]
             },
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
         }
     }
     config_path = tmp_path / "config.yaml"

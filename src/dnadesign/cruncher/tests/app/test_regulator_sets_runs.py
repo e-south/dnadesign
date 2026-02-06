@@ -66,10 +66,10 @@ def test_sample_runs_split_by_regulator_set(tmp_path: Path) -> None:
     }
     config = {
         "cruncher": {
-            "out_dir": "results",
-            "regulator_sets": [["lexA"], ["cpxR"]],
-            "motif_store": {
-                "catalog_root": str(catalog_root),
+            "schema_version": 3,
+            "workspace": {"out_dir": "results", "regulator_sets": [["lexA"], ["cpxR"]]},
+            "catalog": {
+                "root": str(catalog_root),
                 "source_preference": ["regulondb"],
                 "allow_ambiguous": False,
                 "pwm_source": "matrix",
@@ -77,15 +77,17 @@ def test_sample_runs_split_by_regulator_set(tmp_path: Path) -> None:
                 "allow_low_sites": False,
             },
             "ingest": {"regulondb": {"min_sites_for_pwm": 2}},
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
             "sample": {
-                "mode": "sample",
-                "rng": {"seed": 11, "deterministic": True},
+                "seed": 11,
                 "sequence_length": 6,
-                "compute": {"total_sweeps": 3, "adapt_sweep_frac": 0.34},
-                "init": {"kind": "random", "pad_with": "background"},
-                "objective": {"bidirectional": True, "score_scale": "llr"},
-                "elites": {"k": 1, "min_per_tf_norm": None, "mmr_alpha": 0.85},
+                "budget": {"tune": 1, "draws": 2},
+                "pt": {"n_temps": 2, "temp_max": 10.0},
+                "objective": {"bidirectional": True, "score_scale": "llr", "combine": "min"},
+                "elites": {
+                    "k": 1,
+                    "filter": {"min_per_tf_norm": None, "require_all_tfs": True, "pwm_sum_min": 0.0},
+                    "select": {"alpha": 0.85, "pool_size": "auto"},
+                },
                 "moves": {
                     "profile": "balanced",
                     "overrides": {
@@ -96,8 +98,12 @@ def test_sample_runs_split_by_regulator_set(tmp_path: Path) -> None:
                         "move_probs": {"S": 1.0, "B": 0.0, "M": 0.0},
                     },
                 },
-                "output": {"trace": {"save": False}, "save_sequences": True},
-                "ui": {"progress_bar": False, "progress_every": 0},
+                "output": {
+                    "save_trace": False,
+                    "save_sequences": True,
+                    "include_tune_in_sequences": False,
+                    "live_metrics": False,
+                },
             },
         }
     }

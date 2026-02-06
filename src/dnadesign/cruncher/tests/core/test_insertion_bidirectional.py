@@ -49,6 +49,7 @@ def test_insertion_can_reverse_complement() -> None:
         "chains": 1,
         "min_dist": 0,
         "top_k": 1,
+        "sequence_length": 2,
         "swap_prob": 0.0,
         "bidirectional": True,
         "record_tune": False,

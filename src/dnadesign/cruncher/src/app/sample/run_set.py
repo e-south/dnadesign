@@ -65,30 +65,115 @@ from dnadesign.cruncher.utils.hashing import sha256_bytes
 logger = logging.getLogger(__name__)
 
 
-def _resolve_final_softmin_beta(optimizer: object, sample_cfg: SampleConfig) -> float | None:
-    if hasattr(optimizer, "final_softmin_beta") and callable(getattr(optimizer, "final_softmin_beta")):
-        try:
-            return getattr(optimizer, "final_softmin_beta")()
-        except Exception:
-            pass
-    if hasattr(optimizer, "stats") and callable(getattr(optimizer, "stats")):
-        try:
-            stats = getattr(optimizer, "stats")()
-            if isinstance(stats, dict):
-                value = stats.get("final_softmin_beta")
-                if isinstance(value, (int, float)):
-                    return float(value)
-        except Exception:
-            pass
+class ConfigError(ValueError):
+    """Raised when run configuration is internally contradictory."""
+
+
+class RunError(RuntimeError):
+    """Raised when run-time state violates strict sampling contracts."""
+
+
+def _assert_sequence_buffers_aligned(optimizer: object) -> tuple[list[object], list[object], list[object]]:
+    required_buffers = ("all_meta", "all_samples", "all_scores")
+    resolved: dict[str, list[object]] = {}
+    for name in required_buffers:
+        value = getattr(optimizer, name, None)
+        if not isinstance(value, list):
+            raise RunError(f"Optimizer missing required sequence buffer '{name}' while saving sequences.")
+        resolved[name] = value
+    lengths = {name: len(values) for name, values in resolved.items()}
+    if len(set(lengths.values())) != 1:
+        raise RunError(
+            "Optimizer sequence buffers have inconsistent lengths: "
+            + ", ".join(f"{name}={lengths[name]}" for name in required_buffers)
+        )
+    return resolved["all_meta"], resolved["all_samples"], resolved["all_scores"]
+
+
+def _validate_objective_preflight(sample_cfg: SampleConfig, *, n_tfs: int) -> None:
+    scale = sample_cfg.objective.score_scale
+    combine_cfg = sample_cfg.objective.combine
+    softmin_enabled = bool(sample_cfg.objective.softmin.enabled)
+
+    if n_tfs >= 2 and scale == "llr":
+        raise ConfigError(
+            "cruncher.sample.objective.score_scale='llr' is not allowed for multi-TF runs. "
+            "Multi-TF runs require comparable scales. Use normalized-llr, logp, z, or consensus-neglop-sum."
+        )
+
+    if combine_cfg == "sum" and softmin_enabled:
+        raise ConfigError(
+            "cruncher.sample.objective.softmin.enabled=true is incompatible with "
+            "cruncher.sample.objective.combine='sum'. Disable softmin or switch combine to "
+            "min/softmin-compatible mode."
+        )
+
+    if scale == "consensus-neglop-sum" and softmin_enabled:
+        raise ConfigError(
+            "cruncher.sample.objective.softmin.enabled=true is incompatible with "
+            "cruncher.sample.objective.score_scale='consensus-neglop-sum'. Disable softmin or switch combine to "
+            "min/softmin-compatible mode."
+        )
+
+
+def _softmin_schedule_payload(sample_cfg: SampleConfig) -> dict[str, object]:
     softmin_cfg = sample_cfg.objective.softmin
-    if softmin_cfg.enabled:
-        total = int(sample_cfg.budget.tune + sample_cfg.budget.draws)
-        if softmin_cfg.schedule == "fixed":
-            sched = {"kind": "fixed", "beta": float(softmin_cfg.beta_end)}
-        else:
-            sched = {"kind": "linear", "beta": (float(softmin_cfg.beta_start), float(softmin_cfg.beta_end))}
-        return make_beta_scheduler(sched, total)(total - 1)
-    return None
+    if softmin_cfg.schedule == "fixed":
+        return {"kind": "fixed", "beta": float(softmin_cfg.beta_end)}
+    if softmin_cfg.schedule == "linear":
+        return {"kind": "linear", "beta": (float(softmin_cfg.beta_start), float(softmin_cfg.beta_end))}
+    raise ConfigError(
+        "Unsupported cruncher.sample.objective.softmin.schedule value "
+        f"'{softmin_cfg.schedule}'. Expected 'fixed' or 'linear'."
+    )
+
+
+def _final_executed_sweep_index(optimizer: object) -> int:
+    all_meta = getattr(optimizer, "all_meta", None)
+    if not isinstance(all_meta, list) or not all_meta:
+        raise RunError(
+            "Unable to resolve final executed sweep for softmin schedule: optimizer.all_meta is missing or empty."
+        )
+    sweep_indices: list[int] = []
+    for item in all_meta:
+        if not isinstance(item, tuple) or len(item) < 2 or not isinstance(item[1], (int, np.integer)):
+            raise RunError(
+                "Unable to resolve final executed sweep for softmin schedule: invalid optimizer.all_meta row."
+            )
+        sweep_indices.append(int(item[1]))
+    final_idx = max(sweep_indices)
+    if final_idx < 0:
+        raise RunError("Unable to resolve final executed sweep for softmin schedule: final sweep index is negative.")
+    return final_idx
+
+
+def _resolve_final_softmin_beta(optimizer: object, sample_cfg: SampleConfig) -> float | None:
+    softmin_cfg = sample_cfg.objective.softmin
+    if not softmin_cfg.enabled:
+        return None
+
+    total = int(sample_cfg.budget.tune + sample_cfg.budget.draws)
+    if total < 1:
+        raise ConfigError(
+            "cruncher.sample.budget is invalid for softmin scheduling; tune + draws must be >= 1 when "
+            "cruncher.sample.objective.softmin.enabled=true."
+        )
+
+    final_sweep_idx = _final_executed_sweep_index(optimizer)
+    if final_sweep_idx >= total:
+        raise RunError(
+            "Unable to resolve final softmin beta: final executed sweep index exceeds configured "
+            "cruncher.sample.budget.tune + cruncher.sample.budget.draws."
+        )
+
+    schedule = _softmin_schedule_payload(sample_cfg)
+    try:
+        beta_of = make_beta_scheduler(schedule, total)
+        return float(beta_of(final_sweep_idx))
+    except Exception as exc:
+        raise ConfigError(
+            "Failed to evaluate cruncher.sample.objective.softmin schedule for the final executed sweep."
+        ) from exc
 
 
 def _assert_init_length_fits_pwms(sample_cfg: SampleConfig, pwms: dict[str, PWM]) -> None:
@@ -100,7 +185,7 @@ def _assert_init_length_fits_pwms(sample_cfg: SampleConfig, pwms: dict[str, PWM]
         raise ValueError(
             f"sequence_length={sample_cfg.sequence_length} is shorter than the widest PWM (max={max_w}). "
             f"Per-TF lengths: {names}. Increase sample.sequence_length or trim PWMs via "
-            "motif_store.pwm_window_lengths (with pwm_window_strategy=max_info)."
+            "cruncher.catalog.pwm_window_lengths (with pwm_window_strategy=max_info)."
         )
 
 
@@ -195,6 +280,16 @@ def _run_sample_for_set(
     telemetry = RunTelemetry(status_writer)
     progress = progress_adapter(True)
 
+    def _finish_failed(exc: Exception) -> None:
+        status_writer.finish(status="failed", status_message="failed", error=str(exc))
+        update_run_index_from_status(
+            config_path,
+            out_dir,
+            status_writer.payload,
+            catalog_root=cfg.catalog.catalog_root,
+        )
+        raise exc
+
     # 1) LOAD all required PWMs
     pwms = _load_pwms_for_set(cfg=cfg, config_path=config_path, tfs=tfs, lockmap=lockmap)
 
@@ -216,11 +311,7 @@ def _run_sample_for_set(
     scale = sample_cfg.objective.score_scale
     combine_cfg = sample_cfg.objective.combine
     logger.debug("Using score_scale = %r", scale)
-    if scale == "llr" and len(tfs) > 1:
-        logger.warning(
-            "score_scale='llr' is not comparable across PWMs in multi-TF runs. "
-            "Consider normalized-llr or logp, or set objective.allow_unscaled_llr=true to silence this warning."
-        )
+    _validate_objective_preflight(sample_cfg, n_tfs=len(tfs))
 
     def _sum_combine(values):
         return float(sum(values))
@@ -230,20 +321,14 @@ def _run_sample_for_set(
     if combine_cfg == "sum":
         combiner = _sum_combine
         combine_resolved = "sum"
-        if sample_cfg.objective.softmin.enabled:
-            logger.warning("objective.combine='sum' disables softmin; softmin schedule will be ignored.")
     elif combine_cfg == "min":
         if scale == "consensus-neglop-sum":
             combiner = min
         combine_resolved = "min"
-    elif scale == "consensus-neglop-sum":
-        combiner = _sum_combine
-        combine_resolved = "sum"
-        if sample_cfg.objective.softmin.enabled:
-            logger.warning(
-                "score_scale='consensus-neglop-sum' defaults to sum() and disables softmin. "
-                "Set objective.combine='min' to enforce weakest-TF optimization."
-            )
+    else:
+        raise ConfigError(
+            f"Unsupported cruncher.sample.objective.combine value '{combine_cfg}'. Expected 'min' or 'sum'."
+        )
     logger.debug("Building Scorer and SequenceEvaluator with scale=%r", scale)
     scorer = Scorer(
         pwms,
@@ -274,10 +359,7 @@ def _run_sample_for_set(
     # 3) FLATTEN optimizer config for PT
     moves = resolve_move_config(sample_cfg.moves)
     softmin_cfg = sample_cfg.objective.softmin
-    if softmin_cfg.schedule == "fixed":
-        softmin_sched = {"kind": "fixed", "beta": float(softmin_cfg.beta_end)}
-    else:
-        softmin_sched = {"kind": "linear", "beta": (float(softmin_cfg.beta_start), float(softmin_cfg.beta_end))}
+    softmin_sched = _softmin_schedule_payload(sample_cfg)
     pt_cfg = sample_cfg.pt
     beta_min = 1.0 / float(pt_cfg.temp_max)
     if chain_count == 1:
@@ -335,7 +417,7 @@ def _run_sample_for_set(
             config_path,
             out_dir,
             status_writer.payload,
-            catalog_root=cfg.motif_store.catalog_root,
+            catalog_root=cfg.catalog.catalog_root,
         )
         raise
     except Exception as exc:  # pragma: no cover - ensures run status is updated on failure
@@ -344,7 +426,7 @@ def _run_sample_for_set(
             config_path,
             out_dir,
             status_writer.payload,
-            catalog_root=cfg.motif_store.catalog_root,
+            catalog_root=cfg.catalog.catalog_root,
         )
         raise
     if status_writer is not None and hasattr(optimizer, "best_score"):
@@ -393,21 +475,15 @@ def _run_sample_for_set(
     beta_softmin_final: float | None = _resolve_final_softmin_beta(optimizer, sample_cfg)
 
     # 8) SAVE sequences.parquet (chain, draw, phase, sequence_string, per-TF scaled scores)
-    if (
-        sample_cfg.output.save_sequences
-        and hasattr(optimizer, "all_samples")
-        and hasattr(optimizer, "all_meta")
-        and hasattr(optimizer, "all_scores")
-    ):
+    if sample_cfg.output.save_sequences:
         seq_parquet = sequences_path(out_dir)
         tf_order = sorted(tfs)
         want_canonical_all = bool(sample_cfg.objective.bidirectional)
         record_tune = bool(sample_cfg.output.include_tune_in_sequences)
+        all_meta, all_samples, all_scores = _assert_sequence_buffers_aligned(optimizer)
 
         def _sequence_rows() -> Iterable[dict[str, object]]:
-            for (chain_id, draw_i), seq_arr, per_tf_map in zip(
-                optimizer.all_meta, optimizer.all_samples, optimizer.all_scores
-            ):
+            for (chain_id, draw_i), seq_arr, per_tf_map in zip(all_meta, all_samples, all_scores):
                 if not record_tune and draw_i < adapt_sweeps:
                     continue
                 if record_tune and draw_i < adapt_sweeps:
@@ -593,6 +669,15 @@ def _run_sample_for_set(
         logger.debug("Normalised-min percentiles |  median %.2f   90%% %.2f", p50_min, p90_min)
 
     elite_k = int(sample_cfg.elites.k or 0)
+    if elite_k > 0 and not raw_elites:
+        _finish_failed(
+            RunError(
+                "No elite candidates passed filtering. "
+                "Try one or more of: relax cruncher.sample.elites.filter.min_per_tf_norm, "
+                "increase cruncher.sample.sequence_length, or increase cruncher.sample.budget.draws."
+            )
+        )
+
     dsdna_mode = bool(sample_cfg.objective.bidirectional)
     pool_size_cfg = sample_cfg.elites.select.pool_size
     if pool_size_cfg == "auto":
@@ -619,8 +704,15 @@ def _run_sample_for_set(
     mmr_meta_rows = selection_result.mmr_meta_rows
     mmr_summary = selection_result.mmr_summary
 
-    if not kept_elites and min_per_tf_norm is not None:
-        logger.warning("Elite filters removed all candidates; relax min_per_tf_norm.")
+    if elite_k > 0 and len(kept_elites) < elite_k:
+        _finish_failed(
+            RunError(
+                f"Elite selection returned {len(kept_elites)} candidates, "
+                f"fewer than cruncher.sample.elites.k={elite_k}. "
+                "Try one or more of: relax cruncher.sample.elites.filter.min_per_tf_norm, "
+                "increase cruncher.sample.sequence_length, or increase cruncher.sample.budget.draws."
+            )
+        )
 
     # serialise elites
     want_cons = False
@@ -736,7 +828,7 @@ def _run_sample_for_set(
         "passed_pre_filter": len(raw_elites),
         "kept_after_mmr": kept_after_mmr,
         "objective_combine": combine_resolved,
-        "softmin_beta_final_resolved": beta_softmin_final,
+        "softmin_final_beta_used": beta_softmin_final,
         "pool_size": pool_size,
         "indexing_note": (
             "chain is 0-based; chain_1based is 1-based; draw_idx is absolute sweep; draw_in_phase is phase-relative"

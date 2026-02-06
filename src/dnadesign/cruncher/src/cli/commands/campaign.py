@@ -57,10 +57,19 @@ def _rebase_path(value: str | None, *, src_dir: Path, dst_dir: Path) -> str | No
 def _rebase_config_paths(data: dict, *, src_dir: Path, dst_dir: Path) -> None:
     if src_dir == dst_dir:
         return
-    data["out_dir"] = _rebase_path(data.get("out_dir"), src_dir=src_dir, dst_dir=dst_dir)
-    motif_store = data.get("motif_store") or {}
-    motif_store["catalog_root"] = _rebase_path(
-        motif_store.get("catalog_root"),
+    workspace = data.get("workspace")
+    if not isinstance(workspace, dict):
+        raise ValueError("Derived config payload missing required workspace mapping.")
+    workspace["out_dir"] = _rebase_path(
+        workspace.get("out_dir"),
+        src_dir=src_dir,
+        dst_dir=dst_dir,
+    )
+    catalog = data.get("catalog")
+    if not isinstance(catalog, dict):
+        raise ValueError("Derived config payload missing required catalog mapping.")
+    catalog["root"] = _rebase_path(
+        catalog.get("root"),
         src_dir=src_dir,
         dst_dir=dst_dir,
     )
@@ -74,7 +83,8 @@ def _rebase_config_paths(data: dict, *, src_dir: Path, dst_dir: Path) -> None:
     for src in local_sources:
         src["root"] = _rebase_path(src.get("root"), src_dir=src_dir, dst_dir=dst_dir)
     ingest["local_sources"] = local_sources
-    data["motif_store"] = motif_store
+    data["workspace"] = workspace
+    data["catalog"] = catalog
     data["ingest"] = ingest
 
 
@@ -149,7 +159,11 @@ def generate(
     generated_at = datetime.now(timezone.utc).isoformat()
 
     data = cfg.model_dump(mode="json")
-    data["regulator_sets"] = expansion.regulator_sets
+    workspace = data.get("workspace")
+    if not isinstance(workspace, dict):
+        raise ValueError("Resolved config missing workspace settings.")
+    workspace["regulator_sets"] = expansion.regulator_sets
+    data["workspace"] = workspace
     manifest_value: Path | str
     try:
         manifest_value = manifest_path.relative_to(workspace_root)

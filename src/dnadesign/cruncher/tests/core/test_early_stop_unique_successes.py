@@ -53,6 +53,7 @@ def test_pt_early_stop_waits_for_unique_successes() -> None:
         "chains": 1,
         "min_dist": 0,
         "top_k": 1,
+        "sequence_length": 4,
         "swap_prob": 0.0,
         "bidirectional": False,
         "dsdna_canonicalize": False,

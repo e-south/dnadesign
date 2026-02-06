@@ -45,11 +45,6 @@ from dnadesign.cruncher.analysis.objective import compute_objective_components
 from dnadesign.cruncher.analysis.overlap import compute_overlap_tables
 from dnadesign.cruncher.analysis.parquet import read_parquet, write_parquet
 from dnadesign.cruncher.analysis.plot_registry import PLOT_SPECS
-from dnadesign.cruncher.analysis.plots.elites_nn_distance import plot_elites_nn_distance
-from dnadesign.cruncher.analysis.plots.health_panel import plot_health_panel
-from dnadesign.cruncher.analysis.plots.opt_trajectory import plot_opt_trajectory
-from dnadesign.cruncher.analysis.plots.overlap import plot_overlap_panel
-from dnadesign.cruncher.analysis.plots.run_summary import plot_run_summary
 from dnadesign.cruncher.analysis.report import build_report_payload, write_report_json, write_report_md
 from dnadesign.cruncher.analysis.trajectory import build_trajectory_points, project_scores
 from dnadesign.cruncher.app.analyze.archive import _prune_latest_analysis_artifacts
@@ -61,7 +56,7 @@ from dnadesign.cruncher.app.analyze.metadata import (
     _resolve_sample_meta,
 )
 from dnadesign.cruncher.app.analyze.plan import resolve_analysis_plan
-from dnadesign.cruncher.app.run_service import list_runs
+from dnadesign.cruncher.app.run_service import get_run, list_runs
 from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json, atomic_write_yaml
 from dnadesign.cruncher.artifacts.entries import append_artifacts, artifact_entry
 from dnadesign.cruncher.artifacts.layout import (
@@ -110,11 +105,38 @@ def _resolve_run_names(
 
 
 def _resolve_run_dir(cfg: CruncherConfig, config_path: Path, run_name: str) -> Path:
-    runs = list_runs(cfg, config_path, stage="sample")
-    for run in runs:
-        if run.name == run_name:
-            return run.run_dir
-    raise FileNotFoundError(f"Run '{run_name}' not found in run index.")
+    run = get_run(cfg, config_path, run_name)
+    if run.stage != "sample":
+        raise ValueError(f"Run '{run_name}' is not a sample run (stage={run.stage}).")
+    return run.run_dir
+
+
+def _resolve_optimizer_stats(manifest: dict[str, object], run_dir: Path) -> dict[str, object] | None:
+    stats_payload = manifest.get("optimizer_stats")
+    if stats_payload is None:
+        return None
+    if not isinstance(stats_payload, dict):
+        raise ValueError("Run manifest field 'optimizer_stats' must be a dictionary.")
+    optimizer_stats = dict(stats_payload)
+    move_stats_path = optimizer_stats.get("move_stats_path") or manifest.get("optimizer_stats_path")
+    if move_stats_path is None:
+        return optimizer_stats
+    if not isinstance(move_stats_path, str) or not move_stats_path:
+        raise ValueError("Run manifest field 'optimizer_stats_path' must be a non-empty string when provided.")
+    relative = Path(move_stats_path)
+    if relative.is_absolute():
+        raise ValueError("Run manifest field 'optimizer_stats_path' must be relative to the run directory.")
+    sidecar = run_dir / relative
+    if not sidecar.exists():
+        raise FileNotFoundError(f"Missing optimizer stats sidecar: {sidecar}")
+    payload = json.loads(sidecar.read_text())
+    if not isinstance(payload, dict):
+        raise ValueError(f"Optimizer stats sidecar must contain an object: {sidecar}")
+    move_stats = payload.get("move_stats")
+    if not isinstance(move_stats, list):
+        raise ValueError(f"Optimizer stats sidecar missing 'move_stats' list: {sidecar}")
+    optimizer_stats["move_stats"] = move_stats
+    return optimizer_stats
 
 
 def _load_elites_meta(path: Path) -> dict[str, object]:
@@ -311,8 +333,13 @@ def run_analyze(
     if cfg.sample is None:
         raise ValueError("sample section is required for analyze")
 
-    ensure_mpl_cache(resolve_catalog_root(config_path, cfg.motif_store.catalog_root))
-    import arviz as az
+    ensure_mpl_cache(resolve_catalog_root(config_path, cfg.catalog.catalog_root))
+
+    from dnadesign.cruncher.analysis.plots.elites_nn_distance import plot_elites_nn_distance
+    from dnadesign.cruncher.analysis.plots.health_panel import plot_health_panel
+    from dnadesign.cruncher.analysis.plots.opt_trajectory import plot_opt_trajectory
+    from dnadesign.cruncher.analysis.plots.overlap import plot_overlap_panel
+    from dnadesign.cruncher.analysis.plots.run_summary import plot_run_summary
 
     plan = resolve_analysis_plan(cfg)
     analysis_cfg = plan.analysis_cfg
@@ -322,6 +349,7 @@ def run_analyze(
     for run_name in runs:
         run_dir = _resolve_run_dir(cfg, config_path, run_name)
         manifest = load_manifest(run_dir)
+        optimizer_stats = _resolve_optimizer_stats(manifest, run_dir)
         lockfile_path = manifest.get("lockfile_path")
         lockfile_sha = manifest.get("lockfile_sha256")
         if lockfile_path and lockfile_sha:
@@ -374,7 +402,11 @@ def run_analyze(
         baseline_hits_df = load_baseline_hits(baseline_hits_file)
 
         trace_file = trace_path(run_dir)
-        trace_idata = az.from_netcdf(trace_file) if trace_file.exists() else None
+        trace_idata = None
+        if trace_file.exists():
+            import arviz as az
+
+            trace_idata = az.from_netcdf(trace_file)
 
         elites_meta = _load_elites_meta(elites_yaml_path(run_dir))
 
@@ -424,7 +456,7 @@ def run_analyze(
             elites_hits_df=hits_df,
             tf_names=tf_names,
             optimizer=manifest.get("optimizer"),
-            optimizer_stats=manifest.get("optimizer_stats"),
+            optimizer_stats=optimizer_stats,
             mode=sample_meta.mode,
             optimizer_kind=sample_meta.optimizer_kind,
             sample_meta={
@@ -526,53 +558,56 @@ def run_analyze(
                 )
 
         plot_summary_path = tmp_root / f"plot__run__summary.{plot_format}"
-        try:
-            plot_run_summary(
-                sequences_df,
-                elites_df,
-                baseline_df,
-                nn_df,
-                tf_names,
-                plot_summary_path,
-                optimizer_stats=manifest.get("optimizer_stats") if trace_idata is not None else None,
-                score_scale=plot_score_scale_used,
-                **plot_kwargs,
-            )
-            _record_plot("run_summary", plot_summary_path, True, None)
-        except Exception as exc:
-            _record_plot("run_summary", plot_summary_path, False, str(exc))
+        min_per_tf_norm_filter = manifest.get("elites_min_per_tf_norm_resolved")
+        if min_per_tf_norm_filter is not None:
+            min_per_tf_norm_filter = float(min_per_tf_norm_filter)
+        plot_run_summary(
+            sequences_df,
+            elites_df,
+            baseline_df,
+            nn_df,
+            tf_names,
+            plot_summary_path,
+            optimizer_stats=optimizer_stats if trace_idata is not None else None,
+            include_swap_summary=trace_idata is not None,
+            min_per_tf_norm_filter=min_per_tf_norm_filter,
+            score_scale=plot_score_scale_used,
+            **plot_kwargs,
+        )
+        _record_plot("run_summary", plot_summary_path, True, None)
 
         plot_trajectory_path = tmp_root / f"plot__opt__trajectory.{plot_format}"
-        try:
-            identity_mode = "canonical" if sample_meta.bidirectional else "raw"
-            elite_centroid = None
-            if elites_df is not None and not elites_df.empty:
-                elite_x, elite_y, _, _, _, _ = project_scores(elites_df, tf_names)
-                if len(elite_x) and len(elite_y):
-                    elite_centroid = (float(np.median(elite_x)), float(np.median(elite_y)))
-            plot_opt_trajectory(
-                trajectory_df,
-                baseline_df,
-                tf_names,
-                plot_trajectory_path,
-                identity_mode=identity_mode,
-                elite_centroid=elite_centroid,
-                score_scale=plot_score_scale_used,
-                **plot_kwargs,
-            )
-            _record_plot("opt_trajectory", plot_trajectory_path, True, None)
-        except Exception as exc:
-            _record_plot("opt_trajectory", plot_trajectory_path, False, str(exc))
+        identity_mode = "canonical" if sample_meta.bidirectional else "raw"
+        elite_centroid = None
+        if elites_df is not None and not elites_df.empty:
+            elite_x, elite_y, _, _, _, _ = project_scores(elites_df, tf_names)
+            if len(elite_x) and len(elite_y):
+                elite_centroid = (float(np.median(elite_x)), float(np.median(elite_y)))
+        plot_opt_trajectory(
+            trajectory_df,
+            baseline_df,
+            tf_names,
+            plot_trajectory_path,
+            identity_mode=identity_mode,
+            elite_centroid=elite_centroid,
+            score_scale=plot_score_scale_used,
+            **plot_kwargs,
+        )
+        _record_plot("opt_trajectory", plot_trajectory_path, True, None)
 
         plot_nn_path = tmp_root / f"plot__elites__nn_distance.{plot_format}"
-        try:
-            plot_elites_nn_distance(nn_df, plot_nn_path, baseline_nn=pd.Series(baseline_nn), **plot_kwargs)
-            _record_plot("elites_nn_distance", plot_nn_path, True, None)
-        except Exception as exc:
-            _record_plot("elites_nn_distance", plot_nn_path, False, str(exc))
+        plot_elites_nn_distance(nn_df, plot_nn_path, baseline_nn=pd.Series(baseline_nn), **plot_kwargs)
+        _record_plot("elites_nn_distance", plot_nn_path, True, None)
 
         plot_overlap_path = tmp_root / f"plot__overlap__panel.{plot_format}"
-        try:
+        overlap_skip_reason = None
+        if len(tf_names) < 2:
+            overlap_skip_reason = "n_tf < 2"
+        elif len(elites_df) < 2:
+            overlap_skip_reason = "elites_count < 2"
+        if overlap_skip_reason is not None:
+            _record_plot("overlap_panel", plot_overlap_path, False, overlap_skip_reason)
+        else:
             plot_overlap_panel(
                 overlap_summary_df,
                 elite_overlap_df,
@@ -582,18 +617,13 @@ def run_analyze(
                 **plot_kwargs,
             )
             _record_plot("overlap_panel", plot_overlap_path, True, None)
-        except Exception as exc:
-            _record_plot("overlap_panel", plot_overlap_path, False, str(exc))
 
         plot_health_path = tmp_root / f"plot__health__panel.{plot_format}"
         if trace_idata is None:
-            _record_plot("health_panel", plot_health_path, False, "Trace not available.")
+            _record_plot("health_panel", plot_health_path, False, "trace disabled")
         else:
-            try:
-                plot_health_panel(manifest.get("optimizer_stats"), plot_health_path, **plot_kwargs)
-                _record_plot("health_panel", plot_health_path, True, None)
-            except Exception as exc:
-                _record_plot("health_panel", plot_health_path, False, str(exc))
+            plot_health_panel(optimizer_stats, plot_health_path, **plot_kwargs)
+            _record_plot("health_panel", plot_health_path, True, None)
 
         table_entries = [
             {"key": "scores_summary", "label": "Per-TF summary", "path": score_summary_path.name, "exists": True},

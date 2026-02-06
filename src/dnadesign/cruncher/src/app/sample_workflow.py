@@ -69,7 +69,7 @@ def run_sample(
     if cfg.sample is None:
         raise ValueError("sample section is required for sample")
     with _sigterm_as_keyboard_interrupt():
-        ensure_mpl_cache(resolve_catalog_root(config_path, cfg.motif_store.catalog_root))
+        ensure_mpl_cache(resolve_catalog_root(config_path, cfg.catalog.catalog_root))
         lockmap = _lockmap_for(cfg, config_path)
         statuses = target_statuses(cfg=cfg, config_path=config_path)
         sample_cfg = cfg.sample

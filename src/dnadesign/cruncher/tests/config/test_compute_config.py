@@ -23,21 +23,26 @@ from dnadesign.cruncher.config.load import load_config
 def _base_config() -> dict:
     return {
         "cruncher": {
-            "out_dir": "runs",
-            "regulator_sets": [["lexA", "cpxR"]],
-            "motif_store": {"catalog_root": ".cruncher", "pwm_source": "matrix"},
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
+            "schema_version": 3,
+            "workspace": {"out_dir": "runs", "regulator_sets": [["lexA", "cpxR"]]},
+            "catalog": {"root": ".cruncher", "pwm_source": "matrix"},
             "sample": {
-                "mode": "sample",
-                "rng": {"seed": 7, "deterministic": True},
+                "seed": 7,
                 "sequence_length": 12,
-                "compute": {"total_sweeps": 4, "adapt_sweep_frac": 0.25},
-                "init": {"kind": "random", "pad_with": "background"},
-                "objective": {"bidirectional": True, "score_scale": "normalized-llr"},
-                "elites": {"k": 1, "min_per_tf_norm": 0.0, "mmr_alpha": 0.85},
+                "budget": {"tune": 1, "draws": 3},
+                "objective": {"bidirectional": True, "score_scale": "normalized-llr", "combine": "min"},
+                "elites": {
+                    "k": 1,
+                    "filter": {"min_per_tf_norm": 0.0, "require_all_tfs": True, "pwm_sum_min": 0.0},
+                    "select": {"alpha": 0.85, "pool_size": "auto"},
+                },
                 "moves": {"profile": "balanced"},
-                "output": {"trace": {"save": False}, "save_sequences": True},
-                "ui": {"progress_bar": False, "progress_every": 0},
+                "output": {
+                    "save_trace": False,
+                    "save_sequences": True,
+                    "include_tune_in_sequences": False,
+                    "live_metrics": False,
+                },
             },
         }
     }
@@ -54,23 +59,23 @@ def test_compute_config_loads(tmp_path: Path) -> None:
     cfg = load_config(config_path)
     assert cfg.sample is not None
     assert cfg.sample.sequence_length == 12
-    assert cfg.sample.compute.total_sweeps == 4
-    assert cfg.sample.compute.adapt_sweep_frac == 0.25
-
-
-@pytest.mark.parametrize("value", [0.0, -0.1, 1.1])
-def test_adapt_sweep_frac_bounds(tmp_path: Path, value: float) -> None:
-    payload = _base_config()
-    payload["cruncher"]["sample"]["compute"]["adapt_sweep_frac"] = value
-    config_path = _write_config(tmp_path, payload)
-    with pytest.raises(ValidationError, match="adapt_sweep_frac"):
-        load_config(config_path)
+    assert cfg.sample.budget.tune == 1
+    assert cfg.sample.budget.draws == 3
 
 
 @pytest.mark.parametrize("value", [0, -1])
-def test_total_sweeps_requires_positive(tmp_path: Path, value: int) -> None:
+def test_draws_requires_positive(tmp_path: Path, value: int) -> None:
     payload = _base_config()
-    payload["cruncher"]["sample"]["compute"]["total_sweeps"] = value
+    payload["cruncher"]["sample"]["budget"]["draws"] = value
     config_path = _write_config(tmp_path, payload)
-    with pytest.raises(ValidationError, match="total_sweeps"):
+    with pytest.raises(ValidationError, match="sample.budget.draws"):
+        load_config(config_path)
+
+
+@pytest.mark.parametrize("value", [-1])
+def test_tune_requires_non_negative(tmp_path: Path, value: int) -> None:
+    payload = _base_config()
+    payload["cruncher"]["sample"]["budget"]["tune"] = value
+    config_path = _write_config(tmp_path, payload)
+    with pytest.raises(ValidationError, match="sample.budget.tune"):
         load_config(config_path)

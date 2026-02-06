@@ -20,11 +20,14 @@ runner = CliRunner()
 def _write_config(tmp_path: Path) -> Path:
     config = {
         "cruncher": {
-            "out_dir": "runs",
-            "regulator_sets": [["LexA"]],
-            "regulator_categories": {
-                "CatA": ["LexA", "CpxR"],
-                "CatB": ["Fur", "Lrp"],
+            "schema_version": 3,
+            "workspace": {
+                "out_dir": "runs",
+                "regulator_sets": [["LexA"]],
+                "regulator_categories": {
+                    "CatA": ["LexA", "CpxR"],
+                    "CatB": ["Fur", "Lrp"],
+                },
             },
             "campaigns": [
                 {
@@ -34,7 +37,6 @@ def _write_config(tmp_path: Path) -> Path:
                     "across_categories": {"sizes": [2], "max_per_category": 1},
                 }
             ],
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
         }
     }
     config_path = tmp_path / "config.yaml"

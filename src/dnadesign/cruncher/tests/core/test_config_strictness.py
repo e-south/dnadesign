@@ -21,10 +21,9 @@ from dnadesign.cruncher.config.load import load_config
 def _base_config() -> dict:
     return {
         "cruncher": {
-            "out_dir": "runs",
-            "regulator_sets": [["lexA"]],
-            "motif_store": {"catalog_root": ".cruncher", "pwm_source": "matrix"},
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
+            "schema_version": 3,
+            "workspace": {"out_dir": "runs", "regulator_sets": [["lexA"]]},
+            "catalog": {"root": ".cruncher", "pwm_source": "matrix"},
         }
     }
 
@@ -36,14 +35,18 @@ def _write_config(tmp_path: Path, config: dict) -> Path:
 
 
 def _sample_block(*, total_sweeps: int = 3, adapt_sweep_frac: float = 0.34) -> dict:
+    tune = max(0, min(total_sweeps - 1, int(round(total_sweeps * adapt_sweep_frac))))
+    draws = total_sweeps - tune
     return {
-        "mode": "sample",
-        "rng": {"seed": 7, "deterministic": True},
+        "seed": 7,
         "sequence_length": 12,
-        "compute": {"total_sweeps": total_sweeps, "adapt_sweep_frac": adapt_sweep_frac},
-        "init": {"kind": "random", "pad_with": "background"},
-        "objective": {"bidirectional": True, "score_scale": "llr"},
-        "elites": {"k": 1, "min_per_tf_norm": None},
+        "budget": {"tune": tune, "draws": draws},
+        "objective": {"bidirectional": True, "score_scale": "llr", "combine": "min"},
+        "elites": {
+            "k": 1,
+            "filter": {"min_per_tf_norm": None, "require_all_tfs": True, "pwm_sum_min": 0.0},
+            "select": {"alpha": 0.85, "pool_size": "auto"},
+        },
         "moves": {
             "profile": "balanced",
             "overrides": {
@@ -54,7 +57,12 @@ def _sample_block(*, total_sweeps: int = 3, adapt_sweep_frac: float = 0.34) -> d
                 "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
             },
         },
-        "output": {"trace": {"save": False}, "save_sequences": True},
+        "output": {
+            "save_trace": False,
+            "save_sequences": True,
+            "include_tune_in_sequences": False,
+            "live_metrics": False,
+        },
     }
 
 
@@ -71,21 +79,19 @@ def test_unknown_top_level_key_is_rejected(tmp_path: Path) -> None:
     )
 
 
-def test_multi_tf_llr_requires_allow_unscaled(tmp_path: Path) -> None:
+def test_multi_tf_llr_rejects_removed_allow_unscaled_key(tmp_path: Path) -> None:
     config = _base_config()
-    config["cruncher"]["regulator_sets"] = [["lexA", "cpxR"]]
+    config["cruncher"]["workspace"]["regulator_sets"] = [["lexA", "cpxR"]]
     config["cruncher"]["sample"] = _sample_block()
+    config["cruncher"]["sample"]["objective"]["allow_unscaled_llr"] = True
     config_path = _write_config(tmp_path, config)
     with pytest.raises(ValidationError, match="allow_unscaled_llr"):
         load_config(config_path)
-    config["cruncher"]["sample"]["objective"]["allow_unscaled_llr"] = True
-    config_path = _write_config(tmp_path, config)
-    load_config(config_path)
 
 
 def test_unknown_nested_key_is_rejected(tmp_path: Path) -> None:
     config = _base_config()
-    config["cruncher"]["motif_store"]["bogus"] = "nope"
+    config["cruncher"]["catalog"]["bogus"] = "nope"
     config_path = _write_config(tmp_path, config)
 
     with pytest.raises(ValidationError) as exc:
@@ -96,7 +102,7 @@ def test_unknown_nested_key_is_rejected(tmp_path: Path) -> None:
 
 def test_motif_discovery_accepts_meme_prior(tmp_path: Path) -> None:
     config = _base_config()
-    config["cruncher"]["motif_discovery"] = {"tool": "meme", "meme_prior": "addone"}
+    config["cruncher"]["discover"] = {"tool": "meme", "meme_prior": "addone"}
     config_path = _write_config(tmp_path, config)
 
     load_config(config_path)
@@ -104,7 +110,7 @@ def test_motif_discovery_accepts_meme_prior(tmp_path: Path) -> None:
 
 def test_motif_discovery_rejects_invalid_meme_prior(tmp_path: Path) -> None:
     config = _base_config()
-    config["cruncher"]["motif_discovery"] = {"tool": "meme", "meme_prior": "invalid"}
+    config["cruncher"]["discover"] = {"tool": "meme", "meme_prior": "invalid"}
     config_path = _write_config(tmp_path, config)
 
     with pytest.raises(ValidationError, match="meme_prior"):
@@ -114,10 +120,8 @@ def test_motif_discovery_rejects_invalid_meme_prior(tmp_path: Path) -> None:
 def test_missing_cruncher_root_is_rejected(tmp_path: Path) -> None:
     config_path = _write_config(tmp_path, {"not_cruncher": {"out_dir": "runs"}})
 
-    with pytest.raises(ValidationError) as exc:
+    with pytest.raises(ValueError, match="missing root key: cruncher"):
         load_config(config_path)
-
-    assert any(err.get("type") == "missing" and err.get("loc") == ("cruncher",) for err in exc.value.errors())
 
 
 @pytest.mark.parametrize("out_dir", ["__absolute__", "../runs"])
@@ -125,34 +129,52 @@ def test_out_dir_must_be_workspace_relative(tmp_path: Path, out_dir: str) -> Non
     config = _base_config()
     if out_dir == "__absolute__":
         out_dir = str(tmp_path / "runs")
-    config["cruncher"]["out_dir"] = str(out_dir)
+    config["cruncher"]["workspace"]["out_dir"] = str(out_dir)
     config_path = _write_config(tmp_path, config)
 
     with pytest.raises(ValidationError) as exc:
         load_config(config_path)
 
-    assert any(err.get("loc") == ("cruncher", "out_dir") for err in exc.value.errors())
+    assert any(err.get("loc") == ("cruncher", "workspace", "out_dir") for err in exc.value.errors())
 
 
 @pytest.mark.parametrize("catalog_root", ["../catalog"])
 def test_catalog_root_rejects_parent_traversal(tmp_path: Path, catalog_root: str) -> None:
     config = _base_config()
-    config["cruncher"]["motif_store"]["catalog_root"] = str(catalog_root)
+    config["cruncher"]["catalog"]["root"] = str(catalog_root)
     config_path = _write_config(tmp_path, config)
 
     with pytest.raises(ValidationError) as exc:
         load_config(config_path)
 
-    assert any(err.get("loc") == ("cruncher", "motif_store", "catalog_root") for err in exc.value.errors())
+    assert any(err.get("loc") == ("cruncher", "catalog", "root") for err in exc.value.errors())
 
 
 def test_catalog_root_allows_absolute(tmp_path: Path) -> None:
     config = _base_config()
-    config["cruncher"]["motif_store"]["catalog_root"] = str(tmp_path / "catalog")
+    config["cruncher"]["catalog"]["root"] = str(tmp_path / "catalog")
     config_path = _write_config(tmp_path, config)
 
     cfg = load_config(config_path)
-    assert cfg.motif_store.catalog_root.is_absolute()
+    assert cfg.catalog.root.is_absolute()
+
+
+def test_removed_motif_store_alias_property_is_not_exposed(tmp_path: Path) -> None:
+    config = _base_config()
+    config_path = _write_config(tmp_path, config)
+    cfg = load_config(config_path)
+
+    with pytest.raises(AttributeError):
+        _ = cfg.motif_store
+
+
+def test_removed_motif_discovery_alias_property_is_not_exposed(tmp_path: Path) -> None:
+    config = _base_config()
+    config_path = _write_config(tmp_path, config)
+    cfg = load_config(config_path)
+
+    with pytest.raises(AttributeError):
+        _ = cfg.motif_discovery
 
 
 @pytest.mark.parametrize("genome_cache", ["__absolute__", "../genomes"])

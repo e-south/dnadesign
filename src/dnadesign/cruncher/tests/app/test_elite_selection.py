@@ -17,14 +17,18 @@ def test_elite_filter_min_per_tf_norm() -> None:
     assert not _elite_filter_passes(
         norm_map=norm_map,
         min_norm=0.05,
+        sum_norm=0.25,
         min_per_tf_norm=0.1,
         require_all_tfs_over_min_norm=True,
+        pwm_sum_min=0.0,
     )
     assert not _elite_filter_passes(
         norm_map=norm_map,
         min_norm=0.05,
+        sum_norm=0.25,
         min_per_tf_norm=0.1,
         require_all_tfs_over_min_norm=False,
+        pwm_sum_min=0.0,
     )
 
 
@@ -32,12 +36,16 @@ def test_elite_filter_reapplies_min_per_tf_norm() -> None:
     assert _elite_filter_passes(
         norm_map={"tf1": 0.5},
         min_norm=0.5,
+        sum_norm=0.5,
         min_per_tf_norm=0.4,
         require_all_tfs_over_min_norm=True,
+        pwm_sum_min=0.0,
     )
     assert not _elite_filter_passes(
         norm_map={"tf1": 0.1},
         min_norm=0.1,
+        sum_norm=0.1,
         min_per_tf_norm=0.4,
         require_all_tfs_over_min_norm=True,
+        pwm_sum_min=0.0,
     )

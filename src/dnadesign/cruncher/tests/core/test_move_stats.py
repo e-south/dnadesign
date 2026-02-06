@@ -36,6 +36,7 @@ def test_move_stats_length_matches_sweeps() -> None:
         "chains": 1,
         "min_dist": 0,
         "top_k": 1,
+        "sequence_length": 4,
         "swap_prob": 0.0,
         "record_tune": False,
         "progress_bar": False,

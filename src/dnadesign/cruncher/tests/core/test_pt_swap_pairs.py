@@ -38,6 +38,7 @@ def test_pt_swap_pairs_tracked() -> None:
         "chains": chains,
         "min_dist": 0,
         "top_k": 1,
+        "sequence_length": 4,
         "swap_prob": 1.0,
         "bidirectional": False,
         "record_tune": False,

@@ -26,13 +26,13 @@ runner = CliRunner()
 def test_campaign_generate_cli(tmp_path: Path) -> None:
     config = {
         "cruncher": {
-            "out_dir": "runs",
-            "regulator_sets": [],
-            "motif_store": {"catalog_root": str(tmp_path / ".cruncher")},
-            "regulator_categories": {
-                "CatA": ["A", "B"],
-                "CatB": ["C", "D"],
+            "schema_version": 3,
+            "workspace": {
+                "out_dir": "runs",
+                "regulator_sets": [["A"]],
+                "regulator_categories": {"CatA": ["A", "B"], "CatB": ["C", "D"]},
             },
+            "catalog": {"root": str(tmp_path / ".cruncher")},
             "campaigns": [
                 {
                     "name": "demo",
@@ -41,7 +41,6 @@ def test_campaign_generate_cli(tmp_path: Path) -> None:
                     "across_categories": {"sizes": [2], "max_per_category": 1},
                 }
             ],
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
         }
     }
     config_path = tmp_path / "config.yaml"
@@ -59,7 +58,7 @@ def test_campaign_generate_cli(tmp_path: Path) -> None:
 
     payload = yaml.safe_load(out_path.read_text())["cruncher"]
     assert payload["campaign"]["name"] == "demo"
-    assert payload["regulator_sets"] == [
+    assert payload["workspace"]["regulator_sets"] == [
         ["A", "B"],
         ["C", "D"],
         ["A", "C"],
@@ -78,9 +77,12 @@ def test_campaign_generate_keeps_workspace_relative_paths(tmp_path: Path) -> Non
     workspace.mkdir()
     config = {
         "cruncher": {
-            "out_dir": "runs",
-            "regulator_sets": [],
-            "regulator_categories": {"CatA": ["A"], "CatB": ["B"]},
+            "schema_version": 3,
+            "workspace": {
+                "out_dir": "runs",
+                "regulator_sets": [["A"]],
+                "regulator_categories": {"CatA": ["A"], "CatB": ["B"]},
+            },
             "campaigns": [
                 {
                     "name": "demo",
@@ -88,7 +90,7 @@ def test_campaign_generate_keeps_workspace_relative_paths(tmp_path: Path) -> Non
                     "across_categories": {"sizes": [2], "max_per_category": 1},
                 }
             ],
-            "motif_store": {"catalog_root": ".cruncher"},
+            "catalog": {"root": ".cruncher"},
             "ingest": {
                 "genome_fasta": "data/genome.fna",
                 "genome_cache": ".cruncher/genomes",
@@ -101,7 +103,6 @@ def test_campaign_generate_keeps_workspace_relative_paths(tmp_path: Path) -> Non
                     }
                 ],
             },
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
         }
     }
     config_path = workspace / "config.yaml"
@@ -115,8 +116,8 @@ def test_campaign_generate_keeps_workspace_relative_paths(tmp_path: Path) -> Non
     assert out_path.exists()
     payload = yaml.safe_load(out_path.read_text())["cruncher"]
 
-    assert payload["out_dir"] == "runs"
-    assert payload["motif_store"]["catalog_root"] == ".cruncher"
+    assert payload["workspace"]["out_dir"] == "runs"
+    assert payload["catalog"]["root"] == ".cruncher"
     assert payload["ingest"]["genome_cache"] == ".cruncher/genomes"
     assert payload["ingest"]["genome_fasta"] == "data/genome.fna"
     assert payload["ingest"]["regulondb"]["ca_bundle"] == "certs/ca.pem"
@@ -126,10 +127,13 @@ def test_campaign_generate_keeps_workspace_relative_paths(tmp_path: Path) -> Non
 def test_campaign_summarize_cli(tmp_path: Path) -> None:
     config = {
         "cruncher": {
-            "out_dir": "runs",
-            "regulator_sets": [],
-            "motif_store": {"catalog_root": str(tmp_path / ".cruncher")},
-            "regulator_categories": {"CatA": ["A", "B"], "CatB": ["C", "D"]},
+            "schema_version": 3,
+            "workspace": {
+                "out_dir": "runs",
+                "regulator_sets": [["A"]],
+                "regulator_categories": {"CatA": ["A", "B"], "CatB": ["C", "D"]},
+            },
+            "catalog": {"root": str(tmp_path / ".cruncher")},
             "campaigns": [
                 {
                     "name": "demo",
@@ -138,7 +142,6 @@ def test_campaign_summarize_cli(tmp_path: Path) -> None:
                     "across_categories": {"sizes": [2], "max_per_category": 1},
                 }
             ],
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
         }
     }
     config_path = tmp_path / "config.yaml"
@@ -153,13 +156,24 @@ def test_campaign_summarize_cli(tmp_path: Path) -> None:
     ):
         (run_dir / "analysis").mkdir(parents=True, exist_ok=True)
         (run_dir / "analysis" / "summary.json").write_text(json.dumps({"analysis_id": "analysis-1", "tf_names": tfs}))
+        (run_dir / "analysis" / "table_manifest.json").write_text(
+            json.dumps(
+                {
+                    "analysis_id": "analysis-1",
+                    "tables": [
+                        {"key": "scores_summary", "path": "table__scores__summary.parquet", "exists": True},
+                        {"key": "metrics_joint", "path": "table__metrics__joint.parquet", "exists": True},
+                    ],
+                }
+            )
+        )
         score_summary_df = pd.DataFrame(
             [
                 {"tf": tfs[0], "mean": 1.0, "median": 1.0, "std": 0.1, "min": 0.8, "max": 1.2},
                 {"tf": tfs[1], "mean": 0.9, "median": 0.9, "std": 0.1, "min": 0.7, "max": 1.1},
             ]
         )
-        score_summary_df.to_parquet(run_dir / "analysis" / "score_summary.parquet", index=False)
+        score_summary_df.to_parquet(run_dir / "analysis" / "table__scores__summary.parquet", index=False)
         joint_metrics_df = pd.DataFrame(
             [
                 {
@@ -173,7 +187,7 @@ def test_campaign_summarize_cli(tmp_path: Path) -> None:
                 }
             ]
         )
-        joint_metrics_df.to_parquet(run_dir / "analysis" / "joint_metrics.parquet", index=False)
+        joint_metrics_df.to_parquet(run_dir / "analysis" / "table__metrics__joint.parquet", index=False)
         manifest_path = run_dir / "meta" / "run_manifest.json"
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_text(
@@ -213,12 +227,99 @@ def test_campaign_summarize_cli(tmp_path: Path) -> None:
     assert (out_dir / "plot__pareto_projection.png").exists()
 
 
+def test_campaign_summarize_uses_table_manifest_contract(tmp_path: Path) -> None:
+    config = {
+        "cruncher": {
+            "schema_version": 3,
+            "workspace": {
+                "out_dir": "runs",
+                "regulator_sets": [["A"]],
+                "regulator_categories": {"CatA": ["A", "B"], "CatB": ["C", "D"]},
+            },
+            "catalog": {"root": str(tmp_path / ".cruncher")},
+            "campaigns": [
+                {
+                    "name": "demo",
+                    "categories": ["CatA", "CatB"],
+                    "within_category": {"sizes": [2]},
+                    "across_categories": {"sizes": [2], "max_per_category": 1},
+                }
+            ],
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    run_dir = tmp_path / "runs" / "sample" / "sample_manifest_tables"
+    analysis_dir = run_dir / "analysis"
+    analysis_dir.mkdir(parents=True, exist_ok=True)
+    tfs = ["A", "B"]
+    (analysis_dir / "summary.json").write_text(
+        json.dumps({"analysis_id": "analysis-1", "tf_names": tfs, "analysis_config": {"table_format": "parquet"}})
+    )
+    (analysis_dir / "table_manifest.json").write_text(
+        json.dumps(
+            {
+                "analysis_id": "analysis-1",
+                "tables": [
+                    {"key": "scores_summary", "path": "table__scores__summary.parquet", "exists": True},
+                    {"key": "metrics_joint", "path": "table__metrics__joint.parquet", "exists": True},
+                ],
+            }
+        )
+    )
+    pd.DataFrame(
+        [
+            {"tf": tfs[0], "mean": 1.0, "median": 1.0, "std": 0.1, "min": 0.8, "max": 1.2},
+            {"tf": tfs[1], "mean": 0.9, "median": 0.9, "std": 0.1, "min": 0.7, "max": 1.1},
+        ]
+    ).to_parquet(analysis_dir / "table__scores__summary.parquet", index=False)
+    pd.DataFrame(
+        [
+            {
+                "tf_names": ",".join(tfs),
+                "joint_min": 0.8,
+                "joint_mean": 1.0,
+                "joint_hmean": 0.9,
+                "balance_index": 0.8,
+                "pareto_front_size": 1,
+                "pareto_fraction": 0.5,
+            }
+        ]
+    ).to_parquet(analysis_dir / "table__metrics__joint.parquet", index=False)
+    manifest_path = run_dir / "meta" / "run_manifest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(json.dumps({"stage": "sample", "run_dir": str(run_dir), "regulator_set": {"tfs": tfs}}))
+    report_path = run_dir / "analysis" / "report.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps({"run": {"n_sequences": 2, "n_elites": 1}}))
+
+    result = runner.invoke(
+        app,
+        [
+            "campaign",
+            "summarize",
+            "--campaign",
+            "demo",
+            "--no-metrics",
+            "--runs",
+            str(run_dir),
+            "--config",
+            str(config_path),
+        ],
+    )
+    assert result.exit_code == 0
+
+
 def test_campaign_validate_cli_no_selectors(tmp_path: Path) -> None:
     config = {
         "cruncher": {
-            "out_dir": "runs",
-            "regulator_sets": [],
-            "regulator_categories": {"CatA": ["A", "B"], "CatB": ["C"]},
+            "schema_version": 3,
+            "workspace": {
+                "out_dir": "runs",
+                "regulator_sets": [["A"]],
+                "regulator_categories": {"CatA": ["A", "B"], "CatB": ["C"]},
+            },
             "campaigns": [
                 {
                     "name": "demo",
@@ -226,7 +327,6 @@ def test_campaign_validate_cli_no_selectors(tmp_path: Path) -> None:
                     "across_categories": {"sizes": [2], "max_per_category": 1},
                 }
             ],
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
         }
     }
     config_path = tmp_path / "config.yaml"
@@ -243,10 +343,13 @@ def test_campaign_validate_cli_no_selectors(tmp_path: Path) -> None:
 def test_campaign_validate_requires_catalog(tmp_path: Path) -> None:
     config = {
         "cruncher": {
-            "out_dir": "runs",
-            "regulator_sets": [],
-            "motif_store": {"catalog_root": str(tmp_path / ".cruncher")},
-            "regulator_categories": {"CatA": ["A", "B"], "CatB": ["C"]},
+            "schema_version": 3,
+            "workspace": {
+                "out_dir": "runs",
+                "regulator_sets": [["A"]],
+                "regulator_categories": {"CatA": ["A", "B"], "CatB": ["C"]},
+            },
+            "catalog": {"root": str(tmp_path / ".cruncher")},
             "campaigns": [
                 {
                     "name": "demo",
@@ -255,7 +358,6 @@ def test_campaign_validate_requires_catalog(tmp_path: Path) -> None:
                     "selectors": {"min_site_count": 1},
                 }
             ],
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
         }
     }
     config_path = tmp_path / "config.yaml"

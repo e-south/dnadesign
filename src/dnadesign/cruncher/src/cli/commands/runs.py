@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,6 +27,7 @@ from dnadesign.cruncher.analysis.layout import (
 )
 from dnadesign.cruncher.app.run_service import (
     drop_run_index_entries,
+    find_invalid_run_index_entries,
     get_run,
     list_runs,
     load_run_status,
@@ -34,7 +36,7 @@ from dnadesign.cruncher.app.run_service import (
 )
 from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json
 from dnadesign.cruncher.artifacts.entries import normalize_artifacts
-from dnadesign.cruncher.artifacts.layout import live_metrics_path, status_path
+from dnadesign.cruncher.artifacts.layout import live_metrics_path, manifest_path, status_path
 from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
     parse_config_and_value,
@@ -137,6 +139,34 @@ def _parse_timestamp(value: str | None) -> datetime | None:
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=timezone.utc)
     return parsed
+
+
+def _run_timestamp(run: object) -> datetime:
+    created_at = _parse_timestamp(getattr(run, "created_at", None))
+    if created_at is not None:
+        return created_at
+    run_dir = getattr(run, "run_dir", None)
+    if isinstance(run_dir, Path) and run_dir.exists():
+        return datetime.fromtimestamp(run_dir.stat().st_mtime, tz=timezone.utc)
+    raise FileNotFoundError(
+        f"Run '{getattr(run, 'name', '-')}' has no created_at and run directory is missing: {run_dir}"
+    )
+
+
+def _render_index_issue_table(issues: list[object], *, title: str) -> Table:
+    table = Table(title=title, header_style="bold")
+    table.add_column("Run")
+    table.add_column("Stage")
+    table.add_column("Issue")
+    table.add_column("Run directory")
+    for issue in issues:
+        table.add_row(
+            str(getattr(issue, "run_name", "-")),
+            str(getattr(issue, "stage", "-")),
+            str(getattr(issue, "reason", "-")),
+            str(getattr(issue, "run_dir", "-")),
+        )
+    return table
 
 
 def _plot_live_metrics(history: list[dict], out_path: Path) -> None:
@@ -443,15 +473,22 @@ def best_run_cmd(
     best_run = None
     best_score = None
     for run in runs:
+        run_status = run.status
         score = run.best_score
-        if score is None:
+        status_payload = None
+        if score is None or run_status is None:
             try:
                 status_payload = load_run_status(run.run_dir)
             except ValueError as exc:
                 console.print(f"Error reading run status: {exc}")
                 raise typer.Exit(code=1)
             if status_payload is not None:
-                score = status_payload.get("best_score")
+                if score is None:
+                    score = status_payload.get("best_score")
+                if run_status is None:
+                    run_status = status_payload.get("status")
+        if str(run_status or "").lower() == "failed":
+            continue
         if score is None:
             continue
         if best_score is None or score > best_score:
@@ -505,6 +542,44 @@ def rebuild_index_cmd(
     cfg = load_config(config_path)
     index_path = rebuild_run_index(cfg, config_path)
     console.print(f"Rebuilt run index → {render_path(index_path, base=config_path.parent)}")
+
+
+@app.command("repair-index", help="Drop invalid run index entries (missing run directory or manifest).")
+def repair_index_cmd(
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
+    config_option: Path | None = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="Path to cruncher config.yaml (overrides positional CONFIG).",
+    ),
+    stage: str | None = typer.Option(None, "--stage", help="Optional stage filter when repairing index entries."),
+    apply: bool = typer.Option(False, "--apply", help="Remove invalid entries from the run index."),
+) -> None:
+    try:
+        config_path = resolve_config_path(config_option or config)
+    except ConfigResolutionError as exc:
+        console.print(str(exc))
+        raise typer.Exit(code=1)
+    cfg = load_config(config_path)
+    issues = find_invalid_run_index_entries(config_path, stage=stage, catalog_root=cfg.catalog.catalog_root)
+    if not issues:
+        console.print("Run index is valid.")
+        return
+    console.print(_render_index_issue_table(issues, title="Invalid run index entries"))
+    if not apply:
+        console.print("Dry-run only. Re-run with --apply to remove these index entries.")
+        raise typer.Exit(code=1)
+    removed = drop_run_index_entries(
+        config_path,
+        [issue.run_name for issue in issues],
+        catalog_root=cfg.catalog.catalog_root,
+    )
+    console.print(f"Removed {removed} invalid run index entr{'y' if removed == 1 else 'ies'}.")
 
 
 @app.command("clean", help="Mark stale running runs as aborted (or drop from index).")
@@ -600,7 +675,7 @@ def clean_runs_cmd(
         removed = drop_run_index_entries(
             config_path,
             [run_dir.name for run_dir, _payload, _reason in stale_runs],
-            catalog_root=cfg.motif_store.catalog_root,
+            catalog_root=cfg.catalog.catalog_root,
         )
         console.print(f"Dropped {removed} stale run(s) from the run index.")
         return
@@ -618,10 +693,120 @@ def clean_runs_cmd(
             config_path,
             run_dir,
             payload,
-            catalog_root=cfg.motif_store.catalog_root,
+            catalog_root=cfg.catalog.catalog_root,
         )
         updated += 1
     console.print(f"Marked {updated} stale run(s) as aborted.")
+
+
+@app.command("prune", help="Archive old runs with deterministic retention (keep latest N per stage).")
+def prune_runs_cmd(
+    config: Path | None = typer.Argument(
+        None,
+        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
+        metavar="CONFIG",
+    ),
+    config_option: Path | None = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="Path to cruncher config.yaml (overrides positional CONFIG).",
+    ),
+    stage: str = typer.Option("sample", "--stage", help="Run stage to prune (default: sample)."),
+    keep_latest: int = typer.Option(20, "--keep-latest", help="Always keep at least this many most-recent runs."),
+    older_than_days: float = typer.Option(
+        30.0,
+        "--older-than-days",
+        help="Only archive runs at least this many days old (set 0 to ignore age).",
+    ),
+    apply: bool = typer.Option(False, "--apply", help="Move candidate runs into stage archive."),
+) -> None:
+    try:
+        config_path = resolve_config_path(config_option or config)
+    except ConfigResolutionError as exc:
+        console.print(str(exc))
+        raise typer.Exit(code=1)
+    if keep_latest < 0:
+        console.print("Error: --keep-latest must be >= 0.")
+        raise typer.Exit(code=1)
+    if older_than_days < 0:
+        console.print("Error: --older-than-days must be >= 0.")
+        raise typer.Exit(code=1)
+    cfg = load_config(config_path)
+    index_issues = find_invalid_run_index_entries(config_path, stage=stage, catalog_root=cfg.catalog.catalog_root)
+    if index_issues:
+        console.print(_render_index_issue_table(index_issues, title="Invalid run index entries"))
+        console.print("Error: run index contains invalid run index entries.")
+        console.print("Fix: run `cruncher runs repair-index --apply` and re-run prune.")
+        raise typer.Exit(code=1)
+    try:
+        runs = list_runs(cfg, config_path, stage=stage)
+    except ValueError as exc:
+        console.print(f"Error reading run metadata: {exc}")
+        raise typer.Exit(code=1)
+    if not runs:
+        console.print(f"No runs found for stage '{stage}'.")
+        return
+
+    runs_sorted = sorted(
+        runs,
+        key=lambda run: (_run_timestamp(run), run.name),
+        reverse=True,
+    )
+    keep_names = {run.name for run in runs_sorted[:keep_latest]}
+    now = datetime.now(timezone.utc)
+
+    candidates: list[tuple[object, float]] = []
+    for run in runs_sorted:
+        if run.name in keep_names:
+            continue
+        if run.status == "running":
+            continue
+        run_dir = run.run_dir
+        if not run_dir.exists():
+            raise FileNotFoundError(f"Indexed run directory is missing: {run_dir}")
+        if not manifest_path(run_dir).exists():
+            raise FileNotFoundError(f"Indexed run is missing meta/run_manifest.json: {run_dir}")
+        age_days = (now - _run_timestamp(run)).total_seconds() / 86400.0
+        if older_than_days > 0 and age_days < older_than_days:
+            continue
+        candidates.append((run, age_days))
+
+    if not candidates:
+        console.print("No prune candidates found for the requested policy.")
+        return
+
+    table = Table(title=f"Run prune candidates ({stage})", header_style="bold")
+    table.add_column("Run")
+    table.add_column("Status")
+    table.add_column("Created")
+    table.add_column("Age (days)", justify="right")
+    for run, age_days in candidates:
+        table.add_row(run.name, run.status or "-", run.created_at or "-", f"{age_days:.1f}")
+    console.print(table)
+
+    if not apply:
+        console.print("Dry-run only. Re-run with --apply to archive these runs.")
+        return
+
+    archive_stage_root = config_path.parent / cfg.out_dir / "_archive" / stage
+    archive_stage_root.mkdir(parents=True, exist_ok=True)
+    moved_names: list[str] = []
+    for run, _age_days in candidates:
+        src = run.run_dir
+        bucket = _run_timestamp(run).strftime("%Y-%m")
+        archive_root = archive_stage_root / bucket
+        archive_root.mkdir(parents=True, exist_ok=True)
+        dst = archive_root / run.name
+        if dst.exists():
+            dst = archive_root / f"{run.name}__{int(time.time())}"
+        shutil.move(str(src), str(dst))
+        moved_names.append(run.name)
+    removed = drop_run_index_entries(config_path, moved_names, catalog_root=cfg.catalog.catalog_root)
+    console.print(
+        f"Archived {len(moved_names)} run(s) to {render_path(archive_stage_root, base=config_path.parent)} "
+        f"and removed {removed} index entr{'y' if removed == 1 else 'ies'}."
+    )
 
 
 @app.command("watch", help="Tail meta/run_status.json for a live progress snapshot.")
@@ -661,7 +846,7 @@ def watch_run_cmd(
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
     if plot or plot_path is not None:
-        ensure_mpl_cache(resolve_catalog_root(config_path, cfg.motif_store.catalog_root))
+        ensure_mpl_cache(resolve_catalog_root(config_path, cfg.catalog.catalog_root))
     try:
         run = get_run(cfg, config_path, run_name)
     except FileNotFoundError as exc:

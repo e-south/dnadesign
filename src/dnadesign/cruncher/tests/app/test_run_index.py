@@ -23,38 +23,9 @@ from dnadesign.cruncher.config.load import load_config
 def test_run_index_rebuild(tmp_path: Path) -> None:
     config = {
         "cruncher": {
-            "out_dir": "results",
-            "regulator_sets": [["lexA"]],
-            "motif_store": {
-                "catalog_root": "cache_root",
-                "source_preference": ["regulondb"],
-                "allow_ambiguous": False,
-                "pwm_source": "matrix",
-                "min_sites_for_pwm": 2,
-                "allow_low_sites": False,
-            },
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
-            "sample": {
-                "mode": "sample",
-                "rng": {"seed": 1, "deterministic": True},
-                "sequence_length": 6,
-                "compute": {"total_sweeps": 2, "adapt_sweep_frac": 0.5},
-                "init": {"kind": "random", "pad_with": "background"},
-                "objective": {"bidirectional": True, "score_scale": "llr"},
-                "elites": {"k": 1, "min_per_tf_norm": None, "mmr_alpha": 0.85},
-                "moves": {
-                    "profile": "balanced",
-                    "overrides": {
-                        "block_len_range": [2, 2],
-                        "multi_k_range": [2, 2],
-                        "slide_max_shift": 1,
-                        "swap_len_range": [2, 2],
-                        "move_probs": {"S": 1.0, "B": 0.0, "M": 0.0},
-                    },
-                },
-                "output": {"trace": {"save": False}, "save_sequences": True},
-                "ui": {"progress_bar": False, "progress_every": 0},
-            },
+            "schema_version": 3,
+            "workspace": {"out_dir": "results", "regulator_sets": [["lexA"]]},
+            "catalog": {"root": "cache_root", "pwm_source": "matrix"},
         }
     }
     config_path = tmp_path / "config.yaml"

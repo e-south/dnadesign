@@ -26,8 +26,8 @@ def test_sources_list_uses_workspace_config(tmp_path: Path) -> None:
 
     config = {
         "cruncher": {
-            "out_dir": "runs",
-            "regulator_sets": [],
+            "schema_version": 3,
+            "workspace": {"out_dir": "runs", "regulator_sets": [["lexA"]]},
             "ingest": {
                 "local_sources": [
                     {
@@ -38,7 +38,6 @@ def test_sources_list_uses_workspace_config(tmp_path: Path) -> None:
                     }
                 ]
             },
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
         }
     }
     config_path = workspace / "config.yaml"

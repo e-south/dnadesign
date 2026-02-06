@@ -98,10 +98,9 @@ def test_global_config_option_resolves_workspace() -> None:
 def test_targets_status_rejects_site_kinds_with_matrix_pwm(tmp_path: Path) -> None:
     config = {
         "cruncher": {
-            "out_dir": "runs",
-            "regulator_sets": [["lexA"]],
-            "motif_store": {"catalog_root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
+            "schema_version": 3,
+            "workspace": {"out_dir": "runs", "regulator_sets": [["lexA"]]},
+            "catalog": {"root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
         }
     }
     config_path = tmp_path / "config.yaml"
@@ -115,9 +114,12 @@ def test_targets_status_rejects_site_kinds_with_matrix_pwm(tmp_path: Path) -> No
 def test_campaign_generate_resolves_relative_out_to_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     config = {
         "cruncher": {
-            "out_dir": "runs",
-            "regulator_sets": [["lexA"]],
-            "regulator_categories": {"A": ["lexA"], "B": ["cpxR"]},
+            "schema_version": 3,
+            "workspace": {
+                "out_dir": "runs",
+                "regulator_sets": [["lexA"]],
+                "regulator_categories": {"A": ["lexA"], "B": ["cpxR"]},
+            },
             "campaigns": [
                 {
                     "name": "demo",
@@ -125,8 +127,7 @@ def test_campaign_generate_resolves_relative_out_to_workspace(tmp_path: Path, mo
                     "across_categories": {"sizes": [2]},
                 }
             ],
-            "motif_store": {"catalog_root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
+            "catalog": {"root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
         }
     }
     config_path = tmp_path / "config.yaml"
@@ -144,9 +145,12 @@ def test_campaign_generate_resolves_relative_out_to_workspace(tmp_path: Path, mo
 def test_campaign_generate_rejects_outside_workspace(tmp_path: Path) -> None:
     config = {
         "cruncher": {
-            "out_dir": "runs",
-            "regulator_sets": [["lexA"]],
-            "regulator_categories": {"A": ["lexA"], "B": ["cpxR"]},
+            "schema_version": 3,
+            "workspace": {
+                "out_dir": "runs",
+                "regulator_sets": [["lexA"]],
+                "regulator_categories": {"A": ["lexA"], "B": ["cpxR"]},
+            },
             "campaigns": [
                 {
                     "name": "demo",
@@ -154,8 +158,7 @@ def test_campaign_generate_rejects_outside_workspace(tmp_path: Path) -> None:
                     "across_categories": {"sizes": [2]},
                 }
             ],
-            "motif_store": {"catalog_root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
+            "catalog": {"root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
         }
     }
     config_path = tmp_path / "config.yaml"
@@ -197,10 +200,9 @@ def test_sources_datasets_requires_args_with_hint() -> None:
 def test_sources_list_auto_detects_config_in_cwd(tmp_path, monkeypatch) -> None:
     config = {
         "cruncher": {
-            "out_dir": "results",
-            "regulator_sets": [["lexA"]],
-            "motif_store": {"catalog_root": str(tmp_path / ".cruncher")},
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
+            "schema_version": 3,
+            "workspace": {"out_dir": "results", "regulator_sets": [["lexA"]]},
+            "catalog": {"root": str(tmp_path / ".cruncher")},
             "ingest": {
                 "local_sources": [
                     {
@@ -233,6 +235,23 @@ def test_config_defaults_to_summary() -> None:
     assert "Cruncher config summary" in result.output
 
 
+def test_config_reports_invalid_schema_without_traceback(tmp_path: Path) -> None:
+    bad_config = {
+        "cruncher": {
+            "workspace": {"out_dir": "results", "regulator_sets": [["lexA"]]},
+            "catalog": {"root": str(tmp_path / ".cruncher")},
+        }
+    }
+    config_path = tmp_path / "bad_config.yaml"
+    config_path.write_text(yaml.safe_dump(bad_config))
+
+    result = invoke_cli(["config", str(config_path)])
+
+    assert result.exit_code != 0
+    assert not isinstance(result.exception, ValueError)
+    assert "Error: Config schema v3 required (schema_version: 3)" in result.output
+
+
 def test_analyze_hint_not_duplicated(monkeypatch: pytest.MonkeyPatch) -> None:
     def _boom(*args, **kwargs):
         raise ValueError("No analysis runs configured. Set analysis.runs, pass --run, or use --latest.")
@@ -248,10 +267,9 @@ def test_analyze_hint_not_duplicated(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_sources_summary_remote_error_is_user_friendly(tmp_path, monkeypatch) -> None:
     config = {
         "cruncher": {
-            "out_dir": "results",
-            "regulator_sets": [["lexA"]],
-            "motif_store": {"catalog_root": str(tmp_path / ".cruncher")},
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
+            "schema_version": 3,
+            "workspace": {"out_dir": "results", "regulator_sets": [["lexA"]]},
+            "catalog": {"root": str(tmp_path / ".cruncher")},
         }
     }
     config_path = tmp_path / "config.yaml"
@@ -279,10 +297,9 @@ def test_sources_summary_remote_error_is_user_friendly(tmp_path, monkeypatch) ->
 def test_sources_summary_cache_filters_source_and_titles(tmp_path) -> None:
     config = {
         "cruncher": {
-            "out_dir": "results",
-            "regulator_sets": [["lexA"]],
-            "motif_store": {"catalog_root": str(tmp_path / ".cruncher")},
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
+            "schema_version": 3,
+            "workspace": {"out_dir": "results", "regulator_sets": [["lexA"]]},
+            "catalog": {"root": str(tmp_path / ".cruncher")},
         }
     }
     config_path = tmp_path / "config.yaml"
@@ -323,10 +340,9 @@ def test_sources_summary_cache_filters_source_and_titles(tmp_path) -> None:
 def test_sources_summary_requires_remote_limit_when_no_iter(tmp_path, monkeypatch) -> None:
     config = {
         "cruncher": {
-            "out_dir": "results",
-            "regulator_sets": [["lexA"]],
-            "motif_store": {"catalog_root": str(tmp_path / ".cruncher")},
-            "parse": {"plot": {"logo": False, "bits_mode": "information", "dpi": 72}},
+            "schema_version": 3,
+            "workspace": {"out_dir": "results", "regulator_sets": [["lexA"]]},
+            "catalog": {"root": str(tmp_path / ".cruncher")},
         }
     }
     config_path = tmp_path / "config.yaml"
@@ -401,13 +417,32 @@ def test_runs_watch_requires_args_with_hint() -> None:
     assert "Missing RUN" in result.output
 
 
-def test_analyze_list_plots_succeeds() -> None:
-    result = invoke_cli(["analyze", "--list-plots", str(CONFIG_PATH)])
-    assert result.exit_code == 0
-    assert "Analysis plot plan" in result.output
-
-
-def test_analyze_list_plots_without_config_succeeds() -> None:
-    result = invoke_isolated(["analyze", "--list-plots"])
+def test_analyze_latest_requires_complete_artifacts() -> None:
+    result = invoke_cli(["analyze", "--latest", str(CONFIG_PATH)])
     assert result.exit_code != 0
-    assert "No config argument provided" in result.output
+    assert "Missing elites hits parquet" in result.output
+
+
+def test_analyze_rejects_run_and_latest_together() -> None:
+    result = invoke_cli(["analyze", "--latest", "--run", "sample_123", str(CONFIG_PATH)])
+    assert result.exit_code != 0
+    assert "Use either --run or --latest, not both." in result.output
+
+
+def test_analyze_accepts_run_directory_path_override(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    captured: dict[str, object] = {}
+    run_dir = tmp_path / "runs" / "sample" / "sample_path"
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    def _fake_run_analyze(cfg, config_path, *, runs_override=None, use_latest=False):
+        captured["runs_override"] = runs_override
+        captured["use_latest"] = use_latest
+        return []
+
+    monkeypatch.setattr(analyze_workflow, "run_analyze", _fake_run_analyze)
+
+    result = invoke_cli(["analyze", "--run", str(run_dir.resolve()), str(CONFIG_PATH)])
+
+    assert result.exit_code == 0
+    assert captured.get("runs_override") == [str(run_dir.resolve())]
+    assert captured.get("use_latest") is False

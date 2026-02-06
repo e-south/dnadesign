@@ -52,22 +52,22 @@ logger = logging.getLogger(__name__)
 
 def _store(cfg: CruncherConfig, config_path: Path):
     return CatalogMotifStore(
-        resolve_catalog_root(config_path, cfg.motif_store.catalog_root),
-        pwm_source=cfg.motif_store.pwm_source,
-        site_kinds=cfg.motif_store.site_kinds,
-        combine_sites=cfg.motif_store.combine_sites,
-        site_window_lengths=cfg.motif_store.site_window_lengths,
-        site_window_center=cfg.motif_store.site_window_center,
-        pwm_window_lengths=cfg.motif_store.pwm_window_lengths,
-        pwm_window_strategy=cfg.motif_store.pwm_window_strategy,
-        min_sites_for_pwm=cfg.motif_store.min_sites_for_pwm,
-        allow_low_sites=cfg.motif_store.allow_low_sites,
-        pseudocounts=cfg.motif_store.pseudocounts,
+        resolve_catalog_root(config_path, cfg.catalog.catalog_root),
+        pwm_source=cfg.catalog.pwm_source,
+        site_kinds=cfg.catalog.site_kinds,
+        combine_sites=cfg.catalog.combine_sites,
+        site_window_lengths=cfg.catalog.site_window_lengths,
+        site_window_center=cfg.catalog.site_window_center,
+        pwm_window_lengths=cfg.catalog.pwm_window_lengths,
+        pwm_window_strategy=cfg.catalog.pwm_window_strategy,
+        min_sites_for_pwm=cfg.catalog.min_sites_for_pwm,
+        allow_low_sites=cfg.catalog.allow_low_sites,
+        pseudocounts=cfg.catalog.pseudocounts,
     )
 
 
 def _lockmap_for(cfg: CruncherConfig, config_path: Path) -> tuple[Lockfile, dict[str, object]]:
-    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     lock_path = resolve_lock_path(config_path)
     if not lock_path.exists():
         raise ValueError(f"Lockfile is required: {lock_path}. Run `cruncher lock {config_path.name}`.")
@@ -75,15 +75,15 @@ def _lockmap_for(cfg: CruncherConfig, config_path: Path) -> tuple[Lockfile, dict
     required = {tf for group in cfg.regulator_sets for tf in group}
     validate_lockfile(
         lockfile,
-        expected_pwm_source=cfg.motif_store.pwm_source,
-        expected_site_kinds=cfg.motif_store.site_kinds,
-        expected_combine_sites=cfg.motif_store.combine_sites,
+        expected_pwm_source=cfg.catalog.pwm_source,
+        expected_site_kinds=cfg.catalog.site_kinds,
+        expected_combine_sites=cfg.catalog.combine_sites,
         required_tfs=required,
     )
     verify_lockfile_hashes(
         lockfile=lockfile,
         catalog_root=catalog_root,
-        expected_pwm_source=cfg.motif_store.pwm_source,
+        expected_pwm_source=cfg.catalog.pwm_source,
     )
     return lockfile, lockfile.resolved
 
@@ -99,16 +99,16 @@ def _parse_signature(
         "tfs": sorted(tfs),
         "lockfile_fingerprint": lock_sig,
         "motif_store": {
-            "pwm_source": cfg.motif_store.pwm_source,
-            "combine_sites": cfg.motif_store.combine_sites,
-            "site_kinds": cfg.motif_store.site_kinds,
-            "site_window_lengths": cfg.motif_store.site_window_lengths,
-            "site_window_center": cfg.motif_store.site_window_center,
-            "pwm_window_lengths": cfg.motif_store.pwm_window_lengths,
-            "pwm_window_strategy": cfg.motif_store.pwm_window_strategy,
-            "min_sites_for_pwm": cfg.motif_store.min_sites_for_pwm,
-            "allow_low_sites": cfg.motif_store.allow_low_sites,
-            "pseudocounts": cfg.motif_store.pseudocounts,
+            "pwm_source": cfg.catalog.pwm_source,
+            "combine_sites": cfg.catalog.combine_sites,
+            "site_kinds": cfg.catalog.site_kinds,
+            "site_window_lengths": cfg.catalog.site_window_lengths,
+            "site_window_center": cfg.catalog.site_window_center,
+            "pwm_window_lengths": cfg.catalog.pwm_window_lengths,
+            "pwm_window_strategy": cfg.catalog.pwm_window_strategy,
+            "min_sites_for_pwm": cfg.catalog.min_sites_for_pwm,
+            "allow_low_sites": cfg.catalog.allow_low_sites,
+            "pseudocounts": cfg.catalog.pseudocounts,
         },
     }
     signature = sha256_bytes(json.dumps(payload, sort_keys=True).encode("utf-8"))
@@ -155,7 +155,7 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
     Error behavior:
       - If the motif store cannot resolve a PWM, we allow that exception to propagate.
     """
-    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
 
     store = _store(cfg, config_path)
 
@@ -172,9 +172,9 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
     logger.info("Using lockfile: %s", lock_path)
     logger.info(
         "PWM config: source=%s combine_sites=%s site_kinds=%s",
-        cfg.motif_store.pwm_source,
-        cfg.motif_store.combine_sites,
-        cfg.motif_store.site_kinds,
+        cfg.catalog.pwm_source,
+        cfg.catalog.combine_sites,
+        cfg.catalog.site_kinds,
     )
 
     for set_index, group in enumerate(groups, start=1):
@@ -223,7 +223,7 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
             config_path,
             run_dir,
             status_writer.payload,
-            catalog_root=cfg.motif_store.catalog_root,
+            catalog_root=cfg.catalog.catalog_root,
         )
 
         for tf in sorted(tfs):
@@ -235,11 +235,11 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
             if catalog_entry is None:
                 raise ValueError(f"Catalog entry missing for {ref.source}:{ref.motif_id}")
             provenance = pwm_provenance_summary(
-                pwm_source=cfg.motif_store.pwm_source,
+                pwm_source=cfg.catalog.pwm_source,
                 entry=catalog_entry,
                 catalog=catalog,
-                combine_sites=cfg.motif_store.combine_sites,
-                site_kinds=cfg.motif_store.site_kinds,
+                combine_sites=cfg.catalog.combine_sites,
+                site_kinds=cfg.catalog.site_kinds,
             )
             logger.info("PWM %s ← %s:%s | %s", tf, ref.source, ref.motif_id, provenance)
 
@@ -296,7 +296,7 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
             config_path,
             run_dir,
             manifest,
-            catalog_root=cfg.motif_store.catalog_root,
+            catalog_root=cfg.catalog.catalog_root,
         )
         logger.info("Parse stage complete: %s", run_dir)
         logger.info("Wrote run manifest → %s", manifest_path.relative_to(run_dir.parent))
@@ -305,5 +305,5 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
             config_path,
             run_dir,
             status_writer.payload,
-            catalog_root=cfg.motif_store.catalog_root,
+            catalog_root=cfg.catalog.catalog_root,
         )

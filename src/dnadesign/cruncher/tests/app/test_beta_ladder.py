@@ -12,17 +12,19 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dnadesign.cruncher.app.sample_workflow import _default_beta_ladder, _resolve_beta_ladder
-from dnadesign.cruncher.config.schema_v2 import BetaLadderGeometric, OptimizersConfig, PTOptimizerConfig
+from dnadesign.cruncher.config.schema_v3 import SamplePtConfig
+from dnadesign.cruncher.core.optimizers.cooling import make_beta_ladder
 
 
 def test_geometric_beta_ladder_spacing() -> None:
-    pt_cfg = PTOptimizerConfig(beta_ladder=BetaLadderGeometric(beta_min=0.1, beta_max=1.6, n_temps=4))
-    ladders, _ = _resolve_beta_ladder(OptimizersConfig(pt=pt_cfg).pt)
+    pt_cfg = SamplePtConfig(n_temps=4, temp_max=10.0)
+    beta_min = 1.0 / float(pt_cfg.temp_max)
+    geometric = list(np.geomspace(beta_min, 1.0, int(pt_cfg.n_temps)))
+    ladders = make_beta_ladder({"kind": "geometric", "beta": geometric})
     ratios = [ladders[i + 1] / ladders[i] for i in range(len(ladders) - 1)]
     assert np.allclose(ratios, ratios[0])
 
 
-def test_geometric_beta_ladder_requires_positive() -> None:
-    with pytest.raises(ValueError, match="beta_min>0"):
-        _default_beta_ladder(3, 0.0, 1.0)
+def test_pt_temp_max_must_be_positive() -> None:
+    with pytest.raises(ValueError, match="sample.pt.temp_max must be >= 1.0"):
+        SamplePtConfig(n_temps=3, temp_max=0.0)

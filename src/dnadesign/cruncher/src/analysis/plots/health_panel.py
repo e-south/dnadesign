@@ -83,6 +83,15 @@ def plot_health_panel(
     ax_swap, ax_move = axes
     _plot_swap_acceptance(ax_swap, optimizer_stats)
     _plot_move_acceptance(ax_move, optimizer_stats)
+    fig.text(
+        0.5,
+        0.01,
+        "Optimization health indicators (not posterior convergence).",
+        ha="center",
+        va="bottom",
+        fontsize=8,
+        color="#555555",
+    )
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
