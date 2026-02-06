@@ -112,6 +112,7 @@ def summarize_sampling_diagnostics(
     trace_idata: Any | None,
     sequences_df: pd.DataFrame | None,
     elites_df: pd.DataFrame | None,
+    elites_hits_df: pd.DataFrame | None,
     tf_names: list[str],
     optimizer: dict[str, object] | None,
     optimizer_stats: dict[str, object] | None,
@@ -426,7 +427,9 @@ def summarize_sampling_diagnostics(
                 elites_metrics["overlap_total_bp_median"] = _safe_float(overlap_total_bp_median)
         else:
             try:
-                _, _, overlap_summary = compute_overlap_tables(elites_df, tf_names)
+                if elites_hits_df is None:
+                    raise ValueError("elites_hits.parquet is required for overlap metrics.")
+                _, _, overlap_summary = compute_overlap_tables(elites_df, elites_hits_df, tf_names)
                 overlap_rate_median = overlap_summary.get("overlap_rate_median")
                 overlap_total_bp_median = overlap_summary.get("overlap_total_bp_median")
                 if overlap_rate_median is not None:
@@ -485,6 +488,15 @@ def summarize_sampling_diagnostics(
         unique_successes = _safe_int(optimizer_stats.get("unique_successes"))
         if unique_successes is not None:
             optimizer_metrics["unique_successes"] = unique_successes
+            if sample_meta:
+                early_stop = sample_meta.get("early_stop") if isinstance(sample_meta, dict) else None
+                if isinstance(early_stop, dict) and early_stop.get("require_min_unique"):
+                    min_unique = _safe_int(early_stop.get("min_unique"))
+                    if min_unique is not None and unique_successes < min_unique:
+                        warnings.append(
+                            f"unique successes {unique_successes} below minimum {min_unique} required by early stop."
+                        )
+                        _mark("warn")
     else:
         warnings.append("Optimizer stats missing from run manifest; acceptance checks skipped.")
         _mark("warn")

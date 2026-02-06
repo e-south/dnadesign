@@ -109,12 +109,20 @@ def sequences_path(run_dir: Path) -> Path:
     return run_dir / RUN_ARTIFACTS_DIR / "sequences.parquet"
 
 
+def random_baseline_path(run_dir: Path) -> Path:
+    return run_dir / RUN_ARTIFACTS_DIR / "random_baseline.parquet"
+
+
 def elites_path(run_dir: Path) -> Path:
     return run_dir / RUN_ARTIFACTS_DIR / "elites.parquet"
 
 
 def elites_mmr_meta_path(run_dir: Path) -> Path:
     return run_dir / RUN_ARTIFACTS_DIR / "elites_mmr_meta.parquet"
+
+
+def elites_hits_path(run_dir: Path) -> Path:
+    return run_dir / RUN_ARTIFACTS_DIR / "elites_hits.parquet"
 
 
 def elites_json_path(run_dir: Path) -> Path:

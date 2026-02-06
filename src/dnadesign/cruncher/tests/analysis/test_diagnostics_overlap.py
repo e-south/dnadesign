@@ -31,7 +31,17 @@ def test_diagnostics_uses_overlap_summary(monkeypatch) -> None:
         {
             "sequence": ["ACGT"],
             "score_tf1": [0.2],
-            "per_tf_json": ["{}"],
+            "id": ["elite-1"],
+        }
+    )
+    hits_df = pd.DataFrame(
+        {
+            "elite_id": ["elite-1"],
+            "tf": ["tf1"],
+            "best_start": [0],
+            "best_strand": ["+"],
+            "pwm_width": [4],
+            "best_core_seq": ["ACGT"],
         }
     )
     overlap_summary = {"overlap_rate_median": 0.5, "overlap_total_bp_median": 1.0}
@@ -40,6 +50,7 @@ def test_diagnostics_uses_overlap_summary(monkeypatch) -> None:
         trace_idata=None,
         sequences_df=sequences_df,
         elites_df=elites_df,
+        elites_hits_df=hits_df,
         tf_names=["tf1"],
         optimizer=None,
         optimizer_stats=None,

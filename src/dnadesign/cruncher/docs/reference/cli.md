@@ -347,7 +347,9 @@ Inputs:
 
 * CONFIG (explicit or resolved)
 * runs via `analysis.run_selector`/`analysis.runs` or `--run` (defaults to latest sample run if empty)
-* run artifacts: `artifacts/sequences.parquet` (required), `artifacts/elites.parquet` (required), and `artifacts/trace.nc` for trace-based plots
+* run artifacts: `artifacts/sequences.parquet` (required), `artifacts/elites.parquet` (required),
+  `artifacts/elites_hits.parquet` (required), `artifacts/random_baseline.parquet` (required),
+  and `artifacts/trace.nc` for trace-based plots
 
 Network:
 
@@ -369,10 +371,10 @@ Preconditions:
 Outputs:
 
 * tables: `analysis/table__scores__summary.parquet`, `analysis/table__elites__topk.parquet`,
-  `analysis/table__metrics__joint.parquet`, `analysis/table__diagnostics__summary.json`,
-  `analysis/table__objective__components.json`, `analysis/table__elites__mmr_summary.parquet`,
-  `analysis/table__elites__nn_distance.parquet`
-* plots: `analysis/plot__run__dashboard.<plot_format>`, `analysis/plot__scores__projection.<plot_format>`,
+  `analysis/table__metrics__joint.parquet`, `analysis/table__opt__trajectory_points.parquet`,
+  `analysis/table__diagnostics__summary.json`, `analysis/table__objective__components.json`,
+  `analysis/table__elites__mmr_summary.parquet`, `analysis/table__elites__nn_distance.parquet`
+* plots: `analysis/plot__run__dashboard.<plot_format>`, `analysis/plot__opt__trajectory.<plot_format>`,
   `analysis/plot__elites__nn_distance.<plot_format>`, `analysis/plot__overlap__panel.<plot_format>`,
   `analysis/plot__diag__panel.<plot_format>` (trace only)
 * reports: `analysis/report.json`, `analysis/report.md`
@@ -380,8 +382,7 @@ Outputs:
 
 Note:
 
-* Analyze is idempotent for identical inputs + analysis config; if the current summary signature matches,
-  it reports that analysis is already up to date and skips re-running plots/tables.
+* Analyze rewrites the latest analysis outputs each run; set `analysis.archive=true` to keep prior reports.
 * Use `cruncher analyze --summary` to print the highlights from `analysis/report.json`.
 
 ---

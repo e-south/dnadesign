@@ -81,7 +81,10 @@ Key files:
 - `analysis/summary.json`
 - `analysis/report.md`
 - `analysis/report.json`
-- curated plots: `analysis/plot__run__dashboard.*`, `analysis/plot__scores__projection.*`, `analysis/plot__elites__nn_distance.*`
+- curated plots: `analysis/plot__run__dashboard.*`, `analysis/plot__opt__trajectory.*`, `analysis/plot__elites__nn_distance.*`,
+  `analysis/plot__overlap__panel.*` (and `analysis/plot__diag__panel.*` if a trace is present)
+- elite hit metadata: `artifacts/elites_hits.parquet`
+- random baseline cloud: `artifacts/random_baseline.parquet`
 
 ## Optional: motif discovery
 

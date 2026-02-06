@@ -27,6 +27,7 @@ from dnadesign.cruncher.analysis.diversity import (
     compute_elites_nn_distance_table,
     summarize_elite_distances,
 )
+from dnadesign.cruncher.analysis.hits import load_elites_hits
 from dnadesign.cruncher.analysis.layout import (
     analysis_manifest_path,
     analysis_root,
@@ -44,9 +45,11 @@ from dnadesign.cruncher.analysis.plot_registry import PLOT_SPECS
 from dnadesign.cruncher.analysis.plots.dashboard import plot_dashboard
 from dnadesign.cruncher.analysis.plots.diag_panel import plot_diag_panel
 from dnadesign.cruncher.analysis.plots.elites_nn_distance import plot_elites_nn_distance
+from dnadesign.cruncher.analysis.plots.opt_trajectory import plot_opt_trajectory
 from dnadesign.cruncher.analysis.plots.overlap import plot_overlap_panel
-from dnadesign.cruncher.analysis.plots.projection import plot_scores_projection
 from dnadesign.cruncher.analysis.report import build_report_payload, write_report_json, write_report_md
+from dnadesign.cruncher.analysis.trajectory import build_trajectory_points
+from dnadesign.cruncher.app.analyze.archive import _prune_latest_analysis_artifacts
 from dnadesign.cruncher.app.analyze.manifests import build_analysis_manifests
 from dnadesign.cruncher.app.analyze.metadata import (
     _analysis_id,
@@ -58,9 +61,17 @@ from dnadesign.cruncher.app.analyze.plan import resolve_analysis_plan
 from dnadesign.cruncher.app.run_service import list_runs
 from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json, atomic_write_yaml
 from dnadesign.cruncher.artifacts.entries import append_artifacts, artifact_entry
-from dnadesign.cruncher.artifacts.layout import elites_path, elites_yaml_path, sequences_path, trace_path
+from dnadesign.cruncher.artifacts.layout import (
+    elites_hits_path,
+    elites_path,
+    elites_yaml_path,
+    random_baseline_path,
+    sequences_path,
+    trace_path,
+)
 from dnadesign.cruncher.artifacts.manifest import load_manifest, write_manifest
 from dnadesign.cruncher.config.schema_v3 import CruncherConfig
+from dnadesign.cruncher.utils.hashing import sha256_path
 from dnadesign.cruncher.utils.paths import resolve_catalog_root
 from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
 
@@ -157,14 +168,15 @@ def _write_analysis_used(path: Path, analysis_cfg: dict[str, object], analysis_i
 
 def _summarize_elites_mmr(
     elites_df: pd.DataFrame,
+    hits_df: pd.DataFrame,
     sequences_df: pd.DataFrame,
     elites_meta: dict[str, object],
     tf_names: list[str],
     pwms: dict[str, object],
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     identity_mode = "canonical" if "canonical_sequence" in sequences_df.columns else "raw"
-    nn_df = compute_elites_nn_distance_table(elites_df, tf_names, pwms, identity_mode=identity_mode)
-    elite_ids, dist = compute_elite_distance_matrix(elites_df, tf_names, pwms)
+    nn_df = compute_elites_nn_distance_table(hits_df, tf_names, pwms, identity_mode=identity_mode)
+    elite_ids, dist = compute_elite_distance_matrix(hits_df, tf_names, pwms)
     dist_summary = summarize_elite_distances(dist)
     min_norm = pd.to_numeric(elites_df.get("min_norm"), errors="coerce") if "min_norm" in elites_df.columns else None
     median_relevance_raw = float(min_norm.median()) if min_norm is not None and not min_norm.empty else None
@@ -261,6 +273,15 @@ def run_analyze(
     for run_name in runs:
         run_dir = _resolve_run_dir(cfg, config_path, run_name)
         manifest = load_manifest(run_dir)
+        lockfile_path = manifest.get("lockfile_path")
+        lockfile_sha = manifest.get("lockfile_sha256")
+        if lockfile_path and lockfile_sha:
+            lock_path = Path(str(lockfile_path))
+            if not lock_path.exists():
+                raise FileNotFoundError(f"Lockfile referenced by run manifest missing: {lock_path}")
+            current_sha = sha256_path(lock_path)
+            if str(current_sha) != str(lockfile_sha):
+                raise ValueError("Lockfile checksum mismatch (run manifest does not match current lockfile).")
         pwms, used_cfg = _load_pwms_from_config(run_dir)
         tf_names = _resolve_tf_names(used_cfg, pwms)
         sample_meta = _resolve_sample_meta(cfg, used_cfg, manifest)
@@ -284,13 +305,21 @@ def run_analyze(
 
         sequences_file = sequences_path(run_dir)
         elites_file = elites_path(run_dir)
+        hits_file = elites_hits_path(run_dir)
+        baseline_file = random_baseline_path(run_dir)
         if not sequences_file.exists():
             raise FileNotFoundError(f"Missing sequences parquet: {sequences_file}")
         if not elites_file.exists():
             raise FileNotFoundError(f"Missing elites parquet: {elites_file}")
+        if not hits_file.exists():
+            raise FileNotFoundError(f"Missing elites hits parquet: {hits_file}")
+        if not baseline_file.exists():
+            raise FileNotFoundError(f"Missing random baseline parquet: {baseline_file}")
 
         sequences_df = read_parquet(sequences_file)
         elites_df = read_parquet(elites_file)
+        hits_df = load_elites_hits(hits_file)
+        baseline_df = read_parquet(baseline_file)
 
         trace_file = trace_path(run_dir)
         trace_idata = az.from_netcdf(trace_file) if trace_file.exists() else None
@@ -307,6 +336,7 @@ def run_analyze(
         objective_path = tmp_root / "table__objective__components.json"
         elites_mmr_path = tmp_root / f"table__elites__mmr_summary.{table_ext}"
         nn_distance_path = tmp_root / f"table__elites__nn_distance.{table_ext}"
+        trajectory_path = tmp_root / f"table__opt__trajectory_points.{table_ext}"
 
         from dnadesign.cruncher.analysis.plots.summary import (
             score_frame_from_df,
@@ -322,8 +352,15 @@ def run_analyze(
         write_elite_topk(elites_df=elites_df, tf_names=tf_names, out_path=topk_path, top_k=top_k)
         write_joint_metrics(elites_df=elites_df, tf_names=tf_names, out_path=joint_metrics_path)
 
+        trajectory_df = build_trajectory_points(
+            sequences_df,
+            tf_names,
+            max_points=analysis_cfg.max_points,
+        )
+        _write_table(trajectory_df, trajectory_path)
+
         overlap_summary_df, elite_overlap_df, overlap_summary = compute_overlap_tables(
-            elites_df, tf_names, include_sequences=False
+            elites_df, hits_df, tf_names, include_sequences=False
         )
         _write_table(overlap_summary_df, overlap_pair_path)
         _write_table(elite_overlap_df, overlap_elite_path)
@@ -332,6 +369,7 @@ def run_analyze(
             trace_idata=trace_idata,
             sequences_df=sequences_df,
             elites_df=elites_df,
+            elites_hits_df=hits_df,
             tf_names=tf_names,
             optimizer=manifest.get("optimizer"),
             optimizer_stats=manifest.get("optimizer_stats"),
@@ -354,7 +392,7 @@ def run_analyze(
         )
         _write_json(objective_path, objective_components)
 
-        elites_mmr_df, nn_df = _summarize_elites_mmr(elites_df, sequences_df, elites_meta, tf_names, pwms)
+        elites_mmr_df, nn_df = _summarize_elites_mmr(elites_df, hits_df, sequences_df, elites_meta, tf_names, pwms)
         _write_table(elites_mmr_df, elites_mmr_path)
         _write_table(nn_df, nn_distance_path)
 
@@ -399,19 +437,25 @@ def run_analyze(
         except Exception as exc:
             _record_plot("run_dashboard", plot_dashboard_path, False, str(exc))
 
-        plot_projection_path = tmp_root / f"plot__scores__projection.{plot_format}"
+        plot_trajectory_path = tmp_root / f"plot__opt__trajectory.{plot_format}"
+        score_scale = None
+        sample_payload = used_cfg.get("sample") if isinstance(used_cfg, dict) else None
+        if isinstance(sample_payload, dict):
+            objective_payload = sample_payload.get("objective")
+            if isinstance(objective_payload, dict):
+                score_scale = objective_payload.get("score_scale")
         try:
-            plot_scores_projection(
-                sequences_df,
-                elites_df,
+            plot_opt_trajectory(
+                trajectory_df,
+                baseline_df,
                 tf_names,
-                plot_projection_path,
-                max_points=analysis_cfg.max_points,
+                plot_trajectory_path,
+                score_scale=str(score_scale) if score_scale else None,
                 **plot_kwargs,
             )
-            _record_plot("scores_projection", plot_projection_path, True, None)
+            _record_plot("opt_trajectory", plot_trajectory_path, True, None)
         except Exception as exc:
-            _record_plot("scores_projection", plot_projection_path, False, str(exc))
+            _record_plot("opt_trajectory", plot_trajectory_path, False, str(exc))
 
         plot_nn_path = tmp_root / f"plot__elites__nn_distance.{plot_format}"
         try:
@@ -450,6 +494,12 @@ def run_analyze(
             {"key": "elites_topk", "label": "Elite top-K", "path": topk_path.name, "exists": True},
             {"key": "metrics_joint", "label": "Joint score metrics", "path": joint_metrics_path.name, "exists": True},
             {
+                "key": "opt_trajectory_points",
+                "label": "Optimization trajectory points",
+                "path": trajectory_path.name,
+                "exists": True,
+            },
+            {
                 "key": "overlap_pair_summary",
                 "label": "Overlap pair summary",
                 "path": overlap_pair_path.name,
@@ -486,6 +536,7 @@ def run_analyze(
             artifact_entry(analysis_root_path / score_summary_path.name, run_dir, kind="table", stage="analysis"),
             artifact_entry(analysis_root_path / topk_path.name, run_dir, kind="table", stage="analysis"),
             artifact_entry(analysis_root_path / joint_metrics_path.name, run_dir, kind="table", stage="analysis"),
+            artifact_entry(analysis_root_path / trajectory_path.name, run_dir, kind="table", stage="analysis"),
             artifact_entry(analysis_root_path / overlap_pair_path.name, run_dir, kind="table", stage="analysis"),
             artifact_entry(analysis_root_path / overlap_elite_path.name, run_dir, kind="table", stage="analysis"),
             artifact_entry(analysis_root_path / diagnostics_path.name, run_dir, kind="table", stage="analysis"),
@@ -567,6 +618,8 @@ def run_analyze(
             prev_root=prev_root,
         )
 
+        if not analysis_cfg.archive:
+            _prune_latest_analysis_artifacts(manifest)
         append_artifacts(manifest, analysis_artifacts)
         write_manifest(run_dir, manifest)
 

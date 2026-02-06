@@ -16,7 +16,6 @@ from collections.abc import Iterable
 import numpy as np
 import pandas as pd
 
-from dnadesign.cruncher.analysis.overlap import _parse_per_tf
 from dnadesign.cruncher.core.pwm import PWM
 
 
@@ -45,36 +44,32 @@ def _weighted_hamming(a: str, b: str, weights: np.ndarray) -> float:
 
 
 def _tfbs_core_map(
-    elites_df: pd.DataFrame,
+    hits_df: pd.DataFrame,
     tf_names: Iterable[str],
 ) -> dict[str, dict[str, str]]:
     tf_list = list(tf_names)
     core_by_elite: dict[str, dict[str, str]] = {}
-    for _, row in elites_df.iterrows():
-        elite_id = str(row.get("id") or "")
-        if not elite_id:
+    if hits_df is None or hits_df.empty:
+        return core_by_elite
+    for _, row in hits_df.iterrows():
+        elite_id = str(row.get("elite_id") or "")
+        tf_name = row.get("tf")
+        if not elite_id or tf_name not in tf_list:
             continue
-        per_tf = _parse_per_tf(row)
-        cores: dict[str, str] = {}
-        for tf in tf_list:
-            details = per_tf.get(tf)
-            if not isinstance(details, dict):
-                continue
-            core_seq = details.get("best_core_seq")
-            if isinstance(core_seq, str) and core_seq:
-                cores[tf] = core_seq
-        if cores:
-            core_by_elite[elite_id] = cores
+        core_seq = row.get("best_core_seq")
+        if not isinstance(core_seq, str) or not core_seq:
+            continue
+        core_by_elite.setdefault(elite_id, {})[str(tf_name)] = core_seq
     return core_by_elite
 
 
 def compute_elite_distance_matrix(
-    elites_df: pd.DataFrame,
+    hits_df: pd.DataFrame,
     tf_names: Iterable[str],
     pwms: dict[str, PWM],
 ) -> tuple[list[str], np.ndarray]:
     tf_list = list(tf_names)
-    core_by_elite = _tfbs_core_map(elites_df, tf_list)
+    core_by_elite = _tfbs_core_map(hits_df, tf_list)
     elite_ids = sorted(core_by_elite.keys())
     n = len(elite_ids)
     dist = np.full((n, n), np.nan, dtype=float)
@@ -110,13 +105,13 @@ def compute_elite_distance_matrix(
 
 
 def compute_elites_nn_distance_table(
-    elites_df: pd.DataFrame,
+    hits_df: pd.DataFrame,
     tf_names: Iterable[str],
     pwms: dict[str, PWM],
     *,
     identity_mode: str,
 ) -> pd.DataFrame:
-    elite_ids, dist = compute_elite_distance_matrix(elites_df, tf_names, pwms)
+    elite_ids, dist = compute_elite_distance_matrix(hits_df, tf_names, pwms)
     if dist.size == 0:
         return pd.DataFrame(columns=["elite_id", "nn_dist", "mean_dist", "min_dist", "identity_mode"])
     rows: list[dict[str, object]] = []

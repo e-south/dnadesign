@@ -23,6 +23,7 @@ def test_pt_diagnostics_uses_cold_chain_only() -> None:
         trace_idata=trace_idata,
         sequences_df=pd.DataFrame({"sequence": []}),
         elites_df=pd.DataFrame(),
+        elites_hits_df=None,
         tf_names=["tf1"],
         optimizer_kind="pt",
         optimizer={},

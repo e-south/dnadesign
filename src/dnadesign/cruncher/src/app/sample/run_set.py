@@ -21,7 +21,12 @@ import numpy as np
 
 from dnadesign.cruncher.app.progress import progress_adapter
 from dnadesign.cruncher.app.run_service import update_run_index_from_status
-from dnadesign.cruncher.app.sample.artifacts import _elite_parquet_schema, _save_config, _write_parquet_rows
+from dnadesign.cruncher.app.sample.artifacts import (
+    _elite_hits_parquet_schema,
+    _elite_parquet_schema,
+    _save_config,
+    _write_parquet_rows,
+)
 from dnadesign.cruncher.app.sample.diagnostics import _norm_map_for_elites
 from dnadesign.cruncher.app.sample.elites_mmr import (
     build_elite_entries,
@@ -35,10 +40,12 @@ from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json, atomic_
 from dnadesign.cruncher.artifacts.entries import artifact_entry
 from dnadesign.cruncher.artifacts.layout import (
     config_used_path,
+    elites_hits_path,
     elites_json_path,
     elites_mmr_meta_path,
     elites_path,
     elites_yaml_path,
+    random_baseline_path,
     sequences_path,
     trace_path,
 )
@@ -51,6 +58,7 @@ from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.core.scoring import Scorer
 from dnadesign.cruncher.core.sequence import canon_int
 from dnadesign.cruncher.core.state import SequenceState
+from dnadesign.cruncher.utils.hashing import sha256_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +136,18 @@ def _resolve_min_per_tf_norm(
         "value": float(threshold),
     }
     return float(threshold), meta
+
+
+def _core_def_hash(pwm: PWM, pwm_hash: str | None) -> str:
+    payload = {
+        "pwm_hash": pwm_hash,
+        "pwm_width": pwm.length,
+        "source_length": pwm.source_length,
+        "window_start": pwm.window_start,
+        "window_strategy": pwm.window_strategy,
+        "window_score": pwm.window_score,
+    }
+    return sha256_bytes(json.dumps(payload, sort_keys=True).encode("utf-8"))
 
 
 def _run_sample_for_set(
@@ -427,6 +447,46 @@ def _run_sample_for_set(
             seq_parquet.relative_to(out_dir.parent),
         )
 
+    # 8b) SAVE random baseline cloud (artifact-only analysis)
+    baseline_seed = int(sample_cfg.seed + set_index - 1)
+    baseline_n = 2048
+    baseline_path = random_baseline_path(out_dir)
+    tf_order = sorted(tfs)
+    baseline_canonical = bool(sample_cfg.objective.bidirectional)
+
+    def _baseline_rows() -> Iterable[dict[str, object]]:
+        rng = np.random.default_rng(baseline_seed)
+        for _ in range(baseline_n):
+            seq_state = SequenceState.random(sample_cfg.sequence_length, rng)
+            seq_arr = seq_state.seq
+            seq_str = seq_state.to_string()
+            row: dict[str, object] = {
+                "sequence": seq_str,
+                "baseline_seed": baseline_seed,
+                "baseline_n": baseline_n,
+                "sequence_length": sample_cfg.sequence_length,
+                "score_scale": sample_cfg.objective.score_scale,
+                "bidirectional": bool(sample_cfg.objective.bidirectional),
+            }
+            if baseline_canonical:
+                row["canonical_sequence"] = SequenceState(canon_int(seq_arr)).to_string()
+            per_tf = scorer.compute_all_per_pwm(seq_arr, sample_cfg.sequence_length)
+            for tf_name in tf_order:
+                row[f"score_{tf_name}"] = float(per_tf[tf_name])
+            yield row
+
+    _write_parquet_rows(baseline_path, _baseline_rows())
+    artifacts.append(
+        artifact_entry(
+            baseline_path,
+            out_dir,
+            kind="table",
+            label="Random baseline (Parquet)",
+            stage=stage,
+        )
+    )
+    logger.debug("Saved random baseline -> %s", baseline_path.relative_to(out_dir.parent))
+
     # 9) BUILD elites list — filter (representativeness), rank (objective), diversify
     baseline_seed = int(sample_cfg.seed + set_index - 1)
     min_per_tf_norm, auto_norm_meta = _resolve_min_per_tf_norm(
@@ -515,6 +575,17 @@ def _run_sample_for_set(
     )
 
     tf_label = format_regulator_slug(tfs)
+    pwm_ref_by_tf: dict[str, str | None] = {}
+    pwm_hash_by_tf: dict[str, str | None] = {}
+    core_def_by_tf: dict[str, str] = {}
+    for tf_name in tfs:
+        locked = lockmap.get(tf_name)
+        pwm_ref_by_tf[tf_name] = f"{locked.source}:{locked.motif_id}" if locked else None
+        pwm_hash_by_tf[tf_name] = locked.sha256 if locked else None
+        pwm = pwms.get(tf_name)
+        if pwm is None:
+            raise ValueError(f"Missing PWM for TF '{tf_name}'.")
+        core_def_by_tf[tf_name] = _core_def_hash(pwm, pwm_hash_by_tf[tf_name])
 
     # 1)  parquet payload ----------------------------------------------------
     parquet_path = elites_path(out_dir)
@@ -530,9 +601,62 @@ def _run_sample_for_set(
                     row[f"norm_{tf_name}"] = details.get("best_score_norm")
             yield row
 
+    def _elite_hits_rows(entries: list[dict[str, object]]) -> Iterable[dict[str, object]]:
+        for entry in entries:
+            elite_id = entry.get("id")
+            rank = entry.get("rank")
+            chain_id = entry.get("chain")
+            draw_idx = entry.get("draw_idx")
+            per_tf = entry.get("per_tf")
+            if not isinstance(per_tf, dict):
+                raise ValueError("Elite entry missing per_tf metadata.")
+            for tf_name, details in per_tf.items():
+                if not isinstance(details, dict):
+                    raise ValueError(f"Elite per_tf details missing for '{tf_name}'.")
+                start = details.get("best_start")
+                if start is None:
+                    start = details.get("offset")
+                if not isinstance(start, int):
+                    raise ValueError(f"Elite hit missing best_start for '{tf_name}'.")
+                strand = details.get("strand")
+                if not isinstance(strand, str):
+                    raise ValueError(f"Elite hit missing strand for '{tf_name}'.")
+                width = details.get("width")
+                pwm = pwms.get(tf_name)
+                if pwm is None:
+                    raise ValueError(f"Missing PWM for TF '{tf_name}'.")
+                pwm_width = int(pwm.length)
+                core_width = int(width) if isinstance(width, int) else pwm_width
+                yield {
+                    "elite_id": elite_id,
+                    "tf": tf_name,
+                    "rank": rank,
+                    "chain": chain_id,
+                    "draw_idx": draw_idx,
+                    "best_start": int(start),
+                    "best_core_offset": int(start),
+                    "best_strand": strand,
+                    "best_window_seq": details.get("best_window_seq"),
+                    "best_core_seq": details.get("best_core_seq"),
+                    "best_score_raw": details.get("best_score_raw"),
+                    "best_score_scaled": details.get("best_score_scaled"),
+                    "best_score_norm": details.get("best_score_norm"),
+                    "tiebreak_rule": details.get("best_hit_tiebreak"),
+                    "pwm_ref": pwm_ref_by_tf.get(tf_name),
+                    "pwm_hash": pwm_hash_by_tf.get(tf_name),
+                    "pwm_width": pwm_width,
+                    "core_width": core_width,
+                    "core_def_hash": core_def_by_tf.get(tf_name),
+                }
+
     elite_schema = _elite_parquet_schema(tfs, include_canonical=want_canonical)
     _write_parquet_rows(parquet_path, _elite_rows_from(elites), chunk_size=2000, schema=elite_schema)
     logger.debug("Saved elites Parquet -> %s", parquet_path.relative_to(out_dir.parent))
+
+    hits_path = elites_hits_path(out_dir)
+    hits_schema = _elite_hits_parquet_schema()
+    _write_parquet_rows(hits_path, _elite_hits_rows(elites), chunk_size=2000, schema=hits_schema)
+    logger.debug("Saved elites hits Parquet -> %s", hits_path.relative_to(out_dir.parent))
 
     json_path = elites_json_path(out_dir)
     atomic_write_json(json_path, elites)
@@ -611,6 +735,13 @@ def _run_sample_for_set(
                 out_dir,
                 kind="metadata",
                 label="Elite metadata (YAML)",
+                stage=stage,
+            ),
+            artifact_entry(
+                hits_path,
+                out_dir,
+                kind="table",
+                label="Elite best-hit metadata (Parquet)",
                 stage=stage,
             ),
         ]

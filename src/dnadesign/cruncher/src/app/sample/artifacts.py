@@ -159,6 +159,34 @@ def _elite_parquet_schema(tfs: Iterable[str], *, include_canonical: bool) -> Any
     return pa.schema(fields)
 
 
+def _elite_hits_parquet_schema() -> Any:
+    import pyarrow as pa
+
+    return pa.schema(
+        [
+            pa.field("elite_id", pa.string()),
+            pa.field("tf", pa.string()),
+            pa.field("rank", pa.int64()),
+            pa.field("chain", pa.int64()),
+            pa.field("draw_idx", pa.int64()),
+            pa.field("best_start", pa.int64()),
+            pa.field("best_core_offset", pa.int64()),
+            pa.field("best_strand", pa.string()),
+            pa.field("best_window_seq", pa.string()),
+            pa.field("best_core_seq", pa.string()),
+            pa.field("best_score_raw", pa.float64()),
+            pa.field("best_score_scaled", pa.float64()),
+            pa.field("best_score_norm", pa.float64()),
+            pa.field("tiebreak_rule", pa.string()),
+            pa.field("pwm_ref", pa.string()),
+            pa.field("pwm_hash", pa.string()),
+            pa.field("pwm_width", pa.int64()),
+            pa.field("core_width", pa.int64()),
+            pa.field("core_def_hash", pa.string()),
+        ]
+    )
+
+
 def _format_run_path(path: Path, *, base: Path) -> str:
     try:
         return str(path.relative_to(base))

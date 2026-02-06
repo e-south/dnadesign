@@ -65,6 +65,7 @@ Analysis writes a curated, orthogonal suite of plots and tables (no plot boolean
 - `table__scores__summary.parquet`
 - `table__elites__topk.parquet`
 - `table__metrics__joint.parquet`
+- `table__opt__trajectory_points.parquet`
 - `table__overlap__pair_summary.parquet`
 - `table__overlap__per_elite.parquet`
 - `table__diagnostics__summary.json`
@@ -72,10 +73,15 @@ Analysis writes a curated, orthogonal suite of plots and tables (no plot boolean
 - `table__elites__mmr_summary.parquet`
 - `table__elites__nn_distance.parquet`
 
+Sampling artifacts consumed by analysis:
+
+- `artifacts/elites_hits.parquet` (per-elite, per-TF best-hit/core metadata)
+- `artifacts/random_baseline.parquet` (baseline cloud for trajectory plots)
+
 Plots (always generated when data is available):
 
 - `plot__run__dashboard.*`
-- `plot__scores__projection.*`
+- `plot__opt__trajectory.*`
 - `plot__elites__nn_distance.*`
 - `plot__overlap__panel.*`
 - `plot__diag__panel.*` (only if `trace.nc` exists)

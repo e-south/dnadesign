@@ -24,6 +24,7 @@ def test_acceptance_tail_from_move_stats() -> None:
         trace_idata=None,
         sequences_df=pd.DataFrame({"sequence": []}),
         elites_df=pd.DataFrame(),
+        elites_hits_df=None,
         tf_names=["tfA"],
         optimizer={"kind": "pt"},
         optimizer_stats={"move_stats": move_stats},

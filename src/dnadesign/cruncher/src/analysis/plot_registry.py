@@ -35,12 +35,12 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         "Compact summary of learning, diversity, and worst-TF identity.",
     ),
     PlotSpec(
-        "scores_projection",
-        "Score projection",
-        ("sequences",),
-        ("plot__scores__projection.{ext}",),
+        "opt_trajectory",
+        "Optimization trajectory",
+        ("sequences", "baseline"),
+        ("plot__opt__trajectory.{ext}",),
         "summary",
-        "Projection of min-per-TF norm vs harmonic mean for sampled sequences.",
+        "Trajectory in score space with a baseline cloud for context.",
     ),
     PlotSpec(
         "elites_nn_distance",

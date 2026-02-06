@@ -116,15 +116,14 @@ def plot_overlap_strand_combos(
 
 
 def plot_motif_offset_rug(
-    elites_df: pd.DataFrame,
+    hits_df: pd.DataFrame,
     tf_names: Iterable[str],
     out_path: Path,
     *,
-    pwm_widths: dict[str, int] | None = None,
     dpi: int,
     png_compress_level: int,
 ) -> None:
-    hits_df = extract_elite_hits(elites_df, tf_names, pwm_widths=pwm_widths)
+    hits_df = extract_elite_hits(hits_df, tf_names)
     if hits_df.empty:
         logger.warning("Skipping motif offset rug: no elite hits available.")
         return
