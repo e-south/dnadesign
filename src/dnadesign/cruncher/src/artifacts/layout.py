@@ -113,6 +113,10 @@ def random_baseline_path(run_dir: Path) -> Path:
     return run_dir / RUN_ARTIFACTS_DIR / "random_baseline.parquet"
 
 
+def random_baseline_hits_path(run_dir: Path) -> Path:
+    return run_dir / RUN_ARTIFACTS_DIR / "random_baseline_hits.parquet"
+
+
 def elites_path(run_dir: Path) -> Path:
     return run_dir / RUN_ARTIFACTS_DIR / "elites.parquet"
 

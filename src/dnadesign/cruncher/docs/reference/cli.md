@@ -374,9 +374,9 @@ Outputs:
   `analysis/table__metrics__joint.parquet`, `analysis/table__opt__trajectory_points.parquet`,
   `analysis/table__diagnostics__summary.json`, `analysis/table__objective__components.json`,
   `analysis/table__elites__mmr_summary.parquet`, `analysis/table__elites__nn_distance.parquet`
-* plots: `analysis/plot__run__dashboard.<plot_format>`, `analysis/plot__opt__trajectory.<plot_format>`,
+* plots: `analysis/plot__run__summary.<plot_format>`, `analysis/plot__opt__trajectory.<plot_format>`,
   `analysis/plot__elites__nn_distance.<plot_format>`, `analysis/plot__overlap__panel.<plot_format>`,
-  `analysis/plot__diag__panel.<plot_format>` (trace only)
+  `analysis/plot__health__panel.<plot_format>` (trace only)
 * reports: `analysis/report.json`, `analysis/report.md`
 * summaries: `analysis/summary.json`, `analysis/manifest.json`, `analysis/plot_manifest.json`, `analysis/table_manifest.json`
 

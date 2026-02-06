@@ -18,17 +18,19 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import yaml
 
 from dnadesign.cruncher.analysis.diagnostics import summarize_sampling_diagnostics
 from dnadesign.cruncher.analysis.diversity import (
+    compute_baseline_nn_distances,
     compute_elite_distance_matrix,
     compute_elites_nn_distance_table,
     representative_elite_ids,
     summarize_elite_distances,
 )
-from dnadesign.cruncher.analysis.hits import load_elites_hits
+from dnadesign.cruncher.analysis.hits import load_baseline_hits, load_elites_hits
 from dnadesign.cruncher.analysis.layout import (
     analysis_manifest_path,
     analysis_root,
@@ -43,13 +45,13 @@ from dnadesign.cruncher.analysis.objective import compute_objective_components
 from dnadesign.cruncher.analysis.overlap import compute_overlap_tables
 from dnadesign.cruncher.analysis.parquet import read_parquet, write_parquet
 from dnadesign.cruncher.analysis.plot_registry import PLOT_SPECS
-from dnadesign.cruncher.analysis.plots.dashboard import plot_dashboard
-from dnadesign.cruncher.analysis.plots.diag_panel import plot_diag_panel
 from dnadesign.cruncher.analysis.plots.elites_nn_distance import plot_elites_nn_distance
+from dnadesign.cruncher.analysis.plots.health_panel import plot_health_panel
 from dnadesign.cruncher.analysis.plots.opt_trajectory import plot_opt_trajectory
 from dnadesign.cruncher.analysis.plots.overlap import plot_overlap_panel
+from dnadesign.cruncher.analysis.plots.run_summary import plot_run_summary
 from dnadesign.cruncher.analysis.report import build_report_payload, write_report_json, write_report_md
-from dnadesign.cruncher.analysis.trajectory import build_trajectory_points
+from dnadesign.cruncher.analysis.trajectory import build_trajectory_points, project_scores
 from dnadesign.cruncher.app.analyze.archive import _prune_latest_analysis_artifacts
 from dnadesign.cruncher.app.analyze.manifests import build_analysis_manifests
 from dnadesign.cruncher.app.analyze.metadata import (
@@ -66,6 +68,7 @@ from dnadesign.cruncher.artifacts.layout import (
     elites_hits_path,
     elites_path,
     elites_yaml_path,
+    random_baseline_hits_path,
     random_baseline_path,
     sequences_path,
     trace_path,
@@ -352,6 +355,7 @@ def run_analyze(
         elites_file = elites_path(run_dir)
         hits_file = elites_hits_path(run_dir)
         baseline_file = random_baseline_path(run_dir)
+        baseline_hits_file = random_baseline_hits_path(run_dir)
         if not sequences_file.exists():
             raise FileNotFoundError(f"Missing sequences parquet: {sequences_file}")
         if not elites_file.exists():
@@ -360,11 +364,14 @@ def run_analyze(
             raise FileNotFoundError(f"Missing elites hits parquet: {hits_file}")
         if not baseline_file.exists():
             raise FileNotFoundError(f"Missing random baseline parquet: {baseline_file}")
+        if not baseline_hits_file.exists():
+            raise FileNotFoundError(f"Missing random baseline hits parquet: {baseline_hits_file}")
 
         sequences_df = read_parquet(sequences_file)
         elites_df = read_parquet(elites_file)
         hits_df = load_elites_hits(hits_file)
         baseline_df = read_parquet(baseline_file)
+        baseline_hits_df = load_baseline_hits(baseline_hits_file)
 
         trace_file = trace_path(run_dir)
         trace_idata = az.from_netcdf(trace_file) if trace_file.exists() else None
@@ -449,6 +456,19 @@ def run_analyze(
         _write_table(elites_mmr_df, elites_mmr_path)
         _write_table(nn_df, nn_distance_path)
 
+        baseline_seed = None
+        if "baseline_seed" in baseline_df.columns and not baseline_df.empty:
+            try:
+                baseline_seed = int(baseline_df["baseline_seed"].iloc[0])
+            except Exception:
+                baseline_seed = None
+        baseline_nn = compute_baseline_nn_distances(
+            baseline_hits_df,
+            tf_names,
+            pwms,
+            seed=baseline_seed,
+        )
+
         plot_format = analysis_cfg.plot_format
         plot_dpi = analysis_cfg.plot_dpi
         plot_kwargs = {"dpi": plot_dpi, "png_compress_level": 9}
@@ -505,20 +525,38 @@ def run_analyze(
                     )
                 )
 
-        plot_dashboard_path = tmp_root / f"plot__run__dashboard.{plot_format}"
+        plot_summary_path = tmp_root / f"plot__run__summary.{plot_format}"
         try:
-            plot_dashboard(sequences_df, elites_df, tf_names, plot_dashboard_path, **plot_kwargs)
-            _record_plot("run_dashboard", plot_dashboard_path, True, None)
+            plot_run_summary(
+                sequences_df,
+                elites_df,
+                baseline_df,
+                nn_df,
+                tf_names,
+                plot_summary_path,
+                optimizer_stats=manifest.get("optimizer_stats") if trace_idata is not None else None,
+                score_scale=plot_score_scale_used,
+                **plot_kwargs,
+            )
+            _record_plot("run_summary", plot_summary_path, True, None)
         except Exception as exc:
-            _record_plot("run_dashboard", plot_dashboard_path, False, str(exc))
+            _record_plot("run_summary", plot_summary_path, False, str(exc))
 
         plot_trajectory_path = tmp_root / f"plot__opt__trajectory.{plot_format}"
         try:
+            identity_mode = "canonical" if sample_meta.bidirectional else "raw"
+            elite_centroid = None
+            if elites_df is not None and not elites_df.empty:
+                elite_x, elite_y, _, _, _, _ = project_scores(elites_df, tf_names)
+                if len(elite_x) and len(elite_y):
+                    elite_centroid = (float(np.median(elite_x)), float(np.median(elite_y)))
             plot_opt_trajectory(
                 trajectory_df,
                 baseline_df,
                 tf_names,
                 plot_trajectory_path,
+                identity_mode=identity_mode,
+                elite_centroid=elite_centroid,
                 score_scale=plot_score_scale_used,
                 **plot_kwargs,
             )
@@ -528,7 +566,7 @@ def run_analyze(
 
         plot_nn_path = tmp_root / f"plot__elites__nn_distance.{plot_format}"
         try:
-            plot_elites_nn_distance(nn_df, plot_nn_path, **plot_kwargs)
+            plot_elites_nn_distance(nn_df, plot_nn_path, baseline_nn=pd.Series(baseline_nn), **plot_kwargs)
             _record_plot("elites_nn_distance", plot_nn_path, True, None)
         except Exception as exc:
             _record_plot("elites_nn_distance", plot_nn_path, False, str(exc))
@@ -547,15 +585,15 @@ def run_analyze(
         except Exception as exc:
             _record_plot("overlap_panel", plot_overlap_path, False, str(exc))
 
-        plot_diag_path = tmp_root / f"plot__diag__panel.{plot_format}"
+        plot_health_path = tmp_root / f"plot__health__panel.{plot_format}"
         if trace_idata is None:
-            _record_plot("diag_panel", plot_diag_path, False, "Trace not available.")
+            _record_plot("health_panel", plot_health_path, False, "Trace not available.")
         else:
             try:
-                plot_diag_panel(trace_idata, manifest.get("optimizer_stats"), plot_diag_path, **plot_kwargs)
-                _record_plot("diag_panel", plot_diag_path, True, None)
+                plot_health_panel(manifest.get("optimizer_stats"), plot_health_path, **plot_kwargs)
+                _record_plot("health_panel", plot_health_path, True, None)
             except Exception as exc:
-                _record_plot("diag_panel", plot_diag_path, False, str(exc))
+                _record_plot("health_panel", plot_health_path, False, str(exc))
 
         table_entries = [
             {"key": "scores_summary", "label": "Per-TF summary", "path": score_summary_path.name, "exists": True},
@@ -565,6 +603,7 @@ def run_analyze(
                 "key": "opt_trajectory_points",
                 "label": "Optimization trajectory points",
                 "path": trajectory_path.name,
+                "purpose": "plot_support",
                 "exists": True,
             },
             {

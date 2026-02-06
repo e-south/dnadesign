@@ -27,12 +27,12 @@ class PlotSpec:
 
 PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
-        "run_dashboard",
-        "Run dashboard",
-        ("sequences", "elites"),
-        ("plot__run__dashboard.{ext}",),
+        "run_summary",
+        "Run summary",
+        ("sequences", "elites", "baseline"),
+        ("plot__run__summary.{ext}",),
         "summary",
-        "Compact summary of learning, diversity, and worst-TF identity.",
+        "Single-page summary of learning, outcome, and diversity.",
     ),
     PlotSpec(
         "opt_trajectory",
@@ -45,7 +45,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         "elites_nn_distance",
         "Elite nearest-neighbor distance",
-        ("elites",),
+        ("elites", "baseline_hits"),
         ("plot__elites__nn_distance.{ext}",),
         "summary",
         "Nearest-neighbor distance distribution for elites in TFBS-core space.",
@@ -59,11 +59,11 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         "Overlap heatmap and distribution (or compact summary for large TF sets).",
     ),
     PlotSpec(
-        "diag_panel",
-        "Diagnostics panel",
+        "health_panel",
+        "Health panel",
         ("trace",),
-        ("plot__diag__panel.{ext}",),
+        ("plot__health__panel.{ext}",),
         "diagnostics",
-        "Trace, rank plot, swap acceptance, and move acceptance in one panel.",
+        "Swap acceptance and move acceptance summary.",
     ),
 )

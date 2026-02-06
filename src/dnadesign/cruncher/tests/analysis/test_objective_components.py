@@ -29,7 +29,6 @@ def test_objective_components_basic() -> None:
         ["tfA", "tfB"],
         top_k=1,
         overlap_total_bp_median=2.0,
-        dsdna_canonicalize=False,
     )
     assert result["best_score_final"] == 2.0
     assert result["top_k_median_final"] == 2.0
@@ -56,8 +55,6 @@ def test_objective_components_learning_metrics() -> None:
         ["tfA", "tfB"],
         top_k=1,
         overlap_total_bp_median=2.0,
-        dsdna_canonicalize=False,
-        early_stop={"enabled": True, "patience": 1, "min_delta": 0.02},
     )
 
     learning = result.get("learning") or {}
@@ -65,12 +62,10 @@ def test_objective_components_learning_metrics() -> None:
     assert learning["best_score_chain"] == 1
     assert learning["last_improvement_draw"] == 1
     assert learning["plateau_draws"] == 0
-    early_stop = learning.get("early_stop") or {}
-    assert early_stop["enabled"] is True
-    assert early_stop["per_chain"]["1"]["early_stop_draw"] == 1
+    assert "early_stop" not in learning
 
 
-def test_objective_components_early_stop_requires_unique_successes() -> None:
+def test_objective_components_canonical_fraction() -> None:
     df = pd.DataFrame(
         {
             "phase": ["draw", "draw", "draw"],
@@ -80,6 +75,7 @@ def test_objective_components_early_stop_requires_unique_successes() -> None:
             "score_tfA": [0.2, 0.2, 0.2],
             "score_tfB": [0.2, 0.2, 0.2],
             "sequence": ["AA", "AA", "AA"],
+            "canonical_sequence": ["AA", "AA", "AA"],
         }
     )
 
@@ -87,17 +83,7 @@ def test_objective_components_early_stop_requires_unique_successes() -> None:
         df,
         ["tfA", "tfB"],
         top_k=1,
-        dsdna_canonicalize=False,
-        early_stop={
-            "enabled": True,
-            "patience": 1,
-            "min_delta": 0.0,
-            "require_min_unique": True,
-            "min_unique": 2,
-            "success_min_per_tf_norm": 0.5,
-        },
     )
 
-    early_stop = (result.get("learning") or {}).get("early_stop") or {}
-    assert early_stop.get("eligible") is False
-    assert early_stop.get("earliest_draw") is None
+    assert result["canonicalization_enabled"] is True
+    assert result["unique_fraction_canonical"] == 1.0 / 3.0

@@ -46,35 +46,42 @@ def _weighted_hamming(a: str, b: str, weights: np.ndarray) -> float:
 def _tfbs_core_map(
     hits_df: pd.DataFrame,
     tf_names: Iterable[str],
+    *,
+    id_column: str,
 ) -> dict[str, dict[str, str]]:
     tf_list = list(tf_names)
-    core_by_elite: dict[str, dict[str, str]] = {}
+    core_by_id: dict[str, dict[str, str]] = {}
     if hits_df is None or hits_df.empty:
-        return core_by_elite
+        return core_by_id
     for _, row in hits_df.iterrows():
-        elite_id = str(row.get("elite_id") or "")
+        item_id = row.get(id_column)
+        if item_id is None:
+            continue
+        item_id = str(item_id)
         tf_name = row.get("tf")
-        if not elite_id or tf_name not in tf_list:
+        if not item_id or tf_name not in tf_list:
             continue
         core_seq = row.get("best_core_seq")
         if not isinstance(core_seq, str) or not core_seq:
             continue
-        core_by_elite.setdefault(elite_id, {})[str(tf_name)] = core_seq
-    return core_by_elite
+        core_by_id.setdefault(item_id, {})[str(tf_name)] = core_seq
+    return core_by_id
 
 
-def compute_elite_distance_matrix(
+def compute_distance_matrix(
     hits_df: pd.DataFrame,
     tf_names: Iterable[str],
     pwms: dict[str, PWM],
+    *,
+    id_column: str,
 ) -> tuple[list[str], np.ndarray]:
     tf_list = list(tf_names)
-    core_by_elite = _tfbs_core_map(hits_df, tf_list)
-    elite_ids = sorted(core_by_elite.keys())
-    n = len(elite_ids)
+    core_by_id = _tfbs_core_map(hits_df, tf_list, id_column=id_column)
+    item_ids = sorted(core_by_id.keys())
+    n = len(item_ids)
     dist = np.full((n, n), np.nan, dtype=float)
     if n == 0:
-        return elite_ids, dist
+        return item_ids, dist
 
     weights_by_tf: dict[str, np.ndarray] = {}
     for tf in tf_list:
@@ -83,14 +90,14 @@ def compute_elite_distance_matrix(
             continue
         weights_by_tf[tf] = _info_norm_weights(pwm)
 
-    for i, elite_i in enumerate(elite_ids):
+    for i, item_i in enumerate(item_ids):
         dist[i, i] = 0.0
         for j in range(i + 1, n):
-            elite_j = elite_ids[j]
+            item_j = item_ids[j]
             per_tf = []
             for tf in tf_list:
-                core_i = core_by_elite[elite_i].get(tf)
-                core_j = core_by_elite[elite_j].get(tf)
+                core_i = core_by_id[item_i].get(tf)
+                core_j = core_by_id[item_j].get(tf)
                 weights = weights_by_tf.get(tf)
                 if core_i is None or core_j is None or weights is None:
                     continue
@@ -101,7 +108,15 @@ def compute_elite_distance_matrix(
                 value = float(np.nanmean(per_tf))
             dist[i, j] = value
             dist[j, i] = value
-    return elite_ids, dist
+    return item_ids, dist
+
+
+def compute_elite_distance_matrix(
+    hits_df: pd.DataFrame,
+    tf_names: Iterable[str],
+    pwms: dict[str, PWM],
+) -> tuple[list[str], np.ndarray]:
+    return compute_distance_matrix(hits_df, tf_names, pwms, id_column="elite_id")
 
 
 def _representative_by_identity(
@@ -194,6 +209,34 @@ def compute_elites_nn_distance_table(
         row["elite_id"] = elite_id
         expanded_rows.append(row)
     return pd.DataFrame(expanded_rows)
+
+
+def compute_baseline_nn_distances(
+    hits_df: pd.DataFrame,
+    tf_names: Iterable[str],
+    pwms: dict[str, PWM],
+    *,
+    max_samples: int = 250,
+    seed: int | None = None,
+) -> np.ndarray:
+    if hits_df is None or hits_df.empty or "baseline_id" not in hits_df.columns:
+        return np.asarray([], dtype=float)
+    baseline_ids = sorted({int(val) for val in hits_df["baseline_id"].dropna().astype(int).tolist()})
+    if max_samples > 0 and len(baseline_ids) > max_samples:
+        rng = np.random.default_rng(seed)
+        baseline_ids = sorted(rng.choice(baseline_ids, size=max_samples, replace=False))
+        hits_df = hits_df[hits_df["baseline_id"].isin(baseline_ids)].copy()
+    ids, dist = compute_distance_matrix(hits_df, tf_names, pwms, id_column="baseline_id")
+    if dist.size == 0:
+        return np.asarray([], dtype=float)
+    nn_vals: list[float] = []
+    for i, _ in enumerate(ids):
+        row = dist[i, :].astype(float)
+        other = np.delete(row, i)
+        if other.size == 0:
+            continue
+        nn_vals.append(float(np.nanmin(other)))
+    return np.asarray(nn_vals, dtype=float)
 
 
 def summarize_elite_distances(dist: np.ndarray) -> dict[str, float | None]:

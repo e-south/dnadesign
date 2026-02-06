@@ -186,7 +186,7 @@ def build_report_payload(
     }
 
     pointers = {
-        "start_here_plot": _plot_path(analysis_root, "plot__run__dashboard", plot_format),
+        "start_here_plot": _plot_path(analysis_root, "plot__run__summary", plot_format),
         "diagnostics": _path_if_exists(analysis_root, "table__diagnostics__summary.json"),
         "objective_components": _path_if_exists(analysis_root, "table__objective__components.json"),
         "elites_mmr_summary": _table_path(analysis_root, "table__elites__mmr_summary", table_format),
@@ -291,7 +291,7 @@ def write_report_md(
             "",
             "## Start here",
             "",
-            f"- {pointers.get('start_here_plot') or 'plot__run__dashboard.<ext>'}",
+            f"- {pointers.get('start_here_plot') or 'plot__run__summary.<ext>'}",
             f"- {pointers.get('diagnostics') or 'table__diagnostics__summary.json'}",
             f"- {pointers.get('objective_components') or 'table__objective__components.json'}",
         ]
@@ -314,7 +314,7 @@ def write_report_md(
         lines.extend([f"- {item}" for item in warnings])
 
     artifact_index = [
-        pointers.get("start_here_plot") or "plot__run__dashboard.<ext>",
+        pointers.get("start_here_plot") or "plot__run__summary.<ext>",
         pointers.get("diagnostics") or "table__diagnostics__summary.json",
         pointers.get("objective_components") or "table__objective__components.json",
         pointers.get("elites_mmr_summary") or None,

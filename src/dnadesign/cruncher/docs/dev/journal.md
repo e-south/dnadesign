@@ -80,3 +80,8 @@
 - Simplified analysis CLI to v3 behavior (run selection + summary only) and removed plot/tf-pair override flags.
 - Updated v3 docs (config reference, sampling/analysis guide, demos, ingestion/meme suite guides, architecture, internals spec) to match the curated analysis suite and v3 schema terminology.
 - Added a local encode helper in analysis/per_pwm to remove dependency on deprecated scatter utils.
+- Added baseline hits artifacts for analysis-only plots and updated sampling to emit `random_baseline_hits.parquet`.
+- Replaced the run dashboard + diagnostics plots with a curated v3 plot suite: run summary + trajectory + NN distance + overlap panel + health panel.
+- Updated analysis workflow and plot registry to use baseline NN references, new plot names, and health-only diagnostics.
+- Simplified overlap plotting to a single panel figure with best-hit labels and readability rules.
+- Updated analysis tests and docs to match the new plot suite and baseline artifacts.

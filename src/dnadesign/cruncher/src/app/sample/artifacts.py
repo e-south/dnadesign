@@ -187,6 +187,31 @@ def _elite_hits_parquet_schema() -> Any:
     )
 
 
+def _baseline_hits_parquet_schema() -> Any:
+    import pyarrow as pa
+
+    return pa.schema(
+        [
+            pa.field("baseline_id", pa.int64()),
+            pa.field("tf", pa.string()),
+            pa.field("best_start", pa.int64()),
+            pa.field("best_core_offset", pa.int64()),
+            pa.field("best_strand", pa.string()),
+            pa.field("best_window_seq", pa.string()),
+            pa.field("best_core_seq", pa.string()),
+            pa.field("best_score_raw", pa.float64()),
+            pa.field("best_score_scaled", pa.float64()),
+            pa.field("best_score_norm", pa.float64()),
+            pa.field("tiebreak_rule", pa.string()),
+            pa.field("pwm_ref", pa.string()),
+            pa.field("pwm_hash", pa.string()),
+            pa.field("pwm_width", pa.int64()),
+            pa.field("core_width", pa.int64()),
+            pa.field("core_def_hash", pa.string()),
+        ]
+    )
+
+
 def _format_run_path(path: Path, *, base: Path) -> str:
     try:
         return str(path.relative_to(base))

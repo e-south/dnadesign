@@ -22,6 +22,7 @@ import numpy as np
 from dnadesign.cruncher.app.progress import progress_adapter
 from dnadesign.cruncher.app.run_service import update_run_index_from_status
 from dnadesign.cruncher.app.sample.artifacts import (
+    _baseline_hits_parquet_schema,
     _elite_hits_parquet_schema,
     _elite_parquet_schema,
     _save_config,
@@ -45,6 +46,7 @@ from dnadesign.cruncher.artifacts.layout import (
     elites_mmr_meta_path,
     elites_path,
     elites_yaml_path,
+    random_baseline_hits_path,
     random_baseline_path,
     sequences_path,
     trace_path,
@@ -197,6 +199,17 @@ def _run_sample_for_set(
     pwms = _load_pwms_for_set(cfg=cfg, config_path=config_path, tfs=tfs, lockmap=lockmap)
 
     _assert_init_length_fits_pwms(sample_cfg, pwms)
+    pwm_ref_by_tf: dict[str, str | None] = {}
+    pwm_hash_by_tf: dict[str, str | None] = {}
+    core_def_by_tf: dict[str, str] = {}
+    for tf_name in tfs:
+        locked = lockmap.get(tf_name)
+        pwm_ref_by_tf[tf_name] = f"{locked.source}:{locked.motif_id}" if locked else None
+        pwm_hash_by_tf[tf_name] = locked.sha256 if locked else None
+        pwm = pwms.get(tf_name)
+        if pwm is None:
+            raise ValueError(f"Missing PWM for TF '{tf_name}'.")
+        core_def_by_tf[tf_name] = _core_def_hash(pwm, pwm_hash_by_tf[tf_name])
     adapt_sweeps = int(sample_cfg.budget.tune)
     draws = int(sample_cfg.budget.draws)
     # 2) INSTANTIATE SCORER and SequenceEvaluator
@@ -447,49 +460,94 @@ def _run_sample_for_set(
             seq_parquet.relative_to(out_dir.parent),
         )
 
-    # 8b) SAVE random baseline cloud (artifact-only analysis)
+    # 8b) SAVE random baseline cloud + hits (artifact-only analysis)
     baseline_seed = int(sample_cfg.seed + set_index - 1)
     baseline_n = 2048
     baseline_path = random_baseline_path(out_dir)
+    baseline_hits_path = random_baseline_hits_path(out_dir)
     tf_order = sorted(tfs)
     baseline_canonical = bool(sample_cfg.objective.bidirectional)
+    rng = np.random.default_rng(baseline_seed)
+    baseline_rows: list[dict[str, object]] = []
+    baseline_hit_rows: list[dict[str, object]] = []
+    for baseline_id in range(baseline_n):
+        seq_state = SequenceState.random(sample_cfg.sequence_length, rng)
+        seq_arr = seq_state.seq
+        seq_str = seq_state.to_string()
+        per_tf = scorer.compute_all_per_pwm(seq_arr, sample_cfg.sequence_length)
+        norm_map = _norm_map_for_elites(
+            seq_arr,
+            per_tf,
+            scorer=scorer,
+            score_scale=sample_cfg.objective.score_scale,
+        )
+        row: dict[str, object] = {
+            "baseline_id": baseline_id,
+            "sequence": seq_str,
+            "baseline_seed": baseline_seed,
+            "baseline_n": baseline_n,
+            "seed": baseline_seed,
+            "n_samples": baseline_n,
+            "sequence_length": sample_cfg.sequence_length,
+            "length": sample_cfg.sequence_length,
+            "score_scale": sample_cfg.objective.score_scale,
+            "bidirectional": bool(sample_cfg.objective.bidirectional),
+            "bg_model": "uniform",
+            "bg_a": 0.25,
+            "bg_c": 0.25,
+            "bg_g": 0.25,
+            "bg_t": 0.25,
+        }
+        if baseline_canonical:
+            row["canonical_sequence"] = SequenceState(canon_int(seq_arr)).to_string()
+        for tf_name in tf_order:
+            row[f"score_{tf_name}"] = float(per_tf[tf_name])
+            hit = scorer.best_hit(seq_arr, tf_name)
+            pwm = pwms.get(tf_name)
+            if pwm is None:
+                raise ValueError(f"Missing PWM for TF '{tf_name}'.")
+            pwm_width = int(pwm.length)
+            width = hit.get("width")
+            core_width = int(width) if isinstance(width, int) else pwm_width
+            baseline_hit_rows.append(
+                {
+                    "baseline_id": baseline_id,
+                    "tf": tf_name,
+                    "best_start": hit.get("best_start"),
+                    "best_core_offset": hit.get("best_start"),
+                    "best_strand": hit.get("strand"),
+                    "best_window_seq": hit.get("best_window_seq"),
+                    "best_core_seq": hit.get("best_core_seq"),
+                    "best_score_raw": hit.get("best_score_raw"),
+                    "best_score_scaled": float(per_tf[tf_name]),
+                    "best_score_norm": float(norm_map.get(tf_name, 0.0)),
+                    "tiebreak_rule": hit.get("best_hit_tiebreak"),
+                    "pwm_ref": pwm_ref_by_tf.get(tf_name),
+                    "pwm_hash": pwm_hash_by_tf.get(tf_name),
+                    "pwm_width": pwm_width,
+                    "core_width": core_width,
+                    "core_def_hash": core_def_by_tf.get(tf_name),
+                }
+            )
+        baseline_rows.append(row)
 
-    def _baseline_rows() -> Iterable[dict[str, object]]:
-        rng = np.random.default_rng(baseline_seed)
-        for _ in range(baseline_n):
-            seq_state = SequenceState.random(sample_cfg.sequence_length, rng)
-            seq_arr = seq_state.seq
-            seq_str = seq_state.to_string()
-            row: dict[str, object] = {
-                "sequence": seq_str,
-                "baseline_seed": baseline_seed,
-                "baseline_n": baseline_n,
-                "seed": baseline_seed,
-                "n_samples": baseline_n,
-                "sequence_length": sample_cfg.sequence_length,
-                "length": sample_cfg.sequence_length,
-                "score_scale": sample_cfg.objective.score_scale,
-                "bidirectional": bool(sample_cfg.objective.bidirectional),
-                "bg_model": "uniform",
-                "bg_a": 0.25,
-                "bg_c": 0.25,
-                "bg_g": 0.25,
-                "bg_t": 0.25,
-            }
-            if baseline_canonical:
-                row["canonical_sequence"] = SequenceState(canon_int(seq_arr)).to_string()
-            per_tf = scorer.compute_all_per_pwm(seq_arr, sample_cfg.sequence_length)
-            for tf_name in tf_order:
-                row[f"score_{tf_name}"] = float(per_tf[tf_name])
-            yield row
-
-    _write_parquet_rows(baseline_path, _baseline_rows())
+    _write_parquet_rows(baseline_path, baseline_rows)
+    _write_parquet_rows(baseline_hits_path, baseline_hit_rows, schema=_baseline_hits_parquet_schema())
     artifacts.append(
         artifact_entry(
             baseline_path,
             out_dir,
             kind="table",
             label="Random baseline (Parquet)",
+            stage=stage,
+        )
+    )
+    artifacts.append(
+        artifact_entry(
+            baseline_hits_path,
+            out_dir,
+            kind="table",
+            label="Random baseline hits (Parquet)",
             stage=stage,
         )
     )
@@ -583,17 +641,6 @@ def _run_sample_for_set(
     )
 
     tf_label = format_regulator_slug(tfs)
-    pwm_ref_by_tf: dict[str, str | None] = {}
-    pwm_hash_by_tf: dict[str, str | None] = {}
-    core_def_by_tf: dict[str, str] = {}
-    for tf_name in tfs:
-        locked = lockmap.get(tf_name)
-        pwm_ref_by_tf[tf_name] = f"{locked.source}:{locked.motif_id}" if locked else None
-        pwm_hash_by_tf[tf_name] = locked.sha256 if locked else None
-        pwm = pwms.get(tf_name)
-        if pwm is None:
-            raise ValueError(f"Missing PWM for TF '{tf_name}'.")
-        core_def_by_tf[tf_name] = _core_def_hash(pwm, pwm_hash_by_tf[tf_name])
 
     # 1)  parquet payload ----------------------------------------------------
     parquet_path = elites_path(out_dir)

@@ -62,6 +62,8 @@ def plot_opt_trajectory(
     tf_names: Iterable[str],
     out_path: Path,
     *,
+    identity_mode: str | None,
+    elite_centroid: tuple[float, float] | None,
     score_scale: str | None,
     dpi: int,
     png_compress_level: int,
@@ -108,11 +110,48 @@ def plot_opt_trajectory(
             alphas = np.linspace(0.2, 0.95, len(segments))
             ax.add_collection(_line_collection(segments, color=color, alphas=alphas))
 
+        if phase is not None and phase.size >= 1:
+            phase_series = phase.astype(str)
+            draw_indices = np.where(phase_series == "draw")[0]
+            if draw_indices.size:
+                first_draw_idx = int(draw_indices[0])
+                ax.scatter(
+                    [x[first_draw_idx]],
+                    [y[first_draw_idx]],
+                    s=40,
+                    marker="o",
+                    color="#333333",
+                    zorder=5,
+                    label="tune→draw",
+                )
+
+    if elite_centroid is not None:
+        ax.scatter(
+            [elite_centroid[0]],
+            [elite_centroid[1]],
+            s=80,
+            marker="*",
+            color="#f58518",
+            zorder=6,
+            label="elite median",
+        )
+
     ax.set_xlabel(_axis_label(x_metric, score_scale))
     ax.set_ylabel(_axis_label(y_metric, score_scale))
     tf_label = ", ".join(str(tf) for tf in tf_names)
     scale_label = f", scale={score_scale}" if score_scale else ""
     ax.set_title(f"Optimization trajectory ({tf_label}{scale_label}; cold chain)")
+    if identity_mode:
+        ax.text(
+            0.02,
+            0.98,
+            f"identity={identity_mode}",
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontsize=9,
+            color="#444444",
+        )
     ax.legend(frameon=False, fontsize=8)
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)

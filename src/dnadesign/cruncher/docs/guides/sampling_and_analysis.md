@@ -77,14 +77,15 @@ Sampling artifacts consumed by analysis:
 
 - `artifacts/elites_hits.parquet` (per-elite, per-TF best-hit/core metadata)
 - `artifacts/random_baseline.parquet` (baseline cloud for trajectory plots; includes seed, n_samples, length, score_scale, bidirectional, background model)
+- `artifacts/random_baseline_hits.parquet` (baseline best-hit/core metadata for diversity context)
 
 Plots (always generated when data is available):
 
-- `plot__run__dashboard.*`
+- `plot__run__summary.*`
 - `plot__opt__trajectory.*`
 - `plot__elites__nn_distance.*`
 - `plot__overlap__panel.*`
-- `plot__diag__panel.*` (only if `trace.nc` exists)
+- `plot__health__panel.*` (only if `trace.nc` exists)
 
 ## Diagnostics quick read
 

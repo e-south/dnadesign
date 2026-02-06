@@ -23,6 +23,7 @@ from dnadesign.cruncher.artifacts.layout import (
     elites_hits_path,
     elites_path,
     manifest_path,
+    random_baseline_hits_path,
     random_baseline_path,
     sequences_path,
     trace_path,
@@ -109,6 +110,7 @@ def _write_basic_run_artifacts(
     }
     baseline_df = pd.DataFrame(
         {
+            "baseline_id": [0, 1, 2],
             "sequence": ["ACGTACGTACGT", "TGCATGCATGCA", "AACCGGTTAACC"],
             "canonical_sequence": ["ACGTACGTACGT", "TGCATGCATGCA", "AACCGGTTAACC"],
             "baseline_seed": 7,
@@ -130,6 +132,34 @@ def _write_basic_run_artifacts(
     baseline_path = random_baseline_path(run_dir)
     baseline_path.parent.mkdir(parents=True, exist_ok=True)
     baseline_df.to_parquet(baseline_path, engine="fastparquet")
+
+    baseline_hits_rows = []
+    for baseline_id, seq in enumerate(baseline_df["sequence"]):
+        for tf_idx, tf_name in enumerate(tf_names):
+            baseline_hits_rows.append(
+                {
+                    "baseline_id": baseline_id,
+                    "tf": tf_name,
+                    "best_start": 0,
+                    "best_core_offset": 0,
+                    "best_strand": "+",
+                    "best_window_seq": seq[:4],
+                    "best_core_seq": seq[:4],
+                    "best_score_raw": 1.0 + 0.1 * tf_idx,
+                    "best_score_scaled": 1.0 + 0.1 * tf_idx,
+                    "best_score_norm": 0.9,
+                    "tiebreak_rule": "leftmost",
+                    "pwm_ref": "demo",
+                    "pwm_hash": "hash",
+                    "pwm_width": 4,
+                    "core_width": 4,
+                    "core_def_hash": "core",
+                }
+            )
+    baseline_hits_df = pd.DataFrame(baseline_hits_rows)
+    baseline_hits_path = random_baseline_hits_path(run_dir)
+    baseline_hits_path.parent.mkdir(parents=True, exist_ok=True)
+    baseline_hits_df.to_parquet(baseline_hits_path, engine="fastparquet")
 
     elite_scores = {f"score_{tf}": [1.0 + 0.05 * idx] for idx, tf in enumerate(tf_names)}
     elites_df = pd.DataFrame(
@@ -410,6 +440,7 @@ def test_analyze_opt_trajectory_multi_tf(tmp_path: Path) -> None:
     assert analysis_runs
 
     analysis_dir = analysis_runs[0]
+    assert (analysis_dir / "plot__run__summary.png").exists()
     assert (analysis_dir / "plot__opt__trajectory.png").exists()
 
 
@@ -458,6 +489,7 @@ def test_analyze_opt_trajectory_single_tf(tmp_path: Path) -> None:
     assert analysis_runs
 
     analysis_dir = analysis_runs[0]
+    assert (analysis_dir / "plot__run__summary.png").exists()
     assert (analysis_dir / "plot__opt__trajectory.png").exists()
 
 
@@ -506,9 +538,9 @@ def test_analyze_without_trace_when_no_trace_plots(tmp_path: Path) -> None:
     assert analysis_runs
     analysis_dir = analysis_runs[0]
     plot_manifest = json.loads((analysis_dir / "plot_manifest.json").read_text())
-    diag = next(entry for entry in plot_manifest.get("plots", []) if entry.get("key") == "diag_panel")
-    assert diag.get("generated") is False
-    assert "Trace not available" in (diag.get("skip_reason") or "")
+    health = next(entry for entry in plot_manifest.get("plots", []) if entry.get("key") == "health_panel")
+    assert health.get("generated") is False
+    assert "Trace not available" in (health.get("skip_reason") or "")
 
 
 def test_analyze_missing_trace_with_mcmc_diagnostics(tmp_path: Path) -> None:

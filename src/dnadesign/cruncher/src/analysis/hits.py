@@ -38,6 +38,25 @@ REQUIRED_HITS_COLUMNS = {
     "tiebreak_rule",
 }
 
+REQUIRED_BASELINE_HITS_COLUMNS = {
+    "baseline_id",
+    "tf",
+    "best_start",
+    "best_core_offset",
+    "best_strand",
+    "best_window_seq",
+    "best_core_seq",
+    "best_score_raw",
+    "best_score_scaled",
+    "best_score_norm",
+    "tiebreak_rule",
+    "pwm_ref",
+    "pwm_hash",
+    "pwm_width",
+    "core_width",
+    "core_def_hash",
+}
+
 
 def validate_elites_hits_df(df: pd.DataFrame) -> None:
     missing = [col for col in sorted(REQUIRED_HITS_COLUMNS) if col not in df.columns]
@@ -48,4 +67,16 @@ def validate_elites_hits_df(df: pd.DataFrame) -> None:
 def load_elites_hits(path: Path) -> pd.DataFrame:
     df = read_parquet(path)
     validate_elites_hits_df(df)
+    return df
+
+
+def validate_baseline_hits_df(df: pd.DataFrame) -> None:
+    missing = [col for col in sorted(REQUIRED_BASELINE_HITS_COLUMNS) if col not in df.columns]
+    if missing:
+        raise ValueError(f"random_baseline_hits.parquet missing required columns: {missing}")
+
+
+def load_baseline_hits(path: Path) -> pd.DataFrame:
+    df = read_parquet(path)
+    validate_baseline_hits_df(df)
     return df
