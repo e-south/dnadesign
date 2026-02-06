@@ -7,11 +7,13 @@ Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
+import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
+import pandas as pd
 import pytest
 import yaml
 from typer.testing import CliRunner
@@ -417,8 +419,87 @@ def test_runs_watch_requires_args_with_hint() -> None:
     assert "Missing RUN" in result.output
 
 
-def test_analyze_latest_requires_complete_artifacts() -> None:
-    result = invoke_cli(["analyze", "--latest", str(CONFIG_PATH)])
+def test_analyze_latest_requires_complete_artifacts(tmp_path: Path) -> None:
+    config = {
+        "cruncher": {
+            "schema_version": 3,
+            "workspace": {"out_dir": "results", "regulator_sets": [["lexA", "cpxR"]]},
+            "catalog": {"root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
+            "sample": {
+                "seed": 7,
+                "sequence_length": 12,
+                "budget": {"tune": 1, "draws": 1},
+                "elites": {"k": 1},
+                "output": {"save_sequences": True, "save_trace": False},
+            },
+            "analysis": {
+                "run_selector": "latest",
+                "pairwise": "off",
+                "plot_format": "png",
+                "plot_dpi": 72,
+                "table_format": "parquet",
+                "max_points": 1000,
+            },
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    run_dir = tmp_path / "results" / "sample" / "sample_missing_hits"
+    (run_dir / "meta").mkdir(parents=True, exist_ok=True)
+    (run_dir / "artifacts").mkdir(parents=True, exist_ok=True)
+
+    config_used = {
+        "cruncher": {
+            "schema_version": 3,
+            "active_regulator_set": {"tfs": ["lexA", "cpxR"]},
+            "pwms_info": {
+                "lexA": {"pwm_matrix": [[0.25, 0.25, 0.25, 0.25] for _ in range(4)]},
+                "cpxR": {"pwm_matrix": [[0.25, 0.25, 0.25, 0.25] for _ in range(4)]},
+            },
+            "sample": {"objective": {"score_scale": "normalized-llr"}},
+        }
+    }
+    (run_dir / "meta" / "config_used.yaml").write_text(yaml.safe_dump(config_used))
+
+    pd.DataFrame(
+        {
+            "chain": [0],
+            "draw": [0],
+            "phase": ["draw"],
+            "sequence": ["ACGTACGTACGT"],
+            "score_lexA": [1.0],
+            "score_cpxR": [1.1],
+        }
+    ).to_parquet(run_dir / "artifacts" / "sequences.parquet", engine="fastparquet")
+    pd.DataFrame(
+        {
+            "id": ["elite-1"],
+            "sequence": ["ACGTACGTACGT"],
+            "rank": [1],
+            "score_lexA": [1.0],
+            "score_cpxR": [1.1],
+        }
+    ).to_parquet(run_dir / "artifacts" / "elites.parquet", engine="fastparquet")
+
+    (run_dir / "meta" / "run_manifest.json").write_text(
+        json.dumps(
+            {
+                "stage": "sample",
+                "run_dir": str(run_dir.resolve()),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "draws": 1,
+                "adapt_sweeps": 1,
+                "top_k": 1,
+                "objective": {"bidirectional": True, "score_scale": "normalized-llr"},
+                "optimizer_stats": {"beta_ladder_final": [1.0]},
+                "artifacts": [],
+            },
+            indent=2,
+        )
+    )
+
+    result = invoke_cli(["analyze", "--latest", str(config_path)])
     assert result.exit_code != 0
     assert "Missing elites hits parquet" in result.output
 

@@ -1,13 +1,21 @@
 cruncher:
-  out_dir: outputs
-  regulator_sets:
-    - [lexA, cpxR, fur]
-  regulator_categories:
-    Stress: [lexA]
-    Envelope: [cpxR]
-    Category1: [cpxR, baeR]
-    Category2: [lexA, rcdA, lrp, fur]
-    Category3: [fnr, fur, acrR, soxR, soxS, lrp]
+  schema_version: 3
+
+  workspace:
+    out_dir: outputs
+    regulator_sets:
+      - [lexA, cpxR, fur]
+    regulator_categories:
+      Stress: [lexA]
+      Envelope: [cpxR]
+      Category1: [cpxR, baeR]
+      Category2: [lexA, rcdA, lrp, fur]
+      Category3: [fnr, fur, acrR, soxR, soxS, lrp]
+
+  io:
+    parsers:
+      extra_modules: []
+
   campaigns:
     - name: demo_pair
       categories: [Stress, Envelope]
@@ -45,21 +53,15 @@ cruncher:
         organism: ecoli
         purpose: demo_filtered
 
-  io:
-    parsers:
-      extra_modules: []
-
-  motif_store:
-    catalog_root: .cruncher/demo_campaigns_multi_tf
+  catalog:
+    root: .cruncher/demo_campaigns_multi_tf
     source_preference: [meme_suite_meme, meme_suite_streme, demo_local_meme, regulondb]
     allow_ambiguous: false
-    pwm_source: matrix
+    pwm_source: sites
     site_kinds: null
     combine_sites: true
     dataset_preference: []
     dataset_map: {}
-    # Required for pwm_source=sites (site-derived PWMs need fixed-length inputs).
-    # This does NOT affect MEME/STREME discovery unless motif_discovery.window_sites=true.
     site_window_lengths:
       lexA: 15
       cpxR: 11
@@ -72,10 +74,13 @@ cruncher:
       soxR: 18
       soxS: 20
     site_window_center: midpoint
+    pwm_window_lengths: {}
+    pwm_window_strategy: max_info
     min_sites_for_pwm: 2
     allow_low_sites: false
 
-  motif_discovery:
+  discover:
+    enabled: true
     source_id: meme_suite_streme
 
   ingest:
@@ -127,46 +132,33 @@ cruncher:
           format: meme
           assay: dapseq
 
-  parse:
-    plot:
-      logo: true
-      bits_mode: information
-      dpi: 150
-
   sample:
-    mode: optimize
-    rng:
-      seed: 42
-      deterministic: true
+    seed: 42
     sequence_length: 30
-    compute:
-      total_sweeps: 8000
-      adapt_sweep_frac: 0.34
-    early_stop:
-      enabled: true
-      patience: 500
-      min_delta: 0.01
-      require_min_unique: true
-      min_unique: 10
-      success_min_per_tf_norm: 0.30
-    init:
-      kind: random
-      pad_with: background
+    budget:
+      tune: 2720
+      draws: 5280
     objective:
       bidirectional: true
       score_scale: normalized-llr
+      combine: min
       scoring:
         pwm_pseudocounts: 0.10
         log_odds_clip: null
       softmin:
         enabled: true
-        kind: linear
-        beta: [0.5, 10.0]
+        schedule: linear
+        beta_start: 0.5
+        beta_end: 10.0
     elites:
       k: 5
-      min_per_tf_norm: 0.30
-      require_all_tfs_over_min_norm: true
-      mmr_alpha: 0.85
+      filter:
+        min_per_tf_norm: 0.30
+        require_all_tfs: true
+        pwm_sum_min: 0.0
+      select:
+        alpha: 0.85
+        pool_size: auto
     moves:
       profile: balanced
       overrides:
@@ -180,28 +172,17 @@ cruncher:
           M: 0.35
     output:
       save_sequences: true
-      include_consensus_in_elites: false
+      save_trace: true
+      include_tune_in_sequences: false
       live_metrics: true
-      trace:
-        save: true
-        include_tune: false
-    ui:
-      progress_bar: false
-      progress_every: 1000
 
   analysis:
+    enabled: true
+    run_selector: latest
     runs: []
-    plots:
-      trace: true
-      autocorr: true
-      convergence: true
-      scatter_pwm: true
-      pair_pwm: true
-      parallel_pwm: true
-      pairgrid: true
-      score_hist: true
-      score_box: false
-      correlation_heatmap: true
-      parallel_coords: true
-    scatter_scale: normalized-llr
-    subsampling_epsilon: 10.0
+    pairwise: auto
+    plot_format: png
+    plot_dpi: 150
+    table_format: parquet
+    archive: false
+    max_points: 5000

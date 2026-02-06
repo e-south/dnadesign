@@ -366,10 +366,19 @@ def run_analyze(
         created_at = datetime.now(timezone.utc).isoformat()
 
         analysis_root_path = analysis_root(run_dir)
-        tmp_root = analysis_root_path.parent / f".analysis_tmp_{analysis_id}"
+        tmp_root = analysis_root_path.parent / ".analysis_tmp"
         if tmp_root.exists():
-            shutil.rmtree(tmp_root)
-        tmp_root.mkdir(parents=True, exist_ok=True)
+            raise RuntimeError(
+                f"Analyze already in progress for run '{run_name}' (lock: {tmp_root}). "
+                "If no analyze is running, remove the stale analysis temp directory."
+            )
+        try:
+            tmp_root.mkdir(parents=True, exist_ok=False)
+        except FileExistsError as exc:
+            raise RuntimeError(
+                f"Analyze already in progress for run '{run_name}' (lock: {tmp_root}). "
+                "If no analyze is running, remove the stale analysis temp directory."
+            ) from exc
 
         prev_root = _prepare_analysis_root(
             analysis_root_path,

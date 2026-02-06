@@ -1,0 +1,384 @@
+********************************************************************************
+MEME - Motif discovery tool
+********************************************************************************
+MEME version 4.12.0 (Release date: Tue Jun 27 16:22:50 2017 -0700)
+
+For further information on how to interpret these results or to get
+a copy of the MEME software please access http://meme-suite.org .
+
+This file may be used as input to the MAST algorithm for searching
+sequence databases for matches to groups of motifs.  MAST is available
+for interactive use and downloading at http://meme-suite.org .
+********************************************************************************
+
+
+********************************************************************************
+REFERENCE
+********************************************************************************
+If you use this program in your research, please cite:
+
+Timothy L. Bailey and Charles Elkan,
+"Fitting a mixture model by expectation maximization to discover
+motifs in biopolymers", Proceedings of the Second International
+Conference on Intelligent Systems for Molecular Biology, pp. 28-36,
+AAAI Press, Menlo Park, California, 1994.
+********************************************************************************
+
+
+********************************************************************************
+TRAINING SET
+********************************************************************************
+DATAFILE= /global/projectb/scratch/leo/multiMotifs/rcdA_B-GTGTGTAC/rcdA_B-GTGTGTAC_summits_combined_sorted.fasta
+ALPHABET= ACGT
+Sequence name            Weight Length  Sequence name            Weight Length
+-------------            ------ ------  -------------            ------ ------
+Enterobacter_cloacae_ATC 1.0000     60  Escherichia_coli_MG1655_ 1.0000     60
+Klebsiella_psneumoniae_A 1.0000     60  Shigella_flexneri_ATCC70 1.0000     60
+Escherichia_fergusonii_A 1.0000     60  Pseudomonas_stutzeri_RCH 1.0000     60
+Klebsiella_oxytoca_M5al_ 1.0000     60  Salmonella_enterica_LT2_ 1.0000     60
+Escherichia_coli_BW25113 1.0000     60  Pseudomonas_stutzeri_RCH 1.0000     60
+Enterobacter_cloacae_ATC 1.0000     60  Salmonella_enterica_LT2_ 1.0000     60
+Marinobacter_hydrocarbon 1.0000     60  Salmonella_enterica_LT2_ 1.0000     60
+Klebsiella_psneumoniae_A 1.0000     60  Enterobacter_cloacae_ATC 1.0000     60
+Escherichia_fergusonii_A 1.0000     60  Klebsiella_oxytoca_M5al_ 1.0000     60
+Escherichia_fergusonii_A 1.0000     60  Marinobacter_adhaerens_H 1.0000     60
+Herbaspirillum_seropedic 1.0000     60  Enterobacter_cloacae_ATC 1.0000     60
+Pseudomonas_stutzeri_RCH 1.0000     60  Pontibacter_actiniarum_K 1.0000     60
+Pseudomonas_stutzeri_RCH 1.0000     60  Escherichia_coli_MG1655_ 1.0000     60
+Marinobacter_adhaerens_H 1.0000     60  Escherichia_coli_MG1655_ 1.0000     60
+Pseudomonas_fluorescens_ 1.0000     60  Klebsiella_psneumoniae_A 1.0000     60
+Klebsiella_psneumoniae_A 1.0000     60  Klebsiella_psneumoniae_A 1.0000     60
+Pontibacter_actiniarum_K 1.0000     60  Acidovorax_sp_GW101-3H11 1.0000     60
+Acidovorax_sp_GW101-3H11 1.0000     60  Pseudomonas_aeruginosa_P 1.0000     60
+Klebsiella_oxytoca_M5al_ 1.0000     60  Pseudomonas_fluorescens_ 1.0000     60
+Pseudomonas_stutzeri_RCH 1.0000     60  Acidovorax_sp_GW101-3H11 1.0000     60
+Shewanella_loihica_PV-4_ 1.0000     60  Pseudomonas_fluorescens_ 1.0000     60
+Herbaspirillum_seropedic 1.0000     60  Herbaspirillum_seropedic 1.0000     60
+Escherichia_coli_MG1655_ 1.0000     60  Pseudomonas_fluorescens_ 1.0000     60
+Pseudomonas_simiae_WCS41 1.0000     60  Klebsiella_oxytoca_M5al_ 1.0000     60
+Saccharophagus_degradans 1.0000     60  Klebsiella_psneumoniae_A 1.0000     60
+Phaeobacter_inhibens_DSM 1.0000     60  Pseudomonas_stutzeri_RCH 1.0000     60
+Sphingobacteriaceae_sp_G 1.0000     60  Pseudomonas_fluorescens_ 1.0000     60
+Pseudomonas_aeruginosa_P 1.0000     60  Pseudomonas_fluorescens_ 1.0000     60
+Enterobacter_cloacae_ATC 1.0000     60  Escherichia_coli_MG1655_ 1.0000     60
+Escherichia_coli_MG1655_ 1.0000     60  Shewanella_sp_ANA-3_rcdA 1.0000     60
+Pseudomonas_fluorescens_ 1.0000     60  Herbaspirillum_seropedic 1.0000     60
+Pseudomonas_fluorescens_ 1.0000     60  Pseudomonas_fluorescens_ 1.0000     60
+Herbaspirillum_seropedic 1.0000     60  Shewanella_sp_ANA-3_rcdA 1.0000     60
+Pseudomonas_putida_KT244 1.0000     60  Salmonella_enterica_LT2_ 1.0000     60
+Shewanella_oneidensis_MR 1.0000     60  Escherichia_fergusonii_A 1.0000     60
+Dyella_japonica_UNC79MFT 1.0000     60  Klebsiella_oxytoca_M5al_ 1.0000     60
+Shewanella_sp_ANA-3_rcdA 1.0000     60  Pseudomonas_fluorescens_ 1.0000     60
+Shigella_flexneri_ATCC70 1.0000     60  Shewanella_sp_ANA-3_rcdA 1.0000     60
+Dyella_japonica_UNC79MFT 1.0000     60  Pseudomonas_putida_KT244 1.0000     60
+Burkholderia_bryophila_3 1.0000     60  Shewanella_sp_ANA-3_rcdA 1.0000     60
+Pontibacter_actiniarum_K 1.0000     60  Pontibacter_actiniarum_K 1.0000     60
+Escherichia_fergusonii_A 1.0000     60  Pseudomonas_fluorescens_ 1.0000     60
+Pseudomonas_fluorescens_ 1.0000     60  Sphingobacteriaceae_sp_G 1.0000     60
+Salmonella_enterica_LT2_ 1.0000     60  Pseudomonas_fluorescens_ 1.0000     60
+Herbaspirillum_seropedic 1.0000     60  Pseudomonas_fluorescens_ 1.0000     60
+Klebsiella_oxytoca_M5al_ 1.0000     60  Burkholderia_bryophila_3 1.0000     60
+Klebsiella_oxytoca_M5al_ 1.0000     60  Saccharophagus_degradans 1.0000     60
+Ralstonia_sp_UNC404CL21C 1.0000     60  Saccharophagus_degradans 1.0000     60
+Herbaspirillum_seropedic 1.0000     60  Pontibacter_actiniarum_K 1.0000     60
+Marinobacter_adhaerens_H 1.0000     60  Pseudomonas_fluorescens_ 1.0000     60
+********************************************************************************
+
+********************************************************************************
+COMMAND LINE SUMMARY
+********************************************************************************
+This information can also be useful in the event you wish to report a
+problem with the MEME software.
+
+command: meme /global/projectb/scratch/leo/multiMotifs/rcdA_B-GTGTGTAC/rcdA_B-GTGTGTAC_summits_combined_sorted.fasta -oc /global/projectb/scratch/leo/multiMotifs/rcdA_B-GTGTGTAC_motifs_summits -dna -revcomp -mod anr -nmotifs 3 -minw 8 -maxw 32 -maxsize 1000000
+
+model:  mod=           anr    nmotifs=         3    evt=           inf
+object function=  E-value of product of p-values
+width:  minw=            8    maxw=           32
+width:  wg=             11    ws=              1    endgaps=       yes
+nsites: minsites=        2    maxsites=       50    wnsites=       0.8
+theta:  spmap=         uni    spfuzz=        0.5
+global: substring=     yes    branching=      no    wbranch=        no
+em:     prior=   dirichlet    b=            0.01    maxiter=        50
+        distance=    1e-05
+data:   n=            6000    N=             100    shuffle=        -1
+strands: + -
+sample: seed=            0    ctfrac=         -1    maxwords=       -1
+Letter frequencies in dataset:
+A 0.296 C 0.204 G 0.204 T 0.296
+Background letter frequencies (from dataset with add-one prior applied):
+A 0.296 C 0.204 G 0.204 T 0.296
+********************************************************************************
+
+
+********************************************************************************
+MOTIF rcdA MEME-1	width =  32  sites =  44  llr = 593  E-value = 1.5e-078
+********************************************************************************
+--------------------------------------------------------------------------------
+	Motif rcdA MEME-1 Description
+--------------------------------------------------------------------------------
+Simplified        A  2534415245325511333:::a:711:::71
+pos.-specific     C  2243:42323152231222::::9:1131:29
+probability       G  5121422221512155214:92::3131912:
+matrix            T  2212232322122213341a18:1:755:9::
+
+         bits    2.3
+                 2.1
+                 1.8                     *  *    *  *
+                 1.6                    ** **    *  *
+Relative         1.4                    ** **    *  *
+Entropy          1.1                    *****    ** *
+(19.4 bits)      0.9                    ******   ** *
+                 0.7                    ******   ****
+                 0.5     *     *   *    *************
+                 0.2 *** ***  *** ***  **************
+                 0.0 --------------------------------
+
+Multilevel           GACAACACAAGCAAGGATGTGTACATTTGTAC
+consensus            CTACGT TTCAACCCTTAA     G GC
+sequence              C T   A   T T  G
+                            G
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+	Motif rcdA MEME-1 sites sorted by position p-value
+--------------------------------------------------------------------------------
+Sequence name            Strand  Start   P-value                          Site
+-------------            ------  ----- ---------            --------------------------------
+Klebsiella_oxytoca_M5al_     +      8  6.28e-16    AGATGCA GACAACAGTAGCAAGGTTGTGTACATTTGTAC ATCCAGGTTG
+Escherichia_fergusonii_A     +      8  6.28e-16    GAGAGAG GACAACAGTAGCAAGGTTGTGTACATTTGTAC ACATACCTGT
+Escherichia_coli_BW25113     +      5  1.39e-15       GGAA GACAACATTAGCAAGGTTGTGTACATTTGTAC ACAATTGCAG
+Shigella_flexneri_ATCC70     +      6  1.39e-15      GGGAA GACAACATTAGCAAGGTTGTGTACATTTGTAC ACAATTGCAG
+Escherichia_coli_MG1655_     +      6  1.39e-15      GGGAA GACAACATTAGCAAGGTTGTGTACATTTGTAC ACAATTGCAG
+Enterobacter_cloacae_ATC     -     24  6.03e-15      ATAGC GACAACACTAGCAAGTTTGTGTACATTTGTAC ACAAATCAGA
+Klebsiella_psneumoniae_A     +      8  8.51e-15    GAGTGAA GACAACAGTAGCAAGTAAGTGTACATTTGTAC ATAAACCGGA
+Salmonella_enterica_LT2_     +      4  2.38e-12        GAG GTAAACATTAGCAAGCTTGTGTACATTTGTAC ATATCATCGT
+Marinobacter_adhaerens_H     +      4  1.78e-08        GTT GTCAGTTGACGTTGTCGTGTGTACATTCGTAC ACATTAGTGA
+Shigella_flexneri_ATCC70     -     12  3.69e-08 TTGTACAATG AACTGTACAAAATAGGAGATTTACATGCGTAC AATTAGCTAC
+Dyella_japonica_UNC79MFT     -     29  3.69e-08          . GCAAGGAAGAATGAAGGAGTGTACGTCCGTAC ACGACTGAGT
+Pseudomonas_fluorescens_     -      9  7.33e-08 CCTGGATGCC GTACGCAAACGTCCCGGTATGTACATTGGTGA CACCGACG
+Pseudomonas_fluorescens_     -     11  7.33e-08 CCTGGATGCC GTACGCAAACGTCCCGGTATGTACATTGGTGA CACCGACGAT
+Escherichia_fergusonii_A     -     11  1.02e-07 TTGTACAATG AACTGTACAAAAGAGGAGATTGACATGCGTAC AATTAGTTAC
+Escherichia_coli_MG1655_     -      6  1.02e-07 TTGTACAATG AACTGTACAAAAGAGGAGATTGACATGCGTAC AATTA
+Pseudomonas_stutzeri_RCH     -     26  1.02e-07        GAC TAATGCCTGCACGTGCTTCTGTACGTTTGTCC AGTGTGAAAT
+Herbaspirillum_seropedic     +      5  1.02e-07       AACT ATTCATTGACGCACCGCATTGTACGTTTGTCC ACACAGCTTA
+Klebsiella_oxytoca_M5al_     -     21  1.13e-07   GATCTTAC GCATAGCCAAACCTTAGACTGTACATGCGTAC AGTATAGCAA
+Pseudomonas_aeruginosa_P     -     25  1.26e-07       AGTC GATAGCCAACAGCAATAAATGTACATTGGTGC GAACAAGACT
+Herbaspirillum_seropedic     -     15  2.58e-07 CCATGGTCCC ATGCGTACACGACTGCACGTGTACATGAGTGC ATGAGTCCAT
+Pseudomonas_fluorescens_     -     22  3.14e-07    CACACAA TAAGTTGTATACAACTCTATGGACATTTGTCC TGAATTTTGA
+Herbaspirillum_seropedic     +     13  6.65e-07 AACGGGAAAC GGCGAGCGATCAACGGAACTGTACATACGTAC AGTATAAATC
+Klebsiella_oxytoca_M5al_     +      6  6.65e-07      ATCGT CAGCATAAGATGTACGGCTTGTACAGGTGTAC AGGTGTACAG
+Pseudomonas_fluorescens_     +     16  8.69e-07 GCGGACAGTT GTCCGGTACGGTTTGCAAGTGGACACTTGTCC GCTTACTCAA
+Salmonella_enterica_LT2_     -     17  1.03e-06 CTTCGATAGC GTACACCGATGCCAGAGCATGTACCCCGGTAC ATACACCACA
+Ralstonia_sp_UNC404CL21C     -      5  1.34e-06 CAAGTACGCA CGGCACGCCTGCAGCGTGGTGTACATGTCGGC CATC
+Marinobacter_hydrocarbon     -     12  1.34e-06 ATAACGATGT GTACACTTGTTCACTTATGTGTACGACTGTAC ACAGTGAGGG
+Pseudomonas_fluorescens_     +      9  1.71e-06   ACGTCGAT CCAGAATTGCGATTGTACGTGTACAGGCGTAC ATTTCAAGTG
+Acidovorax_sp_GW101-3H11     -     15  2.56e-06 CCTGAATGTA CATTTTGACGAGCCCTCAATGTACATTTGGAC GGTAAACGCA
+Klebsiella_psneumoniae_A     -     11  2.77e-06 TGTTCAACAA TCCGGCAGGATCGCCATCCTGGACGTGTGTCC AATATTCAAT
+Escherichia_coli_MG1655_     +     15  2.99e-06 ACATAATCAA TCCAGCCCCTGTGAGTTACTGTATGGATGTAC AGTACATCCA
+Acidovorax_sp_GW101-3H11     +     26  2.99e-06 CCTGAATGTA CATTTGGACGAGCCCTCAATGTACATTTGGAC GGT
+Acidovorax_sp_GW101-3H11     +     23  4.05e-06 TGTGTACGAC GCGCTGATCAGCAAGCGTGTGTACAAGCCCGC GTTTTC
+Shewanella_sp_ANA-3_rcdA     +     26  4.69e-06 ACTATCCCTT ACGAATAAAGATAACTCATTGTACATTCGTAG CTT
+Burkholderia_bryophila_3     -     15  7.20e-06 TGAGAGGGTA CAGTTCTCGTGCTTTGATACGTACGATCGTAC AGATTCTGCA
+Pseudomonas_fluorescens_     +     26  7.20e-06 ATGTCCATCA TAAAATGTACGAAACGCATTTTATCTTTGTAC ATT
+Sphingobacteriaceae_sp_G     +     20  7.72e-06 TACACACGTG TACATACACCTCTTCGCTGTGGACAGCTGTCC AACGCTGGA
+Marinobacter_adhaerens_H     -     27  8.85e-06         CC GCTTGACCTAACAGAGGAATGGACAATAGTAC TGAACACAGC
+Pseudomonas_fluorescens_     -     17  9.47e-06 ATTGACCGAC ATACTTGTACAACGTTAACTGTATGTTCGTAC AGTTGTTTTG
+Klebsiella_oxytoca_M5al_     +     18  1.08e-05 AAATTGTTAC TGTAGTGTACAAAAAATCATGTACGGTTGTGC TTTTGACGCT
+Salmonella_enterica_LT2_     -      2  1.40e-05 TGTACAATAA ACATGTACAACTGGGGAGATGTTTATGCGTAC G
+Dyella_japonica_UNC79MFT     +     14  1.92e-05 GAACATCGGG CAGCTGAGTTCCATGTACATGTACGCGTGGAA GTCCGGCATC
+Marinobacter_adhaerens_H     +     23  2.16e-05 AAGAACTGTA CAAAGGTGAAGGTTATAACTGTACAGATCTCC GTACCG
+Pseudomonas_aeruginosa_P     -      6  2.59e-05 CTGTCGTACA CAACGTGCCAGTACTTCGGCGGACGCCGGGAC GGGTC
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+	Motif rcdA MEME-1 block diagrams
+--------------------------------------------------------------------------------
+SEQUENCE NAME            POSITION P-VALUE  MOTIF DIAGRAM
+-------------            ----------------  -------------
+Klebsiella_oxytoca_M5al_          6.3e-16  7_[+1]_21
+Escherichia_fergusonii_A          6.3e-16  7_[+1]_21
+Escherichia_coli_BW25113          1.4e-15  4_[+1]_24
+Shigella_flexneri_ATCC70          1.4e-15  5_[+1]_23
+Escherichia_coli_MG1655_          1.4e-15  5_[+1]_23
+Enterobacter_cloacae_ATC            6e-15  23_[-1]_5
+Klebsiella_psneumoniae_A          8.5e-15  7_[+1]_21
+Salmonella_enterica_LT2_          2.4e-12  3_[+1]_25
+Marinobacter_adhaerens_H          1.8e-08  3_[+1]_25
+Shigella_flexneri_ATCC70          3.7e-08  11_[-1]_17
+Dyella_japonica_UNC79MFT          3.7e-08  28_[-1]
+Pseudomonas_fluorescens_          7.3e-08  8_[-1]_20
+Pseudomonas_fluorescens_          7.3e-08  10_[-1]_18
+Escherichia_fergusonii_A            1e-07  10_[-1]_18
+Escherichia_coli_MG1655_            1e-07  5_[-1]_23
+Pseudomonas_stutzeri_RCH            1e-07  25_[-1]_3
+Herbaspirillum_seropedic            1e-07  4_[+1]_24
+Klebsiella_oxytoca_M5al_          1.1e-07  20_[-1]_8
+Pseudomonas_aeruginosa_P          1.3e-07  24_[-1]_4
+Herbaspirillum_seropedic          2.6e-07  14_[-1]_14
+Pseudomonas_fluorescens_          3.1e-07  21_[-1]_7
+Herbaspirillum_seropedic          6.6e-07  12_[+1]_16
+Klebsiella_oxytoca_M5al_          6.6e-07  5_[+1]_23
+Pseudomonas_fluorescens_          8.7e-07  15_[+1]_13
+Salmonella_enterica_LT2_            1e-06  16_[-1]_12
+Ralstonia_sp_UNC404CL21C          1.3e-06  4_[-1]_24
+Marinobacter_hydrocarbon          1.3e-06  11_[-1]_17
+Pseudomonas_fluorescens_          1.7e-06  8_[+1]_20
+Acidovorax_sp_GW101-3H11          2.6e-06  14_[-1]_14
+Klebsiella_psneumoniae_A          2.8e-06  10_[-1]_18
+Escherichia_coli_MG1655_            3e-06  14_[+1]_14
+Acidovorax_sp_GW101-3H11            3e-06  25_[+1]_3
+Acidovorax_sp_GW101-3H11          4.1e-06  22_[+1]_6
+Shewanella_sp_ANA-3_rcdA          4.7e-06  25_[+1]_3
+Burkholderia_bryophila_3          7.2e-06  14_[-1]_14
+Pseudomonas_fluorescens_          7.2e-06  25_[+1]_3
+Sphingobacteriaceae_sp_G          7.7e-06  19_[+1]_9
+Marinobacter_adhaerens_H          8.9e-06  26_[-1]_2
+Pseudomonas_fluorescens_          9.5e-06  16_[-1]_12
+Klebsiella_oxytoca_M5al_          1.1e-05  17_[+1]_11
+Salmonella_enterica_LT2_          1.4e-05  1_[-1]_27
+Dyella_japonica_UNC79MFT          1.9e-05  13_[+1]_15
+Marinobacter_adhaerens_H          2.2e-05  22_[+1]_6
+Pseudomonas_aeruginosa_P          2.6e-05  5_[-1]_23
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+	Motif rcdA MEME-1 in BLOCKS format
+--------------------------------------------------------------------------------
+BL   MOTIF rcdA width=32 seqs=44
+Klebsiella_oxytoca_M5al_ (    8) GACAACAGTAGCAAGGTTGTGTACATTTGTAC  1
+Escherichia_fergusonii_A (    8) GACAACAGTAGCAAGGTTGTGTACATTTGTAC  1
+Escherichia_coli_BW25113 (    5) GACAACATTAGCAAGGTTGTGTACATTTGTAC  1
+Shigella_flexneri_ATCC70 (    6) GACAACATTAGCAAGGTTGTGTACATTTGTAC  1
+Escherichia_coli_MG1655_ (    6) GACAACATTAGCAAGGTTGTGTACATTTGTAC  1
+Enterobacter_cloacae_ATC (   24) GACAACACTAGCAAGTTTGTGTACATTTGTAC  1
+Klebsiella_psneumoniae_A (    8) GACAACAGTAGCAAGTAAGTGTACATTTGTAC  1
+Salmonella_enterica_LT2_ (    4) GTAAACATTAGCAAGCTTGTGTACATTTGTAC  1
+Marinobacter_adhaerens_H (    4) GTCAGTTGACGTTGTCGTGTGTACATTCGTAC  1
+Shigella_flexneri_ATCC70 (   12) AACTGTACAAAATAGGAGATTTACATGCGTAC  1
+Dyella_japonica_UNC79MFT (   29) GCAAGGAAGAATGAAGGAGTGTACGTCCGTAC  1
+Pseudomonas_fluorescens_ (    9) GTACGCAAACGTCCCGGTATGTACATTGGTGA  1
+Pseudomonas_fluorescens_ (   11) GTACGCAAACGTCCCGGTATGTACATTGGTGA  1
+Escherichia_fergusonii_A (   11) AACTGTACAAAAGAGGAGATTGACATGCGTAC  1
+Escherichia_coli_MG1655_ (    6) AACTGTACAAAAGAGGAGATTGACATGCGTAC  1
+Pseudomonas_stutzeri_RCH (   26) TAATGCCTGCACGTGCTTCTGTACGTTTGTCC  1
+Herbaspirillum_seropedic (    5) ATTCATTGACGCACCGCATTGTACGTTTGTCC  1
+Klebsiella_oxytoca_M5al_ (   21) GCATAGCCAAACCTTAGACTGTACATGCGTAC  1
+Pseudomonas_aeruginosa_P (   25) GATAGCCAACAGCAATAAATGTACATTGGTGC  1
+Herbaspirillum_seropedic (   15) ATGCGTACACGACTGCACGTGTACATGAGTGC  1
+Pseudomonas_fluorescens_ (   22) TAAGTTGTATACAACTCTATGGACATTTGTCC  1
+Herbaspirillum_seropedic (   13) GGCGAGCGATCAACGGAACTGTACATACGTAC  1
+Klebsiella_oxytoca_M5al_ (    6) CAGCATAAGATGTACGGCTTGTACAGGTGTAC  1
+Pseudomonas_fluorescens_ (   16) GTCCGGTACGGTTTGCAAGTGGACACTTGTCC  1
+Salmonella_enterica_LT2_ (   17) GTACACCGATGCCAGAGCATGTACCCCGGTAC  1
+Ralstonia_sp_UNC404CL21C (    5) CGGCACGCCTGCAGCGTGGTGTACATGTCGGC  1
+Marinobacter_hydrocarbon (   12) GTACACTTGTTCACTTATGTGTACGACTGTAC  1
+Pseudomonas_fluorescens_ (    9) CCAGAATTGCGATTGTACGTGTACAGGCGTAC  1
+Acidovorax_sp_GW101-3H11 (   15) CATTTTGACGAGCCCTCAATGTACATTTGGAC  1
+Klebsiella_psneumoniae_A (   11) TCCGGCAGGATCGCCATCCTGGACGTGTGTCC  1
+Escherichia_coli_MG1655_ (   15) TCCAGCCCCTGTGAGTTACTGTATGGATGTAC  1
+Acidovorax_sp_GW101-3H11 (   26) CATTTGGACGAGCCCTCAATGTACATTTGGAC  1
+Acidovorax_sp_GW101-3H11 (   23) GCGCTGATCAGCAAGCGTGTGTACAAGCCCGC  1
+Shewanella_sp_ANA-3_rcdA (   26) ACGAATAAAGATAACTCATTGTACATTCGTAG  1
+Burkholderia_bryophila_3 (   15) CAGTTCTCGTGCTTTGATACGTACGATCGTAC  1
+Pseudomonas_fluorescens_ (   26) TAAAATGTACGAAACGCATTTTATCTTTGTAC  1
+Sphingobacteriaceae_sp_G (   20) TACATACACCTCTTCGCTGTGGACAGCTGTCC  1
+Marinobacter_adhaerens_H (   27) GCTTGACCTAACAGAGGAATGGACAATAGTAC  1
+Pseudomonas_fluorescens_ (   17) ATACTTGTACAACGTTAACTGTATGTTCGTAC  1
+Klebsiella_oxytoca_M5al_ (   18) TGTAGTGTACAAAAAATCATGTACGGTTGTGC  1
+Salmonella_enterica_LT2_ (    2) ACATGTACAACTGGGGAGATGTTTATGCGTAC  1
+Dyella_japonica_UNC79MFT (   14) CAGCTGAGTTCCATGTACATGTACGCGTGGAA  1
+Marinobacter_adhaerens_H (   23) CAAAGGTGAAGGTTATAACTGTACAGATCTCC  1
+Pseudomonas_aeruginosa_P (    6) CAACGTGCCAGTACTTCGGCGGACGCCGGGAC  1
+//
+
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+	Motif rcdA MEME-1 position-specific scoring matrix
+--------------------------------------------------------------------------------
+log-odds matrix: alength= 4 w= 32 n= 2900 bayes= 7.56826 E= 1.5e-078
+   -70      1    116    -90
+    75      1   -158    -38
+    20     84    -36   -112
+    38     54   -116    -38
+    46  -1210    101    -70
+  -212    101    -16     20
+    69    -16    -16    -90
+   -38     42     16    -12
+    54    -16    -36    -38
+    62     42   -116    -70
+    10   -158    136   -170
+   -53    123    -84    -53
+    62      1    -36    -70
+    69      1    -84    -53
+  -138     42    123   -112
+  -170    -58    116     10
+    20    -16      1    -12
+    20    -36    -58     29
+    20    -36    101   -170
+ -1210   -216  -1210    169
+ -1210  -1210    216   -170
+ -1210  -1210    -16    146
+   172  -1210  -1210   -370
+ -1210    216  -1210   -170
+   125   -216     30  -1210
+  -170   -116    -58    120
+  -212    -84     42     88
+  -270     54    -84     88
+ -1210   -158    219  -1210
+ -1210   -316    -84    154
+   120    -36    -36  -1210
+  -212    216   -316  -1210
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+	Motif rcdA MEME-1 position-specific probability matrix
+--------------------------------------------------------------------------------
+letter-probability matrix: alength= 4 w= 32 nsites= 44 E= 1.5e-078
+ 0.181818  0.204545  0.454545  0.159091
+ 0.500000  0.204545  0.068182  0.227273
+ 0.340909  0.363636  0.159091  0.136364
+ 0.386364  0.295455  0.090909  0.227273
+ 0.409091  0.000000  0.409091  0.181818
+ 0.068182  0.409091  0.181818  0.340909
+ 0.477273  0.181818  0.181818  0.159091
+ 0.227273  0.272727  0.227273  0.272727
+ 0.431818  0.181818  0.159091  0.227273
+ 0.454545  0.272727  0.090909  0.181818
+ 0.318182  0.068182  0.522727  0.090909
+ 0.204545  0.477273  0.113636  0.204545
+ 0.454545  0.204545  0.159091  0.181818
+ 0.477273  0.204545  0.113636  0.204545
+ 0.113636  0.272727  0.477273  0.136364
+ 0.090909  0.136364  0.454545  0.318182
+ 0.340909  0.181818  0.204545  0.272727
+ 0.340909  0.159091  0.136364  0.363636
+ 0.340909  0.159091  0.409091  0.090909
+ 0.000000  0.045455  0.000000  0.954545
+ 0.000000  0.000000  0.909091  0.090909
+ 0.000000  0.000000  0.181818  0.818182
+ 0.977273  0.000000  0.000000  0.022727
+ 0.000000  0.909091  0.000000  0.090909
+ 0.704545  0.045455  0.250000  0.000000
+ 0.090909  0.090909  0.136364  0.681818
+ 0.068182  0.113636  0.272727  0.545455
+ 0.045455  0.295455  0.113636  0.545455
+ 0.000000  0.068182  0.931818  0.000000
+ 0.000000  0.022727  0.113636  0.863636
+ 0.681818  0.159091  0.159091  0.000000
+ 0.068182  0.909091  0.022727  0.000000
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+	Motif rcdA MEME-1 regular expression
+--------------------------------------------------------------------------------
+[GC][ATC][CA][ACT][AG][CT]A[CTAG][AT][AC][GA][CAT][AC][ACT][GC][GT][ATG][TA][GA]TGTAC[AG]T[TG][TC]GTAC
+--------------------------------------------------------------------------------
+
+
+
+
+Time  5.40 secs.
+
+********************************************************************************

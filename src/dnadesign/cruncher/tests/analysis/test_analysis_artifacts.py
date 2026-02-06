@@ -304,6 +304,52 @@ def test_analyze_creates_analysis_run_and_manifest_updates(tmp_path: Path) -> No
     assert summary_after.get("analysis_id")
 
 
+def test_analyze_fails_fast_when_run_lock_exists(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    config = _base_config(
+        catalog_root=catalog_root,
+        regulator_sets=[["lexA", "cpxR"]],
+        sample=_sample_block(save_trace=False, top_k=1),
+        analysis={
+            "run_selector": "explicit",
+            "runs": ["sample_locked"],
+            "pairwise": "off",
+            "plot_format": "png",
+            "plot_dpi": 72,
+            "table_format": "parquet",
+            "max_points": 1000,
+        },
+    )
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    run_dir = _make_sample_run_dir(tmp_path, "sample_locked")
+
+    lock_dir = tmp_path / ".cruncher" / "locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = lock_dir / "config.lock.json"
+    lock_path.write_text("{}")
+    lock_sha = sha256_path(lock_path)
+
+    _write_basic_run_artifacts(
+        run_dir=run_dir,
+        config=config,
+        config_path=config_path,
+        lock_path=lock_path,
+        lock_sha=lock_sha,
+        tf_names=["lexA", "cpxR"],
+        include_trace=False,
+        top_k=1,
+    )
+
+    analyze_lock = run_dir / ".analysis_tmp"
+    analyze_lock.mkdir(parents=True, exist_ok=True)
+
+    cfg = load_config(config_path)
+    with pytest.raises(RuntimeError, match="Analyze already in progress"):
+        run_analyze(cfg, config_path)
+
+
 def test_analyze_without_trace_does_not_import_arviz(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     catalog_root = tmp_path / ".cruncher"
     config = _base_config(

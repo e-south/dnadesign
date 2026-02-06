@@ -3,6 +3,7 @@
 ## Contents
 - [Overview](#overview)
 - [Demo setup](#demo-setup)
+- [Cache sites](#cache-sites)
 - [Generate a campaign](#generate-a-campaign)
 - [Lock + parse](#lock--parse)
 - [Sample + analyze](#sample--analyze)
@@ -21,10 +22,21 @@ CONFIG="$PWD/config.yaml"
 cruncher() { pixi run cruncher -- "$@"; }
 ```
 
+## Cache sites
+
+The multi-TF demo is configured for site-derived PWMs (`catalog.pwm_source: sites`).
+Fetch local DAP-seq sites first, then fill the remaining TFs from RegulonDB:
+
+```bash
+cruncher fetch sites --source demo_local_meme --tf lexA --tf cpxR --tf acrR --tf lrp --tf rcdA --tf soxR --update -c "$CONFIG"
+cruncher fetch sites --source regulondb --tf baeR --tf fnr --tf fur --tf soxS --update -c "$CONFIG"
+```
+
 ## Generate a campaign
 
 ```bash
-cruncher campaign generate --campaign regulators_v1 -c "$CONFIG"
+cruncher campaign generate --campaign demo_pair --out campaign_demo_pair.yaml -c "$CONFIG"
+DERIVED="$PWD/campaign_demo_pair.yaml"
 ```
 
 This writes a derived config that contains explicit `workspace.regulator_sets` and a `campaign` metadata block. Use that derived config for runs.
@@ -32,21 +44,21 @@ This writes a derived config that contains explicit `workspace.regulator_sets` a
 ## Lock + parse
 
 ```bash
-cruncher lock  -c "$CONFIG"
-cruncher parse -c "$CONFIG"
+cruncher lock  -c "$DERIVED"
+cruncher parse -c "$DERIVED"
 ```
 
 ## Sample + analyze
 
 ```bash
-cruncher sample  -c "$CONFIG"
-cruncher analyze -c "$CONFIG"
+cruncher sample  -c "$DERIVED"
+cruncher analyze --summary -c "$DERIVED"
 ```
 
 ## Inspect campaign summary
 
 ```bash
-cruncher campaign summarize --campaign regulators_v1 -c "$CONFIG"
+cruncher campaign summarize --campaign demo_pair -c "$DERIVED"
 ```
 
 Summary artifacts live under:

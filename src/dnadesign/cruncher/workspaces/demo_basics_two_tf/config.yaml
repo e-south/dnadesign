@@ -101,9 +101,9 @@ cruncher:
         beta_start: 0.5
         beta_end: 10.0
     elites:
-      k: 10
+      k: 5
       filter:
-        min_per_tf_norm: 0.40
+        min_per_tf_norm: 0.30
         require_all_tfs: true
         pwm_sum_min: 0.0
       select:
