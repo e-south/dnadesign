@@ -12,6 +12,8 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import json
+import os
 import shutil
 from pathlib import Path
 from typing import Callable, Optional
@@ -21,6 +23,106 @@ import yaml
 
 from ..cli_commands.context import CliContext
 from ..config import LATEST_SCHEMA_VERSION, resolve_relative_path
+
+
+def _repo_root_from(start: Path) -> Path | None:
+    try:
+        cursor = start.resolve()
+    except Exception:
+        cursor = start
+    for root in [cursor, *cursor.parents]:
+        if (root / "pyproject.toml").exists() or (root / ".git").exists():
+            return root
+    return None
+
+
+def _default_workspace_root() -> Path:
+    root, _ = _default_workspace_root_with_source()
+    return root
+
+
+def _default_workspace_root_with_source() -> tuple[Path, str]:
+    env_root = os.environ.get("DENSEGEN_WORKSPACE_ROOT")
+    if env_root:
+        return Path(env_root).expanduser(), "env:DENSEGEN_WORKSPACE_ROOT"
+    repo_root = _repo_root_from(Path(__file__).resolve())
+    if repo_root is not None:
+        return repo_root / "src" / "dnadesign" / "densegen" / "workspaces" / "runs", "repo-default"
+    raise RuntimeError("Unable to determine workspace root. Set DENSEGEN_WORKSPACE_ROOT or pass --root explicitly.")
+
+
+def _templates_root() -> Path:
+    repo_root = _repo_root_from(Path(__file__).resolve())
+    if repo_root is not None:
+        return repo_root / "src" / "dnadesign" / "densegen" / "workspaces"
+    return Path(__file__).resolve().parents[2] / "workspaces"
+
+
+def _apply_output_mode(output: dict, *, run_id: str, output_mode: str) -> dict:
+    mode = str(output_mode).strip().lower()
+    if mode not in {"local", "usr", "both"}:
+        raise ValueError("output_mode must be one of: local, usr, both.")
+
+    out = dict(output or {})
+    parquet_cfg = out.get("parquet")
+    if not isinstance(parquet_cfg, dict):
+        parquet_cfg = {}
+    usr_cfg = out.get("usr")
+    if not isinstance(usr_cfg, dict):
+        usr_cfg = {}
+
+    if mode in {"local", "both"}:
+        parquet_cfg["path"] = "outputs/tables/dense_arrays.parquet"
+        out["parquet"] = parquet_cfg
+
+    if mode in {"usr", "both"}:
+        usr_cfg["root"] = "outputs/usr_datasets"
+        if not str(usr_cfg.get("dataset", "")).strip():
+            usr_cfg["dataset"] = run_id
+        usr_cfg.setdefault("chunk_size", 128)
+        usr_cfg.setdefault("allow_overwrite", False)
+        out["usr"] = usr_cfg
+
+    if mode == "local":
+        out["targets"] = ["parquet"]
+    elif mode == "usr":
+        out["targets"] = ["usr"]
+    else:
+        out["targets"] = ["parquet", "usr"]
+    return out
+
+
+def _seed_usr_registry(*, run_dir: Path, output: dict, console, display_path: Callable[..., str]) -> None:
+    targets = output.get("targets")
+    if not isinstance(targets, list) or "usr" not in targets:
+        return
+    usr_cfg = output.get("usr")
+    if not isinstance(usr_cfg, dict):
+        return
+    root_raw = usr_cfg.get("root")
+    if not isinstance(root_raw, str) or not root_raw.strip():
+        return
+    usr_root = run_dir / Path(root_raw)
+    registry_path = usr_root / "registry.yaml"
+    if registry_path.exists():
+        return
+    repo_root = _repo_root_from(Path(__file__).resolve())
+    template_path = None
+    if repo_root is not None:
+        candidate = repo_root / "src" / "dnadesign" / "usr" / "datasets" / "registry.yaml"
+        if candidate.exists() and candidate.is_file():
+            template_path = candidate
+    usr_root.mkdir(parents=True, exist_ok=True)
+    if template_path is None:
+        console.print(
+            "[yellow]USR output selected but no registry template was found.[/] "
+            "Create outputs/usr_datasets/registry.yaml before running `dense run`."
+        )
+        return
+    shutil.copy2(template_path, registry_path)
+    console.print(
+        f":bookmark_tabs: [bold green]Seeded USR registry[/]: {display_path(registry_path, run_dir, absolute=False)}"
+    )
 
 
 def register_workspace_commands(
@@ -33,13 +135,44 @@ def register_workspace_commands(
 ) -> None:
     console = context.console
 
+    @app.command("where", help="Show effective workspace and template roots.")
+    def workspace_where(
+        fmt: str = typer.Option(
+            "text",
+            "--format",
+            help="Output format: text or json.",
+        ),
+    ) -> None:
+        try:
+            root_path, source = _default_workspace_root_with_source()
+        except RuntimeError as exc:
+            console.print(f"[bold red]{exc}[/]")
+            raise typer.Exit(code=1) from exc
+        templates = _templates_root()
+        payload = {
+            "workspace_root": str(root_path),
+            "workspace_root_source": source,
+            "templates_root": str(templates),
+        }
+        fmt_norm = str(fmt).strip().lower()
+        if fmt_norm == "json":
+            typer.echo(json.dumps(payload, separators=(",", ":")))
+            return
+        if fmt_norm != "text":
+            console.print("[bold red]format must be one of: text, json.[/]")
+            raise typer.Exit(code=1)
+        console.print(f"workspace_root: {payload['workspace_root']}")
+        console.print(f"workspace_root_source: {payload['workspace_root_source']}")
+        console.print(f"templates_root: {payload['templates_root']}")
+        console.print("Tip: set DENSEGEN_WORKSPACE_ROOT to use a flatter or centralized run directory.")
+
     @app.command("init", help="Stage a new workspace with config.yaml and standard subfolders.")
     def workspace_init(
         run_id: str = typer.Option(..., "--id", "-i", help="Run identifier (directory name)."),
-        root: Path = typer.Option(
-            Path("."),
+        root: Optional[Path] = typer.Option(
+            None,
             "--root",
-            help="Workspace root directory (default: current directory).",
+            help="Workspace root directory (default: DENSEGEN_WORKSPACE_ROOT or workspaces/runs).",
         ),
         template_id: Optional[str] = typer.Option(
             None,
@@ -48,11 +181,23 @@ def register_workspace_commands(
         ),
         template: Optional[Path] = typer.Option(None, "--template", help="Template config YAML to copy."),
         copy_inputs: bool = typer.Option(False, help="Copy file-based inputs into workspace/inputs and rewrite paths."),
+        output_mode: str = typer.Option(
+            "local",
+            "--output-mode",
+            help="Output sink mode: local (parquet), usr, or both.",
+        ),
     ):
         run_id_clean = sanitize_filename(run_id)
         if run_id_clean != run_id:
             console.print(f"[yellow]Sanitized run id:[/] {run_id} -> {run_id_clean}")
-        root_path = root.expanduser()
+        if root is not None:
+            root_path = root.expanduser()
+        else:
+            try:
+                root_path = _default_workspace_root()
+            except RuntimeError as exc:
+                console.print(f"[bold red]{exc}[/]")
+                raise typer.Exit(code=1) from exc
         if root_path.exists() and not root_path.is_dir():
             console.print(
                 "[bold red]Workspace root is not a directory:[/] "
@@ -65,6 +210,7 @@ def register_workspace_commands(
                 "[bold red]Run directory already exists:[/] "
                 f"{context.display_path(run_dir, root_path.resolve(), absolute=False)}"
             )
+            console.print("[yellow]Choose a new --id or remove the existing run directory, then retry.[/]")
             raise typer.Exit(code=1)
 
         with resolve_template_dir(template=template, template_id=template_id) as (_template_dir, template_path):
@@ -91,15 +237,25 @@ def register_workspace_commands(
             dense["run"] = run_block
 
             output = dense.get("output") or {}
-            if "parquet" in output and isinstance(output.get("parquet"), dict):
-                output["parquet"]["path"] = "outputs/tables/dense_arrays.parquet"
-            if "usr" in output and isinstance(output.get("usr"), dict):
-                output["usr"]["root"] = "outputs/usr"
+            if not isinstance(output, dict):
+                console.print("[bold red]Template output block must be a mapping.[/]")
+                raise typer.Exit(code=1)
+            try:
+                output = _apply_output_mode(output, run_id=run_id_clean, output_mode=output_mode)
+            except ValueError as exc:
+                console.print(f"[bold red]{exc}[/]")
+                raise typer.Exit(code=1)
             dense["output"] = output
 
             logging_cfg = dense.get("logging") or {}
             logging_cfg["log_dir"] = "outputs/logs"
             dense["logging"] = logging_cfg
+            _seed_usr_registry(
+                run_dir=run_dir,
+                output=output,
+                console=console,
+                display_path=context.display_path,
+            )
 
             if "plots" in raw and isinstance(raw.get("plots"), dict):
                 raw["plots"]["out_dir"] = "outputs/plots"

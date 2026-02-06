@@ -52,6 +52,13 @@ class USRSink(SinkBase):
     def flush(self) -> None:
         self.writer.flush()
 
+    def finalize(self) -> None:
+        finalize = getattr(self.writer, "finalize", None)
+        if callable(finalize):
+            finalize()
+        else:
+            self.writer.flush()
+
     def existing_ids(self) -> set[str]:
         return set(self.writer.existing_ids())
 

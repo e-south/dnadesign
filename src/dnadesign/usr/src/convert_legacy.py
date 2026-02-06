@@ -419,6 +419,7 @@ def convert_legacy(
         dataset=ds.name,
         args={"rows": N},
         target_path=ds.records_path,
+        dataset_root=ds.root,
     )
     # Append a helpful note to the scratch pad
     skipped_str = ""
@@ -1058,6 +1059,7 @@ def repair_densegen_used_tfbs(
         dataset=ds.name,
         args={"rows": rows_total, "touched": touched, "min_tfbs_len": min_tfbs_len},
         target_path=ds.records_path,
+        dataset_root=ds.root,
     )
 
     # ----------- Assertions (no fallbacks) -----------

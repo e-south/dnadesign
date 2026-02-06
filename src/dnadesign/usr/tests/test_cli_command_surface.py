@@ -34,3 +34,5 @@ def test_top_level_excludes_tool_commands() -> None:
     assert "densegen" in help_text
     assert "maintenance" in help_text
     assert "namespace" in help_text
+    assert "events" in help_text
+    assert "state" in help_text

@@ -35,7 +35,26 @@ class OutputUSRConfig(BaseModel):
     dataset: str
     root: str
     chunk_size: int = 128
+    health_event_interval_seconds: float = 60.0
     allow_overwrite: bool = False
+    npz_fields: List[str] = Field(default_factory=list)
+    npz_root: Optional[str] = None
+
+    @field_validator("npz_fields")
+    @classmethod
+    def _npz_fields_valid(cls, v: List[str]):
+        cleaned = [str(item).strip() for item in v if str(item).strip()]
+        if len(cleaned) != len(set(cleaned)):
+            raise ValueError("output.usr.npz_fields must not contain duplicates")
+        return cleaned
+
+    @field_validator("health_event_interval_seconds")
+    @classmethod
+    def _health_event_interval_positive(cls, v: float):
+        value = float(v)
+        if value <= 0:
+            raise ValueError("output.usr.health_event_interval_seconds must be > 0")
+        return value
 
 
 class OutputParquetConfig(BaseModel):

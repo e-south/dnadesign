@@ -14,6 +14,17 @@ DenseGen can emit Parquet datasets (stored locally or in the sibling USR package
 
 ---
 
+### Integration boundary
+
+DenseGen runtime diagnostics and USR mutation events are separate streams:
+
+- DenseGen runtime diagnostics: `outputs/meta/events.jsonl`
+- USR mutation events: `<usr_root>/<dataset>/.events.log`
+
+Notify reads USR `.events.log`, not DenseGen `outputs/meta/events.jsonl`.
+
+---
+
 ### Canonical IDs
 
 - Sequence IDs use USR's algorithm:
@@ -41,10 +52,22 @@ Behavior:
 
 ### USR
 
-USR output uses `Dataset.attach` with a fixed namespace (`densegen`). USR integration is
-optional; if you do not include `usr` in `output.targets`, DenseGen should not import USR code. USR output requires an explicit `output.usr.root`. List/dict metadata values are serialized to JSON for attaches. USR output skips any IDs that already exist in `records.parquet` (resume-safe).
+USR output uses the USR Dataset overlay-part writer with a fixed namespace (`densegen`). USR integration is
+optional; if you do not include `usr` in `output.targets`, DenseGen should not import USR code. USR output requires
+an explicit `output.usr.root` and a registry entry for the `densegen` namespace (repo-wide `usr/datasets/registry.yaml`).
 
-When multiple outputs are configured, all sinks must be in sync before a run. If one output already exists and the other does not (or IDs differ), DenseGen fails fast.
+Behavior:
+- Base sequences are imported once; derived metadata is written as overlay parts under `_derived/densegen/part-*.parquet`.
+- Metadata values are stored as typed Arrow list/struct columns (no JSON encoding).
+- Existing IDs in `records.parquet` are skipped (resume-safe).
+- Overlay parts are append-only. Compact parts with `usr maintenance overlay-compact <dataset> --namespace densegen`.
+ - If `output.usr.npz_fields` is set, those metadata fields are offloaded into NPZ artifacts under
+   `<dataset>/_artifacts/densegen_npz/<id>.npz`. Overlay columns `densegen__npz_ref`,
+   `densegen__npz_sha256`, `densegen__npz_bytes`, and `densegen__npz_fields` are populated and the
+   offloaded fields are stored as null inline.
+
+When multiple outputs are configured, all sinks must be in sync before a run. If one output already exists and the other
+does not (or IDs differ), DenseGen fails fast.
 
 ---
 
@@ -78,6 +101,22 @@ These are produced alongside Parquet/USR outputs and provide a compact audit tra
 ### Events log
 
 DenseGen writes `outputs/meta/events.jsonl` (JSON lines) with structured events for pool builds, library builds, sampling pressure, stalls, and resamples. This is a lightweight machine-readable trace of runtime control flow.
+
+---
+
+### Event streams and consumers (DenseGen vs USR)
+
+DenseGen participates in two distinct event streams when you enable the USR sink:
+
+| Stream | Path | Producer | Primary purpose | Typical consumer |
+|---|---|---|---|---|
+| DenseGen runtime events | `outputs/meta/events.jsonl` | DenseGen | Run diagnostics (resamples, stalls, library rebuilds) | `dense inspect run --events`, plots, reports |
+| USR mutation events | `<usr_root>/<dataset>/.events.log` | USR | Audit plus integration boundary | `notify usr-events watch`, `usr events tail` |
+
+Important: Notify consumes USR `.events.log`, not DenseGen `outputs/meta/events.jsonl`.
+See also:
+- USR event schema: `../../../usr/README.md#event-log-schema`
+- Notify operators doc: `../../../notify/docs/usr_events.md`
 
 ---
 

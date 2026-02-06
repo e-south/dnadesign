@@ -19,6 +19,7 @@ from dnadesign.usr import Dataset
 from dnadesign.usr.src import sync as sync_module
 from dnadesign.usr.src.remote import RemoteDatasetStat, RemotePrimaryStat
 from dnadesign.usr.src.schema import REQUIRED_COLUMNS
+from dnadesign.usr.tests.registry_helpers import ensure_registry
 
 
 def _write_min_parquet(path: Path) -> None:
@@ -70,6 +71,7 @@ class DummyRemote:
 
 
 def test_execute_pull_uses_lock(tmp_path: Path, monkeypatch) -> None:
+    ensure_registry(tmp_path)
     remote_file = tmp_path / "remote" / "records.parquet"
     _write_min_parquet(remote_file)
 
@@ -97,6 +99,7 @@ def test_execute_pull_uses_lock(tmp_path: Path, monkeypatch) -> None:
 
 def test_execute_push_uses_lock(tmp_path: Path, monkeypatch) -> None:
     root = tmp_path / "datasets"
+    ensure_registry(root)
     ds = Dataset(root, "demo")
     ds.init(source="unit-test")
     ds.import_rows(

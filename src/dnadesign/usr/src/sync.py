@@ -123,6 +123,7 @@ def execute_pull(root: Path, dataset: str, remote_name: str, opts: SyncOptions) 
                 "cols": summary.primary_remote.cols,
             },
             target_path=dest / "records.parquet",
+            dataset_root=root,
         )
     return summary
 
@@ -150,6 +151,7 @@ def execute_pull_file(local_file: Path, remote_name: str, remote_path: str, opts
             dataset=str(local_file.parent),
             args={"from": remote_name, "path": str(local_file), "verify": before.verify_mode},
             target_path=local_file,
+            dataset_root=local_file.parent,
         )
     return before
 
@@ -189,6 +191,7 @@ def execute_push(root: Path, dataset: str, remote_name: str, opts: SyncOptions) 
             dataset=dataset,
             args={"to": remote_name, "verify": summary.verify_mode},
             target_path=src / "records.parquet",
+            dataset_root=root,
         )
     return summary
 
@@ -210,5 +213,6 @@ def execute_push_file(local_file: Path, remote_name: str, remote_path: str, opts
             dataset=str(local_file.parent),
             args={"to": remote_name, "path": str(local_file), "verify": before.verify_mode},
             target_path=local_file,
+            dataset_root=local_file.parent,
         )
     return before

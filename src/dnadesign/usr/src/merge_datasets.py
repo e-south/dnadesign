@@ -26,6 +26,7 @@ from .errors import SchemaError, ValidationError
 from .events import record_event
 from .io import PARQUET_COMPRESSION, iter_parquet_batches, now_utc, write_parquet_atomic_batches
 from .locks import dataset_write_lock
+from .maintenance import require_maintenance
 from .schema import REQUIRED_COLUMNS
 
 # -------------------- public enums & preview --------------------
@@ -343,18 +344,18 @@ def merge_usr_to_usr(
     note: str = "",
     overlap_coercion: str = "none",  # "none" | "to-dest"
     avoid_casefold_dups: bool = True,
-    maintenance: bool = False,
 ) -> MergePreview:
     """
     Merge rows from a source USR dataset into a destination dataset.
     See CLI help for options. Returns a MergePreview with counts.
     """
-    if not maintenance:
-        raise SchemaError("merge is a maintenance-only operation.")
+    ctx = require_maintenance("merge")
     ds_dest = Dataset(root, dest)
     ds_src = Dataset(root, src)
     lock_ctx = dataset_write_lock(ds_dest.dir) if not dry_run else nullcontext()
     with lock_ctx:
+        if not dry_run:
+            ds_dest._auto_freeze_registry()
         dest_pf = pq.ParquetFile(str(ds_dest.records_path))
         src_pf = pq.ParquetFile(str(ds_src.records_path))
         dest_schema = dest_pf.schema_arrow
@@ -511,12 +512,16 @@ def merge_usr_to_usr(
                 }
                 if coercion_notes:
                     payload["overlap_coercions"] = coercion_notes
+                payload["maintenance_reason"] = ctx.reason
                 record_event(
                     ds_dest.events_path,
                     "merge_datasets",
                     dataset=ds_dest.name,
                     args=payload,
+                    maintenance={"reason": ctx.reason},
                     target_path=ds_dest.records_path,
+                    dataset_root=ds_dest.root,
+                    actor=ctx.actor,
                 )
         finally:
             con.close()

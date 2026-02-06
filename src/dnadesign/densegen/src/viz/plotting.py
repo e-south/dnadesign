@@ -178,9 +178,9 @@ def _load_effective_config(run_root: Path) -> dict:
 
 def _load_dense_arrays(run_root: Path) -> pd.DataFrame:
     path = run_root / "outputs" / "tables" / "dense_arrays.parquet"
-    if not path.exists():
-        raise ValueError(f"dense_arrays.parquet not found: {path}")
-    return pd.read_parquet(path)
+    if path.exists():
+        return pd.read_parquet(path)
+    raise ValueError(f"dense_arrays.parquet not found: {path}")
 
 
 _PLOT_FNS = {
@@ -392,9 +392,12 @@ def run_plots_from_config(
             if result is None:
                 paths = [out_path]
             elif isinstance(result, (list, tuple, set)):
-                paths = [Path(p) for p in result]
+                paths = [Path(p) for p in result if p is not None]
             else:
                 paths = [Path(result)]
+            if not paths:
+                summary.add_row(name, "-", "[yellow]skipped[/] (not applicable for available artifacts)")
+                continue
             saved_label = _format_plot_path(paths[0], run_root, absolute)
             if len(paths) > 1:
                 saved_label = f"{saved_label} (+{len(paths) - 1})"

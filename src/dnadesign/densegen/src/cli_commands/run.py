@@ -13,7 +13,9 @@ Dunlop Lab
 from __future__ import annotations
 
 import hashlib
+import json
 import shutil
+from copy import deepcopy
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -26,6 +28,126 @@ from ..core.run_paths import has_existing_run_outputs, run_outputs_root, run_sta
 from ..core.run_state import load_run_state
 from ..utils.logging_utils import install_native_stderr_filters, setup_logging
 from ..utils.mpl_utils import ensure_mpl_cache_dir
+
+
+def _model_to_dict(value) -> dict:
+    if hasattr(value, "model_dump"):
+        return value.model_dump(by_alias=True, exclude_none=False)
+    if hasattr(value, "dict"):
+        return value.dict()
+    if isinstance(value, dict):
+        return dict(value)
+    raise TypeError("Expected config model or mapping.")
+
+
+def _extract_quota_profile(cfg: dict) -> tuple[list[str], dict[str, int], int]:
+    generation = cfg.get("generation")
+    if not isinstance(generation, dict):
+        raise ValueError("Missing generation block in effective config.")
+    plan = generation.get("plan")
+    if not isinstance(plan, list) or not plan:
+        raise ValueError("generation.plan must be a non-empty list.")
+    names: list[str] = []
+    quotas: dict[str, int] = {}
+    for item in plan:
+        if not isinstance(item, dict):
+            raise ValueError("generation.plan contains non-mapping entries.")
+        name = str(item.get("name", "")).strip()
+        if not name:
+            raise ValueError("generation.plan item is missing name.")
+        if "fraction" in item and item.get("fraction") is not None:
+            raise ValueError("--allow-quota-increase supports quota-based plans only.")
+        quota_raw = item.get("quota")
+        if quota_raw is None:
+            raise ValueError("--allow-quota-increase requires explicit plan quotas.")
+        quota_val = int(quota_raw)
+        if quota_val <= 0:
+            raise ValueError("Plan quotas must be positive for --allow-quota-increase.")
+        names.append(name)
+        quotas[name] = quota_val
+    total_raw = generation.get("quota")
+    if total_raw is None:
+        raise ValueError("generation.quota is required for --allow-quota-increase.")
+    total = int(total_raw)
+    if total <= 0:
+        raise ValueError("generation.quota must be > 0 for --allow-quota-increase.")
+    return names, quotas, total
+
+
+def _strip_quota_fields(cfg: dict) -> dict:
+    normalized = deepcopy(cfg)
+    generation = normalized.get("generation")
+    if not isinstance(generation, dict):
+        return _canonicalize_structure(normalized)
+    generation.pop("quota", None)
+    plan = generation.get("plan")
+    if isinstance(plan, list):
+        for item in plan:
+            if not isinstance(item, dict):
+                continue
+            item.pop("quota", None)
+            item.pop("fraction", None)
+    return _canonicalize_structure(normalized)
+
+
+def _canonicalize_structure(value):
+    if isinstance(value, dict):
+        return {k: _canonicalize_structure(v) for k, v in value.items()}
+    if isinstance(value, tuple):
+        return [_canonicalize_structure(v) for v in value]
+    if isinstance(value, list):
+        return [_canonicalize_structure(v) for v in value]
+    return value
+
+
+def _validate_quota_increase_only(*, previous_cfg: dict, current_cfg: dict) -> None:
+    prev_order, prev_quotas, prev_total = _extract_quota_profile(previous_cfg)
+    curr_order, curr_quotas, curr_total = _extract_quota_profile(current_cfg)
+    if prev_order != curr_order:
+        raise ValueError("Plan names/order changed; quota-only resume is not allowed.")
+    for name in prev_order:
+        if curr_quotas[name] < prev_quotas[name]:
+            raise ValueError(f"Plan quota decreased for '{name}' ({prev_quotas[name]} -> {curr_quotas[name]}).")
+    if curr_total < prev_total:
+        raise ValueError(f"generation.quota decreased ({prev_total} -> {curr_total}).")
+    prev_norm = _strip_quota_fields(previous_cfg)
+    curr_norm = _strip_quota_fields(current_cfg)
+    if prev_norm != curr_norm:
+        raise ValueError("Config changed beyond generation quotas.")
+
+
+def _load_previous_densegen_config(run_root: Path) -> dict:
+    effective_path = run_root / "outputs" / "meta" / "effective_config.json"
+    if not effective_path.exists():
+        raise ValueError("Missing outputs/meta/effective_config.json; cannot validate quota-only config changes.")
+    payload = json.loads(effective_path.read_text())
+    previous_cfg = payload.get("config")
+    if not isinstance(previous_cfg, dict):
+        raise ValueError("effective_config.json is missing a valid 'config' object.")
+    return previous_cfg
+
+
+def _capture_usr_registry_snapshots(*, cfg, cfg_path: Path, run_root: Path, context: CliContext) -> dict[Path, str]:
+    snapshots: dict[Path, str] = {}
+    out_cfg = cfg.output
+    if "usr" not in out_cfg.targets or out_cfg.usr is None:
+        return snapshots
+    usr_root = context.resolve_outputs_path_or_exit(
+        cfg_path,
+        run_root,
+        Path(out_cfg.usr.root),
+        label="output.usr.root",
+    )
+    registry_path = usr_root / "registry.yaml"
+    if registry_path.exists() and registry_path.is_file():
+        snapshots[registry_path] = registry_path.read_text()
+    return snapshots
+
+
+def _restore_usr_registry_snapshots(*, snapshots: dict[Path, str]) -> None:
+    for registry_path, content in snapshots.items():
+        registry_path.parent.mkdir(parents=True, exist_ok=True)
+        registry_path.write_text(content)
 
 
 def register_run_commands(
@@ -44,6 +166,11 @@ def register_run_commands(
         no_plot: bool = typer.Option(False, help="Do not auto-run plots even if configured."),
         fresh: bool = typer.Option(False, "--fresh", help="Clear outputs and start a new run."),
         resume: bool = typer.Option(False, "--resume", help="Resume from existing outputs."),
+        allow_quota_increase: bool = typer.Option(
+            False,
+            "--allow-quota-increase",
+            help="Allow resume when only generation quotas increased (requires effective_config.json).",
+        ),
         log_file: Optional[Path] = typer.Option(
             None,
             help="Override logfile path (must be inside outputs/ under the run root).",
@@ -65,13 +192,23 @@ def register_run_commands(
             raise typer.Exit(code=1)
         outputs_root = run_outputs_root(run_root)
         existing_outputs = has_existing_run_outputs(run_root)
+        registry_snapshots: dict[Path, str] = {}
+        allow_config_mismatch = False
         if fresh:
+            registry_snapshots = _capture_usr_registry_snapshots(
+                cfg=cfg,
+                cfg_path=loaded.path,
+                run_root=run_root,
+                context=context,
+            )
             if outputs_root.exists():
                 try:
                     shutil.rmtree(outputs_root)
                 except Exception as exc:
                     console.print(f"[bold red]Failed to clear outputs:[/] {exc}")
                     raise typer.Exit(code=1)
+                if registry_snapshots:
+                    _restore_usr_registry_snapshots(snapshots=registry_snapshots)
                 console.print(
                     ":broom: [bold yellow]Cleared outputs[/]: "
                     f"{context.display_path(outputs_root, run_root, absolute=False)}"
@@ -123,24 +260,50 @@ def register_run_commands(
                 console.print(f"  - {reset_cmd}")
                 raise typer.Exit(code=1)
             if existing_state.config_sha256 and existing_state.config_sha256 != config_sha:
-                console.print(
-                    "[bold red]Existing run_state.json was created with a different config. "
-                    "Remove run_state.json or stage a new run root to start fresh.[/]"
-                )
-                console.print("[bold]Next steps[/]:")
-                fresh_cmd = context.workspace_command(
-                    "dense run --fresh",
-                    cfg_path=cfg_path,
-                    run_root=run_root,
-                )
-                reset_cmd = context.workspace_command(
-                    "dense campaign-reset",
-                    cfg_path=cfg_path,
-                    run_root=run_root,
-                )
-                console.print(f"  - {fresh_cmd}")
-                console.print(f"  - {reset_cmd}")
-                raise typer.Exit(code=1)
+                if not allow_quota_increase:
+                    console.print(
+                        "[bold red]Existing run_state.json was created with a different config. "
+                        "Remove run_state.json or stage a new run root to start fresh.[/]"
+                    )
+                    console.print("[bold]Next steps[/]:")
+                    fresh_cmd = context.workspace_command(
+                        "dense run --fresh",
+                        cfg_path=cfg_path,
+                        run_root=run_root,
+                    )
+                    reset_cmd = context.workspace_command(
+                        "dense campaign-reset",
+                        cfg_path=cfg_path,
+                        run_root=run_root,
+                    )
+                    console.print(f"  - {fresh_cmd}")
+                    console.print(f"  - {reset_cmd}")
+                    raise typer.Exit(code=1)
+                if not resume_run:
+                    console.print("[bold red]--allow-quota-increase requires resume mode with existing outputs.[/]")
+                    raise typer.Exit(code=1)
+                try:
+                    previous_cfg = _load_previous_densegen_config(run_root)
+                    current_cfg = _model_to_dict(cfg)
+                    _validate_quota_increase_only(previous_cfg=previous_cfg, current_cfg=current_cfg)
+                except ValueError as exc:
+                    console.print(f"[bold red]--allow-quota-increase rejected:[/] {exc}")
+                    console.print("[bold]Next steps[/]:")
+                    fresh_cmd = context.workspace_command(
+                        "dense run --fresh",
+                        cfg_path=cfg_path,
+                        run_root=run_root,
+                    )
+                    reset_cmd = context.workspace_command(
+                        "dense campaign-reset",
+                        cfg_path=cfg_path,
+                        run_root=run_root,
+                    )
+                    console.print(f"  - {fresh_cmd}")
+                    console.print(f"  - {reset_cmd}")
+                    raise typer.Exit(code=1)
+                allow_config_mismatch = True
+                console.print("[yellow]Quota-only config increase detected; resuming with existing outputs.[/]")
             if (
                 not existing_outputs
                 and existing_state.items
@@ -201,6 +364,7 @@ def register_run_commands(
                 build_stage_a=build_stage_a,
                 show_tfbs=show_tfbs,
                 show_solutions=show_solutions,
+                allow_config_mismatch=allow_config_mismatch,
             )
         except FileNotFoundError as exc:
             render_missing_input_hint(cfg_path, loaded, exc)
@@ -209,6 +373,12 @@ def register_run_commands(
             if render_output_schema_hint(exc):
                 raise typer.Exit(code=1)
             message = str(exc)
+            if "progress_style=screen requires TERM with cursor controls" in message:
+                console.print(f"[bold red]{message}[/]")
+                console.print("[bold]Next steps[/]:")
+                console.print("  - export TERM=xterm-256color")
+                console.print("  - or set densegen.logging.progress_style: stream")
+                raise typer.Exit(code=1)
             if "Existing run_state.json was created with a different" in message:
                 console.print(f"[bold red]{message}[/]")
                 console.print("[bold]Next steps[/]:")

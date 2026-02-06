@@ -14,6 +14,7 @@ from pathlib import Path
 from dnadesign.usr import Dataset
 from dnadesign.usr.src import dataset as dataset_module
 from dnadesign.usr.src.locks import LOCK_FILENAME, dataset_write_lock
+from dnadesign.usr.tests.registry_helpers import ensure_registry
 
 
 def test_dataset_write_lock_creates_lock_file(tmp_path: Path) -> None:
@@ -24,6 +25,7 @@ def test_dataset_write_lock_creates_lock_file(tmp_path: Path) -> None:
 
 def test_import_rows_uses_write_lock(tmp_path: Path, monkeypatch) -> None:
     root = tmp_path / "datasets"
+    ensure_registry(root)
     ds = Dataset(root, "demo")
     ds.init(source="test")
     called = {"lock": False}

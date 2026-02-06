@@ -14,9 +14,11 @@ from pathlib import Path
 import pandas as pd
 
 from dnadesign.usr.src.dataset import Dataset
+from dnadesign.usr.tests.registry_helpers import ensure_registry
 
 
 def _make_dataset(tmp_path: Path) -> Dataset:
+    ensure_registry(tmp_path)
     ds = Dataset(tmp_path, "ns/demo")
     ds.init(source="test")
     ds.import_rows(

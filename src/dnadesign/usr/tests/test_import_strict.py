@@ -13,10 +13,12 @@ import pandas as pd
 import pytest
 
 from dnadesign.usr import AlphabetError, Dataset, SchemaError
+from dnadesign.usr.tests.registry_helpers import ensure_registry
 
 
 def _init_dataset(tmp_path: Path) -> Dataset:
     root = tmp_path / "datasets"
+    ensure_registry(root)
     ds = Dataset(root, "demo")
     ds.init(source="test")
     return ds

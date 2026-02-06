@@ -34,6 +34,7 @@ def load_resume_state(
     loaded: LoadedConfig,
     tables_root: Path,
     config_sha: str,
+    allowed_config_sha256: list[str] | None = None,
 ) -> ResumeState:
     existing_counts: dict[tuple[str, str], int] = {}
     existing_usage_by_plan: dict[tuple[str, str], dict[tuple[str, str], int]] = {}
@@ -66,12 +67,19 @@ def load_resume_state(
             df_existing = None
         if df_existing is not None and not df_existing.empty:
             if "densegen__run_config_sha256" in df_existing.columns:
-                mismatched = df_existing["densegen__run_config_sha256"].dropna().unique().tolist()
-                if mismatched and any(val != config_sha for val in mismatched):
+                observed_hashes = {
+                    str(v) for v in df_existing["densegen__run_config_sha256"].dropna().unique().tolist()
+                }
+                allowed_hashes = {str(config_sha)}
+                if allowed_config_sha256 is not None:
+                    allowed_hashes |= {str(v) for v in allowed_config_sha256 if str(v)}
+                disallowed = sorted(h for h in observed_hashes if h and h not in allowed_hashes)
+                if disallowed:
                     raise RuntimeError(
                         "Existing outputs were produced with a different config. "
                         "Remove outputs/tables (and outputs/meta if present) "
-                        "or stage a new run root to start fresh."
+                        "or stage a new run root to start fresh. "
+                        f"Disallowed config hashes: {', '.join(disallowed[:3])}"
                     )
             if "densegen__run_id" in df_existing.columns:
                 run_ids = df_existing["densegen__run_id"].dropna().unique().tolist()

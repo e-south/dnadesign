@@ -126,7 +126,9 @@ def plot_stage_a_summary(
             continue
         sampling = entry.stage_a_sampling
         if sampling is None:
-            raise ValueError(f"Stage-A sampling metadata missing for input '{input_name}'.")
+            if entry.input_type == "pwm_artifact":
+                raise ValueError(f"Stage-A sampling metadata missing for input '{input_name}'.")
+            continue
         eligible_hist = sampling.get("eligible_score_hist") or []
         if not eligible_hist:
             raise ValueError(f"Stage-A sampling missing eligible score histogram for input '{input_name}'.")

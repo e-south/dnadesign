@@ -54,7 +54,7 @@ Strengthen USR for long-running, write-heavy tools (densegen) while keeping the 
 - Overlay metadata is derived from the Parquet file metadata in each part.
 
 ### Compaction
-- Add `Dataset.compact_overlay(namespace, maintenance=True)`:
+- Add `with ds.maintenance(reason=...): ds.compact_overlay(namespace)`:
   - merge parts into a single file (or fewer parts)
   - archive old parts under `_derived/_archived/<namespace>/<ts>/...`
 

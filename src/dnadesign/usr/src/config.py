@@ -121,7 +121,10 @@ def save_remote(cfg: SSHRemoteConfig, custom: Optional[Path] = None) -> Path:
 def get_remote(name: str, custom: Optional[Path] = None) -> SSHRemoteConfig:
     remotes = load_all(custom)
     if name not in remotes:
-        raise RemoteConfigError(f"Unknown remote '{name}'. Define it with 'usr remotes add {name} --type ssh ...'.")
+        raise RemoteConfigError(
+            f"Unknown remote '{name}'. Define it with 'usr remotes wizard --preset bu-scc ...' "
+            f"or 'usr remotes add {name} --type ssh ...'."
+        )
     cfg = remotes[name]
     if cfg.ssh_key_env:
         # Validate env presence early (assertive programming)

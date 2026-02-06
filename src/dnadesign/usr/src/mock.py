@@ -28,6 +28,7 @@ from .io import read_parquet, write_parquet_atomic
 from .locks import dataset_write_lock
 from .normalize import compute_id, normalize_sequence
 from .overlays import overlay_metadata, overlay_path, with_overlay_metadata
+from .registry import registry_hash
 from .schema import ARROW_SCHEMA
 
 
@@ -132,8 +133,13 @@ def create_mock_dataset(root: Path, dataset: str, spec: MockSpec, *, force: bool
         write_parquet_atomic(base_tbl, ds.records_path, ds.snapshot_dir)
 
         ds._validate_registry_schema(namespace=spec.namespace, schema=overlay_tbl.schema, key="id")
+        reg_hash = registry_hash(ds.root, required=True)
         overlay_tbl = with_overlay_metadata(
-            overlay_tbl, namespace=spec.namespace, key="id", created_at=datetime.now(timezone.utc).isoformat()
+            overlay_tbl,
+            namespace=spec.namespace,
+            key="id",
+            created_at=datetime.now(timezone.utc).isoformat(),
+            registry_hash=reg_hash,
         )
         out_path = overlay_path(ds.dir, spec.namespace)
         out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -156,6 +162,7 @@ def create_mock_dataset(root: Path, dataset: str, spec: MockSpec, *, force: bool
                 "csv_path": str(spec.csv_path) if spec.csv_path else "",
             },
             target_path=ds.records_path,
+            dataset_root=ds.root,
         )
         return base_tbl.num_rows
 
@@ -205,8 +212,13 @@ def add_demo_columns(
             ),
         )
         ds._validate_registry_schema(namespace=namespace, schema=overlay_tbl.schema, key="id")
+        reg_hash = registry_hash(ds.root, required=True)
         overlay_tbl = with_overlay_metadata(
-            overlay_tbl, namespace=namespace, key="id", created_at=datetime.now(timezone.utc).isoformat()
+            overlay_tbl,
+            namespace=namespace,
+            key="id",
+            created_at=datetime.now(timezone.utc).isoformat(),
+            registry_hash=reg_hash,
         )
 
         out_path = overlay_path(ds.dir, namespace)
@@ -242,5 +254,6 @@ def add_demo_columns(
                 "overwrote": bool(overwrote),
             },
             target_path=out_path,
+            dataset_root=ds.root,
         )
         return n

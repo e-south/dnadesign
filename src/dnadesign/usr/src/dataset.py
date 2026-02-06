@@ -14,8 +14,10 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import sqlite3
 import tempfile
+import uuid
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,6 +28,25 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from .dataset_query import create_overlay_view, sql_ident, sql_str
+from .dataset_state import (
+    clear_state as dataset_clear_state,
+)
+from .dataset_state import (
+    ensure_ids_exist as dataset_ensure_ids_exist,
+)
+from .dataset_state import (
+    get_state as dataset_get_state,
+)
+from .dataset_state import (
+    restore as dataset_restore,
+)
+from .dataset_state import (
+    set_state as dataset_set_state,
+)
+from .dataset_state import (
+    tombstone as dataset_tombstone,
+)
 from .errors import (
     AlphabetError,
     DuplicateGroup,
@@ -35,7 +56,32 @@ from .errors import (
     SequencesError,
 )
 from .events import fingerprint_parquet, record_event
-from .io import (
+from .maintenance import maintenance as maintenance_context
+from .maintenance import require_maintenance
+from .normalize import compute_id, normalize_sequence, validate_alphabet, validate_bio_type  # case-preserving
+from .overlays import (
+    OVERLAY_META_CREATED,
+    OVERLAY_META_KEY,
+    OVERLAY_META_NAMESPACE,
+    OVERLAY_META_REGISTRY_HASH,
+    list_overlays,
+    overlay_dir_path,
+    overlay_metadata,
+    overlay_path,
+    overlay_schema,
+    with_overlay_metadata,
+)
+from .registry import (
+    USR_STATE_NAMESPACE,
+    load_registry,
+    load_registry_file,
+    registry_bytes,
+    registry_hash,
+    validate_overlay_schema,
+)
+from .schema import ARROW_SCHEMA, META_REGISTRY_HASH, REQUIRED_COLUMNS, merge_base_metadata, with_base_metadata
+from .storage.locking import dataset_write_lock
+from .storage.parquet import (
     PARQUET_COMPRESSION,
     iter_parquet_batches,
     now_utc,
@@ -44,20 +90,7 @@ from .io import (
     write_parquet_atomic,
     write_parquet_atomic_batches,
 )
-from .locks import dataset_write_lock
-from .normalize import compute_id, normalize_sequence, validate_alphabet, validate_bio_type  # case-preserving
-from .overlays import (
-    OVERLAY_META_CREATED,
-    OVERLAY_META_KEY,
-    OVERLAY_META_NAMESPACE,
-    list_overlays,
-    overlay_metadata,
-    overlay_path,
-    with_overlay_metadata,
-)
-from .registry import load_registry, validate_overlay_schema
-from .schema import ARROW_SCHEMA, REQUIRED_COLUMNS, merge_base_metadata, with_base_metadata
-from .types import AddSequencesResult, DatasetInfo, Manifest, OverlayInfo
+from .types import AddSequencesResult, DatasetInfo, Fingerprint, Manifest, OverlayInfo
 
 RECORDS = "records.parquet"
 SNAPDIR = "_snapshots"  # standardized
@@ -68,6 +101,17 @@ _NS_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 TOMBSTONE_NAMESPACE = "usr"
 TOMBSTONE_COLUMNS = ("usr__deleted", "usr__deleted_at", "usr__deleted_reason")
 RESERVED_NAMESPACES = {TOMBSTONE_NAMESPACE}
+LEGACY_DATASET_PREFIX = "archived"
+USR_STATE_SCHEMA_TYPES = {
+    "id": pa.string(),
+    "usr_state__masked": pa.bool_(),
+    "usr_state__qc_status": pa.string(),
+    "usr_state__split": pa.string(),
+    "usr_state__supersedes": pa.string(),
+    "usr_state__lineage": pa.list_(pa.string()),
+}
+USR_STATE_QC_STATUS_ALLOWED = {"pass", "fail", "warn", "unknown"}
+USR_STATE_SPLIT_ALLOWED = {"train", "val", "test", "holdout"}
 
 
 @dataclass(frozen=True)
@@ -88,6 +132,11 @@ def normalize_dataset_id(name: str) -> str:
         raise SequencesError("Dataset name must be a relative path.")
     if any(part in {".", ".."} for part in p.parts):
         raise SequencesError("Dataset name must not contain '.' or '..'.")
+    if p.parts and p.parts[0] == LEGACY_DATASET_PREFIX:
+        raise SequencesError(
+            "legacy dataset paths under 'archived/' are not supported. "
+            "Use canonical datasets or datasets/_archive/<namespace>/<dataset>."
+        )
     return Path(*p.parts).as_posix()
 
 
@@ -148,16 +197,22 @@ class Dataset:
 
     # ---- lifecycle ----
 
+    def maintenance(self, reason: Optional[str] = None, *, actor: Optional[dict] = None):
+        return maintenance_context(reason=reason, actor=actor)
+
     def init(self, source: str = "", notes: str = "") -> None:
         """Create a new, empty dataset directory with canonical schema."""
         with dataset_write_lock(self.dir):
+            self._require_registry_for_mutation("init")
             self.dir.mkdir(parents=True, exist_ok=True)
             if self.records_path.exists():
                 raise SequencesError(f"Dataset already initialized: {self.records_path}")
             ts = now_utc()
             empty = pa.Table.from_arrays([pa.array([], type=f.type) for f in ARROW_SCHEMA], schema=ARROW_SCHEMA)
-            empty = with_base_metadata(empty, created_at=ts)
+            reg_hash = self._registry_hash(required=True)
+            empty = with_base_metadata(empty, created_at=ts, registry_hash=reg_hash)
             write_parquet_atomic(empty, self.records_path, self.snapshot_dir)
+            self._auto_freeze_registry()
             date = ts.split("T")[0]
             meta_md = (
                 f"name: {self.name}\n"
@@ -175,6 +230,7 @@ class Dataset:
                 dataset=self.name,
                 args={"source": source},
                 target_path=self.records_path,
+                dataset_root=self.root,
             )
 
     # --- lightweight, best-effort scratch-pad logging in meta.md ---
@@ -192,15 +248,67 @@ class Dataset:
                 f.write(code_block.strip() + "\n")
                 f.write("```\n")
 
+    def log_event(
+        self,
+        action: str,
+        *,
+        args: Optional[dict] = None,
+        metrics: Optional[dict] = None,
+        artifacts: Optional[dict] = None,
+        maintenance: Optional[dict] = None,
+        target_path: Optional[Path] = None,
+        actor: Optional[dict] = None,
+    ) -> None:
+        self._require_exists()
+        record_event(
+            self.events_path,
+            action,
+            dataset=self.name,
+            args=args,
+            metrics=metrics,
+            artifacts=artifacts,
+            maintenance=maintenance,
+            target_path=target_path or self.records_path,
+            dataset_root=self.root,
+            actor=actor,
+        )
+
+    def freeze_registry(self) -> Path:
+        """
+        Snapshot the current registry into this dataset and persist its hash.
+        """
+        ctx = require_maintenance("freeze_registry")
+        self._require_exists()
+        with dataset_write_lock(self.dir):
+            snap_path, reg_hash, updated = self._auto_freeze_registry(record_auto_event=False)
+            record_event(
+                self.events_path,
+                "registry_freeze",
+                dataset=self.name,
+                args={"registry_hash": reg_hash, "snapshot": str(snap_path), "auto": False, "updated": updated},
+                maintenance={"reason": ctx.reason},
+                target_path=self.records_path,
+                dataset_root=self.root,
+                actor=ctx.actor,
+            )
+            return snap_path
+
     def _require_exists(self) -> None:
         if not self.records_path.exists():
             raise SequencesError(f"Dataset not initialized: {self.records_path}")
+
+    def _require_registry_for_mutation(self, action: str) -> dict:
+        try:
+            return load_registry(self.root, required=True)
+        except SchemaError as e:
+            raise SchemaError(f"Registry required for {action}. Create registry.yaml before mutating datasets.") from e
 
     def _base_metadata(self, *, created_at: Optional[str] = None) -> Dict[bytes, bytes]:
         md = None
         if self.records_path.exists():
             md = pq.ParquetFile(str(self.records_path)).schema_arrow.metadata
-        return merge_base_metadata(md, created_at)
+        reg_hash = registry_hash(self.root, required=True)
+        return merge_base_metadata(md, created_at, reg_hash)
 
     def _tombstone_path(self) -> Path:
         return overlay_path(self.dir, TOMBSTONE_NAMESPACE)
@@ -213,6 +321,61 @@ class Dataset:
             return
         registry = self._registry(required=True)
         validate_overlay_schema(namespace, schema, registry=registry, key=key)
+
+    def _registry_hash(self, *, required: bool) -> Optional[str]:
+        return registry_hash(self.root, required=required)
+
+    def _dataset_registry_hash(self) -> str:
+        pf = pq.ParquetFile(str(self.records_path))
+        md = pf.schema_arrow.metadata or {}
+        raw = md.get(META_REGISTRY_HASH.encode("utf-8"))
+        if not raw:
+            raise SchemaError("Dataset does not have a registry_hash; run `usr maintenance registry-freeze`.")
+        return raw.decode("utf-8")
+
+    def _frozen_registry_path(self) -> Path:
+        reg_hash = self._dataset_registry_hash()
+        return self.dir / "_registry" / f"registry.{reg_hash}.yaml"
+
+    def _auto_freeze_registry(self, *, record_auto_event: bool = True) -> tuple[Path, str, bool]:
+        reg_hash = registry_hash(self.root, required=True)
+        reg_bytes = registry_bytes(self.root)
+        snap_dir = self.dir / "_registry"
+        snap_dir.mkdir(parents=True, exist_ok=True)
+        snap_path = snap_dir / f"registry.{reg_hash}.yaml"
+        created = False
+        if not snap_path.exists():
+            snap_path.write_bytes(reg_bytes)
+            created = True
+
+        pf = pq.ParquetFile(str(self.records_path))
+        md = pf.schema_arrow.metadata or {}
+        if md.get(META_REGISTRY_HASH.encode("utf-8")) != reg_hash.encode("utf-8"):
+
+            def _iter_batches():
+                for batch in iter_parquet_batches(self.records_path):
+                    yield batch
+
+            metadata = merge_base_metadata(md, registry_hash=reg_hash)
+            write_parquet_atomic_batches(
+                _iter_batches(),
+                pf.schema_arrow,
+                self.records_path,
+                self.snapshot_dir,
+                metadata=metadata,
+            )
+            created = True
+
+        if created and record_auto_event:
+            record_event(
+                self.events_path,
+                "registry_freeze",
+                dataset=self.name,
+                args={"registry_hash": reg_hash, "snapshot": str(snap_path), "auto": True},
+                target_path=self.records_path,
+                dataset_root=self.root,
+            )
+        return snap_path, reg_hash, created
 
     # ---- info ----
 
@@ -228,7 +391,10 @@ class Dataset:
                 derived_cols.extend(ov["cols"])
         except FileNotFoundError:
             overlay_data = []
-        all_cols = cols + derived_cols
+        all_cols = list(cols)
+        for col in derived_cols:
+            if col not in all_cols:
+                all_cols.append(col)
         namespaces = sorted(
             {c.split("__", 1)[0] for c in all_cols if c not in {k for k, _ in REQUIRED_COLUMNS} and "__" in c}
         )
@@ -251,8 +417,15 @@ class Dataset:
             for field in ov["schema"]:
                 if field.name == ov["key"]:
                     continue
-                if base_schema.get_field_index(field.name) >= 0:
-                    raise NamespaceError(f"Derived column already exists in schema: {field.name}")
+                existing_idx = base_schema.get_field_index(field.name)
+                if existing_idx >= 0:
+                    existing_field = base_schema.field(existing_idx)
+                    if existing_field.type != field.type:
+                        raise NamespaceError(
+                            f"Derived column type mismatch in schema: {field.name} "
+                            f"(base={existing_field.type}, overlay={field.type})"
+                        )
+                    continue
                 base_schema = base_schema.append(field)
         return base_schema
 
@@ -347,27 +520,35 @@ class Dataset:
     ):
         overlays = []
         paths = list_overlays(self.dir)
+        namespace_filter = set(namespaces) if namespaces else None
         require_registry = any(
             (overlay_metadata(p).get("namespace") or p.stem) not in RESERVED_NAMESPACES for p in paths
         )
         registry = self._registry(required=require_registry) if require_registry else {}
+        seen: Dict[str, Path] = {}
         for path in paths:
             meta = overlay_metadata(path)
             key = meta.get("key")
             if not key:
                 raise SchemaError(f"Overlay missing required metadata key: {path}")
             ns = meta.get("namespace") or path.stem
+            if ns in seen:
+                raise SchemaError(
+                    f"Overlay namespace '{ns}' has multiple sources: {seen[ns]} and {path}. "
+                    "Resolve by compacting or removing one source."
+                )
+            seen[ns] = path
             if not include_tombstone and ns in RESERVED_NAMESPACES:
                 continue
-            if namespaces and ns not in set(namespaces):
+            if namespace_filter and ns not in namespace_filter:
                 continue
-            pf = pq.ParquetFile(str(path))
-            schema = pf.schema_arrow
+            schema = overlay_schema(path)
             if ns not in RESERVED_NAMESPACES:
                 validate_overlay_schema(ns, schema, registry=registry, key=key)
             if key not in schema.names:
                 raise SchemaError(f"Overlay missing key column '{key}': {path}")
             overlay_cols = [c for c in schema.names if c != key]
+            read_path = str(path / "part-*.parquet") if path.is_dir() else str(path)
             overlays.append(
                 {
                     "namespace": ns,
@@ -375,9 +556,28 @@ class Dataset:
                     "cols": overlay_cols,
                     "schema": schema,
                     "path": path,
+                    "read_path": read_path,
                 }
             )
         return overlays
+
+    @staticmethod
+    def _sql_ident(name: str) -> str:
+        return sql_ident(name)
+
+    @staticmethod
+    def _sql_str(value: str) -> str:
+        return sql_str(value)
+
+    def _create_overlay_view(
+        self,
+        con,
+        *,
+        view_name: str,
+        path: Path,
+        key: str,
+    ) -> None:
+        create_overlay_view(con, view_name=view_name, path=path, key=key)
 
     def _duckdb_query(
         self,
@@ -410,10 +610,6 @@ class Dataset:
 
         requested = set(columns) if columns is not None else None
         selected_cols: List[str] = []
-
-        def _sql_ident(name: str) -> str:
-            escaped = str(name).replace('"', '""')
-            return f'"{escaped}"'
 
         def _key_expr(expr: str, *, key: str) -> str:
             if key == "sequence_ci":
@@ -453,15 +649,12 @@ class Dataset:
                     "cols": list(TOMBSTONE_COLUMNS),
                     "schema": tomb_pf.schema_arrow,
                     "path": tomb_path,
+                    "read_path": str(tomb_path),
                 }
             )
 
-        select_exprs = []
-        existing_cols = set(base_cols)
-        for col in base_cols:
-            if requested is None or col in requested:
-                select_exprs.append(f"b.{_sql_ident(col)} AS {_sql_ident(col)}")
-                selected_cols.append(col)
+        select_expr_by_col = {col: f"b.{self._sql_ident(col)}" for col in base_cols}
+        select_order = list(base_cols)
 
         join_clauses: List[str] = []
         essential = {k for k, _ in REQUIRED_COLUMNS}
@@ -484,21 +677,9 @@ class Dataset:
                     raise NamespaceError(f"Overlay cannot modify required column '{col}'.")
                 if "__" not in col:
                     raise NamespaceError(f"Derived columns must be namespaced (got '{col}').")
-                if col in existing_cols:
-                    raise NamespaceError(f"Derived columns already exist: {col}")
 
             view_name = f"overlay_{idx}"
-            overlay_sql = str(ov["path"]).replace("'", "''")
-            con.execute(f"CREATE TEMP VIEW {view_name} AS SELECT * FROM read_parquet('{overlay_sql}')")
-
-            key_q = _sql_ident(key)
-            dup_overlay = int(
-                con.execute(
-                    f"SELECT COUNT(*) FROM (SELECT {key_q} FROM {view_name} GROUP BY {key_q} HAVING COUNT(*) > 1)"
-                ).fetchone()[0]
-            )
-            if dup_overlay:
-                raise SchemaError(f"Overlay has duplicate keys for '{key}': {ov['path']}")
+            self._create_overlay_view(con, view_name=view_name, path=ov["path"], key=key)
 
             if key in {"sequence", "sequence_norm", "sequence_ci"}:
                 bt_count = int(con.execute(f"SELECT COUNT(DISTINCT bio_type) FROM {base_view}").fetchone()[0])
@@ -508,7 +689,7 @@ class Dataset:
                     bad = int(con.execute(f"SELECT COUNT(*) FROM {base_view} WHERE alphabet != 'dna_4'").fetchone()[0])
                     if bad:
                         raise SchemaError("sequence_ci is only valid for dna_4 datasets.")
-                base_key_expr = _key_expr(f"b.{_sql_ident('sequence')}", key=key)
+                base_key_expr = _key_expr(f"b.{self._sql_ident('sequence')}", key=key)
                 dup_base = int(
                     con.execute(
                         "SELECT COUNT(*) FROM "
@@ -520,14 +701,25 @@ class Dataset:
                         f"Attach key requires unique base keys; duplicate base keys detected for '{key}'."
                     )
             else:
-                base_key_expr = _key_expr(f"b.{_sql_ident('id')}", key=key)
+                base_key_expr = _key_expr(f"b.{self._sql_ident('id')}", key=key)
 
-            overlay_key_expr = _key_expr(f"o{idx}.{_sql_ident(key)}", key=key)
+            overlay_key_expr = _key_expr(f"o{idx}.{self._sql_ident(key)}", key=key)
             join_clauses.append(f"LEFT JOIN {view_name} o{idx} ON {base_key_expr} = {overlay_key_expr}")
             for col in derived_cols:
-                select_exprs.append(f"o{idx}.{_sql_ident(col)} AS {_sql_ident(col)}")
+                col_ident = self._sql_ident(col)
+                overlay_expr = f"o{idx}.{col_ident}"
+                existing_expr = select_expr_by_col.get(col)
+                if existing_expr is None:
+                    select_expr_by_col[col] = overlay_expr
+                    select_order.append(col)
+                else:
+                    select_expr_by_col[col] = f"COALESCE({overlay_expr}, {existing_expr})"
+
+        select_exprs: List[str] = []
+        for col in select_order:
+            if requested is None or col in requested:
+                select_exprs.append(f"{select_expr_by_col[col]} AS {self._sql_ident(col)}")
                 selected_cols.append(col)
-            existing_cols.update(derived_cols)
 
         if requested is not None:
             missing = [c for c in columns if c not in selected_cols]
@@ -799,12 +991,15 @@ class Dataset:
                 ids_added = list(ids_all)
                 ids_skipped = []
 
+            self._auto_freeze_registry()
             record_event(
                 self.events_path,
                 "import_rows",
                 dataset=self.name,
                 args={"n": int(out_count), "source_param": source or "", "on_conflict": on_conflict},
+                metrics={"rows_written": int(out_count), "rows_skipped": len(ids_skipped)},
                 target_path=self.records_path,
+                dataset_root=self.root,
             )
             if return_ids:
                 return int(out_count), ids_added, ids_skipped
@@ -968,6 +1163,12 @@ class Dataset:
             raise SchemaError(f"Unsupported join key '{key}'.")
         if key_col is None:
             key_col = "sequence" if key in {"sequence", "sequence_norm", "sequence_ci"} else key
+        part_dir = overlay_dir_path(self.dir, namespace)
+        if part_dir.exists():
+            raise SchemaError(
+                f"Overlay parts already exist for namespace '{namespace}'. "
+                "Use write_overlay_part or compact the parts first."
+            )
 
         if backend == "duckdb":
             return self._attach_duckdb(
@@ -1090,6 +1291,7 @@ class Dataset:
                 raise NamespaceError(f"Derived columns must be namespaced (got '{t}').")
 
         def _write_overlay() -> int:
+            self._auto_freeze_registry()
             # Validate keys exist in base dataset
             base_cols = {"id"} if key == "id" else {"sequence", "alphabet", "bio_type"}
             base_tbl = read_parquet(self.records_path, columns=list(base_cols))
@@ -1166,7 +1368,14 @@ class Dataset:
 
             tbl = pa.Table.from_pandas(overlay_df, preserve_index=False)
             self._validate_registry_schema(namespace=namespace, schema=tbl.schema, key=key)
-            tbl = with_overlay_metadata(tbl, namespace=namespace, key=key, created_at=now_utc())
+            reg_hash = self._registry_hash(required=True)
+            tbl = with_overlay_metadata(
+                tbl,
+                namespace=namespace,
+                key=key,
+                created_at=now_utc(),
+                registry_hash=reg_hash,
+            )
             out_path.parent.mkdir(parents=True, exist_ok=True)
             tmp = out_path.with_suffix(".tmp.parquet")
             pq.write_table(tbl, tmp, compression=PARQUET_COMPRESSION)
@@ -1187,6 +1396,7 @@ class Dataset:
                     "note": note,
                 },
                 target_path=out_path,
+                dataset_root=self.root,
             )
             return rows_matched
 
@@ -1271,6 +1481,7 @@ class Dataset:
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
         def _write_overlay_duckdb() -> int:
+            self._auto_freeze_registry()
             con = duckdb.connect()
             try:
                 base_sql = str(self.records_path).replace("'", "''")
@@ -1414,6 +1625,9 @@ class Dataset:
                 metadata[OVERLAY_META_NAMESPACE.encode("utf-8")] = str(namespace).encode("utf-8")
                 metadata[OVERLAY_META_KEY.encode("utf-8")] = str(key).encode("utf-8")
                 metadata[OVERLAY_META_CREATED.encode("utf-8")] = str(now_utc()).encode("utf-8")
+                reg_hash = self._registry_hash(required=True)
+                if reg_hash:
+                    metadata[OVERLAY_META_REGISTRY_HASH.encode("utf-8")] = str(reg_hash).encode("utf-8")
 
                 def _batches():
                     for batch in pf_tmp.iter_batches(batch_size=65536):
@@ -1442,6 +1656,7 @@ class Dataset:
                         "note": note,
                     },
                     target_path=out_path,
+                    dataset_root=self.root,
                 )
                 return rows_matched
             finally:
@@ -1518,21 +1733,222 @@ class Dataset:
                 backend="pyarrow",
             )
 
+    def write_overlay_part(
+        self,
+        namespace: str,
+        table_or_batches,
+        *,
+        key: str = "id",
+        key_col: Optional[str] = None,
+        allow_missing: bool = False,
+    ) -> int:
+        """
+        Append an overlay part file under _derived/<namespace>/part-*.parquet.
+        """
+        self._require_exists()
+        key = str(key or "").strip()
+        if key not in {"id", "sequence", "sequence_norm", "sequence_ci"}:
+            raise SchemaError(f"Unsupported overlay key '{key}'.")
+        key_col = str(key_col or key)
+
+        file_path = overlay_path(self.dir, namespace)
+        dir_path = overlay_dir_path(self.dir, namespace)
+        if file_path.exists():
+            raise SchemaError(
+                f"Overlay file already exists for namespace '{namespace}'. "
+                "Remove it or compact it before writing parts."
+            )
+
+        if isinstance(table_or_batches, pa.Table):
+            tbl = table_or_batches
+        elif isinstance(table_or_batches, pd.DataFrame):
+            tbl = pa.Table.from_pandas(table_or_batches, preserve_index=False)
+        else:
+            batches = list(table_or_batches)
+            if not batches:
+                return 0
+            tbl = pa.Table.from_batches(batches)
+
+        if key_col not in tbl.schema.names:
+            raise SchemaError(f"Overlay table missing key column '{key_col}'.")
+        if key_col != key:
+            if key in tbl.schema.names:
+                raise SchemaError(f"Overlay table already contains a '{key}' column; cannot rename '{key_col}'.")
+            cols = [key if c == key_col else c for c in tbl.schema.names]
+            tbl = tbl.rename_columns(cols)
+
+        attach_cols = [c for c in tbl.schema.names if c != key]
+        if not attach_cols:
+            return 0
+
+        essential = {k for k, _ in REQUIRED_COLUMNS}
+        for col in attach_cols:
+            if col in essential:
+                raise NamespaceError(f"Overlay cannot modify required column '{col}'.")
+            if "__" not in col:
+                raise NamespaceError(f"Derived columns must be namespaced (got '{col}').")
+
+        self._validate_registry_schema(namespace=namespace, schema=tbl.schema, key=key)
+
+        def _write_part() -> int:
+            try:
+                import duckdb  # type: ignore
+            except ImportError as e:
+                raise SchemaError("write_overlay_part requires duckdb (install duckdb).") from e
+
+            def _sql_ident(name: str) -> str:
+                escaped = str(name).replace('"', '""')
+                return f'"{escaped}"'
+
+            def _key_expr(expr: str, *, key_name: str) -> str:
+                if key_name == "sequence_ci":
+                    return f"NULLIF(UPPER(TRIM(CAST({expr} AS VARCHAR))), '')"
+                return f"NULLIF(TRIM(CAST({expr} AS VARCHAR)), '')"
+
+            con = duckdb.connect()
+            try:
+                base_sql = str(self.records_path).replace("'", "''")
+                con.execute(f"CREATE TEMP VIEW base AS SELECT * FROM read_parquet('{base_sql}')")
+                con.register("incoming", tbl)
+
+                incoming_key_expr = _key_expr(f"i.{_sql_ident(key)}", key_name=key)
+
+                dup_incoming = int(
+                    con.execute(
+                        "SELECT COUNT(*) FROM "
+                        f"(SELECT {incoming_key_expr} AS k FROM incoming i "
+                        "GROUP BY k HAVING COUNT(*) > 1)"
+                    ).fetchone()[0]
+                )
+                if dup_incoming:
+                    raise SchemaError(f"Overlay part has duplicate keys for '{key}'.")
+
+                if key in {"sequence", "sequence_norm", "sequence_ci"}:
+                    bt_count = int(con.execute("SELECT COUNT(DISTINCT bio_type) FROM base").fetchone()[0])
+                    if bt_count > 1:
+                        raise SchemaError("Attach by sequence requires dataset with a single bio_type.")
+                    if key == "sequence_ci":
+                        bad = int(con.execute("SELECT COUNT(*) FROM base WHERE alphabet != 'dna_4'").fetchone()[0])
+                        if bad:
+                            raise SchemaError("sequence_ci is only valid for dna_4 datasets.")
+                    base_key_expr = _key_expr(f"b.{_sql_ident('sequence')}", key_name=key)
+                    dup_base = int(
+                        con.execute(
+                            "SELECT COUNT(*) FROM "
+                            f"(SELECT {base_key_expr} AS k FROM base b GROUP BY k HAVING COUNT(*) > 1)"
+                        ).fetchone()[0]
+                    )
+                    if dup_base:
+                        raise SchemaError(
+                            f"Attach key requires unique base keys; duplicate base keys detected for '{key}'."
+                        )
+                else:
+                    base_key_expr = _key_expr(f"b.{_sql_ident('id')}", key_name=key)
+
+                missing = int(
+                    con.execute(
+                        "SELECT COUNT(*) FROM incoming i "
+                        f"LEFT JOIN base b ON {base_key_expr} = {incoming_key_expr} "
+                        "WHERE b.id IS NULL"
+                    ).fetchone()[0]
+                )
+                if missing and not allow_missing:
+                    raise SchemaError(f"{missing} row(s) reference keys not present in the dataset.")
+
+                if allow_missing:
+                    tbl_out = con.execute(
+                        f"SELECT i.* FROM incoming i JOIN base b ON {base_key_expr} = {incoming_key_expr}"
+                    ).fetch_arrow_table()
+                else:
+                    tbl_out = tbl
+            finally:
+                con.close()
+
+            rows_incoming = int(tbl.num_rows)
+            rows_written = int(tbl_out.num_rows)
+            rows_missing = rows_incoming - rows_written
+            if rows_written == 0:
+                return 0
+
+            reg_hash = self._registry_hash(required=True)
+            tbl_out = with_overlay_metadata(
+                tbl_out,
+                namespace=namespace,
+                key=key,
+                created_at=now_utc(),
+                registry_hash=reg_hash,
+            )
+
+            dir_path.mkdir(parents=True, exist_ok=True)
+            stamp = now_utc().replace(":", "").replace("-", "").replace(".", "")
+            part_path = dir_path / f"part-{stamp}-{uuid.uuid4().hex}.parquet"
+            tmp_path = part_path.with_suffix(".parquet.tmp")
+            try:
+                pq.write_table(tbl_out, tmp_path, compression=PARQUET_COMPRESSION)
+                os.replace(tmp_path, part_path)
+            finally:
+                if tmp_path.exists():
+                    tmp_path.unlink(missing_ok=True)
+
+            record_event(
+                self.events_path,
+                "write_overlay_part",
+                dataset=self.name,
+                args={
+                    "namespace": namespace,
+                    "key": key,
+                    "rows_incoming": rows_incoming,
+                    "rows_written": rows_written,
+                    "rows_missing": rows_missing,
+                    "allow_missing": allow_missing,
+                },
+                metrics={
+                    "rows_incoming": rows_incoming,
+                    "rows_written": rows_written,
+                    "rows_missing": rows_missing,
+                },
+                artifacts={"overlay": {"namespace": namespace, "key": key}},
+                target_path=part_path,
+                dataset_root=self.root,
+            )
+            return rows_written
+
+        with dataset_write_lock(self.dir):
+            self._auto_freeze_registry()
+            return _write_part()
+
     def list_overlays(self) -> List[OverlayInfo]:
         """Return overlay metadata summaries."""
         self._require_exists()
         overlays = []
         for path in list_overlays(self.dir):
             meta = overlay_metadata(path)
-            pf = pq.ParquetFile(str(path))
+            parts = []
+            if path.is_dir():
+                parts = sorted(path.glob("part-*.parquet"))
+            else:
+                parts = [path]
+            if not parts:
+                raise SchemaError(f"Overlay has no parquet parts: {path}")
+            schema = overlay_schema(path)
+            rows = 0
+            size_bytes = 0
+            for part in parts:
+                pf_part = pq.ParquetFile(str(part))
+                rows += pf_part.metadata.num_rows
+                size_bytes += int(part.stat().st_size)
             overlays.append(
                 OverlayInfo(
                     namespace=meta.get("namespace") or path.stem,
                     key=meta.get("key"),
                     created_at=meta.get("created_at"),
                     path=str(path),
-                    columns=list(pf.schema_arrow.names),
-                    fingerprint=fingerprint_parquet(path),
+                    columns=list(schema.names),
+                    fingerprint=Fingerprint(
+                        rows=int(rows),
+                        cols=int(len(schema.names)),
+                        size_bytes=int(size_bytes),
+                    ),
                 )
             )
         return overlays
@@ -1543,7 +1959,12 @@ class Dataset:
         """
         if mode not in {"error", "delete", "archive"}:
             raise SchemaError(f"Unsupported remove_overlay mode '{mode}'.")
-        path = overlay_path(self.dir, namespace)
+        self._require_registry_for_mutation("remove_overlay")
+        file_path = overlay_path(self.dir, namespace)
+        dir_path = overlay_dir_path(self.dir, namespace)
+        if file_path.exists() and dir_path.exists():
+            raise SchemaError(f"Overlay '{namespace}' has both file and directory sources; resolve manually.")
+        path = dir_path if dir_path.exists() else file_path
         if not path.exists():
             if mode == "error":
                 raise SchemaError(f"Overlay '{namespace}' not found.")
@@ -1553,8 +1974,9 @@ class Dataset:
             if mode == "archive":
                 archive_dir = path.parent / "_archived"
                 archive_dir.mkdir(parents=True, exist_ok=True)
-                stamp = now_utc().replace(":", "").replace("-", "")
-                archived = archive_dir / f"{path.stem}-{stamp}.parquet"
+                stamp = now_utc().replace(":", "").replace("-", "").replace(".", "")
+                suffix = ".parquet" if path.is_file() else ""
+                archived = archive_dir / f"{path.stem}-{stamp}{suffix}"
                 path.replace(archived)
                 record_event(
                     self.events_path,
@@ -1562,27 +1984,101 @@ class Dataset:
                     dataset=self.name,
                     args={"namespace": namespace, "archived": str(archived)},
                     target_path=self.records_path,
+                    dataset_root=self.root,
                 )
                 return {"removed": True, "namespace": namespace, "archived_path": str(archived)}
 
-            path.unlink()
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
             record_event(
                 self.events_path,
                 "remove_overlay",
                 dataset=self.name,
                 args={"namespace": namespace},
                 target_path=self.records_path,
+                dataset_root=self.root,
             )
             return {"removed": True, "namespace": namespace}
 
+    def compact_overlay(self, namespace: str) -> Path:
+        """
+        Compact overlay parts into a single parquet file and archive old parts.
+        """
+        ctx = require_maintenance("compact_overlay")
+        with dataset_write_lock(self.dir):
+            self._auto_freeze_registry()
+            file_path = overlay_path(self.dir, namespace)
+            dir_path = overlay_dir_path(self.dir, namespace)
+            if not dir_path.exists():
+                raise SchemaError(f"Overlay parts not found for namespace '{namespace}'.")
+            if file_path.exists():
+                raise SchemaError(f"Overlay file already exists for namespace '{namespace}'. Remove it first.")
+            parts = sorted(dir_path.glob("part-*.parquet"))
+            if not parts:
+                raise SchemaError(f"Overlay parts not found for namespace '{namespace}'.")
+
+            meta = overlay_metadata(dir_path)
+            key = meta.get("key")
+            if not key:
+                raise SchemaError(f"Overlay missing required metadata key: {dir_path}")
+            schema = overlay_schema(dir_path)
+            if namespace not in RESERVED_NAMESPACES:
+                registry = self._registry(required=True)
+                validate_overlay_schema(namespace, schema, registry=registry, key=key)
+
+            try:
+                import pyarrow.dataset as ds
+            except Exception as e:
+                raise SchemaError(f"Parquet dataset support is required for compact_overlay: {e}") from e
+
+            dataset = ds.dataset([str(p) for p in parts], format="parquet")
+            batches = dataset.to_batches(batch_size=65536)
+
+            metadata = dict(schema.metadata or {})
+            metadata[OVERLAY_META_CREATED.encode("utf-8")] = str(now_utc()).encode("utf-8")
+            reg_hash = self._registry_hash(required=namespace not in RESERVED_NAMESPACES)
+            if reg_hash:
+                metadata[OVERLAY_META_REGISTRY_HASH.encode("utf-8")] = str(reg_hash).encode("utf-8")
+
+            write_parquet_atomic_batches(
+                batches,
+                schema,
+                file_path,
+                snapshot_dir=None,
+                metadata=metadata,
+            )
+
+            archive_dir = dir_path.parent / "_archived" / namespace
+            archive_dir.mkdir(parents=True, exist_ok=True)
+            stamp = now_utc().replace(":", "").replace("-", "").replace(".", "")
+            archived = archive_dir / stamp
+            shutil.move(str(dir_path), str(archived))
+
+            record_event(
+                self.events_path,
+                "compact_overlay",
+                dataset=self.name,
+                args={"namespace": namespace, "archived": str(archived), "maintenance_reason": ctx.reason},
+                maintenance={"reason": ctx.reason},
+                target_path=file_path,
+                dataset_root=self.root,
+                actor=ctx.actor,
+            )
+            return file_path
+
     # ---- validation & utils ----
 
-    def validate(self, strict: bool = False) -> None:
+    def validate(self, strict: bool = False, *, registry_mode: str = "current") -> None:
         """
         Validate schema, ID uniqueness, alphabet constraints, and namespacing policy.
         In strict mode, warnings become errors for alphabet/namespacing issues.
         """
         self._require_exists()
+        mode = str(registry_mode or "current").strip()
+        if mode not in {"current", "frozen", "either"}:
+            raise SchemaError(f"Unsupported registry_mode '{registry_mode}'.")
         pf = pq.ParquetFile(str(self.records_path))
         schema = pf.schema_arrow
         names = set(schema.names)
@@ -1625,6 +2121,60 @@ class Dataset:
                 raise SchemaError("Tombstone overlay missing 'usr__deleted_reason' column.")
             if tomb_schema.field("usr__deleted_reason").type != pa.string():
                 raise SchemaError("Tombstone overlay 'usr__deleted_reason' must be string.")
+
+        overlays = list_overlays(self.dir)
+        if overlays:
+            if mode == "current":
+                allowed_hashes = {registry_hash(self.root, required=True)}
+            elif mode == "frozen":
+                allowed_hashes = {self._dataset_registry_hash()}
+            else:
+                allowed_hashes: set[str] = set()
+                try:
+                    allowed_hashes.add(registry_hash(self.root, required=True))
+                except SchemaError:
+                    pass
+                try:
+                    allowed_hashes.add(self._dataset_registry_hash())
+                except SchemaError:
+                    pass
+                if not allowed_hashes:
+                    raise SchemaError("No registry hash available for overlay validation.")
+
+            def _validate_overlays(registry: dict) -> None:
+                for path in overlays:
+                    meta = overlay_metadata(path)
+                    key = meta.get("key")
+                    if not key:
+                        raise SchemaError(f"Overlay missing required metadata key: {path}")
+                    ns = meta.get("namespace") or path.stem
+                    reg_hash = meta.get("registry_hash")
+                    if reg_hash is None:
+                        raise SchemaError(f"Overlay missing registry_hash metadata: {path}")
+                    if reg_hash not in allowed_hashes:
+                        allowed = ", ".join(sorted(allowed_hashes))
+                        raise SchemaError(f"Overlay registry_hash mismatch for {path}: {reg_hash} not in [{allowed}].")
+                    if ns in RESERVED_NAMESPACES:
+                        continue
+                    schema = overlay_schema(path)
+                    validate_overlay_schema(ns, schema, registry=registry, key=key)
+
+            if mode == "current":
+                registry = load_registry(self.root, required=True)
+                _validate_overlays(registry)
+            elif mode == "frozen":
+                frozen_path = self._frozen_registry_path()
+                registry = load_registry_file(frozen_path)
+                _validate_overlays(registry)
+            else:
+                try:
+                    registry = load_registry(self.root, required=True)
+                    _validate_overlays(registry)
+                except SchemaError:
+                    frozen_path = self._frozen_registry_path()
+                    registry = load_registry_file(frozen_path)
+                    _validate_overlays(registry)
+                    # frozen ok -> suppress current error
 
         # streaming validation + uniqueness check
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1698,14 +2248,12 @@ class Dataset:
         keep: str,
         batch_size: int = 65536,
         dry_run: bool = False,
-        maintenance: bool = False,
     ) -> DedupeStats:
         """
         Deduplicate rows by key, keeping either the first or last occurrence.
         """
         self._require_exists()
-        if not maintenance:
-            raise SchemaError("dedupe is a maintenance-only operation.")
+        ctx = require_maintenance("dedupe")
         if batch_size < 1:
             raise SequencesError("batch_size must be >= 1.")
         key = str(key or "").strip()
@@ -1752,6 +2300,7 @@ class Dataset:
             return filtered.to_batches()
 
         with dataset_write_lock(self.dir):
+            self._auto_freeze_registry()
             with tempfile.TemporaryDirectory() as tmpdir:
                 db_path = Path(tmpdir) / "dedupe.sqlite"
                 conn = sqlite3.connect(db_path)
@@ -1841,8 +2390,12 @@ class Dataset:
                             "rows_total": stats.rows_total,
                             "rows_dropped": stats.rows_dropped,
                             "groups": stats.groups,
+                            "maintenance_reason": ctx.reason,
                         },
+                        maintenance={"reason": ctx.reason},
                         target_path=self.records_path,
+                        dataset_root=self.root,
+                        actor=ctx.actor,
                     )
                     return stats
                 finally:
@@ -1942,7 +2495,16 @@ class Dataset:
         else:
             raise SequencesError("Unsupported export format. Use csv|jsonl.")
 
-    def _write_reserved_overlay(self, namespace: str, key: str, overlay_df: pd.DataFrame) -> int:
+    def _write_reserved_overlay(
+        self,
+        namespace: str,
+        key: str,
+        overlay_df: pd.DataFrame,
+        *,
+        validate_registry: bool = False,
+        schema_types: Optional[Dict[str, pa.DataType]] = None,
+    ) -> int:
+        self._auto_freeze_registry()
         if not _NS_RE.match(namespace):
             raise NamespaceError(
                 "Invalid namespace. Use lowercase letters, digits, and underscores, starting with a letter."
@@ -1950,6 +2512,9 @@ class Dataset:
         if overlay_df[key].duplicated().any():
             raise SchemaError(f"Overlay has duplicate keys for '{key}'.")
         out_path = overlay_path(self.dir, namespace)
+        dir_path = overlay_dir_path(self.dir, namespace)
+        if dir_path.exists():
+            raise SchemaError(f"Overlay parts already exist for namespace '{namespace}'. Remove them before writing.")
         if out_path.exists():
             meta = overlay_metadata(out_path)
             if meta.get("key") != key:
@@ -1972,13 +2537,33 @@ class Dataset:
             combined[key] = combined.index
             overlay_df = combined.reset_index(drop=True)
 
-        tbl = pa.Table.from_pandas(overlay_df, preserve_index=False)
-        tbl = with_overlay_metadata(tbl, namespace=namespace, key=key, created_at=now_utc())
+        schema = None
+        if schema_types:
+            fields = []
+            for col in overlay_df.columns:
+                if col in schema_types:
+                    fields.append(pa.field(col, schema_types[col]))
+            if fields:
+                schema = pa.schema(fields)
+        tbl = pa.Table.from_pandas(overlay_df, preserve_index=False, schema=schema)
+        if validate_registry:
+            self._validate_registry_schema(namespace=namespace, schema=tbl.schema, key=key)
+        reg_hash = self._registry_hash(required=False)
+        tbl = with_overlay_metadata(
+            tbl,
+            namespace=namespace,
+            key=key,
+            created_at=now_utc(),
+            registry_hash=reg_hash,
+        )
         out_path.parent.mkdir(parents=True, exist_ok=True)
         tmp = out_path.with_suffix(".tmp.parquet")
         pq.write_table(tbl, tmp, compression=PARQUET_COMPRESSION)
         os.replace(tmp, out_path)
         return int(overlay_df.shape[0])
+
+    def _ensure_ids_exist(self, ids: list[str]) -> None:
+        dataset_ensure_ids_exist(self, ids)
 
     def tombstone(
         self,
@@ -1988,100 +2573,70 @@ class Dataset:
         deleted_at: Optional[str] = None,
         allow_missing: bool = False,
     ) -> int:
-        """
-        Mark records as deleted using a tombstone overlay.
-        """
-        self._require_exists()
-        ids_list = [str(i).strip() for i in ids if str(i).strip()]
-        if not ids_list:
-            raise SchemaError("Provide at least one id to tombstone.")
-        if len(ids_list) != len(set(ids_list)):
-            raise SchemaError("Duplicate ids provided to tombstone.")
-
-        if not allow_missing:
-            targets = set(ids_list)
-            found: set[str] = set()
-            for batch in iter_parquet_batches(self.records_path, columns=["id"]):
-                for rid in batch.column("id").to_pylist():
-                    s = str(rid)
-                    if s in targets:
-                        found.add(s)
-                if len(found) == len(targets):
-                    break
-            missing = sorted(targets - found)
-            if missing:
-                sample = ", ".join(missing[:5])
-                raise SchemaError(f"{len(missing)} id(s) not found in dataset (sample: {sample}).")
-
-        ts = pd.to_datetime(deleted_at, utc=True) if deleted_at is not None else pd.Timestamp.now(tz="UTC")
-        ts_series = pd.Series([ts] * len(ids_list), dtype="datetime64[ns, UTC]")
-        reason_vals = [reason] * len(ids_list)
-        overlay_df = pd.DataFrame(
-            {
-                "id": ids_list,
-                "usr__deleted": [True] * len(ids_list),
-                "usr__deleted_at": ts_series,
-                "usr__deleted_reason": reason_vals,
-            }
+        return dataset_tombstone(
+            self,
+            ids,
+            reason=reason,
+            deleted_at=deleted_at,
+            allow_missing=allow_missing,
+            tombstone_namespace=TOMBSTONE_NAMESPACE,
         )
-
-        with dataset_write_lock(self.dir):
-            rows = self._write_reserved_overlay(TOMBSTONE_NAMESPACE, "id", overlay_df)
-            record_event(
-                self.events_path,
-                "tombstone",
-                dataset=self.name,
-                args={"rows": rows, "reason": reason or "", "allow_missing": allow_missing},
-                target_path=self.records_path,
-            )
-            return rows
 
     def restore(self, ids: Sequence[str], *, allow_missing: bool = False) -> int:
-        """
-        Clear tombstones for provided ids.
-        """
-        self._require_exists()
-        ids_list = [str(i).strip() for i in ids if str(i).strip()]
-        if not ids_list:
-            raise SchemaError("Provide at least one id to restore.")
-        if len(ids_list) != len(set(ids_list)):
-            raise SchemaError("Duplicate ids provided to restore.")
-
-        if not allow_missing:
-            targets = set(ids_list)
-            found: set[str] = set()
-            for batch in iter_parquet_batches(self.records_path, columns=["id"]):
-                for rid in batch.column("id").to_pylist():
-                    s = str(rid)
-                    if s in targets:
-                        found.add(s)
-                if len(found) == len(targets):
-                    break
-            missing = sorted(targets - found)
-            if missing:
-                sample = ", ".join(missing[:5])
-                raise SchemaError(f"{len(missing)} id(s) not found in dataset (sample: {sample}).")
-
-        ts_series = pd.Series([pd.NaT] * len(ids_list), dtype="datetime64[ns, UTC]")
-        overlay_df = pd.DataFrame(
-            {
-                "id": ids_list,
-                "usr__deleted": [False] * len(ids_list),
-                "usr__deleted_at": ts_series,
-                "usr__deleted_reason": [None] * len(ids_list),
-            }
+        return dataset_restore(
+            self,
+            ids,
+            allow_missing=allow_missing,
+            tombstone_namespace=TOMBSTONE_NAMESPACE,
         )
 
-        with dataset_write_lock(self.dir):
-            rows = self._write_reserved_overlay(TOMBSTONE_NAMESPACE, "id", overlay_df)
-            record_event(
-                self.events_path,
-                "restore",
-                dataset=self.name,
-                args={"rows": rows, "allow_missing": allow_missing},
-                target_path=self.records_path,
-            )
-            return rows
+    def set_state(
+        self,
+        ids: Sequence[str],
+        *,
+        masked: Optional[bool] = None,
+        qc_status: Optional[str] = None,
+        split: Optional[str] = None,
+        supersedes: Optional[str] = None,
+        lineage: Optional[Sequence[str] | str] = None,
+        allow_missing: bool = False,
+    ) -> int:
+        return dataset_set_state(
+            self,
+            ids,
+            masked=masked,
+            qc_status=qc_status,
+            split=split,
+            supersedes=supersedes,
+            lineage=lineage,
+            allow_missing=allow_missing,
+            state_namespace=USR_STATE_NAMESPACE,
+            state_schema_types=USR_STATE_SCHEMA_TYPES,
+            state_qc_status_allowed=USR_STATE_QC_STATUS_ALLOWED,
+            state_split_allowed=USR_STATE_SPLIT_ALLOWED,
+        )
+
+    def clear_state(self, ids: Sequence[str], *, allow_missing: bool = False) -> int:
+        return dataset_clear_state(
+            self,
+            ids,
+            allow_missing=allow_missing,
+            state_namespace=USR_STATE_NAMESPACE,
+            state_schema_types=USR_STATE_SCHEMA_TYPES,
+        )
+
+    def get_state(
+        self,
+        ids: Sequence[str],
+        *,
+        allow_missing: bool = False,
+    ) -> pd.DataFrame:
+        return dataset_get_state(
+            self,
+            ids,
+            allow_missing=allow_missing,
+            state_namespace=USR_STATE_NAMESPACE,
+        )
 
     def manifest(self, *, include_events: bool = False) -> Manifest:
         """
@@ -2149,13 +2704,12 @@ class Dataset:
         keep_overlays: bool = True,
         archive_overlays: bool = False,
         drop_deleted: bool = False,
-        maintenance: bool = False,
     ) -> None:
         """Merge overlays into the base table (maintenance operation)."""
-        if not maintenance:
-            raise SchemaError("materialize is a maintenance operation. Pass maintenance=True to proceed.")
+        ctx = require_maintenance("materialize")
         with dataset_write_lock(self.dir):
             self._require_exists()
+            self._auto_freeze_registry()
             overlays_all = list_overlays(self.dir)
             if not overlays_all and not drop_deleted:
                 return
@@ -2181,10 +2735,6 @@ class Dataset:
             except ImportError as e:
                 raise SchemaError("materialize requires duckdb (install duckdb).") from e
 
-            def _sql_ident(name: str) -> str:
-                escaped = str(name).replace('"', '""')
-                return f'"{escaped}"'
-
             def _key_expr(expr: str, *, key: str) -> str:
                 if key == "sequence_ci":
                     return f"NULLIF(UPPER(TRIM(CAST({expr} AS VARCHAR))), '')"
@@ -2193,7 +2743,6 @@ class Dataset:
             base_pf = pq.ParquetFile(str(self.records_path))
             base_cols = list(base_pf.schema_arrow.names)
             essential = {k for k, _ in REQUIRED_COLUMNS}
-            existing_cols = set(base_cols)
 
             tmp_path = self.records_path.with_suffix(".materialize.parquet")
             con = duckdb.connect()
@@ -2219,7 +2768,8 @@ class Dataset:
                     )
                     base_view = "base_filtered"
 
-                select_exprs = [f"b.{_sql_ident(col)} AS {_sql_ident(col)}" for col in base_cols]
+                select_expr_by_col = {col: f"b.{self._sql_ident(col)}" for col in base_cols}
+                select_order = list(base_cols)
                 join_clauses: List[str] = []
 
                 for idx, path in enumerate(overlays):
@@ -2230,11 +2780,11 @@ class Dataset:
                     if key not in {"id", "sequence", "sequence_norm", "sequence_ci"}:
                         raise SchemaError(f"Unsupported overlay key '{key}': {path}")
 
-                    pf_overlay = pq.ParquetFile(str(path))
-                    overlay_cols = list(pf_overlay.schema_arrow.names)
+                    schema = overlay_schema(path)
+                    overlay_cols = list(schema.names)
                     if key not in overlay_cols:
                         raise SchemaError(f"Overlay missing key column '{key}': {path}")
-                    validate_overlay_schema(_overlay_ns(path), pf_overlay.schema_arrow, registry=registry, key=key)
+                    validate_overlay_schema(_overlay_ns(path), schema, registry=registry, key=key)
 
                     derived_cols = [c for c in overlay_cols if c != key]
                     if not derived_cols:
@@ -2245,22 +2795,9 @@ class Dataset:
                             raise NamespaceError(f"Overlay cannot modify required column '{col}'.")
                         if "__" not in col:
                             raise NamespaceError(f"Derived columns must be namespaced (got '{col}').")
-                        if col in existing_cols:
-                            raise NamespaceError(f"Derived columns already exist: {col}")
 
                     view_name = f"overlay_{idx}"
-                    overlay_sql = str(path).replace("'", "''")
-                    con.execute(f"CREATE TEMP VIEW {view_name} AS SELECT * FROM read_parquet('{overlay_sql}')")
-
-                    dup_overlay = int(
-                        con.execute(
-                            "SELECT COUNT(*) FROM "
-                            f"(SELECT {_sql_ident(key)} FROM {view_name} "
-                            f"GROUP BY {_sql_ident(key)} HAVING COUNT(*) > 1)"
-                        ).fetchone()[0]
-                    )
-                    if dup_overlay:
-                        raise SchemaError(f"Overlay has duplicate keys for '{key}': {path}")
+                    self._create_overlay_view(con, view_name=view_name, path=path, key=key)
 
                     if key in {"sequence", "sequence_norm", "sequence_ci"}:
                         bt_count = int(con.execute(f"SELECT COUNT(DISTINCT bio_type) FROM {base_view}").fetchone()[0])
@@ -2272,7 +2809,7 @@ class Dataset:
                             )
                             if bad:
                                 raise SchemaError("sequence_ci is only valid for dna_4 datasets.")
-                        base_key_expr = _key_expr(f"b.{_sql_ident('sequence')}", key=key)
+                        base_key_expr = _key_expr(f"b.{self._sql_ident('sequence')}", key=key)
                         dup_base = int(
                             con.execute(
                                 "SELECT COUNT(*) FROM "
@@ -2284,14 +2821,21 @@ class Dataset:
                                 f"Attach key requires unique base keys; duplicate base keys detected for '{key}'."
                             )
                     else:
-                        base_key_expr = _key_expr(f"b.{_sql_ident('id')}", key=key)
+                        base_key_expr = _key_expr(f"b.{self._sql_ident('id')}", key=key)
 
-                    overlay_key_expr = _key_expr(f"o{idx}.{_sql_ident(key)}", key=key)
+                    overlay_key_expr = _key_expr(f"o{idx}.{self._sql_ident(key)}", key=key)
                     join_clauses.append(f"LEFT JOIN {view_name} o{idx} ON {base_key_expr} = {overlay_key_expr}")
                     for col in derived_cols:
-                        select_exprs.append(f"o{idx}.{_sql_ident(col)} AS {_sql_ident(col)}")
-                    existing_cols.update(derived_cols)
+                        col_ident = self._sql_ident(col)
+                        overlay_expr = f"o{idx}.{col_ident}"
+                        existing_expr = select_expr_by_col.get(col)
+                        if existing_expr is None:
+                            select_expr_by_col[col] = overlay_expr
+                            select_order.append(col)
+                        else:
+                            select_expr_by_col[col] = f"COALESCE({overlay_expr}, {existing_expr})"
 
+                select_exprs = [f"{select_expr_by_col[col]} AS {self._sql_ident(col)}" for col in select_order]
                 query = "SELECT " + ", ".join(select_exprs) + f" FROM {base_view} b " + " ".join(join_clauses)
                 tmp_sql = str(tmp_path).replace("'", "''")
                 compression = PARQUET_COMPRESSION.upper()
@@ -2319,11 +2863,25 @@ class Dataset:
             overlay_fingerprints = []
             for p in overlays:
                 meta = overlay_metadata(p)
+                if p.is_dir():
+                    parts = sorted(p.glob("part-*.parquet"))
+                    if not parts:
+                        raise SchemaError(f"Overlay has no parquet parts: {p}")
+                    schema = overlay_schema(p)
+                    rows = 0
+                    size_bytes = 0
+                    for part in parts:
+                        pf_part = pq.ParquetFile(str(part))
+                        rows += pf_part.metadata.num_rows
+                        size_bytes += int(part.stat().st_size)
+                    fp = Fingerprint(rows=int(rows), cols=int(len(schema.names)), size_bytes=int(size_bytes)).to_dict()
+                else:
+                    fp = fingerprint_parquet(p).to_dict()
                 overlay_fingerprints.append(
                     {
                         "namespace": meta.get("namespace") or p.stem,
                         "key": meta.get("key"),
-                        "fingerprint": fingerprint_parquet(p).to_dict(),
+                        "fingerprint": fp,
                     }
                 )
             tomb_fp = None
@@ -2333,13 +2891,19 @@ class Dataset:
             if archive_overlays:
                 archive_dir = self.dir / "_derived" / "_archived"
                 archive_dir.mkdir(parents=True, exist_ok=True)
-                stamp = now_utc().replace(":", "").replace("-", "")
+                stamp = now_utc().replace(":", "").replace("-", "").replace(".", "")
                 for p in overlays:
-                    archived = archive_dir / f"{p.stem}-{stamp}.parquet"
+                    if p.is_dir():
+                        archived = archive_dir / f"{p.name}-{stamp}"
+                    else:
+                        archived = archive_dir / f"{p.stem}-{stamp}.parquet"
                     p.replace(archived)
             elif not keep_overlays:
                 for p in overlays:
-                    p.unlink()
+                    if p.is_dir():
+                        shutil.rmtree(p)
+                    else:
+                        p.unlink()
 
             record_event(
                 self.events_path,
@@ -2352,14 +2916,20 @@ class Dataset:
                     "drop_deleted": bool(drop_deleted),
                     "overlays": overlay_fingerprints,
                     "tombstone": tomb_fp,
+                    "maintenance_reason": ctx.reason,
                 },
+                artifacts={"overlays": overlay_fingerprints, "tombstone": tomb_fp},
+                maintenance={"reason": ctx.reason},
                 target_path=self.records_path,
+                dataset_root=self.root,
+                actor=ctx.actor,
             )
 
     def snapshot(self) -> None:
         """Write a timestamped snapshot and atomically persist current table."""
         with dataset_write_lock(self.dir):
             self._require_exists()
+            self._require_registry_for_mutation("snapshot")
             snapshot_parquet_file(self.records_path, self.snapshot_dir)
             record_event(
                 self.events_path,
@@ -2367,4 +2937,5 @@ class Dataset:
                 dataset=self.name,
                 args={},
                 target_path=self.records_path,
+                dataset_root=self.root,
             )

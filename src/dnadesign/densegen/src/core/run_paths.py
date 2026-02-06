@@ -53,6 +53,7 @@ META_BLOCKING_FILES = {
     ID_INDEX_NAME,
 }
 META_NON_BLOCKING_FILES = {"events.jsonl"}
+USR_ROOT_NON_BLOCKING_FILES = {"registry.yaml"}
 
 
 def run_outputs_root(run_root: Path) -> Path:
@@ -153,6 +154,10 @@ def has_existing_run_outputs(run_root: Path) -> bool:
                 if _tables_has_run_artifacts(entry):
                     return True
                 continue
+            if _looks_like_usr_root(entry):
+                if _usr_root_has_run_artifacts(entry):
+                    return True
+                continue
             return True
         return True
     return False
@@ -181,6 +186,25 @@ def _tables_has_run_artifacts(tables_dir: Path) -> bool:
         if entry.name in TABLE_FILES:
             return True
         if entry.is_dir():
+            return True
+        return True
+    return False
+
+
+def _looks_like_usr_root(path: Path) -> bool:
+    if not path.exists() or not path.is_dir():
+        return False
+    return (path / "registry.yaml").exists()
+
+
+def _usr_root_has_run_artifacts(usr_root: Path) -> bool:
+    for entry in usr_root.iterdir():
+        if entry.name in IGNORED_OUTPUT_ENTRIES:
+            continue
+        if entry.name in USR_ROOT_NON_BLOCKING_FILES:
+            continue
+        if entry.is_dir():
+            # Any dataset/archive directory under the USR root indicates persisted output state.
             return True
         return True
     return False

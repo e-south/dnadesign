@@ -16,6 +16,7 @@ from pathlib import Path
 import pandas as pd
 
 from dnadesign.usr import Dataset
+from dnadesign.usr.tests.registry_helpers import ensure_registry
 
 
 def _row(seq: str, *, source: str = "test") -> dict:
@@ -28,6 +29,7 @@ def _row(seq: str, *, source: str = "test") -> dict:
 
 
 def _make_dataset(root: Path) -> Dataset:
+    ensure_registry(root)
     ds = Dataset(root, "demo")
     ds.init(source="unit-test")
     ds.import_rows([_row("ACGT"), _row("TGCA")], source="unit-test")

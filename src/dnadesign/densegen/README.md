@@ -1,96 +1,103 @@
 ## DenseGen — Dense Array Generator
 
-**DenseGen** packs transcription factor binding sites (TFBSs) into dense synthetic nucleic acid sequences by wrapping the [dense-arrays](https://github.com/e-south/dense-arrays) ILP solver.
+DenseGen places transcription factor binding sites (TFBSs) into synthetic sequences by driving the [dense-arrays](https://github.com/e-south/dense-arrays) ILP solver.
 
-DenseGen is a staged pipeline:
+Pipeline stages:
 
-1. **Stage‑A sampling** — mine TFBSs from PWM inputs (via [FIMO](https://meme-suite.org/meme/doc/fimo.html)) to build TFBS pools.
-2. **Stage‑B sampling** — iterative subsampling from the above TFBS libraries.
-3. **Optimization + postprocess** — assemble dense arrays under constraints.
-4. **Artifacts** — write Parquet tables, manifests, plots, and audit reports under `outputs/`.
+1. **Stage-A sampling**: build TFBS pools from inputs (PWM mining via [FIMO](https://meme-suite.org/meme/doc/fimo.html), binding sites, or sequence sources).
+2. **Stage-B library sampling**: choose per-run solver libraries from Stage-A pools.
+3. **Optimization + postprocess**: solve sequence layouts under plan constraints.
+4. **Artifacts**: write tables, manifests, plots, and reports under `outputs/`.
 
-For a walkthrough, start with the demo:
-- **Demo walkthrough:** [docs/demo/demo_basic.md](docs/demo/demo_basic.md)
+Start with the demo index:
+- [docs/demo/README.md](docs/demo/README.md)
+
+If you are integrating the full stack (DenseGen -> USR -> Notify), start here:
+- [docs/demo/demo_usr_notify.md](docs/demo/demo_usr_notify.md)
+
+Note on event logs:
+- DenseGen writes runtime diagnostics to `outputs/meta/events.jsonl`.
+- Notify consumes USR dataset mutation events from `<usr_root>/<dataset>/.events.log`.
 
 ---
 
 ### Contents
 
-- [Quick start](#quick-start)
+- [Choose a demo](#choose-a-demo)
+- [Quick start (vanilla)](#quick-start-vanilla)
+- [Quick start (canonical PWM)](#quick-start-canonical-pwm)
 - [Documentation map](#documentation-map)
 
 ---
 
-### Quick start
+### Choose a demo
 
-Prerequisites include Python, dense-arrays, and a MILP solver. CBC is open-source; GUROBI is supported if installed and licensed. Stage‑A PWM sampling requires MEME Suite (`fimo` on PATH).
+- **Vanilla binding-sites demo** (recommended first): no added plan constraints.
+  - [docs/demo/demo_binding_sites.md](docs/demo/demo_binding_sites.md)
+- **Canonical Cruncher PWM flow** (main workflow): three-TF motif artifacts from Cruncher.
+  - [docs/workflows/cruncher_pwm_pipeline.md](docs/workflows/cruncher_pwm_pipeline.md)
+  - [docs/demo/demo_pwm_artifacts.md](docs/demo/demo_pwm_artifacts.md)
+
+### Quick start (vanilla)
 
 From the repo root:
+
+```bash
+uv sync --locked
+uv run dense workspace init --id demo_vanilla --template-id demo_binding_sites_vanilla --copy-inputs --output-mode local
+cd src/dnadesign/densegen/workspaces/runs/demo_vanilla
+uv run dense validate-config --probe-solver
+uv run dense run --fresh
+uv run dense inspect run --library --events
+```
+
+### Quick start (canonical PWM)
+
+The canonical demo requires MEME Suite (`fimo` on `PATH`) in addition to solver availability.
 
 ```bash
 uv sync --locked
 pixi install
 pixi run fimo --version
 
-# Option A: cd into the workspace
-cd src/dnadesign/densegen/workspaces/demo_meme_three_tfs  # enter demo workspace
-CONFIG="$PWD/config.yaml"  # point to workspace config
-
-# Option B: run from anywhere in the repo
-CONFIG=src/dnadesign/densegen/workspaces/demo_meme_three_tfs/config.yaml  # config path from repo root
-
-# Choose a runner (pixi is the default in this repo; uv is optional).
-# If `dense` is already an alias, remove it before defining the function.
-unalias dense 2>/dev/null
-dense() { pixi run dense -- "$@"; }  # convenience wrapper
-
-# Optional: uv-only wrapper
-# dense() { uv run dense "$@"; }
-
-# From here on, commands use $CONFIG for clarity; if you're in the workspace, you can omit -c.
+uv run dense workspace init --id demo_pwm --template-id demo_meme_three_tfs --copy-inputs --output-mode usr
+cd src/dnadesign/densegen/workspaces/runs/demo_pwm
+uv run dense validate-config --probe-solver
+uv run dense stage-a build-pool --fresh
+uv run dense run --fresh --no-plot
+uv run dense inspect run --library --events
 ```
 
-Run the packaged demo workspace:
+To generate additional sequences later, increase quotas in `config.yaml` and resume with:
 
 ```bash
-# 1) Validate schema + solver availability
-dense validate-config --probe-solver -c "$CONFIG"
-
-# 2) Stage‑A: build TFBS pools (optional; `dense run --fresh` rebuilds these)
-dense stage-a build-pool --fresh -c "$CONFIG"
-
-# 3) Run generation (use --fresh to reset outputs; existing outputs auto-resume)
-#    By default, this auto-runs plots configured in `plots`; use --no-plot to skip.
-dense run -c "$CONFIG"
-
-# 4) Plot a minimal diagnostics set (useful to re-render plots on demand)
-dense plot --only stage_a_summary,placement_map -c "$CONFIG"
+uv run dense run --resume --allow-quota-increase --no-plot
 ```
 
 ---
 
 ### Documentation map
 
-Progressive guides:
+Guides:
 
-* **Demo walkthrough:** [docs/demo/demo_basic.md](docs/demo/demo_basic.md)
-* **Workspace layout:** [docs/guide/workspace.md](docs/guide/workspace.md)
-* **Inputs (Stage‑A):** [docs/guide/inputs.md](docs/guide/inputs.md)
-* **Sampling (Stage‑A + Stage‑B):** [docs/guide/sampling.md](docs/guide/sampling.md)
-* **Generation (constraints + Stage‑B):** [docs/guide/generation.md](docs/guide/generation.md)
-* **Outputs + metadata:** [docs/guide/outputs-metadata.md](docs/guide/outputs-metadata.md)
-* **Postprocess:** [docs/guide/postprocess.md](docs/guide/postprocess.md)
+- [docs/guide/workspace.md](docs/guide/workspace.md)
+- [docs/guide/inputs.md](docs/guide/inputs.md)
+- [docs/guide/sampling.md](docs/guide/sampling.md)
+- [docs/guide/generation.md](docs/guide/generation.md)
+- [docs/guide/outputs-metadata.md](docs/guide/outputs-metadata.md)
+- [docs/guide/postprocess.md](docs/guide/postprocess.md)
 
-References:
+Reference:
 
-* **CLI operator manual:** [docs/reference/cli.md](docs/reference/cli.md)
-* **Config schema:** [docs/reference/config.md](docs/reference/config.md)
-* **Outputs + manifests:** [docs/reference/outputs.md](docs/reference/outputs.md)
-* **Motif artifact contract:** [docs/reference/motif_artifacts.md](docs/reference/motif_artifacts.md)
+- [docs/reference/cli.md](docs/reference/cli.md)
+- [docs/reference/config.md](docs/reference/config.md)
+- [docs/reference/outputs.md](docs/reference/outputs.md)
+- [docs/reference/motif_artifacts.md](docs/reference/motif_artifacts.md)
 
-Developer notes:
+Workflows:
 
-* **Architecture:** [docs/dev/architecture.md](docs/dev/architecture.md)
+- [docs/workflows/cruncher_pwm_pipeline.md](docs/workflows/cruncher_pwm_pipeline.md)
+- [docs/workflows/usr_notify_hpc.md](docs/workflows/usr_notify_hpc.md)
 
 ---
 

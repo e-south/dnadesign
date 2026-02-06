@@ -11,8 +11,9 @@ Supplement to repo-root `AGENTS.md` with `usr`-specific contracts + navigation.
     - `datasets/<namespace>/<name>/meta.md` (hand-edited notes/snippets)
     - `datasets/<namespace>/<name>/.events.log` (append-only; generated)
     - `datasets/<namespace>/<name>/_snapshots/` (generated)
-  - Legacy layout (still supported):
-    - `datasets/<name>/records.parquet`
+    - `datasets/_archive/<namespace>/<name>/...` (canonical archive location)
+  - Legacy archive roots are not operational:
+    - `datasets/archived/**` and `usr/archived/**` should be treated as historical only.
 - Notebooks: `src/dnadesign/usr/notebooks/`
 - Remote sync config: set `USR_REMOTES_PATH` to your remotes YAML
 - Namespace registry: `registry.yaml` under the datasets root
@@ -62,7 +63,9 @@ uv run usr push <dataset-or-path> --remote <name> -y
 ### Notes
 - macOS: PyArrow sysctl warnings are suppressed by default. Set `USR_SHOW_PYARROW_SYSCTL=1` to re-enable.
 - The `datasets/demo` dataset is tracked. Copy it before running attach/materialize/snapshot if you want a scratch run.
-- Update policy: base records are append-only; overlays are the only supported update path. Base rewrites are maintenance operations. In the library, `Dataset.materialize(..., maintenance=True)` is required.
+- Update policy: base records are append-only; overlays are the only supported update path. Base rewrites are maintenance operations. In the library, use `with ds.maintenance(reason=...): ds.materialize(...)`.
+- Reserved state overlay: `usr_state__masked`, `usr_state__qc_status`, `usr_state__split`, `usr_state__supersedes`, `usr_state__lineage` are standardized and registry-governed.
+- Registry auto-freeze: when a registry exists, the first dataset mutation snapshots `_registry/registry.<hash>.yaml`.
 - Tombstones: `usr__deleted_at` is stored as `timestamp[us, UTC]`.
 
 ### Tests

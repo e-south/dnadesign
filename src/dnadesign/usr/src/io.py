@@ -28,7 +28,7 @@ PARQUET_COMPRESSION: str = "zstd"
 
 
 def now_utc() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 def _snapshot_stamp() -> str:

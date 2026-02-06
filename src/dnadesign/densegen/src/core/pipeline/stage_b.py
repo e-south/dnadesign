@@ -387,11 +387,6 @@ def build_library_for_plan(
                 "generation.sampling.unique_binding_cores=true requires tfbs_core in the Stage-A pool. "
                 "Rebuild pools with core-aware sampling or disable unique_binding_cores."
             )
-        if not groups:
-            raise ValueError(
-                "regulator_constraints.groups must be non-empty for TFBS inputs. "
-                "Define at least one regulator group in generation.plan[].regulator_constraints."
-            )
         available_tfs = set(meta_df["tf"].tolist())
         all_group_members = list(dict.fromkeys([m for g in groups for m in g.members]))
         tfbs_counts = (
@@ -457,13 +452,16 @@ def build_library_for_plan(
                 failure_penalty_alpha=float(sampling_cfg.failure_penalty_alpha),
                 failure_penalty_power=float(sampling_cfg.failure_penalty_power),
             )
-        required_regulators_selected, _ = select_group_members(
-            groups=groups,
-            available_tfs=available_tfs,
-            np_rng=np_rng,
-            sampling_strategy=library_sampling_strategy,
-            weight_by_tf=weight_by_tf,
-        )
+        if groups:
+            required_regulators_selected, _ = select_group_members(
+                groups=groups,
+                available_tfs=available_tfs,
+                np_rng=np_rng,
+                sampling_strategy=library_sampling_strategy,
+                weight_by_tf=weight_by_tf,
+            )
+        else:
+            required_regulators_selected = []
 
         if pool_strategy == "full":
             lib_df = meta_df.copy()

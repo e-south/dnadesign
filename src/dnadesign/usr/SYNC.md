@@ -1,44 +1,56 @@
-## USR sync & SSH (SCC)
+## USR Sync over SSH
 
-This is a guide for moving USR datasets between your laptop and the BU SCC. For USR concepts and CLI basics, see the sibling **README.md**. This page focuses on SSH keys, remote configuration, and day‑to‑day sync.
+This page covers syncing USR datasets between local and remote hosts (for example, BU SCC).
+For USR concepts and CLI basics, see `README.md`.
 
 ---
 
-### 1) Prepare SSH keys (once)
+### 0) HPC <-> local pattern (datasets are not in git)
 
-**Check if you already have an Ed25519 key:**
+Recommended storage layout:
+- Local datasets root outside the repo, for example `~/data/usr_datasets/`
+- SCC datasets root in project/scratch storage, for example `/project/$USER/densegen_runs/outputs/usr_datasets`
+
+Notes:
+- Scratch may have retention/purge policies; use project storage for long-lived datasets.
+- Keep code in git, keep datasets in USR roots, and sync with `usr diff/pull/push`.
+
+---
+
+### 1) Prepare SSH keys (one-time)
+
+Check whether you already have an Ed25519 key:
+
 ```bash
 ls -l ~/.ssh/id_ed25519 ~/.ssh/id_ed25519.pub 2>/dev/null || echo "no Ed25519 key yet"
-````
+```
 
-**Generate a key if needed:**
+Generate one if needed:
 
 ```bash
-ssh-keygen -t ed25519 -C "esouth@scc1" -f ~/.ssh/id_ed25519
+ssh-keygen -t ed25519 -C "<you>@<host>" -f ~/.ssh/id_ed25519
 chmod 600 ~/.ssh/id_ed25519
 ```
 
-**Install your public key on SCC (adds to `authorized_keys`):**
+Install your public key on the remote host:
 
 ```bash
-ssh-copy-id -i ~/.ssh/id_ed25519.pub esouth@scc1.bu.edu
+ssh-copy-id -i ~/.ssh/id_ed25519.pub <user>@<host>
 ```
 
-You’ll enter your SCC password once. After this, ssh/rsync will use your key + Duo/MFA.
-
-**macOS: keep the key loaded**
+macOS keychain convenience:
 
 ```bash
 eval "$(ssh-agent -s)"
 ssh-add --apple-use-keychain ~/.ssh/id_ed25519
 ```
 
-**Optional convenience alias** in `~/.ssh/config`:
+Optional `~/.ssh/config` entry:
 
-```
-Host scc1 scc1.bu.edu
-  HostName scc1.bu.edu
-  User esouth
+```text
+Host <alias>
+  HostName <host>
+  User <user>
   IdentityFile ~/.ssh/id_ed25519
   IdentitiesOnly yes
   AddKeysToAgent yes
@@ -48,168 +60,159 @@ Host scc1 scc1.bu.edu
   ControlPersist 10m
 ```
 
-```bash
-chmod 600 ~/.ssh/config
-ssh scc1   # should log in (with Duo/MFA)
-exit
-```
-
-> **Note:** USR uses SSH BatchMode and will fail fast if keys aren’t configured.
-
 ---
 
 ### 2) Configure a USR remote
 
-Run from your laptop in the repo where your dataset lives.
-
-**CLI-based config (writes to the file at `USR_REMOTES_PATH`, which is required):**
+`USR_REMOTES_PATH` is required.
 
 ```bash
 export USR_REMOTES_PATH="$HOME/.config/dnadesign/usr-remotes.yaml"
-usr remotes add cluster --type ssh \
-  --host scc1.bu.edu --user esouth \
-  --base-dir /project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets
+usr remotes wizard \
+  --preset bu-scc \
+  --name bu-scc \
+  --user <user> \
+  --host scc1.bu.edu \
+  --base-dir /project/<user>/densegen_runs/outputs/usr_datasets
+
+usr remotes doctor --remote bu-scc
 ```
 
-**Inspect config:**
+Inspect remote config:
 
 ```bash
 usr remotes list
-usr remotes show cluster
-# Expected: ssh user/host and base_dir shown; ssh_key : (ssh-agent or default key)
+usr remotes show bu-scc
 ```
 
-**File-based config (alternative):**
+File-based config example:
 
 ```yaml
 # $USR_REMOTES_PATH
 remotes:
-  cluster:
+  bu-scc:
     type: ssh
     host: scc1.bu.edu
-    user: esouth
-    base_dir: /project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets
+    user: <user>
+    base_dir: /project/<user>/densegen_runs/outputs/usr_datasets
     # Optional explicit key via environment variable:
     # ssh_key_env: USR_SSH_KEY
 ```
 
-If you set `ssh_key_env`, export it before running `usr`:
+If using `ssh_key_env`:
 
 ```bash
 export USR_SSH_KEY="$HOME/.ssh/id_ed25519"
 ```
 
-**Config requirement**
+---
 
-* `USR_REMOTES_PATH` must be set; there is no repo-local fallback.
+### 3) Daily sync workflow
+
+Rule: run the command on the machine where you want files to end up.
+
+Preview:
+
+```bash
+usr diff densegen/my_dataset --remote bu-scc
+```
+
+Pull remote -> local:
+
+```bash
+usr pull densegen/my_dataset --remote bu-scc -y
+```
+
+Push local -> remote:
+
+```bash
+usr push densegen/my_dataset --remote bu-scc -y
+```
+
+Useful flags:
+
+- `-y/--yes`: non-interactive overwrite confirmation
+- `--primary-only`: transfer only `records.parquet`
+- `--skip-snapshots`: exclude `_snapshots/`
+- `--dry-run`: preview only
+- `--verify {auto,hash,size,parquet}`: verification mode
 
 ---
 
-### 3) Everyday sync
+### 4) Dataset directory mode + file mode
 
-> **Rule of thumb:** Run the command *on the machine where you want the files to end up.*
-
-**Preview differences:**
+Use dataset directory mode when you have an explicit dataset path outside `--root`:
 
 ```bash
-usr diff densegen/my_usr_dataset --remote cluster
-# or: usr status my_usr_dataset --remote cluster
+usr diff /path/to/outputs/usr_datasets/densegen/demo_hpc --remote bu-scc
+usr pull /path/to/outputs/usr_datasets/densegen/demo_hpc --remote bu-scc -y
+usr push /path/to/outputs/usr_datasets/densegen/demo_hpc --remote bu-scc -y
 ```
 
-**Pull cluster → local:**
+Use file mode when syncing a single file.
 
-```bash
-usr pull densegen/my_usr_dataset --from cluster -y
-```
-
-**Push local → cluster:**
-
-```bash
-usr push densegen/my_usr_dataset --to cluster -y
-```
-
-**Useful flags**
-
-* `-y/--yes` confirm overwrites non‑interactively
-* `--primary-only` transfers only `records.parquet`
-* `--skip-snapshots` excludes `_snapshots/`
-* `--dry-run` shows what would copy without copying
-* `--verify {auto,hash,size,parquet}` controls verification strength
-
----
-
-### 4) Path‑first sync (FILE mode)
-
-Use FILE mode when you want to sync a single file outside a canonical USR dataset directory (e.g., anywhere in your monorepo).
-
-1. Make sure the remote knows both the datasets base and your repo root:
+Remote config example with repo mapping:
 
 ```yaml
-# $USR_REMOTES_PATH
 remotes:
-  cluster:
+  bu-scc:
     type: ssh
     host: scc1.bu.edu
-    user: esouth
-    base_dir: /project/dunlop/esouth/dnadesign/src/dnadesign/usr/datasets   # dataset mode
-    repo_root: /project/dunlop/esouth/dnadesign                              # FILE mode (remote side)
-    local_repo_root: /Users/Shockwing/Dropbox/projects/phd/dnadesign         # optional (local fallback)
+    user: <user>
+    base_dir: /project/<user>/densegen_runs/outputs/usr_datasets
+    repo_root: /path/to/remote/dnadesign
+    local_repo_root: /path/to/local/dnadesign
 ```
 
-2. From anywhere in your local repo, operate on a **file path**:
+Examples:
 
 ```bash
-# Show diff for a file path
-usr diff permuter/run42/records.parquet --remote cluster
+usr diff permuter/run42/records.parquet --remote bu-scc
+usr pull permuter/run42/records.parquet --remote bu-scc -y
 
-# Pull that file cluster → local
-usr pull permuter/run42/records.parquet --remote cluster -y
+# If local repo root is not configured
+usr pull permuter/run42/records.parquet --remote bu-scc \
+  --repo-root /path/to/local/dnadesign -y
 
-# If your local root isn’t configured, pass it explicitly:
-usr pull permuter/run42/records.parquet --remote cluster \
-  --repo-root "$HOME/.../dnadesign" -y
-
-# If automatic mapping can’t be derived, give the remote path explicitly:
-usr pull permuter/run42/records.parquet --remote cluster \
-  --remote-path /project/dunlop/esouth/dnadesign/src/dnadesign/permuter/run42/records.parquet -y
+# If remote path mapping cannot be inferred
+usr pull permuter/run42/records.parquet --remote bu-scc \
+  --remote-path /path/to/remote/dnadesign/src/dnadesign/permuter/run42/records.parquet -y
 ```
 
-3. Dataset‑folder convenience:
+Verification in `--verify auto` uses this order:
 
-```bash
-cd usr/datasets/densegen/my_usr_dataset
-usr diff --remote cluster
-usr pull --remote cluster -y
-```
+1. SHA-256 (if available on both hosts)
+2. file size
+3. for Parquet files, row/column checks (`pyarrow` required on remote)
 
-**Verification behavior (both modes)**
-Transfers are verified automatically. `--verify auto` uses this preference order:
+If auto mode falls back, USR prints a warning.
 
-* **SHA‑256** (if available on both ends)
-* file **size**
-* for Parquet files, **rows/cols** (requires Python + `pyarrow` on the remote host)
+Environment variable for file mode:
 
-If a fallback is used in `auto`, USR prints a warning. You can force strict modes with
-`--verify hash`, `--verify size`, or `--verify parquet` (which will error if unavailable).
+- `DNADESIGN_REPO_ROOT` can provide local repo root when not passed with `--repo-root`.
 
-> Environment variable for FILE mode:
-> `DNADESIGN_REPO_ROOT` can supply your local repo root if not passed via `--repo-root` and not present in the `USR_REMOTES_PATH` config.
+BU transfer-heavy option:
+- Use host `scc-globus.bu.edu` for transfer-focused workflows.
+- BU also supports download-node jobs via `qsub -l download`.
 
 ---
 
-### 5) Key rotation & hygiene
+### 5) Key rotation hygiene
 
-* Generate a fresh key and install it:
+```bash
+ssh-keygen -t ed25519 -C "<you>@<host>" -f ~/.ssh/id_ed25519_new
+ssh-copy-id -i ~/.ssh/id_ed25519_new.pub <user>@<host>
+```
 
-  ```bash
-  ssh-keygen -t ed25519 -C "esouth@scc1" -f ~/.ssh/id_ed25519_new
-  ssh-copy-id -i ~/.ssh/id_ed25519_new.pub esouth@scc1.bu.edu
-  ```
+Then update `~/.ssh/config` and remove old keys when ready.
 
-  Update `~/.ssh/config` to use the new key, then remove the old one later.
+Keep permissions strict:
 
-* Keep permissions tight: `chmod 600 ~/.ssh/id_*`, `chmod 700 ~/.ssh`.
+```bash
+chmod 600 ~/.ssh/id_*
+chmod 700 ~/.ssh
+```
 
 ---
 
-@ e-south
+@e-south

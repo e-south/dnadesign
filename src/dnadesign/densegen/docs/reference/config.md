@@ -170,7 +170,10 @@ Outputs (tables), logs, and plots must resolve inside `outputs/` under `densegen
 - `targets`: list of sinks to write (`usr`, `parquet`)
 - When multiple targets are set, outputs must be in sync before a run; mismatches are errors.
 - `usr` (required when `targets` includes `usr`)
-  - `dataset`, `root`, `chunk_size`, `allow_overwrite`
+  - `dataset`, `root`, `chunk_size`, `health_event_interval_seconds`, `allow_overwrite`
+  - `health_event_interval_seconds` (float > 0; default 60) controls cadence for `densegen_health` USR events
+  - `npz_fields` (optional list of metadata keys to offload into NPZ artifacts; see outputs doc)
+  - `npz_root` (optional path for NPZ artifacts; defaults to `<dataset>/_artifacts/densegen_npz`)
 - `parquet` (required when `targets` includes `parquet`)
   - `path` (file), `deduplicate`, `chunk_size`
   - `path` must be a `.parquet` file (single-file output)
@@ -307,7 +310,9 @@ Notes:
 - `progress_style`: `stream | summary | screen` (default `screen`)
   - `stream`: per‑sequence logs (controlled by `progress_every`)
   - `summary`: suppress per‑sequence logs; keep periodic leaderboard summaries
-  - `screen`: emit compact dashboard panels per update (append-only)
+  - `screen`: use in-place Rich `Live` dashboard updates on interactive terminals.
+    - Requires a non-`dumb` terminal (`TERM` must support cursor controls). If `TERM=dumb`, DenseGen fails fast with an actionable error.
+    - On non-terminal streams (for example redirected output), DenseGen appends static panels.
 - `progress_every` (int >= 0) - log/refresh interval in sequences (`0` disables per‑sequence logging)
 - `progress_refresh_seconds` (float > 0) - minimum seconds between screen refreshes
 - `show_tfbs` (bool) - include TFBS sequences in progress output

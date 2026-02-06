@@ -11,11 +11,12 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import datetime as _dt
 import json
 import os
+import shlex
+import shutil
 import sys
-from dataclasses import asdict
+import time
 from pathlib import Path
 from types import SimpleNamespace as NS
 
@@ -24,8 +25,31 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import typer
 
+from .cli_commands import datasets as dataset_commands
+from .cli_commands import read as read_commands
+from .cli_commands import state as state_commands
+from .cli_commands import sync as sync_commands
+from .cli_commands import write as write_commands
+from .cli_paths import (
+    LEGACY_DATASET_PATH_ERROR as _LEGACY_DATASET_PATH_ERROR,
+)
+from .cli_paths import (
+    assert_not_legacy_dataset_path as _assert_not_legacy_dataset_path_impl,
+)
+from .cli_paths import (
+    assert_supported_root as _assert_supported_root_impl,
+)
+from .cli_paths import (
+    pkg_usr_root as _pkg_usr_root_impl,
+)
+from .cli_paths import (
+    resolve_dataset_for_read as _resolve_dataset_for_read_impl,
+)
+from .cli_paths import (
+    resolve_path_anywhere as _resolve_path_anywhere_impl,
+)
 from .config import SSHRemoteConfig, get_remote, load_all, save_remote
-from .dataset import Dataset, normalize_dataset_id
+from .dataset import LEGACY_DATASET_PREFIX, Dataset
 from .errors import DuplicateIDError, SequencesError, UserAbort
 from .events import record_event
 from .io import read_parquet_head
@@ -36,21 +60,11 @@ from .merge_datasets import (
 )
 from .mock import MockSpec, add_demo_columns, create_mock_dataset
 from .overlays import list_overlays, overlay_metadata
-from .pretty import PrettyOpts, fmt_value, render_schema_tree
+from .pretty import PrettyOpts, fmt_value
 from .registry import load_registry, parse_columns_spec, register_namespace
-from .sync import (
-    SyncOptions,
-    execute_pull,
-    execute_pull_file,
-    execute_push,
-    execute_push_file,
-    plan_diff,
-    plan_diff_file,
-)
+from .remote import SSHRemote
 from .ui import (
     print_df_plain,
-    render_diff_rich,
-    render_schema_tree_rich,
     render_table_rich,
 )
 
@@ -96,6 +110,7 @@ def _human_size(n: int | None) -> str:
 
 
 USR_OUTPUT_VERSION = 1
+LEGACY_DATASET_PATH_ERROR = _LEGACY_DATASET_PATH_ERROR
 
 
 def _resolve_output_format(args, *, default: str = "auto") -> str:
@@ -190,9 +205,12 @@ def _select_parquet_target_interactive(
     path_like: Path,
     glob: str | None,
     use_rich: bool,
+    root: Path | None = None,
     confirm_if_inferred: bool = False,
 ) -> Path | None:
     p = Path(path_like)
+    if p.exists():
+        _assert_not_legacy_dataset_path(p, root=root)
     if p.is_file() and p.suffix.lower() == ".parquet":
         return p
     if p.is_dir():
@@ -213,124 +231,50 @@ def _select_parquet_target_interactive(
 
 
 # --------- dataset guessing (path-first) ----------
-def _prompt_pick_dataset(root: Path, names: list[str], use_rich: bool) -> str | None:
-    if not names:
-        print(f"(no datasets under {root})")
-        return None
-    if len(names) == 1:
-        return names[0]
-    # preview rows/cols for each dataset
-    rows = []
-    for idx, name in enumerate(names, start=1):
-        rp = root / name / "records.parquet"
-        pf = pq.ParquetFile(str(rp))
-        rows.append(
-            {
-                "#": idx,
-                "dataset": name,
-                "rows": pf.metadata.num_rows,
-                "cols": pf.metadata.num_columns,
-            }
-        )
-    df = pd.DataFrame(rows, columns=["#", "dataset", "rows", "cols"])
-    msg = "Multiple datasets found. Choose one by number (Enter = first, q = abort):"
-    if use_rich:
-        render_table_rich(df, title="Pick a dataset", caption=str(root))
-    else:
-        print_df_plain(df)
-        print(msg)
-    sel = input("> ").strip().lower()
-    if sel in {"q", "quit", "n"}:
-        print("Aborted.")
-        return None
-    if not sel:
-        return names[0]
-    try:
-        k = int(sel)
-        if 1 <= k <= len(names):
-            return names[k - 1]
-    except ValueError:
-        pass
-    print("Invalid selection. Aborted.")
-    return None
-
-
 def _normalize_dataset_id(dataset: str) -> str:
-    try:
-        return normalize_dataset_id(dataset)
-    except SequencesError as e:
-        raise SystemExit(str(e)) from None
-
-
-def _dataset_exists(root: Path, dataset_id: str) -> bool:
-    return (root / Path(dataset_id) / "records.parquet").exists()
+    return dataset_commands._normalize_dataset_id(dataset)  # noqa: SLF001
 
 
 def _resolve_existing_dataset_id(root: Path, dataset: str) -> str:
-    root = Path(root).resolve()
-    ds = _normalize_dataset_id(dataset)
-    all_ds = list_datasets(root)
-    if "/" in ds:
-        if ds not in all_ds:
-            raise SystemExit(f"Dataset not found: {ds}")
-        return ds
-    # unqualified: prefer unique match, fail if ambiguous
-    candidates = [name for name in all_ds if name.split("/", 1)[-1] == ds]
-    if ds in all_ds and len(candidates) == 1:
-        return ds
-    if len(candidates) == 1:
-        return candidates[0]
-    if not candidates:
-        raise SystemExit(f"Dataset not found: {ds}")
-    raise SystemExit("Ambiguous dataset name. Use a namespace-qualified id. Matches: " + ", ".join(sorted(candidates)))
-
-
-def _dataset_id_from_path(root: Path, path: Path) -> str | None:
-    root = Path(root).resolve()
-    p = Path(path).resolve()
-    try:
-        rel = p.relative_to(root)
-    except ValueError:
-        return None
-    if len(rel.parts) >= 2:
-        cand = Path(rel.parts[0], rel.parts[1])
-        if _dataset_exists(root, cand.as_posix()):
-            return cand.as_posix()
-    if len(rel.parts) >= 1:
-        cand = Path(rel.parts[0])
-        if _dataset_exists(root, cand.as_posix()):
-            return cand.as_posix()
-    return None
+    return dataset_commands.resolve_existing_dataset_id(root, dataset)
 
 
 def _resolve_dataset_name_interactive(root: Path, dataset: str | None, use_rich: bool) -> str | None:
-    """
-    If dataset is None, try to infer from CWD:
-      - If CWD is <root>/<dataset>[/...], use that dataset
-      - If CWD is <root>/<namespace>/<dataset>[/...], use that dataset
-      - If CWD == <root>, prompt to pick a dataset
-    """
-    root = Path(root).resolve()
-    if dataset:
-        return _resolve_existing_dataset_id(root, dataset)
-    cwd = Path.cwd().resolve()
-    inferred = _dataset_id_from_path(root, cwd)
-    if inferred:
-        return inferred
-    if cwd == root:
-        from_names = list_datasets(root)
-        return _prompt_pick_dataset(root, from_names, use_rich)
-    # final attempt: walk up a few levels under root
-    p = cwd
-    for _ in range(4):
-        inferred = _dataset_id_from_path(root, p)
-        if inferred:
-            return inferred
-        p = p.parent
-    print(
-        "Dataset not provided and could not be inferred from CWD. Run inside a dataset folder under --root or pass a dataset name."  # noqa
+    return dataset_commands.resolve_dataset_name_interactive(root, dataset, use_rich)
+
+
+def _is_explicit_path_target(target: str | None) -> bool:
+    text = str(target or "").strip()
+    if text in {"", ".", "./", "..", "../"}:
+        return True
+    if text.startswith("./") or text.startswith("../") or text.startswith("~/"):
+        return True
+    if Path(text).is_absolute():
+        return True
+    if text.lower().endswith(".parquet"):
+        return True
+    if "/" in text or "\\" in text:
+        return Path(text).expanduser().exists()
+    return False
+
+
+def _exit_missing_path_target(target: str) -> None:
+    print(f"ERROR: Path target not found: {target}")
+    raise typer.Exit(code=4)
+
+
+def _resolve_dataset_for_read(root: Path, dataset_arg: str) -> Dataset:
+    return _resolve_dataset_for_read_impl(
+        root,
+        dataset_arg,
+        resolve_existing_dataset_id=_resolve_existing_dataset_id,
+        normalize_dataset_id=_normalize_dataset_id,
+        pkg_root=_pkg_usr_root(),
     )
-    return None
+
+
+def _assert_not_legacy_dataset_path(path: Path, *, root: Path | None = None) -> None:
+    _assert_not_legacy_dataset_path_impl(path, root=root, pkg_root=_pkg_usr_root())
 
 
 # ---------------- path helpers: resolve paths relative to the installed package ----------------
@@ -341,8 +285,11 @@ def _pkg_usr_root() -> Path:
     Return the installed dnadesign/usr package directory.
     This is stable no matter where the user runs 'usr' from.
     """
-    # .../dnadesign/usr/src/cli.py -> parents[1] = .../dnadesign/usr
-    return Path(__file__).resolve().parents[1]
+    return _pkg_usr_root_impl()
+
+
+def _assert_supported_root(root: Path) -> None:
+    _assert_supported_root_impl(root, pkg_root=_pkg_usr_root())
 
 
 def _resolve_path_anywhere(p: Path) -> Path:
@@ -354,179 +301,39 @@ def _resolve_path_anywhere(p: Path) -> Path:
          including common repo-style prefixes like 'src/dnadesign/usr/...'
          or 'usr/...'.
     """
-    p = Path(p)
-
-    # 1) absolute
-    if p.is_absolute() and p.exists():
-        return p
-
-    # 2) relative under CWD
-    if p.exists():
-        return p
-
-    # 3) under installed package
-    base = _pkg_usr_root()
-
-    # direct join
-    cand = base / p
-    if cand.exists():
-        return cand
-
-    # repo-style prefix: src/dnadesign/usr/<...>
-    parts = p.parts
-    if "dnadesign" in parts and "usr" in parts:
-        try:
-            i = parts.index("dnadesign")
-            if parts[i + 1] == "usr":
-                sub = Path(*parts[i + 2 :])
-                cand2 = base / sub
-                if cand2.exists():
-                    return cand2
-        except (ValueError, IndexError):
-            pass
-
-    # prefix starting with 'usr/...'
-    if parts and parts[0] == "usr":
-        cand3 = base / Path(*parts[1:])
-        if cand3.exists():
-            return cand3
-
-    # give up (let caller raise if needed)
-    return p
+    return _resolve_path_anywhere_impl(p, pkg_root=_pkg_usr_root())
 
 
 # ---------- helpers & command impls ----------
 def list_datasets(root: Path):
-    root = root.resolve()
-    if not root.exists():
-        return []
-    names = set()
-    for p in root.iterdir():
-        if not p.is_dir():
-            continue
-        if (p / "records.parquet").exists():
-            names.add(p.name)
-            continue
-        for child in p.iterdir():
-            if child.is_dir() and (child / "records.parquet").exists():
-                names.add(f"{p.name}/{child.name}")
-    return sorted(names)
+    return dataset_commands.list_datasets(root)
 
 
 def cmd_ls(args):
-    fmt = _resolve_output_format(args)
-    names = list_datasets(args.root)
-    if not names:
-        print(f"(no datasets under {args.root})")
-        return
-
-    def _fmt_bytes(n: int | None) -> str:
-        if not isinstance(n, int):
-            return "?"
-        units = ["B", "KB", "MB", "GB", "TB", "PB"]
-        i = 0
-        x = float(n)
-        while x >= 1024 and i < len(units) - 1:
-            x /= 1024.0
-            i += 1
-        return f"{x:.0f}{units[i]}"
-
-    rows = []
-    for name in names:
-        rp = args.root / name / "records.parquet"
-        pf = pq.ParquetFile(str(rp))
-        st = rp.stat()
-        rows.append(
-            {
-                "dataset": name,
-                "rows": pf.metadata.num_rows,
-                "cols": pf.metadata.num_columns,
-                "size_bytes": int(st.st_size),
-                "updated": _dt.datetime.fromtimestamp(int(st.st_mtime)).isoformat(timespec="seconds"),
-            }
-        )
-
-    if fmt == "json":
-        _print_json({"usr_output_version": USR_OUTPUT_VERSION, "data": rows})
-        return
-
-    table_rows = []
-    for row in rows:
-        table_rows.append(
-            {
-                "dataset": row["dataset"],
-                "rows": row["rows"],
-                "cols": row["cols"],
-                "size": _fmt_bytes(int(row["size_bytes"])),
-                "updated": row["updated"],
-            }
-        )
-
-    df = pd.DataFrame(table_rows, columns=["dataset", "rows", "cols", "size", "updated"])
-    if fmt == "rich":
-        render_table_rich(df, title="USR datasets", caption=str(args.root))
-    else:
-        print_df_plain(df)
+    read_commands.cmd_ls(
+        args,
+        resolve_output_format=_resolve_output_format,
+        print_json=_print_json,
+        output_version=USR_OUTPUT_VERSION,
+    )
 
 
 def cmd_init(args):
-    d = Dataset(args.root, args.dataset)
-    d.init(source=args.source, notes=args.notes)
-    print(f"Initialized dataset at {d.records_path}")
+    write_commands.cmd_init(args)
 
 
 def cmd_import(args):
-    d = Dataset(args.root, args.dataset)
-    in_path = _resolve_path_anywhere(args.path)
-    if args.source_format == "csv":
-        df = pd.read_csv(in_path)
-    else:
-        df = pd.read_json(in_path, lines=True)
-    n = d.import_rows(
-        df,
-        default_bio_type=args.bio_type,
-        default_alphabet=args.alphabet,
-        source=str(in_path),
+    write_commands.cmd_import(
+        args,
+        resolve_path_anywhere=_resolve_path_anywhere,
     )
-    print(f"Imported {n} records into {d.name}")
-    cmd = f"usr import {args.dataset} --from {args.source_format} --path {in_path} --bio-type {args.bio_type} --alphabet {args.alphabet}"  # noqa
-    d.append_meta_note(f"Imported {n} records from {in_path}", cmd)
 
 
 def cmd_attach(args):
-    d = Dataset(args.root, args.dataset)
-    in_path = _resolve_path_anywhere(args.path)
-    cols = [c.strip() for c in args.columns.split(",")] if args.columns else None
-    n = d.attach_columns(  # friendly alias
-        in_path,
-        namespace=args.namespace,
-        key=args.key,
-        key_col=(args.key_col if args.key_col else None),
-        columns=cols,
-        allow_overwrite=bool(args.allow_overwrite),
-        allow_missing=bool(args.allow_missing),
-        parse_json=bool(args.parse_json),
-        backend=args.backend,
-        note=args.note,
+    write_commands.cmd_attach(
+        args,
+        resolve_path_anywhere=_resolve_path_anywhere,
     )
-    msg = f"Attached {n} matched row(s) of {args.namespace} columns into {d.name} (input file: {in_path})"
-    if args.allow_missing:
-        msg += " (unmatched rows skipped; see .events.log for counts)"
-    print(msg)
-    cols = args.columns or "(all columns)"
-    cmd = (
-        f"usr attach {args.dataset} --path {in_path} --namespace {args.namespace} "
-        f'--key {args.key} --key-col {args.key_col or ""} --columns "{cols}"'
-    )
-    if args.allow_overwrite:
-        cmd += " --allow-overwrite"
-    if args.allow_missing:
-        cmd += " --allow-missing"
-    if not args.parse_json:
-        cmd += " --no-parse-json"
-    if args.backend != "pyarrow":
-        cmd += f" --backend {args.backend}"
-    d.append_meta_note(f"Attached columns under '{args.namespace}' ({n} row match)", cmd)
 
 
 # ---------------- error formatting (actionable nudges) ----------------
@@ -570,42 +377,22 @@ def _print_user_error(e: SequencesError) -> None:
 
 
 def cmd_info(args):
-    fmt = _resolve_output_format(args)
-    ds_name = _resolve_dataset_name_interactive(
-        args.root, getattr(args, "dataset", None), bool(getattr(args, "rich", False))
+    read_commands.cmd_info(
+        args,
+        resolve_output_format=_resolve_output_format,
+        print_json=_print_json,
+        output_version=USR_OUTPUT_VERSION,
+        resolve_dataset_for_read=_resolve_dataset_for_read,
     )
-    if not ds_name:
-        return
-    d = Dataset(args.root, ds_name)
-    info = d.info_dict()
-    if fmt == "json":
-        _print_json({"usr_output_version": USR_OUTPUT_VERSION, "data": info})
-        return
-    for k, v in info.items():
-        print(f"{k}: {v}")
 
 
 def cmd_schema(args):
-    fmt = _resolve_output_format(args)
-    ds_name = _resolve_dataset_name_interactive(
-        args.root, getattr(args, "dataset", None), bool(getattr(args, "rich", False))
+    read_commands.cmd_schema(
+        args,
+        resolve_output_format=_resolve_output_format,
+        print_json=_print_json,
+        output_version=USR_OUTPUT_VERSION,
     )
-    if not ds_name:
-        return
-    d = Dataset(args.root, ds_name)
-    sch = d.schema()
-    if fmt == "json":
-        fields = [{"name": f.name, "type": str(f.type), "nullable": f.nullable} for f in sch]
-        _print_json({"usr_output_version": USR_OUTPUT_VERSION, "data": {"fields": fields}})
-        return
-    if args.tree:
-        if fmt == "rich":
-            lines = render_schema_tree(sch).splitlines()
-            render_schema_tree_rich(lines, title=str(d.records_path))
-        else:
-            print(render_schema_tree(sch))
-    else:
-        print(sch)
 
 
 def _resolve_parquet_from_dir(dir_path: Path, glob: str | None = None) -> Path:
@@ -679,25 +466,38 @@ def _log_implicit_pick_if_dataset(pq_path: Path | None, reason: str) -> None:
         dataset_name = first.split(":", 1)[1].strip()
         if not dataset_name:
             raise SequencesError(f"meta.md has empty name field: {meta_path}")
+        if dataset_name == LEGACY_DATASET_PREFIX or dataset_name.startswith(f"{LEGACY_DATASET_PREFIX}/"):
+            raise SequencesError(LEGACY_DATASET_PATH_ERROR)
+        dataset_root = None
+        parts = Path(dataset_name).parts
+        if parts:
+            try:
+                dataset_root = d.parents[len(parts) - 1]
+            except IndexError:
+                dataset_root = None
         record_event(
             d / ".events.log",
             "implicit_file_pick",
             dataset=dataset_name,
             args={"path": str(p), "cwd": str(Path.cwd().resolve()), "reason": reason},
             target_path=p,
+            dataset_root=dataset_root,
         )
 
 
 def cmd_head(args):
-    # Path-first mode (file/dir), then dataset fallback.
-    p = Path(args.target)
-    implicit = str(getattr(args, "target", "")) in {"", ".", "./"}
+    target = str(getattr(args, "target", "."))
+    implicit = target in {"", ".", "./"}
     cols = [c.strip() for c in args.columns.split(",") if c.strip()] if args.columns else None
-    if p.exists():
+    if _is_explicit_path_target(target):
+        p = Path(target).expanduser()
+        if not p.exists():
+            _exit_missing_path_target(target)
         pq_path = _select_parquet_target_interactive(
             p,
             glob=None,
             use_rich=bool(getattr(args, "rich", False)),
+            root=args.root,
             confirm_if_inferred=implicit,
         )
         if pq_path is None:
@@ -723,8 +523,9 @@ def cmd_head(args):
                 df = _pretty_df(df, _pretty_opts_from(args))
             _print_df(df)
         return
-    # dataset mode
-    d = Dataset(args.root, args.target)
+    # dataset mode for plain IDs (no implicit cwd path fallback)
+    ds_name = _resolve_existing_dataset_id(args.root, target)
+    d = Dataset(args.root, ds_name)
     df = d.head(args.n, columns=cols, include_deleted=bool(getattr(args, "include_deleted", False)))
     meta = pq.ParquetFile(str(d.records_path)).metadata
     caption = f"{d.records_path}  rows={meta.num_rows:,}  cols={meta.num_columns}"
@@ -733,7 +534,7 @@ def cmd_head(args):
             df = _pretty_df(df, _pretty_opts_from(args))
         render_table_rich(
             df,
-            title=f"dataset: {args.target}",
+            title=f"dataset: {ds_name}",
             caption=caption,
             max_colwidth=int(args.max_colwidth),
         )
@@ -746,15 +547,18 @@ def cmd_head(args):
 def cmd_cols(args):
     path_arg = getattr(args, "path", None)
     target_arg = getattr(args, "target", None)
-    implicit = (path_arg is None) and (target_arg is None)
-    tgt = path_arg or target_arg or "."
-    p = Path(tgt)
+    tgt = str(path_arg or target_arg or ".")
+    implicit = (path_arg is None) and tgt in {"", ".", "./"}
     pq_path: Path | None = None
-    if p.exists():
+    if path_arg is not None or _is_explicit_path_target(tgt):
+        p = Path(tgt).expanduser()
+        if not p.exists():
+            _exit_missing_path_target(tgt)
         pq_path = _select_parquet_target_interactive(
             p,
             glob=args.glob,
             use_rich=bool(getattr(args, "rich", False)),
+            root=args.root,
             confirm_if_inferred=implicit,
         )
         if pq_path is None:
@@ -763,7 +567,7 @@ def cmd_cols(args):
             _log_implicit_pick_if_dataset(pq_path, reason="cols")
     else:
         ds_name = _resolve_existing_dataset_id(args.root, str(tgt))
-        pq_path = (args.root / ds_name / "records.parquet") if ds_name else None
+        pq_path = args.root / ds_name / "records.parquet"
     if pq_path is None or not pq_path.exists():
         raise FileNotFoundError(f"Target not found: {tgt}")
     pf = pq.ParquetFile(str(pq_path))
@@ -834,12 +638,20 @@ def cmd_cell(args):
     # Determine target path: --path, or positional, or dataset name
     path_arg = getattr(args, "path", None)
     target_arg = getattr(args, "target", None)
-    implicit = (path_arg is None) and (target_arg is None)
-    tgt = path_arg or target_arg or "."
-    p = Path(tgt)
+    tgt = str(path_arg or target_arg or ".")
+    implicit = (path_arg is None) and tgt in {"", ".", "./"}
     pq_path: Path | None = None
-    if p.exists():
-        pq_path = _select_parquet_target_interactive(p, glob=args.glob, use_rich=False, confirm_if_inferred=implicit)
+    if path_arg is not None or _is_explicit_path_target(tgt):
+        p = Path(tgt).expanduser()
+        if not p.exists():
+            _exit_missing_path_target(tgt)
+        pq_path = _select_parquet_target_interactive(
+            p,
+            glob=args.glob,
+            use_rich=False,
+            root=args.root,
+            confirm_if_inferred=implicit,
+        )
         if pq_path is None:
             return
         if implicit:
@@ -868,8 +680,81 @@ def cmd_validate(args):
     if not ds_name:
         return
     d = Dataset(args.root, ds_name)
-    d.validate(strict=bool(getattr(args, "strict", False)))
+    d.validate(
+        strict=bool(getattr(args, "strict", False)),
+        registry_mode=str(getattr(args, "registry_mode", "current")),
+    )
     print("OK: validation passed.")
+
+
+def cmd_registry_freeze(args) -> None:
+    ds_name = _resolve_dataset_name_interactive(args.root, getattr(args, "dataset", None), False)
+    if not ds_name:
+        return
+    d = Dataset(args.root, ds_name)
+    with d.maintenance(reason="registry_freeze"):
+        snap = d.freeze_registry()
+    print(f"[registry-freeze] wrote {snap}")
+
+
+def cmd_overlay_compact(args) -> None:
+    ds_name = _resolve_dataset_name_interactive(args.root, getattr(args, "dataset", None), False)
+    if not ds_name:
+        return
+    namespace = getattr(args, "namespace", None)
+    if not namespace:
+        raise SequencesError("overlay-compact requires a namespace argument.")
+    d = Dataset(args.root, ds_name)
+    with d.maintenance(reason="overlay_compact"):
+        out_path = d.compact_overlay(str(namespace))
+    print(f"[overlay-compact] wrote {out_path}")
+
+
+def _emit_event_line(line: str, fmt: str) -> None:
+    text = line.strip()
+    if not text:
+        return
+    if fmt == "raw":
+        print(text)
+        return
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as e:
+        raise SequencesError(f"Invalid JSONL event line: {e}") from e
+    print(json.dumps(payload, separators=(",", ":")))
+
+
+def cmd_events_tail(args) -> None:
+    ds_name = _resolve_dataset_name_interactive(args.root, getattr(args, "dataset", None), False)
+    if not ds_name:
+        return
+    events_path = Path(args.root) / ds_name / ".events.log"
+    if not events_path.exists():
+        raise SequencesError(f"Events log not found: {events_path}")
+
+    fmt = str(getattr(args, "format", "json")).strip().lower()
+    if fmt not in {"json", "raw"}:
+        raise SequencesError("format must be 'json' or 'raw'.")
+    n = int(getattr(args, "n", 0))
+    follow = bool(getattr(args, "follow", False))
+
+    lines = events_path.read_text(encoding="utf-8").splitlines()
+    if n > 0:
+        lines = lines[-n:]
+    for line in lines:
+        _emit_event_line(line, fmt)
+
+    if not follow:
+        return
+
+    with events_path.open("r", encoding="utf-8") as f:
+        f.seek(0, os.SEEK_END)
+        while True:
+            line = f.readline()
+            if line:
+                _emit_event_line(line, fmt)
+                continue
+            time.sleep(0.2)
 
 
 def cmd_get(args):
@@ -937,28 +822,51 @@ def _collect_ids(ids: list[str] | None, id_file: Path | None) -> list[str]:
     return out
 
 
+def _collect_list(vals: list[str] | None) -> list[str]:
+    out: list[str] = []
+    if vals:
+        for v in vals:
+            out.extend([s.strip() for s in str(v).split(",") if s.strip()])
+    return out
+
+
 def cmd_delete(args):
-    ds_name = _resolve_dataset_name_interactive(args.root, getattr(args, "dataset", None), False)
-    if not ds_name:
-        return
-    d = Dataset(args.root, ds_name)
-    ids = _collect_ids(getattr(args, "id", None), getattr(args, "id_file", None))
-    n = d.tombstone(
-        ids,
-        reason=getattr(args, "reason", None),
-        allow_missing=bool(getattr(args, "allow_missing", False)),
+    state_commands.cmd_delete(
+        args,
+        collect_ids=_collect_ids,
     )
-    print(f"Tombstoned {n} record(s) in {d.name}")
 
 
 def cmd_restore(args):
-    ds_name = _resolve_dataset_name_interactive(args.root, getattr(args, "dataset", None), False)
-    if not ds_name:
-        return
-    d = Dataset(args.root, ds_name)
-    ids = _collect_ids(getattr(args, "id", None), getattr(args, "id_file", None))
-    n = d.restore(ids, allow_missing=bool(getattr(args, "allow_missing", False)))
-    print(f"Restored {n} record(s) in {d.name}")
+    state_commands.cmd_restore(
+        args,
+        collect_ids=_collect_ids,
+    )
+
+
+def cmd_state_set(args):
+    state_commands.cmd_state_set(
+        args,
+        collect_ids=_collect_ids,
+        collect_list=_collect_list,
+    )
+
+
+def cmd_state_clear(args):
+    state_commands.cmd_state_clear(
+        args,
+        collect_ids=_collect_ids,
+    )
+
+
+def cmd_state_get(args):
+    state_commands.cmd_state_get(
+        args,
+        collect_ids=_collect_ids,
+        resolve_output_format=_resolve_output_format,
+        print_json=_print_json,
+        output_version=USR_OUTPUT_VERSION,
+    )
 
 
 def cmd_materialize(args):
@@ -1002,13 +910,13 @@ def cmd_materialize(args):
             raise UserAbort()
     if getattr(args, "snapshot_before", False):
         d.snapshot()
-    d.materialize(
-        namespaces=ns_filter or None,
-        keep_overlays=not bool(getattr(args, "drop_overlays", False)),
-        archive_overlays=bool(getattr(args, "archive_overlays", False)),
-        drop_deleted=bool(getattr(args, "drop_deleted", False)),
-        maintenance=True,
-    )
+    with d.maintenance(reason="materialize"):
+        d.materialize(
+            namespaces=ns_filter or None,
+            keep_overlays=not bool(getattr(args, "drop_overlays", False)),
+            archive_overlays=bool(getattr(args, "archive_overlays", False)),
+            drop_deleted=bool(getattr(args, "drop_deleted", False)),
+        )
     print(f"Materialized {len(overlays)} overlay(s) into {d.records_path}")
     d.append_meta_note("Materialized overlays", f"usr materialize {ds_name}")
 
@@ -1096,26 +1004,40 @@ def _policy_from_str(s: str) -> MergePolicy:
 
 
 def cmd_merge_datasets(args):
-    cols_subset = [c.strip() for c in args.columns.split(",") if c.strip()] if args.columns else None
-    mode = MergeColumnsMode.REQUIRE_SAME if args.require_same else MergeColumnsMode.UNION
-    policy = _policy_from_str(args.dup_policy)
+    columns = str(getattr(args, "columns", "") or "")
+    cols_subset = [c.strip() for c in columns.split(",") if c.strip()] if columns else None
+    require_same = bool(getattr(args, "require_same", False))
+    mode = MergeColumnsMode.REQUIRE_SAME if require_same else MergeColumnsMode.UNION
+    dup_policy = str(getattr(args, "dup_policy", "error") or "error")
+    policy = _policy_from_str(dup_policy)
+    coerce_overlap = str(getattr(args, "coerce_overlap", "none") or "none")
+    if coerce_overlap not in {"none", "to-dest"}:
+        raise SequencesError("--coerce-overlap must be one of: none, to-dest")
+    dry_run = bool(getattr(args, "dry_run", False))
+    assume_yes = bool(getattr(args, "yes", False))
+    note = str(getattr(args, "note", "") or "")
+    if hasattr(args, "avoid_casefold_dups"):
+        avoid_casefold_dups = bool(getattr(args, "avoid_casefold_dups", True))
+    else:
+        avoid_casefold_dups = not bool(getattr(args, "no_avoid_casefold_dups", False))
 
-    preview = merge_usr_to_usr(
-        root=args.root,
-        dest=args.dest,
-        src=args.src,
-        columns_mode=mode,
-        duplicate_policy=policy,
-        columns_subset=cols_subset,
-        dry_run=bool(args.dry_run),
-        assume_yes=bool(args.yes),
-        note=args.note or "",
-        overlap_coercion=("to-dest" if args.coerce_overlap == "to-dest" else "none"),
-        avoid_casefold_dups=bool(getattr(args, "avoid_casefold_dups", True)),
-        maintenance=True,
-    )
+    ds_dest = Dataset(args.root, args.dest)
+    with ds_dest.maintenance(reason="merge"):
+        preview = merge_usr_to_usr(
+            root=args.root,
+            dest=args.dest,
+            src=args.src,
+            columns_mode=mode,
+            duplicate_policy=policy,
+            columns_subset=cols_subset,
+            dry_run=dry_run,
+            assume_yes=assume_yes,
+            note=note,
+            overlap_coercion=("to-dest" if coerce_overlap == "to-dest" else "none"),
+            avoid_casefold_dups=avoid_casefold_dups,
+        )
 
-    action = "DRY-RUN" if args.dry_run else "MERGED"
+    action = "DRY-RUN" if dry_run else "MERGED"
     print(
         f"[{action}] dest='{args.dest}'  src='{args.src}'  "
         f"rows_src={preview.src_rows}  "
@@ -1127,19 +1049,40 @@ def cmd_merge_datasets(args):
         f"columns(total={preview.columns_total}, overlap={preview.overlapping_columns})  "
         f"dup_policy={preview.duplicate_policy.value}"
     )
-    if not args.dry_run:
+    if not dry_run:
         cmd = (
             f"usr merge-datasets --dest {args.dest} --src {args.src} "
-            f"{'--require-same-columns' if args.require_same else '--union-columns'} "
-            f"--if-duplicate {args.dup_policy}"
+            f"{'--require-same-columns' if require_same else '--union-columns'} "
+            f"--if-duplicate {dup_policy}"
         )
-        Dataset(args.root, args.dest).append_meta_note(
+        ds_dest.append_meta_note(
             f"Merged from '{args.src}' → '{args.dest}' (added {preview.new_rows} rows; dup_policy={preview.duplicate_policy.value})",  # noqa
             cmd,
         )
 
 
 # ---------- remotes commands ----------
+_BU_SCC_PRESET = "bu-scc"
+_BU_SCC_LOGIN_HOST = "scc1.bu.edu"
+_BU_SCC_TRANSFER_HOST = "scc-globus.bu.edu"
+
+
+def _render_ssh_config_snippet(*, alias: str, host: str, user: str) -> str:
+    return "\n".join(
+        [
+            f"Host {alias}",
+            f"  HostName {host}",
+            f"  User {user}",
+            "  IdentitiesOnly yes",
+            "  AddKeysToAgent yes",
+            "  ServerAliveInterval 60",
+            "  ServerAliveCountMax 2",
+            "  # If Duo prompts fail in your client, try:",
+            "  # PasswordAuthentication no",
+        ]
+    )
+
+
 def cmd_remotes_list(args):
     remotes = load_all()
     if not remotes:
@@ -1170,6 +1113,60 @@ def cmd_remotes_add(args):
     )
     path = save_remote(cfg)
     print(f"Saved remote '{cfg.name}' to {path}")
+
+
+def cmd_remotes_wizard(args):
+    preset = str(args.preset).strip().lower()
+    if preset != _BU_SCC_PRESET:
+        raise SystemExit(f"Unsupported preset '{args.preset}'. Supported presets: {_BU_SCC_PRESET}.")
+    host = (
+        args.host
+        if str(getattr(args, "host", "")).strip()
+        else (_BU_SCC_TRANSFER_HOST if bool(getattr(args, "transfer_node", False)) else _BU_SCC_LOGIN_HOST)
+    )
+    cfg = SSHRemoteConfig(
+        name=args.name,
+        host=host,
+        user=args.user,
+        base_dir=args.base_dir,
+        ssh_key_env=args.ssh_key_env,
+    )
+    path = save_remote(cfg)
+    print(f"Saved remote '{cfg.name}' to {path}")
+    print("\nSSH config snippet (copy into ~/.ssh/config):")
+    print(_render_ssh_config_snippet(alias=cfg.name, host=cfg.host, user=cfg.user))
+
+
+def cmd_remotes_doctor(args):
+    cfg = get_remote(args.remote)
+
+    if shutil.which("ssh") is None:
+        raise SystemExit("ssh not found on local PATH.")
+    if shutil.which("rsync") is None:
+        raise SystemExit("rsync not found on local PATH.")
+
+    remote = SSHRemote(cfg)
+    rc, _out, err = remote._ssh_run("echo USR_REMOTE_OK", check=False)
+    if rc != 0:
+        detail = err.strip() or "unknown ssh error"
+        raise SystemExit(f"SSH connectivity check failed for {cfg.ssh_target}: {detail}")
+
+    rc, _out, _err = remote._ssh_run("command -v rsync >/dev/null 2>&1", check=False)
+    if rc != 0:
+        raise SystemExit(f"Remote rsync is unavailable on {cfg.ssh_target}.")
+
+    if bool(getattr(args, "check_base_dir", True)):
+        base_dir = shlex.quote(cfg.base_dir)
+        rc, _out, _err = remote._ssh_run(f"test -d {base_dir}", check=False)
+        if rc != 0:
+            raise SystemExit(f"Remote base_dir does not exist: {cfg.base_dir}")
+
+    print(f"Remote: {cfg.name}")
+    print(f"SSH: {cfg.ssh_target} (ok)")
+    print("Remote rsync: ok")
+    if bool(getattr(args, "check_base_dir", True)):
+        print(f"base_dir: {cfg.base_dir} (ok)")
+    print("Doctor checks passed.")
 
 
 # ---------- namespace registry ----------
@@ -1210,200 +1207,32 @@ def cmd_namespace_register(args):
 
 
 # ---------- diff/pull/push ----------
-def _print_diff(summary, use_rich: bool | None = None):
-    def fmt_sz(n):
-        if n is None:
-            return "?"
-        for unit in ["B", "KB", "MB", "GB", "TB"]:
-            if n < 1024:
-                return f"{n:.0f}{unit}"
-            n /= 1024
-        return f"{n:.0f}PB"
-
-    if use_rich:
-        render_diff_rich(summary)
-        return
-    pl, pr = summary.primary_local, summary.primary_remote
-    print(f"Dataset: {summary.dataset}")
-
-    local_line = f"Local  : {pl.sha256 or '?'}  size={fmt_sz(pl.size)}  rows={pl.rows or '?'}  cols={pl.cols or '?'}"
-    print(local_line)
-
-    remote_line = f"Remote : {pr.sha256 or '?'}  size={fmt_sz(pr.size)}  rows={pr.rows or '?'}  cols={pr.cols or '?'}"
-    print(remote_line)
-
-    eq = "==" if (pl.sha256 and pr.sha256 and pl.sha256 == pr.sha256) else "≠"
-    print(f"Primary sha: {pl.sha256 or '?'} {eq} {pr.sha256 or '?'}")
-    print(f"meta.md     mtime: {summary.meta_local_mtime or '-'}  →  {summary.meta_remote_mtime or '-'}")
-    delta_evt = max(0, summary.events_remote_lines - summary.events_local_lines)
-    print(
-        ".events.log lines: "
-        f"local={summary.events_local_lines}  "
-        f"remote={summary.events_remote_lines}  "
-        f"(+{delta_evt} on remote)"
-    )
-    print(f"_snapshots : remote_count={summary.snapshots.count}  newer_than_local={summary.snapshots.newer_than_local}")
-    print("Status     :", "CHANGES" if summary.has_change else "up-to-date")
-    print("Verify     :", summary.verify_mode)
-
-
-def _print_verify_notes(summary) -> None:
-    for note in summary.verify_notes:
-        print(f"WARNING: {note}")
-
-
-def _confirm_or_abort(summary, assume_yes: bool):
-    if not summary.has_change:
-        print("Already up to date.")
-        return
-    if assume_yes:
-        return
-    print("\nChanges detected. Proceed with overwrite?")
-    ans = input("[Enter = Yes / n = No] : ").strip().lower()
-    if ans in {"n", "no"}:
-        raise UserAbort("User cancelled.")
-
-
-def _opts_from_args(args) -> SyncOptions:
-    return SyncOptions(
-        primary_only=bool(args.primary_only),
-        skip_snapshots=bool(args.skip_snapshots),
-        dry_run=bool(args.dry_run),
-        assume_yes=bool(args.yes),
-        verify=str(getattr(args, "verify", "auto")),
-    )
-
-
-def _is_file_mode_target(target: str | None) -> bool:
-    """Heuristic: treat as FILE mode only if the user passed something path-like explicitly."""
-    if not target:
-        return False
-    try:
-        p = Path(target)
-    except (TypeError, ValueError):
-        return False
-    return ("/" in target) or target.endswith(".parquet") or p.exists()
-
-
 def cmd_diff(args):
-    fmt = _resolve_output_format(args)
-    target = args.dataset  # may be None
-    if _is_file_mode_target(target):
-        local_file = Path(target).resolve()
-        if local_file.is_dir():
-            raise SystemExit("FILE mode: pass a file path, not a directory.")
-        remote_path = _resolve_remote_path_for_file(local_file, args)
-        s = plan_diff_file(local_file, args.remote, remote_path=remote_path, verify=args.verify)
-    else:
-        ds_name = _resolve_dataset_name_interactive(
-            args.root,
-            getattr(args, "dataset", None),
-            bool(getattr(args, "rich", False)),
-        )
-        if not ds_name:
-            return
-        s = plan_diff(args.root, ds_name, args.remote, verify=args.verify)
-    if fmt == "json":
-        _print_json({"usr_output_version": USR_OUTPUT_VERSION, "data": asdict(s)})
-        return
-    _print_verify_notes(s)
-    _print_diff(s, use_rich=(fmt == "rich"))
+    sync_commands.cmd_diff(
+        args,
+        resolve_output_format=_resolve_output_format,
+        print_json=_print_json,
+        output_version=USR_OUTPUT_VERSION,
+    )
 
 
 def cmd_pull(args):
-    target = args.dataset
-    if _is_file_mode_target(target):
-        if args.primary_only or args.skip_snapshots:
-            raise SystemExit("--primary-only/--skip-snapshots are dataset-only flags (not valid in FILE mode).")
-        local_file = Path(target).resolve()
-        if local_file.is_dir():
-            raise SystemExit("FILE mode: pass a file path, not a directory.")
-        remote_path = _resolve_remote_path_for_file(local_file, args)
-        s = plan_diff_file(local_file, args.remote, remote_path=remote_path, verify=args.verify)
-        _print_verify_notes(s)
-        _print_diff(s, use_rich=bool(getattr(args, "rich", False)))
-        _confirm_or_abort(s, assume_yes=bool(args.yes))
-        execute_pull_file(local_file, args.remote, remote_path, _opts_from_args(args))
-    else:
-        ds_name = _resolve_dataset_name_interactive(
-            args.root,
-            getattr(args, "dataset", None),
-            bool(getattr(args, "rich", False)),
-        )
-        if not ds_name:
-            return
-        s = plan_diff(args.root, ds_name, args.remote, verify=args.verify)
-        _print_verify_notes(s)
-        _print_diff(s, use_rich=bool(getattr(args, "rich", False)))
-        _confirm_or_abort(s, assume_yes=bool(args.yes))
-        execute_pull(args.root, ds_name, args.remote, _opts_from_args(args))
-    if not args.dry_run:
-        print("Pull complete.")
+    sync_commands.cmd_pull(args)
 
 
 def cmd_push(args):
-    target = args.dataset
-    if _is_file_mode_target(target):
-        if args.primary_only or args.skip_snapshots:
-            raise SystemExit("--primary-only/--skip-snapshots are dataset-only flags (not valid in FILE mode).")
-        local_file = Path(target).resolve()
-        if local_file.is_dir():
-            raise SystemExit("FILE mode: pass a file path, not a directory.")
-        remote_path = _resolve_remote_path_for_file(local_file, args)
-        s = plan_diff_file(local_file, args.remote, remote_path=remote_path, verify=args.verify)
-        _print_verify_notes(s)
-        _print_diff(s, use_rich=bool(getattr(args, "rich", False)))
-        _confirm_or_abort(s, assume_yes=bool(args.yes))
-        execute_push_file(local_file, args.remote, remote_path, _opts_from_args(args))
-    else:
-        ds_name = _resolve_dataset_name_interactive(
-            args.root,
-            getattr(args, "dataset", None),
-            bool(getattr(args, "rich", False)),
-        )
-        if not ds_name:
-            return
-        s = plan_diff(args.root, ds_name, args.remote, verify=args.verify)
-        _print_verify_notes(s)
-        _print_diff(s, use_rich=bool(getattr(args, "rich", False)))
-        _confirm_or_abort(s, assume_yes=bool(args.yes))
-        execute_push(args.root, ds_name, args.remote, _opts_from_args(args))
-    if not args.dry_run:
-        print("Push complete.")
-
-
-# ---------- helpers for FILE mode ----------
-def _resolve_remote_path_for_file(local_file: Path, args) -> str:
-    if args.remote_path:
-        return args.remote_path
-    cfg = get_remote(args.remote)
-    if not cfg.repo_root:
-        raise SystemExit("FILE mode requires remote.repo_root in remotes.yaml or --remote-path.")
-    import os
-
-    local_root = args.repo_root or cfg.local_repo_root or os.environ.get("DNADESIGN_REPO_ROOT")
-    if not local_root:
-        raise SystemExit(
-            "FILE mode requires a local repo root. Pass --repo-root, set DNADESIGN_REPO_ROOT, or add local_repo_root in remotes.yaml."  # noqa
-        )
-    try:
-        rel = local_file.resolve().relative_to(Path(local_root).resolve())
-    except ValueError:
-        raise SystemExit(f"Cannot compute path relative to local repo root: {local_file} not under {local_root}")
-    from pathlib import PurePosixPath
-
-    return str(PurePosixPath(cfg.repo_root).joinpath(rel.as_posix()))
+    sync_commands.cmd_push(args)
 
 
 def cmd_dedupe_sequences(args):
     d = Dataset(args.root, args.dataset)
-    stats = d.dedupe(
-        key=str(args.key),
-        keep=str(args.keep),
-        batch_size=int(args.batch_size),
-        dry_run=True,
-        maintenance=True,
-    )
+    with d.maintenance(reason="dedupe"):
+        stats = d.dedupe(
+            key=str(args.key),
+            keep=str(args.keep),
+            batch_size=int(args.batch_size),
+            dry_run=True,
+        )
     if stats.rows_dropped == 0:
         print("OK: no duplicate keys found.")
         return
@@ -1415,13 +1244,13 @@ def cmd_dedupe_sequences(args):
         if ans not in {"y", "yes"}:
             print("Aborted.")
             return
-    stats = d.dedupe(
-        key=str(args.key),
-        keep=str(args.keep),
-        batch_size=int(args.batch_size),
-        dry_run=False,
-        maintenance=True,
-    )
+    with d.maintenance(reason="dedupe"):
+        stats = d.dedupe(
+            key=str(args.key),
+            keep=str(args.keep),
+            batch_size=int(args.batch_size),
+            dry_run=False,
+        )
     rows_after = stats.rows_total - stats.rows_dropped
     print(f"[dedupe] dropped {stats.rows_dropped} row(s); dataset now has {rows_after} rows.")
 
@@ -1434,12 +1263,16 @@ maintenance_app = typer.Typer(add_completion=False, no_args_is_help=True, help="
 densegen_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Densegen-specific utilities.")
 dev_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Developer utilities (unstable).")
 namespace_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Manage namespace registry.")
+events_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Inspect dataset events.")
+state_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Record state utilities.")
 
 app.add_typer(remotes_app, name="remotes")
 app.add_typer(legacy_app, name="legacy")
 app.add_typer(maintenance_app, name="maintenance")
 app.add_typer(densegen_app, name="densegen")
 app.add_typer(namespace_app, name="namespace")
+app.add_typer(events_app, name="events")
+app.add_typer(state_app, name="state")
 if os.getenv("USR_SHOW_DEV_COMMANDS") == "1":
     app.add_typer(dev_app, name="dev")
 
@@ -1465,6 +1298,10 @@ def _root(
     ),
     rich: bool = typer.Option(True, "--rich/--no-rich", help="Use Rich formatting for supported commands"),
 ) -> None:
+    try:
+        _assert_supported_root(root)
+    except SequencesError as exc:
+        raise typer.BadParameter(str(exc), param_hint="--root") from exc
     ctx.obj = {"root": root, "rich": rich}
 
 
@@ -1636,8 +1473,24 @@ def cli_validate(
     ctx: typer.Context,
     dataset: str = typer.Argument(None),
     strict: bool = typer.Option(False, "--strict"),
+    registry_mode: str = typer.Option(
+        "current",
+        "--registry-mode",
+        help="Registry mode: current|frozen|either",
+    ),
 ) -> None:
-    cmd_validate(_ctx_args(ctx, dataset=dataset, strict=strict))
+    cmd_validate(_ctx_args(ctx, dataset=dataset, strict=strict, registry_mode=registry_mode))
+
+
+@events_app.command("tail")
+def cli_events_tail(
+    ctx: typer.Context,
+    dataset: str = typer.Argument(None),
+    format: str = typer.Option("json", "--format", help="Output format: json|raw"),
+    n: int = typer.Option(0, "--n", help="Show only the last N events (0 = all)."),
+    follow: bool = typer.Option(False, "--follow", help="Follow the events log for new entries."),
+) -> None:
+    cmd_events_tail(_ctx_args(ctx, dataset=dataset, format=format, n=n, follow=follow))
 
 
 @app.command("get")
@@ -1724,6 +1577,75 @@ def cli_restore(
     )
 
 
+@state_app.command("set")
+def cli_state_set(
+    ctx: typer.Context,
+    dataset: str = typer.Argument(None),
+    id: list[str] = typer.Option(None, "--id"),
+    id_file: Path | None = typer.Option(None, "--id-file"),
+    masked: bool | None = typer.Option(None, "--masked/--unmasked"),
+    qc_status: str = typer.Option("", "--qc-status"),
+    split: str = typer.Option("", "--split"),
+    supersedes: str = typer.Option("", "--supersedes"),
+    lineage: list[str] = typer.Option(None, "--lineage"),
+    allow_missing: bool = typer.Option(False, "--allow-missing"),
+) -> None:
+    cmd_state_set(
+        _ctx_args(
+            ctx,
+            dataset=dataset,
+            id=id,
+            id_file=id_file,
+            masked=masked,
+            qc_status=qc_status,
+            split=split,
+            supersedes=supersedes,
+            lineage=lineage,
+            allow_missing=allow_missing,
+        )
+    )
+
+
+@state_app.command("clear")
+def cli_state_clear(
+    ctx: typer.Context,
+    dataset: str = typer.Argument(None),
+    id: list[str] = typer.Option(None, "--id"),
+    id_file: Path | None = typer.Option(None, "--id-file"),
+    allow_missing: bool = typer.Option(False, "--allow-missing"),
+) -> None:
+    cmd_state_clear(
+        _ctx_args(
+            ctx,
+            dataset=dataset,
+            id=id,
+            id_file=id_file,
+            allow_missing=allow_missing,
+        )
+    )
+
+
+@state_app.command("get")
+def cli_state_get(
+    ctx: typer.Context,
+    dataset: str = typer.Argument(None),
+    id: list[str] = typer.Option(None, "--id"),
+    id_file: Path | None = typer.Option(None, "--id-file"),
+    allow_missing: bool = typer.Option(False, "--allow-missing"),
+    format: str = typer.Option("auto", "--format", help="Output format: auto|rich|plain|json"),
+) -> None:
+    cmd_state_get(
+        _ctx_args(
+            ctx,
+            dataset=dataset,
+            id=id,
+            id_file=id_file,
+            allow_missing=allow_missing,
+            format=format,
+        )
+    )
+
+
 @app.command("materialize")
 def cli_materialize(
     ctx: typer.Context,
@@ -1775,6 +1697,23 @@ def cli_dedupe_sequences(
             yes=yes,
         )
     )
+
+
+@maintenance_app.command("registry-freeze")
+def cli_registry_freeze(
+    ctx: typer.Context,
+    dataset: str = typer.Argument(...),
+) -> None:
+    cmd_registry_freeze(_ctx_args(ctx, dataset=dataset))
+
+
+@maintenance_app.command("overlay-compact")
+def cli_overlay_compact(
+    ctx: typer.Context,
+    dataset: str = typer.Argument(...),
+    namespace: str = typer.Option(..., "--namespace"),
+) -> None:
+    cmd_overlay_compact(_ctx_args(ctx, dataset=dataset, namespace=namespace))
 
 
 @densegen_app.command("repair")
@@ -1891,6 +1830,48 @@ def cli_remotes_add(
     )
 
 
+@remotes_app.command("wizard")
+def cli_remotes_wizard(
+    ctx: typer.Context,
+    preset: str = typer.Option("bu-scc", "--preset", help="Wizard preset: bu-scc."),
+    name: str = typer.Option("bu-scc", "--name", help="Remote config name."),
+    user: str = typer.Option(..., "--user", help="Remote SSH username."),
+    base_dir: str = typer.Option(..., "--base-dir", help="Remote dataset root path."),
+    host: str = typer.Option(
+        "",
+        "--host",
+        help="Remote host override. Defaults to scc1.bu.edu, or scc-globus.bu.edu with --transfer-node.",
+    ),
+    transfer_node: bool = typer.Option(
+        False,
+        "--transfer-node",
+        help="Use BU SCC transfer host default (scc-globus.bu.edu).",
+    ),
+    ssh_key_env: str | None = typer.Option(None, "--ssh-key-env"),
+) -> None:
+    cmd_remotes_wizard(
+        _ctx_args(
+            ctx,
+            preset=preset,
+            name=name,
+            user=user,
+            base_dir=base_dir,
+            host=host,
+            transfer_node=transfer_node,
+            ssh_key_env=ssh_key_env,
+        )
+    )
+
+
+@remotes_app.command("doctor")
+def cli_remotes_doctor(
+    ctx: typer.Context,
+    remote: str = typer.Option(..., "--remote", help="Configured remote name."),
+    check_base_dir: bool = typer.Option(True, "--check-base-dir/--no-check-base-dir"),
+) -> None:
+    cmd_remotes_doctor(_ctx_args(ctx, remote=remote, check_base_dir=check_base_dir))
+
+
 @namespace_app.command("list")
 def cli_namespace_list(ctx: typer.Context) -> None:
     cmd_namespace_list(_ctx_args(ctx))
@@ -1952,8 +1933,8 @@ def cli_merge_datasets(
     src: str = typer.Option(..., "--src"),
     require_same_columns: bool = typer.Option(False, "--require-same-columns"),
     union_columns: bool = typer.Option(False, "--union-columns"),
-    dup_policy: str = typer.Option("skip", "--if-duplicate"),
-    coerce_overlap: str = typer.Option("to-dest", "--coerce-overlap"),
+    dup_policy: str = typer.Option("error", "--if-duplicate"),
+    coerce_overlap: str = typer.Option("none", "--coerce-overlap"),
     no_avoid_casefold_dups: bool = typer.Option(False, "--no-avoid-casefold-dups"),
     dry_run: bool = typer.Option(False, "--dry-run"),
 ) -> None:

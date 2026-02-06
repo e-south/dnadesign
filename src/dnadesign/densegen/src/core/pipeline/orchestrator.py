@@ -14,7 +14,6 @@ from __future__ import annotations
 import hashlib
 import logging
 import random
-import shutil
 import sys
 import time
 from dataclasses import dataclass
@@ -36,7 +35,6 @@ from ...config import (
 )
 from ...utils import logging_utils
 from ...utils.logging_utils import install_native_stderr_filters
-from ...utils.rich_style import make_panel, make_table
 from ...utils.sequence_utils import gc_fraction
 from ..artifacts.pool import POOL_MODE_SEQUENCE, POOL_MODE_TFBS, PoolData
 from ..input_types import PWM_INPUT_TYPES
@@ -214,9 +212,10 @@ def _init_progress_settings(
                 if tty:
                     screen_console = Console()
                 else:
-                    width = shutil.get_terminal_size(fallback=(140, 40)).columns
-                    screen_console = Console(file=sys.stdout, width=int(width), force_terminal=False)
-                    log.warning("progress_style=screen requires an interactive terminal; using static output.")
+                    raise RuntimeError(
+                        "logging.progress_style=screen requires an interactive terminal. "
+                        "Use logging.progress_style=stream for non-interactive output."
+                    )
     show_tfbs = bool(show_tfbs or getattr(log_cfg, "show_tfbs", False))
     show_solutions = bool(show_solutions or getattr(log_cfg, "show_solutions", False))
     tf_colors = None
@@ -233,7 +232,7 @@ def _init_progress_settings(
                 _ScreenDashboard(
                     console=screen_console,
                     refresh_seconds=progress_refresh_seconds,
-                    append=True,
+                    append=_dashboard_append_mode(screen_console),
                 )
                 if screen_console is not None
                 else None
@@ -269,6 +268,28 @@ def _init_progress_settings(
     )
 
 
+def _dashboard_append_mode(console: Console) -> bool:
+    if not bool(getattr(console, "is_terminal", False)):
+        raise RuntimeError(
+            "logging.progress_style=screen requires an interactive terminal. "
+            "Use logging.progress_style=stream for non-interactive output."
+        )
+    if bool(getattr(console, "is_dumb_terminal", False)):
+        raise RuntimeError(
+            "logging.progress_style=screen requires TERM with cursor controls (TERM must not be 'dumb'). "
+            "Set TERM=xterm-256color or switch logging.progress_style to 'stream'."
+        )
+    return False
+
+
+def _close_plan_dashboard(*, dashboard, shared_dashboard) -> None:
+    if dashboard is None:
+        return
+    if shared_dashboard is not None and dashboard is shared_dashboard:
+        return
+    dashboard.close()
+
+
 def _build_shared_dashboard(log_cfg) -> _ScreenDashboard | None:
     progress_style = str(getattr(log_cfg, "progress_style", "stream"))
     progress_refresh_seconds = float(getattr(log_cfg, "progress_refresh_seconds", 1.0))
@@ -280,10 +301,15 @@ def _build_shared_dashboard(log_cfg) -> _ScreenDashboard | None:
         if tty:
             console = Console()
         else:
-            width = shutil.get_terminal_size(fallback=(140, 40)).columns
-            console = Console(file=sys.stdout, width=int(width), force_terminal=False)
-            log.warning("progress_style=screen requires an interactive terminal; using static output.")
-    return _ScreenDashboard(console=console, refresh_seconds=progress_refresh_seconds, append=True)
+            raise RuntimeError(
+                "logging.progress_style=screen requires an interactive terminal. "
+                "Use logging.progress_style=stream for non-interactive output."
+            )
+    return _ScreenDashboard(
+        console=console,
+        refresh_seconds=progress_refresh_seconds,
+        append=_dashboard_append_mode(console),
+    )
 
 
 def _init_plan_settings(
@@ -652,6 +678,7 @@ def _run_stage_b_sampling(
     show_solutions = progress.show_solutions
     progress_reporter = progress.reporter
     dashboard = progress.dashboard
+    shared_dashboard = execution_state.shared_dashboard
 
     max_per_subsample = runtime.max_per_subsample
     min_count_per_tf = runtime.min_count_per_tf
@@ -679,35 +706,26 @@ def _run_stage_b_sampling(
     solver_threads = solver.threads
     extra_library_label = settings.extra_library_label
 
-    def _log_solver_settings() -> None:
-        backend = str(chosen_solver) if chosen_solver is not None else "-"
-        strategy = str(solver_strategy)
-        strands = str(solver_strands)
-        time_limit = "-" if solver_time_limit_seconds is None else str(solver_time_limit_seconds)
-        threads = "-" if solver_threads is None else str(solver_threads)
-        table = make_table("setting", "value")
-        table.add_row("backend", backend)
-        table.add_row("strategy", strategy)
-        table.add_row("strands", strands)
-        table.add_row("time_limit_seconds", time_limit)
-        table.add_row("threads", threads)
-        table.add_row("sequence_length", str(seq_len))
-        console = logging_utils.get_logging_console()
-        if console is not None:
-            console.print(make_panel(table, title="Stage-B solver settings"))
-        else:
-            log.info(
-                "Stage-B solver settings: backend=%s strategy=%s strands=%s "
-                "time_limit_seconds=%s threads=%s sequence_length=%s",
-                backend,
-                strategy,
-                strands,
-                time_limit,
-                threads,
-                seq_len,
-            )
-
-    _log_solver_settings()
+    backend = str(chosen_solver) if chosen_solver is not None else "-"
+    strategy = str(solver_strategy)
+    strands = str(solver_strands)
+    time_limit = "-" if solver_time_limit_seconds is None else str(solver_time_limit_seconds)
+    threads = "-" if solver_threads is None else str(solver_threads)
+    progress_reporter.solver_settings = (
+        f"backend={backend} strategy={strategy} strands={strands} "
+        f"time_limit={time_limit}s threads={threads} seq_len={seq_len}"
+    )
+    if progress_style != "screen":
+        log.info(
+            "Stage-B solver settings: backend=%s strategy=%s strands=%s "
+            "time_limit_seconds=%s threads=%s sequence_length=%s",
+            backend,
+            strategy,
+            strands,
+            time_limit,
+            threads,
+            seq_len,
+        )
 
     fixed_elements = plan_item.fixed_elements
     constraints = plan_item.regulator_constraints
@@ -951,8 +969,8 @@ def _run_stage_b_sampling(
                                 "library_hash": str(sampling_library_hash),
                             },
                         )
-                    except Exception:
-                        log.debug("Failed to emit STALL_DETECTED event.", exc_info=True)
+                    except Exception as exc:
+                        raise RuntimeError("Failed to emit STALL_DETECTED event.") from exc
                 stall_triggered = True
 
             for sol in generator:
@@ -1449,8 +1467,8 @@ def _run_stage_b_sampling(
                     "library_hash": str(library_context.sampling_library_hash),
                 },
             )
-        except Exception:
-            log.debug("Failed to emit RESAMPLE_TRIGGERED event.", exc_info=True)
+        except Exception as exc:
+            raise RuntimeError("Failed to emit RESAMPLE_TRIGGERED event.") from exc
 
     sampler = StageBSampler(
         source_label=source_label,
@@ -1488,8 +1506,7 @@ def _run_stage_b_sampling(
             snapshot = diagnostics.snapshot()
             if global_generated >= quota and (usage_counts or tf_usage_counts or failure_counts):
                 diagnostics.log_snapshot()
-            if dashboard is not None:
-                dashboard.close()
+            _close_plan_dashboard(dashboard=dashboard, shared_dashboard=shared_dashboard)
             return produced_total_this_call, {
                 "generated": produced_total_this_call,
                 "duplicates_skipped": duplicate_records,
@@ -1516,8 +1533,7 @@ def _run_stage_b_sampling(
     snapshot = diagnostics.snapshot()
     if usage_counts or tf_usage_counts or failure_counts:
         diagnostics.log_snapshot()
-    if dashboard is not None:
-        dashboard.close()
+    _close_plan_dashboard(dashboard=dashboard, shared_dashboard=shared_dashboard)
     return produced_total_this_call, {
         "generated": produced_total_this_call,
         "duplicates_skipped": duplicate_records,
@@ -1683,6 +1699,7 @@ def run_pipeline(
     build_stage_a: bool = False,
     show_tfbs: bool = False,
     show_solutions: bool = False,
+    allow_config_mismatch: bool = False,
     deps: PipelineDeps | None = None,
 ) -> RunSummary:
     deps = deps or default_deps()
@@ -1750,8 +1767,8 @@ def run_pipeline(
         _write_effective_config(
             cfg=cfg, cfg_path=loaded.path, run_root=run_root, seeds=seeds, outputs_root=outputs_root
         )
-    except Exception:
-        log.debug("Failed to write effective_config.json.", exc_info=True)
+    except Exception as exc:
+        raise RuntimeError("Failed to write effective_config.json.") from exc
     stage_a_state = prepare_stage_a_pools(
         cfg=cfg,
         cfg_path=loaded.path,
@@ -1794,6 +1811,7 @@ def run_pipeline(
         run_id=str(cfg.run.id),
         schema_version=str(cfg.schema_version),
         config_sha256=config_sha,
+        allow_config_mismatch=allow_config_mismatch,
     )
 
     resume_state = load_resume_state(
@@ -1801,6 +1819,7 @@ def run_pipeline(
         loaded=loaded,
         tables_root=tables_root,
         config_sha=config_sha,
+        allowed_config_sha256=state_ctx.accepted_config_sha256,
     )
     existing_counts = resume_state.existing_counts
     existing_usage_by_plan = resume_state.existing_usage_by_plan
@@ -1870,6 +1889,7 @@ def run_pipeline(
             run_id=str(cfg.run.id),
             schema_version=str(cfg.schema_version),
             config_sha256=config_sha,
+            accepted_config_sha256=state_ctx.accepted_config_sha256,
             run_root=str(run_root),
             counts=state_counts,
             created_at=state_ctx.created_at,
@@ -1917,52 +1937,56 @@ def run_pipeline(
         events_path=events_path,
         display_map_by_input=display_map_by_input,
     )
-    plan_execution = run_plan_schedule(
-        plan_items=pl,
-        plan_pools=plan_pools,
-        plan_pool_sources=plan_pool_sources,
-        existing_counts=existing_counts,
-        round_robin=round_robin,
-        process_plan=_process_plan_for_source,
-        plan_context=plan_context,
-        execution_state=execution_state,
-        accumulate_stats=_accumulate_stats,
-        plan_pool_input_meta=_plan_pool_input_meta,
-        existing_usage_by_plan=existing_usage_by_plan,
-    )
-    per_plan = plan_execution.per_plan
-    total = plan_execution.total
-    plan_leaderboards = plan_execution.plan_leaderboards
+    try:
+        plan_execution = run_plan_schedule(
+            plan_items=pl,
+            plan_pools=plan_pools,
+            plan_pool_sources=plan_pool_sources,
+            existing_counts=existing_counts,
+            round_robin=round_robin,
+            process_plan=_process_plan_for_source,
+            plan_context=plan_context,
+            execution_state=execution_state,
+            accumulate_stats=_accumulate_stats,
+            plan_pool_input_meta=_plan_pool_input_meta,
+            existing_usage_by_plan=existing_usage_by_plan,
+        )
+        per_plan = plan_execution.per_plan
+        total = plan_execution.total
+        plan_leaderboards = plan_execution.plan_leaderboards
 
-    for sink in sinks:
-        sink.finalize()
+        for sink in sinks:
+            sink.finalize()
 
-    finalize_run_outputs(
-        cfg=cfg,
-        run_root=run_root,
-        run_root_str=run_root_str,
-        cfg_path=loaded.path,
-        config_sha=config_sha,
-        seed=seed,
-        seeds=seeds,
-        chosen_solver=chosen_solver,
-        solver_time_limit_seconds=solver_time_limit_seconds,
-        solver_threads=solver_threads,
-        dense_arrays_version=dense_arrays_version,
-        dense_arrays_version_source=dense_arrays_version_source,
-        plan_stats=plan_stats,
-        plan_order=plan_order,
-        plan_leaderboards=plan_leaderboards,
-        plan_pools=plan_pools,
-        plan_items=pl,
-        inputs_manifest_entries=inputs_manifest_entries,
-        library_source=library_source,
-        library_artifact=library_artifact,
-        library_build_rows=library_build_rows,
-        library_member_rows=library_member_rows,
-        composition_rows=composition_rows,
-    )
+        finalize_run_outputs(
+            cfg=cfg,
+            run_root=run_root,
+            run_root_str=run_root_str,
+            cfg_path=loaded.path,
+            config_sha=config_sha,
+            seed=seed,
+            seeds=seeds,
+            chosen_solver=chosen_solver,
+            solver_time_limit_seconds=solver_time_limit_seconds,
+            solver_threads=solver_threads,
+            dense_arrays_version=dense_arrays_version,
+            dense_arrays_version_source=dense_arrays_version_source,
+            plan_stats=plan_stats,
+            plan_order=plan_order,
+            plan_leaderboards=plan_leaderboards,
+            plan_pools=plan_pools,
+            plan_items=pl,
+            inputs_manifest_entries=inputs_manifest_entries,
+            library_source=library_source,
+            library_artifact=library_artifact,
+            library_build_rows=library_build_rows,
+            library_member_rows=library_member_rows,
+            composition_rows=composition_rows,
+        )
 
-    _write_state()
+        _write_state()
 
-    return RunSummary(total_generated=total, per_plan=per_plan)
+        return RunSummary(total_generated=total, per_plan=per_plan)
+    finally:
+        if shared_dashboard is not None:
+            shared_dashboard.close()

@@ -17,9 +17,11 @@ import pytest
 from dnadesign.usr.src.cli import cmd_cell
 from dnadesign.usr.src.dataset import Dataset
 from dnadesign.usr.src.errors import SequencesError
+from dnadesign.usr.tests.registry_helpers import ensure_registry
 
 
 def _make_dataset(tmp_path: Path) -> Dataset:
+    ensure_registry(tmp_path)
     ds = Dataset(tmp_path, "ns/demo")
     ds.init(source="test")
     ds.import_rows(

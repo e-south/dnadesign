@@ -15,6 +15,7 @@ from pathlib import Path
 from dnadesign.usr import Dataset
 from dnadesign.usr.src import merge_datasets as merge_module
 from dnadesign.usr.src.merge_datasets import MergeColumnsMode, MergePolicy, merge_usr_to_usr
+from dnadesign.usr.tests.registry_helpers import ensure_registry
 
 
 def _row(seq: str, *, source: str = "test") -> dict:
@@ -28,6 +29,7 @@ def _row(seq: str, *, source: str = "test") -> dict:
 
 def test_merge_uses_write_lock(tmp_path: Path, monkeypatch) -> None:
     root = tmp_path / "datasets"
+    ensure_registry(root)
     dest = Dataset(root, "dest")
     src = Dataset(root, "src")
     dest.init(source="unit-test")
@@ -47,13 +49,13 @@ def test_merge_uses_write_lock(tmp_path: Path, monkeypatch) -> None:
 
     monkeypatch.setattr(merge_module, "dataset_write_lock", _lock)
 
-    merge_usr_to_usr(
-        root=root,
-        dest="dest",
-        src="src",
-        columns_mode=MergeColumnsMode.UNION,
-        duplicate_policy=MergePolicy.SKIP,
-        dry_run=False,
-        maintenance=True,
-    )
+    with dest.maintenance(reason="merge"):
+        merge_usr_to_usr(
+            root=root,
+            dest="dest",
+            src="src",
+            columns_mode=MergeColumnsMode.UNION,
+            duplicate_policy=MergePolicy.SKIP,
+            dry_run=False,
+        )
     assert called["lock"] is True

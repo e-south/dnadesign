@@ -15,16 +15,20 @@ import os
 from urllib.parse import urlparse
 
 from .errors import NotifyConfigError
+from .secrets import resolve_secret_ref
 
 
-def resolve_webhook_url(*, url: str | None, url_env: str | None) -> str:
-    if bool(url) == bool(url_env):
-        raise NotifyConfigError("Specify exactly one of --url or --url-env.")
+def resolve_webhook_url(*, url: str | None, url_env: str | None, secret_ref: str | None = None) -> str:
+    source_count = int(bool(url)) + int(bool(url_env)) + int(bool(secret_ref))
+    if source_count != 1:
+        raise NotifyConfigError("Specify exactly one of --url, --url-env, or --secret-ref.")
     if url_env:
         env_value = os.environ.get(url_env, "").strip()
         if not env_value:
             raise NotifyConfigError(f"--url-env {url_env} is not set or empty.")
         resolved = env_value
+    elif secret_ref:
+        resolved = resolve_secret_ref(secret_ref)
     else:
         resolved = str(url).strip() if url is not None else ""
     if not resolved:

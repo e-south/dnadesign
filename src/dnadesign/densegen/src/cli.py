@@ -94,7 +94,10 @@ _PYARROW_SYSCTL_PATTERN = re.compile(r"sysctlbyname failed for 'hw\.")
 log = logging.getLogger(__name__)
 install_native_stderr_filters(suppress_solver_messages=False)
 
-DEFAULT_CONFIG_MISSING_MESSAGE = "Config path is required. Pass -c/--config or set DENSEGEN_CONFIG_PATH."
+DEFAULT_CONFIG_MISSING_MESSAGE = (
+    "No config file found. Pass -c/--config, set DENSEGEN_CONFIG_PATH, "
+    "or run from a workspace directory with config.yaml."
+)
 
 
 @contextlib.contextmanager

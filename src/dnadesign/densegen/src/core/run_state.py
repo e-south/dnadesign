@@ -40,17 +40,22 @@ class RunState:
     updated_at: str
     schema_version: str
     config_sha256: str
+    accepted_config_sha256: list[str]
     run_root: str
     items: list[PlanState]
 
     def to_dict(self) -> dict[str, Any]:
         total_generated = sum(int(item.generated) for item in self.items)
+        accepted_hashes = [str(v) for v in self.accepted_config_sha256 if str(v)]
+        if self.config_sha256 and self.config_sha256 not in accepted_hashes:
+            accepted_hashes.append(self.config_sha256)
         return {
             "run_id": self.run_id,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "schema_version": self.schema_version,
             "config_sha256": self.config_sha256,
+            "accepted_config_sha256": sorted(set(accepted_hashes)),
             "run_root": self.run_root,
             "total_generated": int(total_generated),
             "items": [item.to_dict() for item in self.items],
@@ -68,6 +73,7 @@ class RunState:
         run_id: str,
         schema_version: str,
         config_sha256: str,
+        accepted_config_sha256: list[str] | None,
         run_root: str,
         counts: dict[tuple[str, str], int],
         created_at: str | None = None,
@@ -75,12 +81,16 @@ class RunState:
     ) -> "RunState":
         now = datetime.now(timezone.utc).isoformat()
         items = [PlanState(input_name=k[0], plan_name=k[1], generated=int(v)) for k, v in sorted(counts.items())]
+        accepted_hashes = [str(v) for v in (accepted_config_sha256 or []) if str(v)]
+        if config_sha256 and config_sha256 not in accepted_hashes:
+            accepted_hashes.append(str(config_sha256))
         return RunState(
             run_id=run_id,
             created_at=created_at or now,
             updated_at=updated_at or now,
             schema_version=str(schema_version),
             config_sha256=str(config_sha256),
+            accepted_config_sha256=sorted(set(accepted_hashes)),
             run_root=str(run_root),
             items=items,
         )
@@ -88,6 +98,10 @@ class RunState:
 
 def load_run_state(path: Path) -> RunState:
     data = json.loads(path.read_text())
+    config_sha256 = str(data.get("config_sha256", ""))
+    accepted_hashes = [str(v) for v in data.get("accepted_config_sha256", []) if str(v)]
+    if config_sha256 and config_sha256 not in accepted_hashes:
+        accepted_hashes.append(config_sha256)
     items = [
         PlanState(
             input_name=str(item.get("input_name", "")),
@@ -101,7 +115,8 @@ def load_run_state(path: Path) -> RunState:
         created_at=str(data.get("created_at", "")),
         updated_at=str(data.get("updated_at", "")),
         schema_version=str(data.get("schema_version", "")),
-        config_sha256=str(data.get("config_sha256", "")),
+        config_sha256=config_sha256,
+        accepted_config_sha256=sorted(set(accepted_hashes)),
         run_root=str(data.get("run_root", "")),
         items=items,
     )

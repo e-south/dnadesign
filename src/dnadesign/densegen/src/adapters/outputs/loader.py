@@ -73,12 +73,29 @@ def load_records_from_config(
         rp = ds.records_path
         if not rp.exists():
             raise FileNotFoundError(f"USR records not found at: {rp}")
-        import pyarrow.parquet as pq
+        requested = list(columns) if columns else None
+        if max_rows is not None:
+            df = ds.head(
+                n=int(max_rows),
+                columns=requested,
+                include_derived=True,
+                include_deleted=False,
+            )
+        else:
+            import pyarrow as pa
 
-        tbl = pq.read_table(rp, columns=list(columns) if columns else None)
-        if max_rows is not None and tbl.num_rows > max_rows:
-            tbl = tbl.slice(0, max_rows)
-        df = tbl.to_pandas()
+            batches = list(
+                ds.scan(
+                    columns=requested,
+                    include_overlays=True,
+                    include_deleted=False,
+                )
+            )
+            if not batches:
+                raise RuntimeError(f"USR output has no rows: {rp}")
+            df = pa.Table.from_batches(batches).to_pandas()
+        if df.empty:
+            raise RuntimeError(f"USR output has no rows: {rp}")
         for col in [c for c in df.columns if "__" in c]:
             df[col] = df[col].map(_maybe_json_load)
         return df, f"usr:{usr_cfg.dataset}"

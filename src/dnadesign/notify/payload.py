@@ -11,9 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import socket
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 from .errors import NotifyValidationError
@@ -55,10 +53,12 @@ def build_payload(
         "tool": tool_norm,
         "run_id": run_id_norm,
         "timestamp": ts,
-        "host": host or socket.gethostname(),
-        "cwd": cwd or str(Path.cwd()),
         "meta": meta,
     }
+    if host is not None:
+        payload["host"] = str(host)
+    if cwd is not None:
+        payload["cwd"] = str(cwd)
     if message:
         payload["message"] = str(message)
     if version:

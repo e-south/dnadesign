@@ -31,6 +31,7 @@ def _row(seq: str, *, source: str = "test") -> dict:
 
 def test_snapshot_does_not_read_parquet(tmp_path: Path, monkeypatch) -> None:
     root = tmp_path / "datasets"
+    register_test_namespace(root, namespace="mock", columns_spec="mock__score:float64")
     ds = Dataset(root, "demo")
     ds.init(source="unit-test")
     ds.import_rows([_row("ACGT")], source="unit-test")
@@ -65,6 +66,7 @@ def test_materialize_does_not_read_parquet(tmp_path: Path, monkeypatch) -> None:
         raise AssertionError("read_parquet should not be called during materialize")
 
     monkeypatch.setattr(dataset_module, "read_parquet", _boom)
-    ds.materialize(maintenance=True)
+    with ds.maintenance(reason="materialize"):
+        ds.materialize()
 
     assert overlay_path(ds.dir, "mock").exists()

@@ -20,9 +20,11 @@ from dnadesign.usr import Dataset, DuplicateIDError
 from dnadesign.usr.src import dataset as dataset_module
 from dnadesign.usr.src.normalize import compute_id
 from dnadesign.usr.src.schema import ARROW_SCHEMA
+from dnadesign.usr.tests.registry_helpers import ensure_registry
 
 
 def test_validate_detects_duplicates_without_full_read(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    ensure_registry(tmp_path)
     ds = Dataset(tmp_path, "demo")
     ds.init(source="test")
 

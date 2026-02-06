@@ -305,7 +305,9 @@ def setup_logging(
 
     progress_enabled = is_progress_enabled()
     progress_style = get_progress_style()
-    if progress_enabled and progress_style in {"screen", "stream"}:
+    if progress_enabled and progress_style == "screen":
+        console_stream = sys.stdout
+    elif progress_enabled and progress_style == "stream":
         if bool(getattr(sys.stderr, "isatty", lambda: False)()):
             console_stream = sys.stderr
         elif bool(getattr(sys.stdout, "isatty", lambda: False)()):

@@ -20,6 +20,7 @@ from typing import Callable, Iterator, Optional
 import typer
 
 PACKAGED_TEMPLATES: dict[str, str] = {
+    "demo_binding_sites_vanilla": "workspaces/demo_binding_sites_vanilla",
     "demo_meme_three_tfs": "workspaces/demo_meme_three_tfs",
 }
 

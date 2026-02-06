@@ -1,6 +1,6 @@
 ## DenseGen CLI
 
-DenseGen exposes a Typer CLI via `dense`. This page is an operator manual (commands + flags). For a progressive, end‑to‑end walkthrough, see the [demo](../demo/demo_basic.md).
+DenseGen exposes a Typer CLI via `dense`. This page is an operator manual (commands + flags). For a progressive, end‑to‑end walkthrough, see the [demo](../demo/demo_pwm_artifacts.md).
 
 ### Contents
 - [Config resolution](#config-resolution) - where `dense` looks for config.yaml.
@@ -23,11 +23,18 @@ DenseGen exposes a Typer CLI via `dense`. This page is an operator manual (comma
 ### Config resolution
 
 - `-c, --config PATH` — config YAML path (global or per‑command).
-- If `-c/--config` is omitted, DenseGen requires `DENSEGEN_CONFIG_PATH` to be set.
-- If no explicit config is provided, the CLI exits non‑zero with an actionable error message.
+- If `-c/--config` is omitted, DenseGen resolves config in this order:
+  1. `DENSEGEN_CONFIG_PATH`
+  2. `./config.yaml`
+- DenseGen does not scan parent directories or workspace candidates.
+- If no config is found in the two locations above, the CLI fails fast and requires explicit `-c`.
 - Input paths resolve against the config file directory.
 - Outputs/tables/logs/plots/report must resolve inside `outputs/` under `densegen.run.root`.
 - Config files must include `densegen.schema_version` (currently `2.9`) and `densegen.run`.
+
+Operational guidance:
+- For HPC and CI, always pass `-c /abs/path/to/config.yaml`.
+- In local interactive sessions, `./config.yaml` is safe when you run from the workspace root.
 
 ---
 
@@ -136,10 +143,26 @@ Stage a new workspace with `config.yaml`, `inputs/`, `outputs/`, plus `outputs/l
 
 Options:
 - `--id` — run identifier (directory name).
-- `--root` — workspace root directory (default: current directory).
-- `--template-id` — packaged template id (e.g., `demo_meme_three_tfs`).
+- `--root` — workspace root directory (default: `src/dnadesign/densegen/workspaces/runs` or `$DENSEGEN_WORKSPACE_ROOT`).
+- `--template-id` — packaged template id (e.g., `demo_binding_sites_vanilla`, `demo_meme_three_tfs`).
 - `--template` — template config YAML to copy (path).
 - `--copy-inputs` — copy file-based inputs into `workspace/inputs` and rewrite paths.
+- `--output-mode` — output sink mode: `local` (parquet), `usr`, or `both`.
+- For `--output-mode usr|both`, DenseGen sets `output.usr.root` to `outputs/usr_datasets` and seeds
+  `outputs/usr_datasets/registry.yaml` when a repo registry template is available.
+
+---
+
+#### `dense workspace where`
+Show effective workspace roots and template roots used by `dense workspace init`.
+
+Options:
+- `--format` — output format: `text` or `json`.
+
+Notes:
+- `workspace_root_source` reports whether the root came from `$DENSEGEN_WORKSPACE_ROOT`,
+  the repo default, or a cwd fallback.
+- This command is useful when shell location and workspace location diverge.
 
 ---
 
@@ -150,6 +173,8 @@ Options:
 - `--no-plot` — skip auto‑plotting even if `plots` is configured in YAML.
 - `--fresh` — delete the workspace `outputs/` directory before running.
 - `--resume` — resume from existing outputs in the workspace.
+- `--allow-quota-increase` — allow resume if the only config changes are quota increases
+  (`generation.quota` and `generation.plan[*].quota`); requires `outputs/meta/effective_config.json`.
 - `--log-file PATH` — override the log file path. Otherwise DenseGen writes to
   `logging.log_dir/<run_id>.log` inside the workspace. The override path must still resolve
   inside `outputs/` under `densegen.run.root`.
@@ -163,6 +188,7 @@ Notes:
 - If the workspace already has run outputs (e.g., `outputs/tables/*.parquet` or
   `outputs/meta/run_state.json`), `dense run` resumes by default; use `--fresh` to reset outputs.
   Stage‑A/Stage‑B artifacts in `outputs/pools` or `outputs/libraries` do not trigger this guard.
+- When using USR outputs, `--fresh` preserves `<output.usr.root>/registry.yaml` so reruns do not require re-seeding.
 
 ---
 

@@ -431,37 +431,332 @@ class _ScreenDashboard:
         refresh_rate = max(1.0, 1.0 / max(refresh_seconds, 0.1))
         self._console = console
         self._append = bool(append)
+        self._muted_handlers: list[tuple[logging.Handler, int]] = []
         self._live = (
-            Live(console=console, refresh_per_second=refresh_rate, transient=False)
+            Live(
+                console=console,
+                refresh_per_second=refresh_rate,
+                transient=False,
+                screen=True,
+                vertical_overflow="crop",
+            )
             if console.is_terminal and not self._append
             else None
         )
         self._started = False
         self._last_renderable = None
         self._printed = False
+        self._disabled = False
         atexit.register(self.close)
 
+    def _console_closed(self) -> bool:
+        stream = getattr(self._console, "file", None)
+        return bool(getattr(stream, "closed", False))
+
+    def terminal_height(self) -> int | None:
+        try:
+            height = int(self._console.size.height)
+        except Exception:
+            return None
+        return height if height > 0 else None
+
+    def terminal_width(self) -> int | None:
+        try:
+            width = int(self._console.size.width)
+        except Exception:
+            return None
+        return width if width > 0 else None
+
+    def _disable(self, message: str, *, exc_info: bool = False) -> None:
+        if self._disabled:
+            return
+        self._disabled = True
+        if self._live is not None and self._started:
+            try:
+                self._live.stop()
+            except ValueError:
+                pass
+            self._started = False
+        self._restore_console_handlers()
+        log.warning(message, exc_info=exc_info)
+
+    def _mute_console_handlers(self) -> None:
+        if self._muted_handlers:
+            return
+        root = logging.getLogger()
+        for handler in list(root.handlers):
+            if getattr(handler, "console", None) is self._console:
+                self._muted_handlers.append((handler, int(handler.level)))
+                handler.setLevel(logging.CRITICAL + 100)
+
+    def _restore_console_handlers(self) -> None:
+        if not self._muted_handlers:
+            return
+        for handler, level in self._muted_handlers:
+            handler.setLevel(int(level))
+        self._muted_handlers.clear()
+
     def update(self, renderable) -> None:
+        if self._disabled:
+            return
+        if self._console_closed():
+            self._disable("Dashboard console stream closed; disabling screen dashboard updates.")
+            return
         if self._live is None:
             if self._append:
-                self._console.print(renderable)
+                try:
+                    self._console.print(renderable)
+                except ValueError:
+                    self._disable(
+                        "Dashboard console stream unavailable during append update; disabling screen dashboard.",
+                        exc_info=True,
+                    )
                 return
             self._last_renderable = renderable
             return
         if not self._started:
-            self._live.start()
+            try:
+                self._mute_console_handlers()
+                self._live.start()
+            except ValueError:
+                self._disable(
+                    "Dashboard console stream unavailable while starting live dashboard; disabling screen dashboard.",
+                    exc_info=True,
+                )
+                return
             self._started = True
-        self._live.update(renderable, refresh=True)
+        try:
+            self._live.update(renderable, refresh=True)
+        except ValueError:
+            self._disable(
+                "Dashboard console stream unavailable during live update; disabling screen dashboard.",
+                exc_info=True,
+            )
 
     def close(self) -> None:
+        if self._disabled:
+            return
+        if self._console_closed():
+            self._disabled = True
+            return
         if self._live is not None and self._started:
-            self._live.stop()
+            try:
+                self._live.stop()
+            except ValueError:
+                self._disable(
+                    "Dashboard console stream unavailable during live shutdown; disabling screen dashboard.",
+                    exc_info=True,
+                )
+                return
             self._started = False
+        self._restore_console_handlers()
         if self._append:
             return
         if self._live is None and self._last_renderable is not None and not self._printed:
-            self._console.print(self._last_renderable)
+            try:
+                self._console.print(self._last_renderable)
+            except ValueError:
+                self._disable(
+                    "Dashboard console stream unavailable during final render; disabling screen dashboard.",
+                    exc_info=True,
+                )
+                return
             self._printed = True
+
+
+def _slice_visual_preview(
+    sequence_preview,
+    *,
+    max_lines: int | None,
+    window_start: int,
+) -> tuple[object, str | None, int]:
+    if max_lines is None:
+        return sequence_preview, None, window_start
+    budget = max(1, int(max_lines))
+    if isinstance(sequence_preview, Group):
+        lines = list(sequence_preview.renderables)
+    else:
+        return sequence_preview, None, window_start
+    total = len(lines)
+    if total <= budget:
+        return sequence_preview, None, window_start
+    start = int(window_start) % total
+    subset = [lines[(start + idx) % total] for idx in range(budget)]
+    end = ((start + budget - 1) % total) + 1
+    label = f"window {start + 1}-{end}/{total}"
+    next_start = (start + 1) % total
+    return Group(*subset), label, next_start
+
+
+def _rendered_line_count(renderable, *, width: int) -> int:
+    probe_width = max(20, int(width))
+    probe = Console(
+        width=probe_width,
+        force_terminal=False,
+        color_system=None,
+        no_color=True,
+        record=True,
+    )
+    probe.print(renderable)
+    text = probe.export_text(styles=False).rstrip("\n")
+    if not text:
+        return 0
+    return len(text.splitlines())
+
+
+def _build_screen_dashboard_adaptive(
+    *,
+    source_label: str,
+    plan_name: str,
+    bar: str,
+    generated: int,
+    quota: int,
+    pct: float,
+    global_bar: str | None,
+    global_generated: int | None,
+    global_quota: int | None,
+    global_pct: float | None,
+    local_generated: int,
+    local_target: int,
+    library_index: int,
+    cr_now: float | None,
+    cr_avg: float | None,
+    resamples: int,
+    dup_out: int,
+    dup_sol: int,
+    fails: int,
+    stalls: int,
+    failure_totals: str | None,
+    tf_usage: dict[str, int],
+    tfbs_usage: dict[tuple[str, str], int],
+    diversity_label: str,
+    legend: object | None,
+    show_tfbs: bool,
+    show_solutions: bool,
+    sequence_preview: object | None,
+    solution_label: str = "sequence",
+    solver_settings: str | None = None,
+    max_lines: int | None = None,
+    max_width: int | None = None,
+    visual_window_start: int = 0,
+) -> tuple[Panel, int]:
+    optional = {
+        "failure": bool(failure_totals),
+        "usage": True,
+        "diversity": True,
+        "legend": legend is not None,
+        "solver": bool(solver_settings),
+    }
+    visual_enabled = bool(show_solutions and sequence_preview is not None)
+    if max_lines is not None:
+        # Reserve room for table/panel borders and keep a conservative line budget.
+        budget = max(8, int(max_lines) - 8)
+        base_rows = 5
+        if (
+            global_bar is not None
+            and global_generated is not None
+            and global_quota is not None
+            and global_pct is not None
+        ):
+            base_rows += 1
+        optional_rows = sum(1 for enabled in optional.values() if enabled)
+        min_visual_rows = 1 if visual_enabled else 0
+        drop_order = ["legend", "diversity", "usage", "failure", "solver"]
+        while base_rows + optional_rows + min_visual_rows > budget and drop_order:
+            key = drop_order.pop(0)
+            if optional.get(key, False):
+                optional[key] = False
+                optional_rows -= 1
+    visual_lines_budget = None
+    if max_lines is not None and visual_enabled:
+        budget = max(8, int(max_lines) - 8)
+        non_visual_rows = 5
+        if (
+            global_bar is not None
+            and global_generated is not None
+            and global_quota is not None
+            and global_pct is not None
+        ):
+            non_visual_rows += 1
+        non_visual_rows += sum(1 for enabled in optional.values() if enabled)
+        visual_lines_budget = max(1, budget - non_visual_rows)
+
+    def _build_panel() -> tuple[Panel, int]:
+        local_solution_label = solution_label
+        local_sequence_preview = sequence_preview
+        next_visual_window_start = visual_window_start
+        if visual_enabled:
+            local_sequence_preview, window_label, next_visual_window_start = _slice_visual_preview(
+                local_sequence_preview,
+                max_lines=visual_lines_budget,
+                window_start=visual_window_start,
+            )
+            if window_label:
+                local_solution_label = f"{solution_label} ({window_label})"
+
+        table = make_table(show_header=False, expand=True)
+        header = f"{source_label}/{plan_name}"
+        table.add_row("run (pool/plan)", header)
+        table.add_row("progress (plan)", f"{bar} {generated}/{quota} ({pct:.2f}%)")
+        if (
+            global_bar is not None
+            and global_generated is not None
+            and global_quota is not None
+            and global_pct is not None
+        ):
+            table.add_row(
+                "global progress (all plans)",
+                f"{global_bar} {global_generated}/{global_quota} ({global_pct:.2f}%)",
+            )
+        table.add_row("library (index/local)", f"index={library_index} local={local_generated}/{local_target}")
+        if cr_now is not None:
+            if cr_avg is not None:
+                table.add_row("compression (ratio)", f"now={cr_now:.3f} avg={cr_avg:.3f}")
+            else:
+                table.add_row("compression (ratio)", f"now={cr_now:.3f}")
+        table.add_row(
+            "counts (resample/dup/fail/stall)",
+            f"resamples={resamples} dup_out={dup_out} dup_sol={dup_sol} fails={fails} stalls={stalls}",
+        )
+        if optional["solver"] and solver_settings:
+            table.add_row("solver", solver_settings)
+        if optional["failure"] and failure_totals:
+            table.add_row("failures", failure_totals)
+        if optional["usage"]:
+            tfbs_label = (
+                _summarize_leaderboard(tfbs_usage, top=5) if show_tfbs else _summarize_tfbs_usage_stats(tfbs_usage)
+            )
+            table.add_row("TFBS usage (unique tf/tfbs used)", tfbs_label)
+        if optional["diversity"]:
+            table.add_row("diversity (tf_coverage/tfbs_coverage/tfbs_entropy)", diversity_label)
+        if optional["legend"] and legend is not None:
+            table.add_row("legend (TF colors)", legend)
+        if visual_enabled and local_sequence_preview:
+            table.add_row(f"{local_solution_label} (dense-arrays)", local_sequence_preview)
+        return make_panel(table, title="DenseGen progress"), int(next_visual_window_start)
+
+    panel, next_visual_window_start = _build_panel()
+    if max_lines is None or max_width is None:
+        return panel, next_visual_window_start
+
+    safety_target = max(1, int(max_lines) - 1)
+    drop_order = ["legend", "diversity", "usage", "failure", "solver"]
+    while _rendered_line_count(panel, width=int(max_width)) > safety_target:
+        if visual_enabled and visual_lines_budget is not None and visual_lines_budget > 1:
+            visual_lines_budget -= 1
+            panel, next_visual_window_start = _build_panel()
+            continue
+        dropped = False
+        while drop_order:
+            key = drop_order.pop(0)
+            if optional.get(key, False):
+                optional[key] = False
+                dropped = True
+                break
+        if not dropped:
+            break
+        panel, next_visual_window_start = _build_panel()
+    return panel, next_visual_window_start
 
 
 def _build_screen_dashboard(
@@ -496,35 +791,38 @@ def _build_screen_dashboard(
     sequence_preview: object | None,
     solution_label: str = "sequence",
 ) -> Panel:
-    table = make_table(show_header=False, expand=True)
-    header = f"{source_label}/{plan_name}"
-    table.add_row("run (pool/plan)", header)
-    table.add_row("progress (plan)", f"{bar} {generated}/{quota} ({pct:.2f}%)")
-    if global_bar is not None and global_generated is not None and global_quota is not None and global_pct is not None:
-        table.add_row(
-            "global progress (all plans)",
-            f"{global_bar} {global_generated}/{global_quota} ({global_pct:.2f}%)",
-        )
-    table.add_row("library (index/local)", f"index={library_index} local={local_generated}/{local_target}")
-    if cr_now is not None:
-        if cr_avg is not None:
-            table.add_row("compression (ratio)", f"now={cr_now:.3f} avg={cr_avg:.3f}")
-        else:
-            table.add_row("compression (ratio)", f"now={cr_now:.3f}")
-    table.add_row(
-        "counts (resample/dup/fail/stall)",
-        f"resamples={resamples} dup_out={dup_out} dup_sol={dup_sol} fails={fails} stalls={stalls}",
+    panel, _ = _build_screen_dashboard_adaptive(
+        source_label=source_label,
+        plan_name=plan_name,
+        bar=bar,
+        generated=generated,
+        quota=quota,
+        pct=pct,
+        global_bar=global_bar,
+        global_generated=global_generated,
+        global_quota=global_quota,
+        global_pct=global_pct,
+        local_generated=local_generated,
+        local_target=local_target,
+        library_index=library_index,
+        cr_now=cr_now,
+        cr_avg=cr_avg,
+        resamples=resamples,
+        dup_out=dup_out,
+        dup_sol=dup_sol,
+        fails=fails,
+        stalls=stalls,
+        failure_totals=failure_totals,
+        tf_usage=tf_usage,
+        tfbs_usage=tfbs_usage,
+        diversity_label=diversity_label,
+        legend=legend,
+        show_tfbs=show_tfbs,
+        show_solutions=show_solutions,
+        sequence_preview=sequence_preview,
+        solution_label=solution_label,
     )
-    if failure_totals:
-        table.add_row("failures", failure_totals)
-    tfbs_label = _summarize_leaderboard(tfbs_usage, top=5) if show_tfbs else _summarize_tfbs_usage_stats(tfbs_usage)
-    table.add_row("TFBS usage (unique tf/tfbs used)", tfbs_label)
-    table.add_row("diversity (tf_coverage/tfbs_coverage/tfbs_entropy)", diversity_label)
-    if legend is not None:
-        table.add_row("legend (TF colors)", legend)
-    if show_solutions and sequence_preview:
-        table.add_row(f"{solution_label} (dense-arrays)", sequence_preview)
-    return make_panel(table, title="DenseGen progress")
+    return panel
 
 
 @dataclass
@@ -535,6 +833,7 @@ class PlanProgressState:
     latest_failure_totals: str | None = None
     legend_cache: object | None = None
     legend_key: tuple[str, ...] | None = None
+    visual_window_start: int = 0
 
 
 @dataclass
@@ -552,6 +851,7 @@ class PlanProgressReporter:
     dashboard: _ScreenDashboard | None
     tf_colors: dict[str, str] | None = None
     extra_library_label: str | None = None
+    solver_settings: str | None = None
     display_tf_label: Callable[[str], str] | None = None
     logger: logging.Logger = field(default_factory=lambda: log)
     state: PlanProgressState = field(default_factory=PlanProgressState)
@@ -636,7 +936,13 @@ class PlanProgressReporter:
                     library_tfs=display_library_tfs,
                     library_tfbs=library_tfbs,
                 )
-                renderable = _build_screen_dashboard(
+                max_dashboard_lines = None
+                max_dashboard_width = None
+                if hasattr(self.dashboard, "terminal_height"):
+                    max_dashboard_lines = self.dashboard.terminal_height()
+                if hasattr(self.dashboard, "terminal_width"):
+                    max_dashboard_width = self.dashboard.terminal_width()
+                renderable, next_visual_window_start = _build_screen_dashboard_adaptive(
                     source_label=self.source_label,
                     plan_name=self.plan_name,
                     bar=bar,
@@ -666,7 +972,12 @@ class PlanProgressReporter:
                     show_solutions=bool(solution_preview),
                     sequence_preview=solution_preview,
                     solution_label=solution_label,
+                    solver_settings=self.solver_settings,
+                    max_lines=max_dashboard_lines,
+                    max_width=max_dashboard_width,
+                    visual_window_start=self.state.visual_window_start,
                 )
+                self.state.visual_window_start = int(next_visual_window_start)
                 self.dashboard.update(renderable)
 
         if self.progress_style == "stream" and global_generated % max(1, self.progress_every) == 0:
