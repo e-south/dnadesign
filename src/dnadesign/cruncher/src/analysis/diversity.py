@@ -36,11 +36,17 @@ def _info_norm_weights(pwm: PWM) -> np.ndarray:
 def _weighted_hamming(a: str, b: str, weights: np.ndarray) -> float:
     if len(a) != len(b) or not a:
         return float("nan")
-    mismatches = np.fromiter((c0 != c1 for c0, c1 in zip(a, b)), dtype=float)
-    total = float(weights.sum())
-    if total <= 0:
+    weights_arr = np.asarray(weights, dtype=float)
+    if weights_arr.size != len(a):
         return float("nan")
-    return float(np.dot(weights, mismatches) / total)
+    total = float(weights_arr.sum())
+    if total <= 0 or not np.isfinite(total):
+        return float("nan")
+    mismatch_weight = 0.0
+    for c0, c1, w in zip(a, b, weights_arr):
+        if c0 != c1:
+            mismatch_weight += float(w)
+    return mismatch_weight / total
 
 
 def _tfbs_core_map(
@@ -53,15 +59,15 @@ def _tfbs_core_map(
     core_by_id: dict[str, dict[str, str]] = {}
     if hits_df is None or hits_df.empty:
         return core_by_id
-    for _, row in hits_df.iterrows():
-        item_id = row.get(id_column)
+    required_cols = [id_column, "tf", "best_core_seq"]
+    if any(column not in hits_df.columns for column in required_cols):
+        return core_by_id
+    for item_id, tf_name, core_seq in hits_df[required_cols].itertuples(index=False, name=None):
         if item_id is None:
             continue
         item_id = str(item_id)
-        tf_name = row.get("tf")
         if not item_id or tf_name not in tf_list:
             continue
-        core_seq = row.get("best_core_seq")
         if not isinstance(core_seq, str) or not core_seq:
             continue
         core_by_id.setdefault(item_id, {})[str(tf_name)] = core_seq
@@ -94,18 +100,22 @@ def compute_distance_matrix(
         dist[i, i] = 0.0
         for j in range(i + 1, n):
             item_j = item_ids[j]
-            per_tf = []
+            per_tf_sum = 0.0
+            per_tf_count = 0
             for tf in tf_list:
                 core_i = core_by_id[item_i].get(tf)
                 core_j = core_by_id[item_j].get(tf)
                 weights = weights_by_tf.get(tf)
                 if core_i is None or core_j is None or weights is None:
                     continue
-                per_tf.append(_weighted_hamming(core_i, core_j, weights))
-            if not per_tf:
+                distance = _weighted_hamming(core_i, core_j, weights)
+                if np.isfinite(distance):
+                    per_tf_sum += float(distance)
+                    per_tf_count += 1
+            if per_tf_count == 0:
                 value = float("nan")
             else:
-                value = float(np.nanmean(per_tf))
+                value = per_tf_sum / float(per_tf_count)
             dist[i, j] = value
             dist[j, i] = value
     return item_ids, dist

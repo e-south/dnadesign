@@ -243,7 +243,7 @@ class Scorer:
         """
         L, w = seq.size, info.width
         if L < w:
-            return float("-inf"), 0, "+"
+            return float("-inf"), 0, "+", "sequence_too_short"
 
         def _scan(arr: np.ndarray) -> np.ndarray:
             windows = np.lib.stride_tricks.sliding_window_view(arr, w)

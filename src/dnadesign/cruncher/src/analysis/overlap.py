@@ -86,7 +86,13 @@ def compute_overlap_tables(
         raise ValueError("elites_hits.parquet is required to compute overlap metrics.")
 
     elite_info: dict[str, dict[str, object]] = {}
-    for _, row in elites_df.iterrows():
+    elite_cols = ["id"]
+    if "rank" in elites_df.columns:
+        elite_cols.append("rank")
+    if "sequence" in elites_df.columns:
+        elite_cols.append("sequence")
+    for values in elites_df[elite_cols].itertuples(index=False, name=None):
+        row = dict(zip(elite_cols, values, strict=False))
         elite_id = str(row.get("id") or "")
         if not elite_id:
             raise ValueError("Elites parquet missing required 'id' column.")
@@ -96,14 +102,11 @@ def compute_overlap_tables(
         }
 
     hits_by_elite: dict[str, dict[str, tuple[int, int, str | None]]] = {}
-    for _, row in hits_df.iterrows():
-        elite_id = str(row.get("elite_id") or "")
-        tf_name = row.get("tf")
+    hit_cols = ["elite_id", "tf", "best_start", "pwm_width", "best_strand"]
+    for elite_id_raw, tf_name, start, width, strand in hits_df[hit_cols].itertuples(index=False, name=None):
+        elite_id = str(elite_id_raw or "")
         if not elite_id or tf_name not in tf_list:
             continue
-        start = row.get("best_start")
-        width = row.get("pwm_width")
-        strand = row.get("best_strand")
         if not isinstance(start, (int, float)) or not isinstance(width, (int, float)) or not isinstance(strand, str):
             raise ValueError(f"Invalid hit metadata for elite '{elite_id}' TF '{tf_name}'.")
         start_i = int(start)
@@ -209,13 +212,10 @@ def extract_elite_hits(
     if hits_df is None or hits_df.empty:
         return pd.DataFrame(columns=["tf", "offset", "end", "strand", "elite_id"])
     rows: list[dict[str, object]] = []
-    for _, row in hits_df.iterrows():
-        tf_name = row.get("tf")
+    hit_cols = ["elite_id", "tf", "best_start", "pwm_width", "best_strand"]
+    for elite_id, tf_name, start, width, strand in hits_df[hit_cols].itertuples(index=False, name=None):
         if tf_name not in tf_list:
             continue
-        start = row.get("best_start")
-        width = row.get("pwm_width")
-        strand = row.get("best_strand")
         if not isinstance(start, (int, float)) or not isinstance(width, (int, float)) or not isinstance(strand, str):
             continue
         rows.append(
@@ -224,7 +224,7 @@ def extract_elite_hits(
                 "offset": int(start),
                 "end": int(start) + int(width),
                 "strand": strand,
-                "elite_id": row.get("elite_id"),
+                "elite_id": elite_id,
             }
         )
     return pd.DataFrame(rows)

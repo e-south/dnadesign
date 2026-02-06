@@ -15,9 +15,10 @@ from pathlib import Path
 import arviz as az
 import numpy as np
 import pandas as pd
+import pytest
 
 from dnadesign.cruncher.analysis.layout import analysis_root, summary_path
-from dnadesign.cruncher.analysis.report import ensure_report
+from dnadesign.cruncher.analysis.report import build_report_payload, ensure_report
 from dnadesign.cruncher.artifacts.layout import (
     elites_path,
     sequences_path,
@@ -186,3 +187,40 @@ def test_report_includes_learning_highlights(tmp_path: Path) -> None:
     assert learning["best_score_draw"] == 5
     assert learning["best_score_chain"] == 1
     assert learning["early_stop_earliest_draw"] == 6
+
+
+def test_report_payload_preserves_zero_highlights() -> None:
+    payload = build_report_payload(
+        analysis_root=Path("."),
+        summary_payload={
+            "run": "sample_zero",
+            "analysis_id": "analysis_zero",
+            "tf_names": ["lexA"],
+        },
+        diagnostics_payload={
+            "status": "ok",
+            "warnings": [],
+            "metrics": {"sequences": {"unique_fraction": 0.9}},
+        },
+        objective_components={
+            "unique_fraction_canonical": 0.0,
+            "unique_fraction_raw": 0.8,
+            "overlap_total_bp_median": 0.0,
+        },
+        overlap_summary={"overlap_rate_median": 0.0, "overlap_total_bp_median": 0.0},
+        analysis_used_payload={"analysis": {"table_format": "parquet", "plot_format": "png"}},
+    )
+    diversity = payload["highlights"]["diversity"]
+    overlap = payload["highlights"]["overlap"]
+    assert diversity["unique_fraction"] == 0.0
+    assert overlap["overlap_rate_median"] == 0.0
+    assert overlap["overlap_total_bp_median"] == 0.0
+
+
+def test_ensure_report_requires_summary_json_when_payload_not_provided(tmp_path: Path) -> None:
+    run_dir = tmp_path / "results" / "sample" / "sample_missing_summary"
+    analysis_dir = analysis_root(run_dir)
+    analysis_dir.mkdir(parents=True, exist_ok=True)
+
+    with pytest.raises(FileNotFoundError, match="Missing analysis summary JSON"):
+        ensure_report(analysis_root=analysis_dir, refresh=True)

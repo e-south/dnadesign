@@ -184,8 +184,8 @@ def list_analysis_entries(run_dir: Path) -> list[dict]:
                 summary = None
             analysis_id = summary.get("analysis_id") if isinstance(summary, dict) else None
             if not isinstance(analysis_id, str) or not analysis_id:
-                analysis_id = child.name
-                logger.warning("archive summary missing analysis_id, using folder name: %s", child)
+                logger.warning("Skipping archive summary missing analysis_id: %s", child)
+                continue
             entries.append({"id": analysis_id, "path": child, "kind": "archive"})
 
     return entries
@@ -272,8 +272,9 @@ def list_analysis_entries_verbose(run_dir: Path) -> list[dict]:
                 warnings.append(summary_error)
             analysis_id = summary.get("analysis_id") if isinstance(summary, dict) else None
             if not isinstance(analysis_id, str) or not analysis_id:
-                warnings.append(f"archive summary missing analysis_id; using folder name: {child}")
-                analysis_id = child.name
+                warnings.append(f"archive summary missing analysis_id: {child}")
+                logger.warning("Skipping archive summary missing analysis_id: %s", child)
+                continue
             _append_entry(
                 analysis_id=analysis_id,
                 path=child,

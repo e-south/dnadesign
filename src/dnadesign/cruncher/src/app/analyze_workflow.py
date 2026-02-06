@@ -141,10 +141,13 @@ def _resolve_optimizer_stats(manifest: dict[str, object], run_dir: Path) -> dict
 
 def _load_elites_meta(path: Path) -> dict[str, object]:
     if not path.exists():
-        return {}
-    payload = yaml.safe_load(path.read_text()) or {}
+        raise FileNotFoundError(f"Missing elites metadata YAML: {path}")
+    try:
+        payload = yaml.safe_load(path.read_text())
+    except yaml.YAMLError as exc:
+        raise ValueError(f"Invalid elites metadata YAML at {path}: {exc}") from exc
     if not isinstance(payload, dict):
-        return {}
+        raise ValueError(f"Elites metadata must contain a YAML mapping: {path}")
     return payload
 
 
@@ -200,6 +203,18 @@ def _write_analysis_used(
     if extras:
         payload.update(extras)
     atomic_write_yaml(path, payload, sort_keys=False, default_flow_style=False)
+
+
+def _resolve_baseline_seed(baseline_df: pd.DataFrame) -> int | None:
+    if "baseline_seed" not in baseline_df.columns or baseline_df.empty:
+        return None
+    raw_seed = baseline_df["baseline_seed"].iloc[0]
+    if pd.isna(raw_seed):
+        raise ValueError("random baseline metadata baseline_seed is missing in random_baseline.parquet")
+    try:
+        return int(raw_seed)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"random baseline metadata baseline_seed is not an integer: {raw_seed!r}") from exc
 
 
 def _summarize_elites_mmr(
@@ -380,11 +395,7 @@ def run_analyze(
                 "If no analyze is running, remove the stale analysis temp directory."
             ) from exc
 
-        prev_root = _prepare_analysis_root(
-            analysis_root_path,
-            archive=analysis_cfg.archive,
-            analysis_id=analysis_id,
-        )
+        prev_root = None
 
         analysis_used_file = analysis_used_path(tmp_root)
 
@@ -445,11 +456,15 @@ def run_analyze(
         write_elite_topk(elites_df=elites_df, tf_names=tf_names, out_path=topk_path, top_k=top_k)
         write_joint_metrics(elites_df=elites_df, tf_names=tf_names, out_path=joint_metrics_path)
 
-        trajectory_df = build_trajectory_points(
-            sequences_df,
-            tf_names,
-            max_points=analysis_cfg.max_points,
-        )
+        try:
+            trajectory_df = build_trajectory_points(
+                sequences_df,
+                tf_names,
+                max_points=analysis_cfg.max_points,
+            )
+        except Exception:
+            shutil.rmtree(tmp_root, ignore_errors=True)
+            raise
         _write_table(trajectory_df, trajectory_path)
 
         overlap_summary_df, elite_overlap_df, overlap_summary = compute_overlap_tables(
@@ -497,12 +512,7 @@ def run_analyze(
         _write_table(elites_mmr_df, elites_mmr_path)
         _write_table(nn_df, nn_distance_path)
 
-        baseline_seed = None
-        if "baseline_seed" in baseline_df.columns and not baseline_df.empty:
-            try:
-                baseline_seed = int(baseline_df["baseline_seed"].iloc[0])
-            except Exception:
-                baseline_seed = None
+        baseline_seed = _resolve_baseline_seed(baseline_df)
         baseline_nn = compute_baseline_nn_distances(
             baseline_hits_df,
             tf_names,
@@ -757,12 +767,24 @@ def run_analyze(
         summary_file = summary_path(tmp_root)
         _write_json(summary_file, summary_payload)
 
-        _finalize_analysis_root(
-            analysis_root_path,
-            tmp_root,
-            archive=analysis_cfg.archive,
-            prev_root=prev_root,
-        )
+        try:
+            prev_root = _prepare_analysis_root(
+                analysis_root_path,
+                archive=analysis_cfg.archive,
+                analysis_id=analysis_id,
+            )
+            _finalize_analysis_root(
+                analysis_root_path,
+                tmp_root,
+                archive=analysis_cfg.archive,
+                prev_root=prev_root,
+            )
+        except Exception:
+            if tmp_root.exists():
+                shutil.rmtree(tmp_root, ignore_errors=True)
+            if prev_root is not None and prev_root.exists() and not analysis_root_path.exists():
+                os.replace(prev_root, analysis_root_path)
+            raise
 
         if not analysis_cfg.archive:
             _prune_latest_analysis_artifacts(manifest)

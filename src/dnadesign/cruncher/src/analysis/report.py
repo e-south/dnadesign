@@ -93,6 +93,12 @@ def build_report_payload(
     objective_components = objective_components or summary_payload.get("objective_components")
     overlap_summary = overlap_summary or summary_payload.get("overlap_summary")
 
+    def _first_non_none(*values: object) -> object | None:
+        for value in values:
+            if value is not None:
+                return value
+        return None
+
     analysis_cfg = {}
     if isinstance(analysis_used_payload, dict):
         analysis_cfg = analysis_used_payload.get("analysis") or analysis_used_payload.get("analysis_base") or {}
@@ -130,20 +136,27 @@ def build_report_payload(
         }
     highlights_diversity = {
         "unique_fraction": _safe_float(
-            (objective_components or {}).get("unique_fraction_canonical")
-            or (objective_components or {}).get("unique_fraction_raw")
-            or (seq_metrics or {}).get("unique_fraction")
+            _first_non_none(
+                (objective_components or {}).get("unique_fraction_canonical"),
+                (objective_components or {}).get("unique_fraction_raw"),
+                (seq_metrics or {}).get("unique_fraction"),
+            )
         ),
         "n_elites": _safe_int((elites_metrics or {}).get("n_elites")),
         "diversity_hamming": _safe_float((elites_metrics or {}).get("diversity_hamming")),
     }
     highlights_overlap = {
         "overlap_rate_median": _safe_float(
-            (overlap_summary or {}).get("overlap_rate_median") or (elites_metrics or {}).get("overlap_rate_median")
+            _first_non_none(
+                (overlap_summary or {}).get("overlap_rate_median"),
+                (elites_metrics or {}).get("overlap_rate_median"),
+            )
         ),
         "overlap_total_bp_median": _safe_float(
-            (overlap_summary or {}).get("overlap_total_bp_median")
-            or (objective_components or {}).get("overlap_total_bp_median")
+            _first_non_none(
+                (overlap_summary or {}).get("overlap_total_bp_median"),
+                (objective_components or {}).get("overlap_total_bp_median"),
+            )
         ),
     }
     highlights_sampling = {
@@ -352,7 +365,10 @@ def ensure_report(
         return report_json, report_md
 
     if summary_payload is None:
-        summary_payload = _load_json(analysis_root / "summary.json") or {}
+        loaded_summary = _load_json(analysis_root / "summary.json")
+        if loaded_summary is None:
+            raise FileNotFoundError(f"Missing analysis summary JSON: {analysis_root / 'summary.json'}")
+        summary_payload = loaded_summary
     if diagnostics_payload is None:
         diagnostics_payload = _load_json(analysis_root / "table__diagnostics__summary.json")
     if objective_components is None:

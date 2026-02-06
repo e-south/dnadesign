@@ -49,7 +49,7 @@ def _trace_score_array(idata: Any) -> np.ndarray | None:
         return None
     try:
         return np.asarray(score)
-    except Exception:
+    except (TypeError, ValueError):
         return None
 
 
@@ -255,8 +255,7 @@ def summarize_sampling_diagnostics(
                             score = score_idata.posterior["score"]
                             ess = _safe_float(az.ess(score)["score"].item())
                         except Exception as exc:
-                            warnings.append(f"Trace diagnostics failed: {exc}")
-                            _mark("warn")
+                            raise ValueError(f"Trace diagnostics failed: {exc}") from exc
                     if ess is not None:
                         trace_metrics["ess"] = ess
                         denom = max(1, n_draws)
@@ -285,8 +284,7 @@ def summarize_sampling_diagnostics(
                             rhat = _safe_float(az.rhat(score)["score"].item())
                             ess = _safe_float(az.ess(score)["score"].item())
                         except Exception as exc:
-                            warnings.append(f"Trace diagnostics failed: {exc}")
-                            _mark("warn")
+                            raise ValueError(f"Trace diagnostics failed: {exc}") from exc
                     if rhat is not None:
                         trace_metrics["rhat"] = rhat
                         if mode == "sample":
@@ -435,19 +433,15 @@ def summarize_sampling_diagnostics(
             if overlap_total_bp_median is not None:
                 elites_metrics["overlap_total_bp_median"] = _safe_float(overlap_total_bp_median)
         else:
-            try:
-                if elites_hits_df is None:
-                    raise ValueError("elites_hits.parquet is required for overlap metrics.")
-                _, _, overlap_summary = compute_overlap_tables(elites_df, elites_hits_df, tf_names)
-                overlap_rate_median = overlap_summary.get("overlap_rate_median")
-                overlap_total_bp_median = overlap_summary.get("overlap_total_bp_median")
-                if overlap_rate_median is not None:
-                    elites_metrics["overlap_rate_median"] = _safe_float(overlap_rate_median)
-                if overlap_total_bp_median is not None:
-                    elites_metrics["overlap_total_bp_median"] = _safe_float(overlap_total_bp_median)
-            except Exception as exc:
-                warnings.append(f"Overlap metrics unavailable: {exc}")
-                _mark("warn")
+            if elites_hits_df is None:
+                raise ValueError("elites_hits.parquet is required for overlap metrics.")
+            _, _, overlap_summary = compute_overlap_tables(elites_df, elites_hits_df, tf_names)
+            overlap_rate_median = overlap_summary.get("overlap_rate_median")
+            overlap_total_bp_median = overlap_summary.get("overlap_total_bp_median")
+            if overlap_rate_median is not None:
+                elites_metrics["overlap_rate_median"] = _safe_float(overlap_rate_median)
+            if overlap_total_bp_median is not None:
+                elites_metrics["overlap_total_bp_median"] = _safe_float(overlap_total_bp_median)
     metrics["elites"] = elites_metrics
 
     # ---- optimizer stats --------------------------------------------------

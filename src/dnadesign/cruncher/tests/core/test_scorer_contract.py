@@ -81,3 +81,21 @@ def test_best_llr_tie_prefers_smaller_start_then_plus() -> None:
     assert best_llr == pytest.approx(0.0, abs=1.0e-6)
     assert offset == 0
     assert strand == "+"
+
+
+def test_best_llr_handles_sequence_shorter_than_pwm_width() -> None:
+    matrix = np.array(
+        [
+            [0.9, 0.05, 0.03, 0.02],
+            [0.9, 0.05, 0.03, 0.02],
+            [0.9, 0.05, 0.03, 0.02],
+        ],
+        dtype=float,
+    )
+    pwm = PWM(name="tfA", matrix=matrix)
+    scorer = Scorer({"tfA": pwm}, bidirectional=True, scale="llr")
+    seq = np.array([0, 1], dtype=np.int8)
+    best_llr, offset, strand = scorer.best_llr(seq, "tfA")
+    assert best_llr == float("-inf")
+    assert offset == 0
+    assert strand == "+"

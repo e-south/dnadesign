@@ -20,11 +20,13 @@ import pandas as pd
 import pytest
 import yaml
 
-from dnadesign.cruncher.app.analyze_workflow import run_analyze
+from dnadesign.cruncher.app import analyze_workflow
+from dnadesign.cruncher.app.analyze_workflow import _load_elites_meta, run_analyze
 from dnadesign.cruncher.artifacts.layout import (
     config_used_path,
     elites_hits_path,
     elites_path,
+    elites_yaml_path,
     manifest_path,
     random_baseline_hits_path,
     random_baseline_path,
@@ -43,6 +45,19 @@ def _sample_block(*, save_trace: bool, top_k: int, draws: int = 2, tune: int = 1
         "elites": {"k": top_k},
         "output": {"save_sequences": True, "save_trace": save_trace},
     }
+
+
+def test_load_elites_meta_requires_file(tmp_path: Path) -> None:
+    missing = tmp_path / "elites.yaml"
+    with pytest.raises(FileNotFoundError, match="Missing elites metadata YAML"):
+        _load_elites_meta(missing)
+
+
+def test_load_elites_meta_requires_mapping(tmp_path: Path) -> None:
+    invalid = tmp_path / "elites.yaml"
+    invalid.write_text("- not-a-mapping\n")
+    with pytest.raises(ValueError, match="must contain a YAML mapping"):
+        _load_elites_meta(invalid)
 
 
 def _make_sample_run_dir(tmp_path: Path, name: str) -> Path:
@@ -176,6 +191,15 @@ def _write_basic_run_artifacts(
     )
     elites_path(run_dir).parent.mkdir(parents=True, exist_ok=True)
     elites_df.to_parquet(elites_path(run_dir), engine="fastparquet")
+    elites_yaml_path(run_dir).write_text(
+        yaml.safe_dump(
+            {
+                "n_elites": int(len(elites_df)),
+                "mmr_alpha": 0.85,
+                "pool_size": max(top_k, len(elites_df)),
+            }
+        )
+    )
 
     hits_rows = []
     for idx, tf in enumerate(tf_names):
@@ -499,6 +523,120 @@ def test_analyze_fails_when_random_baseline_hits_missing(tmp_path: Path) -> None
     cfg = load_config(config_path)
     with pytest.raises(FileNotFoundError, match="random baseline hits"):
         run_analyze(cfg, config_path)
+
+
+def test_analyze_fails_when_baseline_seed_invalid(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    config = _base_config(
+        catalog_root=catalog_root,
+        regulator_sets=[["lexA", "cpxR"]],
+        sample=_sample_block(save_trace=False, top_k=1),
+        analysis={
+            "run_selector": "explicit",
+            "runs": ["sample_invalid_baseline_seed"],
+            "pairwise": ["lexA", "cpxR"],
+            "plot_format": "png",
+            "plot_dpi": 72,
+            "table_format": "parquet",
+            "max_points": 2000,
+        },
+    )
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    run_dir = _make_sample_run_dir(tmp_path, "sample_invalid_baseline_seed")
+
+    lock_dir = tmp_path / ".cruncher" / "locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = lock_dir / "config.lock.json"
+    lock_path.write_text("{}")
+    lock_sha = sha256_path(lock_path)
+
+    _write_basic_run_artifacts(
+        run_dir=run_dir,
+        config=config,
+        config_path=config_path,
+        lock_path=lock_path,
+        lock_sha=lock_sha,
+        tf_names=["lexA", "cpxR"],
+        include_trace=False,
+        top_k=1,
+        draws=2,
+        tune=1,
+    )
+    baseline_path = random_baseline_path(run_dir)
+    baseline_df = pd.read_parquet(baseline_path, engine="fastparquet")
+    baseline_df["baseline_seed"] = baseline_df["baseline_seed"].astype(float)
+    baseline_df.loc[0, "baseline_seed"] = np.nan
+    baseline_df.to_parquet(baseline_path, engine="fastparquet")
+
+    cfg = load_config(config_path)
+    with pytest.raises(ValueError, match="baseline_seed"):
+        run_analyze(cfg, config_path)
+
+
+def test_analyze_restores_previous_analysis_when_generation_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    config = _base_config(
+        catalog_root=catalog_root,
+        regulator_sets=[["lexA", "cpxR"]],
+        sample=_sample_block(save_trace=False, top_k=1),
+        analysis={
+            "run_selector": "explicit",
+            "runs": ["sample_restore_previous"],
+            "pairwise": ["lexA", "cpxR"],
+            "plot_format": "png",
+            "plot_dpi": 72,
+            "table_format": "parquet",
+            "max_points": 2000,
+        },
+    )
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    run_dir = _make_sample_run_dir(tmp_path, "sample_restore_previous")
+
+    lock_dir = tmp_path / ".cruncher" / "locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = lock_dir / "config.lock.json"
+    lock_path.write_text("{}")
+    lock_sha = sha256_path(lock_path)
+
+    _write_basic_run_artifacts(
+        run_dir=run_dir,
+        config=config,
+        config_path=config_path,
+        lock_path=lock_path,
+        lock_sha=lock_sha,
+        tf_names=["lexA", "cpxR"],
+        include_trace=False,
+        top_k=1,
+        draws=2,
+        tune=1,
+    )
+
+    analysis_dir = run_dir / "analysis"
+    analysis_dir.mkdir(parents=True, exist_ok=True)
+    (analysis_dir / "summary.json").write_text(json.dumps({"analysis_id": "old-analysis"}))
+    (analysis_dir / "old_marker.txt").write_text("preserve")
+
+    def _boom(*_args, **_kwargs):
+        raise RuntimeError("synthetic failure in analyze")
+
+    monkeypatch.setattr(analyze_workflow, "build_trajectory_points", _boom)
+    cfg = load_config(config_path)
+
+    with pytest.raises(RuntimeError, match="synthetic failure in analyze"):
+        run_analyze(cfg, config_path)
+
+    restored_summary = json.loads((analysis_dir / "summary.json").read_text())
+    assert restored_summary["analysis_id"] == "old-analysis"
+    assert (analysis_dir / "old_marker.txt").read_text() == "preserve"
+    assert not (run_dir / ".analysis_tmp").exists()
+    assert not list(run_dir.glob(".analysis_prev_*"))
 
 
 def test_analyze_defaults_to_latest_when_runs_empty(tmp_path: Path) -> None:
