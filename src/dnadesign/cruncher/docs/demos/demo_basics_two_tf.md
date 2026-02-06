@@ -1,491 +1,102 @@
-# Cruncher demo 1
-
+# Two‑TF demo (end‑to‑end)
 
 ## Contents
+- [Overview](#overview)
 - [Demo setup](#demo-setup)
-- [Preview sources and inventories](#preview-sources-and-inventories)
-- [Fetch local DAP-seq motifs + binding sites](#fetch-local-dap-seq-motifs-binding-sites)
-- [Fetch binding sites (RegulonDB, network)](#fetch-binding-sites-regulondb-network)
-- [Verify cache (pre-lock)](#verify-cache-pre-lock)
-- [Combine curated + DAP-seq sites for discovery](#combine-curated-dap-seq-sites-for-discovery)
-- [Discover motifs from merged sites (MEME preferred)](#discover-motifs-from-merged-sites-meme-preferred)
-- [Inspect candidate PWMs + logos (pre-lock)](#inspect-candidate-pwms-logos-pre-lock)
-- [Select motif source + lock](#select-motif-source-lock)
-- [Inspect cached entries and targets (post-lock)](#inspect-cached-entries-and-targets-post-lock)
-- [Parse workflow (validate locked motifs)](#parse-workflow-validate-locked-motifs)
-- [Sample (MCMC optimization)](#sample-mcmc-optimization)
+- [Cache motifs and sites](#cache-motifs-and-sites)
+- [Lock + parse](#lock--parse)
+- [Sample + analyze](#sample--analyze)
+- [Inspect results](#inspect-results)
+- [Optional: motif discovery](#optional-motif-discovery)
+- [Related docs](#related-docs)
 
-**Design short dsDNA sequences that satisfy two PWMs at once.**
+## Overview
 
-**cruncher** scores each TF by the best PWM match anywhere in the candidate sequence on either strand, then optimizes the min/soft‑min across TFs so the weakest TF improves. It explores sequence space with parallel tempering (MCMC) and returns a diverse elite set (unique up to reverse‑complement) selected via TFBS‑core MMR, plus diagnostics for stability/mixing. Motif overlap is allowed and treated as informative structure in analysis.
+This demo designs fixed‑length sequences that satisfy two PWMs (LexA + CpxR). It follows the full lifecycle:
 
-Scoring is **FIMO-like** (internal implementation): for each PWM, cruncher builds log‑odds scores against a 0‑order background, scans all windows to find the best hit (optionally bidirectional), and optionally converts that best hit to a p‑value via a DP‑derived null distribution (`score_scale: logp`). For `logp`, the tail probability for the best window becomes a sequence‑level p via `p_seq = 1 − (1 − p_win)^n_windows`. When bidirectional, `n_windows` counts both strands (`2 * (L − w + 1)`).
+1. cache inputs
+2. lock
+3. parse
+4. sample
+5. analyze
 
-This demo is intentionally linear: cache inputs, choose/lock PWMs, validate, sample, and analyze. Each step writes artifacts consumed by the next.
+Cruncher scores each TF by the best PWM match anywhere in the sequence on either strand (when `objective.bidirectional=true`). It optimizes the weakest TF by default (`objective.combine=min`) and selects diverse elites via TFBS‑core MMR.
 
-**Terminology:**
+## Demo setup
 
-- **sites** = training binding sequences
-- **PWMs/matrices** = scoring models
-- **lock** pins the exact matrices used for scoring.
-
----
-
-> **Fast path (local-only, no discovery):** run end‑to‑end using the packaged demo motifs (no network and no MEME Suite required).
->
-> ```bash
-> cruncher fetch motifs --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
-> cruncher fetch sites  --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
-> cruncher lock   -c "$CONFIG"
-> cruncher parse  -c "$CONFIG"
-> cruncher sample -c "$CONFIG"
-> cruncher analyze -c "$CONFIG"
-> cruncher analyze --summary -c "$CONFIG"
-> ```
->
-> Continue below for a more in‑depth guide.
-
-### Demo setup
-
-- **Workspace**: `src/dnadesign/cruncher/workspaces/demo_basics_two_tf/`
-- **Config**: `config.yaml`
-- **Output root**: `outputs/` (relative to the workspace)
-- **Catalog cache**: `src/dnadesign/cruncher/.cruncher/` (shared across workspaces by default)
-- **Motif flow**: fetch sites + local motifs → inspect/select → lock/sample using chosen matrices
-- **Path placeholders**: example outputs use `<workspace>` for the demo workspace root
+- Workspace: `src/dnadesign/cruncher/workspaces/demo_basics_two_tf/`
+- Config: `config.yaml`
+- Output root: `outputs/`
 
 ```bash
-# Option A: cd into the workspace
-cd src/dnadesign/cruncher/workspaces/demo_basics_two_tf  # enter demo workspace
-CONFIG="$PWD/config.yaml"  # point to workspace config
+cd src/dnadesign/cruncher/workspaces/demo_basics_two_tf
+CONFIG="$PWD/config.yaml"
 
-# Option B: run from anywhere in the repo
-CONFIG=src/dnadesign/cruncher/workspaces/demo_basics_two_tf/config.yaml  # config path from repo root
-
-# Choose a runner (pixi is the default in this repo; uv is optional).
-cruncher() { pixi run cruncher -- "$@"; }  # convenience wrapper
-
-# Optional: uv-only wrapper
-# cruncher() { uv run cruncher "$@"; }
-
-# From here on, commands use $CONFIG for clarity; if you're in the workspace, you can omit --config.
+# Convenience wrapper (pixi is the default in this repo)
+cruncher() { pixi run cruncher -- "$@"; }
 ```
 
-If you plan to run **motif discovery** (`discover`), verify MEME Suite and external tools:
+## Cache motifs and sites
+
+The demo ships with local MEME motifs and MEME BLOCKS sites.
 
 ```bash
-cruncher doctor -c "$CONFIG"
+cruncher fetch motifs --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
+cruncher fetch sites  --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
 ```
 
-Sampling + analysis do **not** require MEME Suite, so you can still run the fast path above without it. If it reports missing tools, install MEME Suite (pixi or system install) or set `motif_discovery.tool_path`; see the [MEME Suite guide](../guides/meme_suite.md). Local demo motifs live at `inputs/local_motifs/` (DAP‑seq MEME files from [this](https://www.nature.com/articles/s41592-021-01312-2) study).
-
----
-
-### Preview sources and inventories
-
-Optional: run this if you want to confirm which sources the config will use (and which steps will require network access).
+Optional: pull curated sites from RegulonDB (network access required):
 
 ```bash
-# List configured sources
-cruncher sources list -c "$CONFIG"  # list configured sources
+cruncher fetch sites --tf lexA --tf cpxR --update -c "$CONFIG"
 ```
+
+## Lock + parse
 
 ```bash
-# Inspect local demo source metadata
-cruncher sources info demo_local_meme -c "$CONFIG"  # inspect demo source metadata
-
-# Inspect RegulonDB source metadata
-cruncher sources info regulondb -c "$CONFIG"  # inspect RegulonDB metadata
+cruncher lock  -c "$CONFIG"
+cruncher parse -c "$CONFIG"
 ```
-If you’re debugging RegulonDB inventory size, `cruncher sources summary --source regulondb --scope remote --remote-limit 20` is a quick sample. Use `sources datasets` or `fetch sites --dry-run` when you need HT dataset coverage.
 
----
+`lock` pins the exact PWM artifacts for reproducible runs. `parse` validates the locked motifs and writes a parse manifest used by sampling.
 
-### Fetch local DAP-seq motifs + binding sites
-
-Local DAP-seq MEME files live under `inputs/local_motifs/` in the workspace. Fetch the motif matrices and the MEME BLOCKS training sites:
+## Sample + analyze
 
 ```bash
-# Cache local motif matrices
-cruncher fetch motifs --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"  # fetch local PWM matrices
-
-# Cache local MEME BLOCKS sites
-cruncher fetch sites --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"  # fetch local training sites
-```
-
----
-
-### Fetch binding sites (RegulonDB, network)
-
-Optional: fetch curated sites from RegulonDB if you want extra site evidence for discovery or to compare against curated annotations. If you’re offline, skip this — the demo still runs end‑to‑end with local motifs.
-
-```bash
-# Fetch curated sites from RegulonDB
-cruncher fetch sites --tf lexA --tf cpxR --update -c "$CONFIG"  # fetch curated RegulonDB sites
-```
-
-Note: curated site sets aren’t partitioned by dataset/method; those fields are populated for HT datasets.
-
----
-
-#### Optional: HT-only or combined site modes (RegulonDB)
-
-You can restrict `pwm_source: sites` to curated or HT sites, or combine them. Make these adjustments before discovery/lock if you plan to build site-derived PWMs.
-
-```yaml
-motif_store:
-  pwm_source: sites
-  site_kinds: ["curated"]          # curated-only
-  # site_kinds: ["meme_blocks"]    # local DAP-seq training sites only
-  # site_kinds: ["ht_tfbinding"]   # HT-only (RegulonDB)
-  # combine_sites: true            # combine across sources when site_kinds is null
-```
-
-Tip: if HT datasets return peaks without sequences, hydration uses NCBI by default (`ingest.genome_source=ncbi`). To run offline, provide a local FASTA via `--genome-fasta` or `ingest.genome_fasta`.
-
----
-
-### Verify cache (pre-lock)
-
-Optional sanity check. If you just ran `fetch`, you can skip this; `lock` / `targets status` will fail loudly if required inputs are missing.
-
-```bash
-cruncher catalog list -c "$CONFIG"  # quick view of cached motifs + sites
-```
-
-If you need per‑source cache counts, use `cruncher sources summary --scope cache`.
-
----
-
-### Combine curated + DAP-seq sites for discovery
-
-This only affects **motif discovery** (how site sets are merged before running MEME/STREME). With `combine_sites: true` (the demo default), all selected site sources for a TF are merged into one discovery input. Set `combine_sites: false` if you want separate per-source discoveries.
-
-```yaml
-motif_store:
-  combine_sites: false
-```
-
-After changing `combine_sites` or `site_kinds`, re-run `cruncher lock` so parse/sample use the updated site sets. Tip: to use only local DAP‑seq training sites in discovery, set `site_kinds: ["meme_blocks"]`.
-
----
-
-### Discover motifs from merged sites (MEME preferred)
-
-Optional: run discovery if you want to **rebuild a single aligned PWM per TF from cached sites** (useful when sites have mixed lengths or come from multiple sources). If you already trust the packaged matrices, skip to **Inspect candidate PWMs + logos** (or go straight to `lock`).
-
-If you fetched binding sites from multiple sources and want a single aligned PWM per TF (e.g., to reconcile different site lengths), run MEME Suite on the combined site sets. This creates new motif matrices under `motif_discovery.source_id` (default `meme_suite_meme`, or override with `--source-id`).
-
-Key points:
-
-- Reads cached binding sites (variable lengths are OK).
-- Outputs new PWM entries under the discovery `source_id`; `source_preference` selects which to use and `lock` pins IDs/hashes.
-- Runs write under `src/dnadesign/cruncher/.cruncher/discoveries/` (shared catalog root) and ingest motifs into the catalog.
-
-```bash
-# Verify discovery prerequisites
-cruncher discover check -c "$CONFIG"  # verify MEME Suite availability + inputs
-
-# Run MEME discovery (OOPS + addone prior)
-cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --meme-prior addone --source-id meme_suite_meme -c "$CONFIG"  # discover PWMs from sites
-
-# Confirm discovered motifs in catalog
-cruncher catalog list --source meme_suite_meme -c "$CONFIG"  # verify new motif entries
-```
-
-Discovery prints a short table (TF, tool, motif ID, length) and stores full outputs under the shared catalog root (e.g., `.../.cruncher/discoveries/`). STREME remains an option if you prefer it:
-
-```bash
-# Optional: STREME discovery
-cruncher discover motifs --tf lexA --tf cpxR --tool streme --source-id meme_suite_streme -c "$CONFIG"
-```
-
-This demo config already prefers MEME motifs for optimization: `pwm_source: matrix` with `source_preference: [meme_suite_meme, meme_suite_streme, ...]`. After discovery, inspect candidate PWMs (and optionally set PWM window lengths) before locking so parse/sample use the new motifs.
-
----
-
-#### Optional: set PWM window lengths
-
-If optimization needs a shorter PWM, set `pwm_window_lengths` to select the highest-information contiguous window before sampling:
-
-```yaml
-motif_store:
-  pwm_window_lengths:
-    lexA: 15
-    cpxR: 15
-```
-
-Then inspect candidate PWMs/logos (next section) and proceed to `lock` and `sample` below.
-
----
-
-### Inspect candidate PWMs + logos (pre-lock)
-
-Use `catalog pwms/logos` **before** locking to compare candidate matrices (e.g., MEME vs STREME). `catalog pwms` reports information content in bits; site‑derived PWMs use Biopython with configurable pseudocounts (`motif_store.pseudocounts`):
-
-```bash
-# Summarize candidate PWMs
-cruncher catalog pwms --set 1 -c "$CONFIG"  # summarize candidate matrices
-
-# Render candidate logos
-cruncher catalog logos --set 1 -c "$CONFIG"  # render logos for set 1
-
-# Optional: compare MEME vs STREME sources directly
-cruncher catalog pwms --source meme_suite_streme --set 1 -c "$CONFIG"  # inspect STREME matrices
-cruncher catalog pwms --source meme_suite_meme --set 1 -c "$CONFIG"  # inspect MEME matrices
-```
-
-Example output:
-
-```text
-                                                           PWM summary
-┏━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━┓
-┃ TF   ┃ Source          ┃ Motif ID             ┃ PWM source ┃ Length ┃ Window ┃ Bits  ┃ Sites (cached seq/total) ┃ Sites (matrix n) ┃ Site sets ┃
-┡━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━┩
-│ lexA │ meme_suite_meme │ lexA_CTGTATAWAWWHACA │ matrix     │ 15     │ -      │ 16.13 │ 99/99                │ 99              │ -         │
-│ cpxR │ meme_suite_meme │ cpxR_MANWWHTTTAM     │ matrix     │ 11     │ -      │ 5.47  │ 204/204              │ 204             │ -         │
-└──────┴─────────────────┴──────────────────────┴────────────┴────────┴────────┴───────┴──────────────────────┴─────────────────┴───────────┘
-```
-
-Tip: add `--matrix` to print full PWM matrices or `--log-odds` for log‑odds matrices.
-
-How to read the summary:
-
-- **Bits**: quick specificity screen (very low bits often means a weak/degenerate PWM).
-- **Length/Window**: confirm the width you intend to optimize against (use `pwm_window_lengths` if you want a shorter high‑information window).
-- **Sites (cached seq/total)** vs **Sites (matrix n)**: cached coverage vs the count embedded in the matrix metadata (e.g., discovery output).
-
-Logos are written under `outputs/logos/catalog/<run_name>/` and include site counts (`n=...`) when available.
-
----
-
-#### Optional: local motifs or alignment matrices
-
-This demo already uses matrix mode. If you want to **prefer local motif matrices** or RegulonDB alignments over MEME/STREME discoveries, reorder `source_preference` like this:
-
-```yaml
-motif_store:
-  pwm_source: matrix
-  source_preference: [demo_local_meme, regulondb]
-```
-
-Then fetch local MEME motifs (if you have not already):
-
-```bash
-# Fetch local matrices for preference order
-cruncher fetch motifs --source demo_local_meme --tf lexA --tf cpxR -c "$CONFIG"  # refresh local matrices
-```
-
-Note: not all RegulonDB transcription factors have alignment matrices. If `fetch motifs` fails with “alignment matrix is missing”, switch to `pwm_source: sites` and `fetch sites` instead.
-
----
-
-### Select motif source + lock
-
-Lockfiles resolve TF names to exact motif IDs and hashes for reproducibility.
-
-```bash
-# Write lockfile for reproducibility
-cruncher lock -c "$CONFIG"  # write config.lock.json in workspace state
-```
-
-Example output:
-
-```text
-<workspace>/.cruncher/locks/config.lock.json
-```
-
-Think of `lock` as the “commit”: it freezes the exact motif IDs + hashes used for scoring. Re‑run it after discovery, after changing `source_preference`, or after changing any PWM windowing settings.
-
-Lockfiles are required for `parse`, `sample`, and `targets status`. If you add new motifs (e.g., after `discover motifs`) or change `motif_store` preferences, re-run `lock` to refresh the pinned motif IDs and hashes.
-
----
-
-### Inspect cached entries and targets (post-lock)
-
-Quick checks (target status requires a lockfile):
-
-```bash
-cruncher targets list -c "$CONFIG"  # list targets per regulator set
-
-# Readiness check (lock + cache)
-cruncher targets status -c "$CONFIG"  # validate lock + cache alignment
-```
-
-Optional debugging / deeper visibility:
-
-```bash
-# Show one catalog entry
-cruncher catalog show regulondb:RDBECOLITFC00214 -c "$CONFIG"  # inspect a specific entry
-
-# Stats across candidates
-cruncher targets stats -c "$CONFIG"  # show stats across candidates
-
-# Fuzzy TF lookup
-cruncher targets candidates --fuzzy -c "$CONFIG"  # fuzzy match TF names
-
-# Dashboard: cache + runs
-cruncher status -c "$CONFIG"  # show cache + run summaries
-```
-
-Note: with `combine_sites: true`, `targets status` reports merged site counts per TF (Sites shows merged seq/total) even when `pwm_source=matrix`; **Source** and **Motif ID** still reflect the locked matrix choice.
-
----
-
-### Parse workflow (validate locked motifs)
-
-Parse is a cheap sanity check that validates the locked PWMs load correctly and writes a manifest used by sampling.
-
-```bash
-# Validate lock + cached motifs
-cruncher parse -c "$CONFIG"  # validate locked PWMs and write a parse manifest
-```
-
-Re-running parse with the same config + lock fingerprint reuses existing outputs and reports the location. Parse outputs live under `outputs/parse/<run_name>/meta/`.
-
----
-
-### Sample (MCMC optimization)
-
-Each candidate dsDNA sequence is scored by scanning both strands for each PWM, taking the best match per TF, then optimizing the min/soft‑min across TFs (raise the weakest TF). Sampling length is fixed by `sample.sequence_length` and must be at least the widest PWM; shorter lengths force overlap and typically reduce per‑TF scores. The goal is not a single winner: **cruncher** returns a diverse elite set.
-
-Current MMR behavior (TFBS‑core mode) is:
-- For each sequence in the candidate pool, we extract the best‑hit window for each TF (e.g., LexA core, CpxR core), orient each core to its PWM.
-- When comparing two sequences, we compute LexA‑core vs LexA‑core and CpxR‑core vs CpxR‑core Hamming distances (weighted per PWM position), then average across TFs.
-- We never compare LexA vs CpxR within the same sequence.
-
-“Tolerant” weights emphasize low‑information PWM positions to preserve consensus‑critical bases while encouraging diversity. When `objective.bidirectional=true`, MMR deduplicates by canonical sequence so reverse complements (including palindromes) count as the same identity.
-
-This demo uses `compute.total_sweeps=6000` with `compute.adapt_sweep_frac=0.34` so adaptation ends after the first ~2040 sweeps and the remainder are draws.
-Early-stop is enabled in this demo (`patience: 500`, `min_delta: 0.01`) to cut off draws once scores stall. After `cruncher analyze`, inspect `analysis/report.md` or `analysis/objective_components.json` for the `learning` block, which records the best-score sweep and a per-chain early-stop simulation.
-
-```bash
-# Run sampling
-cruncher sample -c "$CONFIG"
-
-# Run sampling with verbose logs
-cruncher sample --verbose -c "$CONFIG"  # stream periodic status logs
-
-# List runs for this workspace
-cruncher runs list -c "$CONFIG"  # list run history
-
-# Show latest run for set 1
-cruncher runs latest --set-index 1 -c "$CONFIG"  # show most recent run
-
-# Show best run for set 1
-cruncher runs best --set-index 1 -c "$CONFIG"  # show best-scoring run
-```
-
-Example output (runs list, abridged):
-
-```text
-                               Runs
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┓
-┃ Name                     ┃ Stage    ┃ Status    ┃ Created    ┃ Motifs ┃ Regulator set  ┃ PWM source ┃
-┡━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━┩
-│ lexA-cpxR_20260114_155026_a5622e   │ sample   │ completed │ 2026-01-14 │ 2      │ lexA,cpxR       │ matrix     │
-│ lexA-cpxR_20260114_144521_29fb6f   │ parse    │ completed │ 2026-01-14 │ 2      │ lexA,cpxR       │ matrix     │
-└──────────────────────────┴──────────┴───────────┴────────────┴────────┴────────────────┴────────────┘
-```
-
-```bash
-# Mark stale runs as aborted
-cruncher runs clean --stale --older-than-hours 0 -c "$CONFIG"  # mark stale runs
-```
-
-For live progress, you can watch the run status in another terminal:
-
-```bash
-# Stream live run status
-cruncher runs watch <run_name> -c "$CONFIG"  # watch status updates
-
-# Stream status with plots
-cruncher runs watch <run_name> --plot -c "$CONFIG"  # watch status + plots
-```
-
----
-
-#### Run artifacts + performance snapshot
-
-Use `runs show` to inspect what a run produced:
-
-```bash
-# Inspect artifacts for a run
-cruncher runs show 20260114_131314_c2b4ce -c "$CONFIG"  # list artifacts for a run
-```
-
-Key artifacts include `meta/config_used.yaml`, `artifacts/sequences.parquet`,
-`artifacts/trace.nc` (if enabled), and `artifacts/elites.*`.
-
-Runtime scales with `compute.total_sweeps` and the `adapt_sweep_frac` split; adjust them to match your runtime/quality budget.
-
----
-
-#### Analyze + report
-
-Use analysis to answer three questions:
-
-1. **Did we raise the weakest TF?** (look at per‑TF scores and the min/soft‑min objective distribution)
-2. **Did we keep diversity?** (unique sequences *up to reverse‑complement*, avoid a single collapsed cluster)
-3. **Did the sampler mix?** (trace/tempering diagnostics; poor mixing usually means you should increase sweeps or adjust the move profile)
-
-Motif overlap/co‑localization is allowed; use the overlap/structure plots to see *how* the PWMs are being jointly satisfied.
-
-```bash
-# Analyze latest sample run (default when analysis.runs is empty)
+cruncher sample  -c "$CONFIG"
 cruncher analyze -c "$CONFIG"
-# Or pin to a specific run:
-# cruncher analyze --run <run_name|run_dir> -c "$CONFIG"
-
-# Write report from latest run
-cruncher analyze --summary -c "$CONFIG"  # print a concise report from latest run
+cruncher analyze --summary -c "$CONFIG"
 ```
 
-Outputs land under `<workspace>/outputs/sample/<run_name>/analysis/` with a
-summary in `analysis/summary.json`.
-This demo enables a small Tier‑0 plot set by default; use
-`cruncher analyze --plots all` to generate the full suite.
+## Inspect results
 
-If you're running via `pixi`, prefix those next-step commands with `pixi run cruncher --`.
+Run artifacts live under:
 
-For a compact diagnostics checklist and tuning guidance, see the
-[sampling + analysis guide](../guides/sampling_and_analysis.md).
+```
+<workspace>/outputs/sample/<run_name>/
+```
 
----
+Key files:
 
-#### Optional: live analysis notebook
+- `analysis/summary.json`
+- `analysis/report.md`
+- `analysis/report.json`
+- curated plots: `analysis/plot__run__dashboard.*`, `analysis/plot__scores__projection.*`, `analysis/plot__elites__nn_distance.*`
 
-Replace the run directory below with your own sample run (see `cruncher runs latest`).
+## Optional: motif discovery
+
+If you want to rebuild PWMs from cached sites, enable discovery in the config and run:
 
 ```bash
-cruncher notebook <workspace>/outputs/sample/lexA-cpxR_20260113_115749_e72283 --latest  # generate analysis notebook
+cruncher discover motifs --tf lexA --tf cpxR -c "$CONFIG"
+cruncher lock -c "$CONFIG"
+cruncher parse -c "$CONFIG"
 ```
 
-Notebook files are written under `<run_dir>/analysis/notebooks/`.
+Discovery writes new motif matrices into the catalog and requires MEME Suite.
 
----
+## Related docs
 
-#### Bridge to DenseGen
-
-Export the binding-site superset and the selected motifs for DenseGen runs:
-
-```bash
-# Export binding sites (CSV/Parquet) for DenseGen binding_sites inputs
-cruncher catalog export-sites --set 1 --densegen-workspace demo_meme_three_tfs -c "$CONFIG"
-
-# Export per-motif JSON artifacts for DenseGen PWM artifact inputs
-cruncher catalog export-densegen --set 1 --densegen-workspace demo_meme_three_tfs -c "$CONFIG"
-```
-
-`--densegen-workspace` accepts a workspace name (resolved under `src/dnadesign/densegen/workspaces`)
-or an absolute path, and writes under that workspace's `inputs/`. You can still provide `--out`,
-but the path must remain inside the target `inputs/` directory.
-`catalog export-densegen` removes existing artifact JSONs for the selected TFs by default; use
-`--no-clean` if you want to keep prior artifacts.
-
-Then point DenseGen configs at the exported files (`type: binding_sites`) or artifacts
-(`type: pwm_artifact_set`).
-
----
-
-@e-south
+- [Config reference](../reference/config.md)
+- [Sampling + analysis](../guides/sampling_and_analysis.md)
+- [CLI reference](../reference/cli.md)

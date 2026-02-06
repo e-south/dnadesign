@@ -18,7 +18,7 @@ from pathlib import Path
 
 from dnadesign.cruncher.analysis.layout import ANALYSIS_LAYOUT_VERSION, summary_path
 from dnadesign.cruncher.artifacts.entries import normalize_artifacts
-from dnadesign.cruncher.config.schema_v2 import AnalysisConfig
+from dnadesign.cruncher.config.schema_v3 import AnalysisConfig
 from dnadesign.cruncher.utils.hashing import sha256_bytes, sha256_path
 
 

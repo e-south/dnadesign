@@ -3,7 +3,9 @@
 <cruncher project>
 src/dnadesign/cruncher/src/artifacts/manifest.py
 
-Author(s): Eric J. South
+Read and write run manifest artifacts for Cruncher runs.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -16,7 +18,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json
 from dnadesign.cruncher.artifacts.layout import manifest_path
-from dnadesign.cruncher.config.schema_v2 import CruncherConfig
+from dnadesign.cruncher.config.schema_v3 import CruncherConfig
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 from dnadesign.cruncher.store.lockfile import LockedMotif
 from dnadesign.cruncher.utils.hashing import sha256_path

@@ -3,7 +3,9 @@
 <cruncher project>
 src/dnadesign/cruncher/src/app/campaign_summary.py
 
-Author(s): Eric J. South
+Summarize campaign runs into aggregated tables and plots.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -34,7 +36,7 @@ from dnadesign.cruncher.app.campaign_service import (
 from dnadesign.cruncher.app.run_service import list_runs
 from dnadesign.cruncher.artifacts.layout import sequences_path
 from dnadesign.cruncher.artifacts.manifest import load_manifest
-from dnadesign.cruncher.config.schema_v2 import CampaignConfig, CruncherConfig
+from dnadesign.cruncher.config.schema_v3 import CampaignConfig, CruncherConfig
 from dnadesign.cruncher.utils.paths import resolve_catalog_root
 from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
 

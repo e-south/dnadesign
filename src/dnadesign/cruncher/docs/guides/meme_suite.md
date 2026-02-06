@@ -1,8 +1,7 @@
-## MEME Suite dependency
-
+# MEME Suite
 
 ## Contents
-- [MEME Suite dependency](#meme-suite-dependency)
+- [MEME Suite](#meme-suite)
 - [Install with pixi (recommended)](#install-with-pixi-recommended)
 - [Choose MEME vs STREME](#choose-meme-vs-streme)
 - [Compare outputs (optional)](#compare-outputs-optional)
@@ -44,7 +43,7 @@ cruncher catalog logos --source meme_suite_streme <config>
 cruncher catalog logos --source meme_suite_meme <config>
 ```
 
-After choosing, set `motif_store.source_preference` and re‑run `cruncher lock`.
+After choosing, set `catalog.source_preference` and re‑run `cruncher lock`.
 Note: MEME/STREME matrices are rounded in their text output. **cruncher** renormalizes near‑1.0 rows to avoid false validation errors.
 
 ### If you don't use pixi
@@ -55,7 +54,7 @@ Point **cruncher** at a MEME Suite bin directory:
 export DNADESIGN_ROOT="$(git rev-parse --show-toplevel)"
 export MEME_BIN="$DNADESIGN_ROOT/.pixi/envs/default/bin"
 # or set in config:
-# motif_discovery:
+# discover:
 #   tool_path: /abs/path/to/meme/bin
 ```
 

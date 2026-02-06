@@ -1,8 +1,7 @@
-## cruncher ingestion
-
+# Ingestion
 
 ## Contents
-- [cruncher ingestion](#cruncher-ingestion)
+- [Ingestion](#ingestion)
 - [How ingestion works](#how-ingestion-works)
 - [Cache layout](#cache-layout)
 - [General normalization rules](#general-normalization-rules)
@@ -30,7 +29,7 @@ This guide describes how Cruncher ingests, normalizes, and caches motif and site
 ### Cache layout
 
 ```
-<catalog_root>/
+<catalog.root>/
   catalog.json
   normalized/
     motifs/<source>/<motif_id>.json
@@ -60,7 +59,7 @@ Workspace state (per workspace `.cruncher/`):
 - **Coordinates** are stored as 0-based, half-open intervals.
 - **Hydration** is required when HT peaks have coordinates but no sequences.
 - **Site length variability**: if site lengths vary, set
-  `motif_store.site_window_lengths` per TF or dataset before building PWMs.
+  `catalog.site_window_lengths` per TF or dataset before building PWMs.
 
 ---
 
@@ -166,8 +165,8 @@ HT datasets (ChIP‑seq, ChIP‑exo, DAP‑seq, gSELEX) are discovered and fetch
 
 When multiple HT datasets exist for a TF, pin selection with:
 
-- `motif_store.dataset_map` (TF -> dataset ID, strongest)
-- `motif_store.dataset_preference` (ordered preference list)
+- `catalog.dataset_map` (TF -> dataset ID, strongest)
+- `catalog.dataset_preference` (ordered preference list)
 
 Lockfiles record the chosen dataset ID for reproducibility.
 
@@ -208,7 +207,7 @@ those sites (for example via `cruncher fetch sites --hydrate <config>`).
 - `cruncher fetch sites --hydrate <config>` -> hydrate missing sequences only (all cached site sets by default).
 - `cruncher fetch sites --dataset-id <id> <config>` -> pin a specific HT dataset
   (also enables HT access for this request).
-- `--source` defaults to the first available entry in `motif_store.source_preference` (skipping entries that are
+- `--source` defaults to the first available entry in `catalog.source_preference` (skipping entries that are
   not registered ingest sources); if the list is empty or none are available you must pass `--source` explicitly.
 - `--offline` validates cache without network.
 - `--update` forces refresh of cached artifacts.
@@ -217,8 +216,8 @@ those sites (for example via `cruncher fetch sites --hydrate <config>`).
 
 ### PWM creation strategy
 
-- `motif_store.pwm_source=matrix` uses cached matrices (default).
-- `motif_store.pwm_source=sites` builds PWMs from cached binding sites.
+- `catalog.pwm_source=matrix` uses cached matrices (default).
+- `catalog.pwm_source=sites` builds PWMs from cached binding sites.
 - `min_sites_for_pwm` is enforced unless `allow_low_sites=true`.
 
 ---
@@ -230,7 +229,7 @@ those sites (for example via `cruncher fetch sites --hydrate <config>`).
 - Missing cache files: `cruncher cache verify <config>`.
 - HT sites without sequences: set `ingest.genome_source` or use `--genome-fasta`.
 - Variable site lengths: use `cruncher targets stats` and set
-  `motif_store.site_window_lengths`.
+  `catalog.site_window_lengths`.
 
 ---
 

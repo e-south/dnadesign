@@ -1,8 +1,7 @@
-## cruncher CLI
-
+# Cruncher CLI
 
 ## Contents
-- [cruncher CLI](#cruncher-cli)
+- [Cruncher CLI](#cruncher-cli)
 - [Workspace discovery and config resolution](#workspace-discovery-and-config-resolution)
 - [Quick command map](#quick-command-map)
 - [Core lifecycle commands](#core-lifecycle-commands)
@@ -42,7 +41,7 @@ cruncher workspaces list
 
 #### `cruncher fetch motifs`
 
-Caches motif matrices into `<catalog_root>/normalized/motifs/...`.
+Caches motif matrices into `<catalog.root>/normalized/motifs/...`.
 
 Inputs:
 
@@ -55,7 +54,7 @@ Network:
 
 When to use:
 
-* you want `cruncher.motif_store.pwm_source: matrix`
+* you want `cruncher.catalog.pwm_source: matrix`
 * you want to reuse alignment/matrix payloads across runs
 
 Examples:
@@ -82,14 +81,14 @@ Note:
 
 * `--campaign` applies campaign selectors by default; use `--no-selectors` to fetch raw category TFs when the
   local catalog is empty.
-* `--source` defaults to the first available entry in `motif_store.source_preference` (skipping entries that are
+* `--source` defaults to the first available entry in `catalog.source_preference` (skipping entries that are
   not registered ingest sources); if the list is empty or none are available you must pass `--source` explicitly.
 
 ---
 
 #### `cruncher fetch sites`
 
-Caches binding-site instances into `<catalog_root>/normalized/sites/...`.
+Caches binding-site instances into `<catalog.root>/normalized/sites/...`.
 
 Inputs:
 
@@ -102,7 +101,7 @@ Network:
 
 When to use:
 
-* you want `cruncher.motif_store.pwm_source: sites`
+* you want `cruncher.catalog.pwm_source: sites`
 * you want curated or HT site sets cached locally
 * you need hydration for coordinate-only peaks
 
@@ -133,7 +132,7 @@ Note:
 * `--hydrate` with no `--tf/--motif-id` hydrates all cached site sets by default.
 * `--campaign` applies campaign selectors by default; use `--no-selectors` to fetch raw category TFs when the
   local catalog is empty.
-* `--source` defaults to the first available entry in `motif_store.source_preference` (skipping entries that are
+* `--source` defaults to the first available entry in `catalog.source_preference` (skipping entries that are
   not registered ingest sources); if the list is empty or none are available you must pass `--source` explicitly.
 
 ---
@@ -245,7 +244,7 @@ Notes:
 
 * `--metrics` requires a local catalog; fetch motifs/sites first.
 * `--skip-missing` skips runs missing `analysis/joint_metrics.parquet` or `analysis/score_summary.parquet`.
-* With site-derived PWMs, `--metrics` also requires `motif_store.site_window_lengths`
+* With site-derived PWMs, `--metrics` also requires `catalog.site_window_lengths`
   for TFs with variable site lengths. Use `--no-metrics` if you haven't set them.
 
 ---
@@ -300,7 +299,7 @@ Notes:
 
 * Logos are rendered via `cruncher catalog logos`; its defaults come from `parse.plot.bits_mode` and `parse.plot.dpi`.
 * `cruncher parse` always uses the lockfile to pin exact motif IDs/hashes.
-  If you add new motifs (e.g., via `discover motifs`) or change `motif_store` preferences,
+  If you add new motifs (e.g., via `discover motifs`) or change `catalog` preferences,
   re-run `cruncher lock <config>` to refresh what parse will use.
 * Parse is idempotent for identical inputs; if matching outputs already exist, it reports
   the existing run instead of creating a new one.
@@ -347,9 +346,8 @@ Generates diagnostics and plots for one or more sample runs.
 Inputs:
 
 * CONFIG (explicit or resolved)
-* runs via `analysis.runs` or `--run` (defaults to latest sample run if empty)
-* run artifacts: `artifacts/sequences.parquet` (required) and `artifacts/trace.nc` for trace-based plots
-* pairwise plots auto-select a deterministic `tf_pair` when omitted (override with `--tf-pair`)
+* runs via `analysis.run_selector`/`analysis.runs` or `--run` (defaults to latest sample run if empty)
+* run artifacts: `artifacts/sequences.parquet` (required), `artifacts/elites.parquet` (required), and `artifacts/trace.nc` for trace-based plots
 
 Network:
 
@@ -359,10 +357,7 @@ Examples:
 
 * `cruncher analyze --latest <config>`
 * `cruncher analyze --run <run_name|run_dir> <config>`
-* `cruncher analyze --tf-pair lexA,cpxR <config>`
-* `cruncher analyze --plots trace --plots score_hist <config>`
-* `cruncher analyze --scatter-background --scatter-background-samples 2000 <config>`
-* `cruncher analyze --list-plots`
+* `cruncher analyze --summary <config>`
 
 Preconditions:
 
@@ -373,9 +368,13 @@ Preconditions:
 
 Outputs:
 
-* tables: `analysis/score_summary.parquet`, `analysis/elite_topk.parquet`,
-  `analysis/joint_metrics.parquet`, `analysis/diagnostics.json`
-* plots: `analysis/plot__score__pairgrid.<plot_format>` (when `analysis.plots.pairgrid=true`)
+* tables: `analysis/table__scores__summary.parquet`, `analysis/table__elites__topk.parquet`,
+  `analysis/table__metrics__joint.parquet`, `analysis/table__diagnostics__summary.json`,
+  `analysis/table__objective__components.json`, `analysis/table__elites__mmr_summary.parquet`,
+  `analysis/table__elites__nn_distance.parquet`
+* plots: `analysis/plot__run__dashboard.<plot_format>`, `analysis/plot__scores__projection.<plot_format>`,
+  `analysis/plot__elites__nn_distance.<plot_format>`, `analysis/plot__overlap__panel.<plot_format>`,
+  `analysis/plot__diag__panel.<plot_format>` (trace only)
 * reports: `analysis/report.json`, `analysis/report.md`
 * summaries: `analysis/summary.json`, `analysis/manifest.json`, `analysis/plot_manifest.json`, `analysis/table_manifest.json`
 
@@ -526,18 +525,18 @@ Examples:
 Notes:
 * `tool=auto` selects STREME when there are enough sequences; use `--tool meme` if STREME is not installed.
 * Discovery reads cached binding sites (run `cruncher fetch sites` first).
-  Discovery always uses cached sites regardless of `motif_store.pwm_source`.
+  Discovery always uses cached sites regardless of `catalog.pwm_source`.
 * By default discovery uses raw cached site sequences. Use `--window-sites` (or
-  `motif_discovery.window_sites=true`) to pre-window with `motif_store.site_window_lengths`
+  `discover.window_sites=true`) to pre-window with `catalog.site_window_lengths`
   before running MEME/STREME.
   If enabled without window lengths for a TF, discovery exits with a helpful error.
 * If `--minw/--maxw` are omitted (and unset in config), Cruncher derives them from the min/max
   site lengths per TF.
 * Use `cruncher targets stats` to set `--minw/--maxw` from site-length ranges.
-* If you plan to run both MEME and STREME, set distinct `motif_discovery.source_id` values between runs to avoid lock ambiguity.
+* If you plan to run both MEME and STREME, set distinct `discover.source_id` values between runs to avoid lock ambiguity.
   You can also pass `--source-id` per run to avoid editing config.
 * By default discovery replaces previous discovered motifs for the same TF/source
-  (`motif_discovery.replace_existing=true`). Pass `--keep-existing` to retain historical runs.
+  (`discover.replace_existing=true`). Pass `--keep-existing` to retain historical runs.
 * `--meme-mod` applies to MEME only; use it when each sequence is expected to contain one site.
 * `--meme-prior` applies to MEME only; `addone` is a good default for sparse site sets.
 * Use `--tool-path` or the `MEME_BIN` environment variable to point at a specific install.

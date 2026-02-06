@@ -1,8 +1,7 @@
-## cruncher architecture
-
+# Cruncher architecture
 
 ## Contents
-- [cruncher architecture](#cruncher-architecture)
+- [Cruncher architecture](#cruncher-architecture)
 - [Run lifecycle](#run-lifecycle)
 - [Layers and responsibilities](#layers-and-responsibilities)
 - [On-disk layout](#on-disk-layout)
@@ -93,10 +92,10 @@ In this repo, the bundled demo workspaces live at:
 - `src/dnadesign/cruncher/workspaces/demo_basics_two_tf/`
 - `src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf/`
 
-#### Catalog root (`catalog_root`, default: `.cruncher/`)
+#### Catalog root (`catalog.root`, default: `.cruncher/`)
 
 ```
-<catalog_root>/
+<catalog.root>/
 catalog.json
 normalized/
 motifs/<source>/<motif_id>.json
@@ -107,7 +106,7 @@ discoveries/          # MEME/STREME discovery runs
 ```
 
 - `catalog.json` is the “what do we have cached?” index.
-- `catalog_root` can be absolute or relative to the cruncher root (`src/dnadesign/cruncher`); relative paths must not include `..`.
+- `catalog.root` can be absolute or relative to the cruncher root (`src/dnadesign/cruncher`); relative paths must not include `..`.
 - By default the catalog cache is shared across workspaces (`src/dnadesign/cruncher/.cruncher`); locks/run_index live in each workspace’s `.cruncher/`.
 
 #### Workspace state (per workspace `.cruncher/`)
@@ -123,7 +122,7 @@ run_index.json
 
 #### Tooling caches
 
-- Matplotlib writes its cache under `<catalog_root>/.mplcache/` unless `MPLCONFIGDIR` is set.
+- Matplotlib writes its cache under `<catalog.root>/.mplcache/` unless `MPLCONFIGDIR` is set.
 - Numba JIT cache defaults to `<workspace>/.cruncher/numba_cache` unless `NUMBA_CACHE_DIR` is set.
 
 #### Run outputs (`out_dir`, e.g. `outputs/`)
@@ -142,9 +141,11 @@ A typical **sample** run directory contains:
 
 - `meta/` — manifests, config_used, live status snapshots
 - `artifacts/` — sequences, trace (if enabled), elites exports
-- `analysis/` — plots, tables, and analysis metadata (plus optional notebooks/archive)
+- `analysis/` — plots, tables, manifests, and reports
 - `live/` — streaming metrics (if enabled)
+- `analysis/summary.json` — canonical analysis summary
 - `analysis/report.json` + `analysis/report.md` — analysis report outputs from `cruncher analyze`
+- `analysis/plot_manifest.json` + `analysis/table_manifest.json` — artifact inventories
 
 ---
 

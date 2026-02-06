@@ -3,7 +3,9 @@
 <cruncher project>
 src/dnadesign/cruncher/src/app/target_service.py
 
-Author(s): Eric J. South
+Resolve target regulator sets and campaign expansions.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -14,7 +16,7 @@ from pathlib import Path
 from typing import Iterable, Optional, Tuple
 
 from dnadesign.cruncher.app.campaign_service import select_catalog_entry
-from dnadesign.cruncher.config.schema_v2 import CruncherConfig
+from dnadesign.cruncher.config.schema_v3 import CruncherConfig
 from dnadesign.cruncher.ingest.site_windows import resolve_window_length
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 from dnadesign.cruncher.store.lockfile import LockedMotif, read_lockfile

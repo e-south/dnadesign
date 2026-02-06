@@ -3,7 +3,9 @@
 <cruncher project>
 src/dnadesign/cruncher/src/app/parse_workflow.py
 
-Author(s): Eric J. South
+Parse locked motifs into normalized catalog artifacts.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -29,7 +31,7 @@ from dnadesign.cruncher.artifacts.layout import (
 )
 from dnadesign.cruncher.artifacts.manifest import build_run_manifest, load_manifest, write_manifest
 from dnadesign.cruncher.artifacts.status import RunStatusWriter
-from dnadesign.cruncher.config.schema_v2 import CruncherConfig
+from dnadesign.cruncher.config.schema_v3 import CruncherConfig
 from dnadesign.cruncher.core.labels import regulator_sets
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
 from dnadesign.cruncher.store.catalog_store import CatalogMotifStore

@@ -1,8 +1,7 @@
-## cruncher for developers
-
+# Cruncher for developers
 
 ## Contents
-- [cruncher for developers](#cruncher-for-developers)
+- [Cruncher for developers](#cruncher-for-developers)
 - [Goals](#goals)
 - [Architecture](#architecture)
 - [Data model](#data-model)
@@ -19,7 +18,7 @@
 
 - Decoupled: core optimization is source-agnostic and runs offline.
 - Assertive: explicit errors for missing inputs, ambiguous TFs, invalid matrices.
-- Extendable: new sources and optimizers are adapters/registries.
+- Extendable: new sources and optimizers can be added via registries (v3 ships PT-only).
 - Reproducible: lockfiles + run manifests + deterministic seeds.
 - Operational UX: clear CLI commands, deterministic cache, readable reports, crisp docs.
 - No fallbacks: no implicit legacy modes, no silent fallbacks, no hidden network access.
@@ -72,7 +71,7 @@
 ### Cache layout
 
 ```
-<catalog_root>/
+<catalog.root>/
   catalog.json
   normalized/
     motifs/<source>/<motif_id>.json
@@ -82,7 +81,7 @@
 ```
 
 `catalog.json` is the single source of truth for “what we have in-house”. It tracks matrix availability, site counts, and provenance tags.
-`catalog_root` can be absolute or relative to the cruncher root (`src/dnadesign/cruncher`); relative paths must not include `..`.
+`catalog.root` can be absolute or relative to the cruncher root (`src/dnadesign/cruncher`); relative paths must not include `..`.
 By default the catalog cache is shared across workspaces (`src/dnadesign/cruncher/.cruncher`).
 
 Workspace state (per workspace `.cruncher/`):
@@ -96,7 +95,7 @@ Workspace state (per workspace `.cruncher/`):
 
 Tooling caches:
 
-- Matplotlib caches in `<catalog_root>/.mplcache/` unless `MPLCONFIGDIR` is set.
+- Matplotlib caches in `<catalog.root>/.mplcache/` unless `MPLCONFIGDIR` is set.
 - Numba JIT cache defaults to `<workspace>/.cruncher/numba_cache` unless `NUMBA_CACHE_DIR` is set.
 
 ---
@@ -114,35 +113,31 @@ If a TF cannot be uniquely resolved, **cruncher** errors immediately. Analyze op
 
 ### PWM creation strategy
 
-- Default: use cached matrices (`motif_store.pwm_source=matrix`).
-- Optional: build PWM from cached sites (`motif_store.pwm_source=sites`).
-- Site-derived PWMs use Biopython with configurable pseudocounts (`motif_store.pseudocounts`).
-- `motif_store.site_kinds` can restrict which site sets are eligible (e.g., curated vs HT vs local).
-- `motif_store.combine_sites=true` concatenates site sets for a TF before PWM creation (explicit opt‑in).
+- Default: use cached matrices (`catalog.pwm_source=matrix`).
+- Optional: build PWM from cached sites (`catalog.pwm_source=sites`).
+- Site-derived PWMs use Biopython with configurable pseudocounts (`catalog.pseudocounts`).
+- `catalog.site_kinds` can restrict which site sets are eligible (e.g., curated vs HT vs local).
+- `catalog.combine_sites=true` concatenates site sets for a TF before PWM creation (explicit opt‑in).
 - When `combine_sites=true`, lockfiles hash the full set of site files used for that TF, so cache changes require re-locking.
-- HT site sets with variable lengths require per‑TF/per‑dataset window lengths via `motif_store.site_window_lengths`.
-- If optimization requires a shorter PWM, set `motif_store.pwm_window_lengths` to select the highest‑information window.
+- HT site sets with variable lengths require per‑TF/per‑dataset window lengths via `catalog.site_window_lengths`.
+- If optimization requires a shorter PWM, set `catalog.pwm_window_lengths` to select the highest‑information window.
 - Fail if fewer than `min_sites_for_pwm` binding sites are available (unless `allow_low_sites=true`).
 - All PWMs are validated (shape Lx4, rows sum to 1, non-negative).
 - De novo alignment/discovery is handled via MEME Suite (`cruncher discover motifs`) and stored as catalog matrices.
-  Tool resolution uses `motif_discovery.tool_path` (resolved relative to config), `MEME_BIN`, or PATH, and discovery
+  Tool resolution uses `discover.tool_path` (resolved relative to config), `MEME_BIN`, or PATH, and discovery
   writes a `discover_manifest.json` with tool/version metadata per run.
 
 ---
 
 ### MCMC optimization spec
 
-- Deterministic RNG via `sample.rng.seed` (and `sample.rng.deterministic=true` for stable run seeding).
-- Burn-in storage is optional via `sample.output.trace.include_tune` (default: false, affects sequences.parquet only).
+- Deterministic RNG via `sample.seed` and run-level stable seeding.
+- Burn-in storage is optional via `sample.output.include_tune_in_sequences` (default: false, affects sequences.parquet only).
 - Fixed-length sampling: `sample.sequence_length` must be >= the widest PWM length.
-- Optimizer registry supports `pt` (parallel tempering).
-- Each optimizer reports:
-  - move tallies
-  - acceptance ratios for B/M moves
-  - PT swap acceptance rates
-- Cooling (PT ladder) and soft-min schedules are independent.
-- Optional adaptive controllers tune the PT ladder scale toward target swap acceptance.
-- Move policies support slide/swap/insertion moves plus optional “worst TF” targeting and move scheduling.
+- PT-only kernel with ladder adaptation (`sample.pt.*`).
+- Each run reports move tallies, acceptance ratios, and swap acceptance rates.
+- PT ladder adaptation and softmin schedules are independent.
+- Move policies are selected via `sample.moves.profile` with optional overrides.
 
 ---
 

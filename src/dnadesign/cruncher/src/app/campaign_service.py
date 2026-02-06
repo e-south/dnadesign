@@ -3,7 +3,9 @@
 <cruncher project>
 src/dnadesign/cruncher/src/app/campaign_service.py
 
-Author(s): Eric J. South
+Build, validate, and expand campaign configurations.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -16,7 +18,7 @@ from itertools import combinations
 from pathlib import Path
 from typing import Dict, Iterable, Optional
 
-from dnadesign.cruncher.config.schema_v2 import (
+from dnadesign.cruncher.config.schema_v3 import (
     CampaignConfig,
     CampaignSelectorsConfig,
     CruncherConfig,

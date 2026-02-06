@@ -3,7 +3,9 @@
 <cruncher project>
 src/dnadesign/cruncher/src/app/run_service.py
 
-Author(s): Eric J. South
+Enumerate and summarize sample runs in a workspace.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -17,7 +19,7 @@ from typing import Iterable, Optional
 
 from dnadesign.cruncher.artifacts.entries import normalize_artifacts
 from dnadesign.cruncher.artifacts.layout import manifest_path, status_path
-from dnadesign.cruncher.config.schema_v2 import CruncherConfig
+from dnadesign.cruncher.config.schema_v3 import CruncherConfig
 from dnadesign.cruncher.utils.paths import resolve_run_index_path
 
 

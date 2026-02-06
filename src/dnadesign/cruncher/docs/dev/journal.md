@@ -4,6 +4,7 @@
 ## Contents
 - [2026-02-04](#2026-02-04)
 - [2026-02-05](#2026-02-05)
+- [2026-02-06](#2026-02-06)
 
 ## 2026-02-04
 - Start refactor to remove core I/O dependencies and progress UI from optimizers.
@@ -73,3 +74,9 @@
 - Updated sampling/CLI/demo docs to state `elites.k` drives the scorecard size and to guide pilots when elites fall short.
 - Added a v3 single-path schema design: `sequence_length`, `compute.total_sweeps`, and `compute.adapt_sweep_frac` with explicit numeric elite gates (`min_per_tf_norm`, `mmr_alpha`), removing pilot grids and inference-style tune/draws.
 - Removed auto-opt orchestration modules and CLI/report wiring; updated demos/workspaces and sampling docs to the fixed-length compute schema with no pilot references.
+
+## 2026-02-06
+- Continued v3 work: updated schema_v3 to be self-contained (removed schema_v2 imports) and aligned CLI config/analyze commands with the v3 surface.
+- Simplified analysis CLI to v3 behavior (run selection + summary only) and removed plot/tf-pair override flags.
+- Updated v3 docs (config reference, sampling/analysis guide, demos, ingestion/meme suite guides, architecture, internals spec) to match the curated analysis suite and v3 schema terminology.
+- Added a local encode helper in analysis/per_pwm to remove dependency on deprecated scatter utils.
