@@ -9,6 +9,7 @@ Author(s): Eric J. South
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import pandas as pd
@@ -251,3 +252,91 @@ def test_demo_workspace_cli_without_config(tmp_path: Path, monkeypatch: pytest.M
 
     result = runner.invoke(app, ["runs", "list"])
     assert result.exit_code == 0
+
+
+def test_demo_campaign_pair_local_only_generates_plots(tmp_path: Path) -> None:
+    package_root = Path(__file__).resolve().parents[2]
+    demo_workspace = package_root / "workspaces" / "demo_campaigns_multi_tf"
+    workspace = tmp_path / "demo_campaigns_multi_tf"
+    shutil.copytree(demo_workspace, workspace)
+    shutil.rmtree(workspace / "outputs", ignore_errors=True)
+    shutil.rmtree(workspace / ".cruncher", ignore_errors=True)
+    (workspace / "outputs").mkdir(parents=True, exist_ok=True)
+
+    config_path = workspace / "config.yaml"
+    config_payload = yaml.safe_load(config_path.read_text())
+    cruncher_cfg = config_payload["cruncher"]
+    cruncher_cfg["catalog"]["root"] = str(workspace / ".cruncher" / "demo_campaigns_multi_tf")
+    cruncher_cfg["sample"]["budget"]["tune"] = 240
+    cruncher_cfg["sample"]["budget"]["draws"] = 480
+    cruncher_cfg["sample"]["elites"]["k"] = 3
+    cruncher_cfg["sample"]["elites"]["filter"]["min_per_tf_norm"] = 0.0
+    cruncher_cfg["analysis"]["max_points"] = 1000
+    config_path.write_text(yaml.safe_dump(config_payload))
+
+    result = runner.invoke(
+        app,
+        [
+            "fetch",
+            "sites",
+            "--source",
+            "demo_local_meme",
+            "--tf",
+            "lexA",
+            "--tf",
+            "cpxR",
+            "--update",
+            "-c",
+            str(config_path),
+        ],
+    )
+    assert result.exit_code == 0
+
+    result = runner.invoke(
+        app,
+        [
+            "campaign",
+            "generate",
+            "--campaign",
+            "demo_pair",
+            "--out",
+            "campaign_demo_pair.yaml",
+            "-c",
+            str(config_path),
+        ],
+    )
+    assert result.exit_code == 0
+
+    derived_config = workspace / "campaign_demo_pair.yaml"
+    for command in (
+        ["lock", "-c", str(derived_config)],
+        ["parse", "-c", str(derived_config)],
+        ["sample", "-c", str(derived_config)],
+        ["analyze", "--summary", "-c", str(derived_config)],
+        ["campaign", "summarize", "--campaign", "demo_pair", "-c", str(derived_config)],
+    ):
+        result = runner.invoke(app, command)
+        assert result.exit_code == 0
+
+    sample_runs = [
+        child
+        for child in (workspace / "outputs" / "sample").iterdir()
+        if child.is_dir() and manifest_path(child).exists()
+    ]
+    assert sample_runs
+    latest_run = sorted(sample_runs)[-1]
+    analysis_dir = latest_run / "analysis"
+    assert (analysis_dir / "plot__run__summary.png").exists()
+    assert (analysis_dir / "plot__opt__trajectory.png").exists()
+    assert (analysis_dir / "plot__elites__nn_distance.png").exists()
+    assert (analysis_dir / "plot__overlap__panel.png").exists()
+    assert (analysis_dir / "plot__health__panel.png").exists()
+
+    campaign_roots = [child for child in (workspace / "outputs" / "campaigns").iterdir() if child.is_dir()]
+    assert campaign_roots
+    campaign_dir = sorted(campaign_roots)[-1]
+    assert (campaign_dir / "plot__best_jointscore_bar.png").exists()
+    assert (campaign_dir / "plot__tf_coverage_heatmap.png").exists()
+    assert (campaign_dir / "plot__pairgrid_overview.png").exists()
+    assert (campaign_dir / "plot__joint_trend.png").exists()
+    assert (campaign_dir / "plot__pareto_projection.png").exists()

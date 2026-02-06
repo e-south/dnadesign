@@ -16,10 +16,16 @@ from typing import Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
-ANALYSIS_LAYOUT_VERSION = "v8"
+ANALYSIS_LAYOUT_VERSION = "v9"
 ANALYSIS_DIR_NAME = "analysis"
 ARCHIVE_DIR_NAME = "_archive"
-MANIFEST_FILE_NAME = "manifest.json"
+REPORT_DIR_NAME = "report"
+PLOTS_DIR_NAME = "plots"
+TABLES_DIR_NAME = "tables"
+MANIFESTS_DIR_NAME = "manifests"
+PLOT_MANIFEST_FILE_NAME = "manifest.json"
+TABLE_MANIFEST_FILE_NAME = "manifest.json"
+MANIFEST_FILE_NAME = "analysis_manifest.json"
 
 
 def analysis_root(run_dir: Path) -> Path:
@@ -27,7 +33,19 @@ def analysis_root(run_dir: Path) -> Path:
 
 
 def analysis_meta_root(analysis_root: Path) -> Path:
-    return analysis_root
+    return analysis_root / REPORT_DIR_NAME
+
+
+def analysis_plots_root(analysis_root: Path) -> Path:
+    return analysis_root / PLOTS_DIR_NAME
+
+
+def analysis_tables_root(analysis_root: Path) -> Path:
+    return analysis_root / TABLES_DIR_NAME
+
+
+def analysis_manifests_root(analysis_root: Path) -> Path:
+    return analysis_root / MANIFESTS_DIR_NAME
 
 
 def summary_path(analysis_root: Path) -> Path:
@@ -47,15 +65,15 @@ def analysis_used_path(analysis_root: Path) -> Path:
 
 
 def plot_manifest_path(analysis_root: Path) -> Path:
-    return analysis_meta_root(analysis_root) / "plot_manifest.json"
+    return analysis_plots_root(analysis_root) / PLOT_MANIFEST_FILE_NAME
 
 
 def table_manifest_path(analysis_root: Path) -> Path:
-    return analysis_meta_root(analysis_root) / "table_manifest.json"
+    return analysis_tables_root(analysis_root) / TABLE_MANIFEST_FILE_NAME
 
 
 def analysis_manifest_path(analysis_root: Path) -> Path:
-    return analysis_meta_root(analysis_root) / MANIFEST_FILE_NAME
+    return analysis_manifests_root(analysis_root) / MANIFEST_FILE_NAME
 
 
 def load_summary(path: Path, *, required: bool = False) -> Optional[dict]:

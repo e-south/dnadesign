@@ -163,7 +163,7 @@ Each run directory contains:
 - `live/metrics.jsonl` — live sampling progress (when enabled)
 - `analysis/report.json` + `analysis/report.md` — summary (from `cruncher analyze`)
 
-`cruncher analyze` warns when required analysis artifacts are missing and still writes the report stubs.
+`cruncher analyze` fails when required analysis artifacts are missing and does not write partial report outputs.
 
 ---
 

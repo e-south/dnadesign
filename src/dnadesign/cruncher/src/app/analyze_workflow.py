@@ -431,16 +431,18 @@ def run_analyze(
         elites_meta = _load_elites_meta(elites_yaml_path(run_dir))
 
         table_ext = analysis_cfg.table_format
-        score_summary_path = tmp_root / f"table__scores__summary.{table_ext}"
-        topk_path = tmp_root / f"table__elites__topk.{table_ext}"
-        joint_metrics_path = tmp_root / f"table__metrics__joint.{table_ext}"
-        overlap_pair_path = tmp_root / f"table__overlap__pair_summary.{table_ext}"
-        overlap_elite_path = tmp_root / f"table__overlap__per_elite.{table_ext}"
-        diagnostics_path = tmp_root / "table__diagnostics__summary.json"
-        objective_path = tmp_root / "table__objective__components.json"
-        elites_mmr_path = tmp_root / f"table__elites__mmr_summary.{table_ext}"
-        nn_distance_path = tmp_root / f"table__elites__nn_distance.{table_ext}"
-        trajectory_path = tmp_root / f"table__opt__trajectory_points.{table_ext}"
+        tables_dir = tmp_root / "tables"
+        plots_dir = tmp_root / "plots"
+        score_summary_path = tables_dir / f"scores_summary.{table_ext}"
+        topk_path = tables_dir / f"elites_topk.{table_ext}"
+        joint_metrics_path = tables_dir / f"metrics_joint.{table_ext}"
+        overlap_pair_path = tables_dir / f"overlap_pair_summary.{table_ext}"
+        overlap_elite_path = tables_dir / f"overlap_per_elite.{table_ext}"
+        diagnostics_path = tables_dir / "diagnostics_summary.json"
+        objective_path = tables_dir / "objective_components.json"
+        elites_mmr_path = tables_dir / f"elites_mmr_summary.{table_ext}"
+        nn_distance_path = tables_dir / f"elites_nn_distance.{table_ext}"
+        trajectory_path = tables_dir / f"opt_trajectory_points.{table_ext}"
 
         from dnadesign.cruncher.analysis.plots.summary import (
             score_frame_from_df,
@@ -551,7 +553,8 @@ def run_analyze(
 
         def _record_plot(spec_key: str, output: Path, generated: bool, skip_reason: str | None) -> None:
             spec = next(spec for spec in PLOT_SPECS if spec.key == spec_key)
-            final_output = analysis_root_path / output.name
+            rel_output = Path("plots") / output.name
+            final_output = analysis_root_path / rel_output
             plot_entries.append(
                 {
                     "key": spec.key,
@@ -559,7 +562,7 @@ def run_analyze(
                     "group": spec.group,
                     "description": spec.description,
                     "requires": list(spec.requires),
-                    "outputs": [{"path": output.name, "exists": output.exists()}],
+                    "outputs": [{"path": str(rel_output), "exists": output.exists()}],
                     "generated": generated,
                     "skipped": not generated,
                     "skip_reason": skip_reason,
@@ -576,7 +579,7 @@ def run_analyze(
                     )
                 )
 
-        plot_summary_path = tmp_root / f"plot__run__summary.{plot_format}"
+        plot_summary_path = plots_dir / f"run_summary.{plot_format}"
         min_per_tf_norm_filter = manifest.get("elites_min_per_tf_norm_resolved")
         if min_per_tf_norm_filter is not None:
             min_per_tf_norm_filter = float(min_per_tf_norm_filter)
@@ -595,7 +598,7 @@ def run_analyze(
         )
         _record_plot("run_summary", plot_summary_path, True, None)
 
-        plot_trajectory_path = tmp_root / f"plot__opt__trajectory.{plot_format}"
+        plot_trajectory_path = plots_dir / f"opt_trajectory.{plot_format}"
         identity_mode = "canonical" if sample_meta.bidirectional else "raw"
         elite_centroid = None
         if elites_df is not None and not elites_df.empty:
@@ -614,11 +617,11 @@ def run_analyze(
         )
         _record_plot("opt_trajectory", plot_trajectory_path, True, None)
 
-        plot_nn_path = tmp_root / f"plot__elites__nn_distance.{plot_format}"
+        plot_nn_path = plots_dir / f"elites_nn_distance.{plot_format}"
         plot_elites_nn_distance(nn_df, plot_nn_path, baseline_nn=pd.Series(baseline_nn), **plot_kwargs)
         _record_plot("elites_nn_distance", plot_nn_path, True, None)
 
-        plot_overlap_path = tmp_root / f"plot__overlap__panel.{plot_format}"
+        plot_overlap_path = plots_dir / f"overlap_panel.{plot_format}"
         overlap_skip_reason = None
         if len(tf_names) < 2:
             overlap_skip_reason = "n_tf < 2"
@@ -637,7 +640,7 @@ def run_analyze(
             )
             _record_plot("overlap_panel", plot_overlap_path, True, None)
 
-        plot_health_path = tmp_root / f"plot__health__panel.{plot_format}"
+        plot_health_path = plots_dir / f"health_panel.{plot_format}"
         if trace_idata is None:
             _record_plot("health_panel", plot_health_path, False, "trace disabled")
         else:
@@ -645,60 +648,100 @@ def run_analyze(
             _record_plot("health_panel", plot_health_path, True, None)
 
         table_entries = [
-            {"key": "scores_summary", "label": "Per-TF summary", "path": score_summary_path.name, "exists": True},
-            {"key": "elites_topk", "label": "Elite top-K", "path": topk_path.name, "exists": True},
-            {"key": "metrics_joint", "label": "Joint score metrics", "path": joint_metrics_path.name, "exists": True},
+            {
+                "key": "scores_summary",
+                "label": "Per-TF summary",
+                "path": str(score_summary_path.relative_to(tmp_root)),
+                "exists": True,
+            },
+            {
+                "key": "elites_topk",
+                "label": "Elite top-K",
+                "path": str(topk_path.relative_to(tmp_root)),
+                "exists": True,
+            },
+            {
+                "key": "metrics_joint",
+                "label": "Joint score metrics",
+                "path": str(joint_metrics_path.relative_to(tmp_root)),
+                "exists": True,
+            },
             {
                 "key": "opt_trajectory_points",
                 "label": "Optimization trajectory points",
-                "path": trajectory_path.name,
+                "path": str(trajectory_path.relative_to(tmp_root)),
                 "purpose": "plot_support",
                 "exists": True,
             },
             {
                 "key": "overlap_pair_summary",
                 "label": "Overlap pair summary",
-                "path": overlap_pair_path.name,
+                "path": str(overlap_pair_path.relative_to(tmp_root)),
                 "exists": True,
             },
             {
                 "key": "overlap_per_elite",
                 "label": "Overlap per elite",
-                "path": overlap_elite_path.name,
+                "path": str(overlap_elite_path.relative_to(tmp_root)),
                 "exists": True,
             },
             {
                 "key": "diagnostics_summary",
                 "label": "Diagnostics summary",
-                "path": diagnostics_path.name,
+                "path": str(diagnostics_path.relative_to(tmp_root)),
                 "exists": True,
             },
             {
                 "key": "objective_components",
                 "label": "Objective components",
-                "path": objective_path.name,
+                "path": str(objective_path.relative_to(tmp_root)),
                 "exists": True,
             },
-            {"key": "elites_mmr_summary", "label": "Elites MMR summary", "path": elites_mmr_path.name, "exists": True},
+            {
+                "key": "elites_mmr_summary",
+                "label": "Elites MMR summary",
+                "path": str(elites_mmr_path.relative_to(tmp_root)),
+                "exists": True,
+            },
             {
                 "key": "elites_nn_distance",
                 "label": "Elites NN distance",
-                "path": nn_distance_path.name,
+                "path": str(nn_distance_path.relative_to(tmp_root)),
                 "exists": True,
             },
         ]
 
         analysis_artifacts = [
-            artifact_entry(analysis_root_path / score_summary_path.name, run_dir, kind="table", stage="analysis"),
-            artifact_entry(analysis_root_path / topk_path.name, run_dir, kind="table", stage="analysis"),
-            artifact_entry(analysis_root_path / joint_metrics_path.name, run_dir, kind="table", stage="analysis"),
-            artifact_entry(analysis_root_path / trajectory_path.name, run_dir, kind="table", stage="analysis"),
-            artifact_entry(analysis_root_path / overlap_pair_path.name, run_dir, kind="table", stage="analysis"),
-            artifact_entry(analysis_root_path / overlap_elite_path.name, run_dir, kind="table", stage="analysis"),
-            artifact_entry(analysis_root_path / diagnostics_path.name, run_dir, kind="table", stage="analysis"),
-            artifact_entry(analysis_root_path / objective_path.name, run_dir, kind="table", stage="analysis"),
-            artifact_entry(analysis_root_path / elites_mmr_path.name, run_dir, kind="table", stage="analysis"),
-            artifact_entry(analysis_root_path / nn_distance_path.name, run_dir, kind="table", stage="analysis"),
+            artifact_entry(
+                analysis_root_path / score_summary_path.relative_to(tmp_root), run_dir, kind="table", stage="analysis"
+            ),
+            artifact_entry(
+                analysis_root_path / topk_path.relative_to(tmp_root), run_dir, kind="table", stage="analysis"
+            ),
+            artifact_entry(
+                analysis_root_path / joint_metrics_path.relative_to(tmp_root), run_dir, kind="table", stage="analysis"
+            ),
+            artifact_entry(
+                analysis_root_path / trajectory_path.relative_to(tmp_root), run_dir, kind="table", stage="analysis"
+            ),
+            artifact_entry(
+                analysis_root_path / overlap_pair_path.relative_to(tmp_root), run_dir, kind="table", stage="analysis"
+            ),
+            artifact_entry(
+                analysis_root_path / overlap_elite_path.relative_to(tmp_root), run_dir, kind="table", stage="analysis"
+            ),
+            artifact_entry(
+                analysis_root_path / diagnostics_path.relative_to(tmp_root), run_dir, kind="table", stage="analysis"
+            ),
+            artifact_entry(
+                analysis_root_path / objective_path.relative_to(tmp_root), run_dir, kind="table", stage="analysis"
+            ),
+            artifact_entry(
+                analysis_root_path / elites_mmr_path.relative_to(tmp_root), run_dir, kind="table", stage="analysis"
+            ),
+            artifact_entry(
+                analysis_root_path / nn_distance_path.relative_to(tmp_root), run_dir, kind="table", stage="analysis"
+            ),
         ] + plot_artifacts
 
         report_payload = build_report_payload(

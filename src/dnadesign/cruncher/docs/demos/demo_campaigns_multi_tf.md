@@ -25,10 +25,16 @@ cruncher() { pixi run cruncher -- "$@"; }
 ## Cache sites
 
 The multi-TF demo is configured for site-derived PWMs (`catalog.pwm_source: sites`).
-Fetch local DAP-seq sites first, then fill the remaining TFs from RegulonDB:
+For `demo_pair`, only `lexA` and `cpxR` are required:
 
 ```bash
-cruncher fetch sites --source demo_local_meme --tf lexA --tf cpxR --tf acrR --tf lrp --tf rcdA --tf soxR --update -c "$CONFIG"
+cruncher fetch sites --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
+```
+
+Optional: prefetch additional TFs used by `demo_categories` / `demo_categories_best`:
+
+```bash
+cruncher fetch sites --source demo_local_meme --tf acrR --tf lrp --tf rcdA --tf soxR --update -c "$CONFIG"
 cruncher fetch sites --source regulondb --tf baeR --tf fnr --tf fur --tf soxS --update -c "$CONFIG"
 ```
 
