@@ -112,14 +112,32 @@ cruncher:
     moves:
       profile: balanced
       overrides:
-        block_len_range: [4, 16]
-        multi_k_range: [3, 10]
-        slide_max_shift: 4
-        swap_len_range: [2, 8]
+        block_len_range: [5, 18]
+        multi_k_range: [4, 12]
+        slide_max_shift: 5
+        swap_len_range: [3, 10]
         move_probs:
-          S: 0.35
-          B: 0.30
-          M: 0.35
+          S: 0.45
+          B: 0.20
+          M: 0.10
+          L: 0.00
+          W: 0.00
+          I: 0.25
+        target_worst_tf_prob: 0.7
+        target_window_pad: 4
+        insertion_consensus_prob: 0.75
+    pt:
+      n_temps: 4
+      temp_max: 20.0
+      swap_stride: 1
+      adapt:
+        enabled: true
+        target_swap: 0.25
+        window: 50
+        k: 0.5
+        min_scale: 0.25
+        max_scale: 4.0
+        stop_after_tune: true
     output:
       save_sequences: true
       save_trace: true
