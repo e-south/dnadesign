@@ -191,7 +191,23 @@ sample:
 
   moves:
     profile: balanced             # enum only
-    overrides: null               # expert-only escape hatch
+    overrides:
+      adaptive_weights:
+        enabled: false
+        window: 250
+        k: 0.5
+        min_prob: 0.01
+        max_prob: 0.95
+        kinds: [S, B, M, I]
+        targets: {S: 0.95, B: 0.40, M: 0.35, I: 0.35}
+      proposal_adapt:
+        enabled: false
+        window: 250
+        step: 0.10
+        min_scale: 0.50
+        max_scale: 2.00
+        target_low: 0.25
+        target_high: 0.75
 
   pt:
     n_temps: 6
@@ -204,6 +220,8 @@ sample:
       k: 0.5
       min_scale: 0.25
       max_scale: 4.0
+      strict: false
+      saturation_windows: 5
       stop_after_tune: true
 
   elites:
@@ -229,6 +247,8 @@ Notes:
 - `sequence_length` must be at least the widest PWM (after any `pwm_window_lengths`).
 - Canonicalization is automatic when `objective.bidirectional=true`.
 - MMR distance is TFBS-core weighted Hamming (tolerant weighting, low-information positions emphasized).
+- `moves.overrides.adaptive_weights` and `moves.overrides.proposal_adapt` are optional expert controls.
+- Set `pt.adapt.strict=true` to fail the run when PT ladder adaptation saturates at `max_scale` for too many windows.
 
 ## analysis
 
