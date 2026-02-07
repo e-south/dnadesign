@@ -41,3 +41,13 @@ def test_demo_configs_enable_adaptive_pt_surface() -> None:
         assert adapt_cfg.saturation_windows >= 3, (
             f"{config_path} must set sample.pt.adapt.saturation_windows to at least 3"
         )
+
+
+def test_densegen_demo_uses_tighter_site_windows() -> None:
+    config_path = Path(__file__).resolve().parents[2] / "workspaces" / "densegen_prep_three_tf" / "config.yaml"
+    cfg = load_config(config_path)
+    assert cfg.sample is not None
+    assert cfg.catalog.site_window_lengths["lexA"] <= 16
+    assert cfg.catalog.site_window_lengths["cpxR"] <= 16
+    max_window = max(cfg.catalog.site_window_lengths.values())
+    assert cfg.sample.sequence_length >= max_window

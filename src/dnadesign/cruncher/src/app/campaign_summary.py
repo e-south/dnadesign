@@ -34,7 +34,11 @@ from dnadesign.cruncher.app.campaign_service import (
     collect_campaign_metrics,
     expand_campaign,
 )
-from dnadesign.cruncher.app.run_service import list_runs
+from dnadesign.cruncher.app.run_service import (
+    drop_run_index_entries,
+    find_invalid_run_index_entries,
+    list_runs,
+)
 from dnadesign.cruncher.artifacts.layout import sequences_path
 from dnadesign.cruncher.artifacts.manifest import load_manifest
 from dnadesign.cruncher.config.schema_v3 import CampaignConfig, CruncherConfig
@@ -220,6 +224,19 @@ def _resolve_run_dirs(
         if not expanded:
             raise FileNotFoundError("No runs matched the provided --runs inputs.")
         return expanded, False
+    stale_issues = find_invalid_run_index_entries(
+        config_path,
+        stage="sample",
+        catalog_root=cfg.catalog.catalog_root,
+    )
+    if stale_issues:
+        stale_names = sorted({issue.run_name for issue in stale_issues})
+        removed = drop_run_index_entries(config_path, stale_names, catalog_root=cfg.catalog.catalog_root)
+        logger.warning(
+            "Auto-repaired %d stale sample run index entr%s before campaign summarize.",
+            removed,
+            "y" if removed == 1 else "ies",
+        )
     runs = list_runs(cfg, config_path, stage="sample")
     run_dirs = [run.run_dir for run in runs]
     return run_dirs, True

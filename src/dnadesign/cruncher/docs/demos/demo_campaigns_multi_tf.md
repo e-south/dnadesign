@@ -68,7 +68,8 @@ cruncher analyze --summary -c "$DERIVED"
 cruncher campaign summarize --campaign demo_pair -c "$DERIVED"
 ```
 
-If you manually delete old run outputs, repair stale run-index entries first:
+`campaign summarize` auto-repairs stale sample run-index entries (for example after manual output cleanup) and logs what it removed.
+If you want to repair explicitly first:
 
 ```bash
 cruncher runs repair-index --apply -c "$DERIVED"

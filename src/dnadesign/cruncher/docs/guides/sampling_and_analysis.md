@@ -4,6 +4,7 @@
 - [Overview](#overview)
 - [End-to-end](#end-to-end)
 - [Fixed-length sampling model](#fixed-length-sampling-model)
+- [PT optimization model](#pt-optimization-model)
 - [Elites: filter -> MMR select](#elites-filter--mmr-select)
 - [Analysis outputs](#analysis-outputs)
 - [Diagnostics quick read](#diagnostics-quick-read)
@@ -40,6 +41,27 @@ Sampling is fixed-length and strict:
 - `sample.sequence_length` must be at least the widest PWM (after any `catalog.pwm_window_lengths`).
 
 If the length invariant is violated, sampling fails fast with the per-TF widths.
+
+## PT optimization model
+
+Cruncher uses replica-exchange MCMC (parallel tempering) as the only optimizer.
+The method follows the standard composition from the PT literature:
+
+1. Multiple replicas are simulated at different inverse temperatures (`sample.pt.n_temps`, `sample.pt.temp_max`).
+2. Each replica performs local Metropolis-Hastings updates on sequence proposals (`sample.moves.*`).
+3. Adjacent replicas periodically attempt state swaps (`sample.pt.swap_stride`) to move information between hot and cold chains.
+4. Optional adaptation adjusts move probabilities/proposal scales and ladder scaling during tune (`sample.moves.overrides.*`, `sample.pt.adapt.*`).
+
+This keeps exploration (hot replicas) and exploitation (cold replica) coupled without changing the objective definition.
+In strict mode (`sample.pt.adapt.strict=true`), ladder saturation is treated as a tuning failure and the run fails fast.
+
+Terminology alignment with common methods:
+
+- `parallel tempering` == `replica exchange MCMC`
+- swap acceptance diagnostics correspond to adjacent-replica exchange rates
+- tune windows adapt proposal mechanics; draw windows produce the retained sample set
+
+For background, this is the same class of methods often cited as Metropolis-coupled MCMC / parallel tempering / replica exchange.
 
 ## Elites: filter -> MMR select
 

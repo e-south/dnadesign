@@ -17,6 +17,7 @@ import yaml
 from typer.testing import CliRunner
 
 from dnadesign.cruncher.app.campaign_service import expand_campaign
+from dnadesign.cruncher.app.run_service import load_run_index, save_run_index
 from dnadesign.cruncher.cli.app import app
 from dnadesign.cruncher.config.load import load_config
 
@@ -311,6 +312,106 @@ def test_campaign_summarize_uses_table_manifest_contract(tmp_path: Path) -> None
         ],
     )
     assert result.exit_code == 0
+
+
+def test_campaign_summarize_auto_repairs_stale_index_entries(tmp_path: Path) -> None:
+    config = {
+        "cruncher": {
+            "schema_version": 3,
+            "workspace": {
+                "out_dir": "runs",
+                "regulator_sets": [["A"]],
+                "regulator_categories": {"CatA": ["A", "B"], "CatB": ["C", "D"]},
+            },
+            "catalog": {"root": str(tmp_path / ".cruncher")},
+            "campaigns": [
+                {
+                    "name": "demo",
+                    "categories": ["CatA", "CatB"],
+                    "within_category": {"sizes": [2]},
+                    "across_categories": {"sizes": [2], "max_per_category": 1},
+                }
+            ],
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    run_dir = tmp_path / "runs" / "sample" / "sample_valid"
+    tfs = ["A", "B"]
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "summary.json").write_text(
+        json.dumps({"analysis_id": "analysis-1", "tf_names": tfs, "analysis_config": {"table_format": "parquet"}})
+    )
+    (run_dir / "table_manifest.json").write_text(
+        json.dumps(
+            {
+                "analysis_id": "analysis-1",
+                "tables": [
+                    {"key": "scores_summary", "path": "tables/scores_summary.parquet", "exists": True},
+                    {"key": "metrics_joint", "path": "tables/metrics_joint.parquet", "exists": True},
+                ],
+            }
+        )
+    )
+    (run_dir / "tables").mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {"tf": tfs[0], "mean": 1.0, "median": 1.0, "std": 0.1, "min": 0.8, "max": 1.2},
+            {"tf": tfs[1], "mean": 0.9, "median": 0.9, "std": 0.1, "min": 0.7, "max": 1.1},
+        ]
+    ).to_parquet(run_dir / "tables" / "scores_summary.parquet", index=False)
+    pd.DataFrame(
+        [
+            {
+                "tf_names": ",".join(tfs),
+                "joint_min": 0.8,
+                "joint_mean": 1.0,
+                "joint_hmean": 0.9,
+                "balance_index": 0.8,
+                "pareto_front_size": 1,
+                "pareto_fraction": 0.5,
+            }
+        ]
+    ).to_parquet(run_dir / "tables" / "metrics_joint.parquet", index=False)
+    (run_dir / "run_manifest.json").write_text(
+        json.dumps(
+            {
+                "stage": "sample",
+                "run_dir": str(run_dir),
+                "regulator_set": {"tfs": tfs},
+            }
+        )
+    )
+    (run_dir / "report.json").write_text(json.dumps({"run": {"n_sequences": 2, "n_elites": 1}}))
+
+    stale_dir = tmp_path / "runs" / "sample" / "deleted_run"
+    save_run_index(
+        config_path,
+        {
+            "sample/deleted_run": {"stage": "sample", "run_dir": str(stale_dir)},
+            "sample/sample_valid": {"stage": "sample", "run_dir": str(run_dir)},
+        },
+        catalog_root=str(tmp_path / ".cruncher"),
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "campaign",
+            "summarize",
+            "--campaign",
+            "demo",
+            "--no-metrics",
+            "--config",
+            str(config_path),
+        ],
+    )
+    assert result.exit_code == 0
+
+    index = load_run_index(config_path, catalog_root=str(tmp_path / ".cruncher"))
+    assert "sample/deleted_run" not in index
+    assert "sample/sample_valid" in index
 
 
 def test_campaign_validate_cli_no_selectors(tmp_path: Path) -> None:

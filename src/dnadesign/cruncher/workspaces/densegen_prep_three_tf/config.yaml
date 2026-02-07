@@ -20,8 +20,8 @@ cruncher:
     dataset_preference: []
     dataset_map: {}
     site_window_lengths:
-      lexA: 20
-      cpxR: 20
+      lexA: 16
+      cpxR: 16
       baeR: 14
     site_window_center: midpoint
     pwm_window_lengths: {}
