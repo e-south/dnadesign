@@ -243,6 +243,7 @@ Outputs:
 Notes:
 
 * `--metrics` requires a local catalog; fetch motifs/sites first.
+* When `--runs` is omitted, stale sample run-index entries are auto-repaired before summary.
 * `--skip-missing` skips runs missing required `table_manifest.json` entries/files for
   `scores_summary` and `metrics_joint` (typically `tables/scores_summary.parquet` and
   `tables/metrics_joint.parquet`).
