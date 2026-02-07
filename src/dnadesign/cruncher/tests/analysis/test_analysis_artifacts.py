@@ -618,7 +618,7 @@ def test_analyze_restores_previous_analysis_when_generation_fails(
         tune=1,
     )
 
-    analysis_dir = run_dir / "analysis"
+    analysis_dir = run_dir
     analysis_dir.mkdir(parents=True, exist_ok=True)
     (analysis_dir / "summary.json").write_text(json.dumps({"analysis_id": "old-analysis"}))
     (analysis_dir / "old_marker.txt").write_text("preserve")
@@ -975,7 +975,7 @@ def test_analyze_prunes_stale_analysis_artifacts_when_not_archiving(tmp_path: Pa
         tune=1,
     )
 
-    analysis_root = run_dir / "analysis"
+    analysis_root = run_dir
     analysis_root.mkdir(parents=True, exist_ok=True)
     (analysis_root / "summary.json").write_text(json.dumps({"analysis_id": "old-analysis"}))
     stale_plot = analysis_root / "score__box.png"
@@ -983,7 +983,7 @@ def test_analyze_prunes_stale_analysis_artifacts_when_not_archiving(tmp_path: Pa
 
     manifest_file = manifest_path(run_dir)
     manifest_payload = json.loads(manifest_file.read_text())
-    manifest_payload["artifacts"] = ["analysis/score__box.png"]
+    manifest_payload["artifacts"] = ["plots/score__box.png"]
     manifest_file.write_text(json.dumps(manifest_payload))
 
     cfg = load_config(config_path)
@@ -991,7 +991,7 @@ def test_analyze_prunes_stale_analysis_artifacts_when_not_archiving(tmp_path: Pa
 
     manifest = yaml.safe_load(manifest_path(run_dir).read_text())
     artifacts = manifest.get("artifacts", [])
-    assert "analysis/score__box.png" not in {a.get("path") if isinstance(a, dict) else a for a in artifacts}
+    assert "plots/score__box.png" not in {a.get("path") if isinstance(a, dict) else a for a in artifacts}
 
 
 def test_analyze_fails_on_lockfile_mismatch(tmp_path: Path) -> None:
@@ -1244,4 +1244,4 @@ def test_analyze_accepts_run_directory_path_override(tmp_path: Path) -> None:
     cfg = load_config(config_path)
     analysis_runs = run_analyze(cfg, config_path, runs_override=[str(run_dir.resolve())])
     assert len(analysis_runs) == 1
-    assert analysis_runs[0] == run_dir / "analysis"
+    assert analysis_runs[0] == run_dir

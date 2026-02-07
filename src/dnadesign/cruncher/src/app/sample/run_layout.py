@@ -21,6 +21,7 @@ from dnadesign.cruncher.artifacts.entries import artifact_entry
 from dnadesign.cruncher.artifacts.layout import (
     build_run_dir,
     ensure_run_dirs,
+    live_metrics_path,
     manifest_path,
     run_group_label,
     status_path,
@@ -59,7 +60,7 @@ def _materialize_optimizer_stats(
         return manifest_stats, [], None
     if not isinstance(move_stats, list):
         raise ValueError("optimizer.stats()['move_stats'] must be a list.")
-    rel_path = Path("artifacts") / "optimizer_move_stats.json"
+    rel_path = Path("optimizer_move_stats.json")
     sidecar_path = run_dir / rel_path
     sidecar_path.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_json(sidecar_path, {"move_stats": move_stats})
@@ -103,7 +104,21 @@ def prepare_run_layout(
         tfs=tfs,
         set_index=set_index,
         include_set_index=include_set_index,
+        slot="latest",
     )
+    previous_dir = build_run_dir(
+        config_path=config_path,
+        out_dir=cfg.out_dir,
+        stage=stage,
+        tfs=tfs,
+        set_index=set_index,
+        include_set_index=include_set_index,
+        slot="previous",
+    )
+    if previous_dir.exists():
+        shutil.rmtree(previous_dir)
+    if run_dir.exists():
+        shutil.move(str(run_dir), previous_dir)
     ensure_run_dirs(run_dir, meta=True, artifacts=True, live=sample_cfg.output.live_metrics)
     run_group = run_group_label(tfs, set_index, include_set_index=include_set_index)
     stage_label = stage.upper().replace("_", "-")
@@ -112,7 +127,7 @@ def prepare_run_layout(
         path=status_path(run_dir),
         stage=stage,
         run_dir=run_dir,
-        metrics_path=run_dir / "live" / "metrics.jsonl" if sample_cfg.output.live_metrics else None,
+        metrics_path=live_metrics_path(run_dir) if sample_cfg.output.live_metrics else None,
         payload={
             "config_path": str(config_path.resolve()),
             "status_message": "initializing",

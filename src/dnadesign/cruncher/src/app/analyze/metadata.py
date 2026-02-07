@@ -38,7 +38,7 @@ class SampleMeta:
 def _load_pwms_from_config(run_dir: Path) -> tuple[dict[str, PWM], dict]:
     config_path = config_used_path(run_dir)
     if not config_path.exists():
-        raise FileNotFoundError(f"Missing meta/config_used.yaml in {run_dir}")
+        raise FileNotFoundError(f"Missing config_used.yaml in {run_dir}")
     payload = yaml.safe_load(config_path.read_text()) or {}
     cruncher_cfg = payload.get("cruncher")
     if not isinstance(cruncher_cfg, dict):

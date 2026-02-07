@@ -243,9 +243,9 @@ Outputs:
 Notes:
 
 * `--metrics` requires a local catalog; fetch motifs/sites first.
-* `--skip-missing` skips runs missing required `analysis/table_manifest.json` entries/files for
-  `scores_summary` and `metrics_joint` (typically `analysis/tables/scores_summary.parquet` and
-  `analysis/tables/metrics_joint.parquet`).
+* `--skip-missing` skips runs missing required `table_manifest.json` entries/files for
+  `scores_summary` and `metrics_joint` (typically `tables/scores_summary.parquet` and
+  `tables/metrics_joint.parquet`).
 * With site-derived PWMs, `--metrics` also requires `catalog.site_window_lengths`
   for TFs with variable site lengths. Use `--no-metrics` if you haven't set them.
 
@@ -350,9 +350,9 @@ Inputs:
 
 * CONFIG (explicit or resolved)
 * runs via `analysis.run_selector`/`analysis.runs` or `--run` (defaults to latest sample run if empty)
-* run artifacts: `artifacts/sequences.parquet` (required), `artifacts/elites.parquet` (required),
-  `artifacts/elites_hits.parquet` (required), `artifacts/random_baseline.parquet` (required),
-  and `artifacts/trace.nc` for trace-based plots
+* run artifacts: `sequences.parquet` (required), `elites.parquet` (required),
+  `elites_hits.parquet` (required), `random_baseline.parquet` (required),
+  and `trace.nc` for trace-based plots
 
 Network:
 
@@ -367,26 +367,26 @@ Examples:
 Preconditions:
 
 * provide runs via `analysis.runs`/`--run` or rely on the default latest run
-* trace-dependent plots require `artifacts/trace.nc`
-* if `analysis/` exists without `analysis/summary.json`, remove the incomplete analysis folder before re-running `cruncher analyze`
+* trace-dependent plots require `trace.nc`
+* if `analysis/` exists without `summary.json`, remove the incomplete analysis folder before re-running `cruncher analyze`
 * each sample run snapshots the lockfile under `meta/lockfile.json`; analysis uses that snapshot to avoid mismatch if the workspace lockfile changes later
 
 Outputs:
 
-* tables: `analysis/tables/scores_summary.parquet`, `analysis/tables/elites_topk.parquet`,
-  `analysis/tables/metrics_joint.parquet`, `analysis/tables/opt_trajectory_points.parquet`,
-  `analysis/tables/diagnostics_summary.json`, `analysis/tables/objective_components.json`,
-  `analysis/tables/elites_mmr_summary.parquet`, `analysis/tables/elites_nn_distance.parquet`
-* plots: `analysis/plots/run_summary.<plot_format>`, `analysis/plots/opt_trajectory.<plot_format>`,
-  `analysis/plots/elites_nn_distance.<plot_format>`, `analysis/plots/overlap_panel.<plot_format>`,
-  `analysis/plots/health_panel.<plot_format>` (trace only)
-* reports: `analysis/report.json`, `analysis/report.md`
-* summaries: `analysis/summary.json`, `analysis/manifest.json`, `analysis/plot_manifest.json`, `analysis/table_manifest.json`
+* tables: `tables/scores_summary.parquet`, `tables/elites_topk.parquet`,
+  `tables/metrics_joint.parquet`, `tables/opt_trajectory_points.parquet`,
+  `tables/diagnostics_summary.json`, `tables/objective_components.json`,
+  `tables/elites_mmr_summary.parquet`, `tables/elites_nn_distance.parquet`
+* plots: `plots/run_summary.<plot_format>`, `plots/opt_trajectory.<plot_format>`,
+  `plots/elites_nn_distance.<plot_format>`, `plots/overlap_panel.<plot_format>`,
+  `plots/health_panel.<plot_format>` (trace only)
+* reports: `report.json`, `report.md`
+* summaries: `summary.json`, `manifest.json`, `plot_manifest.json`, `table_manifest.json`
 
 Note:
 
 * Analyze rewrites the latest analysis outputs each run; set `analysis.archive=true` to keep prior reports.
-* Use `cruncher analyze --summary` to print the highlights from `analysis/report.json`.
+* Use `cruncher analyze --summary` to print the highlights from `report.json`.
 
 ---
 
@@ -410,15 +410,15 @@ Notes:
 
 * requires `marimo` to be installed (for example: `uv add --group notebooks marimo`)
 * useful when you want interactive slicing/filtering beyond static plots
-* strict artifact contract: requires `analysis/summary.json`, `analysis/plot_manifest.json`, and `analysis/table_manifest.json` to exist and parse, `analysis/summary.json` must include a non-empty `tf_names` list, and `table_manifest.json` must provide `scores_summary`, `metrics_joint`, and `elites_topk` entries with existing files
+* strict artifact contract: requires `summary.json`, `plot_manifest.json`, and `table_manifest.json` to exist and parse, `summary.json` must include a non-empty `tf_names` list, and `table_manifest.json` must provide `scores_summary`, `metrics_joint`, and `elites_topk` entries with existing files
 * plot output status is refreshed from disk so missing files are shown accurately
 * the Refresh button re-scans analysis entries and updates plot/table status without restarting marimo
-* the notebook infers `run_dir` from its location; keep it under `<run_dir>/analysis/` or regenerate it
-* plots are loaded from `analysis/plot_manifest.json`; the curated keys are `run_summary`, `opt_trajectory`, `elites_nn_distance`, plus optional `overlap_panel` and `health_panel` entries when generated
+* the notebook infers `run_dir` from its location; keep it under `<run_dir>/` or regenerate it
+* plots are loaded from `plot_manifest.json`; the curated keys are `run_summary`, `opt_trajectory`, `elites_nn_distance`, plus optional `overlap_panel` and `health_panel` entries when generated
 * the notebook includes:
   * Overview tab with run metadata and explicit warnings for missing/invalid analysis artifacts
-  * Tables tab with a Top-K slider and per-table previews from `analysis/table_manifest.json`
-  * Plots tab with inline previews and generated/skipped status from `analysis/plot_manifest.json`
+  * Tables tab with a Top-K slider and per-table previews from `table_manifest.json`
+  * Plots tab with inline previews and generated/skipped status from `plot_manifest.json`
 
 ---
 
@@ -729,7 +729,7 @@ Network:
 * `runs show <config> <run>` — show manifest + artifacts (run name or run dir)
 * `runs latest <config> --set-index 1` — print most recent run for a regulator set
 * `runs best <config> --set-index 1` — print best run by `best_score` for a regulator set
-* `runs watch <config> <run>` — live progress snapshot (run name or run dir; reads `meta/run_status.json`, optionally `live/metrics.jsonl`)
+* `runs watch <config> <run>` — live progress snapshot (run name or run dir; reads `run_status.json`, optionally `metrics.jsonl`)
 * `runs rebuild-index <config>` — rebuild `<workspace>/.cruncher/run_index.json`
 * `runs repair-index <config>` — validate and optionally remove index entries missing run directories/manifests (`--apply`)
 * `runs clean <config> --stale` — mark stale `running` runs as `aborted` (use `--drop` to remove from the index)

@@ -27,7 +27,7 @@ MANIFEST_FILE_NAME = "manifest.json"
 
 
 def analysis_root(run_dir: Path) -> Path:
-    return run_dir / ANALYSIS_DIR_NAME
+    return run_dir
 
 
 def analysis_plots_root(analysis_root: Path) -> Path:

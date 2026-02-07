@@ -325,7 +325,7 @@ def test_demo_campaign_pair_local_only_generates_plots(tmp_path: Path) -> None:
     ]
     assert sample_runs
     latest_run = sorted(sample_runs)[-1]
-    analysis_dir = latest_run / "analysis"
+    analysis_dir = latest_run
     assert (analysis_dir / "plots" / "run_summary.png").exists()
     assert (analysis_dir / "plots" / "opt_trajectory.png").exists()
     assert (analysis_dir / "plots" / "elites_nn_distance.png").exists()

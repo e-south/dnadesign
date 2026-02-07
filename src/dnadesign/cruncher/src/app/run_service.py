@@ -141,7 +141,7 @@ def find_invalid_run_index_entries(
                     run_name=run_name,
                     stage=run_stage,
                     run_dir=run_dir,
-                    reason="missing meta/run_manifest.json",
+                    reason="missing run_manifest.json",
                 )
             )
     return issues
@@ -149,11 +149,22 @@ def find_invalid_run_index_entries(
 
 def _iter_run_dirs(stage_dir: Path) -> list[Path]:
     runs: list[Path] = []
-    for child in stage_dir.iterdir():
-        if not child.is_dir():
+    seen: set[Path] = set()
+    for manifest_file in sorted(stage_dir.rglob("run_manifest.json")):
+        run_dir = manifest_file.parent
+        if run_dir.name == "previous":
             continue
-        if manifest_path(child).exists():
-            runs.append(child)
+        try:
+            rel = run_dir.relative_to(stage_dir)
+        except ValueError:
+            continue
+        if rel.parts and rel.parts[0].startswith("."):
+            continue
+        resolved = run_dir.resolve()
+        if resolved in seen:
+            continue
+        runs.append(run_dir)
+        seen.add(resolved)
     return runs
 
 
@@ -164,6 +175,28 @@ def _merge_payload(existing: dict, updates: dict) -> dict:
             continue
         merged[key] = value
     return merged
+
+
+def _run_index_key(run_dir: Path, updates: dict) -> str:
+    stage = str(updates.get("stage") or "unknown")
+    slot = run_dir.name
+    run_group = updates.get("run_group")
+    if slot in {"latest", "previous"}:
+        if isinstance(run_group, str) and run_group:
+            return f"{stage}/{run_group}/{slot}"
+        parent_name = run_dir.parent.name
+        if parent_name and parent_name != stage:
+            return f"{stage}/{parent_name}/{slot}"
+        return f"{stage}/{slot}"
+    return slot
+
+
+def _is_under(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+        return True
+    except ValueError:
+        return False
 
 
 def upsert_run_index(
@@ -230,7 +263,8 @@ def update_run_index_from_manifest(
         catalog_root = _catalog_root_from_manifest(manifest)
     updates = _updates_from_manifest(manifest)
     updates.setdefault("run_dir_guess", str(run_dir.resolve()))
-    return upsert_run_index(config_path, run_dir.name, updates, catalog_root=catalog_root)
+    run_key = _run_index_key(run_dir, updates)
+    return upsert_run_index(config_path, run_key, updates, catalog_root=catalog_root)
 
 
 def update_run_index_from_status(
@@ -242,7 +276,8 @@ def update_run_index_from_status(
 ) -> dict:
     updates = _updates_from_status(status_payload)
     updates.setdefault("run_dir_guess", str(run_dir.resolve()))
-    return upsert_run_index(config_path, run_dir.name, updates, catalog_root=catalog_root)
+    run_key = _run_index_key(run_dir, updates)
+    return upsert_run_index(config_path, run_key, updates, catalog_root=catalog_root)
 
 
 def rebuild_run_index(cfg: CruncherConfig, config_path: Path) -> Path:
@@ -262,7 +297,8 @@ def rebuild_run_index(cfg: CruncherConfig, config_path: Path) -> Path:
                 if status_payload:
                     entry = _merge_payload(entry, _updates_from_status(status_payload))
                 entry.setdefault("run_dir_guess", str(child.resolve()))
-                index[child.name] = entry
+                run_key = _run_index_key(child, entry)
+                index[run_key] = entry
     return save_run_index(config_path, index, cfg.catalog.catalog_root)
 
 
@@ -276,8 +312,8 @@ def list_runs(cfg: CruncherConfig, config_path: Path, *, stage: Optional[str] = 
                 continue
             run_dir_raw = payload.get("run_dir") or payload.get("run_dir_guess", name)
             run_dir = Path(run_dir_raw)
-            stage_dir = out_dir / str(payload.get("stage") or "")
-            if stage_dir.name and run_dir.parent != stage_dir:
+            stage_name = str(payload.get("stage") or "")
+            if stage_name and not _is_under(run_dir, out_dir / stage_name):
                 continue
             runs.append(RunInfo.from_payload(name, payload))
         runs.sort(key=lambda r: r.created_at or "", reverse=True)
@@ -324,6 +360,8 @@ def _resolve_run_dir_from_arg(config_path: Path, run_name: str) -> Path | None:
     candidate = Path(run_name).expanduser()
     if candidate.is_absolute():
         resolved = candidate
+        if not resolved.exists():
+            raise FileNotFoundError(f"Run directory not found: {resolved}")
     else:
         cwd_candidate = (Path.cwd() / candidate).resolve()
         cfg_candidate = (config_path.parent / candidate).resolve()
@@ -338,7 +376,7 @@ def _resolve_run_dir_from_arg(config_path: Path, run_name: str) -> Path | None:
         elif cfg_exists:
             resolved = cfg_candidate
         else:
-            raise FileNotFoundError(f"Run directory not found. Checked {cwd_candidate} and {cfg_candidate}.")
+            return None
     if resolved.is_file():
         if resolved.name == "run_manifest.json":
             resolved = resolved.parent
@@ -373,16 +411,29 @@ def get_run(cfg: CruncherConfig, config_path: Path, run_name: str) -> RunInfo:
         return RunInfo.from_payload(run_name, index[run_name])
     out_dir = config_path.parent / cfg.out_dir
     run_dir = None
+    matches: list[Path] = []
     if out_dir.exists():
         for stage_dir in out_dir.iterdir():
             if not stage_dir.is_dir():
                 continue
             for candidate in _iter_run_dirs(stage_dir):
-                if candidate.name == run_name and manifest_path(candidate).exists():
-                    run_dir = candidate
-                    break
-            if run_dir is not None:
-                break
+                if not manifest_path(candidate).exists():
+                    continue
+                candidate_rel = None
+                try:
+                    candidate_rel = candidate.relative_to(out_dir).as_posix()
+                except ValueError:
+                    candidate_rel = None
+                if candidate.name == run_name or candidate_rel == run_name:
+                    matches.append(candidate)
+    if len(matches) > 1:
+        rendered = ", ".join(str(path) for path in matches[:5])
+        raise FileNotFoundError(
+            f"Run name '{run_name}' is ambiguous. Matching run directories: {rendered}. "
+            "Use an indexed run key or an explicit run path."
+        )
+    if matches:
+        run_dir = matches[0]
     if run_dir is None:
         raise FileNotFoundError(f"Run directory not found (or missing manifest) for run '{run_name}'")
     manifest_file = manifest_path(run_dir)

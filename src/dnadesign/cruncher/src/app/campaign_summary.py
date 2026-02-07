@@ -275,7 +275,7 @@ def _summarize_run(
     reg = manifest.get("regulator_set") or {}
     tfs = reg.get("tfs") or []
     if not tfs:
-        raise ValueError(f"Run '{run_dir.name}' missing regulator_set.tfs in meta/run_manifest.json")
+        raise ValueError(f"Run '{run_dir.name}' missing regulator_set.tfs in run_manifest.json")
 
     set_key = _tf_key(tfs)
     set_index = set_index_map.get(set_key)
@@ -360,7 +360,7 @@ def _load_counts(run_dir: Path) -> tuple[int, int]:
     seq_path = sequences_path(run_dir)
     elite_path = find_elites_parquet(run_dir)
     if not seq_path.exists():
-        raise FileNotFoundError(f"Missing artifacts/sequences.parquet for run '{run_dir.name}'.")
+        raise FileNotFoundError(f"Missing sequences.parquet for run '{run_dir.name}'.")
     seq_df = read_parquet(seq_path)
     if "phase" in seq_df.columns:
         seq_df = seq_df[seq_df["phase"] == "draw"].copy()

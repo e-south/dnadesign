@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -297,14 +296,18 @@ def _summarize_elites_mmr(
 def _prepare_analysis_root(
     analysis_root_path: Path,
     *,
-    archive: bool,
     analysis_id: str,
 ) -> Path | None:
     if not analysis_root_path.exists():
         return None
-    prev_root = analysis_root_path.parent / f".analysis_prev_{analysis_id}"
-    os.replace(analysis_root_path, prev_root)
-    return prev_root if archive else prev_root
+    managed_paths = _analysis_managed_paths(analysis_root_path)
+    if not managed_paths:
+        return None
+    prev_root = analysis_root_path / f".analysis_prev_{analysis_id}"
+    prev_root.mkdir(parents=True, exist_ok=False)
+    for path in managed_paths:
+        shutil.move(str(path), prev_root / path.name)
+    return prev_root
 
 
 def _finalize_analysis_root(
@@ -314,7 +317,9 @@ def _finalize_analysis_root(
     archive: bool,
     prev_root: Path | None,
 ) -> None:
-    os.replace(tmp_root, analysis_root_path)
+    for path in sorted(tmp_root.iterdir()):
+        shutil.move(str(path), analysis_root_path / path.name)
+    shutil.rmtree(tmp_root, ignore_errors=True)
     if prev_root is None:
         return
     if not archive:
@@ -333,7 +338,34 @@ def _finalize_analysis_root(
         prev_id = prev_root.name.replace(".analysis_prev_", "")
     archive_root = analysis_root_path / "_archive" / str(prev_id)
     archive_root.parent.mkdir(parents=True, exist_ok=True)
+    if archive_root.exists():
+        shutil.rmtree(archive_root)
     shutil.move(str(prev_root), archive_root)
+
+
+def _analysis_managed_paths(analysis_root_path: Path) -> list[Path]:
+    managed = [
+        analysis_used_path(analysis_root_path),
+        summary_path(analysis_root_path),
+        report_json_path(analysis_root_path),
+        report_md_path(analysis_root_path),
+        plot_manifest_path(analysis_root_path),
+        table_manifest_path(analysis_root_path),
+        analysis_manifest_path(analysis_root_path),
+        analysis_root_path / "plots",
+        analysis_root_path / "tables",
+        analysis_root_path / "notebook__run_overview.py",
+    ]
+    return [path for path in managed if path.exists()]
+
+
+def _delete_path(path: Path) -> None:
+    if not path.exists():
+        return
+    if path.is_dir():
+        shutil.rmtree(path)
+        return
+    path.unlink()
 
 
 def run_analyze(
@@ -381,7 +413,7 @@ def run_analyze(
         created_at = datetime.now(timezone.utc).isoformat()
 
         analysis_root_path = analysis_root(run_dir)
-        tmp_root = analysis_root_path.parent / ".analysis_tmp"
+        tmp_root = analysis_root_path / ".analysis_tmp"
         if tmp_root.exists():
             raise RuntimeError(
                 f"Analyze already in progress for run '{run_name}' (lock: {tmp_root}). "
@@ -813,7 +845,6 @@ def run_analyze(
         try:
             prev_root = _prepare_analysis_root(
                 analysis_root_path,
-                archive=analysis_cfg.archive,
                 analysis_id=analysis_id,
             )
             _finalize_analysis_root(
@@ -825,12 +856,15 @@ def run_analyze(
         except Exception:
             if tmp_root.exists():
                 shutil.rmtree(tmp_root, ignore_errors=True)
-            if prev_root is not None and prev_root.exists() and not analysis_root_path.exists():
-                os.replace(prev_root, analysis_root_path)
+            if prev_root is not None and prev_root.exists():
+                for path in _analysis_managed_paths(analysis_root_path):
+                    _delete_path(path)
+                for child in prev_root.iterdir():
+                    shutil.move(str(child), analysis_root_path / child.name)
+                shutil.rmtree(prev_root, ignore_errors=True)
             raise
 
-        if not analysis_cfg.archive:
-            _prune_latest_analysis_artifacts(manifest)
+        _prune_latest_analysis_artifacts(manifest)
         append_artifacts(manifest, analysis_artifacts)
         write_manifest(run_dir, manifest)
 

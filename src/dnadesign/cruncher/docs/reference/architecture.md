@@ -128,11 +128,10 @@ run_index.json
 
 #### Run outputs (`out_dir`, e.g. `outputs/`)
 
-Each configured regulator set produces **separate** runs, grouped by stage. Run names include the TF slug (and a `setN_` prefix only when multiple regulator sets are configured):
+Each configured regulator set produces **separate** run slots, grouped by stage:
 
-- `outputs/parse/lexA-cpxR_20260101_143210_f3a9d2/`
-- `outputs/sample/lexA-cpxR_20260101_143512_a91c0e/`
-- `outputs/logos/catalog/lexA-cpxR_20260101_143210_f3a9d2/` *(prefix `setN_` only when multiple regulator sets are configured)*
+- single regulator set: `outputs/<stage>/latest/` with optional `outputs/<stage>/previous/`
+- multiple regulator sets: `outputs/<stage>/setN_<tf-slug>/latest/` with optional `.../previous/`
 
 ---
 
@@ -140,15 +139,14 @@ Each configured regulator set produces **separate** runs, grouped by stage. Run 
 
 A typical **sample** run directory contains:
 
-- `meta/` - manifests, config_used, live status snapshots
-- `artifacts/` - sequences, trace (if enabled), elites exports
-- `analysis/` - analysis metadata at root (`summary`, `report`, manifests)
-- `analysis/plots/` - curated plot outputs
-- `analysis/tables/` - curated table outputs
-- `live/` - streaming metrics (if enabled)
-- `analysis/summary.json` - canonical analysis summary
-- `analysis/report.json` + `analysis/report.md` - analysis report outputs from `cruncher analyze`
-- `analysis/plot_manifest.json` + `analysis/table_manifest.json` - artifact inventories
+- `run_manifest.json`, `run_status.json`, `config_used.yaml` - run metadata + status
+- `sequences.parquet`, `trace.nc`, `elites.*`, `random_baseline*` - sampling outputs
+- `metrics.jsonl` - live sampling metrics (if enabled)
+- `summary.json` - canonical analysis summary
+- `report.json` + `report.md` - analysis report outputs from `cruncher analyze`
+- `plot_manifest.json` + `table_manifest.json` + `manifest.json` - analysis inventories
+- `plots/` - curated plot outputs
+- `tables/` - curated table outputs
 
 ---
 

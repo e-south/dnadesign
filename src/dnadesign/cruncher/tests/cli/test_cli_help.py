@@ -446,8 +446,7 @@ def test_analyze_latest_requires_complete_artifacts(tmp_path: Path) -> None:
     config_path.write_text(yaml.safe_dump(config))
 
     run_dir = tmp_path / "results" / "sample" / "sample_missing_hits"
-    (run_dir / "meta").mkdir(parents=True, exist_ok=True)
-    (run_dir / "artifacts").mkdir(parents=True, exist_ok=True)
+    run_dir.mkdir(parents=True, exist_ok=True)
 
     config_used = {
         "cruncher": {
@@ -460,7 +459,7 @@ def test_analyze_latest_requires_complete_artifacts(tmp_path: Path) -> None:
             "sample": {"objective": {"score_scale": "normalized-llr"}},
         }
     }
-    (run_dir / "meta" / "config_used.yaml").write_text(yaml.safe_dump(config_used))
+    (run_dir / "config_used.yaml").write_text(yaml.safe_dump(config_used))
 
     pd.DataFrame(
         {
@@ -471,7 +470,7 @@ def test_analyze_latest_requires_complete_artifacts(tmp_path: Path) -> None:
             "score_lexA": [1.0],
             "score_cpxR": [1.1],
         }
-    ).to_parquet(run_dir / "artifacts" / "sequences.parquet", engine="fastparquet")
+    ).to_parquet(run_dir / "sequences.parquet", engine="fastparquet")
     pd.DataFrame(
         {
             "id": ["elite-1"],
@@ -480,9 +479,9 @@ def test_analyze_latest_requires_complete_artifacts(tmp_path: Path) -> None:
             "score_lexA": [1.0],
             "score_cpxR": [1.1],
         }
-    ).to_parquet(run_dir / "artifacts" / "elites.parquet", engine="fastparquet")
+    ).to_parquet(run_dir / "elites.parquet", engine="fastparquet")
 
-    (run_dir / "meta" / "run_manifest.json").write_text(
+    (run_dir / "run_manifest.json").write_text(
         json.dumps(
             {
                 "stage": "sample",

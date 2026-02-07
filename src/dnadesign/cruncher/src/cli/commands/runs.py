@@ -349,7 +349,7 @@ def show_run_cmd(
         console.print(f"analysis_ids: {', '.join(analysis_ids)}")
     if latest_analysis:
         console.print(f"latest_analysis: {latest_analysis}")
-        notebook_path = run.run_dir / "analysis" / "notebooks" / "run_overview.py"
+        notebook_path = run.run_dir / "notebook__run_overview.py"
         if notebook_path.exists():
             console.print(f"notebook: {render_path(notebook_path, base=base)}")
     if artifacts:
@@ -520,7 +520,7 @@ def best_run_cmd(
     console.print(best_run.name)
 
 
-@app.command("rebuild-index", help="Rebuild the run index from meta/run_manifest.json files.")
+@app.command("rebuild-index", help="Rebuild the run index from run_manifest.json files.")
 def rebuild_index_cmd(
     config: Path | None = typer.Argument(
         None,
@@ -627,7 +627,7 @@ def clean_runs_cmd(
 
     now = datetime.now(timezone.utc)
     stale_seconds = older_than_hours * 3600
-    stale_runs: list[tuple[Path, dict | None, str]] = []
+    stale_runs: list[tuple[str, Path, dict | None, str]] = []
 
     for run in runs:
         if run.status != "running":
@@ -655,7 +655,7 @@ def clean_runs_cmd(
             payload = status_payload or {"stage": run.stage}
             payload["run_dir"] = str(run.run_dir.resolve())
             payload.setdefault("started_at", run.created_at or now.isoformat())
-            stale_runs.append((run.run_dir, payload, reason))
+            stale_runs.append((run.name, run.run_dir, payload, reason))
 
     if not stale_runs:
         console.print("No stale running runs found.")
@@ -666,15 +666,15 @@ def clean_runs_cmd(
         table.add_column("Run")
         table.add_column("Stage")
         table.add_column("Reason")
-        for run_dir, payload, reason in stale_runs:
-            table.add_row(run_dir.name, str(payload.get("stage") or "-"), reason)
+        for run_name, _run_dir, payload, reason in stale_runs:
+            table.add_row(run_name, str(payload.get("stage") or "-"), reason)
         console.print(table)
         return
 
     if drop:
         removed = drop_run_index_entries(
             config_path,
-            [run_dir.name for run_dir, _payload, _reason in stale_runs],
+            [run_name for run_name, _run_dir, _payload, _reason in stale_runs],
             catalog_root=cfg.catalog.catalog_root,
         )
         console.print(f"Dropped {removed} stale run(s) from the run index.")
@@ -682,7 +682,7 @@ def clean_runs_cmd(
 
     updated = 0
     now_iso = now.isoformat()
-    for run_dir, payload, reason in stale_runs:
+    for _run_name, run_dir, payload, reason in stale_runs:
         payload["status"] = "aborted"
         payload["status_message"] = f"stale ({reason})"
         payload["updated_at"] = now_iso
@@ -778,7 +778,7 @@ def prune_runs_cmd(
         if not run_dir.exists():
             raise FileNotFoundError(f"Indexed run directory is missing: {run_dir}")
         if not manifest_path(run_dir).exists():
-            raise FileNotFoundError(f"Indexed run is missing meta/run_manifest.json: {run_dir}")
+            raise FileNotFoundError(f"Indexed run is missing run_manifest.json: {run_dir}")
         age_days = (now - _run_timestamp(run)).total_seconds() / 86400.0
         if older_than_days > 0 and age_days < older_than_days:
             continue
@@ -821,7 +821,7 @@ def prune_runs_cmd(
     )
 
 
-@app.command("watch", help="Tail meta/run_status.json for a live progress snapshot.")
+@app.command("watch", help="Tail run_status.json for a live progress snapshot.")
 def watch_run_cmd(
     args: list[str] = typer.Argument(
         None,
@@ -871,8 +871,8 @@ def watch_run_cmd(
         console.print(f"Error reading run status: {exc}")
         raise typer.Exit(code=1)
     if status is None:
-        console.print(f"No meta/run_status.json found for run '{run_name}'.")
-        console.print("Hint: watch is only available for active runs writing meta/run_status.json.")
+        console.print(f"No run_status.json found for run '{run_name}'.")
+        console.print("Hint: watch is only available for active runs writing run_status.json.")
         raise typer.Exit(code=1)
     if metric_points < 1:
         console.print("Error: --metric-points must be >= 1.")
@@ -884,7 +884,7 @@ def watch_run_cmd(
         console.print("Error: --plot-every must be >= 1.")
         raise typer.Exit(code=1)
 
-    plot_target = plot_path or (run.run_dir / "live" / "live_metrics.png")
+    plot_target = plot_path or (run.run_dir / "live_metrics.png")
 
     def _render(payload: dict) -> Table:
         table = Table(title=f"Run status: {run.name}", header_style="bold")
@@ -933,7 +933,7 @@ def watch_run_cmd(
                     )
                 table.add_row("metric_points", str(len(history)))
             else:
-                table.add_row("live_metrics", "live/metrics.jsonl not found")
+                table.add_row("live_metrics", "metrics.jsonl not found")
         return table
 
     tick = 0
@@ -945,7 +945,7 @@ def watch_run_cmd(
                 console.print(f"Error reading run status: {exc}")
                 raise typer.Exit(code=1)
             if status is None:
-                console.print("meta/run_status.json missing.")
+                console.print("run_status.json missing.")
                 break
             live.update(_render(status))
             if plot or plot_path is not None:

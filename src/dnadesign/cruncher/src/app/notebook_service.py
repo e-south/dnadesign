@@ -121,7 +121,6 @@ def generate_notebook(
     ensure_marimo()
     run_dir = run_dir.resolve()
     manifest = load_manifest(run_dir)
-    analysis_root = run_dir / "analysis"
     analysis_dir, resolved_id = resolve_analysis_dir(run_dir, analysis_id=analysis_id, latest=latest)
     _validate_notebook_inputs(analysis_dir)
 
@@ -135,7 +134,7 @@ def generate_notebook(
         )
         return notebook_path
 
-    template = _render_template(run_dir, analysis_root, resolved_id)
+    template = _render_template(resolved_id)
     notebook_path.write_text(template)
 
     _record_notebook_artifact(
@@ -147,7 +146,7 @@ def generate_notebook(
     return notebook_path
 
 
-def _render_template(run_dir: Path, analysis_root: Path, default_analysis_id: str | None) -> str:
+def _render_template(default_analysis_id: str | None) -> str:
     return f"""import marimo as mo
 
 app = mo.App(width="full")
@@ -167,21 +166,13 @@ def _(Path, json, mo, refresh_button):
     _ = refresh_button.value
     notebook_path = Path(__file__).resolve()
     analysis_dir = notebook_path.parent
-    analysis_root = analysis_dir
-    if analysis_root.name != "analysis":
-        if analysis_root.parent.name == "_archive" and analysis_root.parent.parent.name == "analysis":
-            analysis_root = analysis_root.parent.parent
-        else:
-            mo.stop(
-                True,
-                mo.md(
-                    "Expected this notebook to live under `<run_dir>/analysis/` (or analysis/_archive).\n"
-                    f"Found: {{notebook_path}}"
-                ),
-            )
-    if not analysis_root.exists():
-        mo.stop(True, mo.md(f"Analysis directory not found: {{analysis_root}}"))
-    run_dir = analysis_root.parent
+    if analysis_dir.parent.name == "_archive":
+        run_dir = analysis_dir.parent.parent
+    else:
+        run_dir = analysis_dir
+    if not run_dir.exists():
+        mo.stop(True, mo.md(f"Run directory not found: {{run_dir}}"))
+    analysis_root = run_dir
     from dnadesign.cruncher.analysis.layout import list_analysis_entries_verbose
 
     analysis_entries = list_analysis_entries_verbose(run_dir)

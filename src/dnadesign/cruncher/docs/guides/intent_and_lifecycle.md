@@ -91,19 +91,19 @@ The demo workflows in `docs/demos/` follow this lifecycle end-to-end.
 
 Sampling writes:
 
-- `artifacts/sequences.parquet` (per-draw scores and metadata)
-- `artifacts/elites.parquet` (elite sequences + summaries)
-- `artifacts/elites_hits.parquet` (per-elite x per-TF best-hit/core metadata)
-- `artifacts/random_baseline.parquet` (baseline score cloud)
-- `artifacts/random_baseline_hits.parquet` (baseline best-hit/core metadata)
+- `sequences.parquet` (per-draw scores and metadata)
+- `elites.parquet` (elite sequences + summaries)
+- `elites_hits.parquet` (per-elite x per-TF best-hit/core metadata)
+- `random_baseline.parquet` (baseline score cloud)
+- `random_baseline_hits.parquet` (baseline best-hit/core metadata)
 
 Analysis writes:
 
-- `analysis/summary.json`
-- `analysis/report.md` and `analysis/report.json`
-- `analysis/plot_manifest.json` and `analysis/table_manifest.json`
-- `analysis/plots/` (curated figures)
-- `analysis/tables/` (curated tabular artifacts)
+- `summary.json`
+- `report.md` and `report.json`
+- `plot_manifest.json` and `table_manifest.json`
+- `plots/` (curated figures)
+- `tables/` (curated tabular artifacts)
 
 ## Config mapping
 

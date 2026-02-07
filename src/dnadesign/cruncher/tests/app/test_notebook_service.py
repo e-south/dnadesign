@@ -18,7 +18,7 @@ from dnadesign.cruncher.artifacts.layout import manifest_path
 def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
     run_dir = tmp_path / "run"
     analysis_id = "20250101T000000Z_test"
-    analysis_dir = run_dir / "analysis"
+    analysis_dir = run_dir
     analysis_dir.mkdir(parents=True)
     manifest_file = manifest_path(run_dir)
     manifest_file.parent.mkdir(parents=True, exist_ok=True)
@@ -49,6 +49,8 @@ def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
     assert f"default_id_hint = {analysis_id!r}" in content
     assert "Path(__file__).resolve()" in content
     assert "analysis_dir = notebook_path.parent" in content
+    assert 'if analysis_dir.parent.name == "_archive"' in content
+    assert "run_dir = analysis_dir" in content
     assert "Refresh analysis list" in content
     assert "plot_options" in content
     assert "table_manifest.json" in content
@@ -67,7 +69,7 @@ def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
 
 def test_generate_notebook_strict_requires_summary(tmp_path, monkeypatch) -> None:
     run_dir = tmp_path / "run"
-    analysis_dir = run_dir / "analysis"
+    analysis_dir = run_dir
     analysis_dir.mkdir(parents=True)
     manifest_file = manifest_path(run_dir)
     manifest_file.parent.mkdir(parents=True, exist_ok=True)
@@ -81,7 +83,7 @@ def test_generate_notebook_strict_requires_summary(tmp_path, monkeypatch) -> Non
 
 def test_generate_notebook_rejects_lenient_mode(tmp_path, monkeypatch) -> None:
     run_dir = tmp_path / "run"
-    analysis_dir = run_dir / "analysis"
+    analysis_dir = run_dir
     analysis_dir.mkdir(parents=True)
     manifest_file = manifest_path(run_dir)
     manifest_file.parent.mkdir(parents=True, exist_ok=True)
@@ -106,7 +108,7 @@ def test_generate_notebook_rejects_latest_and_analysis_id(tmp_path, monkeypatch)
 def test_generate_notebook_requires_table_manifest_contract_keys(tmp_path, monkeypatch) -> None:
     run_dir = tmp_path / "run"
     analysis_id = "20250101T000000Z_test"
-    analysis_dir = run_dir / "analysis"
+    analysis_dir = run_dir
     analysis_dir.mkdir(parents=True)
     manifest_file = manifest_path(run_dir)
     manifest_file.parent.mkdir(parents=True, exist_ok=True)

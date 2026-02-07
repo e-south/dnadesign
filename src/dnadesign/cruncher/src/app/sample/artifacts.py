@@ -39,7 +39,7 @@ def _save_config(
     log_fn: Callable[..., None] | None = None,
 ) -> None:
     """
-    Save the exact Pydantic-validated config into <batch_dir>/meta/config_used.yaml,
+    Save the exact Pydantic-validated config into <batch_dir>/config_used.yaml,
     plus, for each TF:
       - alphabet: ["A","C","G","T"]
       - pwm_matrix: a list of [p_A, p_C, p_G, p_T] for each position

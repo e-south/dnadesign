@@ -12,11 +12,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Iterable
 
-from dnadesign.cruncher.core.labels import build_run_name, format_regulator_slug
+from dnadesign.cruncher.core.labels import format_regulator_slug
 
-RUN_META_DIR = "meta"
-RUN_ARTIFACTS_DIR = "artifacts"
-RUN_LIVE_DIR = "live"
+# Run metadata/artifact files are written directly under each run directory.
+RUN_META_DIR = ""
+RUN_ARTIFACTS_DIR = ""
+RUN_LIVE_DIR = ""
 LOGOS_ROOT_DIR = "logos"
 
 
@@ -57,16 +58,13 @@ def build_run_dir(
     tfs: Iterable[str],
     set_index: int | None,
     include_set_index: bool = False,
+    slot: str = "latest",
 ) -> Path:
     root = run_group_dir(out_root(config_path, out_dir), stage, tfs, set_index)
-    return root / build_run_name(
-        stage,
-        list(tfs),
-        set_index=set_index,
-        include_stage=False,
-        include_label=True,
-        include_set_index=include_set_index,
-    )
+    if include_set_index:
+        label = run_group_label(tfs, set_index, include_set_index=include_set_index)
+        return root / label / slot
+    return root / slot
 
 
 def ensure_run_dirs(
@@ -77,64 +75,58 @@ def ensure_run_dirs(
     live: bool = False,
 ) -> None:
     run_dir.mkdir(parents=True, exist_ok=True)
-    if meta:
-        (run_dir / RUN_META_DIR).mkdir(parents=True, exist_ok=True)
-    if artifacts:
-        (run_dir / RUN_ARTIFACTS_DIR).mkdir(parents=True, exist_ok=True)
-    if live:
-        (run_dir / RUN_LIVE_DIR).mkdir(parents=True, exist_ok=True)
 
 
 def manifest_path(run_dir: Path) -> Path:
-    return run_dir / RUN_META_DIR / "run_manifest.json"
+    return run_dir / "run_manifest.json"
 
 
 def status_path(run_dir: Path) -> Path:
-    return run_dir / RUN_META_DIR / "run_status.json"
+    return run_dir / "run_status.json"
 
 
 def config_used_path(run_dir: Path) -> Path:
-    return run_dir / RUN_META_DIR / "config_used.yaml"
+    return run_dir / "config_used.yaml"
 
 
 def live_metrics_path(run_dir: Path) -> Path:
-    return run_dir / RUN_LIVE_DIR / "metrics.jsonl"
+    return run_dir / "metrics.jsonl"
 
 
 def trace_path(run_dir: Path) -> Path:
-    return run_dir / RUN_ARTIFACTS_DIR / "trace.nc"
+    return run_dir / "trace.nc"
 
 
 def sequences_path(run_dir: Path) -> Path:
-    return run_dir / RUN_ARTIFACTS_DIR / "sequences.parquet"
+    return run_dir / "sequences.parquet"
 
 
 def random_baseline_path(run_dir: Path) -> Path:
-    return run_dir / RUN_ARTIFACTS_DIR / "random_baseline.parquet"
+    return run_dir / "random_baseline.parquet"
 
 
 def random_baseline_hits_path(run_dir: Path) -> Path:
-    return run_dir / RUN_ARTIFACTS_DIR / "random_baseline_hits.parquet"
+    return run_dir / "random_baseline_hits.parquet"
 
 
 def elites_path(run_dir: Path) -> Path:
-    return run_dir / RUN_ARTIFACTS_DIR / "elites.parquet"
+    return run_dir / "elites.parquet"
 
 
 def elites_mmr_meta_path(run_dir: Path) -> Path:
-    return run_dir / RUN_ARTIFACTS_DIR / "elites_mmr_meta.parquet"
+    return run_dir / "elites_mmr_meta.parquet"
 
 
 def elites_hits_path(run_dir: Path) -> Path:
-    return run_dir / RUN_ARTIFACTS_DIR / "elites_hits.parquet"
+    return run_dir / "elites_hits.parquet"
 
 
 def elites_json_path(run_dir: Path) -> Path:
-    return run_dir / RUN_ARTIFACTS_DIR / "elites.json"
+    return run_dir / "elites.json"
 
 
 def elites_yaml_path(run_dir: Path) -> Path:
-    return run_dir / RUN_ARTIFACTS_DIR / "elites.yaml"
+    return run_dir / "elites.yaml"
 
 
 def logos_root(out_root_path: Path) -> Path:

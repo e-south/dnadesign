@@ -20,6 +20,7 @@ from dnadesign.cruncher.app.run_service import (
     get_run,
     load_run_index,
     save_run_index,
+    update_run_index_from_status,
 )
 from dnadesign.cruncher.artifacts.layout import manifest_path
 from dnadesign.cruncher.config.load import load_config
@@ -48,7 +49,7 @@ def test_get_run_accepts_path(tmp_path: Path) -> None:
         "motifs": [{"tf_name": "lexA"}],
         "motif_store": {"pwm_source": "matrix"},
         "regulator_set": {"index": 1, "tfs": ["lexA"]},
-        "artifacts": ["meta/config_used.yaml"],
+        "artifacts": ["config_used.yaml"],
     }
     manifest_file = manifest_path(run_dir)
     manifest_file.parent.mkdir(parents=True, exist_ok=True)
@@ -76,3 +77,40 @@ def test_drop_run_index_entries(tmp_path: Path) -> None:
     index = load_run_index(config_path, catalog_root=".cruncher")
     assert "run_b" not in index
     assert "run_a" in index
+
+
+def test_update_run_index_uses_semantic_keys_for_latest_slots(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("cruncher: {}")
+
+    sample_dir = tmp_path / "results" / "sample" / "latest"
+    parse_dir = tmp_path / "results" / "parse" / "latest"
+    sample_dir.mkdir(parents=True, exist_ok=True)
+    parse_dir.mkdir(parents=True, exist_ok=True)
+
+    update_run_index_from_status(
+        config_path,
+        sample_dir,
+        {
+            "stage": "sample",
+            "status": "running",
+            "run_dir": str(sample_dir.resolve()),
+            "run_group": "lexA",
+            "started_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+    update_run_index_from_status(
+        config_path,
+        parse_dir,
+        {
+            "stage": "parse",
+            "status": "completed",
+            "run_dir": str(parse_dir.resolve()),
+            "run_group": "lexA",
+            "started_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+
+    index = load_run_index(config_path)
+    assert "sample/lexA/latest" in index
+    assert "parse/lexA/latest" in index

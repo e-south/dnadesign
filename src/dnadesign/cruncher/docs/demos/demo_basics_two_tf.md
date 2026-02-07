@@ -75,21 +75,21 @@ cruncher analyze --summary -c "$CONFIG"
 Run artifacts live under:
 
 ```
-<workspace>/outputs/sample/<run_name>/
+<workspace>/outputs/sample/latest/
 ```
 
 Key files:
 
-- `analysis/summary.json`
-- `analysis/report.md`
-- `analysis/report.json`
-- curated plots: `analysis/plots/run_summary.*`, `analysis/plots/opt_trajectory.*`,
-  `analysis/plots/elites_nn_distance.*`, `analysis/plots/overlap_panel.*`
-  (and `analysis/plots/health_panel.*` if a trace is present)
-- analysis tables live in `analysis/tables/` (for example `scores_summary.parquet` and `metrics_joint.parquet`)
-- elite hit metadata: `artifacts/elites_hits.parquet`
-- random baseline cloud: `artifacts/random_baseline.parquet`
-- random baseline hits: `artifacts/random_baseline_hits.parquet`
+- `summary.json`
+- `report.md`
+- `report.json`
+- curated plots: `plots/run_summary.*`, `plots/opt_trajectory.*`,
+  `plots/elites_nn_distance.*`, `plots/overlap_panel.*`
+  (and `plots/health_panel.*` if a trace is present)
+- analysis tables live in `tables/` (for example `scores_summary.parquet` and `metrics_joint.parquet`)
+- elite hit metadata: `elites_hits.parquet`
+- random baseline cloud: `random_baseline.parquet`
+- random baseline hits: `random_baseline_hits.parquet`
 
 ## Optional: motif discovery
 

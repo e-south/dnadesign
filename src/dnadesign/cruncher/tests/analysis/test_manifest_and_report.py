@@ -97,7 +97,7 @@ def test_build_manifest_and_report(tmp_path: Path) -> None:
         lockmap=lockmap,
         catalog=catalog,
         run_dir=run_dir,
-        artifacts=["artifacts/trace.nc", "artifacts/sequences.parquet"],
+        artifacts=["trace.nc", "sequences.parquet"],
         extra={"sequence_length": 6},
     )
     write_manifest(run_dir, manifest)

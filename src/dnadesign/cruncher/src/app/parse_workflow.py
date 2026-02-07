@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import shutil
 from pathlib import Path
 
 import pandas as pd
@@ -25,7 +26,6 @@ from dnadesign.cruncher.artifacts.layout import (
     build_run_dir,
     ensure_run_dirs,
     out_root,
-    run_group_dir,
     run_group_label,
     status_path,
 )
@@ -123,21 +123,27 @@ def _find_existing_parse_run(
     set_index: int,
     signature: str,
 ) -> Path | None:
-    stage_dir = run_group_dir(out_root(config_path, cfg.out_dir), "parse", tfs, set_index)
-    if not stage_dir.exists():
-        return None
-    for child in sorted(stage_dir.iterdir()):
-        if not child.is_dir():
+    for slot in ("latest", "previous"):
+        run_dir = build_run_dir(
+            config_path=config_path,
+            out_dir=cfg.out_dir,
+            stage="parse",
+            tfs=tfs,
+            set_index=set_index,
+            include_set_index=len(cfg.regulator_sets) > 1,
+            slot=slot,
+        )
+        if not run_dir.exists():
             continue
         try:
-            manifest = load_manifest(child)
+            manifest = load_manifest(run_dir)
         except FileNotFoundError:
             continue
         if manifest.get("stage") != "parse":
             continue
         if manifest.get("parse_signature") != signature:
             continue
-        return child
+        return run_dir
     return None
 
 
@@ -206,7 +212,21 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
             tfs=tfs,
             set_index=set_index,
             include_set_index=include_set_index,
+            slot="latest",
         )
+        previous_dir = build_run_dir(
+            config_path=config_path,
+            out_dir=cfg.out_dir,
+            stage="parse",
+            tfs=tfs,
+            set_index=set_index,
+            include_set_index=include_set_index,
+            slot="previous",
+        )
+        if previous_dir.exists():
+            shutil.rmtree(previous_dir)
+        if run_dir.exists():
+            shutil.move(str(run_dir), previous_dir)
         ensure_run_dirs(run_dir, meta=True)
         status_writer = RunStatusWriter(
             path=status_path(run_dir),

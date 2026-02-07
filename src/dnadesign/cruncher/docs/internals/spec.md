@@ -145,25 +145,24 @@ If a TF cannot be uniquely resolved, **cruncher** errors immediately. Analyze op
 
 Each run directory contains:
 
-- `meta/config_used.yaml` — resolved config + PWM summaries
-- `meta/run_manifest.json` — provenance, hashes, optimizer stats
-- `meta/run_status.json` — live progress updates (written during parse and sampling)
-- `artifacts/trace.nc` — canonical ArviZ trace
-- `artifacts/sequences.parquet` — per-draw sequences + per-TF scores
-- `artifacts/elites.parquet` — elite sequences (parquet)
-- `artifacts/elites.json` — elite sequences (JSON, human-readable)
-- `artifacts/elites.yaml` — elite metadata (YAML)
-- `analysis/` — latest analysis root (metadata + manifests)
-- `analysis/plots/` — curated analysis figures
-- `analysis/tables/` — curated analysis tables
-- `analysis/summary.json` — analysis provenance and artifacts
-- `analysis/manifest.json` — artifact inventory with generation reasons
-- `analysis/analysis_used.yaml` — analysis settings used
-- `analysis/plot_manifest.json` — plot registry and generated outputs
-- `analysis/table_manifest.json` — table registry and generated outputs
-- `analysis/_archive/<analysis_id>/` — optional archived analyses (when enabled)
-- `live/metrics.jsonl` — live sampling progress (when enabled)
-- `analysis/report.json` + `analysis/report.md` — summary (from `cruncher analyze`)
+- `config_used.yaml` — resolved config + PWM summaries
+- `run_manifest.json` — provenance, hashes, optimizer stats
+- `run_status.json` — live progress updates (written during parse and sampling)
+- `trace.nc` — canonical ArviZ trace
+- `sequences.parquet` — per-draw sequences + per-TF scores
+- `elites.parquet` — elite sequences (parquet)
+- `elites.json` — elite sequences (JSON, human-readable)
+- `elites.yaml` — elite metadata (YAML)
+- `plots/` — curated analysis figures
+- `tables/` — curated analysis tables
+- `summary.json` — analysis provenance and artifacts
+- `manifest.json` — artifact inventory with generation reasons
+- `analysis_used.yaml` — analysis settings used
+- `plot_manifest.json` — plot registry and generated outputs
+- `table_manifest.json` — table registry and generated outputs
+- `_archive/<analysis_id>/` — optional archived analyses (when enabled)
+- `metrics.jsonl` — live sampling progress (when enabled)
+- `report.json` + `report.md` — summary (from `cruncher analyze`)
 
 `cruncher analyze` fails when required analysis artifacts are missing and does not write partial report outputs.
 

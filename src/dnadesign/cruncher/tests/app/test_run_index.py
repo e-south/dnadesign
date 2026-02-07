@@ -43,7 +43,7 @@ def test_run_index_rebuild(tmp_path: Path) -> None:
         "motifs": [{"tf_name": "lexA"}],
         "motif_store": {"pwm_source": "matrix"},
         "regulator_set": {"index": 1, "tfs": ["lexA"]},
-        "artifacts": ["meta/config_used.yaml"],
+        "artifacts": ["config_used.yaml"],
     }
     manifest_file = manifest_path(run_dir)
     manifest_file.parent.mkdir(parents=True, exist_ok=True)
@@ -61,3 +61,37 @@ def test_run_index_rebuild(tmp_path: Path) -> None:
     assert runs
     assert runs[0].name == run_name
     assert runs[0].status == "completed"
+
+
+def test_run_index_rebuild_includes_nested_latest_slot_runs(tmp_path: Path) -> None:
+    config = {
+        "cruncher": {
+            "schema_version": 3,
+            "workspace": {"out_dir": "results", "regulator_sets": [["lexA"], ["cpxR"]]},
+            "catalog": {"root": "cache_root", "pwm_source": "matrix"},
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+    cfg = load_config(config_path)
+
+    run_dir = tmp_path / "results" / "sample" / "set1_lexA" / "latest"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    created_at = datetime.now(timezone.utc).isoformat()
+    manifest = {
+        "stage": "sample",
+        "created_at": created_at,
+        "run_dir": str(run_dir.resolve()),
+        "motifs": [{"tf_name": "lexA"}],
+        "motif_store": {"pwm_source": "matrix"},
+        "regulator_set": {"index": 1, "tfs": ["lexA"]},
+        "run_group": "set1_lexA",
+        "artifacts": [],
+    }
+    manifest_file = manifest_path(run_dir)
+    manifest_file.parent.mkdir(parents=True, exist_ok=True)
+    manifest_file.write_text(json.dumps(manifest))
+
+    index_path = rebuild_run_index(cfg, config_path)
+    payload = json.loads(index_path.read_text())
+    assert "sample/set1_lexA/latest" in payload
