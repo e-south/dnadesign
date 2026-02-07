@@ -70,6 +70,7 @@ from dnadesign.cruncher.artifacts.layout import (
 from dnadesign.cruncher.artifacts.manifest import load_manifest, write_manifest
 from dnadesign.cruncher.config.schema_v3 import CruncherConfig
 from dnadesign.cruncher.core.sequence import identity_key
+from dnadesign.cruncher.utils.arviz_cache import ensure_arviz_data_dir
 from dnadesign.cruncher.utils.hashing import sha256_path
 from dnadesign.cruncher.utils.paths import resolve_catalog_root
 from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
@@ -380,7 +381,9 @@ def run_analyze(
     if cfg.sample is None:
         raise ValueError("sample section is required for analyze")
 
-    ensure_mpl_cache(resolve_catalog_root(config_path, cfg.catalog.catalog_root))
+    catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
+    ensure_mpl_cache(catalog_root)
+    ensure_arviz_data_dir(catalog_root)
 
     from dnadesign.cruncher.analysis.plots.elites_nn_distance import plot_elites_nn_distance
     from dnadesign.cruncher.analysis.plots.health_panel import plot_health_panel

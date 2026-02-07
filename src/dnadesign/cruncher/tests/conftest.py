@@ -12,10 +12,17 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import os
+import tempfile
+from pathlib import Path
 
 import pytest
 
 from dnadesign.cruncher.utils.numba_cache import temporary_numba_cache_dir
+
+_SESSION_HOME = Path(tempfile.mkdtemp(prefix="cruncher-test-home-session-"))
+os.environ["HOME"] = str(_SESSION_HOME)
+os.environ["MPLCONFIGDIR"] = str(_SESSION_HOME / ".matplotlib")
+os.environ["ARVIZ_DATA"] = str(_SESSION_HOME / "arviz_data")
 
 
 @pytest.fixture(autouse=True, scope="function")
@@ -30,6 +37,9 @@ def _cruncher_test_environment() -> None:
         "CRUNCHER_CONFIG",
         "CRUNCHER_NONINTERACTIVE",
         "CRUNCHER_CWD",
+        "HOME",
+        "MPLCONFIGDIR",
+        "ARVIZ_DATA",
     )
     for name in env_vars:
         prior_env[name] = os.environ.get(name)
@@ -40,8 +50,13 @@ def _cruncher_test_environment() -> None:
     if prior_string_storage is not None:
         pd.options.mode.string_storage = "python"
     try:
-        with temporary_numba_cache_dir():
-            yield
+        with tempfile.TemporaryDirectory(prefix="cruncher-test-home-") as tmp_home:
+            home_path = Path(tmp_home)
+            os.environ["HOME"] = str(home_path)
+            os.environ["MPLCONFIGDIR"] = str(home_path / ".matplotlib")
+            os.environ["ARVIZ_DATA"] = str(home_path / "arviz_data")
+            with temporary_numba_cache_dir():
+                yield
     finally:
         if prior_string_storage is not None:
             pd.options.mode.string_storage = prior_string_storage

@@ -21,7 +21,9 @@ from dnadesign.cruncher.core.optimizers.cooling import make_beta_ladder, make_be
 from dnadesign.cruncher.core.optimizers.helpers import _replace_block, slide_window, swap_block
 from dnadesign.cruncher.core.optimizers.policies import (
     MOVE_KINDS,
-    AdaptiveSwapController,
+    AdaptiveMoveController,
+    AdaptiveProposalController,
+    AdaptiveSwapPairController,
     MoveSchedule,
     TargetingPolicy,
     move_probs_array,
@@ -101,6 +103,8 @@ class PTGibbsOptimizer(Optimizer):
             "slide_max_shift": int(cfg["slide_max_shift"]),
             "swap_len_range": tuple(cfg["swap_len_range"]),
         }
+        self._base_block_len_range: tuple[int, int] = tuple(int(v) for v in cfg["block_len_range"])
+        self._base_multi_k_range: tuple[int, int] = tuple(int(v) for v in cfg["multi_k_range"])
         self.move_probs_start = move_probs_array(cfg["move_probs"])
         move_sched_cfg = cfg.get("move_schedule") or {}
         if move_sched_cfg.get("enabled"):
@@ -108,6 +112,27 @@ class PTGibbsOptimizer(Optimizer):
         else:
             end_probs = None
         self.move_schedule = MoveSchedule(start=self.move_probs_start, end=end_probs)
+        adaptive_moves_cfg = cfg.get("adaptive_weights") or {}
+        self.adaptive_moves_enabled = bool(adaptive_moves_cfg.get("enabled", False))
+        self.move_controller = AdaptiveMoveController(
+            enabled=self.adaptive_moves_enabled,
+            window=int(adaptive_moves_cfg.get("window", 250)),
+            k=float(adaptive_moves_cfg.get("k", 0.5)),
+            min_prob=float(adaptive_moves_cfg.get("min_prob", 0.01)),
+            max_prob=float(adaptive_moves_cfg.get("max_prob", 0.95)),
+            targets=dict(adaptive_moves_cfg.get("targets") or {"S": 0.95, "B": 0.40, "M": 0.35, "I": 0.35}),
+            kinds=tuple(adaptive_moves_cfg.get("kinds") or ("S", "B", "M", "I")),
+        )
+        proposal_adapt_cfg = cfg.get("proposal_adapt") or {}
+        self.proposal_controller = AdaptiveProposalController(
+            enabled=bool(proposal_adapt_cfg.get("enabled", False)),
+            window=int(proposal_adapt_cfg.get("window", 250)),
+            step=float(proposal_adapt_cfg.get("step", 0.10)),
+            min_scale=float(proposal_adapt_cfg.get("min_scale", 0.50)),
+            max_scale=float(proposal_adapt_cfg.get("max_scale", 2.0)),
+            target_low=float(proposal_adapt_cfg.get("target_low", 0.25)),
+            target_high=float(proposal_adapt_cfg.get("target_high", 0.75)),
+        )
         target_prob = float(cfg.get("target_worst_tf_prob", 0.0))
         target_pad = int(cfg.get("target_window_pad", 0))
         self.targeting = TargetingPolicy(
@@ -130,12 +155,16 @@ class PTGibbsOptimizer(Optimizer):
         self.adaptive_swap_cfg = cfg.get("adaptive_swap") or {}
         self.adaptive_swap_enabled = bool(self.adaptive_swap_cfg.get("enabled", False))
         if self.adaptive_swap_enabled:
-            self.swap_controller = AdaptiveSwapController(
+            self.swap_controller = AdaptiveSwapPairController(
+                n_pairs=max(0, self.chains - 1),
                 target=float(self.adaptive_swap_cfg.get("target_swap", 0.25)),
                 window=int(self.adaptive_swap_cfg.get("window", 50)),
                 k=float(self.adaptive_swap_cfg.get("k", 0.5)),
                 min_scale=float(self.adaptive_swap_cfg.get("min_scale", 0.25)),
                 max_scale=float(self.adaptive_swap_cfg.get("max_scale", 4.0)),
+                strict=bool(self.adaptive_swap_cfg.get("strict", False)),
+                saturation_windows=int(self.adaptive_swap_cfg.get("saturation_windows", 5)),
+                enabled=True,
             )
         else:
             self.swap_controller = None
@@ -175,6 +204,11 @@ class PTGibbsOptimizer(Optimizer):
         self.best_meta: Tuple[int, int] | None = None
 
     # Public API
+    def _current_beta_ladder(self) -> list[float]:
+        if self.swap_controller is None:
+            return list(self.beta_ladder_base)
+        return self.swap_controller.ladder_from_base(self.beta_ladder_base)
+
     def _scaled_beta_ladder(self, scale: float) -> list[float]:
         if not self.beta_ladder_base:
             return []
@@ -275,15 +309,32 @@ class PTGibbsOptimizer(Optimizer):
                 self._unique_success_set.add(key)
                 self.unique_successes = len(self._unique_success_set)
 
+        def _maybe_raise_tuning_limited(*, phase: str, sweep_idx: int) -> None:
+            if self.swap_controller is None:
+                return
+            if self.swap_controller.tuning_limited():
+                raise RuntimeError(
+                    "PT swap adaptation tuning-limited: ladder scale saturated at max_scale "
+                    f"for {self.swap_controller.saturated_windows_seen} windows "
+                    f"(phase={phase}, sweep={sweep_idx})."
+                )
+
         stop_after_tune = bool(self.adaptive_swap_cfg.get("stop_after_tune", True))
 
         # Burn‑in sweeps (record like Gibbs for consistency)
         for t in self.progress(range(T), desc="burn-in", leave=False, disable=not self.progress_bar):
             sweep_idx = t
             beta_softmin = self.softmin_of(sweep_idx) if self.softmin_of else None
-            move_probs = self.move_schedule.probs(sweep_idx / max(self.total_sweeps - 1, 1))
-            scale = self.swap_controller.scale if self.swap_controller else 1.0
-            self.beta_ladder = self._scaled_beta_ladder(scale)
+            base_move_probs = self.move_schedule.probs(sweep_idx / max(self.total_sweeps - 1, 1))
+            move_probs = self.move_controller.adapt(base_move_probs)
+            block_range, multi_range = self.proposal_controller.current_ranges(
+                self._base_block_len_range,
+                self._base_multi_k_range,
+                sequence_length=self.sequence_length,
+            )
+            self.move_cfg["block_len_range"] = block_range
+            self.move_cfg["multi_k_range"] = multi_range
+            self.beta_ladder = self._current_beta_ladder()
             current_scores: list[float] = []
             for c in range(C):
                 per_tf_map = current_per_tf_maps[c]
@@ -306,6 +357,8 @@ class PTGibbsOptimizer(Optimizer):
                 )
                 current_per_tf_maps[c] = per_tf_map
                 current_scores.append(new_score)
+                self.move_controller.record(move_kind, accepted=accepted)
+                self.proposal_controller.record(move_kind, accepted=accepted)
                 self.move_stats.append(
                     {
                         "sweep_idx": int(sweep_idx),
@@ -347,11 +400,13 @@ class PTGibbsOptimizer(Optimizer):
                         self.swap_accepts_by_pair[c] += 1
                         accepted = True
                     if self.swap_controller is not None:
-                        self.swap_controller.record(accepted)
+                        self.swap_controller.record(pair_idx=c, accepted=accepted)
                         if not stop_after_tune:
-                            self.swap_controller.update_scale()
+                            self.swap_controller.update()
+                            _maybe_raise_tuning_limited(phase="tune", sweep_idx=sweep_idx)
                 if self.swap_controller is not None and stop_after_tune:
-                    self.swap_controller.update_scale()
+                    self.swap_controller.update()
+                    _maybe_raise_tuning_limited(phase="tune", sweep_idx=sweep_idx)
 
             if self.record_tune:
                 for c in range(C):
@@ -365,9 +420,16 @@ class PTGibbsOptimizer(Optimizer):
         for d in self.progress(range(D), desc="sampling", leave=False, disable=not self.progress_bar):
             sweep_idx = T + d
             beta_softmin = self.softmin_of(sweep_idx) if self.softmin_of else None
-            move_probs = self.move_schedule.probs(sweep_idx / max(self.total_sweeps - 1, 1))
-            scale = self.swap_controller.scale if self.swap_controller else 1.0
-            self.beta_ladder = self._scaled_beta_ladder(scale)
+            base_move_probs = self.move_schedule.probs(sweep_idx / max(self.total_sweeps - 1, 1))
+            move_probs = self.move_controller.adapt(base_move_probs)
+            block_range, multi_range = self.proposal_controller.current_ranges(
+                self._base_block_len_range,
+                self._base_multi_k_range,
+                sequence_length=self.sequence_length,
+            )
+            self.move_cfg["block_len_range"] = block_range
+            self.move_cfg["multi_k_range"] = multi_range
+            self.beta_ladder = self._current_beta_ladder()
 
             # Within‑chain proposals
             current_scores: list[float] = []
@@ -392,6 +454,8 @@ class PTGibbsOptimizer(Optimizer):
                 )
                 current_per_tf_maps[c] = per_tf_map
                 current_scores.append(new_score)
+                self.move_controller.record(move_kind, accepted=accepted)
+                self.proposal_controller.record(move_kind, accepted=accepted)
                 self.move_stats.append(
                     {
                         "sweep_idx": int(sweep_idx),
@@ -433,11 +497,13 @@ class PTGibbsOptimizer(Optimizer):
                         self.swap_accepts_by_pair[c] += 1
                         accepted = True
                     if self.swap_controller is not None:
-                        self.swap_controller.record(accepted)
+                        self.swap_controller.record(pair_idx=c, accepted=accepted)
                         if not stop_after_tune:
-                            self.swap_controller.update_scale()
+                            self.swap_controller.update()
+                            _maybe_raise_tuning_limited(phase="draw", sweep_idx=sweep_idx)
                 if self.swap_controller is not None and stop_after_tune:
-                    self.swap_controller.update_scale()
+                    self.swap_controller.update()
+                    _maybe_raise_tuning_limited(phase="draw", sweep_idx=sweep_idx)
 
             for c in range(C):
                 _record(c, T + d, chain_states[c], current_per_tf_maps[c])
@@ -850,6 +916,10 @@ class PTGibbsOptimizer(Optimizer):
         beta_min = float(self.beta_ladder_base[0]) if self.beta_ladder_base else None
         beta_max_base = float(self.beta_ladder_base[-1]) if self.beta_ladder_base else None
         beta_max_final = float(max(self.beta_ladder)) if self.beta_ladder else None
+        beta_mode = "pair_adaptive_log_gap" if self.swap_controller is not None else "fixed"
+        swap_pair_scales = self.swap_controller.pair_scales if self.swap_controller is not None else None
+        tuning_limited = self.swap_controller.tuning_limited() if self.swap_controller is not None else False
+        swap_saturation_windows = self.swap_controller.saturated_windows_seen if self.swap_controller is not None else 0
         return {
             "moves": totals,
             "accepted": accepted,
@@ -867,10 +937,17 @@ class PTGibbsOptimizer(Optimizer):
             "beta_ladder_base": list(self.beta_ladder_base),
             "beta_ladder_final": list(self.beta_ladder),
             "beta_ladder_scale_final": float(self.swap_controller.scale) if self.swap_controller else 1.0,
-            "beta_ladder_scale_mode": "anchor_min_scale_max",
+            "beta_ladder_scale_mode": beta_mode,
+            "swap_pair_scales_final": swap_pair_scales,
+            "swap_saturation_windows": swap_saturation_windows,
+            "swap_tuning_limited": tuning_limited,
             "beta_min": beta_min,
             "beta_max_base": beta_max_base,
             "beta_max_final": beta_max_final,
+            "adaptive_moves_enabled": bool(self.move_controller.enabled),
+            "proposal_adapt_enabled": bool(self.proposal_controller.enabled),
+            "proposal_block_len_range_final": list(self.move_cfg["block_len_range"]),
+            "proposal_multi_k_range_final": list(self.move_cfg["multi_k_range"]),
             "unique_successes": self.unique_successes,
             "move_stats": list(self.move_stats),
             "final_softmin_beta": self.final_softmin_beta(),
@@ -888,10 +965,12 @@ class PTGibbsOptimizer(Optimizer):
         return float(max(self.beta_ladder))
 
     def objective_schedule_summary(self) -> Dict[str, object]:
+        beta_mode = "pair_adaptive_log_gap" if self.swap_controller is not None else "fixed"
         return {
             "total_sweeps": self.total_sweeps,
             "beta_ladder_base": list(self.beta_ladder_base),
             "beta_ladder_final": list(self.beta_ladder),
             "beta_ladder_scale_final": float(self.swap_controller.scale) if self.swap_controller else 1.0,
-            "beta_ladder_scale_mode": "anchor_min_scale_max",
+            "beta_ladder_scale_mode": beta_mode,
+            "swap_pair_scales_final": self.swap_controller.pair_scales if self.swap_controller is not None else None,
         }

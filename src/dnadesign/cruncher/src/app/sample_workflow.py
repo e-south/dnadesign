@@ -26,6 +26,7 @@ from dnadesign.cruncher.app.target_service import (
 from dnadesign.cruncher.artifacts.layout import config_used_path
 from dnadesign.cruncher.config.schema_v3 import CruncherConfig
 from dnadesign.cruncher.core.labels import regulator_sets
+from dnadesign.cruncher.utils.arviz_cache import ensure_arviz_data_dir
 from dnadesign.cruncher.utils.paths import resolve_catalog_root
 from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
 
@@ -70,7 +71,9 @@ def run_sample(
         raise ValueError("sample section is required for sample")
     with _sigterm_as_keyboard_interrupt():
         if cfg.sample.output.save_trace:
-            ensure_mpl_cache(resolve_catalog_root(config_path, cfg.catalog.catalog_root))
+            catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
+            ensure_mpl_cache(catalog_root)
+            ensure_arviz_data_dir(catalog_root)
         lockmap = _lockmap_for(cfg, config_path)
         statuses = target_statuses(cfg=cfg, config_path=config_path)
         sample_cfg = cfg.sample

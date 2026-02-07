@@ -661,6 +661,105 @@ class SampleObjectiveConfig(StrictBaseModel):
     scoring: SampleObjectiveScoringConfig = SampleObjectiveScoringConfig()
 
 
+class MoveAdaptiveWeightsConfig(StrictBaseModel):
+    enabled: bool = False
+    window: int = 250
+    k: float = 0.5
+    min_prob: float = 0.01
+    max_prob: float = 0.95
+    targets: Dict[Literal["S", "B", "M", "L", "W", "I"], float] = {
+        "S": 0.95,
+        "B": 0.40,
+        "M": 0.35,
+        "I": 0.35,
+    }
+    kinds: List[Literal["S", "B", "M", "L", "W", "I"]] = Field(default_factory=lambda: ["S", "B", "M", "I"])
+
+    @field_validator("window")
+    @classmethod
+    def _check_window(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("moves.adaptive_weights.window must be >= 1")
+        return int(v)
+
+    @field_validator("k")
+    @classmethod
+    def _check_k(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v <= 0:
+            raise ValueError("moves.adaptive_weights.k must be > 0")
+        return float(v)
+
+    @field_validator("min_prob", "max_prob")
+    @classmethod
+    def _check_prob_bounds(cls, v: float, info) -> float:
+        if not isinstance(v, (int, float)) or v <= 0 or v > 1:
+            raise ValueError(f"moves.adaptive_weights.{info.field_name} must be in (0, 1]")
+        return float(v)
+
+    @field_validator("targets")
+    @classmethod
+    def _check_targets(cls, v: Dict[str, float]) -> Dict[str, float]:
+        out: dict[str, float] = {}
+        for key, value in v.items():
+            fv = float(value)
+            if fv <= 0 or fv >= 1:
+                raise ValueError(f"moves.adaptive_weights.targets['{key}'] must be in (0, 1)")
+            out[str(key)] = fv
+        return out
+
+    @field_validator("kinds")
+    @classmethod
+    def _check_kinds(cls, v: List[str]) -> List[str]:
+        if not v:
+            raise ValueError("moves.adaptive_weights.kinds must be non-empty")
+        return [str(kind) for kind in v]
+
+    @model_validator(mode="after")
+    def _check_min_max(self) -> "MoveAdaptiveWeightsConfig":
+        if self.max_prob < self.min_prob:
+            raise ValueError("moves.adaptive_weights.max_prob must be >= min_prob")
+        return self
+
+
+class MoveProposalAdaptConfig(StrictBaseModel):
+    enabled: bool = False
+    window: int = 250
+    step: float = 0.10
+    min_scale: float = 0.50
+    max_scale: float = 2.0
+    target_low: float = 0.25
+    target_high: float = 0.75
+
+    @field_validator("window")
+    @classmethod
+    def _check_window(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("moves.proposal_adapt.window must be >= 1")
+        return int(v)
+
+    @field_validator("step", "min_scale", "max_scale")
+    @classmethod
+    def _check_positive(cls, v: float, info) -> float:
+        if not isinstance(v, (int, float)) or v <= 0:
+            raise ValueError(f"moves.proposal_adapt.{info.field_name} must be > 0")
+        return float(v)
+
+    @field_validator("target_low", "target_high")
+    @classmethod
+    def _check_target_bounds(cls, v: float, info) -> float:
+        if not isinstance(v, (int, float)) or v < 0 or v > 1:
+            raise ValueError(f"moves.proposal_adapt.{info.field_name} must be in [0, 1]")
+        return float(v)
+
+    @model_validator(mode="after")
+    def _check_ranges(self) -> "MoveProposalAdaptConfig":
+        if self.max_scale < self.min_scale:
+            raise ValueError("moves.proposal_adapt.max_scale must be >= min_scale")
+        if self.target_high <= self.target_low:
+            raise ValueError("moves.proposal_adapt.target_high must be > target_low")
+        return self
+
+
 class MoveConfig(StrictBaseModel):
     block_len_range: Tuple[int, int] = (3, 12)
     multi_k_range: Tuple[int, int] = (2, 6)
@@ -678,6 +777,8 @@ class MoveConfig(StrictBaseModel):
     target_worst_tf_prob: float = 0.0
     target_window_pad: int = 0
     insertion_consensus_prob: float = 0.50
+    adaptive_weights: MoveAdaptiveWeightsConfig = MoveAdaptiveWeightsConfig()
+    proposal_adapt: MoveProposalAdaptConfig = MoveProposalAdaptConfig()
 
     @field_validator("block_len_range", "multi_k_range", "swap_len_range", mode="before")
     @classmethod
@@ -761,6 +862,8 @@ class MoveOverridesConfig(StrictBaseModel):
     target_worst_tf_prob: Optional[float] = None
     target_window_pad: Optional[int] = None
     insertion_consensus_prob: Optional[float] = None
+    adaptive_weights: Optional[MoveAdaptiveWeightsConfig] = None
+    proposal_adapt: Optional[MoveProposalAdaptConfig] = None
 
     @field_validator("block_len_range", "multi_k_range", "swap_len_range", mode="before")
     @classmethod
@@ -801,6 +904,8 @@ class SamplePtAdaptConfig(StrictBaseModel):
     min_scale: float = 0.25
     max_scale: float = 4.0
     stop_after_tune: bool = True
+    strict: bool = False
+    saturation_windows: int = 5
 
     @field_validator("target_swap")
     @classmethod
@@ -814,6 +919,13 @@ class SamplePtAdaptConfig(StrictBaseModel):
     def _check_window(cls, v: int) -> int:
         if v < 1:
             raise ValueError("pt.adapt.window must be >= 1")
+        return int(v)
+
+    @field_validator("saturation_windows")
+    @classmethod
+    def _check_saturation_windows(cls, v: int) -> int:
+        if not isinstance(v, int) or v < 1:
+            raise ValueError("pt.adapt.saturation_windows must be >= 1")
         return int(v)
 
     @field_validator("k", "min_scale", "max_scale")

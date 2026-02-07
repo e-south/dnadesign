@@ -42,6 +42,7 @@ def test_pt_swap_controller_records_each_attempt() -> None:
         "swap_prob": 1.0,
         "bidirectional": False,
         "record_tune": False,
+        "build_trace": False,
         "progress_bar": False,
         "progress_every": 0,
         "early_stop": {},

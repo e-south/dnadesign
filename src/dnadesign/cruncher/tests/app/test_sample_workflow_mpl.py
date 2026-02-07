@@ -49,19 +49,25 @@ def _config_payload(*, catalog_root: Path, save_trace: bool) -> dict:
     }
 
 
-def test_run_sample_calls_mpl_cache_setup_only_when_trace_enabled(tmp_path, monkeypatch) -> None:
+def test_run_sample_calls_runtime_cache_setup_only_when_trace_enabled(tmp_path, monkeypatch) -> None:
     catalog_root = tmp_path / ".cruncher"
     config_path = tmp_path / "config.yaml"
     config_path.write_text(yaml.safe_dump(_config_payload(catalog_root=catalog_root, save_trace=False)))
     cfg = load_config(config_path)
 
-    calls: list[Path] = []
+    mpl_calls: list[Path] = []
+    arviz_calls: list[Path] = []
 
     def _fake_ensure_mpl_cache(path: Path) -> Path:
-        calls.append(path)
+        mpl_calls.append(path)
+        return path
+
+    def _fake_ensure_arviz_data_dir(path: Path) -> Path:
+        arviz_calls.append(path)
         return path
 
     monkeypatch.setattr(sample_workflow, "ensure_mpl_cache", _fake_ensure_mpl_cache)
+    monkeypatch.setattr(sample_workflow, "ensure_arviz_data_dir", _fake_ensure_arviz_data_dir)
     monkeypatch.setattr(sample_workflow, "_lockmap_for", lambda cfg, config_path: {})
     monkeypatch.setattr(sample_workflow, "target_statuses", lambda **kwargs: [])
     monkeypatch.setattr(sample_workflow, "has_blocking_target_errors", lambda statuses: False)
@@ -72,9 +78,11 @@ def test_run_sample_calls_mpl_cache_setup_only_when_trace_enabled(tmp_path, monk
     )
 
     sample_workflow.run_sample(cfg, config_path)
-    assert calls == []
+    assert mpl_calls == []
+    assert arviz_calls == []
 
     config_path.write_text(yaml.safe_dump(_config_payload(catalog_root=catalog_root, save_trace=True)))
     cfg = load_config(config_path)
     sample_workflow.run_sample(cfg, config_path)
-    assert len(calls) == 1
+    assert len(mpl_calls) == 1
+    assert len(arviz_calls) == 1

@@ -1,9 +1,12 @@
 """
 --------------------------------------------------------------------------------
 <cruncher project>
-src/dnadesign/cruncher/tests/core/test_pt_swap_pairs.py
+src/dnadesign/cruncher/tests/core/test_pt_adaptation_strict_guard.py
 
-Author(s): Eric J. South
+Ensures strict swap-adaptation guard fails PT runs when ladder adaptation is
+persistently saturated.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -12,6 +15,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 from dnadesign.cruncher.core.optimizers.pt import PTGibbsOptimizer
 from dnadesign.cruncher.core.state import SequenceState
@@ -29,20 +33,17 @@ class _DummyEvaluator:
         return per_tf, float(next(iter(per_tf.values())))
 
 
-def test_pt_swap_pairs_tracked() -> None:
-    chains = 3
-    draws = 3
+def test_pt_strict_swap_adaptation_guard_raises() -> None:
     cfg = {
-        "draws": draws,
-        "tune": 0,
-        "chains": chains,
+        "draws": 2,
+        "tune": 6,
+        "chains": 3,
         "min_dist": 0,
         "top_k": 1,
         "sequence_length": 4,
         "swap_prob": 1.0,
         "bidirectional": False,
         "record_tune": False,
-        "build_trace": False,
         "progress_bar": False,
         "progress_every": 0,
         "early_stop": {},
@@ -52,10 +53,21 @@ def test_pt_swap_pairs_tracked() -> None:
         "swap_len_range": (1, 1),
         "move_probs": {"S": 1.0, "B": 0.0, "M": 0.0, "L": 0.0, "W": 0.0, "I": 0.0},
         "kind": "geometric",
-        "beta": [1.0, 2.0, 3.0],
+        "beta": [0.2, 0.5, 1.0],
         "softmin": {"enabled": False},
         "target_worst_tf_prob": 0.0,
         "target_window_pad": 0,
+        "adaptive_swap": {
+            "enabled": True,
+            "target_swap": 0.25,
+            "window": 1,
+            "k": 2.0,
+            "min_scale": 0.25,
+            "max_scale": 1.0,
+            "stop_after_tune": True,
+            "strict": True,
+            "saturation_windows": 2,
+        },
     }
     init_cfg = SimpleNamespace(kind="random", length=4, pad_with="background", regulator=None)
     optimizer = PTGibbsOptimizer(
@@ -65,7 +77,5 @@ def test_pt_swap_pairs_tracked() -> None:
         pwms={},
         init_cfg=init_cfg,
     )
-    optimizer.optimise()
-    stats = optimizer.stats()
-    assert stats["swap_attempts_by_pair"] == [draws] * (chains - 1)
-    assert len(stats["swap_attempts_by_pair"]) == chains - 1
+    with pytest.raises(RuntimeError, match="tuning-limited"):
+        optimizer.optimise()
