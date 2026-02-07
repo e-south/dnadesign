@@ -13,6 +13,7 @@
 ## Overview
 
 Campaigns expand regulator categories into explicit regulator sets. This demo shows how to generate a campaign, run sampling, and summarize results across runs.
+The demo config enables adaptive move/proposal tuning with strict PT adaptation checks so campaign runs fail fast when PT tuning is unhealthy.
 
 ## Demo setup
 
@@ -65,6 +66,12 @@ cruncher analyze --summary -c "$DERIVED"
 
 ```bash
 cruncher campaign summarize --campaign demo_pair -c "$DERIVED"
+```
+
+If you manually delete old run outputs, repair stale run-index entries first:
+
+```bash
+cruncher runs repair-index --apply -c "$DERIVED"
 ```
 
 Summary artifacts live under:

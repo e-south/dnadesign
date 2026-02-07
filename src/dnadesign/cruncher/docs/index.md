@@ -14,10 +14,12 @@ Cruncher designs short, fixed-length DNA sequences that score highly across one 
 
 ## Demos (end-to-end)
 
-Each demo maps to a workspace: `demo_basics_two_tf`, `demo_campaigns_multi_tf`.
+Each demo maps to a workspace: `demo_basics_two_tf`, `demo_campaigns_multi_tf`,
+`densegen_prep_three_tf`.
 
 - [Two-TF demo (end-to-end)](demos/demo_basics_two_tf.md)
 - [Campaign demo (multi-TF)](demos/demo_campaigns_multi_tf.md)
+- [Densegen prep demo (three-TF)](demos/demo_densegen_prep_three_tf.md)
 
 ## Guides (task-focused)
 

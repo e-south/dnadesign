@@ -29,4 +29,5 @@ def test_missing_run_manifest_hint(tmp_path: Path) -> None:
     msg = str(exc.value).lower()
     assert "interrupted" in msg
     assert "cruncher sample" in msg
+    assert "runs repair-index" in msg
     assert "dummy.json" in msg

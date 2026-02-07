@@ -119,6 +119,7 @@ def load_manifest(run_dir: Path) -> Dict[str, Any]:
         )
         if existing:
             hint += f" Existing run files: {', '.join(existing[:10])}."
+        hint += " If old runs were manually deleted, repair stale run index entries with `cruncher runs repair-index`."
         hint += " Re-run sampling with `cruncher sample -c <CONFIG>`."
         raise FileNotFoundError(f"{hint} (run: {run_dir})")
     return json.loads(path.read_text())

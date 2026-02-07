@@ -126,6 +126,26 @@ cruncher:
         target_worst_tf_prob: 0.7
         target_window_pad: 4
         insertion_consensus_prob: 0.75
+        adaptive_weights:
+          enabled: true
+          window: 250
+          k: 0.50
+          min_prob: 0.02
+          max_prob: 0.90
+          kinds: [S, B, M, I]
+          targets:
+            S: 0.92
+            B: 0.45
+            M: 0.35
+            I: 0.35
+        proposal_adapt:
+          enabled: true
+          window: 250
+          step: 0.10
+          min_scale: 0.60
+          max_scale: 1.80
+          target_low: 0.25
+          target_high: 0.70
     pt:
       n_temps: 4
       temp_max: 20.0
@@ -136,7 +156,9 @@ cruncher:
         window: 50
         k: 0.5
         min_scale: 0.25
-        max_scale: 4.0
+        max_scale: 6.0
+        strict: true
+        saturation_windows: 6
         stop_after_tune: true
     output:
       save_sequences: true

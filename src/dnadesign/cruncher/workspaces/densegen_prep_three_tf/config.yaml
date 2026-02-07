@@ -12,17 +12,17 @@ cruncher:
 
   catalog:
     root: .cruncher/densegen_prep_three_tf
-    source_preference: [meme_suite_meme, meme_suite_streme, demo_local_meme, regulondb]
+    source_preference: [meme_suite_meme, meme_suite_streme, baer_chip_exo, demo_local_meme, regulondb]
     allow_ambiguous: false
     pwm_source: sites
     site_kinds: null
-    combine_sites: true
+    combine_sites: false
     dataset_preference: []
     dataset_map: {}
     site_window_lengths:
       lexA: 20
       cpxR: 20
-      baeR: 20
+      baeR: 14
     site_window_center: midpoint
     pwm_window_lengths: {}
     pwm_window_strategy: max_info
@@ -117,6 +117,40 @@ cruncher:
           S: 0.35
           B: 0.30
           M: 0.35
+        adaptive_weights:
+          enabled: true
+          window: 250
+          k: 0.50
+          min_prob: 0.02
+          max_prob: 0.90
+          kinds: [S, B, M, I]
+          targets:
+            S: 0.92
+            B: 0.45
+            M: 0.35
+            I: 0.35
+        proposal_adapt:
+          enabled: true
+          window: 250
+          step: 0.10
+          min_scale: 0.60
+          max_scale: 1.80
+          target_low: 0.25
+          target_high: 0.70
+    pt:
+      n_temps: 6
+      temp_max: 20.0
+      swap_stride: 1
+      adapt:
+        enabled: true
+        target_swap: 0.25
+        window: 50
+        k: 0.5
+        min_scale: 0.25
+        max_scale: 6.0
+        strict: true
+        saturation_windows: 6
+        stop_after_tune: true
     output:
       save_sequences: true
       save_trace: true

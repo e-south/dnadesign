@@ -21,7 +21,7 @@ This demo designs fixed-length sequences that satisfy two PWMs (LexA + CpxR). It
 5. analyze
 
 Cruncher scores each TF by the best PWM match anywhere in the sequence on either strand (when `objective.bidirectional=true`). It optimizes the weakest TF by default (`objective.combine=min`) and selects diverse elites via TFBS-core MMR.
-The bundled demo config uses targeted insertion proposals with explicit PT settings (`n_temps=4`, `temp_max=20`) so the default run stays easier to tune and avoids high-swap PT regimes.
+The bundled demo config uses targeted insertion proposals plus adaptive move weights/proposal sizing with strict PT adaptation (`n_temps=4`, `temp_max=20`) for stable optimization diagnostics.
 
 For the full intent, lifecycle, and config mapping, see [Intent + lifecycle](../guides/intent_and_lifecycle.md).
 

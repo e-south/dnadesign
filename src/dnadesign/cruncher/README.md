@@ -93,13 +93,14 @@ Notes:
 1. [Documentation index](docs/index.md)
 2. [Two-TF demo (end-to-end)](docs/demos/demo_basics_two_tf.md)
 3. [Campaign demo (multi-TF)](docs/demos/demo_campaigns_multi_tf.md)
-4. [MEME Suite setup](docs/guides/meme_suite.md)
-5. [Sampling + analysis](docs/guides/sampling_and_analysis.md)
-6. [Configure your project](docs/reference/config.md)
-7. [Ingesting and caching data](docs/guides/ingestion.md)
-8. [CLI reference](docs/reference/cli.md)
-9. [Architecture and artifacts](docs/reference/architecture.md)
-10. [Package spec (developers)](docs/internals/spec.md)
+4. [Densegen prep demo (three-TF)](docs/demos/demo_densegen_prep_three_tf.md)
+5. [MEME Suite setup](docs/guides/meme_suite.md)
+6. [Sampling + analysis](docs/guides/sampling_and_analysis.md)
+7. [Configure your project](docs/reference/config.md)
+8. [Ingesting and caching data](docs/guides/ingestion.md)
+9. [CLI reference](docs/reference/cli.md)
+10. [Architecture and artifacts](docs/reference/architecture.md)
+11. [Package spec (developers)](docs/internals/spec.md)
 
 ---
 
