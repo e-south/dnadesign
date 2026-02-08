@@ -47,8 +47,6 @@ from dnadesign.cruncher.artifacts.layout import (
     elites_mmr_meta_path,
     elites_path,
     elites_yaml_path,
-    parse_manifest_path,
-    pwm_summary_path,
     random_baseline_hits_path,
     random_baseline_path,
     sequences_path,
@@ -310,49 +308,11 @@ def _run_sample_for_set(
         if pwm is None:
             raise ValueError(f"Missing PWM for TF '{tf_name}'.")
         core_def_by_tf[tf_name] = _core_def_hash(pwm, pwm_hash_by_tf[tf_name])
-    pwm_summary_rows = []
-    for tf_name in tfs:
-        pwm = pwms.get(tf_name)
-        if pwm is None:
-            raise ValueError(f"Missing PWM for TF '{tf_name}'.")
-        locked = lockmap.get(tf_name)
-        pwm_summary_rows.append(
-            {
-                "tf": tf_name,
-                "source": locked.source if locked is not None else None,
-                "motif_id": locked.motif_id if locked is not None else None,
-                "length": int(pwm.length),
-                "information_bits": float(pwm.information_bits()),
-                "nsites": int(pwm.nsites) if pwm.nsites is not None else None,
-                "window_start": int(pwm.window_start) if pwm.window_start is not None else None,
-                "source_length": int(pwm.source_length) if pwm.source_length is not None else None,
-                "window_strategy": pwm.window_strategy,
-            }
-        )
     lockfile = read_lockfile(resolve_lock_path(config_path))
     parse_signature, parse_inputs = compute_parse_signature(
         cfg=cfg,
         lockfile=lockfile,
         tfs=tfs,
-    )
-    atomic_write_json(
-        parse_manifest_path(out_dir),
-        {
-            "stage": "parse",
-            "source": "sample",
-            "run_group": run_group,
-            "regulator_set": {"index": set_index, "tfs": tfs, "count": set_count},
-            "parse_signature": parse_signature,
-            "parse_inputs": parse_inputs,
-            "rows": pwm_summary_rows,
-        },
-    )
-    atomic_write_json(
-        pwm_summary_path(out_dir),
-        {
-            "source": "sample",
-            "rows": pwm_summary_rows,
-        },
     )
     adapt_sweeps = int(sample_cfg.budget.tune)
     draws = int(sample_cfg.budget.draws)
@@ -974,6 +934,8 @@ def _run_sample_for_set(
         beta_softmin_final=beta_softmin_final,
         min_per_tf_norm=min_per_tf_norm,
         min_per_tf_norm_auto=auto_norm_meta,
+        parse_signature=parse_signature,
+        parse_inputs=parse_inputs,
         status_writer=status_writer,
     )
     logger.debug("Wrote run manifest -> %s", manifest_path_out.relative_to(out_dir.parent))

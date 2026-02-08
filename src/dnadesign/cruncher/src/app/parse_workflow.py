@@ -141,6 +141,8 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
     out_base = out_root(config_path, cfg.out_dir)
     out_base.mkdir(parents=True, exist_ok=True)
     groups = regulator_sets(cfg.regulator_sets)
+    if not groups:
+        raise ValueError("parse requires at least one regulator set.")
     set_count = len(groups)
     include_set_index = set_count > 1
 

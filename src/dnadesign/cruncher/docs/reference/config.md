@@ -43,8 +43,8 @@ cruncher:
 ```
 
 Notes:
-- `campaigns` are optional helpers for expanding regulator sets; they do not trigger runs.
-- `campaign` metadata is written by `cruncher campaign generate` into derived configs.
+- `campaigns` are optional helpers for expanding regulator sets.
+- `campaign` metadata is optional runtime metadata (for generated or campaign-driven runs).
 
 ## Workspace
 
@@ -58,7 +58,8 @@ workspace:
 
 Notes:
 - `out_dir` is resolved relative to the config file and must be a relative path.
-- `regulator_sets` defines the runs to execute (each set becomes a run).
+- `regulator_sets` defines direct run targets (each set becomes a run).
+- `regulator_sets` may be empty when you run commands with `--campaign <name>`.
 - `regulator_categories` are used by campaigns.
 
 ## io

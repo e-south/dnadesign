@@ -117,12 +117,11 @@ discoveries/          # MEME/STREME discovery runs
 locks/<config>.lock.json
 run_index.json
 parse/latest/input/{lockfile.json,parse_manifest.json,pwm_summary.json}
-parse/previous/input/{lockfile.json,parse_manifest.json,pwm_summary.json}
 ```
 
 - `locks/<config>.lock.json` pins TF names -> exact cached artifacts + hashes.
 - `run_index.json` tracks run folders for `cruncher runs ...` within that workspace.
-- `parse/{latest,previous}` stores parse-stage validation artifacts outside user-facing sample outputs.
+- `parse/latest` stores parse-stage validation artifacts outside user-facing sample outputs.
 
 #### Tooling caches
 

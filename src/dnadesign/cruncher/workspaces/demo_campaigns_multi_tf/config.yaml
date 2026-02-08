@@ -3,8 +3,7 @@ cruncher:
 
   workspace:
     out_dir: outputs
-    regulator_sets:
-      - [lexA, cpxR, fur]
+    regulator_sets: []
     regulator_categories:
       Stress: [lexA]
       Envelope: [cpxR]

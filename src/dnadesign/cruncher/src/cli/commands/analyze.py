@@ -17,6 +17,7 @@ import typer
 from rich.console import Console
 
 from dnadesign.cruncher.analysis.layout import load_summary, report_json_path, report_md_path, summary_path
+from dnadesign.cruncher.cli.campaign_targeting import resolve_runtime_targeting
 from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
     resolve_config_path,
@@ -42,6 +43,12 @@ def analyze(
         "-c",
         help="Path to cruncher config.yaml (overrides positional CONFIG).",
     ),
+    campaign: str | None = typer.Option(
+        None,
+        "--campaign",
+        "-n",
+        help="Campaign name to expand in-memory for this command.",
+    ),
     runs: list[str] | None = typer.Option(
         None,
         "--run",
@@ -58,6 +65,16 @@ def analyze(
     if runs and latest:
         raise typer.BadParameter("Use either --run or --latest, not both.")
     cfg = load_config(config_path)
+    try:
+        cfg = resolve_runtime_targeting(
+            cfg=cfg,
+            config_path=config_path,
+            command_name="analyze",
+            campaign_name=campaign,
+        ).cfg
+    except ValueError as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1)
     if cfg.analysis is None:
         console.print("Error: analysis section is required for analyze.")
         raise typer.Exit(code=1)

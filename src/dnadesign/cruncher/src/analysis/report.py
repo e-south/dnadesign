@@ -201,8 +201,18 @@ def build_report_payload(
         "created_at": datetime.now(timezone.utc).isoformat(),
         "tf_names": tf_names,
         "optimizer_kind": optimizer_metrics.get("kind") if isinstance(optimizer_metrics, dict) else None,
-        "chains": _safe_int(sample_metrics.get("chains")) if isinstance(sample_metrics, dict) else None,
-        "draws": _safe_int(sample_metrics.get("draws")) if isinstance(sample_metrics, dict) else None,
+        "chains": _safe_int(
+            _first_non_none(
+                sample_metrics.get("chains") if isinstance(sample_metrics, dict) else None,
+                trace_metrics.get("chains") if isinstance(trace_metrics, dict) else None,
+            )
+        ),
+        "draws": _safe_int(
+            _first_non_none(
+                sample_metrics.get("draws") if isinstance(sample_metrics, dict) else None,
+                trace_metrics.get("draws") if isinstance(trace_metrics, dict) else None,
+            )
+        ),
         "tune": _safe_int(sample_metrics.get("tune")) if isinstance(sample_metrics, dict) else None,
         "n_sequences": _safe_int(seq_metrics.get("n_sequences")) if isinstance(seq_metrics, dict) else None,
         "n_elites": _safe_int(elites_metrics.get("n_elites")) if isinstance(elites_metrics, dict) else None,

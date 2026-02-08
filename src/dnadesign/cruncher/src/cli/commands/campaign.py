@@ -28,7 +28,7 @@ from dnadesign.cruncher.app.campaign_service import (
     validate_campaign,
 )
 from dnadesign.cruncher.app.campaign_summary import summarize_campaign
-from dnadesign.cruncher.artifacts.layout import campaign_slot_dir
+from dnadesign.cruncher.artifacts.layout import campaign_name_slug, campaign_slot_dir
 from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
     resolve_config_path,
@@ -89,6 +89,19 @@ def _rebase_config_paths(data: dict, *, src_dir: Path, dst_dir: Path) -> None:
     data["ingest"] = ingest
 
 
+def _resolve_workspace_path(path: Path, *, workspace_root: Path) -> Path:
+    if path.is_absolute():
+        return path.resolve()
+    return (workspace_root / path).resolve()
+
+
+def _ensure_under_workspace(path: Path, *, workspace_root: Path, flag: str) -> None:
+    try:
+        path.relative_to(workspace_root)
+    except ValueError as exc:
+        raise typer.BadParameter(f"{flag} must be inside the workspace ({workspace_root}).") from exc
+
+
 @app.command("generate", help="Expand a campaign into explicit regulator_sets.")
 def generate(
     config: Path | None = typer.Argument(
@@ -107,7 +120,7 @@ def generate(
         None,
         "--out",
         "-o",
-        help="Output path for derived config (default: <config_stem>.<campaign>.yaml).",
+        help="Output path for generated config (default: .cruncher/campaigns/<campaign>/generated.yaml).",
     ),
     manifest: Path | None = typer.Option(
         None,
@@ -138,25 +151,17 @@ def generate(
         raise typer.Exit(code=1)
 
     workspace_root = config_path.parent.resolve()
-    out_path = (out or config_path.with_name(f"{config_path.stem}.{campaign}.yaml")).expanduser()
-    if not out_path.is_absolute():
-        out_path = (workspace_root / out_path).resolve()
-    else:
-        out_path = out_path.resolve()
-    if out_path.parent != workspace_root:
-        raise typer.BadParameter(
-            f"--out must be inside the workspace ({workspace_root}). "
-            "Derived configs must live alongside config.yaml so out_dir remains workspace-relative."
-        )
-    manifest_path = (manifest or out_path.with_suffix(".campaign_manifest.json")).expanduser()
-    if not manifest_path.is_absolute():
-        manifest_path = (workspace_root / manifest_path).resolve()
-    else:
-        manifest_path = manifest_path.resolve()
-    if manifest_path.parent != workspace_root:
-        raise typer.BadParameter(
-            f"--manifest must be inside the workspace ({workspace_root}) to keep campaign artifacts collocated."
-        )
+    default_campaign_root = workspace_root / ".cruncher" / "campaigns" / campaign_name_slug(campaign)
+    out_path = _resolve_workspace_path(
+        (out or (default_campaign_root / "generated.yaml")).expanduser(),
+        workspace_root=workspace_root,
+    )
+    _ensure_under_workspace(out_path, workspace_root=workspace_root, flag="--out")
+    manifest_path = _resolve_workspace_path(
+        (manifest or out_path.with_suffix(".campaign_manifest.json")).expanduser(),
+        workspace_root=workspace_root,
+    )
+    _ensure_under_workspace(manifest_path, workspace_root=workspace_root, flag="--manifest")
     generated_at = datetime.now(timezone.utc).isoformat()
 
     data = cfg.model_dump(mode="json")

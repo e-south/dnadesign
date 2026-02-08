@@ -78,6 +78,8 @@ def run_sample(
         statuses = target_statuses(cfg=cfg, config_path=config_path)
         sample_cfg = cfg.sample
         groups = regulator_sets(cfg.regulator_sets)
+        if not groups:
+            raise ValueError("sample requires at least one regulator set.")
         set_count = len(groups)
         include_set_index = set_count > 1
         for set_index, group in enumerate(groups, start=1):

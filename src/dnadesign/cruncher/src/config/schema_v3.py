@@ -404,8 +404,6 @@ class WorkspaceConfig(StrictBaseModel):
     @field_validator("regulator_sets")
     @classmethod
     def _check_regulator_sets(cls, v: List[List[str]]) -> List[List[str]]:
-        if not v:
-            raise ValueError("workspace.regulator_sets must be a non-empty list")
         cleaned: list[list[str]] = []
         for idx, group in enumerate(v, start=1):
             if not group:
@@ -1121,6 +1119,8 @@ class CruncherConfig(StrictBaseModel):
     def _check_schema_version(self) -> "CruncherConfig":
         if self.schema_version != 3:
             raise ValueError("Config schema v3 required (schema_version: 3)")
+        if not self.workspace.regulator_sets and not self.campaigns:
+            raise ValueError("Config must define workspace.regulator_sets or campaigns.")
         return self
 
     @property

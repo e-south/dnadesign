@@ -162,11 +162,11 @@ def test_end_to_end_sites_pipeline(tmp_path: Path) -> None:
     sample_dir = tmp_path / "results" / "latest"
     assert sample_dir.exists()
     assert manifest_path(sample_dir).exists()
-    assert parse_manifest_path(sample_dir).exists()
-    assert pwm_summary_path(sample_dir).exists()
-    parse_manifest = json.loads(parse_manifest_path(sample_dir).read_text())
-    assert parse_manifest.get("parse_signature")
-    assert isinstance(parse_manifest.get("parse_inputs"), dict)
+    sample_manifest_payload = json.loads(manifest_path(sample_dir).read_text())
+    assert sample_manifest_payload.get("parse_signature")
+    assert isinstance(sample_manifest_payload.get("parse_inputs"), dict)
+    assert not parse_manifest_path(sample_dir).exists()
+    assert not pwm_summary_path(sample_dir).exists()
 
     result = runner.invoke(app, ["catalog", "logos", "--set", "1", "-c", str(config_path)])
     assert result.exit_code == 0
@@ -258,6 +258,7 @@ def test_demo_campaign_pair_local_only_generates_plots(tmp_path: Path) -> None:
     config_path = workspace / "config.yaml"
     config_payload = yaml.safe_load(config_path.read_text())
     cruncher_cfg = config_payload["cruncher"]
+    cruncher_cfg["workspace"]["regulator_sets"] = []
     cruncher_cfg["catalog"]["root"] = str(workspace / ".cruncher" / "demo_campaigns_multi_tf")
     cruncher_cfg["sample"]["budget"]["tune"] = 240
     cruncher_cfg["sample"]["budget"]["draws"] = 480
@@ -284,28 +285,12 @@ def test_demo_campaign_pair_local_only_generates_plots(tmp_path: Path) -> None:
     )
     assert result.exit_code == 0
 
-    result = runner.invoke(
-        app,
-        [
-            "campaign",
-            "generate",
-            "--campaign",
-            "demo_pair",
-            "--out",
-            "campaign_demo_pair.yaml",
-            "-c",
-            str(config_path),
-        ],
-    )
-    assert result.exit_code == 0
-
-    derived_config = workspace / "campaign_demo_pair.yaml"
     for command in (
-        ["lock", "-c", str(derived_config)],
-        ["parse", "-c", str(derived_config)],
-        ["sample", "-c", str(derived_config)],
-        ["analyze", "--summary", "-c", str(derived_config)],
-        ["campaign", "summarize", "--campaign", "demo_pair", "-c", str(derived_config)],
+        ["lock", "--campaign", "demo_pair", "-c", str(config_path)],
+        ["parse", "--campaign", "demo_pair", "-c", str(config_path)],
+        ["sample", "--campaign", "demo_pair", "-c", str(config_path)],
+        ["analyze", "--campaign", "demo_pair", "--summary", "-c", str(config_path)],
+        ["campaign", "summarize", "--campaign", "demo_pair", "-c", str(config_path)],
     ):
         result = runner.invoke(app, command)
         assert result.exit_code == 0

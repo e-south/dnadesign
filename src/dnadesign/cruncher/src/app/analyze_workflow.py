@@ -793,6 +793,17 @@ def run_analyze(
             ),
         ] + plot_artifacts
 
+        build_analysis_manifests(
+            analysis_id=analysis_id,
+            created_at=created_at,
+            analysis_root=tmp_root,
+            analysis_used_file=analysis_used_file,
+            plot_entries=plot_entries,
+            table_entries=table_entries,
+            analysis_artifacts=analysis_artifacts,
+        )
+        report_json = report_json_path(tmp_root)
+        report_md = report_md_path(tmp_root)
         report_payload = build_report_payload(
             analysis_root=tmp_root,
             summary_payload={
@@ -808,9 +819,7 @@ def run_analyze(
             overlap_summary=overlap_summary,
             analysis_used_payload={"analysis": analysis_cfg.model_dump(mode="json")},
         )
-        report_json = report_json_path(tmp_root)
         write_report_json(report_json, report_payload)
-        report_md = report_md_path(tmp_root)
         write_report_md(report_md, report_payload, analysis_root=tmp_root)
         analysis_artifacts.append(
             artifact_entry(report_json_path(analysis_root_path), run_dir, kind="meta", stage="analysis")
@@ -828,23 +837,6 @@ def run_analyze(
             table_entries=table_entries,
             analysis_artifacts=analysis_artifacts,
         )
-        report_payload = build_report_payload(
-            analysis_root=tmp_root,
-            summary_payload={
-                "analysis_id": analysis_id,
-                "run": run_name,
-                "tf_names": tf_names,
-                "diagnostics": diagnostics_payload,
-                "objective_components": objective_components,
-                "overlap_summary": overlap_summary,
-            },
-            diagnostics_payload=diagnostics_payload,
-            objective_components=objective_components,
-            overlap_summary=overlap_summary,
-            analysis_used_payload={"analysis": analysis_cfg.model_dump(mode="json")},
-        )
-        write_report_json(report_json, report_payload)
-        write_report_md(report_md, report_payload, analysis_root=tmp_root)
         analysis_artifacts.append(
             artifact_entry(plot_manifest_path(analysis_root_path), run_dir, kind="meta", stage="analysis")
         )

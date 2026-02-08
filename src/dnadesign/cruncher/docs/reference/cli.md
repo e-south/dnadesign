@@ -143,12 +143,15 @@ Note:
 
 #### `cruncher lock`
 
-Resolves TF names in `workspace.regulator_sets` (under the root `cruncher:` block) to exact cached artifacts (IDs + hashes).
+Resolves TF names to exact cached artifacts (IDs + hashes) from either:
+- `workspace.regulator_sets` (direct mode), or
+- `--campaign <name>` expansion (campaign mode).
 Writes `<workspace>/.cruncher/locks/<config>.lock.json`.
 
 Inputs:
 
 * CONFIG (explicit or resolved)
+* optional `--campaign <name>` (required when `workspace.regulator_sets: []`)
 * cached motifs/sites for the configured regulators
 
 Network:
@@ -163,12 +166,13 @@ When to use:
 Example:
 
 * `cruncher lock <config>`
+* `cruncher lock --campaign demo_pair <config>`
 
 ---
 
 #### `cruncher campaign generate`
 
-Expands a campaign into explicit `regulator_sets` and writes a derived config plus a manifest.
+Expands a campaign into explicit `regulator_sets` and writes a generated config plus a manifest.
 
 Inputs:
 
@@ -181,15 +185,16 @@ Network:
 
 Example:
 
-* `cruncher campaign generate --campaign regulators_v1 --out config.campaign.yaml <config>`
+* `cruncher campaign generate --campaign regulators_v1 <config>`
+* `cruncher campaign generate --campaign regulators_v1 --out .cruncher/campaigns/regulators_v1/custom.yaml <config>`
 
 Notes:
 
 * The base config must define `regulator_categories` and `campaigns`.
 * Selector filters require cached motifs/sites; fetch before generating if you use them.
-* The manifest is written alongside the output config by default.
-* `--out` must live alongside the workspace `config.yaml` so `out_dir` remains workspace-relative.
-  Relative `--out` paths are interpreted from the workspace root.
+* By default, files are written under `<workspace>/.cruncher/campaigns/<campaign>/`.
+* `--out`/`--manifest` must stay inside the workspace root.
+* `campaign generate` is optional; `lock`/`parse`/`sample`/`analyze` can run campaigns directly with `--campaign`.
 
 ---
 
@@ -290,6 +295,7 @@ Validates cached PWMs (matrix- or site-derived) and writes parse-cache artifacts
 Inputs:
 
 * CONFIG (explicit or resolved)
+* optional `--campaign <name>` (required when `workspace.regulator_sets: []`)
 * lockfile (from `cruncher lock`)
 
 Network:
@@ -299,6 +305,7 @@ Network:
 Example:
 
 * `cruncher parse <config>`
+* `cruncher parse --campaign demo_pair <config>`
 
 Precondition:
 
@@ -312,7 +319,7 @@ Notes:
   re-run `cruncher lock <config>` to refresh what parse will use.
 * Parse is idempotent for identical inputs; if matching outputs already exist, it reports
   the existing run instead of creating a new one.
-* Parse artifacts live under `<workspace>/.cruncher/parse/{latest,previous}/input/` and are intentionally
+* Parse artifacts live under `<workspace>/.cruncher/parse/latest/input/` and are intentionally
   separate from user-facing sample outputs in `workspace.out_dir`.
 * Use `cruncher catalog logos` to render PWM logos with provenance subtitles.
 
@@ -325,6 +332,7 @@ Runs MCMC optimization to design sequences scoring well across TFs.
 Inputs:
 
 * CONFIG (explicit or resolved)
+* optional `--campaign <name>` (required when `workspace.regulator_sets: []`)
 * lockfile (from `cruncher lock`)
 
 Network:
@@ -336,6 +344,7 @@ Example:
 * `cruncher sample <config>`
 * `cruncher sample --verbose <config>`
 * `cruncher sample --debug <config>`
+* `cruncher sample --campaign demo_pair <config>`
 
 Precondition:
 
@@ -358,6 +367,7 @@ Generates diagnostics and plots for one or more sample runs.
 Inputs:
 
 * CONFIG (explicit or resolved)
+* optional `--campaign <name>` (required when `workspace.regulator_sets: []`)
 * runs via `analysis.run_selector`/`analysis.runs` or `--run` (defaults to latest sample run if empty)
 * run artifacts: `optimize/sequences.parquet` (required), `optimize/elites.parquet` (required),
   `optimize/elites_hits.parquet` (required), `optimize/random_baseline.parquet` (required),
@@ -372,6 +382,7 @@ Examples:
 * `cruncher analyze --latest <config>`
 * `cruncher analyze --run <run_name|run_dir> <config>`
 * `cruncher analyze --summary <config>`
+* `cruncher analyze --campaign demo_pair --summary <config>`
 
 Preconditions:
 

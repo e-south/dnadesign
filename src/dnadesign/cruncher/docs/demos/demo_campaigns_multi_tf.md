@@ -4,15 +4,14 @@
 - [Overview](#overview)
 - [Demo setup](#demo-setup)
 - [Cache sites](#cache-sites)
-- [Generate a campaign](#generate-a-campaign)
-- [Lock + parse](#lock--parse)
-- [Sample + analyze](#sample--analyze)
+- [Run campaign directly](#run-campaign-directly)
+- [Optional: materialize expansion](#optional-materialize-expansion)
 - [Inspect campaign summary](#inspect-campaign-summary)
 - [Related docs](#related-docs)
 
 ## Overview
 
-Campaigns expand regulator categories into explicit regulator sets. This demo shows how to generate a campaign, run sampling, and summarize results across runs.
+Campaigns expand regulator categories into explicit regulator sets. This demo runs a campaign directly with `--campaign` (no derived config required), then summarizes results across runs.
 The demo config enables adaptive move/proposal tuning with strict PT adaptation checks so campaign runs fail fast when PT tuning is unhealthy.
 
 ## Demo setup
@@ -39,40 +38,41 @@ cruncher fetch sites --source demo_local_meme --tf acrR --tf lrp --tf rcdA --tf 
 cruncher fetch sites --source regulondb --tf baeR --tf fnr --tf fur --tf soxS --update -c "$CONFIG"
 ```
 
-## Generate a campaign
+## Run campaign directly
 
 ```bash
-cruncher campaign generate --campaign demo_pair --out campaign_demo_pair.yaml -c "$CONFIG"
-DERIVED="$PWD/campaign_demo_pair.yaml"
+cruncher lock    --campaign demo_pair -c "$CONFIG"
+cruncher parse   --campaign demo_pair -c "$CONFIG"
+cruncher sample  --campaign demo_pair -c "$CONFIG"
+cruncher analyze --campaign demo_pair --summary -c "$CONFIG"
 ```
 
-This writes a derived config that contains explicit `workspace.regulator_sets` and a `campaign` metadata block. Use that derived config for runs.
+## Optional: materialize expansion
 
-## Lock + parse
+`campaign generate` is optional and writes under workspace state by default:
 
 ```bash
-cruncher lock  -c "$DERIVED"
-cruncher parse -c "$DERIVED"
+cruncher campaign generate --campaign demo_pair -c "$CONFIG"
 ```
 
-## Sample + analyze
+Default outputs:
 
-```bash
-cruncher sample  -c "$DERIVED"
-cruncher analyze --summary -c "$DERIVED"
+```
+<workspace>/.cruncher/campaigns/<campaign>/generated.yaml
+<workspace>/.cruncher/campaigns/<campaign>/generated.campaign_manifest.json
 ```
 
 ## Inspect campaign summary
 
 ```bash
-cruncher campaign summarize --campaign demo_pair -c "$DERIVED"
+cruncher campaign summarize --campaign demo_pair -c "$CONFIG"
 ```
 
 `campaign summarize` auto-repairs stale sample run-index entries (for example after manual output cleanup) and logs what it removed.
 If you want to repair explicitly first:
 
 ```bash
-cruncher runs repair-index --apply -c "$DERIVED"
+cruncher runs repair-index --apply -c "$CONFIG"
 ```
 
 Summary artifacts live under:

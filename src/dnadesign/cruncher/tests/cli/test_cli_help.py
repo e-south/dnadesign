@@ -114,13 +114,13 @@ def test_targets_status_rejects_site_kinds_with_matrix_pwm(tmp_path: Path) -> No
     assert "--site-kind requires pwm_source=sites" in combined_output(result)
 
 
-def test_campaign_generate_resolves_relative_out_to_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_campaign_generate_defaults_to_workspace_campaign_state(tmp_path: Path) -> None:
     config = {
         "cruncher": {
             "schema_version": 3,
             "workspace": {
                 "out_dir": "runs",
-                "regulator_sets": [["lexA"]],
+                "regulator_sets": [],
                 "regulator_categories": {"A": ["lexA"], "B": ["cpxR"]},
             },
             "campaigns": [
@@ -136,13 +136,12 @@ def test_campaign_generate_resolves_relative_out_to_workspace(tmp_path: Path, mo
     config_path = tmp_path / "config.yaml"
     config_path.write_text(yaml.safe_dump(config))
 
-    other_dir = tmp_path / "elsewhere"
-    other_dir.mkdir()
-    monkeypatch.chdir(other_dir)
-
-    result = invoke_cli(["campaign", "generate", "--campaign", "demo", "--out", "derived.yaml", str(config_path)])
+    result = invoke_cli(["campaign", "generate", "--campaign", "demo", str(config_path)])
     assert result.exit_code == 0
-    assert (tmp_path / "derived.yaml").exists()
+    generated = tmp_path / ".cruncher" / "campaigns" / "demo" / "generated.yaml"
+    manifest = tmp_path / ".cruncher" / "campaigns" / "demo" / "generated.campaign_manifest.json"
+    assert generated.exists()
+    assert manifest.exists()
 
 
 def test_campaign_generate_rejects_outside_workspace(tmp_path: Path) -> None:
@@ -151,7 +150,7 @@ def test_campaign_generate_rejects_outside_workspace(tmp_path: Path) -> None:
             "schema_version": 3,
             "workspace": {
                 "out_dir": "runs",
-                "regulator_sets": [["lexA"]],
+                "regulator_sets": [],
                 "regulator_categories": {"A": ["lexA"], "B": ["cpxR"]},
             },
             "campaigns": [
@@ -167,13 +166,180 @@ def test_campaign_generate_rejects_outside_workspace(tmp_path: Path) -> None:
     config_path = tmp_path / "config.yaml"
     config_path.write_text(yaml.safe_dump(config))
 
-    outside = tmp_path / "outside"
+    outside = tmp_path.parent / f"{tmp_path.name}_outside"
     outside.mkdir()
     out_path = outside / "derived.yaml"
 
     result = invoke_cli(["campaign", "generate", "--campaign", "demo", "--out", str(out_path), str(config_path)])
     assert result.exit_code != 0
-    assert "--out must be inside the workspace" in combined_output(result)
+    assert "--out must be inside" in combined_output(result)
+
+
+def test_lock_campaign_required_for_campaign_mode_config(tmp_path: Path) -> None:
+    config = {
+        "cruncher": {
+            "schema_version": 3,
+            "workspace": {
+                "out_dir": "runs",
+                "regulator_sets": [],
+                "regulator_categories": {"A": ["lexA"], "B": ["cpxR"]},
+            },
+            "campaigns": [
+                {
+                    "name": "demo",
+                    "categories": ["A", "B"],
+                    "across_categories": {"sizes": [2]},
+                }
+            ],
+            "catalog": {"root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    result = invoke_cli(["lock", str(config_path)])
+    assert result.exit_code != 0
+    assert "--campaign" in combined_output(result)
+
+
+def test_lock_accepts_campaign_and_expands_targets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config = {
+        "cruncher": {
+            "schema_version": 3,
+            "workspace": {
+                "out_dir": "runs",
+                "regulator_sets": [],
+                "regulator_categories": {"A": ["lexA"], "B": ["cpxR"]},
+            },
+            "campaigns": [
+                {
+                    "name": "demo",
+                    "categories": ["A", "B"],
+                    "across_categories": {"sizes": [2]},
+                }
+            ],
+            "catalog": {"root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    captured: dict[str, object] = {}
+
+    def _fake_resolve_lock(*, names, **kwargs):
+        captured["names"] = set(names)
+
+    monkeypatch.setattr("dnadesign.cruncher.cli.commands.lock.resolve_lock", _fake_resolve_lock)
+
+    result = invoke_cli(["lock", "--campaign", "demo", str(config_path)])
+    assert result.exit_code == 0
+    assert captured["names"] == {"lexA", "cpxR"}
+
+
+def test_parse_accepts_campaign_and_expands_sets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config = {
+        "cruncher": {
+            "schema_version": 3,
+            "workspace": {
+                "out_dir": "runs",
+                "regulator_sets": [],
+                "regulator_categories": {"A": ["lexA"], "B": ["cpxR"]},
+            },
+            "campaigns": [
+                {
+                    "name": "demo",
+                    "categories": ["A", "B"],
+                    "across_categories": {"sizes": [2]},
+                }
+            ],
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    captured: dict[str, object] = {}
+
+    def _fake_run_parse(cfg, _config_path):
+        captured["sets"] = cfg.regulator_sets
+
+    monkeypatch.setattr("dnadesign.cruncher.app.parse_workflow.run_parse", _fake_run_parse)
+
+    result = invoke_cli(["parse", "--campaign", "demo", str(config_path)])
+    assert result.exit_code == 0
+    assert captured["sets"] == [["lexA", "cpxR"]]
+
+
+def test_sample_accepts_campaign_and_expands_sets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config = {
+        "cruncher": {
+            "schema_version": 3,
+            "workspace": {
+                "out_dir": "runs",
+                "regulator_sets": [],
+                "regulator_categories": {"A": ["lexA"], "B": ["cpxR"]},
+            },
+            "campaigns": [
+                {
+                    "name": "demo",
+                    "categories": ["A", "B"],
+                    "across_categories": {"sizes": [2]},
+                }
+            ],
+            "sample": {
+                "seed": 1,
+                "sequence_length": 12,
+                "budget": {"tune": 1, "draws": 1},
+                "pt": {"n_temps": 2, "temp_max": 5.0},
+                "elites": {"k": 1},
+            },
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    captured: dict[str, object] = {}
+
+    def _fake_run_sample(cfg, _config_path):
+        captured["sets"] = cfg.regulator_sets
+
+    monkeypatch.setattr("dnadesign.cruncher.app.sample_workflow.run_sample", _fake_run_sample)
+
+    result = invoke_cli(["sample", "--campaign", "demo", str(config_path)])
+    assert result.exit_code == 0
+    assert captured["sets"] == [["lexA", "cpxR"]]
+
+
+def test_sample_campaign_required_for_campaign_mode_config(tmp_path: Path) -> None:
+    config = {
+        "cruncher": {
+            "schema_version": 3,
+            "workspace": {
+                "out_dir": "runs",
+                "regulator_sets": [],
+                "regulator_categories": {"A": ["lexA"], "B": ["cpxR"]},
+            },
+            "campaigns": [
+                {
+                    "name": "demo",
+                    "categories": ["A", "B"],
+                    "across_categories": {"sizes": [2]},
+                }
+            ],
+            "sample": {
+                "seed": 1,
+                "sequence_length": 12,
+                "budget": {"tune": 1, "draws": 1},
+                "pt": {"n_temps": 2, "temp_max": 5.0},
+                "elites": {"k": 1},
+            },
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    result = invoke_cli(["sample", str(config_path)])
+    assert result.exit_code != 0
+    assert "--campaign" in combined_output(result)
 
 
 def test_catalog_show_requires_source_ref() -> None:

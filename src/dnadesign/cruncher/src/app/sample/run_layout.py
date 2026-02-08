@@ -182,6 +182,8 @@ def write_run_manifest_and_update(
     beta_softmin_final: float | None,
     min_per_tf_norm: float | None,
     min_per_tf_norm_auto: dict[str, object] | None,
+    parse_signature: str | None,
+    parse_inputs: dict[str, object] | None,
     status_writer: RunStatusWriter,
 ) -> Path:
     catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
@@ -238,6 +240,8 @@ def write_run_manifest_and_update(
             "regulator_set": {"index": set_index, "tfs": tfs, "count": set_count},
             "run_group": run_group,
             "run_kind": run_kind,
+            "parse_signature": parse_signature,
+            "parse_inputs": parse_inputs,
             "objective": {
                 "score_scale": sample_cfg.objective.score_scale,
                 "combine": combine_resolved,
