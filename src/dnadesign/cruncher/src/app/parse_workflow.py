@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from dnadesign.cruncher.app.parse_signature import compute_parse_signature
 from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json
 from dnadesign.cruncher.artifacts.layout import (
     build_run_dir,
@@ -36,13 +37,11 @@ from dnadesign.cruncher.store.catalog_index import CatalogIndex
 from dnadesign.cruncher.store.catalog_store import CatalogMotifStore
 from dnadesign.cruncher.store.lockfile import (
     Lockfile,
-    lockfile_fingerprint,
     read_lockfile,
     validate_lockfile,
     verify_lockfile_hashes,
 )
 from dnadesign.cruncher.store.motif_store import MotifRef
-from dnadesign.cruncher.utils.hashing import sha256_bytes
 from dnadesign.cruncher.utils.paths import resolve_catalog_root, resolve_lock_path
 from dnadesign.cruncher.viz.logos import pwm_provenance_summary
 
@@ -85,33 +84,6 @@ def _lockmap_for(cfg: CruncherConfig, config_path: Path) -> tuple[Lockfile, dict
         expected_pwm_source=cfg.catalog.pwm_source,
     )
     return lockfile, lockfile.resolved
-
-
-def _parse_signature(
-    *,
-    cfg: CruncherConfig,
-    lockfile: Lockfile,
-    tfs: list[str],
-) -> tuple[str, dict[str, object]]:
-    lock_sig, _ = lockfile_fingerprint(lockfile)
-    payload = {
-        "tfs": sorted(tfs),
-        "lockfile_fingerprint": lock_sig,
-        "motif_store": {
-            "pwm_source": cfg.catalog.pwm_source,
-            "combine_sites": cfg.catalog.combine_sites,
-            "site_kinds": cfg.catalog.site_kinds,
-            "site_window_lengths": cfg.catalog.site_window_lengths,
-            "site_window_center": cfg.catalog.site_window_center,
-            "pwm_window_lengths": cfg.catalog.pwm_window_lengths,
-            "pwm_window_strategy": cfg.catalog.pwm_window_strategy,
-            "min_sites_for_pwm": cfg.catalog.min_sites_for_pwm,
-            "allow_low_sites": cfg.catalog.allow_low_sites,
-            "pseudocounts": cfg.catalog.pseudocounts,
-        },
-    }
-    signature = sha256_bytes(json.dumps(payload, sort_keys=True).encode("utf-8"))
-    return signature, payload
 
 
 def _find_existing_parse_run(
@@ -188,7 +160,7 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
             raise ValueError(f"regulator_sets[{set_index}] is empty.")
         seen: set[str] = set()
         tfs = [tf for tf in group if not (tf in seen or seen.add(tf))]
-        signature, signature_payload = _parse_signature(
+        signature, signature_payload = compute_parse_signature(
             cfg=cfg,
             lockfile=lockfile,
             tfs=tfs,

@@ -218,14 +218,14 @@ def test_campaign_summarize_cli(tmp_path: Path) -> None:
     cfg = load_config(config_path)
     expansion = expand_campaign(cfg=cfg, config_path=config_path, campaign_name="demo", include_metrics=False)
     out_dir = runs_root / "campaign" / expansion.name / "latest"
-    assert (out_dir / "campaign_summary.csv").exists()
-    assert (out_dir / "campaign_best.csv").exists()
-    assert (out_dir / "campaign_manifest.json").exists()
-    assert (out_dir / "plot__best_jointscore_bar.png").exists()
-    assert (out_dir / "plot__tf_coverage_heatmap.png").exists()
-    assert (out_dir / "plot__pairgrid_overview.png").exists()
-    assert (out_dir / "plot__joint_trend.png").exists()
-    assert (out_dir / "plot__pareto_projection.png").exists()
+    assert (out_dir / "output" / "campaign_summary.csv").exists()
+    assert (out_dir / "output" / "campaign_best.csv").exists()
+    assert (out_dir / "output" / "campaign_manifest.json").exists()
+    assert (out_dir / "plots" / "plot__best_jointscore_bar.png").exists()
+    assert (out_dir / "plots" / "plot__tf_coverage_heatmap.png").exists()
+    assert (out_dir / "plots" / "plot__pairgrid_overview.png").exists()
+    assert (out_dir / "plots" / "plot__joint_trend.png").exists()
+    assert (out_dir / "plots" / "plot__pareto_projection.png").exists()
 
 
 def test_campaign_summarize_uses_table_manifest_contract(tmp_path: Path) -> None:

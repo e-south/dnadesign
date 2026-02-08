@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import gzip
 import json
 from pathlib import Path
 
@@ -36,10 +37,12 @@ def test_materialize_optimizer_stats_moves_move_stats_to_sidecar(tmp_path: Path)
     assert "move_stats" not in manifest_stats
     assert manifest_stats["move_stats_rows"] == 1
     assert stats_path is not None
+    assert stats_path.endswith(".json.gz")
     assert len(artifact_entries) == 1
     assert artifact_entries[0]["path"] == stats_path
 
-    payload = json.loads((run_dir / stats_path).read_text())
+    with gzip.open(run_dir / stats_path, "rt", encoding="utf-8") as handle:
+        payload = json.load(handle)
     assert payload["move_stats"] == move_stats
 
 

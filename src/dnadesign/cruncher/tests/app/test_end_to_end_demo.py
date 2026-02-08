@@ -9,6 +9,7 @@ Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 
@@ -163,6 +164,9 @@ def test_end_to_end_sites_pipeline(tmp_path: Path) -> None:
     assert manifest_path(sample_dir).exists()
     assert parse_manifest_path(sample_dir).exists()
     assert pwm_summary_path(sample_dir).exists()
+    parse_manifest = json.loads(parse_manifest_path(sample_dir).read_text())
+    assert parse_manifest.get("parse_signature")
+    assert isinstance(parse_manifest.get("parse_inputs"), dict)
 
     result = runner.invoke(app, ["catalog", "logos", "--set", "1", "-c", str(config_path)])
     assert result.exit_code == 0
@@ -317,8 +321,11 @@ def test_demo_campaign_pair_local_only_generates_plots(tmp_path: Path) -> None:
 
     campaign_dir = workspace / "outputs" / "campaign" / "demo_pair" / "latest"
     assert campaign_dir.is_dir()
-    assert (campaign_dir / "plot__best_jointscore_bar.png").exists()
-    assert (campaign_dir / "plot__tf_coverage_heatmap.png").exists()
-    assert (campaign_dir / "plot__pairgrid_overview.png").exists()
-    assert (campaign_dir / "plot__joint_trend.png").exists()
-    assert (campaign_dir / "plot__pareto_projection.png").exists()
+    assert (campaign_dir / "output" / "campaign_summary.csv").exists()
+    assert (campaign_dir / "output" / "campaign_best.csv").exists()
+    assert (campaign_dir / "output" / "campaign_manifest.json").exists()
+    assert (campaign_dir / "plots" / "plot__best_jointscore_bar.png").exists()
+    assert (campaign_dir / "plots" / "plot__tf_coverage_heatmap.png").exists()
+    assert (campaign_dir / "plots" / "plot__pairgrid_overview.png").exists()
+    assert (campaign_dir / "plots" / "plot__joint_trend.png").exists()
+    assert (campaign_dir / "plots" / "plot__pareto_projection.png").exists()

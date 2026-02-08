@@ -283,7 +283,7 @@ Notes:
 
 #### `cruncher parse`
 
-Validates cached PWMs (matrix- or site-derived) and writes a run manifest.
+Validates cached PWMs (matrix- or site-derived) and writes parse-cache artifacts in workspace state.
 
 Inputs:
 
@@ -310,6 +310,8 @@ Notes:
   re-run `cruncher lock <config>` to refresh what parse will use.
 * Parse is idempotent for identical inputs; if matching outputs already exist, it reports
   the existing run instead of creating a new one.
+* Parse artifacts live under `<workspace>/.cruncher/parse/{latest,previous}/input/` and are intentionally
+  separate from user-facing sample outputs in `workspace.out_dir`.
 * Use `cruncher catalog logos` to render PWM logos with provenance subtitles.
 
 ---

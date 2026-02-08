@@ -134,7 +134,7 @@ Crosswalk (behavior -> config -> modules -> artifacts):
 |---|---|---|---|
 | Fetch motifs/sites (cache) | `catalog.*`, `ingest.*`, `discover.*` | `ingest/`, `store/` | `<catalog.root>/normalized/...` + `catalog.json` |
 | Pin exact inputs (lock) | `workspace.regulator_sets`, `catalog.*` | `store/`, `app/` | `<workspace>/.cruncher/locks/<config>.lock.json` |
-| Validate locked PWMs (parse) | (lockfile-driven) | `app/` | `<run_dir>/input/` + manifest/status updates |
+| Validate locked PWMs (parse) | (lockfile-driven) | `app/` | `<workspace>/.cruncher/parse/{latest,previous}/input/` |
 | PT optimization (sample) | `sample.*` | `core/`, `app/` | `<run_dir>/optimize/` + manifest/status updates |
 | Elite filter + TFBS-core MMR | `sample.elites.*` | `core/`, `app/` | `optimize/elites*.parquet` |
 | Artifact-only reporting (analyze) | `analysis.*` | `analysis/`, `app/` | `<run_dir>/output/` + `<run_dir>/plots/` |

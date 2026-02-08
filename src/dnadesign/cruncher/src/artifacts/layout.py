@@ -31,7 +31,10 @@ def out_root(config_path: Path, out_dir: str | Path) -> Path:
 
 
 def stage_root(out_root_path: Path, stage: str) -> Path:
-    return out_root_path / stage
+    stage_name = str(stage).strip().lower()
+    if stage_name == "parse":
+        return out_root_path.parent / ".cruncher" / "parse"
+    return out_root_path
 
 
 def runs_root(out_root_path: Path) -> Path:
@@ -56,7 +59,7 @@ def run_group_dir(
     tfs: Iterable[str],
     set_index: int | None,
 ) -> Path:
-    return runs_root(out_root_path)
+    return runs_root(stage_root(out_root_path, stage))
 
 
 def build_run_dir(

@@ -19,6 +19,7 @@ from pathlib import Path
 
 import numpy as np
 
+from dnadesign.cruncher.app.parse_signature import compute_parse_signature
 from dnadesign.cruncher.app.progress import progress_adapter
 from dnadesign.cruncher.app.run_service import update_run_index_from_status
 from dnadesign.cruncher.app.sample.artifacts import (
@@ -62,7 +63,9 @@ from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.core.scoring import Scorer
 from dnadesign.cruncher.core.sequence import canon_int
 from dnadesign.cruncher.core.state import SequenceState
+from dnadesign.cruncher.store.lockfile import read_lockfile
 from dnadesign.cruncher.utils.hashing import sha256_bytes
+from dnadesign.cruncher.utils.paths import resolve_lock_path
 
 logger = logging.getLogger(__name__)
 
@@ -326,6 +329,12 @@ def _run_sample_for_set(
                 "window_strategy": pwm.window_strategy,
             }
         )
+    lockfile = read_lockfile(resolve_lock_path(config_path))
+    parse_signature, parse_inputs = compute_parse_signature(
+        cfg=cfg,
+        lockfile=lockfile,
+        tfs=tfs,
+    )
     atomic_write_json(
         parse_manifest_path(out_dir),
         {
@@ -333,6 +342,8 @@ def _run_sample_for_set(
             "source": "sample",
             "run_group": run_group,
             "regulator_set": {"index": set_index, "tfs": tfs, "count": set_count},
+            "parse_signature": parse_signature,
+            "parse_inputs": parse_inputs,
             "rows": pwm_summary_rows,
         },
     )

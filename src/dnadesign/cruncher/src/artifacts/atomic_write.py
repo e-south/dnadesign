@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import gzip
 import json
 import os
 import tempfile
@@ -47,6 +48,23 @@ def atomic_write_json(
 ) -> None:
     text = json.dumps(payload, indent=indent, sort_keys=sort_keys, allow_nan=allow_nan)
     atomic_write_text(path, text)
+
+
+def atomic_write_gzip_json(
+    path: Path,
+    payload: Any,
+    *,
+    sort_keys: bool = False,
+    allow_nan: bool = True,
+) -> None:
+    tmp_path = _atomic_tmp_path(path)
+    try:
+        with gzip.open(tmp_path, "wt", encoding="utf-8") as handle:
+            json.dump(payload, handle, sort_keys=sort_keys, allow_nan=allow_nan, separators=(",", ":"))
+        os.replace(tmp_path, path)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
 
 
 def atomic_write_yaml(

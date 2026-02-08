@@ -16,7 +16,7 @@ This doc describes the Cruncher run lifecycle, module boundaries, and on-disk ar
 
 1. **fetch** -> cache motifs/sites and update `catalog.json`
 2. **lock** -> resolve TFs to exact cached artifacts (`<workspace>/.cruncher/locks/<config>.lock.json`)
-3. **parse** *(optional)* -> validate cached PWMs (no logo rendering)
+3. **parse** *(optional)* -> validate locked PWMs and refresh the parse cache in workspace state (no logo rendering)
 4. **sample** -> run MCMC and write sequences/trace + manifests
 5. **analyze** -> curated `plot__*`/`table__*` artifacts + report from sample artifacts (offline, written into the run directory)
 
@@ -116,10 +116,13 @@ discoveries/          # MEME/STREME discovery runs
 <workspace>/.cruncher/
 locks/<config>.lock.json
 run_index.json
+parse/latest/input/{lockfile.json,parse_manifest.json,pwm_summary.json}
+parse/previous/input/{lockfile.json,parse_manifest.json,pwm_summary.json}
 ```
 
 - `locks/<config>.lock.json` pins TF names -> exact cached artifacts + hashes.
 - `run_index.json` tracks run folders for `cruncher runs ...` within that workspace.
+- `parse/{latest,previous}` stores parse-stage validation artifacts outside user-facing sample outputs.
 
 #### Tooling caches
 

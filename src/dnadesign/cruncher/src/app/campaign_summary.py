@@ -166,6 +166,10 @@ def summarize_campaign(
     else:
         output_root = out_dir
     output_root.mkdir(parents=True, exist_ok=True)
+    output_data_root = output_root / "output"
+    output_plots_root = output_root / "plots"
+    output_data_root.mkdir(parents=True, exist_ok=True)
+    output_plots_root.mkdir(parents=True, exist_ok=True)
 
     manifest = build_campaign_manifest(expansion=expansion, config_path=config_path)
     if include_metrics and metrics:
@@ -182,20 +186,20 @@ def summarize_campaign(
             }
             for name, metric in metrics.items()
         }
-    manifest_path = output_root / "campaign_manifest.json"
+    manifest_path = output_data_root / "campaign_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2))
 
-    summary_path = output_root / "campaign_summary.csv"
-    best_path = output_root / "campaign_best.csv"
+    summary_path = output_data_root / "campaign_summary.csv"
+    best_path = output_data_root / "campaign_best.csv"
     summary_df.to_csv(summary_path, index=False)
     best_df.to_csv(best_path, index=False)
 
     plot_paths = [
-        _plot_best_jointscore(best_df, output_root / "plot__best_jointscore_bar.png"),
-        _plot_tf_coverage(expansion, output_root / "plot__tf_coverage_heatmap.png"),
-        _plot_pairgrid_overview(summary_df, output_root / "plot__pairgrid_overview.png"),
-        _plot_joint_trend(summary_df, output_root / "plot__joint_trend.png"),
-        _plot_pareto_projection(summary_df, output_root / "plot__pareto_projection.png"),
+        _plot_best_jointscore(best_df, output_plots_root / "plot__best_jointscore_bar.png"),
+        _plot_tf_coverage(expansion, output_plots_root / "plot__tf_coverage_heatmap.png"),
+        _plot_pairgrid_overview(summary_df, output_plots_root / "plot__pairgrid_overview.png"),
+        _plot_joint_trend(summary_df, output_plots_root / "plot__joint_trend.png"),
+        _plot_pareto_projection(summary_df, output_plots_root / "plot__pareto_projection.png"),
     ]
 
     return CampaignSummaryResult(

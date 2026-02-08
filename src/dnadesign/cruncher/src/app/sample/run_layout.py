@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dnadesign.cruncher.app.run_service import update_run_index_from_manifest, update_run_index_from_status
-from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json
+from dnadesign.cruncher.artifacts.atomic_write import atomic_write_gzip_json
 from dnadesign.cruncher.artifacts.entries import artifact_entry
 from dnadesign.cruncher.artifacts.layout import (
     build_run_dir,
@@ -61,10 +61,10 @@ def _materialize_optimizer_stats(
         return manifest_stats, [], None
     if not isinstance(move_stats, list):
         raise ValueError("optimizer.stats()['move_stats'] must be a list.")
-    rel_path = Path("optimize") / "optimizer_move_stats.json"
-    sidecar_path = run_optimize_dir(run_dir) / "optimizer_move_stats.json"
+    rel_path = Path("optimize") / "optimizer_move_stats.json.gz"
+    sidecar_path = run_optimize_dir(run_dir) / "optimizer_move_stats.json.gz"
     sidecar_path.parent.mkdir(parents=True, exist_ok=True)
-    atomic_write_json(sidecar_path, {"move_stats": move_stats})
+    atomic_write_gzip_json(sidecar_path, {"move_stats": move_stats}, allow_nan=False)
     manifest_stats["move_stats_path"] = str(rel_path)
     manifest_stats["move_stats_rows"] = len(move_stats)
     return (

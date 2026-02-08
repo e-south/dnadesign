@@ -25,6 +25,7 @@ from dnadesign.cruncher.analysis.layout import (
     analysis_table_path,
     analysis_used_path,
     plot_manifest_path,
+    report_json_path,
     summary_path,
     table_manifest_path,
 )
@@ -319,6 +320,14 @@ def test_analyze_creates_analysis_run_and_manifest_updates(tmp_path: Path) -> No
     assert analysis_table_path(analysis_dir, "metrics_joint", "parquet").exists()
     assert analysis_table_path(analysis_dir, "diagnostics_summary", "json").exists()
     assert analysis_table_path(analysis_dir, "opt_trajectory_points", "parquet").exists()
+    report_payload = json.loads(report_json_path(analysis_dir).read_text())
+    assert report_payload["run"]["chains"] == 1
+    assert report_payload["run"]["draws"] == 2
+    assert report_payload["run"]["tune"] == 1
+    report_paths = report_payload["paths"]
+    assert report_paths["manifest"] == "output/manifest.json"
+    assert report_paths["plot_manifest"] == "output/plot_manifest.json"
+    assert report_paths["table_manifest"] == "output/table_manifest.json"
 
     table_manifest = json.loads(table_manifest_path(analysis_dir).read_text())
     keys = {entry.get("key") for entry in table_manifest.get("tables", [])}

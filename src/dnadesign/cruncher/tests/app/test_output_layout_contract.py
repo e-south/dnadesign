@@ -57,6 +57,32 @@ def test_build_run_dir_uses_latest_slot_without_opaque_hash(tmp_path: Path) -> N
     assert run_dir == tmp_path / "outputs" / "latest"
 
 
+def test_build_run_dir_parse_stage_uses_workspace_state_root(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("cruncher: {}\n")
+
+    parse_dir = build_run_dir(
+        config_path=config_path,
+        out_dir="outputs",
+        stage="parse",
+        tfs=["lexA", "cpxR"],
+        set_index=1,
+        include_set_index=False,
+    )
+    sample_dir = build_run_dir(
+        config_path=config_path,
+        out_dir="outputs",
+        stage="sample",
+        tfs=["lexA", "cpxR"],
+        set_index=1,
+        include_set_index=False,
+    )
+
+    assert parse_dir == tmp_path / ".cruncher" / "parse" / "latest"
+    assert sample_dir == tmp_path / "outputs" / "latest"
+    assert parse_dir != sample_dir
+
+
 def test_build_run_dir_with_multiple_sets_uses_set_folder_and_slot(tmp_path: Path) -> None:
     config_path = tmp_path / "config.yaml"
     config_path.write_text("cruncher: {}\n")

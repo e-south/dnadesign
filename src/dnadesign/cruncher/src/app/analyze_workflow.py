@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import gzip
 import json
 import logging
 import shutil
@@ -131,7 +132,11 @@ def _resolve_optimizer_stats(manifest: dict[str, object], run_dir: Path) -> dict
     sidecar = run_dir / relative
     if not sidecar.exists():
         raise FileNotFoundError(f"Missing optimizer stats sidecar: {sidecar}")
-    payload = json.loads(sidecar.read_text())
+    if sidecar.suffix == ".gz":
+        with gzip.open(sidecar, "rt", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    else:
+        payload = json.loads(sidecar.read_text())
     if not isinstance(payload, dict):
         raise ValueError(f"Optimizer stats sidecar must contain an object: {sidecar}")
     move_stats = payload.get("move_stats")
@@ -525,6 +530,11 @@ def run_analyze(
             mode=sample_meta.mode,
             optimizer_kind=sample_meta.optimizer_kind,
             sample_meta={
+                "chains": sample_meta.chains,
+                "draws": sample_meta.draws,
+                "tune": sample_meta.tune,
+                "mode": sample_meta.mode,
+                "optimizer_kind": sample_meta.optimizer_kind,
                 "top_k": sample_meta.top_k,
                 "dsdna_canonicalize": sample_meta.bidirectional,
             },
@@ -818,6 +828,23 @@ def run_analyze(
             table_entries=table_entries,
             analysis_artifacts=analysis_artifacts,
         )
+        report_payload = build_report_payload(
+            analysis_root=tmp_root,
+            summary_payload={
+                "analysis_id": analysis_id,
+                "run": run_name,
+                "tf_names": tf_names,
+                "diagnostics": diagnostics_payload,
+                "objective_components": objective_components,
+                "overlap_summary": overlap_summary,
+            },
+            diagnostics_payload=diagnostics_payload,
+            objective_components=objective_components,
+            overlap_summary=overlap_summary,
+            analysis_used_payload={"analysis": analysis_cfg.model_dump(mode="json")},
+        )
+        write_report_json(report_json, report_payload)
+        write_report_md(report_md, report_payload, analysis_root=tmp_root)
         analysis_artifacts.append(
             artifact_entry(plot_manifest_path(analysis_root_path), run_dir, kind="meta", stage="analysis")
         )
