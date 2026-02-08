@@ -143,6 +143,7 @@ src/dnadesign/cruncher/workspaces/**/.cruncher/
 src/dnadesign/cruncher/**/runs/
 src/dnadesign/cruncher/workspaces/**/runs/
 src/dnadesign/cruncher/workspaces/**/campaign.*.yaml
+src/dnadesign/cruncher/workspaces/**/campaign_*.yaml
 src/dnadesign/cruncher/workspaces/**/*.campaign_manifest.json
 src/dnadesign/cruncher/**/run_manifest.json
 src/dnadesign/cruncher/**/run_status.json
