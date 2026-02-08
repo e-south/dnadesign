@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import logging
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -51,7 +52,11 @@ def prepare_stage_a_pools(
     run_id: str,
     deps,
 ) -> StageAPoolState:
-    progress_style = str(getattr(cfg.logging, "progress_style", "stream"))
+    requested_progress_style = str(getattr(cfg.logging, "progress_style", "stream"))
+    progress_style, _progress_reason = logging_utils.resolve_progress_style(
+        requested_progress_style,
+        stdout=sys.stdout,
+    )
     logging_utils.set_progress_style(progress_style)
     logging_utils.set_progress_enabled(progress_style in {"stream", "screen"})
 

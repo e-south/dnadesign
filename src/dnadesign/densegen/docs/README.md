@@ -22,7 +22,7 @@
 - Integration boundary details are canonical in `reference/outputs.md#event-streams-and-consumers-densegen-vs-usr`.
 
 **Start here:**
-- [Vanilla binding-sites demo](demo/demo_binding_sites.md)
+- [Binding-sites baseline demo](demo/demo_binding_sites.md)
 - [Three-TF PWM demo](demo/demo_pwm_artifacts.md)
 - [DenseGen -> USR -> Notify demo](demo/demo_usr_notify.md)
 - [CLI reference (config resolution)](reference/cli.md#config-resolution)
@@ -32,7 +32,7 @@
 Pick the path that matches what you are trying to do:
 
 1) Understand DenseGen end-to-end with the smallest moving parts.
-   - [Vanilla binding-sites demo](demo/demo_binding_sites.md)
+   - [Binding-sites baseline demo](demo/demo_binding_sites.md)
 
 2) Run the canonical PWM workflow (Cruncher -> motif artifacts -> Stage-A PWM mining).
    - [Three-TF PWM demo](demo/demo_pwm_artifacts.md)
@@ -56,7 +56,7 @@ See `reference/outputs.md#event-streams-and-consumers-densegen-vs-usr`.
 
 ## Demos
 - [Demo flows index](demo/README.md)
-- [Vanilla binding-sites demo](demo/demo_binding_sites.md)
+- [Binding-sites baseline demo](demo/demo_binding_sites.md)
 - [Three-TF PWM demo](demo/demo_pwm_artifacts.md)
 - [DenseGen -> USR -> Notify demo](demo/demo_usr_notify.md)
 

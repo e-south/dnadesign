@@ -79,6 +79,7 @@ def _build_background_logo_figure(
         ax.set_xlabel("Position")
         ax.set_ylabel("Probability")
         _apply_style(ax, style)
+        ax.grid(False)
         used_axes.append(ax)
     for ax in axes_list[len(lengths) :]:
         ax.set_axis_off()
@@ -101,7 +102,9 @@ def plot_stage_a_summary(
     style = _style(raw_style)
     style["seaborn_style"] = False
     if "figsize" not in raw_style:
-        style["figsize"] = (11, 4)
+        style["figsize"] = (15.8, 2.6)
+    base_dir = out_path.parent / "stage_a"
+    base_dir.mkdir(parents=True, exist_ok=True)
     paths: list[Path] = []
     pwm_inputs: list[tuple[str, pd.DataFrame, dict]] = []
     background_inputs: list[tuple[str, pd.DataFrame]] = []
@@ -143,7 +146,7 @@ def plot_stage_a_summary(
     if pwm_inputs:
         fig_width = float(style.get("figsize", (11, 4))[0])
         strata_heights = [
-            max(3.8, 1.35 * _regulator_count(input_name, sampling) + 1.2)
+            max(2.45, 0.9 * _regulator_count(input_name, sampling) + 0.6)
             for input_name, _pool_df, sampling in pwm_inputs
         ]
         fig = plt.figure(figsize=(fig_width, float(sum(strata_heights))), constrained_layout=False)
@@ -151,7 +154,7 @@ def plot_stage_a_summary(
             nrows=len(pwm_inputs),
             ncols=1,
             height_ratios=strata_heights,
-            hspace=0.4,
+            hspace=0.34,
         )
         for idx, (input_name, pool_df, sampling) in enumerate(pwm_inputs):
             _build_stage_a_strata_overview_figure(
@@ -161,15 +164,16 @@ def plot_stage_a_summary(
                 style=style,
                 fig=fig,
                 slot=outer[idx, 0],
+                show_column_titles=(idx == 0),
             )
-        path = out_path.parent / f"{out_path.stem}__pool_tiers{out_path.suffix}"
-        fig.savefig(path, bbox_inches="tight", pad_inches=0.1, facecolor="white")
+        path = base_dir / f"pool_tiers{out_path.suffix}"
+        fig.savefig(path, bbox_inches="tight", pad_inches=0.08, facecolor="white")
         plt.close(fig)
         paths.append(path)
 
         base_height = float(style.get("figsize", (11, 4.2))[1])
         yield_heights = [
-            max(4.8, base_height, 1.75 * _regulator_count(input_name, sampling) + 0.8)
+            max(2.9, base_height, 0.95 * _regulator_count(input_name, sampling) + 0.5)
             for input_name, _pool_df, sampling in pwm_inputs
         ]
         fig2 = plt.figure(figsize=(fig_width, float(sum(yield_heights))), constrained_layout=False)
@@ -177,7 +181,7 @@ def plot_stage_a_summary(
             nrows=len(pwm_inputs),
             ncols=1,
             height_ratios=yield_heights,
-            hspace=0.45,
+            hspace=0.36,
         )
         for idx, (input_name, pool_df, sampling) in enumerate(pwm_inputs):
             _build_stage_a_yield_bias_figure(
@@ -187,14 +191,15 @@ def plot_stage_a_summary(
                 style=style,
                 fig=fig2,
                 slot=outer[idx, 0],
+                show_column_titles=(idx == 0),
             )
-        path2 = out_path.parent / f"{out_path.stem}__yield_bias{out_path.suffix}"
-        fig2.savefig(path2, bbox_inches="tight", pad_inches=0.1, facecolor="white")
+        path2 = base_dir / f"yield_bias{out_path.suffix}"
+        fig2.savefig(path2, bbox_inches="tight", pad_inches=0.08, facecolor="white")
         plt.close(fig2)
         paths.append(path2)
 
         diversity_heights = [
-            max(4.0, 1.5 * _regulator_count(input_name, sampling) + 1.1)
+            max(2.65, 0.9 * _regulator_count(input_name, sampling) + 0.65)
             for input_name, _pool_df, sampling in pwm_inputs
         ]
         fig3 = plt.figure(figsize=(fig_width, float(sum(diversity_heights))), constrained_layout=False)
@@ -202,7 +207,7 @@ def plot_stage_a_summary(
             nrows=len(pwm_inputs),
             ncols=1,
             height_ratios=diversity_heights,
-            hspace=0.4,
+            hspace=0.34,
         )
         for idx, (input_name, pool_df, sampling) in enumerate(pwm_inputs):
             _build_stage_a_diversity_figure(
@@ -212,9 +217,10 @@ def plot_stage_a_summary(
                 style=style,
                 fig=fig3,
                 slot=outer[idx, 0],
+                show_column_titles=(idx == 0),
             )
-        path3 = out_path.parent / f"{out_path.stem}__diversity{out_path.suffix}"
-        fig3.savefig(path3, bbox_inches="tight", pad_inches=0.1, facecolor="white")
+        path3 = base_dir / f"diversity{out_path.suffix}"
+        fig3.savefig(path3, bbox_inches="tight", pad_inches=0.08, facecolor="white")
         plt.close(fig3)
         paths.append(path3)
 
@@ -230,9 +236,9 @@ def plot_stage_a_summary(
             sequences=sequences,
             style=style,
         )
-        fname = f"{out_path.stem}__{_safe_filename(input_name)}__background_logo{out_path.suffix}"
-        path = out_path.parent / fname
-        fig.savefig(path, bbox_inches="tight", pad_inches=0.1, facecolor="white")
+        fname = f"{_safe_filename(input_name)}__background_logo{out_path.suffix}"
+        path = base_dir / fname
+        fig.savefig(path, bbox_inches="tight", pad_inches=0.08, facecolor="white")
         plt.close(fig)
         paths.append(path)
     return paths

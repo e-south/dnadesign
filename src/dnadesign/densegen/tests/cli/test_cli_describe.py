@@ -43,7 +43,6 @@ def _write_min_config(path: Path) -> None:
 
               generation:
                 sequence_length: 10
-                quota: 1
                 plan:
                   - name: default
                     quota: 1
@@ -121,7 +120,6 @@ def _write_pwm_mmr_config(path: Path) -> None:
                   path: outputs/tables/dense_arrays.parquet
               generation:
                 sequence_length: 30
-                quota: 1
                 plan:
                   - name: demo_plan
                     quota: 1

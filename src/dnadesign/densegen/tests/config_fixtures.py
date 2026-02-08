@@ -37,7 +37,6 @@ def write_minimal_config(path: Path) -> None:
                   path: outputs/tables/dense_arrays.parquet
               generation:
                 sequence_length: 10
-                quota: 1
                 plan:
                   - name: demo_plan
                     quota: 1

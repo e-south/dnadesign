@@ -102,6 +102,60 @@ def test_screen_progress_requires_tty(monkeypatch) -> None:
         )
 
 
+def test_auto_progress_uses_live_dashboard_when_interactive(monkeypatch) -> None:
+    monkeypatch.setenv("TERM", "xterm-256color")
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True, raising=False)
+    monkeypatch.setattr(logging_utils, "_LOGGING_CONSOLE", None, raising=False)
+    settings = orchestrator._init_progress_settings(
+        log_cfg=_make_log_cfg(progress_style="auto"),
+        source_label="demo",
+        plan_name="demo",
+        quota=1,
+        max_per_subsample=1,
+        show_tfbs=False,
+        show_solutions=False,
+        extra_library_label=None,
+    )
+    assert settings.progress_style == "screen"
+    assert settings.dashboard is not None
+    assert settings.dashboard._live is not None
+
+
+def test_auto_progress_downgrades_to_summary_when_non_interactive(monkeypatch) -> None:
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: False, raising=False)
+    monkeypatch.setattr(logging_utils, "_LOGGING_CONSOLE", None, raising=False)
+    settings = orchestrator._init_progress_settings(
+        log_cfg=_make_log_cfg(progress_style="auto", print_visual=False, visuals=None),
+        source_label="demo",
+        plan_name="demo",
+        quota=1,
+        max_per_subsample=1,
+        show_tfbs=False,
+        show_solutions=False,
+        extra_library_label=None,
+    )
+    assert settings.progress_style == "summary"
+    assert settings.dashboard is None
+
+
+def test_auto_progress_downgrades_to_stream_for_dumb_term(monkeypatch) -> None:
+    monkeypatch.setenv("TERM", "dumb")
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True, raising=False)
+    monkeypatch.setattr(logging_utils, "_LOGGING_CONSOLE", None, raising=False)
+    settings = orchestrator._init_progress_settings(
+        log_cfg=_make_log_cfg(progress_style="auto", print_visual=False, visuals=None),
+        source_label="demo",
+        plan_name="demo",
+        quota=1,
+        max_per_subsample=1,
+        show_tfbs=False,
+        show_solutions=False,
+        extra_library_label=None,
+    )
+    assert settings.progress_style == "stream"
+    assert settings.dashboard is None
+
+
 def test_screen_progress_updates_per_solution_when_visual(monkeypatch) -> None:
     dashboard = _DummyDashboard()
     reporter = PlanProgressReporter(
@@ -158,6 +212,7 @@ def test_screen_progress_updates_per_solution_when_visual(monkeypatch) -> None:
 
 
 def test_screen_progress_reuses_shared_dashboard(monkeypatch) -> None:
+    monkeypatch.setenv("TERM", "xterm-256color")
     monkeypatch.setattr(sys.stdout, "isatty", lambda: True, raising=False)
     shared = orchestrator._ScreenDashboard(console=Console(), refresh_seconds=1.0)
     settings_a = orchestrator._init_progress_settings(

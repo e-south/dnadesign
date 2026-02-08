@@ -14,9 +14,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
-from dnadesign.notify.cli import app
+from dnadesign.notify.cli import _ensure_private_directory, app
+from dnadesign.notify.errors import NotifyConfigError
 
 
 def _event(action: str = "write_overlay_part") -> dict:
@@ -205,6 +207,52 @@ def test_profile_wizard_rejects_yaml_path_for_events(tmp_path: Path, monkeypatch
     assert result.exit_code == 1
     assert "USR .events.log" in result.stdout
     assert "inspect run --usr-events-path" in result.stdout
+
+
+def test_profile_wizard_reports_actionable_cursor_directory_error(tmp_path: Path, monkeypatch) -> None:
+    events = tmp_path / "events.log"
+    profile = tmp_path / "notify.profile.json"
+    _write_events(events, [_event()])
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+
+    def _fail_private_dir(path: Path, *, label: str) -> None:
+        raise NotifyConfigError(f"failed to set secure permissions on {label}: {path}")
+
+    monkeypatch.setattr("dnadesign.notify.cli._ensure_private_directory", _fail_private_dir)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "profile",
+            "wizard",
+            "--profile",
+            str(profile),
+            "--provider",
+            "slack",
+            "--events",
+            str(events),
+            "--secret-source",
+            "env",
+            "--url-env",
+            "DENSEGEN_WEBHOOK",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "--cursor" in result.stdout
+    assert "--spool-dir" in result.stdout
+
+
+def test_ensure_private_directory_wraps_mkdir_permission_errors(tmp_path: Path, monkeypatch) -> None:
+    target = tmp_path / "restricted" / "dir"
+
+    def _deny_mkdir(self, *args, **kwargs):
+        raise PermissionError("denied")
+
+    monkeypatch.setattr(Path, "mkdir", _deny_mkdir)
+
+    with pytest.raises(NotifyConfigError, match="failed to create cursor directory"):
+        _ensure_private_directory(target, label="cursor directory")
 
 
 def test_profile_wizard_stores_absolute_events_path(tmp_path: Path, monkeypatch) -> None:

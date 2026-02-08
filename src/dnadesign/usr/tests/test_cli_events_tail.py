@@ -46,3 +46,32 @@ def test_events_tail_json(tmp_path: Path) -> None:
     lines = [line for line in result.stdout.splitlines() if line.strip()]
     payload = json.loads(lines[-1])
     assert payload["action"] == "init"
+
+
+def test_events_tail_accepts_dataset_path_outside_root(tmp_path: Path) -> None:
+    dataset_root = tmp_path / "dataset_root"
+    register_test_namespace(dataset_root, namespace="mock", columns_spec="mock__score:float64")
+    ds = Dataset(dataset_root, "densegen/demo")
+    ds.init(source="unit-test")
+
+    unrelated_root = tmp_path / "unrelated_root"
+    unrelated_root.mkdir(parents=True, exist_ok=True)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "--root",
+            str(unrelated_root),
+            "events",
+            "tail",
+            str(ds.dir),
+            "--format",
+            "json",
+            "--n",
+            "1",
+        ],
+    )
+    assert result.exit_code == 0
+    lines = [line for line in result.stdout.splitlines() if line.strip()]
+    payload = json.loads(lines[-1])
+    assert payload["action"] == "init"

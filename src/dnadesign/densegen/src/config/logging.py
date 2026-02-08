@@ -42,7 +42,7 @@ class LoggingConfig(BaseModel):
     level: str = "INFO"
     suppress_solver_stderr: bool = True
     print_visual: bool = False
-    progress_style: Literal["stream", "summary", "screen"] = "screen"
+    progress_style: Literal["auto", "stream", "summary", "screen"] = "summary"
     progress_every: int = 1
     progress_refresh_seconds: float = 1.0
     show_tfbs: bool = False

@@ -37,8 +37,8 @@ uv run dense inspect run --usr-events-path -c /abs/path/to/config.yaml
 Concrete example for the three-TF demo workspace (run from repo root):
 
 ```bash
-uv run dense workspace init --id demo_pwm --template-id demo_meme_three_tfs --copy-inputs --output-mode usr
-EVENTS_PATH="$(uv run dense inspect run --usr-events-path -c src/dnadesign/densegen/workspaces/runs/demo_pwm/config.yaml)"
+uv run dense workspace init --id meme_three_tfs_trial --from-workspace demo_meme_three_tfs --copy-inputs --output-mode usr
+EVENTS_PATH="$(uv run dense inspect run --usr-events-path -c src/dnadesign/densegen/workspaces/meme_three_tfs_trial/config.yaml)"
 ```
 
 Important: `--events` for notify must be a USR `.events.log` JSONL path, not `config.yaml`.
@@ -50,6 +50,8 @@ uv run notify profile wizard \
   --profile outputs/notify.profile.json \
   --provider slack \
   --events <PASTE_EVENTS_PATH_FROM_ABOVE> \
+  --cursor outputs/notify.cursor \
+  --spool-dir outputs/notify_spool \
   --secret-source auto \
   --preset densegen
 ```
@@ -71,6 +73,8 @@ uv run notify profile wizard \
   --profile outputs/notify.profile.json \
   --provider slack \
   --events <PASTE_EVENTS_PATH_FROM_ABOVE> \
+  --cursor outputs/notify.cursor \
+  --spool-dir outputs/notify_spool \
   --secret-source env \
   --url-env DENSEGEN_WEBHOOK \
   --preset densegen
@@ -174,6 +178,8 @@ Use the Slack wizard quickstart above for onboarding. If you already have a prof
 - If the profile is under `outputs/`, use `usr_datasets/...` rather than `outputs/usr_datasets/...`.
 - `--secret-source auto` requires Keychain (macOS) or Secret Service (Linux).
 - Use `--secret-source env --url-env DENSEGEN_WEBHOOK` only when you explicitly want env-based secrets.
+- If your environment restricts the default state directory, pass explicit writable paths:
+  `--cursor outputs/notify.cursor --spool-dir outputs/notify_spool`.
 
 Validate wiring before posting:
 
@@ -214,7 +220,7 @@ If payloads look correct, remove `--dry-run` to deliver for real.
 Generate additional events by increasing quota and resuming DenseGen:
 
 ```bash
-uv run dense run --resume --allow-quota-increase --no-plot
+uv run dense run --resume --no-plot
 ```
 
 ---

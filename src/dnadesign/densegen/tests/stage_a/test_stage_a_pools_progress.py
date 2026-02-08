@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import dnadesign.densegen.src.core.pipeline.stage_a_pools as stage_a_pools
@@ -64,8 +65,12 @@ def test_prepare_stage_a_pools_sets_progress_style(monkeypatch, tmp_path: Path) 
             run_id=str(cfg.run.id),
             deps=None,
         )
-        assert logging_utils.get_progress_style() == str(cfg.logging.progress_style)
-        assert logging_utils.is_progress_enabled() is True
+        expected_style, _ = logging_utils.resolve_progress_style(
+            str(cfg.logging.progress_style),
+            stdout=sys.stdout,
+        )
+        assert logging_utils.get_progress_style() == expected_style
+        assert logging_utils.is_progress_enabled() is (expected_style in {"stream", "screen"})
     finally:
         logging_utils.set_progress_enabled(prev_enabled)
         logging_utils.set_progress_style(prev_style)

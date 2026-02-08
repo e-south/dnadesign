@@ -219,11 +219,13 @@ usr schema densegen/demo               # Arrow schema (plain)
 usr schema densegen/demo --tree        # pretty tree view
 usr schema densegen/demo --format json
 usr events tail densegen/demo --format json --follow
+usr events tail /abs/path/to/datasets/densegen/demo --format json --n 5
 
 usr validate densegen/demo             # checks schema, uniqueness, namespacing
 usr validate densegen/demo --strict
 usr validate densegen/demo --registry-mode frozen
 usr validate densegen/demo --registry-mode either
+usr validate /abs/path/to/datasets/densegen/demo --strict
 
 
 ```

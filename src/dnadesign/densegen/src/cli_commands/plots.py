@@ -51,7 +51,10 @@ def register_plot_commands(app: typer.Typer, *, context: CliContext) -> None:
             ensure_mpl_cache_dir()
         except Exception as exc:
             console.print(f"[bold red]Matplotlib cache setup failed:[/] {exc}")
-            console.print("[bold]Tip[/]: set MPLCONFIGDIR to a shared cache directory (e.g. ~/.cache/matplotlib).")
+            console.print(
+                "[bold]Tip[/]: DenseGen defaults to a repo-local cache at .cache/matplotlib/densegen; "
+                "set MPLCONFIGDIR to override."
+            )
             raise typer.Exit(code=1)
         install_native_stderr_filters(suppress_solver_messages=False)
         from ..viz.plotting import run_plots_from_config

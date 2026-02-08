@@ -18,6 +18,7 @@ import pandas as pd
 from dnadesign.densegen.src.adapters.outputs import OutputRecord, ParquetSink
 from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.core.reporting import collect_report_data
+from dnadesign.densegen.src.core.reporting_render import _render_report_md
 from dnadesign.densegen.tests.meta_fixtures import output_meta
 
 PLAN_POOL_LABEL = "plan_pool__demo_plan"
@@ -44,7 +45,45 @@ def _write_config(path: Path) -> None:
               path: outputs/tables/dense_arrays.parquet
           generation:
             sequence_length: 10
-            quota: 1
+            plan:
+              - name: demo_plan
+                quota: 1
+                sampling:
+                  include_inputs: [demo_input]
+                regulator_constraints:
+                  groups: []
+          solver:
+            backend: CBC
+            strategy: iterate
+          logging:
+            log_dir: outputs/logs
+        """.strip()
+        + "\n"
+    )
+
+
+def _write_usr_config(path: Path) -> None:
+    path.write_text(
+        """
+        densegen:
+          schema_version: "2.9"
+          run:
+            id: demo
+            root: "."
+          inputs:
+            - name: demo_input
+              type: binding_sites
+              path: inputs.csv
+          output:
+            targets: [usr]
+            schema:
+              bio_type: dna
+              alphabet: dna_4
+            usr:
+              root: outputs/usr_datasets
+              dataset: densegen/demo_usr
+          generation:
+            sequence_length: 10
             plan:
               - name: demo_plan
                 quota: 1
@@ -150,3 +189,42 @@ def test_library_summary_outputs_filled(tmp_path: Path) -> None:
     assert int(row["libraries"]) == 2
     assert int(row["library_size_min"]) == 2
     assert int(row["library_size_max"]) == 2
+
+
+def test_report_outputs_section_uses_usr_records_path(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    cfg_path = run_root / "config.yaml"
+    _write_usr_config(cfg_path)
+    (run_root / "inputs.csv").write_text("tf,tfbs\nTF_A,AAAA\n")
+
+    records_df = pd.DataFrame(
+        [
+            {
+                "id": "sol-1",
+                "sequence": "ATGCATGCAT",
+                "densegen__plan": "demo_plan",
+                "densegen__input_name": PLAN_POOL_LABEL,
+                "densegen__sampling_library_hash": "abc123",
+                "densegen__sampling_library_index": 1,
+                "densegen__used_tfbs_detail": [{"tf": "lexA", "tfbs": "AAAA"}],
+                "densegen__required_regulators": ["lexA"],
+                "densegen__covers_all_tfs_in_solution": True,
+                "densegen__used_tf_counts": [{"tf": "lexA", "count": 1}],
+                "densegen__min_count_by_regulator": [{"tf": "lexA", "min_count": 1}],
+            }
+        ]
+    )
+
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.core.reporting_data.load_records_from_config",
+        lambda *_args, **_kwargs: (records_df.copy(), "usr:densegen/demo_usr"),
+    )
+
+    loaded = load_config(cfg_path)
+    bundle = collect_report_data(loaded.root, cfg_path, include_combinatorics=False)
+    assert bundle.run_report["outputs_path"] == "outputs/usr_datasets/densegen/demo_usr/records.parquet"
+
+    report_md = _render_report_md(bundle)
+    assert "- outputs/usr_datasets/densegen/demo_usr/records.parquet" in report_md
+    assert "- outputs/tables/dense_arrays.parquet" not in report_md

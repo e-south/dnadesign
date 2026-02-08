@@ -55,8 +55,8 @@ from .cli_commands.report import register_report_command
 from .cli_commands.run import register_run_commands
 from .cli_commands.stage_a import register_stage_a_commands
 from .cli_commands.stage_b import register_stage_b_commands
-from .cli_commands.templates import resolve_template_dir as _resolve_template_dir_impl
 from .cli_commands.workspace import register_workspace_commands
+from .cli_commands.workspace_sources import resolve_workspace_source as _resolve_workspace_source_impl
 from .cli_sampling import format_selection_label
 from .cli_setup import (
     DEFAULT_CONFIG_FILENAME,
@@ -291,10 +291,14 @@ _ensure_fimo_available = partial(
 )
 
 
-def _resolve_template_dir(*, template: Optional[Path], template_id: Optional[str]) -> Iterator[tuple[Path, Path]]:
-    return _resolve_template_dir_impl(
-        template=template,
-        template_id=template_id,
+def _resolve_workspace_source(
+    *,
+    source_config: Optional[Path],
+    source_workspace: Optional[str],
+) -> Iterator[tuple[Path, Path]]:
+    return _resolve_workspace_source_impl(
+        source_config=source_config,
+        source_workspace=source_workspace,
         console=console,
         display_path=_display_path,
         default_config_filename=DEFAULT_CONFIG_FILENAME,
@@ -796,7 +800,7 @@ register_plot_commands(app, context=cli_context)
 register_workspace_commands(
     workspace_app,
     context=cli_context,
-    resolve_template_dir=_resolve_template_dir,
+    resolve_workspace_source=_resolve_workspace_source,
     sanitize_filename=_sanitize_filename,
     collect_relative_input_paths_from_raw=_collect_relative_input_paths_from_raw,
 )

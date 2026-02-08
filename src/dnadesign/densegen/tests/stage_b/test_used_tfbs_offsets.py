@@ -57,3 +57,37 @@ def test_update_usage_summary_counts_tf_and_tfbs() -> None:
 
     assert usage_counts == {("TF1", "AAA"): 2, ("TF2", "CCC"): 1}
     assert tf_usage_counts == {"TF1": 2, "TF2": 1}
+
+
+def test_used_tfbs_detail_includes_stage_a_lineage_fields() -> None:
+    sol = _DummySol(sequence="AAAA", library=["TT"], indices=[0, 0])
+    _used_tfbs, used_detail, _used_counts, _used_list = _compute_used_tf_info(
+        sol,
+        ["TT"],
+        ["TF1"],
+        None,
+        None,
+        None,
+        None,
+        None,
+        stage_a_best_hit_score_by_index=[7.25],
+        stage_a_rank_within_regulator_by_index=[3],
+        stage_a_tier_by_index=[1],
+        stage_a_fimo_start_by_index=[12],
+        stage_a_fimo_stop_by_index=[17],
+        stage_a_fimo_strand_by_index=["+"],
+        stage_a_selection_rank_by_index=[2],
+        stage_a_selection_score_norm_by_index=[0.91],
+        stage_a_tfbs_core_by_index=["TT"],
+    )
+    assert len(used_detail) == 2
+    for entry in used_detail:
+        assert entry["stage_a_best_hit_score"] == 7.25
+        assert entry["stage_a_rank_within_regulator"] == 3
+        assert entry["stage_a_tier"] == 1
+        assert entry["stage_a_fimo_start"] == 12
+        assert entry["stage_a_fimo_stop"] == 17
+        assert entry["stage_a_fimo_strand"] == "+"
+        assert entry["stage_a_selection_rank"] == 2
+        assert entry["stage_a_selection_score_norm"] == 0.91
+        assert entry["stage_a_tfbs_core"] == "TT"

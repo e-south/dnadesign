@@ -1,8 +1,8 @@
-# DenseGen demo: unconstrained baseline using simple binding-site inputs.
+# DenseGen demo: binding-site baseline plus sigma70-constrained variant.
 densegen:
   schema_version: "2.9"
   run:
-    id: demo_binding_sites_vanilla
+    id: demo_binding_sites
     root: "."
 
   inputs:
@@ -21,8 +21,7 @@ densegen:
       chunk_size: 64
 
   generation:
-    sequence_length: 12
-    quota: 4
+    sequence_length: 60
     sampling:
       pool_strategy: full
       library_size: 3
@@ -31,9 +30,21 @@ densegen:
       relax_on_exhaustion: false
     plan:
       - name: baseline
-        quota: 4
+        quota: 9
         sampling:
           include_inputs: [basic_sites]
+        regulator_constraints:
+          groups: []
+      - name: baseline_sigma70
+        quota: 6
+        sampling:
+          include_inputs: [basic_sites]
+        fixed_elements:
+          promoter_constraints:
+            - name: sigma70_consensus
+              upstream: TTGACA
+              downstream: TATAAT
+              spacer_length: [16, 18]
         regulator_constraints:
           groups: []
 

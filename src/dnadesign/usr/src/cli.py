@@ -676,10 +676,14 @@ def cmd_cell(args):
 
 
 def cmd_validate(args):
-    ds_name = _resolve_dataset_name_interactive(args.root, getattr(args, "dataset", None), False)
-    if not ds_name:
-        return
-    d = Dataset(args.root, ds_name)
+    dataset_arg = getattr(args, "dataset", None)
+    if dataset_arg:
+        d = _resolve_dataset_for_read(args.root, str(dataset_arg))
+    else:
+        ds_name = _resolve_dataset_name_interactive(args.root, dataset_arg, False)
+        if not ds_name:
+            return
+        d = Dataset(args.root, ds_name)
     d.validate(
         strict=bool(getattr(args, "strict", False)),
         registry_mode=str(getattr(args, "registry_mode", "current")),
@@ -725,10 +729,15 @@ def _emit_event_line(line: str, fmt: str) -> None:
 
 
 def cmd_events_tail(args) -> None:
-    ds_name = _resolve_dataset_name_interactive(args.root, getattr(args, "dataset", None), False)
-    if not ds_name:
-        return
-    events_path = Path(args.root) / ds_name / ".events.log"
+    dataset_arg = getattr(args, "dataset", None)
+    if dataset_arg:
+        d = _resolve_dataset_for_read(args.root, str(dataset_arg))
+    else:
+        ds_name = _resolve_dataset_name_interactive(args.root, dataset_arg, False)
+        if not ds_name:
+            return
+        d = Dataset(args.root, ds_name)
+    events_path = d.events_path
     if not events_path.exists():
         raise SequencesError(f"Events log not found: {events_path}")
 

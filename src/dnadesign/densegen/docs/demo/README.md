@@ -2,10 +2,10 @@
 
 DenseGen includes two packaged workspaces plus one stack integration walkthrough.
 
-### 1) Vanilla binding-sites demo (start here)
+### 1) Binding-sites baseline demo (start here)
 
-- Workspace: `workspaces/demo_binding_sites_vanilla/`
-- Purpose: understand default `dense run` behavior with no added plan constraints.
+- Workspace: `workspaces/demo_binding_sites/`
+- Purpose: compare default `baseline` behavior against `baseline_sigma70` (fixed promoter spacer 16-18 bp) using mock TFBS inputs in the 16–20 bp range.
 - Guide: [demo_binding_sites.md](demo_binding_sites.md)
 
 ### 2) Three-TF PWM demo (canonical workflow)
@@ -16,7 +16,15 @@ DenseGen includes two packaged workspaces plus one stack integration walkthrough
   - [demo_pwm_artifacts.md](demo_pwm_artifacts.md)
   - [../workflows/cruncher_pwm_pipeline.md](../workflows/cruncher_pwm_pipeline.md)
 
-Recommended order: run the vanilla demo first, then the three-TF PWM workflow, then the stack demo.
+Recommended order: run the binding-sites baseline demo first, then the three-TF PWM workflow, then the stack demo.
+
+Reset + rerun pattern for either demo:
+
+```bash
+dense campaign-reset -c "$CONFIG"
+dense run --fresh --no-plot -c "$CONFIG"
+dense plot -c "$CONFIG"
+```
 
 ### 3) DenseGen -> USR -> Notify demo (end-to-end stack)
 

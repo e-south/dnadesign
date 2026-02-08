@@ -55,7 +55,6 @@ def _write_min_config(path: Path) -> None:
 
               generation:
                 sequence_length: 10
-                quota: 1
                 plan:
                   - name: default
                     quota: 1

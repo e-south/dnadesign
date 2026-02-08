@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import random
 import sys
 import time
@@ -102,6 +103,7 @@ log = logging.getLogger(__name__)
 class RunSummary:
     total_generated: int
     per_plan: dict[tuple[str, str], int]
+    generated_this_run: int = 0
 
 
 @dataclass(frozen=True)
@@ -186,6 +188,26 @@ class PlanInputState:
     input_tf_tfbs_pair_count: int | None
 
 
+def _progress_terminal_probe(
+    *,
+    shared_dashboard: _ScreenDashboard | None = None,
+) -> tuple[Console | None, bool | None, str | None]:
+    console = getattr(shared_dashboard, "_console", None) if shared_dashboard is not None else None
+    if console is None:
+        console = logging_utils.get_logging_console()
+    if console is None:
+        return None, None, os.environ.get("TERM")
+    is_tty = bool(getattr(console, "is_terminal", False))
+    console_environ = getattr(console, "_environ", None)
+    console_term = None
+    if isinstance(console_environ, dict):
+        console_term = console_environ.get("TERM")
+    term_value = (
+        "dumb" if bool(getattr(console, "is_dumb_terminal", False)) else (console_term or os.environ.get("TERM"))
+    )
+    return console, is_tty, term_value
+
+
 def _init_progress_settings(
     *,
     log_cfg,
@@ -198,7 +220,14 @@ def _init_progress_settings(
     extra_library_label: str | None,
     shared_dashboard: _ScreenDashboard | None = None,
 ) -> ProgressSettings:
-    progress_style = str(getattr(log_cfg, "progress_style", "stream"))
+    requested_progress_style = str(getattr(log_cfg, "progress_style", "stream"))
+    probed_console, probed_tty, probed_term = _progress_terminal_probe(shared_dashboard=shared_dashboard)
+    progress_style, _progress_reason = logging_utils.resolve_progress_style(
+        requested_progress_style,
+        stdout=sys.stdout,
+        term=probed_term,
+        is_tty=probed_tty,
+    )
     progress_every = int(getattr(log_cfg, "progress_every", 1))
     progress_refresh_seconds = float(getattr(log_cfg, "progress_refresh_seconds", 1.0))
     logging_utils.set_progress_style(progress_style)
@@ -206,7 +235,7 @@ def _init_progress_settings(
     screen_console = None
     if progress_style == "screen":
         if shared_dashboard is None:
-            screen_console = logging_utils.get_logging_console()
+            screen_console = probed_console
             if screen_console is None:
                 tty = bool(getattr(sys.stdout, "isatty", lambda: False)())
                 if tty:
@@ -291,11 +320,18 @@ def _close_plan_dashboard(*, dashboard, shared_dashboard) -> None:
 
 
 def _build_shared_dashboard(log_cfg) -> _ScreenDashboard | None:
-    progress_style = str(getattr(log_cfg, "progress_style", "stream"))
+    requested_progress_style = str(getattr(log_cfg, "progress_style", "stream"))
+    probed_console, probed_tty, probed_term = _progress_terminal_probe()
+    progress_style, _progress_reason = logging_utils.resolve_progress_style(
+        requested_progress_style,
+        stdout=sys.stdout,
+        term=probed_term,
+        is_tty=probed_tty,
+    )
     progress_refresh_seconds = float(getattr(log_cfg, "progress_refresh_seconds", 1.0))
     if progress_style != "screen":
         return None
-    console = logging_utils.get_logging_console()
+    console = probed_console
     if console is None:
         tty = bool(getattr(sys.stdout, "isatty", lambda: False)())
         if tty:
@@ -872,6 +908,15 @@ def _run_stage_b_sampling(
         source_by_index = sampling_info.get("source_by_index")
         tfbs_id_by_index = sampling_info.get("tfbs_id_by_index")
         motif_id_by_index = sampling_info.get("motif_id_by_index")
+        stage_a_best_hit_score_by_index = sampling_info.get("stage_a_best_hit_score_by_index")
+        stage_a_rank_within_regulator_by_index = sampling_info.get("stage_a_rank_within_regulator_by_index")
+        stage_a_tier_by_index = sampling_info.get("stage_a_tier_by_index")
+        stage_a_fimo_start_by_index = sampling_info.get("stage_a_fimo_start_by_index")
+        stage_a_fimo_stop_by_index = sampling_info.get("stage_a_fimo_stop_by_index")
+        stage_a_fimo_strand_by_index = sampling_info.get("stage_a_fimo_strand_by_index")
+        stage_a_selection_rank_by_index = sampling_info.get("stage_a_selection_rank_by_index")
+        stage_a_selection_score_norm_by_index = sampling_info.get("stage_a_selection_score_norm_by_index")
+        stage_a_tfbs_core_by_index = sampling_info.get("stage_a_tfbs_core_by_index")
 
         diagnostics.update_library(
             library_tfs=library_tfs,
@@ -1022,6 +1067,15 @@ def _run_stage_b_sampling(
                     source_by_index,
                     tfbs_id_by_index,
                     motif_id_by_index,
+                    stage_a_best_hit_score_by_index,
+                    stage_a_rank_within_regulator_by_index,
+                    stage_a_tier_by_index,
+                    stage_a_fimo_start_by_index,
+                    stage_a_fimo_stop_by_index,
+                    stage_a_fimo_strand_by_index,
+                    stage_a_selection_rank_by_index,
+                    stage_a_selection_score_norm_by_index,
+                    stage_a_tfbs_core_by_index,
                 )
                 solver_status = getattr(sol, "status", None)
                 if solver_status is not None:
@@ -1834,6 +1888,7 @@ def run_pipeline(
             len(existing_counts),
         )
     assert_state_matches_outputs(state_path=state_ctx.path, existing_counts=existing_counts)
+    existing_total = sum(existing_counts.values())
 
     plan_stats, plan_order = init_plan_stats(
         plan_items=pl,
@@ -1986,7 +2041,11 @@ def run_pipeline(
 
         _write_state()
 
-        return RunSummary(total_generated=total, per_plan=per_plan)
+        return RunSummary(
+            total_generated=total,
+            per_plan=per_plan,
+            generated_this_run=max(0, int(total) - int(existing_total)),
+        )
     finally:
         if shared_dashboard is not None:
             shared_dashboard.close()

@@ -26,6 +26,15 @@ def _compute_used_tf_info(
     source_by_index,
     tfbs_id_by_index,
     motif_id_by_index,
+    stage_a_best_hit_score_by_index=None,
+    stage_a_rank_within_regulator_by_index=None,
+    stage_a_tier_by_index=None,
+    stage_a_fimo_start_by_index=None,
+    stage_a_fimo_stop_by_index=None,
+    stage_a_fimo_strand_by_index=None,
+    stage_a_selection_rank_by_index=None,
+    stage_a_selection_score_norm_by_index=None,
+    stage_a_tfbs_core_by_index=None,
 ):
     promoter_motifs = set()
     if fixed_elements is not None:
@@ -52,6 +61,19 @@ def _compute_used_tf_info(
     used_detail: list[dict] = []
     counts: dict[str, int] = {}
     used_tf_set: set[str] = set()
+
+    def _value(values, idx):
+        if values is None or idx >= len(values):
+            return None
+        raw = values[idx]
+        if raw is None:
+            return None
+        try:
+            if pd.isna(raw):
+                return None
+        except Exception:
+            pass
+        return raw
 
     for offset, idx in sol.offset_indices_in_order():
         base_idx = idx % len(lib)
@@ -90,6 +112,33 @@ def _compute_used_tf_info(
             motif_id = motif_id_by_index[base_idx]
             if motif_id is not None:
                 entry["motif_id"] = motif_id
+        best_hit_score = _value(stage_a_best_hit_score_by_index, base_idx)
+        if best_hit_score is not None:
+            entry["stage_a_best_hit_score"] = float(best_hit_score)
+        rank_within_regulator = _value(stage_a_rank_within_regulator_by_index, base_idx)
+        if rank_within_regulator is not None:
+            entry["stage_a_rank_within_regulator"] = int(rank_within_regulator)
+        tier = _value(stage_a_tier_by_index, base_idx)
+        if tier is not None:
+            entry["stage_a_tier"] = int(tier)
+        fimo_start = _value(stage_a_fimo_start_by_index, base_idx)
+        if fimo_start is not None:
+            entry["stage_a_fimo_start"] = int(fimo_start)
+        fimo_stop = _value(stage_a_fimo_stop_by_index, base_idx)
+        if fimo_stop is not None:
+            entry["stage_a_fimo_stop"] = int(fimo_stop)
+        fimo_strand = _value(stage_a_fimo_strand_by_index, base_idx)
+        if fimo_strand is not None:
+            entry["stage_a_fimo_strand"] = str(fimo_strand)
+        selection_rank = _value(stage_a_selection_rank_by_index, base_idx)
+        if selection_rank is not None:
+            entry["stage_a_selection_rank"] = int(selection_rank)
+        selection_score_norm = _value(stage_a_selection_score_norm_by_index, base_idx)
+        if selection_score_norm is not None:
+            entry["stage_a_selection_score_norm"] = float(selection_score_norm)
+        tfbs_core = _value(stage_a_tfbs_core_by_index, base_idx)
+        if tfbs_core is not None:
+            entry["stage_a_tfbs_core"] = str(tfbs_core)
         used_detail.append(entry)
         if tf_label:
             counts[tf_label] = counts.get(tf_label, 0) + 1

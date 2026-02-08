@@ -56,7 +56,6 @@ def load_resume_state(
                 loaded.root,
                 loaded.path,
                 columns=[
-                    "densegen__run_config_sha256",
                     "densegen__run_id",
                     "densegen__input_name",
                     "densegen__plan",
@@ -66,21 +65,6 @@ def load_resume_state(
         except Exception:
             df_existing = None
         if df_existing is not None and not df_existing.empty:
-            if "densegen__run_config_sha256" in df_existing.columns:
-                observed_hashes = {
-                    str(v) for v in df_existing["densegen__run_config_sha256"].dropna().unique().tolist()
-                }
-                allowed_hashes = {str(config_sha)}
-                if allowed_config_sha256 is not None:
-                    allowed_hashes |= {str(v) for v in allowed_config_sha256 if str(v)}
-                disallowed = sorted(h for h in observed_hashes if h and h not in allowed_hashes)
-                if disallowed:
-                    raise RuntimeError(
-                        "Existing outputs were produced with a different config. "
-                        "Remove outputs/tables (and outputs/meta if present) "
-                        "or stage a new run root to start fresh. "
-                        f"Disallowed config hashes: {', '.join(disallowed[:3])}"
-                    )
             if "densegen__run_id" in df_existing.columns:
                 run_ids = df_existing["densegen__run_id"].dropna().unique().tolist()
                 if run_ids and any(val != loaded.root.densegen.run.id for val in run_ids):

@@ -46,7 +46,6 @@ def test_build_pool_artifact_binding_sites(tmp_path: Path) -> None:
                     },
                     "generation": {
                         "sequence_length": 10,
-                        "quota": 1,
                         "plan": [
                             {
                                 "name": "default",

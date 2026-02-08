@@ -73,6 +73,15 @@ class _LibraryState:
     sources: list[str | None]
     tfbs_ids: list[str | None]
     motif_ids: list[str | None]
+    stage_a_best_hit_scores: list[float | None]
+    stage_a_ranks_within_regulator: list[int | None]
+    stage_a_tiers: list[int | None]
+    stage_a_fimo_starts: list[int | None]
+    stage_a_fimo_stops: list[int | None]
+    stage_a_fimo_strands: list[str | None]
+    stage_a_selection_ranks: list[int | None]
+    stage_a_selection_score_norms: list[float | None]
+    stage_a_tfbs_cores: list[str | None]
     seen_tfbs: set[tuple[str, str]]
     seen_cores: set[tuple[str, str]]
     used_per_tf: dict[str, int]
@@ -176,6 +185,15 @@ class TFSampler:
         has_source: bool,
         has_tfbs_id: bool,
         has_motif_id: bool,
+        has_stage_a_best_hit_score: bool,
+        has_stage_a_rank_within_regulator: bool,
+        has_stage_a_tier: bool,
+        has_stage_a_fimo_start: bool,
+        has_stage_a_fimo_stop: bool,
+        has_stage_a_fimo_strand: bool,
+        has_stage_a_selection_rank: bool,
+        has_stage_a_selection_score_norm: bool,
+        has_stage_a_tfbs_core: bool,
         weight_by_tf: dict[str, float] | None,
         weight_fraction_by_tf: dict[str, float] | None,
         usage_count_by_tf: dict[str, int] | None,
@@ -191,6 +209,19 @@ class TFSampler:
             "source_by_index": state.sources if has_source else None,
             "tfbs_id_by_index": state.tfbs_ids if has_tfbs_id else None,
             "motif_id_by_index": state.motif_ids if has_motif_id else None,
+            "stage_a_best_hit_score_by_index": (state.stage_a_best_hit_scores if has_stage_a_best_hit_score else None),
+            "stage_a_rank_within_regulator_by_index": (
+                state.stage_a_ranks_within_regulator if has_stage_a_rank_within_regulator else None
+            ),
+            "stage_a_tier_by_index": state.stage_a_tiers if has_stage_a_tier else None,
+            "stage_a_fimo_start_by_index": state.stage_a_fimo_starts if has_stage_a_fimo_start else None,
+            "stage_a_fimo_stop_by_index": state.stage_a_fimo_stops if has_stage_a_fimo_stop else None,
+            "stage_a_fimo_strand_by_index": state.stage_a_fimo_strands if has_stage_a_fimo_strand else None,
+            "stage_a_selection_rank_by_index": (state.stage_a_selection_ranks if has_stage_a_selection_rank else None),
+            "stage_a_selection_score_norm_by_index": (
+                state.stage_a_selection_score_norms if has_stage_a_selection_score_norm else None
+            ),
+            "stage_a_tfbs_core_by_index": state.stage_a_tfbs_cores if has_stage_a_tfbs_core else None,
             "selection_reason_by_index": state.reasons,
             "sampling_weight_by_tf": weight_by_tf,
             "sampling_weight_fraction_by_tf": weight_fraction_by_tf,
@@ -277,6 +308,15 @@ class TFSampler:
         has_source = prepared.has_source
         has_tfbs_id = prepared.has_tfbs_id
         has_motif_id = prepared.has_motif_id
+        has_stage_a_best_hit_score = "best_hit_score" in df.columns
+        has_stage_a_rank_within_regulator = "rank_within_regulator" in df.columns
+        has_stage_a_tier = "tier" in df.columns
+        has_stage_a_fimo_start = "fimo_start" in df.columns
+        has_stage_a_fimo_stop = "fimo_stop" in df.columns
+        has_stage_a_fimo_strand = "fimo_strand" in df.columns
+        has_stage_a_selection_rank = "selection_rank" in df.columns
+        has_stage_a_selection_score_norm = "selection_score_norm" in df.columns
+        has_stage_a_tfbs_core = "tfbs_core" in df.columns
         total_unique_tfbs = prepared.total_unique_tfbs
         total_unique_cores = prepared.total_unique_cores
         unique_tfs = prepared.unique_tfs
@@ -316,10 +356,29 @@ class TFSampler:
             sources=[],
             tfbs_ids=[],
             motif_ids=[],
+            stage_a_best_hit_scores=[],
+            stage_a_ranks_within_regulator=[],
+            stage_a_tiers=[],
+            stage_a_fimo_starts=[],
+            stage_a_fimo_stops=[],
+            stage_a_fimo_strands=[],
+            stage_a_selection_ranks=[],
+            stage_a_selection_score_norms=[],
+            stage_a_tfbs_cores=[],
             seen_tfbs=set(),
             seen_cores=set(),
             used_per_tf={},
         )
+
+        def _clean_optional(val):
+            if val is None:
+                return None
+            try:
+                if pd.isna(val):
+                    return None
+            except Exception:
+                pass
+            return val
 
         def _append_row(row, reason: str) -> bool:
             tf = str(row["tf"])
@@ -344,6 +403,32 @@ class TFSampler:
             state.sources.append(str(row["source"]) if has_source else None)
             state.tfbs_ids.append(str(row["tfbs_id"]) if has_tfbs_id else None)
             state.motif_ids.append(str(row["motif_id"]) if has_motif_id else None)
+            stage_a_best_hit_score = _clean_optional(row["best_hit_score"]) if has_stage_a_best_hit_score else None
+            state.stage_a_best_hit_scores.append(
+                float(stage_a_best_hit_score) if stage_a_best_hit_score is not None else None
+            )
+            stage_a_rank = _clean_optional(row["rank_within_regulator"]) if has_stage_a_rank_within_regulator else None
+            state.stage_a_ranks_within_regulator.append(int(stage_a_rank) if stage_a_rank is not None else None)
+            stage_a_tier = _clean_optional(row["tier"]) if has_stage_a_tier else None
+            state.stage_a_tiers.append(int(stage_a_tier) if stage_a_tier is not None else None)
+            stage_a_fimo_start = _clean_optional(row["fimo_start"]) if has_stage_a_fimo_start else None
+            state.stage_a_fimo_starts.append(int(stage_a_fimo_start) if stage_a_fimo_start is not None else None)
+            stage_a_fimo_stop = _clean_optional(row["fimo_stop"]) if has_stage_a_fimo_stop else None
+            state.stage_a_fimo_stops.append(int(stage_a_fimo_stop) if stage_a_fimo_stop is not None else None)
+            stage_a_fimo_strand = _clean_optional(row["fimo_strand"]) if has_stage_a_fimo_strand else None
+            state.stage_a_fimo_strands.append(str(stage_a_fimo_strand) if stage_a_fimo_strand is not None else None)
+            stage_a_selection_rank = _clean_optional(row["selection_rank"]) if has_stage_a_selection_rank else None
+            state.stage_a_selection_ranks.append(
+                int(stage_a_selection_rank) if stage_a_selection_rank is not None else None
+            )
+            stage_a_selection_score_norm = (
+                _clean_optional(row["selection_score_norm"]) if has_stage_a_selection_score_norm else None
+            )
+            state.stage_a_selection_score_norms.append(
+                float(stage_a_selection_score_norm) if stage_a_selection_score_norm is not None else None
+            )
+            stage_a_tfbs_core = _clean_optional(row["tfbs_core"]) if has_stage_a_tfbs_core else None
+            state.stage_a_tfbs_cores.append(str(stage_a_tfbs_core) if stage_a_tfbs_core is not None else None)
             return True
 
         def _pick_for_tf(tf: str, *, reason: str, cap_override: int | None = None) -> bool:
@@ -558,6 +643,15 @@ class TFSampler:
             has_source=has_source,
             has_tfbs_id=has_tfbs_id,
             has_motif_id=has_motif_id,
+            has_stage_a_best_hit_score=has_stage_a_best_hit_score,
+            has_stage_a_rank_within_regulator=has_stage_a_rank_within_regulator,
+            has_stage_a_tier=has_stage_a_tier,
+            has_stage_a_fimo_start=has_stage_a_fimo_start,
+            has_stage_a_fimo_stop=has_stage_a_fimo_stop,
+            has_stage_a_fimo_strand=has_stage_a_fimo_strand,
+            has_stage_a_selection_rank=has_stage_a_selection_rank,
+            has_stage_a_selection_score_norm=has_stage_a_selection_score_norm,
+            has_stage_a_tfbs_core=has_stage_a_tfbs_core,
             weight_by_tf=weight_by_tf,
             weight_fraction_by_tf=weight_fraction_by_tf,
             usage_count_by_tf=usage_count_by_tf,

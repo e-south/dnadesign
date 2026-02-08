@@ -96,9 +96,29 @@ def test_stage_a_yield_bias_labels_and_ticks() -> None:
         assert axes_left[-1].get_xlabel() == "Stage"
         labels = [tick.get_text() for tick in axes_left[-1].get_xticklabels() if tick.get_text()]
         assert labels == ["Generated", "Eligible", "Unique core", "Selection pool", "Retained"]
+        header_axes = [ax for ax in fig.axes if ax.get_label() == "header"]
+        assert not header_axes
         assert axes_left[0].get_title() == "Stepwise sequence yield"
         assert axes_right[0].get_title() == "Core positional entropy (top vs diversified)"
         assert axes_left[0].yaxis.get_offset_text().get_text() == ""
+        assert axes_left[-1].xaxis.label.get_size() == pytest.approx(axes_right[-1].xaxis.label.get_size())
+        left_x_ticks = [tick.get_size() for tick in axes_left[-1].get_xticklabels() if tick.get_text()]
+        right_x_ticks = [tick.get_size() for tick in axes_right[-1].get_xticklabels() if tick.get_text()]
+        right_y_ticks = [tick.get_size() for tick in axes_right[-1].get_yticklabels() if tick.get_text()]
+        assert left_x_ticks and right_x_ticks
+        assert min(left_x_ticks) == pytest.approx(max(left_x_ticks))
+        assert min(right_x_ticks) == pytest.approx(max(right_x_ticks))
+        assert right_y_ticks
+        assert left_x_ticks[0] < right_y_ticks[0]
+        left_pos = axes_left[0].get_position()
+        right_pos = axes_right[0].get_position()
+        assert left_pos.width > right_pos.width
+        assert (right_pos.x0 - left_pos.x1) <= 0.10
+        stage_annotation_sizes = [
+            text.get_fontsize() for text in axes_left[0].texts if "\n" in text.get_text() and "%" in text.get_text()
+        ]
+        assert stage_annotation_sizes
+        assert stage_annotation_sizes[0] >= 7.2
         entropy_labels = [text for text in fig.texts if text.get_text() == "Entropy (bits)"]
         assert len(entropy_labels) == 1
         x_label_size = axes_right[-1].xaxis.label.get_size()

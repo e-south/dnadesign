@@ -41,7 +41,6 @@ MIN_CONFIG = {
         },
         "generation": {
             "sequence_length": 10,
-            "quota": 1,
             "plan": [
                 {
                     "name": "default",
@@ -249,7 +248,6 @@ def test_pad_mode_off_accepts_yaml_boolean(tmp_path: Path) -> None:
           chunk_size: 128
       generation:
         sequence_length: 10
-        quota: 1
         plan:
           - name: default
             quota: 1
@@ -289,8 +287,39 @@ def test_plan_mixing_quota_and_fraction(tmp_path: Path) -> None:
         {"name": "b", "fraction": 0.5, "regulator_constraints": {"groups": []}},
     ]
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
-    with pytest.raises(ConfigError):
+    with pytest.raises(ConfigError, match="fraction"):
         load_config(cfg_path)
+
+
+def test_generation_top_level_quota_is_not_allowed(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["generation"]["quota"] = 10
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="densegen.generation.quota"):
+        load_config(cfg_path)
+
+
+def test_generation_without_top_level_quota_uses_plan_quotas(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["generation"].pop("quota", None)
+    cfg["densegen"]["generation"]["plan"] = [
+        {
+            "name": "a",
+            "quota": 2,
+            "sampling": {"include_inputs": ["demo"]},
+            "regulator_constraints": {"groups": []},
+        },
+        {
+            "name": "b",
+            "quota": 3,
+            "sampling": {"include_inputs": ["demo"]},
+            "regulator_constraints": {"groups": []},
+        },
+    ]
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    resolved = loaded.root.densegen.generation.resolve_plan()
+    assert [item.quota for item in resolved] == [2, 3]
 
 
 def test_usr_output_requires_root(tmp_path: Path) -> None:

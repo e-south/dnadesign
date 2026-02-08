@@ -104,7 +104,6 @@ def test_sequence_length_guard_shorter_than_motif(tmp_path: Path) -> None:
             },
             "generation": {
                 "sequence_length": 4,
-                "quota": 1,
                 "sampling": {
                     "pool_strategy": "full",
                     "library_size": 1,
@@ -184,7 +183,6 @@ def test_sequence_length_guard_library_total_bp_too_small(tmp_path: Path) -> Non
             },
             "generation": {
                 "sequence_length": 10,
-                "quota": 1,
                 "sampling": {
                     "pool_strategy": "subsample",
                     "library_size": 1,
@@ -263,7 +261,6 @@ def test_sequence_length_guard_required_regulators_min_length(tmp_path: Path) ->
             },
             "generation": {
                 "sequence_length": 8,
-                "quota": 1,
                 "sampling": {
                     "pool_strategy": "full",
                     "library_size": 2,
@@ -343,7 +340,6 @@ def test_sequence_length_guard_promoter_constraints_min_length(tmp_path: Path) -
             },
             "generation": {
                 "sequence_length": 8,
-                "quota": 1,
                 "sampling": {
                     "pool_strategy": "full",
                     "library_size": 1,

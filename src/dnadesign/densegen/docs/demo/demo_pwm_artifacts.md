@@ -37,13 +37,13 @@ pixi run fimo --version
 ## 1) Stage workspace
 
 ```bash
-uv run dense workspace init --id demo_pwm --template-id demo_meme_three_tfs --copy-inputs --output-mode usr
-cd src/dnadesign/densegen/workspaces/runs/demo_pwm
+uv run dense workspace init --id meme_three_tfs_trial --from-workspace demo_meme_three_tfs --copy-inputs --output-mode usr
+cd src/dnadesign/densegen/workspaces/meme_three_tfs_trial
 ```
 
-If `demo_pwm` already exists, choose a new `--id` or remove the existing run directory first.
+If `meme_three_tfs_trial` already exists, choose a new `--id` or remove the existing workspace directory first.
 
-`workspace init --output-mode usr` seeds `outputs/usr_datasets/registry.yaml` in the workspace.
+`workspace init --output-mode usr` seeds `outputs/usr_datasets/registry.yaml` in the workspace when a repo registry seed file is available.
 
 Optional wrapper (if you want shorter commands):
 
@@ -95,6 +95,10 @@ dense plot --only stage_a_summary -c "$CONFIG"
 dense run --fresh --no-plot -c "$CONFIG"
 ```
 
+`demo_meme_three_tfs` defaults to `logging.progress_style: auto`, so DenseGen
+adapts progress output by terminal capability (screen/stream/summary) without
+manual terminal setup.
+
 Useful debug flags:
 
 ```bash
@@ -114,18 +118,17 @@ dense run --resume --no-plot -c "$CONFIG"
 
 To generate more sequences in the same workspace:
 
-1. Increase quota fields in `config.yaml` (example: `generation.quota` 48 -> 52 and each plan quota 12 -> 13).
-2. Resume with explicit quota-growth intent:
+1. Increase one or more `generation.plan[*].quota` values in `config.yaml` (example: each plan quota 10 -> 13).
+2. Resume:
 
 ```bash
-dense run --resume --allow-quota-increase --no-plot -c "$CONFIG"
+dense run --resume --no-plot -c "$CONFIG"
 ```
 
 Rules:
 
-- `--allow-quota-increase` only accepts quota-based plans.
-- Only `generation.quota` and `generation.plan[*].quota` may change.
-- Quotas must not decrease.
+- Plan quotas must not decrease.
+- Quota-only plan increases are auto-accepted on resume.
 - Any other config change fails fast and requires `dense run --fresh` or `dense campaign-reset`.
 
 ## 7) Inspect outputs
@@ -141,9 +144,9 @@ Key files:
   - `outputs/meta/events.jsonl`
   - `outputs/pools/pool_manifest.json`
 - USR dataset artifacts:
-  - `outputs/usr_datasets/demo_pwm/records.parquet`
-  - `outputs/usr_datasets/demo_pwm/.events.log`
-  - `outputs/usr_datasets/demo_pwm/_derived/densegen/part-*.parquet`
+  - `outputs/usr_datasets/meme_three_tfs_trial/records.parquet`
+  - `outputs/usr_datasets/meme_three_tfs_trial/.events.log`
+  - `outputs/usr_datasets/meme_three_tfs_trial/_derived/densegen/part-*.parquet`
 
 ## 8) Wire Notify to a real endpoint (deployed pressure test)
 
@@ -165,6 +168,8 @@ uv run notify profile wizard \
   --profile outputs/notify.profile.json \
   --provider slack \
   --events "$EVENTS_PATH" \
+  --cursor outputs/notify.cursor \
+  --spool-dir outputs/notify_spool \
   --secret-source auto \
   --preset densegen
 ```
@@ -179,18 +184,15 @@ If payloads look correct, remove `--dry-run` to send for real.
 Then trigger more events by increasing quota and resuming:
 
 ```bash
-dense run --resume --allow-quota-increase --no-plot -c "$CONFIG"
+dense run --resume --no-plot -c "$CONFIG"
 ```
 
 Email note: use `--provider generic` with your email relay webhook endpoint.
 
 ## 9) Plot and report
 
-If your environment has Matplotlib cache restrictions, set `MPLCONFIGDIR` first:
-
-```bash
-export MPLCONFIGDIR="${MPLCONFIGDIR:-$HOME/.cache/matplotlib}"
-```
+DenseGen automatically uses a repo-local Matplotlib cache at `.cache/matplotlib/densegen`.
+Set `MPLCONFIGDIR` only if you need to override that location.
 
 Then run:
 
@@ -220,6 +222,19 @@ pixi run fimo --version
 ```bash
 dense validate-config --probe-solver -c "$CONFIG"
 ```
+
+### `logging.progress_style=screen requires ...`
+
+`progress_style: screen` is strict and needs an interactive terminal with cursor controls.
+
+For interactive shells:
+
+```bash
+export TERM=xterm-256color
+dense run --fresh --no-plot -c "$CONFIG"
+```
+
+For non-interactive runs (CI, redirected logs), set `densegen.logging.progress_style: stream` in `config.yaml`.
 
 ### USR registry missing
 

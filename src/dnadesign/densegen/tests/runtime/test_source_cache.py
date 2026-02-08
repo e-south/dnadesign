@@ -126,7 +126,6 @@ def test_source_cache_reuses_loaded_inputs(tmp_path: Path) -> None:
             },
             "generation": {
                 "sequence_length": 3,
-                "quota": 2,
                 "sampling": {
                     "pool_strategy": "subsample",
                     "library_size": 2,

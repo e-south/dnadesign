@@ -34,7 +34,7 @@ def _write_config(path: Path) -> None:
             densegen:
               schema_version: "2.9"
               run:
-                id: demo_binding_sites_vanilla
+                id: demo_binding_sites
                 root: "."
 
               inputs:
@@ -59,7 +59,6 @@ def _write_config(path: Path) -> None:
 
               generation:
                 sequence_length: 3
-                quota: 1
                 sampling:
                   pool_strategy: full
                   library_size: 1
@@ -115,7 +114,7 @@ def _write_config_usr_only(path: Path) -> None:
             densegen:
               schema_version: "2.9"
               run:
-                id: demo_binding_sites_vanilla
+                id: demo_binding_sites
                 root: "."
 
               inputs:
@@ -136,7 +135,6 @@ def _write_config_usr_only(path: Path) -> None:
 
               generation:
                 sequence_length: 3
-                quota: 1
                 sampling:
                   pool_strategy: full
                   library_size: 1

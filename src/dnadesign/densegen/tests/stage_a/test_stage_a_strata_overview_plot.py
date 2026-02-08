@@ -14,6 +14,7 @@ from __future__ import annotations
 import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
+import pytest
 from matplotlib.offsetbox import AnchoredText
 
 from dnadesign.densegen.src.viz.plotting import _build_stage_a_strata_overview_figure, _draw_tier_markers
@@ -79,8 +80,19 @@ def test_stage_a_strata_overview_axes_and_legend() -> None:
         assert any("regA" in text for text in label_texts)
         assert any("regB" in text for text in label_texts)
         assert ax_right.get_xlim()[1] > ax_right.get_xlim()[0]
-        assert len(fig.axes) == 4
+        assert len(fig.axes) == 3
         assert len(ax_right.patches) > 0
+        assert axes_left[-1].xaxis.label.get_size() == pytest.approx(ax_right.xaxis.label.get_size())
+        left_x_ticks = [tick.get_size() for tick in axes_left[-1].get_xticklabels() if tick.get_text()]
+        right_x_ticks = [tick.get_size() for tick in ax_right.get_xticklabels() if tick.get_text()]
+        right_y_ticks = [tick.get_size() for tick in ax_right.get_yticklabels() if tick.get_text()]
+        assert left_x_ticks and right_x_ticks and right_y_ticks
+        assert left_x_ticks[0] == pytest.approx(right_x_ticks[0])
+        assert right_x_ticks[0] == pytest.approx(right_y_ticks[0])
+        tier_boxes = [artist for artist in axes_left[0].artists if isinstance(artist, AnchoredText)]
+        assert tier_boxes
+        assert all(box.loc == 2 for box in tier_boxes)
+        assert all(box.txt._text.get_fontsize() >= 6.6 for box in tier_boxes)
     finally:
         fig.clf()
 

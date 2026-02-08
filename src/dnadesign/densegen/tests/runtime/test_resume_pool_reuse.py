@@ -94,7 +94,6 @@ def _write_config(path: Path, input_path: Path) -> None:
             },
             "generation": {
                 "sequence_length": 3,
-                "quota": 1,
                 "sampling": {
                     "pool_strategy": "full",
                     "library_size": 1,

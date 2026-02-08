@@ -47,7 +47,6 @@ def _write_config(tmp_path: Path) -> Path:
                   path: outputs/tables/dense_arrays.parquet
               generation:
                 sequence_length: 20
-                quota: 1
                 plan:
                   - name: demo_plan
                     quota: 1

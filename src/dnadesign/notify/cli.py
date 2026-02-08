@@ -583,7 +583,10 @@ def _spool_payload(
 
 
 def _ensure_private_directory(path: Path, *, label: str) -> None:
-    path.mkdir(parents=True, exist_ok=True, mode=0o700)
+    try:
+        path.mkdir(parents=True, exist_ok=True, mode=0o700)
+    except OSError as exc:
+        raise NotifyConfigError(f"failed to create {label}: {path}") from exc
     try:
         path.chmod(0o700)
     except OSError as exc:
@@ -797,8 +800,13 @@ def _profile_wizard_impl(
         default_spool = state_root / "spool"
         cursor_value = cursor or default_cursor
         spool_value = spool_dir or default_spool
-        _ensure_private_directory(cursor_value.parent, label="cursor directory")
-        _ensure_private_directory(spool_value, label="spool_dir")
+        try:
+            _ensure_private_directory(cursor_value.parent, label="cursor directory")
+            _ensure_private_directory(spool_value, label="spool_dir")
+        except NotifyConfigError as exc:
+            raise NotifyConfigError(
+                f"{exc}. Pass --cursor and --spool-dir to writable paths if the default state root is restricted."
+            ) from exc
 
         payload: dict[str, Any] = {
             "profile_version": PROFILE_VERSION,

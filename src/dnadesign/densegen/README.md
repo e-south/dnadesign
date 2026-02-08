@@ -24,7 +24,7 @@ Note on event logs:
 ### Contents
 
 - [Choose a demo](#choose-a-demo)
-- [Quick start (vanilla)](#quick-start-vanilla)
+- [Quick start (binding-sites baseline)](#quick-start-binding-sites-baseline)
 - [Quick start (canonical PWM)](#quick-start-canonical-pwm)
 - [Documentation map](#documentation-map)
 
@@ -32,20 +32,20 @@ Note on event logs:
 
 ### Choose a demo
 
-- **Vanilla binding-sites demo** (recommended first): no added plan constraints.
+- **Binding-sites baseline demo** (recommended first): no added plan constraints.
   - [docs/demo/demo_binding_sites.md](docs/demo/demo_binding_sites.md)
 - **Canonical Cruncher PWM flow** (main workflow): three-TF motif artifacts from Cruncher.
   - [docs/workflows/cruncher_pwm_pipeline.md](docs/workflows/cruncher_pwm_pipeline.md)
   - [docs/demo/demo_pwm_artifacts.md](docs/demo/demo_pwm_artifacts.md)
 
-### Quick start (vanilla)
+### Quick start (binding-sites baseline)
 
 From the repo root:
 
 ```bash
 uv sync --locked
-uv run dense workspace init --id demo_vanilla --template-id demo_binding_sites_vanilla --copy-inputs --output-mode local
-cd src/dnadesign/densegen/workspaces/runs/demo_vanilla
+uv run dense workspace init --id binding_sites_trial --from-workspace demo_binding_sites --copy-inputs --output-mode local
+cd src/dnadesign/densegen/workspaces/binding_sites_trial
 uv run dense validate-config --probe-solver
 uv run dense run --fresh
 uv run dense inspect run --library --events
@@ -60,8 +60,8 @@ uv sync --locked
 pixi install
 pixi run fimo --version
 
-uv run dense workspace init --id demo_pwm --template-id demo_meme_three_tfs --copy-inputs --output-mode usr
-cd src/dnadesign/densegen/workspaces/runs/demo_pwm
+uv run dense workspace init --id meme_three_tfs_trial --from-workspace demo_meme_three_tfs --copy-inputs --output-mode usr
+cd src/dnadesign/densegen/workspaces/meme_three_tfs_trial
 uv run dense validate-config --probe-solver
 uv run dense stage-a build-pool --fresh
 uv run dense run --fresh --no-plot
@@ -71,7 +71,7 @@ uv run dense inspect run --library --events
 To generate additional sequences later, increase quotas in `config.yaml` and resume with:
 
 ```bash
-uv run dense run --resume --allow-quota-increase --no-plot
+uv run dense run --resume --no-plot
 ```
 
 ---

@@ -370,6 +370,15 @@ def build_library_for_plan(
         source_by_index: list[str | None] | None,
         tfbs_id_by_index: list[str | None] | None,
         motif_id_by_index: list[str | None] | None,
+        stage_a_best_hit_score_by_index: list[float | None] | None,
+        stage_a_rank_within_regulator_by_index: list[int | None] | None,
+        stage_a_tier_by_index: list[int | None] | None,
+        stage_a_fimo_start_by_index: list[int | None] | None,
+        stage_a_fimo_stop_by_index: list[int | None] | None,
+        stage_a_fimo_strand_by_index: list[str | None] | None,
+        stage_a_selection_rank_by_index: list[int | None] | None,
+        stage_a_selection_score_norm_by_index: list[float | None] | None,
+        stage_a_tfbs_core_by_index: list[str | None] | None,
     ) -> tuple[list[str], list[str], list[str], dict]:
         nonlocal libraries_built
         libraries_built += 1
@@ -379,6 +388,15 @@ def build_library_for_plan(
         info["source_by_index"] = source_by_index
         info["tfbs_id_by_index"] = tfbs_id_by_index
         info["motif_id_by_index"] = motif_id_by_index
+        info["stage_a_best_hit_score_by_index"] = stage_a_best_hit_score_by_index
+        info["stage_a_rank_within_regulator_by_index"] = stage_a_rank_within_regulator_by_index
+        info["stage_a_tier_by_index"] = stage_a_tier_by_index
+        info["stage_a_fimo_start_by_index"] = stage_a_fimo_start_by_index
+        info["stage_a_fimo_stop_by_index"] = stage_a_fimo_stop_by_index
+        info["stage_a_fimo_strand_by_index"] = stage_a_fimo_strand_by_index
+        info["stage_a_selection_rank_by_index"] = stage_a_selection_rank_by_index
+        info["stage_a_selection_score_norm_by_index"] = stage_a_selection_score_norm_by_index
+        info["stage_a_tfbs_core_by_index"] = stage_a_tfbs_core_by_index
         return library, parts, reg_labels, info
 
     if meta_df is not None and isinstance(meta_df, pd.DataFrame):
@@ -482,6 +500,23 @@ def build_library_for_plan(
             source_by_index = lib_df["source"].tolist() if "source" in lib_df.columns else None
             tfbs_id_by_index = lib_df["tfbs_id"].tolist() if "tfbs_id" in lib_df.columns else None
             motif_id_by_index = lib_df["motif_id"].tolist() if "motif_id" in lib_df.columns else None
+            stage_a_best_hit_score_by_index = (
+                lib_df["best_hit_score"].tolist() if "best_hit_score" in lib_df.columns else None
+            )
+            stage_a_rank_within_regulator_by_index = (
+                lib_df["rank_within_regulator"].tolist() if "rank_within_regulator" in lib_df.columns else None
+            )
+            stage_a_tier_by_index = lib_df["tier"].tolist() if "tier" in lib_df.columns else None
+            stage_a_fimo_start_by_index = lib_df["fimo_start"].tolist() if "fimo_start" in lib_df.columns else None
+            stage_a_fimo_stop_by_index = lib_df["fimo_stop"].tolist() if "fimo_stop" in lib_df.columns else None
+            stage_a_fimo_strand_by_index = lib_df["fimo_strand"].tolist() if "fimo_strand" in lib_df.columns else None
+            stage_a_selection_rank_by_index = (
+                lib_df["selection_rank"].tolist() if "selection_rank" in lib_df.columns else None
+            )
+            stage_a_selection_score_norm_by_index = (
+                lib_df["selection_score_norm"].tolist() if "selection_score_norm" in lib_df.columns else None
+            )
+            stage_a_tfbs_core_by_index = lib_df["tfbs_core"].tolist() if "tfbs_core" in lib_df.columns else None
             library_bp = _require_library_bp(
                 library,
                 seq_len,
@@ -507,6 +542,15 @@ def build_library_for_plan(
                 source_by_index=source_by_index,
                 tfbs_id_by_index=tfbs_id_by_index,
                 motif_id_by_index=motif_id_by_index,
+                stage_a_best_hit_score_by_index=stage_a_best_hit_score_by_index,
+                stage_a_rank_within_regulator_by_index=stage_a_rank_within_regulator_by_index,
+                stage_a_tier_by_index=stage_a_tier_by_index,
+                stage_a_fimo_start_by_index=stage_a_fimo_start_by_index,
+                stage_a_fimo_stop_by_index=stage_a_fimo_stop_by_index,
+                stage_a_fimo_strand_by_index=stage_a_fimo_strand_by_index,
+                stage_a_selection_rank_by_index=stage_a_selection_rank_by_index,
+                stage_a_selection_score_norm_by_index=stage_a_selection_score_norm_by_index,
+                stage_a_tfbs_core_by_index=stage_a_tfbs_core_by_index,
             )
 
         sampler = TFSampler(meta_df, np_rng)
@@ -564,6 +608,15 @@ def build_library_for_plan(
         source_by_index = info.get("source_by_index")
         tfbs_id_by_index = info.get("tfbs_id_by_index")
         motif_id_by_index = info.get("motif_id_by_index")
+        stage_a_best_hit_score_by_index = info.get("stage_a_best_hit_score_by_index")
+        stage_a_rank_within_regulator_by_index = info.get("stage_a_rank_within_regulator_by_index")
+        stage_a_tier_by_index = info.get("stage_a_tier_by_index")
+        stage_a_fimo_start_by_index = info.get("stage_a_fimo_start_by_index")
+        stage_a_fimo_stop_by_index = info.get("stage_a_fimo_stop_by_index")
+        stage_a_fimo_strand_by_index = info.get("stage_a_fimo_strand_by_index")
+        stage_a_selection_rank_by_index = info.get("stage_a_selection_rank_by_index")
+        stage_a_selection_score_norm_by_index = info.get("stage_a_selection_score_norm_by_index")
+        stage_a_tfbs_core_by_index = info.get("stage_a_tfbs_core_by_index")
         return _finalize(
             library,
             parts,
@@ -573,6 +626,15 @@ def build_library_for_plan(
             source_by_index=source_by_index,
             tfbs_id_by_index=tfbs_id_by_index,
             motif_id_by_index=motif_id_by_index,
+            stage_a_best_hit_score_by_index=stage_a_best_hit_score_by_index,
+            stage_a_rank_within_regulator_by_index=stage_a_rank_within_regulator_by_index,
+            stage_a_tier_by_index=stage_a_tier_by_index,
+            stage_a_fimo_start_by_index=stage_a_fimo_start_by_index,
+            stage_a_fimo_stop_by_index=stage_a_fimo_stop_by_index,
+            stage_a_fimo_strand_by_index=stage_a_fimo_strand_by_index,
+            stage_a_selection_rank_by_index=stage_a_selection_rank_by_index,
+            stage_a_selection_score_norm_by_index=stage_a_selection_score_norm_by_index,
+            stage_a_tfbs_core_by_index=stage_a_tfbs_core_by_index,
         )
 
     if groups or plan_min_count_by_regulator:
@@ -636,6 +698,15 @@ def build_library_for_plan(
         source_by_index=None,
         tfbs_id_by_index=tfbs_id_by_index,
         motif_id_by_index=None,
+        stage_a_best_hit_score_by_index=None,
+        stage_a_rank_within_regulator_by_index=None,
+        stage_a_tier_by_index=None,
+        stage_a_fimo_start_by_index=None,
+        stage_a_fimo_stop_by_index=None,
+        stage_a_fimo_strand_by_index=None,
+        stage_a_selection_rank_by_index=None,
+        stage_a_selection_score_norm_by_index=None,
+        stage_a_tfbs_core_by_index=None,
     )
 
 

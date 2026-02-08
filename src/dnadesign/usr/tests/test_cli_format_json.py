@@ -92,3 +92,32 @@ def test_cli_info_json_accepts_dataset_path_outside_root(tmp_path: Path) -> None
     assert payload["usr_output_version"] == 1
     assert payload["data"]["name"] == "densegen/demo"
     assert payload["data"]["path"].endswith("densegen/demo/records.parquet")
+
+
+def test_cli_validate_accepts_dataset_path_outside_root(tmp_path: Path) -> None:
+    dataset_root = tmp_path / "dataset_root"
+    ensure_registry(dataset_root)
+    ds = Dataset(dataset_root, "densegen/demo")
+    ds.init(source="test")
+    ds.import_rows(
+        [
+            {"sequence": "ACGT", "bio_type": "dna", "alphabet": "dna_4", "source": "unit"},
+        ],
+        source="unit",
+    )
+
+    unrelated_root = tmp_path / "unrelated_root"
+    unrelated_root.mkdir(parents=True, exist_ok=True)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "--root",
+            str(unrelated_root),
+            "validate",
+            str(ds.dir),
+            "--strict",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "OK: validation passed." in result.stdout

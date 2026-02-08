@@ -223,7 +223,6 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
                     },
                     "generation": {
                         "sequence_length": 10,
-                        "quota": 1,
                         "plan": [
                             {
                                 "name": "default",

@@ -115,7 +115,6 @@ def test_round_robin_chunk_cap_subsample(tmp_path: Path) -> None:
             },
             "generation": {
                 "sequence_length": 3,
-                "quota": 5,
                 "sampling": {
                     "pool_strategy": "subsample",
                     "library_size": 2,
@@ -234,7 +233,6 @@ def test_stall_detected_with_no_solutions(tmp_path: Path) -> None:
             },
             "generation": {
                 "sequence_length": 3,
-                "quota": 1,
                 "sampling": {
                     "pool_strategy": "subsample",
                     "library_size": 2,

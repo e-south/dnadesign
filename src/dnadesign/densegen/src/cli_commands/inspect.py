@@ -507,7 +507,7 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
 
         plan_table = context.make_table(
             "name",
-            "quota/fraction",
+            "quota",
             "promoter_constraints",
             "side_biases",
             "regulator_groups",
@@ -523,10 +523,9 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
             group_count = len(groups)
             group_min_total = sum(int(group.min_required) for group in groups)
             min_count_regs = len(item.regulator_constraints.min_count_by_regulator or {})
-            quota = str(item.quota) if item.quota is not None else f"{item.fraction:.3f}"
             plan_table.add_row(
                 item.name,
-                quota,
+                str(int(item.quota)),
                 str(len(pcs)),
                 str(bias_count),
                 str(group_count),

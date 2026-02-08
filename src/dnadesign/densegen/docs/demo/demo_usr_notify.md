@@ -6,7 +6,7 @@ This demo connects the whole stack with minimal moving parts:
 - DenseGen writes results into a USR dataset (base rows plus `densegen` overlay parts).
 - Notify tails the USR `.events.log` and posts selected events to a webhook.
 
-If you are new to DenseGen, run the vanilla demo first:
+If you are new to DenseGen, run the binding-sites baseline demo first:
 - [demo_binding_sites.md](demo_binding_sites.md)
 
 ---
@@ -36,7 +36,7 @@ uv sync --locked
 You also need a supported solver backend (CBC or GUROBI depending on your setup):
 
 ```bash
-uv run dense validate-config --probe-solver -c src/dnadesign/densegen/workspaces/demo_binding_sites_vanilla/config.yaml
+uv run dense validate-config --probe-solver -c src/dnadesign/densegen/workspaces/demo_binding_sites/config.yaml
 ```
 
 ---
@@ -76,12 +76,12 @@ export DENSEGEN_WEBHOOK="http://127.0.0.1:8787/webhook"
 
 ```bash
 uv run dense workspace init \
-  --id demo_usr_notify \
-  --template-id demo_binding_sites_vanilla \
+  --id usr_notify_trial \
+  --from-workspace demo_binding_sites \
   --copy-inputs \
   --output-mode usr
 
-cd src/dnadesign/densegen/workspaces/runs/demo_usr_notify
+cd src/dnadesign/densegen/workspaces/usr_notify_trial
 CONFIG="$PWD/config.yaml"
 ```
 
@@ -95,7 +95,7 @@ already configures:
 
 - `output.targets: [usr]`
 - `output.usr.root: outputs/usr_datasets`
-- `outputs/usr_datasets/registry.yaml` (seeded when template is available)
+- `outputs/usr_datasets/registry.yaml` (seeded when repo registry seed file is available)
 
 ---
 
@@ -107,12 +107,12 @@ In `config.yaml`, set a namespaced dataset id:
 densegen:
   output:
     usr:
-      dataset: densegen/demo_usr_notify
+      dataset: densegen/usr_notify_trial
 ```
 
 Notes:
 
-- `dataset` can be namespaced (`densegen/demo_usr_notify`) to reduce collisions.
+- `dataset` can be namespaced (`densegen/usr_notify_trial`) to reduce collisions.
 - `registry.yaml` must define the `densegen` namespace columns used by the sink.
 
 ---
@@ -137,15 +137,15 @@ ls -la outputs/meta/events.jsonl
 USR mutation events (Notify input):
 
 ```bash
-ls -la outputs/usr_datasets/densegen/demo_usr_notify/.events.log
+ls -la outputs/usr_datasets/densegen/usr_notify_trial/.events.log
 ```
 
 Optional: inspect the dataset via USR CLI using the dataset path:
 
 ```bash
-uv run usr info outputs/usr_datasets/densegen/demo_usr_notify
-uv run usr head outputs/usr_datasets/densegen/demo_usr_notify -n 3 --columns id,sequence
-uv run usr events tail outputs/usr_datasets/densegen/demo_usr_notify --follow --format json
+uv run usr info outputs/usr_datasets/densegen/usr_notify_trial
+uv run usr head outputs/usr_datasets/densegen/usr_notify_trial -n 3 --columns id,sequence
+uv run usr events tail outputs/usr_datasets/densegen/usr_notify_trial --follow --format json
 ```
 
 ---
@@ -160,7 +160,7 @@ uv run dense inspect run --usr-events-path -c "$CONFIG"
 If Terminal B is not in this run workspace, use:
 
 ```bash
-uv run dense inspect run --usr-events-path -c src/dnadesign/densegen/workspaces/runs/demo_usr_notify/config.yaml
+uv run dense inspect run --usr-events-path -c src/dnadesign/densegen/workspaces/usr_notify_trial/config.yaml
 ```
 
 `notify profile wizard --events` expects the USR `.events.log` path from the command above, not `config.yaml`.
@@ -171,6 +171,8 @@ uv run notify profile wizard \
   --profile outputs/notify.profile.json \
   --provider slack \
   --events <PASTE_EVENTS_PATH_FROM_ABOVE> \
+  --cursor outputs/notify.cursor \
+  --spool-dir outputs/notify_spool \
   --secret-source env \
   --url-env DENSEGEN_WEBHOOK \
   --only-tools densegen \
@@ -189,7 +191,7 @@ You should see webhook POST bodies printing in Terminal A.
 If you want to verify real-time updates instead of replaying existing events, keep Terminal B running and trigger new events from a third shell:
 
 ```bash
-uv run dense run --resume --allow-quota-increase --no-plot -c "$CONFIG"
+uv run dense run --resume --no-plot -c "$CONFIG"
 ```
 
 This emits additional `densegen_health` and `materialize` events that should appear immediately in your webhook receiver output.

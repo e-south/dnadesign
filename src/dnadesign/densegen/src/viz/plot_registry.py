@@ -16,7 +16,7 @@ PLOT_SPECS = {
     "placement_map": {
         "fn": "plot_placement_map",
         "description": "Stage-B fingerprint: per-position occupancy + TFBS leaderboard.",
-        "requires": ["composition", "dense_arrays", "config"],
+        "requires": ["outputs", "composition", "config", "libraries"],
     },
     "tfbs_usage": {
         "fn": "plot_tfbs_usage",
@@ -25,8 +25,8 @@ PLOT_SPECS = {
     },
     "run_health": {
         "fn": "plot_run_health",
-        "description": "Run health summary (outcomes, failures, duplicate pressure).",
-        "requires": ["attempts"],
+        "description": "Run health summary (outcomes, waste pressure, reason families, plan quota progress).",
+        "requires": ["attempts", "config"],
     },
     "stage_a_summary": {
         "fn": "plot_stage_a_summary",

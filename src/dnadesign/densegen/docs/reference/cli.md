@@ -6,7 +6,7 @@ DenseGen exposes a Typer CLI via `dense`. This page is an operator manual (comma
 - [Config resolution](#config-resolution) - where `dense` looks for config.yaml.
 - [`dense validate-config`](#dense-validate-config) - schema and sanity checks.
 - [`dense inspect inputs`](#dense-inspect-inputs) - Stage‑A input + sampling summary.
-- [`dense inspect plan`](#dense-inspect-plan) - resolved quota/fraction plan.
+- [`dense inspect plan`](#dense-inspect-plan) - resolved plan quotas.
 - [`dense inspect config`](#dense-inspect-config) - resolved inputs, outputs, Stage‑A/Stage‑B settings.
 - [`dense inspect run`](#dense-inspect-run) - summarize run manifests or list workspaces.
 - [`dense stage-a build-pool`](#dense-stage-a-build-pool) - build Stage‑A TFBS pools.
@@ -142,19 +142,19 @@ Stage a new workspace with `config.yaml`, `inputs/`, `outputs/`, plus `outputs/l
 `outputs/tables/`, `outputs/plots/`, and `outputs/report/`.
 
 Options:
-- `--id` — run identifier (directory name).
-- `--root` — workspace root directory (default: `src/dnadesign/densegen/workspaces/runs` or `$DENSEGEN_WORKSPACE_ROOT`).
-- `--template-id` — packaged template id (e.g., `demo_binding_sites_vanilla`, `demo_meme_three_tfs`).
-- `--template` — template config YAML to copy (path).
+- `--id` — workspace identifier (directory name).
+- `--root` — workspace root directory (default: `src/dnadesign/densegen/workspaces` or `$DENSEGEN_WORKSPACE_ROOT`).
+- `--from-workspace` — packaged source workspace id (e.g., `demo_binding_sites`, `demo_meme_three_tfs`).
+- `--from-config` — source workspace config YAML to copy (path).
 - `--copy-inputs` — copy file-based inputs into `workspace/inputs` and rewrite paths.
 - `--output-mode` — output sink mode: `local` (parquet), `usr`, or `both`.
 - For `--output-mode usr|both`, DenseGen sets `output.usr.root` to `outputs/usr_datasets` and seeds
-  `outputs/usr_datasets/registry.yaml` when a repo registry template is available.
+  `outputs/usr_datasets/registry.yaml` when a repo registry seed file is available.
 
 ---
 
 #### `dense workspace where`
-Show effective workspace roots and template roots used by `dense workspace init`.
+Show effective workspace root and source-workspace root used by `dense workspace init`.
 
 Options:
 - `--format` — output format: `text` or `json`.
@@ -162,6 +162,7 @@ Options:
 Notes:
 - `workspace_root_source` reports whether the root came from `$DENSEGEN_WORKSPACE_ROOT`,
   the repo default, or a cwd fallback.
+- `workspace_source_root` reports where packaged source workspaces are loaded from.
 - This command is useful when shell location and workspace location diverge.
 
 ---
@@ -173,8 +174,6 @@ Options:
 - `--no-plot` — skip auto‑plotting even if `plots` is configured in YAML.
 - `--fresh` — delete the workspace `outputs/` directory before running.
 - `--resume` — resume from existing outputs in the workspace.
-- `--allow-quota-increase` — allow resume if the only config changes are quota increases
-  (`generation.quota` and `generation.plan[*].quota`); requires `outputs/meta/effective_config.json`.
 - `--log-file PATH` — override the log file path. Otherwise DenseGen writes to
   `logging.log_dir/<run_id>.log` inside the workspace. The override path must still resolve
   inside `outputs/` under `densegen.run.root`.
@@ -188,6 +187,7 @@ Notes:
 - If the workspace already has run outputs (e.g., `outputs/tables/*.parquet` or
   `outputs/meta/run_state.json`), `dense run` resumes by default; use `--fresh` to reset outputs.
   Stage‑A/Stage‑B artifacts in `outputs/pools` or `outputs/libraries` do not trigger this guard.
+- On `--resume`, plan-quota increases are auto-accepted when all other config fields are unchanged.
 - When using USR outputs, `--fresh` preserves `<output.usr.root>/registry.yaml` so reruns do not require re-seeding.
 
 ---

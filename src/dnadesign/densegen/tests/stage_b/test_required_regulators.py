@@ -104,7 +104,6 @@ def test_regulator_groups_filtering(tmp_path: Path) -> None:
             },
             "generation": {
                 "sequence_length": 6,
-                "quota": 1,
                 "sampling": {
                     "pool_strategy": "full",
                     "library_size": 3,

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import stat
+from pathlib import Path
 
 import pytest
 
@@ -39,3 +40,12 @@ def test_ensure_mpl_cache_dir_requires_writable_dir(tmp_path, monkeypatch) -> No
         pytest.skip("unable to make directory read-only on this platform")
     with pytest.raises(RuntimeError, match="not writable"):
         ensure_mpl_cache_dir(dest)
+
+
+def test_ensure_mpl_cache_dir_defaults_to_repo_cache(monkeypatch) -> None:
+    monkeypatch.delenv("MPLCONFIGDIR", raising=False)
+    result = ensure_mpl_cache_dir()
+    repo_root = Path(__file__).resolve().parents[5]
+    expected = repo_root / ".cache" / "matplotlib" / "densegen"
+    assert result == expected
+    assert os.environ["MPLCONFIGDIR"] == str(expected)

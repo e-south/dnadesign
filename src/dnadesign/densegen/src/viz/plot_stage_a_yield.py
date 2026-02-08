@@ -31,6 +31,7 @@ def _build_stage_a_yield_bias_figure(
     fig: mpl.figure.Figure | None = None,
     slot: SubplotSpec | None = None,
     title: str | None = None,
+    show_column_titles: bool = True,
 ) -> tuple[mpl.figure.Figure, list[mpl.axes.Axes], list[mpl.axes.Axes], mpl.axes.Axes]:
     style = _style(style)
     style["seaborn_style"] = False
@@ -94,13 +95,13 @@ def _build_stage_a_yield_bias_figure(
         if reg not in pool_regs:
             raise ValueError(f"Stage-A pool missing regulator '{reg}' for input '{input_name}'.")
 
-    fig_width = float(style.get("figsize", (11, 4.2))[0])
-    base_height = float(style.get("figsize", (11, 4.2))[1])
+    fig_width = float(style.get("figsize", (11.6, 3.9))[0])
+    base_height = float(style.get("figsize", (11.6, 3.9))[1])
     reg_order = [reg for reg in regs if reg]
     if not reg_order:
         raise ValueError(f"Stage-A sampling missing regulator labels for input '{input_name}'.")
     n_regs = max(1, len(reg_order))
-    fig_height = max(4.8, base_height, 1.75 * n_regs + 0.8)
+    fig_height = max(2.9, base_height, 0.95 * n_regs + 0.5)
     reg_colors = _stage_a_regulator_colors(reg_order, style)
     stage_labels = ["Generated", "Eligible", "Unique core", "Selection pool", "Retained"]
     counts_by_reg = {reg: counts for reg, counts in zip(regs, stage_counts)}
@@ -108,51 +109,28 @@ def _build_stage_a_yield_bias_figure(
     subtitle_size = text_sizes["panel_title"] * 0.88
     font_size = float(style.get("font_size", 12.0))
     label_size = float(style.get("label_size", font_size))
-    tick_size = text_sizes["annotation"] * 0.75
-    title_pad = 12
+    tick_size = float(style.get("tick_size", label_size))
+    left_x_tick_size = tick_size * 0.88
+    title_pad = 9
     with mpl.rc_context(rc):
         if fig is None:
             fig = plt.figure(figsize=(fig_width, fig_height), constrained_layout=False)
-        header_height = min(0.95, fig_height * 0.18)
-        body_height = max(1.0, fig_height - header_height)
         if slot is None:
-            outer = fig.add_gridspec(
-                nrows=2,
-                ncols=1,
-                height_ratios=[header_height, body_height],
-                hspace=0.05,
-            )
+            panel = fig.add_gridspec(nrows=1, ncols=1)[0, 0]
         else:
-            outer = slot.subgridspec(
-                nrows=2,
-                ncols=1,
-                height_ratios=[header_height, body_height],
-                hspace=0.05,
-            )
-        ax_header = fig.add_subplot(outer[0, 0])
-        ax_header.set_axis_off()
-        ax_header.set_label("header")
-        ax_header.text(
-            0.5,
-            0.74,
-            title or f"Stage-A yield & bias -- {input_name}",
-            ha="center",
-            va="center",
-            fontsize=text_sizes["fig_title"],
-            color="#111111",
-        )
-        body = outer[1].subgridspec(
+            panel = slot
+        body = panel.subgridspec(
             nrows=1,
             ncols=2,
             width_ratios=[1.0, 0.05],
-            wspace=0.12,
+            wspace=0.1,
         )
         main = body[0, 0].subgridspec(
             nrows=n_regs,
             ncols=2,
-            width_ratios=[1.0, 1.0],
-            hspace=0.32,
-            wspace=0.52,
+            width_ratios=[1.1, 0.9],
+            hspace=0.24,
+            wspace=0.26,
         )
         axes_left: list[mpl.axes.Axes] = []
         axes_right: list[mpl.axes.Axes] = []
@@ -186,8 +164,8 @@ def _build_stage_a_yield_bias_figure(
                     textcoords="offset points",
                     ha="center",
                     va="bottom",
-                    fontsize=text_sizes["annotation"] * 0.75,
-                    color="#222222",
+                    fontsize=text_sizes["annotation"] * 0.82,
+                    color="#111111",
                 )
             label = format_regulator_label(reg)
             ax.set_ylabel("")
@@ -199,7 +177,7 @@ def _build_stage_a_yield_bias_figure(
                 ha="right",
                 va="center",
                 fontsize=text_sizes["regulator_label"] * 0.84,
-                color="#222222",
+                color="#111111",
                 clip_on=False,
             )
             core_len = core_lengths.get(str(reg))
@@ -212,15 +190,15 @@ def _build_stage_a_yield_bias_figure(
                     ha="right",
                     va="center",
                     fontsize=text_sizes["sublabel"] * 0.84,
-                    color="#555555",
+                    color="#111111",
                     clip_on=False,
                 )
             ax.tick_params(axis="y", pad=1, labelsize=tick_size)
-            ax.tick_params(axis="x", labelsize=tick_size)
+            ax.tick_params(axis="x", labelsize=left_x_tick_size)
             ax.yaxis.set_major_formatter(mpl.ticker.StrMethodFormatter("{x:,.0f}"))
-            ax.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
             ax.yaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=4, integer=True))
-        axes_left[0].set_title("Stepwise sequence yield", fontsize=subtitle_size, pad=title_pad)
+        if show_column_titles:
+            axes_left[0].set_title("Stepwise sequence yield", fontsize=subtitle_size, pad=title_pad)
         axes_left[-1].set_xticks(x_positions)
         axes_left[-1].set_xticklabels(stage_labels)
         axes_left[-1].set_xlabel("Stage")
@@ -288,7 +266,6 @@ def _build_stage_a_yield_bias_figure(
             ax.set_ylim(0.0, 2.0)
             ax.set_xticks(positions)
             ax.set_xticklabels(list(consensus))
-            ax.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
             ax.yaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=4))
             ax.tick_params(axis="y", labelsize=tick_size, labelleft=True)
             ax.tick_params(axis="x", labelsize=tick_size)
@@ -296,15 +273,16 @@ def _build_stage_a_yield_bias_figure(
                 ax.legend(
                     loc="upper right",
                     frameon=False,
-                    fontsize=text_sizes["annotation"] * 0.75,
+                    fontsize=text_sizes["annotation"] * 0.95,
                 )
             if idx == len(reg_order) - 1:
                 ax.set_xlabel("Core position")
-        axes_right[0].set_title(
-            "Core positional entropy (top vs diversified)",
-            fontsize=subtitle_size,
-            pad=title_pad,
-        )
+        if show_column_titles:
+            axes_right[0].set_title(
+                "Core positional entropy (top vs diversified)",
+                fontsize=subtitle_size,
+                pad=title_pad,
+            )
         if axes_right:
             y_center = (axes_right[0].get_position().y1 + axes_right[-1].get_position().y0) / 2.0
             right_bbox = axes_right[0].get_position()
@@ -316,9 +294,13 @@ def _build_stage_a_yield_bias_figure(
                 ha="right",
                 va="center",
                 fontsize=label_size,
-                color="#222222",
+                color="#111111",
             )
-        for ax in axes_left + axes_right:
+        for ax in axes_left:
+            _apply_style(ax, style)
+            ax.tick_params(axis="y", labelsize=tick_size)
+            ax.tick_params(axis="x", labelsize=left_x_tick_size)
+        for ax in axes_right:
             _apply_style(ax, style)
             ax.tick_params(axis="both", labelsize=tick_size)
     return fig, axes_left, axes_right, cbar_ax

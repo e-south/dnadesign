@@ -10,7 +10,7 @@ Use `reference/config.md` for exact fields.
 
 ### Plan definition (minimal)
 
-Each plan item has a `name` and either `quota` or `fraction`.
+Each plan item has a `name` and a required `quota`.
 
 ```yaml
 plan:

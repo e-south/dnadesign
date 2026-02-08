@@ -186,11 +186,9 @@ Outputs (tables), logs, and plots must resolve inside `outputs/` under `densegen
 - `sequence_length` (int > 0)
 - `sequence_length` should be >= the widest required motif (library TFBS or fixed elements); if it
   is shorter, Stage‑B records infeasibility and warns.
-- `quota` (int > 0)
 - `sampling` (Stage‑B; see below)
 - `plan` (required, non-empty)
-  - Each item: `name`, and either `quota` or `fraction`
-  - Mixing quotas and fractions across items is not allowed.
+  - Each item: `name` and `quota` (int > 0)
   - `sampling.include_inputs` (required) - input names that feed the plan‑scoped pool.
   - `fixed_elements.promoter_constraints[]` supports `name`, `upstream`, `downstream`,
     `spacer_length`, `upstream_pos`, `downstream_pos`
@@ -307,12 +305,16 @@ Notes:
 - `level` (e.g., `INFO`)
 - `suppress_solver_stderr` (bool)
 - `print_visual` (bool; show dense-arrays ASCII placement visuals in progress output)
-- `progress_style`: `stream | summary | screen` (default `screen`)
+- `progress_style`: `auto | stream | summary | screen` (default `summary`)
+  - `auto`: adapt at runtime:
+    - interactive + cursor-capable terminal → `screen`
+    - interactive + `TERM=dumb` → `stream`
+    - non-interactive output → `summary`
   - `stream`: per‑sequence logs (controlled by `progress_every`)
   - `summary`: suppress per‑sequence logs; keep periodic leaderboard summaries
   - `screen`: use in-place Rich `Live` dashboard updates on interactive terminals.
     - Requires a non-`dumb` terminal (`TERM` must support cursor controls). If `TERM=dumb`, DenseGen fails fast with an actionable error.
-    - On non-terminal streams (for example redirected output), DenseGen appends static panels.
+    - Requires terminal output; if output is redirected/non-interactive, DenseGen fails fast and instructs you to use `summary` or `stream`.
 - `progress_every` (int >= 0) - log/refresh interval in sequences (`0` disables per‑sequence logging)
 - `progress_refresh_seconds` (float > 0) - minimum seconds between screen refreshes
 - `show_tfbs` (bool) - include TFBS sequences in progress output
@@ -320,7 +322,7 @@ Notes:
 - `visuals.tf_colors` (mapping; required when `print_visual: true`)
   - Maps display TF label → Rich color string for colored label lines in the dense-arrays visual.
     Use the display name shown in progress output (e.g., `lexA` for `lexA_CTGT...`,
-    `background` for `neutral_bg`).
+    `background` for a background-pool input).
   - Missing TFs are an error (no fallback).
   - If promoter constraints add fixed motifs to the optimizer library, include a color for the
     fixed-elements label derived from `promoter_constraints[].name`. Multiple names are joined
@@ -382,7 +384,6 @@ densegen:
 
   generation:
     sequence_length: 60
-    quota: 100
     plan:
       - name: default
         quota: 100

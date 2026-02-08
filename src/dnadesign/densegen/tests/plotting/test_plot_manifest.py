@@ -17,8 +17,10 @@ import textwrap
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from dnadesign.densegen.src.config import load_config
+from dnadesign.densegen.src.viz import plotting as plotting_module
 from dnadesign.densegen.src.viz.plotting import run_plots_from_config
 
 
@@ -150,7 +152,6 @@ def _write_config(path: Path, *, plots_default: list[str]) -> None:
                   path: outputs/tables/dense_arrays.parquet
               generation:
                 sequence_length: 10
-                quota: 1
                 plan:
                   - name: demo_plan
                     quota: 1
@@ -349,8 +350,13 @@ def test_plot_manifest_written(tmp_path: Path) -> None:
     names = {item["name"] for item in payload.get("plots", [])}
     assert "stage_a_summary" in names
     paths = {item["path"] for item in payload.get("plots", [])}
-    assert "stage_a_summary__pool_tiers.png" in paths
-    assert "stage_a_summary__diversity.png" in paths
+    assert "stage_a/pool_tiers.png" in paths
+    assert "stage_a/diversity.png" in paths
+    for item in payload.get("plots", []):
+        assert "plot_id" in item
+        assert "group" in item
+        assert "family" in item
+        assert "variant" in item
 
 
 def test_stage_a_plots_without_outputs(tmp_path: Path) -> None:
@@ -365,9 +371,9 @@ def test_stage_a_plots_without_outputs(tmp_path: Path) -> None:
     run_plots_from_config(loaded.root, cfg_path)
 
     plots_dir = run_root / "outputs" / "plots"
-    overview_plot = plots_dir / "stage_a_summary__pool_tiers.png"
+    overview_plot = plots_dir / "stage_a" / "pool_tiers.png"
     assert overview_plot.exists()
-    diversity_plot = plots_dir / "stage_a_summary__diversity.png"
+    diversity_plot = plots_dir / "stage_a" / "diversity.png"
     assert diversity_plot.exists()
 
 
@@ -386,3 +392,157 @@ def test_stage_a_plots_skip_missing_sampling_metadata(tmp_path: Path) -> None:
     assert manifest_path.exists()
     payload = json.loads(manifest_path.read_text())
     assert payload.get("plots", []) == []
+
+
+def test_plot_run_removes_legacy_flat_outputs(tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    cfg_path = run_root / "config.yaml"
+    _write_config(cfg_path, plots_default=["stage_a_summary"])
+    (run_root / "inputs.csv").write_text("tf,tfbs\n")
+    _write_pool_manifest(run_root)
+
+    legacy = run_root / "outputs" / "plots" / "stage_a_summary__pool_tiers.png"
+    legacy.parent.mkdir(parents=True, exist_ok=True)
+    legacy.write_text("legacy")
+    assert legacy.exists()
+
+    loaded = load_config(cfg_path)
+    run_plots_from_config(loaded.root, cfg_path)
+
+    assert not legacy.exists()
+    assert (run_root / "outputs" / "plots" / "stage_a" / "pool_tiers.png").exists()
+
+
+def test_placement_map_uses_selected_output_source_for_solutions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    cfg_path = run_root / "config.yaml"
+    cfg_path.write_text(
+        textwrap.dedent(
+            """
+            densegen:
+              schema_version: "2.9"
+              run:
+                id: demo
+                root: "."
+              inputs:
+                - name: demo_input
+                  type: binding_sites
+                  path: inputs.csv
+              output:
+                targets: [usr]
+                schema:
+                  bio_type: dna
+                  alphabet: dna_4
+                usr:
+                  root: outputs/usr_datasets
+                  dataset: densegen/demo
+              generation:
+                sequence_length: 10
+                plan:
+                  - name: demo_plan
+                    quota: 1
+                    sampling:
+                      include_inputs: [demo_input]
+                    regulator_constraints:
+                      groups: []
+              solver:
+                backend: CBC
+                strategy: iterate
+              logging:
+                log_dir: outputs/logs
+            plots:
+              source: usr
+              out_dir: outputs/plots
+              format: png
+              default: ["placement_map"]
+            """
+        ).strip()
+        + "\n"
+    )
+    (run_root / "inputs.csv").write_text("tf,tfbs\nTF_A,AAAA\n")
+    loaded = load_config(cfg_path)
+
+    dense_arrays_df = pd.DataFrame(
+        {
+            "id": ["sol-1"],
+            "sequence": ["ACGTACGTAA"],
+            "densegen__input_name": ["demo_input"],
+            "densegen__plan": ["demo_plan"],
+        }
+    )
+    composition_df = pd.DataFrame(
+        {
+            "solution_id": ["sol-1"],
+            "input_name": ["demo_input"],
+            "plan_name": ["demo_plan"],
+            "tf": ["TF_A"],
+            "tfbs": ["AAAA"],
+            "offset": [1],
+            "length": [4],
+        }
+    )
+
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.viz.plotting.load_records_from_config",
+        lambda *_args, **_kwargs: (dense_arrays_df.copy(), "usr:densegen/demo"),
+    )
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.viz.plotting._load_composition",
+        lambda *_args, **_kwargs: composition_df.copy(),
+    )
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.viz.plotting._load_effective_config",
+        lambda *_args, **_kwargs: {"densegen": {"generation": {"sequence_length": 10}}},
+    )
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.viz.plotting._load_dense_arrays",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("placement_map must use selected output source rows, not dense_arrays.parquet")
+        ),
+    )
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.viz.plotting._load_libraries",
+        lambda *_args, **_kwargs: (
+            pd.DataFrame({"library_index": [1], "library_hash": ["hash1"]}),
+            pd.DataFrame(
+                {
+                    "input_name": ["demo_input"],
+                    "plan_name": ["demo_plan"],
+                    "library_index": [1],
+                    "library_hash": ["hash1"],
+                    "tf": ["TF_A"],
+                    "tfbs": ["AAAA"],
+                }
+            ),
+        ),
+    )
+
+    def _fake_placement_map(
+        _df: pd.DataFrame,
+        out_path: Path,
+        *,
+        composition_df: pd.DataFrame,
+        dense_arrays_df: pd.DataFrame,
+        cfg: dict,
+        **_kwargs,
+    ) -> list[Path]:
+        assert list(dense_arrays_df["id"]) == ["sol-1"]
+        assert list(composition_df["solution_id"]) == ["sol-1"]
+        assert int(cfg["densegen"]["generation"]["sequence_length"]) == 10
+        target = out_path.parent / "stage_b" / "demo_plan" / "demo_input" / "occupancy.png"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("plot")
+        return [target]
+
+    monkeypatch.setitem(plotting_module.AVAILABLE_PLOTS["placement_map"], "fn", _fake_placement_map)
+
+    run_plots_from_config(loaded.root, cfg_path)
+
+    manifest_path = run_root / "outputs" / "plots" / "plot_manifest.json"
+    payload = json.loads(manifest_path.read_text())
+    paths = {item["path"] for item in payload.get("plots", [])}
+    assert "stage_b/demo_plan/demo_input/occupancy.png" in paths

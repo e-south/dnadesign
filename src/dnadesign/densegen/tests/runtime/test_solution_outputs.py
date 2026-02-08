@@ -82,6 +82,71 @@ def test_record_solution_outputs_emits_composition_rows(tmp_path: Path) -> None:
     assert {row["tf"] for row in composition_rows} == {"TF1", "TF2"}
 
 
+def test_record_solution_outputs_preserves_stage_a_lineage_in_composition_rows(tmp_path: Path) -> None:
+    sink = _DummySink()
+    composition_rows: list[dict] = []
+    used_tfbs_detail = [
+        {
+            "tf": "lexA",
+            "tfbs": "AAA",
+            "orientation": "fwd",
+            "offset": 0,
+            "stage_a_best_hit_score": 8.25,
+            "stage_a_rank_within_regulator": 2,
+            "stage_a_tier": 1,
+            "stage_a_fimo_start": 14,
+            "stage_a_fimo_stop": 17,
+            "stage_a_fimo_strand": "+",
+            "stage_a_selection_rank": 3,
+            "stage_a_selection_score_norm": 0.87,
+            "stage_a_tfbs_core": "AAA",
+        }
+    ]
+    record_solution_outputs(
+        sinks=[sink],
+        final_seq="AAATT",
+        derived={},
+        source_label="input",
+        plan_name="plan",
+        output_bio_type="dna",
+        output_alphabet="dna",
+        tables_root=tmp_path,
+        run_id="run",
+        next_attempt_index=lambda: 1,
+        used_tf_counts={},
+        used_tf_list=[],
+        sampling_library_index=1,
+        sampling_library_hash="hash",
+        solver_status=None,
+        solver_objective=None,
+        solver_solve_time_s=None,
+        dense_arrays_version=None,
+        dense_arrays_version_source="package",
+        library_tfbs=[],
+        library_tfs=[],
+        library_site_ids=[],
+        library_sources=[],
+        attempts_buffer=[],
+        solution_rows=None,
+        composition_rows=composition_rows,
+        events_path=None,
+        used_tfbs=[],
+        used_tfbs_detail=used_tfbs_detail,
+    )
+
+    assert len(composition_rows) == 1
+    row = composition_rows[0]
+    assert row["stage_a_best_hit_score"] == 8.25
+    assert row["stage_a_rank_within_regulator"] == 2
+    assert row["stage_a_tier"] == 1
+    assert row["stage_a_fimo_start"] == 14
+    assert row["stage_a_fimo_stop"] == 17
+    assert row["stage_a_fimo_strand"] == "+"
+    assert row["stage_a_selection_rank"] == 3
+    assert row["stage_a_selection_score_norm"] == 0.87
+    assert row["stage_a_tfbs_core"] == "AAA"
+
+
 def test_record_solution_outputs_records_structured_solution_rows(tmp_path: Path) -> None:
     sink = _DummySink()
     attempts_buffer: list[dict] = []

@@ -200,21 +200,17 @@ class PlanSamplingConfig(BaseModel):
 class PlanItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
     name: str
-    quota: Optional[int] = None
-    fraction: Optional[float] = None
+    quota: int
     sampling: PlanSamplingConfig
     fixed_elements: FixedElements = Field(default_factory=FixedElements)
     regulator_constraints: RegulatorConstraints
 
-    @model_validator(mode="after")
-    def _quota_or_fraction(self):
-        if (self.quota is None) == (self.fraction is None):
-            raise ValueError("Plan item must define exactly one of: quota or fraction")
-        if self.quota is not None and self.quota <= 0:
+    @field_validator("quota")
+    @classmethod
+    def _quota_ok(cls, v: int):
+        if int(v) <= 0:
             raise ValueError("Plan item quota must be > 0")
-        if self.fraction is not None and self.fraction <= 0:
-            raise ValueError("Plan item fraction must be > 0")
-        return self
+        return int(v)
 
 
 class SamplingConfig(BaseModel):
@@ -296,11 +292,10 @@ class SamplingConfig(BaseModel):
 class GenerationConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     sequence_length: int
-    quota: int
     sampling: SamplingConfig = Field(default_factory=SamplingConfig)
     plan: List[PlanItem]
 
-    @field_validator("sequence_length", "quota")
+    @field_validator("sequence_length")
     @classmethod
     def _positive(cls, v: int):
         if v <= 0:
@@ -311,53 +306,22 @@ class GenerationConfig(BaseModel):
     def _plan_mode(self):
         if not self.plan:
             raise ValueError("generation.plan must contain at least one item")
-        has_quota = all(p.quota is not None for p in self.plan)
-        has_fraction = all(p.fraction is not None for p in self.plan)
-        if not (has_quota or has_fraction):
-            raise ValueError("Plan items must all use quota or all use fraction (no mixing)")
-        if has_fraction:
-            total = sum(float(p.fraction) for p in self.plan)
-            if abs(total - 1.0) > 1e-6:
-                raise ValueError("Plan fractions must sum to 1.0")
         return self
 
     def resolve_plan(self) -> List["ResolvedPlanItem"]:
-        if all(p.quota is not None for p in self.plan):
-            return [
-                ResolvedPlanItem(
-                    name=p.name,
-                    quota=int(p.quota),
-                    include_inputs=list(p.sampling.include_inputs),
-                    fixed_elements=p.fixed_elements,
-                    regulator_constraints=p.regulator_constraints,
-                )
-                for p in self.plan
-            ]
-
-        # Fractions mode
-        remaining = self.quota
-        resolved: List[ResolvedPlanItem] = []
-        for i, p in enumerate(self.plan):
-            if i == len(self.plan) - 1:
-                q = remaining
-            else:
-                q = int(round(self.quota * float(p.fraction)))
-                q = min(q, remaining)
-            if q <= 0:
-                raise ValueError("Resolved plan quota must be > 0")
-            resolved.append(
-                ResolvedPlanItem(
-                    name=p.name,
-                    quota=q,
-                    include_inputs=list(p.sampling.include_inputs),
-                    fixed_elements=p.fixed_elements,
-                    regulator_constraints=p.regulator_constraints,
-                )
+        return [
+            ResolvedPlanItem(
+                name=p.name,
+                quota=int(p.quota),
+                include_inputs=list(p.sampling.include_inputs),
+                fixed_elements=p.fixed_elements,
+                regulator_constraints=p.regulator_constraints,
             )
-            remaining -= q
-        if remaining != 0:
-            raise ValueError("Resolved plan quotas do not sum to generation.quota")
-        return resolved
+            for p in self.plan
+        ]
+
+    def total_quota(self) -> int:
+        return sum(int(item.quota) for item in self.plan)
 
 
 @dataclass(frozen=True)

@@ -163,7 +163,6 @@ def _write_stage_a_config(tmp_path: Path) -> Path:
                   path: outputs/tables/dense_arrays.parquet
               generation:
                 sequence_length: 30
-                quota: 1
                 plan:
                   - name: default
                     quota: 1
@@ -244,7 +243,6 @@ def _write_pwm_stage_a_config(tmp_path: Path) -> Path:
                   path: outputs/tables/dense_arrays.parquet
               generation:
                 sequence_length: 30
-                quota: 1
                 plan:
                   - name: default
                     quota: 1

@@ -22,7 +22,7 @@ from typing import Any, Dict
 import pandas as pd
 
 from ..adapters.outputs import load_records_from_config
-from ..config import RootConfig, resolve_run_root
+from ..config import RootConfig, resolve_outputs_scoped_path, resolve_run_root
 from .artifacts.pool import POOL_MODE_TFBS, load_pool_data
 from .event_log import load_events
 from .motif_labels import input_motifs, motif_display_name
@@ -42,13 +42,44 @@ from .reporting_transforms import (
 from .run_manifest import load_run_manifest
 from .run_paths import (
     candidates_root,
-    dense_arrays_path,
     run_manifest_path,
     run_outputs_root,
     run_tables_root,
 )
 
 log = logging.getLogger(__name__)
+
+
+def _resolve_output_records_path(root_cfg: RootConfig, cfg_path: Path, run_root: Path, source_label: str) -> str | None:
+    out_cfg = root_cfg.densegen.output
+    targets = list(out_cfg.targets)
+    if len(targets) > 1:
+        plots_cfg = root_cfg.plots
+        if plots_cfg is None or plots_cfg.source is None:
+            raise ValueError("plots.source must be set when output.targets has multiple sinks")
+        source = str(plots_cfg.source)
+    elif targets:
+        source = str(targets[0])
+    else:
+        source = "missing"
+
+    if source == "usr":
+        usr_cfg = out_cfg.usr
+        if usr_cfg is None:
+            raise ValueError("output.usr is required when selected output source is usr")
+        usr_root = resolve_outputs_scoped_path(cfg_path, run_root, usr_cfg.root, label="output.usr.root")
+        return os.path.relpath(usr_root / usr_cfg.dataset / "records.parquet", run_root)
+
+    if source == "parquet":
+        pq_cfg = out_cfg.parquet
+        if pq_cfg is None:
+            raise ValueError("output.parquet is required when selected output source is parquet")
+        pq_path = resolve_outputs_scoped_path(cfg_path, run_root, pq_cfg.path, label="output.parquet.path")
+        return os.path.relpath(pq_path, run_root)
+
+    if source_label and source_label != "missing":
+        return str(source_label)
+    return None
 
 
 @dataclass
@@ -74,15 +105,12 @@ def collect_report_data(
         "sequence",
         _dg("plan"),
         _dg("input_name"),
-        _dg("sampling_library_hash"),
         _dg("sampling_library_index"),
         _dg("used_tfbs_detail"),
         _dg("required_regulators"),
-        _dg("covers_required_regulators"),
         _dg("covers_all_tfs_in_solution"),
-        _dg("min_required_regulators"),
-        _dg("used_tf_list"),
-        _dg("min_count_per_tf"),
+        _dg("used_tf_counts"),
+        _dg("min_count_by_regulator"),
     ]
     try:
         df, source_label = load_records_from_config(root_cfg, cfg_path, columns=cols)
@@ -95,6 +123,15 @@ def collect_report_data(
         source_label = "missing"
     if df.empty:
         warnings.append("Output records are empty; solution-focused sections will be blank.")
+
+    try:
+        output_records_path = _resolve_output_records_path(root_cfg, cfg_path, run_root, source_label)
+    except Exception as exc:
+        message = f"Failed to resolve output records path for report outputs section. ({exc})"
+        if strict:
+            raise ValueError(message) from exc
+        warnings.append(message)
+        output_records_path = None
 
     used_df = _explode_used(df)
     attempts_path = tables_root / "attempts.parquet"
@@ -338,14 +375,55 @@ def collect_report_data(
             "coverage_required_rate",
             "coverage_all_tfs_rate",
             "avg_used_tf_count",
-            "min_required_regulators",
-            "min_count_per_tf",
         ]
     )
     if not df.empty:
         df_plan = df.copy()
-        df_plan["_used_tf_count"] = df_plan[_dg("used_tf_list")].apply(lambda x: len(_ensure_list(x)))
-        df_plan["_covers_required"] = df_plan[_dg("covers_required_regulators")].fillna(False).astype(bool)
+
+        def _used_tf_count(value: Any) -> int:
+            counts = _ensure_list(value)
+            total = 0
+            for item in counts:
+                if isinstance(item, dict):
+                    tf_val = str(item.get("tf") or "").strip()
+                    if tf_val:
+                        total += 1
+            return int(total)
+
+        def _covers_required(row: pd.Series) -> bool:
+            required = {str(v).strip() for v in _ensure_list(row.get(_dg("required_regulators"))) if str(v).strip()}
+            if not required:
+                return True
+            used_counts: dict[str, int] = {}
+            for item in _ensure_list(row.get(_dg("used_tf_counts"))):
+                if not isinstance(item, dict):
+                    continue
+                tf_val = str(item.get("tf") or "").strip()
+                if not tf_val:
+                    continue
+                try:
+                    used_counts[tf_val] = int(item.get("count") or 0)
+                except Exception:
+                    used_counts[tf_val] = 0
+            min_by_reg = {}
+            for item in _ensure_list(row.get(_dg("min_count_by_regulator"))):
+                if not isinstance(item, dict):
+                    continue
+                tf_val = str(item.get("tf") or "").strip()
+                if not tf_val:
+                    continue
+                try:
+                    min_by_reg[tf_val] = int(item.get("min_count") or 0)
+                except Exception:
+                    min_by_reg[tf_val] = 0
+            for tf_val in required:
+                min_required = int(min_by_reg.get(tf_val, 1))
+                if int(used_counts.get(tf_val, 0)) < min_required:
+                    return False
+            return True
+
+        df_plan["_used_tf_count"] = df_plan[_dg("used_tf_counts")].apply(_used_tf_count)
+        df_plan["_covers_required"] = df_plan.apply(_covers_required, axis=1)
         df_plan["_covers_all"] = df_plan[_dg("covers_all_tfs_in_solution")].fillna(False).astype(bool)
         plan_summary = (
             df_plan.groupby([_dg("input_name"), _dg("plan")])
@@ -355,8 +433,6 @@ def collect_report_data(
                 coverage_required_rate=("_covers_required", "mean"),
                 coverage_all_tfs_rate=("_covers_all", "mean"),
                 avg_used_tf_count=("_used_tf_count", "mean"),
-                min_required_regulators=(_dg("min_required_regulators"), "max"),
-                min_count_per_tf=(_dg("min_count_per_tf"), "max"),
             )
             .reset_index()
             .rename(columns={_dg("input_name"): "input_name", _dg("plan"): "plan_name"})
@@ -458,7 +534,7 @@ def collect_report_data(
         except Exception:
             log.warning("Failed to load composition.parquet for report tables.", exc_info=True)
 
-    library_hashes = df[_dg("sampling_library_hash")].dropna().unique().tolist()
+    library_hashes = used_df["library_hash"].dropna().unique().tolist() if "library_hash" in used_df.columns else []
     tf_counts = used_df["tf"].value_counts().to_dict() if not used_df.empty else {}
     tfbs_counts = used_df["tfbs"].value_counts().to_dict() if not used_df.empty else {}
     diversity_entropy_tfbs = _normalized_entropy_from_counts({str(k): int(v) for k, v in tfbs_counts.items()})
@@ -522,7 +598,7 @@ def collect_report_data(
         "candidates_summary_path": os.path.relpath(cand_summary_path, run_root)
         if candidate_logging and cand_summary_path.exists()
         else None,
-        "outputs_path": os.path.relpath(dense_arrays_path(run_root), run_root),
+        "outputs_path": output_records_path,
         "effective_config_path": os.path.relpath(outputs_root / "meta" / "effective_config.json", run_root)
         if (outputs_root / "meta" / "effective_config.json").exists()
         else None,

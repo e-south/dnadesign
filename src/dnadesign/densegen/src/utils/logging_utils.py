@@ -34,6 +34,15 @@ _PROGRESS_VISIBLE = False
 _PROGRESS_STYLE = "stream"
 _LOGGING_CONSOLE: Console | None = None
 
+_SCREEN_REQUIRES_INTERACTIVE_ERROR = (
+    "logging.progress_style=screen requires an interactive terminal. "
+    "Use logging.progress_style=stream for non-interactive output."
+)
+_SCREEN_REQUIRES_TERM_ERROR = (
+    "logging.progress_style=screen requires TERM with cursor controls (TERM must not be 'dumb'). "
+    "Set TERM=xterm-256color or switch logging.progress_style to 'stream'."
+)
+
 
 def set_progress_enabled(enabled: bool) -> None:
     global _PROGRESS_ENABLED, _PROGRESS_ACTIVE, _PROGRESS_VISIBLE
@@ -53,6 +62,38 @@ def set_progress_style(style: str) -> None:
 def get_progress_style() -> str:
     with _PROGRESS_LOCK:
         return str(_PROGRESS_STYLE)
+
+
+def resolve_progress_style(
+    style: str,
+    *,
+    stdout: TextIO | None = None,
+    term: str | None = None,
+    is_tty: bool | None = None,
+) -> tuple[str, str | None]:
+    requested = str(style or "stream").strip().lower()
+    if requested not in {"auto", "stream", "summary", "screen"}:
+        raise ValueError(f"Unknown progress style: {requested}")
+
+    stream = stdout if stdout is not None else sys.stdout
+    tty_value = bool(is_tty) if is_tty is not None else bool(getattr(stream, "isatty", lambda: False)())
+    term_value = str(term if term is not None else os.environ.get("TERM", "")).strip().lower()
+
+    if requested == "screen":
+        if not tty_value:
+            raise RuntimeError(_SCREEN_REQUIRES_INTERACTIVE_ERROR)
+        if term_value == "dumb":
+            raise RuntimeError(_SCREEN_REQUIRES_TERM_ERROR)
+        return "screen", None
+
+    if requested == "auto":
+        if not tty_value:
+            return "summary", "non-interactive stdout"
+        if term_value == "dumb":
+            return "stream", "TERM=dumb"
+        return "screen", "interactive terminal with cursor controls"
+
+    return requested, None
 
 
 def set_logging_console(console: Console | None) -> None:

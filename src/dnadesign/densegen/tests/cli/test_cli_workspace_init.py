@@ -22,7 +22,7 @@ from dnadesign.densegen.src.cli import app
 from dnadesign.densegen.src.cli_commands import workspace as workspace_commands
 
 
-def _write_template_config(path: Path) -> None:
+def _write_source_config(path: Path) -> None:
     path.write_text(
         textwrap.dedent(
             """
@@ -65,7 +65,6 @@ def _write_min_config(path: Path) -> None:
 
               generation:
                 sequence_length: 10
-                quota: 1
                 plan:
                   - name: default
                     quota: 1
@@ -87,8 +86,8 @@ def _write_min_config(path: Path) -> None:
 
 
 def test_workspace_init_warns_on_relative_inputs_without_copy(tmp_path: Path) -> None:
-    template_path = tmp_path / "template.yaml"
-    _write_template_config(template_path)
+    source_path = tmp_path / "source.yaml"
+    _write_source_config(source_path)
     runner = CliRunner()
     result = runner.invoke(
         app,
@@ -99,8 +98,8 @@ def test_workspace_init_warns_on_relative_inputs_without_copy(tmp_path: Path) ->
             "demo_run",
             "--root",
             str(tmp_path),
-            "--template",
-            str(template_path),
+            "--from-config",
+            str(source_path),
         ],
     )
     assert result.exit_code == 0, result.output
@@ -131,7 +130,7 @@ def test_stage_b_reports_missing_pool_manifest(tmp_path: Path) -> None:
     assert "dense stage-a build-pool" in normalized
 
 
-def test_workspace_init_supports_vanilla_demo_template_id(tmp_path: Path) -> None:
+def test_workspace_init_supports_binding_sites_demo_workspace(tmp_path: Path) -> None:
     runner = CliRunner()
     result = runner.invoke(
         app,
@@ -142,12 +141,31 @@ def test_workspace_init_supports_vanilla_demo_template_id(tmp_path: Path) -> Non
             "demo_run",
             "--root",
             str(tmp_path),
-            "--template-id",
-            "demo_binding_sites_vanilla",
+            "--from-workspace",
+            "demo_binding_sites",
         ],
     )
     assert result.exit_code == 0, result.output
     assert (tmp_path / "demo_run" / "config.yaml").exists()
+
+
+def test_workspace_init_rejects_archived_source_workspace(tmp_path: Path) -> None:
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "demo_run",
+            "--root",
+            str(tmp_path),
+            "--from-workspace",
+            "archived",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "Unknown source workspace" in result.output
 
 
 def test_workspace_init_uses_env_workspace_root_when_root_not_provided(
@@ -165,8 +183,8 @@ def test_workspace_init_uses_env_workspace_root_when_root_not_provided(
             "init",
             "--id",
             "demo_run",
-            "--template-id",
-            "demo_binding_sites_vanilla",
+            "--from-workspace",
+            "demo_binding_sites",
         ],
     )
     assert result.exit_code == 0, result.output
@@ -184,8 +202,8 @@ def test_workspace_init_output_mode_usr_sets_usr_target(tmp_path: Path) -> None:
             "demo_run",
             "--root",
             str(tmp_path),
-            "--template-id",
-            "demo_binding_sites_vanilla",
+            "--from-workspace",
+            "demo_binding_sites",
             "--output-mode",
             "usr",
         ],
@@ -210,8 +228,8 @@ def test_workspace_init_output_mode_both_sets_both_targets(tmp_path: Path) -> No
             "demo_run",
             "--root",
             str(tmp_path),
-            "--template-id",
-            "demo_binding_sites_vanilla",
+            "--from-workspace",
+            "demo_binding_sites",
             "--output-mode",
             "both",
         ],
@@ -225,7 +243,7 @@ def test_workspace_init_output_mode_both_sets_both_targets(tmp_path: Path) -> No
     assert (tmp_path / "demo_run" / "outputs" / "usr_datasets" / "registry.yaml").exists()
 
 
-def test_workspace_init_existing_run_dir_shows_actionable_error(tmp_path: Path) -> None:
+def test_workspace_init_existing_workspace_dir_shows_actionable_error(tmp_path: Path) -> None:
     existing = tmp_path / "demo_run"
     existing.mkdir(parents=True, exist_ok=True)
 
@@ -239,14 +257,14 @@ def test_workspace_init_existing_run_dir_shows_actionable_error(tmp_path: Path) 
             "demo_run",
             "--root",
             str(tmp_path),
-            "--template-id",
-            "demo_binding_sites_vanilla",
+            "--from-workspace",
+            "demo_binding_sites",
         ],
     )
 
     assert result.exit_code != 0
-    assert "Run directory already exists" in result.output
-    assert "Choose a new --id or remove the existing run directory" in result.output
+    assert "Workspace directory already exists" in result.output
+    assert "Choose a new --id or remove the existing workspace directory" in result.output
 
 
 def test_workspace_where_json_reports_roots(tmp_path: Path, monkeypatch) -> None:
@@ -259,6 +277,19 @@ def test_workspace_where_json_reports_roots(tmp_path: Path, monkeypatch) -> None
     payload = json.loads(result.output)
     assert payload["workspace_root"] == str(workspace_root)
     assert payload["workspace_root_source"] == "env:DENSEGEN_WORKSPACE_ROOT"
+    assert payload["workspace_source_root"].endswith("src/dnadesign/densegen/workspaces")
+
+
+def test_workspace_where_json_reports_repo_workspace_root_not_runs(monkeypatch) -> None:
+    repo_root = Path("/tmp/repo")
+    monkeypatch.delenv("DENSEGEN_WORKSPACE_ROOT", raising=False)
+    monkeypatch.setattr(workspace_commands, "_repo_root_from", lambda _start: repo_root)
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["workspace", "where", "--format", "json"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["workspace_root"] == str(repo_root / "src" / "dnadesign" / "densegen" / "workspaces")
 
 
 def test_workspace_where_requires_explicit_root_outside_repo(tmp_path: Path, monkeypatch) -> None:

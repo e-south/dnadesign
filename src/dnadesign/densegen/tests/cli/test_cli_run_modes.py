@@ -15,6 +15,7 @@ import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
@@ -50,7 +51,6 @@ def _write_config(run_root: Path) -> Path:
               path: outputs/tables/dense_arrays.parquet
           generation:
             sequence_length: 10
-            quota: 1
             plan:
               - name: demo_plan
                 quota: 1
@@ -80,6 +80,26 @@ def _write_config(run_root: Path) -> Path:
         """.strip()
         + "\n"
     )
+    return cfg_path
+
+
+def _write_screen_progress_config(run_root: Path) -> Path:
+    cfg_path = _write_config(run_root)
+    marker = "          logging:\n            log_dir: outputs/logs\n"
+    replacement = "          logging:\n            log_dir: outputs/logs\n            progress_style: screen\n"
+    text = cfg_path.read_text()
+    assert marker in text
+    cfg_path.write_text(text.replace(marker, replacement, 1))
+    return cfg_path
+
+
+def _write_auto_progress_config(run_root: Path) -> Path:
+    cfg_path = _write_config(run_root)
+    marker = "          logging:\n            log_dir: outputs/logs\n"
+    replacement = "          logging:\n            log_dir: outputs/logs\n            progress_style: auto\n"
+    text = cfg_path.read_text()
+    assert marker in text
+    cfg_path.write_text(text.replace(marker, replacement, 1))
     return cfg_path
 
 
@@ -120,7 +140,6 @@ def _write_pwm_config(run_root: Path) -> Path:
               path: outputs/tables/dense_arrays.parquet
           generation:
             sequence_length: 10
-            quota: 1
             plan:
               - name: demo_plan
                 quota: 1
@@ -199,7 +218,6 @@ def _write_usr_config(run_root: Path) -> Path:
               allow_overwrite: false
           generation:
             sequence_length: 10
-            quota: 1
             plan:
               - name: demo_plan
                 quota: 1
@@ -337,6 +355,99 @@ def test_campaign_reset_removes_outputs(tmp_path: Path) -> None:
     assert (run_root / "inputs.csv").exists()
 
 
+def test_run_fails_fast_for_screen_progress_without_interactive_terminal(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_screen_progress_config(run_root)
+    outputs_dir = run_root / "outputs"
+    sentinel = outputs_dir / "tables" / "dense_arrays.parquet"
+    sentinel.parent.mkdir(parents=True, exist_ok=True)
+    sentinel.write_text("seed")
+
+    called = {"run_pipeline": False}
+
+    def _fake_run_pipeline(*_args, **_kwargs):
+        called["run_pipeline"] = True
+
+    monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
+    runner = CliRunner()
+    result = runner.invoke(app, ["run", "--fresh", "-c", str(cfg_path)])
+
+    assert result.exit_code != 0, result.output
+    assert "interactive terminal" in result.output
+    assert "progress_style: stream" in result.output
+    assert called["run_pipeline"] is False
+    assert sentinel.exists()
+
+
+def test_run_auto_progress_downgrades_to_summary_for_non_interactive_stdout(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_auto_progress_config(run_root)
+
+    captured: dict[str, str] = {}
+
+    def _fake_run_pipeline(loaded, **_kwargs):
+        captured["style"] = str(loaded.root.densegen.logging.progress_style)
+
+    monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
+    monkeypatch.setattr("sys.stdout.isatty", lambda: False, raising=False)
+    runner = CliRunner()
+    result = runner.invoke(app, ["run", "--fresh", "--no-plot", "-c", str(cfg_path)])
+
+    assert result.exit_code == 0, result.output
+    assert captured["style"] == "summary"
+    assert "progress_style=auto -> summary" in result.output
+
+
+def test_run_auto_progress_prefers_non_interactive_summary_over_dumb_term(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_auto_progress_config(run_root)
+
+    captured: dict[str, str] = {}
+
+    def _fake_run_pipeline(loaded, **_kwargs):
+        captured["style"] = str(loaded.root.densegen.logging.progress_style)
+
+    monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
+    monkeypatch.setenv("TERM", "dumb")
+    runner = CliRunner()
+    result = runner.invoke(app, ["run", "--fresh", "--no-plot", "-c", str(cfg_path)])
+
+    assert result.exit_code == 0, result.output
+    assert captured["style"] == "summary"
+    assert "progress_style=auto -> summary" in result.output
+
+
+def test_run_handles_screen_progress_runtime_errors_with_actionable_next_steps(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_config(run_root)
+
+    def _fake_run_pipeline(*_args, **_kwargs):
+        raise RuntimeError(
+            "logging.progress_style=screen requires an interactive terminal. "
+            "Use logging.progress_style=stream for non-interactive output."
+        )
+
+    monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
+    runner = CliRunner()
+    result = runner.invoke(app, ["run", "-c", str(cfg_path)])
+
+    assert result.exit_code != 0, result.output
+    assert "interactive terminal" in result.output
+    assert "Next steps" in result.output
+    assert "progress_style: stream" in result.output
+
+
 def test_run_fresh_rebuilds_stage_a(tmp_path: Path, monkeypatch) -> None:
     run_root = tmp_path / "run"
     run_root.mkdir(parents=True)
@@ -379,7 +490,7 @@ def test_run_fresh_preserves_usr_registry(tmp_path: Path, monkeypatch) -> None:
     assert registry_path.read_text() == "namespaces: {}\n"
 
 
-def test_run_allows_quota_increase_with_explicit_flag(tmp_path: Path, monkeypatch) -> None:
+def test_run_auto_accepts_plan_quota_increase_on_resume(tmp_path: Path, monkeypatch) -> None:
     run_root = tmp_path / "run"
     run_root.mkdir(parents=True)
     _write_inputs(run_root)
@@ -387,7 +498,7 @@ def test_run_allows_quota_increase_with_explicit_flag(tmp_path: Path, monkeypatc
     old_cfg = load_config(cfg_path).root.densegen.model_dump(by_alias=True, exclude_none=False)
     old_sha = hashlib.sha256(cfg_path.read_bytes()).hexdigest()
 
-    updated_text = cfg_path.read_text().replace("quota: 1", "quota: 2")
+    updated_text = cfg_path.read_text().replace("                quota: 1\n", "                quota: 2\n", 1)
     cfg_path.write_text(updated_text)
     outputs_dir = run_root / "outputs"
     (outputs_dir / "tables").mkdir(parents=True, exist_ok=True)
@@ -424,8 +535,32 @@ def test_run_allows_quota_increase_with_explicit_flag(tmp_path: Path, monkeypatc
 
     runner = CliRunner()
     monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
-    result = runner.invoke(app, ["run", "-c", str(cfg_path), "--resume", "--allow-quota-increase", "--no-plot"])
+    result = runner.invoke(app, ["run", "-c", str(cfg_path), "--resume", "--no-plot"])
 
     assert result.exit_code == 0, result.output
     assert captured["resume"] is True
     assert captured["allow_config_mismatch"] is True
+
+
+def test_run_reports_quota_already_met_when_resume_has_no_work(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_config(run_root)
+
+    def _fake_run_pipeline(*_args, **_kwargs):
+        return SimpleNamespace(total_generated=1, per_plan={("demo_input", "demo_plan"): 1}, generated_this_run=0)
+
+    runner = CliRunner()
+    monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
+    result = runner.invoke(app, ["run", "-c", str(cfg_path), "--resume", "--no-plot"])
+
+    assert result.exit_code != 0, result.output
+    assert "--resume requested but no outputs were found" in result.output
+
+    outputs_dir = run_root / "outputs"
+    (outputs_dir / "tables").mkdir(parents=True, exist_ok=True)
+    (outputs_dir / "tables" / "dense_arrays.parquet").write_text("seed")
+    result = runner.invoke(app, ["run", "-c", str(cfg_path), "--resume", "--no-plot"])
+    assert result.exit_code == 0, result.output
+    assert "quota is already met" in result.output.lower()

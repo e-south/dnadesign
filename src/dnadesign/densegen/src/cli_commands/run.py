@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
+import sys
 from copy import deepcopy
 from pathlib import Path
 from typing import Callable, Optional
@@ -26,8 +28,22 @@ from ..core.artifacts.pool import pool_status_by_input
 from ..core.pipeline import resolve_plan, run_pipeline
 from ..core.run_paths import has_existing_run_outputs, run_outputs_root, run_state_path
 from ..core.run_state import load_run_state
+from ..utils import logging_utils
 from ..utils.logging_utils import install_native_stderr_filters, setup_logging
 from ..utils.mpl_utils import ensure_mpl_cache_dir
+
+
+def _resolve_progress_style(log_cfg) -> tuple[str, str | None]:
+    requested = str(getattr(log_cfg, "progress_style", "stream"))
+    effective, reason = logging_utils.resolve_progress_style(
+        requested,
+        stdout=sys.stdout,
+        term=os.environ.get("TERM"),
+    )
+    setattr(log_cfg, "progress_style", effective)
+    logging_utils.set_progress_style(effective)
+    logging_utils.set_progress_enabled(effective in {"stream", "screen"})
+    return effective, reason
 
 
 def _model_to_dict(value) -> dict:
@@ -56,21 +72,18 @@ def _extract_quota_profile(cfg: dict) -> tuple[list[str], dict[str, int], int]:
         if not name:
             raise ValueError("generation.plan item is missing name.")
         if "fraction" in item and item.get("fraction") is not None:
-            raise ValueError("--allow-quota-increase supports quota-based plans only.")
+            raise ValueError("generation.plan fractions are not supported.")
         quota_raw = item.get("quota")
         if quota_raw is None:
-            raise ValueError("--allow-quota-increase requires explicit plan quotas.")
+            raise ValueError("generation.plan items must define quota.")
         quota_val = int(quota_raw)
         if quota_val <= 0:
-            raise ValueError("Plan quotas must be positive for --allow-quota-increase.")
+            raise ValueError("Plan quotas must be positive.")
         names.append(name)
         quotas[name] = quota_val
-    total_raw = generation.get("quota")
-    if total_raw is None:
-        raise ValueError("generation.quota is required for --allow-quota-increase.")
-    total = int(total_raw)
+    total = sum(quotas.values())
     if total <= 0:
-        raise ValueError("generation.quota must be > 0 for --allow-quota-increase.")
+        raise ValueError("generation.plan quotas must sum to > 0.")
     return names, quotas, total
 
 
@@ -79,14 +92,12 @@ def _strip_quota_fields(cfg: dict) -> dict:
     generation = normalized.get("generation")
     if not isinstance(generation, dict):
         return _canonicalize_structure(normalized)
-    generation.pop("quota", None)
     plan = generation.get("plan")
     if isinstance(plan, list):
         for item in plan:
             if not isinstance(item, dict):
                 continue
             item.pop("quota", None)
-            item.pop("fraction", None)
     return _canonicalize_structure(normalized)
 
 
@@ -109,11 +120,11 @@ def _validate_quota_increase_only(*, previous_cfg: dict, current_cfg: dict) -> N
         if curr_quotas[name] < prev_quotas[name]:
             raise ValueError(f"Plan quota decreased for '{name}' ({prev_quotas[name]} -> {curr_quotas[name]}).")
     if curr_total < prev_total:
-        raise ValueError(f"generation.quota decreased ({prev_total} -> {curr_total}).")
+        raise ValueError(f"Total plan quota decreased ({prev_total} -> {curr_total}).")
     prev_norm = _strip_quota_fields(previous_cfg)
     curr_norm = _strip_quota_fields(current_cfg)
     if prev_norm != curr_norm:
-        raise ValueError("Config changed beyond generation quotas.")
+        raise ValueError("Config changed beyond plan quotas.")
 
 
 def _load_previous_densegen_config(run_root: Path) -> dict:
@@ -166,11 +177,6 @@ def register_run_commands(
         no_plot: bool = typer.Option(False, help="Do not auto-run plots even if configured."),
         fresh: bool = typer.Option(False, "--fresh", help="Clear outputs and start a new run."),
         resume: bool = typer.Option(False, "--resume", help="Resume from existing outputs."),
-        allow_quota_increase: bool = typer.Option(
-            False,
-            "--allow-quota-increase",
-            help="Allow resume when only generation quotas increased (requires effective_config.json).",
-        ),
         log_file: Optional[Path] = typer.Option(
             None,
             help="Override logfile path (must be inside outputs/ under the run root).",
@@ -187,6 +193,21 @@ def register_run_commands(
         root = loaded.root
         cfg = root.densegen
         run_root = context.run_root_for(loaded)
+        log_cfg = cfg.logging
+        try:
+            resolved_progress_style, progress_reason = _resolve_progress_style(log_cfg)
+        except RuntimeError as exc:
+            message = str(exc)
+            if "progress_style=screen requires" in message:
+                console.print(f"[bold red]{message}[/]")
+                console.print("[bold]Next steps[/]:")
+                console.print("  - run in an interactive terminal with TERM=xterm-256color")
+                console.print("  - or set densegen.logging.progress_style: stream")
+                raise typer.Exit(code=1)
+            raise
+        if progress_reason is not None:
+            console.print(f"[dim]logging.progress_style=auto -> {resolved_progress_style} ({progress_reason})[/]")
+
         if fresh and resume:
             console.print("[bold red]Choose either --fresh or --resume, not both.[/]")
             raise typer.Exit(code=1)
@@ -260,34 +281,16 @@ def register_run_commands(
                 console.print(f"  - {reset_cmd}")
                 raise typer.Exit(code=1)
             if existing_state.config_sha256 and existing_state.config_sha256 != config_sha:
-                if not allow_quota_increase:
-                    console.print(
-                        "[bold red]Existing run_state.json was created with a different config. "
-                        "Remove run_state.json or stage a new run root to start fresh.[/]"
-                    )
-                    console.print("[bold]Next steps[/]:")
-                    fresh_cmd = context.workspace_command(
-                        "dense run --fresh",
-                        cfg_path=cfg_path,
-                        run_root=run_root,
-                    )
-                    reset_cmd = context.workspace_command(
-                        "dense campaign-reset",
-                        cfg_path=cfg_path,
-                        run_root=run_root,
-                    )
-                    console.print(f"  - {fresh_cmd}")
-                    console.print(f"  - {reset_cmd}")
-                    raise typer.Exit(code=1)
-                if not resume_run:
-                    console.print("[bold red]--allow-quota-increase requires resume mode with existing outputs.[/]")
-                    raise typer.Exit(code=1)
                 try:
                     previous_cfg = _load_previous_densegen_config(run_root)
                     current_cfg = _model_to_dict(cfg)
                     _validate_quota_increase_only(previous_cfg=previous_cfg, current_cfg=current_cfg)
                 except ValueError as exc:
-                    console.print(f"[bold red]--allow-quota-increase rejected:[/] {exc}")
+                    console.print(
+                        "[bold red]Existing run_state.json was created with a different config "
+                        "and changes are not quota-only.[/]"
+                    )
+                    console.print(f"[bold red]Quota validation failed:[/] {exc}")
                     console.print("[bold]Next steps[/]:")
                     fresh_cmd = context.workspace_command(
                         "dense run --fresh",
@@ -303,7 +306,7 @@ def register_run_commands(
                     console.print(f"  - {reset_cmd}")
                     raise typer.Exit(code=1)
                 allow_config_mismatch = True
-                console.print("[yellow]Quota-only config increase detected; resuming with existing outputs.[/]")
+                console.print("[yellow]Quota-only config change detected; resuming with existing outputs.[/]")
             if (
                 not existing_outputs
                 and existing_state.items
@@ -336,7 +339,6 @@ def register_run_commands(
             ensure_fimo_available(cfg, strict=True)
 
         # Logging setup
-        log_cfg = cfg.logging
         log_dir = context.resolve_outputs_path_or_exit(
             loaded.path,
             run_root,
@@ -358,7 +360,7 @@ def register_run_commands(
         pl = resolve_plan(loaded)
         console.print("[bold]Quota plan[/]: " + ", ".join(f"{p.name}={p.quota}" for p in pl))
         try:
-            run_pipeline(
+            summary = run_pipeline(
                 loaded,
                 resume=resume_run,
                 build_stage_a=build_stage_a,
@@ -373,10 +375,10 @@ def register_run_commands(
             if render_output_schema_hint(exc):
                 raise typer.Exit(code=1)
             message = str(exc)
-            if "progress_style=screen requires TERM with cursor controls" in message:
+            if "progress_style=screen requires" in message:
                 console.print(f"[bold red]{message}[/]")
                 console.print("[bold]Next steps[/]:")
-                console.print("  - export TERM=xterm-256color")
+                console.print("  - run in an interactive terminal with TERM=xterm-256color")
                 console.print("  - or set densegen.logging.progress_style: stream")
                 raise typer.Exit(code=1)
             if "Existing run_state.json was created with a different" in message:
@@ -422,6 +424,9 @@ def register_run_commands(
                 raise typer.Exit(code=1)
             raise
 
+        if int(getattr(summary, "generated_this_run", 0)) == 0:
+            console.print("[yellow]Quota is already met; no new sequences generated.[/]")
+
         console.print(":tada: [bold green]Run complete[/].")
         console.print("[bold]Next steps[/]:")
         inspect_cmd = context.workspace_command(
@@ -455,7 +460,10 @@ def register_run_commands(
                 ensure_mpl_cache_dir()
             except Exception as exc:
                 console.print(f"[bold red]Matplotlib cache setup failed:[/] {exc}")
-                console.print("[bold]Tip[/]: set MPLCONFIGDIR to a shared cache directory (e.g. ~/.cache/matplotlib).")
+                console.print(
+                    "[bold]Tip[/]: DenseGen defaults to a repo-local cache at .cache/matplotlib/densegen; "
+                    "set MPLCONFIGDIR to override."
+                )
                 raise typer.Exit(code=1)
             install_native_stderr_filters(suppress_solver_messages=False)
             from ..viz.plotting import run_plots_from_config

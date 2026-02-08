@@ -119,7 +119,6 @@ def test_inspect_run_usr_events_path_prints_absolute_path(tmp_path: Path) -> Non
                   allow_overwrite: false
               generation:
                 sequence_length: 10
-                quota: 1
                 plan:
                   - name: demo_plan
                     quota: 1

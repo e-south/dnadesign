@@ -58,3 +58,26 @@
 - [x] Add docs index at `src/dnadesign/densegen/docs/README.md`.
 - [x] Run DenseGen test subset and capture results.
 - [ ] Profiling target workspace: TBD (need config path).
+
+## 2026-02-10
+- Audit scope: compared legacy USR dataset `60bp_dual_promoter_cpxR_LexA` against a fresh end-to-end DenseGen run (`/tmp/schema_audit_both_0210`) with `output.targets: [parquet, usr]`.
+- Confirmed sink consistency for a same-run output: local `outputs/tables/dense_arrays.parquet` and USR merged view share identical values/types for all shared densegen columns.
+- Decision: keep a single curated DenseGen schema under the `densegen__` namespace; no split "compact vs full" schemas.
+- Decision: organize the one schema by hierarchical semantic prefixes (run/solver/input/stage_a/stage_b/placement/pad) while keeping `densegen__` as the USR namespace boundary.
+- Key gap found: Stage-A PWM fields (`densegen__input_pwm_*`) are registered but all-null for plan-pool runs; retention work should either populate these from pooled sources or replace them with non-redundant populated summaries.
+- Key gap found: record-level placement provenance includes ids and offsets (`densegen__used_tfbs_detail`) but not per-site score lineage (`best_hit_score`, tier, FIMO locus/strand, selection score) available in Stage-A pool tables.
+- Retention direction: preserve sequence-level provenance and minimal join keys in records; demote repeated run constants to run-level manifests unless needed for direct USR-only analysis.
+- Next implementation target: define an explicit retention matrix (keep/conditional/demote) and align metadata emission rules to avoid all-null and run-constant column sprawl.
+- Implemented retention guards in metadata emission: non-`pwm_sampled` records now clear PWM-only fields (`input_pwm_*`, `input_pwm_ids`), and non-`binding_sites` records clear pair-specific fields (`input_tf_tfbs_pair_count`, `sampling_fraction_pairs`).
+- Implemented Stage-A lineage propagation into `densegen__used_tfbs_detail` at record level: `stage_a_best_hit_score`, `stage_a_rank_within_regulator`, `stage_a_tier`, `stage_a_fimo_start`, `stage_a_fimo_stop`, `stage_a_fimo_strand`, `stage_a_selection_rank`, `stage_a_selection_score_norm`, and `stage_a_tfbs_core`.
+- Updated Parquet/USR schema contract for `densegen__used_tfbs_detail` to keep sink parity, including USR registry type updates.
+- Added tests for: Stage-A lineage in placement detail, retention/sparsity behavior by `input_mode`, and parity between Parquet and USR shared metadata columns.
+- Fresh e2e schema audit run (temp workspace): `/tmp/densegen_audit_demo_meme_three_tfs` with current `demo_meme_three_tfs` config.
+- Fresh run result: `dense_arrays.parquet` has 101 `densegen__*` columns (40 rows); 29 columns are all-null and 39 are run-constant in this run.
+- Confirmed expanded placement lineage now materializes in fresh outputs: `densegen__used_tfbs_detail` includes Stage-A fields; non-null placement counts in this run were `stage_a_* = 68/120` placements (core/id/offset fields remain 120/120).
+- Confirmed gap: `composition.parquet` currently stores placement identity/geometry (`tf`, `tfbs`, ids, offsets) but not `stage_a_*` fields, so Stage-A placement lineage is only present in nested `densegen__used_tfbs_detail`.
+- Retention triage direction (single `densegen__` schema): keep sequence/placement provenance inline; move repeated run constants to `outputs/meta/*`; keep library/pool-level attributes in `outputs/libraries/*` and `outputs/pools/*` with stable join keys (`sampling_library_hash`, `library_index`, `tfbs_id`, `motif_id`).
+- Applied curated DenseGen record schema contract from review: reduced `META_FIELDS` to the agreed field set and aligned Parquet + USR namespace registry.
+- Added contract tests that pin: metadata schema keys, emitted metadata keys, and `usr/datasets/registry.yaml` densegen columns (including NPZ conditional columns).
+- Updated resume-state loading to avoid relying on removed `densegen__run_config_sha256`; resume now keys off retained record columns (`run_id`, `input_name`, `plan`, `used_tfbs_detail`).
+- Updated DenseGen outputs reference docs with explicit curated field catalog (field, retention class, meaning) for UX/dev discoverability.

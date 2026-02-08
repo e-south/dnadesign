@@ -93,7 +93,6 @@ def build_run_metrics(*, cfg, run_root: Path) -> pd.DataFrame:
             columns=[
                 "densegen__used_tfbs_detail",
                 "densegen__sampling_library_index",
-                "densegen__sampling_library_hash",
                 "densegen__input_name",
                 "densegen__plan",
             ],
@@ -111,6 +110,29 @@ def build_run_metrics(*, cfg, run_root: Path) -> pd.DataFrame:
     elif not dense_arrays_df.empty:
         placements_df = _placements_from_dense_arrays(dense_arrays_df)
         placement_source = "dense_arrays"
+
+    if placement_source == "dense_arrays" and not placements_df.empty:
+        attempts_map = (
+            attempts_df[["input_name", "plan_name", "sampling_library_index", "sampling_library_hash"]]
+            .dropna(subset=["input_name", "plan_name", "sampling_library_index", "sampling_library_hash"])
+            .drop_duplicates(subset=["input_name", "plan_name", "sampling_library_index"])
+        )
+        if not attempts_map.empty:
+            attempts_map["sampling_library_index"] = attempts_map["sampling_library_index"].astype(int)
+            placement_keys = placements_df[["input_name", "plan_name", "library_index"]].copy()
+            placement_keys["library_index"] = placement_keys["library_index"].astype(int)
+            merged = placement_keys.merge(
+                attempts_map,
+                how="left",
+                left_on=["input_name", "plan_name", "library_index"],
+                right_on=["input_name", "plan_name", "sampling_library_index"],
+            )
+            replacements = merged["sampling_library_hash"].fillna("").tolist()
+            replacements = [
+                str(val) if str(val) else str(orig)
+                for val, orig in zip(replacements, placements_df["library_hash"].tolist(), strict=False)
+            ]
+            placements_df["library_hash"] = replacements
 
     events_path = outputs_root / "meta" / "events.jsonl"
     events_df = pd.DataFrame()
