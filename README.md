@@ -34,8 +34,13 @@ dnadesign/
 
 1. [Installation](docs/installation.md)
 2. [Maintaining dependencies](docs/dependencies.md)
-3. [CUDA/GPU install notes (BU SCC)](docs/INSTALL_BU_SCC.md)
-4. [Notifications](docs/notify.md)
+3. [Notifications](docs/notify.md)
+
+### HPC / BU SCC
+
+1. [BU SCC quickstart (interactive -> batch -> notify)](docs/hpc/bu_scc_quickstart.md)
+2. [BU SCC install (interactive bootstrap)](docs/hpc/bu_scc_install.md)
+3. [BU SCC batch + Notify runbook](docs/hpc/bu_scc_batch_notify.md)
 
 ---
 

@@ -149,7 +149,7 @@ Key files:
 
 Notify setup and secret-handling details live in:
 
-- `../../../notify/docs/usr_events.md`
+- `../../../../../docs/notify/usr_events.md`
 
 Slack-first pressure test flow:
 

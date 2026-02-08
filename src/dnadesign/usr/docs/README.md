@@ -37,7 +37,7 @@
 - DenseGen writes into USR via the `densegen` namespace:
   - DenseGen outputs reference: `../../densegen/docs/reference/outputs.md`
 - Notify consumes USR `.events.log`:
-  - Notify operators doc: `../../notify/docs/usr_events.md`
+  - Notify operators doc: `../../../../docs/notify/usr_events.md`
 
 ## Operations
 

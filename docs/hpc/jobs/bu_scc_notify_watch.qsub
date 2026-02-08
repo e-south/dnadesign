@@ -1,0 +1,37 @@
+#!/bin/bash -l
+#$ -N dnadesign_notify_watch
+#$ -l h_rt=24:00:00
+#$ -pe omp 1
+#$ -l mem_per_core=2G
+#$ -j y
+#$ -o outputs/logs/$JOB_NAME.$JOB_ID.out
+
+set -euo pipefail
+
+EVENTS_PATH="${EVENTS_PATH:-$PWD/outputs/usr_datasets/densegen/demo/.events.log}"
+CURSOR_PATH="${CURSOR_PATH:-$PWD/outputs/notify.cursor}"
+SPOOL_DIR="${SPOOL_DIR:-$PWD/outputs/notify_spool}"
+WEBHOOK_ENV="${WEBHOOK_ENV:-DENSEGEN_WEBHOOK}"
+NOTIFY_PROVIDER="${NOTIFY_PROVIDER:-slack}"
+NOTIFY_ACTIONS="${NOTIFY_ACTIONS:-densegen_health,densegen_flush_failed,materialize}"
+
+if [[ ! -f "$EVENTS_PATH" ]]; then
+  echo "Missing events log: $EVENTS_PATH" >&2
+  echo "Set EVENTS_PATH to a USR dataset .events.log path." >&2
+  exit 2
+fi
+
+if [[ -z "${!WEBHOOK_ENV:-}" ]]; then
+  echo "Webhook environment variable is not set: $WEBHOOK_ENV" >&2
+  echo "Export it before qsub (for example: export $WEBHOOK_ENV=https://hooks.slack.com/services/...)." >&2
+  exit 2
+fi
+
+uv run notify usr-events watch \
+  --events "$EVENTS_PATH" \
+  --cursor "$CURSOR_PATH" \
+  --spool-dir "$SPOOL_DIR" \
+  --provider "$NOTIFY_PROVIDER" \
+  --url-env "$WEBHOOK_ENV" \
+  --only-actions "$NOTIFY_ACTIONS" \
+  --follow

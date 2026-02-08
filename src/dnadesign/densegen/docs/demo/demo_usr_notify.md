@@ -195,7 +195,7 @@ uv run dense run --resume --allow-quota-increase --no-plot -c "$CONFIG"
 This emits additional `densegen_health` and `materialize` events that should appear immediately in your webhook receiver output.
 
 For real deployed endpoints (Slack/email relay) and secret-safe setup (`.env.local`, `--url-env`),
-see `../../../notify/docs/usr_events.md`.
+see `../../../../../docs/notify/usr_events.md`.
 
 ---
 
@@ -203,7 +203,7 @@ see `../../../notify/docs/usr_events.md`.
 
 - DenseGen output contracts: `../reference/outputs.md`
 - USR concepts plus overlay semantics: `../../../usr/README.md`
-- Notify operators manual: `../../../notify/docs/usr_events.md`
+- Notify operators manual: `../../../../../docs/notify/usr_events.md`
 
 ---
 

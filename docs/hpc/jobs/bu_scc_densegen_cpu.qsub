@@ -1,0 +1,25 @@
+#!/bin/bash -l
+#$ -N dnadesign_densegen_cpu
+#$ -l h_rt=08:00:00
+#$ -pe omp 8
+#$ -l mem_per_core=8G
+#$ -j y
+#$ -o outputs/logs/$JOB_NAME.$JOB_ID.out
+
+set -euo pipefail
+
+# Notify boundary reminder: Notify watches USR <dataset>/.events.log, not DenseGen outputs/meta/events.jsonl.
+
+DENSEGEN_CONFIG="${DENSEGEN_CONFIG:-$PWD/config.yaml}"
+
+if [[ ! -f "$DENSEGEN_CONFIG" ]]; then
+  echo "Missing DenseGen config: $DENSEGEN_CONFIG"
+  echo "Set DENSEGEN_CONFIG=/abs/path/to/config.yaml or submit from a DenseGen workspace." >&2
+  exit 2
+fi
+
+export USR_ACTOR_TOOL="${USR_ACTOR_TOOL:-densegen}"
+export USR_ACTOR_RUN_ID="${USR_ACTOR_RUN_ID:-${JOB_ID}.${SGE_TASK_ID:-0}}"
+
+uv run dense validate-config --probe-solver -c "$DENSEGEN_CONFIG"
+uv run dense run --no-plot -c "$DENSEGEN_CONFIG"

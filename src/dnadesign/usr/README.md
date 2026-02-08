@@ -43,7 +43,7 @@ When running the full stack:
 
 Relevant docs:
 - DenseGen outputs plus event streams: `../densegen/docs/reference/outputs.md`
-- Notify operators doc: `../notify/docs/usr_events.md`
+- Notify operators doc: `../../../docs/notify/usr_events.md`
 
 ## Doc map
 
@@ -511,7 +511,7 @@ Each line of `.events.log` is JSONL with:
 * `actor` (object with `tool`, `run_id`, `host`, `pid`)
 * `version` (USR package version)
 
-Notify expects at minimum `event_version` and `action`. See: `../notify/docs/usr_events.md`.
+Notify expects at minimum `event_version` and `action`. See: `../../../docs/notify/usr_events.md`.
 
 
 ---

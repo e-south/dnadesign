@@ -42,6 +42,7 @@ Pick the path that matches what you are trying to do:
    - [DenseGen -> USR -> Notify demo](demo/demo_usr_notify.md)
    - (For clusters) [DenseGen -> USR -> Notify on HPC](workflows/usr_notify_hpc.md)
    - (BU SCC) [DenseGen -> USR -> Notify on BU SCC](workflows/bu_scc_end_to_end.md)
+   - (Platform BU SCC docs) `docs/hpc/bu_scc_install.md` and `docs/hpc/bu_scc_batch_notify.md`
 
 ## Event boundary
 
@@ -77,6 +78,7 @@ See `reference/outputs.md#event-streams-and-consumers-densegen-vs-usr`.
 - [Cruncher PWM pipeline](workflows/cruncher_pwm_pipeline.md)
 - [DenseGen -> USR -> Notify on HPC](workflows/usr_notify_hpc.md)
 - [DenseGen -> USR -> Notify on BU SCC](workflows/bu_scc_end_to_end.md)
+- Platform BU SCC docs: `docs/hpc/bu_scc_install.md`, `docs/hpc/bu_scc_batch_notify.md`
 
 ## Development
 - [Dev README](dev/README.md)

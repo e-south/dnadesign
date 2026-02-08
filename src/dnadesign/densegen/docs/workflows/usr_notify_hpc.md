@@ -4,6 +4,10 @@ This runbook is for the operational stack:
 
 DenseGen (generator) -> USR (canonical store plus `.events.log`) -> Notify (webhook delivery).
 
+For BU SCC platform operations, use:
+- `docs/hpc/bu_scc_install.md`
+- `docs/hpc/bu_scc_batch_notify.md`
+
 Boundary contract:
 - DenseGen runtime diagnostics: `outputs/meta/events.jsonl` (DenseGen-only)
 - USR mutation events: `<usr_root>/<dataset>/.events.log` (Notify input)

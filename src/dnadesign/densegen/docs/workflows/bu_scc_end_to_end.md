@@ -2,6 +2,10 @@
 
 This runbook is BU SCC specific.
 
+Platform-level BU SCC docs:
+- `docs/hpc/bu_scc_install.md`
+- `docs/hpc/bu_scc_batch_notify.md`
+
 Intent:
 - run DenseGen on BU SCC with SGE/qsub
 - store outputs in USR dataset layout
