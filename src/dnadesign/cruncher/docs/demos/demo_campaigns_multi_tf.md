@@ -78,7 +78,7 @@ cruncher runs repair-index --apply -c "$DERIVED"
 Summary artifacts live under:
 
 ```
-<workspace>/outputs/campaigns/<campaign_id>/
+<workspace>/outputs/campaign/<campaign_name>/latest/
 ```
 
 ## Related docs

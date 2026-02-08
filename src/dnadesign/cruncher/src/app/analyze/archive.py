@@ -16,7 +16,12 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
-from dnadesign.cruncher.analysis.layout import ANALYSIS_LAYOUT_VERSION, summary_path
+from dnadesign.cruncher.analysis.layout import (
+    ANALYSIS_LAYOUT_VERSION,
+    PLOT_FILE_PREFIX,
+    TABLE_FILE_PREFIX,
+    summary_path,
+)
 from dnadesign.cruncher.artifacts.entries import normalize_artifacts
 from dnadesign.cruncher.config.schema_v3 import AnalysisConfig
 from dnadesign.cruncher.utils.hashing import sha256_bytes, sha256_path
@@ -31,11 +36,13 @@ ANALYSIS_TOP_LEVEL_FILES = {
     "manifest.json",
     "notebook__run_overview.py",
 }
-ANALYSIS_TOP_LEVEL_DIRS = {"plots", "tables"}
+ANALYSIS_TOP_LEVEL_DIRS = {"output", "plots", "tables"}
 
 
 def _is_analysis_relpath(path: str) -> bool:
     if path in ANALYSIS_TOP_LEVEL_FILES:
+        return True
+    if path.startswith(PLOT_FILE_PREFIX) or path.startswith(TABLE_FILE_PREFIX):
         return True
     for root in ANALYSIS_TOP_LEVEL_DIRS:
         if path == root or path.startswith(f"{root}/"):
@@ -51,6 +58,10 @@ def _analysis_item_paths(analysis_root: Path) -> list[Path]:
         path = analysis_root / name
         if path.exists():
             items.append(path)
+    for pattern in (f"{PLOT_FILE_PREFIX}*", f"{TABLE_FILE_PREFIX}*"):
+        for path in sorted(analysis_root.glob(pattern)):
+            if path.exists():
+                items.append(path)
     return items
 
 

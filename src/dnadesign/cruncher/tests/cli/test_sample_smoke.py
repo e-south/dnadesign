@@ -18,7 +18,7 @@ import pandas as pd
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.cruncher.artifacts.layout import manifest_path
+from dnadesign.cruncher.artifacts.layout import sequences_path
 from dnadesign.cruncher.cli.app import app
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 from dnadesign.cruncher.utils.paths import resolve_lock_path
@@ -36,19 +36,15 @@ def _write_motif(path: Path, *, source: str, motif_id: str, tf_name: str) -> Non
     path.write_text(json.dumps(payload))
 
 
-def _find_runs(stage_dir: Path) -> list[Path]:
+def _find_runs(runs_root: Path) -> list[Path]:
     runs: list[Path] = []
-    if not stage_dir.exists():
+    if not runs_root.exists():
         return runs
-    for child in stage_dir.iterdir():
-        if not child.is_dir():
+    for manifest_file in runs_root.rglob("run_manifest.json"):
+        run_dir = manifest_file.parent
+        if run_dir.name == "previous":
             continue
-        if manifest_path(child).exists():
-            runs.append(child)
-            continue
-        for grand in child.iterdir():
-            if grand.is_dir() and manifest_path(grand).exists():
-                runs.append(grand)
+        runs.append(run_dir)
     return runs
 
 
@@ -131,9 +127,9 @@ def test_sample_cli_smoke_matrix(tmp_path: Path) -> None:
 
     result = runner.invoke(app, ["sample", "-c", str(config_path)])
     assert result.exit_code == 0
-    sample_runs = _find_runs(tmp_path / "runs" / "sample")
+    sample_runs = _find_runs(tmp_path / "runs" / "runs")
     assert sample_runs
-    seq_path = sample_runs[0] / "sequences.parquet"
+    seq_path = sequences_path(sample_runs[0])
     seq_df = pd.read_parquet(seq_path)
     assert "min_per_tf_norm" in seq_df.columns
     assert "min_norm" in seq_df.columns

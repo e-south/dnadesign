@@ -245,8 +245,8 @@ Notes:
 * `--metrics` requires a local catalog; fetch motifs/sites first.
 * When `--runs` is omitted, stale sample run-index entries are auto-repaired before summary.
 * `--skip-missing` skips runs missing required `table_manifest.json` entries/files for
-  `scores_summary` and `metrics_joint` (typically `tables/scores_summary.parquet` and
-  `tables/metrics_joint.parquet`).
+  `scores_summary` and `metrics_joint` (typically `table__scores_summary.parquet` and
+  `table__metrics_joint.parquet`).
 * With site-derived PWMs, `--metrics` also requires `catalog.site_window_lengths`
   for TFs with variable site lengths. Use `--no-metrics` if you haven't set them.
 
@@ -268,7 +268,7 @@ Network:
 Examples:
 
 * `cruncher campaign notebook --campaign regulators_v1 <config>`
-* `cruncher campaign notebook --campaign regulators_v1 --out outputs/campaigns/<id> <config>`
+* `cruncher campaign notebook --campaign regulators_v1 --out outputs/campaign/regulators_v1/latest <config>`
 
 Notes:
 
@@ -369,18 +369,18 @@ Preconditions:
 
 * provide runs via `analysis.runs`/`--run` or rely on the default latest run
 * trace-dependent plots require `trace.nc`
-* if `analysis/` exists without `summary.json`, remove the incomplete analysis folder before re-running `cruncher analyze`
-* each sample run snapshots the lockfile under `meta/lockfile.json`; analysis uses that snapshot to avoid mismatch if the workspace lockfile changes later
+* if `output/` exists without `summary.json`, remove the incomplete output folder before re-running `cruncher analyze`
+* each sample run snapshots the lockfile under `input/lockfile.json`; analysis uses that snapshot to avoid mismatch if the workspace lockfile changes later
 
 Outputs:
 
-* tables: `tables/scores_summary.parquet`, `tables/elites_topk.parquet`,
-  `tables/metrics_joint.parquet`, `tables/opt_trajectory_points.parquet`,
-  `tables/diagnostics_summary.json`, `tables/objective_components.json`,
-  `tables/elites_mmr_summary.parquet`, `tables/elites_nn_distance.parquet`
-* plots: `plots/run_summary.<plot_format>`, `plots/opt_trajectory.<plot_format>`,
-  `plots/elites_nn_distance.<plot_format>`, `plots/overlap_panel.<plot_format>`,
-  `plots/health_panel.<plot_format>` (trace only)
+* tables: `table__scores_summary.parquet`, `table__elites_topk.parquet`,
+  `table__metrics_joint.parquet`, `table__opt_trajectory_points.parquet`,
+  `table__diagnostics_summary.json`, `table__objective_components.json`,
+  `table__elites_mmr_summary.parquet`, `table__elites_nn_distance.parquet`
+* plots: `plot__run_summary.<plot_format>`, `plot__opt_trajectory.<plot_format>`,
+  `plot__elites_nn_distance.<plot_format>`, `plot__overlap_panel.<plot_format>`,
+  `plot__health_panel.<plot_format>` (trace only)
 * reports: `report.json`, `report.md`
 * summaries: `summary.json`, `manifest.json`, `plot_manifest.json`, `table_manifest.json`
 

@@ -83,7 +83,7 @@ dedupe, and success counters.
 2. **lock** -> resolve TF names to exact cached artifacts and hashes
 3. **parse** -> validate locked PWMs (no logo rendering)
 4. **sample** -> PT optimization + elite selection + artifacts
-5. **analyze** -> plots/tables + report from artifacts only
+5. **analyze** -> curated `plot__*`/`table__*` artifacts + report from artifacts only
 
 The demo workflows in `docs/demos/` follow this lifecycle end-to-end.
 
@@ -102,8 +102,8 @@ Analysis writes:
 - `summary.json`
 - `report.md` and `report.json`
 - `plot_manifest.json` and `table_manifest.json`
-- `plots/` (curated figures)
-- `tables/` (curated tabular artifacts)
+- `plot__*` (curated figures)
+- `table__*` (curated tabular artifacts)
 
 ## Config mapping
 

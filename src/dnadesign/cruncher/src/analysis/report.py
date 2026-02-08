@@ -17,10 +17,16 @@ from pathlib import Path
 import yaml
 
 from dnadesign.cruncher.analysis.layout import (
+    analysis_manifest_path,
+    analysis_plot_path,
+    analysis_table_filename,
+    analysis_table_path,
     analysis_used_path,
+    plot_manifest_path,
     report_json_path,
     report_md_path,
     summary_path,
+    table_manifest_path,
 )
 from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json, atomic_write_text
 
@@ -70,19 +76,18 @@ def _safe_int(value: object) -> int | None:
         return None
 
 
-def _path_if_exists(base: Path, rel: str) -> str | None:
-    path = base / rel
-    return rel if path.exists() else None
+def _relative_if_exists(base: Path, target: Path) -> str | None:
+    if not target.exists():
+        return None
+    return str(target.relative_to(base))
 
 
 def _table_path(base: Path, stem: str, fmt: str) -> str | None:
-    rel = f"tables/{stem}.{fmt}"
-    return rel if (base / rel).exists() else None
+    return _relative_if_exists(base, analysis_table_path(base, stem, fmt))
 
 
 def _plot_path(base: Path, stem: str, fmt: str) -> str | None:
-    rel = f"plots/{stem}.{fmt}"
-    return rel if (base / rel).exists() else None
+    return _relative_if_exists(base, analysis_plot_path(base, stem, fmt))
 
 
 def build_report_payload(
@@ -205,13 +210,14 @@ def build_report_payload(
 
     pointers = {
         "start_here_plot": _plot_path(analysis_root, "run_summary", plot_format),
-        "diagnostics": _path_if_exists(analysis_root, "tables/diagnostics_summary.json"),
-        "objective_components": _path_if_exists(analysis_root, "tables/objective_components.json"),
+        "diagnostics": _table_path(analysis_root, "diagnostics_summary", "json"),
+        "objective_components": _table_path(analysis_root, "objective_components", "json"),
         "elites_mmr_summary": _table_path(analysis_root, "elites_mmr_summary", table_format),
         "overlap_summary": _table_path(analysis_root, "overlap_pair_summary", table_format),
         "elite_topk": _table_path(analysis_root, "elites_topk", table_format),
-        "plot_manifest": _path_if_exists(analysis_root, "plot_manifest.json"),
-        "table_manifest": _path_if_exists(analysis_root, "table_manifest.json"),
+        "manifest": _relative_if_exists(analysis_root, analysis_manifest_path(analysis_root)),
+        "plot_manifest": _relative_if_exists(analysis_root, plot_manifest_path(analysis_root)),
+        "table_manifest": _relative_if_exists(analysis_root, table_manifest_path(analysis_root)),
     }
 
     payload: dict[str, object] = {
@@ -309,16 +315,18 @@ def write_report_md(
             "",
             "## Start here",
             "",
-            f"- {pointers.get('start_here_plot') or 'plots/run_summary.<ext>'}",
-            f"- {pointers.get('diagnostics') or 'tables/diagnostics_summary.json'}",
-            f"- {pointers.get('objective_components') or 'tables/objective_components.json'}",
+            f"- {pointers.get('start_here_plot') or 'plots/plot__run_summary.<ext>'}",
+            f"- {pointers.get('diagnostics') or 'output/table__diagnostics_summary.json'}",
+            f"- {pointers.get('objective_components') or 'output/table__objective_components.json'}",
         ]
     )
     elites_mmr_path = pointers.get("elites_mmr_summary")
     if elites_mmr_path:
         lines.append(f"- {elites_mmr_path}")
-    overlap_path = pointers.get("overlap_summary") or f"tables/overlap_pair_summary.{table_format}"
-    elite_topk_path = pointers.get("elite_topk") or f"tables/elites_topk.{table_format}"
+    overlap_path = pointers.get("overlap_summary") or (
+        f"output/{analysis_table_filename('overlap_pair_summary', table_format)}"
+    )
+    elite_topk_path = pointers.get("elite_topk") or f"output/{analysis_table_filename('elites_topk', table_format)}"
     lines.extend([f"- {overlap_path}", f"- {elite_topk_path}"])
 
     autopicks = payload.get("autopicks")
@@ -332,14 +340,15 @@ def write_report_md(
         lines.extend([f"- {item}" for item in warnings])
 
     artifact_index = [
-        pointers.get("start_here_plot") or "plots/run_summary.<ext>",
-        pointers.get("diagnostics") or "tables/diagnostics_summary.json",
-        pointers.get("objective_components") or "tables/objective_components.json",
+        pointers.get("start_here_plot") or "plots/plot__run_summary.<ext>",
+        pointers.get("diagnostics") or "output/table__diagnostics_summary.json",
+        pointers.get("objective_components") or "output/table__objective_components.json",
         pointers.get("elites_mmr_summary") or None,
         overlap_path,
         elite_topk_path,
-        "plot_manifest.json",
-        "table_manifest.json",
+        pointers.get("manifest") or "output/manifest.json",
+        pointers.get("plot_manifest") or "output/plot_manifest.json",
+        pointers.get("table_manifest") or "output/table_manifest.json",
     ]
     artifact_index = [item for item in artifact_index if item]
     move_summary = _table_path(analysis_root, "move_stats_summary", table_format)
@@ -375,9 +384,9 @@ def ensure_report(
             raise FileNotFoundError(f"Missing analysis summary JSON: {summary_path(analysis_root)}")
         summary_payload = loaded_summary
     if diagnostics_payload is None:
-        diagnostics_payload = _load_json(analysis_root / "tables" / "diagnostics_summary.json")
+        diagnostics_payload = _load_json(analysis_table_path(analysis_root, "diagnostics_summary", "json"))
     if objective_components is None:
-        objective_components = _load_json(analysis_root / "tables" / "objective_components.json")
+        objective_components = _load_json(analysis_table_path(analysis_root, "objective_components", "json"))
     if overlap_summary is None:
         overlap_summary = summary_payload.get("overlap_summary") if isinstance(summary_payload, dict) else None
     if analysis_used_payload is None:

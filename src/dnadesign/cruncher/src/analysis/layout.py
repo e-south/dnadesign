@@ -16,11 +16,13 @@ from typing import Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
-ANALYSIS_LAYOUT_VERSION = "v9"
+ANALYSIS_LAYOUT_VERSION = "v10"
 ANALYSIS_DIR_NAME = "analysis"
 ARCHIVE_DIR_NAME = "_archive"
-PLOTS_DIR_NAME = "plots"
-TABLES_DIR_NAME = "tables"
+ANALYSIS_OUTPUT_DIR = "output"
+ANALYSIS_PLOTS_DIR = "plots"
+PLOT_FILE_PREFIX = "plot__"
+TABLE_FILE_PREFIX = "table__"
 PLOT_MANIFEST_FILE_NAME = "plot_manifest.json"
 TABLE_MANIFEST_FILE_NAME = "table_manifest.json"
 MANIFEST_FILE_NAME = "manifest.json"
@@ -31,39 +33,71 @@ def analysis_root(run_dir: Path) -> Path:
 
 
 def analysis_plots_root(analysis_root: Path) -> Path:
-    return analysis_root / PLOTS_DIR_NAME
+    return analysis_root / ANALYSIS_PLOTS_DIR
 
 
 def analysis_tables_root(analysis_root: Path) -> Path:
-    return analysis_root / TABLES_DIR_NAME
+    return analysis_root / ANALYSIS_OUTPUT_DIR
+
+
+def analysis_plot_filename(plot_key: str, plot_format: str) -> str:
+    key = str(plot_key).strip()
+    ext = str(plot_format).strip().lstrip(".")
+    if not key:
+        raise ValueError("plot key must be non-empty")
+    if not ext:
+        raise ValueError("plot format must be non-empty")
+    if "/" in key or "\\" in key:
+        raise ValueError(f"plot key must not contain path separators: {plot_key!r}")
+    return f"{PLOT_FILE_PREFIX}{key}.{ext}"
+
+
+def analysis_table_filename(table_key: str, table_format: str) -> str:
+    key = str(table_key).strip()
+    ext = str(table_format).strip().lstrip(".")
+    if not key:
+        raise ValueError("table key must be non-empty")
+    if not ext:
+        raise ValueError("table format must be non-empty")
+    if "/" in key or "\\" in key:
+        raise ValueError(f"table key must not contain path separators: {table_key!r}")
+    return f"{TABLE_FILE_PREFIX}{key}.{ext}"
+
+
+def analysis_plot_path(analysis_root: Path, plot_key: str, plot_format: str) -> Path:
+    return analysis_plots_root(analysis_root) / analysis_plot_filename(plot_key, plot_format)
+
+
+def analysis_table_path(analysis_root: Path, table_key: str, table_format: str) -> Path:
+    return analysis_tables_root(analysis_root) / analysis_table_filename(table_key, table_format)
 
 
 def summary_path(analysis_root: Path) -> Path:
-    return analysis_root / "summary.json"
+    return analysis_tables_root(analysis_root) / "summary.json"
 
 
 def report_json_path(analysis_root: Path) -> Path:
-    return analysis_root / "report.json"
+    return analysis_tables_root(analysis_root) / "report.json"
 
 
 def report_md_path(analysis_root: Path) -> Path:
-    return analysis_root / "report.md"
+    return analysis_tables_root(analysis_root) / "report.md"
 
 
 def analysis_used_path(analysis_root: Path) -> Path:
-    return analysis_root / "analysis_used.yaml"
+    return analysis_tables_root(analysis_root) / "analysis_used.yaml"
 
 
 def plot_manifest_path(analysis_root: Path) -> Path:
-    return analysis_root / PLOT_MANIFEST_FILE_NAME
+    return analysis_tables_root(analysis_root) / PLOT_MANIFEST_FILE_NAME
 
 
 def table_manifest_path(analysis_root: Path) -> Path:
-    return analysis_root / TABLE_MANIFEST_FILE_NAME
+    return analysis_tables_root(analysis_root) / TABLE_MANIFEST_FILE_NAME
 
 
 def analysis_manifest_path(analysis_root: Path) -> Path:
-    return analysis_root / MANIFEST_FILE_NAME
+    return analysis_tables_root(analysis_root) / MANIFEST_FILE_NAME
 
 
 def load_summary(path: Path, *, required: bool = False) -> Optional[dict]:
@@ -122,11 +156,22 @@ def table_paths_by_key(analysis_root: Path) -> dict[str, Path]:
             raise ValueError(
                 f"analysis table manifest table entry '{key}' has invalid path: {table_manifest_path(analysis_root)}"
             )
+        rel_path_obj = Path(rel_path)
+        if rel_path_obj.name != rel_path or rel_path.startswith("."):
+            raise ValueError(
+                f"analysis table manifest table entry '{key}' must use a flat filename path: "
+                f"{table_manifest_path(analysis_root)}"
+            )
+        if not rel_path.startswith(TABLE_FILE_PREFIX):
+            raise ValueError(
+                f"analysis table manifest table entry '{key}' must start with '{TABLE_FILE_PREFIX}': "
+                f"{table_manifest_path(analysis_root)}"
+            )
         if key in resolved:
             raise ValueError(
                 f"analysis table manifest has duplicate table key '{key}': {table_manifest_path(analysis_root)}"
             )
-        resolved[key] = analysis_root / rel_path
+        resolved[key] = analysis_tables_root(analysis_root) / rel_path
     return resolved
 
 

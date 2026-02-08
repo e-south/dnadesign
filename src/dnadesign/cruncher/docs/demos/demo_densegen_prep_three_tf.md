@@ -50,7 +50,7 @@ cruncher analyze --summary -c "$CONFIG"
 Plots and tables are written under:
 
 ```
-<workspace>/outputs/sample/latest/
+<workspace>/outputs/runs/latest/
 ```
 
 ## Related docs

@@ -18,7 +18,7 @@ This doc describes the Cruncher run lifecycle, module boundaries, and on-disk ar
 2. **lock** -> resolve TFs to exact cached artifacts (`<workspace>/.cruncher/locks/<config>.lock.json`)
 3. **parse** *(optional)* -> validate cached PWMs (no logo rendering)
 4. **sample** -> run MCMC and write sequences/trace + manifests
-5. **analyze** -> plots/tables + report from sample artifacts (offline, written in analysis root)
+5. **analyze** -> curated `plot__*`/`table__*` artifacts + report from sample artifacts (offline, written in analysis root)
 
 ---
 
@@ -145,8 +145,8 @@ A typical **sample** run directory contains:
 - `summary.json` - canonical analysis summary
 - `report.json` + `report.md` - analysis report outputs from `cruncher analyze`
 - `plot_manifest.json` + `table_manifest.json` + `manifest.json` - analysis inventories
-- `plots/` - curated plot outputs
-- `tables/` - curated table outputs
+- `plot__*` - curated plot outputs
+- `table__*` - curated table outputs
 
 ---
 

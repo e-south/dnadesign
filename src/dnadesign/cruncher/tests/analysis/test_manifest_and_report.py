@@ -17,7 +17,17 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from dnadesign.cruncher.analysis.layout import analysis_root, summary_path
+from dnadesign.cruncher.analysis.layout import (
+    analysis_manifest_path,
+    analysis_plot_path,
+    analysis_root,
+    analysis_table_path,
+    plot_manifest_path,
+    report_json_path,
+    report_md_path,
+    summary_path,
+    table_manifest_path,
+)
 from dnadesign.cruncher.analysis.report import build_report_payload, ensure_report
 from dnadesign.cruncher.artifacts.layout import (
     elites_path,
@@ -143,15 +153,16 @@ def test_build_manifest_and_report(tmp_path: Path) -> None:
         "objective_components": {},
         "overlap_summary": {},
     }
+    summary_path(analysis_dir).parent.mkdir(parents=True, exist_ok=True)
     summary_path(analysis_dir).write_text(json.dumps(summary_payload))
 
     ensure_report(analysis_root=analysis_dir, summary_payload=summary_payload, refresh=True)
 
     report_root = analysis_root(run_dir)
-    assert (report_root / "report.json").exists()
-    assert (report_root / "report.md").exists()
+    assert report_json_path(report_root).exists()
+    assert report_md_path(report_root).exists()
 
-    report = json.loads((report_root / "report.json").read_text())
+    report = json.loads(report_json_path(report_root).read_text())
     assert report["run"]["run"] == "sample_test"
 
 
@@ -178,11 +189,12 @@ def test_report_includes_learning_highlights(tmp_path: Path) -> None:
         },
         "overlap_summary": {},
     }
+    summary_path(analysis_dir).parent.mkdir(parents=True, exist_ok=True)
     summary_path(analysis_dir).write_text(json.dumps(summary_payload))
 
     ensure_report(analysis_root=analysis_dir, summary_payload=summary_payload, refresh=True)
 
-    report = json.loads((analysis_dir / "report.json").read_text())
+    report = json.loads(report_json_path(analysis_dir).read_text())
     learning = report["highlights"]["learning"]
     assert learning["best_score_draw"] == 5
     assert learning["best_score_chain"] == 1
@@ -215,6 +227,34 @@ def test_report_payload_preserves_zero_highlights() -> None:
     assert diversity["unique_fraction"] == 0.0
     assert overlap["overlap_rate_median"] == 0.0
     assert overlap["overlap_total_bp_median"] == 0.0
+
+
+def test_report_payload_paths_use_flat_output_and_plots_schema(tmp_path: Path) -> None:
+    analysis_dir = tmp_path / "run"
+    analysis_plot_path(analysis_dir, "run_summary", "png").parent.mkdir(parents=True, exist_ok=True)
+    analysis_plot_path(analysis_dir, "run_summary", "png").write_text("png")
+    analysis_table_path(analysis_dir, "diagnostics_summary", "json").parent.mkdir(parents=True, exist_ok=True)
+    analysis_table_path(analysis_dir, "diagnostics_summary", "json").write_text("{}")
+    analysis_table_path(analysis_dir, "objective_components", "json").write_text("{}")
+    analysis_manifest_path(analysis_dir).write_text("{}")
+    plot_manifest_path(analysis_dir).write_text('{"plots": []}')
+    table_manifest_path(analysis_dir).write_text('{"tables": []}')
+
+    payload = build_report_payload(
+        analysis_root=analysis_dir,
+        summary_payload={"run": "sample_one", "analysis_id": "analysis_one", "tf_names": ["lexA"]},
+        diagnostics_payload={"status": "ok", "warnings": [], "metrics": {}},
+        objective_components={},
+        overlap_summary={},
+        analysis_used_payload={"analysis": {"table_format": "parquet", "plot_format": "png"}},
+    )
+    pointers = payload["paths"]
+    assert pointers["start_here_plot"] == "plots/plot__run_summary.png"
+    assert pointers["diagnostics"] == "output/table__diagnostics_summary.json"
+    assert pointers["objective_components"] == "output/table__objective_components.json"
+    assert pointers["manifest"] == "output/manifest.json"
+    assert pointers["plot_manifest"] == "output/plot_manifest.json"
+    assert pointers["table_manifest"] == "output/table_manifest.json"
 
 
 def test_ensure_report_requires_summary_json_when_payload_not_provided(tmp_path: Path) -> None:

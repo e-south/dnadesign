@@ -20,6 +20,14 @@ import pandas as pd
 import pytest
 import yaml
 
+from dnadesign.cruncher.analysis.layout import (
+    analysis_plot_path,
+    analysis_table_path,
+    analysis_used_path,
+    plot_manifest_path,
+    summary_path,
+    table_manifest_path,
+)
 from dnadesign.cruncher.app import analyze_workflow
 from dnadesign.cruncher.app.analyze_workflow import _load_elites_meta, run_analyze
 from dnadesign.cruncher.artifacts.layout import (
@@ -61,7 +69,7 @@ def test_load_elites_meta_requires_mapping(tmp_path: Path) -> None:
 
 
 def _make_sample_run_dir(tmp_path: Path, name: str) -> Path:
-    run_dir = tmp_path / "results" / "sample" / name
+    run_dir = tmp_path / "results" / "runs" / name
     run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir
 
@@ -304,16 +312,15 @@ def test_analyze_creates_analysis_run_and_manifest_updates(tmp_path: Path) -> No
     assert analysis_runs
 
     analysis_dir = analysis_runs[0]
-    assert (analysis_dir / "analysis_used.yaml").exists()
-    assert (analysis_dir / "summary.json").exists()
-    assert (analysis_dir / "manifest.json").exists()
-    assert (analysis_dir / "manifest.json").exists()
-    assert (analysis_dir / "tables" / "scores_summary.parquet").exists()
-    assert (analysis_dir / "tables" / "metrics_joint.parquet").exists()
-    assert (analysis_dir / "tables" / "diagnostics_summary.json").exists()
-    assert (analysis_dir / "tables" / "opt_trajectory_points.parquet").exists()
+    assert analysis_used_path(analysis_dir).exists()
+    assert summary_path(analysis_dir).exists()
+    assert (analysis_dir / "output" / "manifest.json").exists()
+    assert analysis_table_path(analysis_dir, "scores_summary", "parquet").exists()
+    assert analysis_table_path(analysis_dir, "metrics_joint", "parquet").exists()
+    assert analysis_table_path(analysis_dir, "diagnostics_summary", "json").exists()
+    assert analysis_table_path(analysis_dir, "opt_trajectory_points", "parquet").exists()
 
-    table_manifest = json.loads((analysis_dir / "table_manifest.json").read_text())
+    table_manifest = json.loads(table_manifest_path(analysis_dir).read_text())
     keys = {entry.get("key") for entry in table_manifest.get("tables", [])}
     assert "metrics_joint" in keys
     assert "diagnostics_summary" in keys
@@ -324,7 +331,7 @@ def test_analyze_creates_analysis_run_and_manifest_updates(tmp_path: Path) -> No
 
     analysis_runs_repeat = run_analyze(cfg, config_path)
     assert analysis_runs_repeat
-    summary_after = json.loads((analysis_dir / "summary.json").read_text())
+    summary_after = json.loads(summary_path(analysis_dir).read_text())
     assert summary_after.get("analysis_id")
 
 
@@ -619,8 +626,8 @@ def test_analyze_restores_previous_analysis_when_generation_fails(
     )
 
     analysis_dir = run_dir
-    analysis_dir.mkdir(parents=True, exist_ok=True)
-    (analysis_dir / "summary.json").write_text(json.dumps({"analysis_id": "old-analysis"}))
+    summary_path(analysis_dir).parent.mkdir(parents=True, exist_ok=True)
+    summary_path(analysis_dir).write_text(json.dumps({"analysis_id": "old-analysis"}))
     (analysis_dir / "old_marker.txt").write_text("preserve")
 
     def _boom(*_args, **_kwargs):
@@ -632,7 +639,7 @@ def test_analyze_restores_previous_analysis_when_generation_fails(
     with pytest.raises(RuntimeError, match="synthetic failure in analyze"):
         run_analyze(cfg, config_path)
 
-    restored_summary = json.loads((analysis_dir / "summary.json").read_text())
+    restored_summary = json.loads(summary_path(analysis_dir).read_text())
     assert restored_summary["analysis_id"] == "old-analysis"
     assert (analysis_dir / "old_marker.txt").read_text() == "preserve"
     assert not (run_dir / ".analysis_tmp").exists()
@@ -728,8 +735,8 @@ def test_analyze_opt_trajectory_multi_tf(tmp_path: Path) -> None:
     assert analysis_runs
 
     analysis_dir = analysis_runs[0]
-    assert (analysis_dir / "plots" / "run_summary.png").exists()
-    assert (analysis_dir / "plots" / "opt_trajectory.png").exists()
+    assert analysis_plot_path(analysis_dir, "run_summary", "png").exists()
+    assert analysis_plot_path(analysis_dir, "opt_trajectory", "png").exists()
 
 
 def test_analyze_opt_trajectory_single_tf(tmp_path: Path) -> None:
@@ -777,8 +784,8 @@ def test_analyze_opt_trajectory_single_tf(tmp_path: Path) -> None:
     assert analysis_runs
 
     analysis_dir = analysis_runs[0]
-    assert (analysis_dir / "plots" / "run_summary.png").exists()
-    assert (analysis_dir / "plots" / "opt_trajectory.png").exists()
+    assert analysis_plot_path(analysis_dir, "run_summary", "png").exists()
+    assert analysis_plot_path(analysis_dir, "opt_trajectory", "png").exists()
 
 
 def test_analyze_without_trace_when_no_trace_plots(tmp_path: Path) -> None:
@@ -825,7 +832,7 @@ def test_analyze_without_trace_when_no_trace_plots(tmp_path: Path) -> None:
     analysis_runs = run_analyze(cfg, config_path)
     assert analysis_runs
     analysis_dir = analysis_runs[0]
-    plot_manifest = json.loads((analysis_dir / "plot_manifest.json").read_text())
+    plot_manifest = json.loads(plot_manifest_path(analysis_dir).read_text())
     health = next(entry for entry in plot_manifest.get("plots", []) if entry.get("key") == "health_panel")
     assert health.get("generated") is False
     assert (health.get("skip_reason") or "") == "trace disabled"
@@ -875,7 +882,7 @@ def test_analyze_missing_trace_with_mcmc_diagnostics(tmp_path: Path) -> None:
     analysis_runs = run_analyze(cfg, config_path)
     assert analysis_runs
     analysis_dir = analysis_runs[0]
-    diagnostics = json.loads((analysis_dir / "tables" / "diagnostics_summary.json").read_text())
+    diagnostics = json.loads(analysis_table_path(analysis_dir, "diagnostics_summary", "json").read_text())
     trace_metrics = diagnostics.get("metrics", {}).get("trace", {})
     assert trace_metrics.get("rhat") is None
 
@@ -924,11 +931,11 @@ def test_analyze_auto_tf_pair_selection(tmp_path: Path) -> None:
     analysis_runs = run_analyze(cfg, config_path)
     assert analysis_runs
     analysis_dir = analysis_runs[0]
-    used_payload = yaml.safe_load((analysis_dir / "analysis_used.yaml").read_text())
+    used_payload = yaml.safe_load(analysis_used_path(analysis_dir).read_text())
     assert used_payload["analysis"]["pairwise"] == "auto"
     assert used_payload["tf_pair_selected"] == ["lexA", "cpxR"]
 
-    plot_manifest = json.loads((analysis_dir / "plot_manifest.json").read_text())
+    plot_manifest = json.loads(plot_manifest_path(analysis_dir).read_text())
     overlap = next(entry for entry in plot_manifest.get("plots", []) if entry.get("key") == "overlap_panel")
     assert overlap.get("generated") is False
     assert "elites_count < 2" in str(overlap.get("skip_reason"))
@@ -976,14 +983,14 @@ def test_analyze_prunes_stale_analysis_artifacts_when_not_archiving(tmp_path: Pa
     )
 
     analysis_root = run_dir
-    analysis_root.mkdir(parents=True, exist_ok=True)
-    (analysis_root / "summary.json").write_text(json.dumps({"analysis_id": "old-analysis"}))
+    summary_path(analysis_root).parent.mkdir(parents=True, exist_ok=True)
+    summary_path(analysis_root).write_text(json.dumps({"analysis_id": "old-analysis"}))
     stale_plot = analysis_root / "score__box.png"
     stale_plot.write_text("stale")
 
     manifest_file = manifest_path(run_dir)
     manifest_payload = json.loads(manifest_file.read_text())
-    manifest_payload["artifacts"] = ["plots/score__box.png"]
+    manifest_payload["artifacts"] = ["plot__score__box.png"]
     manifest_file.write_text(json.dumps(manifest_payload))
 
     cfg = load_config(config_path)
@@ -991,7 +998,7 @@ def test_analyze_prunes_stale_analysis_artifacts_when_not_archiving(tmp_path: Pa
 
     manifest = yaml.safe_load(manifest_path(run_dir).read_text())
     artifacts = manifest.get("artifacts", [])
-    assert "plots/score__box.png" not in {a.get("path") if isinstance(a, dict) else a for a in artifacts}
+    assert "plot__score__box.png" not in {a.get("path") if isinstance(a, dict) else a for a in artifacts}
 
 
 def test_analyze_fails_on_lockfile_mismatch(tmp_path: Path) -> None:
@@ -1088,7 +1095,7 @@ def test_analyze_plot_manifest_single_tf_overlap_skip_and_trace_skip(tmp_path: P
     assert analysis_runs
     analysis_dir = analysis_runs[0]
 
-    plot_manifest = json.loads((analysis_dir / "plot_manifest.json").read_text())
+    plot_manifest = json.loads(plot_manifest_path(analysis_dir).read_text())
     plots_by_key = {entry.get("key"): entry for entry in plot_manifest.get("plots", [])}
     assert set(plots_by_key) == {
         "run_summary",
@@ -1150,7 +1157,7 @@ def test_analyze_plot_manifest_skips_overlap_when_elites_count_lt_two(tmp_path: 
     assert analysis_runs
     analysis_dir = analysis_runs[0]
 
-    plot_manifest = json.loads((analysis_dir / "plot_manifest.json").read_text())
+    plot_manifest = json.loads(plot_manifest_path(analysis_dir).read_text())
     plots_by_key = {entry.get("key"): entry for entry in plot_manifest.get("plots", [])}
     assert plots_by_key["overlap_panel"]["generated"] is False
     assert "elites_count < 2" in str(plots_by_key["overlap_panel"].get("skip_reason"))

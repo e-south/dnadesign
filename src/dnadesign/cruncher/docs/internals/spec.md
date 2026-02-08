@@ -153,8 +153,8 @@ Each run directory contains:
 - `elites.parquet` — elite sequences (parquet)
 - `elites.json` — elite sequences (JSON, human-readable)
 - `elites.yaml` — elite metadata (YAML)
-- `plots/` — curated analysis figures
-- `tables/` — curated analysis tables
+- `plot__*` — curated analysis figures
+- `table__*` — curated analysis tables
 - `summary.json` — analysis provenance and artifacts
 - `manifest.json` — artifact inventory with generation reasons
 - `analysis_used.yaml` — analysis settings used

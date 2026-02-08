@@ -14,6 +14,7 @@ from __future__ import annotations
 import glob
 import json
 import logging
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterable, Optional
@@ -39,7 +40,7 @@ from dnadesign.cruncher.app.run_service import (
     find_invalid_run_index_entries,
     list_runs,
 )
-from dnadesign.cruncher.artifacts.layout import sequences_path
+from dnadesign.cruncher.artifacts.layout import campaign_slot_dir, sequences_path
 from dnadesign.cruncher.artifacts.manifest import load_manifest
 from dnadesign.cruncher.config.schema_v3 import CampaignConfig, CruncherConfig
 from dnadesign.cruncher.utils.paths import resolve_catalog_root
@@ -145,7 +146,25 @@ def summarize_campaign(
 
     best_df = _best_rows(summary_df, top_k=top_k)
 
-    output_root = out_dir or (runs_root / "campaigns" / expansion.campaign_id)
+    if out_dir is None:
+        output_root = campaign_slot_dir(
+            config_path=config_path,
+            out_dir=cfg.out_dir,
+            campaign_name=expansion.name,
+            slot="latest",
+        )
+        previous_root = campaign_slot_dir(
+            config_path=config_path,
+            out_dir=cfg.out_dir,
+            campaign_name=expansion.name,
+            slot="previous",
+        )
+        if previous_root.exists():
+            shutil.rmtree(previous_root)
+        if output_root.exists():
+            shutil.move(str(output_root), previous_root)
+    else:
+        output_root = out_dir
     output_root.mkdir(parents=True, exist_ok=True)
 
     manifest = build_campaign_manifest(expansion=expansion, config_path=config_path)

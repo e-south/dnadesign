@@ -26,11 +26,11 @@ cruncher analyze
 cruncher analyze --summary
 ```
 
-Outputs are written under each run directory (typically `outputs/sample/latest/`). The canonical entrypoints are:
+Outputs are written under each run directory (typically `outputs/runs/latest/`). The canonical entrypoints are:
 
-- `summary.json`
-- `report.md`
-- `report.json`
+- `output/summary.json`
+- `output/report.md`
+- `output/report.json`
 
 ## Fixed-length sampling model
 
@@ -84,30 +84,30 @@ When `objective.bidirectional=true`, canonicalization is automatic: reverse comp
 
 Analysis writes a curated, orthogonal suite of plots and tables (no plot booleans). Key artifacts include:
 
-- `tables/scores_summary.parquet`
-- `tables/elites_topk.parquet`
-- `tables/metrics_joint.parquet`
-- `tables/opt_trajectory_points.parquet`
-- `tables/overlap_pair_summary.parquet`
-- `tables/overlap_per_elite.parquet`
-- `tables/diagnostics_summary.json`
-- `tables/objective_components.json`
-- `tables/elites_mmr_summary.parquet`
-- `tables/elites_nn_distance.parquet`
+- `output/table__scores_summary.parquet`
+- `output/table__elites_topk.parquet`
+- `output/table__metrics_joint.parquet`
+- `output/table__opt_trajectory_points.parquet`
+- `output/table__overlap_pair_summary.parquet`
+- `output/table__overlap_per_elite.parquet`
+- `output/table__diagnostics_summary.json`
+- `output/table__objective_components.json`
+- `output/table__elites_mmr_summary.parquet`
+- `output/table__elites_nn_distance.parquet`
 
 Sampling artifacts consumed by analysis:
 
-- `elites_hits.parquet` (per-elite, per-TF best-hit/core metadata)
-- `random_baseline.parquet` (baseline cloud for trajectory plots; includes seed, n_samples, length, score_scale, bidirectional, background model)
-- `random_baseline_hits.parquet` (baseline best-hit/core metadata for diversity context)
+- `optimize/elites_hits.parquet` (per-elite, per-TF best-hit/core metadata)
+- `optimize/random_baseline.parquet` (baseline cloud for trajectory plots; includes seed, n_samples, length, score_scale, bidirectional, background model)
+- `optimize/random_baseline_hits.parquet` (baseline best-hit/core metadata for diversity context)
 
 Plots (always generated when data is available):
 
-- `plots/run_summary.*`
-- `plots/opt_trajectory.*`
-- `plots/elites_nn_distance.*`
-- `plots/overlap_panel.*`
-- `plots/health_panel.*` (only if `trace.nc` exists)
+- `plots/plot__run_summary.*`
+- `plots/plot__opt_trajectory.*`
+- `plots/plot__elites_nn_distance.*`
+- `plots/plot__overlap_panel.*`
+- `plots/plot__health_panel.*` (only if `optimize/trace.nc` exists)
 
 ## Diagnostics quick read
 
@@ -131,7 +131,7 @@ cruncher runs best --set-index 1
 Run artifacts live under:
 
 ```
-<workspace>/outputs/sample/latest/
+<workspace>/outputs/runs/latest/
 ```
 
 ## Related references

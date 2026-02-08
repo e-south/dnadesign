@@ -15,7 +15,14 @@ from pathlib import Path
 import yaml
 
 from dnadesign.cruncher.app.parse_workflow import run_parse
-from dnadesign.cruncher.artifacts.layout import logos_dir_for_run, manifest_path, out_root, status_path
+from dnadesign.cruncher.artifacts.layout import (
+    build_run_dir,
+    lockfile_snapshot_path,
+    logos_dir_for_run,
+    out_root,
+    parse_manifest_path,
+    pwm_summary_path,
+)
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 from dnadesign.cruncher.utils.paths import resolve_lock_path
@@ -70,21 +77,17 @@ def test_parse_skips_logos_when_disabled(tmp_path: Path) -> None:
 
     run_parse(cfg, config_path)
 
-    out_dir = tmp_path / "runs" / "parse"
-    parse_runs = []
-    for child in out_dir.iterdir():
-        if not child.is_dir():
-            continue
-        if manifest_path(child).exists():
-            parse_runs.append(child)
-            continue
-        for grand in child.iterdir():
-            if grand.is_dir() and manifest_path(grand).exists():
-                parse_runs.append(grand)
-    assert len(parse_runs) == 1
-    parse_dir = parse_runs[0]
-    assert manifest_path(parse_dir).exists()
-    assert status_path(parse_dir).exists()
+    parse_dir = build_run_dir(
+        config_path=config_path,
+        out_dir=cfg.out_dir,
+        stage="parse",
+        tfs=["lexA"],
+        set_index=1,
+        include_set_index=False,
+    )
+    assert parse_manifest_path(parse_dir).exists()
+    assert pwm_summary_path(parse_dir).exists()
+    assert lockfile_snapshot_path(parse_dir).exists()
     logo_dir = logos_dir_for_run(out_root(config_path, cfg.out_dir), "parse", parse_dir.name)
     assert not logo_dir.exists() or not list(logo_dir.glob("*_logo.png"))
 
@@ -138,17 +141,13 @@ def test_parse_is_idempotent_when_inputs_match(tmp_path: Path) -> None:
     )
     run_parse(cfg, config_path)
 
-    out_dir = tmp_path / "runs" / "parse"
-    parse_runs = []
-    for child in out_dir.iterdir():
-        if not child.is_dir():
-            continue
-        if manifest_path(child).exists():
-            parse_runs.append(child)
-            continue
-        for grand in child.iterdir():
-            if grand.is_dir() and manifest_path(grand).exists():
-                parse_runs.append(grand)
-    assert len(parse_runs) == 1
-    manifest = json.loads(manifest_path(parse_runs[0]).read_text())
+    parse_dir = build_run_dir(
+        config_path=config_path,
+        out_dir=cfg.out_dir,
+        stage="parse",
+        tfs=["lexA"],
+        set_index=1,
+        include_set_index=False,
+    )
+    manifest = json.loads(parse_manifest_path(parse_dir).read_text())
     assert manifest.get("parse_signature")

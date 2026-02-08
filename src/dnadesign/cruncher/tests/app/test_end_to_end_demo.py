@@ -27,7 +27,10 @@ from dnadesign.cruncher.artifacts.layout import (
     logos_root,
     manifest_path,
     out_root,
+    parse_manifest_path,
+    pwm_summary_path,
     sequences_path,
+    trace_path,
 )
 from dnadesign.cruncher.cli.app import app
 from dnadesign.cruncher.config.load import load_config
@@ -155,26 +158,11 @@ def test_end_to_end_sites_pipeline(tmp_path: Path) -> None:
     run_parse(cfg, config_path)
     run_sample(cfg, config_path)
 
-    results_dir = tmp_path / "results"
-
-    def _find_runs(stage_dir: Path) -> list[Path]:
-        runs: list[Path] = []
-        for child in stage_dir.iterdir():
-            if not child.is_dir():
-                continue
-            if manifest_path(child).exists():
-                runs.append(child)
-                continue
-            for grand in child.iterdir():
-                if grand.is_dir() and manifest_path(grand).exists():
-                    runs.append(grand)
-        return runs
-
-    parse_runs = _find_runs(results_dir / "parse")
-    sample_runs = _find_runs(results_dir / "sample")
-    assert parse_runs
-    assert sample_runs
-    sample_dir = sample_runs[0]
+    sample_dir = tmp_path / "results" / "runs" / "latest"
+    assert sample_dir.exists()
+    assert manifest_path(sample_dir).exists()
+    assert parse_manifest_path(sample_dir).exists()
+    assert pwm_summary_path(sample_dir).exists()
 
     result = runner.invoke(app, ["catalog", "logos", "--set", "1", "-c", str(config_path)])
     assert result.exit_code == 0
@@ -186,7 +174,7 @@ def test_end_to_end_sites_pipeline(tmp_path: Path) -> None:
     assert any("cpxR" in path.name for path in logos)
     assert config_used_path(sample_dir).exists()
     assert sequences_path(sample_dir).exists()
-    assert not (sample_dir / "artifacts" / "trace.nc").exists()
+    assert not trace_path(sample_dir).exists()
 
 
 def test_demo_workspace_cli_without_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -318,23 +306,17 @@ def test_demo_campaign_pair_local_only_generates_plots(tmp_path: Path) -> None:
         result = runner.invoke(app, command)
         assert result.exit_code == 0
 
-    sample_runs = [
-        child
-        for child in (workspace / "outputs" / "sample").iterdir()
-        if child.is_dir() and manifest_path(child).exists()
-    ]
-    assert sample_runs
-    latest_run = sorted(sample_runs)[-1]
-    analysis_dir = latest_run
-    assert (analysis_dir / "plots" / "run_summary.png").exists()
-    assert (analysis_dir / "plots" / "opt_trajectory.png").exists()
-    assert (analysis_dir / "plots" / "elites_nn_distance.png").exists()
-    assert (analysis_dir / "plots" / "overlap_panel.png").exists()
-    assert (analysis_dir / "plots" / "health_panel.png").exists()
+    analysis_dir = workspace / "outputs" / "runs" / "latest"
+    assert analysis_dir.is_dir()
+    assert manifest_path(analysis_dir).exists()
+    assert (analysis_dir / "plots" / "plot__run_summary.png").exists()
+    assert (analysis_dir / "plots" / "plot__opt_trajectory.png").exists()
+    assert (analysis_dir / "plots" / "plot__elites_nn_distance.png").exists()
+    assert (analysis_dir / "plots" / "plot__overlap_panel.png").exists()
+    assert (analysis_dir / "plots" / "plot__health_panel.png").exists()
 
-    campaign_roots = [child for child in (workspace / "outputs" / "campaigns").iterdir() if child.is_dir()]
-    assert campaign_roots
-    campaign_dir = sorted(campaign_roots)[-1]
+    campaign_dir = workspace / "outputs" / "campaign" / "demo_pair" / "latest"
+    assert campaign_dir.is_dir()
     assert (campaign_dir / "plot__best_jointscore_bar.png").exists()
     assert (campaign_dir / "plot__tf_coverage_heatmap.png").exists()
     assert (campaign_dir / "plot__pairgrid_overview.png").exists()

@@ -27,7 +27,7 @@ def test_analysis_entries_verbose_marks_unindexed_when_summary_missing(tmp_path:
 
 def test_list_analysis_entries_skips_archive_when_summary_missing_analysis_id(tmp_path: Path) -> None:
     run_dir = tmp_path / "run"
-    archive_dir = run_dir / "_archive" / "broken-entry"
+    archive_dir = run_dir / "_archive" / "broken-entry" / "output"
     archive_dir.mkdir(parents=True)
     (archive_dir / "summary.json").write_text("{}\n")
 
@@ -37,7 +37,7 @@ def test_list_analysis_entries_skips_archive_when_summary_missing_analysis_id(tm
 
 def test_list_analysis_entries_verbose_skips_archive_when_summary_missing_analysis_id(tmp_path: Path) -> None:
     run_dir = tmp_path / "run"
-    archive_dir = run_dir / "_archive" / "broken-entry"
+    archive_dir = run_dir / "_archive" / "broken-entry" / "output"
     archive_dir.mkdir(parents=True)
     (archive_dir / "summary.json").write_text("{}\n")
 

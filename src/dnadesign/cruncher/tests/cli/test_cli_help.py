@@ -20,6 +20,7 @@ from typer.testing import CliRunner
 
 import dnadesign.cruncher.app.analyze_workflow as analyze_workflow
 import dnadesign.cruncher.cli.commands.sources as sources_module
+from dnadesign.cruncher.artifacts.layout import config_used_path, elites_path, sequences_path
 from dnadesign.cruncher.cli.app import app
 from dnadesign.cruncher.cli.config_resolver import (
     CONFIG_ENV_VAR,
@@ -445,7 +446,7 @@ def test_analyze_latest_requires_complete_artifacts(tmp_path: Path) -> None:
     config_path = tmp_path / "config.yaml"
     config_path.write_text(yaml.safe_dump(config))
 
-    run_dir = tmp_path / "results" / "sample" / "sample_missing_hits"
+    run_dir = tmp_path / "results" / "runs" / "latest"
     run_dir.mkdir(parents=True, exist_ok=True)
 
     config_used = {
@@ -459,8 +460,10 @@ def test_analyze_latest_requires_complete_artifacts(tmp_path: Path) -> None:
             "sample": {"objective": {"score_scale": "normalized-llr"}},
         }
     }
-    (run_dir / "config_used.yaml").write_text(yaml.safe_dump(config_used))
+    config_used_path(run_dir).parent.mkdir(parents=True, exist_ok=True)
+    config_used_path(run_dir).write_text(yaml.safe_dump(config_used))
 
+    sequences_path(run_dir).parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(
         {
             "chain": [0],
@@ -470,7 +473,8 @@ def test_analyze_latest_requires_complete_artifacts(tmp_path: Path) -> None:
             "score_lexA": [1.0],
             "score_cpxR": [1.1],
         }
-    ).to_parquet(run_dir / "sequences.parquet", engine="fastparquet")
+    ).to_parquet(sequences_path(run_dir), engine="fastparquet")
+    elites_path(run_dir).parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(
         {
             "id": ["elite-1"],
@@ -479,7 +483,7 @@ def test_analyze_latest_requires_complete_artifacts(tmp_path: Path) -> None:
             "score_lexA": [1.0],
             "score_cpxR": [1.1],
         }
-    ).to_parquet(run_dir / "elites.parquet", engine="fastparquet")
+    ).to_parquet(elites_path(run_dir), engine="fastparquet")
 
     (run_dir / "run_manifest.json").write_text(
         json.dumps(

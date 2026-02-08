@@ -168,6 +168,13 @@ def _iter_run_dirs(stage_dir: Path) -> list[Path]:
     return runs
 
 
+def _iter_workspace_run_dirs(out_dir: Path) -> list[Path]:
+    runs_root = out_dir / "runs"
+    if not runs_root.exists():
+        return []
+    return _iter_run_dirs(runs_root)
+
+
 def _merge_payload(existing: dict, updates: dict) -> dict:
     merged = dict(existing)
     for key, value in updates.items():
@@ -185,7 +192,7 @@ def _run_index_key(run_dir: Path, updates: dict) -> str:
         if isinstance(run_group, str) and run_group:
             return f"{stage}/{run_group}/{slot}"
         parent_name = run_dir.parent.name
-        if parent_name and parent_name != stage:
+        if parent_name and parent_name not in {stage, "runs"}:
             return f"{stage}/{parent_name}/{slot}"
         return f"{stage}/{slot}"
     return slot
@@ -284,21 +291,18 @@ def rebuild_run_index(cfg: CruncherConfig, config_path: Path) -> Path:
     out_dir = config_path.parent / cfg.out_dir
     index: dict[str, dict] = {}
     if out_dir.exists():
-        for stage_dir in out_dir.iterdir():
-            if not stage_dir.is_dir():
+        for child in _iter_workspace_run_dirs(out_dir):
+            manifest_file = manifest_path(child)
+            if not manifest_file.exists():
                 continue
-            for child in _iter_run_dirs(stage_dir):
-                manifest_file = manifest_path(child)
-                if not manifest_file.exists():
-                    continue
-                payload = json.loads(manifest_file.read_text())
-                entry = _updates_from_manifest(payload)
-                status_payload = load_run_status(child)
-                if status_payload:
-                    entry = _merge_payload(entry, _updates_from_status(status_payload))
-                entry.setdefault("run_dir_guess", str(child.resolve()))
-                run_key = _run_index_key(child, entry)
-                index[run_key] = entry
+            payload = json.loads(manifest_file.read_text())
+            entry = _updates_from_manifest(payload)
+            status_payload = load_run_status(child)
+            if status_payload:
+                entry = _merge_payload(entry, _updates_from_status(status_payload))
+            entry.setdefault("run_dir_guess", str(child.resolve()))
+            run_key = _run_index_key(child, entry)
+            index[run_key] = entry
     return save_run_index(config_path, index, cfg.catalog.catalog_root)
 
 
@@ -310,11 +314,6 @@ def list_runs(cfg: CruncherConfig, config_path: Path, *, stage: Optional[str] = 
         for name, payload in index.items():
             if stage and payload.get("stage") != stage:
                 continue
-            run_dir_raw = payload.get("run_dir") or payload.get("run_dir_guess", name)
-            run_dir = Path(run_dir_raw)
-            stage_name = str(payload.get("stage") or "")
-            if stage_name and not _is_under(run_dir, out_dir / stage_name):
-                continue
             runs.append(RunInfo.from_payload(name, payload))
         runs.sort(key=lambda r: r.created_at or "", reverse=True)
         return runs
@@ -322,33 +321,30 @@ def list_runs(cfg: CruncherConfig, config_path: Path, *, stage: Optional[str] = 
     out_dir = config_path.parent / cfg.out_dir
     if not out_dir.exists():
         return []
-    for stage_dir in out_dir.iterdir():
-        if not stage_dir.is_dir():
+    for child in _iter_workspace_run_dirs(out_dir):
+        manifest_file = manifest_path(child)
+        if not manifest_file.exists():
             continue
-        for child in _iter_run_dirs(stage_dir):
-            manifest_file = manifest_path(child)
-            if not manifest_file.exists():
-                continue
-            payload = json.loads(manifest_file.read_text())
-            run_stage = payload.get("stage", "unknown")
-            if stage and run_stage != stage:
-                continue
-            status_payload = load_run_status(child)
-            runs.append(
-                RunInfo(
-                    name=child.name,
-                    stage=run_stage,
-                    created_at=payload.get("created_at"),
-                    run_dir=child,
-                    status=status_payload.get("status") if status_payload else None,
-                    motif_count=len(payload.get("motifs", [])),
-                    pwm_source=(payload.get("motif_store") or {}).get("pwm_source"),
-                    best_score=status_payload.get("best_score") if status_payload else None,
-                    artifacts=normalize_artifacts(payload.get("artifacts", [])),
-                    regulator_set=payload.get("regulator_set"),
-                    run_group=payload.get("run_group"),
-                )
+        payload = json.loads(manifest_file.read_text())
+        run_stage = payload.get("stage", "unknown")
+        if stage and run_stage != stage:
+            continue
+        status_payload = load_run_status(child)
+        runs.append(
+            RunInfo(
+                name=child.name,
+                stage=run_stage,
+                created_at=payload.get("created_at"),
+                run_dir=child,
+                status=status_payload.get("status") if status_payload else None,
+                motif_count=len(payload.get("motifs", [])),
+                pwm_source=(payload.get("motif_store") or {}).get("pwm_source"),
+                best_score=status_payload.get("best_score") if status_payload else None,
+                artifacts=normalize_artifacts(payload.get("artifacts", [])),
+                regulator_set=payload.get("regulator_set"),
+                run_group=payload.get("run_group"),
             )
+        )
     runs.sort(key=lambda r: r.created_at or "", reverse=True)
     return runs
 
@@ -413,19 +409,16 @@ def get_run(cfg: CruncherConfig, config_path: Path, run_name: str) -> RunInfo:
     run_dir = None
     matches: list[Path] = []
     if out_dir.exists():
-        for stage_dir in out_dir.iterdir():
-            if not stage_dir.is_dir():
+        for candidate in _iter_workspace_run_dirs(out_dir):
+            if not manifest_path(candidate).exists():
                 continue
-            for candidate in _iter_run_dirs(stage_dir):
-                if not manifest_path(candidate).exists():
-                    continue
+            candidate_rel = None
+            try:
+                candidate_rel = candidate.relative_to(out_dir).as_posix()
+            except ValueError:
                 candidate_rel = None
-                try:
-                    candidate_rel = candidate.relative_to(out_dir).as_posix()
-                except ValueError:
-                    candidate_rel = None
-                if candidate.name == run_name or candidate_rel == run_name:
-                    matches.append(candidate)
+            if candidate.name == run_name or candidate_rel == run_name:
+                matches.append(candidate)
     if len(matches) > 1:
         rendered = ", ".join(str(path) for path in matches[:5])
         raise FileNotFoundError(

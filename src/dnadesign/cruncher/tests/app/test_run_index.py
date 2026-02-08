@@ -32,8 +32,8 @@ def test_run_index_rebuild(tmp_path: Path) -> None:
     config_path.write_text(yaml.safe_dump(config))
     cfg = load_config(config_path)
 
-    run_name = "20250101_000000_abcd12"
-    run_dir = tmp_path / "results" / "sample" / run_name
+    run_name = "sample/latest"
+    run_dir = tmp_path / "results" / "runs" / "latest"
     run_dir.mkdir(parents=True, exist_ok=True)
     created_at = datetime.now(timezone.utc).isoformat()
     manifest = {
@@ -75,7 +75,7 @@ def test_run_index_rebuild_includes_nested_latest_slot_runs(tmp_path: Path) -> N
     config_path.write_text(yaml.safe_dump(config))
     cfg = load_config(config_path)
 
-    run_dir = tmp_path / "results" / "sample" / "set1_lexA" / "latest"
+    run_dir = tmp_path / "results" / "runs" / "set1_lexA" / "latest"
     run_dir.mkdir(parents=True, exist_ok=True)
     created_at = datetime.now(timezone.utc).isoformat()
     manifest = {

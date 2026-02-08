@@ -48,9 +48,8 @@ def _write_config(tmp_path: Path, run_name: str) -> Path:
 
 
 def _write_minimal_run(tmp_path: Path, run_name: str) -> Path:
-    run_dir = tmp_path / "outputs" / "sample" / run_name
-    (run_dir / "meta").mkdir(parents=True, exist_ok=True)
-    (run_dir / "artifacts").mkdir(parents=True, exist_ok=True)
+    run_dir = tmp_path / "outputs" / "runs" / run_name
+    run_dir.mkdir(parents=True, exist_ok=True)
 
     pwm_matrix = [[0.25, 0.25, 0.25, 0.25] for _ in range(4)]
     config_used = {
@@ -62,6 +61,7 @@ def _write_minimal_run(tmp_path: Path, run_name: str) -> Path:
             "active_regulator_set": {"index": 1, "tfs": ["lexA", "cpxR"]},
         }
     }
+    config_used_path(run_dir).parent.mkdir(parents=True, exist_ok=True)
     config_used_path(run_dir).write_text(yaml.safe_dump(config_used))
 
     manifest = {
@@ -86,6 +86,7 @@ def _write_minimal_run(tmp_path: Path, run_name: str) -> Path:
             "phase": ["draw"],
         }
     )
+    sequences_path(run_dir).parent.mkdir(parents=True, exist_ok=True)
     seq_df.to_parquet(sequences_path(run_dir), engine="pyarrow", index=False)
 
     elite_df = pd.DataFrame(
@@ -100,6 +101,7 @@ def _write_minimal_run(tmp_path: Path, run_name: str) -> Path:
             "min_norm": [0.2],
         }
     )
+    elites_path(run_dir).parent.mkdir(parents=True, exist_ok=True)
     elite_df.to_parquet(elites_path(run_dir), engine="pyarrow", index=False)
 
     lock_dir = tmp_path / ".cruncher" / "locks"

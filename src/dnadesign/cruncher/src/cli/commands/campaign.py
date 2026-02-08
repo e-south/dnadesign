@@ -28,6 +28,7 @@ from dnadesign.cruncher.app.campaign_service import (
     validate_campaign,
 )
 from dnadesign.cruncher.app.campaign_summary import summarize_campaign
+from dnadesign.cruncher.artifacts.layout import campaign_slot_dir
 from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
     resolve_config_path,
@@ -361,7 +362,7 @@ def notebook(
         None,
         "--out",
         "-o",
-        help="Campaign summary directory (defaults to <out_dir>/campaigns/<campaign_id>).",
+        help="Campaign summary directory (defaults to <out_dir>/campaign/<campaign_name>/latest).",
     ),
     force: bool = typer.Option(False, "--force", help="Overwrite the notebook if it already exists."),
     strict: bool = typer.Option(
@@ -387,8 +388,12 @@ def notebook(
         except ValueError as exc:
             console.print(f"Error: {exc}")
             raise typer.Exit(code=1)
-        runs_root = config_path.parent / cfg.out_dir
-        out_dir = runs_root / "campaigns" / expansion.campaign_id
+        out_dir = campaign_slot_dir(
+            config_path=config_path,
+            out_dir=cfg.out_dir,
+            campaign_name=expansion.name,
+            slot="latest",
+        )
     else:
         out_dir = out
     try:

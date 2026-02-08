@@ -14,23 +14,22 @@ from __future__ import annotations
 import json
 import logging
 import shutil
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
 
-from dnadesign.cruncher.app.run_service import (
-    update_run_index_from_manifest,
-    update_run_index_from_status,
-)
+from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json
 from dnadesign.cruncher.artifacts.layout import (
     build_run_dir,
     ensure_run_dirs,
+    lockfile_snapshot_path,
     out_root,
+    parse_manifest_path,
+    pwm_summary_path,
     run_group_label,
-    status_path,
 )
-from dnadesign.cruncher.artifacts.manifest import build_run_manifest, load_manifest, write_manifest
-from dnadesign.cruncher.artifacts.status import RunStatusWriter
+from dnadesign.cruncher.artifacts.manifest import build_run_manifest
 from dnadesign.cruncher.config.schema_v3 import CruncherConfig
 from dnadesign.cruncher.core.labels import regulator_sets
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
@@ -123,28 +122,29 @@ def _find_existing_parse_run(
     set_index: int,
     signature: str,
 ) -> Path | None:
-    for slot in ("latest", "previous"):
-        run_dir = build_run_dir(
-            config_path=config_path,
-            out_dir=cfg.out_dir,
-            stage="parse",
-            tfs=tfs,
-            set_index=set_index,
-            include_set_index=len(cfg.regulator_sets) > 1,
-            slot=slot,
-        )
-        if not run_dir.exists():
-            continue
-        try:
-            manifest = load_manifest(run_dir)
-        except FileNotFoundError:
-            continue
-        if manifest.get("stage") != "parse":
-            continue
-        if manifest.get("parse_signature") != signature:
-            continue
-        return run_dir
-    return None
+    run_dir = build_run_dir(
+        config_path=config_path,
+        out_dir=cfg.out_dir,
+        stage="parse",
+        tfs=tfs,
+        set_index=set_index,
+        include_set_index=len(cfg.regulator_sets) > 1,
+        slot="latest",
+    )
+    if not run_dir.exists():
+        return None
+    manifest_file = parse_manifest_path(run_dir)
+    if not manifest_file.exists():
+        return None
+    try:
+        payload = json.loads(manifest_file.read_text())
+    except Exception:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    if payload.get("parse_signature") != signature:
+        return None
+    return run_dir
 
 
 def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
@@ -214,37 +214,8 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
             include_set_index=include_set_index,
             slot="latest",
         )
-        previous_dir = build_run_dir(
-            config_path=config_path,
-            out_dir=cfg.out_dir,
-            stage="parse",
-            tfs=tfs,
-            set_index=set_index,
-            include_set_index=include_set_index,
-            slot="previous",
-        )
-        if previous_dir.exists():
-            shutil.rmtree(previous_dir)
-        if run_dir.exists():
-            shutil.move(str(run_dir), previous_dir)
         ensure_run_dirs(run_dir, meta=True)
-        status_writer = RunStatusWriter(
-            path=status_path(run_dir),
-            stage="parse",
-            run_dir=run_dir,
-            payload={
-                "config_path": str(config_path.resolve()),
-                "status_message": "parsing",
-                "regulator_set": {"index": set_index, "tfs": tfs, "count": set_count},
-                "run_group": run_group,
-            },
-        )
-        update_run_index_from_status(
-            config_path,
-            run_dir,
-            status_writer.payload,
-            catalog_root=cfg.catalog.catalog_root,
-        )
+        pwm_rows: list[dict[str, object]] = []
 
         for tf in sorted(tfs):
             locked = lockmap.get(tf)
@@ -280,6 +251,19 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
                     pwm.source_length,
                     pwm.window_strategy or "max_info",
                 )
+            pwm_rows.append(
+                {
+                    "tf": tf,
+                    "source": ref.source,
+                    "motif_id": ref.motif_id,
+                    "length": int(length),
+                    "information_bits": float(bits),
+                    "nsites": int(pwm.nsites) if pwm.nsites is not None else None,
+                    "window_start": int(pwm.window_start) if pwm.window_start is not None else None,
+                    "source_length": int(pwm.source_length) if pwm.source_length is not None else None,
+                    "window_strategy": pwm.window_strategy,
+                }
+            )
 
             log_odds = pwm.log_odds()
             df_lo = pd.DataFrame(
@@ -311,19 +295,22 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
                 "parse_inputs": signature_payload,
             },
         )
-        manifest_path = write_manifest(run_dir, manifest)
-        update_run_index_from_manifest(
-            config_path,
-            run_dir,
-            manifest,
-            catalog_root=cfg.catalog.catalog_root,
+        lock_snapshot = lockfile_snapshot_path(run_dir)
+        lock_snapshot.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(lock_path, lock_snapshot)
+
+        parse_manifest_file = parse_manifest_path(run_dir)
+        atomic_write_json(parse_manifest_file, manifest)
+
+        pwm_summary_file = pwm_summary_path(run_dir)
+        atomic_write_json(
+            pwm_summary_file,
+            {
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "regulator_set": {"index": set_index, "tfs": tfs, "count": set_count},
+                "run_group": run_group,
+                "rows": pwm_rows,
+            },
         )
         logger.info("Parse stage complete: %s", run_dir)
-        logger.info("Wrote run manifest → %s", manifest_path.relative_to(run_dir.parent))
-        status_writer.finish(status="completed", artifacts=[])
-        update_run_index_from_status(
-            config_path,
-            run_dir,
-            status_writer.payload,
-            catalog_root=cfg.catalog.catalog_root,
-        )
+        logger.info("Wrote parse manifest → %s", parse_manifest_file.relative_to(run_dir))

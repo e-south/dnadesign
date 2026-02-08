@@ -22,8 +22,9 @@ from dnadesign.cruncher.artifacts.layout import (
     build_run_dir,
     ensure_run_dirs,
     live_metrics_path,
-    manifest_path,
+    lockfile_snapshot_path,
     run_group_label,
+    run_optimize_dir,
     status_path,
 )
 from dnadesign.cruncher.artifacts.manifest import build_run_manifest, write_manifest
@@ -60,8 +61,8 @@ def _materialize_optimizer_stats(
         return manifest_stats, [], None
     if not isinstance(move_stats, list):
         raise ValueError("optimizer.stats()['move_stats'] must be a list.")
-    rel_path = Path("optimizer_move_stats.json")
-    sidecar_path = run_dir / rel_path
+    rel_path = Path("optimize") / "optimizer_move_stats.json"
+    sidecar_path = run_optimize_dir(run_dir) / "optimizer_move_stats.json"
     sidecar_path.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_json(sidecar_path, {"move_stats": move_stats})
     manifest_stats["move_stats_path"] = str(rel_path)
@@ -186,7 +187,7 @@ def write_run_manifest_and_update(
     catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     catalog = CatalogIndex.load(catalog_root)
     lock_path = resolve_lock_path(config_path)
-    lock_snapshot_path = manifest_path(run_dir).parent / "lockfile.json"
+    lock_snapshot_path = lockfile_snapshot_path(run_dir)
     lock_snapshot_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         shutil.copy2(lock_path, lock_snapshot_path)
