@@ -138,7 +138,7 @@ Crosswalk (behavior -> config -> modules -> artifacts):
 | PT optimization (sample) | `sample.*` | `core/`, `app/` | `<run_dir>/optimize/` + manifest/status updates |
 | Elite filter + TFBS-core MMR | `sample.elites.*` | `core/`, `app/` | `optimize/elites*.parquet` |
 | Artifact-only reporting (analyze) | `analysis.*` | `analysis/`, `app/` | `<run_dir>/output/` + `<run_dir>/plots/` |
-| Campaign expand + summarize | `campaigns[]`, `campaign` | `app/` | `outputs/campaign/<name>/...` |
+| Campaign expand + summarize | `campaigns[]`, `campaign` | `app/` | `outputs/campaign/<name>/latest/{output,plots}` |
 
 ## Architecture mapping
 

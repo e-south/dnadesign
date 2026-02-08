@@ -14,11 +14,20 @@ from pathlib import Path
 from dnadesign.cruncher.app.notebook_service import ensure_marimo
 
 
+def _summary_output_dir(summary_dir: Path) -> Path:
+    return summary_dir / "output"
+
+
+def _summary_plots_dir(summary_dir: Path) -> Path:
+    return summary_dir / "plots"
+
+
 def _validate_campaign_summary_inputs(summary_dir: Path) -> None:
+    output_dir = _summary_output_dir(summary_dir)
     required = [
-        summary_dir / "campaign_summary.csv",
-        summary_dir / "campaign_best.csv",
-        summary_dir / "campaign_manifest.json",
+        output_dir / "campaign_summary.csv",
+        output_dir / "campaign_best.csv",
+        output_dir / "campaign_manifest.json",
     ]
     missing = [path for path in required if not path.exists()]
     if missing:
@@ -73,12 +82,14 @@ def _(Path, mo):
         summary_dir = summary_dir.parent
     if not summary_dir.exists():
         mo.stop(True, mo.md(f"Campaign summary directory not found: {summary_dir}"))
-    summary_path = summary_dir / "campaign_summary.csv"
-    best_path = summary_dir / "campaign_best.csv"
-    manifest_path = summary_dir / "campaign_manifest.json"
+    data_dir = summary_dir / "output"
+    plots_dir = summary_dir / "plots"
+    summary_path = data_dir / "campaign_summary.csv"
+    best_path = data_dir / "campaign_best.csv"
+    manifest_path = data_dir / "campaign_manifest.json"
     if not summary_path.exists():
         mo.stop(True, mo.md(f"Missing summary CSV: {summary_path}"))
-    return summary_dir, summary_path, best_path, manifest_path
+    return best_path, manifest_path, plots_dir, summary_path
 
 
 @app.cell
@@ -159,8 +170,7 @@ def _(manifest_summary, mo, overview_block):
 
 
 @app.cell
-def _(summary_dir, mo):
-    plots_dir = summary_dir
+def _(plots_dir, mo):
     images = []
     for name in [
         "plot__best_jointscore_bar.png",
@@ -173,7 +183,7 @@ def _(summary_dir, mo):
     if images:
         plots_block = mo.vstack(images)
     else:
-        plots_block = mo.md("No campaign plots found under the campaign output root.")
+        plots_block = mo.md("No campaign plots found under the campaign plots directory.")
     return plots_block
 
 

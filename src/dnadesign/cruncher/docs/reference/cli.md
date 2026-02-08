@@ -240,8 +240,8 @@ Examples:
 
 Outputs:
 
-* `campaign_summary.csv`, `campaign_best.csv`
-* plots under the campaign output root (e.g., `plot__best_jointscore_bar.png`,
+* `output/campaign_summary.csv`, `output/campaign_best.csv`, `output/campaign_manifest.json`
+* plots under `plots/` (e.g., `plot__best_jointscore_bar.png`,
   `plot__tf_coverage_heatmap.png`, `plot__joint_trend.png`, `plot__pareto_projection.png`)
 
 Notes:
@@ -258,7 +258,8 @@ Notes:
 
 #### `cruncher campaign notebook`
 
-Generates a marimo notebook for exploring `campaign_summary.csv` outputs.
+Generates a marimo notebook for exploring campaign summary outputs from
+`<campaign_latest>/output/` and `<campaign_latest>/plots/`.
 
 Inputs:
 
@@ -276,7 +277,8 @@ Examples:
 
 Notes:
 
-* Requires `cruncher campaign summarize` to have been run first (summary CSVs + manifest present).
+* Requires `cruncher campaign summarize` to have been run first
+  (`output/campaign_summary.csv`, `output/campaign_best.csv`, `output/campaign_manifest.json`).
 * Install marimo with `uv sync --locked --group notebooks`.
 
 ---
