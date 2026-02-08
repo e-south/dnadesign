@@ -22,6 +22,10 @@ Cruncher uses a single root key and strict validation. Unknown keys and missing 
 - Schema version: `schema_version: 3`
 - Fixed-length invariant: `sample.sequence_length >= max_pwm_width`
 
+Use this doc as a *schema map*. If you only change a few knobs, start with:
+`workspace.regulator_sets`, `catalog.pwm_source`, `sample.sequence_length`,
+`sample.budget.*`, and `sample.elites.*`.
+
 ## Root
 
 ```yaml
@@ -192,6 +196,17 @@ sample:
   moves:
     profile: balanced             # enum only
     overrides:
+      # Optional per-move/operator knobs (advanced).
+      # These tune proposal shapes and relative mix; leave unset to use the profile defaults.
+      block_len_range: null       # [min, max] bp (B move)
+      multi_k_range: null         # [min, max] positions (M move)
+      slide_max_shift: null       # max shift in bp (L move, if enabled by profile)
+      swap_len_range: null        # [min, max] bp (W move, if enabled by profile)
+      move_probs: null            # map of move -> probability (e.g., {S: 0.4, B: 0.3, M: 0.3, I: 0.0})
+      move_schedule: null         # optional schedule policy (when supported)
+      target_worst_tf_prob: null  # bias proposals toward the worst TF (when supported)
+      target_window_pad: null     # pad around target window for proposals (when supported)
+      insertion_consensus_prob: null  # consensus bias for insertions (when supported)
       adaptive_weights:
         enabled: false
         window: 250
@@ -247,7 +262,7 @@ Notes:
 - `sequence_length` must be at least the widest PWM (after any `pwm_window_lengths`).
 - Canonicalization is automatic when `objective.bidirectional=true`.
 - MMR distance is TFBS-core weighted Hamming (tolerant weighting, low-information positions emphasized).
-- `moves.overrides.adaptive_weights` and `moves.overrides.proposal_adapt` are optional expert controls.
+- `moves.overrides.*` contains optional expert controls (operator mix + adaptation). Leave unset unless you are actively tuning proposals.
 - Set `pt.adapt.strict=true` to fail the run when PT ladder adaptation saturates at `max_scale` for too many windows.
 
 ## analysis

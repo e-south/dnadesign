@@ -10,6 +10,10 @@
 
 This reference summarizes the Cruncher CLI surface, grouped by lifecycle stage and workflow.
 
+> **Intent:** Cruncher is an optimization engine for **fixed-length** multi-TF PWM sequence design that returns a **diverse elite set** - not posterior inference.
+>
+> **When to use:** design under tight length constraints; explore motif compatibility tradeoffs; generate a small candidate set for assays; sweep many regulator sets via campaigns + summarize results.
+
 ### Workspace discovery and config resolution
 
 Cruncher resolves config from `--config/-c` or `--workspace/-w`, then the nearest `config.yaml` in the current directory or parents, then known workspace roots. If multiple workspaces are found, **cruncher** prompts for a selection (interactive shells only).
@@ -139,7 +143,7 @@ Note:
 
 #### `cruncher lock`
 
-Resolves TF names in `cruncher.regulator_sets` to exact cached artifacts (IDs + hashes).
+Resolves TF names in `workspace.regulator_sets` (under the root `cruncher:` block) to exact cached artifacts (IDs + hashes).
 Writes `<workspace>/.cruncher/locks/<config>.lock.json`.
 
 Inputs:
@@ -351,9 +355,9 @@ Inputs:
 
 * CONFIG (explicit or resolved)
 * runs via `analysis.run_selector`/`analysis.runs` or `--run` (defaults to latest sample run if empty)
-* run artifacts: `sequences.parquet` (required), `elites.parquet` (required),
-  `elites_hits.parquet` (required), `random_baseline.parquet` (required),
-  and `trace.nc` for trace-based plots
+* run artifacts: `optimize/sequences.parquet` (required), `optimize/elites.parquet` (required),
+  `optimize/elites_hits.parquet` (required), `optimize/random_baseline.parquet` (required),
+  and `optimize/trace.nc` for trace-based plots
 
 Network:
 
@@ -368,21 +372,21 @@ Examples:
 Preconditions:
 
 * provide runs via `analysis.runs`/`--run` or rely on the default latest run
-* trace-dependent plots require `trace.nc`
-* if `output/` exists without `summary.json`, remove the incomplete output folder before re-running `cruncher analyze`
+* trace-dependent plots require `optimize/trace.nc`
+* if `<run_dir>/output/` exists without `summary.json`, remove the incomplete `output/` folder before re-running `cruncher analyze`
 * each sample run snapshots the lockfile under `input/lockfile.json`; analysis uses that snapshot to avoid mismatch if the workspace lockfile changes later
 
 Outputs:
 
-* tables: `table__scores_summary.parquet`, `table__elites_topk.parquet`,
-  `table__metrics_joint.parquet`, `table__opt_trajectory_points.parquet`,
-  `table__diagnostics_summary.json`, `table__objective_components.json`,
-  `table__elites_mmr_summary.parquet`, `table__elites_nn_distance.parquet`
-* plots: `plot__run_summary.<plot_format>`, `plot__opt_trajectory.<plot_format>`,
-  `plot__elites_nn_distance.<plot_format>`, `plot__overlap_panel.<plot_format>`,
-  `plot__health_panel.<plot_format>` (trace only)
-* reports: `report.json`, `report.md`
-* summaries: `summary.json`, `manifest.json`, `plot_manifest.json`, `table_manifest.json`
+* tables: `output/table__scores_summary.parquet`, `output/table__elites_topk.parquet`,
+  `output/table__metrics_joint.parquet`, `output/table__opt_trajectory_points.parquet`,
+  `output/table__diagnostics_summary.json`, `output/table__objective_components.json`,
+  `output/table__elites_mmr_summary.parquet`, `output/table__elites_nn_distance.parquet`
+* plots: `plots/plot__run_summary.<plot_format>`, `plots/plot__opt_trajectory.<plot_format>`,
+  `plots/plot__elites_nn_distance.<plot_format>`, `plots/plot__overlap_panel.<plot_format>`,
+  `plots/plot__health_panel.<plot_format>` (trace only)
+* reports: `output/report.json`, `output/report.md`
+* summaries: `output/summary.json`, `output/manifest.json`, `output/plot_manifest.json`, `output/table_manifest.json`
 
 Note:
 
@@ -411,15 +415,15 @@ Notes:
 
 * requires `marimo` to be installed (for example: `uv add --group notebooks marimo`)
 * useful when you want interactive slicing/filtering beyond static plots
-* strict artifact contract: requires `summary.json`, `plot_manifest.json`, and `table_manifest.json` to exist and parse, `summary.json` must include a non-empty `tf_names` list, and `table_manifest.json` must provide `scores_summary`, `metrics_joint`, and `elites_topk` entries with existing files
+* strict artifact contract: requires `output/summary.json`, `output/plot_manifest.json`, and `output/table_manifest.json` to exist and parse, `output/summary.json` must include a non-empty `tf_names` list, and `output/table_manifest.json` must provide `scores_summary`, `metrics_joint`, and `elites_topk` entries with existing files
 * plot output status is refreshed from disk so missing files are shown accurately
 * the Refresh button re-scans analysis entries and updates plot/table status without restarting marimo
 * the notebook infers `run_dir` from its location; keep it under `<run_dir>/` or regenerate it
-* plots are loaded from `plot_manifest.json`; the curated keys are `run_summary`, `opt_trajectory`, `elites_nn_distance`, plus optional `overlap_panel` and `health_panel` entries when generated
+* plots are loaded from `output/plot_manifest.json`; the curated keys are `run_summary`, `opt_trajectory`, `elites_nn_distance`, plus optional `overlap_panel` and `health_panel` entries when generated
 * the notebook includes:
   * Overview tab with run metadata and explicit warnings for missing/invalid analysis artifacts
-  * Tables tab with a Top-K slider and per-table previews from `table_manifest.json`
-  * Plots tab with inline previews and generated/skipped status from `plot_manifest.json`
+  * Tables tab with a Top-K slider and per-table previews from `output/table_manifest.json`
+  * Plots tab with inline previews and generated/skipped status from `output/plot_manifest.json`
 
 ---
 

@@ -3,6 +3,7 @@
 ## Contents
 - [Intent](#intent)
 - [Intended use cases](#intended-use-cases)
+- [Non-goals](#non-goals)
 - [Core behavior](#core-behavior)
 - [Math and scoring](#math-and-scoring)
 - [Diversity and elites](#diversity-and-elites)
@@ -22,12 +23,20 @@ an optimization engine, not a posterior inference engine. It favors:
 - strict input validation (no silent fallbacks)
 - reproducible artifacts and analysis
 
+**Practical mental model:** deterministic data prep + strict optimization + artifact-native analytics.
+
 ## Intended use cases
 
-- Generate a small set of high-scoring, diverse sequences for downstream testing.
-- Explore tradeoffs when multiple TF motifs must co-exist in a constrained length.
-- Compare motif sets by their achievable score/overlap profiles under a shared
-  optimization regime.
+- Multi-TF promoter/operator design under tight length constraints.
+- Tradeoff exploration when multiple TF motifs must co-exist in a constrained length.
+- Producing a small, diverse, high-quality candidate set for downstream assays.
+- Campaign sweeps across many regulator sets, then aggregate comparison.
+
+## Non-goals
+
+- **Posterior inference:** PT/MCMC here is used as an optimization engine + diagnostics, not Bayesian inference.
+- **Variable-length design:** sequences are fixed length by contract.
+- **Motif discovery as the primary workflow:** discovery is supported (MEME/STREME integration), but Cruncher's core is sequence design under pinned PWMs.
 
 ## Core behavior
 
@@ -46,6 +55,7 @@ an optimization engine, not a posterior inference engine. It favors:
 Cruncher uses a FIMO-like scanning model without calling FIMO:
 
 1. Convert each PWM to log-odds against a 0-order background.
+   For `score_scale=logp`, Cruncher builds an exact best-window tail lookup via DP convolution under the same background.
 2. Scan all windows of width `w` in each sequence.
 3. Pick the best window per TF (deterministic tie-break).
 
@@ -89,21 +99,22 @@ The demo workflows in `docs/demos/` follow this lifecycle end-to-end.
 
 ## Artifacts and outputs
 
-Sampling writes:
+Sampling writes (under `optimize/` unless noted):
 
-- `sequences.parquet` (per-draw scores and metadata)
-- `elites.parquet` (elite sequences + summaries)
-- `elites_hits.parquet` (per-elite x per-TF best-hit/core metadata)
-- `random_baseline.parquet` (baseline score cloud)
-- `random_baseline_hits.parquet` (baseline best-hit/core metadata)
+- `optimize/sequences.parquet` (per-draw scores + metadata)
+- `optimize/elites.parquet` (elite sequences + summaries)
+- `optimize/elites_hits.parquet` (per-elite x per-TF best-hit/core metadata)
+- `optimize/random_baseline.parquet` (baseline score cloud)
+- `optimize/random_baseline_hits.parquet` (baseline best-hit/core metadata)
+- `input/lockfile.json` (snapshot of the pinned lockfile for reproducibility)
 
 Analysis writes:
 
-- `summary.json`
-- `report.md` and `report.json`
-- `plot_manifest.json` and `table_manifest.json`
-- `plot__*` (curated figures)
-- `table__*` (curated tabular artifacts)
+- `output/summary.json`
+- `output/report.md` and `output/report.json`
+- `output/plot_manifest.json` and `output/table_manifest.json`
+- `output/table__*` (curated tabular artifacts)
+- `plots/plot__*` (curated figures)
 
 ## Config mapping
 
@@ -116,6 +127,18 @@ Each config block maps directly to a lifecycle phase or runtime contract:
 - `analysis` -> report generation and curated plot settings
 
 See the full key reference at `docs/reference/config.md`.
+
+Crosswalk (behavior -> config -> modules -> artifacts):
+
+| Behavior / phase | Config keys (v3) | Primary layers | Writes |
+|---|---|---|---|
+| Fetch motifs/sites (cache) | `catalog.*`, `ingest.*`, `discover.*` | `ingest/`, `store/` | `<catalog.root>/normalized/...` + `catalog.json` |
+| Pin exact inputs (lock) | `workspace.regulator_sets`, `catalog.*` | `store/`, `app/` | `<workspace>/.cruncher/locks/<config>.lock.json` |
+| Validate locked PWMs (parse) | (lockfile-driven) | `app/` | `<run_dir>/input/` + manifest/status updates |
+| PT optimization (sample) | `sample.*` | `core/`, `app/` | `<run_dir>/optimize/` + manifest/status updates |
+| Elite filter + TFBS-core MMR | `sample.elites.*` | `core/`, `app/` | `optimize/elites*.parquet` |
+| Artifact-only reporting (analyze) | `analysis.*` | `analysis/`, `app/` | `<run_dir>/output/` + `<run_dir>/plots/` |
+| Campaign expand + summarize | `campaigns[]`, `campaign` | `app/` | `outputs/campaign/<name>/...` |
 
 ## Architecture mapping
 

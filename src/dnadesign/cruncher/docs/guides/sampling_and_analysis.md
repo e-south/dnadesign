@@ -4,6 +4,7 @@
 - [Overview](#overview)
 - [End-to-end](#end-to-end)
 - [Fixed-length sampling model](#fixed-length-sampling-model)
+- [Fail-fast contracts](#fail-fast-contracts)
 - [PT optimization model](#pt-optimization-model)
 - [Elites: filter -> MMR select](#elites-filter--mmr-select)
 - [Analysis outputs](#analysis-outputs)
@@ -14,6 +15,8 @@
 ## Overview
 
 Cruncher designs fixed-length DNA sequences that jointly satisfy multiple PWMs. Sampling uses PT-only MCMC and returns a diverse elite set via TFBS-core MMR. Analysis is offline and reads only run artifacts.
+
+**Important:** Cruncher is an **optimization engine**, not posterior inference. The "tune/draws/trace" terminology is used for PT mechanics + diagnostics; don't interpret outputs as posterior samples.
 
 ## End-to-end
 
@@ -41,6 +44,17 @@ Sampling is fixed-length and strict:
 - `sample.sequence_length` must be at least the widest PWM (after any `catalog.pwm_window_lengths`).
 
 If the length invariant is violated, sampling fails fast with the per-TF widths.
+
+## Fail-fast contracts
+
+Cruncher is intentionally strict and will error instead of silently degrading:
+
+- Unknown config keys or missing required keys -> error (strict schema).
+- Missing lockfile for `parse`/`sample` -> error.
+- `sample.sequence_length < max_pwm_width` -> error with widths.
+- Elite constraints cannot be satisfied (after filtering/selection) -> error (no silent threshold relaxation).
+- With `sample.pt.adapt.strict=true`, ladder saturation during tune is treated as a tuning failure -> error.
+- `analyze` requires required artifacts and will not write partial reports on missing/invalid inputs.
 
 ## PT optimization model
 
@@ -79,6 +93,8 @@ Current MMR behavior (TFBS-core mode) is:
 "Tolerant" weights are hard-coded: low-information PWM positions are weighted more (weight = `1 - info_norm`). This preserves consensus-critical positions while encouraging diversity where the motif is flexible.
 
 When `objective.bidirectional=true`, canonicalization is automatic: reverse complements (including palindromes) count as the same identity for uniqueness and MMR dedupe.
+
+If Cruncher cannot produce `sample.elites.k` elites that satisfy the configured filter gates, the run fails fast (it does not silently lower thresholds).
 
 ## Analysis outputs
 

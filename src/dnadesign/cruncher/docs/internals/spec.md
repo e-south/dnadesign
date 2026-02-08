@@ -143,26 +143,27 @@ If a TF cannot be uniquely resolved, **cruncher** errors immediately. Analyze op
 
 ### Outputs and reporting
 
-Each run directory contains:
+Each run directory uses a stable subdir layout (stage-agnostic) plus top-level manifests:
 
-- `config_used.yaml` — resolved config + PWM summaries
-- `run_manifest.json` — provenance, hashes, optimizer stats
-- `run_status.json` — live progress updates (written during parse and sampling)
-- `trace.nc` — canonical ArviZ trace
-- `sequences.parquet` — per-draw sequences + per-TF scores
-- `elites.parquet` — elite sequences (parquet)
-- `elites.json` — elite sequences (JSON, human-readable)
-- `elites.yaml` — elite metadata (YAML)
-- `plot__*` — curated analysis figures
-- `table__*` — curated analysis tables
-- `summary.json` — analysis provenance and artifacts
-- `manifest.json` — artifact inventory with generation reasons
-- `analysis_used.yaml` — analysis settings used
-- `plot_manifest.json` — plot registry and generated outputs
-- `table_manifest.json` — table registry and generated outputs
-- `_archive/<analysis_id>/` — optional archived analyses (when enabled)
-- `metrics.jsonl` — live sampling progress (when enabled)
-- `report.json` + `report.md` — summary (from `cruncher analyze`)
+```
+<run_dir>/
+  input/      # lockfile snapshot + input manifests
+  optimize/   # sequences/trace/elites/baselines
+  output/     # report + table__* + manifest inventory
+  plots/      # plot__*
+  run_manifest.json
+  run_status.json
+  config_used.yaml
+```
+
+Key artifacts:
+
+- `run_manifest.json` / `run_status.json` / `config_used.yaml` — provenance + status + resolved config
+- `input/lockfile.json` — pinned input snapshot for reproducible analysis
+- `optimize/sequences.parquet`, `optimize/trace.nc`, `optimize/elites*`, `optimize/random_baseline*` — sampling outputs
+- `output/summary.json`, `output/report.json`, `output/report.md` — analysis outputs
+- `output/plot_manifest.json`, `output/table_manifest.json`, `output/manifest.json` — inventories
+- `plots/plot__*`, `output/table__*` — curated plots and tables
 
 `cruncher analyze` fails when required analysis artifacts are missing and does not write partial report outputs.
 
@@ -197,7 +198,7 @@ Defaults + automation:
 - `cruncher runs rebuild-index <config>`
 - `cruncher notebook [--analysis-id <id>|--latest] <run_dir>`
 
-Pairwise plots auto-pick a deterministic `tf_pair` when missing; explicit `analysis.tf_pair` overrides the selection.
+Pairwise plots auto-pick a deterministic TF pair when missing; `analysis.pairwise` can disable pairwise plots or pin a specific pair.
 
 Network access is explicit and opt-in. `cruncher fetch ...` and remote inventory commands (for example `cruncher sources summary --scope remote` or
 `cruncher sources datasets`) contact sources; other commands operate on local

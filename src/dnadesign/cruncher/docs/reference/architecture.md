@@ -18,7 +18,7 @@ This doc describes the Cruncher run lifecycle, module boundaries, and on-disk ar
 2. **lock** -> resolve TFs to exact cached artifacts (`<workspace>/.cruncher/locks/<config>.lock.json`)
 3. **parse** *(optional)* -> validate cached PWMs (no logo rendering)
 4. **sample** -> run MCMC and write sequences/trace + manifests
-5. **analyze** -> curated `plot__*`/`table__*` artifacts + report from sample artifacts (offline, written in analysis root)
+5. **analyze** -> curated `plot__*`/`table__*` artifacts + report from sample artifacts (offline, written into the run directory)
 
 ---
 
@@ -128,10 +128,28 @@ run_index.json
 
 #### Run outputs (`out_dir`, e.g. `outputs/`)
 
-Each configured regulator set produces **separate** run slots, grouped by stage:
+Each regulator set gets a retention-oriented **run slot** with two pointers:
 
-- single regulator set: `outputs/<stage>/latest/` with optional `outputs/<stage>/previous/`
-- multiple regulator sets: `outputs/<stage>/setN_<tf-slug>/latest/` with optional `.../previous/`
+- `latest/` - most recent run for that set
+- `previous/` - immediately prior run for that set (if any)
+
+Slot roots:
+
+- single regulator set: `<workspace>/<out_dir>/latest/` and `<workspace>/<out_dir>/previous/`
+- multiple regulator sets: `<workspace>/<out_dir>/setN_<tf-slug>/latest/` and `.../previous/`
+
+Within each run directory, Cruncher uses a stable, stage-agnostic subdirectory layout:
+
+```
+<run_dir>/
+  input/
+  optimize/
+  output/
+  plots/
+  run_manifest.json
+  run_status.json
+  config_used.yaml
+```
 
 ---
 
@@ -140,13 +158,14 @@ Each configured regulator set produces **separate** run slots, grouped by stage:
 A typical **sample** run directory contains:
 
 - `run_manifest.json`, `run_status.json`, `config_used.yaml` - run metadata + status
-- `sequences.parquet`, `trace.nc`, `elites.*`, `random_baseline*` - sampling outputs
+- `input/lockfile.json` - pinned input snapshot (reproducibility boundary)
+- `optimize/sequences.parquet`, `optimize/trace.nc`, `optimize/elites*`, `optimize/random_baseline*` - sampling outputs
 - `metrics.jsonl` - live sampling metrics (if enabled)
-- `summary.json` - canonical analysis summary
-- `report.json` + `report.md` - analysis report outputs from `cruncher analyze`
-- `plot_manifest.json` + `table_manifest.json` + `manifest.json` - analysis inventories
-- `plot__*` - curated plot outputs
-- `table__*` - curated table outputs
+- `output/summary.json` - canonical analysis summary
+- `output/report.json` + `output/report.md` - analysis report outputs from `cruncher analyze`
+- `output/plot_manifest.json` + `output/table_manifest.json` + `output/manifest.json` - analysis inventories
+- `plots/plot__*` - curated plot outputs
+- `output/table__*` - curated table outputs
 
 ---
 
