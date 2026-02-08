@@ -446,7 +446,7 @@ def test_analyze_latest_requires_complete_artifacts(tmp_path: Path) -> None:
     config_path = tmp_path / "config.yaml"
     config_path.write_text(yaml.safe_dump(config))
 
-    run_dir = tmp_path / "results" / "runs" / "latest"
+    run_dir = tmp_path / "results" / "latest"
     run_dir.mkdir(parents=True, exist_ok=True)
 
     config_used = {

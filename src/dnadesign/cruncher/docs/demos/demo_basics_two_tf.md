@@ -76,7 +76,7 @@ cruncher analyze --summary -c "$CONFIG"
 Run artifacts live under:
 
 ```
-<workspace>/outputs/runs/latest/
+<workspace>/outputs/latest/
 ```
 
 Key files:

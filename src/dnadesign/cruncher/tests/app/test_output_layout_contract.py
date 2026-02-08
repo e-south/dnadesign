@@ -54,7 +54,7 @@ def test_build_run_dir_uses_latest_slot_without_opaque_hash(tmp_path: Path) -> N
         include_set_index=False,
     )
 
-    assert run_dir == tmp_path / "outputs" / "runs" / "latest"
+    assert run_dir == tmp_path / "outputs" / "latest"
 
 
 def test_build_run_dir_with_multiple_sets_uses_set_folder_and_slot(tmp_path: Path) -> None:
@@ -70,11 +70,11 @@ def test_build_run_dir_with_multiple_sets_uses_set_folder_and_slot(tmp_path: Pat
         include_set_index=True,
     )
 
-    assert run_dir == tmp_path / "outputs" / "runs" / "set2_lexA-cpxR" / "latest"
+    assert run_dir == tmp_path / "outputs" / "set2_lexA-cpxR" / "latest"
 
 
 def test_run_artifacts_live_in_lifecycle_subdirs(tmp_path: Path) -> None:
-    run_dir = tmp_path / "outputs" / "runs" / "latest"
+    run_dir = tmp_path / "outputs" / "latest"
 
     assert run_input_dir(run_dir) == run_dir / "input"
     assert run_optimize_dir(run_dir) == run_dir / "optimize"
@@ -98,12 +98,12 @@ def test_run_artifacts_live_in_lifecycle_subdirs(tmp_path: Path) -> None:
 
 
 def test_analysis_root_is_run_root_for_flat_access(tmp_path: Path) -> None:
-    run_dir = tmp_path / "outputs" / "runs" / "latest"
+    run_dir = tmp_path / "outputs" / "latest"
     assert analysis_root(run_dir) == run_dir
 
 
 def test_analysis_tables_and_plots_use_flat_semantic_filenames(tmp_path: Path) -> None:
-    run_dir = tmp_path / "outputs" / "runs" / "latest"
+    run_dir = tmp_path / "outputs" / "latest"
     analysis_dir = analysis_root(run_dir)
 
     assert analysis_table_path(analysis_dir, "scores_summary", "parquet") == (

@@ -18,7 +18,6 @@ from dnadesign.cruncher.core.labels import format_regulator_slug
 RUN_META_DIR = ""
 RUN_ARTIFACTS_DIR = ""
 RUN_LIVE_DIR = ""
-RUNS_ROOT_DIR = "runs"
 RUN_INPUT_DIR = "input"
 RUN_OPTIMIZE_DIR = "optimize"
 RUN_OUTPUT_DIR = "output"
@@ -36,7 +35,7 @@ def stage_root(out_root_path: Path, stage: str) -> Path:
 
 
 def runs_root(out_root_path: Path) -> Path:
-    return out_root_path / RUNS_ROOT_DIR
+    return out_root_path
 
 
 def run_group_label(

@@ -39,7 +39,7 @@ def test_get_run_accepts_path(tmp_path: Path) -> None:
     cfg = load_config(config_path)
 
     run_name = "20250101_000000_abcd12"
-    run_dir = tmp_path / "results" / "runs" / run_name
+    run_dir = tmp_path / "results" / run_name
     run_dir.mkdir(parents=True, exist_ok=True)
     created_at = datetime.now(timezone.utc).isoformat()
     manifest = {
@@ -83,8 +83,8 @@ def test_update_run_index_uses_semantic_keys_for_latest_slots(tmp_path: Path) ->
     config_path = tmp_path / "config.yaml"
     config_path.write_text("cruncher: {}")
 
-    sample_dir = tmp_path / "results" / "runs" / "latest"
-    parse_dir = tmp_path / "results" / "runs" / "parse_set" / "latest"
+    sample_dir = tmp_path / "results" / "latest"
+    parse_dir = tmp_path / "results" / "parse_set" / "latest"
     sample_dir.mkdir(parents=True, exist_ok=True)
     parse_dir.mkdir(parents=True, exist_ok=True)
 

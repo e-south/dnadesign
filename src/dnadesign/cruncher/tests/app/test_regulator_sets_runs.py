@@ -116,7 +116,7 @@ def test_sample_runs_split_by_regulator_set(tmp_path: Path) -> None:
     lock_path.write_text(json.dumps(lock_payload))
     run_sample(cfg, config_path)
 
-    results_dir = tmp_path / "results" / "runs"
+    results_dir = tmp_path / "results"
     runs = sorted(path.parent for path in results_dir.rglob("run_manifest.json"))
     assert len(runs) == 2
     for run_dir in runs:

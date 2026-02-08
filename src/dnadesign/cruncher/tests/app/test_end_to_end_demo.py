@@ -158,7 +158,7 @@ def test_end_to_end_sites_pipeline(tmp_path: Path) -> None:
     run_parse(cfg, config_path)
     run_sample(cfg, config_path)
 
-    sample_dir = tmp_path / "results" / "runs" / "latest"
+    sample_dir = tmp_path / "results" / "latest"
     assert sample_dir.exists()
     assert manifest_path(sample_dir).exists()
     assert parse_manifest_path(sample_dir).exists()
@@ -306,7 +306,7 @@ def test_demo_campaign_pair_local_only_generates_plots(tmp_path: Path) -> None:
         result = runner.invoke(app, command)
         assert result.exit_code == 0
 
-    analysis_dir = workspace / "outputs" / "runs" / "latest"
+    analysis_dir = workspace / "outputs" / "latest"
     assert analysis_dir.is_dir()
     assert manifest_path(analysis_dir).exists()
     assert (analysis_dir / "plots" / "plot__run_summary.png").exists()

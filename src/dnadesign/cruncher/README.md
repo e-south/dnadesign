@@ -85,7 +85,7 @@ cruncher analyze --summary
 Notes:
 - Analysis writes a canonical summary to `summary.json`, a human-readable
   entrypoint to `report.md`, and a detailed artifact manifest to
-  `manifest.json` (all under each run directory, typically `outputs/runs/latest/output/`).
+  `manifest.json` (all under each run directory, typically `outputs/latest/output/`).
 - Motif overlap is a feature, not a failure; overlap plots are descriptive only.
 
 ### More documentation

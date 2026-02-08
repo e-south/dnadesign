@@ -169,10 +169,9 @@ def _iter_run_dirs(stage_dir: Path) -> list[Path]:
 
 
 def _iter_workspace_run_dirs(out_dir: Path) -> list[Path]:
-    runs_root = out_dir / "runs"
-    if not runs_root.exists():
+    if not out_dir.exists():
         return []
-    return _iter_run_dirs(runs_root)
+    return _iter_run_dirs(out_dir)
 
 
 def _merge_payload(existing: dict, updates: dict) -> dict:
@@ -191,9 +190,6 @@ def _run_index_key(run_dir: Path, updates: dict) -> str:
     if slot in {"latest", "previous"}:
         if isinstance(run_group, str) and run_group:
             return f"{stage}/{run_group}/{slot}"
-        parent_name = run_dir.parent.name
-        if parent_name and parent_name not in {stage, "runs"}:
-            return f"{stage}/{parent_name}/{slot}"
         return f"{stage}/{slot}"
     return slot
 

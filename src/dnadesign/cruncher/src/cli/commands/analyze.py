@@ -82,12 +82,11 @@ def analyze(
             if report_path.exists():
                 console.print(f"  report: {render_path(report_path, base=config_path.parent)}")
             console.print(f"  analysis_id: {analysis_id}")
-            sample_dir = analysis_dir.parent
-            run_name = sample_dir.name
+            run_dir = analysis_dir
             config_hint = render_path(config_path)
             console.print("Next steps:")
-            console.print(f"  cruncher runs show {run_name} -c {config_hint}")
-            console.print(f"  cruncher notebook --latest {render_path(sample_dir, base=config_path.parent)}")
+            console.print(f"  cruncher runs show {render_path(run_dir, base=config_path.parent)} -c {config_hint}")
+            console.print(f"  cruncher notebook --latest {render_path(run_dir, base=config_path.parent)}")
             console.print(f"  open {render_path(report_path, base=config_path.parent)}")
             if summary_flag:
                 report_json = report_json_path(analysis_dir)

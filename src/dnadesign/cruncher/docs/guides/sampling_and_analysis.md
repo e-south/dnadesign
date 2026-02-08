@@ -26,7 +26,7 @@ cruncher analyze
 cruncher analyze --summary
 ```
 
-Outputs are written under each run directory (typically `outputs/runs/latest/`). The canonical entrypoints are:
+Outputs are written under each run directory (typically `outputs/latest/`). The canonical entrypoints are:
 
 - `output/summary.json`
 - `output/report.md`
@@ -131,7 +131,7 @@ cruncher runs best --set-index 1
 Run artifacts live under:
 
 ```
-<workspace>/outputs/runs/latest/
+<workspace>/outputs/latest/
 ```
 
 ## Related references
