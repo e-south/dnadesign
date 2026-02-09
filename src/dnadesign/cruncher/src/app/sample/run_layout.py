@@ -19,6 +19,8 @@ from dnadesign.cruncher.app.run_service import update_run_index_from_manifest, u
 from dnadesign.cruncher.artifacts.atomic_write import atomic_write_gzip_json
 from dnadesign.cruncher.artifacts.entries import artifact_entry
 from dnadesign.cruncher.artifacts.layout import (
+    CAMPAIGN_ROOT_DIR,
+    LOGOS_ROOT_DIR,
     build_run_dir,
     ensure_run_dirs,
     live_metrics_path,
@@ -34,6 +36,8 @@ from dnadesign.cruncher.core.pvalue import logodds_cache_info
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
 from dnadesign.cruncher.utils.paths import resolve_catalog_root, resolve_lock_path
 
+_PRESERVED_SAMPLE_ROOT_DIRS = frozenset({LOGOS_ROOT_DIR, CAMPAIGN_ROOT_DIR, "_archive"})
+
 
 @dataclass(frozen=True)
 class RunLayout:
@@ -41,6 +45,16 @@ class RunLayout:
     run_group: str
     stage_label: str
     status_writer: RunStatusWriter
+
+
+def _clear_run_dir(*, run_dir: Path, preserve_root_dirs: frozenset[str]) -> None:
+    for child in run_dir.iterdir():
+        if child.is_dir() and not child.is_symlink() and child.name in preserve_root_dirs:
+            continue
+        if child.is_dir() and not child.is_symlink():
+            shutil.rmtree(child)
+            continue
+        child.unlink()
 
 
 def _materialize_optimizer_stats(
@@ -126,7 +140,10 @@ def prepare_run_layout(
                 raise ValueError(
                     f"Run output directory already exists: {run_dir}. Re-run with --force-overwrite to replace it."
                 )
-            shutil.rmtree(run_dir)
+            if stage == "sample" and not include_set_index:
+                _clear_run_dir(run_dir=run_dir, preserve_root_dirs=_PRESERVED_SAMPLE_ROOT_DIRS)
+            else:
+                shutil.rmtree(run_dir)
     ensure_run_dirs(run_dir, meta=True, artifacts=True, live=sample_cfg.output.live_metrics)
     run_group = run_group_label(tfs, set_index, include_set_index=include_set_index)
     stage_label = stage.upper().replace("_", "-")

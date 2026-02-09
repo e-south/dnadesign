@@ -39,24 +39,17 @@ Use this block for a clean, repeatable end-to-end run that regenerates plots.
 set -euo pipefail
 cd src/dnadesign/cruncher/workspaces/demo_basics_two_tf
 CONFIG="$PWD/config.yaml"
-
-# Clean reset (robust to stale parse/lock/run artifacts)
 rm -rf outputs
 rm -rf .cruncher/parse .cruncher/locks .cruncher/campaigns
 rm -f .cruncher/run_index.json
-
-# Cache sites from both sources
 pixi run cruncher -- fetch sites --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
-pixi run cruncher -- fetch sites --source regulondb      --tf lexA --tf cpxR --update -c "$CONFIG"
-
-# Discover MEME OOPS motifs from merged site sets and pin lock to this source
+pixi run cruncher -- fetch sites --source regulondb --tf lexA --tf cpxR --update -c "$CONFIG"
 pixi run cruncher -- discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --source-id demo_merged_meme_oops -c "$CONFIG"
 pixi run cruncher -- lock -c "$CONFIG"
 pixi run cruncher -- parse --force-overwrite -c "$CONFIG"
-pixi run cruncher -- catalog logos --source demo_merged_meme_oops --tf lexA --tf cpxR -c "$CONFIG"
 pixi run cruncher -- sample --force-overwrite -c "$CONFIG"
 pixi run cruncher -- analyze --summary -c "$CONFIG"
-
+pixi run cruncher -- catalog logos --source demo_merged_meme_oops --tf lexA --tf cpxR -c "$CONFIG"
 find outputs -type f -name 'plot__*.png' | sort
 find outputs -type f -path '*/logos/*' -name '*.png' | sort
 ```
@@ -128,19 +121,21 @@ This demo pins `catalog.source_preference` to `demo_merged_meme_oops` to prevent
 
 ## Render MEME logos
 
-Render logos from the discovered MEME motifs as a quick validation that the cached motif shapes look sane before sampling:
+Render logos from the discovered MEME motifs as a quick validation that the cached motif shapes look sane:
 
 ```bash
 cruncher catalog logos --source demo_merged_meme_oops --tf lexA --tf cpxR -c "$CONFIG"
 ```
 
+When you run `sample --force-overwrite`, generate logos after sampling so they are part of the final output snapshot.
+
 ## Sample + analyze
 
 ```bash
-cruncher catalog logos --source demo_merged_meme_oops --tf lexA --tf cpxR -c "$CONFIG" && \
 cruncher sample  -c "$CONFIG" && \
 cruncher analyze -c "$CONFIG" && \
-cruncher analyze --summary -c "$CONFIG"
+cruncher analyze --summary -c "$CONFIG" && \
+cruncher catalog logos --source demo_merged_meme_oops --tf lexA --tf cpxR -c "$CONFIG"
 ```
 
 If `outputs/` already exists from a prior run, re-run sample with `--force-overwrite`.
@@ -158,9 +153,9 @@ CONFIG="$PWD/config.yaml"
 
 pixi run cruncher -- lock -c "$CONFIG"
 pixi run cruncher -- parse --force-overwrite -c "$CONFIG"
-pixi run cruncher -- catalog logos --source demo_merged_meme_oops --tf lexA --tf cpxR -c "$CONFIG"
 pixi run cruncher -- sample --force-overwrite -c "$CONFIG"
 pixi run cruncher -- analyze --summary -c "$CONFIG"
+pixi run cruncher -- catalog logos --source demo_merged_meme_oops --tf lexA --tf cpxR -c "$CONFIG"
 ```
 
 If you changed site/discovery settings, refresh discovery before lock:
