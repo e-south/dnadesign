@@ -5,26 +5,28 @@
 - [TL;DR (copy/paste e2e)](#tldr-copypaste-e2e)
 - [Demo setup](#demo-setup)
 - [Reset demo](#reset-demo)
-- [Cache motifs and sites](#cache-motifs-and-sites)
+- [Cache Binding Sites (DAP-seq + RegulonDB)](#cache-binding-sites-dap-seq--regulondb)
+- [Discover MEME OOPS Motifs](#discover-meme-oops-motifs)
 - [Lock + parse](#lock--parse)
 - [Sample + analyze](#sample--analyze)
 - [Fast rerun after config edits](#fast-rerun-after-config-edits)
 - [Inspect results](#inspect-results)
-- [Optional: motif discovery](#optional-motif-discovery)
 - [Related docs](#related-docs)
 
 ## Overview
 
 This demo designs fixed-length sequences that satisfy two PWMs (LexA + CpxR). It follows the full lifecycle:
 
-1. cache inputs
-2. lock
-3. parse
-4. sample
-5. analyze
+1. cache binding sites
+2. discover motifs
+3. lock
+4. parse
+5. sample
+6. analyze
 
 Cruncher scores each TF by the best PWM match anywhere in the sequence on either strand (when `objective.bidirectional=true`). It optimizes the weakest TF by default (`objective.combine=min`) and selects diverse elites via TFBS-core MMR.
-The bundled demo config uses targeted insertion proposals plus adaptive move weights/proposal sizing with strict PT adaptation (`n_temps=4`, `temp_max=14`) for stable optimization diagnostics.
+The demo builds MEME OOPS motifs from merged DAP-seq (`demo_local_meme`) + RegulonDB sites, constrains motif width to 11-15 bp, then locks sampling to those discovered motifs. Sequence length is fixed at 16 bp.
+The bundled config uses targeted insertion proposals plus adaptive move weights/proposal sizing with strict PT adaptation (`n_temps=4`, `temp_max=14`) for stable optimization diagnostics.
 
 For the full intent, lifecycle, and config mapping, see [Intent + lifecycle](../guides/intent_and_lifecycle.md).
 
@@ -42,8 +44,12 @@ rm -rf outputs
 rm -rf .cruncher/parse .cruncher/locks .cruncher/campaigns
 rm -f .cruncher/run_index.json
 
-pixi run cruncher -- fetch motifs --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
-pixi run cruncher -- fetch sites  --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
+# Cache sites from both sources
+pixi run cruncher -- fetch sites --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
+pixi run cruncher -- fetch sites --source regulondb      --tf lexA --tf cpxR --update -c "$CONFIG"
+
+# Discover MEME OOPS motifs from merged site sets and pin lock to this source
+pixi run cruncher -- discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --source-id demo_merged_meme_oops -c "$CONFIG"
 pixi run cruncher -- lock -c "$CONFIG"
 pixi run cruncher -- parse --force-overwrite -c "$CONFIG"
 pixi run cruncher -- sample --force-overwrite -c "$CONFIG"
@@ -54,6 +60,7 @@ find outputs -type f -name 'plot__*.png' | sort
 
 If `sample` fails due elite filters, adjust `sample.elites.filter.min_per_tf_norm`,
 `sample.sequence_length`, or `sample.budget.draws`, then rerun.
+If `lock` fails after reset, run `discover motifs` first; this demo intentionally locks only to discovered motifs.
 
 ## Demo setup
 
@@ -81,23 +88,28 @@ rm -rf .cruncher/parse .cruncher/locks .cruncher/campaigns
 rm -f .cruncher/run_index.json
 ```
 
-## Cache motifs and sites
+## Cache Binding Sites (DAP-seq + RegulonDB)
 
-The demo ships with local MEME motifs and MEME BLOCKS sites.
-
-```bash
-cruncher fetch motifs --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
-cruncher fetch sites  --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
-```
-
-With `catalog.pwm_source: matrix` in this demo, `lock`/`parse` select matrix motifs from the lockfile.
-Fetched sites are cached for site-based workflows and diagnostics, but they do not override matrix locking.
-
-Optional: pull curated sites from RegulonDB (network access required):
+Fetch binding sites from both sources so each TF has a larger merged site pool.
 
 ```bash
-cruncher fetch sites --tf lexA --tf cpxR --update -c "$CONFIG"
+cruncher fetch sites --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
+cruncher fetch sites --source regulondb      --tf lexA --tf cpxR --update -c "$CONFIG"
 ```
+
+`catalog.combine_sites=true` in this demo, so discovery uses all cached site entries per TF (across both sources).
+The local MEME files provide DAP-seq sites; RegulonDB adds curated sites.
+
+## Discover MEME OOPS motifs
+
+Run MEME in OOPS mode over the merged site sets and write discovered motifs under
+source `demo_merged_meme_oops`.
+
+```bash
+cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --source-id demo_merged_meme_oops -c "$CONFIG"
+```
+
+The demo config constrains discovery to `minw=11` and `maxw=15`, so discovered motifs fit within `sample.sequence_length=16`.
 
 ## Lock + parse
 
@@ -106,8 +118,9 @@ cruncher lock  -c "$CONFIG"
 cruncher parse -c "$CONFIG"
 ```
 
-`lock` pins the exact PWM artifacts for reproducible runs. `parse` validates the locked motifs and writes a parse manifest used by sampling.
+`lock` pins exact discovered motif IDs/hashes for reproducible runs. `parse` validates those locked motifs and writes a parse manifest used by sampling.
 If `.cruncher/parse` already exists from a prior run, re-run parse with `--force-overwrite`.
+This demo pins `catalog.source_preference` to `demo_merged_meme_oops` to prevent accidental fallback to local 21/22 bp motifs.
 
 ## Sample + analyze
 
@@ -136,6 +149,15 @@ pixi run cruncher -- sample --force-overwrite -c "$CONFIG"
 pixi run cruncher -- analyze --summary -c "$CONFIG"
 ```
 
+If you changed site/discovery settings, refresh discovery before lock:
+
+```bash
+pixi run cruncher -- fetch sites --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
+pixi run cruncher -- fetch sites --source regulondb      --tf lexA --tf cpxR --update -c "$CONFIG"
+pixi run cruncher -- discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --source-id demo_merged_meme_oops -c "$CONFIG"
+pixi run cruncher -- lock -c "$CONFIG"
+```
+
 ## Inspect results
 
 Run artifacts live under:
@@ -157,18 +179,6 @@ Key files:
 - elite hit metadata: `optimize/elites_hits.parquet`
 - random baseline cloud: `optimize/random_baseline.parquet`
 - random baseline hits: `optimize/random_baseline_hits.parquet`
-
-## Optional: motif discovery
-
-If you want to rebuild PWMs from cached sites, enable discovery in the config and run:
-
-```bash
-cruncher discover motifs --tf lexA --tf cpxR -c "$CONFIG"
-cruncher lock -c "$CONFIG"
-cruncher parse -c "$CONFIG"
-```
-
-Discovery writes new motif matrices into the catalog and requires MEME Suite.
 
 ## Related docs
 

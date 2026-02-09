@@ -12,7 +12,7 @@ cruncher:
 
   catalog:
     root: .cruncher
-    source_preference: [meme_suite_meme, meme_suite_streme, demo_local_meme, regulondb]
+    source_preference: [demo_merged_meme_oops]
     allow_ambiguous: false
     pwm_source: matrix
     site_kinds: null
@@ -31,7 +31,11 @@ cruncher:
     allow_low_sites: false
 
   discover:
-    source_id: meme_suite_streme
+    tool: meme
+    source_id: demo_merged_meme_oops
+    minw: 11
+    maxw: 15
+    meme_mod: oops
 
   ingest:
     genome_source: ncbi
