@@ -25,7 +25,7 @@ Note: the pixi `meme` package provides both `meme` and `streme`. When using pixi
 
 - **MEME**: best when each sequence is one site; use `--meme-mod oops` (or `zoops` if noisy).
 - **STREME**: good default for larger sets or when you want speed.
-- If `minw/maxw` are unset, **cruncher** derives bounds from per‑TF site lengths.
+- If `minw/maxw` are unset, **cruncher** passes no width flags and uses MEME/STREME defaults.
 
 ```bash
 cruncher discover motifs --tool meme --meme-mod oops <config>

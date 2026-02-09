@@ -204,7 +204,7 @@ def _assert_init_length_fits_pwms(sample_cfg: SampleConfig, pwms: dict[str, PWM]
         raise ValueError(
             f"sequence_length={sample_cfg.sequence_length} is shorter than the widest PWM (max={max_w}). "
             f"Per-TF lengths: {names}. Increase sample.sequence_length or trim PWMs via "
-            "cruncher.catalog.pwm_window_lengths (with pwm_window_strategy=max_info)."
+            "cruncher.sample.motif_width.maxw (with strategy=max_info)."
         )
 
 

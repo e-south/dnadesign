@@ -120,7 +120,7 @@ If a TF cannot be uniquely resolved, **cruncher** errors immediately. Analyze op
 - `catalog.combine_sites=true` concatenates site sets for a TF before PWM creation (explicit opt‑in).
 - When `combine_sites=true`, lockfiles hash the full set of site files used for that TF, so cache changes require re-locking.
 - HT site sets with variable lengths require per‑TF/per‑dataset window lengths via `catalog.site_window_lengths`.
-- If optimization requires a shorter PWM, set `catalog.pwm_window_lengths` to select the highest‑information window.
+- If optimization requires a shorter PWM, set `sample.motif_width.maxw` to select the highest‑information window at sampling time.
 - Fail if fewer than `min_sites_for_pwm` binding sites are available (unless `allow_low_sites=true`).
 - All PWMs are validated (shape Lx4, rows sum to 1, non-negative).
 - De novo alignment/discovery is handled via MEME Suite (`cruncher discover motifs`) and stored as catalog matrices.

@@ -25,7 +25,7 @@ This demo designs fixed-length sequences that satisfy two PWMs (LexA + CpxR). It
 6. analyze
 
 Cruncher scores each TF by the best PWM match anywhere in the sequence on either strand (when `objective.bidirectional=true`). It optimizes the weakest TF by default (`objective.combine=min`) and selects diverse elites via TFBS-core MMR.
-The demo builds MEME OOPS motifs from merged DAP-seq (`demo_local_meme`) + RegulonDB sites, constrains motif width to 11-15 bp, then locks sampling to those discovered motifs. Sequence length is fixed at 16 bp.
+The demo builds MEME OOPS motifs from merged DAP-seq (`demo_local_meme`) + RegulonDB sites, then locks sampling to those discovered motifs. Sequence length is fixed at 16 bp, and sampling enforces `sample.motif_width.maxw=16` via max-information contiguous windowing.
 The bundled config uses targeted insertion proposals plus adaptive move weights/proposal sizing with strict PT adaptation (`n_temps=4`, `temp_max=14`) for stable optimization diagnostics.
 
 For the full intent, lifecycle, and config mapping, see [Intent + lifecycle](../guides/intent_and_lifecycle.md).
@@ -109,7 +109,8 @@ source `demo_merged_meme_oops`.
 cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --source-id demo_merged_meme_oops -c "$CONFIG"
 ```
 
-The demo config constrains discovery to `minw=11` and `maxw=15`, so discovered motifs fit within `sample.sequence_length=16`.
+This demo leaves MEME width unconstrained at discovery time (`discover.minw/maxw: null`) so logos and catalog inspection keep full discovered motifs.
+Width enforcement is applied only in sampling via `sample.motif_width.maxw=16`.
 
 ## Lock + parse
 

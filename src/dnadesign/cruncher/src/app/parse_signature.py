@@ -34,8 +34,6 @@ def compute_parse_signature(
             "site_kinds": cfg.catalog.site_kinds,
             "site_window_lengths": cfg.catalog.site_window_lengths,
             "site_window_center": cfg.catalog.site_window_center,
-            "pwm_window_lengths": cfg.catalog.pwm_window_lengths,
-            "pwm_window_strategy": cfg.catalog.pwm_window_strategy,
             "min_sites_for_pwm": cfg.catalog.min_sites_for_pwm,
             "allow_low_sites": cfg.catalog.allow_low_sites,
             "pseudocounts": cfg.catalog.pseudocounts,

@@ -108,8 +108,8 @@ def build_meme_command(
     exe: Path,
     fasta_path: Path,
     run_dir: Path,
-    minw: int,
-    maxw: int,
+    minw: int | None,
+    maxw: int | None,
     nmotifs: int,
     meme_mod: str | None,
     meme_prior: str | None,
@@ -120,13 +120,13 @@ def build_meme_command(
         "-dna",
         "-oc",
         str(run_dir),
-        "-minw",
-        str(minw),
-        "-maxw",
-        str(maxw),
         "-nmotifs",
         str(nmotifs),
     ]
+    if minw is not None:
+        cmd.extend(["-minw", str(minw)])
+    if maxw is not None:
+        cmd.extend(["-maxw", str(maxw)])
     if meme_mod:
         cmd.extend(["-mod", str(meme_mod)])
     if meme_prior:
@@ -296,12 +296,12 @@ def discover_motifs(
     minw: int | None = typer.Option(
         None,
         "--minw",
-        help="Minimum motif width (defaults to config; auto from site lengths if unset).",
+        help="Minimum motif width (defaults to config; tool default if unset).",
     ),
     maxw: int | None = typer.Option(
         None,
         "--maxw",
-        help="Maximum motif width (defaults to config; auto from site lengths if unset).",
+        help="Maximum motif width (defaults to config; tool default if unset).",
     ),
     nmotifs: int | None = typer.Option(None, "--nmotifs", help="Number of motifs to report per TF."),
     meme_mod: str | None = typer.Option(
@@ -425,24 +425,24 @@ def discover_motifs(
         if not sequences:
             console.print(f"Error: no site sequences available for {target.tf_name}.")
             raise typer.Exit(code=1)
-        lengths = [len(seq) for seq in sequences]
-        min_len = min(lengths)
-        max_len = max(lengths)
-        resolved_minw = minw if minw is not None else min_len
-        resolved_maxw = maxw if maxw is not None else max_len
-        if resolved_minw < 1 or resolved_maxw < 1 or resolved_maxw < resolved_minw:
+        resolved_minw = minw if minw is not None else None
+        resolved_maxw = maxw if maxw is not None else None
+        if resolved_minw is not None and resolved_minw < 1:
+            console.print(f"Error: invalid motif width lower bound for {target.tf_name}: minw={resolved_minw}.")
+            raise typer.Exit(code=1)
+        if resolved_maxw is not None and resolved_maxw < 1:
+            console.print(f"Error: invalid motif width upper bound for {target.tf_name}: maxw={resolved_maxw}.")
+            raise typer.Exit(code=1)
+        if resolved_minw is not None and resolved_maxw is not None and resolved_maxw < resolved_minw:
             console.print(
                 f"Error: invalid motif width range for {target.tf_name}: minw={resolved_minw}, maxw={resolved_maxw}."
             )
             raise typer.Exit(code=1)
-        if minw is None or maxw is None:
-            console.print(
-                f"INFO {target.tf_name}: using site-length bounds for discovery "
-                f"(minw={resolved_minw}, maxw={resolved_maxw}, site lengths {min_len}-{max_len})."
-            )
+        chosen_tool = _choose_tool(tool, nseq=len(sequences), streme_threshold=streme_threshold)
+        if resolved_minw is None and resolved_maxw is None:
+            console.print(f"INFO {target.tf_name}: discovery width bounds unset; using {chosen_tool} defaults.")
         _write_fasta(fasta_path, sequences)
 
-        chosen_tool = _choose_tool(tool, nseq=len(sequences), streme_threshold=streme_threshold)
         try:
             exe = resolve_executable(chosen_tool, tool_path=resolved_tool_path)
         except FileNotFoundError as exc:
@@ -467,13 +467,13 @@ def discover_motifs(
                 str(fasta_path),
                 "--oc",
                 str(run_dir),
-                "--minw",
-                str(resolved_minw),
-                "--maxw",
-                str(resolved_maxw),
                 "--nmotifs",
                 str(nmotifs),
             ]
+            if resolved_minw is not None:
+                cmd.extend(["--minw", str(resolved_minw)])
+            if resolved_maxw is not None:
+                cmd.extend(["--maxw", str(resolved_maxw)])
             output_path = run_dir / "streme.txt"
         else:
             cmd = build_meme_command(
@@ -533,8 +533,8 @@ def discover_motifs(
                 "discovery_tool_version": version or "unknown",
                 "discovery_run": run_dir.name,
                 "discovery_nsites": str(len(sequences)),
-                "discovery_minw": str(resolved_minw),
-                "discovery_maxw": str(resolved_maxw),
+                "discovery_minw": str(resolved_minw) if resolved_minw is not None else "tool_default",
+                "discovery_maxw": str(resolved_maxw) if resolved_maxw is not None else "tool_default",
                 "discovery_nmotifs": str(nmotifs),
             }
             record = build_motif_record(

@@ -228,8 +228,6 @@ def _build_logo_signature(
 ) -> tuple[str, dict]:
     pwm_config = {
         "pwm_source": cfg.catalog.pwm_source,
-        "pwm_window_lengths": cfg.catalog.pwm_window_lengths,
-        "pwm_window_strategy": cfg.catalog.pwm_window_strategy,
     }
     if cfg.catalog.pwm_source == "sites":
         pwm_config.update(
@@ -952,6 +950,7 @@ def pwms(
             site_window_center=cfg.catalog.site_window_center,
             pwm_window_lengths=cfg.catalog.pwm_window_lengths,
             pwm_window_strategy=cfg.catalog.pwm_window_strategy,
+            apply_pwm_window=False,
             min_sites_for_pwm=cfg.catalog.min_sites_for_pwm,
             allow_low_sites=cfg.catalog.allow_low_sites,
             pseudocounts=cfg.catalog.pseudocounts,
@@ -1396,6 +1395,7 @@ def logos(
             site_window_center=cfg.catalog.site_window_center,
             pwm_window_lengths=cfg.catalog.pwm_window_lengths,
             pwm_window_strategy=cfg.catalog.pwm_window_strategy,
+            apply_pwm_window=False,
             min_sites_for_pwm=cfg.catalog.min_sites_for_pwm,
             allow_low_sites=cfg.catalog.allow_low_sites,
             pseudocounts=cfg.catalog.pseudocounts,

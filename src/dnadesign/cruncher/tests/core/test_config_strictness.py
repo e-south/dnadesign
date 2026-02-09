@@ -159,6 +159,15 @@ def test_catalog_root_allows_absolute(tmp_path: Path) -> None:
     assert cfg.catalog.root.is_absolute()
 
 
+def test_catalog_pwm_window_lengths_rejected(tmp_path: Path) -> None:
+    config = _base_config()
+    config["cruncher"]["catalog"]["pwm_window_lengths"] = {"lexA": 12}
+    config_path = _write_config(tmp_path, config)
+
+    with pytest.raises(ValidationError, match="catalog.pwm_window_lengths is no longer used"):
+        load_config(config_path)
+
+
 def test_removed_motif_store_alias_property_is_not_exposed(tmp_path: Path) -> None:
     config = _base_config()
     config_path = _write_config(tmp_path, config)

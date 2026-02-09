@@ -29,3 +29,18 @@ def test_build_meme_command_includes_prior_and_mod() -> None:
     assert "oops" in cmd
     assert "-prior" in cmd
     assert "addone" in cmd
+
+
+def test_build_meme_command_omits_width_flags_when_unset() -> None:
+    cmd = build_meme_command(
+        exe=Path("/usr/local/bin/meme"),
+        fasta_path=Path("sites.fasta"),
+        run_dir=Path("run_dir"),
+        minw=None,
+        maxw=None,
+        nmotifs=1,
+        meme_mod=None,
+        meme_prior=None,
+    )
+    assert "-minw" not in cmd
+    assert "-maxw" not in cmd

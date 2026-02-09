@@ -1033,6 +1033,27 @@ class SampleOutputConfig(StrictBaseModel):
     live_metrics: bool = True
 
 
+class SampleMotifWidthConfig(StrictBaseModel):
+    minw: Optional[int] = None
+    maxw: Optional[int] = None
+    strategy: Literal["max_info"] = "max_info"
+
+    @field_validator("minw", "maxw")
+    @classmethod
+    def _check_optional_positive_ints(cls, v: Optional[int], info) -> Optional[int]:
+        if v is None:
+            return v
+        if v < 1:
+            raise ValueError(f"sample.motif_width.{info.field_name} must be >= 1")
+        return int(v)
+
+    @model_validator(mode="after")
+    def _check_widths(self) -> "SampleMotifWidthConfig":
+        if self.minw is not None and self.maxw is not None and self.maxw < self.minw:
+            raise ValueError("sample.motif_width.maxw must be >= sample.motif_width.minw")
+        return self
+
+
 class SampleConfig(StrictBaseModel):
     seed: int
     sequence_length: int
@@ -1042,6 +1063,7 @@ class SampleConfig(StrictBaseModel):
     pt: SamplePtConfig = SamplePtConfig()
     elites: SampleElitesConfig = SampleElitesConfig()
     output: SampleOutputConfig = SampleOutputConfig()
+    motif_width: SampleMotifWidthConfig = SampleMotifWidthConfig()
 
     @field_validator("seed")
     @classmethod
@@ -1056,6 +1078,16 @@ class SampleConfig(StrictBaseModel):
         if not isinstance(v, int) or v < 1:
             raise ValueError("sample.sequence_length must be >= 1")
         return v
+
+    @model_validator(mode="after")
+    def _check_motif_width_bounds(self) -> "SampleConfig":
+        minw = self.motif_width.minw
+        maxw = self.motif_width.maxw
+        if minw is not None and minw > self.sequence_length:
+            raise ValueError("sample.motif_width.minw must be <= sample.sequence_length")
+        if maxw is not None and maxw > self.sequence_length:
+            raise ValueError("sample.motif_width.maxw must be <= sample.sequence_length")
+        return self
 
 
 class AnalysisConfig(StrictBaseModel):
@@ -1149,6 +1181,11 @@ class CruncherConfig(StrictBaseModel):
             raise ValueError("Config schema v3 required (schema_version: 3)")
         if not self.workspace.regulator_sets and not self.campaigns:
             raise ValueError("Config must define workspace.regulator_sets or campaigns.")
+        if self.catalog.pwm_window_lengths:
+            raise ValueError(
+                "catalog.pwm_window_lengths is no longer used for optimization. "
+                "Set sample.motif_width.maxw to enforce PWM width at sampling time."
+            )
         return self
 
     @property

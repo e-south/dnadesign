@@ -169,3 +169,54 @@ def test_pwm_from_sites_requires_sequences(tmp_path):
         assert "missing a sequence" in str(exc)
     else:
         raise AssertionError("Expected ValueError for missing site sequences")
+
+
+def test_matrix_pwm_window_can_be_disabled_for_logo_views(tmp_path):
+    motifs_dir = tmp_path / "normalized" / "motifs" / "demo_source"
+    motifs_dir.mkdir(parents=True)
+    motif_path = motifs_dir / "lexA_demo.json"
+    motif_path.write_text(
+        json.dumps(
+            {
+                "descriptor": {"tf_name": "lexA"},
+                "matrix": [
+                    [0.97, 0.01, 0.01, 0.01],
+                    [0.25, 0.25, 0.25, 0.25],
+                    [0.25, 0.25, 0.25, 0.25],
+                    [0.97, 0.01, 0.01, 0.01],
+                ],
+            }
+        )
+    )
+    catalog = CatalogIndex(
+        entries={
+            "demo_source:lexA_demo": CatalogEntry(
+                source="demo_source",
+                motif_id="lexA_demo",
+                tf_name="lexA",
+                kind="PFM",
+                has_matrix=True,
+                matrix_length=4,
+            )
+        }
+    )
+    catalog.save(tmp_path)
+
+    windowed_store = CatalogMotifStore(
+        tmp_path,
+        pwm_source="matrix",
+        pwm_window_lengths={"lexA": 2},
+        pwm_window_strategy="max_info",
+    )
+    windowed = windowed_store.get_pwm(MotifRef(source="demo_source", motif_id="lexA_demo"))
+    assert windowed.length == 2
+
+    full_store = CatalogMotifStore(
+        tmp_path,
+        pwm_source="matrix",
+        pwm_window_lengths={"lexA": 2},
+        pwm_window_strategy="max_info",
+        apply_pwm_window=False,
+    )
+    full = full_store.get_pwm(MotifRef(source="demo_source", motif_id="lexA_demo"))
+    assert full.length == 4

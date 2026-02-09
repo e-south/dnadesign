@@ -41,7 +41,8 @@ Sampling is fixed-length and strict:
 
 - `sample.sequence_length` sets the designed DNA length.
 - `sample.budget.tune` and `sample.budget.draws` are explicit; no hidden budgets.
-- `sample.sequence_length` must be at least the widest PWM (after any `catalog.pwm_window_lengths`).
+- `sample.motif_width.maxw` optionally trims wide PWMs by max-information windowing during sampling.
+- `sample.sequence_length` must be at least the widest PWM after `sample.motif_width` constraints are applied.
 
 If the length invariant is violated, sampling fails fast with the per-TF widths.
 

@@ -91,8 +91,8 @@ catalog:
   dataset_map: {}                 # TF -> dataset ID
   site_window_lengths: {}         # TF or dataset:<id> -> length (bp)
   site_window_center: midpoint    # midpoint | summit
-  pwm_window_lengths: {}          # TF or dataset:<id> -> PWM window length (bp)
-  pwm_window_strategy: max_info   # max_info
+  pwm_window_lengths: {}          # keep empty (deprecated for optimization)
+  pwm_window_strategy: max_info   # reserved
   min_sites_for_pwm: 2
   allow_low_sites: false
 ```
@@ -101,7 +101,7 @@ Notes:
 - `pwm_source=matrix` uses cached motif matrices (default).
 - `pwm_source=sites` builds PWMs from cached binding-site sequences at runtime.
 - If site lengths vary, set `site_window_lengths` per TF or dataset.
-- To constrain long PWMs, set `pwm_window_lengths` and use `pwm_window_strategy=max_info`.
+- Leave `pwm_window_lengths` empty. Optimization-time width control is configured in `sample.motif_width`.
 
 ## discover
 
@@ -113,8 +113,8 @@ discover:
   tool: auto                     # auto | streme | meme
   tool_path: null                # optional path to meme/streme or a bin dir
   window_sites: false            # pre-window binding sites before discovery
-  minw: null                     # minimum motif width (auto from site lengths if unset)
-  maxw: null                     # maximum motif width (auto from site lengths if unset)
+  minw: null                     # minimum motif width (tool default if unset)
+  maxw: null                     # maximum motif width (tool default if unset)
   nmotifs: 1                     # motifs per TF
   meme_mod: null                 # oops | zoops | anr
   meme_prior: null               # dirichlet | dmix | mega | megap | addone
@@ -176,6 +176,10 @@ Fixed-length sampling with PT-only optimization and MMR elite selection.
 sample:
   seed: 42
   sequence_length: 30
+  motif_width:
+    minw: null
+    maxw: 30
+    strategy: max_info
 
   budget:
     tune: 1000
@@ -260,7 +264,8 @@ sample:
 ```
 
 Notes:
-- `sequence_length` must be at least the widest PWM (after any `pwm_window_lengths`).
+- `sequence_length` must be at least the widest PWM after applying `sample.motif_width` bounds.
+- `motif_width.maxw` enforces a contiguous max-information trim during sampling only.
 - Canonicalization is automatic when `objective.bidirectional=true`.
 - MMR distance is TFBS-core weighted Hamming (tolerant weighting, low-information positions emphasized).
 - `moves.overrides.*` contains optional expert controls (operator mix + adaptation). Leave unset unless you are actively tuning proposals.

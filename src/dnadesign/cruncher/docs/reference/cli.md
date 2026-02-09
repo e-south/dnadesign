@@ -470,7 +470,7 @@ Example:
 Inspect cached motifs and site sets.
 
 Use `catalog pwms` to compute PWMs from cached matrices or binding sites and
-survey their lengths/bit scores (including any configured PWM window), and `catalog logos` to render PNG logos for the
+survey their lengths/bit scores (without sampling-time motif-width trimming), and `catalog logos` to render PNG logos for the
 same selection criteria.
 
 Inputs:
@@ -554,8 +554,8 @@ Notes:
   `discover.window_sites=true`) to pre-window with `catalog.site_window_lengths`
   before running MEME/STREME.
   If enabled without window lengths for a TF, discovery exits with a helpful error.
-* If `--minw/--maxw` are omitted (and unset in config), Cruncher derives them from the min/max
-  site lengths per TF.
+* If `--minw/--maxw` are omitted (and unset in config), Cruncher passes no width flags and
+  MEME/STREME uses its own defaults.
 * Use `cruncher targets stats` to set `--minw/--maxw` from site-length ranges.
 * If you plan to run both MEME and STREME, set distinct `discover.source_id` values between runs to avoid lock ambiguity.
   You can also pass `--source-id` per run to avoid editing config.
