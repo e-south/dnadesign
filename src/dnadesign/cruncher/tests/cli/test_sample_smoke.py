@@ -129,6 +129,11 @@ def test_sample_cli_smoke_matrix(tmp_path: Path) -> None:
     assert result.exit_code == 0
     sample_runs = _find_runs(tmp_path / "runs")
     assert sample_runs
+    result = runner.invoke(app, ["sample", "-c", str(config_path)])
+    assert result.exit_code != 0
+    assert "--force-overwrite" in result.output
+    result = runner.invoke(app, ["sample", "--force-overwrite", "-c", str(config_path)])
+    assert result.exit_code == 0
     seq_path = sequences_path(sample_runs[0])
     seq_df = pd.read_parquet(seq_path)
     assert "min_per_tf_norm" in seq_df.columns

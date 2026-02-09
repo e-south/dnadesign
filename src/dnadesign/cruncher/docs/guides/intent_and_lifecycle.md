@@ -134,11 +134,11 @@ Crosswalk (behavior -> config -> modules -> artifacts):
 |---|---|---|---|
 | Fetch motifs/sites (cache) | `catalog.*`, `ingest.*`, `discover.*` | `ingest/`, `store/` | `<catalog.root>/normalized/...` + `catalog.json` |
 | Pin exact inputs (lock) | `workspace.regulator_sets` or `campaigns[]` + `--campaign`, `catalog.*` | `store/`, `app/` | `<workspace>/.cruncher/locks/<config>.lock.json` |
-| Validate locked PWMs (parse) | (lockfile-driven) | `app/` | `<workspace>/.cruncher/parse/latest/input/` |
+| Validate locked PWMs (parse) | (lockfile-driven) | `app/` | `<workspace>/.cruncher/parse/input/` |
 | PT optimization (sample) | `sample.*` | `core/`, `app/` | `<run_dir>/optimize/` + manifest/status updates |
 | Elite filter + TFBS-core MMR | `sample.elites.*` | `core/`, `app/` | `optimize/elites*.parquet` |
 | Artifact-only reporting (analyze) | `analysis.*` | `analysis/`, `app/` | `<run_dir>/output/` + `<run_dir>/plots/` |
-| Campaign expand + summarize | `campaigns[]`, `campaign` | `app/` | `outputs/campaign/<name>/latest/{output,plots}` |
+| Campaign expand + summarize | `campaigns[]`, `campaign` | `app/` | `outputs/campaign/<name>/{output,plots}` |
 
 ## Architecture mapping
 

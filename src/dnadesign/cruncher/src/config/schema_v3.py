@@ -1068,8 +1068,13 @@ class AnalysisConfig(StrictBaseModel):
     table_format: Literal["parquet", "csv"] = "parquet"
     archive: bool = False
     max_points: int = 5000
+    trajectory_plot_style: Literal["story", "debug"] = "story"
+    trajectory_story_stride: int = 50
+    trajectory_debug_stride: int = 10
+    trajectory_baseline_mode: Literal["hexbin", "scatter"] = "hexbin"
+    trajectory_show_all_chains: bool = False
 
-    @field_validator("plot_dpi", "max_points")
+    @field_validator("plot_dpi", "max_points", "trajectory_story_stride", "trajectory_debug_stride")
     @classmethod
     def _check_positive_ints(cls, v: int, info) -> int:
         if not isinstance(v, int) or v < 1:

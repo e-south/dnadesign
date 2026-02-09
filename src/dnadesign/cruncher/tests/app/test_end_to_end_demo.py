@@ -159,7 +159,7 @@ def test_end_to_end_sites_pipeline(tmp_path: Path) -> None:
     run_parse(cfg, config_path)
     run_sample(cfg, config_path)
 
-    sample_dir = tmp_path / "results" / "latest"
+    sample_dir = tmp_path / "results"
     assert sample_dir.exists()
     assert manifest_path(sample_dir).exists()
     sample_manifest_payload = json.loads(manifest_path(sample_dir).read_text())
@@ -295,16 +295,16 @@ def test_demo_campaign_pair_local_only_generates_plots(tmp_path: Path) -> None:
         result = runner.invoke(app, command)
         assert result.exit_code == 0
 
-    analysis_dir = workspace / "outputs" / "latest"
+    analysis_dir = workspace / "outputs"
     assert analysis_dir.is_dir()
     assert manifest_path(analysis_dir).exists()
-    assert (analysis_dir / "plots" / "plot__run_summary.png").exists()
-    assert (analysis_dir / "plots" / "plot__opt_trajectory.png").exists()
+    assert (analysis_dir / "plots" / "plot__opt_trajectory_story.png").exists()
+    assert (analysis_dir / "plots" / "plot__opt_trajectory_debug.png").exists()
     assert (analysis_dir / "plots" / "plot__elites_nn_distance.png").exists()
     assert (analysis_dir / "plots" / "plot__overlap_panel.png").exists()
     assert (analysis_dir / "plots" / "plot__health_panel.png").exists()
 
-    campaign_dir = workspace / "outputs" / "campaign" / "demo_pair" / "latest"
+    campaign_dir = workspace / "outputs" / "campaign" / "demo_pair"
     assert campaign_dir.is_dir()
     assert (campaign_dir / "output" / "campaign_summary.csv").exists()
     assert (campaign_dir / "output" / "campaign_best.csv").exists()

@@ -252,6 +252,7 @@ Outputs:
 Notes:
 
 * `--metrics` requires a local catalog; fetch motifs/sites first.
+* Use `--force-overwrite` to replace an existing campaign summary directory.
 * When `--runs` is omitted, stale sample run-index entries are auto-repaired before summary.
 * `--skip-missing` skips runs missing required `table_manifest.json` entries/files for
   `scores_summary` and `metrics_joint` (typically `table__scores_summary.parquet` and
@@ -278,7 +279,7 @@ Network:
 Examples:
 
 * `cruncher campaign notebook --campaign regulators_v1 <config>`
-* `cruncher campaign notebook --campaign regulators_v1 --out outputs/campaign/regulators_v1/latest <config>`
+* `cruncher campaign notebook --campaign regulators_v1 --out outputs/campaign/regulators_v1 <config>`
 
 Notes:
 
@@ -297,6 +298,7 @@ Inputs:
 * CONFIG (explicit or resolved)
 * optional `--campaign <name>` (required when `workspace.regulator_sets: []`)
 * lockfile (from `cruncher lock`)
+* optional `--force-overwrite` to replace an existing run directory
 
 Network:
 
@@ -317,9 +319,8 @@ Notes:
 * `cruncher parse` always uses the lockfile to pin exact motif IDs/hashes.
   If you add new motifs (e.g., via `discover motifs`) or change `catalog` preferences,
   re-run `cruncher lock <config>` to refresh what parse will use.
-* Parse is idempotent for identical inputs; if matching outputs already exist, it reports
-  the existing run instead of creating a new one.
-* Parse artifacts live under `<workspace>/.cruncher/parse/latest/input/` and are intentionally
+* Parse requires overwrite intent when output already exists; use `--force-overwrite` to replace.
+* Parse artifacts live under `<workspace>/.cruncher/parse/input/` and are intentionally
   separate from user-facing sample outputs in `workspace.out_dir`.
 * Use `cruncher catalog logos` to render PWM logos with provenance subtitles.
 
@@ -397,7 +398,8 @@ Outputs:
   `output/table__metrics_joint.parquet`, `output/table__opt_trajectory_points.parquet`,
   `output/table__diagnostics_summary.json`, `output/table__objective_components.json`,
   `output/table__elites_mmr_summary.parquet`, `output/table__elites_nn_distance.parquet`
-* plots: `plots/plot__run_summary.<plot_format>`, `plots/plot__opt_trajectory.<plot_format>`,
+* plots: `plots/plot__opt_trajectory_story.<plot_format>`,
+  `plots/plot__opt_trajectory_debug.<plot_format>`,
   `plots/plot__elites_nn_distance.<plot_format>`, `plots/plot__overlap_panel.<plot_format>`,
   `plots/plot__health_panel.<plot_format>` (trace only)
 * reports: `output/report.json`, `output/report.md`
@@ -434,7 +436,7 @@ Notes:
 * plot output status is refreshed from disk so missing files are shown accurately
 * the Refresh button re-scans analysis entries and updates plot/table status without restarting marimo
 * the notebook infers `run_dir` from its location; keep it under `<run_dir>/` or regenerate it
-* plots are loaded from `output/plot_manifest.json`; the curated keys are `run_summary`, `opt_trajectory`, `elites_nn_distance`, plus optional `overlap_panel` and `health_panel` entries when generated
+* plots are loaded from `output/plot_manifest.json`; the curated keys are `opt_trajectory_story`, `opt_trajectory_debug`, `elites_nn_distance`, plus optional `overlap_panel` and `health_panel` entries when generated
 * the notebook includes:
   * Overview tab with run metadata and explicit warnings for missing/invalid analysis artifacts
   * Tables tab with a Top-K slider and per-table previews from `output/table_manifest.json`

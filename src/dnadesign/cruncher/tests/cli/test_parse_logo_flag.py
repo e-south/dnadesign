@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 import yaml
 
 from dnadesign.cruncher.app.parse_workflow import run_parse
@@ -22,6 +23,9 @@ from dnadesign.cruncher.artifacts.layout import (
     out_root,
     parse_manifest_path,
     pwm_summary_path,
+    run_optimize_dir,
+    run_output_dir,
+    run_plots_dir,
 )
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
@@ -88,11 +92,15 @@ def test_parse_skips_logos_when_disabled(tmp_path: Path) -> None:
     assert parse_manifest_path(parse_dir).exists()
     assert pwm_summary_path(parse_dir).exists()
     assert lockfile_snapshot_path(parse_dir).exists()
+    assert not (tmp_path / "runs").exists()
+    assert not run_optimize_dir(parse_dir).exists()
+    assert not run_output_dir(parse_dir).exists()
+    assert not run_plots_dir(parse_dir).exists()
     logo_dir = logos_dir_for_run(out_root(config_path, cfg.out_dir), "parse", parse_dir.name)
     assert not logo_dir.exists() or not list(logo_dir.glob("*_logo.png"))
 
 
-def test_parse_is_idempotent_when_inputs_match(tmp_path: Path) -> None:
+def test_parse_requires_force_overwrite_when_outputs_exist(tmp_path: Path) -> None:
     catalog_root = tmp_path / ".cruncher"
     entry = CatalogEntry(
         source="regulondb",
@@ -139,7 +147,9 @@ def test_parse_is_idempotent_when_inputs_match(tmp_path: Path) -> None:
             }
         )
     )
-    run_parse(cfg, config_path)
+    with pytest.raises(ValueError, match="--force-overwrite"):
+        run_parse(cfg, config_path)
+    run_parse(cfg, config_path, force_overwrite=True)
 
     parse_dir = build_run_dir(
         config_path=config_path,

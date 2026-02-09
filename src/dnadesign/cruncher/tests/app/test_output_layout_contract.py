@@ -3,7 +3,7 @@
 <cruncher project>
 src/dnadesign/cruncher/tests/app/test_output_layout_contract.py
 
-Asserts the run output layout remains flat, slot-based, and easy to navigate.
+Asserts the run output layout remains flat, canonical, and easy to navigate.
 
 Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -41,7 +41,7 @@ from dnadesign.cruncher.artifacts.layout import (
 )
 
 
-def test_build_run_dir_uses_latest_slot_without_opaque_hash(tmp_path: Path) -> None:
+def test_build_run_dir_uses_canonical_root_without_opaque_hash(tmp_path: Path) -> None:
     config_path = tmp_path / "config.yaml"
     config_path.write_text("cruncher: {}\n")
 
@@ -54,7 +54,7 @@ def test_build_run_dir_uses_latest_slot_without_opaque_hash(tmp_path: Path) -> N
         include_set_index=False,
     )
 
-    assert run_dir == tmp_path / "outputs" / "latest"
+    assert run_dir == tmp_path / "outputs"
 
 
 def test_build_run_dir_parse_stage_uses_workspace_state_root(tmp_path: Path) -> None:
@@ -78,12 +78,12 @@ def test_build_run_dir_parse_stage_uses_workspace_state_root(tmp_path: Path) -> 
         include_set_index=False,
     )
 
-    assert parse_dir == tmp_path / ".cruncher" / "parse" / "latest"
-    assert sample_dir == tmp_path / "outputs" / "latest"
+    assert parse_dir == tmp_path / ".cruncher" / "parse"
+    assert sample_dir == tmp_path / "outputs"
     assert parse_dir != sample_dir
 
 
-def test_build_run_dir_with_multiple_sets_uses_set_folder_and_slot(tmp_path: Path) -> None:
+def test_build_run_dir_with_multiple_sets_uses_set_folder(tmp_path: Path) -> None:
     config_path = tmp_path / "config.yaml"
     config_path.write_text("cruncher: {}\n")
 
@@ -96,11 +96,11 @@ def test_build_run_dir_with_multiple_sets_uses_set_folder_and_slot(tmp_path: Pat
         include_set_index=True,
     )
 
-    assert run_dir == tmp_path / "outputs" / "set2_lexA-cpxR" / "latest"
+    assert run_dir == tmp_path / "outputs" / "set2_lexA-cpxR"
 
 
 def test_run_artifacts_live_in_lifecycle_subdirs(tmp_path: Path) -> None:
-    run_dir = tmp_path / "outputs" / "latest"
+    run_dir = tmp_path / "outputs"
 
     assert run_input_dir(run_dir) == run_dir / "input"
     assert run_optimize_dir(run_dir) == run_dir / "optimize"
@@ -124,15 +124,20 @@ def test_run_artifacts_live_in_lifecycle_subdirs(tmp_path: Path) -> None:
 
 
 def test_analysis_root_is_run_root_for_flat_access(tmp_path: Path) -> None:
-    run_dir = tmp_path / "outputs" / "latest"
+    run_dir = tmp_path / "outputs"
     assert analysis_root(run_dir) == run_dir
 
 
 def test_analysis_tables_and_plots_use_flat_semantic_filenames(tmp_path: Path) -> None:
-    run_dir = tmp_path / "outputs" / "latest"
+    run_dir = tmp_path / "outputs"
     analysis_dir = analysis_root(run_dir)
 
     assert analysis_table_path(analysis_dir, "scores_summary", "parquet") == (
         analysis_dir / "output" / "table__scores_summary.parquet"
     )
-    assert analysis_plot_path(analysis_dir, "run_summary", "png") == analysis_dir / "plots" / "plot__run_summary.png"
+    assert analysis_plot_path(analysis_dir, "opt_trajectory_story", "png") == (
+        analysis_dir / "plots" / "plot__opt_trajectory_story.png"
+    )
+    assert analysis_plot_path(analysis_dir, "opt_trajectory_debug", "png") == (
+        analysis_dir / "plots" / "plot__opt_trajectory_debug.png"
+    )

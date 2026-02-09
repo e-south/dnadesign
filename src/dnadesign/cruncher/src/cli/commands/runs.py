@@ -682,17 +682,19 @@ def clean_runs_cmd(
 
     updated = 0
     now_iso = now.isoformat()
-    for _run_name, run_dir, payload, reason in stale_runs:
+    for run_name, run_dir, payload, reason in stale_runs:
         payload["status"] = "aborted"
         payload["status_message"] = f"stale ({reason})"
         payload["updated_at"] = now_iso
         payload["finished_at"] = now_iso
+        payload["run_name"] = run_name
         status_file = status_path(run_dir)
         atomic_write_json(status_file, payload)
         update_run_index_from_status(
             config_path,
             run_dir,
             payload,
+            run_name=run_name,
             catalog_root=cfg.catalog.catalog_root,
         )
         updated += 1

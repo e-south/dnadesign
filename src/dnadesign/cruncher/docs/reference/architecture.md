@@ -116,12 +116,12 @@ discoveries/          # MEME/STREME discovery runs
 <workspace>/.cruncher/
 locks/<config>.lock.json
 run_index.json
-parse/latest/input/{lockfile.json,parse_manifest.json,pwm_summary.json}
+parse/input/{lockfile.json,parse_manifest.json,pwm_summary.json}
 ```
 
 - `locks/<config>.lock.json` pins TF names -> exact cached artifacts + hashes.
 - `run_index.json` tracks run folders for `cruncher runs ...` within that workspace.
-- `parse/latest` stores parse-stage validation artifacts outside user-facing sample outputs.
+- `parse/` stores parse-stage validation artifacts outside user-facing sample outputs.
 
 #### Tooling caches
 
@@ -130,15 +130,10 @@ parse/latest/input/{lockfile.json,parse_manifest.json,pwm_summary.json}
 
 #### Run outputs (`out_dir`, e.g. `outputs/`)
 
-Each regulator set gets a retention-oriented **run slot** with two pointers:
+Each regulator set gets one canonical run directory:
 
-- `latest/` - most recent run for that set
-- `previous/` - immediately prior run for that set (if any)
-
-Slot roots:
-
-- single regulator set: `<workspace>/<out_dir>/latest/` and `<workspace>/<out_dir>/previous/`
-- multiple regulator sets: `<workspace>/<out_dir>/setN_<tf-slug>/latest/` and `.../previous/`
+- single regulator set: `<workspace>/<out_dir>/`
+- multiple regulator sets: `<workspace>/<out_dir>/setN_<tf-slug>/`
 
 Within each run directory, Cruncher uses a stable, stage-agnostic subdirectory layout:
 

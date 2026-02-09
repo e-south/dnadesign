@@ -252,6 +252,7 @@ def _run_sample_for_set(
     sample_cfg: SampleConfig,
     stage: str = "sample",
     run_kind: str | None = None,
+    force_overwrite: bool = False,
 ) -> Path:
     """
     Run MCMC sampler, save config/meta plus artifacts (trace.nc, sequences.parquet, elites.*).
@@ -271,6 +272,7 @@ def _run_sample_for_set(
         run_kind=run_kind,
         chain_count=chain_count,
         optimizer_kind=optimizer_kind,
+        force_overwrite=force_overwrite,
     )
     out_dir = layout.run_dir
     run_group = layout.run_group

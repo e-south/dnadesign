@@ -3,6 +3,7 @@
 ## Contents
 - [Overview](#overview)
 - [Demo setup](#demo-setup)
+- [Reset demo](#reset-demo)
 - [Cache sites](#cache-sites)
 - [Run campaign directly](#run-campaign-directly)
 - [Optional: materialize expansion](#optional-materialize-expansion)
@@ -20,6 +21,19 @@ The demo config enables adaptive move/proposal tuning with strict PT adaptation 
 cd src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf
 CONFIG="$PWD/config.yaml"
 cruncher() { pixi run cruncher -- "$@"; }
+```
+
+## Reset demo
+
+Run this before repeating the campaign e2e flow.
+It removes run artifacts, campaign summary outputs, and stale generated campaign files in the workspace root.
+
+```bash
+cd src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf
+rm -rf outputs
+rm -rf .cruncher/parse .cruncher/locks .cruncher/campaigns
+rm -f .cruncher/run_index.json
+rm -f campaign_*.yaml campaign_*.campaign_manifest.json
 ```
 
 ## Cache sites
@@ -78,7 +92,7 @@ cruncher runs repair-index --apply -c "$CONFIG"
 Summary artifacts live under:
 
 ```
-<workspace>/outputs/campaign/<campaign_name>/latest/
+<workspace>/outputs/campaign/<campaign_name>/
   output/campaign_summary.csv
   output/campaign_best.csv
   output/campaign_manifest.json

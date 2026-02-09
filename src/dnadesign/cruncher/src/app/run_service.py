@@ -152,8 +152,6 @@ def _iter_run_dirs(stage_dir: Path) -> list[Path]:
     seen: set[Path] = set()
     for manifest_file in sorted(stage_dir.rglob("run_manifest.json")):
         run_dir = manifest_file.parent
-        if run_dir.name == "previous":
-            continue
         try:
             rel = run_dir.relative_to(stage_dir)
         except ValueError:
@@ -184,14 +182,15 @@ def _merge_payload(existing: dict, updates: dict) -> dict:
 
 
 def _run_index_key(run_dir: Path, updates: dict) -> str:
+    run_name = updates.get("run_name")
+    if isinstance(run_name, str) and run_name:
+        return run_name
     stage = str(updates.get("stage") or "unknown")
-    slot = run_dir.name
     run_group = updates.get("run_group")
-    if slot in {"latest", "previous"}:
-        if isinstance(run_group, str) and run_group:
-            return f"{stage}/{run_group}/{slot}"
-        return f"{stage}/{slot}"
-    return slot
+    if isinstance(run_group, str) and run_group:
+        return f"{stage}/{run_group}"
+    run_dir_name = run_dir.name or stage
+    return f"{stage}/{run_dir_name}"
 
 
 def _is_under(path: Path, root: Path) -> bool:
@@ -275,11 +274,12 @@ def update_run_index_from_status(
     run_dir: Path,
     status_payload: dict,
     *,
+    run_name: str | None = None,
     catalog_root: Path | str | None = None,
 ) -> dict:
     updates = _updates_from_status(status_payload)
     updates.setdefault("run_dir_guess", str(run_dir.resolve()))
-    run_key = _run_index_key(run_dir, updates)
+    run_key = run_name if isinstance(run_name, str) and run_name else _run_index_key(run_dir, updates)
     return upsert_run_index(config_path, run_key, updates, catalog_root=catalog_root)
 
 

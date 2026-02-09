@@ -15,7 +15,7 @@ from dnadesign.cruncher.app import campaign_notebook_service
 
 
 def test_generate_campaign_notebook_reads_output_and_plots_dirs(tmp_path, monkeypatch) -> None:
-    summary_dir = tmp_path / "campaign" / "demo" / "latest"
+    summary_dir = tmp_path / "campaign" / "demo"
     output_dir = summary_dir / "output"
     plots_dir = summary_dir / "plots"
     output_dir.mkdir(parents=True)
@@ -38,7 +38,7 @@ def test_generate_campaign_notebook_reads_output_and_plots_dirs(tmp_path, monkey
 
 
 def test_generate_campaign_notebook_strict_requires_output_contract(tmp_path, monkeypatch) -> None:
-    summary_dir = tmp_path / "campaign" / "demo" / "latest"
+    summary_dir = tmp_path / "campaign" / "demo"
     output_dir = summary_dir / "output"
     output_dir.mkdir(parents=True)
     (output_dir / "campaign_best.csv").write_text("set_index,joint_hmean\n1,0.95\n")

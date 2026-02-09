@@ -95,9 +95,8 @@ def prepare_run_layout(
     run_kind: str | None,
     chain_count: int,
     optimizer_kind: str,
+    force_overwrite: bool,
 ) -> RunLayout:
-    base_out = config_path.parent / Path(cfg.out_dir)
-    base_out.mkdir(parents=True, exist_ok=True)
     run_dir = build_run_dir(
         config_path=config_path,
         out_dir=cfg.out_dir,
@@ -105,21 +104,18 @@ def prepare_run_layout(
         tfs=tfs,
         set_index=set_index,
         include_set_index=include_set_index,
-        slot="latest",
     )
-    previous_dir = build_run_dir(
-        config_path=config_path,
-        out_dir=cfg.out_dir,
-        stage=stage,
-        tfs=tfs,
-        set_index=set_index,
-        include_set_index=include_set_index,
-        slot="previous",
-    )
-    if previous_dir.exists():
-        shutil.rmtree(previous_dir)
+    run_dir.parent.mkdir(parents=True, exist_ok=True)
     if run_dir.exists():
-        shutil.move(str(run_dir), previous_dir)
+        if not run_dir.is_dir():
+            raise ValueError(f"Run output path exists and is not a directory: {run_dir}")
+        has_entries = any(run_dir.iterdir())
+        if has_entries:
+            if not force_overwrite:
+                raise ValueError(
+                    f"Run output directory already exists: {run_dir}. Re-run with --force-overwrite to replace it."
+                )
+            shutil.rmtree(run_dir)
     ensure_run_dirs(run_dir, meta=True, artifacts=True, live=sample_cfg.output.live_metrics)
     run_group = run_group_label(tfs, set_index, include_set_index=include_set_index)
     stage_label = stage.upper().replace("_", "-")

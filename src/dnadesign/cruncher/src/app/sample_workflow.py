@@ -62,6 +62,8 @@ def _sigterm_as_keyboard_interrupt():
 def run_sample(
     cfg: CruncherConfig,
     config_path: Path,
+    *,
+    force_overwrite: bool = False,
 ) -> None:
     """
     Run MCMC sampler, save config/meta plus artifacts (trace.nc, sequences.parquet, elites.*).
@@ -103,6 +105,7 @@ def run_sample(
                 tfs=tfs,
                 lockmap=lockmap,
                 sample_cfg=sample_cfg,
+                force_overwrite=force_overwrite,
             )
             logger.info(
                 "Sample outputs -> %s",

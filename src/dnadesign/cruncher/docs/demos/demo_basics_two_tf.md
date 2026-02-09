@@ -3,6 +3,7 @@
 ## Contents
 - [Overview](#overview)
 - [Demo setup](#demo-setup)
+- [Reset demo](#reset-demo)
 - [Cache motifs and sites](#cache-motifs-and-sites)
 - [Lock + parse](#lock--parse)
 - [Sample + analyze](#sample--analyze)
@@ -37,6 +38,18 @@ CONFIG="$PWD/config.yaml"
 
 # Convenience wrapper (pixi is the default in this repo)
 cruncher() { pixi run cruncher -- "$@"; }
+```
+
+## Reset demo
+
+Run this before re-running the full demo from scratch.
+It clears run artifacts and workspace state while leaving shared catalog caches intact.
+
+```bash
+cd src/dnadesign/cruncher/workspaces/demo_basics_two_tf
+rm -rf outputs
+rm -rf .cruncher/parse .cruncher/locks .cruncher/campaigns
+rm -f .cruncher/run_index.json
 ```
 
 ## Cache motifs and sites
@@ -76,7 +89,7 @@ cruncher analyze --summary -c "$CONFIG"
 Run artifacts live under:
 
 ```
-<workspace>/outputs/latest/
+<workspace>/outputs/
 ```
 
 Key files:
@@ -84,7 +97,8 @@ Key files:
 - `output/summary.json`
 - `output/report.md`
 - `output/report.json`
-- curated plots in `plots/`: `plot__run_summary.*`, `plot__opt_trajectory.*`,
+- curated plots in `plots/`: `plot__opt_trajectory_story.*`,
+  `plot__opt_trajectory_debug.*`,
   `plot__elites_nn_distance.*`, `plot__overlap_panel.*`
   (and `plot__health_panel.*` if a trace is present)
 - analysis tables in `output/` use `table__*` filenames (for example

@@ -29,7 +29,7 @@ cruncher analyze
 cruncher analyze --summary
 ```
 
-Outputs are written under each run directory (typically `outputs/latest/`). The canonical entrypoints are:
+Outputs are written under each run directory (typically `outputs/`). The canonical entrypoints are:
 
 - `output/summary.json`
 - `output/report.md`
@@ -119,8 +119,8 @@ Sampling artifacts consumed by analysis:
 
 Plots (always generated when data is available):
 
-- `plots/plot__run_summary.*`
-- `plots/plot__opt_trajectory.*`
+- `plots/plot__opt_trajectory_story.*` (default narrative trajectory)
+- `plots/plot__opt_trajectory_debug.*` (chain-level diagnostics)
 - `plots/plot__elites_nn_distance.*`
 - `plots/plot__overlap_panel.*`
 - `plots/plot__health_panel.*` (only if `optimize/trace.nc` exists)
@@ -147,7 +147,7 @@ cruncher runs best --set-index 1
 Run artifacts live under:
 
 ```
-<workspace>/outputs/latest/
+<workspace>/outputs/
 ```
 
 ## Related references

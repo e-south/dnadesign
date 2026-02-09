@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 import yaml
 
+from dnadesign.cruncher.analysis.consensus import compute_consensus_anchors
 from dnadesign.cruncher.analysis.diagnostics import summarize_sampling_diagnostics
 from dnadesign.cruncher.analysis.diversity import (
     compute_baseline_nn_distances,
@@ -400,7 +401,6 @@ def run_analyze(
     from dnadesign.cruncher.analysis.plots.health_panel import plot_health_panel
     from dnadesign.cruncher.analysis.plots.opt_trajectory import plot_opt_trajectory
     from dnadesign.cruncher.analysis.plots.overlap import plot_overlap_panel
-    from dnadesign.cruncher.analysis.plots.run_summary import plot_run_summary
 
     plan = resolve_analysis_plan(cfg)
     analysis_cfg = plan.analysis_cfg
@@ -502,11 +502,26 @@ def run_analyze(
         write_elite_topk(elites_df=elites_df, tf_names=tf_names, out_path=topk_path, top_k=top_k)
         write_joint_metrics(elites_df=elites_df, tf_names=tf_names, out_path=joint_metrics_path)
 
+        objective_from_manifest = manifest.get("objective")
+        if objective_from_manifest is None:
+            objective_from_manifest = {}
+        if not isinstance(objective_from_manifest, dict):
+            raise ValueError("Run manifest field 'objective' must be an object when provided.")
+        beta_ladder = None
+        if isinstance(optimizer_stats, dict):
+            ladder_payload = optimizer_stats.get("beta_ladder_final")
+            if ladder_payload is not None:
+                if not isinstance(ladder_payload, list):
+                    raise ValueError("optimizer_stats.beta_ladder_final must be a list when provided.")
+                beta_ladder = [float(v) for v in ladder_payload]
+
         try:
             trajectory_df = build_trajectory_points(
                 sequences_df,
                 tf_names,
                 max_points=analysis_cfg.max_points,
+                objective_config=objective_from_manifest,
+                beta_ladder=beta_ladder,
             )
         except Exception:
             shutil.rmtree(tmp_root, ignore_errors=True)
@@ -628,43 +643,68 @@ def run_analyze(
                     )
                 )
 
-        plot_summary_path = analysis_plot_path(tmp_root, "run_summary", plot_format)
-        min_per_tf_norm_filter = manifest.get("elites_min_per_tf_norm_resolved")
-        if min_per_tf_norm_filter is not None:
-            min_per_tf_norm_filter = float(min_per_tf_norm_filter)
-        plot_run_summary(
-            sequences_df,
-            elites_df,
-            baseline_df,
-            nn_df,
-            tf_names,
-            plot_summary_path,
-            optimizer_stats=optimizer_stats if trace_idata is not None else None,
-            include_swap_summary=trace_idata is not None,
-            min_per_tf_norm_filter=min_per_tf_norm_filter,
-            score_scale=plot_score_scale_used,
-            **plot_kwargs,
-        )
-        _record_plot("run_summary", plot_summary_path, True, None)
-
-        plot_trajectory_path = analysis_plot_path(tmp_root, "opt_trajectory", plot_format)
+        plot_story_path = analysis_plot_path(tmp_root, "opt_trajectory_story", plot_format)
+        plot_debug_path = analysis_plot_path(tmp_root, "opt_trajectory_debug", plot_format)
         identity_mode = "canonical" if sample_meta.bidirectional else "raw"
         elite_centroid = None
+        selected_projected = pd.DataFrame(columns=["x", "y"])
         if elites_df is not None and not elites_df.empty:
             elite_x, elite_y, _, _, _, _ = project_scores(elites_df, tf_names)
             if len(elite_x) and len(elite_y):
                 elite_centroid = (float(np.median(elite_x)), float(np.median(elite_y)))
+                selected_projected = pd.DataFrame({"x": elite_x.astype(float), "y": elite_y.astype(float)})
+
+        if trajectory_df.empty:
+            raise ValueError("Trajectory points are required for opt trajectory plots.")
+        if "x_metric" not in trajectory_df.columns or "y_metric" not in trajectory_df.columns:
+            raise ValueError("Trajectory points missing x_metric/y_metric for consensus anchor projection.")
+        x_metric = str(trajectory_df["x_metric"].iloc[0])
+        y_metric = str(trajectory_df["y_metric"].iloc[0])
+        sequence_length = manifest.get("sequence_length")
+        if sequence_length is None and "sequence" in sequences_df.columns and not sequences_df.empty:
+            sequence_length = int(sequences_df["sequence"].astype(str).str.len().iloc[0])
+        if sequence_length is None:
+            raise ValueError("Run manifest missing sequence_length required for consensus anchors.")
+        consensus_anchors = compute_consensus_anchors(
+            pwms=pwms,
+            tf_names=tf_names,
+            sequence_length=int(sequence_length),
+            objective_config=objective_from_manifest,
+            x_metric=x_metric,
+            y_metric=y_metric,
+        )
+
         plot_opt_trajectory(
             trajectory_df,
             baseline_df,
             tf_names,
-            plot_trajectory_path,
+            plot_story_path,
             identity_mode=identity_mode,
             elite_centroid=elite_centroid,
             score_scale=plot_score_scale_used,
+            style="story",
+            selected_df=selected_projected,
+            consensus_anchors=consensus_anchors,
+            stride_story=analysis_cfg.trajectory_story_stride,
+            baseline_mode=analysis_cfg.trajectory_baseline_mode,
             **plot_kwargs,
         )
-        _record_plot("opt_trajectory", plot_trajectory_path, True, None)
+        _record_plot("opt_trajectory_story", plot_story_path, True, None)
+
+        plot_opt_trajectory(
+            trajectory_df,
+            baseline_df,
+            tf_names,
+            plot_debug_path,
+            identity_mode=identity_mode,
+            elite_centroid=elite_centroid,
+            score_scale=plot_score_scale_used,
+            style="debug",
+            stride_debug=analysis_cfg.trajectory_debug_stride,
+            show_all_chains=analysis_cfg.trajectory_show_all_chains,
+            **plot_kwargs,
+        )
+        _record_plot("opt_trajectory_debug", plot_debug_path, True, None)
 
         plot_nn_path = analysis_plot_path(tmp_root, "elites_nn_distance", plot_format)
         plot_elites_nn_distance(nn_df, plot_nn_path, baseline_nn=pd.Series(baseline_nn), **plot_kwargs)

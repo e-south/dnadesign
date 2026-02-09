@@ -79,12 +79,12 @@ def test_drop_run_index_entries(tmp_path: Path) -> None:
     assert "run_a" in index
 
 
-def test_update_run_index_uses_semantic_keys_for_latest_slots(tmp_path: Path) -> None:
+def test_update_run_index_uses_semantic_keys_without_slots(tmp_path: Path) -> None:
     config_path = tmp_path / "config.yaml"
     config_path.write_text("cruncher: {}")
 
-    sample_dir = tmp_path / "results" / "latest"
-    parse_dir = tmp_path / "results" / "parse_set" / "latest"
+    sample_dir = tmp_path / "results"
+    parse_dir = tmp_path / ".cruncher" / "parse"
     sample_dir.mkdir(parents=True, exist_ok=True)
     parse_dir.mkdir(parents=True, exist_ok=True)
 
@@ -112,5 +112,5 @@ def test_update_run_index_uses_semantic_keys_for_latest_slots(tmp_path: Path) ->
     )
 
     index = load_run_index(config_path)
-    assert "sample/lexA/latest" in index
-    assert "parse/lexA/latest" in index
+    assert "sample/lexA" in index
+    assert "parse/lexA" in index

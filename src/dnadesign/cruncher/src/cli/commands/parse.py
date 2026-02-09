@@ -42,6 +42,11 @@ def parse(
         "-n",
         help="Campaign name to expand in-memory for this command.",
     ),
+    force_overwrite: bool = typer.Option(
+        False,
+        "--force-overwrite",
+        help="Replace existing parse output directory before parsing.",
+    ),
 ) -> None:
     try:
         config_path = resolve_config_path(config_option or config)
@@ -62,7 +67,7 @@ def parse(
     try:
         from dnadesign.cruncher.app.parse_workflow import run_parse
 
-        run_parse(cfg, config_path)
+        run_parse(cfg, config_path, force_overwrite=force_overwrite)
     except (ValueError, FileNotFoundError) as exc:
         console.print(f"Error: {exc}")
         console.print("Hint: run cruncher fetch + lock before parse, and verify cache paths.")

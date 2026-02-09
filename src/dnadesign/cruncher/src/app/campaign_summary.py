@@ -40,7 +40,7 @@ from dnadesign.cruncher.app.run_service import (
     find_invalid_run_index_entries,
     list_runs,
 )
-from dnadesign.cruncher.artifacts.layout import campaign_slot_dir, sequences_path
+from dnadesign.cruncher.artifacts.layout import campaign_stage_root, sequences_path
 from dnadesign.cruncher.artifacts.manifest import load_manifest
 from dnadesign.cruncher.config.schema_v3 import CampaignConfig, CruncherConfig
 from dnadesign.cruncher.utils.paths import resolve_catalog_root
@@ -84,6 +84,7 @@ def summarize_campaign(
     run_inputs: Optional[Iterable[str]] = None,
     analysis_id: Optional[str] = None,
     out_dir: Optional[Path] = None,
+    force_overwrite: bool = False,
     include_metrics: bool = True,
     skip_missing: bool = False,
     skip_non_campaign: bool = False,
@@ -147,24 +148,24 @@ def summarize_campaign(
     best_df = _best_rows(summary_df, top_k=top_k)
 
     if out_dir is None:
-        output_root = campaign_slot_dir(
+        output_root = campaign_stage_root(
             config_path=config_path,
             out_dir=cfg.out_dir,
             campaign_name=expansion.name,
-            slot="latest",
         )
-        previous_root = campaign_slot_dir(
-            config_path=config_path,
-            out_dir=cfg.out_dir,
-            campaign_name=expansion.name,
-            slot="previous",
-        )
-        if previous_root.exists():
-            shutil.rmtree(previous_root)
-        if output_root.exists():
-            shutil.move(str(output_root), previous_root)
     else:
         output_root = out_dir
+    if output_root.exists():
+        if not output_root.is_dir():
+            raise ValueError(f"Campaign output path exists and is not a directory: {output_root}")
+        has_entries = any(output_root.iterdir())
+        if has_entries:
+            if not force_overwrite:
+                raise ValueError(
+                    f"Campaign output directory already exists: {output_root}. "
+                    "Re-run with --force-overwrite to replace it."
+                )
+            shutil.rmtree(output_root)
     output_root.mkdir(parents=True, exist_ok=True)
     output_data_root = output_root / "output"
     output_plots_root = output_root / "plots"

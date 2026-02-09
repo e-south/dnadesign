@@ -281,6 +281,11 @@ analysis:
   table_format: parquet     # parquet | csv
   archive: false
   max_points: 5000
+  trajectory_plot_style: story       # story | debug
+  trajectory_story_stride: 50
+  trajectory_debug_stride: 10
+  trajectory_baseline_mode: hexbin   # hexbin | scatter
+  trajectory_show_all_chains: false
 ```
 
 ## campaigns
@@ -308,7 +313,9 @@ campaigns:
 ```
 
 Notes:
-- Campaigns do not execute runs; they materialize configs via `cruncher campaign generate`.
+- Campaigns execute directly via `--campaign` on `lock`, `parse`, `sample`, and `analyze`.
+- `cruncher campaign generate` is optional and writes export snapshots under
+  `<workspace>/.cruncher/campaigns/<campaign>/` by default.
 
 ## Inspect resolved config
 

@@ -217,7 +217,7 @@ def test_campaign_summarize_cli(tmp_path: Path) -> None:
 
     cfg = load_config(config_path)
     expansion = expand_campaign(cfg=cfg, config_path=config_path, campaign_name="demo", include_metrics=False)
-    out_dir = runs_root / "campaign" / expansion.name / "latest"
+    out_dir = runs_root / "campaign" / expansion.name
     assert (out_dir / "output" / "campaign_summary.csv").exists()
     assert (out_dir / "output" / "campaign_best.csv").exists()
     assert (out_dir / "output" / "campaign_manifest.json").exists()

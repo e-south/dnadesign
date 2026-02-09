@@ -11,7 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import json
 import logging
 import shutil
 from datetime import datetime, timezone
@@ -25,7 +24,6 @@ from dnadesign.cruncher.artifacts.layout import (
     build_run_dir,
     ensure_run_dirs,
     lockfile_snapshot_path,
-    out_root,
     parse_manifest_path,
     pwm_summary_path,
     run_group_label,
@@ -86,40 +84,12 @@ def _lockmap_for(cfg: CruncherConfig, config_path: Path) -> tuple[Lockfile, dict
     return lockfile, lockfile.resolved
 
 
-def _find_existing_parse_run(
-    *,
+def run_parse(
     cfg: CruncherConfig,
     config_path: Path,
-    tfs: list[str],
-    set_index: int,
-    signature: str,
-) -> Path | None:
-    run_dir = build_run_dir(
-        config_path=config_path,
-        out_dir=cfg.out_dir,
-        stage="parse",
-        tfs=tfs,
-        set_index=set_index,
-        include_set_index=len(cfg.regulator_sets) > 1,
-        slot="latest",
-    )
-    if not run_dir.exists():
-        return None
-    manifest_file = parse_manifest_path(run_dir)
-    if not manifest_file.exists():
-        return None
-    try:
-        payload = json.loads(manifest_file.read_text())
-    except Exception:
-        return None
-    if not isinstance(payload, dict):
-        return None
-    if payload.get("parse_signature") != signature:
-        return None
-    return run_dir
-
-
-def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
+    *,
+    force_overwrite: bool = False,
+) -> None:
     """
     Load each PWM for all regulators and validate cached motifs, logging a summary
     (length, information bits, and PWM window metadata) to stdout.
@@ -137,9 +107,6 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
 
     store = _store(cfg, config_path)
 
-    # Prepare output folder
-    out_base = out_root(config_path, cfg.out_dir)
-    out_base.mkdir(parents=True, exist_ok=True)
     groups = regulator_sets(cfg.regulator_sets)
     if not groups:
         raise ValueError("parse requires at least one regulator set.")
@@ -167,16 +134,6 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
             lockfile=lockfile,
             tfs=tfs,
         )
-        existing = _find_existing_parse_run(
-            cfg=cfg,
-            config_path=config_path,
-            tfs=tfs,
-            set_index=set_index,
-            signature=signature,
-        )
-        if existing is not None:
-            logger.info("Parse outputs already generated: %s", existing)
-            continue
 
         run_group = run_group_label(tfs, set_index, include_set_index=include_set_index)
         run_dir = build_run_dir(
@@ -186,8 +143,18 @@ def run_parse(cfg: CruncherConfig, config_path: Path) -> None:
             tfs=tfs,
             set_index=set_index,
             include_set_index=include_set_index,
-            slot="latest",
         )
+        if run_dir.exists():
+            if not run_dir.is_dir():
+                raise ValueError(f"Parse output path exists and is not a directory: {run_dir}")
+            has_entries = any(run_dir.iterdir())
+            if has_entries:
+                if not force_overwrite:
+                    raise ValueError(
+                        f"Parse output directory already exists: {run_dir}. "
+                        "Re-run with --force-overwrite to replace it."
+                    )
+                shutil.rmtree(run_dir)
         ensure_run_dirs(run_dir, meta=True)
         pwm_rows: list[dict[str, object]] = []
 

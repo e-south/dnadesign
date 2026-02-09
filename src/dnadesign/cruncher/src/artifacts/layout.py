@@ -70,13 +70,12 @@ def build_run_dir(
     tfs: Iterable[str],
     set_index: int | None,
     include_set_index: bool = False,
-    slot: str = "latest",
 ) -> Path:
     root = run_group_dir(out_root(config_path, out_dir), stage, tfs, set_index)
     if include_set_index:
         label = run_group_label(tfs, set_index, include_set_index=include_set_index)
-        return root / label / slot
-    return root / slot
+        return root / label
+    return root
 
 
 def ensure_run_dirs(
@@ -87,10 +86,13 @@ def ensure_run_dirs(
     live: bool = False,
 ) -> None:
     run_dir.mkdir(parents=True, exist_ok=True)
-    run_input_dir(run_dir).mkdir(parents=True, exist_ok=True)
-    run_optimize_dir(run_dir).mkdir(parents=True, exist_ok=True)
-    run_output_dir(run_dir).mkdir(parents=True, exist_ok=True)
-    run_plots_dir(run_dir).mkdir(parents=True, exist_ok=True)
+    if meta or artifacts or live:
+        run_input_dir(run_dir).mkdir(parents=True, exist_ok=True)
+    if artifacts or live:
+        run_optimize_dir(run_dir).mkdir(parents=True, exist_ok=True)
+    if artifacts:
+        run_output_dir(run_dir).mkdir(parents=True, exist_ok=True)
+        run_plots_dir(run_dir).mkdir(parents=True, exist_ok=True)
 
 
 def run_input_dir(run_dir: Path) -> Path:
@@ -192,13 +194,3 @@ def campaign_stage_root(
     campaign_name: str,
 ) -> Path:
     return out_root(config_path, out_dir) / CAMPAIGN_ROOT_DIR / campaign_name_slug(campaign_name)
-
-
-def campaign_slot_dir(
-    *,
-    config_path: Path,
-    out_dir: str | Path,
-    campaign_name: str,
-    slot: str = "latest",
-) -> Path:
-    return campaign_stage_root(config_path=config_path, out_dir=out_dir, campaign_name=campaign_name) / slot

@@ -3,6 +3,7 @@
 ## Contents
 - [Overview](#overview)
 - [Demo setup](#demo-setup)
+- [Reset demo](#reset-demo)
 - [Cache sites by source](#cache-sites-by-source)
 - [Lock + parse](#lock--parse)
 - [Sample + analyze](#sample--analyze)
@@ -20,6 +21,18 @@ sources can be locked, parsed, sampled, and analyzed end-to-end.
 cd src/dnadesign/cruncher/workspaces/densegen_prep_three_tf
 CONFIG="$PWD/config.yaml"
 cruncher() { pixi run cruncher -- "$@"; }
+```
+
+## Reset demo
+
+Run this before re-running the full three-TF flow.
+It clears run artifacts and workspace state while leaving shared catalog caches intact.
+
+```bash
+cd src/dnadesign/cruncher/workspaces/densegen_prep_three_tf
+rm -rf outputs
+rm -rf .cruncher/parse .cruncher/locks .cruncher/campaigns
+rm -f .cruncher/run_index.json
 ```
 
 ## Cache sites by source
@@ -50,7 +63,7 @@ cruncher analyze --summary -c "$CONFIG"
 Plots and tables are written under:
 
 ```
-<workspace>/outputs/latest/
+<workspace>/outputs/
 ```
 
 ## Related docs

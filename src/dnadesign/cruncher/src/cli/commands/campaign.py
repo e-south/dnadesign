@@ -28,7 +28,7 @@ from dnadesign.cruncher.app.campaign_service import (
     validate_campaign,
 )
 from dnadesign.cruncher.app.campaign_summary import summarize_campaign
-from dnadesign.cruncher.artifacts.layout import campaign_name_slug, campaign_slot_dir
+from dnadesign.cruncher.artifacts.layout import campaign_name_slug, campaign_stage_root
 from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
     resolve_config_path,
@@ -226,6 +226,11 @@ def summarize(
         "-o",
         help="Output directory for campaign summary artifacts.",
     ),
+    force_overwrite: bool = typer.Option(
+        False,
+        "--force-overwrite",
+        help="Replace existing campaign summary directory before writing.",
+    ),
     include_metrics: bool = typer.Option(
         True,
         "--metrics/--no-metrics",
@@ -257,6 +262,7 @@ def summarize(
             run_inputs=runs or None,
             analysis_id=analysis_id,
             out_dir=out,
+            force_overwrite=force_overwrite,
             include_metrics=include_metrics,
             skip_missing=skip_missing,
             skip_non_campaign=skip_non_campaign,
@@ -367,7 +373,7 @@ def notebook(
         None,
         "--out",
         "-o",
-        help="Campaign summary directory (defaults to <out_dir>/campaign/<campaign_name>/latest).",
+        help="Campaign summary directory (defaults to <out_dir>/campaign/<campaign_name>).",
     ),
     force: bool = typer.Option(False, "--force", help="Overwrite the notebook if it already exists."),
     strict: bool = typer.Option(
@@ -393,11 +399,10 @@ def notebook(
         except ValueError as exc:
             console.print(f"Error: {exc}")
             raise typer.Exit(code=1)
-        out_dir = campaign_slot_dir(
+        out_dir = campaign_stage_root(
             config_path=config_path,
             out_dir=cfg.out_dir,
             campaign_name=expansion.name,
-            slot="latest",
         )
     else:
         out_dir = out

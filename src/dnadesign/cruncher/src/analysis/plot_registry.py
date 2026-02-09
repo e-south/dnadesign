@@ -27,20 +27,20 @@ class PlotSpec:
 
 PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
-        "run_summary",
-        "Run summary",
-        ("sequences", "elites", "baseline"),
-        ("plot__run_summary.{ext}",),
+        "opt_trajectory_story",
+        "Optimization trajectory (story)",
+        ("sequences", "baseline"),
+        ("plot__opt_trajectory_story.{ext}",),
         "summary",
-        "Single-page summary of learning, outcome, and diversity.",
+        "Story view: baseline density, best-so-far progression, selected top-k, and consensus anchors.",
     ),
     PlotSpec(
-        "opt_trajectory",
-        "Optimization trajectory",
+        "opt_trajectory_debug",
+        "Optimization trajectory (debug)",
         ("sequences", "baseline"),
-        ("plot__opt_trajectory.{ext}",),
-        "summary",
-        "Trajectory in score space with a baseline cloud for context.",
+        ("plot__opt_trajectory_debug.{ext}",),
+        "diagnostics",
+        "Debug view: chain trajectories and phase boundary markers with corrected cold-chain semantics.",
     ),
     PlotSpec(
         "elites_nn_distance",

@@ -55,6 +55,11 @@ def sample(
         "--debug",
         help="Enable debug logging (very verbose).",
     ),
+    force_overwrite: bool = typer.Option(
+        False,
+        "--force-overwrite",
+        help="Replace existing run output directory before sampling.",
+    ),
 ) -> None:
     try:
         config_path = resolve_config_path(config_option or config)
@@ -86,7 +91,7 @@ def sample(
         ensure_numba_cache_dir(config_path.parent, cache_dir=cache_dir)
         from dnadesign.cruncher.app.sample_workflow import run_sample
 
-        run_sample(cfg, config_path)
+        run_sample(cfg, config_path, force_overwrite=force_overwrite)
     except (RuntimeError, ValueError, FileNotFoundError) as exc:
         console.print(f"Error: {exc}")
         console.print("Hint: run cruncher fetch + lock, then cruncher sample <config>.")

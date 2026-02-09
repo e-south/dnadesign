@@ -47,7 +47,7 @@ def plot_elites_nn_distance(
         else:
             lines.append("No finite NN distances available.")
         if baseline_vals is not None and not baseline_vals.empty:
-            lines.append(f"baseline median={float(baseline_vals.median()):.3f}")
+            lines.append(f"random-baseline NN median={float(baseline_vals.median()):.3f}")
         ax.text(0.5, 0.5, "\n".join(lines), ha="center", va="center", fontsize=10, color="#444444")
     else:
         ax.hist(nn_vals, bins=20, color="#4c78a8", alpha=0.8, edgecolor="white", label="elites")
@@ -58,7 +58,7 @@ def plot_elites_nn_distance(
                 color="#9a9a9a",
                 linestyle="--",
                 linewidth=1.5,
-                label="baseline median",
+                label="random-baseline NN median",
             )
 
         nn_min = float(nn_vals.min())

@@ -32,8 +32,8 @@ def test_run_index_rebuild(tmp_path: Path) -> None:
     config_path.write_text(yaml.safe_dump(config))
     cfg = load_config(config_path)
 
-    run_name = "sample/latest"
-    run_dir = tmp_path / "results" / "latest"
+    run_name = "sample/results"
+    run_dir = tmp_path / "results"
     run_dir.mkdir(parents=True, exist_ok=True)
     created_at = datetime.now(timezone.utc).isoformat()
     manifest = {
@@ -63,7 +63,7 @@ def test_run_index_rebuild(tmp_path: Path) -> None:
     assert runs[0].status == "completed"
 
 
-def test_run_index_rebuild_includes_nested_latest_slot_runs(tmp_path: Path) -> None:
+def test_run_index_rebuild_includes_set_scoped_runs(tmp_path: Path) -> None:
     config = {
         "cruncher": {
             "schema_version": 3,
@@ -75,7 +75,7 @@ def test_run_index_rebuild_includes_nested_latest_slot_runs(tmp_path: Path) -> N
     config_path.write_text(yaml.safe_dump(config))
     cfg = load_config(config_path)
 
-    run_dir = tmp_path / "results" / "set1_lexA" / "latest"
+    run_dir = tmp_path / "results" / "set1_lexA"
     run_dir.mkdir(parents=True, exist_ok=True)
     created_at = datetime.now(timezone.utc).isoformat()
     manifest = {
@@ -94,4 +94,4 @@ def test_run_index_rebuild_includes_nested_latest_slot_runs(tmp_path: Path) -> N
 
     index_path = rebuild_run_index(cfg, config_path)
     payload = json.loads(index_path.read_text())
-    assert "sample/set1_lexA/latest" in payload
+    assert "sample/set1_lexA" in payload
