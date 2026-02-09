@@ -141,7 +141,7 @@ Within each run directory, Cruncher uses a stable, stage-agnostic subdirectory l
 <run_dir>/
   input/
   optimize/
-  output/
+  analysis/
   plots/
   run_manifest.json
   run_status.json
@@ -158,11 +158,11 @@ A typical **sample** run directory contains:
 - `input/lockfile.json` - pinned input snapshot (reproducibility boundary)
 - `optimize/sequences.parquet`, `optimize/trace.nc`, `optimize/elites*`, `optimize/random_baseline*` - sampling outputs
 - `metrics.jsonl` - live sampling metrics (if enabled)
-- `output/summary.json` - canonical analysis summary
-- `output/report.json` + `output/report.md` - analysis report outputs from `cruncher analyze`
-- `output/plot_manifest.json` + `output/table_manifest.json` + `output/manifest.json` - analysis inventories
+- `analysis/summary.json` - canonical analysis summary
+- `analysis/report.json` + `analysis/report.md` - analysis report outputs from `cruncher analyze`
+- `analysis/plot_manifest.json` + `analysis/table_manifest.json` + `analysis/manifest.json` - analysis inventories
 - `plots/plot__*` - curated plot outputs
-- `output/table__*` - curated table outputs
+- `analysis/table__*` - curated table outputs
 
 ---
 

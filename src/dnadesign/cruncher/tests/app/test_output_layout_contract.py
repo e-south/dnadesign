@@ -133,7 +133,7 @@ def test_analysis_tables_and_plots_use_flat_semantic_filenames(tmp_path: Path) -
     analysis_dir = analysis_root(run_dir)
 
     assert analysis_table_path(analysis_dir, "scores_summary", "parquet") == (
-        analysis_dir / "output" / "table__scores_summary.parquet"
+        analysis_dir / "analysis" / "table__scores_summary.parquet"
     )
     assert analysis_plot_path(analysis_dir, "opt_trajectory_story", "png") == (
         analysis_dir / "plots" / "plot__opt_trajectory_story.png"

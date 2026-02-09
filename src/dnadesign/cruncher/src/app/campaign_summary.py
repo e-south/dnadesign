@@ -167,7 +167,7 @@ def summarize_campaign(
                 )
             shutil.rmtree(output_root)
     output_root.mkdir(parents=True, exist_ok=True)
-    output_data_root = output_root / "output"
+    output_data_root = output_root / "analysis"
     output_plots_root = output_root / "plots"
     output_data_root.mkdir(parents=True, exist_ok=True)
     output_plots_root.mkdir(parents=True, exist_ok=True)

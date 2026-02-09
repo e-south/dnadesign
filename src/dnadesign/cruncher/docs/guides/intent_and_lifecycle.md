@@ -110,10 +110,10 @@ Sampling writes (under `optimize/` unless noted):
 
 Analysis writes:
 
-- `output/summary.json`
-- `output/report.md` and `output/report.json`
-- `output/plot_manifest.json` and `output/table_manifest.json`
-- `output/table__*` (curated tabular artifacts)
+- `analysis/summary.json`
+- `analysis/report.md` and `analysis/report.json`
+- `analysis/plot_manifest.json` and `analysis/table_manifest.json`
+- `analysis/table__*` (curated tabular artifacts)
 - `plots/plot__*` (curated figures)
 
 ## Config mapping
@@ -137,8 +137,8 @@ Crosswalk (behavior -> config -> modules -> artifacts):
 | Validate locked PWMs (parse) | (lockfile-driven) | `app/` | `<workspace>/.cruncher/parse/input/` |
 | PT optimization (sample) | `sample.*` | `core/`, `app/` | `<run_dir>/optimize/` + manifest/status updates |
 | Elite filter + TFBS-core MMR | `sample.elites.*` | `core/`, `app/` | `optimize/elites*.parquet` |
-| Artifact-only reporting (analyze) | `analysis.*` | `analysis/`, `app/` | `<run_dir>/output/` + `<run_dir>/plots/` |
-| Campaign expand + summarize | `campaigns[]`, `campaign` | `app/` | `outputs/campaign/<name>/{output,plots}` |
+| Artifact-only reporting (analyze) | `analysis.*` | `analysis/`, `app/` | `<run_dir>/analysis/` + `<run_dir>/plots/` |
+| Campaign expand + summarize | `campaigns[]`, `campaign` | `app/` | `outputs/campaign/<name>/{analysis,plots}` |
 
 ## Architecture mapping
 

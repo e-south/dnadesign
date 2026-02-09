@@ -337,17 +337,17 @@ def write_report_md(
             "## Start here",
             "",
             f"- {pointers.get('start_here_plot') or 'plots/plot__opt_trajectory_story.<ext>'}",
-            f"- {pointers.get('diagnostics') or 'output/table__diagnostics_summary.json'}",
-            f"- {pointers.get('objective_components') or 'output/table__objective_components.json'}",
+            f"- {pointers.get('diagnostics') or 'analysis/table__diagnostics_summary.json'}",
+            f"- {pointers.get('objective_components') or 'analysis/table__objective_components.json'}",
         ]
     )
     elites_mmr_path = pointers.get("elites_mmr_summary")
     if elites_mmr_path:
         lines.append(f"- {elites_mmr_path}")
     overlap_path = pointers.get("overlap_summary") or (
-        f"output/{analysis_table_filename('overlap_pair_summary', table_format)}"
+        f"analysis/{analysis_table_filename('overlap_pair_summary', table_format)}"
     )
-    elite_topk_path = pointers.get("elite_topk") or f"output/{analysis_table_filename('elites_topk', table_format)}"
+    elite_topk_path = pointers.get("elite_topk") or f"analysis/{analysis_table_filename('elites_topk', table_format)}"
     lines.extend([f"- {overlap_path}", f"- {elite_topk_path}"])
 
     autopicks = payload.get("autopicks")
@@ -362,14 +362,14 @@ def write_report_md(
 
     artifact_index = [
         pointers.get("start_here_plot") or "plots/plot__opt_trajectory_story.<ext>",
-        pointers.get("diagnostics") or "output/table__diagnostics_summary.json",
-        pointers.get("objective_components") or "output/table__objective_components.json",
+        pointers.get("diagnostics") or "analysis/table__diagnostics_summary.json",
+        pointers.get("objective_components") or "analysis/table__objective_components.json",
         pointers.get("elites_mmr_summary") or None,
         overlap_path,
         elite_topk_path,
-        pointers.get("manifest") or "output/manifest.json",
-        pointers.get("plot_manifest") or "output/plot_manifest.json",
-        pointers.get("table_manifest") or "output/table_manifest.json",
+        pointers.get("manifest") or "analysis/manifest.json",
+        pointers.get("plot_manifest") or "analysis/plot_manifest.json",
+        pointers.get("table_manifest") or "analysis/table_manifest.json",
     ]
     artifact_index = [item for item in artifact_index if item]
     move_summary = _table_path(analysis_root, "move_stats_summary", table_format)

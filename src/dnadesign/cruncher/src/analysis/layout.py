@@ -16,10 +16,10 @@ from typing import Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
-ANALYSIS_LAYOUT_VERSION = "v10"
+ANALYSIS_LAYOUT_VERSION = "v11"
 ANALYSIS_DIR_NAME = "analysis"
 ARCHIVE_DIR_NAME = "_archive"
-ANALYSIS_OUTPUT_DIR = "output"
+ANALYSIS_OUTPUT_DIR = "analysis"
 ANALYSIS_PLOTS_DIR = "plots"
 PLOT_FILE_PREFIX = "plot__"
 TABLE_FILE_PREFIX = "table__"

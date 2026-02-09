@@ -36,7 +36,7 @@ ANALYSIS_TOP_LEVEL_FILES = {
     "manifest.json",
     "notebook__run_overview.py",
 }
-ANALYSIS_TOP_LEVEL_DIRS = {"output", "plots", "tables"}
+ANALYSIS_TOP_LEVEL_DIRS = {"analysis", "plots", "tables"}
 
 
 def _is_analysis_relpath(path: str) -> bool:

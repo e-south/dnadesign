@@ -307,9 +307,9 @@ def test_demo_campaign_pair_local_only_generates_plots(tmp_path: Path) -> None:
 
     campaign_dir = workspace / "outputs" / "campaign" / "demo_pair"
     assert campaign_dir.is_dir()
-    assert (campaign_dir / "output" / "campaign_summary.csv").exists()
-    assert (campaign_dir / "output" / "campaign_best.csv").exists()
-    assert (campaign_dir / "output" / "campaign_manifest.json").exists()
+    assert (campaign_dir / "analysis" / "campaign_summary.csv").exists()
+    assert (campaign_dir / "analysis" / "campaign_best.csv").exists()
+    assert (campaign_dir / "analysis" / "campaign_manifest.json").exists()
     assert (campaign_dir / "plots" / "plot__best_jointscore_bar.png").exists()
     assert (campaign_dir / "plots" / "plot__tf_coverage_heatmap.png").exists()
     assert (campaign_dir / "plots" / "plot__pairgrid_overview.png").exists()

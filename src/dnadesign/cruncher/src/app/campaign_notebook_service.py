@@ -15,7 +15,7 @@ from dnadesign.cruncher.app.notebook_service import ensure_marimo
 
 
 def _summary_output_dir(summary_dir: Path) -> Path:
-    return summary_dir / "output"
+    return summary_dir / "analysis"
 
 
 def _summary_plots_dir(summary_dir: Path) -> Path:
@@ -82,7 +82,7 @@ def _(Path, mo):
         summary_dir = summary_dir.parent
     if not summary_dir.exists():
         mo.stop(True, mo.md(f"Campaign summary directory not found: {summary_dir}"))
-    data_dir = summary_dir / "output"
+    data_dir = summary_dir / "analysis"
     plots_dir = summary_dir / "plots"
     summary_path = data_dir / "campaign_summary.csv"
     best_path = data_dir / "campaign_best.csv"

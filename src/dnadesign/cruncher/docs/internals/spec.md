@@ -149,7 +149,7 @@ Each run directory uses a stable subdir layout (stage-agnostic) plus top-level m
 <run_dir>/
   input/      # lockfile snapshot + input manifests
   optimize/   # sequences/trace/elites/baselines
-  output/     # report + table__* + manifest inventory
+  analysis/     # report + table__* + manifest inventory
   plots/      # plot__*
   run_manifest.json
   run_status.json
@@ -161,9 +161,9 @@ Key artifacts:
 - `run_manifest.json` / `run_status.json` / `config_used.yaml` — provenance + status + resolved config
 - `input/lockfile.json` — pinned input snapshot for reproducible analysis
 - `optimize/sequences.parquet`, `optimize/trace.nc`, `optimize/elites*`, `optimize/random_baseline*` — sampling outputs
-- `output/summary.json`, `output/report.json`, `output/report.md` — analysis outputs
-- `output/plot_manifest.json`, `output/table_manifest.json`, `output/manifest.json` — inventories
-- `plots/plot__*`, `output/table__*` — curated plots and tables
+- `analysis/summary.json`, `analysis/report.json`, `analysis/report.md` — analysis outputs
+- `analysis/plot_manifest.json`, `analysis/table_manifest.json`, `analysis/manifest.json` — inventories
+- `plots/plot__*`, `analysis/table__*` — curated plots and tables
 
 `cruncher analyze` fails when required analysis artifacts are missing and does not write partial report outputs.
 

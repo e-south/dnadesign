@@ -253,11 +253,11 @@ def test_report_payload_paths_use_flat_output_and_plots_schema(tmp_path: Path) -
     assert pointers["trajectory_story_plot"] == "plots/plot__opt_trajectory_story.png"
     assert pointers["trajectory_debug_plot"] is None
     assert pointers["trajectory_particles_plot"] is None
-    assert pointers["diagnostics"] == "output/table__diagnostics_summary.json"
-    assert pointers["objective_components"] == "output/table__objective_components.json"
-    assert pointers["manifest"] == "output/manifest.json"
-    assert pointers["plot_manifest"] == "output/plot_manifest.json"
-    assert pointers["table_manifest"] == "output/table_manifest.json"
+    assert pointers["diagnostics"] == "analysis/table__diagnostics_summary.json"
+    assert pointers["objective_components"] == "analysis/table__objective_components.json"
+    assert pointers["manifest"] == "analysis/manifest.json"
+    assert pointers["plot_manifest"] == "analysis/plot_manifest.json"
+    assert pointers["table_manifest"] == "analysis/table_manifest.json"
 
 
 def test_ensure_report_requires_summary_json_when_payload_not_provided(tmp_path: Path) -> None:

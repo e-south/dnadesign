@@ -31,9 +31,9 @@ cruncher analyze --summary
 
 Outputs are written under each run directory (typically `outputs/`). The canonical entrypoints are:
 
-- `output/summary.json`
-- `output/report.md`
-- `output/report.json`
+- `analysis/summary.json`
+- `analysis/report.md`
+- `analysis/report.json`
 
 ## Fixed-length sampling model
 
@@ -102,17 +102,17 @@ If Cruncher cannot produce `sample.elites.k` elites that satisfy the configured 
 
 Analysis writes a curated, orthogonal suite of plots and tables (no plot booleans). Key artifacts include:
 
-- `output/table__scores_summary.parquet`
-- `output/table__elites_topk.parquet`
-- `output/table__metrics_joint.parquet`
-- `output/table__opt_trajectory_points.parquet`
-- `output/table__opt_trajectory_particles.parquet`
-- `output/table__overlap_pair_summary.parquet`
-- `output/table__overlap_per_elite.parquet`
-- `output/table__diagnostics_summary.json`
-- `output/table__objective_components.json`
-- `output/table__elites_mmr_summary.parquet`
-- `output/table__elites_nn_distance.parquet`
+- `analysis/table__scores_summary.parquet`
+- `analysis/table__elites_topk.parquet`
+- `analysis/table__metrics_joint.parquet`
+- `analysis/table__opt_trajectory_points.parquet`
+- `analysis/table__opt_trajectory_particles.parquet`
+- `analysis/table__overlap_pair_summary.parquet`
+- `analysis/table__overlap_per_elite.parquet`
+- `analysis/table__diagnostics_summary.json`
+- `analysis/table__objective_components.json`
+- `analysis/table__elites_mmr_summary.parquet`
+- `analysis/table__elites_nn_distance.parquet`
 
 Sampling artifacts consumed by analysis:
 

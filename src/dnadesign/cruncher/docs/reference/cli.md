@@ -245,7 +245,7 @@ Examples:
 
 Outputs:
 
-* `output/campaign_summary.csv`, `output/campaign_best.csv`, `output/campaign_manifest.json`
+* `analysis/campaign_summary.csv`, `analysis/campaign_best.csv`, `analysis/campaign_manifest.json`
 * plots under `plots/` (e.g., `plot__best_jointscore_bar.png`,
   `plot__tf_coverage_heatmap.png`, `plot__joint_trend.png`, `plot__pareto_projection.png`)
 
@@ -265,7 +265,7 @@ Notes:
 #### `cruncher campaign notebook`
 
 Generates a marimo notebook for exploring campaign summary outputs from
-`<campaign_latest>/output/` and `<campaign_latest>/plots/`.
+`<campaign_latest>/analysis/` and `<campaign_latest>/plots/`.
 
 Inputs:
 
@@ -284,7 +284,7 @@ Examples:
 Notes:
 
 * Requires `cruncher campaign summarize` to have been run first
-  (`output/campaign_summary.csv`, `output/campaign_best.csv`, `output/campaign_manifest.json`).
+  (`analysis/campaign_summary.csv`, `analysis/campaign_best.csv`, `analysis/campaign_manifest.json`).
 * Install marimo with `uv sync --locked --group notebooks`.
 
 ---
@@ -389,23 +389,23 @@ Preconditions:
 
 * provide runs via `analysis.runs`/`--run` or rely on the default latest run
 * trace-dependent plots require `optimize/trace.nc`
-* if `<run_dir>/output/` exists without `summary.json`, remove the incomplete `output/` folder before re-running `cruncher analyze`
+* if `<run_dir>/analysis/` exists without `summary.json`, remove the incomplete `analysis/` folder before re-running `cruncher analyze`
 * each sample run snapshots the lockfile under `input/lockfile.json`; analysis uses that snapshot to avoid mismatch if the workspace lockfile changes later
 
 Outputs:
 
-* tables: `output/table__scores_summary.parquet`, `output/table__elites_topk.parquet`,
-  `output/table__metrics_joint.parquet`, `output/table__opt_trajectory_points.parquet`,
-  `output/table__opt_trajectory_particles.parquet`,
-  `output/table__diagnostics_summary.json`, `output/table__objective_components.json`,
-  `output/table__elites_mmr_summary.parquet`, `output/table__elites_nn_distance.parquet`
+* tables: `analysis/table__scores_summary.parquet`, `analysis/table__elites_topk.parquet`,
+  `analysis/table__metrics_joint.parquet`, `analysis/table__opt_trajectory_points.parquet`,
+  `analysis/table__opt_trajectory_particles.parquet`,
+  `analysis/table__diagnostics_summary.json`, `analysis/table__objective_components.json`,
+  `analysis/table__elites_mmr_summary.parquet`, `analysis/table__elites_nn_distance.parquet`
 * plots: `plots/plot__opt_trajectory_story.<plot_format>`,
   `plots/plot__opt_trajectory_debug.<plot_format>`,
   `plots/plot__opt_trajectory_particles.<plot_format>`,
   `plots/plot__elites_nn_distance.<plot_format>`, `plots/plot__overlap_panel.<plot_format>`,
   `plots/plot__health_panel.<plot_format>` (trace only)
-* reports: `output/report.json`, `output/report.md`
-* summaries: `output/summary.json`, `output/manifest.json`, `output/plot_manifest.json`, `output/table_manifest.json`
+* reports: `analysis/report.json`, `analysis/report.md`
+* summaries: `analysis/summary.json`, `analysis/manifest.json`, `analysis/plot_manifest.json`, `analysis/table_manifest.json`
 
 Note:
 
@@ -434,15 +434,15 @@ Notes:
 
 * requires `marimo` to be installed (for example: `uv add --group notebooks marimo`)
 * useful when you want interactive slicing/filtering beyond static plots
-* strict artifact contract: requires `output/summary.json`, `output/plot_manifest.json`, and `output/table_manifest.json` to exist and parse, `output/summary.json` must include a non-empty `tf_names` list, and `output/table_manifest.json` must provide `scores_summary`, `metrics_joint`, and `elites_topk` entries with existing files
+* strict artifact contract: requires `analysis/summary.json`, `analysis/plot_manifest.json`, and `analysis/table_manifest.json` to exist and parse, `analysis/summary.json` must include a non-empty `tf_names` list, and `analysis/table_manifest.json` must provide `scores_summary`, `metrics_joint`, and `elites_topk` entries with existing files
 * plot output status is refreshed from disk so missing files are shown accurately
 * the Refresh button re-scans analysis entries and updates plot/table status without restarting marimo
 * the notebook infers `run_dir` from its location; keep it under `<run_dir>/` or regenerate it
-* plots are loaded from `output/plot_manifest.json`; the curated keys are `opt_trajectory_story`, `opt_trajectory_debug`, `opt_trajectory_particles`, `elites_nn_distance`, plus optional `overlap_panel` and `health_panel` entries when generated
+* plots are loaded from `analysis/plot_manifest.json`; the curated keys are `opt_trajectory_story`, `opt_trajectory_debug`, `opt_trajectory_particles`, `elites_nn_distance`, plus optional `overlap_panel` and `health_panel` entries when generated
 * the notebook includes:
   * Overview tab with run metadata and explicit warnings for missing/invalid analysis artifacts
-  * Tables tab with a Top-K slider and per-table previews from `output/table_manifest.json`
-  * Plots tab with inline previews and generated/skipped status from `output/plot_manifest.json`
+  * Tables tab with a Top-K slider and per-table previews from `analysis/table_manifest.json`
+  * Plots tab with inline previews and generated/skipped status from `analysis/plot_manifest.json`
 
 ---
 

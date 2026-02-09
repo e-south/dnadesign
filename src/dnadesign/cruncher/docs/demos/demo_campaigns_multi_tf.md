@@ -96,9 +96,9 @@ Summary artifacts live under:
 
 ```
 <workspace>/outputs/campaign/<campaign_name>/
-  output/campaign_summary.csv
-  output/campaign_best.csv
-  output/campaign_manifest.json
+  analysis/campaign_summary.csv
+  analysis/campaign_best.csv
+  analysis/campaign_manifest.json
   plots/plot__*.png
 ```
 

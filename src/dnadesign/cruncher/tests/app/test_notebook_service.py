@@ -19,15 +19,15 @@ def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
     run_dir = tmp_path / "run"
     analysis_id = "20250101T000000Z_test"
     analysis_dir = run_dir
-    (analysis_dir / "output").mkdir(parents=True)
+    (analysis_dir / "analysis").mkdir(parents=True)
     manifest_file = manifest_path(run_dir)
     manifest_file.parent.mkdir(parents=True, exist_ok=True)
     manifest_file.write_text(json.dumps({"artifacts": [], "config_path": ""}))
-    (analysis_dir / "output" / "summary.json").write_text(
+    (analysis_dir / "analysis" / "summary.json").write_text(
         json.dumps({"tf_names": ["LexA"], "analysis_id": analysis_id})
     )
-    (analysis_dir / "output" / "plot_manifest.json").write_text(json.dumps({"plots": []}))
-    (analysis_dir / "output" / "table_manifest.json").write_text(
+    (analysis_dir / "analysis" / "plot_manifest.json").write_text(json.dumps({"plots": []}))
+    (analysis_dir / "analysis" / "table_manifest.json").write_text(
         json.dumps(
             {
                 "tables": [
@@ -38,9 +38,9 @@ def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
             }
         )
     )
-    (analysis_dir / "output" / "table__scores_summary.parquet").write_text("placeholder")
-    (analysis_dir / "output" / "table__metrics_joint.parquet").write_text("placeholder")
-    (analysis_dir / "output" / "table__elites_topk.parquet").write_text("placeholder")
+    (analysis_dir / "analysis" / "table__scores_summary.parquet").write_text("placeholder")
+    (analysis_dir / "analysis" / "table__metrics_joint.parquet").write_text("placeholder")
+    (analysis_dir / "analysis" / "table__elites_topk.parquet").write_text("placeholder")
 
     monkeypatch.setattr(notebook_service, "ensure_marimo", lambda: None)
 
@@ -71,7 +71,7 @@ def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
 def test_generate_notebook_strict_requires_summary(tmp_path, monkeypatch) -> None:
     run_dir = tmp_path / "run"
     analysis_dir = run_dir
-    (analysis_dir / "output").mkdir(parents=True)
+    (analysis_dir / "analysis").mkdir(parents=True)
     manifest_file = manifest_path(run_dir)
     manifest_file.parent.mkdir(parents=True, exist_ok=True)
     manifest_file.write_text(json.dumps({"artifacts": [], "config_path": ""}))
@@ -85,11 +85,11 @@ def test_generate_notebook_strict_requires_summary(tmp_path, monkeypatch) -> Non
 def test_generate_notebook_rejects_lenient_mode(tmp_path, monkeypatch) -> None:
     run_dir = tmp_path / "run"
     analysis_dir = run_dir
-    (analysis_dir / "output").mkdir(parents=True)
+    (analysis_dir / "analysis").mkdir(parents=True)
     manifest_file = manifest_path(run_dir)
     manifest_file.parent.mkdir(parents=True, exist_ok=True)
     manifest_file.write_text(json.dumps({"artifacts": [], "config_path": ""}))
-    (analysis_dir / "output" / "plot_manifest.json").write_text(json.dumps({"plots": []}))
+    (analysis_dir / "analysis" / "plot_manifest.json").write_text(json.dumps({"plots": []}))
 
     monkeypatch.setattr(notebook_service, "ensure_marimo", lambda: None)
 
@@ -110,15 +110,15 @@ def test_generate_notebook_requires_table_manifest_contract_keys(tmp_path, monke
     run_dir = tmp_path / "run"
     analysis_id = "20250101T000000Z_test"
     analysis_dir = run_dir
-    (analysis_dir / "output").mkdir(parents=True)
+    (analysis_dir / "analysis").mkdir(parents=True)
     manifest_file = manifest_path(run_dir)
     manifest_file.parent.mkdir(parents=True, exist_ok=True)
     manifest_file.write_text(json.dumps({"artifacts": [], "config_path": ""}))
-    (analysis_dir / "output" / "summary.json").write_text(
+    (analysis_dir / "analysis" / "summary.json").write_text(
         json.dumps({"tf_names": ["LexA"], "analysis_id": analysis_id})
     )
-    (analysis_dir / "output" / "plot_manifest.json").write_text(json.dumps({"plots": []}))
-    (analysis_dir / "output" / "table_manifest.json").write_text(json.dumps({"tables": []}))
+    (analysis_dir / "analysis" / "plot_manifest.json").write_text(json.dumps({"plots": []}))
+    (analysis_dir / "analysis" / "table_manifest.json").write_text(json.dumps({"tables": []}))
 
     monkeypatch.setattr(notebook_service, "ensure_marimo", lambda: None)
 

@@ -367,7 +367,7 @@ def _finalize_analysis_root(
 
 def _analysis_managed_paths(analysis_root_path: Path) -> list[Path]:
     managed = [
-        analysis_root_path / "output",
+        analysis_root_path / "analysis",
         analysis_root_path / "plots",
         analysis_root_path / "notebook__run_overview.py",
         analysis_root_path / "tables",

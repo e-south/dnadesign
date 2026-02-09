@@ -319,7 +319,7 @@ def test_analyze_creates_analysis_run_and_manifest_updates(tmp_path: Path) -> No
     analysis_dir = analysis_runs[0]
     assert analysis_used_path(analysis_dir).exists()
     assert summary_path(analysis_dir).exists()
-    assert (analysis_dir / "output" / "manifest.json").exists()
+    assert (analysis_dir / "analysis" / "manifest.json").exists()
     assert analysis_table_path(analysis_dir, "scores_summary", "parquet").exists()
     assert analysis_table_path(analysis_dir, "metrics_joint", "parquet").exists()
     assert analysis_table_path(analysis_dir, "diagnostics_summary", "json").exists()
@@ -330,9 +330,9 @@ def test_analyze_creates_analysis_run_and_manifest_updates(tmp_path: Path) -> No
     assert report_payload["run"]["draws"] == 2
     assert report_payload["run"]["tune"] == 1
     report_paths = report_payload["paths"]
-    assert report_paths["manifest"] == "output/manifest.json"
-    assert report_paths["plot_manifest"] == "output/plot_manifest.json"
-    assert report_paths["table_manifest"] == "output/table_manifest.json"
+    assert report_paths["manifest"] == "analysis/manifest.json"
+    assert report_paths["plot_manifest"] == "analysis/plot_manifest.json"
+    assert report_paths["table_manifest"] == "analysis/table_manifest.json"
 
     table_manifest = json.loads(table_manifest_path(analysis_dir).read_text())
     keys = {entry.get("key") for entry in table_manifest.get("tables", [])}
