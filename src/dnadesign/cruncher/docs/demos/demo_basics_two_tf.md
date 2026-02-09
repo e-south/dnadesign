@@ -107,6 +107,7 @@ cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --sourc
 
 This demo leaves MEME width unconstrained at discovery time (`discover.minw/maxw: null`) so logos and catalog inspection keep full discovered motifs.
 Width enforcement is applied only in sampling via `sample.motif_width.maxw=16`.
+`discover motifs` prints `Tool width` and `Width bounds`; `tool_default` means no discovery-time width flags were passed to MEME/STREME.
 
 ## Lock + parse
 
@@ -137,6 +138,9 @@ cruncher analyze -c "$CONFIG" && \
 cruncher analyze --summary -c "$CONFIG" && \
 cruncher catalog logos --source demo_merged_meme_oops --tf lexA --tf cpxR -c "$CONFIG"
 ```
+
+During sampling, logs now print `Sampling PWM width <TF>: source=<...> effective=<...> ... action=<trimmed|unchanged>`
+so it is explicit when `sample.motif_width` changed widths versus leaving discovered widths unchanged.
 
 If `outputs/` already exists from a prior run, re-run sample with `--force-overwrite`.
 If sample fails with an elite-filter message, relax `sample.elites.filter.min_per_tf_norm`, increase

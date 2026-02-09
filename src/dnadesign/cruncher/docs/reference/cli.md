@@ -556,6 +556,9 @@ Notes:
   If enabled without window lengths for a TF, discovery exits with a helpful error.
 * If `--minw/--maxw` are omitted (and unset in config), Cruncher passes no width flags and
   MEME/STREME uses its own defaults.
+* `discover motifs` output `Tool width` is the discovery-time motif length from MEME/STREME;
+  `Width bounds` reports `minw/maxw` used for discovery (`tool_default` means unset).
+  Sampling-time constraints (`sample.motif_width`) are applied later during `sample`.
 * Use `cruncher targets stats` to set `--minw/--maxw` from site-length ranges.
 * If you plan to run both MEME and STREME, set distinct `discover.source_id` values between runs to avoid lock ambiguity.
   You can also pass `--source-id` per run to avoid editing config.

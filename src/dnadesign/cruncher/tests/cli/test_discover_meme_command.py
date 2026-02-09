@@ -11,7 +11,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dnadesign.cruncher.cli.commands.discover import build_meme_command
+from dnadesign.cruncher.cli.commands.discover import (
+    build_meme_command,
+    format_discovery_width_bounds,
+)
 
 
 def test_build_meme_command_includes_prior_and_mod() -> None:
@@ -44,3 +47,11 @@ def test_build_meme_command_omits_width_flags_when_unset() -> None:
     )
     assert "-minw" not in cmd
     assert "-maxw" not in cmd
+
+
+def test_format_discovery_width_bounds_uses_tool_defaults_when_unset() -> None:
+    assert format_discovery_width_bounds(minw=None, maxw=None) == "minw=tool_default maxw=tool_default"
+
+
+def test_format_discovery_width_bounds_renders_explicit_bounds() -> None:
+    assert format_discovery_width_bounds(minw=8, maxw=14) == "minw=8 maxw=14"

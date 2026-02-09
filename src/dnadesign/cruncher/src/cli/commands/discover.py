@@ -86,6 +86,14 @@ def _choose_tool(tool: str, *, nseq: int, streme_threshold: int) -> str:
     return tool
 
 
+def _format_discovery_width(value: int | None) -> str:
+    return str(value) if value is not None else "tool_default"
+
+
+def format_discovery_width_bounds(*, minw: int | None, maxw: int | None) -> str:
+    return f"minw={_format_discovery_width(minw)} maxw={_format_discovery_width(maxw)}"
+
+
 def _run_command(cmd: list[str], *, cwd: Path) -> None:
     result = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, check=False)
     if result.returncode != 0:
@@ -382,7 +390,8 @@ def discover_motifs(
     table.add_column("TF")
     table.add_column("Tool")
     table.add_column("Motif ID")
-    table.add_column("Length")
+    table.add_column("Tool width")
+    table.add_column("Width bounds")
     table.add_column("Output")
 
     base = config_path.parent
@@ -559,8 +568,10 @@ def discover_motifs(
                 chosen_tool,
                 f"{resolved_source_id}:{motif_id}",
                 str(len(motif.prob_matrix)),
+                format_discovery_width_bounds(minw=resolved_minw, maxw=resolved_maxw),
                 render_path(output_path, base=base),
             )
 
     catalog.save(catalog_root)
     console.print(table)
+    console.print("Note: Tool width is discovery-time motif length before sample.motif_width constraints.")

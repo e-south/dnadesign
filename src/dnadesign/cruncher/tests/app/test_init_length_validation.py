@@ -76,6 +76,26 @@ def test_sampling_window_uses_explicit_maxw() -> None:
     assert trimmed.length == 10
 
 
+def test_sampling_window_logs_effective_width_without_trim(caplog: pytest.LogCaptureFixture) -> None:
+    cfg = _sample_config(length=16, maxw=16)
+    pwm = _pwm("lexA", 11)
+    with caplog.at_level("INFO"):
+        trimmed = _apply_sampling_pwm_window(tf_name="lexA", pwm=pwm, sample_cfg=cfg)
+    assert trimmed.length == 11
+    assert "Sampling PWM width lexA: source=11bp effective=11bp" in caplog.text
+    assert "action=unchanged" in caplog.text
+
+
+def test_sampling_window_logs_trim_action(caplog: pytest.LogCaptureFixture) -> None:
+    cfg = _sample_config(length=16, maxw=10)
+    pwm = _pwm("lexA", 12)
+    with caplog.at_level("INFO"):
+        trimmed = _apply_sampling_pwm_window(tf_name="lexA", pwm=pwm, sample_cfg=cfg)
+    assert trimmed.length == 10
+    assert "Sampling PWM width lexA: source=12bp effective=10bp" in caplog.text
+    assert "action=trimmed" in caplog.text
+
+
 def test_sampling_window_rejects_maxw_above_sequence_length() -> None:
     with pytest.raises(ValueError, match="sample.motif_width.maxw must be <= sample.sequence_length"):
         _sample_config(length=16, maxw=20)

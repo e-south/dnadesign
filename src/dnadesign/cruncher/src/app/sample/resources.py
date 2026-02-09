@@ -51,15 +51,30 @@ def _apply_sampling_pwm_window(*, tf_name: str, pwm: PWM, sample_cfg: SampleConf
         raise ValueError(f"PWM for TF '{tf_name}' has length {pwm.length}, below sample.motif_width.minw={minw}.")
 
     max_allowed = sample_cfg.sequence_length if maxw is None else min(maxw, sample_cfg.sequence_length)
+    minw_label = "none" if minw is None else str(minw)
+    maxw_label = "none" if maxw is None else str(maxw)
     if pwm.length <= max_allowed:
+        logger.info(
+            "Sampling PWM width %s: source=%dbp effective=%dbp cap=%dbp minw=%s maxw=%s strategy=%s action=unchanged",
+            tf_name,
+            pwm.length,
+            pwm.length,
+            max_allowed,
+            minw_label,
+            maxw_label,
+            strategy,
+        )
         return pwm
 
     trimmed = select_pwm_window(pwm, length=max_allowed, strategy=strategy)
     logger.info(
-        "Sampling PWM window %s: %d -> %d bp (%s)",
+        "Sampling PWM width %s: source=%dbp effective=%dbp cap=%dbp minw=%s maxw=%s strategy=%s action=trimmed",
         tf_name,
         pwm.length,
         trimmed.length,
+        max_allowed,
+        minw_label,
+        maxw_label,
         strategy,
     )
     return trimmed
