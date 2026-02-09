@@ -40,7 +40,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         ("sequences",),
         ("plot__opt_trajectory_sweep.{ext}",),
         "diagnostics",
-        "Causal particle lineage view over sweep index for selected objective column.",
+        "Cold-slot progression over sweeps with lineage handoff markers and bottleneck-TF coloring.",
     ),
     PlotSpec(
         "elites_nn_distance",

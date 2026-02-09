@@ -292,7 +292,8 @@ analysis:
 Notes:
 - `analysis.pairwise` selects the TF pair used for the trajectory scatter axes (`plot__opt_trajectory.*`).
 - `analysis.trajectory_scatter_scale` controls whether scatter axes use per-TF raw LLR or normalized LLR.
-- `analysis.trajectory_sweep_y_column` controls the y-axis for `plot__opt_trajectory_sweep.*`.
+- `analysis.trajectory_sweep_y_column` controls the y-axis for `plot__opt_trajectory_sweep.*`; each point is the combined per-TF objective at that sweep.
+- `plot__opt_trajectory_sweep.*` highlights cold-slot progression, draws dashed segments when particle lineage handoffs occur, and colors points by the current bottleneck TF when per-TF columns are available.
 - `analysis.trajectory_slot_overlay=true` overlays temperature-slot occupancy markers (diagnostic only; lineage edges remain particle-causal).
 
 ## campaigns

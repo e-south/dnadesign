@@ -71,6 +71,68 @@ def _sample_rows(df: pd.DataFrame, *, stride: int, group_col: str = "particle_id
     return pd.concat(sampled_parts).sort_values([group_col, "sweep_idx"]).reset_index(drop=True)
 
 
+def _sample_rows_by_sweep_stride(df: pd.DataFrame, *, stride: int) -> pd.DataFrame:
+    if stride <= 1 or df.empty:
+        return df
+    ordered = df.sort_values("sweep_idx").reset_index(drop=True)
+    idx = list(range(0, len(ordered), stride))
+    if len(ordered) - 1 not in idx:
+        idx.append(len(ordered) - 1)
+    return ordered.iloc[sorted(set(idx))].reset_index(drop=True)
+
+
+def _extract_cold_slot_path(df: pd.DataFrame) -> pd.DataFrame:
+    if "is_cold_chain" not in df.columns:
+        raise ValueError("Trajectory missing required column 'is_cold_chain' for cold-slot sweep trajectory.")
+    cold_values = pd.to_numeric(df["is_cold_chain"], errors="coerce")
+    if cold_values.isna().any():
+        raise ValueError("Trajectory column 'is_cold_chain' must be numeric.")
+    cold_mask = cold_values.astype(int)
+    invalid = ~cold_mask.isin([0, 1])
+    if invalid.any():
+        raise ValueError("Trajectory column 'is_cold_chain' must contain only 0/1 values.")
+    cold_df = df.loc[cold_mask == 1].copy()
+    if cold_df.empty:
+        raise ValueError("Trajectory contains no cold-slot rows (is_cold_chain=1).")
+    cold_df = cold_df.sort_values("sweep_idx").drop_duplicates(["sweep_idx"], keep="last").reset_index(drop=True)
+    return cold_df
+
+
+def _infer_bottleneck_tf(
+    cold_df: pd.DataFrame,
+    *,
+    y_column: str,
+) -> tuple[pd.DataFrame, dict[str, tuple[float, float, float, float]]]:
+    prefix_by_y = {
+        "raw_llr_objective": "raw_llr_",
+        "norm_llr_objective": "norm_llr_",
+        "objective_scalar": "score_",
+    }
+    prefix = prefix_by_y.get(y_column)
+    if prefix is None:
+        return cold_df, {}
+    tf_cols = [col for col in cold_df.columns if col.startswith(prefix) and not col.endswith("_objective")]
+    if not tf_cols:
+        return cold_df, {}
+    tf_score_df = pd.DataFrame(index=cold_df.index)
+    for col in tf_cols:
+        tf_score_df[col] = pd.to_numeric(cold_df[col], errors="coerce")
+    valid_rows = ~tf_score_df.isna().any(axis=1)
+    if not valid_rows.any():
+        return cold_df, {}
+    bottleneck_col = tf_score_df[valid_rows].idxmin(axis=1)
+    cold_df = cold_df.copy()
+    cold_df.loc[valid_rows, "bottleneck_tf"] = bottleneck_col.str[len(prefix) :]
+    unique_tfs = sorted(str(tf) for tf in cold_df["bottleneck_tf"].dropna().astype(str).unique())
+    if not unique_tfs:
+        return cold_df, {}
+    cmap = plt.get_cmap("tab10", max(1, len(unique_tfs)))
+    color_map: dict[str, tuple[float, float, float, float]] = {}
+    for idx, tf_name in enumerate(unique_tfs):
+        color_map[tf_name] = tuple(cmap(idx % cmap.N))
+    return cold_df, color_map
+
+
 def _legend_labels(ax: plt.Axes) -> list[str]:
     handles, labels = ax.get_legend_handles_labels()
     if handles:
@@ -179,6 +241,68 @@ def _draw_slot_overlay(
         fontsize=8,
         color="#4a4a4a",
     )
+
+
+def _draw_sweep_context_points(ax: plt.Axes, sampled: pd.DataFrame, *, y_col: str) -> None:
+    ax.scatter(
+        sampled["sweep_idx"].astype(float),
+        sampled[y_col].astype(float),
+        s=14,
+        c="#b8b8b8",
+        alpha=0.16,
+        edgecolors="none",
+        zorder=1,
+        label="all particle states",
+    )
+
+
+def _draw_cold_slot_progression(
+    ax: plt.Axes,
+    cold_df: pd.DataFrame,
+    *,
+    y_col: str,
+    alpha_lo: float,
+    alpha_hi: float,
+    color_map: dict[str, tuple[float, float, float, float]],
+) -> int:
+    if cold_df.empty:
+        raise ValueError("Cold-slot progression requires non-empty trajectory rows.")
+    x_vals = cold_df["sweep_idx"].astype(float).to_numpy()
+    y_vals = cold_df[y_col].astype(float).to_numpy()
+    particle_ids = cold_df["particle_id"].astype(int).to_numpy()
+    sweep_min = float(x_vals.min())
+    sweep_span = float(x_vals.max() - sweep_min)
+    handoff_count = 0
+    point_colors: list[tuple[float, float, float, float]] = []
+    for tf_name in cold_df.get("bottleneck_tf", pd.Series(index=cold_df.index, dtype=object)).astype(object):
+        if tf_name is None or (isinstance(tf_name, float) and np.isnan(tf_name)):
+            point_colors.append((0.84, 0.15, 0.16, 0.95))
+            continue
+        point_colors.append(color_map.get(str(tf_name), (0.84, 0.15, 0.16, 0.95)))
+    if x_vals.size >= 2:
+        for seg_idx in range(1, x_vals.size):
+            if sweep_span <= 0:
+                alpha = 0.65
+            else:
+                t = (float(x_vals[seg_idx]) - sweep_min) / sweep_span
+                alpha = alpha_lo + (alpha_hi - alpha_lo) * t
+            handoff = int(particle_ids[seg_idx - 1]) != int(particle_ids[seg_idx])
+            handoff_count += int(handoff)
+            seg_color = point_colors[seg_idx]
+            ax.plot(
+                x_vals[seg_idx - 1 : seg_idx + 1],
+                y_vals[seg_idx - 1 : seg_idx + 1],
+                color=(seg_color[0], seg_color[1], seg_color[2], alpha),
+                linewidth=1.8,
+                linestyle="--" if handoff else "-",
+                zorder=6,
+            )
+    ax.scatter(x_vals, y_vals, s=26, c=point_colors, edgecolors="none", zorder=7)
+    ax.plot([], [], color="#333333", linewidth=1.8, label="cold-slot progression")
+    ax.plot([], [], color="#333333", linewidth=1.4, linestyle="--", label="lineage handoff (slot swap)")
+    for tf_name in sorted(color_map):
+        ax.scatter([], [], s=28, c=[color_map[tf_name]], label=f"bottleneck TF: {tf_name}")
+    return handoff_count
 
 
 def plot_opt_trajectory(
@@ -308,18 +432,21 @@ def plot_opt_trajectory_sweep(
     plot_df = _prepare_lineage_df(trajectory_df)
     plot_df[y_column] = _require_numeric(plot_df, y_column, context="Trajectory")
     sampled = _sample_rows(plot_df, stride=max(1, int(stride)))
+    cold_df = _extract_cold_slot_path(plot_df)
+    cold_df = _sample_rows_by_sweep_stride(cold_df, stride=max(1, int(stride)))
+    cold_df[y_column] = _require_numeric(cold_df, y_column, context="Cold-slot trajectory")
+    cold_df, color_map = _infer_bottleneck_tf(cold_df, y_column=y_column)
 
     fig, ax = plt.subplots(figsize=(6.8, 5.1))
-    particle_ids, _, _ = _draw_particle_lineage(
+    _draw_sweep_context_points(ax, sampled, y_col=y_column)
+    handoff_count = _draw_cold_slot_progression(
         ax,
-        sampled,
-        x_col="sweep_idx",
+        cold_df,
         y_col=y_column,
         alpha_lo=alpha_lo,
         alpha_hi=alpha_hi,
+        color_map=color_map,
     )
-    max_particle = max(particle_ids)
-    ax.plot([], [], color="#333333", linewidth=1.2, label=f"particle lineage (id=0..{max_particle})")
     if slot_overlay:
         _draw_slot_overlay(ax, sampled, x_col="sweep_idx", y_col=y_column)
 
@@ -330,15 +457,27 @@ def plot_opt_trajectory_sweep(
     }.get(y_column, y_column)
     ax.set_xlabel("Sweep index")
     ax.set_ylabel(ylabel)
-    ax.set_title("Optimization trajectory (particle lineage over sweeps)")
+    ax.set_title("Optimization trajectory (cold-slot progress over sweeps)")
+    ax.text(
+        0.02,
+        0.98,
+        "y = combined objective across TFs per sweep; bottleneck TF may change",
+        transform=ax.transAxes,
+        ha="left",
+        va="top",
+        fontsize=8,
+        color="#4a4a4a",
+    )
     legend_labels = _legend_labels(ax)
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
     plt.close(fig)
     return {
-        "mode": "particle_sweep",
+        "mode": "cold_slot_sweep",
         "legend_labels": legend_labels,
-        "particle_count": len(particle_ids),
+        "cold_point_count": int(len(cold_df)),
+        "cold_handoff_count": int(handoff_count),
+        "particle_count": int(plot_df["particle_id"].nunique()),
         "y_column": y_column,
     }
