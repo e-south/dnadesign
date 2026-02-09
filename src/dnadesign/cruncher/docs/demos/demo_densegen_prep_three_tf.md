@@ -53,12 +53,16 @@ cruncher lock  -c "$CONFIG"
 cruncher parse -c "$CONFIG"
 ```
 
+If `.cruncher/parse` already exists from a prior run, re-run parse with `--force-overwrite`.
+
 ## Sample + analyze
 
 ```bash
 cruncher sample  -c "$CONFIG"
 cruncher analyze --summary -c "$CONFIG"
 ```
+
+If `outputs/` already exists from a prior run, re-run sample with `--force-overwrite`.
 
 Plots and tables are written under:
 

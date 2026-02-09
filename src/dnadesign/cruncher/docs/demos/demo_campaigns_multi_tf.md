@@ -61,6 +61,9 @@ cruncher sample  --campaign demo_pair -c "$CONFIG"
 cruncher analyze --campaign demo_pair --summary -c "$CONFIG"
 ```
 
+If `.cruncher/parse` or `outputs/` already exist from a prior run, add
+`--force-overwrite` to `parse` and `sample`.
+
 ## Optional: materialize expansion
 
 `campaign generate` is optional and writes under workspace state by default:

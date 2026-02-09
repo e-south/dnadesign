@@ -51,6 +51,7 @@ Cruncher is intentionally strict and will error instead of silently degrading:
 
 - Unknown config keys or missing required keys -> error (strict schema).
 - Missing lockfile for `parse`/`sample` -> error.
+- Existing `.cruncher/parse` or run `outputs/` directories -> error unless `--force-overwrite` is passed to `parse`/`sample`.
 - `sample.sequence_length < max_pwm_width` -> error with widths.
 - Elite constraints cannot be satisfied (after filtering/selection) -> error (no silent threshold relaxation).
 - With `sample.pt.adapt.strict=true`, ladder saturation during tune is treated as a tuning failure -> error.

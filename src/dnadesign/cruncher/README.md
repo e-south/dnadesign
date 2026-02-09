@@ -80,6 +80,9 @@ cruncher analyze --summary
 
 ```
 
+If you re-run in the same workspace without clearing prior artifacts, use:
+`cruncher parse --force-overwrite` and `cruncher sample --force-overwrite`.
+
 ---
 
 Notes:

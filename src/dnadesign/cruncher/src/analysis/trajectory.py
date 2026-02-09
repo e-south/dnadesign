@@ -53,11 +53,21 @@ def resolve_cold_chain(*, beta_ladder: list[float] | None, chain_ids: Iterable[i
     beta_arr = np.asarray(beta_ladder, dtype=float)
     if not np.isfinite(beta_arr).all():
         raise ValueError("optimizer beta ladder must contain finite values.")
-    cold_idx = int(np.argmax(beta_arr))
-    if cold_idx not in ids:
+    max_beta = float(np.max(beta_arr))
+    cold_candidates = np.where(np.isclose(beta_arr, max_beta, rtol=0.0, atol=1e-12))[0]
+    present_candidates = [int(idx) for idx in cold_candidates if int(idx) in ids]
+    if len(present_candidates) > 1:
         raise ValueError(
-            f"optimizer beta ladder cold index is not present in trajectory chain IDs (cold={cold_idx}, chains={ids})."
+            "optimizer beta ladder is ambiguous; multiple chains share the maximum beta "
+            f"(chains={present_candidates}, beta={max_beta})."
         )
+    if len(present_candidates) == 0:
+        cold_candidates_list = [int(idx) for idx in cold_candidates]
+        raise ValueError(
+            "optimizer beta ladder cold index is not present in trajectory chain IDs "
+            f"(cold_candidates={cold_candidates_list}, chains={ids})."
+        )
+    cold_idx = int(present_candidates[0])
     return cold_idx
 
 

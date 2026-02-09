@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 from dnadesign.cruncher.analysis.trajectory import build_trajectory_points, compute_best_so_far_path
 
@@ -86,6 +87,26 @@ def test_build_trajectory_points_uses_max_beta_as_cold_chain() -> None:
     hot_rows = trajectory_df[trajectory_df["chain"] == 0]
     assert set(cold_rows["is_cold_chain"].astype(int).unique()) == {1}
     assert set(hot_rows["is_cold_chain"].astype(int).unique()) == {0}
+
+
+def test_build_trajectory_points_rejects_ambiguous_cold_chain_beta_ties() -> None:
+    sequences_df = pd.DataFrame(
+        {
+            "chain": [0, 0, 1, 1],
+            "draw": [0, 1, 0, 1],
+            "phase": ["draw", "draw", "draw", "draw"],
+            "score_lexA": [0.2, 0.3, 0.5, 0.6],
+            "score_cpxR": [0.1, 0.2, 0.4, 0.5],
+        }
+    )
+
+    with pytest.raises(ValueError, match="multiple chains share the maximum beta"):
+        build_trajectory_points(
+            sequences_df,
+            ["lexA", "cpxR"],
+            max_points=100,
+            beta_ladder=[1.0, 1.0],
+        )
 
 
 def test_compute_best_so_far_path_is_monotonic() -> None:

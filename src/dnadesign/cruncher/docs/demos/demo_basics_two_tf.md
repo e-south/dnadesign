@@ -75,6 +75,7 @@ cruncher parse -c "$CONFIG"
 ```
 
 `lock` pins the exact PWM artifacts for reproducible runs. `parse` validates the locked motifs and writes a parse manifest used by sampling.
+If `.cruncher/parse` already exists from a prior run, re-run parse with `--force-overwrite`.
 
 ## Sample + analyze
 
@@ -83,6 +84,8 @@ cruncher sample  -c "$CONFIG"
 cruncher analyze -c "$CONFIG"
 cruncher analyze --summary -c "$CONFIG"
 ```
+
+If `outputs/` already exists from a prior run, re-run sample with `--force-overwrite`.
 
 ## Inspect results
 
