@@ -173,6 +173,7 @@ def test_build_particle_trajectory_points_tracks_slot_migration() -> None:
             "y_metric": ["score_cpxR"] * 4,
             "objective_scalar": [0.1, 0.2, 0.3, 0.4],
             "raw_llr_objective": [1.1, 1.2, 1.3, 1.4],
+            "norm_llr_objective": [0.2, 0.3, 0.4, 0.5],
         }
     )
 
@@ -229,5 +230,9 @@ def test_add_raw_llr_objective_adds_combined_raw_llr_column() -> None:
 
     assert "raw_llr_lexA" in enriched.columns
     assert "raw_llr_cpxR" in enriched.columns
+    assert "norm_llr_lexA" in enriched.columns
+    assert "norm_llr_cpxR" in enriched.columns
     assert "raw_llr_objective" in enriched.columns
+    assert "norm_llr_objective" in enriched.columns
     assert enriched["raw_llr_objective"].notna().all()
+    assert enriched["norm_llr_objective"].notna().all()

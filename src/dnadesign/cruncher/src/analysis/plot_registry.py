@@ -32,7 +32,15 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         ("sequences",),
         ("plot__opt_trajectory.{ext}",),
         "summary",
-        "Causal particle lineage view: raw LLR objective over sweep index.",
+        "Causal particle lineage view in TF score-space with random-baseline context.",
+    ),
+    PlotSpec(
+        "opt_trajectory_sweep",
+        "Optimization trajectory over sweeps",
+        ("sequences",),
+        ("plot__opt_trajectory_sweep.{ext}",),
+        "diagnostics",
+        "Causal particle lineage view over sweep index for selected objective column.",
     ),
     PlotSpec(
         "elites_nn_distance",

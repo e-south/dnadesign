@@ -282,10 +282,18 @@ analysis:
   archive: false
   max_points: 5000
   trajectory_stride: 10
+  trajectory_scatter_scale: normalized-llr   # normalized-llr | llr
+  trajectory_sweep_y_column: raw_llr_objective  # raw_llr_objective | objective_scalar | norm_llr_objective
   trajectory_particle_alpha_min: 0.15
   trajectory_particle_alpha_max: 0.95
   trajectory_slot_overlay: false
 ```
+
+Notes:
+- `analysis.pairwise` selects the TF pair used for the trajectory scatter axes (`plot__opt_trajectory.*`).
+- `analysis.trajectory_scatter_scale` controls whether scatter axes use per-TF raw LLR or normalized LLR.
+- `analysis.trajectory_sweep_y_column` controls the y-axis for `plot__opt_trajectory_sweep.*`.
+- `analysis.trajectory_slot_overlay=true` overlays temperature-slot occupancy markers (diagnostic only; lineage edges remain particle-causal).
 
 ## campaigns
 

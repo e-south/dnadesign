@@ -122,7 +122,8 @@ Sampling artifacts consumed by analysis:
 
 Plots (always generated when data is available):
 
-- `plots/plot__opt_trajectory.*` (causal particle lineage trajectory: raw LLR objective vs sweep index)
+- `plots/plot__opt_trajectory.*` (causal particle lineage scatter in TF score-space, with random-baseline cloud and consensus anchors)
+- `plots/plot__opt_trajectory_sweep.*` (causal particle lineage over sweep index for the selected objective column)
 - `plots/plot__elites_nn_distance.*`
 - `plots/plot__overlap_panel.*`
 - `plots/plot__health_panel.*` (only if `optimize/trace.nc` exists)

@@ -1069,6 +1069,10 @@ class AnalysisConfig(StrictBaseModel):
     archive: bool = False
     max_points: int = 5000
     trajectory_stride: int = 10
+    trajectory_scatter_scale: Literal["normalized-llr", "llr"] = "normalized-llr"
+    trajectory_sweep_y_column: Literal["raw_llr_objective", "objective_scalar", "norm_llr_objective"] = (
+        "raw_llr_objective"
+    )
     trajectory_particle_alpha_min: float = 0.15
     trajectory_particle_alpha_max: float = 0.95
     trajectory_slot_overlay: bool = False

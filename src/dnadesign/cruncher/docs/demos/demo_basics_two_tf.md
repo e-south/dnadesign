@@ -101,7 +101,7 @@ Key files:
 - `analysis/report.md`
 - `analysis/report.json`
 - curated plots in `plots/`: `plot__opt_trajectory.*`,
-  `plot__elites_nn_distance.*`, `plot__overlap_panel.*`
+  `plot__opt_trajectory_sweep.*`, `plot__elites_nn_distance.*`, `plot__overlap_panel.*`
   (and `plot__health_panel.*` if a trace is present)
 - analysis tables in `analysis/` use `table__*` filenames (for example
   `table__scores_summary.parquet` and `table__metrics_joint.parquet`)

@@ -21,6 +21,7 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
+from dnadesign.cruncher.analysis.consensus import compute_consensus_anchors
 from dnadesign.cruncher.analysis.diagnostics import summarize_sampling_diagnostics
 from dnadesign.cruncher.analysis.diversity import (
     compute_baseline_nn_distances,
@@ -189,6 +190,16 @@ def _select_tf_pair(tf_names: list[str], pairwise: object) -> tuple[str, str] | 
     if len(tf_names) >= 2:
         return (tf_names[0], tf_names[1])
     return None
+
+
+def _resolve_trajectory_tf_pair(tf_names: list[str], pairwise: object) -> tuple[str, str]:
+    selected = _select_tf_pair(tf_names, pairwise)
+    if selected is not None:
+        return selected
+    if len(tf_names) == 1:
+        tf_name = str(tf_names[0])
+        return (tf_name, tf_name)
+    raise ValueError("Trajectory scatter plot requires at least one TF.")
 
 
 def _write_json(path: Path, payload: dict[str, object]) -> None:
@@ -409,7 +420,7 @@ def run_analyze(
 
     from dnadesign.cruncher.analysis.plots.elites_nn_distance import plot_elites_nn_distance
     from dnadesign.cruncher.analysis.plots.health_panel import plot_health_panel
-    from dnadesign.cruncher.analysis.plots.opt_trajectory import plot_opt_trajectory
+    from dnadesign.cruncher.analysis.plots.opt_trajectory import plot_opt_trajectory, plot_opt_trajectory_sweep
     from dnadesign.cruncher.analysis.plots.overlap import plot_overlap_panel
 
     plan = resolve_analysis_plan(cfg)
@@ -518,6 +529,16 @@ def run_analyze(
             objective_from_manifest = {}
         if not isinstance(objective_from_manifest, dict):
             raise ValueError("Run manifest field 'objective' must be an object when provided.")
+        sample_payload = used_cfg.get("sample") if isinstance(used_cfg, dict) else None
+        objective_used = sample_payload.get("objective") if isinstance(sample_payload, dict) else None
+        scoring_used = objective_used.get("scoring") if isinstance(objective_used, dict) else None
+        pseudocounts_raw = 0.10
+        if isinstance(scoring_used, dict) and scoring_used.get("pwm_pseudocounts") is not None:
+            pseudocounts_raw = float(scoring_used.get("pwm_pseudocounts"))
+        log_odds_clip_raw = None
+        if isinstance(scoring_used, dict) and scoring_used.get("log_odds_clip") is not None:
+            log_odds_clip_raw = float(scoring_used.get("log_odds_clip"))
+        bidirectional = bool(objective_from_manifest.get("bidirectional", True))
         beta_ladder = None
         if isinstance(optimizer_stats, dict):
             ladder_payload = optimizer_stats.get("beta_ladder_final")
@@ -534,18 +555,17 @@ def run_analyze(
                 objective_config=objective_from_manifest,
                 beta_ladder=beta_ladder,
             )
-            sample_payload = used_cfg.get("sample") if isinstance(used_cfg, dict) else None
-            objective_used = sample_payload.get("objective") if isinstance(sample_payload, dict) else None
-            scoring_used = objective_used.get("scoring") if isinstance(objective_used, dict) else None
-            pseudocounts_raw = 0.10
-            if isinstance(scoring_used, dict) and scoring_used.get("pwm_pseudocounts") is not None:
-                pseudocounts_raw = float(scoring_used.get("pwm_pseudocounts"))
-            log_odds_clip_raw = None
-            if isinstance(scoring_used, dict) and scoring_used.get("log_odds_clip") is not None:
-                log_odds_clip_raw = float(scoring_used.get("log_odds_clip"))
-            bidirectional = bool(objective_from_manifest.get("bidirectional", True))
             trajectory_df = add_raw_llr_objective(
                 trajectory_df,
+                tf_names,
+                pwms=pwms,
+                objective_config=objective_from_manifest,
+                bidirectional=bidirectional,
+                pwm_pseudocounts=pseudocounts_raw,
+                log_odds_clip=log_odds_clip_raw,
+            )
+            baseline_plot_df = add_raw_llr_objective(
+                baseline_df,
                 tf_names,
                 pwms=pwms,
                 objective_config=objective_from_manifest,
@@ -626,6 +646,23 @@ def run_analyze(
         plot_kwargs = {"dpi": plot_dpi, "png_compress_level": 9}
 
         focus_pair = _select_tf_pair(tf_names, analysis_cfg.pairwise)
+        trajectory_tf_pair = _resolve_trajectory_tf_pair(tf_names, analysis_cfg.pairwise)
+        trajectory_scale = str(analysis_cfg.trajectory_scatter_scale)
+        sequence_length = manifest.get("sequence_length")
+        if sequence_length is None and "sequence" in sequences_df.columns and not sequences_df.empty:
+            sequence_length = int(sequences_df["sequence"].astype(str).str.len().iloc[0])
+        if sequence_length is None:
+            raise ValueError("Run manifest missing sequence_length required for trajectory consensus anchors.")
+        anchor_objective_cfg = dict(objective_from_manifest)
+        anchor_objective_cfg["score_scale"] = trajectory_scale
+        consensus_anchors = compute_consensus_anchors(
+            pwms=pwms,
+            tf_names=tf_names,
+            sequence_length=int(sequence_length),
+            objective_config=anchor_objective_cfg,
+            x_metric=f"score_{trajectory_tf_pair[0]}",
+            y_metric=f"score_{trajectory_tf_pair[1]}",
+        )
 
         _write_analysis_used(
             analysis_used_file,
@@ -635,7 +672,9 @@ def run_analyze(
             extras={
                 "tf_pair_mode": analysis_cfg.pairwise,
                 "tf_pair_selected": list(focus_pair) if focus_pair else None,
-                "trajectory_y_axis": "raw_llr_objective",
+                "trajectory_tf_pair": list(trajectory_tf_pair),
+                "trajectory_scatter_scale": trajectory_scale,
+                "trajectory_sweep_y_column": analysis_cfg.trajectory_sweep_y_column,
             },
         )
 
@@ -671,10 +710,15 @@ def run_analyze(
                 )
 
         plot_trajectory_path = analysis_plot_path(tmp_root, "opt_trajectory", plot_format)
+        plot_trajectory_sweep_path = analysis_plot_path(tmp_root, "opt_trajectory_sweep", plot_format)
         if trajectory_particles_df.empty:
             raise ValueError("Particle trajectory points are required for opt trajectory plot.")
         plot_opt_trajectory(
             trajectory_df=trajectory_particles_df,
+            baseline_df=baseline_plot_df,
+            tf_pair=trajectory_tf_pair,
+            scatter_scale=trajectory_scale,
+            consensus_anchors=consensus_anchors,
             out_path=plot_trajectory_path,
             stride=analysis_cfg.trajectory_stride,
             alpha_min=analysis_cfg.trajectory_particle_alpha_min,
@@ -683,6 +727,17 @@ def run_analyze(
             **plot_kwargs,
         )
         _record_plot("opt_trajectory", plot_trajectory_path, True, None)
+        plot_opt_trajectory_sweep(
+            trajectory_df=trajectory_particles_df,
+            y_column=str(analysis_cfg.trajectory_sweep_y_column),
+            out_path=plot_trajectory_sweep_path,
+            stride=analysis_cfg.trajectory_stride,
+            alpha_min=analysis_cfg.trajectory_particle_alpha_min,
+            alpha_max=analysis_cfg.trajectory_particle_alpha_max,
+            slot_overlay=analysis_cfg.trajectory_slot_overlay,
+            **plot_kwargs,
+        )
+        _record_plot("opt_trajectory_sweep", plot_trajectory_sweep_path, True, None)
 
         plot_nn_path = analysis_plot_path(tmp_root, "elites_nn_distance", plot_format)
         plot_elites_nn_distance(nn_df, plot_nn_path, baseline_nn=pd.Series(baseline_nn), **plot_kwargs)

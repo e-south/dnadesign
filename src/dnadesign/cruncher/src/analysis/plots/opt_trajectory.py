@@ -3,7 +3,7 @@
 <cruncher project>
 src/dnadesign/cruncher/src/analysis/plots/opt_trajectory.py
 
-Plot causal particle lineage as raw LLR objective over sweep index.
+Plot optimization trajectory lineage in TF score-space and sweep-space views.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -35,7 +35,28 @@ def _require_numeric(df: pd.DataFrame, column: str, *, context: str) -> pd.Serie
     return values.astype(float)
 
 
-def _sample_rows(df: pd.DataFrame, *, stride: int, group_col: str) -> pd.DataFrame:
+def _prepare_lineage_df(trajectory_df: pd.DataFrame) -> pd.DataFrame:
+    plot_df = _require_df(trajectory_df, name="Trajectory").copy()
+    particle_values = _require_numeric(plot_df, "particle_id", context="Trajectory")
+    if "sweep_idx" in plot_df.columns:
+        sweep_values = _require_numeric(plot_df, "sweep_idx", context="Trajectory")
+    elif "sweep" in plot_df.columns:
+        sweep_values = _require_numeric(plot_df, "sweep", context="Trajectory")
+    else:
+        raise ValueError("Trajectory points must include sweep_idx for trajectory plotting.")
+    plot_df["particle_id"] = particle_values.astype(int)
+    plot_df["sweep_idx"] = sweep_values.astype(int)
+    if "slot_id" in plot_df.columns:
+        slot_values = pd.to_numeric(plot_df["slot_id"], errors="coerce")
+        if slot_values.notna().any() and slot_values.isna().any():
+            raise ValueError("Trajectory slot_id must be numeric when provided.")
+        plot_df["slot_id"] = slot_values
+    else:
+        plot_df["slot_id"] = np.nan
+    return plot_df
+
+
+def _sample_rows(df: pd.DataFrame, *, stride: int, group_col: str = "particle_id") -> pd.DataFrame:
     if stride <= 1 or df.empty:
         return df
     if group_col not in df.columns:
@@ -47,7 +68,7 @@ def _sample_rows(df: pd.DataFrame, *, stride: int, group_col: str) -> pd.DataFra
         if len(ordered) - 1 not in idx:
             idx.append(len(ordered) - 1)
         sampled_parts.append(ordered.iloc[sorted(set(idx))])
-    return pd.concat(sampled_parts).sort_values(["particle_id", "sweep_idx"]).reset_index(drop=True)
+    return pd.concat(sampled_parts).sort_values([group_col, "sweep_idx"]).reset_index(drop=True)
 
 
 def _legend_labels(ax: plt.Axes) -> list[str]:
@@ -57,66 +78,37 @@ def _legend_labels(ax: plt.Axes) -> list[str]:
     return labels
 
 
-def plot_opt_trajectory(
+def _resolve_scatter_columns(*, tf_pair: tuple[str, str], scatter_scale: str) -> tuple[str, str, str]:
+    scale = str(scatter_scale).strip().lower()
+    if scale in {"llr", "raw-llr", "raw_llr"}:
+        return f"raw_llr_{tf_pair[0]}", f"raw_llr_{tf_pair[1]}", "llr"
+    if scale in {"normalized-llr", "norm-llr", "norm_llr"}:
+        return f"norm_llr_{tf_pair[0]}", f"norm_llr_{tf_pair[1]}", "normalized-llr"
+    raise ValueError("scatter_scale must be 'llr' or 'normalized-llr'.")
+
+
+def _draw_particle_lineage(
+    ax: plt.Axes,
+    sampled: pd.DataFrame,
     *,
-    trajectory_df: pd.DataFrame,
-    out_path: Path,
-    dpi: int,
-    png_compress_level: int,
-    stride: int = 10,
-    alpha_min: float = 0.15,
-    alpha_max: float = 0.95,
-    slot_overlay: bool = False,
-) -> dict[str, object]:
-    trajectory = _require_df(trajectory_df, name="Trajectory")
-    if "particle_id" not in trajectory.columns:
-        raise ValueError(
-            "Trajectory particle_id not available; rerun with sample.output.save_trace=true and particle tracking."
-        )
-    particle_values = _require_numeric(trajectory, "particle_id", context="Trajectory")
-    if "sweep_idx" in trajectory.columns:
-        sweep_values = _require_numeric(trajectory, "sweep_idx", context="Trajectory")
-    elif "sweep" in trajectory.columns:
-        sweep_values = _require_numeric(trajectory, "sweep", context="Trajectory")
-    else:
-        raise ValueError("Trajectory points must include sweep_idx for trajectory plotting.")
-    raw_llr_values = _require_numeric(trajectory, "raw_llr_objective", context="Trajectory")
-    if not isinstance(alpha_min, (int, float)) or not isinstance(alpha_max, (int, float)):
-        raise ValueError("Particle alpha bounds must be numeric.")
-    alpha_lo = float(alpha_min)
-    alpha_hi = float(alpha_max)
-    if alpha_lo < 0 or alpha_hi > 1 or alpha_lo > alpha_hi:
-        raise ValueError("Particle alpha bounds must satisfy 0 <= min <= max <= 1.")
-
-    plot_df = trajectory.copy()
-    plot_df["particle_id"] = particle_values.astype(int)
-    plot_df["sweep_idx"] = sweep_values.astype(int)
-    plot_df["raw_llr_objective"] = raw_llr_values.astype(float)
-    if "slot_id" in plot_df.columns:
-        slot_values = pd.to_numeric(plot_df["slot_id"], errors="coerce")
-        if slot_values.notna().any() and slot_values.isna().any():
-            raise ValueError("Trajectory slot_id must be numeric when provided.")
-        plot_df["slot_id"] = slot_values
-    else:
-        plot_df["slot_id"] = np.nan
-
-    sampled = _sample_rows(plot_df, stride=max(1, int(stride)), group_col="particle_id")
+    x_col: str,
+    y_col: str,
+    alpha_lo: float,
+    alpha_hi: float,
+) -> tuple[list[int], float, float]:
     particle_ids = sorted(int(v) for v in sampled["particle_id"].unique())
     if not particle_ids:
         raise ValueError("Trajectory plot requires at least one particle_id.")
-
     sweep_float = sampled["sweep_idx"].astype(float)
     sweep_min = float(sweep_float.min())
     sweep_span = float(sweep_float.max() - sweep_min)
-
-    fig, ax = plt.subplots(figsize=(6.8, 5.1))
     cmap = plt.get_cmap("tab20", max(1, len(particle_ids)))
     for idx, particle_id in enumerate(particle_ids):
         particle_df = sampled[sampled["particle_id"].astype(int) == particle_id].sort_values("sweep_idx")
         if particle_df.empty:
             continue
-        x = particle_df["sweep_idx"].astype(float).to_numpy()
-        y = particle_df["raw_llr_objective"].astype(float).to_numpy()
+        x = particle_df[x_col].astype(float).to_numpy()
+        y = particle_df[y_col].astype(float).to_numpy()
         sweeps = particle_df["sweep_idx"].astype(float).to_numpy()
         rgb = cmap(idx % cmap.N)
         if x.size >= 2:
@@ -131,7 +123,7 @@ def plot_opt_trajectory(
                     y[seg_idx - 1 : seg_idx + 1],
                     color=(rgb[0], rgb[1], rgb[2], alpha),
                     linewidth=1.2,
-                    zorder=3,
+                    zorder=4,
                 )
         if sweep_span <= 0:
             alphas = np.full(x.size, 0.60, dtype=float)
@@ -145,53 +137,208 @@ def plot_opt_trajectory(
                 np.asarray(alphas, dtype=float),
             ]
         )
-        ax.scatter(x, y, s=16, c=colors, edgecolors="none", zorder=4)
+        ax.scatter(x, y, s=16, c=colors, edgecolors="none", zorder=5)
+    return particle_ids, sweep_min, sweep_span
 
+
+def _draw_slot_overlay(
+    ax: plt.Axes,
+    sampled: pd.DataFrame,
+    *,
+    x_col: str,
+    y_col: str,
+) -> None:
+    marker_cycle = ["o", "s", "^", "D", "P", "X", "v", "<", ">"]
+    slot_rows = sampled.dropna(subset=["slot_id"]).copy()
+    if slot_rows.empty:
+        return
+    slot_rows["slot_id"] = slot_rows["slot_id"].astype(int)
+    slot_ids = sorted(int(slot) for slot in slot_rows["slot_id"].unique())
+    marker_map = {slot: marker_cycle[idx % len(marker_cycle)] for idx, slot in enumerate(slot_ids)}
+    for slot_id in slot_ids:
+        slot_df = slot_rows[slot_rows["slot_id"].astype(int) == slot_id]
+        ax.scatter(
+            slot_df[x_col].astype(float),
+            slot_df[y_col].astype(float),
+            s=20,
+            marker=marker_map[slot_id],
+            facecolors="none",
+            edgecolors="#222222",
+            linewidth=0.45,
+            alpha=0.35,
+            zorder=6,
+        )
+    mapping = ", ".join(f"{slot}:{marker}" for slot, marker in marker_map.items())
+    ax.text(
+        0.02,
+        0.02,
+        f"slot marker map: {mapping}",
+        transform=ax.transAxes,
+        ha="left",
+        va="bottom",
+        fontsize=8,
+        color="#4a4a4a",
+    )
+
+
+def plot_opt_trajectory(
+    *,
+    trajectory_df: pd.DataFrame,
+    baseline_df: pd.DataFrame,
+    tf_pair: tuple[str, str],
+    scatter_scale: str,
+    consensus_anchors: list[dict[str, object]] | None,
+    out_path: Path,
+    dpi: int,
+    png_compress_level: int,
+    stride: int = 10,
+    alpha_min: float = 0.15,
+    alpha_max: float = 0.95,
+    slot_overlay: bool = False,
+) -> dict[str, object]:
+    if not isinstance(alpha_min, (int, float)) or not isinstance(alpha_max, (int, float)):
+        raise ValueError("Particle alpha bounds must be numeric.")
+    alpha_lo = float(alpha_min)
+    alpha_hi = float(alpha_max)
+    if alpha_lo < 0 or alpha_hi > 1 or alpha_lo > alpha_hi:
+        raise ValueError("Particle alpha bounds must satisfy 0 <= min <= max <= 1.")
+    if len(tf_pair) != 2:
+        raise ValueError("tf_pair must contain exactly two TF names.")
+
+    x_col, y_col, normalized_scale = _resolve_scatter_columns(tf_pair=tf_pair, scatter_scale=scatter_scale)
+    plot_df = _prepare_lineage_df(trajectory_df)
+    plot_df[x_col] = _require_numeric(plot_df, x_col, context="Trajectory")
+    plot_df[y_col] = _require_numeric(plot_df, y_col, context="Trajectory")
+    sampled = _sample_rows(plot_df, stride=max(1, int(stride)))
+
+    baseline = _require_df(baseline_df, name="Baseline").copy()
+    baseline[x_col] = _require_numeric(baseline, x_col, context="Baseline")
+    baseline[y_col] = _require_numeric(baseline, y_col, context="Baseline")
+
+    fig, ax = plt.subplots(figsize=(6.8, 5.1))
+    ax.scatter(
+        baseline[x_col].astype(float),
+        baseline[y_col].astype(float),
+        s=8,
+        c="#c9c9c9",
+        alpha=0.28,
+        edgecolors="none",
+        zorder=1,
+        label=f"random baseline (n={len(baseline)})",
+    )
+
+    particle_ids, _, _ = _draw_particle_lineage(
+        ax,
+        sampled,
+        x_col=x_col,
+        y_col=y_col,
+        alpha_lo=alpha_lo,
+        alpha_hi=alpha_hi,
+    )
     max_particle = max(particle_ids)
     ax.plot([], [], color="#333333", linewidth=1.2, label=f"particle lineage (id=0..{max_particle})")
 
-    if slot_overlay:
-        marker_cycle = ["o", "s", "^", "D", "P", "X", "v", "<", ">"]
-        slot_rows = sampled.dropna(subset=["slot_id"]).copy()
-        if not slot_rows.empty:
-            slot_rows["slot_id"] = slot_rows["slot_id"].astype(int)
-            slot_ids = sorted(int(slot) for slot in slot_rows["slot_id"].unique())
-            marker_map = {slot: marker_cycle[idx % len(marker_cycle)] for idx, slot in enumerate(slot_ids)}
-            for slot_id in slot_ids:
-                slot_df = slot_rows[slot_rows["slot_id"].astype(int) == slot_id]
-                ax.scatter(
-                    slot_df["sweep_idx"].astype(float),
-                    slot_df["raw_llr_objective"].astype(float),
-                    s=20,
-                    marker=marker_map[slot_id],
-                    facecolors="none",
-                    edgecolors="#222222",
-                    linewidth=0.45,
-                    alpha=0.35,
-                    zorder=5,
-                )
-            mapping = ", ".join(f"{slot}:{marker}" for slot, marker in marker_map.items())
-            ax.text(
-                0.02,
-                0.02,
-                f"slot marker map: {mapping}",
-                transform=ax.transAxes,
-                ha="left",
-                va="bottom",
+    if consensus_anchors:
+        anchor_x = [float(item["x"]) for item in consensus_anchors]
+        anchor_y = [float(item["y"]) for item in consensus_anchors]
+        ax.scatter(
+            anchor_x,
+            anchor_y,
+            s=120,
+            marker="*",
+            facecolor="#f58518",
+            edgecolor="#111111",
+            linewidth=0.8,
+            zorder=8,
+            label="consensus anchors",
+        )
+        for item in consensus_anchors:
+            x = float(item["x"])
+            y = float(item["y"])
+            label = str(item.get("label") or item.get("tf") or "consensus")
+            ax.annotate(
+                label,
+                xy=(x, y),
+                xytext=(6, -8),
+                textcoords="offset points",
                 fontsize=8,
-                color="#4a4a4a",
+                color="#3f3f3f",
             )
 
-    ax.set_xlabel("Sweep index")
-    ax.set_ylabel("Raw LLR objective")
-    ax.set_title("Optimization trajectory (particle lineage)")
+    if slot_overlay:
+        _draw_slot_overlay(ax, sampled, x_col=x_col, y_col=y_col)
+
+    scale_label = "raw LLR" if normalized_scale == "llr" else "normalized LLR"
+    ax.set_xlabel(f"{tf_pair[0]} ({scale_label})")
+    ax.set_ylabel(f"{tf_pair[1]} ({scale_label})")
+    ax.set_title(f"Optimization trajectory ({tf_pair[0]} vs {tf_pair[1]}; particle lineage)")
     legend_labels = _legend_labels(ax)
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
     plt.close(fig)
     return {
-        "mode": "particle_raw_llr",
+        "mode": "particle_scatter",
         "legend_labels": legend_labels,
         "particle_count": len(particle_ids),
+        "x_column": x_col,
+        "y_column": y_col,
+    }
+
+
+def plot_opt_trajectory_sweep(
+    *,
+    trajectory_df: pd.DataFrame,
+    y_column: str,
+    out_path: Path,
+    dpi: int,
+    png_compress_level: int,
+    stride: int = 10,
+    alpha_min: float = 0.15,
+    alpha_max: float = 0.95,
+    slot_overlay: bool = False,
+) -> dict[str, object]:
+    if not isinstance(alpha_min, (int, float)) or not isinstance(alpha_max, (int, float)):
+        raise ValueError("Particle alpha bounds must be numeric.")
+    alpha_lo = float(alpha_min)
+    alpha_hi = float(alpha_max)
+    if alpha_lo < 0 or alpha_hi > 1 or alpha_lo > alpha_hi:
+        raise ValueError("Particle alpha bounds must satisfy 0 <= min <= max <= 1.")
+
+    plot_df = _prepare_lineage_df(trajectory_df)
+    plot_df[y_column] = _require_numeric(plot_df, y_column, context="Trajectory")
+    sampled = _sample_rows(plot_df, stride=max(1, int(stride)))
+
+    fig, ax = plt.subplots(figsize=(6.8, 5.1))
+    particle_ids, _, _ = _draw_particle_lineage(
+        ax,
+        sampled,
+        x_col="sweep_idx",
+        y_col=y_column,
+        alpha_lo=alpha_lo,
+        alpha_hi=alpha_hi,
+    )
+    max_particle = max(particle_ids)
+    ax.plot([], [], color="#333333", linewidth=1.2, label=f"particle lineage (id=0..{max_particle})")
+    if slot_overlay:
+        _draw_slot_overlay(ax, sampled, x_col="sweep_idx", y_col=y_column)
+
+    ylabel = {
+        "raw_llr_objective": "Raw LLR objective",
+        "norm_llr_objective": "Normalized LLR objective",
+        "objective_scalar": "Optimization score",
+    }.get(y_column, y_column)
+    ax.set_xlabel("Sweep index")
+    ax.set_ylabel(ylabel)
+    ax.set_title("Optimization trajectory (particle lineage over sweeps)")
+    legend_labels = _legend_labels(ax)
+    fig.tight_layout()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
+    plt.close(fig)
+    return {
+        "mode": "particle_sweep",
+        "legend_labels": legend_labels,
+        "particle_count": len(particle_ids),
+        "y_column": y_column,
     }

@@ -86,6 +86,8 @@ def test_analysis_particle_trajectory_fields_load(tmp_path: Path) -> None:
     payload["cruncher"]["analysis"] = {
         "run_selector": "latest",
         "trajectory_stride": 5,
+        "trajectory_scatter_scale": "llr",
+        "trajectory_sweep_y_column": "objective_scalar",
         "trajectory_particle_alpha_min": 0.2,
         "trajectory_particle_alpha_max": 0.9,
         "trajectory_slot_overlay": False,
@@ -94,3 +96,5 @@ def test_analysis_particle_trajectory_fields_load(tmp_path: Path) -> None:
     cfg = load_config(config_path)
     assert cfg.analysis is not None
     assert cfg.analysis.trajectory_stride == 5
+    assert cfg.analysis.trajectory_scatter_scale == "llr"
+    assert cfg.analysis.trajectory_sweep_y_column == "objective_scalar"

@@ -341,29 +341,48 @@ def add_raw_llr_objective(
     missing_pwms = [tf for tf in tf_list if tf not in pwms]
     if missing_pwms:
         raise ValueError(f"Cannot compute raw-LLR objective; missing PWMs for TFs: {missing_pwms}")
-    scorer = Scorer(
+    scorer_raw = Scorer(
         {tf: pwms[tf] for tf in tf_list},
         bidirectional=bool(bidirectional),
         scale="llr",
         pseudocounts=float(pwm_pseudocounts),
         log_odds_clip=log_odds_clip,
     )
+    scorer_norm = Scorer(
+        {tf: pwms[tf] for tf in tf_list},
+        bidirectional=bool(bidirectional),
+        scale="normalized-llr",
+        pseudocounts=float(pwm_pseudocounts),
+        log_odds_clip=log_odds_clip,
+    )
     out = trajectory_df.copy()
-    raw_payload = []
+    raw_payload: list[dict[str, float]] = []
+    norm_payload: list[dict[str, float]] = []
     for row_idx, seq in out["sequence"].items():
         seq_arr = _encode_sequence(seq, context=f"trajectory row {row_idx}")
-        raw_payload.append(scorer.compute_all_per_pwm(seq_arr, int(seq_arr.size)))
+        raw_payload.append(scorer_raw.compute_all_per_pwm(seq_arr, int(seq_arr.size)))
+        norm_payload.append(scorer_norm.compute_all_per_pwm(seq_arr, int(seq_arr.size)))
     raw_df = pd.DataFrame(raw_payload, index=out.index)
-    score_df = pd.DataFrame(index=out.index)
+    norm_df = pd.DataFrame(norm_payload, index=out.index)
+    raw_score_df = pd.DataFrame(index=out.index)
+    norm_score_df = pd.DataFrame(index=out.index)
     for tf in tf_list:
         if tf not in raw_df.columns:
             raise ValueError(f"Raw-LLR scorer output missing TF '{tf}'.")
-        values = pd.to_numeric(raw_df[tf], errors="coerce")
-        if values.isna().any():
+        if tf not in norm_df.columns:
+            raise ValueError(f"Normalized-LLR scorer output missing TF '{tf}'.")
+        raw_values = pd.to_numeric(raw_df[tf], errors="coerce")
+        norm_values = pd.to_numeric(norm_df[tf], errors="coerce")
+        if raw_values.isna().any():
             raise ValueError(f"Raw-LLR scorer output for TF '{tf}' contains non-numeric values.")
-        out[f"raw_llr_{tf}"] = values.astype(float)
-        score_df[f"score_{tf}"] = values.astype(float)
-    out["raw_llr_objective"] = _resolve_objective_scalar(score_df, tf_list, objective_config=objective_config)
+        if norm_values.isna().any():
+            raise ValueError(f"Normalized-LLR scorer output for TF '{tf}' contains non-numeric values.")
+        out[f"raw_llr_{tf}"] = raw_values.astype(float)
+        out[f"norm_llr_{tf}"] = norm_values.astype(float)
+        raw_score_df[f"score_{tf}"] = raw_values.astype(float)
+        norm_score_df[f"score_{tf}"] = norm_values.astype(float)
+    out["raw_llr_objective"] = _resolve_objective_scalar(raw_score_df, tf_list, objective_config=objective_config)
+    out["norm_llr_objective"] = _resolve_objective_scalar(norm_score_df, tf_list, objective_config=objective_config)
     return out
 
 
@@ -386,6 +405,7 @@ def build_particle_trajectory_points(
         "y_metric",
         "objective_scalar",
         "raw_llr_objective",
+        "norm_llr_objective",
     }
     missing = [name for name in sorted(required) if name not in trajectory_df.columns]
     if missing:

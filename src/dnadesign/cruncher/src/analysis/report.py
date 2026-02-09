@@ -222,6 +222,7 @@ def build_report_payload(
     pointers = {
         "start_here_plot": _plot_path(analysis_root, start_here_key, plot_format),
         "trajectory_plot": _plot_path(analysis_root, "opt_trajectory", plot_format),
+        "trajectory_sweep_plot": _plot_path(analysis_root, "opt_trajectory_sweep", plot_format),
         "diagnostics": _table_path(analysis_root, "diagnostics_summary", "json"),
         "objective_components": _table_path(analysis_root, "objective_components", "json"),
         "elites_mmr_summary": _table_path(analysis_root, "elites_mmr_summary", table_format),
@@ -328,6 +329,7 @@ def write_report_md(
             "## Start here",
             "",
             f"- {pointers.get('start_here_plot') or 'plots/plot__opt_trajectory.<ext>'}",
+            f"- {pointers.get('trajectory_sweep_plot') or 'plots/plot__opt_trajectory_sweep.<ext>'}",
             f"- {pointers.get('diagnostics') or 'analysis/table__diagnostics_summary.json'}",
             f"- {pointers.get('objective_components') or 'analysis/table__objective_components.json'}",
         ]
@@ -353,6 +355,7 @@ def write_report_md(
 
     artifact_index = [
         pointers.get("start_here_plot") or "plots/plot__opt_trajectory.<ext>",
+        pointers.get("trajectory_sweep_plot") or "plots/plot__opt_trajectory_sweep.<ext>",
         pointers.get("diagnostics") or "analysis/table__diagnostics_summary.json",
         pointers.get("objective_components") or "analysis/table__objective_components.json",
         pointers.get("elites_mmr_summary") or None,
