@@ -8,6 +8,7 @@
 - [Cache Binding Sites (DAP-seq + RegulonDB)](#cache-binding-sites-dap-seq--regulondb)
 - [Discover MEME OOPS Motifs](#discover-meme-oops-motifs)
 - [Lock + parse](#lock--parse)
+- [Render MEME Logos](#render-meme-logos)
 - [Sample + analyze](#sample--analyze)
 - [Fast rerun after config edits](#fast-rerun-after-config-edits)
 - [Inspect results](#inspect-results)
@@ -52,10 +53,12 @@ pixi run cruncher -- fetch sites --source regulondb      --tf lexA --tf cpxR --u
 pixi run cruncher -- discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --source-id demo_merged_meme_oops -c "$CONFIG"
 pixi run cruncher -- lock -c "$CONFIG"
 pixi run cruncher -- parse --force-overwrite -c "$CONFIG"
+pixi run cruncher -- catalog logos --source demo_merged_meme_oops --tf lexA --tf cpxR -c "$CONFIG"
 pixi run cruncher -- sample --force-overwrite -c "$CONFIG"
 pixi run cruncher -- analyze --summary -c "$CONFIG"
 
 find outputs -type f -name 'plot__*.png' | sort
+find outputs -type f -path '*/logos/*' -name '*.png' | sort
 ```
 
 If `sample` fails due elite filters, adjust `sample.elites.filter.min_per_tf_norm`,
@@ -123,9 +126,18 @@ cruncher parse -c "$CONFIG"
 If `.cruncher/parse` already exists from a prior run, re-run parse with `--force-overwrite`.
 This demo pins `catalog.source_preference` to `demo_merged_meme_oops` to prevent accidental fallback to local 21/22 bp motifs.
 
+## Render MEME logos
+
+Render logos from the discovered MEME motifs as a quick validation that the cached motif shapes look sane before sampling:
+
+```bash
+cruncher catalog logos --source demo_merged_meme_oops --tf lexA --tf cpxR -c "$CONFIG"
+```
+
 ## Sample + analyze
 
 ```bash
+cruncher catalog logos --source demo_merged_meme_oops --tf lexA --tf cpxR -c "$CONFIG" && \
 cruncher sample  -c "$CONFIG" && \
 cruncher analyze -c "$CONFIG" && \
 cruncher analyze --summary -c "$CONFIG"
@@ -146,6 +158,7 @@ CONFIG="$PWD/config.yaml"
 
 pixi run cruncher -- lock -c "$CONFIG"
 pixi run cruncher -- parse --force-overwrite -c "$CONFIG"
+pixi run cruncher -- catalog logos --source demo_merged_meme_oops --tf lexA --tf cpxR -c "$CONFIG"
 pixi run cruncher -- sample --force-overwrite -c "$CONFIG"
 pixi run cruncher -- analyze --summary -c "$CONFIG"
 ```
@@ -172,6 +185,7 @@ Key files:
 - `analysis/summary.json`
 - `analysis/report.md`
 - `analysis/report.json`
+- motif logos under `logos/catalog/<run_name>/`
 - curated plots in `plots/`: `plot__opt_trajectory.*`,
   `plot__opt_trajectory_sweep.*`, `plot__elites_nn_distance.*`, `plot__overlap_panel.*`
   (and `plot__health_panel.*` if a trace is present; `plot__overlap_panel.*` is skipped when `n_elites < 2`)
