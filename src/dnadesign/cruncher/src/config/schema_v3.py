@@ -612,9 +612,9 @@ class SampleBudgetConfig(StrictBaseModel):
 
 class SampleObjectiveSoftminConfig(StrictBaseModel):
     enabled: bool = True
-    schedule: Literal["fixed", "linear"] = "linear"
+    schedule: Literal["fixed", "linear"] = "fixed"
     beta_start: float = 0.5
-    beta_end: float = 10.0
+    beta_end: float = 6.0
 
     @field_validator("beta_start", "beta_end")
     @classmethod
@@ -759,22 +759,22 @@ class MoveProposalAdaptConfig(StrictBaseModel):
 
 
 class MoveConfig(StrictBaseModel):
-    block_len_range: Tuple[int, int] = (3, 12)
-    multi_k_range: Tuple[int, int] = (2, 6)
+    block_len_range: Tuple[int, int] = (2, 6)
+    multi_k_range: Tuple[int, int] = (2, 3)
     slide_max_shift: int = 2
     swap_len_range: Tuple[int, int] = (6, 12)
     move_probs: Dict[Literal["S", "B", "M", "L", "W", "I"], float] = {
-        "S": 0.80,
-        "B": 0.10,
-        "M": 0.10,
+        "S": 0.85,
+        "B": 0.07,
+        "M": 0.04,
         "L": 0.00,
         "W": 0.00,
-        "I": 0.00,
+        "I": 0.04,
     }
     move_schedule: Optional["MoveScheduleConfig"] = None
     target_worst_tf_prob: float = 0.0
     target_window_pad: int = 0
-    insertion_consensus_prob: float = 0.50
+    insertion_consensus_prob: float = 0.35
     adaptive_weights: MoveAdaptiveWeightsConfig = MoveAdaptiveWeightsConfig()
     proposal_adapt: MoveProposalAdaptConfig = MoveProposalAdaptConfig()
 
@@ -941,9 +941,9 @@ class SamplePtAdaptConfig(StrictBaseModel):
 
 
 class SamplePtConfig(StrictBaseModel):
-    n_temps: int = 6
-    temp_max: float = 20.0
-    swap_stride: int = 1
+    n_temps: int = 3
+    temp_max: float = 8.0
+    swap_stride: int = 4
     adapt: SamplePtAdaptConfig = SamplePtAdaptConfig()
 
     @field_validator("n_temps")
@@ -1100,13 +1100,13 @@ class AnalysisConfig(StrictBaseModel):
     table_format: Literal["parquet", "csv"] = "parquet"
     archive: bool = False
     max_points: int = 5000
-    trajectory_stride: int = 1
+    trajectory_stride: int = 5
     trajectory_scatter_scale: Literal["normalized-llr", "llr"] = "llr"
     trajectory_sweep_y_column: Literal["raw_llr_objective", "objective_scalar", "norm_llr_objective"] = (
         "raw_llr_objective"
     )
     trajectory_particle_alpha_min: float = 0.15
-    trajectory_particle_alpha_max: float = 0.95
+    trajectory_particle_alpha_max: float = 0.45
     trajectory_slot_overlay: bool = False
 
     @field_validator(

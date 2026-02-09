@@ -191,9 +191,9 @@ sample:
     combine: min                  # min | sum
     softmin:
       enabled: true
-      schedule: linear            # fixed | linear
+      schedule: fixed             # fixed | linear
       beta_start: 0.5
-      beta_end: 10.0
+      beta_end: 6.0
     scoring:
       pwm_pseudocounts: 0.10
       log_odds_clip: null
@@ -230,9 +230,9 @@ sample:
         target_high: 0.75
 
   pt:
-    n_temps: 6
-    temp_max: 20.0
-    swap_stride: 1
+    n_temps: 3
+    temp_max: 8.0
+    swap_stride: 4
     adapt:
       enabled: true
       target_swap: 0.25
@@ -286,11 +286,11 @@ analysis:
   table_format: parquet     # parquet | csv
   archive: false
   max_points: 5000
-  trajectory_stride: 1
+  trajectory_stride: 5
   trajectory_scatter_scale: llr   # normalized-llr | llr
   trajectory_sweep_y_column: raw_llr_objective  # raw_llr_objective | objective_scalar | norm_llr_objective
   trajectory_particle_alpha_min: 0.15
-  trajectory_particle_alpha_max: 0.95
+  trajectory_particle_alpha_max: 0.45
   trajectory_slot_overlay: false
 ```
 

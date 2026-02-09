@@ -27,7 +27,7 @@ This demo designs fixed-length sequences that satisfy two PWMs (LexA + CpxR). It
 
 Cruncher scores each TF by the best PWM match anywhere in the sequence on either strand (when `objective.bidirectional=true`). It optimizes the weakest TF by default (`objective.combine=min`) and selects diverse elites via TFBS-core MMR.
 The demo builds MEME OOPS motifs from merged DAP-seq (`demo_local_meme`) + RegulonDB sites, then locks sampling to those discovered motifs. Sequence length is fixed at 16 bp, and sampling enforces `sample.motif_width.maxw=16` via max-information contiguous windowing.
-The bundled config uses targeted insertion proposals plus adaptive move weights/proposal sizing with strict PT adaptation (`n_temps=4`, `temp_max=14`) for stable optimization diagnostics.
+The bundled config uses targeted insertion proposals plus adaptive move weights/proposal sizing with strict PT adaptation (`n_temps=3`, `temp_max=8`, `swap_stride=4`) and a fixed softmin schedule (`beta_end=6`) for a less jumpy optimization trajectory.
 
 For the full intent, lifecycle, and config mapping, see [Intent + lifecycle](../guides/intent_and_lifecycle.md).
 

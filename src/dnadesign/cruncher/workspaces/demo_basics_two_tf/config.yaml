@@ -106,9 +106,9 @@ cruncher:
         log_odds_clip: null
       softmin:
         enabled: true
-        schedule: linear
+        schedule: fixed
         beta_start: 0.5
-        beta_end: 10.0
+        beta_end: 6.0
     elites:
       k: 1
       filter:
@@ -121,20 +121,20 @@ cruncher:
     moves:
       profile: balanced
       overrides:
-        block_len_range: [3, 10]
-        multi_k_range: [2, 4]
+        block_len_range: [2, 6]
+        multi_k_range: [2, 3]
         slide_max_shift: 4
         swap_len_range: [2, 8]
         move_probs:
-          S: 0.72
-          B: 0.12
-          M: 0.08
+          S: 0.85
+          B: 0.07
+          M: 0.04
           L: 0.00
           W: 0.00
-          I: 0.08
+          I: 0.04
         target_worst_tf_prob: 0.3
         target_window_pad: 2
-        insertion_consensus_prob: 0.55
+        insertion_consensus_prob: 0.35
         adaptive_weights:
           enabled: true
           window: 250
@@ -156,9 +156,9 @@ cruncher:
           target_low: 0.25
           target_high: 0.70
     pt:
-      n_temps: 4
-      temp_max: 14.0
-      swap_stride: 2
+      n_temps: 3
+      temp_max: 8.0
+      swap_stride: 4
       adapt:
         enabled: true
         target_swap: 0.25
@@ -185,5 +185,6 @@ cruncher:
     table_format: parquet
     archive: false
     max_points: 5000
-    trajectory_stride: 1
+    trajectory_stride: 5
     trajectory_scatter_scale: llr
+    trajectory_particle_alpha_max: 0.45

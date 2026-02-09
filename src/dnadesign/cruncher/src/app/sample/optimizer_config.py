@@ -15,9 +15,9 @@ from typing import Any
 
 from dnadesign.cruncher.config.schema_v3 import SamplePtAdaptConfig, SamplePtConfig
 
-DEFAULT_TEMP_MAX: float = 20.0
-DEFAULT_N_TEMPS: int = 6
-DEFAULT_SWAP_STRIDE: int = 1
+DEFAULT_TEMP_MAX: float = 8.0
+DEFAULT_N_TEMPS: int = 3
+DEFAULT_SWAP_STRIDE: int = 4
 DEFAULT_ADAPTIVE_SWAP: dict[str, object] = SamplePtAdaptConfig(
     enabled=True,
     target_swap=0.25,

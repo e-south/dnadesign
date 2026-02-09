@@ -18,6 +18,7 @@ import yaml
 from pydantic import ValidationError
 
 from dnadesign.cruncher.config.load import load_config
+from dnadesign.cruncher.config.moves import resolve_move_config
 
 
 def _base_config() -> dict:
@@ -61,6 +62,26 @@ def test_compute_config_loads(tmp_path: Path) -> None:
     assert cfg.sample.sequence_length == 12
     assert cfg.sample.budget.tune == 1
     assert cfg.sample.budget.draws == 3
+    assert cfg.sample.objective.softmin.schedule == "fixed"
+    assert cfg.sample.objective.softmin.beta_end == pytest.approx(6.0)
+    assert cfg.sample.pt.n_temps == 3
+    assert cfg.sample.pt.temp_max == pytest.approx(8.0)
+    assert cfg.sample.pt.swap_stride == 4
+
+
+def test_balanced_move_defaults_are_stability_oriented(tmp_path: Path) -> None:
+    config_path = _write_config(tmp_path, _base_config())
+    cfg = load_config(config_path)
+    assert cfg.sample is not None
+    move_cfg = resolve_move_config(cfg.sample.moves)
+
+    assert move_cfg.block_len_range == (2, 6)
+    assert move_cfg.multi_k_range == (2, 3)
+    assert move_cfg.insertion_consensus_prob == pytest.approx(0.35)
+    assert move_cfg.move_probs["S"] == pytest.approx(0.85)
+    assert move_cfg.move_probs["B"] == pytest.approx(0.07)
+    assert move_cfg.move_probs["M"] == pytest.approx(0.04)
+    assert move_cfg.move_probs["I"] == pytest.approx(0.04)
 
 
 @pytest.mark.parametrize("value", [0, -1])
@@ -108,4 +129,5 @@ def test_analysis_trajectory_defaults_prefer_raw_llr_and_dense_lineage(tmp_path:
 
     assert cfg.analysis is not None
     assert cfg.analysis.trajectory_scatter_scale == "llr"
-    assert cfg.analysis.trajectory_stride == 1
+    assert cfg.analysis.trajectory_stride == 5
+    assert cfg.analysis.trajectory_particle_alpha_max == pytest.approx(0.45)
