@@ -88,7 +88,7 @@ If you re-run in the same workspace without clearing prior artifacts, use:
 Notes:
 - Analysis writes a canonical summary to `summary.json`, a human-readable
   entrypoint to `report.md`, and a detailed artifact manifest to
-  `manifest.json` (all under each run directory, typically `outputs/output/`).
+  `manifest.json` (all under each run directory, typically `outputs/analysis/`).
 - Motif overlap is a feature, not a failure; overlap plots are descriptive only.
 
 ### More documentation

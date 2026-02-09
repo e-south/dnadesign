@@ -33,7 +33,7 @@ cd src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf
 rm -rf outputs
 rm -rf .cruncher/parse .cruncher/locks .cruncher/campaigns
 rm -f .cruncher/run_index.json
-rm -f campaign_*.yaml campaign_*.campaign_manifest.json
+find . -maxdepth 1 -type f \( -name 'campaign_*.yaml' -o -name 'campaign_*.campaign_manifest.json' \) -delete
 ```
 
 ## Cache sites
