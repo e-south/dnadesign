@@ -577,10 +577,6 @@ class PTGibbsOptimizer(Optimizer):
                             "log_u": float(log_u) if log_u is not None else None,
                         }
                     )
-                if self.swap_controller is not None and stop_after_tune:
-                    self.swap_controller.update()
-                    _maybe_raise_tuning_limited(phase="draw", sweep_idx=sweep_idx)
-
             for c in range(C):
                 _record(
                     c,

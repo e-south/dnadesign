@@ -270,6 +270,7 @@ Notes:
 - MMR distance is TFBS-core weighted Hamming (tolerant weighting, low-information positions emphasized).
 - `moves.overrides.*` contains optional expert controls (operator mix + adaptation). Leave unset unless you are actively tuning proposals.
 - Set `pt.adapt.strict=true` to fail the run when PT ladder adaptation saturates at `max_scale` for too many windows.
+- `pt.adapt.stop_after_tune=true` updates the PT ladder only during tune sweeps; draw sweeps use the frozen ladder.
 
 ## analysis
 
