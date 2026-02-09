@@ -31,6 +31,7 @@ from dnadesign.cruncher.analysis.layout import (
 )
 from dnadesign.cruncher.app import analyze_workflow
 from dnadesign.cruncher.app.analyze_workflow import _load_elites_meta, run_analyze
+from dnadesign.cruncher.app.run_service import save_run_index
 from dnadesign.cruncher.artifacts.layout import (
     config_used_path,
     elites_hits_path,
@@ -702,6 +703,133 @@ def test_analyze_defaults_to_latest_when_runs_empty(tmp_path: Path) -> None:
     cfg = load_config(config_path)
     analysis_runs = run_analyze(cfg, config_path)
     assert analysis_runs
+
+
+def test_analyze_latest_skips_failed_index_run(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    config = _base_config(
+        catalog_root=catalog_root,
+        regulator_sets=[["lexA", "cpxR"]],
+        sample=_sample_block(save_trace=False, top_k=1),
+        analysis={
+            "run_selector": "latest",
+            "runs": [],
+            "pairwise": ["lexA", "cpxR"],
+            "plot_format": "png",
+            "plot_dpi": 72,
+            "table_format": "parquet",
+            "max_points": 1000,
+        },
+    )
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    completed_run = _make_sample_run_dir(tmp_path, "sample_completed")
+    failed_run = _make_sample_run_dir(tmp_path, "sample_failed")
+
+    lock_dir = tmp_path / ".cruncher" / "locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = lock_dir / "config.lock.json"
+    lock_path.write_text("{}")
+    lock_sha = sha256_path(lock_path)
+
+    _write_basic_run_artifacts(
+        run_dir=completed_run,
+        config=config,
+        config_path=config_path,
+        lock_path=lock_path,
+        lock_sha=lock_sha,
+        tf_names=["lexA", "cpxR"],
+        include_trace=False,
+        top_k=1,
+        draws=1,
+        tune=1,
+    )
+    (failed_run / "run_status.json").write_text(
+        json.dumps(
+            {
+                "stage": "sample",
+                "status": "failed",
+                "run_dir": str(failed_run.resolve()),
+                "error": "Elite selection returned 1 candidates, fewer than cruncher.sample.elites.k=5.",
+            }
+        )
+    )
+
+    save_run_index(
+        config_path,
+        {
+            "sample/sample_failed": {
+                "stage": "sample",
+                "status": "failed",
+                "created_at": "2026-02-09T16:30:19+00:00",
+                "run_dir": str(failed_run.resolve()),
+                "run_group": "lexA-cpxR",
+            },
+            "sample/sample_completed": {
+                "stage": "sample",
+                "status": "completed",
+                "created_at": "2026-02-09T16:29:19+00:00",
+                "run_dir": str(completed_run.resolve()),
+                "run_group": "lexA-cpxR",
+            },
+        },
+    )
+
+    cfg = load_config(config_path)
+    analysis_runs = run_analyze(cfg, config_path)
+    assert analysis_runs
+    assert analysis_runs[0] == completed_run
+
+
+def test_analyze_latest_reports_failed_reason_when_no_completed_runs(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    config = _base_config(
+        catalog_root=catalog_root,
+        regulator_sets=[["lexA", "cpxR"]],
+        sample=_sample_block(save_trace=False, top_k=1),
+        analysis={
+            "run_selector": "latest",
+            "runs": [],
+            "pairwise": ["lexA", "cpxR"],
+            "plot_format": "png",
+            "plot_dpi": 72,
+            "table_format": "parquet",
+            "max_points": 1000,
+        },
+    )
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    failed_run = _make_sample_run_dir(tmp_path, "sample_failed")
+    failed_error = "Elite selection returned 1 candidates, fewer than cruncher.sample.elites.k=5."
+    (failed_run / "run_status.json").write_text(
+        json.dumps(
+            {
+                "stage": "sample",
+                "status": "failed",
+                "run_dir": str(failed_run.resolve()),
+                "error": failed_error,
+            }
+        )
+    )
+    save_run_index(
+        config_path,
+        {
+            "sample/sample_failed": {
+                "stage": "sample",
+                "status": "failed",
+                "created_at": "2026-02-09T16:30:19+00:00",
+                "run_dir": str(failed_run.resolve()),
+                "run_group": "lexA-cpxR",
+            },
+        },
+    )
+
+    cfg = load_config(config_path)
+    with pytest.raises(ValueError, match="No completed sample runs found for analysis.") as exc:
+        run_analyze(cfg, config_path)
+    assert failed_error in str(exc.value)
 
 
 def test_analyze_opt_trajectory_multi_tf(tmp_path: Path) -> None:

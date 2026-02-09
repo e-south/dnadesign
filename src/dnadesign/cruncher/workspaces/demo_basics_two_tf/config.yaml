@@ -84,10 +84,10 @@ cruncher:
 
   sample:
     seed: 42
-    sequence_length: 30
+    sequence_length: 16
     budget:
-      tune: 600
-      draws: 1000
+      tune: 0
+      draws: 100000
     objective:
       bidirectional: true
       score_scale: normalized-llr
@@ -101,7 +101,7 @@ cruncher:
         beta_start: 0.5
         beta_end: 10.0
     elites:
-      k: 5
+      k: 1
       filter:
         min_per_tf_norm: 0.30
         require_all_tfs: true

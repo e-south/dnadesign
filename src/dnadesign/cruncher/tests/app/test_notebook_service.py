@@ -55,6 +55,9 @@ def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
     assert "Refresh analysis list" in content
     assert "plot_options" in content
     assert "table_manifest.json" in content
+    assert 'manifest_generated = bool(entry.get("generated"))' in content
+    assert 'manifest_skipped = bool(entry.get("skipped"))' in content
+    assert 'enabled = bool(entry.get("enabled"))' not in content
     assert "scores_summary" in content
     assert "metrics_joint" in content
     assert "elites_topk" in content

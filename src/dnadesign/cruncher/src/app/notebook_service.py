@@ -338,16 +338,19 @@ def _(analysis_dir, pd, plot_manifest):
                     "exists": bool(full_path and full_path.exists()),
                 }}
             )
-        enabled = bool(entry.get("enabled"))
-        missing = [o["path"] for o in outputs if enabled and not o["exists"] and o.get("path")]
-        generated = bool(enabled and any(o["exists"] for o in outputs))
+        manifest_generated = bool(entry.get("generated"))
+        manifest_skipped = bool(entry.get("skipped"))
+        generated = bool(manifest_generated and any(o["exists"] for o in outputs))
+        missing = [o["path"] for o in outputs if manifest_generated and not o["exists"] and o.get("path")]
         rows.append(
             dict(
                 key=entry.get("key"),
                 label=entry.get("label"),
                 group=entry.get("group"),
-                enabled=entry.get("enabled"),
+                manifest_generated=manifest_generated,
+                skipped=manifest_skipped,
                 generated=generated,
+                skip_reason=entry.get("skip_reason"),
                 missing_outputs="; ".join(missing),
                 outputs="; ".join([o.get("path", "") for o in outputs if o.get("path")]),
             )

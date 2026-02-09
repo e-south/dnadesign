@@ -62,13 +62,14 @@ from dnadesign.cruncher.app.analyze.metadata import (
     _resolve_sample_meta,
 )
 from dnadesign.cruncher.app.analyze.plan import resolve_analysis_plan
-from dnadesign.cruncher.app.run_service import get_run, list_runs
+from dnadesign.cruncher.app.run_service import get_run, list_runs, load_run_status
 from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json, atomic_write_yaml
 from dnadesign.cruncher.artifacts.entries import append_artifacts, artifact_entry
 from dnadesign.cruncher.artifacts.layout import (
     elites_hits_path,
     elites_path,
     elites_yaml_path,
+    manifest_path,
     random_baseline_hits_path,
     random_baseline_path,
     sequences_path,
@@ -85,6 +86,55 @@ from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
 logger = logging.getLogger(__name__)
 
 __all__ = ["run_analyze"]
+
+
+def _status_text(status: object) -> str:
+    return str(status or "").strip().lower()
+
+
+def _run_status_detail(run_dir: Path) -> str | None:
+    try:
+        payload = load_run_status(run_dir)
+    except ValueError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    error = payload.get("error")
+    if isinstance(error, str) and error.strip():
+        return error.strip()
+    status_message = payload.get("status_message")
+    if isinstance(status_message, str) and status_message.strip():
+        return status_message.strip()
+    return None
+
+
+def _is_analyzable_sample_run(run: object) -> bool:
+    status = _status_text(getattr(run, "status", None))
+    if status in {"failed", "aborted", "running"}:
+        return False
+    run_dir = getattr(run, "run_dir", None)
+    if not isinstance(run_dir, Path):
+        return False
+    return manifest_path(run_dir).exists()
+
+
+def _latest_unavailable_reason(run: object) -> str:
+    run_name = str(getattr(run, "name", "<unknown>"))
+    status = _status_text(getattr(run, "status", None)) or "unknown"
+    run_dir = getattr(run, "run_dir", None)
+    has_manifest = isinstance(run_dir, Path) and manifest_path(run_dir).exists()
+    detail = _run_status_detail(run_dir) if isinstance(run_dir, Path) else None
+    if not has_manifest:
+        if status in {"failed", "aborted"} and detail:
+            return f"run '{run_name}' {status}: {detail}"
+        return f"run '{run_name}' status={status} is missing run_manifest.json"
+    if status in {"failed", "aborted"}:
+        if detail:
+            return f"run '{run_name}' {status}: {detail}"
+        return f"run '{run_name}' status={status}"
+    if status == "running":
+        return f"run '{run_name}' is still running"
+    return f"run '{run_name}' is not ready for analysis (status={status})"
 
 
 def _resolve_run_names(
@@ -107,7 +157,15 @@ def _resolve_run_names(
         runs = list_runs(cfg, config_path, stage="sample")
         if not runs:
             raise ValueError("No sample runs found for analysis.")
-        return [runs[0].name]
+        for run in runs:
+            if _is_analyzable_sample_run(run):
+                return [run.name]
+        latest_reason = _latest_unavailable_reason(runs[0])
+        raise ValueError(
+            "No completed sample runs found for analysis. "
+            f"Latest sample run unavailable: {latest_reason}. "
+            "Re-run sampling with `cruncher sample -c <CONFIG>`."
+        )
     raise ValueError("analysis.run_selector must be 'latest' or 'explicit'")
 
 
