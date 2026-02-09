@@ -98,3 +98,14 @@ def test_analysis_particle_trajectory_fields_load(tmp_path: Path) -> None:
     assert cfg.analysis.trajectory_stride == 5
     assert cfg.analysis.trajectory_scatter_scale == "llr"
     assert cfg.analysis.trajectory_sweep_y_column == "objective_scalar"
+
+
+def test_analysis_trajectory_defaults_prefer_raw_llr_and_dense_lineage(tmp_path: Path) -> None:
+    payload = _base_config()
+    payload["cruncher"]["analysis"] = {"enabled": True}
+    config_path = _write_config(tmp_path, payload)
+    cfg = load_config(config_path)
+
+    assert cfg.analysis is not None
+    assert cfg.analysis.trajectory_scatter_scale == "llr"
+    assert cfg.analysis.trajectory_stride == 1

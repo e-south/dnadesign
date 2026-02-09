@@ -86,8 +86,8 @@ cruncher:
     seed: 42
     sequence_length: 30
     budget:
-      tune: 2000
-      draws: 4000
+      tune: 600
+      draws: 1000
     objective:
       bidirectional: true
       score_scale: normalized-llr
@@ -112,20 +112,20 @@ cruncher:
     moves:
       profile: balanced
       overrides:
-        block_len_range: [5, 18]
-        multi_k_range: [4, 12]
-        slide_max_shift: 5
-        swap_len_range: [3, 10]
+        block_len_range: [3, 10]
+        multi_k_range: [2, 4]
+        slide_max_shift: 4
+        swap_len_range: [2, 8]
         move_probs:
-          S: 0.45
-          B: 0.20
-          M: 0.10
+          S: 0.72
+          B: 0.12
+          M: 0.08
           L: 0.00
           W: 0.00
-          I: 0.25
-        target_worst_tf_prob: 0.7
-        target_window_pad: 4
-        insertion_consensus_prob: 0.75
+          I: 0.08
+        target_worst_tf_prob: 0.3
+        target_window_pad: 2
+        insertion_consensus_prob: 0.55
         adaptive_weights:
           enabled: true
           window: 250
@@ -142,14 +142,14 @@ cruncher:
           enabled: true
           window: 250
           step: 0.10
-          min_scale: 0.60
-          max_scale: 1.80
+          min_scale: 0.80
+          max_scale: 1.20
           target_low: 0.25
           target_high: 0.70
     pt:
       n_temps: 4
-      temp_max: 20.0
-      swap_stride: 1
+      temp_max: 14.0
+      swap_stride: 2
       adapt:
         enabled: true
         target_swap: 0.25
@@ -176,3 +176,5 @@ cruncher:
     table_format: parquet
     archive: false
     max_points: 5000
+    trajectory_stride: 1
+    trajectory_scatter_scale: llr

@@ -1068,8 +1068,8 @@ class AnalysisConfig(StrictBaseModel):
     table_format: Literal["parquet", "csv"] = "parquet"
     archive: bool = False
     max_points: int = 5000
-    trajectory_stride: int = 10
-    trajectory_scatter_scale: Literal["normalized-llr", "llr"] = "normalized-llr"
+    trajectory_stride: int = 1
+    trajectory_scatter_scale: Literal["normalized-llr", "llr"] = "llr"
     trajectory_sweep_y_column: Literal["raw_llr_objective", "objective_scalar", "norm_llr_objective"] = (
         "raw_llr_objective"
     )

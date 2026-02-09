@@ -281,8 +281,8 @@ analysis:
   table_format: parquet     # parquet | csv
   archive: false
   max_points: 5000
-  trajectory_stride: 10
-  trajectory_scatter_scale: normalized-llr   # normalized-llr | llr
+  trajectory_stride: 1
+  trajectory_scatter_scale: llr   # normalized-llr | llr
   trajectory_sweep_y_column: raw_llr_objective  # raw_llr_objective | objective_scalar | norm_llr_objective
   trajectory_particle_alpha_min: 0.15
   trajectory_particle_alpha_max: 0.95
