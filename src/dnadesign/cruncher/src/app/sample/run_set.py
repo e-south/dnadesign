@@ -93,6 +93,22 @@ def _assert_sequence_buffers_aligned(optimizer: object) -> tuple[list[object], l
     return resolved["all_meta"], resolved["all_samples"], resolved["all_scores"]
 
 
+def _assert_trace_meta_aligned(optimizer: object, *, expected_rows: int) -> list[dict[str, object]]:
+    value = getattr(optimizer, "all_trace_meta", None)
+    if not isinstance(value, list):
+        raise RunError("Optimizer missing required sequence buffer 'all_trace_meta' while saving sequences.")
+    if len(value) != expected_rows:
+        raise RunError(
+            f"Optimizer sequence trace metadata length mismatch: all_trace_meta={len(value)} expected={expected_rows}"
+        )
+    rows: list[dict[str, object]] = []
+    for idx, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise RunError(f"Optimizer trace metadata row {idx} must be a dictionary.")
+        rows.append(item)
+    return rows
+
+
 def _validate_objective_preflight(sample_cfg: SampleConfig, *, n_tfs: int) -> None:
     scale = sample_cfg.objective.score_scale
     combine_cfg = sample_cfg.objective.combine
@@ -493,19 +509,46 @@ def _run_sample_for_set(
         want_canonical_all = bool(sample_cfg.objective.bidirectional)
         record_tune = bool(sample_cfg.output.include_tune_in_sequences)
         all_meta, all_samples, all_scores = _assert_sequence_buffers_aligned(optimizer)
+        all_trace_meta = _assert_trace_meta_aligned(optimizer, expected_rows=len(all_meta))
 
         def _sequence_rows() -> Iterable[dict[str, object]]:
-            for (chain_id, draw_i), seq_arr, per_tf_map in zip(all_meta, all_samples, all_scores):
-                if not record_tune and draw_i < adapt_sweeps:
+            for meta_row, trace_meta, seq_arr, per_tf_map in zip(all_meta, all_trace_meta, all_samples, all_scores):
+                if not isinstance(meta_row, tuple) or len(meta_row) < 2:
+                    raise RunError("Optimizer all_meta row must be a tuple with at least (slot_id, sweep_idx).")
+                chain_id = int(meta_row[0])
+                draw_i = int(meta_row[1])
+                slot_id_raw = trace_meta.get("slot_id")
+                particle_id_raw = trace_meta.get("particle_id")
+                beta_raw = trace_meta.get("beta")
+                sweep_idx_raw = trace_meta.get("sweep_idx")
+                phase_raw = trace_meta.get("phase")
+                if slot_id_raw is None or particle_id_raw is None or beta_raw is None or sweep_idx_raw is None:
+                    raise RunError(
+                        "Optimizer trace metadata row is missing one of: slot_id, particle_id, beta, sweep_idx."
+                    )
+                slot_id = int(slot_id_raw)
+                particle_id = int(particle_id_raw)
+                beta = float(beta_raw)
+                sweep_idx = int(sweep_idx_raw)
+                phase = str(phase_raw or "")
+                if phase not in {"tune", "draw"}:
+                    raise RunError(f"Optimizer trace metadata row has invalid phase '{phase}'.")
+                if slot_id != chain_id:
+                    raise RunError(
+                        f"Optimizer trace metadata slot_id mismatch: slot_id={slot_id} all_meta.chain={chain_id}"
+                    )
+                if sweep_idx != draw_i:
+                    raise RunError(
+                        f"Optimizer trace metadata sweep mismatch: sweep_idx={sweep_idx} all_meta.draw={draw_i}"
+                    )
+                if not record_tune and phase == "tune":
                     continue
-                if record_tune and draw_i < adapt_sweeps:
-                    phase = "tune"
-                    draw_i_to_write = draw_i
-                    draw_in_phase = draw_i
+                if phase == "tune":
+                    draw_i_to_write = sweep_idx
+                    draw_in_phase = sweep_idx
                 else:
-                    phase = "draw"
-                    draw_i_to_write = draw_i
-                    draw_in_phase = draw_i - adapt_sweeps if record_tune else draw_i
+                    draw_i_to_write = sweep_idx
+                    draw_in_phase = sweep_idx - adapt_sweeps if record_tune else sweep_idx
                 seq_str = SequenceState(seq_arr).to_string()
                 norm_map = _norm_map_for_elites(
                     seq_arr,
@@ -516,6 +559,10 @@ def _run_sample_for_set(
                 row: dict[str, object] = {
                     "chain": int(chain_id),
                     "chain_1based": int(chain_id) + 1,
+                    "slot_id": int(slot_id),
+                    "particle_id": int(particle_id),
+                    "beta": float(beta),
+                    "sweep_idx": int(sweep_idx),
                     "draw": int(draw_i_to_write),
                     "draw_in_phase": int(draw_in_phase),
                     "phase": phase,
@@ -843,7 +890,9 @@ def _run_sample_for_set(
         "softmin_final_beta_used": beta_softmin_final,
         "pool_size": pool_size,
         "indexing_note": (
-            "chain is 0-based; chain_1based is 1-based; draw_idx is absolute sweep; draw_in_phase is phase-relative"
+            "chain/slot_id are 0-based temperature slots; chain_1based is 1-based; "
+            "particle_id is persistent state lineage identity; draw_idx/sweep_idx are absolute sweeps; "
+            "draw_in_phase is phase-relative"
         ),
         "tf_label": tf_label,
         "sequence_length": sample_cfg.sequence_length,

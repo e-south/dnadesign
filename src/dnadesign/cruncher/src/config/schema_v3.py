@@ -1068,18 +1068,39 @@ class AnalysisConfig(StrictBaseModel):
     table_format: Literal["parquet", "csv"] = "parquet"
     archive: bool = False
     max_points: int = 5000
-    trajectory_plot_style: Literal["story", "debug"] = "story"
+    trajectory_plot_style: Literal["story", "debug", "particles"] = "story"
+    trajectory_identity_mode: Optional[Literal["particle", "slot"]] = None
     trajectory_story_stride: int = 50
     trajectory_debug_stride: int = 10
+    trajectory_particles_stride: int = 10
     trajectory_baseline_mode: Literal["hexbin", "scatter"] = "hexbin"
     trajectory_show_all_chains: bool = False
+    trajectory_particle_alpha_min: float = 0.15
+    trajectory_particle_alpha_max: float = 0.95
+    trajectory_slot_overlay: bool = False
 
-    @field_validator("plot_dpi", "max_points", "trajectory_story_stride", "trajectory_debug_stride")
+    @field_validator(
+        "plot_dpi",
+        "max_points",
+        "trajectory_story_stride",
+        "trajectory_debug_stride",
+        "trajectory_particles_stride",
+    )
     @classmethod
     def _check_positive_ints(cls, v: int, info) -> int:
         if not isinstance(v, int) or v < 1:
             raise ValueError(f"analysis.{info.field_name} must be >= 1")
         return v
+
+    @field_validator("trajectory_particle_alpha_min", "trajectory_particle_alpha_max")
+    @classmethod
+    def _check_alpha_bounds(cls, v: float, info) -> float:
+        if not isinstance(v, (int, float)):
+            raise ValueError(f"analysis.{info.field_name} must be numeric")
+        value = float(v)
+        if value < 0 or value > 1:
+            raise ValueError(f"analysis.{info.field_name} must be between 0 and 1")
+        return value
 
     @field_validator("runs")
     @classmethod
@@ -1106,6 +1127,12 @@ class AnalysisConfig(StrictBaseModel):
                 raise ValueError("analysis.pairwise TF names must be non-empty")
             return [tf_a, tf_b]
         raise ValueError("analysis.pairwise must be 'off', 'auto', or a list of two TF names")
+
+    @model_validator(mode="after")
+    def _check_particle_alpha_order(self) -> "AnalysisConfig":
+        if self.trajectory_particle_alpha_max < self.trajectory_particle_alpha_min:
+            raise ValueError("analysis.trajectory_particle_alpha_max must be >= analysis.trajectory_particle_alpha_min")
+        return self
 
 
 class CruncherConfig(StrictBaseModel):

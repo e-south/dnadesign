@@ -49,7 +49,11 @@ from dnadesign.cruncher.analysis.overlap import compute_overlap_tables
 from dnadesign.cruncher.analysis.parquet import read_parquet, write_parquet
 from dnadesign.cruncher.analysis.plot_registry import PLOT_SPECS
 from dnadesign.cruncher.analysis.report import build_report_payload, write_report_json, write_report_md
-from dnadesign.cruncher.analysis.trajectory import build_trajectory_points, project_scores
+from dnadesign.cruncher.analysis.trajectory import (
+    build_particle_trajectory_points,
+    build_trajectory_points,
+    project_scores,
+)
 from dnadesign.cruncher.app.analyze.archive import _prune_latest_analysis_artifacts
 from dnadesign.cruncher.app.analyze.manifests import build_analysis_manifests
 from dnadesign.cruncher.app.analyze.metadata import (
@@ -141,9 +145,17 @@ def _resolve_optimizer_stats(manifest: dict[str, object], run_dir: Path) -> dict
     if not isinstance(payload, dict):
         raise ValueError(f"Optimizer stats sidecar must contain an object: {sidecar}")
     move_stats = payload.get("move_stats")
-    if not isinstance(move_stats, list):
-        raise ValueError(f"Optimizer stats sidecar missing 'move_stats' list: {sidecar}")
-    optimizer_stats["move_stats"] = move_stats
+    if move_stats is not None and not isinstance(move_stats, list):
+        raise ValueError(f"Optimizer stats sidecar field 'move_stats' must be a list when present: {sidecar}")
+    swap_events = payload.get("swap_events")
+    if swap_events is not None and not isinstance(swap_events, list):
+        raise ValueError(f"Optimizer stats sidecar field 'swap_events' must be a list when present: {sidecar}")
+    if move_stats is None and swap_events is None:
+        raise ValueError(f"Optimizer stats sidecar missing both 'move_stats' and 'swap_events' lists: {sidecar}")
+    if move_stats is not None:
+        optimizer_stats["move_stats"] = move_stats
+    if swap_events is not None:
+        optimizer_stats["swap_events"] = swap_events
     return optimizer_stats
 
 
@@ -487,6 +499,7 @@ def run_analyze(
         elites_mmr_path = analysis_table_path(tmp_root, "elites_mmr_summary", table_ext)
         nn_distance_path = analysis_table_path(tmp_root, "elites_nn_distance", table_ext)
         trajectory_path = analysis_table_path(tmp_root, "opt_trajectory_points", table_ext)
+        trajectory_particles_path = analysis_table_path(tmp_root, "opt_trajectory_particles", table_ext)
 
         from dnadesign.cruncher.analysis.plots.summary import (
             score_frame_from_df,
@@ -527,6 +540,16 @@ def run_analyze(
             shutil.rmtree(tmp_root, ignore_errors=True)
             raise
         _write_table(trajectory_df, trajectory_path)
+        particle_table_skip_reason: str | None = None
+        try:
+            trajectory_particles_df = build_particle_trajectory_points(
+                trajectory_df,
+                max_points=analysis_cfg.max_points,
+            )
+            _write_table(trajectory_particles_df, trajectory_particles_path)
+        except ValueError as exc:
+            particle_table_skip_reason = str(exc)
+            trajectory_particles_df = pd.DataFrame()
 
         overlap_summary_df, elite_overlap_df, overlap_summary = compute_overlap_tables(
             elites_df, hits_df, tf_names, include_sequences=False
@@ -597,6 +620,10 @@ def run_analyze(
             if isinstance(objective_payload, dict):
                 score_scale_from_run = objective_payload.get("score_scale")
         plot_score_scale_used = str(score_scale_from_run) if score_scale_from_run else None
+        if analysis_cfg.trajectory_identity_mode is None:
+            trajectory_identity_mode = "particle" if bool(manifest.get("save_trace", False)) else "slot"
+        else:
+            trajectory_identity_mode = str(analysis_cfg.trajectory_identity_mode)
         focus_pair = _select_tf_pair(tf_names, analysis_cfg.pairwise)
 
         _write_analysis_used(
@@ -609,6 +636,7 @@ def run_analyze(
                 "score_scale_from_run": score_scale_from_run,
                 "tf_pair_mode": analysis_cfg.pairwise,
                 "tf_pair_selected": list(focus_pair) if focus_pair else None,
+                "trajectory_identity_mode": trajectory_identity_mode,
             },
         )
 
@@ -645,7 +673,7 @@ def run_analyze(
 
         plot_story_path = analysis_plot_path(tmp_root, "opt_trajectory_story", plot_format)
         plot_debug_path = analysis_plot_path(tmp_root, "opt_trajectory_debug", plot_format)
-        identity_mode = "canonical" if sample_meta.bidirectional else "raw"
+        plot_particles_path = analysis_plot_path(tmp_root, "opt_trajectory_particles", plot_format)
         elite_centroid = None
         selected_projected = pd.DataFrame(columns=["x", "y"])
         if elites_df is not None and not elites_df.empty:
@@ -679,7 +707,7 @@ def run_analyze(
             baseline_df,
             tf_names,
             plot_story_path,
-            identity_mode=identity_mode,
+            identity_mode=trajectory_identity_mode,
             elite_centroid=elite_centroid,
             score_scale=plot_score_scale_used,
             style="story",
@@ -696,7 +724,7 @@ def run_analyze(
             baseline_df,
             tf_names,
             plot_debug_path,
-            identity_mode=identity_mode,
+            identity_mode=trajectory_identity_mode,
             elite_centroid=elite_centroid,
             score_scale=plot_score_scale_used,
             style="debug",
@@ -705,6 +733,26 @@ def run_analyze(
             **plot_kwargs,
         )
         _record_plot("opt_trajectory_debug", plot_debug_path, True, None)
+
+        if particle_table_skip_reason is None:
+            plot_opt_trajectory(
+                trajectory_particles_df,
+                baseline_df,
+                tf_names,
+                plot_particles_path,
+                identity_mode=trajectory_identity_mode,
+                elite_centroid=elite_centroid,
+                score_scale=plot_score_scale_used,
+                style="particles",
+                stride_particles=analysis_cfg.trajectory_particles_stride,
+                particle_alpha_min=analysis_cfg.trajectory_particle_alpha_min,
+                particle_alpha_max=analysis_cfg.trajectory_particle_alpha_max,
+                slot_overlay=analysis_cfg.trajectory_slot_overlay,
+                **plot_kwargs,
+            )
+            _record_plot("opt_trajectory_particles", plot_particles_path, True, None)
+        else:
+            _record_plot("opt_trajectory_particles", plot_particles_path, False, particle_table_skip_reason)
 
         plot_nn_path = analysis_plot_path(tmp_root, "elites_nn_distance", plot_format)
         plot_elites_nn_distance(nn_df, plot_nn_path, baseline_nn=pd.Series(baseline_nn), **plot_kwargs)
@@ -761,6 +809,15 @@ def run_analyze(
                 "path": trajectory_path.name,
                 "purpose": "plot_support",
                 "exists": True,
+            },
+            {
+                "key": "opt_trajectory_particles",
+                "label": "Optimization particle trajectories",
+                "path": trajectory_particles_path.name,
+                "purpose": "plot_support",
+                "exists": trajectory_particles_path.exists(),
+                "skipped": not trajectory_particles_path.exists(),
+                "skip_reason": particle_table_skip_reason,
             },
             {
                 "key": "overlap_pair_summary",
@@ -832,6 +889,15 @@ def run_analyze(
                 analysis_root_path / nn_distance_path.relative_to(tmp_root), run_dir, kind="table", stage="analysis"
             ),
         ] + plot_artifacts
+        if trajectory_particles_path.exists():
+            analysis_artifacts.append(
+                artifact_entry(
+                    analysis_root_path / trajectory_particles_path.relative_to(tmp_root),
+                    run_dir,
+                    kind="table",
+                    stage="analysis",
+                )
+            )
 
         build_analysis_manifests(
             analysis_id=analysis_id,

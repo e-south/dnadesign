@@ -141,3 +141,6 @@ def test_analysis_tables_and_plots_use_flat_semantic_filenames(tmp_path: Path) -
     assert analysis_plot_path(analysis_dir, "opt_trajectory_debug", "png") == (
         analysis_dir / "plots" / "plot__opt_trajectory_debug.png"
     )
+    assert analysis_plot_path(analysis_dir, "opt_trajectory_particles", "png") == (
+        analysis_dir / "plots" / "plot__opt_trajectory_particles.png"
+    )

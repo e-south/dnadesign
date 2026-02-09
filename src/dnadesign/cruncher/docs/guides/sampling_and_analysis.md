@@ -66,6 +66,7 @@ The method follows the standard composition from the PT literature:
 2. Each replica performs local Metropolis-Hastings updates on sequence proposals (`sample.moves.*`).
 3. Adjacent replicas periodically attempt state swaps (`sample.pt.swap_stride`) to move information between hot and cold chains.
 4. Optional adaptation adjusts move probabilities/proposal scales and ladder scaling during tune (`sample.moves.overrides.*`, `sample.pt.adapt.*`).
+5. Each initialized state carries a persistent `particle_id`; swaps exchange particle occupancy across slots while preserving particle lineage identity.
 
 This keeps exploration (hot replicas) and exploitation (cold replica) coupled without changing the objective definition.
 In strict mode (`sample.pt.adapt.strict=true`), ladder saturation is treated as a tuning failure and the run fails fast.
@@ -105,6 +106,7 @@ Analysis writes a curated, orthogonal suite of plots and tables (no plot boolean
 - `output/table__elites_topk.parquet`
 - `output/table__metrics_joint.parquet`
 - `output/table__opt_trajectory_points.parquet`
+- `output/table__opt_trajectory_particles.parquet`
 - `output/table__overlap_pair_summary.parquet`
 - `output/table__overlap_per_elite.parquet`
 - `output/table__diagnostics_summary.json`
@@ -121,7 +123,8 @@ Sampling artifacts consumed by analysis:
 Plots (always generated when data is available):
 
 - `plots/plot__opt_trajectory_story.*` (default narrative trajectory)
-- `plots/plot__opt_trajectory_debug.*` (chain-level diagnostics)
+- `plots/plot__opt_trajectory_debug.*` (temperature-slot occupancy diagnostics; non-causal)
+- `plots/plot__opt_trajectory_particles.*` (causal particle lineage trajectories)
 - `plots/plot__elites_nn_distance.*`
 - `plots/plot__overlap_panel.*`
 - `plots/plot__health_panel.*` (only if `optimize/trace.nc` exists)

@@ -54,19 +54,30 @@ def _materialize_optimizer_stats(
     if not isinstance(optimizer_stats, dict):
         raise ValueError("optimizer.stats() must return a dictionary when present.")
     manifest_stats: dict[str, object] = dict(optimizer_stats)
-    if "move_stats" not in manifest_stats:
+    has_move_stats = "move_stats" in manifest_stats
+    has_swap_events = "swap_events" in manifest_stats
+    if not has_move_stats and not has_swap_events:
         return manifest_stats, [], None
-    move_stats = manifest_stats.pop("move_stats")
-    if move_stats is None:
+    move_stats = manifest_stats.pop("move_stats", None)
+    swap_events = manifest_stats.pop("swap_events", None)
+    if move_stats is None and swap_events is None:
         return manifest_stats, [], None
-    if not isinstance(move_stats, list):
+    if move_stats is not None and not isinstance(move_stats, list):
         raise ValueError("optimizer.stats()['move_stats'] must be a list.")
+    if swap_events is not None and not isinstance(swap_events, list):
+        raise ValueError("optimizer.stats()['swap_events'] must be a list.")
     rel_path = Path("optimize") / "optimizer_move_stats.json.gz"
     sidecar_path = run_optimize_dir(run_dir) / "optimizer_move_stats.json.gz"
     sidecar_path.parent.mkdir(parents=True, exist_ok=True)
-    atomic_write_gzip_json(sidecar_path, {"move_stats": move_stats}, allow_nan=False)
+    sidecar_payload: dict[str, object] = {}
+    if move_stats is not None:
+        sidecar_payload["move_stats"] = move_stats
+        manifest_stats["move_stats_rows"] = len(move_stats)
+    if swap_events is not None:
+        sidecar_payload["swap_events"] = swap_events
+        manifest_stats["swap_events_rows"] = len(swap_events)
+    atomic_write_gzip_json(sidecar_path, sidecar_payload, allow_nan=False)
     manifest_stats["move_stats_path"] = str(rel_path)
-    manifest_stats["move_stats_rows"] = len(move_stats)
     return (
         manifest_stats,
         [

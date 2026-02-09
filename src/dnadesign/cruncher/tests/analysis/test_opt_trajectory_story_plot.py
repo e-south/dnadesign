@@ -14,8 +14,13 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
-from dnadesign.cruncher.analysis.plots.opt_trajectory import plot_opt_trajectory_story
+from dnadesign.cruncher.analysis.plots.opt_trajectory import (
+    plot_opt_trajectory,
+    plot_opt_trajectory_debug,
+    plot_opt_trajectory_story,
+)
 
 
 def test_opt_trajectory_story_plot_includes_expected_legend_and_consensus(tmp_path: Path) -> None:
@@ -72,3 +77,78 @@ def test_opt_trajectory_story_plot_includes_expected_legend_and_consensus(tmp_pa
     anchors = metadata["consensus_anchors"]
     assert len(anchors) == 2
     assert {item["tf"] for item in anchors} == {"lexA", "cpxR"}
+
+
+def test_opt_trajectory_debug_uses_slot_diagnostics_labels(tmp_path: Path) -> None:
+    trajectory_df = pd.DataFrame(
+        {
+            "chain": [0, 0, 1, 1],
+            "slot_id": [0, 0, 1, 1],
+            "sweep": [0, 1, 0, 1],
+            "phase": ["draw", "draw", "draw", "draw"],
+            "beta": [1.2, 1.2, 0.6, 0.6],
+            "is_cold_chain": [1, 1, 0, 0],
+            "x": [0.10, 0.30, 0.20, 0.40],
+            "y": [0.20, 0.25, 0.30, 0.45],
+            "x_metric": ["score_lexA"] * 4,
+            "y_metric": ["score_cpxR"] * 4,
+            "objective_scalar": [0.1, 0.2, 0.15, 0.25],
+        }
+    )
+    baseline_df = pd.DataFrame(
+        {
+            "score_lexA": [0.05, 0.10, 0.15, 0.20],
+            "score_cpxR": [0.03, 0.08, 0.13, 0.18],
+        }
+    )
+
+    out_path = tmp_path / "plot__opt_trajectory_debug.png"
+    metadata = plot_opt_trajectory_debug(
+        trajectory_df=trajectory_df,
+        baseline_df=baseline_df,
+        tf_names=["lexA", "cpxR"],
+        out_path=out_path,
+        identity_mode="slot",
+        elite_centroid=None,
+        score_scale="normalized-llr",
+        dpi=72,
+        png_compress_level=1,
+        show_all_chains=True,
+    )
+
+    assert out_path.exists()
+    labels = metadata["legend_labels"]
+    assert any("cold temperature slot" in label for label in labels)
+    assert "context chain(s)" not in labels
+    assert all("beta≈1" not in label for label in labels)
+
+
+def test_opt_trajectory_particles_style_requires_particle_id(tmp_path: Path) -> None:
+    trajectory_df = pd.DataFrame(
+        {
+            "chain": [0, 0],
+            "sweep": [0, 1],
+            "x": [0.1, 0.2],
+            "y": [0.2, 0.3],
+            "x_metric": ["score_lexA", "score_lexA"],
+            "y_metric": ["score_cpxR", "score_cpxR"],
+            "objective_scalar": [0.1, 0.2],
+            "is_cold_chain": [1, 1],
+        }
+    )
+    baseline_df = pd.DataFrame({"score_lexA": [0.1, 0.2], "score_cpxR": [0.2, 0.3]})
+    out_path = tmp_path / "plot__opt_trajectory_particles.png"
+
+    with pytest.raises(ValueError, match="particle_id"):
+        plot_opt_trajectory(
+            trajectory_df,
+            baseline_df,
+            ["lexA", "cpxR"],
+            out_path,
+            identity_mode="particle",
+            elite_centroid=None,
+            score_scale="normalized-llr",
+            dpi=72,
+            png_compress_level=1,
+            style="particles",
+        )

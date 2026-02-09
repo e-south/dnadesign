@@ -195,8 +195,10 @@ class PTGibbsOptimizer(Optimizer):
         self.swap_attempts_by_pair: List[int] = [0 for _ in range(max(0, self.chains - 1))]
         self.swap_accepts_by_pair: List[int] = [0 for _ in range(max(0, self.chains - 1))]
         self.move_stats: List[Dict[str, object]] = []
+        self.swap_events: List[Dict[str, object]] = []
         self.all_samples: List[np.ndarray] = []
         self.all_meta: List[Tuple[int, int]] = []
+        self.all_trace_meta: List[Dict[str, object]] = []
         self.all_scores: List[Dict[str, float]] = []
         self.elites_meta: List[Tuple[int, int]] = []
         self.trace_idata = None  # filled after optimise()
@@ -230,8 +232,10 @@ class PTGibbsOptimizer(Optimizer):
         logger.debug("Starting PT optimisation: chains=%d  tune=%d  draws=%d", C, T, D)
         self.all_samples.clear()
         self.all_meta.clear()
+        self.all_trace_meta.clear()
         self.all_scores.clear()
         self.move_stats.clear()
+        self.swap_events.clear()
         self.move_tally.clear()
         self.accept_tally.clear()
         self.swap_attempts = 0
@@ -268,7 +272,7 @@ class PTGibbsOptimizer(Optimizer):
             n_mutations = max(1, int(round(base_seed.size * 0.02)))
             for c in range(1, C):
                 chain_states[c] = _perturb_seed(base_seed, n_mutations)
-        chain_state_objs: List[SequenceState] = [SequenceState(chain_states[c]) for c in range(C)]
+        chain_state_objs: List[SequenceState] = [SequenceState(chain_states[c], particle_id=c) for c in range(C)]
         scan_caches: List[LocalScanCache | None] = []
         scorer = getattr(evaluator, "scorer", None)
         for c in range(C):
@@ -282,10 +286,30 @@ class PTGibbsOptimizer(Optimizer):
         chain_scores: List[List[float]] = [[] for _ in range(C)]
 
         # Helper to record a state
-        def _record(chain_id: int, draw_idx: int, seq_arr: np.ndarray, per_tf: Dict[str, float]) -> Dict[str, float]:
+        def _record(
+            slot_id: int,
+            sweep_idx: int,
+            seq_arr: np.ndarray,
+            per_tf: Dict[str, float],
+            *,
+            phase: str,
+            beta: float,
+            particle_id: int | None,
+        ) -> Dict[str, float]:
+            if particle_id is None:
+                raise RuntimeError(f"PT trace invariant violated: missing particle_id for slot {slot_id}.")
             self.all_samples.append(seq_arr.copy())
             self.all_scores.append(per_tf)
-            self.all_meta.append((chain_id, draw_idx))
+            self.all_meta.append((slot_id, sweep_idx))
+            self.all_trace_meta.append(
+                {
+                    "slot_id": int(slot_id),
+                    "particle_id": int(particle_id),
+                    "beta": float(beta),
+                    "sweep_idx": int(sweep_idx),
+                    "phase": str(phase),
+                }
+            )
             return per_tf
 
         def _record_unique_success(seq_arr: np.ndarray, per_tf: Dict[str, float]) -> None:
@@ -383,8 +407,16 @@ class PTGibbsOptimizer(Optimizer):
                     f0 = current_scores[c]
                     f1 = current_scores[c + 1]
                     Δ = (β1 - β0) * (f0 - f1)
+                    particle_lo_before = chain_state_objs[c].particle_id
+                    particle_hi_before = chain_state_objs[c + 1].particle_id
                     accepted = False
-                    if Δ >= 0 or np.log(rng.random()) < Δ:
+                    log_u = None
+                    if Δ >= 0:
+                        accepted = True
+                    else:
+                        log_u = float(np.log(rng.random()))
+                        accepted = bool(log_u < Δ)
+                    if accepted:
                         chain_states[c], chain_states[c + 1] = s1, s0
                         chain_state_objs[c], chain_state_objs[c + 1] = (
                             chain_state_objs[c + 1],
@@ -398,19 +430,41 @@ class PTGibbsOptimizer(Optimizer):
                         )
                         self.swap_accepts += 1
                         self.swap_accepts_by_pair[c] += 1
-                        accepted = True
                     if self.swap_controller is not None:
                         self.swap_controller.record(pair_idx=c, accepted=accepted)
                         if not stop_after_tune:
                             self.swap_controller.update()
                             _maybe_raise_tuning_limited(phase="tune", sweep_idx=sweep_idx)
+                    self.swap_events.append(
+                        {
+                            "sweep_idx": int(sweep_idx),
+                            "phase": "tune",
+                            "slot_lo": int(c),
+                            "slot_hi": int(c + 1),
+                            "beta_lo": float(β0),
+                            "beta_hi": float(β1),
+                            "particle_lo_before": int(particle_lo_before),
+                            "particle_hi_before": int(particle_hi_before),
+                            "accepted": bool(accepted),
+                            "delta": float(Δ),
+                            "log_u": float(log_u) if log_u is not None else None,
+                        }
+                    )
                 if self.swap_controller is not None and stop_after_tune:
                     self.swap_controller.update()
                     _maybe_raise_tuning_limited(phase="tune", sweep_idx=sweep_idx)
 
             if self.record_tune:
                 for c in range(C):
-                    _record(c, t, chain_states[c], current_per_tf_maps[c])
+                    _record(
+                        c,
+                        t,
+                        chain_states[c],
+                        current_per_tf_maps[c],
+                        phase="tune",
+                        beta=self.beta_ladder[c],
+                        particle_id=chain_state_objs[c].particle_id,
+                    )
 
             self._maybe_log_progress("burn-in", t + 1, T)
 
@@ -480,8 +534,16 @@ class PTGibbsOptimizer(Optimizer):
                     f0 = current_scores[c]
                     f1 = current_scores[c + 1]
                     Δ = (β1 - β0) * (f0 - f1)
+                    particle_lo_before = chain_state_objs[c].particle_id
+                    particle_hi_before = chain_state_objs[c + 1].particle_id
                     accepted = False
-                    if Δ >= 0 or np.log(rng.random()) < Δ:
+                    log_u = None
+                    if Δ >= 0:
+                        accepted = True
+                    else:
+                        log_u = float(np.log(rng.random()))
+                        accepted = bool(log_u < Δ)
+                    if accepted:
                         chain_states[c], chain_states[c + 1] = s1, s0  # swap in‑place
                         chain_state_objs[c], chain_state_objs[c + 1] = (
                             chain_state_objs[c + 1],
@@ -495,18 +557,40 @@ class PTGibbsOptimizer(Optimizer):
                         )
                         self.swap_accepts += 1
                         self.swap_accepts_by_pair[c] += 1
-                        accepted = True
                     if self.swap_controller is not None:
                         self.swap_controller.record(pair_idx=c, accepted=accepted)
                         if not stop_after_tune:
                             self.swap_controller.update()
                             _maybe_raise_tuning_limited(phase="draw", sweep_idx=sweep_idx)
+                    self.swap_events.append(
+                        {
+                            "sweep_idx": int(sweep_idx),
+                            "phase": "draw",
+                            "slot_lo": int(c),
+                            "slot_hi": int(c + 1),
+                            "beta_lo": float(β0),
+                            "beta_hi": float(β1),
+                            "particle_lo_before": int(particle_lo_before),
+                            "particle_hi_before": int(particle_hi_before),
+                            "accepted": bool(accepted),
+                            "delta": float(Δ),
+                            "log_u": float(log_u) if log_u is not None else None,
+                        }
+                    )
                 if self.swap_controller is not None and stop_after_tune:
                     self.swap_controller.update()
                     _maybe_raise_tuning_limited(phase="draw", sweep_idx=sweep_idx)
 
             for c in range(C):
-                _record(c, T + d, chain_states[c], current_per_tf_maps[c])
+                _record(
+                    c,
+                    T + d,
+                    chain_states[c],
+                    current_per_tf_maps[c],
+                    phase="draw",
+                    beta=self.beta_ladder[c],
+                    particle_id=chain_state_objs[c].particle_id,
+                )
                 if self._unique_success_set is not None:
                     _record_unique_success(chain_states[c], current_per_tf_maps[c])
                 comb = current_scores[c]
@@ -950,6 +1034,7 @@ class PTGibbsOptimizer(Optimizer):
             "proposal_multi_k_range_final": list(self.move_cfg["multi_k_range"]),
             "unique_successes": self.unique_successes,
             "move_stats": list(self.move_stats),
+            "swap_events": list(self.swap_events),
             "final_softmin_beta": self.final_softmin_beta(),
             "final_mcmc_beta": self.final_mcmc_beta(),
         }

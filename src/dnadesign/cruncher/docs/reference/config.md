@@ -281,11 +281,16 @@ analysis:
   table_format: parquet     # parquet | csv
   archive: false
   max_points: 5000
-  trajectory_plot_style: story       # story | debug
+  trajectory_plot_style: story       # story | debug | particles
+  trajectory_identity_mode: null     # null(auto) | particle | slot
   trajectory_story_stride: 50
   trajectory_debug_stride: 10
+  trajectory_particles_stride: 10
   trajectory_baseline_mode: hexbin   # hexbin | scatter
   trajectory_show_all_chains: false
+  trajectory_particle_alpha_min: 0.15
+  trajectory_particle_alpha_max: 0.95
+  trajectory_slot_overlay: false
 ```
 
 ## campaigns

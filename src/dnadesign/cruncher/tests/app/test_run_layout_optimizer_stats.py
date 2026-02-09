@@ -46,6 +46,51 @@ def test_materialize_optimizer_stats_moves_move_stats_to_sidecar(tmp_path: Path)
     assert payload["move_stats"] == move_stats
 
 
+def test_materialize_optimizer_stats_moves_swap_events_to_sidecar(tmp_path: Path) -> None:
+    run_dir = tmp_path / "runs" / "sample" / "run_c"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    move_stats = [{"sweep_idx": 0, "attempted": 10, "accepted": 5, "phase": "draw"}]
+    swap_events = [
+        {
+            "sweep_idx": 0,
+            "phase": "draw",
+            "slot_lo": 0,
+            "slot_hi": 1,
+            "beta_lo": 1.0,
+            "beta_hi": 0.5,
+            "particle_lo_before": 0,
+            "particle_hi_before": 1,
+            "accepted": True,
+            "delta": 0.2,
+            "log_u": -1.2,
+        }
+    ]
+    raw_stats = {
+        "acceptance_rate_all": 0.5,
+        "swap_acceptance_rate": 0.2,
+        "move_stats": move_stats,
+        "swap_events": swap_events,
+    }
+
+    manifest_stats, artifact_entries, stats_path = _materialize_optimizer_stats(
+        run_dir,
+        raw_stats,
+        stage="sample",
+    )
+
+    assert "move_stats" not in manifest_stats
+    assert "swap_events" not in manifest_stats
+    assert manifest_stats["move_stats_rows"] == 1
+    assert manifest_stats["swap_events_rows"] == 1
+    assert stats_path is not None
+    assert len(artifact_entries) == 1
+
+    with gzip.open(run_dir / stats_path, "rt", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    assert payload["move_stats"] == move_stats
+    assert payload["swap_events"] == swap_events
+
+
 def test_materialize_optimizer_stats_skips_sidecar_without_move_stats(tmp_path: Path) -> None:
     run_dir = tmp_path / "runs" / "sample" / "run_b"
     run_dir.mkdir(parents=True, exist_ok=True)

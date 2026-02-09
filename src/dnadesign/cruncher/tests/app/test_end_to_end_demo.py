@@ -300,6 +300,7 @@ def test_demo_campaign_pair_local_only_generates_plots(tmp_path: Path) -> None:
     assert manifest_path(analysis_dir).exists()
     assert (analysis_dir / "plots" / "plot__opt_trajectory_story.png").exists()
     assert (analysis_dir / "plots" / "plot__opt_trajectory_debug.png").exists()
+    assert (analysis_dir / "plots" / "plot__opt_trajectory_particles.png").exists()
     assert (analysis_dir / "plots" / "plot__elites_nn_distance.png").exists()
     assert (analysis_dir / "plots" / "plot__overlap_panel.png").exists()
     assert (analysis_dir / "plots" / "plot__health_panel.png").exists()

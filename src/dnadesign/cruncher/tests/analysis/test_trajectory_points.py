@@ -14,7 +14,11 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from dnadesign.cruncher.analysis.trajectory import build_trajectory_points, compute_best_so_far_path
+from dnadesign.cruncher.analysis.trajectory import (
+    build_particle_trajectory_points,
+    build_trajectory_points,
+    compute_best_so_far_path,
+)
 
 
 def test_build_trajectory_points_keeps_all_chains_and_marks_cold() -> None:
@@ -123,3 +127,55 @@ def test_compute_best_so_far_path_is_monotonic() -> None:
 
     assert list(best_path["sweep"].astype(int)) == [0, 1, 2]
     assert best_path["objective_scalar"].is_monotonic_increasing
+
+
+def test_build_trajectory_points_carries_particle_identity_fields() -> None:
+    sequences_df = pd.DataFrame(
+        {
+            "slot_id": [0, 1, 0, 1],
+            "particle_id": [0, 1, 1, 0],
+            "draw": [0, 0, 1, 1],
+            "sweep_idx": [0, 0, 1, 1],
+            "phase": ["draw", "draw", "draw", "draw"],
+            "beta": [1.0, 0.5, 1.0, 0.5],
+            "score_lexA": [0.1, 0.4, 0.2, 0.5],
+            "score_cpxR": [0.2, 0.3, 0.3, 0.4],
+        }
+    )
+
+    trajectory_df = build_trajectory_points(
+        sequences_df,
+        ["lexA", "cpxR"],
+        max_points=100,
+        beta_ladder=[1.0, 0.5],
+    )
+
+    for required in ("slot_id", "particle_id", "beta", "sweep", "phase"):
+        assert required in trajectory_df.columns
+    assert sorted(trajectory_df["slot_id"].astype(int).unique()) == [0, 1]
+    assert sorted(trajectory_df["particle_id"].astype(int).unique()) == [0, 1]
+
+
+def test_build_particle_trajectory_points_tracks_slot_migration() -> None:
+    trajectory_df = pd.DataFrame(
+        {
+            "slot_id": [0, 1, 0, 1],
+            "particle_id": [0, 1, 1, 0],
+            "sweep": [0, 0, 1, 1],
+            "phase": ["draw", "draw", "draw", "draw"],
+            "beta": [1.0, 0.5, 1.0, 0.5],
+            "x": [0.1, 0.2, 0.3, 0.4],
+            "y": [0.2, 0.1, 0.4, 0.3],
+            "x_metric": ["score_lexA"] * 4,
+            "y_metric": ["score_cpxR"] * 4,
+            "objective_scalar": [0.1, 0.2, 0.3, 0.4],
+        }
+    )
+
+    particles_df = build_particle_trajectory_points(trajectory_df, max_points=100)
+    particle_zero = particles_df[particles_df["particle_id"].astype(int) == 0].sort_values("sweep_idx")
+
+    assert list(particle_zero["slot_id"].astype(int)) == [0, 1]
+    assert sorted(particles_df["particle_id"].astype(int).unique()) == [0, 1]
+    assert "x_tf" in particles_df.columns
+    assert "y_tf" in particles_df.columns

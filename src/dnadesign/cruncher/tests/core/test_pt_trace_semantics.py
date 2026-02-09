@@ -110,6 +110,105 @@ def test_pt_records_post_swap(monkeypatch) -> None:
     assert int(first_draw[0][0]) == int(mutated[0])  # chain 0 should contain swapped-in state after first swap
 
 
+def test_pt_particle_identity_tracks_swaps(monkeypatch) -> None:
+    class _FlatEvaluator:
+        def __call__(self, state: SequenceState) -> dict[str, float]:
+            return {"tf": 1.0}
+
+        def combined_from_scores(
+            self, per_tf_scores: dict[str, float], beta: float | None = None, *, length: int | None = None
+        ) -> float:
+            return float(per_tf_scores["tf"])
+
+    rng = np.random.default_rng(0)
+    cfg = {
+        "draws": 3,
+        "tune": 0,
+        "chains": 2,
+        "min_dist": 0,
+        "top_k": 1,
+        "sequence_length": 1,
+        "record_tune": False,
+        "progress_bar": False,
+        "progress_every": 0,
+        "early_stop": {},
+        "block_len_range": (1, 1),
+        "multi_k_range": (1, 1),
+        "slide_max_shift": 1,
+        "swap_len_range": (1, 1),
+        "move_probs": {"S": 1.0, "B": 0.0, "M": 0.0, "L": 0.0, "W": 0.0, "I": 0.0},
+        "kind": "geometric",
+        "beta": [1.0, 2.0],
+        "softmin": {"enabled": False},
+        "adaptive_swap": {"enabled": False},
+        "target_worst_tf_prob": 0.0,
+        "target_window_pad": 0,
+    }
+
+    opt = PTGibbsOptimizer(
+        evaluator=_FlatEvaluator(),
+        cfg=cfg,
+        rng=rng,
+        pwms={},
+        init_cfg=type("Init", (), {"kind": "random", "length": 1, "pad_with": "background", "regulator": None})(),
+    )
+
+    def _noop_move(
+        self,
+        seq,
+        current_combined,
+        beta,
+        beta_softmin,
+        evaluator,
+        rng,
+        move_probs,
+        *,
+        state=None,
+        scan_cache=None,
+        per_tf=None,
+    ):
+        if per_tf is None:
+            per_tf = evaluator(SequenceState(seq))
+        return (
+            "S",
+            True,
+            per_tf,
+            current_combined,
+            {
+                "delta": 0.0,
+                "score_old": current_combined,
+                "score_new": current_combined,
+            },
+        )
+
+    monkeypatch.setattr(opt, "_single_chain_move", _noop_move.__get__(opt, PTGibbsOptimizer))
+    opt.optimise()
+
+    trace_rows = opt.all_trace_meta
+    assert len(trace_rows) == cfg["draws"] * cfg["chains"]
+    required = {"slot_id", "particle_id", "beta", "sweep_idx", "phase"}
+    for row in trace_rows:
+        assert required.issubset(set(row.keys()))
+    assert sorted({int(row["particle_id"]) for row in trace_rows}) == [0, 1]
+
+    for sweep in sorted({int(row["sweep_idx"]) for row in trace_rows}):
+        sweep_rows = [row for row in trace_rows if int(row["sweep_idx"]) == sweep and str(row["phase"]) == "draw"]
+        assert sorted(int(row["particle_id"]) for row in sweep_rows) == [0, 1]
+
+    draw_events = [row for row in opt.swap_events if str(row["phase"]) == "draw"]
+    assert len(draw_events) == cfg["draws"] * (cfg["chains"] - 1)
+    assert all(bool(row["accepted"]) for row in draw_events)
+
+    first_event = draw_events[0]
+    sweep_zero_rows = {
+        int(row["slot_id"]): row
+        for row in trace_rows
+        if int(row["sweep_idx"]) == int(first_event["sweep_idx"]) and str(row["phase"]) == "draw"
+    }
+    assert int(sweep_zero_rows[int(first_event["slot_lo"])]["particle_id"]) == int(first_event["particle_hi_before"])
+    assert int(sweep_zero_rows[int(first_event["slot_hi"])]["particle_id"]) == int(first_event["particle_lo_before"])
+
+
 def test_pt_can_skip_trace_construction_when_disabled(monkeypatch) -> None:
     rng = np.random.default_rng(0)
     evaluator = _SwapEvaluator()

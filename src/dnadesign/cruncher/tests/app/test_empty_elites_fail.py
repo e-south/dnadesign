@@ -38,6 +38,7 @@ from dnadesign.cruncher.utils.paths import resolve_lock_path
 class _DummyOptimizer:
     def __init__(self, **_kwargs) -> None:
         self.all_meta = [(0, 0)]
+        self.all_trace_meta = [{"slot_id": 0, "particle_id": 0, "beta": 1.0, "sweep_idx": 0, "phase": "draw"}]
         self.all_samples = [np.array([0, 1, 2, 3, 0, 1], dtype=np.int8)]
         self.all_scores = [{"lexA": 0.0}]
         self.best_score = 0.0

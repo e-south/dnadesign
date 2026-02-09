@@ -139,3 +139,7 @@ def test_sample_cli_smoke_matrix(tmp_path: Path) -> None:
     assert "min_per_tf_norm" in seq_df.columns
     assert "min_norm" in seq_df.columns
     assert (seq_df["min_per_tf_norm"] == seq_df["min_norm"]).all()
+    assert "slot_id" in seq_df.columns
+    assert "particle_id" in seq_df.columns
+    assert "beta" in seq_df.columns
+    assert "sweep_idx" in seq_df.columns

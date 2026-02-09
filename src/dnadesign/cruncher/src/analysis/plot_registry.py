@@ -40,7 +40,15 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         ("sequences", "baseline"),
         ("plot__opt_trajectory_debug.{ext}",),
         "diagnostics",
-        "Debug view: chain trajectories and phase boundary markers with corrected cold-chain semantics.",
+        "Debug view: temperature-slot occupancy diagnostics and phase markers (non-causal).",
+    ),
+    PlotSpec(
+        "opt_trajectory_particles",
+        "Optimization trajectory (particles)",
+        ("sequences", "baseline"),
+        ("plot__opt_trajectory_particles.{ext}",),
+        "summary",
+        "Causal particle lineage view with persistent state identity over sweeps.",
     ),
     PlotSpec(
         "elites_nn_distance",
