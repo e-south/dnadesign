@@ -85,8 +85,7 @@ def test_analysis_particle_trajectory_fields_load(tmp_path: Path) -> None:
     payload = _base_config()
     payload["cruncher"]["analysis"] = {
         "run_selector": "latest",
-        "trajectory_plot_style": "particles",
-        "trajectory_identity_mode": "particle",
+        "trajectory_stride": 5,
         "trajectory_particle_alpha_min": 0.2,
         "trajectory_particle_alpha_max": 0.9,
         "trajectory_slot_overlay": False,
@@ -94,5 +93,4 @@ def test_analysis_particle_trajectory_fields_load(tmp_path: Path) -> None:
     config_path = _write_config(tmp_path, payload)
     cfg = load_config(config_path)
     assert cfg.analysis is not None
-    assert cfg.analysis.trajectory_plot_style == "particles"
-    assert cfg.analysis.trajectory_identity_mode == "particle"
+    assert cfg.analysis.trajectory_stride == 5

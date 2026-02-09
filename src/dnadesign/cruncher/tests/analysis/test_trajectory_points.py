@@ -11,14 +11,17 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 import pytest
 
 from dnadesign.cruncher.analysis.trajectory import (
+    add_raw_llr_objective,
     build_particle_trajectory_points,
     build_trajectory_points,
     compute_best_so_far_path,
 )
+from dnadesign.cruncher.core.pwm import PWM
 
 
 def test_build_trajectory_points_keeps_all_chains_and_marks_cold() -> None:
@@ -169,6 +172,7 @@ def test_build_particle_trajectory_points_tracks_slot_migration() -> None:
             "x_metric": ["score_lexA"] * 4,
             "y_metric": ["score_cpxR"] * 4,
             "objective_scalar": [0.1, 0.2, 0.3, 0.4],
+            "raw_llr_objective": [1.1, 1.2, 1.3, 1.4],
         }
     )
 
@@ -179,3 +183,51 @@ def test_build_particle_trajectory_points_tracks_slot_migration() -> None:
     assert sorted(particles_df["particle_id"].astype(int).unique()) == [0, 1]
     assert "x_tf" in particles_df.columns
     assert "y_tf" in particles_df.columns
+
+
+def test_add_raw_llr_objective_adds_combined_raw_llr_column() -> None:
+    trajectory_df = pd.DataFrame(
+        {
+            "sequence": ["AACCAA", "TTGGTT"],
+            "slot_id": [0, 1],
+            "particle_id": [0, 1],
+            "sweep_idx": [0, 0],
+        }
+    )
+    pwms = {
+        "lexA": PWM(
+            name="lexA",
+            matrix=np.asarray(
+                [
+                    [0.90, 0.03, 0.03, 0.04],
+                    [0.04, 0.90, 0.03, 0.03],
+                ],
+                dtype=float,
+            ),
+        ),
+        "cpxR": PWM(
+            name="cpxR",
+            matrix=np.asarray(
+                [
+                    [0.03, 0.03, 0.90, 0.04],
+                    [0.03, 0.04, 0.03, 0.90],
+                ],
+                dtype=float,
+            ),
+        ),
+    }
+
+    enriched = add_raw_llr_objective(
+        trajectory_df,
+        ["lexA", "cpxR"],
+        pwms=pwms,
+        objective_config={"combine": "min", "softmin": {"enabled": False}},
+        bidirectional=True,
+        pwm_pseudocounts=0.10,
+        log_odds_clip=None,
+    )
+
+    assert "raw_llr_lexA" in enriched.columns
+    assert "raw_llr_cpxR" in enriched.columns
+    assert "raw_llr_objective" in enriched.columns
+    assert enriched["raw_llr_objective"].notna().all()

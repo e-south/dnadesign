@@ -122,9 +122,7 @@ Sampling artifacts consumed by analysis:
 
 Plots (always generated when data is available):
 
-- `plots/plot__opt_trajectory_story.*` (default narrative trajectory)
-- `plots/plot__opt_trajectory_debug.*` (temperature-slot occupancy diagnostics; non-causal)
-- `plots/plot__opt_trajectory_particles.*` (causal particle lineage trajectories)
+- `plots/plot__opt_trajectory.*` (causal particle lineage trajectory: raw LLR objective vs sweep index)
 - `plots/plot__elites_nn_distance.*`
 - `plots/plot__overlap_panel.*`
 - `plots/plot__health_panel.*` (only if `optimize/trace.nc` exists)

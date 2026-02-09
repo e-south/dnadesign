@@ -231,8 +231,8 @@ def test_report_payload_preserves_zero_highlights() -> None:
 
 def test_report_payload_paths_use_flat_output_and_plots_schema(tmp_path: Path) -> None:
     analysis_dir = tmp_path / "run"
-    analysis_plot_path(analysis_dir, "opt_trajectory_story", "png").parent.mkdir(parents=True, exist_ok=True)
-    analysis_plot_path(analysis_dir, "opt_trajectory_story", "png").write_text("png")
+    analysis_plot_path(analysis_dir, "opt_trajectory", "png").parent.mkdir(parents=True, exist_ok=True)
+    analysis_plot_path(analysis_dir, "opt_trajectory", "png").write_text("png")
     analysis_table_path(analysis_dir, "diagnostics_summary", "json").parent.mkdir(parents=True, exist_ok=True)
     analysis_table_path(analysis_dir, "diagnostics_summary", "json").write_text("{}")
     analysis_table_path(analysis_dir, "objective_components", "json").write_text("{}")
@@ -249,10 +249,8 @@ def test_report_payload_paths_use_flat_output_and_plots_schema(tmp_path: Path) -
         analysis_used_payload={"analysis": {"table_format": "parquet", "plot_format": "png"}},
     )
     pointers = payload["paths"]
-    assert pointers["start_here_plot"] == "plots/plot__opt_trajectory_story.png"
-    assert pointers["trajectory_story_plot"] == "plots/plot__opt_trajectory_story.png"
-    assert pointers["trajectory_debug_plot"] is None
-    assert pointers["trajectory_particles_plot"] is None
+    assert pointers["start_here_plot"] == "plots/plot__opt_trajectory.png"
+    assert pointers["trajectory_plot"] == "plots/plot__opt_trajectory.png"
     assert pointers["diagnostics"] == "analysis/table__diagnostics_summary.json"
     assert pointers["objective_components"] == "analysis/table__objective_components.json"
     assert pointers["manifest"] == "analysis/manifest.json"

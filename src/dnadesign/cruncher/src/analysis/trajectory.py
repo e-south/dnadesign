@@ -16,6 +16,11 @@ from typing import Iterable, Tuple
 import numpy as np
 import pandas as pd
 
+from dnadesign.cruncher.core.pwm import PWM
+from dnadesign.cruncher.core.scoring import Scorer
+
+_DNA_BASE_TO_INT: dict[str, int] = {"A": 0, "C": 1, "G": 2, "T": 3}
+
 
 def _score_columns(tf_names: Iterable[str]) -> list[str]:
     return [f"score_{tf}" for tf in tf_names]
@@ -134,6 +139,16 @@ def _resolve_objective_scalar(
     return pd.Series(scores.min(axis=1), index=df.index, dtype=float)
 
 
+def _encode_sequence(seq: object, *, context: str) -> np.ndarray:
+    clean = str(seq).strip().upper()
+    if not clean:
+        raise ValueError(f"{context} sequence is empty.")
+    try:
+        return np.asarray([_DNA_BASE_TO_INT[base] for base in clean], dtype=np.int8)
+    except KeyError as exc:
+        raise ValueError(f"{context} sequence contains invalid base(s): {seq!r}") from exc
+
+
 def _subsample_indices(n: int, max_points: int) -> np.ndarray:
     if max_points <= 0 or n <= max_points:
         return np.arange(n, dtype=int)
@@ -247,7 +262,11 @@ def build_trajectory_points(
 
     x, y, x_metric, y_metric, worst, second = project_scores(df, tf_names)
     score_cols = _score_columns(tf_names)
-    cols = [c for c in ("draw", "sweep_idx", "phase", "chain", "slot_id", "particle_id", "beta") if c in df.columns]
+    cols = [
+        c
+        for c in ("draw", "sweep_idx", "phase", "chain", "slot_id", "particle_id", "beta", "sequence")
+        if c in df.columns
+    ]
     cols += score_cols
     out = df[cols].copy()
     if "sweep_idx" in out.columns:
@@ -302,6 +321,52 @@ def build_trajectory_points(
     return _subsample_chainwise(out.reset_index(drop=True), max_points)
 
 
+def add_raw_llr_objective(
+    trajectory_df: pd.DataFrame,
+    tf_names: Iterable[str],
+    *,
+    pwms: dict[str, PWM],
+    objective_config: dict[str, object] | None,
+    bidirectional: bool,
+    pwm_pseudocounts: float,
+    log_odds_clip: float | None,
+) -> pd.DataFrame:
+    if trajectory_df is None or trajectory_df.empty:
+        return pd.DataFrame()
+    if "sequence" not in trajectory_df.columns:
+        raise ValueError("Trajectory points missing required column 'sequence' for raw-LLR objective.")
+    tf_list = [str(tf) for tf in tf_names]
+    if not tf_list:
+        raise ValueError("Cannot compute raw-LLR objective without TF names.")
+    missing_pwms = [tf for tf in tf_list if tf not in pwms]
+    if missing_pwms:
+        raise ValueError(f"Cannot compute raw-LLR objective; missing PWMs for TFs: {missing_pwms}")
+    scorer = Scorer(
+        {tf: pwms[tf] for tf in tf_list},
+        bidirectional=bool(bidirectional),
+        scale="llr",
+        pseudocounts=float(pwm_pseudocounts),
+        log_odds_clip=log_odds_clip,
+    )
+    out = trajectory_df.copy()
+    raw_payload = []
+    for row_idx, seq in out["sequence"].items():
+        seq_arr = _encode_sequence(seq, context=f"trajectory row {row_idx}")
+        raw_payload.append(scorer.compute_all_per_pwm(seq_arr, int(seq_arr.size)))
+    raw_df = pd.DataFrame(raw_payload, index=out.index)
+    score_df = pd.DataFrame(index=out.index)
+    for tf in tf_list:
+        if tf not in raw_df.columns:
+            raise ValueError(f"Raw-LLR scorer output missing TF '{tf}'.")
+        values = pd.to_numeric(raw_df[tf], errors="coerce")
+        if values.isna().any():
+            raise ValueError(f"Raw-LLR scorer output for TF '{tf}' contains non-numeric values.")
+        out[f"raw_llr_{tf}"] = values.astype(float)
+        score_df[f"score_{tf}"] = values.astype(float)
+    out["raw_llr_objective"] = _resolve_objective_scalar(score_df, tf_list, objective_config=objective_config)
+    return out
+
+
 def build_particle_trajectory_points(
     trajectory_df: pd.DataFrame,
     *,
@@ -320,6 +385,7 @@ def build_particle_trajectory_points(
         "x_metric",
         "y_metric",
         "objective_scalar",
+        "raw_llr_objective",
     }
     missing = [name for name in sorted(required) if name not in trajectory_df.columns]
     if missing:

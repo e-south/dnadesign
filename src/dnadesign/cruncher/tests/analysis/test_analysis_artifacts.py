@@ -749,9 +749,7 @@ def test_analyze_opt_trajectory_multi_tf(tmp_path: Path) -> None:
     assert analysis_runs
 
     analysis_dir = analysis_runs[0]
-    assert analysis_plot_path(analysis_dir, "opt_trajectory_story", "png").exists()
-    assert analysis_plot_path(analysis_dir, "opt_trajectory_debug", "png").exists()
-    assert analysis_plot_path(analysis_dir, "opt_trajectory_particles", "png").exists()
+    assert analysis_plot_path(analysis_dir, "opt_trajectory", "png").exists()
 
 
 def test_analyze_opt_trajectory_single_tf(tmp_path: Path) -> None:
@@ -799,9 +797,7 @@ def test_analyze_opt_trajectory_single_tf(tmp_path: Path) -> None:
     assert analysis_runs
 
     analysis_dir = analysis_runs[0]
-    assert analysis_plot_path(analysis_dir, "opt_trajectory_story", "png").exists()
-    assert analysis_plot_path(analysis_dir, "opt_trajectory_debug", "png").exists()
-    assert analysis_plot_path(analysis_dir, "opt_trajectory_particles", "png").exists()
+    assert analysis_plot_path(analysis_dir, "opt_trajectory", "png").exists()
 
 
 def test_analyze_without_trace_when_no_trace_plots(tmp_path: Path) -> None:
@@ -1114,16 +1110,12 @@ def test_analyze_plot_manifest_single_tf_overlap_skip_and_trace_skip(tmp_path: P
     plot_manifest = json.loads(plot_manifest_path(analysis_dir).read_text())
     plots_by_key = {entry.get("key"): entry for entry in plot_manifest.get("plots", [])}
     assert set(plots_by_key) == {
-        "opt_trajectory_story",
-        "opt_trajectory_debug",
-        "opt_trajectory_particles",
+        "opt_trajectory",
         "elites_nn_distance",
         "overlap_panel",
         "health_panel",
     }
-    assert plots_by_key["opt_trajectory_story"]["generated"] is True
-    assert plots_by_key["opt_trajectory_debug"]["generated"] is True
-    assert plots_by_key["opt_trajectory_particles"]["generated"] is True
+    assert plots_by_key["opt_trajectory"]["generated"] is True
     assert plots_by_key["elites_nn_distance"]["generated"] is True
     assert plots_by_key["overlap_panel"]["generated"] is False
     assert "n_tf < 2" in str(plots_by_key["overlap_panel"].get("skip_reason"))

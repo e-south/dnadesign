@@ -399,9 +399,7 @@ Outputs:
   `analysis/table__opt_trajectory_particles.parquet`,
   `analysis/table__diagnostics_summary.json`, `analysis/table__objective_components.json`,
   `analysis/table__elites_mmr_summary.parquet`, `analysis/table__elites_nn_distance.parquet`
-* plots: `plots/plot__opt_trajectory_story.<plot_format>`,
-  `plots/plot__opt_trajectory_debug.<plot_format>`,
-  `plots/plot__opt_trajectory_particles.<plot_format>`,
+* plots: `plots/plot__opt_trajectory.<plot_format>`,
   `plots/plot__elites_nn_distance.<plot_format>`, `plots/plot__overlap_panel.<plot_format>`,
   `plots/plot__health_panel.<plot_format>` (trace only)
 * reports: `analysis/report.json`, `analysis/report.md`
@@ -438,7 +436,7 @@ Notes:
 * plot output status is refreshed from disk so missing files are shown accurately
 * the Refresh button re-scans analysis entries and updates plot/table status without restarting marimo
 * the notebook infers `run_dir` from its location; keep it under `<run_dir>/` or regenerate it
-* plots are loaded from `analysis/plot_manifest.json`; the curated keys are `opt_trajectory_story`, `opt_trajectory_debug`, `opt_trajectory_particles`, `elites_nn_distance`, plus optional `overlap_panel` and `health_panel` entries when generated
+* plots are loaded from `analysis/plot_manifest.json`; the curated keys are `opt_trajectory`, `elites_nn_distance`, plus optional `overlap_panel` and `health_panel` entries when generated
 * the notebook includes:
   * Overview tab with run metadata and explicit warnings for missing/invalid analysis artifacts
   * Tables tab with a Top-K slider and per-table previews from `analysis/table_manifest.json`

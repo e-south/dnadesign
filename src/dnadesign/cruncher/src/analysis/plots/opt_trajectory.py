@@ -3,7 +3,7 @@
 <cruncher project>
 src/dnadesign/cruncher/src/analysis/plots/opt_trajectory.py
 
-Optimization trajectory plots for story and debug views.
+Plot causal particle lineage as raw LLR objective over sweep index.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -12,28 +12,12 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
 from dnadesign.cruncher.analysis.plots._savefig import savefig
-from dnadesign.cruncher.analysis.trajectory import compute_best_so_far_path, project_scores
-
-
-def _axis_label(metric: str, score_scale: str | None) -> str:
-    if metric.startswith("score_"):
-        label = f"{metric.replace('score_', '')} score"
-    elif metric == "worst_tf_score":
-        label = "worst-TF score"
-    elif metric == "second_worst_tf_score":
-        label = "2nd-worst TF score"
-    else:
-        label = metric
-    if score_scale:
-        return f"{label} ({score_scale})"
-    return label
 
 
 def _require_df(df: pd.DataFrame | None, *, name: str) -> pd.DataFrame:
@@ -42,381 +26,41 @@ def _require_df(df: pd.DataFrame | None, *, name: str) -> pd.DataFrame:
     return df
 
 
-def _first_metric(df: pd.DataFrame, col: str) -> str:
-    if col not in df.columns:
-        raise ValueError(f"Trajectory points missing required column '{col}'.")
-    return str(df[col].iloc[0])
+def _require_numeric(df: pd.DataFrame, column: str, *, context: str) -> pd.Series:
+    if column not in df.columns:
+        raise ValueError(f"{context} missing required column '{column}'.")
+    values = pd.to_numeric(df[column], errors="coerce")
+    if values.isna().any():
+        raise ValueError(f"{context} column '{column}' must be numeric.")
+    return values.astype(float)
 
 
-def _sample_rows(df: pd.DataFrame, *, stride: int, group_col: str = "chain") -> pd.DataFrame:
+def _sample_rows(df: pd.DataFrame, *, stride: int, group_col: str) -> pd.DataFrame:
     if stride <= 1 or df.empty:
         return df
+    if group_col not in df.columns:
+        raise ValueError(f"Trajectory points missing required group column '{group_col}'.")
     sampled_parts: list[pd.DataFrame] = []
-    if group_col in df.columns:
-        for _, group in df.groupby(group_col, sort=True, dropna=False):
-            group = group.sort_values("sweep").reset_index(drop=True)
-            idx = list(range(0, len(group), stride))
-            if len(group) - 1 not in idx:
-                idx.append(len(group) - 1)
-            sampled_parts.append(group.iloc[sorted(set(idx))])
-    else:
-        ordered = df.sort_values("sweep").reset_index(drop=True)
+    for _, group in df.groupby(group_col, sort=True, dropna=False):
+        ordered = group.sort_values("sweep_idx").reset_index(drop=True)
         idx = list(range(0, len(ordered), stride))
         if len(ordered) - 1 not in idx:
             idx.append(len(ordered) - 1)
         sampled_parts.append(ordered.iloc[sorted(set(idx))])
-    return pd.concat(sampled_parts).sort_values(["sweep", group_col]).reset_index(drop=True)
+    return pd.concat(sampled_parts).sort_values(["particle_id", "sweep_idx"]).reset_index(drop=True)
 
 
 def _legend_labels(ax: plt.Axes) -> list[str]:
     handles, labels = ax.get_legend_handles_labels()
-    if not handles:
-        return []
-    ax.legend(frameon=False, fontsize=8)
+    if handles:
+        ax.legend(frameon=False, fontsize=8, loc="best")
     return labels
 
 
-def _set_axes_and_title(
-    ax: plt.Axes,
-    *,
-    x_metric: str,
-    y_metric: str,
-    tf_names: Iterable[str],
-    score_scale: str | None,
-    suffix: str,
-    identity_mode: str | None = None,
-) -> None:
-    ax.set_xlabel(_axis_label(x_metric, score_scale))
-    ax.set_ylabel(_axis_label(y_metric, score_scale))
-    tf_label = ", ".join(str(tf) for tf in tf_names)
-    scale_label = f", scale={score_scale}" if score_scale else ""
-    ax.set_title(f"Optimization trajectory ({tf_label}{scale_label}; {suffix})")
-    if identity_mode:
-        ax.text(
-            0.02,
-            0.98,
-            f"identity={identity_mode}",
-            transform=ax.transAxes,
-            ha="left",
-            va="top",
-            fontsize=9,
-            color="#444444",
-        )
-
-
-def plot_opt_trajectory_story(
+def plot_opt_trajectory(
     *,
     trajectory_df: pd.DataFrame,
-    baseline_df: pd.DataFrame,
-    selected_df: pd.DataFrame | None,
-    consensus_anchors: list[dict[str, object]] | None,
-    tf_names: Iterable[str],
     out_path: Path,
-    score_scale: str | None,
-    dpi: int,
-    png_compress_level: int,
-    stride: int = 50,
-    baseline_mode: str = "hexbin",
-) -> dict[str, object]:
-    trajectory = _require_df(trajectory_df, name="Trajectory")
-    baseline = _require_df(baseline_df, name="Baseline")
-    x_metric = _first_metric(trajectory, "x_metric")
-    y_metric = _first_metric(trajectory, "y_metric")
-    if "objective_scalar" not in trajectory.columns:
-        raise ValueError("Trajectory points must include objective_scalar for story plot.")
-    if baseline_mode not in {"hexbin", "scatter"}:
-        raise ValueError(f"Unsupported baseline_mode '{baseline_mode}'. Use 'hexbin' or 'scatter'.")
-
-    base_x, base_y, _, _, _, _ = project_scores(baseline, tf_names)
-    fig, ax = plt.subplots(figsize=(6.8, 5.1))
-    if baseline_mode == "hexbin":
-        ax.hexbin(
-            base_x,
-            base_y,
-            gridsize=52,
-            bins="log",
-            mincnt=1,
-            cmap="Greys",
-            linewidths=0,
-            alpha=0.55,
-            label=f"random baseline (n={len(base_x)})",
-        )
-    else:
-        ax.scatter(base_x, base_y, s=8, c="#bdbdbd", alpha=0.30, edgecolors="none", label="random baseline")
-
-    draw_points = _sample_rows(trajectory, stride=max(1, int(stride)))
-    if not draw_points.empty:
-        sweep = pd.to_numeric(draw_points["sweep"], errors="coerce").astype(float)
-        sweep_min = float(sweep.min())
-        sweep_range = float(sweep.max() - sweep_min)
-        if sweep_range <= 0:
-            alphas = np.full(len(draw_points), 0.60, dtype=float)
-        else:
-            alphas = 0.20 + 0.75 * ((sweep - sweep_min) / sweep_range)
-        colors = np.column_stack(
-            [
-                np.full(len(draw_points), 0.13),
-                np.full(len(draw_points), 0.40),
-                np.full(len(draw_points), 0.73),
-                np.asarray(alphas, dtype=float),
-            ]
-        )
-        ax.scatter(
-            draw_points["x"].astype(float),
-            draw_points["y"].astype(float),
-            s=18,
-            c=colors,
-            edgecolors="none",
-            zorder=4,
-            label="optimization states",
-        )
-
-    best_path = compute_best_so_far_path(trajectory, objective_col="objective_scalar", sweep_col="sweep")
-    ax.plot(
-        best_path["x"].astype(float),
-        best_path["y"].astype(float),
-        color="#0b4f9c",
-        linewidth=1.7,
-        zorder=5,
-        label="best-so-far",
-    )
-    marker_stride = max(1, int(stride // 2))
-    markers = _sample_rows(best_path.assign(chain=0), stride=marker_stride)
-    ax.scatter(
-        markers["x"].astype(float),
-        markers["y"].astype(float),
-        s=22,
-        color="#0b4f9c",
-        edgecolors="none",
-        zorder=6,
-    )
-
-    selected = selected_df.copy() if selected_df is not None else pd.DataFrame()
-    if not selected.empty:
-        ax.scatter(
-            selected["x"].astype(float),
-            selected["y"].astype(float),
-            s=56,
-            facecolor="#2ca02c",
-            edgecolor="#111111",
-            linewidth=0.9,
-            zorder=8,
-            label="selected top-k",
-        )
-
-    anchor_payload: list[dict[str, object]] = []
-    if consensus_anchors:
-        anchor_x = [float(item["x"]) for item in consensus_anchors]
-        anchor_y = [float(item["y"]) for item in consensus_anchors]
-        ax.scatter(
-            anchor_x,
-            anchor_y,
-            s=120,
-            marker="X",
-            facecolor="#f58518",
-            edgecolor="#111111",
-            linewidth=0.8,
-            zorder=9,
-            label="consensus anchors",
-        )
-        for item in consensus_anchors:
-            x = float(item["x"])
-            y = float(item["y"])
-            label = str(item.get("label") or item.get("tf") or "consensus")
-            ax.annotate(
-                label,
-                xy=(x, y),
-                xytext=(6, -8),
-                textcoords="offset points",
-                fontsize=8,
-                color="#3f3f3f",
-            )
-            anchor_payload.append(
-                {
-                    "tf": str(item.get("tf")),
-                    "label": label,
-                    "x": x,
-                    "y": y,
-                }
-            )
-
-    _set_axes_and_title(
-        ax,
-        x_metric=x_metric,
-        y_metric=y_metric,
-        tf_names=tf_names,
-        score_scale=score_scale,
-        suffix="story",
-    )
-    legend_labels = _legend_labels(ax)
-    fig.tight_layout()
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
-    plt.close(fig)
-    return {
-        "mode": "story",
-        "legend_labels": legend_labels,
-        "consensus_anchors": anchor_payload,
-        "best_path_points": int(len(best_path)),
-    }
-
-
-def _plot_chain_debug(
-    ax: plt.Axes,
-    chain_df: pd.DataFrame,
-    *,
-    label: str | None,
-    color: str,
-    alpha: float,
-    linestyle: str = "--",
-) -> None:
-    x = chain_df["x"].astype(float).to_numpy()
-    y = chain_df["y"].astype(float).to_numpy()
-    if x.size == 0:
-        return
-    if x.size >= 2:
-        ax.plot(x, y, color=color, alpha=alpha, linewidth=1.1, zorder=4, linestyle=linestyle)
-    ax.scatter(x, y, s=14, color=color, alpha=min(0.95, alpha + 0.12), edgecolors="none", zorder=5, label=label)
-
-
-def plot_opt_trajectory_debug(
-    *,
-    trajectory_df: pd.DataFrame,
-    baseline_df: pd.DataFrame,
-    tf_names: Iterable[str],
-    out_path: Path,
-    identity_mode: str | None,
-    elite_centroid: tuple[float, float] | None,
-    score_scale: str | None,
-    dpi: int,
-    png_compress_level: int,
-    stride: int = 10,
-    show_all_chains: bool = False,
-) -> dict[str, object]:
-    trajectory = _require_df(trajectory_df, name="Trajectory")
-    baseline = _require_df(baseline_df, name="Baseline")
-    x_metric = _first_metric(trajectory, "x_metric")
-    y_metric = _first_metric(trajectory, "y_metric")
-    if "is_cold_chain" not in trajectory.columns:
-        raise ValueError("Trajectory points must include is_cold_chain for debug plot.")
-    if "slot_id" not in trajectory.columns and "chain" not in trajectory.columns:
-        raise ValueError("Trajectory points must include slot_id or chain for debug plot.")
-
-    base_x, base_y, _, _, _, _ = project_scores(baseline, tf_names)
-    fig, ax = plt.subplots(figsize=(6.8, 5.1))
-    ax.scatter(base_x, base_y, s=8, c="#c9c9c9", alpha=0.28, edgecolors="none", label="random baseline")
-
-    plot_df = trajectory.copy()
-    if "slot_id" not in plot_df.columns:
-        plot_df["slot_id"] = plot_df["chain"].astype(int)
-    plot_df["slot_id"] = pd.to_numeric(plot_df["slot_id"], errors="coerce").astype(int)
-    if "beta" in plot_df.columns:
-        plot_df["beta"] = pd.to_numeric(plot_df["beta"], errors="coerce")
-    else:
-        plot_df["beta"] = np.nan
-    plot_df = plot_df.sort_values(["slot_id", "sweep"]).reset_index(drop=True)
-    cold_rows = plot_df[plot_df["is_cold_chain"].astype(int) == 1]
-    if cold_rows.empty:
-        raise ValueError("Debug trajectory plot requires at least one cold-chain row.")
-    cold_slot = int(cold_rows["slot_id"].iloc[0])
-    chain_ids = sorted(int(v) for v in plot_df["slot_id"].unique())
-    if show_all_chains:
-        draw_chain_ids = chain_ids
-    else:
-        hot_candidates = [cid for cid in chain_ids if cid != cold_slot]
-        draw_chain_ids = [cold_slot]
-        if hot_candidates:
-            draw_chain_ids.append(hot_candidates[0])
-
-    cold_beta_rows = pd.to_numeric(cold_rows["beta"], errors="coerce")
-    cold_beta_value = float(cold_beta_rows.dropna().iloc[0]) if not cold_beta_rows.dropna().empty else None
-    first_hot_label = True
-    for chain_id in draw_chain_ids:
-        chain_df = plot_df[plot_df["slot_id"].astype(int) == int(chain_id)].copy()
-        chain_df = _sample_rows(chain_df, stride=max(1, int(stride)), group_col="slot_id")
-        is_cold = int(chain_id) == cold_slot
-        label = None
-        if is_cold:
-            if cold_beta_value is None:
-                label = f"cold temperature slot (slot={cold_slot})"
-            else:
-                label = f"cold temperature slot (beta={cold_beta_value:.3g}, slot={cold_slot})"
-            _plot_chain_debug(ax, chain_df, label=label, color="#2f69a8", alpha=0.80, linestyle="--")
-        else:
-            if first_hot_label:
-                label = "other temperature slots"
-                first_hot_label = False
-            _plot_chain_debug(ax, chain_df, label=label, color="#7f7f7f", alpha=0.35, linestyle="--")
-
-    cold_phase_df = plot_df[plot_df["slot_id"].astype(int) == cold_slot]
-    if "phase" in cold_phase_df.columns and not cold_phase_df.empty:
-        phase_series = cold_phase_df["phase"].astype(str)
-        has_tune = bool((phase_series == "tune").any())
-        draw_indices = np.where(phase_series == "draw")[0]
-        if has_tune and draw_indices.size:
-            first_draw_idx = int(draw_indices[0])
-            ax.scatter(
-                [float(cold_phase_df["x"].iloc[first_draw_idx])],
-                [float(cold_phase_df["y"].iloc[first_draw_idx])],
-                s=40,
-                marker="o",
-                color="#222222",
-                zorder=7,
-                label="first draw (cold slot)",
-            )
-
-    if elite_centroid is not None:
-        ax.scatter(
-            [elite_centroid[0]],
-            [elite_centroid[1]],
-            s=84,
-            marker="*",
-            color="#f58518",
-            zorder=8,
-            label="elite median",
-        )
-    ax.text(
-        0.02,
-        0.02,
-        "Dashed lines are temperature-slot occupancy diagnostics, not particle-causal lineage.",
-        transform=ax.transAxes,
-        ha="left",
-        va="bottom",
-        fontsize=8,
-        color="#4a4a4a",
-    )
-
-    _set_axes_and_title(
-        ax,
-        x_metric=x_metric,
-        y_metric=y_metric,
-        tf_names=tf_names,
-        score_scale=score_scale,
-        suffix="debug",
-        identity_mode=identity_mode,
-    )
-    legend_labels = _legend_labels(ax)
-    fig.tight_layout()
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
-    plt.close(fig)
-    return {
-        "mode": "debug",
-        "legend_labels": legend_labels,
-        "cold_chain_id": cold_slot,
-        "cold_beta": cold_beta_value,
-    }
-
-
-def plot_opt_trajectory_particles(
-    *,
-    trajectory_df: pd.DataFrame,
-    baseline_df: pd.DataFrame,
-    tf_names: Iterable[str],
-    out_path: Path,
-    identity_mode: str | None,
-    elite_centroid: tuple[float, float] | None,
-    score_scale: str | None,
     dpi: int,
     png_compress_level: int,
     stride: int = 10,
@@ -425,36 +69,18 @@ def plot_opt_trajectory_particles(
     slot_overlay: bool = False,
 ) -> dict[str, object]:
     trajectory = _require_df(trajectory_df, name="Trajectory")
-    baseline = _require_df(baseline_df, name="Baseline")
-    x_metric = _first_metric(trajectory, "x_metric")
-    y_metric = _first_metric(trajectory, "y_metric")
     if "particle_id" not in trajectory.columns:
         raise ValueError(
             "Trajectory particle_id not available; rerun with sample.output.save_trace=true and particle tracking."
         )
-    particle_values = pd.to_numeric(trajectory["particle_id"], errors="coerce")
-    if particle_values.isna().all():
-        raise ValueError(
-            "Trajectory particle_id not available; rerun with sample.output.save_trace=true and particle tracking."
-        )
-    if particle_values.isna().any():
-        raise ValueError("Trajectory particle_id values must be numeric when present.")
+    particle_values = _require_numeric(trajectory, "particle_id", context="Trajectory")
     if "sweep_idx" in trajectory.columns:
-        sweep_series = pd.to_numeric(trajectory["sweep_idx"], errors="coerce")
-        if sweep_series.isna().any():
-            raise ValueError("Trajectory sweep_idx values must be numeric for particle plot.")
-        plot_df = trajectory.copy()
-        plot_df["sweep"] = sweep_series.astype(int)
+        sweep_values = _require_numeric(trajectory, "sweep_idx", context="Trajectory")
     elif "sweep" in trajectory.columns:
-        plot_df = trajectory.copy()
-        plot_df["sweep"] = pd.to_numeric(plot_df["sweep"], errors="coerce").astype(int)
+        sweep_values = _require_numeric(trajectory, "sweep", context="Trajectory")
     else:
-        raise ValueError("Trajectory points must include sweep or sweep_idx for particle plot.")
-    plot_df["particle_id"] = particle_values.astype(int)
-    if "slot_id" in plot_df.columns:
-        plot_df["slot_id"] = pd.to_numeric(plot_df["slot_id"], errors="coerce")
-    else:
-        plot_df["slot_id"] = np.nan
+        raise ValueError("Trajectory points must include sweep_idx for trajectory plotting.")
+    raw_llr_values = _require_numeric(trajectory, "raw_llr_objective", context="Trajectory")
     if not isinstance(alpha_min, (int, float)) or not isinstance(alpha_max, (int, float)):
         raise ValueError("Particle alpha bounds must be numeric.")
     alpha_lo = float(alpha_min)
@@ -462,23 +88,36 @@ def plot_opt_trajectory_particles(
     if alpha_lo < 0 or alpha_hi > 1 or alpha_lo > alpha_hi:
         raise ValueError("Particle alpha bounds must satisfy 0 <= min <= max <= 1.")
 
-    base_x, base_y, _, _, _, _ = project_scores(baseline, tf_names)
-    fig, ax = plt.subplots(figsize=(6.8, 5.1))
-    ax.scatter(base_x, base_y, s=8, c="#c9c9c9", alpha=0.28, edgecolors="none", label="random baseline")
+    plot_df = trajectory.copy()
+    plot_df["particle_id"] = particle_values.astype(int)
+    plot_df["sweep_idx"] = sweep_values.astype(int)
+    plot_df["raw_llr_objective"] = raw_llr_values.astype(float)
+    if "slot_id" in plot_df.columns:
+        slot_values = pd.to_numeric(plot_df["slot_id"], errors="coerce")
+        if slot_values.notna().any() and slot_values.isna().any():
+            raise ValueError("Trajectory slot_id must be numeric when provided.")
+        plot_df["slot_id"] = slot_values
+    else:
+        plot_df["slot_id"] = np.nan
 
     sampled = _sample_rows(plot_df, stride=max(1, int(stride)), group_col="particle_id")
-    sweep_values = sampled["sweep"].astype(float)
-    sweep_min = float(sweep_values.min())
-    sweep_span = float(sweep_values.max() - sweep_min)
-    particle_ids = sorted(int(pid) for pid in sampled["particle_id"].unique())
+    particle_ids = sorted(int(v) for v in sampled["particle_id"].unique())
+    if not particle_ids:
+        raise ValueError("Trajectory plot requires at least one particle_id.")
+
+    sweep_float = sampled["sweep_idx"].astype(float)
+    sweep_min = float(sweep_float.min())
+    sweep_span = float(sweep_float.max() - sweep_min)
+
+    fig, ax = plt.subplots(figsize=(6.8, 5.1))
     cmap = plt.get_cmap("tab20", max(1, len(particle_ids)))
     for idx, particle_id in enumerate(particle_ids):
-        particle_df = sampled[sampled["particle_id"].astype(int) == particle_id].sort_values("sweep")
+        particle_df = sampled[sampled["particle_id"].astype(int) == particle_id].sort_values("sweep_idx")
         if particle_df.empty:
             continue
-        x = particle_df["x"].astype(float).to_numpy()
-        y = particle_df["y"].astype(float).to_numpy()
-        sweeps = particle_df["sweep"].astype(float).to_numpy()
+        x = particle_df["sweep_idx"].astype(float).to_numpy()
+        y = particle_df["raw_llr_objective"].astype(float).to_numpy()
+        sweeps = particle_df["sweep_idx"].astype(float).to_numpy()
         rgb = cmap(idx % cmap.N)
         if x.size >= 2:
             for seg_idx in range(1, x.size):
@@ -492,7 +131,7 @@ def plot_opt_trajectory_particles(
                     y[seg_idx - 1 : seg_idx + 1],
                     color=(rgb[0], rgb[1], rgb[2], alpha),
                     linewidth=1.2,
-                    zorder=4,
+                    zorder=3,
                 )
         if sweep_span <= 0:
             alphas = np.full(x.size, 0.60, dtype=float)
@@ -506,42 +145,31 @@ def plot_opt_trajectory_particles(
                 np.asarray(alphas, dtype=float),
             ]
         )
-        ax.scatter(x, y, s=16, c=colors, edgecolors="none", zorder=5)
+        ax.scatter(x, y, s=16, c=colors, edgecolors="none", zorder=4)
 
-    if elite_centroid is not None:
-        ax.scatter(
-            [elite_centroid[0]],
-            [elite_centroid[1]],
-            s=84,
-            marker="*",
-            color="#f58518",
-            zorder=8,
-            label="elite median",
-        )
+    max_particle = max(particle_ids)
+    ax.plot([], [], color="#333333", linewidth=1.2, label=f"particle lineage (id=0..{max_particle})")
 
-    if particle_ids:
-        max_particle = max(particle_ids)
-        ax.plot([], [], color="#333333", linewidth=1.2, label=f"particle lineage (id=0..{max_particle})")
-    if slot_overlay and "slot_id" in sampled.columns:
+    if slot_overlay:
         marker_cycle = ["o", "s", "^", "D", "P", "X", "v", "<", ">"]
         slot_rows = sampled.dropna(subset=["slot_id"]).copy()
-        slot_rows["slot_id"] = slot_rows["slot_id"].astype(int)
-        slot_ids = sorted(int(slot) for slot in slot_rows["slot_id"].unique())
-        marker_map = {slot: marker_cycle[idx % len(marker_cycle)] for idx, slot in enumerate(slot_ids)}
-        for slot_id in slot_ids:
-            slot_df = slot_rows[slot_rows["slot_id"].astype(int) == slot_id]
-            ax.scatter(
-                slot_df["x"].astype(float),
-                slot_df["y"].astype(float),
-                s=20,
-                marker=marker_map[slot_id],
-                facecolors="none",
-                edgecolors="#222222",
-                linewidth=0.45,
-                alpha=0.35,
-                zorder=6,
-            )
-        if marker_map:
+        if not slot_rows.empty:
+            slot_rows["slot_id"] = slot_rows["slot_id"].astype(int)
+            slot_ids = sorted(int(slot) for slot in slot_rows["slot_id"].unique())
+            marker_map = {slot: marker_cycle[idx % len(marker_cycle)] for idx, slot in enumerate(slot_ids)}
+            for slot_id in slot_ids:
+                slot_df = slot_rows[slot_rows["slot_id"].astype(int) == slot_id]
+                ax.scatter(
+                    slot_df["sweep_idx"].astype(float),
+                    slot_df["raw_llr_objective"].astype(float),
+                    s=20,
+                    marker=marker_map[slot_id],
+                    facecolors="none",
+                    edgecolors="#222222",
+                    linewidth=0.45,
+                    alpha=0.35,
+                    zorder=5,
+                )
             mapping = ", ".join(f"{slot}:{marker}" for slot, marker in marker_map.items())
             ax.text(
                 0.02,
@@ -554,93 +182,16 @@ def plot_opt_trajectory_particles(
                 color="#4a4a4a",
             )
 
-    _set_axes_and_title(
-        ax,
-        x_metric=x_metric,
-        y_metric=y_metric,
-        tf_names=tf_names,
-        score_scale=score_scale,
-        suffix="particle-lineage",
-        identity_mode=identity_mode,
-    )
+    ax.set_xlabel("Sweep index")
+    ax.set_ylabel("Raw LLR objective")
+    ax.set_title("Optimization trajectory (particle lineage)")
     legend_labels = _legend_labels(ax)
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
     plt.close(fig)
     return {
-        "mode": "particles",
+        "mode": "particle_raw_llr",
         "legend_labels": legend_labels,
         "particle_count": len(particle_ids),
     }
-
-
-def plot_opt_trajectory(
-    trajectory_df: pd.DataFrame,
-    baseline_df: pd.DataFrame,
-    tf_names: Iterable[str],
-    out_path: Path,
-    *,
-    identity_mode: str | None,
-    elite_centroid: tuple[float, float] | None,
-    score_scale: str | None,
-    dpi: int,
-    png_compress_level: int,
-    style: str = "story",
-    selected_df: pd.DataFrame | None = None,
-    consensus_anchors: list[dict[str, object]] | None = None,
-    stride_story: int = 50,
-    stride_debug: int = 10,
-    stride_particles: int = 10,
-    baseline_mode: str = "hexbin",
-    show_all_chains: bool = False,
-    particle_alpha_min: float = 0.15,
-    particle_alpha_max: float = 0.95,
-    slot_overlay: bool = False,
-) -> dict[str, object]:
-    style_name = str(style).strip().lower()
-    if style_name == "story":
-        return plot_opt_trajectory_story(
-            trajectory_df=trajectory_df,
-            baseline_df=baseline_df,
-            selected_df=selected_df,
-            consensus_anchors=consensus_anchors,
-            tf_names=tf_names,
-            out_path=out_path,
-            score_scale=score_scale,
-            dpi=dpi,
-            png_compress_level=png_compress_level,
-            stride=stride_story,
-            baseline_mode=baseline_mode,
-        )
-    if style_name == "debug":
-        return plot_opt_trajectory_debug(
-            trajectory_df=trajectory_df,
-            baseline_df=baseline_df,
-            tf_names=tf_names,
-            out_path=out_path,
-            identity_mode=identity_mode,
-            elite_centroid=elite_centroid,
-            score_scale=score_scale,
-            dpi=dpi,
-            png_compress_level=png_compress_level,
-            stride=stride_debug,
-            show_all_chains=show_all_chains,
-        )
-    if style_name == "particles":
-        return plot_opt_trajectory_particles(
-            trajectory_df=trajectory_df,
-            baseline_df=baseline_df,
-            tf_names=tf_names,
-            out_path=out_path,
-            identity_mode=identity_mode,
-            elite_centroid=elite_centroid,
-            score_scale=score_scale,
-            dpi=dpi,
-            png_compress_level=png_compress_level,
-            stride=stride_particles,
-            alpha_min=particle_alpha_min,
-            alpha_max=particle_alpha_max,
-            slot_overlay=slot_overlay,
-        )
-    raise ValueError(f"Unsupported trajectory plot style '{style}'. Use 'story', 'debug', or 'particles'.")

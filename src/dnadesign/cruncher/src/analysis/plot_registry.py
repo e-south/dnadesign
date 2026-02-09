@@ -27,28 +27,12 @@ class PlotSpec:
 
 PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
-        "opt_trajectory_story",
-        "Optimization trajectory (story)",
-        ("sequences", "baseline"),
-        ("plot__opt_trajectory_story.{ext}",),
+        "opt_trajectory",
+        "Optimization trajectory",
+        ("sequences",),
+        ("plot__opt_trajectory.{ext}",),
         "summary",
-        "Story view: baseline density, best-so-far progression, selected top-k, and consensus anchors.",
-    ),
-    PlotSpec(
-        "opt_trajectory_debug",
-        "Optimization trajectory (debug)",
-        ("sequences", "baseline"),
-        ("plot__opt_trajectory_debug.{ext}",),
-        "diagnostics",
-        "Debug view: temperature-slot occupancy diagnostics and phase markers (non-causal).",
-    ),
-    PlotSpec(
-        "opt_trajectory_particles",
-        "Optimization trajectory (particles)",
-        ("sequences", "baseline"),
-        ("plot__opt_trajectory_particles.{ext}",),
-        "summary",
-        "Causal particle lineage view with persistent state identity over sweeps.",
+        "Causal particle lineage view: raw LLR objective over sweep index.",
     ),
     PlotSpec(
         "elites_nn_distance",

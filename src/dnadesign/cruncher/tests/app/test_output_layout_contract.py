@@ -135,12 +135,6 @@ def test_analysis_tables_and_plots_use_flat_semantic_filenames(tmp_path: Path) -
     assert analysis_table_path(analysis_dir, "scores_summary", "parquet") == (
         analysis_dir / "analysis" / "table__scores_summary.parquet"
     )
-    assert analysis_plot_path(analysis_dir, "opt_trajectory_story", "png") == (
-        analysis_dir / "plots" / "plot__opt_trajectory_story.png"
-    )
-    assert analysis_plot_path(analysis_dir, "opt_trajectory_debug", "png") == (
-        analysis_dir / "plots" / "plot__opt_trajectory_debug.png"
-    )
-    assert analysis_plot_path(analysis_dir, "opt_trajectory_particles", "png") == (
-        analysis_dir / "plots" / "plot__opt_trajectory_particles.png"
+    assert analysis_plot_path(analysis_dir, "opt_trajectory", "png") == (
+        analysis_dir / "plots" / "plot__opt_trajectory.png"
     )

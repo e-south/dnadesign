@@ -100,9 +100,7 @@ Key files:
 - `analysis/summary.json`
 - `analysis/report.md`
 - `analysis/report.json`
-- curated plots in `plots/`: `plot__opt_trajectory_story.*`,
-  `plot__opt_trajectory_debug.*`,
-  `plot__opt_trajectory_particles.*`,
+- curated plots in `plots/`: `plot__opt_trajectory.*`,
   `plot__elites_nn_distance.*`, `plot__overlap_panel.*`
   (and `plot__health_panel.*` if a trace is present)
 - analysis tables in `analysis/` use `table__*` filenames (for example
