@@ -191,9 +191,15 @@ def compute_elites_nn_distance_table(
             mean = None
             min_val = None
         else:
-            nn = float(np.nanmin(other))
-            mean = float(np.nanmean(other))
-            min_val = nn
+            finite_other = other[np.isfinite(other)]
+            if finite_other.size == 0:
+                nn = None
+                mean = None
+                min_val = None
+            else:
+                nn = float(np.min(finite_other))
+                mean = float(np.mean(finite_other))
+                min_val = nn
         rows.append(
             {
                 "elite_id": elite_id,
@@ -245,7 +251,10 @@ def compute_baseline_nn_distances(
         other = np.delete(row, i)
         if other.size == 0:
             continue
-        nn_vals.append(float(np.nanmin(other)))
+        finite_other = other[np.isfinite(other)]
+        if finite_other.size == 0:
+            continue
+        nn_vals.append(float(np.min(finite_other)))
     return np.asarray(nn_vals, dtype=float)
 
 

@@ -34,8 +34,14 @@ def _validate_numeric(series: pd.Series, *, column: str) -> pd.Series:
 
 
 def _softmin(values: np.ndarray, beta: float) -> float:
-    scaled = -beta * values
+    finite_values = np.asarray(values, dtype=float)
+    finite_values = finite_values[np.isfinite(finite_values)]
+    if finite_values.size == 0:
+        return float("nan")
+    scaled = -beta * finite_values
     max_scaled = float(np.max(scaled))
+    if not np.isfinite(max_scaled):
+        return float("nan")
     logsum = max_scaled + float(np.log(np.exp(scaled - max_scaled).sum()))
     return float(-logsum / beta)
 

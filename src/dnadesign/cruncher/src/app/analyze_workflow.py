@@ -781,33 +781,42 @@ def run_analyze(
         plot_trajectory_path = analysis_plot_path(tmp_root, "chain_trajectory_scatter", plot_format)
         plot_trajectory_sweep_path = analysis_plot_path(tmp_root, "chain_trajectory_sweep", plot_format)
         if trajectory_lines_df.empty:
-            raise ValueError("Chain trajectory points are required for trajectory plot.")
-        plot_chain_trajectory_scatter(
-            trajectory_df=trajectory_lines_df,
-            baseline_df=baseline_plot_df,
-            tf_pair=trajectory_tf_pair,
-            scatter_scale=trajectory_scale,
-            consensus_anchors=consensus_anchors,
-            out_path=plot_trajectory_path,
-            stride=analysis_cfg.trajectory_stride,
-            alpha_min=analysis_cfg.trajectory_particle_alpha_min,
-            alpha_max=analysis_cfg.trajectory_particle_alpha_max,
-            slot_overlay=analysis_cfg.trajectory_chain_overlay,
-            **plot_kwargs,
-        )
-        _record_plot("chain_trajectory_scatter", plot_trajectory_path, True, None)
-        plot_chain_trajectory_sweep(
-            trajectory_df=trajectory_lines_df,
-            y_column=str(analysis_cfg.trajectory_sweep_y_column),
-            y_mode=str(analysis_cfg.trajectory_sweep_mode),
-            out_path=plot_trajectory_sweep_path,
-            stride=analysis_cfg.trajectory_stride,
-            alpha_min=analysis_cfg.trajectory_particle_alpha_min,
-            alpha_max=analysis_cfg.trajectory_particle_alpha_max,
-            slot_overlay=analysis_cfg.trajectory_chain_overlay,
-            **plot_kwargs,
-        )
-        _record_plot("chain_trajectory_sweep", plot_trajectory_sweep_path, True, None)
+            _record_plot("chain_trajectory_scatter", plot_trajectory_path, False, "trajectory table is empty")
+            _record_plot("chain_trajectory_sweep", plot_trajectory_sweep_path, False, "trajectory table is empty")
+        else:
+            try:
+                plot_chain_trajectory_scatter(
+                    trajectory_df=trajectory_lines_df,
+                    baseline_df=baseline_plot_df,
+                    tf_pair=trajectory_tf_pair,
+                    scatter_scale=trajectory_scale,
+                    consensus_anchors=consensus_anchors,
+                    out_path=plot_trajectory_path,
+                    stride=analysis_cfg.trajectory_stride,
+                    alpha_min=analysis_cfg.trajectory_particle_alpha_min,
+                    alpha_max=analysis_cfg.trajectory_particle_alpha_max,
+                    slot_overlay=analysis_cfg.trajectory_chain_overlay,
+                    **plot_kwargs,
+                )
+                _record_plot("chain_trajectory_scatter", plot_trajectory_path, True, None)
+            except ValueError as exc:
+                _record_plot("chain_trajectory_scatter", plot_trajectory_path, False, str(exc))
+
+            try:
+                plot_chain_trajectory_sweep(
+                    trajectory_df=trajectory_lines_df,
+                    y_column=str(analysis_cfg.trajectory_sweep_y_column),
+                    y_mode=str(analysis_cfg.trajectory_sweep_mode),
+                    out_path=plot_trajectory_sweep_path,
+                    stride=analysis_cfg.trajectory_stride,
+                    alpha_min=analysis_cfg.trajectory_particle_alpha_min,
+                    alpha_max=analysis_cfg.trajectory_particle_alpha_max,
+                    slot_overlay=analysis_cfg.trajectory_chain_overlay,
+                    **plot_kwargs,
+                )
+                _record_plot("chain_trajectory_sweep", plot_trajectory_sweep_path, True, None)
+            except ValueError as exc:
+                _record_plot("chain_trajectory_sweep", plot_trajectory_sweep_path, False, str(exc))
 
         plot_nn_path = analysis_plot_path(tmp_root, "elites_nn_distance", plot_format)
         plot_elites_nn_distance(nn_df, plot_nn_path, baseline_nn=pd.Series(baseline_nn), **plot_kwargs)

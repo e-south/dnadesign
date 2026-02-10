@@ -321,3 +321,59 @@ def test_demo_campaign_pair_local_only_generates_plots(tmp_path: Path) -> None:
     assert (campaign_dir / "plots" / "plot__pairgrid_overview.png").exists()
     assert (campaign_dir / "plots" / "plot__joint_trend.png").exists()
     assert (campaign_dir / "plots" / "plot__pareto_projection.png").exists()
+
+
+def test_demo_basics_low_budget_analyze_survives_nonfinite_trajectory(tmp_path: Path) -> None:
+    package_root = Path(__file__).resolve().parents[2]
+    demo_workspace = package_root / "workspaces" / "demo_basics_two_tf"
+    workspace = tmp_path / "demo_basics_two_tf"
+    shutil.copytree(demo_workspace, workspace)
+    shutil.rmtree(workspace / "outputs", ignore_errors=True)
+    shutil.rmtree(workspace / ".cruncher", ignore_errors=True)
+    (workspace / "outputs").mkdir(parents=True, exist_ok=True)
+
+    config_path = workspace / "config.yaml"
+    config_payload = yaml.safe_load(config_path.read_text())
+    cruncher_cfg = config_payload["cruncher"]
+    cruncher_cfg["catalog"]["root"] = str(workspace / ".cruncher" / "demo_basics_two_tf")
+    cruncher_cfg["sample"]["budget"]["tune"] = 180
+    cruncher_cfg["sample"]["budget"]["draws"] = 360
+    cruncher_cfg["sample"]["elites"]["k"] = 3
+    cruncher_cfg["analysis"]["max_points"] = 1000
+    config_path.write_text(yaml.safe_dump(config_payload))
+
+    result = runner.invoke(
+        app,
+        [
+            "fetch",
+            "motifs",
+            "--source",
+            "demo_local_meme",
+            "--tf",
+            "lexA",
+            "--tf",
+            "cpxR",
+            "--update",
+            "-c",
+            str(config_path),
+        ],
+    )
+    assert result.exit_code == 0
+
+    for command in (
+        ["lock", "-c", str(config_path)],
+        ["parse", "-c", str(config_path)],
+        ["sample", "-c", str(config_path)],
+        ["analyze", "--summary", "-c", str(config_path)],
+    ):
+        result = runner.invoke(app, command)
+        assert result.exit_code == 0
+
+    summary_file = workspace / "outputs" / "analysis" / "summary.json"
+    manifest_file = workspace / "outputs" / "analysis" / "plot_manifest.json"
+    assert summary_file.exists()
+    assert manifest_file.exists()
+
+    manifest_payload = json.loads(manifest_file.read_text())
+    plots = {entry["key"]: entry for entry in manifest_payload.get("plots", []) if isinstance(entry, dict)}
+    assert "chain_trajectory_sweep" in plots
