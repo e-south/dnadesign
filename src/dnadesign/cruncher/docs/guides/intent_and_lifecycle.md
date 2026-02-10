@@ -6,6 +6,8 @@
 - [Non-goals](#non-goals)
 - [Core behavior](#core-behavior)
 - [Math and scoring](#math-and-scoring)
+- [Per-sweep optimizer mechanics](#per-sweep-optimizer-mechanics)
+- [Why raw trajectories look noisy](#why-raw-trajectories-look-noisy)
 - [Diversity and elites](#diversity-and-elites)
 - [Run lifecycle](#run-lifecycle)
 - [Artifacts and outputs](#artifacts-and-outputs)
@@ -15,15 +17,17 @@
 
 ## Intent
 
-Cruncher designs **short, fixed-length DNA sequences** that jointly satisfy one or
-more transcription factor PWMs and returns a **diverse elite set**. The system is
-an optimization engine, not a posterior inference engine. It favors:
+Cruncher is an **artifact-first, reproducible DNA sequence optimizer** for
+**fixed-length** designs under **multi-transcription-factor PWM objectives**.
+It produces a **small, diverse elite set** of candidate sequences while
+preserving strict operational contracts. The system favors:
 
 - deterministic, auditable runs
 - strict input validation (no silent fallbacks)
 - reproducible artifacts and analysis
 
-**Practical mental model:** deterministic data prep + strict optimization + artifact-native analytics.
+**Practical mental model:** deterministic data prep + strict optimization +
+artifact-native analytics.
 
 ## Intended use cases
 
@@ -73,6 +77,56 @@ bidirectional scanning.
 Normalized scores use the PWM's theoretical max to map best-hit values into a
 0-1 scale (`normalized-llr`), enabling consistent thresholds across TFs.
 
+Per-TF scores are combined into a single optimization objective using
+`objective.combine` (`min` or `sum`). Optional soft-min shaping under
+`objective.softmin` uses:
+
+```
+softmin(v; beta) = -(1 / beta) * log(sum_i exp(-beta * v_i))
+```
+
+where larger `beta` makes the objective closer to hard `min`.
+
+## Per-sweep optimizer mechanics
+
+For each chain, Cruncher maintains a discrete sequence state:
+
+```
+x in {A, C, G, T}^L
+```
+
+with objective `f(x)`. At each sweep, the optimizer uses the configured inverse
+temperature `beta_mcmc` from `sample.optimizer.cooling`.
+
+Move behavior:
+
+1. `S` (single-site Gibbs): sample a base from a conditional distribution
+   proportional to `exp(beta_mcmc * f(.))` at that position. This move is
+   accepted by construction.
+2. `B/M/L/W/I` (block/multi/local rewrite variants): propose `x'` and accept
+   with Metropolis probability:
+
+```
+alpha = min(1, exp(beta_mcmc * (f(x') - f(x))))
+```
+
+This is why cooling and move mix jointly determine stability: temperature
+controls downhill tolerance, and move scale controls proposal jump size.
+
+## Why raw trajectories look noisy
+
+Raw chain paths are expected to jitter even when optimization is healthy:
+
+- Gibbs single-site moves always accept and can flip among near-tie bases.
+- The objective is rugged (`max` over windows, often `min` across TFs), so
+  small sequence edits can cause abrupt score changes.
+- Non-zero tail temperature still permits some downhill MH moves.
+- If adaptation is active, proposal behavior can drift during a run.
+
+For optimizer storytelling, interpret trajectory plots together with tail
+acceptance and elite outcomes. A monotone "best-so-far" overlay is often more
+informative than raw per-step score alone.
+
 ## Diversity and elites
 
 Elites are selected with **TFBS-core MMR**:
@@ -89,11 +143,11 @@ dedupe, and success counters.
 
 ## Run lifecycle
 
-1. **fetch** -> cache motifs/sites in the local catalog
-2. **lock** -> resolve TF names to exact cached artifacts and hashes
-3. **parse** -> validate locked PWMs (no logo rendering)
-4. **sample** -> Gibbs annealing optimization + elite selection + artifacts
-5. **analyze** -> curated `plot__*`/`table__*` artifacts + report from artifacts only
+1. **fetch** -> cache motif/site records in the local catalog
+2. **lock** -> resolve TF names to exact records + hashes (reproducibility pin)
+3. **parse** -> validate/canonicalize locked PWMs into parse artifacts
+4. **sample** -> run multi-chain Gibbs annealing and persist optimize artifacts
+5. **analyze** -> replay from artifacts only and write diagnostics/reports/plots
 
 The demo workflows in `docs/demos/` follow this lifecycle end-to-end.
 

@@ -6,6 +6,8 @@
 - [Fixed-length sampling model](#fixed-length-sampling-model)
 - [Fail-fast contracts](#fail-fast-contracts)
 - [Gibbs annealing optimization model](#gibbs-annealing-optimization-model)
+- [What The Optimizer Is Optimizing](#what-the-optimizer-is-optimizing)
+- [Interpreting Noisy Trajectories](#interpreting-noisy-trajectories)
 - [Elites: filter -> MMR select](#elites-filter--mmr-select)
 - [Analysis outputs](#analysis-outputs)
 - [Diagnostics quick read](#diagnostics-quick-read)
@@ -76,6 +78,65 @@ Terminology alignment with common methods:
 - `gibbs_anneal` = Gibbs/Metropolis sequence proposals under an explicit cooling schedule
 - chain diagnostics are interpreted per chain over sweep index
 - tune windows adapt proposal mechanics; draw windows produce the retained sample set
+
+## What The Optimizer Is Optimizing
+
+Each chain maintains sequence state:
+
+```
+x in {A, C, G, T}^L
+```
+
+with objective `f(x)` built from PWM best-window scores across TFs.
+
+Scoring mechanics:
+
+- Scan windows per TF (optionally both strands via `objective.bidirectional=true`).
+- Select the best window per TF with deterministic tie-breaks.
+- Combine per-TF values using `objective.combine` (`min` or `sum`), optionally
+  shaped with soft-min:
+
+```
+softmin(v; beta) = -(1 / beta) * log(sum_i exp(-beta * v_i))
+```
+
+If using log-probability scoring (`score_scale=logp`), best-window p-values are
+adjusted to sequence-level p-values:
+
+```
+p_seq = 1 - (1 - p_win)^n_tests
+```
+
+Move acceptance:
+
+- `S` (single-site Gibbs): sample from a conditional distribution proportional
+  to `exp(beta_mcmc * f(.))`; accepted by construction.
+- `B/M/L/W/I`: Metropolis acceptance:
+
+```
+alpha = min(1, exp(beta_mcmc * (f(x') - f(x))))
+```
+
+So trajectory stability is controlled by both cooling (`beta_mcmc`) and move
+proposal scale/mix.
+
+## Interpreting Noisy Trajectories
+
+Raw chain traces can look jumpy even when optimization is healthy:
+
+- Gibbs single-site updates are always accepted.
+- The objective is rugged due to max-over-windows and cross-TF aggregation.
+- Finite tail temperature still allows some downhill MH transitions.
+- Adaptive proposal mechanics can change local behavior during a run.
+
+For optimization narrative, prioritize:
+
+- final/best elite quality and constraints
+- tail acceptance diagnostics (`acceptance_rate_mh_tail`)
+- diversity tables (`elites_mmr_summary`, `elites_nn_distance`)
+
+Treat raw trajectory plots as exploration diagnostics, not monotone progress
+curves.
 
 ## Elites: filter -> MMR select
 
