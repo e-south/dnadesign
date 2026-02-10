@@ -356,7 +356,8 @@ Notes:
 * `sample.output.save_sequences: true` is required for later analysis.
 * `sample.output.save_trace: true` enables trace-based diagnostics.
 * `sample.output.save_trace: false` skips ArviZ trace construction and reduces sample runtime/memory overhead.
-* Sampling uses the internal parallel tempering kernel; there is no optimizer selection in the config.
+* Sampling uses `sample.optimizer.*` (`kind: gibbs_anneal`) with chain count and cooling schedule under one explicit surface.
+* Replica exchange is disabled in `gibbs_anneal`; chains are tracked directly in trajectory outputs.
 * `--verbose` enables periodic progress logging; `--debug` enables very verbose debug logs.
 
 ---
@@ -395,12 +396,12 @@ Preconditions:
 Outputs:
 
 * tables: `analysis/table__scores_summary.parquet`, `analysis/table__elites_topk.parquet`,
-  `analysis/table__metrics_joint.parquet`, `analysis/table__opt_trajectory_points.parquet`,
-  `analysis/table__opt_trajectory_particles.parquet`,
+  `analysis/table__metrics_joint.parquet`, `analysis/table__chain_trajectory_points.parquet`,
+  `analysis/table__chain_trajectory_lines.parquet`,
   `analysis/table__diagnostics_summary.json`, `analysis/table__objective_components.json`,
   `analysis/table__elites_mmr_summary.parquet`, `analysis/table__elites_nn_distance.parquet`
-* plots: `plots/plot__opt_trajectory.<plot_format>`,
-  `plots/plot__opt_trajectory_sweep.<plot_format>`,
+* plots: `plots/plot__chain_trajectory_scatter.<plot_format>`,
+  `plots/plot__chain_trajectory_sweep.<plot_format>`,
   `plots/plot__elites_nn_distance.<plot_format>`, `plots/plot__overlap_panel.<plot_format>`,
   `plots/plot__health_panel.<plot_format>` (trace only)
 * reports: `analysis/report.json`, `analysis/report.md`
@@ -437,7 +438,7 @@ Notes:
 * plot output status is refreshed from disk so missing files are shown accurately
 * the Refresh button re-scans analysis entries and updates plot/table status without restarting marimo
 * the notebook infers `run_dir` from its location; keep it under `<run_dir>/` or regenerate it
-* plots are loaded from `analysis/plot_manifest.json`; the curated keys are `opt_trajectory`, `opt_trajectory_sweep`, `elites_nn_distance`, plus optional `overlap_panel` and `health_panel` entries when generated
+* plots are loaded from `analysis/plot_manifest.json`; the curated keys are `chain_trajectory_scatter`, `chain_trajectory_sweep`, `elites_nn_distance`, plus optional `overlap_panel` and `health_panel` entries when generated
 * the notebook includes:
   * Overview tab with run metadata and explicit warnings for missing/invalid analysis artifacts
   * Tables tab with a Top-K slider and per-table previews from `analysis/table_manifest.json`
@@ -815,7 +816,7 @@ Example:
 
 Note:
 
-* Cruncher uses parallel tempering internally; this list is informational for kernel development.
+* Cruncher defaults to `gibbs_anneal`; this list is informational for kernel development.
 
 ---
 

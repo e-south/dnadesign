@@ -170,7 +170,7 @@ ingest:
 
 ## sample
 
-Fixed-length sampling with PT-only optimization and MMR elite selection.
+Fixed-length sampling with gibbs annealing optimization and MMR elite selection.
 
 ```yaml
 sample:
@@ -229,20 +229,12 @@ sample:
         target_low: 0.25
         target_high: 0.75
 
-  pt:
-    n_temps: 3
-    temp_max: 8.0
-    swap_stride: 4
-    adapt:
-      enabled: true
-      target_swap: 0.25
-      window: 50
-      k: 0.5
-      min_scale: 0.25
-      max_scale: 4.0
-      strict: false
-      saturation_windows: 5
-      stop_after_tune: true
+  optimizer:
+    kind: gibbs_anneal
+    chains: 3
+    cooling:
+      kind: fixed
+      beta: 1.0
 
   elites:
     k: 10
@@ -269,8 +261,9 @@ Notes:
 - Canonicalization is automatic when `objective.bidirectional=true`.
 - MMR distance is TFBS-core weighted Hamming (tolerant weighting, low-information positions emphasized).
 - `moves.overrides.*` contains optional expert controls (operator mix + adaptation). Leave unset unless you are actively tuning proposals.
-- Set `pt.adapt.strict=true` to fail the run when PT ladder adaptation saturates at `max_scale` for too many windows.
-- `pt.adapt.stop_after_tune=true` updates the PT ladder only during tune sweeps; draw sweeps use the frozen ladder.
+- `sample.optimizer.kind` currently supports `gibbs_anneal`.
+- `sample.optimizer.chains` controls the number of independently initialized chains.
+- `sample.optimizer.cooling.kind` controls the MCMC beta schedule (`fixed`, `linear`, or `piecewise`).
 
 ## analysis
 
@@ -296,11 +289,11 @@ analysis:
 ```
 
 Notes:
-- `analysis.pairwise` selects the TF pair used for the trajectory scatter axes (`plot__opt_trajectory.*`).
+- `analysis.pairwise` selects the TF pair used for the trajectory scatter axes (`plot__chain_trajectory_scatter.*`).
 - `analysis.trajectory_scatter_scale` controls whether scatter axes use per-TF raw LLR or normalized LLR.
-- `analysis.trajectory_sweep_y_column` controls the y-axis for `plot__opt_trajectory_sweep.*`; each point is the combined per-TF objective at that sweep.
-- `plot__opt_trajectory_sweep.*` highlights cold-slot progression, draws dashed segments when particle lineage handoffs occur, and colors points by the current bottleneck TF when per-TF columns are available.
-- `analysis.trajectory_slot_overlay=true` overlays temperature-slot occupancy markers (diagnostic only; lineage edges remain particle-causal).
+- `analysis.trajectory_sweep_y_column` controls the y-axis for `plot__chain_trajectory_sweep.*`; each point is the combined per-TF objective at that sweep.
+- Trajectory plots are chain-centric: chains are rendered categorically, and lineage follows each chain across sweeps.
+- `analysis.trajectory_slot_overlay=true` overlays chain markers as a diagnostic layer.
 
 ## campaigns
 

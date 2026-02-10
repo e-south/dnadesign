@@ -34,7 +34,7 @@ an optimization engine, not a posterior inference engine. It favors:
 
 ## Non-goals
 
-- **Posterior inference:** PT/MCMC here is used as an optimization engine + diagnostics, not Bayesian inference.
+- **Posterior inference:** Gibbs annealing MCMC here is used as an optimization engine + diagnostics, not Bayesian inference.
 - **Variable-length design:** sequences are fixed length by contract.
 - **Motif discovery as the primary workflow:** discovery is supported (MEME/STREME integration), but Cruncher's core is sequence design under pinned PWMs.
 
@@ -42,7 +42,7 @@ an optimization engine, not a posterior inference engine. It favors:
 
 - **Fixed length** is a hard invariant: every candidate is exactly
   `sample.sequence_length`, and must be at least the widest PWM length.
-- **PT-only optimization**: parallel tempering MCMC explores sequence space.
+- **Gibbs annealing optimization**: chain-based MCMC explores sequence space under an explicit cooling schedule.
 - **Best-hit per TF**: each TF is scored by the best-scoring window in the
   sequence; bidirectional scans include both strands.
 - **Optimization objective**: the default objective prioritizes the weakest TF
@@ -92,7 +92,7 @@ dedupe, and success counters.
 1. **fetch** -> cache motifs/sites in the local catalog
 2. **lock** -> resolve TF names to exact cached artifacts and hashes
 3. **parse** -> validate locked PWMs (no logo rendering)
-4. **sample** -> PT optimization + elite selection + artifacts
+4. **sample** -> Gibbs annealing optimization + elite selection + artifacts
 5. **analyze** -> curated `plot__*`/`table__*` artifacts + report from artifacts only
 
 The demo workflows in `docs/demos/` follow this lifecycle end-to-end.
@@ -123,7 +123,7 @@ Each config block maps directly to a lifecycle phase or runtime contract:
 - `workspace` -> run layout and regulator set expansion
 - `catalog` -> which cached sources are eligible
 - `ingest` / `discover` -> how inputs are sourced or derived
-- `sample` -> optimization objective, PT settings, moves, elites
+- `sample` -> optimization objective, optimizer/cooling settings, moves, elites
 - `analysis` -> report generation and curated plot settings
 
 See the full key reference at `docs/reference/config.md`.
@@ -135,7 +135,7 @@ Crosswalk (behavior -> config -> modules -> artifacts):
 | Fetch motifs/sites (cache) | `catalog.*`, `ingest.*`, `discover.*` | `ingest/`, `store/` | `<catalog.root>/normalized/...` + `catalog.json` |
 | Pin exact inputs (lock) | `workspace.regulator_sets` or `campaigns[]` + `--campaign`, `catalog.*` | `store/`, `app/` | `<workspace>/.cruncher/locks/<config>.lock.json` |
 | Validate locked PWMs (parse) | (lockfile-driven) | `app/` | `<workspace>/.cruncher/parse/input/` |
-| PT optimization (sample) | `sample.*` | `core/`, `app/` | `<run_dir>/optimize/` + manifest/status updates |
+| Gibbs annealing optimization (sample) | `sample.*` | `core/`, `app/` | `<run_dir>/optimize/` + manifest/status updates |
 | Elite filter + TFBS-core MMR | `sample.elites.*` | `core/`, `app/` | `optimize/elites*.parquet` |
 | Artifact-only reporting (analyze) | `analysis.*` | `analysis/`, `app/` | `<run_dir>/analysis/` + `<run_dir>/plots/` |
 | Campaign expand + summarize | `campaigns[]`, `campaign` | `app/` | `outputs/campaign/<name>/{analysis,plots}` |

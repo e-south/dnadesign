@@ -18,7 +18,7 @@
 
 - Decoupled: core optimization is source-agnostic and runs offline.
 - Assertive: explicit errors for missing inputs, ambiguous TFs, invalid matrices.
-- Extendable: new sources and optimizers can be added via registries (v3 ships PT-only).
+- Extendable: new sources and optimizers can be added via registries (v3 defaults to `gibbs_anneal`).
 - Reproducible: lockfiles + run manifests + deterministic seeds.
 - Operational UX: clear CLI commands, deterministic cache, readable reports, crisp docs.
 - No fallbacks: no implicit legacy modes, no silent fallbacks, no hidden network access.
@@ -134,9 +134,9 @@ If a TF cannot be uniquely resolved, **cruncher** errors immediately. Analyze op
 - Deterministic RNG via `sample.seed` and run-level stable seeding.
 - Burn-in storage is optional via `sample.output.include_tune_in_sequences` (default: false, affects sequences.parquet only).
 - Fixed-length sampling: `sample.sequence_length` must be >= the widest PWM length.
-- PT-only kernel with ladder adaptation (`sample.pt.*`).
-- Each run reports move tallies, acceptance ratios, and swap acceptance rates.
-- PT ladder adaptation and softmin schedules are independent.
+- `gibbs_anneal` kernel with configurable chain count and cooling schedule (`sample.optimizer.*`).
+- Each run reports move tallies and acceptance ratios; chain trajectories are persisted for analysis.
+- Optimizer cooling and objective softmin schedules are independent.
 - Move policies are selected via `sample.moves.profile` with optional overrides.
 
 ---

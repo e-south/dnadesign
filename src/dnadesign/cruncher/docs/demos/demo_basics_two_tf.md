@@ -27,7 +27,7 @@ This demo designs fixed-length sequences that satisfy two PWMs (LexA + CpxR). It
 
 Cruncher scores each TF by the best PWM match anywhere in the sequence on either strand (when `objective.bidirectional=true`). It optimizes the weakest TF by default (`objective.combine=min`) and selects diverse elites via TFBS-core MMR.
 The demo builds MEME OOPS motifs from merged DAP-seq (`demo_local_meme`) + RegulonDB sites, then locks sampling to those discovered motifs. Sequence length is fixed at 16 bp, and sampling enforces `sample.motif_width.maxw=16` via max-information contiguous windowing.
-The bundled config uses targeted insertion proposals plus adaptive move weights/proposal sizing with strict PT adaptation (`n_temps=3`, `temp_max=10`, `swap_stride=8`) and a fixed softmin schedule (`beta_end=6`) for a less jumpy optimization trajectory.
+The bundled config uses targeted insertion proposals plus adaptive move weights/proposal sizing with a three-chain Gibbs annealing optimizer (`optimizer.kind=gibbs_anneal`, `optimizer.chains=3`, `cooling.kind=linear`) and a fixed softmin schedule (`beta_end=6`) for a less jumpy optimization trajectory.
 
 For the full intent, lifecycle, and config mapping, see [Intent + lifecycle](../guides/intent_and_lifecycle.md).
 
@@ -185,8 +185,8 @@ Key files:
 - `analysis/report.md`
 - `analysis/report.json`
 - motif logos under `logos/catalog/<run_name>/`
-- curated plots in `plots/`: `plot__opt_trajectory.*`,
-  `plot__opt_trajectory_sweep.*`, `plot__elites_nn_distance.*`, `plot__overlap_panel.*`
+- curated plots in `plots/`: `plot__chain_trajectory_scatter.*`,
+  `plot__chain_trajectory_sweep.*`, `plot__elites_nn_distance.*`, `plot__overlap_panel.*`
   (and `plot__health_panel.*` if a trace is present; `plot__overlap_panel.*` is skipped when `n_elites < 2`)
 - analysis tables in `analysis/` use `table__*` filenames (for example
   `table__scores_summary.parquet` and `table__metrics_joint.parquet`)

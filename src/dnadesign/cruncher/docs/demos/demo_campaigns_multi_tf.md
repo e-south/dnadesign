@@ -13,7 +13,7 @@
 ## Overview
 
 Campaigns expand regulator categories into explicit regulator sets. This demo runs a campaign directly with `--campaign` (no derived config required), then summarizes results across runs.
-The demo config enables adaptive move/proposal tuning with strict PT adaptation checks so campaign runs fail fast when PT tuning is unhealthy.
+The demo config enables adaptive move/proposal tuning with a multi-chain Gibbs annealing optimizer so campaign runs share one explicit cooling schedule surface (`sample.optimizer.*`).
 
 ## Demo setup
 

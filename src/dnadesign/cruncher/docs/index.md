@@ -10,14 +10,14 @@
 
 ## Overview
 
-Cruncher designs short, fixed-length DNA sequences that score highly across one or more TF PWMs, using parallel tempering MCMC and TFBS-core MMR to select a diverse elite set. Use the demos for end-to-end workflows and the references for precise schema/CLI behavior.
+Cruncher designs short, fixed-length DNA sequences that score highly across one or more TF PWMs, using Gibbs annealing and TFBS-core MMR to select a diverse elite set. Use the demos for end-to-end workflows and the references for precise schema/CLI behavior.
 
 **Intent (at a glance)**
 
 - **What it is:** an optimization engine for designing **short, fixed-length DNA** sequences that jointly satisfy one or more TF PWMs, then returning a **diverse elite set**.
 - **When to use:** multi-TF promoter/operator design under tight length constraints; motif-compatibility tradeoff exploration; producing a small, diverse candidate set for assays; campaign sweeps across many regulator sets + aggregate comparison.
 - **What it is not:** a posterior-inference engine (don't interpret traces as posterior samples); a variable-length designer; a motif discovery tool (use MEME/STREME for discovery, then ingest/lock).
-- **Mental model:** deterministic data prep (`fetch`/`lock`) + strict PT optimization (`sample`) + artifact-native analytics (`analyze`).
+- **Mental model:** deterministic data prep (`fetch`/`lock`) + strict Gibbs annealing optimization (`sample`) + artifact-native analytics (`analyze`).
 
 Start with [Intent + lifecycle](guides/intent_and_lifecycle.md) if you're new to Cruncher.
 
