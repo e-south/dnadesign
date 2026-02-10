@@ -663,6 +663,8 @@ class MoveAdaptiveWeightsConfig(StrictBaseModel):
     k: float = 0.5
     min_prob: float = 0.01
     max_prob: float = 0.95
+    freeze_after_sweep: int | None = None
+    freeze_after_beta: float | None = None
     targets: Dict[Literal["S", "B", "M", "L", "W", "I"], float] = {
         "S": 0.95,
         "B": 0.40,
@@ -677,6 +679,24 @@ class MoveAdaptiveWeightsConfig(StrictBaseModel):
         if v < 1:
             raise ValueError("moves.adaptive_weights.window must be >= 1")
         return int(v)
+
+    @field_validator("freeze_after_sweep")
+    @classmethod
+    def _check_freeze_after_sweep(cls, v: int | None) -> int | None:
+        if v is None:
+            return None
+        if not isinstance(v, int) or v < 0:
+            raise ValueError("moves.adaptive_weights.freeze_after_sweep must be >= 0")
+        return int(v)
+
+    @field_validator("freeze_after_beta")
+    @classmethod
+    def _check_freeze_after_beta(cls, v: float | None) -> float | None:
+        if v is None:
+            return None
+        if not isinstance(v, (int, float)) or v <= 0:
+            raise ValueError("moves.adaptive_weights.freeze_after_beta must be > 0")
+        return float(v)
 
     @field_validator("k")
     @classmethod
@@ -725,6 +745,8 @@ class MoveProposalAdaptConfig(StrictBaseModel):
     max_scale: float = 2.0
     target_low: float = 0.25
     target_high: float = 0.75
+    freeze_after_sweep: int | None = None
+    freeze_after_beta: float | None = None
 
     @field_validator("window")
     @classmethod
@@ -732,6 +754,24 @@ class MoveProposalAdaptConfig(StrictBaseModel):
         if v < 1:
             raise ValueError("moves.proposal_adapt.window must be >= 1")
         return int(v)
+
+    @field_validator("freeze_after_sweep")
+    @classmethod
+    def _check_freeze_after_sweep(cls, v: int | None) -> int | None:
+        if v is None:
+            return None
+        if not isinstance(v, int) or v < 0:
+            raise ValueError("moves.proposal_adapt.freeze_after_sweep must be >= 0")
+        return int(v)
+
+    @field_validator("freeze_after_beta")
+    @classmethod
+    def _check_freeze_after_beta(cls, v: float | None) -> float | None:
+        if v is None:
+            return None
+        if not isinstance(v, (int, float)) or v <= 0:
+            raise ValueError("moves.proposal_adapt.freeze_after_beta must be > 0")
+        return float(v)
 
     @field_validator("step", "min_scale", "max_scale")
     @classmethod
@@ -756,6 +796,20 @@ class MoveProposalAdaptConfig(StrictBaseModel):
         return self
 
 
+class MoveGibbsInertiaConfig(StrictBaseModel):
+    enabled: bool = False
+    kind: Literal["fixed", "linear"] = "linear"
+    p_stay_start: float = 0.0
+    p_stay_end: float = 0.0
+
+    @field_validator("p_stay_start", "p_stay_end")
+    @classmethod
+    def _check_probability(cls, v: float, info) -> float:
+        if not isinstance(v, (int, float)) or v < 0 or v > 1:
+            raise ValueError(f"moves.gibbs_inertia.{info.field_name} must be between 0 and 1")
+        return float(v)
+
+
 class MoveConfig(StrictBaseModel):
     block_len_range: Tuple[int, int] = (2, 6)
     multi_k_range: Tuple[int, int] = (2, 3)
@@ -775,6 +829,7 @@ class MoveConfig(StrictBaseModel):
     insertion_consensus_prob: float = 0.35
     adaptive_weights: MoveAdaptiveWeightsConfig = MoveAdaptiveWeightsConfig()
     proposal_adapt: MoveProposalAdaptConfig = MoveProposalAdaptConfig()
+    gibbs_inertia: MoveGibbsInertiaConfig = MoveGibbsInertiaConfig()
 
     @field_validator("block_len_range", "multi_k_range", "swap_len_range", mode="before")
     @classmethod
@@ -860,6 +915,7 @@ class MoveOverridesConfig(StrictBaseModel):
     insertion_consensus_prob: Optional[float] = None
     adaptive_weights: Optional[MoveAdaptiveWeightsConfig] = None
     proposal_adapt: Optional[MoveProposalAdaptConfig] = None
+    gibbs_inertia: Optional[MoveGibbsInertiaConfig] = None
 
     @field_validator("block_len_range", "multi_k_range", "swap_len_range", mode="before")
     @classmethod
@@ -1161,6 +1217,7 @@ class AnalysisConfig(StrictBaseModel):
     trajectory_sweep_y_column: Literal["raw_llr_objective", "objective_scalar", "norm_llr_objective"] = (
         "raw_llr_objective"
     )
+    trajectory_sweep_mode: Literal["best_so_far", "raw", "all"] = "best_so_far"
     trajectory_particle_alpha_min: float = 0.15
     trajectory_particle_alpha_max: float = 0.45
     trajectory_chain_overlay: bool = False

@@ -743,6 +743,7 @@ def run_analyze(
                 "trajectory_tf_pair": list(trajectory_tf_pair),
                 "trajectory_scatter_scale": trajectory_scale,
                 "trajectory_sweep_y_column": analysis_cfg.trajectory_sweep_y_column,
+                "trajectory_sweep_mode": analysis_cfg.trajectory_sweep_mode,
             },
         )
 
@@ -798,6 +799,7 @@ def run_analyze(
         plot_chain_trajectory_sweep(
             trajectory_df=trajectory_lines_df,
             y_column=str(analysis_cfg.trajectory_sweep_y_column),
+            y_mode=str(analysis_cfg.trajectory_sweep_mode),
             out_path=plot_trajectory_sweep_path,
             stride=analysis_cfg.trajectory_stride,
             alpha_min=analysis_cfg.trajectory_particle_alpha_min,

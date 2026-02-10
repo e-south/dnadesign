@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 from dnadesign.cruncher.analysis.plots._savefig import savefig
@@ -50,7 +51,15 @@ def plot_elites_nn_distance(
             lines.append(f"random-baseline NN median={float(baseline_vals.median()):.3f}")
         ax.text(0.5, 0.5, "\n".join(lines), ha="center", va="center", fontsize=10, color="#444444")
     else:
-        ax.hist(nn_vals, bins=20, color="#4c78a8", alpha=0.8, edgecolor="white", label="elites")
+        nn_min = float(nn_vals.min())
+        nn_med = float(nn_vals.median())
+        nn_max = float(nn_vals.max())
+        if np.isclose(nn_min, nn_max, rtol=0.0, atol=1e-12):
+            ax.bar([nn_min], [int(nn_vals.size)], width=0.8, color="#4c78a8", alpha=0.8, edgecolor="white")
+            ax.set_xlim(nn_min - 1.0, nn_max + 1.0)
+        else:
+            bins = min(20, max(5, int(round(np.sqrt(float(nn_vals.size))))))
+            ax.hist(nn_vals, bins=bins, color="#4c78a8", alpha=0.8, edgecolor="white", label="elites")
         if baseline_vals is not None and not baseline_vals.empty:
             baseline_median = float(baseline_vals.median())
             ax.axvline(
@@ -61,8 +70,6 @@ def plot_elites_nn_distance(
                 label="random-baseline NN median",
             )
 
-        nn_min = float(nn_vals.min())
-        nn_med = float(nn_vals.median())
         annotation = f"min={nn_min:.3f}\nmedian={nn_med:.3f}"
         ax.text(
             0.98,

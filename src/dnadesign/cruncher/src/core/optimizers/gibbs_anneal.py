@@ -156,6 +156,14 @@ class GibbsAnnealOptimizer(Optimizer):
         self.move_schedule = MoveSchedule(start=self.move_probs_start, end=end_probs)
         adaptive_moves_cfg = cfg.get("adaptive_weights") or {}
         self.adaptive_moves_enabled = bool(adaptive_moves_cfg.get("enabled", False))
+        freeze_moves_sweep = adaptive_moves_cfg.get("freeze_after_sweep")
+        freeze_moves_beta = adaptive_moves_cfg.get("freeze_after_beta")
+        self.move_adapt_freeze_after_sweep: int | None = (
+            int(freeze_moves_sweep) if freeze_moves_sweep is not None else None
+        )
+        self.move_adapt_freeze_after_beta: float | None = (
+            float(freeze_moves_beta) if freeze_moves_beta is not None else None
+        )
         self.move_controller = AdaptiveMoveController(
             enabled=self.adaptive_moves_enabled,
             window=int(adaptive_moves_cfg.get("window", 250)),
@@ -166,6 +174,14 @@ class GibbsAnnealOptimizer(Optimizer):
             kinds=tuple(adaptive_moves_cfg.get("kinds") or ("S", "B", "M", "I")),
         )
         proposal_adapt_cfg = cfg.get("proposal_adapt") or {}
+        freeze_prop_sweep = proposal_adapt_cfg.get("freeze_after_sweep")
+        freeze_prop_beta = proposal_adapt_cfg.get("freeze_after_beta")
+        self.proposal_adapt_freeze_after_sweep: int | None = (
+            int(freeze_prop_sweep) if freeze_prop_sweep is not None else None
+        )
+        self.proposal_adapt_freeze_after_beta: float | None = (
+            float(freeze_prop_beta) if freeze_prop_beta is not None else None
+        )
         self.proposal_controller = AdaptiveProposalController(
             enabled=bool(proposal_adapt_cfg.get("enabled", False)),
             window=int(proposal_adapt_cfg.get("window", 250)),
@@ -183,6 +199,13 @@ class GibbsAnnealOptimizer(Optimizer):
             window_pad=target_pad,
         )
         self.insertion_consensus_prob = float(cfg.get("insertion_consensus_prob", 0.5))
+        gibbs_inertia_cfg = cfg.get("gibbs_inertia") or {}
+        self.gibbs_inertia_enabled = bool(gibbs_inertia_cfg.get("enabled", False))
+        self.gibbs_inertia_kind = str(gibbs_inertia_cfg.get("kind") or "linear").strip().lower()
+        self.gibbs_inertia_p_stay_start = float(gibbs_inertia_cfg.get("p_stay_start", 0.0))
+        self.gibbs_inertia_p_stay_end = float(gibbs_inertia_cfg.get("p_stay_end", 0.0))
+        if self.gibbs_inertia_kind not in {"fixed", "linear"}:
+            raise ValueError(f"Unsupported gibbs_inertia kind: {self.gibbs_inertia_kind!r}")
 
         # Soft-min schedule (independent of MCMC cooling schedule)
         softmin_cfg = cfg.get("softmin") or {}
@@ -335,14 +358,20 @@ class GibbsAnnealOptimizer(Optimizer):
         # Burn‑in sweeps (record like Gibbs for consistency)
         for t in self.progress(range(T), desc="burn-in", leave=False, disable=not self.progress_bar):
             sweep_idx = t
+            beta_now = float(self.mcmc_beta_of(sweep_idx))
             beta_softmin = self.softmin_of(sweep_idx) if self.softmin_of else None
             base_move_probs = self.move_schedule.probs(sweep_idx / max(self.total_sweeps - 1, 1))
-            move_probs = self.move_controller.adapt(base_move_probs)
-            block_range, multi_range = self.proposal_controller.current_ranges(
-                self._base_block_len_range,
-                self._base_multi_k_range,
-                sequence_length=self.sequence_length,
-            )
+            move_adapt_frozen = self._is_move_adaptation_frozen(sweep_idx, beta_now)
+            proposal_adapt_frozen = self._is_proposal_adaptation_frozen(sweep_idx, beta_now)
+            move_probs = base_move_probs if move_adapt_frozen else self.move_controller.adapt(base_move_probs)
+            if proposal_adapt_frozen:
+                block_range, multi_range = self._base_block_len_range, self._base_multi_k_range
+            else:
+                block_range, multi_range = self.proposal_controller.current_ranges(
+                    self._base_block_len_range,
+                    self._base_multi_k_range,
+                    sequence_length=self.sequence_length,
+                )
             self.move_cfg["block_len_range"] = block_range
             self.move_cfg["multi_k_range"] = multi_range
             self.beta_ladder = self._current_beta_ladder(sweep_idx)
@@ -365,11 +394,14 @@ class GibbsAnnealOptimizer(Optimizer):
                     state=chain_state_objs[c],
                     scan_cache=scan_caches[c],
                     per_tf=per_tf_map,
+                    sweep_idx=sweep_idx,
                 )
                 current_per_tf_maps[c] = per_tf_map
                 current_scores.append(new_score)
-                self.move_controller.record(move_kind, accepted=accepted)
-                self.proposal_controller.record(move_kind, accepted=accepted)
+                if not move_adapt_frozen:
+                    self.move_controller.record(move_kind, accepted=accepted)
+                if not proposal_adapt_frozen:
+                    self.proposal_controller.record(move_kind, accepted=accepted)
                 self.move_stats.append(
                     {
                         "sweep_idx": int(sweep_idx),
@@ -381,6 +413,8 @@ class GibbsAnnealOptimizer(Optimizer):
                         "delta": move_detail.get("delta"),
                         "score_old": move_detail.get("score_old"),
                         "score_new": move_detail.get("score_new"),
+                        "delta_hamming": move_detail.get("delta_hamming"),
+                        "gibbs_changed": move_detail.get("gibbs_changed"),
                     }
                 )
 
@@ -403,14 +437,20 @@ class GibbsAnnealOptimizer(Optimizer):
         best_global: float | None = None
         for d in self.progress(range(D), desc="sampling", leave=False, disable=not self.progress_bar):
             sweep_idx = T + d
+            beta_now = float(self.mcmc_beta_of(sweep_idx))
             beta_softmin = self.softmin_of(sweep_idx) if self.softmin_of else None
             base_move_probs = self.move_schedule.probs(sweep_idx / max(self.total_sweeps - 1, 1))
-            move_probs = self.move_controller.adapt(base_move_probs)
-            block_range, multi_range = self.proposal_controller.current_ranges(
-                self._base_block_len_range,
-                self._base_multi_k_range,
-                sequence_length=self.sequence_length,
-            )
+            move_adapt_frozen = self._is_move_adaptation_frozen(sweep_idx, beta_now)
+            proposal_adapt_frozen = self._is_proposal_adaptation_frozen(sweep_idx, beta_now)
+            move_probs = base_move_probs if move_adapt_frozen else self.move_controller.adapt(base_move_probs)
+            if proposal_adapt_frozen:
+                block_range, multi_range = self._base_block_len_range, self._base_multi_k_range
+            else:
+                block_range, multi_range = self.proposal_controller.current_ranges(
+                    self._base_block_len_range,
+                    self._base_multi_k_range,
+                    sequence_length=self.sequence_length,
+                )
             self.move_cfg["block_len_range"] = block_range
             self.move_cfg["multi_k_range"] = multi_range
             self.beta_ladder = self._current_beta_ladder(sweep_idx)
@@ -435,11 +475,14 @@ class GibbsAnnealOptimizer(Optimizer):
                     state=chain_state_objs[c],
                     scan_cache=scan_caches[c],
                     per_tf=per_tf_map,
+                    sweep_idx=sweep_idx,
                 )
                 current_per_tf_maps[c] = per_tf_map
                 current_scores.append(new_score)
-                self.move_controller.record(move_kind, accepted=accepted)
-                self.proposal_controller.record(move_kind, accepted=accepted)
+                if not move_adapt_frozen:
+                    self.move_controller.record(move_kind, accepted=accepted)
+                if not proposal_adapt_frozen:
+                    self.proposal_controller.record(move_kind, accepted=accepted)
                 self.move_stats.append(
                     {
                         "sweep_idx": int(sweep_idx),
@@ -451,6 +494,8 @@ class GibbsAnnealOptimizer(Optimizer):
                         "delta": move_detail.get("delta"),
                         "score_old": move_detail.get("score_old"),
                         "score_new": move_detail.get("score_new"),
+                        "delta_hamming": move_detail.get("delta_hamming"),
+                        "gibbs_changed": move_detail.get("gibbs_changed"),
                     }
                 )
 
@@ -567,10 +612,12 @@ class GibbsAnnealOptimizer(Optimizer):
         state: SequenceState,
         scan_cache: LocalScanCache | None = None,
         per_tf: Dict[str, float] | None = None,
-    ) -> tuple[str, bool, Dict[str, float], float, Dict[str, float | None]]:
+        sweep_idx: int,
+    ) -> tuple[str, bool, Dict[str, float], float, Dict[str, object]]:
         """One Gibbs-style proposal/accept cycle at inverse-temperature β."""
 
         L = seq.size
+        seq_before = seq.copy()
         if per_tf is None:
             per_tf = evaluator(state)
         move_kind = self._sample_move_kind(rng, move_probs)
@@ -578,11 +625,25 @@ class GibbsAnnealOptimizer(Optimizer):
         accepted = False
         score_old = float(current_combined)
 
-        def _detail(score_new: float) -> Dict[str, float | None]:
-            return {
+        def _detail(
+            score_new: float,
+            *,
+            accepted_flag: bool,
+            gibbs_changed: bool | None = None,
+        ) -> Dict[str, object]:
+            delta_hamming = int(np.count_nonzero(seq != seq_before)) if accepted_flag else 0
+            payload: Dict[str, object] = {
                 "delta": float(score_new - score_old),
                 "score_old": score_old,
                 "score_new": float(score_new),
+                "delta_hamming": int(delta_hamming),
+            }
+            payload["gibbs_changed"] = bool(gibbs_changed) if gibbs_changed is not None else None
+            return payload
+
+        def _gibbs_detail(score_new: float, *, gibbs_changed: bool) -> Dict[str, object]:
+            return {
+                **_detail(score_new, accepted_flag=True, gibbs_changed=gibbs_changed),
             }
 
         target = self.targeting.maybe_target(
@@ -623,18 +684,26 @@ class GibbsAnnealOptimizer(Optimizer):
                 seq[i] = old
             lods -= lods.max()
             probs = np.exp(lods)
-            new_base = rng.choice(4, p=probs / probs.sum())
+            probs = probs / probs.sum()
+            p_stay = self._gibbs_stay_probability(sweep_idx)
+            if p_stay > 0:
+                one_hot = np.zeros(4, dtype=float)
+                one_hot[old] = 1.0
+                probs = (1.0 - p_stay) * probs + p_stay * one_hot
+                probs = probs / probs.sum()
+            new_base = rng.choice(4, p=probs)
             seq[i] = new_base
             if scan_cache is not None:
                 scan_cache.apply_base_change(i, old, int(new_base))
             self.accept_tally[move_kind] += 1
             accepted = True
+            gibbs_changed = int(new_base) != int(old)
             return (
                 move_kind,
                 accepted,
                 per_tf_candidates[int(new_base)],
                 float(combined_vals[new_base]),
-                _detail(float(combined_vals[new_base])),
+                _gibbs_detail(float(combined_vals[new_base]), gibbs_changed=gibbs_changed),
             )
 
         # Contiguous block replace
@@ -642,7 +711,7 @@ class GibbsAnnealOptimizer(Optimizer):
             mn, mx = self.move_cfg["block_len_range"]
             length = rng.integers(mn, mx + 1)
             if length > L:
-                return move_kind, False, per_tf, current_combined, _detail(current_combined)
+                return move_kind, False, per_tf, current_combined, _detail(current_combined, accepted_flag=False)
             start = targeted_start(seq_len=L, block_len=length, target=target_window, rng=rng)
             proposal = rng.integers(0, 4, size=length)
             old_block = seq[start : start + length].copy()
@@ -657,8 +726,8 @@ class GibbsAnnealOptimizer(Optimizer):
                 accepted = True
                 if scan_cache is not None:
                     scan_cache.rebuild(seq)
-                return move_kind, accepted, new_per_tf, new_f, _detail(new_f)
-            return move_kind, accepted, per_tf, current_combined, _detail(new_f)
+                return move_kind, accepted, new_per_tf, new_f, _detail(new_f, accepted_flag=True)
+            return move_kind, accepted, per_tf, current_combined, _detail(new_f, accepted_flag=False)
 
         # Multi‑site flip
         if move_kind == "M":
@@ -683,15 +752,15 @@ class GibbsAnnealOptimizer(Optimizer):
                 accepted = True
                 if scan_cache is not None:
                     scan_cache.rebuild(seq)
-                return move_kind, accepted, new_per_tf, new_f, _detail(new_f)
-            return move_kind, accepted, per_tf, current_combined, _detail(new_f)
+                return move_kind, accepted, new_per_tf, new_f, _detail(new_f, accepted_flag=True)
+            return move_kind, accepted, per_tf, current_combined, _detail(new_f, accepted_flag=False)
 
         if move_kind == "L":
             min_len, max_len = self.move_cfg["swap_len_range"]
             length = rng.integers(min_len, max_len + 1)
             max_shift = int(self.move_cfg["slide_max_shift"])
             if max_shift < 1 or length >= L:
-                return move_kind, False, per_tf, current_combined, _detail(current_combined)
+                return move_kind, False, per_tf, current_combined, _detail(current_combined, accepted_flag=False)
             shift = rng.integers(-max_shift, max_shift + 1)
             if shift == 0:
                 shift = 1 if rng.random() < 0.5 else -1
@@ -700,7 +769,7 @@ class GibbsAnnealOptimizer(Optimizer):
             else:
                 min_start, max_start = -shift, L - length
             if max_start < min_start:
-                return move_kind, False, per_tf, current_combined, _detail(current_combined)
+                return move_kind, False, per_tf, current_combined, _detail(current_combined, accepted_flag=False)
             start = targeted_start(seq_len=L, block_len=length, target=target_window, rng=rng)
             start = max(min_start, min(max_start, start))
             slide_window(seq, start, length, int(shift))
@@ -713,14 +782,14 @@ class GibbsAnnealOptimizer(Optimizer):
                 accepted = True
                 if scan_cache is not None:
                     scan_cache.rebuild(seq)
-                return move_kind, accepted, new_per_tf, new_f, _detail(new_f)
-            return move_kind, accepted, per_tf, current_combined, _detail(new_f)
+                return move_kind, accepted, new_per_tf, new_f, _detail(new_f, accepted_flag=True)
+            return move_kind, accepted, per_tf, current_combined, _detail(new_f, accepted_flag=False)
 
         if move_kind == "W":
             min_len, max_len = self.move_cfg["swap_len_range"]
             length = rng.integers(min_len, max_len + 1)
             if length >= L:
-                return move_kind, False, per_tf, current_combined, _detail(current_combined)
+                return move_kind, False, per_tf, current_combined, _detail(current_combined, accepted_flag=False)
             start_a = targeted_start(seq_len=L, block_len=length, target=target_window, rng=rng)
             max_tries = 10
             start_b = start_a
@@ -729,7 +798,7 @@ class GibbsAnnealOptimizer(Optimizer):
                 if abs(start_b - start_a) >= length:
                     break
             if abs(start_b - start_a) < length:
-                return move_kind, False, per_tf, current_combined, _detail(current_combined)
+                return move_kind, False, per_tf, current_combined, _detail(current_combined, accepted_flag=False)
             swap_block(seq, start_a, start_b, length)
             new_per_tf, new_f = evaluator.evaluate(state, beta=beta_softmin, length=L)
             swap_block(seq, start_a, start_b, length)
@@ -740,18 +809,18 @@ class GibbsAnnealOptimizer(Optimizer):
                 accepted = True
                 if scan_cache is not None:
                     scan_cache.rebuild(seq)
-                return move_kind, accepted, new_per_tf, new_f, _detail(new_f)
-            return move_kind, accepted, per_tf, current_combined, _detail(new_f)
+                return move_kind, accepted, new_per_tf, new_f, _detail(new_f, accepted_flag=True)
+            return move_kind, accepted, per_tf, current_combined, _detail(new_f, accepted_flag=False)
 
         # Motif insertion proposal
         tf_names = list(self.pwms.keys())
         if not tf_names:
-            return move_kind, False, per_tf, current_combined, _detail(current_combined)
+            return move_kind, False, per_tf, current_combined, _detail(current_combined, accepted_flag=False)
         tf_name = target_tf if target_tf in self.pwms else rng.choice(tf_names)
         pwm = self.pwms[tf_name]
         width = pwm.length
         if width > L:
-            return move_kind, False, per_tf, current_combined, _detail(current_combined)
+            return move_kind, False, per_tf, current_combined, _detail(current_combined, accepted_flag=False)
         start = targeted_start(seq_len=L, block_len=width, target=target_window, rng=rng)
         if rng.random() < self.insertion_consensus_prob:
             proposal = self._insertion_consensus[tf_name].copy()
@@ -771,8 +840,39 @@ class GibbsAnnealOptimizer(Optimizer):
             accepted = True
             if scan_cache is not None:
                 scan_cache.rebuild(seq)
-            return move_kind, accepted, new_per_tf, new_f, _detail(new_f)
-        return move_kind, accepted, per_tf, current_combined, _detail(new_f)
+            return move_kind, accepted, new_per_tf, new_f, _detail(new_f, accepted_flag=True)
+        return move_kind, accepted, per_tf, current_combined, _detail(new_f, accepted_flag=False)
+
+    def _is_move_adaptation_frozen(self, sweep_idx: int, beta_now: float) -> bool:
+        if self.move_adapt_freeze_after_sweep is not None and int(sweep_idx) >= int(self.move_adapt_freeze_after_sweep):
+            return True
+        if self.move_adapt_freeze_after_beta is not None and float(beta_now) >= float(
+            self.move_adapt_freeze_after_beta
+        ):
+            return True
+        return False
+
+    def _is_proposal_adaptation_frozen(self, sweep_idx: int, beta_now: float) -> bool:
+        if self.proposal_adapt_freeze_after_sweep is not None and int(sweep_idx) >= int(
+            self.proposal_adapt_freeze_after_sweep
+        ):
+            return True
+        if self.proposal_adapt_freeze_after_beta is not None and float(beta_now) >= float(
+            self.proposal_adapt_freeze_after_beta
+        ):
+            return True
+        return False
+
+    def _gibbs_stay_probability(self, sweep_idx: int) -> float:
+        if not self.gibbs_inertia_enabled:
+            return 0.0
+        if self.gibbs_inertia_kind == "fixed" or self.total_sweeps <= 1:
+            return float(np.clip(self.gibbs_inertia_p_stay_end, 0.0, 1.0))
+        frac = min(max(float(sweep_idx) / float(max(self.total_sweeps - 1, 1)), 0.0), 1.0)
+        value = self.gibbs_inertia_p_stay_start + frac * (
+            self.gibbs_inertia_p_stay_end - self.gibbs_inertia_p_stay_start
+        )
+        return float(np.clip(value, 0.0, 1.0))
 
     def _sample_move_kind(self, rng: np.random.Generator, move_probs: np.ndarray) -> str:
         return str(rng.choice(MOVE_KINDS, p=move_probs))
@@ -885,6 +985,14 @@ class GibbsAnnealOptimizer(Optimizer):
             "proposal_adapt_enabled": bool(self.proposal_controller.enabled),
             "proposal_block_len_range_final": list(self.move_cfg["block_len_range"]),
             "proposal_multi_k_range_final": list(self.move_cfg["multi_k_range"]),
+            "adaptive_weights_freeze_after_sweep": self.move_adapt_freeze_after_sweep,
+            "adaptive_weights_freeze_after_beta": self.move_adapt_freeze_after_beta,
+            "proposal_adapt_freeze_after_sweep": self.proposal_adapt_freeze_after_sweep,
+            "proposal_adapt_freeze_after_beta": self.proposal_adapt_freeze_after_beta,
+            "gibbs_inertia_enabled": bool(self.gibbs_inertia_enabled),
+            "gibbs_inertia_kind": self.gibbs_inertia_kind,
+            "gibbs_inertia_p_stay_start": self.gibbs_inertia_p_stay_start,
+            "gibbs_inertia_p_stay_end": self.gibbs_inertia_p_stay_end,
             "unique_successes": self.unique_successes,
             "move_stats": self.move_stats,
             "mcmc_cooling": dict(self.mcmc_cooling_summary),

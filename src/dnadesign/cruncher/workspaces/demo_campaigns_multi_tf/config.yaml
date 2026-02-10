@@ -188,6 +188,12 @@ cruncher:
           max_scale: 3.00
           target_low: 0.10
           target_high: 0.28
+          freeze_after_beta: 8.0
+        gibbs_inertia:
+          enabled: true
+          kind: linear
+          p_stay_start: 0.0
+          p_stay_end: 0.70
         move_schedule:
           enabled: true
           kind: linear
@@ -235,4 +241,5 @@ cruncher:
     table_format: parquet
     archive: false
     max_points: 5000
+    trajectory_sweep_mode: best_so_far
     trajectory_chain_overlay: false

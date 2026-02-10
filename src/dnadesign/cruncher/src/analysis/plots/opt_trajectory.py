@@ -273,6 +273,7 @@ def plot_chain_trajectory_sweep(
     *,
     trajectory_df: pd.DataFrame,
     y_column: str,
+    y_mode: str = "best_so_far",
     out_path: Path,
     dpi: int,
     png_compress_level: int,
@@ -287,10 +288,15 @@ def plot_chain_trajectory_sweep(
     alpha_hi = float(alpha_max)
     if alpha_lo < 0 or alpha_hi > 1 or alpha_lo > alpha_hi:
         raise ValueError("Chain alpha bounds must satisfy 0 <= min <= max <= 1.")
+    mode = str(y_mode).strip().lower()
+    if mode not in {"raw", "best_so_far", "all"}:
+        raise ValueError("y_mode must be one of: raw, best_so_far, all.")
 
     plot_df = _prepare_chain_df(trajectory_df)
     plot_df[y_column] = _require_numeric(plot_df, y_column, context="Trajectory")
     sampled = _sample_rows(plot_df, stride=max(1, int(stride)))
+    sampled_plot = sampled.copy()
+    sampled_plot["_y_plot"] = np.nan
 
     fig, ax = plt.subplots(figsize=(6.8, 5.1))
     chain_ids = sorted(int(v) for v in sampled["chain"].unique())
@@ -298,23 +304,67 @@ def plot_chain_trajectory_sweep(
     for idx, chain_id in enumerate(chain_ids):
         chain_df = sampled[sampled["chain"].astype(int) == chain_id].sort_values("sweep_idx")
         sweeps = chain_df["sweep_idx"].astype(float).to_numpy()
-        values = chain_df[y_column].astype(float).to_numpy()
+        raw_values = chain_df[y_column].astype(float).to_numpy()
+        best_values = np.maximum.accumulate(raw_values) if raw_values.size else raw_values
         rgb = cmap(idx % cmap.N)
-        ax.plot(sweeps, values, color=rgb, linewidth=1.5, alpha=0.8, label=f"chain {chain_id}")
-        if sweeps.size:
-            alphas = np.linspace(alpha_lo, alpha_hi, sweeps.size)
-            colors = np.column_stack(
-                [
-                    np.full(sweeps.size, rgb[0], dtype=float),
-                    np.full(sweeps.size, rgb[1], dtype=float),
-                    np.full(sweeps.size, rgb[2], dtype=float),
-                    np.asarray(alphas, dtype=float),
-                ]
-            )
-            ax.scatter(sweeps, values, s=18, c=colors, edgecolors="none", zorder=4)
+        if mode == "raw":
+            plot_values = raw_values
+            ax.plot(sweeps, plot_values, color=rgb, linewidth=1.5, alpha=0.8, label=f"chain {chain_id}")
+            if sweeps.size:
+                alphas = np.linspace(alpha_lo, alpha_hi, sweeps.size)
+                colors = np.column_stack(
+                    [
+                        np.full(sweeps.size, rgb[0], dtype=float),
+                        np.full(sweeps.size, rgb[1], dtype=float),
+                        np.full(sweeps.size, rgb[2], dtype=float),
+                        np.asarray(alphas, dtype=float),
+                    ]
+                )
+                ax.scatter(sweeps, plot_values, s=18, c=colors, edgecolors="none", zorder=4)
+        elif mode == "best_so_far":
+            plot_values = best_values
+            ax.plot(sweeps, plot_values, color=rgb, linewidth=1.6, alpha=0.9, label=f"chain {chain_id}")
+            if sweeps.size:
+                alphas = np.linspace(alpha_lo, alpha_hi, sweeps.size)
+                colors = np.column_stack(
+                    [
+                        np.full(sweeps.size, rgb[0], dtype=float),
+                        np.full(sweeps.size, rgb[1], dtype=float),
+                        np.full(sweeps.size, rgb[2], dtype=float),
+                        np.asarray(alphas, dtype=float),
+                    ]
+                )
+                ax.scatter(sweeps, plot_values, s=18, c=colors, edgecolors="none", zorder=4)
+        else:
+            plot_values = best_values
+            ax.plot(sweeps, raw_values, color=rgb, linewidth=1.0, alpha=0.28, zorder=2)
+            ax.plot(sweeps, plot_values, color=rgb, linewidth=1.8, alpha=0.95, label=f"chain {chain_id}", zorder=4)
+            if sweeps.size:
+                raw_alphas = np.linspace(max(0.08, alpha_lo * 0.5), max(0.2, alpha_hi * 0.5), sweeps.size)
+                raw_colors = np.column_stack(
+                    [
+                        np.full(sweeps.size, rgb[0], dtype=float),
+                        np.full(sweeps.size, rgb[1], dtype=float),
+                        np.full(sweeps.size, rgb[2], dtype=float),
+                        np.asarray(raw_alphas, dtype=float),
+                    ]
+                )
+                best_alphas = np.linspace(alpha_lo, alpha_hi, sweeps.size)
+                best_colors = np.column_stack(
+                    [
+                        np.full(sweeps.size, rgb[0], dtype=float),
+                        np.full(sweeps.size, rgb[1], dtype=float),
+                        np.full(sweeps.size, rgb[2], dtype=float),
+                        np.asarray(best_alphas, dtype=float),
+                    ]
+                )
+                ax.scatter(sweeps, raw_values, s=10, c=raw_colors, edgecolors="none", zorder=3)
+                ax.scatter(sweeps, plot_values, s=18, c=best_colors, edgecolors="none", zorder=5)
+
+        sampled_plot.loc[chain_df.index, "_y_plot"] = plot_values
 
     if slot_overlay:
-        _draw_chain_overlay(ax, sampled, x_col="sweep_idx", y_col=y_column)
+        _draw_chain_overlay(ax, sampled_plot, x_col="sweep_idx", y_col="_y_plot")
 
     ylabel = {
         "raw_llr_objective": "Raw LLR objective",
@@ -323,7 +373,12 @@ def plot_chain_trajectory_sweep(
     }.get(y_column, y_column)
     ax.set_xlabel("Sweep index")
     ax.set_ylabel(ylabel)
-    ax.set_title("Chain trajectory over sweeps")
+    title_suffix = {
+        "raw": "raw",
+        "best_so_far": "best-so-far",
+        "all": "raw + best-so-far",
+    }[mode]
+    ax.set_title(f"Chain trajectory over sweeps ({title_suffix})")
     ax.text(
         0.02,
         0.98,
@@ -341,6 +396,7 @@ def plot_chain_trajectory_sweep(
     plt.close(fig)
     return {
         "mode": "chain_sweep",
+        "y_mode": mode,
         "legend_labels": legend_labels,
         "chain_count": len(chain_ids),
         "y_column": y_column,

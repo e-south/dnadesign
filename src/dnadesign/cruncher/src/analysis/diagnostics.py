@@ -73,40 +73,141 @@ def _acceptance_tail_from_move_stats(
     min_window: int = 20,
     max_window: int = 200,
 ) -> tuple[float | None, int | None, int | None]:
+    tail_rows, window, total_sweeps = _tail_move_window_records(
+        move_stats,
+        phase=phase,
+        window_fraction=window_fraction,
+        min_window=min_window,
+        max_window=max_window,
+    )
+    if not tail_rows:
+        return None, window, total_sweeps
+    kinds = {"B", "M", "L", "W", "I"} if mh_only else None
+    rate, _ = _acceptance_rate(tail_rows, move_kinds=kinds)
+    return rate, window, total_sweeps
+
+
+def _tail_move_window_records(
+    move_stats: list[dict[str, object]],
+    *,
+    phase: str = "draw",
+    window_fraction: float = 0.2,
+    min_window: int = 20,
+    max_window: int = 200,
+) -> tuple[list[dict[str, object]], int | None, int | None]:
     if not move_stats:
-        return None, None, None
-    rows = []
+        return [], None, None
+    rows: list[dict[str, object]] = []
     for row in move_stats:
         if phase and row.get("phase") != phase:
-            continue
-        move_kind = row.get("move_kind")
-        if mh_only and move_kind == "S":
             continue
         sweep_idx = _safe_int(row.get("sweep_idx"))
         attempted = _safe_int(row.get("attempted"))
         accepted = _safe_int(row.get("accepted"))
-        if sweep_idx is None or attempted is None or accepted is None:
+        move_kind = row.get("move_kind")
+        if sweep_idx is None or attempted is None or accepted is None or not isinstance(move_kind, str):
             continue
-        rows.append((sweep_idx, attempted, accepted))
+        rows.append(
+            {
+                "sweep_idx": int(sweep_idx),
+                "attempted": int(attempted),
+                "accepted": int(accepted),
+                "move_kind": str(move_kind),
+                "delta": _safe_float(row.get("delta")),
+                "delta_hamming": _safe_float(row.get("delta_hamming")),
+                "gibbs_changed": row.get("gibbs_changed"),
+            }
+        )
     if not rows:
-        return None, None, None
-    sweeps = sorted({sweep for sweep, _, _ in rows})
+        return [], None, None
+    sweeps = sorted({int(row["sweep_idx"]) for row in rows})
     if not sweeps:
-        return None, None, None
+        return [], None, None
     total_sweeps = len(sweeps)
     window = int(round(window_fraction * total_sweeps))
     window = max(min_window, min(max_window, window))
     window = min(window, total_sweeps)
     cutoff = sweeps[-window]
+    tail_rows = [row for row in rows if int(row["sweep_idx"]) >= cutoff]
+    return tail_rows, window, total_sweeps
+
+
+def _acceptance_rate(
+    rows: list[dict[str, object]],
+    *,
+    move_kinds: set[str] | None = None,
+    downhill_only: bool = False,
+) -> tuple[float | None, int]:
     attempted_total = 0
     accepted_total = 0
-    for sweep_idx, attempted, accepted in rows:
-        if sweep_idx >= cutoff:
-            attempted_total += attempted
-            accepted_total += accepted
+    for row in rows:
+        move_kind = str(row.get("move_kind"))
+        if move_kinds is not None and move_kind not in move_kinds:
+            continue
+        delta = _safe_float(row.get("delta"))
+        if downhill_only and (delta is None or delta >= 0):
+            continue
+        attempted = _safe_int(row.get("attempted"))
+        accepted = _safe_int(row.get("accepted"))
+        if attempted is None or accepted is None:
+            continue
+        attempted_total += attempted
+        accepted_total += accepted
     if attempted_total <= 0:
-        return None, window, total_sweeps
-    return accepted_total / float(attempted_total), window, total_sweeps
+        return None, 0
+    return accepted_total / float(attempted_total), attempted_total
+
+
+def _delta_std(rows: list[dict[str, object]], *, move_kinds: set[str] | None = None) -> float | None:
+    deltas: list[float] = []
+    for row in rows:
+        move_kind = str(row.get("move_kind"))
+        if move_kinds is not None and move_kind not in move_kinds:
+            continue
+        delta = _safe_float(row.get("delta"))
+        if delta is None:
+            continue
+        deltas.append(delta)
+    if not deltas:
+        return None
+    return float(np.std(np.asarray(deltas, dtype=float)))
+
+
+def _gibbs_flip_rate(rows: list[dict[str, object]]) -> tuple[float | None, int]:
+    attempts = 0
+    changed = 0
+    for row in rows:
+        if str(row.get("move_kind")) != "S":
+            continue
+        attempted = _safe_int(row.get("attempted"))
+        if attempted is None or attempted <= 0:
+            continue
+        marker = row.get("gibbs_changed")
+        if marker is None:
+            hamming = _safe_float(row.get("delta_hamming"))
+            if hamming is None:
+                continue
+            is_changed = hamming > 0
+        else:
+            is_changed = bool(marker)
+        attempts += attempted
+        if is_changed:
+            changed += attempted
+    if attempts <= 0:
+        return None, 0
+    return changed / float(attempts), attempts
+
+
+def _tail_hamming_mean(rows: list[dict[str, object]]) -> tuple[float | None, int]:
+    values: list[float] = []
+    for row in rows:
+        val = _safe_float(row.get("delta_hamming"))
+        if val is None:
+            continue
+        values.append(val)
+    if not values:
+        return None, 0
+    return float(np.mean(np.asarray(values, dtype=float))), len(values)
 
 
 def summarize_sampling_diagnostics(
@@ -145,6 +246,9 @@ def summarize_sampling_diagnostics(
         "ess_ratio_fail": 0.02,
         "acceptance_low": 0.05,
         "acceptance_high": 0.95,
+        "rugged_acceptance_low": 0.10,
+        "rugged_acceptance_high": 0.45,
+        "rugged_downhill_acceptance_high": 0.05,
         "unique_fraction_warn": 0.20,
         "balance_index_warn": 0.50,
     }
@@ -439,16 +543,83 @@ def summarize_sampling_diagnostics(
             optimizer_metrics["acceptance_rate_all"] = acc_all
         move_stats = optimizer_stats.get("move_stats")
         if isinstance(move_stats, list):
-            tail_rate, tail_window, tail_total = _acceptance_tail_from_move_stats(move_stats)
-            if tail_rate is not None:
-                optimizer_metrics["acceptance_rate_mh_tail"] = tail_rate
+            tail_rows, tail_window, tail_total = _tail_move_window_records(move_stats)
+            if tail_window is not None:
                 optimizer_metrics["acceptance_rate_mh_tail_window"] = tail_window
+            if tail_total is not None:
                 optimizer_metrics["acceptance_rate_mh_tail_sweeps"] = tail_total
-                if tail_rate < thresholds["acceptance_low"] or tail_rate > thresholds["acceptance_high"]:
+
+            tail_non_s, tail_non_s_attempts = _acceptance_rate(tail_rows, move_kinds={"B", "M", "L", "W", "I"})
+            if tail_non_s is not None:
+                optimizer_metrics["acceptance_rate_mh_tail"] = tail_non_s
+                optimizer_metrics["acceptance_rate_non_s_tail"] = tail_non_s
+                optimizer_metrics["acceptance_rate_non_s_tail_attempts"] = tail_non_s_attempts
+                if tail_non_s < thresholds["acceptance_low"] or tail_non_s > thresholds["acceptance_high"]:
                     warnings.append(
-                        f"Tail MH acceptance {tail_rate:.2f} is outside typical bounds (window={tail_window})."
+                        f"Tail non-S acceptance {tail_non_s:.2f} is outside typical bounds (window={tail_window})."
                     )
                     _mark("warn")
+
+            for move_kind in ("B", "M", "L", "W", "I"):
+                rate, attempts = _acceptance_rate(tail_rows, move_kinds={move_kind})
+                if rate is None:
+                    continue
+                optimizer_metrics[f"acceptance_tail_{move_kind}"] = rate
+                optimizer_metrics[f"acceptance_tail_{move_kind}_attempts"] = attempts
+
+            tail_mh_all, attempts_mh_all = _acceptance_rate(tail_rows, move_kinds={"B", "M", "L", "W", "I"})
+            if tail_mh_all is not None:
+                optimizer_metrics["acceptance_tail_mh_all"] = tail_mh_all
+                optimizer_metrics["acceptance_tail_mh_all_attempts"] = attempts_mh_all
+
+            tail_rugged, attempts_rugged = _acceptance_rate(tail_rows, move_kinds={"B", "M"})
+            if tail_rugged is not None:
+                optimizer_metrics["acceptance_tail_rugged"] = tail_rugged
+                optimizer_metrics["acceptance_tail_rugged_attempts"] = attempts_rugged
+                if attempts_rugged >= 10 and (
+                    tail_rugged < thresholds["rugged_acceptance_low"]
+                    or tail_rugged > thresholds["rugged_acceptance_high"]
+                ):
+                    warnings.append(
+                        f"Tail rugged acceptance {tail_rugged:.2f} is outside target band "
+                        f"[{thresholds['rugged_acceptance_low']:.2f}, {thresholds['rugged_acceptance_high']:.2f}]."
+                    )
+                    _mark("warn")
+
+            downhill_rugged, attempts_downhill_rugged = _acceptance_rate(
+                tail_rows,
+                move_kinds={"B", "M"},
+                downhill_only=True,
+            )
+            if downhill_rugged is not None:
+                optimizer_metrics["downhill_accept_tail_rugged"] = downhill_rugged
+                optimizer_metrics["downhill_accept_tail_rugged_attempts"] = attempts_downhill_rugged
+                if attempts_downhill_rugged >= 10 and downhill_rugged > thresholds["rugged_downhill_acceptance_high"]:
+                    warnings.append(
+                        f"Tail rugged downhill acceptance {downhill_rugged:.2f} exceeds "
+                        f"{thresholds['rugged_downhill_acceptance_high']:.2f}."
+                    )
+                    _mark("warn")
+
+            gibbs_flip_rate, gibbs_flip_attempts = _gibbs_flip_rate(tail_rows)
+            if gibbs_flip_rate is not None:
+                optimizer_metrics["gibbs_flip_rate_tail"] = gibbs_flip_rate
+                optimizer_metrics["gibbs_flip_rate_tail_attempts"] = gibbs_flip_attempts
+
+            tail_hamming_mean, tail_hamming_n = _tail_hamming_mean(tail_rows)
+            if tail_hamming_mean is not None:
+                optimizer_metrics["tail_step_hamming_mean"] = tail_hamming_mean
+                optimizer_metrics["tail_step_hamming_n"] = tail_hamming_n
+
+            delta_std_tail = _delta_std(tail_rows)
+            if delta_std_tail is not None:
+                optimizer_metrics["score_delta_std_tail"] = delta_std_tail
+            delta_std_tail_mh = _delta_std(tail_rows, move_kinds={"B", "M", "L", "W", "I"})
+            if delta_std_tail_mh is not None:
+                optimizer_metrics["score_delta_std_tail_mh"] = delta_std_tail_mh
+            delta_std_tail_rugged = _delta_std(tail_rows, move_kinds={"B", "M"})
+            if delta_std_tail_rugged is not None:
+                optimizer_metrics["score_delta_std_tail_rugged"] = delta_std_tail_rugged
         unique_successes = _safe_int(optimizer_stats.get("unique_successes"))
         if unique_successes is not None:
             optimizer_metrics["unique_successes"] = unique_successes

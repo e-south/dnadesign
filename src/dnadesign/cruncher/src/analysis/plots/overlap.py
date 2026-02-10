@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Iterable
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
 
@@ -73,10 +74,23 @@ def plot_overlap_panel(
         ax_heat.set_ylabel("Overlap rate")
         ax_heat.tick_params(axis="x", rotation=35)
 
-    sns.histplot(elite_overlap_df["overlap_total_bp"], bins=20, kde=True, ax=ax_hist)
-    ax_hist.set_title("Overlap bp per elite")
-    ax_hist.set_xlabel("Total overlap bp")
-    ax_hist.set_ylabel("Count")
+    overlap_vals = pd.to_numeric(elite_overlap_df["overlap_total_bp"], errors="coerce").dropna()
+    if overlap_vals.empty:
+        ax_hist.axis("off")
+        ax_hist.text(0.5, 0.5, "Overlap bp histogram unavailable", ha="center", va="center", fontsize=9)
+    else:
+        min_val = float(overlap_vals.min())
+        max_val = float(overlap_vals.max())
+        unique_vals = int(overlap_vals.nunique())
+        if np.isclose(min_val, max_val, rtol=0.0, atol=1e-12):
+            ax_hist.bar([min_val], [int(overlap_vals.size)], width=0.8, color="#4c78a8", alpha=0.85)
+            ax_hist.set_xlim(min_val - 1.0, max_val + 1.0)
+        else:
+            bins = min(20, max(5, int(round(np.sqrt(float(overlap_vals.size))))))
+            sns.histplot(overlap_vals, bins=bins, kde=unique_vals > 1, ax=ax_hist)
+        ax_hist.set_title("Overlap bp per elite")
+        ax_hist.set_xlabel("Total overlap bp")
+        ax_hist.set_ylabel("Count")
 
     fig.text(
         0.99,

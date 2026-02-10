@@ -175,6 +175,9 @@ def build_report_payload(
         "ess": _safe_float((trace_metrics or {}).get("ess")),
         "ess_ratio": _safe_float((trace_metrics or {}).get("ess_ratio")),
         "acceptance_rate_mh_tail": _safe_float((optimizer_metrics or {}).get("acceptance_rate_mh_tail")),
+        "acceptance_tail_rugged": _safe_float((optimizer_metrics or {}).get("acceptance_tail_rugged")),
+        "downhill_accept_tail_rugged": _safe_float((optimizer_metrics or {}).get("downhill_accept_tail_rugged")),
+        "gibbs_flip_rate_tail": _safe_float((optimizer_metrics or {}).get("gibbs_flip_rate_tail")),
     }
     highlights_learning = {}
     if isinstance(objective_components, dict):
@@ -300,6 +303,9 @@ def write_report_md(
         f"- Overlap rate median: {_fmt(overlap.get('overlap_rate_median'))}",
         f"- Overlap bp median: {_fmt(overlap.get('overlap_total_bp_median'))}",
         f"- MH acceptance (tail): {_fmt(sampling.get('acceptance_rate_mh_tail'))}",
+        f"- Rugged acceptance (tail, B/M): {_fmt(sampling.get('acceptance_tail_rugged'))}",
+        f"- Rugged downhill acceptance (tail): {_fmt(sampling.get('downhill_accept_tail_rugged'))}",
+        f"- Gibbs flip rate (tail): {_fmt(sampling.get('gibbs_flip_rate_tail'))}",
         "- Trace diagnostics: directional indicators only (not convergence proofs).",
     ]
     if any(

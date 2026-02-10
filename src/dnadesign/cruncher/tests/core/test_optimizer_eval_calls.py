@@ -83,6 +83,7 @@ def test_gibbs_block_move_calls_evaluate_once_for_proposal() -> None:
         np.array([0.0, 1.0, 0.0, 0.0, 0.0, 0.0]),
         state=state,
         scan_cache=None,
+        sweep_idx=0,
     )
     after = evaluator.evaluate_calls
     assert after - before == 1
@@ -167,6 +168,7 @@ def test_gibbs_block_move_uses_precomputed_scores() -> None:
         state=state,
         scan_cache=None,
         per_tf={"tf": 1.0},
+        sweep_idx=0,
     )
     after = evaluator.call_count
     assert after == before

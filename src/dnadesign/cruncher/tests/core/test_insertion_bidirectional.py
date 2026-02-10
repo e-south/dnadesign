@@ -89,5 +89,6 @@ def test_insertion_can_reverse_complement() -> None:
         state=state,
         scan_cache=None,
         per_tf={"tfA": float(seq.sum())},
+        sweep_idx=0,
     )
     assert seq.tolist() == [2, 3]

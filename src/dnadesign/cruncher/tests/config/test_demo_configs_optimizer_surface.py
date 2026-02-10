@@ -114,6 +114,7 @@ def test_demo_configs_use_modern_schema_keys() -> None:
 
         analysis = cruncher["analysis"]
         assert "trajectory_chain_overlay" in analysis, f"{config_path} should use analysis.trajectory_chain_overlay."
+        assert "trajectory_sweep_mode" in analysis, f"{config_path} should set analysis.trajectory_sweep_mode."
         assert "trajectory_slot_overlay" not in analysis, f"{config_path} must not use trajectory_slot_overlay."
 
         catalog = cruncher["catalog"]

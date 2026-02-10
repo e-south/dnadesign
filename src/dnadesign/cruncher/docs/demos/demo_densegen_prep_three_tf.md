@@ -13,7 +13,10 @@
 
 This workspace prepares a three-TF run (`lexA`, `cpxR`, `baeR`) using site-derived PWMs.
 It is a practical prep flow for downstream densegen exports and validates that mixed site
-sources can be locked, parsed, sampled, and analyzed end-to-end.
+sources can be locked, parsed, sampled, and analyzed end-to-end. The bundled
+config uses Gibbs annealing with piecewise cooling, explicit proposal adaptation
+freeze in the cold tail, and Gibbs inertia for late-stage stability; sweep plots
+default to best-so-far (`analysis.trajectory_sweep_mode=best_so_far`).
 
 ## Demo setup
 

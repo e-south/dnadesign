@@ -124,6 +124,7 @@ def test_chain_trajectory_sweep_renders_raw_llr_by_sweep(tmp_path: Path) -> None
     metadata = plot_chain_trajectory_sweep(
         trajectory_df=trajectory_df,
         y_column="raw_llr_objective",
+        y_mode="all",
         out_path=out_path,
         dpi=72,
         png_compress_level=1,
@@ -137,3 +138,48 @@ def test_chain_trajectory_sweep_renders_raw_llr_by_sweep(tmp_path: Path) -> None
     assert "chain 1" in legend_labels
     assert metadata["mode"] == "chain_sweep"
     assert metadata["chain_count"] == 2
+    assert metadata["y_mode"] == "all"
+
+
+def test_chain_trajectory_sweep_best_so_far_mode_is_supported(tmp_path: Path) -> None:
+    trajectory_df = pd.DataFrame(
+        {
+            "chain": [0, 0, 0, 1, 1, 1],
+            "sweep_idx": [0, 1, 2, 0, 1, 2],
+            "raw_llr_objective": [0.40, 0.32, 0.28, 0.35, 0.55, 0.40],
+            "phase": ["tune", "draw", "draw", "tune", "draw", "draw"],
+        }
+    )
+    out_path = tmp_path / "plot__chain_trajectory_sweep_best.png"
+    metadata = plot_chain_trajectory_sweep(
+        trajectory_df=trajectory_df,
+        y_column="raw_llr_objective",
+        y_mode="best_so_far",
+        out_path=out_path,
+        dpi=72,
+        png_compress_level=1,
+    )
+
+    assert out_path.exists()
+    assert metadata["y_mode"] == "best_so_far"
+    assert metadata["chain_count"] == 2
+
+
+def test_chain_trajectory_sweep_rejects_unknown_mode(tmp_path: Path) -> None:
+    trajectory_df = pd.DataFrame(
+        {
+            "chain": [0, 0],
+            "sweep_idx": [0, 1],
+            "raw_llr_objective": [0.4, 0.5],
+        }
+    )
+    out_path = tmp_path / "plot__chain_trajectory_sweep_invalid.png"
+    with pytest.raises(ValueError, match="y_mode"):
+        plot_chain_trajectory_sweep(
+            trajectory_df=trajectory_df,
+            y_column="raw_llr_objective",
+            y_mode="invalid",
+            out_path=out_path,
+            dpi=72,
+            png_compress_level=1,
+        )

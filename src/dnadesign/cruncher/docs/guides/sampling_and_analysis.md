@@ -132,8 +132,9 @@ Raw chain traces can look jumpy even when optimization is healthy:
 For optimization narrative, prioritize:
 
 - final/best elite quality and constraints
-- tail acceptance diagnostics (`acceptance_rate_mh_tail`)
+- tail move diagnostics (`acceptance_tail_rugged`, `downhill_accept_tail_rugged`, `gibbs_flip_rate_tail`)
 - diversity tables (`elites_mmr_summary`, `elites_nn_distance`)
+- sweep plots with `analysis.trajectory_sweep_mode=best_so_far` (or `all` to overlay raw + best-so-far)
 
 Treat raw trajectory plots as exploration diagnostics, not monotone progress
 curves.
@@ -182,7 +183,7 @@ Sampling artifacts consumed by analysis:
 Plots (always generated when data is available):
 
 - `plots/plot__chain_trajectory_scatter.*` (chain-hued scatter in TF score-space, with random-baseline cloud and consensus anchors)
-- `plots/plot__chain_trajectory_sweep.*` (per-chain progression over sweep index for the selected objective column)
+- `plots/plot__chain_trajectory_sweep.*` (per-chain progression over sweep index for the selected objective column and sweep mode)
 - `plots/plot__elites_nn_distance.*`
 - `plots/plot__overlap_panel.*`
 - `plots/plot__health_panel.*` (only if `optimize/trace.nc` exists)
@@ -195,6 +196,9 @@ Key signals:
 
 - `diagnostics.status`: `ok|warn|fail` summary.
 - `trace.rhat` and `trace.ess_ratio` (if `trace.nc` exists) are directional indicators of sampling health across chains.
+- `optimizer.acceptance_tail_rugged` is the tail acceptance over rugged moves (`B`,`M`) and is more informative than all non-`S` acceptance when diagnosing warm tails.
+- `optimizer.downhill_accept_tail_rugged` isolates downhill rugged acceptance in the tail (cold-tail indicator).
+- `optimizer.gibbs_flip_rate_tail` and `optimizer.tail_step_hamming_mean` indicate whether late-chain motion is dominated by Gibbs micro-flips.
 - `objective_components.unique_fraction_canonical` is present only when canonicalization is enabled.
 - `elites_mmr_summary` and `elites_nn_distance` indicate diversity strength and collapse risk.
 

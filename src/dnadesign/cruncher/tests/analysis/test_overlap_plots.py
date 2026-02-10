@@ -24,3 +24,15 @@ def test_overlap_plot_smoke(tmp_path) -> None:
     panel_path = tmp_path / "plot__overlap__panel.png"
     plot_overlap_panel(summary_df, elite_df, ["tfA", "tfB"], panel_path, dpi=150, png_compress_level=9)
     assert panel_path.exists()
+
+
+def test_overlap_plot_handles_constant_overlap_distribution(tmp_path) -> None:
+    summary_df = pd.DataFrame(
+        [
+            {"tf_i": "tfA", "tf_j": "tfB", "overlap_rate": 1.0},
+        ]
+    )
+    elite_df = pd.DataFrame({"overlap_total_bp": [7, 7, 7, 7]})
+    panel_path = tmp_path / "plot__overlap__panel_constant.png"
+    plot_overlap_panel(summary_df, elite_df, ["tfA", "tfB"], panel_path, dpi=150, png_compress_level=9)
+    assert panel_path.exists()

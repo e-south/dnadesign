@@ -13,7 +13,7 @@
 ## Overview
 
 Campaigns expand regulator categories into explicit regulator sets. This demo runs a campaign directly with `--campaign` (no derived config required), then summarizes results across runs.
-The demo config uses a ten-chain Gibbs annealing optimizer (`optimizer.kind=gibbs_anneal`, `optimizer.chains=10`) with a colder piecewise schedule (`cooling.kind=piecewise`, final `beta=18.0`) and linear move scheduling toward less Gibbs-dominant tail behavior. Adaptive move weights are disabled and proposal scaling remains explicit under `sample.moves.overrides.proposal_adapt`.
+The demo config uses a ten-chain Gibbs annealing optimizer (`optimizer.kind=gibbs_anneal`, `optimizer.chains=10`) with a colder piecewise schedule (`cooling.kind=piecewise`, final `beta=18.0`) and linear move scheduling toward less Gibbs-dominant tail behavior. Adaptive move weights are disabled and proposal scaling remains explicit under `sample.moves.overrides.proposal_adapt`, with a cold-tail freeze (`freeze_after_beta=8.0`). Gibbs inertia is enabled (`gibbs_inertia.p_stay_end=0.70`) to damp late single-site jitter, and sweep plots default to best-so-far (`analysis.trajectory_sweep_mode=best_so_far`).
 
 ## Demo setup
 

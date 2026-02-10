@@ -111,6 +111,7 @@ def test_analysis_particle_trajectory_fields_load(tmp_path: Path) -> None:
         "trajectory_stride": 5,
         "trajectory_scatter_scale": "llr",
         "trajectory_sweep_y_column": "objective_scalar",
+        "trajectory_sweep_mode": "all",
         "trajectory_particle_alpha_min": 0.2,
         "trajectory_particle_alpha_max": 0.9,
         "trajectory_chain_overlay": False,
@@ -121,6 +122,7 @@ def test_analysis_particle_trajectory_fields_load(tmp_path: Path) -> None:
     assert cfg.analysis.trajectory_stride == 5
     assert cfg.analysis.trajectory_scatter_scale == "llr"
     assert cfg.analysis.trajectory_sweep_y_column == "objective_scalar"
+    assert cfg.analysis.trajectory_sweep_mode == "all"
 
 
 def test_analysis_legacy_trajectory_slot_overlay_is_rejected(tmp_path: Path) -> None:
@@ -140,7 +142,7 @@ def test_sample_output_save_sequences_false_is_rejected(tmp_path: Path) -> None:
         load_config(config_path)
 
 
-def test_analysis_trajectory_defaults_prefer_raw_llr_and_dense_lineage(tmp_path: Path) -> None:
+def test_analysis_trajectory_defaults_prefer_best_so_far_and_dense_lineage(tmp_path: Path) -> None:
     payload = _base_config()
     payload["cruncher"]["analysis"] = {"enabled": True}
     config_path = _write_config(tmp_path, payload)
@@ -149,4 +151,38 @@ def test_analysis_trajectory_defaults_prefer_raw_llr_and_dense_lineage(tmp_path:
     assert cfg.analysis is not None
     assert cfg.analysis.trajectory_scatter_scale == "llr"
     assert cfg.analysis.trajectory_stride == 5
+    assert cfg.analysis.trajectory_sweep_mode == "best_so_far"
     assert cfg.analysis.trajectory_particle_alpha_max == pytest.approx(0.45)
+
+
+def test_move_overrides_load_gibbs_inertia_and_freeze_controls(tmp_path: Path) -> None:
+    payload = _base_config()
+    payload["cruncher"]["sample"]["moves"]["overrides"] = {
+        "move_probs": {"S": 1.0, "B": 0.0, "M": 0.0, "L": 0.0, "W": 0.0, "I": 0.0},
+        "gibbs_inertia": {
+            "enabled": True,
+            "kind": "fixed",
+            "p_stay_end": 0.95,
+        },
+        "adaptive_weights": {
+            "enabled": True,
+            "freeze_after_sweep": 100,
+        },
+        "proposal_adapt": {
+            "enabled": True,
+            "freeze_after_beta": 2.0,
+        },
+    }
+    config_path = _write_config(tmp_path, payload)
+    cfg = load_config(config_path)
+
+    assert cfg.sample is not None
+    assert cfg.sample.moves.overrides is not None
+    assert cfg.sample.moves.overrides.gibbs_inertia is not None
+    assert cfg.sample.moves.overrides.gibbs_inertia.enabled is True
+    assert cfg.sample.moves.overrides.gibbs_inertia.kind == "fixed"
+    assert cfg.sample.moves.overrides.gibbs_inertia.p_stay_end == pytest.approx(0.95)
+    assert cfg.sample.moves.overrides.adaptive_weights is not None
+    assert cfg.sample.moves.overrides.adaptive_weights.freeze_after_sweep == 100
+    assert cfg.sample.moves.overrides.proposal_adapt is not None
+    assert cfg.sample.moves.overrides.proposal_adapt.freeze_after_beta == pytest.approx(2.0)

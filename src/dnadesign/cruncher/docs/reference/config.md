@@ -217,6 +217,8 @@ sample:
         k: 0.5
         min_prob: 0.01
         max_prob: 0.95
+        freeze_after_sweep: null   # int | null
+        freeze_after_beta: null    # float | null
         kinds: [S, B, M, I]
         targets: {S: 0.95, B: 0.40, M: 0.35, I: 0.35}
       proposal_adapt:
@@ -227,6 +229,13 @@ sample:
         max_scale: 2.00
         target_low: 0.25
         target_high: 0.75
+        freeze_after_sweep: null   # int | null
+        freeze_after_beta: null    # float | null
+      gibbs_inertia:
+        enabled: false
+        kind: linear               # fixed | linear
+        p_stay_start: 0.0
+        p_stay_end: 0.0
 
   optimizer:
     kind: gibbs_anneal
@@ -268,6 +277,8 @@ Notes:
 - Canonicalization is automatic when `objective.bidirectional=true`.
 - MMR distance is TFBS-core weighted Hamming (tolerant weighting, low-information positions emphasized).
 - `moves.overrides.*` contains optional expert controls (operator mix + adaptation). Leave unset unless you are actively tuning proposals.
+- `moves.overrides.gibbs_inertia` dampens late single-site Gibbs flips (`p_stay_*`), which can reduce raw-trajectory jitter.
+- `moves.overrides.adaptive_weights.freeze_after_*` and `moves.overrides.proposal_adapt.freeze_after_*` freeze adaptation late so the kernel stops drifting.
 - `sample.optimizer.kind` currently supports `gibbs_anneal`.
 - `sample.optimizer.chains` controls the number of independently initialized chains.
 - `sample.optimizer.cooling.kind` controls the MCMC beta schedule (`fixed`, `linear`, or `piecewise`).
@@ -295,6 +306,7 @@ analysis:
   trajectory_stride: 5
   trajectory_scatter_scale: llr   # normalized-llr | llr
   trajectory_sweep_y_column: raw_llr_objective  # raw_llr_objective | objective_scalar | norm_llr_objective
+  trajectory_sweep_mode: best_so_far  # best_so_far | raw | all
   trajectory_particle_alpha_min: 0.15
   trajectory_particle_alpha_max: 0.45
   trajectory_chain_overlay: false
@@ -304,6 +316,7 @@ Notes:
 - `analysis.pairwise` selects the TF pair used for the trajectory scatter axes (`plot__chain_trajectory_scatter.*`).
 - `analysis.trajectory_scatter_scale` controls whether scatter axes use per-TF raw LLR or normalized LLR.
 - `analysis.trajectory_sweep_y_column` controls the y-axis for `plot__chain_trajectory_sweep.*`; each point is the combined per-TF objective at that sweep.
+- `analysis.trajectory_sweep_mode` controls sweep-plot narrative: `best_so_far` (default), `raw`, or `all` (raw + best-so-far overlay).
 - Trajectory plots are chain-centric: chains are rendered categorically, and lineage follows each chain across sweeps.
 - `analysis.trajectory_chain_overlay=true` overlays chain markers as a diagnostic layer.
 - If the `analysis` block is omitted, analyze resolves this section from schema defaults.

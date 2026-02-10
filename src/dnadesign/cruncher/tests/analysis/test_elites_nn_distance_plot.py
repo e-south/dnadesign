@@ -32,3 +32,21 @@ def test_plot_elites_nn_distance_supports_small_k_text_panel(tmp_path: Path) -> 
         png_compress_level=9,
     )
     assert out_path.exists()
+
+
+def test_plot_elites_nn_distance_handles_constant_values(tmp_path: Path) -> None:
+    nn_df = pd.DataFrame(
+        {
+            "elite_id": ["elite-1", "elite-2", "elite-3"],
+            "nn_dist": [0.0, 0.0, 0.0],
+        }
+    )
+    out_path = Path(tmp_path) / "plot__elites__nn_distance__constant.png"
+    plot_elites_nn_distance(
+        nn_df,
+        out_path,
+        baseline_nn=pd.Series([0.2, 0.3]),
+        dpi=150,
+        png_compress_level=9,
+    )
+    assert out_path.exists()
