@@ -13,7 +13,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from dnadesign.cruncher.core.optimizers.pt import GibbsAnnealOptimizer
+from dnadesign.cruncher.core.optimizers.gibbs_anneal import GibbsAnnealOptimizer
 from dnadesign.cruncher.core.state import SequenceState
 
 
@@ -64,6 +64,6 @@ def test_swap_controller_disabled_for_gibbs_anneal() -> None:
         init_cfg=init_cfg,
     )
     optimizer.optimise()
-    assert optimizer.swap_controller is None
+    assert not hasattr(optimizer, "swap_controller")
     assert optimizer.swap_attempts == 0
     assert optimizer.swap_accepts == 0

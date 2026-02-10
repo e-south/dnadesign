@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
 <cruncher project>
-src/dnadesign/cruncher/src/core/optimizers/pt.py
+src/dnadesign/cruncher/src/core/optimizers/gibbs_anneal.py
+
+Gibbs annealing optimizer for sequence design.
 
 Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -75,7 +77,6 @@ class GibbsAnnealOptimizer(Optimizer):
         self.min_dist: int = int(cfg["min_dist"])
         self.top_k: int = int(cfg["top_k"])
         self.sequence_length: int = int(cfg["sequence_length"])
-        self.swap_stride: int = int(cfg.get("swap_stride", 1))
         self.bidirectional: bool = bool(cfg.get("bidirectional", False))
         self.dsdna_canonicalize: bool = bool(cfg.get("dsdna_canonicalize", False))
         self.score_scale: str = str(cfg.get("score_scale") or "")
@@ -130,8 +131,6 @@ class GibbsAnnealOptimizer(Optimizer):
         beta_start = float(self.mcmc_beta_of(0))
         self.beta_ladder_base: List[float] = [beta_start for _ in range(self.chains)]
         self.beta_ladder: List[float] = list(self.beta_ladder_base)
-        # Replica exchange is intentionally disabled for gibbs_anneal.
-        self.swap_enabled = False
 
         # Move configuration
         self.move_cfg: Dict[str, Tuple[int, int] | int] = {
@@ -179,7 +178,7 @@ class GibbsAnnealOptimizer(Optimizer):
         )
         self.insertion_consensus_prob = float(cfg.get("insertion_consensus_prob", 0.5))
 
-        # Soft-min schedule (independent of PT temperature ladder)
+        # Soft-min schedule (independent of MCMC cooling schedule)
         softmin_cfg = cfg.get("softmin") or {}
         self.softmin_enabled = bool(softmin_cfg.get("enabled", False))
         if self.softmin_enabled:
@@ -187,10 +186,6 @@ class GibbsAnnealOptimizer(Optimizer):
             self.softmin_of = make_beta_scheduler(softmin_sched, self.total_sweeps)
         else:
             self.softmin_of = None
-
-        self.adaptive_swap_cfg: dict[str, object] = {}
-        self.adaptive_swap_enabled = False
-        self.swap_controller = None
 
         # References needed during optimisation
         self.pwms = pwms
@@ -304,7 +299,7 @@ class GibbsAnnealOptimizer(Optimizer):
             particle_id: int | None,
         ) -> Dict[str, float]:
             if particle_id is None:
-                raise RuntimeError(f"PT trace invariant violated: missing particle_id for slot {slot_id}.")
+                raise RuntimeError(f"Gibbs trace invariant violated: missing particle_id for slot {slot_id}.")
             self.all_samples.append(seq_arr.copy())
             self.all_scores.append(per_tf)
             self.all_meta.append((slot_id, sweep_idx))
@@ -340,18 +335,6 @@ class GibbsAnnealOptimizer(Optimizer):
             if key not in self._unique_success_set:
                 self._unique_success_set.add(key)
                 self.unique_successes = len(self._unique_success_set)
-
-        def _maybe_raise_tuning_limited(*, phase: str, sweep_idx: int) -> None:
-            if self.swap_controller is None:
-                return
-            if self.swap_controller.tuning_limited():
-                raise RuntimeError(
-                    "PT swap adaptation tuning-limited: ladder scale saturated at max_scale "
-                    f"for {self.swap_controller.saturated_windows_seen} windows "
-                    f"(phase={phase}, sweep={sweep_idx})."
-                )
-
-        stop_after_tune = bool(self.adaptive_swap_cfg.get("stop_after_tune", True))
 
         # Burn‑in sweeps (record like Gibbs for consistency)
         for t in self.progress(range(T), desc="burn-in", leave=False, disable=not self.progress_bar):
@@ -404,63 +387,6 @@ class GibbsAnnealOptimizer(Optimizer):
                         "score_new": move_detail.get("score_new"),
                     }
                 )
-
-            # Optional swap attempts during tune (for adaptive swap calibration)
-            if self.swap_enabled and self.adaptive_swap_enabled and (sweep_idx % self.swap_stride) == 0:
-                for c in range(C - 1):
-                    self.swap_attempts += 1
-                    self.swap_attempts_by_pair[c] += 1
-                    s0, s1 = chain_states[c], chain_states[c + 1]
-                    β0, β1 = self.beta_ladder[c], self.beta_ladder[c + 1]
-                    f0 = current_scores[c]
-                    f1 = current_scores[c + 1]
-                    Δ = (β1 - β0) * (f0 - f1)
-                    particle_lo_before = chain_state_objs[c].particle_id
-                    particle_hi_before = chain_state_objs[c + 1].particle_id
-                    accepted = False
-                    log_u = None
-                    if Δ >= 0:
-                        accepted = True
-                    else:
-                        log_u = float(np.log(rng.random()))
-                        accepted = bool(log_u < Δ)
-                    if accepted:
-                        chain_states[c], chain_states[c + 1] = s1, s0
-                        chain_state_objs[c], chain_state_objs[c + 1] = (
-                            chain_state_objs[c + 1],
-                            chain_state_objs[c],
-                        )
-                        scan_caches[c], scan_caches[c + 1] = scan_caches[c + 1], scan_caches[c]
-                        current_scores[c], current_scores[c + 1] = current_scores[c + 1], current_scores[c]
-                        current_per_tf_maps[c], current_per_tf_maps[c + 1] = (
-                            current_per_tf_maps[c + 1],
-                            current_per_tf_maps[c],
-                        )
-                        self.swap_accepts += 1
-                        self.swap_accepts_by_pair[c] += 1
-                    if self.swap_controller is not None:
-                        self.swap_controller.record(pair_idx=c, accepted=accepted)
-                        if not stop_after_tune:
-                            self.swap_controller.update()
-                            _maybe_raise_tuning_limited(phase="tune", sweep_idx=sweep_idx)
-                    self.swap_events.append(
-                        {
-                            "sweep_idx": int(sweep_idx),
-                            "phase": "tune",
-                            "slot_lo": int(c),
-                            "slot_hi": int(c + 1),
-                            "beta_lo": float(β0),
-                            "beta_hi": float(β1),
-                            "particle_lo_before": int(particle_lo_before),
-                            "particle_hi_before": int(particle_hi_before),
-                            "accepted": bool(accepted),
-                            "delta": float(Δ),
-                            "log_u": float(log_u) if log_u is not None else None,
-                        }
-                    )
-                if self.swap_controller is not None and stop_after_tune:
-                    self.swap_controller.update()
-                    _maybe_raise_tuning_limited(phase="tune", sweep_idx=sweep_idx)
 
             if self.record_tune:
                 for c in range(C):
@@ -532,59 +458,6 @@ class GibbsAnnealOptimizer(Optimizer):
                     }
                 )
 
-            # Pair‑wise swaps
-            if self.swap_enabled and (sweep_idx % self.swap_stride) == 0:
-                for c in range(C - 1):
-                    self.swap_attempts += 1
-                    self.swap_attempts_by_pair[c] += 1
-                    s0, s1 = chain_states[c], chain_states[c + 1]
-                    β0, β1 = self.beta_ladder[c], self.beta_ladder[c + 1]
-                    f0 = current_scores[c]
-                    f1 = current_scores[c + 1]
-                    Δ = (β1 - β0) * (f0 - f1)
-                    particle_lo_before = chain_state_objs[c].particle_id
-                    particle_hi_before = chain_state_objs[c + 1].particle_id
-                    accepted = False
-                    log_u = None
-                    if Δ >= 0:
-                        accepted = True
-                    else:
-                        log_u = float(np.log(rng.random()))
-                        accepted = bool(log_u < Δ)
-                    if accepted:
-                        chain_states[c], chain_states[c + 1] = s1, s0  # swap in‑place
-                        chain_state_objs[c], chain_state_objs[c + 1] = (
-                            chain_state_objs[c + 1],
-                            chain_state_objs[c],
-                        )
-                        scan_caches[c], scan_caches[c + 1] = scan_caches[c + 1], scan_caches[c]
-                        current_scores[c], current_scores[c + 1] = current_scores[c + 1], current_scores[c]
-                        current_per_tf_maps[c], current_per_tf_maps[c + 1] = (
-                            current_per_tf_maps[c + 1],
-                            current_per_tf_maps[c],
-                        )
-                        self.swap_accepts += 1
-                        self.swap_accepts_by_pair[c] += 1
-                    if self.swap_controller is not None:
-                        self.swap_controller.record(pair_idx=c, accepted=accepted)
-                        if not stop_after_tune:
-                            self.swap_controller.update()
-                            _maybe_raise_tuning_limited(phase="draw", sweep_idx=sweep_idx)
-                    self.swap_events.append(
-                        {
-                            "sweep_idx": int(sweep_idx),
-                            "phase": "draw",
-                            "slot_lo": int(c),
-                            "slot_hi": int(c + 1),
-                            "beta_lo": float(β0),
-                            "beta_hi": float(β1),
-                            "particle_lo_before": int(particle_lo_before),
-                            "particle_hi_before": int(particle_hi_before),
-                            "accepted": bool(accepted),
-                            "delta": float(Δ),
-                            "log_u": float(log_u) if log_u is not None else None,
-                        }
-                    )
             for c in range(C):
                 _record(
                     c,
@@ -1003,10 +876,6 @@ class GibbsAnnealOptimizer(Optimizer):
         beta_min = float(self.beta_ladder_base[0]) if self.beta_ladder_base else None
         beta_max_base = float(self.beta_ladder_base[-1]) if self.beta_ladder_base else None
         beta_max_final = float(max(self.beta_ladder)) if self.beta_ladder else None
-        beta_mode = "annealing_schedule"
-        swap_pair_scales = self.swap_controller.pair_scales if self.swap_controller is not None else None
-        tuning_limited = self.swap_controller.tuning_limited() if self.swap_controller is not None else False
-        swap_saturation_windows = self.swap_controller.saturated_windows_seen if self.swap_controller is not None else 0
         return {
             "moves": totals,
             "accepted": accepted,
@@ -1023,11 +892,11 @@ class GibbsAnnealOptimizer(Optimizer):
             "swap_accepts_by_pair": list(self.swap_accepts_by_pair),
             "beta_ladder_base": list(self.beta_ladder_base),
             "beta_ladder_final": list(self.beta_ladder),
-            "beta_ladder_scale_final": float(self.swap_controller.scale) if self.swap_controller else 1.0,
-            "beta_ladder_scale_mode": beta_mode,
-            "swap_pair_scales_final": swap_pair_scales,
-            "swap_saturation_windows": swap_saturation_windows,
-            "swap_tuning_limited": tuning_limited,
+            "beta_ladder_scale_final": 1.0,
+            "beta_ladder_scale_mode": "annealing_schedule",
+            "swap_pair_scales_final": None,
+            "swap_saturation_windows": 0,
+            "swap_tuning_limited": False,
             "beta_min": beta_min,
             "beta_max_base": beta_max_base,
             "beta_max_final": beta_max_final,

@@ -25,3 +25,8 @@ def test_optimizer_registry_unknown() -> None:
 def test_optimizer_specs_have_descriptions() -> None:
     specs = {spec.name: spec.description for spec in list_optimizer_specs()}
     assert specs["gibbs_anneal"]
+
+
+def test_gibbs_optimizer_is_declared_in_gibbs_module() -> None:
+    optimizer_factory = get_optimizer("gibbs_anneal")
+    assert optimizer_factory.__module__ == "dnadesign.cruncher.core.optimizers.gibbs_anneal"

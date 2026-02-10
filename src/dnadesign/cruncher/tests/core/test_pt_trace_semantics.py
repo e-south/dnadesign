@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from dnadesign.cruncher.core.optimizers.pt import GibbsAnnealOptimizer
+from dnadesign.cruncher.core.optimizers.gibbs_anneal import GibbsAnnealOptimizer
 from dnadesign.cruncher.core.state import SequenceState
 
 

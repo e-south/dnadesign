@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Callable, Dict
 
 from dnadesign.cruncher.core.optimizers.base import Optimizer
-from dnadesign.cruncher.core.optimizers.pt import GibbsAnnealOptimizer
+from dnadesign.cruncher.core.optimizers.gibbs_anneal import GibbsAnnealOptimizer
 
 OptimizerFactory = Callable[..., Optimizer]
 

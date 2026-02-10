@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 
 from dnadesign.cruncher.core.evaluator import SequenceEvaluator
-from dnadesign.cruncher.core.optimizers.pt import GibbsAnnealOptimizer
+from dnadesign.cruncher.core.optimizers.gibbs_anneal import GibbsAnnealOptimizer
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.core.scoring import LocalScanCache, Scorer
 from dnadesign.cruncher.core.state import SequenceState
