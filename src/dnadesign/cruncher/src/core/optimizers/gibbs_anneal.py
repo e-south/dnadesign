@@ -104,12 +104,17 @@ class GibbsAnnealOptimizer(Optimizer):
         cooling_cfg_raw = cfg.get("mcmc_cooling") or {"kind": "fixed", "beta": 1.0}
         cooling_kind = str(cooling_cfg_raw.get("kind") or "").strip().lower()
         if cooling_kind == "fixed":
-            self.mcmc_cooling_cfg = {"kind": "fixed", "beta": float(cooling_cfg_raw["beta"])}
+            beta = float(cooling_cfg_raw["beta"])
+            self.mcmc_cooling_cfg = {"kind": "fixed", "beta": beta}
+            self.mcmc_cooling_summary = {"kind": "fixed", "beta": beta}
         elif cooling_kind == "linear":
+            beta_start = float(cooling_cfg_raw["beta_start"])
+            beta_end = float(cooling_cfg_raw["beta_end"])
             self.mcmc_cooling_cfg = {
                 "kind": "linear",
-                "beta": (float(cooling_cfg_raw["beta_start"]), float(cooling_cfg_raw["beta_end"])),
+                "beta": (beta_start, beta_end),
             }
+            self.mcmc_cooling_summary = {"kind": "linear", "beta_start": beta_start, "beta_end": beta_end}
         elif cooling_kind == "piecewise":
             stages_raw = cooling_cfg_raw.get("stages")
             if not isinstance(stages_raw, list) or not stages_raw:
@@ -125,6 +130,7 @@ class GibbsAnnealOptimizer(Optimizer):
                     }
                 )
             self.mcmc_cooling_cfg = {"kind": "piecewise", "stages": stages}
+            self.mcmc_cooling_summary = {"kind": "piecewise", "stages": list(stages)}
         else:
             raise ValueError(f"Unsupported mcmc_cooling kind: {cooling_kind!r}")
         self.mcmc_beta_of = make_beta_scheduler(self.mcmc_cooling_cfg, self.total_sweeps)
@@ -205,12 +211,7 @@ class GibbsAnnealOptimizer(Optimizer):
         # Book‑keeping
         self.move_tally: Counter = Counter()
         self.accept_tally: Counter = Counter()
-        self.swap_attempts: int = 0
-        self.swap_accepts: int = 0
-        self.swap_attempts_by_pair: List[int] = [0 for _ in range(max(0, self.chains - 1))]
-        self.swap_accepts_by_pair: List[int] = [0 for _ in range(max(0, self.chains - 1))]
         self.move_stats: List[Dict[str, object]] = []
-        self.swap_events: List[Dict[str, object]] = []
         self.all_samples: List[np.ndarray] = []
         self.all_meta: List[Tuple[int, int]] = []
         self.all_trace_meta: List[Dict[str, object]] = []
@@ -237,13 +238,8 @@ class GibbsAnnealOptimizer(Optimizer):
         self.all_trace_meta.clear()
         self.all_scores.clear()
         self.move_stats.clear()
-        self.swap_events.clear()
         self.move_tally.clear()
         self.accept_tally.clear()
-        self.swap_attempts = 0
-        self.swap_accepts = 0
-        self.swap_attempts_by_pair = [0 for _ in range(max(0, C - 1))]
-        self.swap_accepts_by_pair = [0 for _ in range(max(0, C - 1))]
         if self._unique_success_set is not None:
             self._unique_success_set.clear()
             self.unique_successes = 0
@@ -808,7 +804,6 @@ class GibbsAnnealOptimizer(Optimizer):
         all_accept = sum(accepted.values())
         acceptance_rate_all = (all_accept / all_total) if all_total else 0.0
         pct = (step / total) * 100 if total else 100.0
-        swap_rate = self.swap_accepts / self.swap_attempts if self.swap_attempts else 0.0
         score_blob = ""
         if current_score is not None:
             score_blob = f" score={current_score:.3f}"
@@ -833,9 +828,6 @@ class GibbsAnnealOptimizer(Optimizer):
             acceptance_rate=acceptance_rate,
             acceptance_rate_mh=acceptance_rate_mh,
             acceptance_rate_all=acceptance_rate_all,
-            swap_accepts=self.swap_accepts,
-            swap_attempts=self.swap_attempts,
-            swap_rate=swap_rate,
             current_score=current_score,
             score_mean=score_mean,
             score_std=score_std,
@@ -858,7 +850,6 @@ class GibbsAnnealOptimizer(Optimizer):
         all_total = sum(totals.values())
         all_accept = sum(accepted.values())
         acceptance_rate_all = (all_accept / all_total) if all_total else 0.0
-        swap_rate = self.swap_accepts / self.swap_attempts if self.swap_attempts else 0.0
         eps = 1.0e-12
         mh_deltas = [
             abs(float(ms.get("delta", 0.0)))
@@ -885,18 +876,8 @@ class GibbsAnnealOptimizer(Optimizer):
             "delta_abs_median_mh": delta_abs_median_mh,
             "delta_frac_zero_mh": delta_frac_zero_mh,
             "score_change_rate_mh": score_change_rate_mh,
-            "swap_attempts": self.swap_attempts,
-            "swap_accepts": self.swap_accepts,
-            "swap_acceptance_rate": swap_rate,
-            "swap_attempts_by_pair": list(self.swap_attempts_by_pair),
-            "swap_accepts_by_pair": list(self.swap_accepts_by_pair),
             "beta_ladder_base": list(self.beta_ladder_base),
             "beta_ladder_final": list(self.beta_ladder),
-            "beta_ladder_scale_final": 1.0,
-            "beta_ladder_scale_mode": "annealing_schedule",
-            "swap_pair_scales_final": None,
-            "swap_saturation_windows": 0,
-            "swap_tuning_limited": False,
             "beta_min": beta_min,
             "beta_max_base": beta_max_base,
             "beta_max_final": beta_max_final,
@@ -905,9 +886,8 @@ class GibbsAnnealOptimizer(Optimizer):
             "proposal_block_len_range_final": list(self.move_cfg["block_len_range"]),
             "proposal_multi_k_range_final": list(self.move_cfg["multi_k_range"]),
             "unique_successes": self.unique_successes,
-            "move_stats": list(self.move_stats),
-            "swap_events": list(self.swap_events),
-            "mcmc_cooling": dict(self.mcmc_cooling_cfg),
+            "move_stats": self.move_stats,
+            "mcmc_cooling": dict(self.mcmc_cooling_summary),
             "final_softmin_beta": self.final_softmin_beta(),
             "final_mcmc_beta": self.final_mcmc_beta(),
         }
@@ -927,8 +907,5 @@ class GibbsAnnealOptimizer(Optimizer):
             "total_sweeps": self.total_sweeps,
             "beta_ladder_base": list(self.beta_ladder_base),
             "beta_ladder_final": list(self.beta_ladder),
-            "beta_ladder_scale_final": 1.0,
-            "beta_ladder_scale_mode": "annealing_schedule",
-            "swap_pair_scales_final": None,
-            "mcmc_cooling": dict(self.mcmc_cooling_cfg),
+            "mcmc_cooling": dict(self.mcmc_cooling_summary),
         }

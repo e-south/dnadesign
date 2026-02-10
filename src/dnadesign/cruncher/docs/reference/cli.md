@@ -49,7 +49,7 @@ Caches motif matrices into `<catalog.root>/normalized/motifs/...`.
 
 Inputs:
 
-* CONFIG (explicit or resolved)
+* optional config path (`--config/-c`), otherwise resolved from workspace/CWD
 * at least one of `--tf`, `--motif-id`, or `--campaign`
 
 Network:
@@ -96,7 +96,7 @@ Caches binding-site instances into `<catalog.root>/normalized/sites/...`.
 
 Inputs:
 
-* CONFIG (explicit or resolved)
+* optional config path (`--config/-c`), otherwise resolved from workspace/CWD
 * at least one of `--tf`, `--motif-id`, `--campaign`, or `--hydrate`
 
 Network:
@@ -150,7 +150,7 @@ Writes `<workspace>/.cruncher/locks/<config>.lock.json`.
 
 Inputs:
 
-* CONFIG (explicit or resolved)
+* optional config path (`--config/-c`), otherwise resolved from workspace/CWD
 * optional `--campaign <name>` (required when `workspace.regulator_sets: []`)
 * cached motifs/sites for the configured regulators
 
@@ -392,6 +392,7 @@ Preconditions:
 * trace-dependent plots require `optimize/trace.nc`
 * if `<run_dir>/analysis/` exists without `summary.json`, remove the incomplete `analysis/` folder before re-running `cruncher analyze`
 * each sample run snapshots the lockfile under `input/lockfile.json`; analysis uses that snapshot to avoid mismatch if the workspace lockfile changes later
+* if `analysis` is omitted from config, analyze uses schema defaults (including `run_selector=latest`)
 
 Outputs:
 
@@ -780,7 +781,7 @@ Summarize effective configuration settings.
 
 Inputs:
 
-* CONFIG (explicit or resolved)
+* optional config path (`--config/-c`), otherwise resolved from workspace/CWD
 
 Network:
 
@@ -788,8 +789,10 @@ Network:
 
 Examples:
 
-* `cruncher config <config>`
-* `cruncher config <config> summary`
+* `cruncher config`
+* `cruncher config summary`
+* `cruncher config summary <config>`
+* `cruncher config --config <config>`
 
 Note:
 

@@ -85,7 +85,7 @@ def test_sample_abort_marks_run_status(tmp_path: Path, monkeypatch: pytest.Monke
                 "moves": {"profile": "balanced", "overrides": {"move_probs": {"S": 1.0, "B": 0.0, "M": 0.0}}},
                 "output": {
                     "save_trace": False,
-                    "save_sequences": False,
+                    "save_sequences": True,
                     "include_tune_in_sequences": False,
                     "live_metrics": False,
                 },

@@ -12,17 +12,15 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from dnadesign.cruncher.config.schema_v3 import SampleOptimizerCoolingConfig
+from dnadesign.cruncher.config.schema_v3 import (
+    SampleOptimizerCoolingFixedConfig,
+    SampleOptimizerCoolingLinearConfig,
+)
 from dnadesign.cruncher.core.optimizers.cooling import make_beta_scheduler
 
 
 def test_linear_mcmc_cooling_is_monotonic() -> None:
-    cooling = SampleOptimizerCoolingConfig(
-        kind="linear",
-        beta=None,
-        beta_start=0.25,
-        beta_end=1.25,
-    )
+    cooling = SampleOptimizerCoolingLinearConfig(beta_start=0.25, beta_end=1.25)
     beta_of = make_beta_scheduler(
         {
             "kind": "linear",
@@ -39,4 +37,4 @@ def test_linear_mcmc_cooling_is_monotonic() -> None:
 
 def test_fixed_mcmc_beta_must_be_positive() -> None:
     with pytest.raises(ValueError, match="sample.optimizer.cooling.beta must be > 0"):
-        SampleOptimizerCoolingConfig(kind="fixed", beta=0.0)
+        SampleOptimizerCoolingFixedConfig(beta=0.0)

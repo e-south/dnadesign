@@ -47,7 +47,7 @@ def _write_config(tmp_path: Path, run_name: str) -> Path:
     return config_path
 
 
-def _write_minimal_run(tmp_path: Path, run_name: str) -> Path:
+def _write_minimal_run(tmp_path: Path, run_name: str, *, optimizer_kind: str = "gibbs_anneal") -> Path:
     run_dir = tmp_path / "outputs" / "runs" / run_name
     run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -70,7 +70,7 @@ def _write_minimal_run(tmp_path: Path, run_name: str) -> Path:
         "draws": 1,
         "adapt_sweeps": 0,
         "top_k": 2,
-        "optimizer": {"kind": "pt"},
+        "optimizer": {"kind": optimizer_kind},
         "optimizer_stats": {"beta_ladder_final": [1.0]},
         "objective": {"bidirectional": True},
         "motif_store": {"catalog_root": str((tmp_path / ".cruncher").resolve())},
@@ -120,4 +120,14 @@ def test_analyze_requires_elites_hits_parquet(tmp_path: Path) -> None:
     cfg = load_config(config_path)
 
     with pytest.raises(FileNotFoundError, match="elites_hits"):
+        run_analyze(cfg, config_path, runs_override=[run_name])
+
+
+def test_analyze_rejects_non_gibbs_optimizer_kind(tmp_path: Path) -> None:
+    run_name = "sample_pt"
+    config_path = _write_config(tmp_path, run_name)
+    _write_minimal_run(tmp_path, run_name, optimizer_kind="pt")
+    cfg = load_config(config_path)
+
+    with pytest.raises(ValueError, match="optimizer kind.*gibbs_anneal"):
         run_analyze(cfg, config_path, runs_override=[run_name])

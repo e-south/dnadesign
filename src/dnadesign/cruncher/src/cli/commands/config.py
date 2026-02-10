@@ -36,11 +36,6 @@ console = Console()
 @app.callback(invoke_without_command=True)
 def config_main(
     ctx: typer.Context,
-    config: Path | None = typer.Argument(
-        None,
-        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
-        metavar="CONFIG",
-    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -49,16 +44,16 @@ def config_main(
     ),
 ) -> None:
     if ctx.invoked_subcommand is not None:
-        if config_option is None and config is None:
+        if config_option is None:
             return
         try:
-            ctx.obj = {"config_path": resolve_config_path(config_option or config)}
+            ctx.obj = {"config_path": resolve_config_path(config_option)}
         except ConfigResolutionError as exc:
             console.print(str(exc))
             raise typer.Exit(code=1)
         return
     try:
-        config_path = resolve_config_path(config_option or config)
+        config_path = resolve_config_path(config_option)
     except ConfigResolutionError as exc:
         console.print(str(exc))
         raise typer.Exit(code=1)
@@ -193,6 +188,16 @@ def summary(
             table.add_row("optimizer.cooling.beta_end", str(cooling["beta_end"]))
         else:
             table.add_row("optimizer.cooling.stages", str(cooling["stages"]))
+        early_stop = sample["optimizer"]["early_stop"]
+        table.add_row("optimizer.early_stop.enabled", str(early_stop["enabled"]))
+        table.add_row("optimizer.early_stop.patience", str(early_stop["patience"]))
+        table.add_row("optimizer.early_stop.min_delta", str(early_stop["min_delta"]))
+        table.add_row("optimizer.early_stop.require_min_unique", str(early_stop["require_min_unique"]))
+        table.add_row("optimizer.early_stop.min_unique", str(early_stop["min_unique"]))
+        table.add_row(
+            "optimizer.early_stop.success_min_per_tf_norm",
+            str(early_stop["success_min_per_tf_norm"]),
+        )
         table.add_row("elites.k", str(sample["elites"]["k"]))
         table.add_row("elites.min_per_tf_norm", str(sample["elites"]["filter"]["min_per_tf_norm"]))
         table.add_row("elites.alpha", str(sample["elites"]["select"]["alpha"]))
@@ -203,6 +208,7 @@ def summary(
     if analysis is None:
         table.add_row("analysis", "None")
     else:
+        table.add_row("analysis.enabled", str(analysis["enabled"]))
         table.add_row("analysis.run_selector", analysis["run_selector"])
         table.add_row("analysis.runs", str(analysis["runs"]))
         table.add_row("analysis.pairwise", str(analysis["pairwise"]))

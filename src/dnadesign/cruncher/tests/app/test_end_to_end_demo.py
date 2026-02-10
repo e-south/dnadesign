@@ -56,7 +56,7 @@ def _sample_block() -> dict:
         "optimizer": {
             "kind": "gibbs_anneal",
             "chains": 2,
-            "cooling": {"kind": "linear", "beta": None, "beta_start": 0.1, "beta_end": 1.0},
+            "cooling": {"kind": "linear", "beta_start": 0.1, "beta_end": 1.0},
         },
         "objective": {"bidirectional": True, "score_scale": "normalized-llr", "combine": "min"},
         "elites": {
@@ -167,6 +167,9 @@ def test_end_to_end_sites_pipeline(tmp_path: Path) -> None:
     assert sample_dir.exists()
     assert manifest_path(sample_dir).exists()
     sample_manifest_payload = json.loads(manifest_path(sample_dir).read_text())
+    assert sample_manifest_payload.get("chains") == config["cruncher"]["sample"]["optimizer"]["chains"]
+    optimizer_stats = sample_manifest_payload.get("optimizer_stats") or {}
+    assert "swap_acceptance_rate" not in optimizer_stats
     assert sample_manifest_payload.get("parse_signature")
     assert isinstance(sample_manifest_payload.get("parse_inputs"), dict)
     assert not parse_manifest_path(sample_dir).exists()

@@ -48,7 +48,7 @@ def sample(
     verbose: bool = typer.Option(
         False,
         "--verbose",
-        help="Enable periodic progress logging during sampling (overrides progress_every when disabled).",
+        help="Enable periodic progress logging during sampling.",
     ),
     debug: bool = typer.Option(
         False,
@@ -77,21 +77,23 @@ def sample(
     except ValueError as exc:
         console.print(f"Error: {exc}")
         raise typer.Exit(code=1)
-    if verbose:
-        if cfg.sample.ui.progress_every == 0:
-            cfg.sample.ui.progress_every = 1000
-        cfg.sample.ui.progress_bar = True
+    progress_bar = True
+    progress_every = 1000 if verbose else 0
     if debug:
         logging.getLogger().setLevel(logging.DEBUG)
-        if cfg.sample.ui.progress_every == 0:
-            cfg.sample.ui.progress_every = 1000
-        cfg.sample.ui.progress_bar = True
+        progress_every = 1000
     try:
         cache_dir = workspace_state_root(config_path) / "numba_cache"
         ensure_numba_cache_dir(config_path.parent, cache_dir=cache_dir)
         from dnadesign.cruncher.app.sample_workflow import run_sample
 
-        run_sample(cfg, config_path, force_overwrite=force_overwrite)
+        run_sample(
+            cfg,
+            config_path,
+            force_overwrite=force_overwrite,
+            progress_bar=progress_bar,
+            progress_every=progress_every,
+        )
     except (RuntimeError, ValueError, FileNotFoundError) as exc:
         console.print(f"Error: {exc}")
         console.print("Hint: run cruncher fetch + lock, then cruncher sample <config>.")

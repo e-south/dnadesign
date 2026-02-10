@@ -156,3 +156,82 @@ def test_insufficient_elites_fail_run(monkeypatch: pytest.MonkeyPatch, tmp_path:
             lockmap=lockmap,
             sample_cfg=sample_cfg,
         )
+
+
+def test_non_gibbs_optimizer_kind_is_rejected_early(tmp_path: Path) -> None:
+    cfg, config_path, sample_cfg = _cfg(tmp_path, elite_k=1, min_per_tf_norm=0.0)
+    object.__setattr__(sample_cfg.optimizer, "kind", "pt")
+
+    with pytest.raises(ValueError, match="sample.optimizer.kind.*gibbs_anneal"):
+        _run_sample_for_set(
+            cfg,
+            config_path,
+            set_index=1,
+            set_count=1,
+            include_set_index=False,
+            tfs=["lexA"],
+            lockmap={},
+            sample_cfg=sample_cfg,
+        )
+
+
+def test_optimizer_early_stop_is_passed_to_optimizer_cfg(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    cfg, config_path, sample_cfg = _cfg(tmp_path, elite_k=1, min_per_tf_norm=0.0)
+    sample_cfg.optimizer.early_stop.enabled = True
+    sample_cfg.optimizer.early_stop.patience = 5
+    sample_cfg.optimizer.early_stop.min_delta = 0.02
+    sample_cfg.optimizer.early_stop.require_min_unique = True
+    sample_cfg.optimizer.early_stop.min_unique = 2
+    sample_cfg.optimizer.early_stop.success_min_per_tf_norm = 0.3
+
+    pwm = PWM(name="lexA", matrix=np.full((4, 4), 0.25, dtype=float))
+    lockmap = {"lexA": SimpleNamespace(source="demo", motif_id="M1", sha256="sha")}
+    lock_path = resolve_lock_path(config_path)
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path.write_text("{}")
+
+    captured: dict[str, object] = {}
+
+    class _CaptureOptimizer(_DummyOptimizer):
+        def __init__(self, **kwargs) -> None:
+            captured["cfg"] = kwargs["cfg"]
+            super().__init__(**kwargs)
+
+        def optimise(self) -> None:
+            raise KeyboardInterrupt("stop")
+
+    monkeypatch.setattr(
+        "dnadesign.cruncher.app.sample.run_set._load_pwms_for_set",
+        lambda **_kwargs: {"lexA": pwm},
+    )
+    monkeypatch.setattr(
+        "dnadesign.cruncher.app.sample.run_set._save_config",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "dnadesign.cruncher.core.optimizers.registry.get_optimizer",
+        lambda _name: _CaptureOptimizer,
+    )
+
+    with pytest.raises(KeyboardInterrupt, match="stop"):
+        _run_sample_for_set(
+            cfg,
+            config_path,
+            set_index=1,
+            set_count=1,
+            include_set_index=False,
+            tfs=["lexA"],
+            lockmap=lockmap,
+            sample_cfg=sample_cfg,
+        )
+
+    optimizer_cfg = captured.get("cfg")
+    assert isinstance(optimizer_cfg, dict)
+    early_stop = optimizer_cfg.get("early_stop")
+    assert isinstance(early_stop, dict)
+    assert early_stop["enabled"] is True
+    assert early_stop["patience"] == 5
+    assert early_stop["min_delta"] == pytest.approx(0.02)
+    assert early_stop["require_min_unique"] is True
+    assert early_stop["min_unique"] == 2
+    assert early_stop["success_min_per_tf_norm"] == pytest.approx(0.3)

@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <cruncher project>
-src/dnadesign/cruncher/tests/core/test_pt_trace_semantics.py
+src/dnadesign/cruncher/tests/core/test_gibbs_trace_semantics.py
 
 Validates gibbs annealing trace metadata semantics.
 
@@ -70,7 +70,7 @@ def test_trace_meta_includes_chain_and_sweep_fields() -> None:
         assert required.issubset(set(row.keys()))
     assert sorted({int(row["chain"]) for row in trace_rows}) == [0, 1]
     assert sorted({int(row["particle_id"]) for row in trace_rows}) == [0, 1]
-    assert opt.swap_events == []
+    assert not hasattr(opt, "swap_events")
 
 
 def test_can_skip_trace_construction_when_disabled() -> None:

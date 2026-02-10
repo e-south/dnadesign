@@ -44,7 +44,7 @@ class _ConstantEvaluator:
         return {"tf": 0.0}, 0.0
 
 
-def test_pt_early_stop_waits_for_unique_successes() -> None:
+def test_gibbs_early_stop_waits_for_unique_successes() -> None:
     rng = np.random.default_rng(0)
     evaluator = _ConstantEvaluator()
     cfg = {

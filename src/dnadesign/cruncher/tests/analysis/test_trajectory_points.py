@@ -13,12 +13,12 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from dnadesign.cruncher.analysis.trajectory import (
     add_raw_llr_objective,
     build_chain_trajectory_points,
     build_trajectory_points,
-    compute_best_so_far_path,
 )
 from dnadesign.cruncher.core.pwm import PWM
 
@@ -68,7 +68,7 @@ def test_build_trajectory_points_subsample_keeps_dense_early_sweeps() -> None:
     assert list(trajectory_df["sweep"].astype(int).head(4)) == [0, 1, 2, 3]
 
 
-def test_build_trajectory_points_maps_slot_id_to_chain_when_chain_missing() -> None:
+def test_build_trajectory_points_requires_chain_column() -> None:
     sequences_df = pd.DataFrame(
         {
             "slot_id": [0, 0, 1, 1],
@@ -79,30 +79,13 @@ def test_build_trajectory_points_maps_slot_id_to_chain_when_chain_missing() -> N
         }
     )
 
-    trajectory_df = build_trajectory_points(
-        sequences_df,
-        ["lexA", "cpxR"],
-        max_points=100,
-        beta_ladder=[0.2, 1.0],
-    )
-
-    assert sorted(trajectory_df["chain"].astype(int).unique()) == [0, 1]
-
-
-def test_compute_best_so_far_path_is_monotonic() -> None:
-    trajectory_df = pd.DataFrame(
-        {
-            "sweep": [0, 0, 1, 1, 2, 2],
-            "x": [0.1, 0.2, 0.3, 0.25, 0.4, 0.35],
-            "y": [0.2, 0.1, 0.4, 0.2, 0.45, 0.3],
-            "objective_scalar": [0.1, 0.2, 0.15, 0.25, 0.22, 0.3],
-        }
-    )
-
-    best_path = compute_best_so_far_path(trajectory_df, objective_col="objective_scalar")
-
-    assert list(best_path["sweep"].astype(int)) == [0, 1, 2]
-    assert best_path["objective_scalar"].is_monotonic_increasing
+    with pytest.raises(ValueError, match="missing required column 'chain'"):
+        build_trajectory_points(
+            sequences_df,
+            ["lexA", "cpxR"],
+            max_points=100,
+            beta_ladder=[0.2, 1.0],
+        )
 
 
 def test_build_trajectory_points_carries_chain_fields() -> None:

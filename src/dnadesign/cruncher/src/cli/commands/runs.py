@@ -912,8 +912,6 @@ def watch_run_cmd(
         if "beta_min" in payload or "beta_max" in payload:
             _add_row("beta_min", "beta_min")
             _add_row("beta_max", "beta_max")
-        if "swap_rate" in payload:
-            _add_row("swap_rate", "swap_rate")
         if "current_score" in payload:
             _add_row("current_score", "current_score")
         _add_row("best_score", "best_score")

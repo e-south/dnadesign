@@ -329,6 +329,9 @@ def discover_motifs(
         console.print(str(exc))
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
+    if not cfg.discover.enabled:
+        console.print("Error: discover.enabled=false; set discover.enabled=true to run motif discovery.")
+        raise typer.Exit(code=1)
 
     tool = (tool or cfg.discover.tool).lower()
     resolved_tool_path = resolve_tool_path(

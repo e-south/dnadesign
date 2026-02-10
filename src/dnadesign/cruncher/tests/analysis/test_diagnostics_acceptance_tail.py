@@ -26,9 +26,9 @@ def test_acceptance_tail_from_move_stats() -> None:
         elites_df=pd.DataFrame(),
         elites_hits_df=None,
         tf_names=["tfA"],
-        optimizer={"kind": "pt"},
+        optimizer={"kind": "gibbs_anneal"},
         optimizer_stats={"move_stats": move_stats},
-        optimizer_kind="pt",
+        optimizer_kind="gibbs_anneal",
     )
     optimizer_metrics = diagnostics["metrics"]["optimizer"]
     assert optimizer_metrics["acceptance_rate_mh_tail"] == 0.5

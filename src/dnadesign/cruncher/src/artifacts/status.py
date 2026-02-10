@@ -43,7 +43,6 @@ DEFAULT_METRICS_FIELDS = (
     "best_chain",
     "best_draw",
     "acceptance_rate",
-    "swap_rate",
 )
 
 
@@ -108,7 +107,6 @@ def _should_emit_metrics(fields: Dict[str, Any]) -> bool:
         "score_std",
         "best_score",
         "acceptance_rate",
-        "swap_rate",
         "status_message",
         "phase",
         "beta",

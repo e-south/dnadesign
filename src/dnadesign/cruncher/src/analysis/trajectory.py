@@ -229,10 +229,7 @@ def build_trajectory_points(
 
     df = sequences_df.copy()
     if "chain" not in df.columns:
-        if "slot_id" in df.columns:
-            df["chain"] = df["slot_id"]
-        else:
-            df["chain"] = 0
+        raise ValueError("Trajectory points are missing required column 'chain'.")
     chain_series = pd.to_numeric(df["chain"], errors="coerce")
     if chain_series.isna().any():
         raise ValueError("Trajectory chain values must be numeric.")
@@ -405,57 +402,3 @@ def build_chain_trajectory_points(
             out = out.iloc[_subsample_indices_early_priority(len(out), max_points)].reset_index(drop=True)
 
     return out.reset_index(drop=True)
-
-
-def compute_best_so_far_path(
-    trajectory_df: pd.DataFrame,
-    *,
-    objective_col: str = "objective_scalar",
-    sweep_col: str = "sweep",
-) -> pd.DataFrame:
-    if trajectory_df is None or trajectory_df.empty:
-        raise ValueError("Cannot compute best-so-far path from empty trajectory data.")
-    if objective_col not in trajectory_df.columns:
-        raise ValueError(f"Missing objective column for best-so-far path: {objective_col}")
-    if sweep_col not in trajectory_df.columns:
-        raise ValueError(f"Missing sweep column for best-so-far path: {sweep_col}")
-    if "x" not in trajectory_df.columns or "y" not in trajectory_df.columns:
-        raise ValueError("Trajectory data must include x/y columns for best-so-far path.")
-
-    df = trajectory_df.copy()
-    df[objective_col] = pd.to_numeric(df[objective_col], errors="coerce")
-    if df[objective_col].isna().any():
-        raise ValueError(f"Trajectory objective column '{objective_col}' contains non-numeric values.")
-    df[sweep_col] = pd.to_numeric(df[sweep_col], errors="coerce")
-    if df[sweep_col].isna().any():
-        raise ValueError(f"Trajectory sweep column '{sweep_col}' contains non-numeric values.")
-    df[sweep_col] = df[sweep_col].astype(int)
-
-    winners = (
-        df.sort_values([sweep_col, objective_col], ascending=[True, False])
-        .groupby(sweep_col, sort=True, as_index=False)
-        .first()
-        .sort_values(sweep_col)
-        .reset_index(drop=True)
-    )
-    if winners.empty:
-        raise ValueError("Cannot compute best-so-far path from empty per-sweep winners.")
-
-    best_rows: list[dict[str, float | int]] = []
-    best_idx = 0
-    best_value = float(winners[objective_col].iloc[0])
-    for idx, row in winners.iterrows():
-        score = float(row[objective_col])
-        if score >= best_value:
-            best_value = score
-            best_idx = idx
-        best_row = winners.iloc[best_idx]
-        best_rows.append(
-            {
-                str(sweep_col): int(row[sweep_col]),
-                "x": float(best_row["x"]),
-                "y": float(best_row["y"]),
-                str(objective_col): float(best_row[objective_col]),
-            }
-        )
-    return pd.DataFrame(best_rows)

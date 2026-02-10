@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Tuple, Union
+from typing import Annotated, Dict, List, Literal, Optional, Tuple, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -415,7 +415,7 @@ class WorkspaceConfig(StrictBaseModel):
                 if not name:
                     raise ValueError(f"workspace.regulator_sets[{idx}] must contain non-empty TF names")
                 if name in seen:
-                    continue
+                    raise ValueError(f"workspace.regulator_sets[{idx}] contains duplicate TF '{name}'")
                 seen.add(name)
                 tfs.append(name)
             cleaned.append(tfs)
@@ -438,7 +438,7 @@ class WorkspaceConfig(StrictBaseModel):
                 if not tf_name:
                     raise ValueError(f"workspace.regulator_categories['{name}'] must contain non-empty TF names")
                 if tf_name in seen:
-                    continue
+                    raise ValueError(f"workspace.regulator_categories['{name}'] contains duplicate TF '{tf_name}'")
                 seen.add(tf_name)
                 tfs.append(tf_name)
             cleaned[name] = tfs
@@ -466,8 +466,6 @@ class CatalogConfig(StrictBaseModel):
     site_kinds: Optional[List[str]] = None
     site_window_lengths: Dict[str, int] = Field(default_factory=dict)
     site_window_center: Literal["midpoint", "summit"] = "midpoint"
-    pwm_window_lengths: Dict[str, int] = Field(default_factory=dict)
-    pwm_window_strategy: Literal["max_info"] = "max_info"
     min_sites_for_pwm: int = 2
     allow_low_sites: bool = False
 
@@ -489,14 +487,6 @@ class CatalogConfig(StrictBaseModel):
                 raise ValueError(f"catalog.site_window_lengths['{key}'] must be > 0")
         return v
 
-    @field_validator("pwm_window_lengths")
-    @classmethod
-    def _check_pwm_window_lengths(cls, v: Dict[str, int]) -> Dict[str, int]:
-        for key, value in v.items():
-            if value <= 0:
-                raise ValueError(f"catalog.pwm_window_lengths['{key}'] must be > 0")
-        return v
-
     @field_validator("min_sites_for_pwm")
     @classmethod
     def _check_min_sites(cls, v: int) -> int:
@@ -514,6 +504,14 @@ class CatalogConfig(StrictBaseModel):
     @property
     def catalog_root(self) -> Path:
         return self.root
+
+    @property
+    def pwm_window_lengths(self) -> Dict[str, int]:
+        return {}
+
+    @property
+    def pwm_window_strategy(self) -> str:
+        return "max_info"
 
 
 class DiscoverConfig(StrictBaseModel):
@@ -913,46 +911,43 @@ class SampleOptimizerCoolingStageConfig(StrictBaseModel):
         return float(v)
 
 
-class SampleOptimizerCoolingConfig(StrictBaseModel):
-    kind: Literal["fixed", "linear", "piecewise"] = "fixed"
-    beta: Optional[float] = 1.0
-    beta_start: Optional[float] = None
-    beta_end: Optional[float] = None
-    stages: List[SampleOptimizerCoolingStageConfig] = Field(default_factory=list)
+class SampleOptimizerCoolingFixedConfig(StrictBaseModel):
+    kind: Literal["fixed"] = "fixed"
+    beta: float = 1.0
 
-    @field_validator("beta", "beta_start", "beta_end")
+    @field_validator("beta")
     @classmethod
-    def _check_beta_values(cls, v: Optional[float], info) -> Optional[float]:
-        if v is None:
-            return None
+    def _check_beta(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v <= 0:
+            raise ValueError("sample.optimizer.cooling.beta must be > 0")
+        return float(v)
+
+
+class SampleOptimizerCoolingLinearConfig(StrictBaseModel):
+    kind: Literal["linear"] = "linear"
+    beta_start: float = 0.20
+    beta_end: float = 4.0
+
+    @field_validator("beta_start", "beta_end")
+    @classmethod
+    def _check_positive_betas(cls, v: float, info) -> float:
         if not isinstance(v, (int, float)) or v <= 0:
             raise ValueError(f"sample.optimizer.cooling.{info.field_name} must be > 0")
         return float(v)
 
     @model_validator(mode="after")
-    def _check_shape(self) -> "SampleOptimizerCoolingConfig":
-        if self.kind == "fixed":
-            if self.beta is None:
-                raise ValueError("sample.optimizer.cooling.beta is required when kind='fixed'")
-            if self.beta_start is not None or self.beta_end is not None:
-                raise ValueError("sample.optimizer.cooling.beta_start/beta_end must be unset when kind='fixed'")
-            if self.stages:
-                raise ValueError("sample.optimizer.cooling.stages must be empty when kind='fixed'")
-            return self
+    def _check_beta_order(self) -> "SampleOptimizerCoolingLinearConfig":
+        if self.beta_end < self.beta_start:
+            raise ValueError("sample.optimizer.cooling.beta_end must be >= beta_start when kind='linear'")
+        return self
 
-        if self.kind == "linear":
-            if self.beta_start is None or self.beta_end is None:
-                raise ValueError("sample.optimizer.cooling.beta_start and beta_end are required when kind='linear'")
-            if self.beta is not None:
-                raise ValueError("sample.optimizer.cooling.beta must be unset when kind='linear'")
-            if self.stages:
-                raise ValueError("sample.optimizer.cooling.stages must be empty when kind='linear'")
-            if self.beta_end < self.beta_start:
-                raise ValueError("sample.optimizer.cooling.beta_end must be >= beta_start when kind='linear'")
-            return self
 
-        if self.beta is not None or self.beta_start is not None or self.beta_end is not None:
-            raise ValueError("sample.optimizer.cooling.beta/beta_start/beta_end must be unset when kind='piecewise'")
+class SampleOptimizerCoolingPiecewiseConfig(StrictBaseModel):
+    kind: Literal["piecewise"] = "piecewise"
+    stages: List[SampleOptimizerCoolingStageConfig] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _check_piecewise_stages(self) -> "SampleOptimizerCoolingPiecewiseConfig":
         if not self.stages:
             raise ValueError("sample.optimizer.cooling.stages must be non-empty when kind='piecewise'")
         sweeps = [stage.sweeps for stage in self.stages]
@@ -961,10 +956,59 @@ class SampleOptimizerCoolingConfig(StrictBaseModel):
         return self
 
 
+SampleOptimizerCoolingConfig = Annotated[
+    Union[
+        SampleOptimizerCoolingFixedConfig,
+        SampleOptimizerCoolingLinearConfig,
+        SampleOptimizerCoolingPiecewiseConfig,
+    ],
+    Field(discriminator="kind"),
+]
+
+
+class SampleOptimizerEarlyStopConfig(StrictBaseModel):
+    enabled: bool = False
+    patience: int = 0
+    min_delta: float = 0.0
+    require_min_unique: bool = False
+    min_unique: int = 0
+    success_min_per_tf_norm: float = 0.0
+
+    @field_validator("patience", "min_unique")
+    @classmethod
+    def _check_non_negative_ints(cls, v: int, info) -> int:
+        if not isinstance(v, int) or v < 0:
+            raise ValueError(f"sample.optimizer.early_stop.{info.field_name} must be >= 0")
+        return int(v)
+
+    @field_validator("min_delta")
+    @classmethod
+    def _check_min_delta(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v < 0:
+            raise ValueError("sample.optimizer.early_stop.min_delta must be >= 0")
+        return float(v)
+
+    @field_validator("success_min_per_tf_norm")
+    @classmethod
+    def _check_success_threshold(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v < 0 or v > 1:
+            raise ValueError("sample.optimizer.early_stop.success_min_per_tf_norm must be between 0 and 1")
+        return float(v)
+
+    @model_validator(mode="after")
+    def _check_consistency(self) -> "SampleOptimizerEarlyStopConfig":
+        if self.enabled and self.patience < 1:
+            raise ValueError("sample.optimizer.early_stop.patience must be >= 1 when enabled=true")
+        if self.require_min_unique and self.min_unique < 1:
+            raise ValueError("sample.optimizer.early_stop.min_unique must be >= 1 when require_min_unique=true")
+        return self
+
+
 class SampleOptimizerConfig(StrictBaseModel):
     kind: Literal["gibbs_anneal"] = "gibbs_anneal"
     chains: int = 1
-    cooling: SampleOptimizerCoolingConfig = SampleOptimizerCoolingConfig()
+    cooling: SampleOptimizerCoolingConfig = Field(default_factory=SampleOptimizerCoolingLinearConfig)
+    early_stop: SampleOptimizerEarlyStopConfig = SampleOptimizerEarlyStopConfig()
 
     @field_validator("chains")
     @classmethod
@@ -975,17 +1019,17 @@ class SampleOptimizerConfig(StrictBaseModel):
 
 
 class SampleEliteFilterConfig(StrictBaseModel):
-    min_per_tf_norm: Union[Literal["auto"], float, None] = "auto"
+    min_per_tf_norm: float | None = None
     require_all_tfs: bool = True
     pwm_sum_min: float = 0.0
 
     @field_validator("min_per_tf_norm")
     @classmethod
     def _check_min_per_tf_norm(cls, v):
-        if v is None or v == "auto":
+        if v is None:
             return v
         if not isinstance(v, (int, float)) or v < 0 or v > 1:
-            raise ValueError("elites.filter.min_per_tf_norm must be 'auto', null, or between 0 and 1")
+            raise ValueError("elites.filter.min_per_tf_norm must be null or between 0 and 1")
         return float(v)
 
     @field_validator("pwm_sum_min")
@@ -1037,6 +1081,12 @@ class SampleOutputConfig(StrictBaseModel):
     save_trace: bool = True
     include_tune_in_sequences: bool = False
     live_metrics: bool = True
+
+    @model_validator(mode="after")
+    def _check_sequences_required(self) -> "SampleOutputConfig":
+        if not self.save_sequences:
+            raise ValueError("sample.output.save_sequences must be true because analyze requires sequences.parquet")
+        return self
 
 
 class SampleMotifWidthConfig(StrictBaseModel):
@@ -1113,7 +1163,7 @@ class AnalysisConfig(StrictBaseModel):
     )
     trajectory_particle_alpha_min: float = 0.15
     trajectory_particle_alpha_max: float = 0.45
-    trajectory_slot_overlay: bool = False
+    trajectory_chain_overlay: bool = False
 
     @field_validator(
         "plot_dpi",
@@ -1187,11 +1237,6 @@ class CruncherConfig(StrictBaseModel):
             raise ValueError("Config schema v3 required (schema_version: 3)")
         if not self.workspace.regulator_sets and not self.campaigns:
             raise ValueError("Config must define workspace.regulator_sets or campaigns.")
-        if self.catalog.pwm_window_lengths:
-            raise ValueError(
-                "catalog.pwm_window_lengths is no longer used for optimization. "
-                "Set sample.motif_width.maxw to enforce PWM width at sampling time."
-            )
         return self
 
     @property

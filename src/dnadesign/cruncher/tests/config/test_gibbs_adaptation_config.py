@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <cruncher project>
-src/dnadesign/cruncher/tests/config/test_pt_adaptation_config.py
+src/dnadesign/cruncher/tests/config/test_gibbs_adaptation_config.py
 
 Validates schema support for optimizer cooling and move/proposal tuning blocks.
 
@@ -49,7 +49,6 @@ def _base_config() -> dict:
                     "chains": 4,
                     "cooling": {
                         "kind": "linear",
-                        "beta": None,
                         "beta_start": 0.25,
                         "beta_end": 1.50,
                     },
@@ -92,9 +91,6 @@ def test_piecewise_cooling_sweeps_must_be_strictly_increasing(tmp_path: Path) ->
         "chains": 2,
         "cooling": {
             "kind": "piecewise",
-            "beta": None,
-            "beta_start": None,
-            "beta_end": None,
             "stages": [
                 {"sweeps": 10, "beta": 0.4},
                 {"sweeps": 10, "beta": 0.9},
@@ -103,4 +99,32 @@ def test_piecewise_cooling_sweeps_must_be_strictly_increasing(tmp_path: Path) ->
     }
     config_path = _write_config(tmp_path, payload)
     with pytest.raises(ValidationError, match="strictly increasing"):
+        load_config(config_path)
+
+
+def test_piecewise_cooling_does_not_require_nulling_unused_keys(tmp_path: Path) -> None:
+    payload = _base_config()
+    payload["cruncher"]["sample"]["optimizer"] = {
+        "kind": "gibbs_anneal",
+        "chains": 2,
+        "cooling": {
+            "kind": "piecewise",
+            "stages": [
+                {"sweeps": 10, "beta": 0.4},
+                {"sweeps": 20, "beta": 0.9},
+            ],
+        },
+    }
+    config_path = _write_config(tmp_path, payload)
+    cfg = load_config(config_path)
+    assert cfg.sample is not None
+    assert cfg.sample.optimizer.cooling.kind == "piecewise"
+    assert len(cfg.sample.optimizer.cooling.stages) == 2
+
+
+def test_linear_cooling_rejects_beta_key(tmp_path: Path) -> None:
+    payload = _base_config()
+    payload["cruncher"]["sample"]["optimizer"]["cooling"]["beta"] = None
+    config_path = _write_config(tmp_path, payload)
+    with pytest.raises(ValidationError):
         load_config(config_path)

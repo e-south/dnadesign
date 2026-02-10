@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <cruncher project>
-src/dnadesign/cruncher/tests/core/test_pt_adaptation_strict_guard.py
+src/dnadesign/cruncher/tests/core/test_gibbs_adaptation_strict_guard.py
 
 Ensures gibbs annealing does not run replica-exchange adaptation logic.
 
@@ -111,7 +111,7 @@ def test_swap_stats_stay_zero_after_draws() -> None:
     optimizer.optimise()
 
     stats = optimizer.stats()
-    assert stats["swap_attempts"] == 0
-    assert stats["swap_accepts"] == 0
-    assert stats["swap_accepts_by_pair"] == [0, 0]
-    assert stats["swap_attempts_by_pair"] == [0, 0]
+    assert "swap_attempts" not in stats
+    assert "swap_accepts" not in stats
+    assert "swap_accepts_by_pair" not in stats
+    assert "swap_attempts_by_pair" not in stats

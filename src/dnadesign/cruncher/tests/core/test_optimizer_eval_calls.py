@@ -37,7 +37,7 @@ class _CountingEvaluator:
         return {"tf": float(state.seq.sum())}, float(state.seq.sum())
 
 
-def test_pt_block_move_calls_evaluate_once_for_proposal() -> None:
+def test_gibbs_block_move_calls_evaluate_once_for_proposal() -> None:
     rng = np.random.default_rng(0)
     evaluator = _CountingEvaluator()
     cfg = {
@@ -120,7 +120,7 @@ def test_targeting_policy_uses_precomputed_per_tf() -> None:
     assert evaluator.best_hit_calls == 1
 
 
-def test_pt_block_move_uses_precomputed_scores() -> None:
+def test_gibbs_block_move_uses_precomputed_scores() -> None:
     rng = np.random.default_rng(0)
     evaluator = _CountingEvaluator()
     cfg = {

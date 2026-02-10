@@ -57,6 +57,7 @@ from dnadesign.cruncher.config.schema_v3 import CruncherConfig, SampleConfig
 from dnadesign.cruncher.core.evaluator import SequenceEvaluator
 from dnadesign.cruncher.core.labels import format_regulator_slug
 from dnadesign.cruncher.core.optimizers.cooling import make_beta_scheduler
+from dnadesign.cruncher.core.optimizers.kinds import resolve_optimizer_kind
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.core.scoring import Scorer
 from dnadesign.cruncher.core.sequence import canon_int
@@ -161,8 +162,10 @@ def _mcmc_cooling_payload(sample_cfg: SampleConfig) -> dict[str, object]:
             "beta_start": float(cooling_cfg.beta_start),
             "beta_end": float(cooling_cfg.beta_end),
         }
-    stages = [{"sweeps": int(stage.sweeps), "beta": float(stage.beta)} for stage in sample_cfg.optimizer.cooling.stages]
-    return {"kind": "piecewise", "stages": stages}
+    if cooling_cfg.kind == "piecewise":
+        stages = [{"sweeps": int(stage.sweeps), "beta": float(stage.beta)} for stage in cooling_cfg.stages]
+        return {"kind": "piecewise", "stages": stages}
+    raise ConfigError(f"Unsupported sample.optimizer.cooling.kind: {cooling_cfg.kind!r}.")
 
 
 def _final_executed_sweep_index(optimizer: object) -> int:
@@ -229,37 +232,11 @@ def _assert_init_length_fits_pwms(sample_cfg: SampleConfig, pwms: dict[str, PWM]
 def _resolve_min_per_tf_norm(
     *,
     sample_cfg: SampleConfig,
-    scorer: Scorer,
-    seed: int,
-    sequence_length: int,
 ) -> tuple[float | None, dict[str, object] | None]:
     cfg_value = sample_cfg.elites.filter.min_per_tf_norm
     if cfg_value is None:
         return None, None
-    if cfg_value != "auto":
-        return float(cfg_value), None
-    if sample_cfg.objective.score_scale != "normalized-llr":
-        raise ValueError("elites.filter.min_per_tf_norm='auto' requires objective.score_scale='normalized-llr'.")
-    rng = np.random.default_rng(seed)
-    n_samples = 2048
-    quantile = 0.995
-    margin = 0.01
-    mins: list[float] = []
-    for _ in range(n_samples):
-        seq = SequenceState.random(sequence_length, rng).seq
-        norm_map = scorer.normalized_llr_map(seq)
-        mins.append(float(min(norm_map.values()) if norm_map else 0.0))
-    q_val = float(np.quantile(np.asarray(mins, dtype=float), quantile))
-    threshold = min(0.9, max(0.0, q_val + margin))
-    meta = {
-        "method": "random_baseline_quantile",
-        "quantile": quantile,
-        "margin": margin,
-        "n": n_samples,
-        "seed": int(seed),
-        "value": float(threshold),
-    }
-    return float(threshold), meta
+    return float(cfg_value), None
 
 
 def _core_def_hash(pwm: PWM, pwm_hash: str | None) -> str:
@@ -287,12 +264,14 @@ def _run_sample_for_set(
     stage: str = "sample",
     run_kind: str | None = None,
     force_overwrite: bool = False,
+    progress_bar: bool = True,
+    progress_every: int = 0,
 ) -> Path:
     """
     Run MCMC sampler, save config/meta plus artifacts (trace.nc, sequences.parquet, elites.*).
     Each chain gets its own independent seed (random/consensus/consensus_mix).
     """
-    optimizer_kind = str(sample_cfg.optimizer.kind)
+    optimizer_kind = resolve_optimizer_kind(sample_cfg.optimizer.kind, context="sample.optimizer.kind")
     chain_count = int(sample_cfg.optimizer.chains)
     layout = prepare_run_layout(
         cfg=cfg,
@@ -317,7 +296,7 @@ def _run_sample_for_set(
 
     status_writer = layout.status_writer
     telemetry = RunTelemetry(status_writer)
-    progress = progress_adapter(True)
+    progress = progress_adapter(progress_bar)
 
     def _finish_failed(exc: Exception) -> None:
         status_writer.finish(status="failed", status_message="failed", error=str(exc))
@@ -406,6 +385,8 @@ def _run_sample_for_set(
     softmin_cfg = sample_cfg.objective.softmin
     softmin_sched = _softmin_schedule_payload(sample_cfg)
     mcmc_cooling = _mcmc_cooling_payload(sample_cfg)
+    if not sample_cfg.output.save_sequences:
+        raise ConfigError("sample.output.save_sequences must be true because analyze requires sequences.parquet")
     opt_cfg: dict[str, object] = {
         "draws": draws,
         "tune": adapt_sweeps,
@@ -418,9 +399,10 @@ def _run_sample_for_set(
         "score_scale": sample_cfg.objective.score_scale,
         "record_tune": sample_cfg.output.include_tune_in_sequences,
         "build_trace": bool(sample_cfg.output.save_trace),
-        "progress_bar": True,
-        "progress_every": 0,
+        "progress_bar": bool(progress_bar),
+        "progress_every": int(progress_every),
         "mcmc_cooling": mcmc_cooling,
+        "early_stop": sample_cfg.optimizer.early_stop.model_dump(mode="json"),
         **moves.model_dump(),
         "softmin": {"enabled": softmin_cfg.enabled, **softmin_sched},
     }
@@ -691,12 +673,8 @@ def _run_sample_for_set(
     logger.debug("Saved random baseline -> %s", baseline_path.relative_to(out_dir.parent))
 
     # 9) BUILD elites list — filter (representativeness), rank (objective), diversify
-    baseline_seed = int(sample_cfg.seed + set_index - 1)
     min_per_tf_norm, auto_norm_meta = _resolve_min_per_tf_norm(
         sample_cfg=sample_cfg,
-        scorer=scorer,
-        seed=baseline_seed,
-        sequence_length=sample_cfg.sequence_length,
     )
     require_all = bool(sample_cfg.elites.filter.require_all_tfs)
     pool_result = build_elite_pool(
@@ -913,9 +891,6 @@ def _run_sample_for_set(
 
         meta["beta_ladder_base"] = _float_list(optimizer_stats.get("beta_ladder_base"))
         meta["beta_ladder_final"] = _float_list(optimizer_stats.get("beta_ladder_final"))
-        beta_scale = optimizer_stats.get("beta_ladder_scale_final")
-        meta["beta_ladder_scale_final"] = float(beta_scale) if beta_scale is not None else None
-        meta["beta_ladder_scale_mode"] = optimizer_stats.get("beta_ladder_scale_mode")
         final_beta = optimizer_stats.get("final_mcmc_beta")
         meta["final_mcmc_beta"] = float(final_beta) if final_beta is not None else None
         cooling_payload = optimizer_stats.get("mcmc_cooling")

@@ -94,7 +94,7 @@ def test_sample_cli_smoke_matrix(tmp_path: Path) -> None:
                 "optimizer": {
                     "kind": "gibbs_anneal",
                     "chains": 2,
-                    "cooling": {"kind": "linear", "beta": None, "beta_start": 0.1, "beta_end": 1.0},
+                    "cooling": {"kind": "linear", "beta_start": 0.1, "beta_end": 1.0},
                 },
                 "objective": {"bidirectional": True, "score_scale": "normalized-llr", "combine": "min"},
                 "elites": {

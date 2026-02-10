@@ -159,12 +159,41 @@ def test_catalog_root_allows_absolute(tmp_path: Path) -> None:
     assert cfg.catalog.root.is_absolute()
 
 
-def test_catalog_pwm_window_lengths_rejected(tmp_path: Path) -> None:
+def test_catalog_pwm_window_lengths_removed_key_is_rejected(tmp_path: Path) -> None:
     config = _base_config()
     config["cruncher"]["catalog"]["pwm_window_lengths"] = {"lexA": 12}
     config_path = _write_config(tmp_path, config)
 
-    with pytest.raises(ValidationError, match="catalog.pwm_window_lengths is no longer used"):
+    with pytest.raises(ValidationError) as exc:
+        load_config(config_path)
+    assert any(err.get("type") == "extra_forbidden" for err in exc.value.errors())
+
+
+def test_catalog_pwm_window_strategy_removed_key_is_rejected(tmp_path: Path) -> None:
+    config = _base_config()
+    config["cruncher"]["catalog"]["pwm_window_strategy"] = "max_info"
+    config_path = _write_config(tmp_path, config)
+
+    with pytest.raises(ValidationError) as exc:
+        load_config(config_path)
+    assert any(err.get("type") == "extra_forbidden" for err in exc.value.errors())
+
+
+def test_workspace_regulator_sets_duplicate_tf_is_rejected(tmp_path: Path) -> None:
+    config = _base_config()
+    config["cruncher"]["workspace"]["regulator_sets"] = [["lexA", "lexA"]]
+    config_path = _write_config(tmp_path, config)
+
+    with pytest.raises(ValidationError, match="duplicate TF"):
+        load_config(config_path)
+
+
+def test_workspace_regulator_categories_duplicate_tf_is_rejected(tmp_path: Path) -> None:
+    config = _base_config()
+    config["cruncher"]["workspace"]["regulator_categories"] = {"stress": ["lexA", "lexA"]}
+    config_path = _write_config(tmp_path, config)
+
+    with pytest.raises(ValidationError, match="duplicate TF"):
         load_config(config_path)
 
 

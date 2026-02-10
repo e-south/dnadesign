@@ -23,25 +23,6 @@ def _empty_panel(ax: plt.Axes, message: str) -> None:
     ax.text(0.5, 0.5, message, ha="center", va="center", fontsize=9, color="#555555")
 
 
-def _plot_swap_acceptance(ax: plt.Axes, optimizer_stats: dict[str, object] | None) -> None:
-    attempts = []
-    accepts = []
-    if isinstance(optimizer_stats, dict):
-        attempts = optimizer_stats.get("swap_attempts_by_pair") or []
-        accepts = optimizer_stats.get("swap_accepts_by_pair") or []
-    attempts = [int(v) for v in attempts] if attempts else []
-    accepts = [int(v) for v in accepts] if accepts else []
-    if not attempts or len(attempts) != len(accepts):
-        _empty_panel(ax, "Replica exchange disabled")
-        return
-    rates = [a / t if t else 0.0 for a, t in zip(accepts, attempts)]
-    ax.bar(range(1, len(rates) + 1), rates, color="#4c78a8")
-    ax.set_title("Cross-chain exchange acceptance")
-    ax.set_xlabel("Adjacent pair")
-    ax.set_ylabel("Acceptance rate")
-    ax.set_ylim(0.0, 1.0)
-
-
 def _plot_move_acceptance(ax: plt.Axes, optimizer_stats: dict[str, object] | None) -> None:
     stats = optimizer_stats.get("move_stats") if isinstance(optimizer_stats, dict) else None
     if not isinstance(stats, list) or not stats:
@@ -79,10 +60,8 @@ def plot_health_panel(
     dpi: int,
     png_compress_level: int,
 ) -> None:
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
-    ax_swap, ax_move = axes
-    _plot_swap_acceptance(ax_swap, optimizer_stats)
-    _plot_move_acceptance(ax_move, optimizer_stats)
+    fig, ax = plt.subplots(1, 1, figsize=(6, 4))
+    _plot_move_acceptance(ax, optimizer_stats)
     fig.text(
         0.5,
         0.01,

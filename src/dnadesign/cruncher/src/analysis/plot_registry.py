@@ -64,6 +64,6 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         ("trace",),
         ("plot__health_panel.{ext}",),
         "diagnostics",
-        "Swap acceptance and move acceptance summary.",
+        "Move acceptance summary.",
     ),
 )

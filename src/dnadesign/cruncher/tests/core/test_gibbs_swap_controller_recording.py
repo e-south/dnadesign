@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <cruncher project>
-src/dnadesign/cruncher/tests/core/test_pt_swap_pairs.py
+src/dnadesign/cruncher/tests/core/test_gibbs_swap_controller_recording.py
 
 Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -29,7 +29,7 @@ class _DummyEvaluator:
         return per_tf, float(next(iter(per_tf.values())))
 
 
-def test_swap_pairs_remain_zero_without_replica_exchange() -> None:
+def test_swap_controller_disabled_for_gibbs_anneal() -> None:
     chains = 3
     draws = 3
     cfg = {
@@ -64,8 +64,6 @@ def test_swap_pairs_remain_zero_without_replica_exchange() -> None:
         init_cfg=init_cfg,
     )
     optimizer.optimise()
-    stats = optimizer.stats()
-    assert stats["swap_attempts_by_pair"] == [0] * (chains - 1)
-    assert stats["swap_accepts_by_pair"] == [0] * (chains - 1)
-    assert stats["swap_events"] == []
-    assert len(stats["swap_attempts_by_pair"]) == chains - 1
+    assert not hasattr(optimizer, "swap_controller")
+    assert not hasattr(optimizer, "swap_attempts")
+    assert not hasattr(optimizer, "swap_accepts")

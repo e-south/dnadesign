@@ -14,8 +14,6 @@ from dnadesign.cruncher.analysis.plots.health_panel import plot_health_panel
 
 def test_health_panel_plot(tmp_path) -> None:
     optimizer_stats = {
-        "swap_attempts_by_pair": [10, 10, 10],
-        "swap_accepts_by_pair": [4, 5, 6],
         "move_stats": [
             {"sweep_idx": 0, "attempted": 10, "accepted": 4},
             {"sweep_idx": 1, "attempted": 10, "accepted": 5},

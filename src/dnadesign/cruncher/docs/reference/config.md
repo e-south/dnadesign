@@ -36,8 +36,8 @@ cruncher:
   catalog: { ... }
   discover: { ... }
   ingest: { ... }
-  sample: { ... }
-  analysis: { ... }
+  sample: { ... }            # optional unless running `cruncher sample`
+  analysis: { ... }          # optional; analyze uses schema defaults when omitted
   campaigns: []
   campaign: null
 ```
@@ -45,6 +45,8 @@ cruncher:
 Notes:
 - `campaigns` are optional helpers for expanding regulator sets.
 - `campaign` metadata is optional runtime metadata (for generated or campaign-driven runs).
+- `sample` is required for `cruncher sample`, but analyze/reporting consume run artifacts and do not require `sample` in the current config.
+- `analysis` is optional; when omitted, analyze uses default settings (`run_selector=latest`, `pairwise=auto`, `plot_format=png`, `table_format=parquet`).
 
 ## Workspace
 
@@ -91,8 +93,6 @@ catalog:
   dataset_map: {}                 # TF -> dataset ID
   site_window_lengths: {}         # TF or dataset:<id> -> length (bp)
   site_window_center: midpoint    # midpoint | summit
-  pwm_window_lengths: {}          # keep empty (deprecated for optimization)
-  pwm_window_strategy: max_info   # reserved
   min_sites_for_pwm: 2
   allow_low_sites: false
 ```
@@ -101,7 +101,6 @@ Notes:
 - `pwm_source=matrix` uses cached motif matrices (default).
 - `pwm_source=sites` builds PWMs from cached binding-site sequences at runtime.
 - If site lengths vary, set `site_window_lengths` per TF or dataset.
-- Leave `pwm_window_lengths` empty. Optimization-time width control is configured in `sample.motif_width`.
 
 ## discover
 
@@ -233,13 +232,21 @@ sample:
     kind: gibbs_anneal
     chains: 3
     cooling:
-      kind: fixed
-      beta: 1.0
+      kind: linear
+      beta_start: 0.20
+      beta_end: 4.0
+    early_stop:
+      enabled: false
+      patience: 0
+      min_delta: 0.0
+      require_min_unique: false
+      min_unique: 0
+      success_min_per_tf_norm: 0.0
 
   elites:
     k: 10
     filter:
-      min_per_tf_norm: auto       # auto | float | null
+      min_per_tf_norm: null       # float | null
       require_all_tfs: true
       pwm_sum_min: 0.0
     select:
@@ -264,6 +271,11 @@ Notes:
 - `sample.optimizer.kind` currently supports `gibbs_anneal`.
 - `sample.optimizer.chains` controls the number of independently initialized chains.
 - `sample.optimizer.cooling.kind` controls the MCMC beta schedule (`fixed`, `linear`, or `piecewise`).
+- Cooling keys are kind-specific and fail fast:
+  - `fixed`: `beta`
+  - `linear`: `beta_start`, `beta_end`
+  - `piecewise`: `stages` (strictly increasing `sweeps`)
+- `sample.elites.filter.min_per_tf_norm` defaults to `null` (off). Set a numeric value only when you explicitly want a hard per-TF gate.
 
 ## analysis
 
@@ -285,7 +297,7 @@ analysis:
   trajectory_sweep_y_column: raw_llr_objective  # raw_llr_objective | objective_scalar | norm_llr_objective
   trajectory_particle_alpha_min: 0.15
   trajectory_particle_alpha_max: 0.45
-  trajectory_slot_overlay: false
+  trajectory_chain_overlay: false
 ```
 
 Notes:
@@ -293,7 +305,8 @@ Notes:
 - `analysis.trajectory_scatter_scale` controls whether scatter axes use per-TF raw LLR or normalized LLR.
 - `analysis.trajectory_sweep_y_column` controls the y-axis for `plot__chain_trajectory_sweep.*`; each point is the combined per-TF objective at that sweep.
 - Trajectory plots are chain-centric: chains are rendered categorically, and lineage follows each chain across sweeps.
-- `analysis.trajectory_slot_overlay=true` overlays chain markers as a diagnostic layer.
+- `analysis.trajectory_chain_overlay=true` overlays chain markers as a diagnostic layer.
+- If the `analysis` block is omitted, analyze resolves this section from schema defaults.
 
 ## campaigns
 

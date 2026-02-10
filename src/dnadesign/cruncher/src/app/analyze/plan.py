@@ -27,9 +27,7 @@ class AnalysisPlan:
 
 
 def resolve_analysis_plan(cfg: CruncherConfig) -> AnalysisPlan:
-    analysis_cfg = cfg.analysis
-    if analysis_cfg is None:
-        raise ValueError("analysis section is required for analyze")
+    analysis_cfg = cfg.analysis if cfg.analysis is not None else AnalysisConfig()
     return AnalysisPlan(
         analysis_cfg=analysis_cfg,
         cfg_effective=cfg,

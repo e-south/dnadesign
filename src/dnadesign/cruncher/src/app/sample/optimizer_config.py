@@ -14,10 +14,11 @@ from __future__ import annotations
 from typing import Any
 
 from dnadesign.cruncher.config.schema_v3 import SampleOptimizerConfig
+from dnadesign.cruncher.core.optimizers.kinds import GIBBS_ANNEAL_KIND
 
-DEFAULT_OPTIMIZER_KIND: str = "gibbs_anneal"
+DEFAULT_OPTIMIZER_KIND: str = GIBBS_ANNEAL_KIND
 DEFAULT_CHAIN_COUNT: int = 1
-DEFAULT_COOLING: dict[str, object] = {"kind": "fixed", "beta": 1.0}
+DEFAULT_COOLING: dict[str, object] = {"kind": "linear", "beta_start": 0.20, "beta_end": 4.0}
 
 
 def _resolve_optimizer_kind() -> str:

@@ -77,7 +77,7 @@ def test_diagnostics_includes_pvalue_cache_stats() -> None:
     assert metrics["pvalue_cache"] == {"hits": 2, "misses": 1, "maxsize": 256, "currsize": 3}
 
 
-def test_gibbs_diagnostics_do_not_emit_pt_swap_warning() -> None:
+def test_gibbs_diagnostics_do_not_emit_swap_warning() -> None:
     diagnostics = summarize_sampling_diagnostics(
         trace_idata=None,
         sequences_df=pd.DataFrame({"sequence": []}),
@@ -91,3 +91,5 @@ def test_gibbs_diagnostics_do_not_emit_pt_swap_warning() -> None:
     )
     warnings = diagnostics.get("warnings") or []
     assert not any("Swap acceptance" in warning for warning in warnings)
+    optimizer_metrics = diagnostics["metrics"]["optimizer"]
+    assert "swap_acceptance_rate" not in optimizer_metrics

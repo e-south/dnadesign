@@ -66,8 +66,9 @@ def test_compute_config_loads(tmp_path: Path) -> None:
     assert cfg.sample.objective.softmin.beta_end == pytest.approx(6.0)
     assert cfg.sample.optimizer.kind == "gibbs_anneal"
     assert cfg.sample.optimizer.chains == 1
-    assert cfg.sample.optimizer.cooling.kind == "fixed"
-    assert cfg.sample.optimizer.cooling.beta == pytest.approx(1.0)
+    assert cfg.sample.optimizer.cooling.kind == "linear"
+    assert cfg.sample.optimizer.cooling.beta_start == pytest.approx(0.20)
+    assert cfg.sample.optimizer.cooling.beta_end == pytest.approx(4.0)
 
 
 def test_balanced_move_defaults_are_stability_oriented(tmp_path: Path) -> None:
@@ -112,7 +113,7 @@ def test_analysis_particle_trajectory_fields_load(tmp_path: Path) -> None:
         "trajectory_sweep_y_column": "objective_scalar",
         "trajectory_particle_alpha_min": 0.2,
         "trajectory_particle_alpha_max": 0.9,
-        "trajectory_slot_overlay": False,
+        "trajectory_chain_overlay": False,
     }
     config_path = _write_config(tmp_path, payload)
     cfg = load_config(config_path)
@@ -120,6 +121,23 @@ def test_analysis_particle_trajectory_fields_load(tmp_path: Path) -> None:
     assert cfg.analysis.trajectory_stride == 5
     assert cfg.analysis.trajectory_scatter_scale == "llr"
     assert cfg.analysis.trajectory_sweep_y_column == "objective_scalar"
+
+
+def test_analysis_legacy_trajectory_slot_overlay_is_rejected(tmp_path: Path) -> None:
+    payload = _base_config()
+    payload["cruncher"]["analysis"] = {"trajectory_slot_overlay": False}
+    config_path = _write_config(tmp_path, payload)
+    with pytest.raises(ValidationError) as exc:
+        load_config(config_path)
+    assert any(err.get("type") == "extra_forbidden" for err in exc.value.errors())
+
+
+def test_sample_output_save_sequences_false_is_rejected(tmp_path: Path) -> None:
+    payload = _base_config()
+    payload["cruncher"]["sample"]["output"]["save_sequences"] = False
+    config_path = _write_config(tmp_path, payload)
+    with pytest.raises(ValidationError, match="sample.output.save_sequences must be true"):
+        load_config(config_path)
 
 
 def test_analysis_trajectory_defaults_prefer_raw_llr_and_dense_lineage(tmp_path: Path) -> None:

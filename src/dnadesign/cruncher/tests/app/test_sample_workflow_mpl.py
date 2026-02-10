@@ -86,3 +86,24 @@ def test_run_sample_calls_runtime_cache_setup_only_when_trace_enabled(tmp_path, 
     sample_workflow.run_sample(cfg, config_path)
     assert len(mpl_calls) == 1
     assert len(arviz_calls) == 1
+
+
+def test_run_sample_forwards_runtime_progress_controls(tmp_path, monkeypatch) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(_config_payload(catalog_root=catalog_root, save_trace=False)))
+    cfg = load_config(config_path)
+
+    captured: list[dict[str, object]] = []
+
+    def _fake_run_set(*args, **kwargs):
+        captured.append({"progress_bar": kwargs.get("progress_bar"), "progress_every": kwargs.get("progress_every")})
+        return tmp_path / "results" / "sample" / "dummy"
+
+    monkeypatch.setattr(sample_workflow, "_lockmap_for", lambda cfg, config_path: {})
+    monkeypatch.setattr(sample_workflow, "target_statuses", lambda **kwargs: [])
+    monkeypatch.setattr(sample_workflow, "has_blocking_target_errors", lambda statuses: False)
+    monkeypatch.setattr(sample_workflow, "_run_sample_for_set", _fake_run_set)
+
+    sample_workflow.run_sample(cfg, config_path, progress_bar=False, progress_every=37)
+    assert captured == [{"progress_bar": False, "progress_every": 37}]

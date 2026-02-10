@@ -64,6 +64,8 @@ def run_sample(
     config_path: Path,
     *,
     force_overwrite: bool = False,
+    progress_bar: bool = True,
+    progress_every: int = 0,
 ) -> None:
     """
     Run MCMC sampler, save config/meta plus artifacts (trace.nc, sequences.parquet, elites.*).
@@ -71,6 +73,8 @@ def run_sample(
     """
     if cfg.sample is None:
         raise ValueError("sample section is required for sample")
+    if progress_every < 0:
+        raise ValueError("progress_every must be >= 0.")
     with _sigterm_as_keyboard_interrupt():
         if cfg.sample.output.save_trace:
             catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
@@ -106,6 +110,8 @@ def run_sample(
                 lockmap=lockmap,
                 sample_cfg=sample_cfg,
                 force_overwrite=force_overwrite,
+                progress_bar=progress_bar,
+                progress_every=progress_every,
             )
             logger.info(
                 "Sample outputs -> %s",

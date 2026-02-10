@@ -20,7 +20,7 @@ import numpy as np
 import yaml
 
 from dnadesign.cruncher.artifacts.layout import config_used_path
-from dnadesign.cruncher.config.schema_v3 import CruncherConfig
+from dnadesign.cruncher.core.optimizers.kinds import resolve_optimizer_kind
 from dnadesign.cruncher.core.pwm import PWM
 
 
@@ -55,16 +55,17 @@ def _load_pwms_from_config(run_dir: Path) -> tuple[dict[str, PWM], dict]:
     return pwms, cruncher_cfg
 
 
-def _resolve_sample_meta(cfg: CruncherConfig, used_cfg: dict, manifest: dict) -> SampleMeta:
-    if cfg.sample is None:
-        raise ValueError("sample section is required for analyze")
+def _resolve_sample_meta(used_cfg: dict, manifest: dict) -> SampleMeta:
     if not isinstance(used_cfg, dict):
         raise ValueError("config_used.yaml missing cruncher config; re-run `cruncher sample`.")
 
     optimizer_payload = manifest.get("optimizer") if isinstance(manifest, dict) else None
-    optimizer_kind = "gibbs_anneal"
-    if isinstance(optimizer_payload, dict):
-        optimizer_kind = str(optimizer_payload.get("kind") or "gibbs_anneal")
+    if optimizer_payload is not None and not isinstance(optimizer_payload, dict):
+        raise ValueError("Run manifest field 'optimizer' must be an object when provided.")
+    optimizer_kind = resolve_optimizer_kind(
+        optimizer_payload.get("kind") if isinstance(optimizer_payload, dict) else None,
+        context="Run manifest field 'optimizer.kind'",
+    )
 
     draws = int(manifest.get("draws") or 0)
     tune = int(manifest.get("adapt_sweeps") or 0)
@@ -89,7 +90,7 @@ def _resolve_sample_meta(cfg: CruncherConfig, used_cfg: dict, manifest: dict) ->
         tune=tune,
         bidirectional=bidirectional,
         top_k=top_k,
-        mode="gibbs_anneal",
+        mode=optimizer_kind,
     )
 
 

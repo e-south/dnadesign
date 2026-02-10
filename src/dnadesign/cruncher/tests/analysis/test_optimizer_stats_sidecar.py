@@ -55,7 +55,7 @@ def test_resolve_optimizer_stats_requires_sidecar_when_declared(tmp_path: Path) 
         _resolve_optimizer_stats(manifest, run_dir)
 
 
-def test_resolve_optimizer_stats_loads_swap_events_sidecar(tmp_path: Path) -> None:
+def test_resolve_optimizer_stats_rejects_swap_events_sidecar(tmp_path: Path) -> None:
     run_dir = tmp_path / "run"
     run_dir.mkdir(parents=True, exist_ok=True)
     sidecar = run_dir / "optimizer_move_stats.json.gz"
@@ -76,7 +76,51 @@ def test_resolve_optimizer_stats_loads_swap_events_sidecar(tmp_path: Path) -> No
         }
     }
 
-    resolved = _resolve_optimizer_stats(manifest, run_dir)
-    assert isinstance(resolved, dict)
-    assert isinstance(resolved.get("swap_events"), list)
-    assert len(resolved["swap_events"]) == 1
+    with pytest.raises(ValueError, match="swap_events.*unsupported"):
+        _resolve_optimizer_stats(manifest, run_dir)
+
+
+def test_resolve_optimizer_stats_rejects_parent_path_escape(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    escaped = tmp_path / "escaped_move_stats.json"
+    escaped.write_text(json.dumps({"move_stats": [{"sweep_idx": 0, "attempted": 1, "accepted": 1}]}))
+
+    manifest = {
+        "optimizer_stats": {
+            "acceptance_rate_all": 1.0,
+            "move_stats_path": "../escaped_move_stats.json",
+            "move_stats_rows": 1,
+        }
+    }
+
+    with pytest.raises(ValueError, match="must resolve within the run directory"):
+        _resolve_optimizer_stats(manifest, run_dir)
+
+
+def test_resolve_optimizer_stats_rejects_inline_swap_events_payload(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    manifest = {
+        "optimizer_stats": {
+            "acceptance_rate_all": 0.3,
+            "swap_events": [{"sweep_idx": 0, "accepted": True}],
+        }
+    }
+
+    with pytest.raises(ValueError, match="swap_events.*unsupported"):
+        _resolve_optimizer_stats(manifest, run_dir)
+
+
+def test_resolve_optimizer_stats_rejects_inline_non_list_move_stats(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    manifest = {
+        "optimizer_stats": {
+            "acceptance_rate_all": 0.3,
+            "move_stats": {"sweep_idx": 0, "attempted": 1, "accepted": 1},
+        }
+    }
+
+    with pytest.raises(ValueError, match="move_stats.*must be a list"):
+        _resolve_optimizer_stats(manifest, run_dir)

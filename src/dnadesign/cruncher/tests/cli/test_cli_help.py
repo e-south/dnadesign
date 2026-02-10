@@ -19,6 +19,7 @@ import yaml
 from typer.testing import CliRunner
 
 import dnadesign.cruncher.app.analyze_workflow as analyze_workflow
+import dnadesign.cruncher.cli.commands.discover as discover_module
 import dnadesign.cruncher.cli.commands.sources as sources_module
 from dnadesign.cruncher.artifacts.layout import config_used_path, elites_path, sequences_path
 from dnadesign.cruncher.cli.app import app
@@ -225,7 +226,7 @@ def test_sample_campaign_required_for_campaign_mode_config(tmp_path: Path) -> No
                 "optimizer": {
                     "kind": "gibbs_anneal",
                     "chains": 2,
-                    "cooling": {"kind": "linear", "beta": None, "beta_start": 0.2, "beta_end": 1.0},
+                    "cooling": {"kind": "linear", "beta_start": 0.2, "beta_end": 1.0},
                 },
                 "elites": {"k": 1},
             },
@@ -237,6 +238,54 @@ def test_sample_campaign_required_for_campaign_mode_config(tmp_path: Path) -> No
     result = invoke_cli(["sample", str(config_path)])
     assert result.exit_code != 0
     assert "--campaign" in combined_output(result)
+
+
+def test_sample_verbose_uses_runtime_progress_controls(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config = {
+        "cruncher": {
+            "schema_version": 3,
+            "workspace": {"out_dir": "runs", "regulator_sets": [["lexA"]]},
+            "catalog": {"root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
+            "sample": {
+                "seed": 1,
+                "sequence_length": 12,
+                "budget": {"tune": 1, "draws": 1},
+                "optimizer": {"kind": "gibbs_anneal", "chains": 1, "cooling": {"kind": "fixed", "beta": 1.0}},
+                "elites": {"k": 1},
+            },
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    calls: list[dict[str, object]] = []
+
+    def _fake_run_sample(
+        cfg,
+        config_path_in: Path,
+        *,
+        force_overwrite: bool = False,
+        progress_bar: bool = True,
+        progress_every: int = 0,
+    ) -> None:
+        calls.append(
+            {
+                "config_path": config_path_in,
+                "force_overwrite": force_overwrite,
+                "progress_bar": progress_bar,
+                "progress_every": progress_every,
+            }
+        )
+
+    monkeypatch.setattr("dnadesign.cruncher.app.sample_workflow.run_sample", _fake_run_sample)
+
+    result = invoke_cli(["sample", "--verbose", str(config_path)])
+    assert result.exit_code == 0
+    assert calls
+    assert calls[0]["config_path"] == config_path
+    assert calls[0]["force_overwrite"] is False
+    assert calls[0]["progress_bar"] is True
+    assert calls[0]["progress_every"] == 1000
 
 
 def test_catalog_show_requires_source_ref() -> None:
@@ -296,7 +345,14 @@ def test_config_requires_config_with_hint() -> None:
 
 
 def test_config_defaults_to_summary() -> None:
-    result = invoke_cli(["config", str(CONFIG_PATH)])
+    result = invoke_cli(["config", "--config", str(CONFIG_PATH)])
+    assert result.exit_code == 0
+    assert "Cruncher config summary" in result.output
+
+
+def test_config_summary_subcommand_defaults_to_resolved_config(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(CONFIG_PATH.parent)
+    result = invoke_cli(["config", "summary"])
     assert result.exit_code == 0
     assert "Cruncher config summary" in result.output
 
@@ -311,7 +367,7 @@ def test_config_reports_invalid_schema_without_traceback(tmp_path: Path) -> None
     config_path = tmp_path / "bad_config.yaml"
     config_path.write_text(yaml.safe_dump(bad_config))
 
-    result = invoke_cli(["config", str(config_path)])
+    result = invoke_cli(["config", "--config", str(config_path)])
 
     assert result.exit_code != 0
     assert not isinstance(result.exception, ValueError)
@@ -328,6 +384,58 @@ def test_analyze_hint_not_duplicated(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result.exit_code != 0
     assert "No analysis runs configured" in result.output
     assert "Hint: set analysis.runs" not in result.output
+
+
+def test_analyze_respects_analysis_enabled_flag(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    config = {
+        "cruncher": {
+            "schema_version": 3,
+            "workspace": {"out_dir": "results", "regulator_sets": [["lexA"]]},
+            "catalog": {"root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
+            "analysis": {"enabled": False},
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    called = {"value": False}
+
+    def _boom(*args, **kwargs):
+        called["value"] = True
+        raise AssertionError("run_analyze should not be called when analysis.enabled is false")
+
+    monkeypatch.setattr(analyze_workflow, "run_analyze", _boom)
+
+    result = invoke_cli(["analyze", "--latest", str(config_path)])
+    assert result.exit_code != 0
+    assert "analysis.enabled=false" in result.output
+    assert called["value"] is False
+
+
+def test_discover_respects_discover_enabled_flag(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    config = {
+        "cruncher": {
+            "schema_version": 3,
+            "workspace": {"out_dir": "results", "regulator_sets": [["lexA"]]},
+            "catalog": {"root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
+            "discover": {"enabled": False},
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    called = {"value": False}
+
+    def _boom(*args, **kwargs):
+        called["value"] = True
+        raise AssertionError("discover target resolution should not run when discover.enabled is false")
+
+    monkeypatch.setattr(discover_module, "_resolve_targets", _boom)
+
+    result = invoke_cli(["discover", "motifs", str(config_path)])
+    assert result.exit_code != 0
+    assert "discover.enabled=false" in result.output
+    assert called["value"] is False
 
 
 def test_sources_summary_remote_error_is_user_friendly(tmp_path, monkeypatch) -> None:
@@ -574,6 +682,42 @@ def test_analyze_rejects_run_and_latest_together() -> None:
     result = invoke_cli(["analyze", "--latest", "--run", "sample_123", str(CONFIG_PATH)])
     assert result.exit_code != 0
     assert "Use either --run or --latest, not both." in result.output
+
+
+def test_analyze_allows_missing_analysis_section(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    config = {
+        "cruncher": {
+            "schema_version": 3,
+            "workspace": {"out_dir": "results", "regulator_sets": [["lexA", "cpxR"]]},
+            "catalog": {"root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
+            "sample": {
+                "seed": 7,
+                "sequence_length": 12,
+                "budget": {"tune": 1, "draws": 1},
+                "elites": {"k": 1},
+                "output": {"save_sequences": True, "save_trace": False},
+            },
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    captured: dict[str, object] = {}
+
+    def _fake_run_analyze(cfg, config_path, *, runs_override=None, use_latest=False):
+        captured["analysis_cfg"] = cfg.analysis
+        captured["runs_override"] = runs_override
+        captured["use_latest"] = use_latest
+        return []
+
+    monkeypatch.setattr(analyze_workflow, "run_analyze", _fake_run_analyze)
+
+    result = invoke_cli(["analyze", "--latest", str(config_path)])
+
+    assert result.exit_code == 0
+    assert captured["analysis_cfg"] is None
+    assert captured["runs_override"] is None
+    assert captured["use_latest"] is True
 
 
 def test_analyze_accepts_run_directory_path_override(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

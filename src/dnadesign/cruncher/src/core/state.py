@@ -27,7 +27,7 @@ class SequenceState:
 
     Attributes:
       seq: 1-D numpy.ndarray of shape (L,), dtype=np.int8, with values in {0,1,2,3}.
-      particle_id: Optional persistent particle identity for PT lineage tracking.
+      particle_id: Optional persistent particle identity for chain lineage tracking.
     """
 
     seq: np.ndarray  # shape = (L,), dtype = np.int8

@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 
 from dnadesign.cruncher.analysis.overlap import compute_overlap_tables
+from dnadesign.cruncher.core.optimizers.kinds import resolve_optimizer_kind
 from dnadesign.cruncher.core.sequence import identity_key
 
 
@@ -132,6 +133,10 @@ def summarize_sampling_diagnostics(
     """
     warnings: list[str] = []
     status = "ok"
+    if optimizer is not None and not isinstance(optimizer, dict):
+        raise ValueError("Sampling diagnostics field 'optimizer' must be an object when provided.")
+    if optimizer_stats is not None and not isinstance(optimizer_stats, dict):
+        raise ValueError("Sampling diagnostics field 'optimizer_stats' must be an object when provided.")
 
     thresholds = {
         "rhat_warn": 1.1,
@@ -140,8 +145,6 @@ def summarize_sampling_diagnostics(
         "ess_ratio_fail": 0.02,
         "acceptance_low": 0.05,
         "acceptance_high": 0.95,
-        "swap_low": 0.05,
-        "swap_high": 0.90,
         "unique_fraction_warn": 0.20,
         "balance_index_warn": 0.50,
     }
@@ -156,11 +159,12 @@ def summarize_sampling_diagnostics(
     metrics: dict[str, object] = {}
     if mode is None and sample_meta:
         mode = str(sample_meta.get("mode") or "")
-    if optimizer_kind is None and sample_meta:
-        optimizer_kind = sample_meta.get("optimizer_kind") or optimizer_kind
-    if optimizer_kind is None and isinstance(optimizer, dict):
-        optimizer_kind = optimizer.get("kind") if isinstance(optimizer.get("kind"), str) else optimizer_kind
-    resolved_optimizer_kind = str(optimizer_kind).lower() if optimizer_kind else None
+    raw_optimizer_kind = optimizer_kind
+    if raw_optimizer_kind is None and sample_meta:
+        raw_optimizer_kind = sample_meta.get("optimizer_kind") or raw_optimizer_kind
+    if raw_optimizer_kind is None and isinstance(optimizer, dict):
+        raw_optimizer_kind = optimizer.get("kind") if isinstance(optimizer.get("kind"), str) else raw_optimizer_kind
+    resolved_optimizer_kind = resolve_optimizer_kind(raw_optimizer_kind, context="Sampling diagnostics")
     has_canonical = bool(sample_meta.get("dsdna_canonicalize")) if sample_meta else False
 
     if isinstance(sample_meta, dict):
@@ -177,8 +181,7 @@ def summarize_sampling_diagnostics(
 
     if mode:
         metrics["mode"] = mode
-    if resolved_optimizer_kind:
-        metrics["optimizer_kind"] = resolved_optimizer_kind
+    metrics["optimizer_kind"] = resolved_optimizer_kind
 
     # ---- trace diagnostics -------------------------------------------------
     trace_metrics: dict[str, object] = {}
@@ -240,72 +243,43 @@ def summarize_sampling_diagnostics(
                 n_chains, n_draws = int(score_arr.shape[0]), int(score_arr.shape[1])
                 trace_metrics["chains"] = n_chains
                 trace_metrics["draws"] = n_draws
-                pt_mixing = resolved_optimizer_kind == "pt"
-                if pt_mixing:
-                    trace_metrics["mixing_note"] = "PT ladder: R-hat/ESS computed on cold chain only."
-                    if n_draws < 4:
-                        warnings.append(f"ESS requires ≥4 draws (got {n_draws}).")
-                        _mark("warn")
-                    else:
-                        try:
-                            import arviz as az
+                if n_chains < 2:
+                    warnings.append(f"R-hat requires ≥2 chains (got {n_chains}).")
+                    _mark("warn")
+                if n_draws < 4:
+                    warnings.append(f"ESS requires ≥4 draws (got {n_draws}).")
+                    _mark("warn")
+                if n_chains >= 2 and n_draws >= 4:
+                    try:
+                        import arviz as az
 
-                            cold_scores = score_arr[-1:, :]
-                            score_idata = az.from_dict(posterior={"score": cold_scores})
-                            score = score_idata.posterior["score"]
-                            ess = _safe_float(az.ess(score)["score"].item())
-                        except Exception as exc:
-                            raise ValueError(f"Trace diagnostics failed: {exc}") from exc
-                    if ess is not None:
-                        trace_metrics["ess"] = ess
-                        denom = max(1, n_draws)
-                        ess_ratio = float(ess) / float(denom)
-                        trace_metrics["ess_ratio"] = ess_ratio
-                        if mode == "sample":
-                            if ess_ratio <= thresholds["ess_ratio_fail"]:
-                                warnings.append(f"Directional ESS ratio {ess_ratio:.3f} suggests failed mixing.")
-                                _mark("fail")
-                            elif ess_ratio < thresholds["ess_ratio_warn"]:
-                                warnings.append(f"Directional ESS ratio {ess_ratio:.3f} is low; consider longer runs.")
-                                _mark("warn")
-                else:
-                    if n_chains < 2:
-                        warnings.append(f"R-hat requires ≥2 chains (got {n_chains}).")
-                        _mark("warn")
-                    if n_draws < 4:
-                        warnings.append(f"ESS requires ≥4 draws (got {n_draws}).")
-                        _mark("warn")
-                    if n_chains >= 2 and n_draws >= 4:
-                        try:
-                            import arviz as az
-
-                            score_idata = az.from_dict(posterior={"score": score_arr})
-                            score = score_idata.posterior["score"]
-                            rhat = _safe_float(az.rhat(score)["score"].item())
-                            ess = _safe_float(az.ess(score)["score"].item())
-                        except Exception as exc:
-                            raise ValueError(f"Trace diagnostics failed: {exc}") from exc
-                    if rhat is not None:
-                        trace_metrics["rhat"] = rhat
-                        if mode == "sample":
-                            if rhat >= thresholds["rhat_fail"]:
-                                warnings.append(f"Directional R-hat={rhat:.3f} suggests failed mixing.")
-                                _mark("fail")
-                            elif rhat > thresholds["rhat_warn"]:
-                                warnings.append(f"Directional R-hat={rhat:.3f} indicates weak mixing.")
-                                _mark("warn")
-                    if ess is not None:
-                        trace_metrics["ess"] = ess
-                        denom = max(1, n_chains * n_draws)
-                        ess_ratio = float(ess) / float(denom)
-                        trace_metrics["ess_ratio"] = ess_ratio
-                        if mode == "sample":
-                            if ess_ratio <= thresholds["ess_ratio_fail"]:
-                                warnings.append(f"Directional ESS ratio {ess_ratio:.3f} suggests failed mixing.")
-                                _mark("fail")
-                            elif ess_ratio < thresholds["ess_ratio_warn"]:
-                                warnings.append(f"Directional ESS ratio {ess_ratio:.3f} is low; consider longer runs.")
-                                _mark("warn")
+                        score_idata = az.from_dict(posterior={"score": score_arr})
+                        score = score_idata.posterior["score"]
+                        rhat = _safe_float(az.rhat(score)["score"].item())
+                        ess = _safe_float(az.ess(score)["score"].item())
+                    except Exception as exc:
+                        raise ValueError(f"Trace diagnostics failed: {exc}") from exc
+                if rhat is not None:
+                    trace_metrics["rhat"] = rhat
+                    if mode == "sample":
+                        if rhat >= thresholds["rhat_fail"]:
+                            warnings.append(f"Directional R-hat={rhat:.3f} suggests failed mixing.")
+                            _mark("fail")
+                        elif rhat > thresholds["rhat_warn"]:
+                            warnings.append(f"Directional R-hat={rhat:.3f} indicates weak mixing.")
+                            _mark("warn")
+                if ess is not None:
+                    trace_metrics["ess"] = ess
+                    denom = max(1, n_chains * n_draws)
+                    ess_ratio = float(ess) / float(denom)
+                    trace_metrics["ess_ratio"] = ess_ratio
+                    if mode == "sample":
+                        if ess_ratio <= thresholds["ess_ratio_fail"]:
+                            warnings.append(f"Directional ESS ratio {ess_ratio:.3f} suggests failed mixing.")
+                            _mark("fail")
+                        elif ess_ratio < thresholds["ess_ratio_warn"]:
+                            warnings.append(f"Directional ESS ratio {ess_ratio:.3f} is low; consider longer runs.")
+                            _mark("warn")
 
                 flat = score_arr.reshape(-1)
                 trace_metrics["score_mean"] = _safe_float(np.mean(flat))
@@ -320,16 +294,6 @@ def summarize_sampling_diagnostics(
                     trace_metrics["score_delta"] = _safe_float(delta)
                     denom = max(abs(start_mean), 1e-12)
                     trace_metrics["score_delta_pct"] = _safe_float(delta / denom)
-                best_so_far = np.maximum.accumulate(score_arr, axis=1)
-                bsf_start = _safe_float(np.mean(best_so_far[:, 0]))
-                bsf_end = _safe_float(np.mean(best_so_far[:, -1]))
-                if bsf_start is not None and bsf_end is not None:
-                    bsf_delta = bsf_end - bsf_start
-                    trace_metrics["best_so_far_start"] = bsf_start
-                    trace_metrics["best_so_far_end"] = bsf_end
-                    trace_metrics["best_so_far_delta"] = _safe_float(bsf_delta)
-                    denom = max(1, int(score_arr.shape[1]) - 1)
-                    trace_metrics["best_so_far_slope"] = _safe_float(bsf_delta / denom)
 
     metrics["trace"] = trace_metrics
 
@@ -448,11 +412,11 @@ def summarize_sampling_diagnostics(
     optimizer_metrics: dict[str, object] = {}
     optimizer_kind_for_stats = resolved_optimizer_kind
     if optimizer:
-        kind_payload = optimizer.get("kind")
-        if isinstance(kind_payload, str):
-            optimizer_kind_for_stats = str(kind_payload).lower()
-        if optimizer_kind_for_stats:
-            optimizer_metrics["kind"] = optimizer_kind_for_stats
+        optimizer_kind_for_stats = resolve_optimizer_kind(
+            optimizer.get("kind"),
+            context="Sampling diagnostics field 'optimizer.kind'",
+        )
+    optimizer_metrics["kind"] = optimizer_kind_for_stats
     if optimizer_stats:
         acc = optimizer_stats.get("acceptance_rate") or {}
         acc_b = _safe_float(acc.get("B"))
@@ -485,14 +449,6 @@ def summarize_sampling_diagnostics(
                         f"Tail MH acceptance {tail_rate:.2f} is outside typical bounds (window={tail_window})."
                     )
                     _mark("warn")
-        swap_rate = _safe_float(optimizer_stats.get("swap_acceptance_rate"))
-        swap_attempts = _safe_int(optimizer_stats.get("swap_attempts"))
-        if swap_rate is not None:
-            optimizer_metrics["swap_acceptance_rate"] = swap_rate
-            has_replica_exchange = bool((swap_attempts or 0) > 0) or optimizer_kind_for_stats == "pt"
-            if has_replica_exchange and (swap_rate < thresholds["swap_low"] or swap_rate > thresholds["swap_high"]):
-                warnings.append(f"Swap acceptance {swap_rate:.2f} suggests poor PT mixing.")
-                _mark("warn")
         unique_successes = _safe_int(optimizer_stats.get("unique_successes"))
         if unique_successes is not None:
             optimizer_metrics["unique_successes"] = unique_successes

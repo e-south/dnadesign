@@ -76,7 +76,7 @@ from dnadesign.cruncher.artifacts.layout import (
     trace_path,
 )
 from dnadesign.cruncher.artifacts.manifest import load_manifest, write_manifest
-from dnadesign.cruncher.config.schema_v3 import CruncherConfig
+from dnadesign.cruncher.config.schema_v3 import AnalysisConfig, CruncherConfig
 from dnadesign.cruncher.core.sequence import identity_key
 from dnadesign.cruncher.utils.arviz_cache import ensure_arviz_data_dir
 from dnadesign.cruncher.utils.hashing import sha256_path
@@ -141,12 +141,10 @@ def _resolve_run_names(
     cfg: CruncherConfig,
     config_path: Path,
     *,
+    analysis_cfg: AnalysisConfig,
     runs_override: list[str] | None,
     use_latest: bool,
 ) -> list[str]:
-    analysis_cfg = cfg.analysis
-    if analysis_cfg is None:
-        raise ValueError("analysis section is required for analyze")
     if runs_override:
         return runs_override
     if analysis_cfg.run_selector == "explicit":
@@ -183,6 +181,11 @@ def _resolve_optimizer_stats(manifest: dict[str, object], run_dir: Path) -> dict
     if not isinstance(stats_payload, dict):
         raise ValueError("Run manifest field 'optimizer_stats' must be a dictionary.")
     optimizer_stats = dict(stats_payload)
+    if "swap_events" in optimizer_stats:
+        raise ValueError("Run manifest field 'optimizer_stats.swap_events' is unsupported for gibbs_anneal.")
+    inline_move_stats = optimizer_stats.get("move_stats")
+    if inline_move_stats is not None and not isinstance(inline_move_stats, list):
+        raise ValueError("Run manifest field 'optimizer_stats.move_stats' must be a list when provided.")
     move_stats_path = optimizer_stats.get("move_stats_path") or manifest.get("optimizer_stats_path")
     if move_stats_path is None:
         return optimizer_stats
@@ -191,7 +194,11 @@ def _resolve_optimizer_stats(manifest: dict[str, object], run_dir: Path) -> dict
     relative = Path(move_stats_path)
     if relative.is_absolute():
         raise ValueError("Run manifest field 'optimizer_stats_path' must be relative to the run directory.")
-    sidecar = run_dir / relative
+    sidecar = (run_dir / relative).resolve()
+    try:
+        sidecar.relative_to(run_dir.resolve())
+    except ValueError as exc:
+        raise ValueError("Run manifest field 'optimizer_stats_path' must resolve within the run directory.") from exc
     if not sidecar.exists():
         raise FileNotFoundError(f"Missing optimizer stats sidecar: {sidecar}")
     if sidecar.suffix == ".gz":
@@ -201,18 +208,15 @@ def _resolve_optimizer_stats(manifest: dict[str, object], run_dir: Path) -> dict
         payload = json.loads(sidecar.read_text())
     if not isinstance(payload, dict):
         raise ValueError(f"Optimizer stats sidecar must contain an object: {sidecar}")
+    if "swap_events" in payload:
+        raise ValueError(f"Optimizer stats sidecar field 'swap_events' is unsupported: {sidecar}")
     move_stats = payload.get("move_stats")
     if move_stats is not None and not isinstance(move_stats, list):
         raise ValueError(f"Optimizer stats sidecar field 'move_stats' must be a list when present: {sidecar}")
-    swap_events = payload.get("swap_events")
-    if swap_events is not None and not isinstance(swap_events, list):
-        raise ValueError(f"Optimizer stats sidecar field 'swap_events' must be a list when present: {sidecar}")
-    if move_stats is None and swap_events is None:
-        raise ValueError(f"Optimizer stats sidecar missing both 'move_stats' and 'swap_events' lists: {sidecar}")
+    if move_stats is None:
+        raise ValueError(f"Optimizer stats sidecar missing required 'move_stats' list: {sidecar}")
     if move_stats is not None:
         optimizer_stats["move_stats"] = move_stats
-    if swap_events is not None:
-        optimizer_stats["swap_events"] = swap_events
     return optimizer_stats
 
 
@@ -467,11 +471,6 @@ def run_analyze(
     runs_override: list[str] | None = None,
     use_latest: bool = False,
 ) -> list[Path]:
-    if cfg.analysis is None:
-        raise ValueError("analysis section is required for analyze")
-    if cfg.sample is None:
-        raise ValueError("sample section is required for analyze")
-
     catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     ensure_mpl_cache(catalog_root)
     ensure_arviz_data_dir(catalog_root)
@@ -486,7 +485,15 @@ def run_analyze(
 
     plan = resolve_analysis_plan(cfg)
     analysis_cfg = plan.analysis_cfg
-    runs = _resolve_run_names(cfg, config_path, runs_override=runs_override, use_latest=use_latest)
+    if not analysis_cfg.enabled:
+        raise ValueError("analysis.enabled=false; set analysis.enabled=true to run analysis.")
+    runs = _resolve_run_names(
+        cfg,
+        config_path,
+        analysis_cfg=analysis_cfg,
+        runs_override=runs_override,
+        use_latest=use_latest,
+    )
     results: list[Path] = []
 
     for run_name in runs:
@@ -504,7 +511,7 @@ def run_analyze(
                 raise ValueError("Lockfile checksum mismatch (run manifest does not match current lockfile).")
         pwms, used_cfg = _load_pwms_from_config(run_dir)
         tf_names = _resolve_tf_names(used_cfg, pwms)
-        sample_meta = _resolve_sample_meta(cfg, used_cfg, manifest)
+        sample_meta = _resolve_sample_meta(used_cfg, manifest)
         analysis_id = _analysis_id()
         created_at = datetime.now(timezone.utc).isoformat()
 
@@ -784,7 +791,7 @@ def run_analyze(
             stride=analysis_cfg.trajectory_stride,
             alpha_min=analysis_cfg.trajectory_particle_alpha_min,
             alpha_max=analysis_cfg.trajectory_particle_alpha_max,
-            slot_overlay=analysis_cfg.trajectory_slot_overlay,
+            slot_overlay=analysis_cfg.trajectory_chain_overlay,
             **plot_kwargs,
         )
         _record_plot("chain_trajectory_scatter", plot_trajectory_path, True, None)
@@ -795,7 +802,7 @@ def run_analyze(
             stride=analysis_cfg.trajectory_stride,
             alpha_min=analysis_cfg.trajectory_particle_alpha_min,
             alpha_max=analysis_cfg.trajectory_particle_alpha_max,
-            slot_overlay=analysis_cfg.trajectory_slot_overlay,
+            slot_overlay=analysis_cfg.trajectory_chain_overlay,
             **plot_kwargs,
         )
         _record_plot("chain_trajectory_sweep", plot_trajectory_sweep_path, True, None)

@@ -51,3 +51,42 @@ def test_objective_config_accepts_normalized_llr_defaults() -> None:
         objective=SampleObjectiveConfig(score_scale="normalized-llr"),
     )
     assert cfg.objective.score_scale == "normalized-llr"
+
+
+def test_optimizer_early_stop_config_is_accepted() -> None:
+    cfg = SampleConfig.model_validate(
+        {
+            **_build_sample_payload(),
+            "optimizer": {
+                "kind": "gibbs_anneal",
+                "chains": 2,
+                "cooling": {"kind": "fixed", "beta": 1.0},
+                "early_stop": {
+                    "enabled": True,
+                    "patience": 10,
+                    "min_delta": 0.05,
+                    "require_min_unique": True,
+                    "min_unique": 3,
+                    "success_min_per_tf_norm": 0.4,
+                },
+            },
+        }
+    )
+    assert cfg.optimizer.early_stop.enabled is True
+    assert cfg.optimizer.early_stop.patience == 10
+    assert cfg.optimizer.early_stop.min_delta == pytest.approx(0.05)
+    assert cfg.optimizer.early_stop.require_min_unique is True
+    assert cfg.optimizer.early_stop.min_unique == 3
+    assert cfg.optimizer.early_stop.success_min_per_tf_norm == pytest.approx(0.4)
+
+
+def test_optimizer_early_stop_enabled_requires_positive_patience() -> None:
+    payload = _build_sample_payload()
+    payload["optimizer"] = {
+        "kind": "gibbs_anneal",
+        "chains": 1,
+        "cooling": {"kind": "fixed", "beta": 1.0},
+        "early_stop": {"enabled": True, "patience": 0},
+    }
+    with pytest.raises(ValidationError, match="sample.optimizer.early_stop.patience must be >= 1 when enabled=true"):
+        SampleConfig.model_validate(payload)

@@ -75,8 +75,8 @@ def analyze(
     except ValueError as exc:
         console.print(f"Error: {exc}")
         raise typer.Exit(code=1)
-    if cfg.analysis is None:
-        console.print("Error: analysis section is required for analyze.")
+    if cfg.analysis is not None and not cfg.analysis.enabled:
+        console.print("Error: analysis.enabled=false; set analysis.enabled=true to run analysis.")
         raise typer.Exit(code=1)
     try:
         cache_dir = workspace_state_root(config_path) / "numba_cache"

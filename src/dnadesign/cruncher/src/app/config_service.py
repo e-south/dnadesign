@@ -78,8 +78,6 @@ def summarize_config(cfg: CruncherConfig) -> Dict[str, Any]:
             "dataset_map": cfg.catalog.dataset_map,
             "site_window_lengths": cfg.catalog.site_window_lengths,
             "site_window_center": cfg.catalog.site_window_center,
-            "pwm_window_lengths": cfg.catalog.pwm_window_lengths,
-            "pwm_window_strategy": cfg.catalog.pwm_window_strategy,
             "min_sites_for_pwm": cfg.catalog.min_sites_for_pwm,
             "allow_low_sites": cfg.catalog.allow_low_sites,
             "source_preference": cfg.catalog.source_preference,

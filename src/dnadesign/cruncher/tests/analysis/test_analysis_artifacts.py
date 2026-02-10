@@ -705,6 +705,102 @@ def test_analyze_defaults_to_latest_when_runs_empty(tmp_path: Path) -> None:
     assert analysis_runs
 
 
+def test_analyze_uses_defaults_when_analysis_section_missing(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    config = _base_config(
+        catalog_root=catalog_root,
+        regulator_sets=[["lexA", "cpxR"]],
+        sample=_sample_block(save_trace=False, top_k=2),
+        analysis={
+            "run_selector": "explicit",
+            "runs": ["sample_defaults"],
+            "pairwise": ["lexA", "cpxR"],
+            "plot_format": "png",
+            "plot_dpi": 72,
+            "table_format": "parquet",
+            "max_points": 2000,
+        },
+    )
+    config["cruncher"].pop("analysis")
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    run_dir = _make_sample_run_dir(tmp_path, "sample_defaults")
+    lock_dir = tmp_path / ".cruncher" / "locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = lock_dir / "config.lock.json"
+    lock_path.write_text("{}")
+    lock_sha = sha256_path(lock_path)
+
+    _write_basic_run_artifacts(
+        run_dir=run_dir,
+        config=config,
+        config_path=config_path,
+        lock_path=lock_path,
+        lock_sha=lock_sha,
+        tf_names=["lexA", "cpxR"],
+        include_trace=False,
+        top_k=2,
+        draws=2,
+        tune=1,
+    )
+
+    cfg = load_config(config_path)
+    analysis_runs = run_analyze(cfg, config_path, runs_override=["sample_defaults"])
+
+    assert analysis_runs == [run_dir]
+    analysis_used = yaml.safe_load(analysis_used_path(run_dir).read_text())
+    assert analysis_used["analysis"]["run_selector"] == "latest"
+
+
+def test_analyze_reads_sample_metadata_without_sample_section(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    config = _base_config(
+        catalog_root=catalog_root,
+        regulator_sets=[["lexA", "cpxR"]],
+        sample=_sample_block(save_trace=False, top_k=2),
+        analysis={
+            "run_selector": "explicit",
+            "runs": ["sample_no_sample_section"],
+            "pairwise": ["lexA", "cpxR"],
+            "plot_format": "png",
+            "plot_dpi": 72,
+            "table_format": "parquet",
+            "max_points": 2000,
+        },
+    )
+    config["cruncher"].pop("sample")
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    run_dir = _make_sample_run_dir(tmp_path, "sample_no_sample_section")
+    lock_dir = tmp_path / ".cruncher" / "locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = lock_dir / "config.lock.json"
+    lock_path.write_text("{}")
+    lock_sha = sha256_path(lock_path)
+
+    _write_basic_run_artifacts(
+        run_dir=run_dir,
+        config=config,
+        config_path=config_path,
+        lock_path=lock_path,
+        lock_sha=lock_sha,
+        tf_names=["lexA", "cpxR"],
+        include_trace=False,
+        top_k=2,
+        draws=2,
+        tune=1,
+    )
+
+    cfg = load_config(config_path)
+    analysis_runs = run_analyze(cfg, config_path, runs_override=["sample_no_sample_section"])
+
+    assert analysis_runs == [run_dir]
+    report_payload = json.loads(report_json_path(run_dir).read_text())
+    assert report_payload["run"]["optimizer_kind"] == "gibbs_anneal"
+
+
 def test_analyze_latest_skips_failed_index_run(tmp_path: Path) -> None:
     catalog_root = tmp_path / ".cruncher"
     config = _base_config(

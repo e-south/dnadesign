@@ -34,7 +34,9 @@ def test_run_status_writer_emits_live_metrics(tmp_path: Path) -> None:
 
     lines = metrics_path.read_text().strip().splitlines()
     assert len(lines) >= 3
+    records = [json.loads(line) for line in lines]
     events = [json.loads(line).get("event") for line in lines]
     assert events[0] == "start"
     assert "update" in events
     assert events[-1] == "finish"
+    assert all("swap_rate" not in record for record in records)
