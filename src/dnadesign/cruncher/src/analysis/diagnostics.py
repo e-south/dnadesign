@@ -160,7 +160,7 @@ def summarize_sampling_diagnostics(
         optimizer_kind = sample_meta.get("optimizer_kind") or optimizer_kind
     if optimizer_kind is None and isinstance(optimizer, dict):
         optimizer_kind = optimizer.get("kind") if isinstance(optimizer.get("kind"), str) else optimizer_kind
-    optimizer_kind = str(optimizer_kind).lower() if optimizer_kind else None
+    resolved_optimizer_kind = str(optimizer_kind).lower() if optimizer_kind else None
     has_canonical = bool(sample_meta.get("dsdna_canonicalize")) if sample_meta else False
 
     if isinstance(sample_meta, dict):
@@ -177,8 +177,8 @@ def summarize_sampling_diagnostics(
 
     if mode:
         metrics["mode"] = mode
-    if optimizer_kind:
-        metrics["optimizer_kind"] = optimizer_kind
+    if resolved_optimizer_kind:
+        metrics["optimizer_kind"] = resolved_optimizer_kind
 
     # ---- trace diagnostics -------------------------------------------------
     trace_metrics: dict[str, object] = {}
@@ -240,7 +240,7 @@ def summarize_sampling_diagnostics(
                 n_chains, n_draws = int(score_arr.shape[0]), int(score_arr.shape[1])
                 trace_metrics["chains"] = n_chains
                 trace_metrics["draws"] = n_draws
-                pt_mixing = optimizer_kind == "pt"
+                pt_mixing = resolved_optimizer_kind == "pt"
                 if pt_mixing:
                     trace_metrics["mixing_note"] = "PT ladder: R-hat/ESS computed on cold chain only."
                     if n_draws < 4:
@@ -446,10 +446,13 @@ def summarize_sampling_diagnostics(
 
     # ---- optimizer stats --------------------------------------------------
     optimizer_metrics: dict[str, object] = {}
-    optimizer_kind = None
+    optimizer_kind_for_stats = resolved_optimizer_kind
     if optimizer:
-        optimizer_kind = optimizer.get("kind")
-        optimizer_metrics["kind"] = optimizer_kind
+        kind_payload = optimizer.get("kind")
+        if isinstance(kind_payload, str):
+            optimizer_kind_for_stats = str(kind_payload).lower()
+        if optimizer_kind_for_stats:
+            optimizer_metrics["kind"] = optimizer_kind_for_stats
     if optimizer_stats:
         acc = optimizer_stats.get("acceptance_rate") or {}
         acc_b = _safe_float(acc.get("B"))
@@ -483,9 +486,11 @@ def summarize_sampling_diagnostics(
                     )
                     _mark("warn")
         swap_rate = _safe_float(optimizer_stats.get("swap_acceptance_rate"))
+        swap_attempts = _safe_int(optimizer_stats.get("swap_attempts"))
         if swap_rate is not None:
             optimizer_metrics["swap_acceptance_rate"] = swap_rate
-            if swap_rate < thresholds["swap_low"] or swap_rate > thresholds["swap_high"]:
+            has_replica_exchange = bool((swap_attempts or 0) > 0) or optimizer_kind_for_stats == "pt"
+            if has_replica_exchange and (swap_rate < thresholds["swap_low"] or swap_rate > thresholds["swap_high"]):
                 warnings.append(f"Swap acceptance {swap_rate:.2f} suggests poor PT mixing.")
                 _mark("warn")
         unique_successes = _safe_int(optimizer_stats.get("unique_successes"))

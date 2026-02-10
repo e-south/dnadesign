@@ -54,7 +54,6 @@ def test_swap_controller_disabled_for_gibbs_anneal() -> None:
         "softmin": {"enabled": False},
         "target_worst_tf_prob": 0.0,
         "target_window_pad": 0,
-        "adaptive_swap": {"enabled": True, "window": 100, "stop_after_tune": True},
     }
     init_cfg = SimpleNamespace(kind="random", length=4, pad_with="background", regulator=None)
     optimizer = GibbsAnnealOptimizer(

@@ -14,6 +14,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 from dnadesign.cruncher.core.optimizers.pt import GibbsAnnealOptimizer
 from dnadesign.cruncher.core.state import SequenceState
@@ -31,7 +32,7 @@ class _DummyEvaluator:
         return per_tf, float(next(iter(per_tf.values())))
 
 
-def test_adaptive_swap_config_is_ignored_in_gibbs_anneal() -> None:
+def test_adaptive_swap_config_is_rejected_for_gibbs_anneal() -> None:
     cfg = {
         "draws": 3,
         "tune": 6,
@@ -66,19 +67,14 @@ def test_adaptive_swap_config_is_ignored_in_gibbs_anneal() -> None:
         },
     }
     init_cfg = SimpleNamespace(kind="random", length=4, pad_with="background", regulator=None)
-    optimizer = GibbsAnnealOptimizer(
-        evaluator=_DummyEvaluator(),
-        cfg=cfg,
-        rng=np.random.default_rng(0),
-        pwms={},
-        init_cfg=init_cfg,
-    )
-
-    optimizer.optimise()
-
-    assert optimizer.swap_controller is None
-    assert optimizer.swap_attempts == 0
-    assert optimizer.swap_accepts == 0
+    with pytest.raises(ValueError, match="unsupported for optimizer kind='gibbs_anneal'"):
+        GibbsAnnealOptimizer(
+            evaluator=_DummyEvaluator(),
+            cfg=cfg,
+            rng=np.random.default_rng(0),
+            pwms={},
+            init_cfg=init_cfg,
+        )
 
 
 def test_swap_stats_stay_zero_after_draws() -> None:
@@ -103,7 +99,6 @@ def test_swap_stats_stay_zero_after_draws() -> None:
         "softmin": {"enabled": False},
         "target_worst_tf_prob": 0.0,
         "target_window_pad": 0,
-        "adaptive_swap": {"enabled": True, "strict": True},
     }
     init_cfg = SimpleNamespace(kind="random", length=4, pad_with="background", regulator=None)
     optimizer = GibbsAnnealOptimizer(

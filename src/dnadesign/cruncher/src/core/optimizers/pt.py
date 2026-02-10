@@ -40,6 +40,13 @@ logger = logging.getLogger(__name__)
 class GibbsAnnealOptimizer(Optimizer):
     """Gibbs/Metropolis sampler with an annealing schedule."""
 
+    _UNSUPPORTED_REPLICA_EXCHANGE_KEYS: tuple[str, ...] = (
+        "adaptive_swap",
+        "swap_stride",
+        "n_temps",
+        "temp_max",
+    )
+
     # Construction
     def __init__(
         self,
@@ -53,6 +60,13 @@ class GibbsAnnealOptimizer(Optimizer):
         progress: ProgressAdapter | None = None,
     ) -> None:
         super().__init__(evaluator, cfg, rng)
+
+        unexpected = [key for key in self._UNSUPPORTED_REPLICA_EXCHANGE_KEYS if key in cfg]
+        if unexpected:
+            keys = ", ".join(sorted(unexpected))
+            raise ValueError(
+                f"Replica-exchange optimizer settings are unsupported for optimizer kind='gibbs_anneal': {keys}"
+            )
 
         # Core dimensions
         self.draws: int = int(cfg["draws"])

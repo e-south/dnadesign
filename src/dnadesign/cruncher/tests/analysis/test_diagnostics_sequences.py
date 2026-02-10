@@ -75,3 +75,19 @@ def test_diagnostics_includes_pvalue_cache_stats() -> None:
     )
     metrics = diagnostics["metrics"]
     assert metrics["pvalue_cache"] == {"hits": 2, "misses": 1, "maxsize": 256, "currsize": 3}
+
+
+def test_gibbs_diagnostics_do_not_emit_pt_swap_warning() -> None:
+    diagnostics = summarize_sampling_diagnostics(
+        trace_idata=None,
+        sequences_df=pd.DataFrame({"sequence": []}),
+        elites_df=pd.DataFrame(),
+        elites_hits_df=None,
+        tf_names=["tf1"],
+        optimizer={"kind": "gibbs_anneal"},
+        optimizer_stats={"swap_attempts": 0, "swap_acceptance_rate": 0.0},
+        optimizer_kind="gibbs_anneal",
+        trace_required=False,
+    )
+    warnings = diagnostics.get("warnings") or []
+    assert not any("Swap acceptance" in warning for warning in warnings)
