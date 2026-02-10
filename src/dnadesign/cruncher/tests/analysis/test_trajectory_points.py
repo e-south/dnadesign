@@ -13,18 +13,17 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from dnadesign.cruncher.analysis.trajectory import (
     add_raw_llr_objective,
-    build_particle_trajectory_points,
+    build_chain_trajectory_points,
     build_trajectory_points,
     compute_best_so_far_path,
 )
 from dnadesign.cruncher.core.pwm import PWM
 
 
-def test_build_trajectory_points_keeps_all_chains_and_marks_cold() -> None:
+def test_build_trajectory_points_keeps_all_chains() -> None:
     sequences_df = pd.DataFrame(
         {
             "chain": [0, 0, 1, 1],
@@ -43,10 +42,7 @@ def test_build_trajectory_points_keeps_all_chains_and_marks_cold() -> None:
     )
 
     assert set(trajectory_df["chain"].astype(int).unique()) == {0, 1}
-    cold_rows = trajectory_df[trajectory_df["chain"] == 0]
-    hot_rows = trajectory_df[trajectory_df["chain"] == 1]
-    assert set(cold_rows["is_cold_chain"].astype(int).unique()) == {1}
-    assert set(hot_rows["is_cold_chain"].astype(int).unique()) == {0}
+    assert "is_cold_chain" not in trajectory_df.columns
 
 
 def test_build_trajectory_points_subsample_keeps_dense_early_sweeps() -> None:
@@ -72,10 +68,10 @@ def test_build_trajectory_points_subsample_keeps_dense_early_sweeps() -> None:
     assert list(trajectory_df["sweep"].astype(int).head(4)) == [0, 1, 2, 3]
 
 
-def test_build_trajectory_points_uses_max_beta_as_cold_chain() -> None:
+def test_build_trajectory_points_maps_slot_id_to_chain_when_chain_missing() -> None:
     sequences_df = pd.DataFrame(
         {
-            "chain": [0, 0, 1, 1],
+            "slot_id": [0, 0, 1, 1],
             "draw": [0, 1, 0, 1],
             "phase": ["draw", "draw", "draw", "draw"],
             "score_lexA": [0.1, 0.2, 0.8, 0.9],
@@ -90,30 +86,7 @@ def test_build_trajectory_points_uses_max_beta_as_cold_chain() -> None:
         beta_ladder=[0.2, 1.0],
     )
 
-    cold_rows = trajectory_df[trajectory_df["chain"] == 1]
-    hot_rows = trajectory_df[trajectory_df["chain"] == 0]
-    assert set(cold_rows["is_cold_chain"].astype(int).unique()) == {1}
-    assert set(hot_rows["is_cold_chain"].astype(int).unique()) == {0}
-
-
-def test_build_trajectory_points_rejects_ambiguous_cold_chain_beta_ties() -> None:
-    sequences_df = pd.DataFrame(
-        {
-            "chain": [0, 0, 1, 1],
-            "draw": [0, 1, 0, 1],
-            "phase": ["draw", "draw", "draw", "draw"],
-            "score_lexA": [0.2, 0.3, 0.5, 0.6],
-            "score_cpxR": [0.1, 0.2, 0.4, 0.5],
-        }
-    )
-
-    with pytest.raises(ValueError, match="multiple chains share the maximum beta"):
-        build_trajectory_points(
-            sequences_df,
-            ["lexA", "cpxR"],
-            max_points=100,
-            beta_ladder=[1.0, 1.0],
-        )
+    assert sorted(trajectory_df["chain"].astype(int).unique()) == [0, 1]
 
 
 def test_compute_best_so_far_path_is_monotonic() -> None:
@@ -132,11 +105,10 @@ def test_compute_best_so_far_path_is_monotonic() -> None:
     assert best_path["objective_scalar"].is_monotonic_increasing
 
 
-def test_build_trajectory_points_carries_particle_identity_fields() -> None:
+def test_build_trajectory_points_carries_chain_fields() -> None:
     sequences_df = pd.DataFrame(
         {
-            "slot_id": [0, 1, 0, 1],
-            "particle_id": [0, 1, 1, 0],
+            "chain": [0, 1, 0, 1],
             "draw": [0, 0, 1, 1],
             "sweep_idx": [0, 0, 1, 1],
             "phase": ["draw", "draw", "draw", "draw"],
@@ -153,17 +125,15 @@ def test_build_trajectory_points_carries_particle_identity_fields() -> None:
         beta_ladder=[1.0, 0.5],
     )
 
-    for required in ("slot_id", "particle_id", "beta", "sweep", "phase"):
+    for required in ("chain", "beta", "sweep", "phase"):
         assert required in trajectory_df.columns
-    assert sorted(trajectory_df["slot_id"].astype(int).unique()) == [0, 1]
-    assert sorted(trajectory_df["particle_id"].astype(int).unique()) == [0, 1]
+    assert sorted(trajectory_df["chain"].astype(int).unique()) == [0, 1]
 
 
-def test_build_particle_trajectory_points_tracks_slot_migration() -> None:
+def test_build_chain_trajectory_points_tracks_chain_progression() -> None:
     trajectory_df = pd.DataFrame(
         {
-            "slot_id": [0, 1, 0, 1],
-            "particle_id": [0, 1, 1, 0],
+            "chain": [0, 1, 0, 1],
             "sweep": [0, 0, 1, 1],
             "phase": ["draw", "draw", "draw", "draw"],
             "beta": [1.0, 0.5, 1.0, 0.5],
@@ -177,21 +147,20 @@ def test_build_particle_trajectory_points_tracks_slot_migration() -> None:
         }
     )
 
-    particles_df = build_particle_trajectory_points(trajectory_df, max_points=100)
-    particle_zero = particles_df[particles_df["particle_id"].astype(int) == 0].sort_values("sweep_idx")
+    chains_df = build_chain_trajectory_points(trajectory_df, max_points=100)
+    chain_zero = chains_df[chains_df["chain"].astype(int) == 0].sort_values("sweep_idx")
 
-    assert list(particle_zero["slot_id"].astype(int)) == [0, 1]
-    assert sorted(particles_df["particle_id"].astype(int).unique()) == [0, 1]
-    assert "x_tf" in particles_df.columns
-    assert "y_tf" in particles_df.columns
+    assert list(chain_zero["sweep_idx"].astype(int)) == [0, 1]
+    assert sorted(chains_df["chain"].astype(int).unique()) == [0, 1]
+    assert "x_tf" in chains_df.columns
+    assert "y_tf" in chains_df.columns
 
 
 def test_add_raw_llr_objective_adds_combined_raw_llr_column() -> None:
     trajectory_df = pd.DataFrame(
         {
             "sequence": ["AACCAA", "TTGGTT"],
-            "slot_id": [0, 1],
-            "particle_id": [0, 1],
+            "chain": [0, 1],
             "sweep_idx": [0, 0],
         }
     )

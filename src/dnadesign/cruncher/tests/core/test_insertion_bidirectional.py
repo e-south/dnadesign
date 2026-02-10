@@ -13,7 +13,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from dnadesign.cruncher.core.optimizers.pt import PTGibbsOptimizer
+from dnadesign.cruncher.core.optimizers.pt import GibbsAnnealOptimizer
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.core.state import SequenceState
 
@@ -67,7 +67,7 @@ def test_insertion_can_reverse_complement() -> None:
         "insertion_consensus_prob": 1.0,
     }
     init_cfg = SimpleNamespace(kind="random", length=2, pad_with="background", regulator=None)
-    optimizer = PTGibbsOptimizer(
+    optimizer = GibbsAnnealOptimizer(
         evaluator=evaluator,
         cfg=cfg,
         rng=np.random.default_rng(0),

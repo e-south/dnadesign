@@ -3,7 +3,7 @@
 <cruncher project>
 src/dnadesign/cruncher/src/analysis/plots/health_panel.py
 
-Render a compact optimization health panel (PT swap + move acceptance).
+Render a compact optimization health panel.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -32,11 +32,11 @@ def _plot_swap_acceptance(ax: plt.Axes, optimizer_stats: dict[str, object] | Non
     attempts = [int(v) for v in attempts] if attempts else []
     accepts = [int(v) for v in accepts] if accepts else []
     if not attempts or len(attempts) != len(accepts):
-        _empty_panel(ax, "Swap acceptance unavailable")
+        _empty_panel(ax, "Replica exchange disabled")
         return
     rates = [a / t if t else 0.0 for a, t in zip(accepts, attempts)]
     ax.bar(range(1, len(rates) + 1), rates, color="#4c78a8")
-    ax.set_title("PT swap acceptance")
+    ax.set_title("Cross-chain exchange acceptance")
     ax.set_xlabel("Adjacent pair")
     ax.set_ylabel("Acceptance rate")
     ax.set_ylim(0.0, 1.0)

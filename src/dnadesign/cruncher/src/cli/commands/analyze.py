@@ -129,10 +129,7 @@ def analyze(
                         f"  overlap_rate_median: {overlap.get('overlap_rate_median')}  "
                         f"overlap_total_bp_median: {overlap.get('overlap_total_bp_median')}"
                     )
-                    console.print(
-                        f"  acceptance_rate_mh_tail: {sampling.get('acceptance_rate_mh_tail')}  "
-                        f"swap_acceptance_rate: {sampling.get('swap_acceptance_rate')}"
-                    )
+                    console.print(f"  acceptance_rate_mh_tail: {sampling.get('acceptance_rate_mh_tail')}")
     except (RuntimeError, ValueError, FileNotFoundError) as exc:
         message = str(exc)
         console.print(f"Error: {message}")

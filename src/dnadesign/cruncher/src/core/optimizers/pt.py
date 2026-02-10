@@ -17,13 +17,12 @@ from typing import Any, Dict, List, Tuple
 import numpy as np
 
 from dnadesign.cruncher.core.optimizers.base import Optimizer
-from dnadesign.cruncher.core.optimizers.cooling import make_beta_ladder, make_beta_scheduler
+from dnadesign.cruncher.core.optimizers.cooling import make_beta_scheduler
 from dnadesign.cruncher.core.optimizers.helpers import _replace_block, slide_window, swap_block
 from dnadesign.cruncher.core.optimizers.policies import (
     MOVE_KINDS,
     AdaptiveMoveController,
     AdaptiveProposalController,
-    AdaptiveSwapPairController,
     MoveSchedule,
     TargetingPolicy,
     move_probs_array,
@@ -38,8 +37,8 @@ from dnadesign.cruncher.core.state import SequenceState, make_seed
 logger = logging.getLogger(__name__)
 
 
-class PTGibbsOptimizer(Optimizer):
-    """Parallel-Tempered Gibbs/Metropolis sampler."""
+class GibbsAnnealOptimizer(Optimizer):
+    """Gibbs/Metropolis sampler with an annealing schedule."""
 
     # Construction
     def __init__(
@@ -84,17 +83,41 @@ class PTGibbsOptimizer(Optimizer):
         if self.early_stop_patience <= 0:
             self.early_stop_enabled = False
 
-        # β‑ladder (base)
-        cooling_cfg = {"kind": cfg["kind"], "beta": cfg["beta"]}
-        self.beta_ladder_base: List[float] = make_beta_ladder(cooling_cfg)
-        if len(self.beta_ladder_base) != self.chains:
-            raise ValueError(
-                "Length of beta ladder (%d) must match number of chains (%d)"
-                % (len(self.beta_ladder_base), self.chains)
-            )
-        self.beta_ladder: List[float] = list(self.beta_ladder_base)
+        # MCMC annealing schedule (shared across independent chains).
         self.sweeps_per_chain = self.tune + self.draws
         self.total_sweeps = self.sweeps_per_chain
+        cooling_cfg_raw = cfg.get("mcmc_cooling") or {"kind": "fixed", "beta": 1.0}
+        cooling_kind = str(cooling_cfg_raw.get("kind") or "").strip().lower()
+        if cooling_kind == "fixed":
+            self.mcmc_cooling_cfg = {"kind": "fixed", "beta": float(cooling_cfg_raw["beta"])}
+        elif cooling_kind == "linear":
+            self.mcmc_cooling_cfg = {
+                "kind": "linear",
+                "beta": (float(cooling_cfg_raw["beta_start"]), float(cooling_cfg_raw["beta_end"])),
+            }
+        elif cooling_kind == "piecewise":
+            stages_raw = cooling_cfg_raw.get("stages")
+            if not isinstance(stages_raw, list) or not stages_raw:
+                raise ValueError("mcmc_cooling.stages must be a non-empty list when kind='piecewise'")
+            stages: list[dict[str, float | int]] = []
+            for stage in stages_raw:
+                if not isinstance(stage, dict):
+                    raise ValueError("mcmc_cooling.stages must contain dictionaries with sweeps and beta")
+                stages.append(
+                    {
+                        "sweeps": int(stage["sweeps"]),
+                        "beta": float(stage["beta"]),
+                    }
+                )
+            self.mcmc_cooling_cfg = {"kind": "piecewise", "stages": stages}
+        else:
+            raise ValueError(f"Unsupported mcmc_cooling kind: {cooling_kind!r}")
+        self.mcmc_beta_of = make_beta_scheduler(self.mcmc_cooling_cfg, self.total_sweeps)
+        beta_start = float(self.mcmc_beta_of(0))
+        self.beta_ladder_base: List[float] = [beta_start for _ in range(self.chains)]
+        self.beta_ladder: List[float] = list(self.beta_ladder_base)
+        # Replica exchange is intentionally disabled for gibbs_anneal.
+        self.swap_enabled = False
 
         # Move configuration
         self.move_cfg: Dict[str, Tuple[int, int] | int] = {
@@ -151,30 +174,13 @@ class PTGibbsOptimizer(Optimizer):
         else:
             self.softmin_of = None
 
-        # Adaptive swap controller
-        self.adaptive_swap_cfg = cfg.get("adaptive_swap") or {}
-        self.adaptive_swap_enabled = bool(self.adaptive_swap_cfg.get("enabled", False))
-        if self.adaptive_swap_enabled:
-            self.swap_controller = AdaptiveSwapPairController(
-                n_pairs=max(0, self.chains - 1),
-                target=float(self.adaptive_swap_cfg.get("target_swap", 0.25)),
-                window=int(self.adaptive_swap_cfg.get("window", 50)),
-                k=float(self.adaptive_swap_cfg.get("k", 0.5)),
-                min_scale=float(self.adaptive_swap_cfg.get("min_scale", 0.25)),
-                max_scale=float(self.adaptive_swap_cfg.get("max_scale", 4.0)),
-                strict=bool(self.adaptive_swap_cfg.get("strict", False)),
-                saturation_windows=int(self.adaptive_swap_cfg.get("saturation_windows", 5)),
-                enabled=True,
-            )
-        else:
-            self.swap_controller = None
+        self.adaptive_swap_cfg: dict[str, object] = {}
+        self.adaptive_swap_enabled = False
+        self.swap_controller = None
 
         # References needed during optimisation
         self.pwms = pwms
         self.init_cfg = init_cfg
-        if self.swap_stride < 1:
-            raise ValueError("swap_stride must be >= 1")
-
         # Cache consensus and per-row probabilities for insertion moves
         self._insertion_consensus: Dict[str, np.ndarray] = {}
         self._insertion_row_probs: Dict[str, List[np.ndarray]] = {}
@@ -206,30 +212,17 @@ class PTGibbsOptimizer(Optimizer):
         self.best_meta: Tuple[int, int] | None = None
 
     # Public API
-    def _current_beta_ladder(self) -> list[float]:
-        if self.swap_controller is None:
-            return list(self.beta_ladder_base)
-        return self.swap_controller.ladder_from_base(self.beta_ladder_base)
-
-    def _scaled_beta_ladder(self, scale: float) -> list[float]:
-        if not self.beta_ladder_base:
-            return []
-        beta_min = float(self.beta_ladder_base[0])
-        beta_max = float(self.beta_ladder_base[-1])
-        if beta_min <= 0:
-            return [float(b) * float(scale) for b in self.beta_ladder_base]
-        effective_beta_max = max(beta_min, beta_max * float(scale))
-        if self.chains <= 1:
-            return [beta_min]
-        return list(np.geomspace(beta_min, effective_beta_max, self.chains))
+    def _current_beta_ladder(self, sweep_idx: int) -> list[float]:
+        beta_now = float(self.mcmc_beta_of(int(sweep_idx)))
+        return [beta_now for _ in range(self.chains)]
 
     def optimise(self) -> List[SequenceState]:  # noqa: C901  (long but readable)
-        """Run PT-MCMC and return *k* diverse elite sequences."""
+        """Run Gibbs annealing and return *k* diverse elite sequences."""
 
         rng = self.rng
         evaluator = self.scorer  # SequenceEvaluator
         C, T, D = self.chains, self.tune, self.draws
-        logger.debug("Starting PT optimisation: chains=%d  tune=%d  draws=%d", C, T, D)
+        logger.debug("Starting Gibbs annealing: chains=%d  tune=%d  draws=%d", C, T, D)
         self.all_samples.clear()
         self.all_meta.clear()
         self.all_trace_meta.clear()
@@ -247,7 +240,7 @@ class PTGibbsOptimizer(Optimizer):
             self.unique_successes = 0
 
         def _perturb_seed(seed_arr: np.ndarray, n_mutations: int) -> np.ndarray:
-            """Return a lightly perturbed copy of the seed for swap-friendly PT starts."""
+            """Return a lightly perturbed copy of the seed for chain-diverse starts."""
             mutated = seed_arr.copy()
             if n_mutations <= 0 or mutated.size == 0:
                 return mutated
@@ -262,7 +255,7 @@ class PTGibbsOptimizer(Optimizer):
                 mutated[pos] = np.int8(pick)
             return mutated
 
-        # Seed each chain (shared seed + small perturbations for swap-friendly PT starts).
+        # Seed each chain from a shared base with light perturbations.
         if self.init_cfg is None:
             base_seed = SequenceState.random(self.sequence_length, rng).seq.copy()
         else:
@@ -303,6 +296,7 @@ class PTGibbsOptimizer(Optimizer):
             self.all_meta.append((slot_id, sweep_idx))
             self.all_trace_meta.append(
                 {
+                    "chain": int(slot_id),
                     "slot_id": int(slot_id),
                     "particle_id": int(particle_id),
                     "beta": float(beta),
@@ -358,7 +352,7 @@ class PTGibbsOptimizer(Optimizer):
             )
             self.move_cfg["block_len_range"] = block_range
             self.move_cfg["multi_k_range"] = multi_range
-            self.beta_ladder = self._current_beta_ladder()
+            self.beta_ladder = self._current_beta_ladder(sweep_idx)
             current_scores: list[float] = []
             for c in range(C):
                 per_tf_map = current_per_tf_maps[c]
@@ -398,7 +392,7 @@ class PTGibbsOptimizer(Optimizer):
                 )
 
             # Optional swap attempts during tune (for adaptive swap calibration)
-            if self.adaptive_swap_enabled and (sweep_idx % self.swap_stride) == 0:
+            if self.swap_enabled and self.adaptive_swap_enabled and (sweep_idx % self.swap_stride) == 0:
                 for c in range(C - 1):
                     self.swap_attempts += 1
                     self.swap_attempts_by_pair[c] += 1
@@ -483,7 +477,7 @@ class PTGibbsOptimizer(Optimizer):
             )
             self.move_cfg["block_len_range"] = block_range
             self.move_cfg["multi_k_range"] = multi_range
-            self.beta_ladder = self._current_beta_ladder()
+            self.beta_ladder = self._current_beta_ladder(sweep_idx)
 
             # Within‑chain proposals
             current_scores: list[float] = []
@@ -525,7 +519,7 @@ class PTGibbsOptimizer(Optimizer):
                 )
 
             # Pair‑wise swaps
-            if (sweep_idx % self.swap_stride) == 0:
+            if self.swap_enabled and (sweep_idx % self.swap_stride) == 0:
                 for c in range(C - 1):
                     self.swap_attempts += 1
                     self.swap_attempts_by_pair[c] += 1
@@ -636,7 +630,7 @@ class PTGibbsOptimizer(Optimizer):
                         )
                         break
 
-        logger.debug("PT optimisation finished. Move utilisation: %s", dict(self.move_tally))
+        logger.debug("Gibbs annealing finished. Move utilisation: %s", dict(self.move_tally))
 
         # Build ArviZ trace from draw phase only when trace output is enabled.
         if self.build_trace:
@@ -936,13 +930,12 @@ class PTGibbsOptimizer(Optimizer):
         if self.best_score is not None:
             score_blob += f" best={self.best_score:.3f}"
         logger.info(
-            "Progress: %s %d/%d (%.1f%%) accept={%s} swap_acc=%.2f%s",
+            "Progress: %s %d/%d (%.1f%%) accept={%s}%s",
             phase,
             step,
             total,
             pct,
             acc_label,
-            swap_rate,
             score_blob,
         )
         self.telemetry.update(
@@ -996,7 +989,7 @@ class PTGibbsOptimizer(Optimizer):
         beta_min = float(self.beta_ladder_base[0]) if self.beta_ladder_base else None
         beta_max_base = float(self.beta_ladder_base[-1]) if self.beta_ladder_base else None
         beta_max_final = float(max(self.beta_ladder)) if self.beta_ladder else None
-        beta_mode = "pair_adaptive_log_gap" if self.swap_controller is not None else "fixed"
+        beta_mode = "annealing_schedule"
         swap_pair_scales = self.swap_controller.pair_scales if self.swap_controller is not None else None
         tuning_limited = self.swap_controller.tuning_limited() if self.swap_controller is not None else False
         swap_saturation_windows = self.swap_controller.saturated_windows_seen if self.swap_controller is not None else 0
@@ -1031,6 +1024,7 @@ class PTGibbsOptimizer(Optimizer):
             "unique_successes": self.unique_successes,
             "move_stats": list(self.move_stats),
             "swap_events": list(self.swap_events),
+            "mcmc_cooling": dict(self.mcmc_cooling_cfg),
             "final_softmin_beta": self.final_softmin_beta(),
             "final_mcmc_beta": self.final_mcmc_beta(),
         }
@@ -1041,17 +1035,17 @@ class PTGibbsOptimizer(Optimizer):
         return float(self.softmin_of(self.total_sweeps - 1))
 
     def final_mcmc_beta(self) -> float | None:
-        if not self.beta_ladder:
+        if self.total_sweeps < 1:
             return None
-        return float(max(self.beta_ladder))
+        return float(self.mcmc_beta_of(self.total_sweeps - 1))
 
     def objective_schedule_summary(self) -> Dict[str, object]:
-        beta_mode = "pair_adaptive_log_gap" if self.swap_controller is not None else "fixed"
         return {
             "total_sweeps": self.total_sweeps,
             "beta_ladder_base": list(self.beta_ladder_base),
             "beta_ladder_final": list(self.beta_ladder),
-            "beta_ladder_scale_final": float(self.swap_controller.scale) if self.swap_controller else 1.0,
-            "beta_ladder_scale_mode": beta_mode,
-            "swap_pair_scales_final": self.swap_controller.pair_scales if self.swap_controller is not None else None,
+            "beta_ladder_scale_final": 1.0,
+            "beta_ladder_scale_mode": "annealing_schedule",
+            "swap_pair_scales_final": None,
+            "mcmc_cooling": dict(self.mcmc_cooling_cfg),
         }

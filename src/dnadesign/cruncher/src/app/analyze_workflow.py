@@ -50,7 +50,7 @@ from dnadesign.cruncher.analysis.plot_registry import PLOT_SPECS
 from dnadesign.cruncher.analysis.report import build_report_payload, write_report_json, write_report_md
 from dnadesign.cruncher.analysis.trajectory import (
     add_raw_llr_objective,
-    build_particle_trajectory_points,
+    build_chain_trajectory_points,
     build_trajectory_points,
 )
 from dnadesign.cruncher.app.analyze.archive import _prune_latest_analysis_artifacts
@@ -478,7 +478,10 @@ def run_analyze(
 
     from dnadesign.cruncher.analysis.plots.elites_nn_distance import plot_elites_nn_distance
     from dnadesign.cruncher.analysis.plots.health_panel import plot_health_panel
-    from dnadesign.cruncher.analysis.plots.opt_trajectory import plot_opt_trajectory, plot_opt_trajectory_sweep
+    from dnadesign.cruncher.analysis.plots.opt_trajectory import (
+        plot_chain_trajectory_scatter,
+        plot_chain_trajectory_sweep,
+    )
     from dnadesign.cruncher.analysis.plots.overlap import plot_overlap_panel
 
     plan = resolve_analysis_plan(cfg)
@@ -565,8 +568,8 @@ def run_analyze(
         objective_path = analysis_table_path(tmp_root, "objective_components", "json")
         elites_mmr_path = analysis_table_path(tmp_root, "elites_mmr_summary", table_ext)
         nn_distance_path = analysis_table_path(tmp_root, "elites_nn_distance", table_ext)
-        trajectory_path = analysis_table_path(tmp_root, "opt_trajectory_points", table_ext)
-        trajectory_particles_path = analysis_table_path(tmp_root, "opt_trajectory_particles", table_ext)
+        trajectory_path = analysis_table_path(tmp_root, "chain_trajectory_points", table_ext)
+        trajectory_lines_path = analysis_table_path(tmp_root, "chain_trajectory_lines", table_ext)
 
         from dnadesign.cruncher.analysis.plots.summary import (
             score_frame_from_df,
@@ -635,11 +638,11 @@ def run_analyze(
             shutil.rmtree(tmp_root, ignore_errors=True)
             raise
         _write_table(trajectory_df, trajectory_path)
-        trajectory_particles_df = build_particle_trajectory_points(
+        trajectory_lines_df = build_chain_trajectory_points(
             trajectory_df,
             max_points=analysis_cfg.max_points,
         )
-        _write_table(trajectory_particles_df, trajectory_particles_path)
+        _write_table(trajectory_lines_df, trajectory_lines_path)
 
         overlap_summary_df, elite_overlap_df, overlap_summary = compute_overlap_tables(
             elites_df, hits_df, tf_names, include_sequences=False
@@ -767,12 +770,12 @@ def run_analyze(
                     )
                 )
 
-        plot_trajectory_path = analysis_plot_path(tmp_root, "opt_trajectory", plot_format)
-        plot_trajectory_sweep_path = analysis_plot_path(tmp_root, "opt_trajectory_sweep", plot_format)
-        if trajectory_particles_df.empty:
-            raise ValueError("Particle trajectory points are required for opt trajectory plot.")
-        plot_opt_trajectory(
-            trajectory_df=trajectory_particles_df,
+        plot_trajectory_path = analysis_plot_path(tmp_root, "chain_trajectory_scatter", plot_format)
+        plot_trajectory_sweep_path = analysis_plot_path(tmp_root, "chain_trajectory_sweep", plot_format)
+        if trajectory_lines_df.empty:
+            raise ValueError("Chain trajectory points are required for trajectory plot.")
+        plot_chain_trajectory_scatter(
+            trajectory_df=trajectory_lines_df,
             baseline_df=baseline_plot_df,
             tf_pair=trajectory_tf_pair,
             scatter_scale=trajectory_scale,
@@ -784,9 +787,9 @@ def run_analyze(
             slot_overlay=analysis_cfg.trajectory_slot_overlay,
             **plot_kwargs,
         )
-        _record_plot("opt_trajectory", plot_trajectory_path, True, None)
-        plot_opt_trajectory_sweep(
-            trajectory_df=trajectory_particles_df,
+        _record_plot("chain_trajectory_scatter", plot_trajectory_path, True, None)
+        plot_chain_trajectory_sweep(
+            trajectory_df=trajectory_lines_df,
             y_column=str(analysis_cfg.trajectory_sweep_y_column),
             out_path=plot_trajectory_sweep_path,
             stride=analysis_cfg.trajectory_stride,
@@ -795,7 +798,7 @@ def run_analyze(
             slot_overlay=analysis_cfg.trajectory_slot_overlay,
             **plot_kwargs,
         )
-        _record_plot("opt_trajectory_sweep", plot_trajectory_sweep_path, True, None)
+        _record_plot("chain_trajectory_sweep", plot_trajectory_sweep_path, True, None)
 
         plot_nn_path = analysis_plot_path(tmp_root, "elites_nn_distance", plot_format)
         plot_elites_nn_distance(nn_df, plot_nn_path, baseline_nn=pd.Series(baseline_nn), **plot_kwargs)
@@ -847,16 +850,16 @@ def run_analyze(
                 "exists": True,
             },
             {
-                "key": "opt_trajectory_points",
-                "label": "Optimization trajectory points",
+                "key": "chain_trajectory_points",
+                "label": "Chain trajectory points",
                 "path": trajectory_path.name,
                 "purpose": "plot_support",
                 "exists": True,
             },
             {
-                "key": "opt_trajectory_particles",
-                "label": "Optimization particle trajectories",
-                "path": trajectory_particles_path.name,
+                "key": "chain_trajectory_lines",
+                "label": "Chain trajectory lines",
+                "path": trajectory_lines_path.name,
                 "purpose": "plot_support",
                 "exists": True,
             },
@@ -930,7 +933,7 @@ def run_analyze(
                 analysis_root_path / nn_distance_path.relative_to(tmp_root), run_dir, kind="table", stage="analysis"
             ),
             artifact_entry(
-                analysis_root_path / trajectory_particles_path.relative_to(tmp_root),
+                analysis_root_path / trajectory_lines_path.relative_to(tmp_root),
                 run_dir,
                 kind="table",
                 stage="analysis",

@@ -3,7 +3,7 @@
 <cruncher project>
 src/dnadesign/cruncher/tests/config/test_pt_adaptation_config.py
 
-Validates schema support for adaptive PT and move/proposal tuning blocks.
+Validates schema support for optimizer cooling and move/proposal tuning blocks.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -44,18 +44,14 @@ def _base_config() -> dict:
                         "proposal_adapt": {"enabled": True, "window": 25},
                     },
                 },
-                "pt": {
-                    "n_temps": 4,
-                    "temp_max": 20.0,
-                    "adapt": {
-                        "enabled": True,
-                        "target_swap": 0.25,
-                        "window": 50,
-                        "k": 0.5,
-                        "min_scale": 0.25,
-                        "max_scale": 4.0,
-                        "strict": True,
-                        "saturation_windows": 5,
+                "optimizer": {
+                    "kind": "gibbs_anneal",
+                    "chains": 4,
+                    "cooling": {
+                        "kind": "linear",
+                        "beta": None,
+                        "beta_start": 0.25,
+                        "beta_end": 1.50,
                     },
                 },
                 "output": {
@@ -75,19 +71,36 @@ def _write_config(tmp_path: Path, payload: dict) -> Path:
     return path
 
 
-def test_pt_and_move_adaptation_blocks_load(tmp_path: Path) -> None:
+def test_optimizer_and_move_adaptation_blocks_load(tmp_path: Path) -> None:
     config_path = _write_config(tmp_path, _base_config())
     cfg = load_config(config_path)
     assert cfg.sample is not None
-    assert cfg.sample.pt.adapt.strict is True
+    assert cfg.sample.optimizer.kind == "gibbs_anneal"
+    assert cfg.sample.optimizer.chains == 4
+    assert cfg.sample.optimizer.cooling.kind == "linear"
+    assert cfg.sample.optimizer.cooling.beta_start == pytest.approx(0.25)
+    assert cfg.sample.optimizer.cooling.beta_end == pytest.approx(1.50)
     assert cfg.sample.moves.overrides is not None
     assert cfg.sample.moves.overrides.adaptive_weights is not None
     assert cfg.sample.moves.overrides.proposal_adapt is not None
 
 
-def test_pt_adapt_saturation_windows_must_be_positive(tmp_path: Path) -> None:
+def test_piecewise_cooling_sweeps_must_be_strictly_increasing(tmp_path: Path) -> None:
     payload = _base_config()
-    payload["cruncher"]["sample"]["pt"]["adapt"]["saturation_windows"] = 0
+    payload["cruncher"]["sample"]["optimizer"] = {
+        "kind": "gibbs_anneal",
+        "chains": 2,
+        "cooling": {
+            "kind": "piecewise",
+            "beta": None,
+            "beta_start": None,
+            "beta_end": None,
+            "stages": [
+                {"sweeps": 10, "beta": 0.4},
+                {"sweeps": 10, "beta": 0.9},
+            ],
+        },
+    }
     config_path = _write_config(tmp_path, payload)
-    with pytest.raises(ValidationError, match="saturation_windows"):
+    with pytest.raises(ValidationError, match="strictly increasing"):
         load_config(config_path)

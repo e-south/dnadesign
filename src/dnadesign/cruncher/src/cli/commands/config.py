@@ -182,10 +182,17 @@ def summary(
         table.add_row("objective.bidirectional", str(sample["objective"]["bidirectional"]))
         table.add_row("objective.softmin.enabled", str(sample["objective"]["softmin"]["enabled"]))
         table.add_row("objective.softmin.schedule", sample["objective"]["softmin"]["schedule"])
-        table.add_row("pt.n_temps", str(sample["pt"]["n_temps"]))
-        table.add_row("pt.temp_max", str(sample["pt"]["temp_max"]))
-        table.add_row("pt.swap_stride", str(sample["pt"]["swap_stride"]))
-        table.add_row("pt.adapt.enabled", str(sample["pt"]["adapt"]["enabled"]))
+        table.add_row("optimizer.kind", str(sample["optimizer"]["kind"]))
+        table.add_row("optimizer.chains", str(sample["optimizer"]["chains"]))
+        cooling = sample["optimizer"]["cooling"]
+        table.add_row("optimizer.cooling.kind", str(cooling["kind"]))
+        if cooling["kind"] == "fixed":
+            table.add_row("optimizer.cooling.beta", str(cooling["beta"]))
+        elif cooling["kind"] == "linear":
+            table.add_row("optimizer.cooling.beta_start", str(cooling["beta_start"]))
+            table.add_row("optimizer.cooling.beta_end", str(cooling["beta_end"]))
+        else:
+            table.add_row("optimizer.cooling.stages", str(cooling["stages"]))
         table.add_row("elites.k", str(sample["elites"]["k"]))
         table.add_row("elites.min_per_tf_norm", str(sample["elites"]["filter"]["min_per_tf_norm"]))
         table.add_row("elites.alpha", str(sample["elites"]["select"]["alpha"]))

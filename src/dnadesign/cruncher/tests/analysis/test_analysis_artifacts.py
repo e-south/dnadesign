@@ -324,8 +324,8 @@ def test_analyze_creates_analysis_run_and_manifest_updates(tmp_path: Path) -> No
     assert analysis_table_path(analysis_dir, "scores_summary", "parquet").exists()
     assert analysis_table_path(analysis_dir, "metrics_joint", "parquet").exists()
     assert analysis_table_path(analysis_dir, "diagnostics_summary", "json").exists()
-    assert analysis_table_path(analysis_dir, "opt_trajectory_points", "parquet").exists()
-    assert analysis_table_path(analysis_dir, "opt_trajectory_particles", "parquet").exists()
+    assert analysis_table_path(analysis_dir, "chain_trajectory_points", "parquet").exists()
+    assert analysis_table_path(analysis_dir, "chain_trajectory_lines", "parquet").exists()
     report_payload = json.loads(report_json_path(analysis_dir).read_text())
     assert report_payload["run"]["chains"] == 1
     assert report_payload["run"]["draws"] == 2
@@ -877,8 +877,8 @@ def test_analyze_opt_trajectory_multi_tf(tmp_path: Path) -> None:
     assert analysis_runs
 
     analysis_dir = analysis_runs[0]
-    assert analysis_plot_path(analysis_dir, "opt_trajectory", "png").exists()
-    assert analysis_plot_path(analysis_dir, "opt_trajectory_sweep", "png").exists()
+    assert analysis_plot_path(analysis_dir, "chain_trajectory_scatter", "png").exists()
+    assert analysis_plot_path(analysis_dir, "chain_trajectory_sweep", "png").exists()
 
 
 def test_analyze_opt_trajectory_single_tf(tmp_path: Path) -> None:
@@ -926,8 +926,8 @@ def test_analyze_opt_trajectory_single_tf(tmp_path: Path) -> None:
     assert analysis_runs
 
     analysis_dir = analysis_runs[0]
-    assert analysis_plot_path(analysis_dir, "opt_trajectory", "png").exists()
-    assert analysis_plot_path(analysis_dir, "opt_trajectory_sweep", "png").exists()
+    assert analysis_plot_path(analysis_dir, "chain_trajectory_scatter", "png").exists()
+    assert analysis_plot_path(analysis_dir, "chain_trajectory_sweep", "png").exists()
 
 
 def test_analyze_without_trace_when_no_trace_plots(tmp_path: Path) -> None:
@@ -1240,14 +1240,14 @@ def test_analyze_plot_manifest_single_tf_overlap_skip_and_trace_skip(tmp_path: P
     plot_manifest = json.loads(plot_manifest_path(analysis_dir).read_text())
     plots_by_key = {entry.get("key"): entry for entry in plot_manifest.get("plots", [])}
     assert set(plots_by_key) == {
-        "opt_trajectory",
-        "opt_trajectory_sweep",
+        "chain_trajectory_scatter",
+        "chain_trajectory_sweep",
         "elites_nn_distance",
         "overlap_panel",
         "health_panel",
     }
-    assert plots_by_key["opt_trajectory"]["generated"] is True
-    assert plots_by_key["opt_trajectory_sweep"]["generated"] is True
+    assert plots_by_key["chain_trajectory_scatter"]["generated"] is True
+    assert plots_by_key["chain_trajectory_sweep"]["generated"] is True
     assert plots_by_key["elites_nn_distance"]["generated"] is True
     assert plots_by_key["overlap_panel"]["generated"] is False
     assert "n_tf < 2" in str(plots_by_key["overlap_panel"].get("skip_reason"))
@@ -1347,7 +1347,7 @@ def test_analyze_fails_when_required_plot_generation_raises(tmp_path: Path, monk
     def _explode(*args, **kwargs) -> None:
         raise RuntimeError("intentional opt trajectory error")
 
-    monkeypatch.setattr("dnadesign.cruncher.analysis.plots.opt_trajectory.plot_opt_trajectory", _explode)
+    monkeypatch.setattr("dnadesign.cruncher.analysis.plots.opt_trajectory.plot_chain_trajectory_scatter", _explode)
 
     cfg = load_config(config_path)
     with pytest.raises(RuntimeError, match="opt trajectory error"):

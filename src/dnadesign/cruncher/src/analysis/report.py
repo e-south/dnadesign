@@ -117,7 +117,7 @@ def build_report_payload(
     if isinstance(analysis_cfg, dict):
         table_format = str(analysis_cfg.get("table_format") or table_format)
         plot_format = str(analysis_cfg.get("plot_format") or plot_format)
-    start_here_key = "opt_trajectory"
+    start_here_key = "chain_trajectory_scatter"
 
     metrics = {}
     warnings = []
@@ -175,7 +175,6 @@ def build_report_payload(
         "ess": _safe_float((trace_metrics or {}).get("ess")),
         "ess_ratio": _safe_float((trace_metrics or {}).get("ess_ratio")),
         "acceptance_rate_mh_tail": _safe_float((optimizer_metrics or {}).get("acceptance_rate_mh_tail")),
-        "swap_acceptance_rate": _safe_float((optimizer_metrics or {}).get("swap_acceptance_rate")),
     }
     highlights_learning = {}
     if isinstance(objective_components, dict):
@@ -221,8 +220,8 @@ def build_report_payload(
 
     pointers = {
         "start_here_plot": _plot_path(analysis_root, start_here_key, plot_format),
-        "trajectory_plot": _plot_path(analysis_root, "opt_trajectory", plot_format),
-        "trajectory_sweep_plot": _plot_path(analysis_root, "opt_trajectory_sweep", plot_format),
+        "trajectory_plot": _plot_path(analysis_root, "chain_trajectory_scatter", plot_format),
+        "trajectory_sweep_plot": _plot_path(analysis_root, "chain_trajectory_sweep", plot_format),
         "diagnostics": _table_path(analysis_root, "diagnostics_summary", "json"),
         "objective_components": _table_path(analysis_root, "objective_components", "json"),
         "elites_mmr_summary": _table_path(analysis_root, "elites_mmr_summary", table_format),
@@ -301,7 +300,6 @@ def write_report_md(
         f"- Overlap rate median: {_fmt(overlap.get('overlap_rate_median'))}",
         f"- Overlap bp median: {_fmt(overlap.get('overlap_total_bp_median'))}",
         f"- MH acceptance (tail): {_fmt(sampling.get('acceptance_rate_mh_tail'))}",
-        f"- PT swap acceptance: {_fmt(sampling.get('swap_acceptance_rate'))}",
         "- Trace diagnostics: directional indicators only (not convergence proofs).",
     ]
     if any(
@@ -328,8 +326,8 @@ def write_report_md(
             "",
             "## Start here",
             "",
-            f"- {pointers.get('start_here_plot') or 'plots/plot__opt_trajectory.<ext>'}",
-            f"- {pointers.get('trajectory_sweep_plot') or 'plots/plot__opt_trajectory_sweep.<ext>'}",
+            f"- {pointers.get('start_here_plot') or 'plots/plot__chain_trajectory_scatter.<ext>'}",
+            f"- {pointers.get('trajectory_sweep_plot') or 'plots/plot__chain_trajectory_sweep.<ext>'}",
             f"- {pointers.get('diagnostics') or 'analysis/table__diagnostics_summary.json'}",
             f"- {pointers.get('objective_components') or 'analysis/table__objective_components.json'}",
         ]
@@ -354,8 +352,8 @@ def write_report_md(
         lines.extend([f"- {item}" for item in warnings])
 
     artifact_index = [
-        pointers.get("start_here_plot") or "plots/plot__opt_trajectory.<ext>",
-        pointers.get("trajectory_sweep_plot") or "plots/plot__opt_trajectory_sweep.<ext>",
+        pointers.get("start_here_plot") or "plots/plot__chain_trajectory_scatter.<ext>",
+        pointers.get("trajectory_sweep_plot") or "plots/plot__chain_trajectory_sweep.<ext>",
         pointers.get("diagnostics") or "analysis/table__diagnostics_summary.json",
         pointers.get("objective_components") or "analysis/table__objective_components.json",
         pointers.get("elites_mmr_summary") or None,
@@ -369,9 +367,6 @@ def write_report_md(
     move_summary = _table_path(analysis_root, "move_stats_summary", table_format)
     if move_summary:
         artifact_index.append(move_summary)
-    pt_swap = _table_path(analysis_root, "pt_swap_pairs", table_format)
-    if pt_swap:
-        artifact_index.append(pt_swap)
     lines.extend(["", "## Artifact index", ""] + [f"- {item}" for item in artifact_index])
 
     report_path.parent.mkdir(parents=True, exist_ok=True)

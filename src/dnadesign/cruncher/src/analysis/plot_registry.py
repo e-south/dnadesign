@@ -27,20 +27,20 @@ class PlotSpec:
 
 PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
-        "opt_trajectory",
-        "Optimization trajectory",
+        "chain_trajectory_scatter",
+        "Chain trajectory scatter",
         ("sequences",),
-        ("plot__opt_trajectory.{ext}",),
+        ("plot__chain_trajectory_scatter.{ext}",),
         "summary",
-        "Causal particle lineage view in TF score-space with random-baseline context.",
+        "Independent chain trajectories in TF score-space with random-baseline context.",
     ),
     PlotSpec(
-        "opt_trajectory_sweep",
-        "Optimization trajectory over sweeps",
+        "chain_trajectory_sweep",
+        "Chain trajectory over sweeps",
         ("sequences",),
-        ("plot__opt_trajectory_sweep.{ext}",),
+        ("plot__chain_trajectory_sweep.{ext}",),
         "diagnostics",
-        "Cold-slot progression over sweeps with lineage handoff markers and bottleneck-TF coloring.",
+        "Per-chain objective progression over sweeps with categorical chain hues.",
     ),
     PlotSpec(
         "elites_nn_distance",

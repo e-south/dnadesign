@@ -14,7 +14,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from dnadesign.cruncher.core.optimizers.policies import TargetingPolicy
-from dnadesign.cruncher.core.optimizers.pt import PTGibbsOptimizer
+from dnadesign.cruncher.core.optimizers.pt import GibbsAnnealOptimizer
 from dnadesign.cruncher.core.state import SequenceState
 
 
@@ -62,7 +62,7 @@ def test_pt_block_move_calls_evaluate_once_for_proposal() -> None:
         "softmin": {"enabled": False},
     }
     init_cfg = SimpleNamespace(kind="random", length=4, pad_with="background", regulator=None)
-    optimizer = PTGibbsOptimizer(
+    optimizer = GibbsAnnealOptimizer(
         evaluator=evaluator,
         cfg=cfg,
         rng=rng,
@@ -145,7 +145,7 @@ def test_pt_block_move_uses_precomputed_scores() -> None:
         "softmin": {"enabled": False},
     }
     init_cfg = SimpleNamespace(kind="random", length=4, pad_with="background", regulator=None)
-    optimizer = PTGibbsOptimizer(
+    optimizer = GibbsAnnealOptimizer(
         evaluator=evaluator,
         cfg=cfg,
         rng=rng,

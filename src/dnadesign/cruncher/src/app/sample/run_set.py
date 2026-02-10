@@ -147,6 +147,24 @@ def _softmin_schedule_payload(sample_cfg: SampleConfig) -> dict[str, object]:
     )
 
 
+def _mcmc_cooling_payload(sample_cfg: SampleConfig) -> dict[str, object]:
+    cooling_cfg = sample_cfg.optimizer.cooling
+    if cooling_cfg.kind == "fixed":
+        if cooling_cfg.beta is None:
+            raise ConfigError("sample.optimizer.cooling.beta is required when kind='fixed'.")
+        return {"kind": "fixed", "beta": float(cooling_cfg.beta)}
+    if cooling_cfg.kind == "linear":
+        if cooling_cfg.beta_start is None or cooling_cfg.beta_end is None:
+            raise ConfigError("sample.optimizer.cooling.beta_start and beta_end are required when kind='linear'.")
+        return {
+            "kind": "linear",
+            "beta_start": float(cooling_cfg.beta_start),
+            "beta_end": float(cooling_cfg.beta_end),
+        }
+    stages = [{"sweeps": int(stage.sweeps), "beta": float(stage.beta)} for stage in sample_cfg.optimizer.cooling.stages]
+    return {"kind": "piecewise", "stages": stages}
+
+
 def _final_executed_sweep_index(optimizer: object) -> int:
     all_meta = getattr(optimizer, "all_meta", None)
     if not isinstance(all_meta, list) or not all_meta:
@@ -274,8 +292,8 @@ def _run_sample_for_set(
     Run MCMC sampler, save config/meta plus artifacts (trace.nc, sequences.parquet, elites.*).
     Each chain gets its own independent seed (random/consensus/consensus_mix).
     """
-    optimizer_kind = "pt"
-    chain_count = int(sample_cfg.pt.n_temps)
+    optimizer_kind = str(sample_cfg.optimizer.kind)
+    chain_count = int(sample_cfg.optimizer.chains)
     layout = prepare_run_layout(
         cfg=cfg,
         config_path=config_path,
@@ -383,16 +401,11 @@ def _run_sample_for_set(
 
     dsdna_mode_for_opt = bool(sample_cfg.objective.bidirectional)
 
-    # 3) FLATTEN optimizer config for PT
+    # 3) FLATTEN optimizer config
     moves = resolve_move_config(sample_cfg.moves)
     softmin_cfg = sample_cfg.objective.softmin
     softmin_sched = _softmin_schedule_payload(sample_cfg)
-    pt_cfg = sample_cfg.pt
-    beta_min = 1.0 / float(pt_cfg.temp_max)
-    if chain_count == 1:
-        betas = [beta_min]
-    else:
-        betas = list(np.geomspace(beta_min, 1.0, chain_count))
+    mcmc_cooling = _mcmc_cooling_payload(sample_cfg)
     opt_cfg: dict[str, object] = {
         "draws": draws,
         "tune": adapt_sweeps,
@@ -407,18 +420,14 @@ def _run_sample_for_set(
         "build_trace": bool(sample_cfg.output.save_trace),
         "progress_bar": True,
         "progress_every": 0,
-        "swap_stride": int(pt_cfg.swap_stride),
-        "kind": "geometric",
-        "beta": betas,
-        "adaptive_swap": pt_cfg.adapt.model_dump(),
+        "mcmc_cooling": mcmc_cooling,
         **moves.model_dump(),
         "softmin": {"enabled": softmin_cfg.enabled, **softmin_sched},
     }
-    logger.debug("β-ladder (%d levels): %s", len(betas), ", ".join(f"{b:g}" for b in betas))
 
     logger.debug("Optimizer config flattened: %s", opt_cfg)
 
-    # 4) INSTANTIATE OPTIMIZER (PT), passing in init_cfg and pwms
+    # 4) INSTANTIATE OPTIMIZER
     from dnadesign.cruncher.core.optimizers.registry import get_optimizer
 
     optimizer_factory = get_optimizer(optimizer_kind)
@@ -514,29 +523,24 @@ def _run_sample_for_set(
         def _sequence_rows() -> Iterable[dict[str, object]]:
             for meta_row, trace_meta, seq_arr, per_tf_map in zip(all_meta, all_trace_meta, all_samples, all_scores):
                 if not isinstance(meta_row, tuple) or len(meta_row) < 2:
-                    raise RunError("Optimizer all_meta row must be a tuple with at least (slot_id, sweep_idx).")
+                    raise RunError("Optimizer all_meta row must be a tuple with at least (chain, sweep_idx).")
                 chain_id = int(meta_row[0])
                 draw_i = int(meta_row[1])
-                slot_id_raw = trace_meta.get("slot_id")
-                particle_id_raw = trace_meta.get("particle_id")
+                chain_raw = trace_meta.get("chain")
                 beta_raw = trace_meta.get("beta")
                 sweep_idx_raw = trace_meta.get("sweep_idx")
                 phase_raw = trace_meta.get("phase")
-                if slot_id_raw is None or particle_id_raw is None or beta_raw is None or sweep_idx_raw is None:
+                if beta_raw is None or sweep_idx_raw is None:
+                    raise RunError("Optimizer trace metadata row is missing one of: beta, sweep_idx.")
+                if chain_raw is not None and int(chain_raw) != chain_id:
                     raise RunError(
-                        "Optimizer trace metadata row is missing one of: slot_id, particle_id, beta, sweep_idx."
+                        f"Optimizer trace metadata chain mismatch: chain={int(chain_raw)} all_meta.chain={chain_id}"
                     )
-                slot_id = int(slot_id_raw)
-                particle_id = int(particle_id_raw)
                 beta = float(beta_raw)
                 sweep_idx = int(sweep_idx_raw)
                 phase = str(phase_raw or "")
                 if phase not in {"tune", "draw"}:
                     raise RunError(f"Optimizer trace metadata row has invalid phase '{phase}'.")
-                if slot_id != chain_id:
-                    raise RunError(
-                        f"Optimizer trace metadata slot_id mismatch: slot_id={slot_id} all_meta.chain={chain_id}"
-                    )
                 if sweep_idx != draw_i:
                     raise RunError(
                         f"Optimizer trace metadata sweep mismatch: sweep_idx={sweep_idx} all_meta.draw={draw_i}"
@@ -559,8 +563,6 @@ def _run_sample_for_set(
                 row: dict[str, object] = {
                     "chain": int(chain_id),
                     "chain_1based": int(chain_id) + 1,
-                    "slot_id": int(slot_id),
-                    "particle_id": int(particle_id),
                     "beta": float(beta),
                     "sweep_idx": int(sweep_idx),
                     "draw": int(draw_i_to_write),
@@ -890,8 +892,8 @@ def _run_sample_for_set(
         "softmin_final_beta_used": beta_softmin_final,
         "pool_size": pool_size,
         "indexing_note": (
-            "chain/slot_id are 0-based temperature slots; chain_1based is 1-based; "
-            "particle_id is persistent state lineage identity; draw_idx/sweep_idx are absolute sweeps; "
+            "chain is a 0-based independent chain index; chain_1based is 1-based; "
+            "draw_idx/sweep_idx are absolute sweeps; "
             "draw_in_phase is phase-relative"
         ),
         "tf_label": tf_label,
@@ -916,6 +918,9 @@ def _run_sample_for_set(
         meta["beta_ladder_scale_mode"] = optimizer_stats.get("beta_ladder_scale_mode")
         final_beta = optimizer_stats.get("final_mcmc_beta")
         meta["final_mcmc_beta"] = float(final_beta) if final_beta is not None else None
+        cooling_payload = optimizer_stats.get("mcmc_cooling")
+        if isinstance(cooling_payload, dict):
+            meta["mcmc_cooling"] = cooling_payload
     if mmr_summary is not None:
         meta["mmr_summary"] = mmr_summary
     yaml_path = elites_yaml_path(out_dir)

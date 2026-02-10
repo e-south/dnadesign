@@ -222,7 +222,11 @@ def test_sample_campaign_required_for_campaign_mode_config(tmp_path: Path) -> No
                 "seed": 1,
                 "sequence_length": 12,
                 "budget": {"tune": 1, "draws": 1},
-                "pt": {"n_temps": 2, "temp_max": 5.0},
+                "optimizer": {
+                    "kind": "gibbs_anneal",
+                    "chains": 2,
+                    "cooling": {"kind": "linear", "beta": None, "beta_start": 0.2, "beta_end": 1.0},
+                },
                 "elites": {"k": 1},
             },
         }

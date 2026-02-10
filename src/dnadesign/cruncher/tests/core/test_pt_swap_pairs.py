@@ -13,7 +13,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from dnadesign.cruncher.core.optimizers.pt import PTGibbsOptimizer
+from dnadesign.cruncher.core.optimizers.pt import GibbsAnnealOptimizer
 from dnadesign.cruncher.core.state import SequenceState
 
 
@@ -29,7 +29,7 @@ class _DummyEvaluator:
         return per_tf, float(next(iter(per_tf.values())))
 
 
-def test_pt_swap_pairs_tracked() -> None:
+def test_swap_pairs_remain_zero_without_replica_exchange() -> None:
     chains = 3
     draws = 3
     cfg = {
@@ -39,7 +39,6 @@ def test_pt_swap_pairs_tracked() -> None:
         "min_dist": 0,
         "top_k": 1,
         "sequence_length": 4,
-        "swap_prob": 1.0,
         "bidirectional": False,
         "record_tune": False,
         "build_trace": False,
@@ -51,14 +50,13 @@ def test_pt_swap_pairs_tracked() -> None:
         "slide_max_shift": 1,
         "swap_len_range": (1, 1),
         "move_probs": {"S": 1.0, "B": 0.0, "M": 0.0, "L": 0.0, "W": 0.0, "I": 0.0},
-        "kind": "geometric",
-        "beta": [1.0, 2.0, 3.0],
+        "mcmc_cooling": {"kind": "fixed", "beta": 1.0},
         "softmin": {"enabled": False},
         "target_worst_tf_prob": 0.0,
         "target_window_pad": 0,
     }
     init_cfg = SimpleNamespace(kind="random", length=4, pad_with="background", regulator=None)
-    optimizer = PTGibbsOptimizer(
+    optimizer = GibbsAnnealOptimizer(
         evaluator=_DummyEvaluator(),
         cfg=cfg,
         rng=np.random.default_rng(0),
@@ -67,5 +65,7 @@ def test_pt_swap_pairs_tracked() -> None:
     )
     optimizer.optimise()
     stats = optimizer.stats()
-    assert stats["swap_attempts_by_pair"] == [draws] * (chains - 1)
+    assert stats["swap_attempts_by_pair"] == [0] * (chains - 1)
+    assert stats["swap_accepts_by_pair"] == [0] * (chains - 1)
+    assert stats["swap_events"] == []
     assert len(stats["swap_attempts_by_pair"]) == chains - 1

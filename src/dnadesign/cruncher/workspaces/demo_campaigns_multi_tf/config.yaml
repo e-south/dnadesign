@@ -189,20 +189,14 @@ cruncher:
           max_scale: 1.80
           target_low: 0.25
           target_high: 0.70
-    pt:
-      n_temps: 6
-      temp_max: 20.0
-      swap_stride: 1
-      adapt:
-        enabled: true
-        target_swap: 0.25
-        window: 50
-        k: 0.5
-        min_scale: 0.25
-        max_scale: 6.0
-        strict: true
-        saturation_windows: 6
-        stop_after_tune: true
+    optimizer:
+      kind: gibbs_anneal
+      chains: 6
+      cooling:
+        kind: linear
+        beta: null
+        beta_start: 0.05
+        beta_end: 1.00
     output:
       save_sequences: true
       save_trace: true

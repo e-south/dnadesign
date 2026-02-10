@@ -894,77 +894,83 @@ class SampleMovesConfig(StrictBaseModel):
     overrides: Optional[MoveOverridesConfig] = None
 
 
-class SamplePtAdaptConfig(StrictBaseModel):
-    enabled: bool = True
-    target_swap: float = 0.25
-    window: int = 50
-    k: float = 0.5
-    min_scale: float = 0.25
-    max_scale: float = 4.0
-    stop_after_tune: bool = True
-    strict: bool = False
-    saturation_windows: int = 5
+class SampleOptimizerCoolingStageConfig(StrictBaseModel):
+    sweeps: int
+    beta: float
 
-    @field_validator("target_swap")
+    @field_validator("sweeps")
     @classmethod
-    def _check_target_swap(cls, v: float) -> float:
-        if not isinstance(v, (int, float)) or v <= 0 or v >= 1:
-            raise ValueError("pt.adapt.target_swap must be between 0 and 1")
+    def _check_sweeps(cls, v: int) -> int:
+        if not isinstance(v, int) or v < 1:
+            raise ValueError("sample.optimizer.cooling.stages[].sweeps must be >= 1")
+        return int(v)
+
+    @field_validator("beta")
+    @classmethod
+    def _check_beta(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v <= 0:
+            raise ValueError("sample.optimizer.cooling.stages[].beta must be > 0")
         return float(v)
 
-    @field_validator("window")
-    @classmethod
-    def _check_window(cls, v: int) -> int:
-        if v < 1:
-            raise ValueError("pt.adapt.window must be >= 1")
-        return int(v)
 
-    @field_validator("saturation_windows")
-    @classmethod
-    def _check_saturation_windows(cls, v: int) -> int:
-        if not isinstance(v, int) or v < 1:
-            raise ValueError("pt.adapt.saturation_windows must be >= 1")
-        return int(v)
+class SampleOptimizerCoolingConfig(StrictBaseModel):
+    kind: Literal["fixed", "linear", "piecewise"] = "fixed"
+    beta: Optional[float] = 1.0
+    beta_start: Optional[float] = None
+    beta_end: Optional[float] = None
+    stages: List[SampleOptimizerCoolingStageConfig] = Field(default_factory=list)
 
-    @field_validator("k", "min_scale", "max_scale")
+    @field_validator("beta", "beta_start", "beta_end")
     @classmethod
-    def _check_scales(cls, v: float, info) -> float:
+    def _check_beta_values(cls, v: Optional[float], info) -> Optional[float]:
+        if v is None:
+            return None
         if not isinstance(v, (int, float)) or v <= 0:
-            raise ValueError(f"pt.adapt.{info.field_name} must be > 0")
+            raise ValueError(f"sample.optimizer.cooling.{info.field_name} must be > 0")
         return float(v)
 
     @model_validator(mode="after")
-    def _check_scale_bounds(self) -> "SamplePtAdaptConfig":
-        if self.max_scale < self.min_scale:
-            raise ValueError("pt.adapt.max_scale must be >= pt.adapt.min_scale")
+    def _check_shape(self) -> "SampleOptimizerCoolingConfig":
+        if self.kind == "fixed":
+            if self.beta is None:
+                raise ValueError("sample.optimizer.cooling.beta is required when kind='fixed'")
+            if self.beta_start is not None or self.beta_end is not None:
+                raise ValueError("sample.optimizer.cooling.beta_start/beta_end must be unset when kind='fixed'")
+            if self.stages:
+                raise ValueError("sample.optimizer.cooling.stages must be empty when kind='fixed'")
+            return self
+
+        if self.kind == "linear":
+            if self.beta_start is None or self.beta_end is None:
+                raise ValueError("sample.optimizer.cooling.beta_start and beta_end are required when kind='linear'")
+            if self.beta is not None:
+                raise ValueError("sample.optimizer.cooling.beta must be unset when kind='linear'")
+            if self.stages:
+                raise ValueError("sample.optimizer.cooling.stages must be empty when kind='linear'")
+            if self.beta_end < self.beta_start:
+                raise ValueError("sample.optimizer.cooling.beta_end must be >= beta_start when kind='linear'")
+            return self
+
+        if self.beta is not None or self.beta_start is not None or self.beta_end is not None:
+            raise ValueError("sample.optimizer.cooling.beta/beta_start/beta_end must be unset when kind='piecewise'")
+        if not self.stages:
+            raise ValueError("sample.optimizer.cooling.stages must be non-empty when kind='piecewise'")
+        sweeps = [stage.sweeps for stage in self.stages]
+        if any(curr <= prev for prev, curr in zip(sweeps, sweeps[1:])):
+            raise ValueError("sample.optimizer.cooling.stages[].sweeps must be strictly increasing")
         return self
 
 
-class SamplePtConfig(StrictBaseModel):
-    n_temps: int = 3
-    temp_max: float = 8.0
-    swap_stride: int = 4
-    adapt: SamplePtAdaptConfig = SamplePtAdaptConfig()
+class SampleOptimizerConfig(StrictBaseModel):
+    kind: Literal["gibbs_anneal"] = "gibbs_anneal"
+    chains: int = 1
+    cooling: SampleOptimizerCoolingConfig = SampleOptimizerCoolingConfig()
 
-    @field_validator("n_temps")
+    @field_validator("chains")
     @classmethod
-    def _check_n_temps(cls, v: int) -> int:
-        if v < 1:
-            raise ValueError("sample.pt.n_temps must be >= 1")
-        return int(v)
-
-    @field_validator("temp_max")
-    @classmethod
-    def _check_temp_max(cls, v: float) -> float:
-        if not isinstance(v, (int, float)) or v < 1.0:
-            raise ValueError("sample.pt.temp_max must be >= 1.0")
-        return float(v)
-
-    @field_validator("swap_stride")
-    @classmethod
-    def _check_swap_stride(cls, v: int) -> int:
-        if v < 1:
-            raise ValueError("sample.pt.swap_stride must be >= 1")
+    def _check_chains(cls, v: int) -> int:
+        if not isinstance(v, int) or v < 1:
+            raise ValueError("sample.optimizer.chains must be >= 1")
         return int(v)
 
 
@@ -1060,7 +1066,7 @@ class SampleConfig(StrictBaseModel):
     budget: SampleBudgetConfig
     objective: SampleObjectiveConfig = SampleObjectiveConfig()
     moves: SampleMovesConfig = SampleMovesConfig()
-    pt: SamplePtConfig = SamplePtConfig()
+    optimizer: SampleOptimizerConfig = SampleOptimizerConfig()
     elites: SampleElitesConfig = SampleElitesConfig()
     output: SampleOutputConfig = SampleOutputConfig()
     motif_width: SampleMotifWidthConfig = SampleMotifWidthConfig()

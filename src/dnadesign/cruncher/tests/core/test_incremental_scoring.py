@@ -12,9 +12,10 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 from dnadesign.cruncher.core.evaluator import SequenceEvaluator
-from dnadesign.cruncher.core.optimizers.pt import PTGibbsOptimizer
+from dnadesign.cruncher.core.optimizers.pt import GibbsAnnealOptimizer
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.core.scoring import LocalScanCache, Scorer
 from dnadesign.cruncher.core.state import SequenceState
@@ -106,10 +107,8 @@ def test_fast_s_move_matches_bruteforce() -> None:
     assert new_fast == new_brute
 
 
-def test_pt_beta_ladder_anchor_scale() -> None:
+def test_mcmc_cooling_beta_is_shared_across_chains() -> None:
     class _Eval:
-        scorer = SimpleNamespace(scale="llr")
-
         def __call__(self, state: SequenceState) -> dict[str, float]:
             return {"tf": float(state.seq.sum())}
 
@@ -120,13 +119,12 @@ def test_pt_beta_ladder_anchor_scale() -> None:
             return {"tf": float(state.seq.sum())}, float(state.seq.sum())
 
     cfg = {
-        "draws": 1,
+        "draws": 5,
         "tune": 0,
         "chains": 4,
         "min_dist": 0,
         "top_k": 1,
         "sequence_length": 4,
-        "swap_prob": 0.0,
         "record_tune": False,
         "progress_bar": False,
         "progress_every": 0,
@@ -136,28 +134,25 @@ def test_pt_beta_ladder_anchor_scale() -> None:
         "slide_max_shift": 1,
         "swap_len_range": (1, 1),
         "move_probs": {"S": 1.0, "B": 0.0, "M": 0.0, "L": 0.0, "W": 0.0, "I": 0.0},
-        "kind": "geometric",
-        "beta": [0.2, 0.4, 0.8, 1.6],
+        "mcmc_cooling": {"kind": "linear", "beta_start": 0.2, "beta_end": 1.6},
         "softmin": {"enabled": False},
-        "adaptive_swap": {"enabled": False},
     }
 
-    opt = PTGibbsOptimizer(
+    opt = GibbsAnnealOptimizer(
         evaluator=_Eval(),
         cfg=cfg,
         rng=np.random.default_rng(0),
         pwms={},
         init_cfg=SimpleNamespace(kind="random", length=4, pad_with="background", regulator=None),
     )
-    ladder = opt._scaled_beta_ladder(10.0)
-    assert np.isclose(ladder[0], 0.2)
-    assert np.isclose(ladder[-1], 16.0)
+    ladder_start = opt._current_beta_ladder(0)
+    ladder_end = opt._current_beta_ladder(4)
+    assert np.allclose(ladder_start, [0.2, 0.2, 0.2, 0.2])
+    assert np.allclose(ladder_end, [1.6, 1.6, 1.6, 1.6])
 
 
-def test_pt_stats_report_effective_beta_ladder() -> None:
+def test_stats_report_final_mcmc_beta_from_cooling_schedule() -> None:
     class _Eval:
-        scorer = SimpleNamespace(scale="llr")
-
         def __call__(self, state: SequenceState) -> dict[str, float]:
             return {"tf": float(state.seq.sum())}
 
@@ -168,13 +163,12 @@ def test_pt_stats_report_effective_beta_ladder() -> None:
             return {"tf": float(state.seq.sum())}, float(state.seq.sum())
 
     cfg = {
-        "draws": 1,
+        "draws": 5,
         "tune": 0,
         "chains": 4,
         "min_dist": 0,
         "top_k": 1,
         "sequence_length": 4,
-        "swap_prob": 0.0,
         "record_tune": False,
         "progress_bar": False,
         "progress_every": 0,
@@ -184,21 +178,19 @@ def test_pt_stats_report_effective_beta_ladder() -> None:
         "slide_max_shift": 1,
         "swap_len_range": (1, 1),
         "move_probs": {"S": 1.0, "B": 0.0, "M": 0.0, "L": 0.0, "W": 0.0, "I": 0.0},
-        "kind": "geometric",
-        "beta": [0.2, 0.4, 0.8, 1.6],
+        "mcmc_cooling": {"kind": "linear", "beta_start": 0.2, "beta_end": 1.6},
         "softmin": {"enabled": False},
-        "adaptive_swap": {"enabled": False},
     }
 
-    opt = PTGibbsOptimizer(
+    opt = GibbsAnnealOptimizer(
         evaluator=_Eval(),
         cfg=cfg,
         rng=np.random.default_rng(0),
         pwms={},
         init_cfg=SimpleNamespace(kind="random", length=4, pad_with="background", regulator=None),
     )
-    opt.beta_ladder = opt._scaled_beta_ladder(5.0)
+    opt.optimise()
     stats = opt.stats()
-    assert stats["beta_ladder_final"] == opt.beta_ladder
-    assert stats["beta_max_final"] == max(opt.beta_ladder)
-    assert stats["final_mcmc_beta"] == max(opt.beta_ladder)
+    assert stats["beta_ladder_final"] == [1.6, 1.6, 1.6, 1.6]
+    assert stats["beta_max_final"] == pytest.approx(1.6)
+    assert stats["final_mcmc_beta"] == pytest.approx(1.6)

@@ -3,7 +3,7 @@
 <cruncher project>
 src/dnadesign/cruncher/tests/config/test_demo_configs_pt_surface.py
 
-Validate that all demo configs expose the hardened PT adaptation surface.
+Validate that all demo configs expose the gibbs annealing optimizer surface.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -25,7 +25,7 @@ def _workspace_config_paths() -> list[Path]:
     ]
 
 
-def test_demo_configs_enable_adaptive_pt_surface() -> None:
+def test_demo_configs_enable_optimizer_surface() -> None:
     for config_path in _workspace_config_paths():
         cfg = load_config(config_path)
         sample_cfg = cfg.sample
@@ -35,12 +35,13 @@ def test_demo_configs_enable_adaptive_pt_surface() -> None:
         assert overrides.adaptive_weights.enabled, f"{config_path} must enable moves.overrides.adaptive_weights"
         assert overrides.proposal_adapt.enabled, f"{config_path} must enable moves.overrides.proposal_adapt"
 
-        adapt_cfg = sample_cfg.pt.adapt
-        assert adapt_cfg.enabled, f"{config_path} must enable sample.pt.adapt"
-        assert adapt_cfg.strict, f"{config_path} must enable sample.pt.adapt.strict"
-        assert adapt_cfg.saturation_windows >= 3, (
-            f"{config_path} must set sample.pt.adapt.saturation_windows to at least 3"
-        )
+        optimizer_cfg = sample_cfg.optimizer
+        assert optimizer_cfg.kind == "gibbs_anneal", f"{config_path} must set sample.optimizer.kind=gibbs_anneal"
+        assert optimizer_cfg.chains >= 1, f"{config_path} must set sample.optimizer.chains >= 1"
+        assert optimizer_cfg.cooling.kind == "linear", f"{config_path} must use linear cooling for demos"
+        assert optimizer_cfg.cooling.beta_start is not None
+        assert optimizer_cfg.cooling.beta_end is not None
+        assert optimizer_cfg.cooling.beta_end >= optimizer_cfg.cooling.beta_start
 
 
 def test_densegen_demo_uses_tighter_site_windows() -> None:

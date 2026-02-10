@@ -81,7 +81,11 @@ def test_sample_runs_split_by_regulator_set(tmp_path: Path) -> None:
                 "seed": 11,
                 "sequence_length": 6,
                 "budget": {"tune": 1, "draws": 2},
-                "pt": {"n_temps": 2, "temp_max": 10.0},
+                "optimizer": {
+                    "kind": "gibbs_anneal",
+                    "chains": 2,
+                    "cooling": {"kind": "linear", "beta": None, "beta_start": 0.1, "beta_end": 1.0},
+                },
                 "objective": {"bidirectional": True, "score_scale": "llr", "combine": "min"},
                 "elites": {
                     "k": 1,

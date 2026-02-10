@@ -64,9 +64,10 @@ def test_compute_config_loads(tmp_path: Path) -> None:
     assert cfg.sample.budget.draws == 3
     assert cfg.sample.objective.softmin.schedule == "fixed"
     assert cfg.sample.objective.softmin.beta_end == pytest.approx(6.0)
-    assert cfg.sample.pt.n_temps == 3
-    assert cfg.sample.pt.temp_max == pytest.approx(8.0)
-    assert cfg.sample.pt.swap_stride == 4
+    assert cfg.sample.optimizer.kind == "gibbs_anneal"
+    assert cfg.sample.optimizer.chains == 1
+    assert cfg.sample.optimizer.cooling.kind == "fixed"
+    assert cfg.sample.optimizer.cooling.beta == pytest.approx(1.0)
 
 
 def test_balanced_move_defaults_are_stability_oriented(tmp_path: Path) -> None:

@@ -62,9 +62,9 @@ def _resolve_sample_meta(cfg: CruncherConfig, used_cfg: dict, manifest: dict) ->
         raise ValueError("config_used.yaml missing cruncher config; re-run `cruncher sample`.")
 
     optimizer_payload = manifest.get("optimizer") if isinstance(manifest, dict) else None
-    optimizer_kind = "pt"
+    optimizer_kind = "gibbs_anneal"
     if isinstance(optimizer_payload, dict):
-        optimizer_kind = str(optimizer_payload.get("kind") or "pt")
+        optimizer_kind = str(optimizer_payload.get("kind") or "gibbs_anneal")
 
     draws = int(manifest.get("draws") or 0)
     tune = int(manifest.get("adapt_sweeps") or 0)
@@ -89,7 +89,7 @@ def _resolve_sample_meta(cfg: CruncherConfig, used_cfg: dict, manifest: dict) ->
         tune=tune,
         bidirectional=bidirectional,
         top_k=top_k,
-        mode="pt",
+        mode="gibbs_anneal",
     )
 
 

@@ -13,7 +13,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from dnadesign.cruncher.core.optimizers.pt import PTGibbsOptimizer
+from dnadesign.cruncher.core.optimizers.pt import GibbsAnnealOptimizer
 from dnadesign.cruncher.core.state import SequenceState
 
 
@@ -52,7 +52,7 @@ def test_move_stats_length_matches_sweeps() -> None:
         "softmin": {"enabled": False},
     }
     init_cfg = SimpleNamespace(kind="random", length=4, pad_with="background", regulator=None)
-    optimizer = PTGibbsOptimizer(
+    optimizer = GibbsAnnealOptimizer(
         evaluator=_DummyEvaluator(),
         cfg=cfg,
         rng=np.random.default_rng(0),

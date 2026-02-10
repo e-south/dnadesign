@@ -192,15 +192,8 @@ def _subsample_chainwise(out: pd.DataFrame, max_points: int) -> pd.DataFrame:
     sampled = pd.concat(sampled_parts).sort_values(["chain", "sweep"]).reset_index(drop=True)
     if len(sampled) <= max_points:
         return sampled
-
-    overflow = len(sampled) - max_points
-    non_cold_idx = sampled.index[sampled["is_cold_chain"] == 0]
-    drop_idx = list(non_cold_idx[-overflow:])
-    if len(drop_idx) < overflow:
-        remain = overflow - len(drop_idx)
-        cold_idx = sampled.index[sampled["is_cold_chain"] == 1]
-        drop_idx.extend(list(cold_idx[-remain:]))
-    return sampled.drop(index=drop_idx).reset_index(drop=True)
+    keep_idx = _subsample_indices_early_priority(len(sampled), max_points)
+    return sampled.iloc[keep_idx].reset_index(drop=True)
 
 
 def project_scores(
@@ -235,38 +228,33 @@ def build_trajectory_points(
         return pd.DataFrame()
 
     df = sequences_df.copy()
-    if "slot_id" not in df.columns:
-        if "chain" in df.columns:
-            df["slot_id"] = df["chain"]
+    if "chain" not in df.columns:
+        if "slot_id" in df.columns:
+            df["chain"] = df["slot_id"]
         else:
-            df["slot_id"] = 0
-    slot_series = pd.to_numeric(df["slot_id"], errors="coerce")
-    if slot_series.isna().any():
-        raise ValueError("Trajectory slot_id values must be numeric.")
-    df["slot_id"] = slot_series.astype(int)
-    df["chain"] = df["slot_id"]
+            df["chain"] = 0
+    chain_series = pd.to_numeric(df["chain"], errors="coerce")
+    if chain_series.isna().any():
+        raise ValueError("Trajectory chain values must be numeric.")
+    df["chain"] = chain_series.astype(int)
     if "sweep_idx" in df.columns:
         sweep_series = pd.to_numeric(df["sweep_idx"], errors="coerce")
         if sweep_series.isna().any():
             raise ValueError("Trajectory sweep_idx values must be numeric.")
         df["sweep_idx"] = sweep_series.astype(int)
-        df = df.sort_values(["slot_id", "sweep_idx"])
+        df = df.sort_values(["chain", "sweep_idx"])
     elif "draw" in df.columns:
         draw_series = pd.to_numeric(df["draw"], errors="coerce")
         if draw_series.isna().any():
             raise ValueError("Trajectory draw values must be numeric.")
         df["draw"] = draw_series.astype(int)
-        df = df.sort_values(["slot_id", "draw"])
+        df = df.sort_values(["chain", "draw"])
     else:
-        df = df.sort_values(["slot_id"])
+        df = df.sort_values(["chain"])
 
     x, y, x_metric, y_metric, worst, second = project_scores(df, tf_names)
     score_cols = _score_columns(tf_names)
-    cols = [
-        c
-        for c in ("draw", "sweep_idx", "phase", "chain", "slot_id", "particle_id", "beta", "sequence")
-        if c in df.columns
-    ]
+    cols = [c for c in ("draw", "sweep_idx", "phase", "chain", "beta", "sequence") if c in df.columns]
     cols += score_cols
     out = df[cols].copy()
     if "sweep_idx" in out.columns:
@@ -274,21 +262,14 @@ def build_trajectory_points(
     elif "draw" in out.columns:
         out["sweep"] = out["draw"].astype(int)
     else:
-        out["sweep"] = out.groupby("slot_id").cumcount()
+        out["sweep"] = out.groupby("chain").cumcount()
     out["sweep_idx"] = out["sweep"].astype(int)
-    if "particle_id" not in out.columns:
-        out["particle_id"] = np.nan
-    else:
-        particle_series = pd.to_numeric(out["particle_id"], errors="coerce")
-        if particle_series.notna().any() and particle_series.isna().any():
-            raise ValueError("Trajectory particle_id values must be numeric when provided.")
-        out["particle_id"] = particle_series
     if "beta" not in out.columns:
         if beta_ladder is not None:
             out["beta"] = (
-                out["slot_id"]
+                out["chain"]
                 .astype(int)
-                .map(lambda slot: float(beta_ladder[int(slot)]) if int(slot) < len(beta_ladder) else np.nan)
+                .map(lambda chain: float(beta_ladder[int(chain)]) if int(chain) < len(beta_ladder) else np.nan)
             )
         else:
             out["beta"] = np.nan
@@ -303,21 +284,6 @@ def build_trajectory_points(
     out["worst_tf_score"] = worst
     out["second_worst_tf_score"] = second
     out["objective_scalar"] = _resolve_objective_scalar(df, tf_names, objective_config=objective_config)
-    beta_by_chain: dict[int, float] | None = None
-    beta_rows = out[["slot_id", "beta"]].dropna()
-    if not beta_rows.empty:
-        beta_by_chain = {
-            int(slot_id): float(beta_val)
-            for slot_id, beta_val in zip(beta_rows["slot_id"].astype(int), beta_rows["beta"].astype(float))
-        }
-    cold_chain = resolve_cold_chain(
-        beta_ladder=beta_ladder,
-        chain_ids=out["slot_id"].astype(int).unique(),
-        beta_by_chain=beta_by_chain,
-    )
-    out["is_cold_chain"] = (out["slot_id"].astype(int) == int(cold_chain)).astype(int)
-    out["chain"] = out["slot_id"].astype(int)
-
     return _subsample_chainwise(out.reset_index(drop=True), max_points)
 
 
@@ -386,7 +352,7 @@ def add_raw_llr_objective(
     return out
 
 
-def build_particle_trajectory_points(
+def build_chain_trajectory_points(
     trajectory_df: pd.DataFrame,
     *,
     max_points: int,
@@ -394,8 +360,7 @@ def build_particle_trajectory_points(
     if trajectory_df is None or trajectory_df.empty:
         return pd.DataFrame()
     required = {
-        "particle_id",
-        "slot_id",
+        "chain",
         "sweep",
         "phase",
         "beta",
@@ -409,39 +374,33 @@ def build_particle_trajectory_points(
     }
     missing = [name for name in sorted(required) if name not in trajectory_df.columns]
     if missing:
-        raise ValueError(f"Trajectory points missing required columns for particle lineage: {missing}")
+        raise ValueError(f"Trajectory points missing required columns for chain lineage: {missing}")
 
     out = trajectory_df.copy()
-    out["particle_id"] = pd.to_numeric(out["particle_id"], errors="coerce")
-    if out["particle_id"].isna().all():
-        raise ValueError("Trajectory particle_id not available; rerun sample with trace-enabled particle tracking.")
-    if out["particle_id"].isna().any():
-        raise ValueError("Trajectory particle_id values must be numeric when present.")
-    out["particle_id"] = out["particle_id"].astype(int)
-    out["slot_id"] = pd.to_numeric(out["slot_id"], errors="coerce")
-    if out["slot_id"].isna().any():
-        raise ValueError("Trajectory slot_id values must be numeric for particle lineage.")
-    out["slot_id"] = out["slot_id"].astype(int)
+    out["chain"] = pd.to_numeric(out["chain"], errors="coerce")
+    if out["chain"].isna().any():
+        raise ValueError("Trajectory chain values must be numeric.")
+    out["chain"] = out["chain"].astype(int)
     out["sweep_idx"] = pd.to_numeric(out["sweep"], errors="coerce")
     if out["sweep_idx"].isna().any():
-        raise ValueError("Trajectory sweep values must be numeric for particle lineage.")
+        raise ValueError("Trajectory sweep values must be numeric for chain lineage.")
     out["sweep_idx"] = out["sweep_idx"].astype(int)
-    out = out.sort_values(["particle_id", "sweep_idx"]).drop_duplicates(["particle_id", "sweep_idx"], keep="last")
+    out = out.sort_values(["chain", "sweep_idx"]).drop_duplicates(["chain", "sweep_idx"], keep="last")
     out["x_tf"] = out["x"].astype(float)
     out["y_tf"] = out["y"].astype(float)
 
     if max_points > 0 and len(out) > max_points:
-        grouped = list(out.groupby("particle_id", sort=True, dropna=False))
+        grouped = list(out.groupby("chain", sort=True, dropna=False))
         if grouped:
             budget_floor = max(1, max_points // len(grouped))
             budget_remainder = max_points - (budget_floor * len(grouped))
             sampled_parts: list[pd.DataFrame] = []
-            for idx, (_, particle_df) in enumerate(grouped):
+            for idx, (_, chain_df) in enumerate(grouped):
                 budget = budget_floor + (1 if idx < budget_remainder else 0)
-                budget = min(len(particle_df), max(1, budget))
-                sampled_idx = _subsample_indices_early_priority(len(particle_df), budget)
-                sampled_parts.append(particle_df.iloc[sampled_idx])
-            out = pd.concat(sampled_parts).sort_values(["particle_id", "sweep_idx"]).reset_index(drop=True)
+                budget = min(len(chain_df), max(1, budget))
+                sampled_idx = _subsample_indices_early_priority(len(chain_df), budget)
+                sampled_parts.append(chain_df.iloc[sampled_idx])
+            out = pd.concat(sampled_parts).sort_values(["chain", "sweep_idx"]).reset_index(drop=True)
         else:
             out = out.iloc[_subsample_indices_early_priority(len(out), max_points)].reset_index(drop=True)
 

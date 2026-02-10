@@ -53,7 +53,11 @@ def _sample_block() -> dict:
         "seed": 7,
         "sequence_length": 12,
         "budget": {"tune": 1, "draws": 2},
-        "pt": {"n_temps": 2, "temp_max": 10.0},
+        "optimizer": {
+            "kind": "gibbs_anneal",
+            "chains": 2,
+            "cooling": {"kind": "linear", "beta": None, "beta_start": 0.1, "beta_end": 1.0},
+        },
         "objective": {"bidirectional": True, "score_scale": "normalized-llr", "combine": "min"},
         "elites": {
             "k": 1,
@@ -298,8 +302,8 @@ def test_demo_campaign_pair_local_only_generates_plots(tmp_path: Path) -> None:
     analysis_dir = workspace / "outputs"
     assert analysis_dir.is_dir()
     assert manifest_path(analysis_dir).exists()
-    assert (analysis_dir / "plots" / "plot__opt_trajectory.png").exists()
-    assert (analysis_dir / "plots" / "plot__opt_trajectory_sweep.png").exists()
+    assert (analysis_dir / "plots" / "plot__chain_trajectory_scatter.png").exists()
+    assert (analysis_dir / "plots" / "plot__chain_trajectory_sweep.png").exists()
     assert (analysis_dir / "plots" / "plot__elites_nn_distance.png").exists()
     assert (analysis_dir / "plots" / "plot__overlap_panel.png").exists()
     assert (analysis_dir / "plots" / "plot__health_panel.png").exists()
