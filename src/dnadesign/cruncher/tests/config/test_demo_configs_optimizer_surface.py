@@ -34,8 +34,11 @@ def test_demo_configs_enable_optimizer_surface() -> None:
         assert sample_cfg is not None
 
         overrides = sample_cfg.moves.overrides
-        assert overrides.adaptive_weights.enabled, f"{config_path} must enable moves.overrides.adaptive_weights"
+        assert not overrides.adaptive_weights.enabled, (
+            f"{config_path} must disable moves.overrides.adaptive_weights for stable demo tails."
+        )
         assert overrides.proposal_adapt.enabled, f"{config_path} must enable moves.overrides.proposal_adapt"
+        assert overrides.move_schedule.enabled, f"{config_path} must enable moves.overrides.move_schedule"
 
         optimizer_cfg = sample_cfg.optimizer
         assert optimizer_cfg.kind == "gibbs_anneal", f"{config_path} must set sample.optimizer.kind=gibbs_anneal"
@@ -62,28 +65,39 @@ def test_densegen_demo_uses_tighter_site_windows() -> None:
 def test_demo_configs_use_tuned_gibbs_annealing_defaults() -> None:
     root = Path(__file__).resolve().parents[2] / "workspaces"
     expected = {
-        root / "demo_basics_two_tf" / "config.yaml": {"chains": 6, "cooling_kind": "piecewise"},
+        root / "demo_basics_two_tf" / "config.yaml": {
+            "chains": 6,
+            "cooling_kind": "piecewise",
+            "final_beta": 14.0,
+            "draws": 150000,
+            "tune": 25000,
+        },
         root / "demo_campaigns_multi_tf" / "config.yaml": {
             "chains": 10,
-            "cooling_kind": "linear",
-            "beta_end": 3.4,
+            "cooling_kind": "piecewise",
+            "final_beta": 18.0,
+            "draws": 12000,
+            "tune": 4000,
         },
         root / "densegen_prep_three_tf" / "config.yaml": {
             "chains": 8,
-            "cooling_kind": "linear",
-            "beta_end": 3.2,
+            "cooling_kind": "piecewise",
+            "final_beta": 18.0,
+            "draws": 8000,
+            "tune": 2500,
         },
     }
     for config_path, values in expected.items():
         cfg = load_config(config_path)
         assert cfg.sample is not None
+        budget = cfg.sample.budget
         optimizer_cfg = cfg.sample.optimizer
         assert optimizer_cfg.chains == values["chains"], f"{config_path} must use tuned demo chain count."
         assert optimizer_cfg.cooling.kind == values["cooling_kind"]
-        if optimizer_cfg.cooling.kind == "linear":
-            assert optimizer_cfg.cooling.beta_end == values["beta_end"], f"{config_path} must use tuned beta_end."
-        else:
-            assert optimizer_cfg.cooling.stages[-1].sweeps == cfg.sample.budget.draws
+        assert budget.draws == values["draws"]
+        assert budget.tune == values["tune"]
+        assert optimizer_cfg.cooling.stages[-1].sweeps == budget.draws
+        assert optimizer_cfg.cooling.stages[-1].beta == values["final_beta"]
 
 
 def test_demo_configs_use_modern_schema_keys() -> None:

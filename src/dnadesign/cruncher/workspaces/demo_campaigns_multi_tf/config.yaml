@@ -133,8 +133,8 @@ cruncher:
     seed: 42
     sequence_length: 30
     budget:
-      tune: 2720
-      draws: 5280
+      tune: 4000
+      draws: 12000
     objective:
       bidirectional: true
       score_scale: normalized-llr
@@ -169,7 +169,7 @@ cruncher:
           M: 0.32
           I: 0.12
         adaptive_weights:
-          enabled: true
+          enabled: false
           window: 200
           k: 0.35
           min_prob: 0.03
@@ -182,19 +182,36 @@ cruncher:
             I: 0.28
         proposal_adapt:
           enabled: true
-          window: 200
-          step: 0.12
-          min_scale: 0.60
-          max_scale: 2.30
-          target_low: 0.15
-          target_high: 0.55
+          window: 400
+          step: 0.08
+          min_scale: 0.55
+          max_scale: 3.00
+          target_low: 0.10
+          target_high: 0.28
+        move_schedule:
+          enabled: true
+          kind: linear
+          end:
+            S: 0.50
+            B: 0.24
+            M: 0.12
+            I: 0.14
     optimizer:
       kind: gibbs_anneal
       chains: 10
       cooling:
-        kind: linear
-        beta_start: 0.10
-        beta_end: 3.40
+        kind: piecewise
+        stages:
+          - sweeps: 3500
+            beta: 0.12
+          - sweeps: 8000
+            beta: 1.0
+          - sweeps: 11000
+            beta: 6.0
+          - sweeps: 11800
+            beta: 12.0
+          - sweeps: 12000
+            beta: 18.0
       early_stop:
         enabled: false
         patience: 0

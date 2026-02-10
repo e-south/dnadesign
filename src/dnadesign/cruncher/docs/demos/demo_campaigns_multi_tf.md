@@ -13,7 +13,7 @@
 ## Overview
 
 Campaigns expand regulator categories into explicit regulator sets. This demo runs a campaign directly with `--campaign` (no derived config required), then summarizes results across runs.
-The demo config enables adaptive move/proposal tuning with a ten-chain Gibbs annealing optimizer (`optimizer.kind=gibbs_anneal`, `optimizer.chains=10`, `cooling.kind=linear`, `cooling.beta_end=3.4`) so campaign runs share one explicit cooling schedule surface (`sample.optimizer.*`).
+The demo config uses a ten-chain Gibbs annealing optimizer (`optimizer.kind=gibbs_anneal`, `optimizer.chains=10`) with a colder piecewise schedule (`cooling.kind=piecewise`, final `beta=18.0`) and linear move scheduling toward less Gibbs-dominant tail behavior. Adaptive move weights are disabled and proposal scaling remains explicit under `sample.moves.overrides.proposal_adapt`.
 
 ## Demo setup
 
