@@ -27,3 +27,15 @@
 - Decision: dataset writes use a write lock only; reads are lock-free.
 - Decision: no backward compatibility or silent fallbacks.
 - Update: remotes config now requires `USR_REMOTES_PATH`; repo-local fallback removed.
+
+## 2026-02-10
+- Cross-stack audit focus: DenseGen -> USR -> Notify contracts (event stream boundaries, resume behavior, and docs alignment).
+- Performance fix: `usr events tail` now streams `.events.log` instead of loading the full file into memory before slicing.
+- Added regression test to enforce streaming behavior for `--n` tail mode:
+  `src/dnadesign/usr/tests/test_cli_events_tail.py::test_events_tail_does_not_read_full_file_for_tail_n`.
+- Docs organization change: moved sync guide to `src/dnadesign/usr/docs/operations/sync.md`, removed top-level `SYNC.md`, and updated all in-repo references.
+- Added shared USR event schema constant in `usr/src/event_schema.py` and switched event emission (`usr/src/events.py`) + Notify consumer validation (`notify/cli.py`) to use the same version source.
+- Notify `usr-events watch --follow` now handles mid-stream `.events.log` truncation/rotation according to `--on-truncate` (`restart` rewinds; `error` fails fast), with regression tests.
+- Added explicit actor plumbing for mutation events: `Dataset.import_rows`, `Dataset.add_sequences`, and `Dataset.write_overlay_part` now accept `actor` and pass it through to `record_event`.
+- Added USR event-schema tests verifying explicit actor retention for `import_rows` and `write_overlay_part`.
+- Public API decoupling: exported `USR_EVENT_VERSION` through `dnadesign.usr` (`src/api.py`, package `__init__.py`) so consumers do not import internal `usr.src.*` modules.

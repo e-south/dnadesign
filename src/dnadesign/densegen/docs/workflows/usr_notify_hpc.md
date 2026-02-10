@@ -130,8 +130,8 @@ uv run usr remotes wizard \
   --base-dir /project/$USER/densegen_runs/demo_hpc/outputs/usr_datasets
 
 uv run usr remotes doctor --remote bu-scc
-uv run usr diff densegen/demo_hpc --remote bu-scc
-uv run usr pull densegen/demo_hpc --remote bu-scc -y
+uv run usr diff densegen/demo_hpc bu-scc
+uv run usr pull densegen/demo_hpc bu-scc -y
 ```
 
 For transfer-heavy workflows, BU provides a data transfer node (`scc-globus.bu.edu`) and `qsub -l download` workflows.

@@ -17,6 +17,7 @@ import shlex
 import shutil
 import sys
 import time
+from collections import deque
 from pathlib import Path
 from types import SimpleNamespace as NS
 
@@ -747,11 +748,17 @@ def cmd_events_tail(args) -> None:
     n = int(getattr(args, "n", 0))
     follow = bool(getattr(args, "follow", False))
 
-    lines = events_path.read_text(encoding="utf-8").splitlines()
     if n > 0:
-        lines = lines[-n:]
-    for line in lines:
-        _emit_event_line(line, fmt)
+        tail_lines: deque[str] = deque(maxlen=n)
+        with events_path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                tail_lines.append(line)
+        for line in tail_lines:
+            _emit_event_line(line, fmt)
+    else:
+        with events_path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                _emit_event_line(line, fmt)
 
     if not follow:
         return

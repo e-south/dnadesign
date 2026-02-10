@@ -17,11 +17,11 @@ Supplement to repo-root `AGENTS.md` with `usr`-specific contracts + navigation.
 - Notebooks: `src/dnadesign/usr/notebooks/`
 - Remote sync config: set `USR_REMOTES_PATH` to your remotes YAML
 - Namespace registry: `registry.yaml` under the datasets root
-- Sync details: `src/dnadesign/usr/SYNC.md`
+- Sync details: `src/dnadesign/usr/docs/operations/sync.md`
 - Historical artifacts: `src/dnadesign/usr/archived/` (treat as generated)
 
 ### Generated vs hand-edited
-- Hand-edited: `datasets/**/meta.md`, `remotes.yaml`, `SYNC.md`
+- Hand-edited: `datasets/**/meta.md`, `remotes.yaml`, `docs/operations/sync.md`
 - Generated / run artifacts: `datasets/**/.events.log`, `datasets/**/_snapshots/**`, `datasets/**/_derived/**`, `archived/**`
 - Ask before committing: changed `records.parquet`, large datasets/logs, any bulk sync outputs/caches.
 
@@ -54,10 +54,10 @@ uv run usr densegen repair --dedupe keep-first
 uv run usr export <dataset> --fmt csv --out /tmp/out.csv
 uv run usr materialize <dataset>
 
-# Remote sync (see SYNC.md)
-uv run usr diff <dataset-or-path> --remote <name>
-uv run usr pull <dataset-or-path> --remote <name> -y
-uv run usr push <dataset-or-path> --remote <name> -y
+# Remote sync (see docs/operations/sync.md)
+uv run usr diff <dataset-or-path> <remote-name>
+uv run usr pull <dataset-or-path> <remote-name> -y
+uv run usr push <dataset-or-path> <remote-name> -y
 ```
 
 ### Notes

@@ -20,6 +20,7 @@ from typing import Any, Mapping, Optional
 
 import pyarrow.parquet as pq
 
+from .event_schema import USR_EVENT_VERSION
 from .io import now_utc
 from .registry import registry_hash as _registry_hash
 from .types import Fingerprint
@@ -151,7 +152,7 @@ def record_event(
             "pid": os.getpid(),
         }
     payload = {
-        "event_version": 1,
+        "event_version": USR_EVENT_VERSION,
         "timestamp_utc": now_utc(),
         "action": str(action),
         "dataset": {

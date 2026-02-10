@@ -23,9 +23,11 @@ from dnadesign.densegen.src.adapters.optimizer import OptimizerRun
 from dnadesign.densegen.src.adapters.outputs import ParquetSink
 from dnadesign.densegen.src.adapters.sources import data_source_factory
 from dnadesign.densegen.src.config import load_config
+from dnadesign.densegen.src.core.pipeline import resume_state as resume_state_module
 from dnadesign.densegen.src.core.pipeline.attempts import _load_failure_counts_from_attempts
 from dnadesign.densegen.src.core.pipeline.deps import PipelineDeps
 from dnadesign.densegen.src.core.pipeline.orchestrator import run_pipeline
+from dnadesign.densegen.src.core.pipeline.resume_state import load_resume_state
 
 
 class _DummyOpt:
@@ -278,3 +280,131 @@ def test_load_failure_counts_handles_numpy_arrays(tmp_path: Path) -> None:
     counts = _load_failure_counts_from_attempts(outputs_root)
     key = ("plan_pool__demo_plan", "demo_plan", "TF1", "AAA", "site1")
     assert counts[key]["constraint"] == 1
+
+
+def test_load_resume_state_uses_streaming_scan(monkeypatch, tmp_path: Path) -> None:
+    loaded = SimpleNamespace(
+        root=SimpleNamespace(
+            densegen=SimpleNamespace(
+                run=SimpleNamespace(id="run-1"),
+                output=SimpleNamespace(targets=["parquet"]),
+            )
+        ),
+        path=tmp_path / "config.yaml",
+    )
+
+    rows = [
+        {
+            "densegen__run_id": "run-1",
+            "densegen__input_name": "input_a",
+            "densegen__plan": "plan_x",
+            "densegen__used_tfbs_detail": [{"tf": "TF1", "tfbs": "AAA"}],
+        },
+        {
+            "densegen__run_id": "run-1",
+            "densegen__input_name": "input_a",
+            "densegen__plan": "plan_x",
+            "densegen__used_tfbs_detail": '[{"tf":"TF1","tfbs":"AAA"},{"tf":"TF2","tfbs":"CCC"}]',
+        },
+        {
+            "densegen__run_id": "run-1",
+            "densegen__input_name": "input_b",
+            "densegen__plan": "plan_y",
+            "densegen__used_tfbs_detail": None,
+        },
+    ]
+
+    def _raise_dataframe_load(*_args, **_kwargs):
+        raise AssertionError("resume state should not use dataframe loading")
+
+    def _scan_records_from_config(*_args, **_kwargs):
+        return iter(rows), "parquet:/tmp/dense_arrays.parquet"
+
+    monkeypatch.setattr(
+        resume_state_module,
+        "_load_failure_counts_from_attempts",
+        lambda _tables_root: {},
+    )
+    monkeypatch.setattr(
+        resume_state_module,
+        "_load_existing_attempt_index_by_plan",
+        lambda _tables_root: {},
+    )
+    monkeypatch.setattr(
+        resume_state_module,
+        "load_records_from_config",
+        _raise_dataframe_load,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        resume_state_module,
+        "scan_records_from_config",
+        _scan_records_from_config,
+        raising=False,
+    )
+
+    state = load_resume_state(
+        resume=True,
+        loaded=loaded,
+        tables_root=tmp_path / "outputs" / "tables",
+        config_sha="abc123",
+        allowed_config_sha256=None,
+    )
+
+    assert state.existing_counts == {
+        ("input_a", "plan_x"): 2,
+        ("input_b", "plan_y"): 1,
+    }
+    assert state.existing_usage_by_plan[("input_a", "plan_x")] == {
+        ("TF1", "AAA"): 2,
+        ("TF2", "CCC"): 1,
+    }
+    assert state.existing_usage_by_plan[("input_b", "plan_y")] == {}
+
+
+def test_load_resume_state_rejects_stream_records_with_mismatched_run_id(monkeypatch, tmp_path: Path) -> None:
+    loaded = SimpleNamespace(
+        root=SimpleNamespace(
+            densegen=SimpleNamespace(
+                run=SimpleNamespace(id="run-1"),
+                output=SimpleNamespace(targets=["parquet"]),
+            )
+        ),
+        path=tmp_path / "config.yaml",
+    )
+
+    def _scan_records_from_config(*_args, **_kwargs):
+        rows = [
+            {
+                "densegen__run_id": "run-2",
+                "densegen__input_name": "input_a",
+                "densegen__plan": "plan_x",
+                "densegen__used_tfbs_detail": [],
+            }
+        ]
+        return iter(rows), "parquet:/tmp/dense_arrays.parquet"
+
+    monkeypatch.setattr(
+        resume_state_module,
+        "_load_failure_counts_from_attempts",
+        lambda _tables_root: {},
+    )
+    monkeypatch.setattr(
+        resume_state_module,
+        "_load_existing_attempt_index_by_plan",
+        lambda _tables_root: {},
+    )
+    monkeypatch.setattr(
+        resume_state_module,
+        "scan_records_from_config",
+        _scan_records_from_config,
+    )
+
+    with pytest.raises(RuntimeError, match="different run_id"):
+        load_resume_state(
+            resume=True,
+            loaded=loaded,
+            tables_root=tmp_path / "outputs" / "tables",
+            config_sha="abc123",
+            allowed_config_sha256=None,
+        )

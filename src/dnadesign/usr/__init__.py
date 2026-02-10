@@ -15,6 +15,7 @@ from .src.api import (  # noqa: F401
     ID_HASH_SPEC,
     REQUIRED_COLUMNS,
     SCHEMA_VERSION,
+    USR_EVENT_VERSION,
     AddSequencesResult,
     AlphabetError,
     Dataset,
@@ -37,6 +38,7 @@ from .src.api import (  # noqa: F401
 
 __all__ = [
     "Dataset",
+    "USR_EVENT_VERSION",
     "AlphabetError",
     "DuplicateIDError",
     "EmbeddingDimensionError",

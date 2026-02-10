@@ -24,7 +24,7 @@
 - CLI quickstart: `#cli-quickstart-run-from-anywhere`
 - Overlay contract: `#namespace-registry-required`
 - Event schema: `#event-log-schema`
-- Remote sync: `SYNC.md`
+- Remote sync: `docs/operations/sync.md`
 
 ---
 
@@ -51,7 +51,7 @@ Relevant docs:
 - Overlay plus registry contract: `#namespace-registry-required`
 - How overlays merge (conflict resolution): `#how-overlays-merge-conflict-resolution`
 - Event log schema (Notify input): `#event-log-schema`
-- Remote sync: `SYNC.md`
+- Remote sync: `docs/operations/sync.md`
 
 ---
 
@@ -371,27 +371,27 @@ usr remotes wizard \
 usr remotes doctor --remote bu-scc
 
 # Preview, then transfer
-usr diff densegen/60bp_dual_promoter_cpxR_LexA --remote bu-scc --verify auto
-usr pull densegen/60bp_dual_promoter_cpxR_LexA --remote bu-scc -y
-usr push densegen/60bp_dual_promoter_cpxR_LexA --remote bu-scc -y
+usr diff densegen/60bp_dual_promoter_cpxR_LexA bu-scc --verify auto
+usr pull densegen/60bp_dual_promoter_cpxR_LexA bu-scc -y
+usr push densegen/60bp_dual_promoter_cpxR_LexA bu-scc -y
 ```
 
 **Dataset directory mode** supports explicit dataset paths outside `--root`:
 
 ```bash
-usr diff /path/to/outputs/usr_datasets/densegen/demo_hpc --remote bu-scc
-usr pull /path/to/outputs/usr_datasets/densegen/demo_hpc --remote bu-scc -y
-usr push /path/to/outputs/usr_datasets/densegen/demo_hpc --remote bu-scc -y
+usr diff /path/to/outputs/usr_datasets/densegen/demo_hpc bu-scc
+usr pull /path/to/outputs/usr_datasets/densegen/demo_hpc bu-scc -y
+usr push /path/to/outputs/usr_datasets/densegen/demo_hpc bu-scc -y
 ```
 
 **FILE mode** lets you diff/pull/push arbitrary files by path:
 
 ```bash
-usr diff permuter/run42/records.parquet --remote bu-scc
-usr pull permuter/run42/records.parquet --remote bu-scc -y
+usr diff permuter/run42/records.parquet bu-scc
+usr pull permuter/run42/records.parquet bu-scc -y
 ```
 
-See **SYNC.md** for full setup, storage-location guidance, and file-mode mapping options (`repo_root`, `local_repo_root`, `--repo-root`, `--remote-path`).
+See **docs/operations/sync.md** for full setup, storage-location guidance, and file-mode mapping options (`repo_root`, `local_repo_root`, `--repo-root`, `--remote-path`).
 
 ---
 

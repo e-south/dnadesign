@@ -122,7 +122,7 @@ uv run usr remotes wizard \
   --base-dir /project/<BU_USERNAME>/densegen_runs/bu_scc_demo/outputs/usr_datasets
 
 uv run usr remotes doctor --remote bu-scc
-uv run usr pull densegen/bu_scc_demo --remote bu-scc -y
+uv run usr pull densegen/bu_scc_demo bu-scc -y
 ```
 
 For transfer-heavy jobs, BU provides `scc-globus.bu.edu` and download-node workflows (`qsub -l download`):

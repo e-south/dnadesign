@@ -1,7 +1,7 @@
 ## USR Sync over SSH
 
 This page covers syncing USR datasets between local and remote hosts (for example, BU SCC).
-For USR concepts and CLI basics, see `README.md`.
+For USR concepts and CLI basics, see `../../README.md`.
 
 ---
 
@@ -114,19 +114,19 @@ Rule: run the command on the machine where you want files to end up.
 Preview:
 
 ```bash
-usr diff densegen/my_dataset --remote bu-scc
+usr diff densegen/my_dataset bu-scc
 ```
 
 Pull remote -> local:
 
 ```bash
-usr pull densegen/my_dataset --remote bu-scc -y
+usr pull densegen/my_dataset bu-scc -y
 ```
 
 Push local -> remote:
 
 ```bash
-usr push densegen/my_dataset --remote bu-scc -y
+usr push densegen/my_dataset bu-scc -y
 ```
 
 Useful flags:
@@ -144,9 +144,9 @@ Useful flags:
 Use dataset directory mode when you have an explicit dataset path outside `--root`:
 
 ```bash
-usr diff /path/to/outputs/usr_datasets/densegen/demo_hpc --remote bu-scc
-usr pull /path/to/outputs/usr_datasets/densegen/demo_hpc --remote bu-scc -y
-usr push /path/to/outputs/usr_datasets/densegen/demo_hpc --remote bu-scc -y
+usr diff /path/to/outputs/usr_datasets/densegen/demo_hpc bu-scc
+usr pull /path/to/outputs/usr_datasets/densegen/demo_hpc bu-scc -y
+usr push /path/to/outputs/usr_datasets/densegen/demo_hpc bu-scc -y
 ```
 
 Use file mode when syncing a single file.
@@ -167,15 +167,15 @@ remotes:
 Examples:
 
 ```bash
-usr diff permuter/run42/records.parquet --remote bu-scc
-usr pull permuter/run42/records.parquet --remote bu-scc -y
+usr diff permuter/run42/records.parquet bu-scc
+usr pull permuter/run42/records.parquet bu-scc -y
 
 # If local repo root is not configured
-usr pull permuter/run42/records.parquet --remote bu-scc \
+usr pull permuter/run42/records.parquet bu-scc \
   --repo-root /path/to/local/dnadesign -y
 
 # If remote path mapping cannot be inferred
-usr pull permuter/run42/records.parquet --remote bu-scc \
+usr pull permuter/run42/records.parquet bu-scc \
   --remote-path /path/to/remote/dnadesign/src/dnadesign/permuter/run42/records.parquet -y
 ```
 

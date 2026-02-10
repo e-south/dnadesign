@@ -43,11 +43,13 @@ class DensegenUsrFlushTransaction:
         namespace: str,
         *,
         run_id: str | None = None,
+        actor: Mapping[str, object] | None = None,
         delete_orphans_on_failure: bool = False,
     ) -> None:
         self.dataset = dataset
         self.namespace = str(namespace)
         self.run_id = str(run_id) if run_id is not None else None
+        self.actor = dict(actor) if actor is not None else None
         self.delete_orphans_on_failure = bool(delete_orphans_on_failure)
         self.orphan_manifest_path = self.dataset.dir / "_artifacts" / "orphans.jsonl"
         self._rows_incoming = 0
@@ -65,7 +67,7 @@ class DensegenUsrFlushTransaction:
         return table, list(artifacts)
 
     def commit_overlay_part(self, table: pa.Table, *, key: str) -> int:
-        return int(self.dataset.write_overlay_part(self.namespace, table, key=key))
+        return int(self.dataset.write_overlay_part(self.namespace, table, key=key, actor=self.actor))
 
     def on_failure(self, exc: Exception, *, orphan_artifacts: Sequence[OrphanArtifact]) -> None:
         artifacts = list(orphan_artifacts)
@@ -94,6 +96,7 @@ class DensegenUsrFlushTransaction:
                 "orphan_artifacts": [artifact.npz_ref for artifact in artifacts],
             },
             target_path=self.dataset.records_path,
+            actor=self.actor,
         )
 
     def _write_orphan_manifest(self, artifacts: Sequence[OrphanArtifact], *, reason: str) -> None:

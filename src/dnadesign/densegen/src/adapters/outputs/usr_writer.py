@@ -19,6 +19,7 @@ Dunlop Lab
 from __future__ import annotations
 
 import os
+import socket
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -26,7 +27,6 @@ from typing import Any, List, Optional
 
 import numpy as np
 import pyarrow as pa
-import pyarrow.parquet as pq
 
 from dnadesign.usr import Dataset
 
@@ -34,7 +34,7 @@ from ...adapters.outputs.parquet import _meta_arrow_type
 from ...artifacts.npz_store import describe_npz, write_npz_atomic
 from ...core.metadata_schema import META_FIELDS, validate_metadata
 from .base import AlignmentDigest
-from .id_index import compute_alignment_digest_from_ids
+from .id_index import INDEX_FILENAME, IdIndex
 from .record import OutputRecord
 from .usr_flush import (
     DensegenUsrFlushError,
@@ -62,7 +62,7 @@ class USRWriter:
     # internal buffers
     _records: List[OutputRecord] = field(default_factory=list)
     _seen_ids: set = field(default_factory=set)
-    _existing_ids: Optional[set] = field(default=None, init=False, repr=False)
+    _id_index: Optional[IdIndex] = field(default=None, init=False, repr=False)
     _npz_root: Optional[Path] = field(default=None, init=False, repr=False)
     _pending_overlay_records: List[OutputRecord] = field(default_factory=list, init=False, repr=False)
     _rows_incoming_session: int = field(default=0, init=False, repr=False)
@@ -87,6 +87,7 @@ class USRWriter:
         if not self.ds.records_path.exists():
             self.ds.init(source="densegen init")
         self._configure_npz()
+        self._configure_id_index()
 
     def _configure_npz(self) -> None:
         fields = [str(f).strip() for f in self.npz_fields if str(f).strip()]
@@ -112,6 +113,12 @@ class USRWriter:
             raise ValueError("USRWriter.npz_root must live under the dataset directory.")
         self._npz_root = npz_root
 
+    def _configure_id_index(self) -> None:
+        index_path = self.ds.dir / "_artifacts" / INDEX_FILENAME
+        self._id_index = IdIndex(index_path)
+        if self.ds.records_path.exists():
+            self._id_index.bootstrap_from_parquet(self.ds.records_path)
+
     def add(self, record: OutputRecord) -> bool:
         if record.bio_type != self.default_bio_type or record.alphabet != self.default_alphabet:
             raise ValueError(
@@ -122,8 +129,9 @@ class USRWriter:
         validate_metadata(record.meta)
         seq_id = record.id
         if self.deduplicate:
-            existing = self._load_existing_ids()
-            if seq_id in existing or seq_id in self._seen_ids:
+            if seq_id in self._seen_ids:
+                return False
+            if self._id_exists(seq_id):
                 return False  # skip existing ids or local duplicates
         elif seq_id in self._seen_ids:
             return False
@@ -154,7 +162,7 @@ class USRWriter:
 
         incoming_ids = [r.id for r in self._records]
         if self.deduplicate:
-            existing_ids = self._load_existing_ids()
+            existing_ids = self._id_exists_many(incoming_ids)
             mask = [rid not in existing_ids for rid in incoming_ids]
             rows_new = [rows[i] for i, keep in enumerate(mask) if keep]
             records_new = [self._records[i] for i, keep in enumerate(mask) if keep]
@@ -167,29 +175,33 @@ class USRWriter:
         run_id = records_new[0].meta.get("run_id") if records_new else None
         if run_id is None and self._pending_overlay_records:
             run_id = self._pending_overlay_records[0].meta.get("run_id")
-        tx = DensegenUsrFlushTransaction(self.ds, self.namespace, run_id=run_id)
+        actor = self._densegen_actor(run_id)
+        tx = DensegenUsrFlushTransaction(
+            self.ds,
+            self.namespace,
+            run_id=None if run_id is None else str(run_id),
+            actor=actor,
+        )
         tx.begin(rows_incoming=len(incoming_records), rows_new=len(rows_new))
         orphan_artifacts: list[OrphanArtifact] = []
         import_done = False
 
         try:
             if rows_new:
-                with self._actor_context(run_id):
-                    self.ds.import_rows(
-                        rows_new,
-                        default_bio_type=self.default_bio_type,
-                        default_alphabet=self.default_alphabet,
-                        source=None,
-                        strict_id_check=True,
-                    )
+                self.ds.import_rows(
+                    rows_new,
+                    default_bio_type=self.default_bio_type,
+                    default_alphabet=self.default_alphabet,
+                    source=None,
+                    strict_id_check=True,
+                    actor=actor,
+                )
                 import_done = True
-                if self.deduplicate:
-                    existing_ids.update({rec.id for rec in records_new})
+                self._add_ids_to_index(rec.id for rec in records_new)
 
             if records_for_overlay:
                 table, orphan_artifacts = tx.stage_artifacts(self._build_overlay_table(records_for_overlay))
-                with self._actor_context(run_id):
-                    tx.commit_overlay_part(table, key="id")
+                tx.commit_overlay_part(table, key="id")
         except Exception as exc:
             if isinstance(exc, DensegenUsrFlushError):
                 orphan_artifacts = list(exc.orphan_artifacts)
@@ -198,8 +210,7 @@ class USRWriter:
             if import_done:
                 self._records.clear()
                 self._seen_ids.clear()
-            with self._actor_context(run_id):
-                tx.on_failure(exc, orphan_artifacts=orphan_artifacts)
+            tx.on_failure(exc, orphan_artifacts=orphan_artifacts)
             raise
         else:
             self._rows_incoming_session += int(rows_incoming_count)
@@ -230,42 +241,14 @@ class USRWriter:
         )
 
     def existing_ids(self) -> set:
-        return set(self._load_existing_ids())
+        if self._id_index is None:
+            return set(self._seen_ids)
+        return set(self._id_index.existing_ids()).union(self._seen_ids)
 
     def alignment_digest(self):
-        rp = self.ds.records_path
-        if not rp.exists():
-            return compute_alignment_digest_from_ids([])
-        try:
-            import pyarrow.dataset as ds
-        except Exception as e:
-            raise RuntimeError(f"Parquet support is not available: {e}") from e
-        dataset = ds.dataset(rp, format="parquet")
-        scanner = ds.Scanner.from_dataset(dataset, columns=["id"], batch_size=4096)
-        xor_val = 0
-        count = 0
-        for batch in scanner.to_batches():
-            ids = [str(x) for x in batch.column(0).to_pylist() if x is not None]
-            if not ids:
-                continue
-            digest = compute_alignment_digest_from_ids(ids)
-            xor_val ^= int(digest.xor_hash, 16)
-            count += digest.id_count
-        return AlignmentDigest(count, f"{xor_val:032x}")
-
-    def _load_existing_ids(self) -> set:
-        if self._existing_ids is not None:
-            return self._existing_ids
-        rp = self.ds.records_path
-        if not rp.exists():
-            self._existing_ids = set()
-            return self._existing_ids
-        try:
-            tbl = pq.read_table(rp, columns=["id"])
-        except Exception as e:
-            raise RuntimeError(f"Failed to read existing USR records at {rp}: {e}") from e
-        self._existing_ids = set(tbl.column("id").to_pylist())
-        return self._existing_ids
+        if self._id_index is None:
+            return AlignmentDigest(0, "0" * 32)
+        return self._id_index.alignment_digest()
 
     def _ensure_registry(self) -> None:
         registry_path = self.root / "registry.yaml"
@@ -412,14 +395,14 @@ class USRWriter:
             "sampling_library_hash": meta.get("sampling_library_hash"),
             "solver_status": meta.get("solver_status"),
         }
-        with self._actor_context(None if run_id is None else str(run_id)):
-            self.ds.log_event(
-                "densegen_health",
-                args=args,
-                metrics=metrics,
-                artifacts={"overlay": {"namespace": self.namespace, "status": str(status)}},
-                target_path=self.ds.records_path,
-            )
+        self.ds.log_event(
+            "densegen_health",
+            args=args,
+            metrics=metrics,
+            artifacts={"overlay": {"namespace": self.namespace, "status": str(status)}},
+            target_path=self.ds.records_path,
+            actor=self._densegen_actor(run_id),
+        )
         self._last_health_event_ts = now
 
     @staticmethod
@@ -452,29 +435,26 @@ class USRWriter:
         except Exception:
             return np.array(value, dtype=object)
 
+    def _id_exists(self, seq_id: str) -> bool:
+        if self._id_index is None:
+            return False
+        return bool(self._id_index.contains(str(seq_id)))
+
+    def _id_exists_many(self, seq_ids: list[str]) -> set[str]:
+        if self._id_index is None:
+            return set()
+        return set(self._id_index.contains_many([str(seq_id) for seq_id in seq_ids if seq_id]))
+
+    def _add_ids_to_index(self, ids) -> None:
+        if self._id_index is None:
+            return
+        self._id_index.add([str(seq_id) for seq_id in ids if seq_id])
+
     @staticmethod
-    def _actor_context(run_id: Optional[str]):
-        class _ActorContext:
-            def __init__(self, run_id: Optional[str]) -> None:
-                self._run_id = run_id
-                self._tool_prev = None
-                self._run_prev = None
-
-            def __enter__(self):
-                self._tool_prev = os.environ.get("USR_ACTOR_TOOL")
-                self._run_prev = os.environ.get("USR_ACTOR_RUN_ID")
-                os.environ["USR_ACTOR_TOOL"] = "densegen"
-                if self._run_id:
-                    os.environ["USR_ACTOR_RUN_ID"] = str(self._run_id)
-
-            def __exit__(self, exc_type, exc, tb):
-                if self._tool_prev is None:
-                    os.environ.pop("USR_ACTOR_TOOL", None)
-                else:
-                    os.environ["USR_ACTOR_TOOL"] = self._tool_prev
-                if self._run_prev is None:
-                    os.environ.pop("USR_ACTOR_RUN_ID", None)
-                else:
-                    os.environ["USR_ACTOR_RUN_ID"] = self._run_prev
-
-        return _ActorContext(run_id)
+    def _densegen_actor(run_id: Any) -> dict[str, Any]:
+        return {
+            "tool": "densegen",
+            "run_id": None if run_id is None else str(run_id),
+            "host": socket.gethostname(),
+            "pid": os.getpid(),
+        }

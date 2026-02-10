@@ -14,13 +14,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
-from dnadesign.notify.cli import app
-from dnadesign.notify.errors import NotifyDeliveryError
+from dnadesign.notify.cli import _iter_file_lines, app
+from dnadesign.notify.errors import NotifyConfigError, NotifyDeliveryError
+from dnadesign.usr import USR_EVENT_VERSION
 
 
-def _event(*, action: str = "write_overlay_part", event_version: int = 1) -> dict:
+def _event(*, action: str = "write_overlay_part", event_version: int = USR_EVENT_VERSION) -> dict:
     return {
         "event_version": event_version,
         "timestamp_utc": "2026-02-06T00:00:00+00:00",
@@ -303,6 +305,62 @@ def test_usr_events_watch_can_restart_on_truncated_cursor_when_configured(tmp_pa
     )
     assert result.exit_code == 0
     assert cursor.read_text(encoding="utf-8").strip() != "99999"
+
+
+def test_iter_file_lines_follow_restarts_after_midstream_truncate(tmp_path: Path, monkeypatch) -> None:
+    events = tmp_path / "events.log"
+    original = json.dumps(_event(action="write_overlay_part")) + "\n"
+    events.write_text(original, encoding="utf-8")
+
+    replacement = json.dumps(_event(action="materialize")) + "\n"
+    sleep_calls = {"n": 0}
+
+    def _fake_sleep(_seconds: float) -> None:
+        sleep_calls["n"] += 1
+        if sleep_calls["n"] == 1:
+            events.write_text(replacement, encoding="utf-8")
+            return
+        raise RuntimeError("follow loop did not recover from truncation")
+
+    monkeypatch.setattr("dnadesign.notify.cli.time.sleep", _fake_sleep)
+
+    rows = _iter_file_lines(
+        events,
+        start_offset=len(original),
+        on_truncate="restart",
+        follow=True,
+    )
+
+    _offset, line = next(rows)
+    parsed = json.loads(line)
+    assert parsed["action"] == "materialize"
+
+
+def test_iter_file_lines_follow_errors_after_midstream_truncate(tmp_path: Path, monkeypatch) -> None:
+    events = tmp_path / "events.log"
+    original = json.dumps(_event(action="write_overlay_part")) + "\n"
+    events.write_text(original, encoding="utf-8")
+
+    replacement = json.dumps(_event(action="materialize")) + "\n"
+    sleep_calls = {"n": 0}
+
+    def _fake_sleep(_seconds: float) -> None:
+        sleep_calls["n"] += 1
+        if sleep_calls["n"] == 1:
+            events.write_text(replacement, encoding="utf-8")
+            return
+        raise RuntimeError("follow loop did not report truncation")
+
+    monkeypatch.setattr("dnadesign.notify.cli.time.sleep", _fake_sleep)
+
+    rows = _iter_file_lines(
+        events,
+        start_offset=len(original),
+        on_truncate="error",
+        follow=True,
+    )
+    with pytest.raises(NotifyConfigError, match="truncated while following"):
+        next(rows)
 
 
 def test_usr_events_watch_spools_after_delivery_failures(tmp_path: Path, monkeypatch) -> None:

@@ -81,3 +81,16 @@
 - Added contract tests that pin: metadata schema keys, emitted metadata keys, and `usr/datasets/registry.yaml` densegen columns (including NPZ conditional columns).
 - Updated resume-state loading to avoid relying on removed `densegen__run_config_sha256`; resume now keys off retained record columns (`run_id`, `input_name`, `plan`, `used_tfbs_detail`).
 - Updated DenseGen outputs reference docs with explicit curated field catalog (field, retention class, meaning) for UX/dev discoverability.
+- Docs alignment audit across DenseGen + USR + Notify: validated CLI contracts against current `uv run ... --help` outputs and corrected stale remote-sync examples.
+- Updated USR sync/operator docs to positional remote syntax for `usr diff/pull/push` (for example `usr pull <dataset-or-path> bu-scc -y`), including DenseGen HPC runbooks and USR package docs.
+- Clarified Notify README webhook-source contract for direct CLI mode and DenseGen outputs docs for USR-only NPZ columns.
+- Refactored resume-state aggregation to stream output rows from sink loaders (`scan_records_from_config`) instead of materializing full output tables in pandas.
+- Added streaming resume-state tests for aggregation correctness and run-id mismatch rejection.
+- Refactored `USRSequencesDataSource` to stream `sequence` values from Parquet batches (no full-column `read_table`) and stop early at `limit`.
+- Added regression test to enforce streaming behavior for `usr_sequences` input loading.
+- Replaced `USRWriter` dedupe preload (`pq.read_table(..., columns=["id"])`) with SQLite-backed `IdIndex` lookups and index bootstrap from `records.parquet`.
+- `USRWriter` now emits explicit actor payloads (`tool/run_id/host/pid`) into USR mutation/event calls instead of mutating `USR_ACTOR_*` environment variables.
+- Added DenseGen regression tests for index-backed dedupe and explicit actor propagation in USR writer calls.
+- Performance pass: `USRWriter.flush` now performs batch dedupe lookups via `IdIndex.contains_many` (single batched query path) instead of one `contains` query per record.
+- Robustness fix: `USRWriter` now updates the id index after successful imports even when `deduplicate=False`, keeping `existing_ids()` and alignment digests correct.
+- Decoupling pass: DenseGen USR loaders/sources now import `Dataset` from public `dnadesign.usr` API instead of internal `dnadesign.usr.src.*` modules.

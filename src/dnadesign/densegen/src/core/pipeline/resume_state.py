@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from ...adapters.outputs import load_records_from_config
+from ...adapters.outputs import scan_records_from_config
 from ...config import LoadedConfig
 from .attempts import _load_existing_attempt_index_by_plan, _load_failure_counts_from_attempts
 from .usage_tracking import _parse_used_tfbs_detail, _update_usage_counts
@@ -51,8 +51,10 @@ def load_resume_state(
     site_failure_counts = _load_failure_counts_from_attempts(tables_root)
     attempt_counters = _load_existing_attempt_index_by_plan(tables_root)
     if loaded.root.densegen.output.targets:
+        scan_ok = False
+        run_ids: set[str] = set()
         try:
-            df_existing, _ = load_records_from_config(
+            rows, _ = scan_records_from_config(
                 loaded.root,
                 loaded.path,
                 columns=[
@@ -62,30 +64,32 @@ def load_resume_state(
                     "densegen__used_tfbs_detail",
                 ],
             )
+            for row in rows:
+                run_id = row.get("densegen__run_id")
+                if run_id is not None:
+                    run_id_val = str(run_id).strip()
+                    if run_id_val:
+                        run_ids.add(run_id_val)
+
+                input_name = str(row.get("densegen__input_name") or "")
+                plan_name = str(row.get("densegen__plan") or "")
+                if not input_name or not plan_name:
+                    continue
+
+                key = (input_name, plan_name)
+                existing_counts[key] = int(existing_counts.get(key, 0)) + 1
+                counts = existing_usage_by_plan.setdefault(key, {})
+                used = _parse_used_tfbs_detail(row.get("densegen__used_tfbs_detail"))
+                _update_usage_counts(counts, used)
+            scan_ok = True
         except Exception:
-            df_existing = None
-        if df_existing is not None and not df_existing.empty:
-            if "densegen__run_id" in df_existing.columns:
-                run_ids = df_existing["densegen__run_id"].dropna().unique().tolist()
-                if run_ids and any(val != loaded.root.densegen.run.id for val in run_ids):
-                    raise RuntimeError(
-                        "Existing outputs were produced with a different run_id. "
-                        "Remove outputs/tables (and outputs/meta if present) "
-                        "or stage a new run root to start fresh."
-                    )
-            if {"densegen__input_name", "densegen__plan"} <= set(df_existing.columns):
-                counts = df_existing.groupby(["densegen__input_name", "densegen__plan"]).size().astype(int).to_dict()
-                existing_counts = {(str(k[0]), str(k[1])): int(v) for k, v in counts.items()}
-            if "densegen__used_tfbs_detail" in df_existing.columns:
-                for _, row in df_existing.iterrows():
-                    input_name = str(row.get("densegen__input_name") or "")
-                    plan_name = str(row.get("densegen__plan") or "")
-                    if not input_name or not plan_name:
-                        continue
-                    key = (input_name, plan_name)
-                    counts = existing_usage_by_plan.setdefault(key, {})
-                    used = _parse_used_tfbs_detail(row.get("densegen__used_tfbs_detail"))
-                    _update_usage_counts(counts, used)
+            scan_ok = False
+        if scan_ok and run_ids and any(val != loaded.root.densegen.run.id for val in run_ids):
+            raise RuntimeError(
+                "Existing outputs were produced with a different run_id. "
+                "Remove outputs/tables (and outputs/meta if present) "
+                "or stage a new run root to start fresh."
+            )
 
     return ResumeState(
         existing_counts=existing_counts,

@@ -17,7 +17,7 @@
 **Boundary / contracts:**
 - Input contract is USR `<dataset>/.events.log` only.
 - Notify does not import USR internals; it consumes JSONL as an external contract.
-- Webhook source must be exactly one of `--url`, `--url-env`, or `--secret-ref`.
+- In direct CLI mode (without `--profile`), webhook source must be exactly one of `--url`, `--url-env`, or `--secret-ref`.
 - Default profile privacy is strict (`include_args=false`, `include_context=false`, `include_raw_event=false`).
 
 **Start here:**

@@ -22,6 +22,8 @@ from typing import Any, Iterable
 
 import typer
 
+from dnadesign.usr import USR_EVENT_VERSION
+
 from .cli_commands import register_profile_commands, register_spool_drain_command, register_usr_events_watch_command
 from .cli_commands.providers import format_for_provider
 from .errors import NotifyConfigError, NotifyDeliveryError, NotifyError
@@ -38,7 +40,6 @@ app.add_typer(usr_events_app, name="usr-events")
 app.add_typer(spool_app, name="spool")
 app.add_typer(profile_app, name="profile")
 
-USR_EVENT_VERSION = 1
 PROFILE_VERSION = 2
 _PROFILE_V1_REQUIRED_KEYS = {"provider", "url_env", "events"}
 _PROFILE_V1_ALLOWED_KEYS = {
@@ -531,20 +532,22 @@ def _iter_file_lines(
 ) -> Iterable[tuple[int, str]]:
     if not events_path.exists():
         raise NotifyConfigError(f"events file not found: {events_path}")
+    mode = str(on_truncate or "").strip().lower()
+    if mode not in {"error", "restart"}:
+        raise NotifyConfigError(f"unsupported on-truncate mode '{on_truncate}'")
     size = int(events_path.stat().st_size)
     offset = int(start_offset)
     if offset > size:
-        mode = str(on_truncate or "").strip().lower()
         if mode == "restart":
             offset = 0
-        elif mode == "error":
+        else:
             raise NotifyConfigError(
                 f"cursor offset exceeds events file size: offset={offset} size={size}. "
                 "If the file was truncated or rotated, pass --on-truncate restart."
             )
-        else:
-            raise NotifyConfigError(f"unsupported on-truncate mode '{on_truncate}'")
-    with events_path.open("r", encoding="utf-8") as handle:
+
+    handle = events_path.open("r", encoding="utf-8")
+    try:
         handle.seek(offset)
         while True:
             line = handle.readline()
@@ -554,6 +557,34 @@ def _iter_file_lines(
             if not follow:
                 return
             time.sleep(0.2)
+            if not events_path.exists():
+                continue
+            try:
+                path_stat = events_path.stat()
+            except FileNotFoundError:
+                continue
+            handle_stat = os.fstat(handle.fileno())
+            handle_pos = int(handle.tell())
+            path_changed = (int(path_stat.st_dev), int(path_stat.st_ino)) != (
+                int(handle_stat.st_dev),
+                int(handle_stat.st_ino),
+            )
+            truncated = handle_pos > int(path_stat.st_size)
+            if not path_changed and not truncated:
+                continue
+            if mode == "error":
+                reason = (
+                    "events file was replaced while following"
+                    if path_changed
+                    else f"events file was truncated while following (pos={handle_pos} size={int(path_stat.st_size)})"
+                )
+                raise NotifyConfigError(f"{reason}. Pass --on-truncate restart to resume from start.")
+            handle.close()
+            handle = events_path.open("r", encoding="utf-8")
+            handle.seek(0)
+    finally:
+        if not handle.closed:
+            handle.close()
 
 
 def _spool_payload(

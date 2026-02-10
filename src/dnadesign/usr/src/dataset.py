@@ -905,6 +905,7 @@ class Dataset:
         *,
         source: Optional[str],
         on_conflict: str,
+        actor: Optional[dict] = None,
         return_ids: bool = False,
     ) -> int | tuple[int, list[str], list[str]]:
         incoming = pa.Table.from_pandas(out_df, schema=ARROW_SCHEMA, preserve_index=False)
@@ -1000,6 +1001,7 @@ class Dataset:
                 metrics={"rows_written": int(out_count), "rows_skipped": len(ids_skipped)},
                 target_path=self.records_path,
                 dataset_root=self.root,
+                actor=actor,
             )
             if return_ids:
                 return int(out_count), ids_added, ids_skipped
@@ -1016,6 +1018,7 @@ class Dataset:
         default_alphabet: str = "dna_4",
         source: Optional[str] = None,
         strict_id_check: bool = True,
+        actor: Optional[dict] = None,
     ) -> int:
         """
         Import sequence rows (DataFrame or sequence of dicts).
@@ -1043,7 +1046,12 @@ class Dataset:
             source=source,
             strict_id_check=strict_id_check,
         )
-        return self._write_import_df(out_df, source=source, on_conflict="error")
+        return self._write_import_df(
+            out_df,
+            source=source,
+            on_conflict="error",
+            actor=actor,
+        )
 
     def add_sequences(
         self,
@@ -1054,6 +1062,7 @@ class Dataset:
         source: str = "",
         created_at: Optional[str] = None,
         on_conflict: str = "error",
+        actor: Optional[dict] = None,
     ) -> AddSequencesResult:
         """
         Append sequences with deterministic ids.
@@ -1087,6 +1096,7 @@ class Dataset:
             out_df,
             source=source,
             on_conflict=on_conflict,
+            actor=actor,
             return_ids=True,
         )
         return AddSequencesResult(
@@ -1741,6 +1751,7 @@ class Dataset:
         key: str = "id",
         key_col: Optional[str] = None,
         allow_missing: bool = False,
+        actor: Optional[dict] = None,
     ) -> int:
         """
         Append an overlay part file under _derived/<namespace>/part-*.parquet.
@@ -1910,6 +1921,7 @@ class Dataset:
                 artifacts={"overlay": {"namespace": namespace, "key": key}},
                 target_path=part_path,
                 dataset_root=self.root,
+                actor=actor,
             )
             return rows_written
 

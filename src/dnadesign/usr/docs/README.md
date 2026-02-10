@@ -23,7 +23,7 @@
 - `../README.md` (concepts + CLI quickstart)
 - `../README.md#namespace-registry-required`
 - `../README.md#event-log-schema`
-- `../SYNC.md` (remote sync)
+- `operations/sync.md` (remote sync)
 
 ## Start here
 
@@ -41,5 +41,5 @@
 
 ## Operations
 
-- Remote sync: `../SYNC.md`
+- Remote sync: `operations/sync.md`
 - Dev notes: `dev/journal.md`

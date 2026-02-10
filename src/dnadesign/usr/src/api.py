@@ -21,6 +21,7 @@ from .errors import (
     SequencesError,
     ValidationError,
 )
+from .event_schema import USR_EVENT_VERSION
 from .normalize import compute_id, normalize_sequence, validate_alphabet, validate_bio_type
 from .schema import ARROW_SCHEMA, ID_HASH_SPEC, REQUIRED_COLUMNS, SCHEMA_VERSION
 from .types import AddSequencesResult, DatasetInfo, Fingerprint, Manifest, OverlayInfo
@@ -28,6 +29,7 @@ from .version import __version__
 
 __all__ = [
     "Dataset",
+    "USR_EVENT_VERSION",
     "AlphabetError",
     "DuplicateIDError",
     "EmbeddingDimensionError",

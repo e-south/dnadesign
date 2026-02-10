@@ -79,7 +79,7 @@ Curated record fields:
 
 | Field | Retention | Meaning |
 |---|---|---|
-| `densegen__schema_version` | artifact_candidate | DenseGen schema version (e.g., 2.7). |
+| `densegen__schema_version` | artifact_candidate | DenseGen schema version (for example, 2.9). |
 | `densegen__created_at` | record_keep | UTC ISO8601 timestamp for record creation. |
 | `densegen__run_id` | record_keep | Run identifier (`densegen.run.id`). |
 | `densegen__run_config_path` | artifact_candidate | Run config path (relative to run root when possible). |
@@ -121,10 +121,10 @@ Curated record fields:
 | `densegen__pad_end` | record_conditional | Pad end (`5prime`/`3prime`). |
 | `densegen__gc_total` | record_keep | GC fraction of final sequence. |
 | `densegen__gc_core` | record_keep | GC fraction of pre-pad core sequence. |
-| `densegen__npz_ref` | record_conditional | Relative NPZ artifact reference when `output.usr.npz_fields` is enabled. |
-| `densegen__npz_sha256` | record_conditional | NPZ payload SHA256. |
-| `densegen__npz_bytes` | record_conditional | NPZ payload size in bytes. |
-| `densegen__npz_fields` | record_conditional | Fields offloaded to NPZ. |
+| `densegen__npz_ref` | record_conditional | Relative NPZ artifact reference when `output.usr.npz_fields` is enabled (USR sink only). |
+| `densegen__npz_sha256` | record_conditional | NPZ payload SHA256 (USR sink only). |
+| `densegen__npz_bytes` | record_conditional | NPZ payload size in bytes (USR sink only). |
+| `densegen__npz_fields` | record_conditional | Fields offloaded to NPZ (USR sink only). |
 
 For canonical types/validation logic, see `src/dnadesign/densegen/src/core/metadata_schema.py`.
 
