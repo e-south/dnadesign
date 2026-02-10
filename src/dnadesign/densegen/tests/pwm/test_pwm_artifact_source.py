@@ -21,6 +21,8 @@ import pytest
 
 from dnadesign.densegen.src.adapters.sources import PWMArtifactDataSource
 from dnadesign.densegen.src.adapters.sources.pwm_sampling import build_log_odds
+from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_metadata import TFBSMeta
+from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_types import SelectionMeta
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
 from dnadesign.densegen.tests.pwm_sampling_fixtures import fixed_candidates_mining, sampling_config
 
@@ -157,3 +159,68 @@ def test_pwm_sampling_shortfall_includes_motif_id(tmp_path: Path, caplog: pytest
         ds.load_data(rng=np.random.default_rng(1))
     assert "motif 'M1'" in caplog.text
     assert "shortfall" in caplog.text.lower()
+
+
+def test_pwm_artifact_sampling_generates_tfbs_rows_without_fimo(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    artifact_path = tmp_path / "motif.json"
+    _write_artifact(artifact_path)
+
+    def _fake_sample_pwm_sites(_rng, _motif, **_kwargs):
+        selected = ["ACG"]
+        meta = TFBSMeta(
+            best_hit_score=6.5,
+            rank_within_regulator=1,
+            tier=0,
+            fimo_start=5,
+            fimo_stop=8,
+            fimo_strand="+",
+            tfbs_core="ACG",
+            fimo_matched_sequence="ACG",
+            selection_meta=SelectionMeta(selection_rank=1, selection_utility=1.0, selection_score_norm=0.95),
+            selection_policy="top_score",
+            selection_alpha=None,
+            selection_similarity=None,
+            selection_relevance_norm=None,
+            selection_pool_size_final=1,
+            selection_pool_rung_fraction_used=1.0,
+            selection_pool_min_score_norm_used=None,
+            selection_pool_capped=False,
+            selection_pool_cap_value=None,
+            tier_target_fraction=0.01,
+            tier_target_required_unique=100,
+            tier_target_met=True,
+            tier_target_eligible_unique=1,
+        )
+        return selected, {"ACG": meta}, None
+
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.adapters.sources.pwm_artifact.sample_pwm_sites",
+        _fake_sample_pwm_sites,
+    )
+
+    ds = PWMArtifactDataSource(
+        path=str(artifact_path),
+        cfg_path=tmp_path / "config.yaml",
+        input_name="demo_input",
+        sampling=sampling_config(
+            n_sites=1,
+            strategy="stochastic",
+            mining=fixed_candidates_mining(batch_size=10, candidates=20),
+            length_policy="exact",
+        ),
+    )
+    entries, df, _summaries = ds.load_data(rng=np.random.default_rng(0))
+
+    assert entries == [("M1", "ACG", str(artifact_path))]
+    assert df is not None
+    assert len(df) == 1
+    assert df.loc[0, "tf"] == "M1"
+    assert df.loc[0, "tfbs"] == "ACG"
+    assert df.loc[0, "best_hit_score"] == 6.5
+    assert df.loc[0, "selection_rank"] == 1
+    assert df.loc[0, "tier"] == 0
+    assert isinstance(df.loc[0, "tfbs_id"], str)
+    assert df.loc[0, "tfbs_id"]

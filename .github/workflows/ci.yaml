@@ -52,3 +52,55 @@ jobs:
 
       - name: Build (sdist + wheel)
         run: uv build
+
+  densegen-fimo:
+    name: DenseGen FIMO Lane
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install pixi
+        run: |
+          curl -fsSL https://pixi.sh/install.sh | sh
+          echo "$HOME/.pixi/bin" >> $GITHUB_PATH
+
+      - name: Install system deps (pixi)
+        run: pixi install --locked
+
+      - name: Export MEME_BIN
+        run: echo "MEME_BIN=${{ github.workspace }}/.pixi/envs/default/bin" >> $GITHUB_ENV
+
+      - name: Verify FIMO availability
+        run: pixi run fimo --version
+
+      - name: DenseGen FIMO tests
+        run: |
+          pixi run pytest \
+            src/dnadesign/densegen/tests/cli/test_cli_stage_a_summary.py \
+            src/dnadesign/densegen/tests/pwm/test_fimo_score_scale.py \
+            src/dnadesign/densegen/tests/pwm/test_pwm_artifact_set_source.py \
+            src/dnadesign/densegen/tests/pwm/test_pwm_artifact_source.py \
+            src/dnadesign/densegen/tests/pwm/test_pwm_fimo_utils.py \
+            src/dnadesign/densegen/tests/pwm/test_pwm_log_odds_smoothing.py \
+            src/dnadesign/densegen/tests/pwm/test_pwm_meme_set_source.py \
+            src/dnadesign/densegen/tests/pwm/test_pwm_meme_source.py \
+            src/dnadesign/densegen/tests/pwm/test_pwm_other_sources.py \
+            src/dnadesign/densegen/tests/pwm/test_pwm_sampling_mining.py \
+            src/dnadesign/densegen/tests/pwm/test_pwm_sampling_relaxed_selection.py \
+            src/dnadesign/densegen/tests/pwm/test_pwm_sampling_stratification.py \
+            src/dnadesign/densegen/tests/pwm/test_pwm_sampling_time_limit.py \
+            src/dnadesign/densegen/tests/pwm/test_pwm_sampling_trim.py \
+            src/dnadesign/densegen/tests/stage_a/test_background_pool_source.py \
+            src/dnadesign/densegen/tests/stage_a/test_stage_a_end_to_end_score_sampling.py \
+            src/dnadesign/densegen/tests/stage_a/test_stage_a_padding_audit.py

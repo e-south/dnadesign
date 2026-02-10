@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import dnadesign.densegen.src.core.pipeline.stage_b as stage_b_module
 from dnadesign.densegen.src.config.generation import (
     FixedElements,
     PromoterConstraint,
@@ -317,3 +318,149 @@ def test_library_builder_allows_long_motif_length() -> None:
 
     assert context.min_required_len == 0
     assert context.infeasible is False
+
+
+def _coverage_weighted_test_context() -> tuple[ResolvedPlanItem, SamplingConfig, PoolData]:
+    plan_item = ResolvedPlanItem(
+        name="demo_plan",
+        quota=2,
+        include_inputs=["demo_input"],
+        fixed_elements=FixedElements(),
+        regulator_constraints=RegulatorConstraints(groups=[]),
+    )
+    sampling_cfg = SamplingConfig(
+        pool_strategy="subsample",
+        library_source="build",
+        library_size=1,
+        library_sampling_strategy="coverage_weighted",
+        avoid_failed_motifs=True,
+        unique_binding_sites=True,
+        unique_binding_cores=True,
+    )
+    pool_df = pd.DataFrame(
+        {
+            "tf": ["TF1", "TF1"],
+            "tfbs": ["AAAA", "CCCC"],
+            "tfbs_core": ["AAAA", "CCCC"],
+        }
+    )
+    pool = PoolData(
+        name="demo_input",
+        input_type="binding_sites",
+        pool_mode=POOL_MODE_TFBS,
+        df=pool_df,
+        sequences=pool_df["tfbs"].tolist(),
+        pool_path=Path("."),
+    )
+    return plan_item, sampling_cfg, pool
+
+
+def test_build_library_for_plan_uses_failure_feedback_across_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _FakeSampler:
+        calls: list[dict[tuple[str, str], int]] = []
+
+        def __init__(self, df: pd.DataFrame, rng: np.random.Generator) -> None:
+            self._df = df
+            self._rng = rng
+
+        def generate_binding_site_library(self, library_size: int, **kwargs):
+            _ = (library_size, self._df, self._rng)
+            failure_counts = dict(kwargs.get("failure_counts") or {})
+            _FakeSampler.calls.append(failure_counts)
+            site = "CCCC" if failure_counts.get(("TF1", "AAAA"), 0) > 0 else "AAAA"
+            return [site], [f"TF1:{site}"], ["TF1"], {"achieved_length": len(site)}
+
+    monkeypatch.setattr(stage_b_module, "TFSampler", _FakeSampler)
+
+    plan_item, sampling_cfg, pool = _coverage_weighted_test_context()
+
+    library1, _parts1, _labels1, _info1 = stage_b_module.build_library_for_plan(
+        source_label="demo_input",
+        plan_item=plan_item,
+        pool=pool,
+        sampling_cfg=sampling_cfg,
+        seq_len=10,
+        min_count_per_tf=0,
+        usage_counts={},
+        failure_counts={},
+        rng=random.Random(1),
+        np_rng=np.random.default_rng(2),
+        library_index_start=0,
+    )
+    assert library1 == ["AAAA"]
+
+    failure_counts = {
+        ("demo_input", "demo_plan", "TF1", "AAAA", None): {"required_regulators": 3},
+        ("other_input", "demo_plan", "TF1", "AAAA", None): {"required_regulators": 99},
+    }
+    library2, _parts2, _labels2, _info2 = stage_b_module.build_library_for_plan(
+        source_label="demo_input",
+        plan_item=plan_item,
+        pool=pool,
+        sampling_cfg=sampling_cfg,
+        seq_len=10,
+        min_count_per_tf=0,
+        usage_counts={},
+        failure_counts=failure_counts,
+        rng=random.Random(1),
+        np_rng=np.random.default_rng(2),
+        library_index_start=1,
+    )
+    assert library2 == ["CCCC"]
+
+    assert _FakeSampler.calls[0] == {}
+    assert _FakeSampler.calls[1] == {("TF1", "AAAA"): 3}
+
+
+def test_build_library_for_plan_passes_usage_counts_across_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _FakeSampler:
+        calls: list[dict[tuple[str, str], int]] = []
+
+        def __init__(self, df: pd.DataFrame, rng: np.random.Generator) -> None:
+            self._df = df
+            self._rng = rng
+
+        def generate_binding_site_library(self, library_size: int, **kwargs):
+            _ = (library_size, self._df, self._rng)
+            usage_counts = dict(kwargs.get("usage_counts") or {})
+            _FakeSampler.calls.append(usage_counts)
+            site = "CCCC" if usage_counts.get(("TF1", "AAAA"), 0) > 0 else "AAAA"
+            return [site], [f"TF1:{site}"], ["TF1"], {"achieved_length": len(site)}
+
+    monkeypatch.setattr(stage_b_module, "TFSampler", _FakeSampler)
+    plan_item, sampling_cfg, pool = _coverage_weighted_test_context()
+
+    usage_counts: dict[tuple[str, str], int] = {}
+    library1, _parts1, _labels1, _info1 = stage_b_module.build_library_for_plan(
+        source_label="demo_input",
+        plan_item=plan_item,
+        pool=pool,
+        sampling_cfg=sampling_cfg,
+        seq_len=10,
+        min_count_per_tf=0,
+        usage_counts=usage_counts,
+        failure_counts={},
+        rng=random.Random(1),
+        np_rng=np.random.default_rng(2),
+        library_index_start=0,
+    )
+    assert library1 == ["AAAA"]
+
+    usage_counts[("TF1", "AAAA")] = 5
+    library2, _parts2, _labels2, _info2 = stage_b_module.build_library_for_plan(
+        source_label="demo_input",
+        plan_item=plan_item,
+        pool=pool,
+        sampling_cfg=sampling_cfg,
+        seq_len=10,
+        min_count_per_tf=0,
+        usage_counts=usage_counts,
+        failure_counts={},
+        rng=random.Random(1),
+        np_rng=np.random.default_rng(2),
+        library_index_start=1,
+    )
+    assert library2 == ["CCCC"]
+
+    assert _FakeSampler.calls[0] == {}
+    assert _FakeSampler.calls[1] == {("TF1", "AAAA"): 5}
