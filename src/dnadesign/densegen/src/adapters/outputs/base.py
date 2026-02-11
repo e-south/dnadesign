@@ -41,6 +41,10 @@ class SinkBase:
     def alignment_digest(self) -> AlignmentDigest | None:  # pragma: no cover - default
         return None
 
+    def on_run_failure(self, exc: Exception) -> None:  # pragma: no cover - default
+        _ = exc
+        return None
+
 
 class USRSink(SinkBase):
     def __init__(self, writer):
@@ -67,3 +71,8 @@ class USRSink(SinkBase):
         if digest is None:
             return None
         return digest()
+
+    def on_run_failure(self, exc: Exception) -> None:
+        on_run_failure = getattr(self.writer, "on_run_failure", None)
+        if callable(on_run_failure):
+            on_run_failure(exc)

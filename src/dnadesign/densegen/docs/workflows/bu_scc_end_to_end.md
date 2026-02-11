@@ -1,16 +1,17 @@
 # BU SCC End-to-End: DenseGen -> USR -> Notify
 
-This runbook is BU SCC specific.
+This runbook is a DenseGen-focused overlay for BU SCC.
 
-Intent:
-- run DenseGen with SGE (`qsub`)
-- write outputs to USR dataset layout
+Use it when you want to:
+- submit DenseGen with SGE (`qsub`)
+- write results into USR datasets
 - watch USR `.events.log` with Notify
-- sync datasets between SCC and local using USR remotes
+- sync datasets between SCC and local machines
 
-Platform docs:
-- [docs/hpc/bu_scc_install.md](../../../../../docs/hpc/bu_scc_install.md)
+Canonical platform references:
+- [docs/hpc/bu_scc_quickstart.md](../../../../../docs/hpc/bu_scc_quickstart.md)
 - [docs/hpc/bu_scc_batch_notify.md](../../../../../docs/hpc/bu_scc_batch_notify.md)
+- [docs/hpc/jobs/README.md](../../../../../docs/hpc/jobs/README.md)
 
 ## Boundary contract
 
@@ -19,31 +20,25 @@ Platform docs:
 
 ---
 
-## 1) Connect to SCC
+## 1) Prepare workspace config
 
-```bash
-# Standard SCC login.
-ssh <BU_USERNAME>@scc1.bu.edu
-
-# Optional Duo-friendly variant (if your client needs it).
-# ssh -o PasswordAuthentication=no <BU_USERNAME>@scc1.bu.edu
-```
-
-References:
-- [BU SCC SSH access](https://www.bu.edu/tech/support/research/system-usage/connect-scc/ssh/)
-- [SCC OnDemand](https://www.bu.edu/tech/support/research/system-usage/connect-scc/scc-ondemand/)
-
----
-
-## 2) Prepare workspace config
-
-Keep USR root inside workspace `outputs/`:
+Keep USR output inside workspace `outputs/` and set solver/runtime caps explicitly.
 
 ```yaml
 densegen:
   run:
     id: bu_scc_demo
     root: "."
+
+  solver:
+    backend: GUROBI
+    strategy: iterate
+    threads: 16
+    time_limit_seconds: 60
+
+  runtime:
+    max_seconds_per_plan: 21600
+
   output:
     targets: [usr]
     usr:
@@ -55,102 +50,115 @@ densegen:
 
 ---
 
-## 3) Submit DenseGen SGE job
-
-`run_densegen.sh`:
+## 2) Validate config and solver before submit
 
 ```bash
-#!/bin/bash -l
-#$ -N densegen_demo
-#$ -cwd
-#$ -j y
-#$ -o densegen_demo.$JOB_ID.out
-#$ -l h_rt=04:00:00
-#$ -pe omp 4
-
-set -euo pipefail
-
-# Point to workspace config.
-CONFIG="/project/$USER/densegen_runs/bu_scc_demo/config.yaml"
-
-# Validate config + solver.
+CONFIG="<dnadesign_repo>/src/dnadesign/densegen/workspaces/bu_scc_demo/config.yaml"
 uv run dense validate-config --probe-solver -c "$CONFIG"
-
-# Run generation in batch mode.
-uv run dense run --no-plot -c "$CONFIG"
+uv run dense inspect config --probe-solver -c "$CONFIG"
 ```
 
-Submit:
+---
+
+## 3) Submit DenseGen batch job
+
+Submit via the canonical template and pass project/resources at submit time:
 
 ```bash
-# Submit job to SGE queue.
-qsub run_densegen.sh
+qsub -P <project> \
+  -pe omp 16 \
+  -l h_rt=08:00:00 \
+  -l mem_per_core=8G \
+  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/bu_scc_demo/config.yaml \
+  docs/hpc/jobs/bu_scc_densegen_cpu.qsub
 ```
+
+Keep `densegen.solver.threads <= pe omp slots`.
 
 ---
 
 ## 4) Inspect run and resolve USR event path
 
 ```bash
-# Show run summary with events and library details.
-uv run dense inspect run --events --library -c /project/$USER/densegen_runs/bu_scc_demo/config.yaml
-
-# Print exact USR .events.log path for Notify.
-uv run dense inspect run --usr-events-path -c /project/$USER/densegen_runs/bu_scc_demo/config.yaml
+uv run dense inspect run --events --library -c <dnadesign_repo>/src/dnadesign/densegen/workspaces/bu_scc_demo/config.yaml
+uv run dense inspect run --usr-events-path -c <dnadesign_repo>/src/dnadesign/densegen/workspaces/bu_scc_demo/config.yaml
 ```
+
+Use the printed USR path for Notify.
 
 ---
 
-## 5) Configure Notify watcher
+## 5) Create Notify profile from workspace config
 
 ```bash
-# Export webhook URL for Notify.
-export DENSEGEN_WEBHOOK="https://example.com/webhook"
+CONFIG="<dnadesign_repo>/src/dnadesign/densegen/workspaces/bu_scc_demo/config.yaml"
+NOTIFY_DIR="<dnadesign_repo>/src/dnadesign/densegen/workspaces/bu_scc_demo/outputs/notify/densegen"
 
-# Create profile from USR events path.
-uv run notify profile wizard \
-  --profile /project/$USER/densegen_runs/bu_scc_demo/outputs/notify.profile.json \
-  --provider slack \
-  --events /project/$USER/densegen_runs/bu_scc_demo/outputs/usr_datasets/densegen/bu_scc_demo/.events.log \
-  --cursor /project/$USER/densegen_runs/bu_scc_demo/outputs/notify.cursor \
-  --spool-dir /project/$USER/densegen_runs/bu_scc_demo/outputs/notify_spool \
-  --secret-source env \
-  --url-env DENSEGEN_WEBHOOK \
-  --only-tools densegen \
-  --only-actions densegen_health,densegen_flush_failed,materialize
-
-# Validate profile.
-uv run notify profile doctor --profile /project/$USER/densegen_runs/bu_scc_demo/outputs/notify.profile.json
-
-# Preview without delivery.
-uv run notify usr-events watch --profile /project/$USER/densegen_runs/bu_scc_demo/outputs/notify.profile.json --dry-run
-
-# Run live watcher.
-uv run notify usr-events watch --profile /project/$USER/densegen_runs/bu_scc_demo/outputs/notify.profile.json --follow
+uv run notify setup slack \
+  --tool densegen \
+  --config "$CONFIG" \
+  --profile "$NOTIFY_DIR/profile.json" \
+  --cursor "$NOTIFY_DIR/cursor" \
+  --spool-dir "$NOTIFY_DIR/spool" \
+  --secret-source auto \
+  --policy densegen
 ```
+
+Flag expectations:
+- `--config` is the workspace/run config path, not a repo-root config
+- profile schema is v2 and stores `events_source` (`tool`, `config`) to prevent drift
+- setup can run before `.events.log` exists
+- flag-by-flag command rationale: [Notify command anatomy](../../../../../docs/notify/usr_events.md#command-anatomy-notify-setup-slack)
 
 ---
 
-## 6) Sync USR dataset between SCC and local
+## 6) Deploy Notify watcher
 
-Run this on the machine where you want files to end up.
+Preferred pattern: dedicated watcher batch job (durable cursor/spool state).
+
+Profile mode (recommended):
 
 ```bash
-# Point USR to your remotes config.
+qsub -P <project> \
+  -v NOTIFY_PROFILE="$NOTIFY_DIR/profile.json" \
+  docs/hpc/jobs/bu_scc_notify_watch.qsub
+```
+
+Env mode (if you intentionally do not use a profile):
+
+```bash
+qsub -P <project> \
+  -v NOTIFY_TOOL=densegen,NOTIFY_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/bu_scc_demo/config.yaml,WEBHOOK_ENV=NOTIFY_WEBHOOK \
+  docs/hpc/jobs/bu_scc_notify_watch.qsub
+```
+
+If `EVENTS_PATH` is explicit in env mode, set `NOTIFY_POLICY` (`densegen`, `infer_evo2`, or `generic`).
+
+For profile setup and diagnostics:
+- `uv run notify setup slack ...`
+- `uv run notify profile doctor ...`
+- `uv run notify usr-events watch --dry-run ...`
+
+Reference:
+- [docs/hpc/bu_scc_batch_notify.md](../../../../../docs/hpc/bu_scc_batch_notify.md)
+
+---
+
+## 7) Sync USR dataset between SCC and local
+
+Run on the destination machine:
+
+```bash
 export USR_REMOTES_PATH="$HOME/.config/dnadesign/usr-remotes.yaml"
 
-# Create/check BU SCC remote.
-uv run usr remotes wizard --preset bu-scc --name bu-scc --user <BU_USERNAME> --base-dir /project/<BU_USERNAME>/densegen_runs/outputs/usr_datasets
+uv run usr remotes wizard --preset bu-scc --name bu-scc --user <BU_USERNAME> --base-dir <dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/outputs/usr_datasets
 uv run usr remotes doctor --remote bu-scc
 
-# Preview differences.
 uv run usr diff densegen/bu_scc_demo bu-scc
-
-# Pull from SCC to local.
 uv run usr pull densegen/bu_scc_demo bu-scc -y
 ```
 
-For deeper sync details, see:
+For deeper sync operations:
 - [../../../usr/docs/operations/sync.md](../../../usr/docs/operations/sync.md)
 
 ---

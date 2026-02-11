@@ -50,7 +50,11 @@ def register_profile_commands(
             "--include-raw-event/--no-include-raw-event",
             help="Whether to include the full USR event blob in payload meta.",
         ),
-        preset: str | None = typer.Option(None, "--preset", help="Optional preset profile: densegen."),
+        policy: str | None = typer.Option(
+            None,
+            "--policy",
+            help="Workflow policy defaults: densegen|infer_evo2|generic.",
+        ),
         force: bool = typer.Option(False, "--force", help="Overwrite an existing profile file."),
     ) -> None:
         init_handler(
@@ -65,14 +69,14 @@ def register_profile_commands(
             include_args=include_args,
             include_context=include_context,
             include_raw_event=include_raw_event,
-            preset=preset,
+            policy=policy,
             force=force,
         )
 
     @profile_app.command("wizard")
     def profile_wizard(
         profile: Path = typer.Option(
-            Path("outputs/notify.profile.json"),
+            Path("outputs/notify/generic/profile.json"),
             "--profile",
             help="Path to profile JSON file.",
         ),
@@ -97,7 +101,11 @@ def register_profile_commands(
             "--include-raw-event/--no-include-raw-event",
             help="Whether to include the full USR event blob in payload meta.",
         ),
-        preset: str | None = typer.Option(None, "--preset", help="Optional preset profile: densegen."),
+        policy: str | None = typer.Option(
+            None,
+            "--policy",
+            help="Workflow policy defaults: densegen|infer_evo2|generic.",
+        ),
         secret_source: str = typer.Option(
             "auto",
             "--secret-source",
@@ -109,7 +117,7 @@ def register_profile_commands(
         url_env: str | None = typer.Option(
             None,
             "--url-env",
-            help="Environment variable name for webhook URL (required with --secret-source env).",
+            help="Environment variable name for webhook URL (default: NOTIFY_WEBHOOK with --secret-source env).",
         ),
         secret_ref: str | None = typer.Option(
             None,
@@ -129,6 +137,7 @@ def register_profile_commands(
             "--store-webhook/--no-store-webhook",
             help="Store webhook URL in the selected secure secret backend.",
         ),
+        json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON output."),
         force: bool = typer.Option(False, "--force", help="Overwrite an existing profile file."),
     ) -> None:
         wizard_handler(
@@ -142,12 +151,13 @@ def register_profile_commands(
             include_args=include_args,
             include_context=include_context,
             include_raw_event=include_raw_event,
-            preset=preset,
+            policy=policy,
             secret_source=secret_source,
             url_env=url_env,
             secret_ref=secret_ref,
             webhook_url=webhook_url,
             store_webhook=store_webhook,
+            json_output=json_output,
             force=force,
         )
 
@@ -160,5 +170,6 @@ def register_profile_commands(
     @profile_app.command("doctor")
     def profile_doctor(
         profile: Path = typer.Option(..., "--profile", help="Path to profile JSON file."),
+        json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON output."),
     ) -> None:
-        doctor_handler(profile=profile)
+        doctor_handler(profile=profile, json_output=json_output)

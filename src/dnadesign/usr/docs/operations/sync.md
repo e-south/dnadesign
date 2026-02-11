@@ -18,7 +18,7 @@ Commands below use `uv run usr ...` to match this monorepo workflow.
 
 Recommended storage layout:
 - Local datasets root outside the repo, for example `~/data/usr_datasets/`
-- SCC datasets root in project/scratch storage, for example `/project/$USER/densegen_runs/outputs/usr_datasets`
+- SCC datasets root in project/scratch storage, for example `/project/$USER/dnadesign/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets`
 
 Notes:
 - Scratch may have retention/purge policies; use project storage for long-lived datasets.
@@ -91,7 +91,7 @@ uv run usr remotes wizard \
   --name bu-scc \
   --user <user> \
   --host scc1.bu.edu \
-  --base-dir /project/<user>/densegen_runs/outputs/usr_datasets
+  --base-dir /project/<user>/dnadesign/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets
 
 # Validate remote profile wiring.
 uv run usr remotes doctor --remote bu-scc
@@ -116,7 +116,7 @@ remotes:
     type: ssh
     host: scc1.bu.edu
     user: <user>
-    base_dir: /project/<user>/densegen_runs/outputs/usr_datasets
+    base_dir: /project/<user>/dnadesign/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets
     # Optional explicit key via environment variable:
     # ssh_key_env: USR_SSH_KEY
 ```
@@ -170,13 +170,13 @@ Use dataset directory mode when you have an explicit dataset path outside `--roo
 
 ```bash
 # Diff dataset directory path outside --root.
-uv run usr diff /path/to/outputs/usr_datasets/densegen/demo_hpc bu-scc
+uv run usr diff /path/to/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets/densegen/demo_hpc bu-scc
 
 # Pull dataset directory by explicit path.
-uv run usr pull /path/to/outputs/usr_datasets/densegen/demo_hpc bu-scc -y
+uv run usr pull /path/to/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets/densegen/demo_hpc bu-scc -y
 
 # Push dataset directory by explicit path.
-uv run usr push /path/to/outputs/usr_datasets/densegen/demo_hpc bu-scc -y
+uv run usr push /path/to/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets/densegen/demo_hpc bu-scc -y
 ```
 
 Use file mode when syncing a single file.
@@ -189,7 +189,7 @@ remotes:
     type: ssh
     host: scc1.bu.edu
     user: <user>
-    base_dir: /project/<user>/densegen_runs/outputs/usr_datasets
+    base_dir: /project/<user>/dnadesign/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets
     repo_root: /path/to/remote/dnadesign
     local_repo_root: /path/to/local/dnadesign
 ```

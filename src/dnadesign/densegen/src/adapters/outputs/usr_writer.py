@@ -240,6 +240,17 @@ class USRWriter:
             force=True,
         )
 
+    def on_run_failure(self, exc: Exception) -> None:
+        self._emit_densegen_health_event(
+            status="failed",
+            record=None,
+            rows_incoming=0,
+            rows_written=0,
+            force=True,
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+        )
+
     def existing_ids(self) -> set:
         if self._id_index is None:
             return set(self._seen_ids)
@@ -351,6 +362,8 @@ class USRWriter:
         rows_incoming: int,
         rows_written: int,
         force: bool,
+        error_type: str | None = None,
+        error_message: str | None = None,
     ) -> None:
         now = time.monotonic()
         if (
@@ -395,6 +408,10 @@ class USRWriter:
             "sampling_library_hash": meta.get("sampling_library_hash"),
             "solver_status": meta.get("solver_status"),
         }
+        if error_type is not None:
+            args["error_type"] = str(error_type)
+        if error_message is not None:
+            args["error"] = str(error_message)
         self.ds.log_event(
             "densegen_health",
             args=args,

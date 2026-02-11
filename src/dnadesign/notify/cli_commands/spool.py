@@ -25,7 +25,7 @@ def register_spool_drain_command(
     @spool_app.command("drain")
     def spool_drain(
         spool_dir: Path | None = typer.Option(None, "--spool-dir", help="Directory containing spooled payload files."),
-        provider: str | None = typer.Option(None, help="Provider: generic|slack|discord."),
+        provider: str | None = typer.Option(None, help="Override provider: generic|slack|discord."),
         url: str | None = typer.Option(None, help="Webhook URL."),
         url_env: str | None = typer.Option(None, help="Environment variable holding webhook URL."),
         secret_ref: str | None = typer.Option(

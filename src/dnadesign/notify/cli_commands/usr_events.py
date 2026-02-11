@@ -36,6 +36,26 @@ def register_usr_events_watch_command(
         profile: Path | None = typer.Option(None, "--profile", help="Path to profile JSON file."),
         cursor: Path | None = typer.Option(None, "--cursor", help="Cursor file storing byte offset."),
         follow: bool = typer.Option(False, "--follow", help="Follow events file for new lines."),
+        wait_for_events: bool = typer.Option(
+            False,
+            "--wait-for-events",
+            help="When following, wait for events file creation instead of failing immediately.",
+        ),
+        idle_timeout: float | None = typer.Option(
+            None,
+            "--idle-timeout",
+            help="Exit after this many seconds without new events while following.",
+        ),
+        poll_interval_seconds: float = typer.Option(
+            0.2,
+            "--poll-interval-seconds",
+            help="Polling interval for follow/wait loops (seconds).",
+        ),
+        stop_on_terminal_status: bool = typer.Option(
+            False,
+            "--stop-on-terminal-status",
+            help="Exit after the first event mapped to success or failure status.",
+        ),
         on_truncate: str = typer.Option(
             "error",
             "--on-truncate",
@@ -66,6 +86,11 @@ def register_usr_events_watch_command(
         fail_fast: bool = typer.Option(False, "--fail-fast", help="Abort on first unsent event."),
         spool_dir: Path | None = typer.Option(None, "--spool-dir", help="Write failed payloads to spool directory."),
         dry_run: bool = typer.Option(False, help="Print formatted payloads instead of posting."),
+        advance_cursor_on_dry_run: bool = typer.Option(
+            True,
+            "--advance-cursor-on-dry-run/--no-advance-cursor-on-dry-run",
+            help="When --dry-run is enabled, persist cursor offsets (default: enabled).",
+        ),
     ) -> None:
         watch_handler(
             provider=provider,
@@ -76,6 +101,10 @@ def register_usr_events_watch_command(
             profile=profile,
             cursor=cursor,
             follow=follow,
+            wait_for_events=wait_for_events,
+            idle_timeout=idle_timeout,
+            poll_interval_seconds=poll_interval_seconds,
+            stop_on_terminal_status=stop_on_terminal_status,
             on_truncate=on_truncate,
             only_actions=only_actions,
             only_tools=only_tools,
@@ -94,4 +123,5 @@ def register_usr_events_watch_command(
             fail_fast=fail_fast,
             spool_dir=spool_dir,
             dry_run=dry_run,
+            advance_cursor_on_dry_run=advance_cursor_on_dry_run,
         )

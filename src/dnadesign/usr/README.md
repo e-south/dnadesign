@@ -439,7 +439,7 @@ usr remotes wizard \
   --name bu-scc \
   --user <cluster-user> \
   --host scc1.bu.edu \
-  --base-dir /project/<cluster-user>/densegen_runs/outputs/usr_datasets
+  --base-dir /project/<cluster-user>/dnadesign/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets
 
 # Validate remote connectivity and config.
 usr remotes doctor --remote bu-scc
@@ -454,13 +454,13 @@ usr push densegen/60bp_dual_promoter_cpxR_LexA bu-scc -y
 
 ```bash
 # Diff dataset directory path outside --root.
-usr diff /path/to/outputs/usr_datasets/densegen/demo_hpc bu-scc
+usr diff /path/to/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets/densegen/demo_hpc bu-scc
 
 # Pull dataset directory by path.
-usr pull /path/to/outputs/usr_datasets/densegen/demo_hpc bu-scc -y
+usr pull /path/to/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets/densegen/demo_hpc bu-scc -y
 
 # Push dataset directory by path.
-usr push /path/to/outputs/usr_datasets/densegen/demo_hpc bu-scc -y
+usr push /path/to/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets/densegen/demo_hpc bu-scc -y
 ```
 
 **FILE mode** lets you diff/pull/push arbitrary files by path:

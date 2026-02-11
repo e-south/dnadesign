@@ -13,13 +13,13 @@ For full operator procedures, use the canonical runbook:
 
 ```bash
 # Validate profile fields and secret wiring.
-uv run notify profile doctor --profile outputs/notify.profile.json
+uv run notify profile doctor --profile outputs/notify/profile.json
 
 # Preview payloads first.
-uv run notify usr-events watch --profile outputs/notify.profile.json --dry-run
+uv run notify usr-events watch --profile outputs/notify/profile.json --dry-run
 
 # Run live.
-uv run notify usr-events watch --profile outputs/notify.profile.json --follow
+uv run notify usr-events watch --profile outputs/notify/profile.json --follow
 ```
 
 ## Related stack docs
@@ -27,6 +27,7 @@ uv run notify usr-events watch --profile outputs/notify.profile.json --follow
 - DenseGen local end-to-end demo: [../../densegen/docs/demo/demo_usr_notify.md](../../densegen/docs/demo/demo_usr_notify.md)
 - DenseGen event-boundary contract: [../../densegen/docs/reference/outputs.md#event-streams-and-consumers-densegen-vs-usr](../../densegen/docs/reference/outputs.md#event-streams-and-consumers-densegen-vs-usr)
 - USR event schema: [../../usr/README.md#event-log-schema](../../usr/README.md#event-log-schema)
+- Setup command guide: [../../../../docs/notify/usr_events.md#command-anatomy-notify-setup-slack](../../../../docs/notify/usr_events.md#command-anatomy-notify-setup-slack)
 
 ## Boundary reminder
 

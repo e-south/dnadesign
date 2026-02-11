@@ -207,46 +207,52 @@ uv run usr events tail "$DATASET_PATH" --follow --format json
 
 ---
 
-## 6) Terminal B: run Notify against the USR event log
+## 6) Terminal B: configure Notify from workspace config and watch events
+
+Use setup resolver mode so you do not have to manually copy the events path:
+flag-by-flag rationale and profile expectations are documented in
+[Notify command anatomy](../../../../../docs/notify/usr_events.md#command-anatomy-notify-setup-slack).
 
 ```bash
-# Resolve exact USR event-log path from this workspace.
-uv run dense inspect run --usr-events-path -c "$CONFIG"
-```
+# Workspace-scoped DenseGen config for this run (not a repo-root config path).
+echo "$CONFIG"
+NOTIFY_DIR="outputs/notify"
 
-If Terminal B is not in this workspace, use explicit config path:
-
-```bash
-# Resolve USR event path using absolute/explicit config location.
-uv run dense inspect run --usr-events-path -c src/dnadesign/densegen/workspaces/usr_notify_trial/config.yaml
-```
-
-`notify profile wizard --events` expects the USR `.events.log` path from this command,
-not `config.yaml`.
-
-```bash
-# Create Notify profile for local Slack-format webhook testing.
-uv run notify profile wizard \
-  --profile outputs/notify.profile.json \
-  --provider slack \
-  --events <PASTE_EVENTS_PATH_FROM_ABOVE> \
-  --cursor outputs/notify.cursor \
-  --spool-dir outputs/notify_spool \
+# Create Notify profile from DenseGen config.
+uv run notify setup slack \
+  --tool densegen \
+  --config "$CONFIG" \
+  --profile "$NOTIFY_DIR/profile.json" \
+  --cursor "$NOTIFY_DIR/cursor" \
+  --spool-dir "$NOTIFY_DIR/spool" \
   --secret-source env \
   --url-env DENSEGEN_WEBHOOK \
-  --only-tools densegen \
-  --only-actions densegen_health,densegen_flush_failed,materialize
+  --policy densegen
+```
+
+For existing runs, `--events` is also valid if you want direct path mode:
+
+```bash
+EVENTS_PATH="$(uv run dense inspect run --usr-events-path -c "$CONFIG")"
+uv run notify setup slack \
+  --events "$EVENTS_PATH" \
+  --profile "$NOTIFY_DIR/profile.json" \
+  --cursor "$NOTIFY_DIR/cursor" \
+  --spool-dir "$NOTIFY_DIR/spool" \
+  --secret-source env \
+  --url-env DENSEGEN_WEBHOOK \
+  --policy densegen
 ```
 
 ```bash
 # Validate profile.
-uv run notify profile doctor --profile outputs/notify.profile.json
+uv run notify profile doctor --profile "$NOTIFY_DIR/profile.json"
 
 # Preview payloads without sending.
-uv run notify usr-events watch --profile outputs/notify.profile.json --dry-run
+uv run notify usr-events watch --profile "$NOTIFY_DIR/profile.json" --dry-run --wait-for-events
 
 # Run live watcher.
-uv run notify usr-events watch --profile outputs/notify.profile.json --follow
+uv run notify usr-events watch --profile "$NOTIFY_DIR/profile.json" --follow --wait-for-events
 ```
 
 You should now see webhook POST payloads in Terminal A.
