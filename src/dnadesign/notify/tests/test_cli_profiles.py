@@ -355,6 +355,32 @@ def test_profile_doctor_rejects_non_usr_events_file(tmp_path: Path, monkeypatch)
     assert "USR .events.log" in result.stdout
 
 
+def test_profile_doctor_rejects_non_usr_events_file_v2_secret_ref(tmp_path: Path, monkeypatch) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    cfg_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    profile = tmp_path / "notify.profile.json"
+    profile.write_text(
+        json.dumps(
+            {
+                "profile_version": 2,
+                "provider": "slack",
+                "events": str(cfg_path),
+                "webhook": {"source": "secret_ref", "ref": "keychain://dnadesign.notify/demo"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "dnadesign.notify.validation.resolve_secret_ref", lambda _ref: "https://example.invalid/webhook"
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["profile", "doctor", "--profile", str(profile)])
+    assert result.exit_code == 1
+    assert "USR .events.log" in result.stdout
+    assert "inspect run --usr-events-path" in result.stdout
+
+
 def test_profile_doctor_passes_when_wiring_is_valid(tmp_path: Path, monkeypatch) -> None:
     events = tmp_path / "events.log"
     profile = tmp_path / "notify.profile.json"
