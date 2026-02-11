@@ -54,6 +54,7 @@ def test_chain_trajectory_scatter_renders_background_chain_and_consensus(tmp_pat
             "raw_llr_cpxR": [0.12, 0.33, 0.47, 0.09, 0.25, 0.37],
             "norm_llr_lexA": [0.05, 0.20, 0.35, 0.03, 0.15, 0.28],
             "norm_llr_cpxR": [0.07, 0.22, 0.36, 0.04, 0.17, 0.29],
+            "objective_scalar": [0.10, 0.30, 0.45, 0.08, 0.22, 0.35],
             "raw_llr_objective": [0.10, 0.30, 0.45, 0.08, 0.22, 0.35],
         }
     )
@@ -90,6 +91,45 @@ def test_chain_trajectory_scatter_renders_background_chain_and_consensus(tmp_pat
     assert "consensus anchors" in labels
     assert metadata["chain_count"] == 2
     assert metadata["mode"] == "chain_scatter"
+
+
+def test_chain_trajectory_scatter_uses_only_new_best_updates(tmp_path: Path) -> None:
+    trajectory_df = pd.DataFrame(
+        {
+            "chain": [0, 0, 0, 0, 1, 1, 1, 1],
+            "sweep_idx": [0, 1, 2, 3, 0, 1, 2, 3],
+            "raw_llr_lexA": [0.10, 0.15, 0.14, 0.20, 0.20, 0.18, 0.25, 0.24],
+            "raw_llr_cpxR": [0.09, 0.12, 0.11, 0.14, 0.19, 0.17, 0.22, 0.21],
+            "norm_llr_lexA": [0.05, 0.08, 0.07, 0.11, 0.09, 0.07, 0.12, 0.10],
+            "norm_llr_cpxR": [0.04, 0.07, 0.06, 0.09, 0.08, 0.06, 0.10, 0.09],
+            "objective_scalar": [0.10, 0.30, 0.25, 0.40, 0.20, 0.18, 0.50, 0.45],
+            "raw_llr_objective": [0.10, 0.30, 0.25, 0.40, 0.20, 0.18, 0.50, 0.45],
+        }
+    )
+    baseline_df = pd.DataFrame(
+        {
+            "raw_llr_lexA": [0.02, 0.04, 0.06, 0.08],
+            "raw_llr_cpxR": [0.03, 0.05, 0.07, 0.09],
+            "norm_llr_lexA": [0.01, 0.03, 0.05, 0.07],
+            "norm_llr_cpxR": [0.02, 0.04, 0.06, 0.08],
+        }
+    )
+    out_path = tmp_path / "plot__chain_trajectory_scatter_best_updates.png"
+    metadata = plot_chain_trajectory_scatter(
+        trajectory_df=trajectory_df,
+        baseline_df=baseline_df,
+        tf_pair=("lexA", "cpxR"),
+        scatter_scale="llr",
+        consensus_anchors=None,
+        out_path=out_path,
+        dpi=72,
+        png_compress_level=1,
+        stride=10,
+    )
+
+    assert out_path.exists()
+    assert metadata["scatter_mode"] == "best_so_far_updates"
+    assert metadata["plotted_points_by_chain"] == {0: 3, 1: 2}
 
 
 def test_chain_trajectory_sweep_requires_selected_y_column(tmp_path: Path) -> None:
@@ -163,6 +203,7 @@ def test_chain_trajectory_sweep_best_so_far_mode_is_supported(tmp_path: Path) ->
     assert out_path.exists()
     assert metadata["y_mode"] == "best_so_far"
     assert metadata["chain_count"] == 2
+    assert metadata["y_label"] == "Raw LLR objective (best-so-far cumulative maximum)"
 
 
 def test_chain_trajectory_sweep_rejects_unknown_mode(tmp_path: Path) -> None:

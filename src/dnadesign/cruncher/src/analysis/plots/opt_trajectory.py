@@ -66,6 +66,19 @@ def _sample_rows(df: pd.DataFrame, *, stride: int, group_col: str = "chain") -> 
     return pd.concat(sampled_parts).sort_values([group_col, "sweep_idx"]).reset_index(drop=True)
 
 
+def _select_best_so_far_updates(sampled: pd.DataFrame, *, objective_column: str = "objective_scalar") -> pd.DataFrame:
+    updates = sampled.copy()
+    updates[objective_column] = _require_numeric(updates, objective_column, context="Trajectory")
+    parts: list[pd.DataFrame] = []
+    for _, chain_df in updates.groupby("chain", sort=True, dropna=False):
+        ordered = chain_df.sort_values("sweep_idx").copy()
+        scores = ordered[objective_column].astype(float)
+        previous_best = scores.cummax().shift(1, fill_value=float("-inf"))
+        keep = scores > previous_best
+        parts.append(ordered.loc[keep])
+    return pd.concat(parts).sort_values(["chain", "sweep_idx"]).reset_index(drop=True)
+
+
 def _resolve_scatter_columns(*, tf_pair: tuple[str, str], scatter_scale: str) -> tuple[str, str, str]:
     scale = str(scatter_scale).strip().lower()
     if scale in {"llr", "raw-llr", "raw_llr"}:
@@ -120,17 +133,20 @@ def _draw_chain_lineage(
     y_col: str,
     alpha_lo: float,
     alpha_hi: float,
-) -> list[int]:
+) -> tuple[list[int], dict[int, int]]:
     chain_ids = sorted(int(v) for v in sampled["chain"].unique())
     if not chain_ids:
         raise ValueError("Trajectory plot requires at least one chain.")
+    points_by_chain: dict[int, int] = {}
     cmap = plt.get_cmap("tab20", max(1, len(chain_ids)))
     for idx, chain_id in enumerate(chain_ids):
         chain_df = sampled[sampled["chain"].astype(int) == chain_id].sort_values("sweep_idx")
         if chain_df.empty:
+            points_by_chain[int(chain_id)] = 0
             continue
         x = chain_df[x_col].astype(float).to_numpy()
         y = chain_df[y_col].astype(float).to_numpy()
+        points_by_chain[int(chain_id)] = int(x.size)
         sweeps = chain_df["sweep_idx"].astype(float).to_numpy()
         sweep_min = float(sweeps.min())
         sweep_span = float(sweeps.max() - sweep_min)
@@ -163,7 +179,7 @@ def _draw_chain_lineage(
         )
         ax.scatter(x, y, s=16, c=colors, edgecolors="none", zorder=5)
         ax.plot([], [], color=rgb, linewidth=1.4, label=f"chain {chain_id}")
-    return chain_ids
+    return chain_ids, points_by_chain
 
 
 def plot_chain_trajectory_scatter(
@@ -194,7 +210,10 @@ def plot_chain_trajectory_scatter(
     plot_df = _prepare_chain_df(trajectory_df)
     plot_df[x_col] = _require_numeric(plot_df, x_col, context="Trajectory")
     plot_df[y_col] = _require_numeric(plot_df, y_col, context="Trajectory")
-    sampled = _sample_rows(plot_df, stride=max(1, int(stride)))
+    sampled = plot_df.sort_values(["chain", "sweep_idx"]).reset_index(drop=True)
+    best_updates = _select_best_so_far_updates(sampled, objective_column="objective_scalar")
+    if best_updates.empty:
+        raise ValueError("Trajectory plot requires at least one best-so-far update per chain.")
 
     baseline = _require_df(baseline_df, name="Baseline").copy()
     baseline[x_col] = _require_numeric(baseline, x_col, context="Baseline")
@@ -212,9 +231,9 @@ def plot_chain_trajectory_scatter(
         label=f"random baseline (n={len(baseline)})",
     )
 
-    chain_ids = _draw_chain_lineage(
+    chain_ids, points_by_chain = _draw_chain_lineage(
         ax,
-        sampled,
+        best_updates,
         x_col=x_col,
         y_col=y_col,
         alpha_lo=alpha_lo,
@@ -249,7 +268,7 @@ def plot_chain_trajectory_scatter(
             )
 
     if slot_overlay:
-        _draw_chain_overlay(ax, sampled, x_col=x_col, y_col=y_col)
+        _draw_chain_overlay(ax, best_updates, x_col=x_col, y_col=y_col)
 
     scale_label = "raw LLR" if normalized_scale == "llr" else "normalized LLR"
     ax.set_xlabel(f"{tf_pair[0]} ({scale_label})")
@@ -262,10 +281,12 @@ def plot_chain_trajectory_scatter(
     plt.close(fig)
     return {
         "mode": "chain_scatter",
+        "scatter_mode": "best_so_far_updates",
         "legend_labels": legend_labels,
         "chain_count": len(chain_ids),
         "x_column": x_col,
         "y_column": y_col,
+        "plotted_points_by_chain": points_by_chain,
     }
 
 
@@ -366,11 +387,16 @@ def plot_chain_trajectory_sweep(
     if slot_overlay:
         _draw_chain_overlay(ax, sampled_plot, x_col="sweep_idx", y_col="_y_plot")
 
-    ylabel = {
+    ylabel_base = {
         "raw_llr_objective": "Raw LLR objective",
         "norm_llr_objective": "Normalized LLR objective",
         "objective_scalar": "Optimization score",
     }.get(y_column, y_column)
+    ylabel = {
+        "raw": f"{ylabel_base} (per-sweep value)",
+        "best_so_far": f"{ylabel_base} (best-so-far cumulative maximum)",
+        "all": f"{ylabel_base} (per-sweep values with best-so-far envelope)",
+    }[mode]
     ax.set_xlabel("Sweep index")
     ax.set_ylabel(ylabel)
     title_suffix = {
@@ -382,7 +408,7 @@ def plot_chain_trajectory_sweep(
     ax.text(
         0.02,
         0.98,
-        "y = combined objective across TFs per sweep",
+        "Chains are colored independently; y-axis semantics are mode-dependent.",
         transform=ax.transAxes,
         ha="left",
         va="top",
@@ -400,4 +426,5 @@ def plot_chain_trajectory_sweep(
         "legend_labels": legend_labels,
         "chain_count": len(chain_ids),
         "y_column": y_column,
+        "y_label": ylabel,
     }

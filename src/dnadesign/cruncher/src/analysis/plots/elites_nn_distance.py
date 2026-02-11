@@ -27,7 +27,7 @@ def plot_elites_nn_distance(
     baseline_nn: pd.Series | None = None,
     dpi: int,
     png_compress_level: int,
-) -> None:
+) -> dict[str, object]:
     if nn_df is None or nn_df.empty or "nn_dist" not in nn_df.columns:
         raise ValueError("Nearest-neighbor distance table is empty or missing nn_dist.")
     nn_vals = pd.to_numeric(nn_df["nn_dist"], errors="coerce").dropna()
@@ -37,6 +37,12 @@ def plot_elites_nn_distance(
     baseline_vals = None
     if baseline_nn is not None:
         baseline_vals = pd.to_numeric(baseline_nn, errors="coerce").dropna()
+    has_finite = not nn_vals.empty
+    all_zero = bool(
+        has_finite
+        and np.isclose(float(nn_vals.min()), 0.0, rtol=0.0, atol=1e-12)
+        and np.isclose(float(nn_vals.max()), 0.0, rtol=0.0, atol=1e-12)
+    )
     if n_elites < 3 or nn_vals.empty:
         ax.axis("off")
         lines = [
@@ -82,12 +88,32 @@ def plot_elites_nn_distance(
             bbox={"facecolor": "white", "alpha": 0.7, "edgecolor": "none"},
         )
         ax.set_title("Elite nearest-neighbor distance")
-        ax.set_xlabel("Distance")
+        ax.set_xlabel("Distance (TFBS-core weighted; 0 means nearest elite has identical motif-core footprint)")
         ax.set_ylabel("Count")
         ax.grid(True, linestyle="--", alpha=0.3)
+        if all_zero:
+            ax.text(
+                0.02,
+                0.98,
+                (
+                    "All NN distances are zero: elites share nearest motif-core signatures.\n"
+                    "Full sequences can still differ outside scored cores."
+                ),
+                transform=ax.transAxes,
+                ha="left",
+                va="top",
+                fontsize=8,
+                color="#4a4a4a",
+                bbox={"facecolor": "white", "alpha": 0.7, "edgecolor": "none"},
+            )
         if baseline_vals is not None and not baseline_vals.empty:
             ax.legend(frameon=False, fontsize=8)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
     plt.close(fig)
+    return {
+        "n_elites": n_elites,
+        "has_finite_distances": has_finite,
+        "all_zero": all_zero,
+    }
