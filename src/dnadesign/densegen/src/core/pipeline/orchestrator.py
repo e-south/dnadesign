@@ -800,7 +800,7 @@ def _run_stage_b_sampling(
         seq_len=seq_len,
         min_count_per_tf=min_count_per_tf,
         usage_counts=usage_counts,
-        failure_counts=failure_counts if failure_counts else None,
+        failure_counts=site_failure_counts,
         rng=rng,
         np_rng=np_rng,
         library_source_label=library_source_label,

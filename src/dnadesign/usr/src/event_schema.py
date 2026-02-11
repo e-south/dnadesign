@@ -12,3 +12,5 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 USR_EVENT_VERSION = 1
+
+__all__ = ["USR_EVENT_VERSION"]

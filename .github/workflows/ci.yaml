@@ -81,6 +81,9 @@ jobs:
       - name: Export MEME_BIN
         run: echo "MEME_BIN=${{ github.workspace }}/.pixi/envs/default/bin" >> $GITHUB_ENV
 
+      - name: Install dependencies (locked)
+        run: uv sync --locked --dev
+
       - name: Verify FIMO availability
         run: pixi run fimo --version
 

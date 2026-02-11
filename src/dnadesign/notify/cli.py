@@ -12,17 +12,17 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import hashlib
+import importlib
 import json
 import os
 import random
 import stat
 import time
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterable
 
 import typer
-
-from dnadesign.usr import USR_EVENT_VERSION
 
 from .cli_commands import register_profile_commands, register_spool_drain_command, register_usr_events_watch_command
 from .cli_commands.providers import format_for_provider
@@ -79,6 +79,15 @@ _DENSEGEN_PROFILE_PRESET = {
     "include_raw_event": False,
 }
 _WEBHOOK_SOURCES = {"env", "secret_ref"}
+
+
+@lru_cache(maxsize=1)
+def _usr_event_version() -> int:
+    module = importlib.import_module("dnadesign.usr.src.event_schema")
+    version = getattr(module, "USR_EVENT_VERSION", None)
+    if not isinstance(version, int):
+        raise NotifyConfigError("USR event schema is invalid: USR_EVENT_VERSION must be an integer")
+    return int(version)
 
 
 def _load_meta(meta_path: Path | None) -> dict[str, Any]:
@@ -484,8 +493,9 @@ def _validate_usr_event(event: dict[str, Any], *, allow_unknown_version: bool) -
     version = event.get("event_version")
     if not isinstance(version, int):
         raise NotifyConfigError("event_version must be an integer")
-    if version != USR_EVENT_VERSION and not allow_unknown_version:
-        raise NotifyConfigError(f"unknown event_version={version}; expected {USR_EVENT_VERSION}")
+    expected_version = _usr_event_version()
+    if version != expected_version and not allow_unknown_version:
+        raise NotifyConfigError(f"unknown event_version={version}; expected {expected_version}")
     action = event.get("action")
     if not isinstance(action, str) or not action.strip():
         raise NotifyConfigError("event missing required 'action'")
