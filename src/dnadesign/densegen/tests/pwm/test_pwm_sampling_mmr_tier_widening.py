@@ -93,4 +93,5 @@ def test_mmr_tier_ladder_honors_pool_size() -> None:
     )
 
     assert len(selected) == 10
-    assert diag.selection_pool_size_final >= 20
+    assert diag.selection_pool_size_final == 100
+    assert diag.selection_pool_target_size == 100

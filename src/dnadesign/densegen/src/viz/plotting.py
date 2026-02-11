@@ -219,7 +219,7 @@ for _name, _spec in PLOT_SPECS.items():
 
 # Options explicitly supported by each plot; unknown options raise errors (strict).
 _ALLOWED_OPTIONS = {
-    "placement_map": {"occupancy_alpha", "occupancy_max_categories", "tfbs_top_k_annotation"},
+    "placement_map": {"occupancy_alpha", "occupancy_max_categories"},
     "tfbs_usage": set(),
     "run_health": set(),
     "stage_a_summary": set(),
@@ -287,7 +287,10 @@ def _manifest_path_fields(name: str, rel_path: Path) -> dict:
     if name == "stage_a_summary":
         fields["group"] = "stage_a"
         fields["family"] = "stage_a"
-        if stem.endswith("__background_logo"):
+        if stem == "background_logo":
+            fields["variant"] = "background_logo"
+            fields["input_name"] = "background"
+        elif stem.endswith("__background_logo"):
             fields["variant"] = "background_logo"
             fields["input_name"] = stem[: -len("__background_logo")]
         else:
@@ -469,6 +472,8 @@ def run_plots_from_config(
                     out_path,
                     style=style,
                     attempts_df=attempts_df,
+                    composition_df=composition_df,
+                    library_members_df=library_members_df,
                     events_df=events_df,
                     cfg=cfg_effective,
                     **kwargs,

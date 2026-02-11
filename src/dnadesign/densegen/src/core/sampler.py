@@ -82,7 +82,7 @@ class _LibraryState:
     stage_a_selection_ranks: list[int | None]
     stage_a_selection_score_norms: list[float | None]
     stage_a_tfbs_cores: list[str | None]
-    seen_tfbs: set[tuple[str, str]]
+    seen_tfbs: set[str]
     seen_cores: set[tuple[str, str]]
     used_per_tf: dict[str, int]
 
@@ -114,7 +114,7 @@ class TFSampler:
 
         df = self.df
         if unique_binding_sites:
-            df = df.drop_duplicates(["tf", "tfbs"]).reset_index(drop=True)
+            df = df.drop_duplicates(["tfbs"]).reset_index(drop=True)
         if unique_binding_cores and "tfbs_core" not in df.columns:
             raise ValueError(
                 "unique_binding_cores=true requires a 'tfbs_core' column in the input data. "
@@ -136,7 +136,7 @@ class TFSampler:
         if not unique_tfs:
             raise ValueError("No regulators found in input.")
 
-        total_unique_tfbs = len(df.drop_duplicates(["tf", "tfbs"]))
+        total_unique_tfbs = len(df.drop_duplicates(["tfbs"]))
         total_unique_cores = len(df.drop_duplicates(["tf", "tfbs_core"])) if unique_binding_cores else total_unique_tfbs
         prepared = _PreparedSamplingData(
             df=df,
@@ -383,8 +383,8 @@ class TFSampler:
         def _append_row(row, reason: str) -> bool:
             tf = str(row["tf"])
             tfbs = str(row["tfbs"])
-            key = (tf, tfbs)
-            if unique_binding_sites and key in state.seen_tfbs:
+            tfbs_key = tfbs
+            if unique_binding_sites and tfbs_key in state.seen_tfbs:
                 return False
             if unique_binding_cores:
                 core = str(row["tfbs_core"])
@@ -395,7 +395,7 @@ class TFSampler:
             state.meta.append(f"{tf}:{tfbs}")
             state.labels.append(tf)
             state.reasons.append(reason)
-            state.seen_tfbs.add(key)
+            state.seen_tfbs.add(tfbs_key)
             if unique_binding_cores:
                 state.seen_cores.add((tf, str(row["tfbs_core"])))
             state.used_per_tf[tf] = state.used_per_tf.get(tf, 0) + 1
@@ -443,17 +443,18 @@ class TFSampler:
                 weights: list[float] = []
                 for idx in indices:
                     row = df.loc[idx]
-                    key = (str(row["tf"]), str(row["tfbs"]))
-                    if unique_binding_sites and key in state.seen_tfbs:
+                    tfbs_key = str(row["tfbs"])
+                    tf_tfbs_key = (str(row["tf"]), tfbs_key)
+                    if unique_binding_sites and tfbs_key in state.seen_tfbs:
                         continue
                     if unique_binding_cores:
                         core_key = (str(row["tf"]), str(row["tfbs_core"]))
                         if core_key in state.seen_cores:
                             continue
-                    count = int(usage_counts.get(key, 0)) if usage_counts else 0
+                    count = int(usage_counts.get(tf_tfbs_key, 0)) if usage_counts else 0
                     weight = 1.0 + float(coverage_boost_alpha) / ((1.0 + count) ** float(coverage_boost_power))
                     if avoid_failed_motifs and failure_counts is not None:
-                        fails = int(failure_counts.get(key, 0))
+                        fails = int(failure_counts.get(tf_tfbs_key, 0))
                         if fails > 0:
                             penalty = 1.0 + float(failure_penalty_alpha) * float(fails)
                             weight = weight / (penalty ** float(failure_penalty_power))
@@ -483,8 +484,8 @@ class TFSampler:
             self.rng.shuffle(indices)
             for idx in indices:
                 row = df.loc[idx]
-                key = (str(row["tf"]), str(row["tfbs"]))
-                if unique_binding_sites and key in state.seen_tfbs:
+                tfbs_key = str(row["tfbs"])
+                if unique_binding_sites and tfbs_key in state.seen_tfbs:
                     continue
                 if unique_binding_cores:
                     core_key = (str(row["tf"]), str(row["tfbs_core"]))

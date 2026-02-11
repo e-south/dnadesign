@@ -60,14 +60,11 @@ def _build_background_logo_figure(
     if not lengths:
         raise ValueError("Background logo requires at least one sequence length.")
     n_lengths = len(lengths)
-    if n_lengths <= 2:
-        ncols = max(1, n_lengths)
-    else:
-        ncols = 2
-    nrows = int(np.ceil(n_lengths / ncols))
-    width = max(7.2, 3.6 * ncols)
-    height = max(3.2, 2.6 * nrows)
-    fig, axes = plt.subplots(nrows, ncols, figsize=(width, height), sharey=True)
+    nrows = n_lengths
+    subplot_side = 3.4
+    width = max(4.4, subplot_side * 1.18)
+    height = max(3.6, subplot_side * float(nrows) + 0.5)
+    fig, axes = plt.subplots(nrows, 1, figsize=(width, height), sharex=True, sharey=True)
     axes_list = list(np.atleast_1d(axes).ravel())
     used_axes: list[plt.Axes] = []
     for ax, length in zip(axes_list, lengths):
@@ -76,15 +73,20 @@ def _build_background_logo_figure(
         df = pd.DataFrame(pwm, columns=["A", "C", "G", "T"], dtype=float)
         logomaker.Logo(df, ax=ax, shade_below=0.5)
         ax.set_title(f"L={length} (n={len(seqs)})")
-        ax.set_xlabel("Position")
         ax.set_ylabel("Probability")
+        ax.set_box_aspect(1.0)
         _apply_style(ax, style)
         ax.grid(False)
         used_axes.append(ax)
+    if used_axes:
+        for ax in used_axes[:-1]:
+            ax.set_xlabel("")
+            ax.tick_params(labelbottom=False)
+        used_axes[-1].set_xlabel("Position")
     for ax in axes_list[len(lengths) :]:
         ax.set_axis_off()
-    fig.suptitle(f"{input_name} background logo", fontsize=float(style.get("title_size", 14)))
-    fig.tight_layout(rect=(0, 0, 1, 0.92))
+    fig.suptitle(f"{input_name} background logo", fontsize=float(style.get("title_size", 14)), y=0.985)
+    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.965), h_pad=0.28)
     return fig, used_axes
 
 
@@ -236,7 +238,11 @@ def plot_stage_a_summary(
             sequences=sequences,
             style=style,
         )
-        fname = f"{_safe_filename(input_name)}__background_logo{out_path.suffix}"
+        input_segment = _safe_filename(input_name)
+        if input_segment.lower() == "background":
+            fname = f"background_logo{out_path.suffix}"
+        else:
+            fname = f"{input_segment}__background_logo{out_path.suffix}"
         path = base_dir / fname
         fig.savefig(path, bbox_inches="tight", pad_inches=0.08, facecolor="white")
         plt.close(fig)

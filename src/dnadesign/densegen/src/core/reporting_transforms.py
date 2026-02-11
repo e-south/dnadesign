@@ -49,8 +49,9 @@ def _explode_used(df: pd.DataFrame) -> pd.DataFrame:
         input_name = str(row.get(input_col) or "")
         plan_name = str(row.get(plan_col) or "")
         library_index = int(row.get(lib_index_col) or 0)
-        library_hash = str(row.get(lib_hash_col) or "").strip()
-        if not library_hash:
+        raw_library_hash = str(row.get(lib_hash_col) or "").strip()
+        library_hash = raw_library_hash
+        if not raw_library_hash:
             library_hash = f"{input_name}|{plan_name}|{library_index}"
         for entry in used_detail:
             tf = str(entry.get("tf") or "").strip()
@@ -61,6 +62,7 @@ def _explode_used(df: pd.DataFrame) -> pd.DataFrame:
                 {
                     "solution_id": seq_id,
                     "library_hash": library_hash,
+                    "library_hash_is_fallback": not bool(raw_library_hash),
                     "library_index": library_index,
                     "plan": plan_name,
                     "input_name": input_name,

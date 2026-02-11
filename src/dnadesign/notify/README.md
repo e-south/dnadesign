@@ -1,43 +1,65 @@
 # Notify
 
+Notify reads USR mutation events and posts selected events to webhook providers.
+
+## Contents
+- [At a glance](#at-a-glance)
+- [Fast operator path](#fast-operator-path)
+- [Read order](#read-order)
+- [Key boundary](#key-boundary)
+
 ## At a glance
 
-**Intent:** Consume USR JSONL mutation events and deliver filtered webhook notifications.
+Use Notify when you want:
+- restart-safe event watching with cursor offsets
+- action/tool filtering before delivery
+- spool-and-drain behavior for unstable network environments
 
-**When to use:**
-- Monitor DenseGen/USR pipelines through USR events.
-- Send milestone or failure notifications to Slack/Discord/generic webhooks.
-- Run restart-safe watchers with cursor state.
-- Buffer failed deliveries with spool/drain workflows.
+Do not use Notify for:
+- DenseGen runtime telemetry (`outputs/meta/events.jsonl`)
+- generic log shipping
 
-**When not to use:**
-- Do not point Notify at DenseGen runtime event logs.
-- Do not use Notify as a generic log shipper.
+Contract:
+- input stream is USR `<dataset>/.events.log` JSONL
+- Notify treats USR events as an external, versioned contract
+- without `--profile`, choose exactly one webhook source:
+  - `--url`
+  - `--url-env`
+  - `--secret-ref`
 
-**Boundary / contracts:**
-- Input contract is USR `<dataset>/.events.log` only.
-- Notify does not import USR internals; it consumes JSONL as an external contract.
-- In direct CLI mode (without `--profile`), webhook source must be exactly one of `--url`, `--url-env`, or `--secret-ref`.
-- Default profile privacy is strict (`include_args=false`, `include_context=false`, `include_raw_event=false`).
+Default profile privacy is strict:
+- `include_args=false`
+- `include_context=false`
+- `include_raw_event=false`
 
-**Start here:**
-- [Notify USR events operator manual](../../../docs/notify/usr_events.md) (canonical operators runbook)
-- [Slack wizard onboarding](../../../docs/notify/usr_events.md#slack-wizard-onboarding-3-minutes)
-- [DenseGen -> USR -> Notify demo](../densegen/docs/demo/demo_usr_notify.md) (local end-to-end demo)
+## Fast operator path
 
-## Start here
+```bash
+# Validate a saved profile.
+uv run notify profile doctor --profile outputs/notify.profile.json
 
-- Operators manual (watch/spool/drain plus flags): [Notify USR events operator manual](../../../docs/notify/usr_events.md)
-- Minimal operator flow: [Minimal operator quickstart](../../../docs/notify/usr_events.md#minimal-operator-quickstart)
-- Secure endpoint setup + deployed pressure test flow: [Secure webhook setup](../../../docs/notify/usr_events.md#secure-webhook-setup-real-endpoints)
-- Wizard onboarding flow: [Slack wizard onboarding](../../../docs/notify/usr_events.md#slack-wizard-onboarding-3-minutes)
-- USR event schema (source of truth for fields): [USR event log schema](../usr/README.md#event-log-schema)
-- DenseGen end-to-end demo: [DenseGen -> USR -> Notify demo](../densegen/docs/demo/demo_usr_notify.md)
+# Preview payloads without posting.
+uv run notify usr-events watch --profile outputs/notify.profile.json --dry-run
+
+# Run live watcher.
+uv run notify usr-events watch --profile outputs/notify.profile.json --follow
+
+# Retry failed payloads from spool.
+uv run notify spool drain --profile outputs/notify.profile.json
+```
+
+## Read order
+
+- Canonical operators runbook: [docs/notify/usr_events.md](../../../docs/notify/usr_events.md)
+- Module-local pointer page: [docs/usr_events.md](docs/usr_events.md)
+- Wizard onboarding: [Slack wizard onboarding](../../../docs/notify/usr_events.md#slack-wizard-onboarding-3-minutes)
+- End-to-end stack demo: [DenseGen -> USR -> Notify demo](../densegen/docs/demo/demo_usr_notify.md)
+- USR event schema source: [USR event log schema](../usr/README.md#event-log-schema)
 
 ## Key boundary
 
-Notify consumes USR events:
+Notify reads:
 - `<usr_root>/<dataset>/.events.log`
 
-Notify does not read DenseGen runtime events:
+Notify does not read:
 - `densegen/.../outputs/meta/events.jsonl`

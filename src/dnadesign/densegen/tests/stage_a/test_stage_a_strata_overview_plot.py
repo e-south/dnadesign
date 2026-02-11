@@ -15,9 +15,26 @@ import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
 import pytest
+from matplotlib.colors import to_hex
 from matplotlib.offsetbox import AnchoredText
 
 from dnadesign.densegen.src.viz.plotting import _build_stage_a_strata_overview_figure, _draw_tier_markers
+
+
+def _vertical_marker_lines(ax, *, linestyle: str) -> list[matplotlib.lines.Line2D]:
+    lines: list[matplotlib.lines.Line2D] = []
+    for line in ax.lines:
+        xdata = list(line.get_xdata())
+        if len(xdata) < 2:
+            continue
+        if float(xdata[0]) != float(xdata[-1]):
+            continue
+        if line.get_linestyle() != linestyle:
+            continue
+        if to_hex(line.get_color()).lower() != "#222222":
+            continue
+        lines.append(line)
+    return lines
 
 
 def test_stage_a_strata_overview_axes_and_legend() -> None:
@@ -262,5 +279,119 @@ def test_draw_tier_markers_caps_height_and_adds_box() -> None:
         box = next(artist for artist in ax.artists if isinstance(artist, AnchoredText))
         edge = box.patch.get_edgecolor()
         assert edge[-1] == 0.0
+    finally:
+        fig.clf()
+
+
+def test_stage_a_strata_excludes_background_regulators_from_fimo_panels() -> None:
+    matplotlib.use("Agg", force=True)
+    sampling = {
+        "backend": "fimo",
+        "tier_scheme": "pct_0.1_1_9",
+        "eligibility_rule": "best_hit_score > 0 (and has at least one FIMO hit)",
+        "retention_rule": "top_n_sites_by_best_hit_score",
+        "fimo_thresh": 1.0,
+        "eligible_score_hist": [
+            {
+                "regulator": "regA",
+                "edges": [0.0, 2.0, 4.0],
+                "counts": [2, 1],
+                "tier0_score": 4.0,
+                "tier1_score": 2.0,
+                "tier2_score": 1.0,
+                "tier_fractions": [0.001, 0.01, 0.09],
+                "tier_fractions_source": "default",
+            },
+            {
+                "regulator": "background",
+                "edges": [0.0, 1.0, 2.0],
+                "counts": [1, 1],
+                "tier0_score": 2.0,
+                "tier1_score": 1.5,
+                "tier2_score": 1.0,
+                "tier_fractions": [0.001, 0.01, 0.09],
+                "tier_fractions_source": "default",
+            },
+        ],
+    }
+    pool_df = pd.DataFrame(
+        {
+            "tf": ["regA", "regA", "background"],
+            "tfbs": ["AAAAAA", "AAAAAT", "CCCCCC"],
+            "best_hit_score": [3.8, 2.2, 1.1],
+        }
+    )
+
+    fig, axes_left, ax_right = _build_stage_a_strata_overview_figure(
+        input_name="demo_input",
+        pool_df=pool_df,
+        sampling=sampling,
+        style={},
+    )
+
+    try:
+        assert len(axes_left) == 1
+        legend = ax_right.get_legend()
+        assert legend is not None
+        labels = [text.get_text().lower() for text in legend.texts]
+        assert "background" not in labels
+    finally:
+        fig.clf()
+
+
+def test_stage_a_strata_marks_worst_retained_percentile_with_single_solid_lollipop() -> None:
+    matplotlib.use("Agg", force=True)
+    sampling = {
+        "backend": "fimo",
+        "tier_scheme": "pct_0.1_1_9",
+        "eligibility_rule": "best_hit_score > 0 (and has at least one FIMO hit)",
+        "retention_rule": "top_n_sites_by_best_hit_score",
+        "fimo_thresh": 1.0,
+        "eligible_score_hist": [
+            {
+                "regulator": "regA",
+                "edges": [0.0, 2.0, 4.0, 6.0],
+                "counts": [1, 2, 1],
+                "tier0_score": 5.6,
+                "tier1_score": 4.5,
+                "tier2_score": 2.2,
+                "tier_fractions": [0.001, 0.01, 0.09],
+                "tier_fractions_source": "default",
+            },
+            {
+                "regulator": "regB",
+                "edges": [0.0, 2.0, 4.0, 6.0],
+                "counts": [2, 1, 1],
+                "tier0_score": 5.2,
+                "tier1_score": 3.8,
+                "tier2_score": 1.8,
+                "tier_fractions": [0.001, 0.01, 0.09],
+                "tier_fractions_source": "default",
+            },
+        ],
+    }
+    pool_df = pd.DataFrame(
+        {
+            "tf": ["regA", "regA", "regB", "regB"],
+            "tfbs": ["AAAAAA", "AAAAAT", "CCCCCC", "CCCCCG"],
+            "best_hit_score": [5.4, 4.9, 1.1, 3.0],
+        }
+    )
+
+    fig, axes_left, _ = _build_stage_a_strata_overview_figure(
+        input_name="demo_input",
+        pool_df=pool_df,
+        sampling=sampling,
+        style={},
+    )
+    try:
+        dashed_a = _vertical_marker_lines(axes_left[0], linestyle="--")
+        dashed_b = _vertical_marker_lines(axes_left[1], linestyle="--")
+        solid_a = _vertical_marker_lines(axes_left[0], linestyle="-")
+        solid_b = _vertical_marker_lines(axes_left[1], linestyle="-")
+        assert len(dashed_a) >= 3
+        assert len(dashed_b) >= 3
+        assert len(solid_a) == 0
+        assert len(solid_b) == 1
     finally:
         fig.clf()

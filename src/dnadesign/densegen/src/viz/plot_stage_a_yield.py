@@ -110,7 +110,7 @@ def _build_stage_a_yield_bias_figure(
     font_size = float(style.get("font_size", 12.0))
     label_size = float(style.get("label_size", font_size))
     tick_size = float(style.get("tick_size", label_size))
-    left_x_tick_size = tick_size * 0.88
+    left_x_tick_size = tick_size * 0.82
     title_pad = 9
     with mpl.rc_context(rc):
         if fig is None:
@@ -277,6 +277,8 @@ def _build_stage_a_yield_bias_figure(
                 )
             if idx == len(reg_order) - 1:
                 ax.set_xlabel("Core position")
+            else:
+                ax.tick_params(labelbottom=False)
         if show_column_titles:
             axes_right[0].set_title(
                 "Core positional entropy (top vs diversified)",

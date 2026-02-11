@@ -1,11 +1,20 @@
 ## USR Sync over SSH
 
 This page covers syncing USR datasets between local and remote hosts (for example, BU SCC).
-For USR concepts and CLI basics, see `../../README.md`.
+For USR concepts and CLI basics, see [../../README.md](../../README.md).
+Commands below use `uv run usr ...` to match this monorepo workflow.
+
+### Contents
+- [0) HPC to local pattern (datasets are not in git)](#0-hpc-to-local-pattern-datasets-are-not-in-git)
+- [1) Prepare SSH keys (one-time)](#1-prepare-ssh-keys-one-time)
+- [2) Configure a USR remote](#2-configure-a-usr-remote)
+- [3) Daily sync workflow](#3-daily-sync-workflow)
+- [4) Dataset directory mode + file mode](#4-dataset-directory-mode-file-mode)
+- [5) Key rotation hygiene](#5-key-rotation-hygiene)
 
 ---
 
-### 0) HPC <-> local pattern (datasets are not in git)
+### 0) HPC to local pattern (datasets are not in git)
 
 Recommended storage layout:
 - Local datasets root outside the repo, for example `~/data/usr_datasets/`
@@ -13,7 +22,7 @@ Recommended storage layout:
 
 Notes:
 - Scratch may have retention/purge policies; use project storage for long-lived datasets.
-- Keep code in git, keep datasets in USR roots, and sync with `usr diff/pull/push`.
+- Keep code in git, keep datasets in USR roots, and sync with `uv run usr diff/pull/push`.
 
 ---
 
@@ -22,25 +31,31 @@ Notes:
 Check whether you already have an Ed25519 key:
 
 ```bash
+# Check if an Ed25519 key already exists.
 ls -l ~/.ssh/id_ed25519 ~/.ssh/id_ed25519.pub 2>/dev/null || echo "no Ed25519 key yet"
 ```
 
 Generate one if needed:
 
 ```bash
+# Generate a new Ed25519 key.
 ssh-keygen -t ed25519 -C "<you>@<host>" -f ~/.ssh/id_ed25519
+
+# Lock private key permissions.
 chmod 600 ~/.ssh/id_ed25519
 ```
 
 Install your public key on the remote host:
 
 ```bash
+# Copy public key to remote host.
 ssh-copy-id -i ~/.ssh/id_ed25519.pub <user>@<host>
 ```
 
 macOS keychain convenience:
 
 ```bash
+# Start agent and add key to macOS keychain.
 eval "$(ssh-agent -s)"
 ssh-add --apple-use-keychain ~/.ssh/id_ed25519
 ```
@@ -67,22 +82,29 @@ Host <alias>
 `USR_REMOTES_PATH` is required.
 
 ```bash
+# Set remote config path for USR CLI commands.
 export USR_REMOTES_PATH="$HOME/.config/dnadesign/usr-remotes.yaml"
-usr remotes wizard \
+
+# Create remote profile.
+uv run usr remotes wizard \
   --preset bu-scc \
   --name bu-scc \
   --user <user> \
   --host scc1.bu.edu \
   --base-dir /project/<user>/densegen_runs/outputs/usr_datasets
 
-usr remotes doctor --remote bu-scc
+# Validate remote profile wiring.
+uv run usr remotes doctor --remote bu-scc
 ```
 
 Inspect remote config:
 
 ```bash
-usr remotes list
-usr remotes show bu-scc
+# List configured remotes.
+uv run usr remotes list
+
+# Show one remote in detail.
+uv run usr remotes show bu-scc
 ```
 
 File-based config example:
@@ -114,19 +136,22 @@ Rule: run the command on the machine where you want files to end up.
 Preview:
 
 ```bash
-usr diff densegen/my_dataset bu-scc
+# Preview local-vs-remote differences.
+uv run usr diff densegen/my_dataset bu-scc
 ```
 
 Pull remote -> local:
 
 ```bash
-usr pull densegen/my_dataset bu-scc -y
+# Pull remote dataset into local machine.
+uv run usr pull densegen/my_dataset bu-scc -y
 ```
 
 Push local -> remote:
 
 ```bash
-usr push densegen/my_dataset bu-scc -y
+# Push local dataset to remote machine.
+uv run usr push densegen/my_dataset bu-scc -y
 ```
 
 Useful flags:
@@ -144,9 +169,14 @@ Useful flags:
 Use dataset directory mode when you have an explicit dataset path outside `--root`:
 
 ```bash
-usr diff /path/to/outputs/usr_datasets/densegen/demo_hpc bu-scc
-usr pull /path/to/outputs/usr_datasets/densegen/demo_hpc bu-scc -y
-usr push /path/to/outputs/usr_datasets/densegen/demo_hpc bu-scc -y
+# Diff dataset directory path outside --root.
+uv run usr diff /path/to/outputs/usr_datasets/densegen/demo_hpc bu-scc
+
+# Pull dataset directory by explicit path.
+uv run usr pull /path/to/outputs/usr_datasets/densegen/demo_hpc bu-scc -y
+
+# Push dataset directory by explicit path.
+uv run usr push /path/to/outputs/usr_datasets/densegen/demo_hpc bu-scc -y
 ```
 
 Use file mode when syncing a single file.
@@ -167,15 +197,18 @@ remotes:
 Examples:
 
 ```bash
-usr diff permuter/run42/records.parquet bu-scc
-usr pull permuter/run42/records.parquet bu-scc -y
+# Diff one file by repo-relative path.
+uv run usr diff permuter/run42/records.parquet bu-scc
+
+# Pull one file by repo-relative path.
+uv run usr pull permuter/run42/records.parquet bu-scc -y
 
 # If local repo root is not configured
-usr pull permuter/run42/records.parquet bu-scc \
+uv run usr pull permuter/run42/records.parquet bu-scc \
   --repo-root /path/to/local/dnadesign -y
 
 # If remote path mapping cannot be inferred
-usr pull permuter/run42/records.parquet bu-scc \
+uv run usr pull permuter/run42/records.parquet bu-scc \
   --remote-path /path/to/remote/dnadesign/src/dnadesign/permuter/run42/records.parquet -y
 ```
 
@@ -200,7 +233,10 @@ BU transfer-heavy option:
 ### 5) Key rotation hygiene
 
 ```bash
+# Generate replacement key.
 ssh-keygen -t ed25519 -C "<you>@<host>" -f ~/.ssh/id_ed25519_new
+
+# Install replacement public key on remote.
 ssh-copy-id -i ~/.ssh/id_ed25519_new.pub <user>@<host>
 ```
 
@@ -209,6 +245,7 @@ Then update `~/.ssh/config` and remove old keys when ready.
 Keep permissions strict:
 
 ```bash
+# Keep key permissions strict.
 chmod 600 ~/.ssh/id_*
 chmod 700 ~/.ssh
 ```

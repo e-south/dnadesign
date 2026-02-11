@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from dnadesign.densegen.src.core.sampler import TFSampler
 
@@ -46,3 +47,23 @@ def test_generate_binding_site_library_required_tfs() -> None:
     )
     assert len(sites) == 3
     assert "TF2" in labels
+
+
+def test_generate_binding_site_library_rejects_duplicate_sequences_across_regulators() -> None:
+    df = pd.DataFrame(
+        {
+            "tf": ["TF1", "TF2"],
+            "tfbs": ["AAAA", "AAAA"],
+            "tfbs_core": ["AAAA", "AAAA"],
+        }
+    )
+    sampler = TFSampler(df, np.random.default_rng(11))
+    with pytest.raises(ValueError, match="Unique TFBS pool exhausted"):
+        sampler.generate_binding_site_library(
+            2,
+            cover_all_tfs=False,
+            unique_binding_sites=True,
+            unique_binding_cores=False,
+            relax_on_exhaustion=False,
+            sampling_strategy="tf_balanced",
+        )

@@ -2,41 +2,42 @@
 
 This runbook is BU SCC specific.
 
-Platform-level BU SCC docs:
-- `docs/hpc/bu_scc_install.md`
-- `docs/hpc/bu_scc_batch_notify.md`
-
 Intent:
-- run DenseGen on BU SCC with SGE/qsub
-- store outputs in USR dataset layout
+- run DenseGen with SGE (`qsub`)
+- write outputs to USR dataset layout
 - watch USR `.events.log` with Notify
-- sync datasets between SCC and local with USR remotes
+- sync datasets between SCC and local using USR remotes
 
-Boundary contract:
-- Notify input is USR `<dataset>/.events.log`
-- DenseGen `outputs/meta/events.jsonl` is diagnostics only
+Platform docs:
+- [docs/hpc/bu_scc_install.md](../../../../../docs/hpc/bu_scc_install.md)
+- [docs/hpc/bu_scc_batch_notify.md](../../../../../docs/hpc/bu_scc_batch_notify.md)
+
+## Boundary contract
+
+- Notify input: USR `<dataset>/.events.log`
+- DenseGen `outputs/meta/events.jsonl`: diagnostics only
 
 ---
 
 ## 1) Connect to SCC
 
 ```bash
+# Standard SCC login.
 ssh <BU_USERNAME>@scc1.bu.edu
-# If your client needs it for Duo:
+
+# Optional Duo-friendly variant (if your client needs it).
 # ssh -o PasswordAuthentication=no <BU_USERNAME>@scc1.bu.edu
 ```
 
-Reference:
+References:
 - [BU SCC SSH access](https://www.bu.edu/tech/support/research/system-usage/connect-scc/ssh/)
-
-OnDemand is also supported for shell/file workflows:
 - [SCC OnDemand](https://www.bu.edu/tech/support/research/system-usage/connect-scc/scc-ondemand/)
 
 ---
 
-## 2) Prepare workspace + config
+## 2) Prepare workspace config
 
-Use project/scratch storage and keep the USR root in workspace `outputs/`:
+Keep USR root inside workspace `outputs/`:
 
 ```yaml
 densegen:
@@ -54,7 +55,7 @@ densegen:
 
 ---
 
-## 3) Submit SGE job
+## 3) Submit DenseGen SGE job
 
 `run_densegen.sh`:
 
@@ -69,82 +70,89 @@ densegen:
 
 set -euo pipefail
 
+# Point to workspace config.
 CONFIG="/project/$USER/densegen_runs/bu_scc_demo/config.yaml"
 
-export USR_ACTOR_TOOL=densegen
-export USR_ACTOR_RUN_ID="${JOB_ID}_${SGE_TASK_ID:-0}"
+# Validate config + solver.
+uv run dense validate-config --probe-solver -c "$CONFIG"
 
+# Run generation in batch mode.
 uv run dense run --no-plot -c "$CONFIG"
 ```
 
 Submit:
 
 ```bash
+# Submit job to SGE queue.
 qsub run_densegen.sh
 ```
 
-Reference:
-- [BU SCC submitting jobs](https://www.bu.edu/tech/support/research/system-usage/running-jobs/submitting-jobs/)
-- [BU SCC batch script examples](https://www.bu.edu/tech/support/research/system-usage/running-jobs/batch-script-examples/)
-
 ---
 
-## 4) Watch events with Notify
-
-Run from login shell or OnDemand shell:
+## 4) Inspect run and resolve USR event path
 
 ```bash
-uv run notify profile wizard \
-  --profile outputs/notify.profile.json \
-  --provider slack \
-  --events /project/$USER/densegen_runs/bu_scc_demo/outputs/usr_datasets/densegen/bu_scc_demo/.events.log \
-  --secret-source auto \
-  --preset densegen
+# Show run summary with events and library details.
+uv run dense inspect run --events --library -c /project/$USER/densegen_runs/bu_scc_demo/config.yaml
 
-uv run notify profile doctor --profile outputs/notify.profile.json
-uv run notify usr-events watch --profile outputs/notify.profile.json --follow
+# Print exact USR .events.log path for Notify.
+uv run dense inspect run --usr-events-path -c /project/$USER/densegen_runs/bu_scc_demo/config.yaml
 ```
 
 ---
 
-## 5) Transfer datasets back to local
-
-Configure remotes once on local:
+## 5) Configure Notify watcher
 
 ```bash
+# Export webhook URL for Notify.
+export DENSEGEN_WEBHOOK="https://example.com/webhook"
+
+# Create profile from USR events path.
+uv run notify profile wizard \
+  --profile /project/$USER/densegen_runs/bu_scc_demo/outputs/notify.profile.json \
+  --provider slack \
+  --events /project/$USER/densegen_runs/bu_scc_demo/outputs/usr_datasets/densegen/bu_scc_demo/.events.log \
+  --cursor /project/$USER/densegen_runs/bu_scc_demo/outputs/notify.cursor \
+  --spool-dir /project/$USER/densegen_runs/bu_scc_demo/outputs/notify_spool \
+  --secret-source env \
+  --url-env DENSEGEN_WEBHOOK \
+  --only-tools densegen \
+  --only-actions densegen_health,densegen_flush_failed,materialize
+
+# Validate profile.
+uv run notify profile doctor --profile /project/$USER/densegen_runs/bu_scc_demo/outputs/notify.profile.json
+
+# Preview without delivery.
+uv run notify usr-events watch --profile /project/$USER/densegen_runs/bu_scc_demo/outputs/notify.profile.json --dry-run
+
+# Run live watcher.
+uv run notify usr-events watch --profile /project/$USER/densegen_runs/bu_scc_demo/outputs/notify.profile.json --follow
+```
+
+---
+
+## 6) Sync USR dataset between SCC and local
+
+Run this on the machine where you want files to end up.
+
+```bash
+# Point USR to your remotes config.
 export USR_REMOTES_PATH="$HOME/.config/dnadesign/usr-remotes.yaml"
 
-uv run usr remotes wizard \
-  --preset bu-scc \
-  --name bu-scc \
-  --user <BU_USERNAME> \
-  --host scc1.bu.edu \
-  --base-dir /project/<BU_USERNAME>/densegen_runs/bu_scc_demo/outputs/usr_datasets
-
+# Create/check BU SCC remote.
+uv run usr remotes wizard --preset bu-scc --name bu-scc --user <BU_USERNAME> --base-dir /project/<BU_USERNAME>/densegen_runs/outputs/usr_datasets
 uv run usr remotes doctor --remote bu-scc
+
+# Preview differences.
+uv run usr diff densegen/bu_scc_demo bu-scc
+
+# Pull from SCC to local.
 uv run usr pull densegen/bu_scc_demo bu-scc -y
 ```
 
-For transfer-heavy jobs, BU provides `scc-globus.bu.edu` and download-node workflows (`qsub -l download`):
-- [BU SCC transfer node docs](https://www.bu.edu/tech/support/research/system-usage/transferring-files/cloud-applications/)
+For deeper sync details, see:
+- [../../../usr/docs/operations/sync.md](../../../usr/docs/operations/sync.md)
 
 ---
 
-## 6) Array job pattern
-
-```bash
-#!/bin/bash -l
-#$ -N densegen_array
-#$ -cwd
-#$ -j y
-#$ -o densegen_array.$JOB_ID.$TASK_ID.out
-#$ -t 1-16
-
-set -euo pipefail
-
-CONFIG="/project/$USER/densegen_runs/run_${SGE_TASK_ID}/config.yaml"
-export USR_ACTOR_TOOL=densegen
-export USR_ACTOR_RUN_ID="${JOB_ID}_${SGE_TASK_ID}"
-
-uv run dense run --no-plot -c "$CONFIG"
-```
+@e-south

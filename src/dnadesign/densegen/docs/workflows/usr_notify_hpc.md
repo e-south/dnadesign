@@ -1,42 +1,38 @@
 # DenseGen -> USR -> Notify on HPC
 
-This runbook is for the operational stack:
+This runbook covers the operational stack on HPC:
 
-DenseGen (generator) -> USR (canonical store plus `.events.log`) -> Notify (webhook delivery).
+DenseGen (generator) -> USR (canonical store + event log) -> Notify (webhook delivery)
 
-For BU SCC platform operations, use:
-- `docs/hpc/bu_scc_install.md`
-- `docs/hpc/bu_scc_batch_notify.md`
+For BU SCC platform specifics, also read:
+- [docs/hpc/bu_scc_install.md](../../../../../docs/hpc/bu_scc_install.md)
+- [docs/hpc/bu_scc_batch_notify.md](../../../../../docs/hpc/bu_scc_batch_notify.md)
 
-Boundary contract:
-- DenseGen runtime diagnostics: `outputs/meta/events.jsonl` (DenseGen-only)
-- USR mutation events: `<usr_root>/<dataset>/.events.log` (Notify input)
+## Boundary contract
 
-Notify reads USR `.events.log` only.
+- DenseGen runtime telemetry: `outputs/meta/events.jsonl` (DenseGen diagnostics)
+- USR mutation stream: `<usr_root>/<dataset>/.events.log` (Notify input)
 
----
-
-## 1) BU SCC quick prerequisites
-
-BU SCC uses SGE (`qsub`) for batch jobs and `#$` directives in job scripts.
-Reference: [BU SCC submitting jobs](https://www.bu.edu/tech/support/research/system-usage/running-jobs/submitting-jobs/)
-
-Use `#!/bin/bash -l` in batch scripts when you need `module` commands.
-Reference: [BU SCC submitting jobs](https://www.bu.edu/tech/support/research/system-usage/running-jobs/submitting-jobs/)
-
-Connection and auth:
-- SSH login host example: `scc1.bu.edu`
-- Some clients need `-o PasswordAuthentication=no` for Duo workflows
-Reference: [BU SCC SSH access](https://www.bu.edu/tech/support/research/system-usage/connect-scc/ssh/)
-
-Operational placement:
-- Run compute workloads with `qsub`
-- Run Notify watcher on a login-node shell or SCC OnDemand shell
-Reference: [SCC OnDemand](https://www.bu.edu/tech/support/research/system-usage/connect-scc/scc-ondemand/)
+Notify consumes USR `.events.log` only.
 
 ---
 
-## 2) SGE job script (single run)
+## 1) HPC prerequisites (BU SCC quick notes)
+
+- BU SCC batch system: SGE (`qsub` + `#$` directives)
+- Use `#!/bin/bash -l` for module-aware job scripts
+- Run compute jobs with `qsub`; run Notify watchers in login/OnDemand shells
+
+References:
+- [BU SCC submitting jobs](https://www.bu.edu/tech/support/research/system-usage/running-jobs/submitting-jobs/)
+- [BU SCC SSH access](https://www.bu.edu/tech/support/research/system-usage/connect-scc/ssh/)
+- [SCC OnDemand](https://www.bu.edu/tech/support/research/system-usage/connect-scc/scc-ondemand/)
+
+---
+
+## 2) Example SGE job script (single run)
+
+`run_densegen.sh`:
 
 ```bash
 #!/bin/bash -l
@@ -49,27 +45,28 @@ Reference: [SCC OnDemand](https://www.bu.edu/tech/support/research/system-usage/
 
 set -euo pipefail
 
+# Point to your workspace config.
 CONFIG="/project/$USER/densegen_runs/demo_hpc/config.yaml"
 
-export USR_ACTOR_TOOL=densegen
-export USR_ACTOR_RUN_ID="${JOB_ID}_${SGE_TASK_ID:-0}"
-
+# Validate config + solver before running.
 uv run dense validate-config --probe-solver -c "$CONFIG"
+
+# Run generation (no plotting in batch job).
 uv run dense run --no-plot -c "$CONFIG"
 ```
-
-Common SGE env vars available in jobs: `JOB_ID`, `JOB_NAME`, `NSLOTS`, `SGE_TASK_ID`.
-Reference: [BU SCC submitting jobs](https://www.bu.edu/tech/support/research/system-usage/running-jobs/submitting-jobs/)
 
 Submit:
 
 ```bash
+# Submit the batch job.
 qsub run_densegen.sh
 ```
 
 ---
 
-## 3) SGE array job pattern
+## 3) Example SGE array pattern
+
+`run_densegen_array.sh`:
 
 ```bash
 #!/bin/bash -l
@@ -78,92 +75,80 @@ qsub run_densegen.sh
 #$ -j y
 #$ -o densegen_array.$JOB_ID.$TASK_ID.out
 #$ -t 1-16
-#$ -l h_rt=04:00:00
-#$ -pe omp 4
 
 set -euo pipefail
 
-CONFIG_DIR="/project/$USER/densegen_runs"
-CONFIG="$CONFIG_DIR/run_${SGE_TASK_ID}/config.yaml"
+# Template workspace config; task index can select per-task config if needed.
+CONFIG_TEMPLATE="/project/$USER/densegen_runs/task_${SGE_TASK_ID}/config.yaml"
 
-export USR_ACTOR_TOOL=densegen
-export USR_ACTOR_RUN_ID="${JOB_ID}_${SGE_TASK_ID}"
+# Validate each task config.
+uv run dense validate-config --probe-solver -c "$CONFIG_TEMPLATE"
 
-uv run dense run --no-plot -c "$CONFIG"
+# Run each task.
+uv run dense run --no-plot -c "$CONFIG_TEMPLATE"
 ```
 
-Reference: [BU SCC batch script examples](https://www.bu.edu/tech/support/research/system-usage/running-jobs/batch-script-examples/)
+Submit:
+
+```bash
+# Submit array job.
+qsub run_densegen_array.sh
+```
 
 ---
 
-## 4) Where Notify runs
+## 4) Resolve USR event path for Notify
 
-Run Notify separately from the batch job, tailing the USR event log produced by DenseGen:
+After DenseGen run completes:
 
 ```bash
-uv run notify usr-events watch \
-  --events /project/$USER/densegen_runs/demo_hpc/outputs/usr_datasets/densegen/demo_hpc/.events.log \
-  --cursor /project/$USER/densegen_runs/notify/demo_hpc.cursor \
+# Print exact USR .events.log path for this run.
+uv run dense inspect run --usr-events-path -c /project/$USER/densegen_runs/demo_hpc/config.yaml
+```
+
+Use this path in Notify. Do not use `outputs/meta/events.jsonl`.
+
+---
+
+## 5) Configure and run Notify watcher
+
+```bash
+# Export webhook URL through env var (example name).
+export DENSEGEN_WEBHOOK="https://example.com/webhook"
+
+# Build a Notify profile against the USR event stream.
+uv run notify profile wizard \
+  --profile /project/$USER/densegen_runs/demo_hpc/outputs/notify.profile.json \
   --provider slack \
+  --events /project/$USER/densegen_runs/demo_hpc/outputs/usr_datasets/densegen/demo_hpc/.events.log \
+  --cursor /project/$USER/densegen_runs/demo_hpc/outputs/notify.cursor \
+  --spool-dir /project/$USER/densegen_runs/demo_hpc/outputs/notify_spool \
+  --secret-source env \
   --url-env DENSEGEN_WEBHOOK \
-  --only-actions densegen_health,densegen_flush_failed,materialize \
-  --follow
-```
+  --only-tools densegen \
+  --only-actions densegen_health,densegen_flush_failed,materialize
 
-If login-shell lifecycle is unstable, run in SCC OnDemand shell.
-Reference: [SCC OnDemand](https://www.bu.edu/tech/support/research/system-usage/connect-scc/scc-ondemand/)
+# Validate profile wiring.
+uv run notify profile doctor --profile /project/$USER/densegen_runs/demo_hpc/outputs/notify.profile.json
+
+# Dry-run first.
+uv run notify usr-events watch --profile /project/$USER/densegen_runs/demo_hpc/outputs/notify.profile.json --dry-run
+
+# Run live watcher.
+uv run notify usr-events watch --profile /project/$USER/densegen_runs/demo_hpc/outputs/notify.profile.json --follow
+```
 
 ---
 
-## 5) Dataset transfer back to local
+## 6) Spool and drain (network-safe pattern)
 
-Datasets are not Git-tracked; transfer them with USR remotes sync:
+If webhook delivery fails, keep `--spool-dir` enabled and drain later from a stable network host.
 
 ```bash
-export USR_REMOTES_PATH="$HOME/.config/dnadesign/usr-remotes.yaml"
-
-uv run usr remotes wizard \
-  --preset bu-scc \
-  --name bu-scc \
-  --user "$USER" \
-  --host scc1.bu.edu \
-  --base-dir /project/$USER/densegen_runs/demo_hpc/outputs/usr_datasets
-
-uv run usr remotes doctor --remote bu-scc
-uv run usr diff densegen/demo_hpc bu-scc
-uv run usr pull densegen/demo_hpc bu-scc -y
+# Drain previously spooled payload files.
+uv run notify spool drain --profile /project/$USER/densegen_runs/demo_hpc/outputs/notify.profile.json
 ```
-
-For transfer-heavy workflows, BU provides a data transfer node (`scc-globus.bu.edu`) and `qsub -l download` workflows.
-Reference: [BU SCC file transfer guide](https://www.bu.edu/tech/support/research/system-usage/transferring-files/cloud-applications/)
 
 ---
 
-## Common pitfalls
-
-- Watching the wrong event log: Notify consumes USR `.events.log`, not DenseGen `outputs/meta/events.jsonl`.
-- Running DenseGen from login nodes: submit compute runs with `qsub`.
-- Missing registry: USR output requires a valid `registry.yaml` at the USR root.
-- Implicit config selection: always pass `-c` in HPC/CI scripts.
-
----
-
-## Appendix: SLURM variant (non-BU clusters)
-
-Use this only on non-BU clusters that run Slurm.
-
-```bash
-#!/usr/bin/env bash
-#SBATCH --job-name=densegen
-#SBATCH --array=0-31
-#SBATCH --time=04:00:00
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=16G
-
-set -euo pipefail
-
-export USR_ACTOR_TOOL=densegen
-export USR_ACTOR_RUN_ID="${SLURM_JOB_ID}_${SLURM_ARRAY_TASK_ID}"
-
-uv run dense run --no-plot -c /path/to/config.yaml
-```
+@e-south

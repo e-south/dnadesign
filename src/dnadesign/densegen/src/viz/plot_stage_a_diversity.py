@@ -188,7 +188,10 @@ def _build_stage_a_diversity_figure(
             if x_base.size > 1:
                 tick_vals = x_base[::2]
             ax_left.set_xticks(tick_vals)
-            ax_left.tick_params(labelbottom=True)
+            if idx == len(regulators) - 1:
+                ax_left.tick_params(labelbottom=True)
+            else:
+                ax_left.tick_params(labelbottom=False)
             ax_left.tick_params(axis="x", labelsize=tick_size)
             if idx == 0:
                 ax_left.legend(
@@ -305,7 +308,10 @@ def _build_stage_a_diversity_figure(
                 )
             ax_right.set_ylabel("")
             ax_right.xaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=5))
-            ax_right.tick_params(labelbottom=True)
+            if idx == len(regulators) - 1:
+                ax_right.tick_params(labelbottom=True)
+            else:
+                ax_right.tick_params(labelbottom=False)
             ax_right.tick_params(axis="both", labelsize=tick_size)
         if axes_left and show_column_titles:
             axes_left[0].set_title("NN distance distribution", fontsize=subtitle_size, pad=title_pad)
@@ -337,7 +343,7 @@ def _build_stage_a_diversity_figure(
                 color="#111111",
             )
             fig.text(
-                right_bbox.x1 + 0.06,
+                right_bbox.x1 + 0.03,
                 y_center,
                 "Score vs max",
                 rotation="vertical",

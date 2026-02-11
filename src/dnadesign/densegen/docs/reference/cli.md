@@ -1,237 +1,234 @@
-## DenseGen CLI
+# DenseGen CLI reference
 
-DenseGen exposes a Typer CLI via `dense`. This page is an operator manual (commands + flags). For a progressive, end‑to‑end walkthrough, see the [demo](../demo/demo_pwm_artifacts.md).
+Use this page when you need exact command behavior and flag names.
+For end-to-end guided runs, use:
+- [binding-sites baseline demo](../demo/demo_binding_sites.md)
+- [three-TF PWM demo](../demo/demo_pwm_artifacts.md)
 
-### Contents
-- [Config resolution](#config-resolution) - where `dense` looks for config.yaml.
-- [`dense validate-config`](#dense-validate-config) - schema and sanity checks.
-- [`dense inspect inputs`](#dense-inspect-inputs) - Stage‑A input + sampling summary.
-- [`dense inspect plan`](#dense-inspect-plan) - resolved plan quotas.
-- [`dense inspect config`](#dense-inspect-config) - resolved inputs, outputs, Stage‑A/Stage‑B settings.
-- [`dense inspect run`](#dense-inspect-run) - summarize run manifests or list workspaces.
-- [`dense stage-a build-pool`](#dense-stage-a-build-pool) - build Stage‑A TFBS pools.
-- [`dense stage-b build-libraries`](#dense-stage-b-build-libraries) - build Stage‑B solver libraries.
-- [`dense workspace init`](#dense-workspace-init) - scaffold a workspace.
-- [`dense run`](#dense-run) - run Stage‑B sampling + optimization.
-- [`dense campaign-reset`](#dense-campaign-reset) - remove outputs for a clean rerun (hidden command).
-- [`dense plot`](#dense-plot) - render plots from outputs.
-- [`dense ls-plots`](#dense-ls-plots) - list available plots.
-- [`dense report`](#dense-report) - write audit-grade report summary.
+## Contents
+- [How to inspect CLI surface quickly](#how-to-inspect-cli-surface-quickly)
+- [Config resolution](#config-resolution)
+- [`dense validate-config`](#dense-validate-config)
+- [`dense inspect inputs`](#dense-inspect-inputs)
+- [`dense inspect plan`](#dense-inspect-plan)
+- [`dense inspect config`](#dense-inspect-config)
+- [`dense inspect run`](#dense-inspect-run)
+- [`dense stage-a build-pool`](#dense-stage-a-build-pool)
+- [`dense stage-b build-libraries`](#dense-stage-b-build-libraries)
+- [`dense workspace init`](#dense-workspace-init)
+- [`dense workspace where`](#dense-workspace-where)
+- [`dense run`](#dense-run)
+- [`dense campaign-reset`](#dense-campaign-reset)
+- [`dense plot`](#dense-plot)
+- [`dense ls-plots`](#dense-ls-plots)
+- [`dense report`](#dense-report)
 
----
+## How to inspect CLI surface quickly
 
-### Config resolution
+```bash
+# Show top-level commands.
+uv run dense --help
 
-- `-c, --config PATH` — config YAML path (global or per‑command).
-- If `-c/--config` is omitted, DenseGen resolves config in this order:
+# Show command-specific flags.
+uv run dense inspect run --help
+uv run dense stage-a build-pool --help
+uv run dense stage-b build-libraries --help
+```
+
+## Config resolution
+
+- `-c, --config PATH` is supported globally and on command groups.
+- If `--config` is omitted, DenseGen resolves config in this order:
   1. `DENSEGEN_CONFIG_PATH`
   2. `./config.yaml`
-- DenseGen does not scan parent directories or workspace candidates.
-- If no config is found in the two locations above, the CLI fails fast and requires explicit `-c`.
-- Input paths resolve against the config file directory.
-- Outputs/tables/logs/plots/report must resolve inside `outputs/` under `densegen.run.root`.
-- Config files must include `densegen.schema_version` (currently `2.9`) and `densegen.run`.
+- DenseGen does not scan parent directories.
+- If neither path exists, the command fails fast.
+- Input paths resolve relative to the config file directory.
+- Output paths must stay inside `outputs/` under `densegen.run.root`.
+- Config must include `densegen.schema_version` and `densegen.run`.
 
 Operational guidance:
-- For HPC and CI, always pass `-c /abs/path/to/config.yaml`.
-- In local interactive sessions, `./config.yaml` is safe when you run from the workspace root.
+- CI/HPC: pass `-c /abs/path/to/config.yaml`.
+- Local workspace shell: `./config.yaml` is usually enough.
 
----
+## `dense validate-config`
 
-### `dense validate-config`
-Validate the config YAML (schema + sanity checks). Fails fast on unknown keys or invalid values.
+Validates schema and config sanity checks.
 
-Options:
-- `--probe-solver` — also probe the solver backend (fails fast if unavailable).
+Key options:
+- `--probe-solver / --no-probe-solver`
+- `-c, --config PATH`
 
----
+## `dense inspect inputs`
 
-#### `dense inspect inputs`
-Print resolved inputs plus Stage‑A pool status.
+Shows resolved input sources plus Stage-A pool status.
 
-Options:
-- `--verbose` — show full source file lists.
-- `--absolute` — show absolute paths instead of workspace‑relative.
-- `--show-motif-ids` — show full motif IDs instead of short TF labels.
+Key options:
+- `--verbose`
+- `--absolute`
+- `--show-motif-ids`
+- `-c, --config PATH`
 
----
+## `dense inspect plan`
 
-#### `dense inspect plan`
-Print the resolved quota plan per constraint bucket.
+Shows resolved plan quotas by plan item.
 
----
+Key options:
+- `-c, --config PATH`
 
-#### `dense inspect config`
-Summarize outputs, Stage‑A sampling policy, Stage‑B sampling policy, and solver settings. Input sources are
-listed in `dense inspect inputs`.
+## `dense inspect config`
 
-Options:
-- `--show-constraints` — print full fixed elements per plan item.
-- `--probe-solver` — verify the solver backend before reporting.
-- `--absolute` — show absolute paths instead of workspace‑relative.
+Shows resolved output wiring, Stage-A/Stage-B sampling settings, and solver settings.
 
----
+Key options:
+- `--show-constraints`
+- `--probe-solver`
+- `--absolute`
+- `-c, --config PATH`
 
-#### `dense inspect run`
-Summarize a run manifest (`outputs/meta/run_manifest.json`) or list workspaces.
+## `dense inspect run`
 
-Options:
-- `--run` — workspace directory (defaults to `densegen.run.root` from config).
-- `--root` — list workspaces under a root directory.
-- `--limit` — limit workspaces displayed when using `--root`.
-- `--all` — include directories without `config.yaml` when using `--root`.
-- `--config` — config path (used to resolve run root when `--run` is not set).
-- `--absolute` — show absolute paths instead of workspace‑relative.
-- `--verbose` — show failure breakdown columns (constraint filters + duplicate solutions).
-- `--library` — include Stage‑B offered‑vs‑used summaries aggregated across all libraries.
-- `--show-tfbs` — include TFBS sequences in library summaries.
-- `--show-motif-ids` — show full motif IDs instead of short TF labels.
-- `--events` — show event summary (stalls/resamples, library rebuilds).
+Summarizes a run manifest, or lists workspaces under a root.
 
----
+Key options:
+- `--run, -r PATH`
+- `--root PATH`
+- `--limit INTEGER`
+- `--all`
+- `--absolute`
+- `--verbose`
+- `--library`
+- `--show-tfbs`
+- `--show-motif-ids`
+- `--events`
+- `--usr-events-path` (prints USR `.events.log` path and exits)
+- `-c, --config PATH`
 
-#### `dense stage-a build-pool`
-Build Stage‑A TFBS pools from inputs and write a pool manifest.
+Notes:
+- `--root` and `--usr-events-path` are mutually exclusive.
+- `--usr-events-path` requires a config that writes to USR outputs.
 
-Options:
-- `--out` — output directory relative to run root (default: `outputs/pools`; must be inside `outputs/`).
-- `--input/-i` — input name(s) to build (defaults to all).
-- `--fresh` — replace existing pool files (default is append + dedupe).
-- `--show-motif-ids` — show full motif IDs instead of short TF labels.
+## `dense stage-a build-pool`
+
+Builds Stage-A TFBS pools and pool metadata.
+
+Key options:
+- `--out TEXT` (default: `outputs/pools`)
+- `--n-sites INTEGER` (override Stage-A `n_sites` for PWM inputs)
+- `--batch-size INTEGER` (override Stage-A mining batch size)
+- `--max-seconds FLOAT` (override Stage-A mining max seconds)
+- `--input, -i TEXT` (repeatable)
+- `--fresh`
+- `--show-motif-ids`
+- `--verbose`
+- `-c, --config PATH`
 
 Outputs:
-- `pool_manifest.json`
-- `<input>__pool.parquet` per input
-- `outputs/pools/candidates/candidates.parquet` + `candidates_summary.parquet` (when candidate logging is enabled)
+- `outputs/pools/pool_manifest.json`
+- `outputs/pools/<input>__pool.parquet`
+- candidate artifacts (when candidate logging is enabled)
 
----
+## `dense stage-b build-libraries`
 
-#### `dense stage-b build-libraries`
-Build Stage‑B libraries (one per plan) from plan‑scoped pools derived from
-`generation.plan[].sampling.include_inputs`.
+Builds Stage-B libraries from Stage-A pools.
 
-Options:
-- `--out` — output directory relative to run root (default: `outputs/libraries`; must be inside `outputs/`).
-- `--pool` — pool directory from `stage-a build-pool` (defaults to `outputs/pools` in the workspace;
-  must be inside `outputs/`).
-- `--input/-i` — input name(s) to filter plan pools (defaults to all).
-- `--plan/-p` — plan item name(s) to build (defaults to all).
-- `--overwrite` — overwrite existing library artifacts (destructive).
-- `--append` — append new libraries to existing artifacts (cumulative). Requires that the existing
-  library manifest matches the current config hash and Stage‑A pool fingerprint; otherwise fails fast.
+Key options:
+- `--out TEXT` (default: `outputs/libraries`)
+- `--pool PATH` (default: `outputs/pools`)
+- `--input, -i TEXT` (repeatable)
+- `--plan, -p TEXT` (repeatable)
+- `--overwrite`
+- `--append`
+- `--show-motif-ids`
+- `-c, --config PATH`
 
 Behavior:
-- If library artifacts exist and neither `--overwrite` nor `--append` is provided, the command exits
-  non‑zero with an actionable error.
-- `--input` filters plans by membership: a plan is built only if its `include_inputs` contains all
-  requested input names.
-
-Output summary:
-- CLI output aggregates libraries per plan pool/plan and reports min/median/max for sites, TF counts, and bp totals.
-- Per-library details are written to the Parquet artifacts under `outputs/libraries/`.
+- If library artifacts already exist, pass either `--append` or `--overwrite`.
+- `--append` preserves previous artifacts and requires manifest compatibility.
 
 Outputs:
-- `library_builds.parquet`
-- `library_members.parquet`
-- `library_manifest.json`
+- `outputs/libraries/library_builds.parquet`
+- `outputs/libraries/library_members.parquet`
+- `outputs/libraries/library_manifest.json`
 
----
+## `dense workspace init`
 
-#### `dense workspace init`
-Stage a new workspace with `config.yaml`, `inputs/`, `outputs/`, plus `outputs/logs/`, `outputs/meta/`,
-`outputs/tables/`, `outputs/plots/`, and `outputs/report/`.
+Creates a run workspace with `config.yaml`, `inputs/`, and `outputs/` subfolders.
 
-Options:
-- `--id` — workspace identifier (directory name).
-- `--root` — workspace root directory (default: `src/dnadesign/densegen/workspaces` or `$DENSEGEN_WORKSPACE_ROOT`).
-- `--from-workspace` — packaged source workspace id (e.g., `demo_binding_sites`, `demo_meme_three_tfs`).
-- `--from-config` — source workspace config YAML to copy (path).
-- `--copy-inputs` — copy file-based inputs into `workspace/inputs` and rewrite paths.
-- `--output-mode` — output sink mode: `local` (parquet), `usr`, or `both`.
-- For `--output-mode usr|both`, DenseGen sets `output.usr.root` to `outputs/usr_datasets` and seeds
-  `outputs/usr_datasets/registry.yaml` when a repo registry seed file is available.
-
----
-
-#### `dense workspace where`
-Show effective workspace root and source-workspace root used by `dense workspace init`.
-
-Options:
-- `--format` — output format: `text` or `json`.
+Key options:
+- `--id, -i TEXT` (required)
+- `--root PATH`
+- `--from-workspace TEXT`
+- `--from-config PATH`
+- `--copy-inputs / --no-copy-inputs`
+- `--output-mode local|usr|both`
 
 Notes:
-- `workspace_root_source` reports whether the root came from `$DENSEGEN_WORKSPACE_ROOT`,
-  the repo default, or a cwd fallback.
-- `workspace_source_root` reports where packaged source workspaces are loaded from.
-- This command is useful when shell location and workspace location diverge.
+- `--output-mode usr|both` seeds `outputs/usr_datasets/registry.yaml` when a seed file is available.
 
----
+## `dense workspace where`
 
-#### `dense run`
-Run the pipeline (Stage‑B sampling → optimization → outputs) using existing Stage‑A pools.
+Shows effective workspace roots that `workspace init` will use.
 
-Options:
-- `--no-plot` — skip auto‑plotting even if `plots` is configured in YAML.
-- `--fresh` — delete the workspace `outputs/` directory before running.
-- `--resume` — resume from existing outputs in the workspace.
-- `--log-file PATH` — override the log file path. Otherwise DenseGen writes to
-  `logging.log_dir/<run_id>.log` inside the workspace. The override path must still resolve
-  inside `outputs/` under `densegen.run.root`.
-- `--show-tfbs` — include TFBS sequences in progress output.
-- `--show-solutions` — include full solution sequences in progress output.
+Key options:
+- `--format text|json`
 
-Notes:
-- `dense run` requires Stage‑A pools under `outputs/pools` by default. If they are missing or stale,
-  it rebuilds them automatically. Use `dense stage-a build-pool --fresh` to force a rebuild.
-- Stage‑A sampling uses FIMO; ensure `fimo` is on PATH (e.g., via `pixi run`).
-- If the workspace already has run outputs (e.g., `outputs/tables/*.parquet` or
-  `outputs/meta/run_state.json`), `dense run` resumes by default; use `--fresh` to reset outputs.
-  Stage‑A/Stage‑B artifacts in `outputs/pools` or `outputs/libraries` do not trigger this guard.
-- On `--resume`, plan-quota increases are auto-accepted when all other config fields are unchanged.
-- When using USR outputs, `--fresh` preserves `<output.usr.root>/registry.yaml` so reruns do not require re-seeding.
+## `dense run`
 
----
+Runs sampling, solving, output writing, and optional plotting.
 
-#### `dense campaign-reset`
-Remove the entire `outputs/` directory under the configured run root. This is a hidden command
-intended for demo and pressure‑testing workflows; it is not listed in `dense --help`.
-
-Options:
-- `--config` — config path (used to resolve run root).
+Key options:
+- `--no-plot`
+- `--fresh`
+- `--resume`
+- `--log-file PATH`
+- `--show-tfbs`
+- `--show-solutions`
+- `-c, --config PATH`
 
 Notes:
-- Inputs and configs are preserved; only run outputs/state are deleted.
+- If prior run outputs exist, default behavior is resume-like unless `--fresh` is set.
+- Missing/stale Stage-A pools are rebuilt automatically.
+- For FIMO-backed inputs, ensure `fimo` is available (for example via `pixi run ...`).
 
----
+## `dense campaign-reset`
 
-#### `dense plot`
-Generate plots from existing outputs.
+Hidden command for demo/pressure-test workflows.
+Deletes run outputs while preserving config and inputs.
 
-Options:
-- `--only NAME1,NAME2` — run a subset of plots by name.
-- `--absolute` — show absolute paths instead of workspace‑relative.
+Key options:
+- `-c, --config PATH`
 
----
+## `dense plot`
 
-#### `dense ls-plots`
-List available plot names and descriptions.
+Generates plots from existing outputs.
 
----
+Key options:
+- `--only NAME1,NAME2`
+- `--absolute`
+- `-c, --config PATH`
 
-#### `dense report`
-Generate an audit-grade report summary for a run. Outputs are run‑scoped under `outputs/report/` by default.
+## `dense ls-plots`
 
-Options:
-- `--run` — run directory (defaults to config run root).
-- `--out` — output directory relative to run root (default: `outputs/report`; must be inside `outputs/`).
-- `--absolute` — show absolute paths instead of workspace‑relative.
-- `--format` — `json`, `md`, `html`, or `all` (comma‑separated allowed).
-- `--strict/--fail-on-missing` — fail if core report inputs are missing.
-- `--plots` — `none` or `include` (default: `none`). When `include`, report links plots from
-  `outputs/plots/plot_manifest.json` (run `dense plot` first).
+Lists available plot names and descriptions.
+
+## `dense report`
+
+Generates run-scoped report artifacts under `outputs/report/`.
+
+Key options:
+- `--run, -r PATH`
+- `--out TEXT` (default: `outputs/report`)
+- `--absolute`
+- `--plots none|include`
+- `--strict, --fail-on-missing`
+- `--format, -f json|md|html|all`
+- `-c, --config PATH`
 
 Report outputs:
-- `report.json`, `report.md`, `report.html`
+- `report.json`
+- `report.md`
+- `report.html`
 
 ---
 

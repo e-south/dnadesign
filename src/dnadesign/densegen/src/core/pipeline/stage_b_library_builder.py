@@ -264,11 +264,10 @@ class LibraryBuilder:
     ) -> None:
         if str(self.sampling_cfg.library_source).lower() == "artifact":
             return
-        if self.library_build_rows is None or self.library_member_rows is None:
-            return
         library_index = int(sampling_info.get("library_index") or 0)
         library_hash = str(sampling_info.get("library_hash") or "")
         library_id = library_hash or f"{self.source_label}:{self.plan_item.name}:{library_index}"
+        library_size = int(sampling_info.get("library_size") or len(library_tfbs))
         row = {
             "created_at": datetime.now(timezone.utc).isoformat(),
             "input_name": self.source_label,
@@ -278,7 +277,7 @@ class LibraryBuilder:
             "library_hash": library_hash,
             "pool_strategy": sampling_info.get("pool_strategy"),
             "library_sampling_strategy": sampling_info.get("library_sampling_strategy"),
-            "library_size": int(sampling_info.get("library_size") or len(library_tfbs)),
+            "library_size": library_size,
             "achieved_length": sampling_info.get("achieved_length"),
             "relaxed_cap": sampling_info.get("relaxed_cap"),
             "final_cap": sampling_info.get("final_cap"),
@@ -291,7 +290,8 @@ class LibraryBuilder:
             "infeasible": bool(infeasible),
             "sequence_length": int(sequence_length),
         }
-        self.library_build_rows.append(row)
+        if self.library_build_rows is not None:
+            self.library_build_rows.append(row)
         if self.events_path is not None:
             try:
                 _emit_event(
@@ -302,7 +302,7 @@ class LibraryBuilder:
                         "plan_name": self.plan_item.name,
                         "library_index": library_index,
                         "library_hash": library_hash,
-                        "library_size": int(row.get("library_size") or len(library_tfbs)),
+                        "library_size": library_size,
                     },
                 )
             except Exception:
@@ -326,20 +326,21 @@ class LibraryBuilder:
                     )
                 except Exception:
                     log.debug("Failed to emit LIBRARY_SAMPLING_PRESSURE event.", exc_info=True)
-        for idx, tfbs in enumerate(library_tfbs):
-            self.library_member_rows.append(
-                {
-                    "library_id": library_id,
-                    "library_hash": library_hash,
-                    "library_index": library_index,
-                    "input_name": self.source_label,
-                    "plan_name": self.plan_item.name,
-                    "position": int(idx),
-                    "tf": library_tfs[idx] if idx < len(library_tfs) else "",
-                    "tfbs": tfbs,
-                    "tfbs_id": library_tfbs_ids[idx] if idx < len(library_tfbs_ids) else None,
-                    "motif_id": library_motif_ids[idx] if idx < len(library_motif_ids) else None,
-                    "site_id": library_site_ids[idx] if idx < len(library_site_ids) else None,
-                    "source": library_sources[idx] if idx < len(library_sources) else None,
-                }
-            )
+        if self.library_member_rows is not None:
+            for idx, tfbs in enumerate(library_tfbs):
+                self.library_member_rows.append(
+                    {
+                        "library_id": library_id,
+                        "library_hash": library_hash,
+                        "library_index": library_index,
+                        "input_name": self.source_label,
+                        "plan_name": self.plan_item.name,
+                        "position": int(idx),
+                        "tf": library_tfs[idx] if idx < len(library_tfs) else "",
+                        "tfbs": tfbs,
+                        "tfbs_id": library_tfbs_ids[idx] if idx < len(library_tfbs_ids) else None,
+                        "motif_id": library_motif_ids[idx] if idx < len(library_motif_ids) else None,
+                        "site_id": library_site_ids[idx] if idx < len(library_site_ids) else None,
+                        "source": library_sources[idx] if idx < len(library_sources) else None,
+                    }
+                )

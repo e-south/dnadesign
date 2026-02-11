@@ -12,12 +12,12 @@ densegen:
       path: inputs/motif_artifacts/lexA__meme_suite_meme__lexA_CTGTATAWAWWHACA.json
       sampling:
         strategy: stochastic
-        n_sites: 200
+        n_sites: 250
         mining:
           batch_size: 5000
           budget:
             mode: fixed_candidates
-            candidates: 100000
+            candidates: 1000000
             growth_factor: 1.25
           log_every_batches: 1
         length:
@@ -25,12 +25,13 @@ densegen:
           range: [16, 20]
         uniqueness:
           key: core
+          cross_regulator_core_collisions: error
         selection:
           policy: mmr
           rank_by: score_norm
-          alpha: 0.5
+          alpha: 0.35
           pool:
-            min_score_norm: 0.85
+            min_score_norm: 0.75
             max_candidates: null
             relevance_norm: minmax_raw_score
         tier_fractions: [0.001, 0.01, 0.09]
@@ -39,12 +40,12 @@ densegen:
       path: inputs/motif_artifacts/cpxR__meme_suite_meme__cpxR_MANWWHTTTAM.json
       sampling:
         strategy: stochastic
-        n_sites: 200
+        n_sites: 250
         mining:
           batch_size: 5000
           budget:
             mode: fixed_candidates
-            candidates: 100000
+            candidates: 1000000
             growth_factor: 1.25
           log_every_batches: 1
         length:
@@ -52,12 +53,13 @@ densegen:
           range: [16, 20]
         uniqueness:
           key: core
+          cross_regulator_core_collisions: error
         selection:
           policy: mmr
           rank_by: score_norm
-          alpha: 0.5
+          alpha: 0.35
           pool:
-            min_score_norm: 0.85
+            min_score_norm: 0.75
             max_candidates: null
             relevance_norm: minmax_raw_score
         tier_fractions: [0.001, 0.01, 0.09]
@@ -66,12 +68,12 @@ densegen:
       path: inputs/motif_artifacts/baeR__meme_suite_meme__baeR_WWDTYTCTSCMNNA.json
       sampling:
         strategy: stochastic
-        n_sites: 200
+        n_sites: 250
         mining:
           batch_size: 5000
           budget:
             mode: fixed_candidates
-            candidates: 100000
+            candidates: 1000000
             growth_factor: 1.25
           log_every_batches: 1
         length:
@@ -79,19 +81,20 @@ densegen:
           range: [16, 20]
         uniqueness:
           key: core
+          cross_regulator_core_collisions: error
         selection:
           policy: mmr
           rank_by: score_norm
-          alpha: 0.5
+          alpha: 0.35
           pool:
-            min_score_norm: 0.85
+            min_score_norm: 0.75
             max_candidates: null
             relevance_norm: minmax_raw_score
         tier_fractions: [0.001, 0.01, 0.09]
     - name: background
       type: background_pool
       sampling:
-        n_sites: 200
+        n_sites: 500
         mining:
           batch_size: 20000
           budget:

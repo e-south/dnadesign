@@ -1,7 +1,23 @@
 ## DenseGen Demo: Three-TF PWM Workflow
 
-This is the canonical DenseGen demo for Cruncher-derived PWM artifacts (`lexA`, `cpxR`, `baeR`) using a USR output sink.
+This is the canonical DenseGen demo for PWM-driven generation.
+It uses three TFs (`lexA`, `cpxR`, `baeR`) and writes results to a local USR dataset.
+
 If you are new to DenseGen, run [demo_binding_sites.md](demo_binding_sites.md) first.
+
+### What this demo teaches
+
+- how to stage a workspace from a packaged template
+- how to build Stage-A pools from motif artifacts
+- how to run generation to quota, then resume safely
+- how to inspect outputs, wire Notify, and render reports
+
+Subprocess map for this demo:
+
+1. Stage-A pool build from motif artifacts
+2. Stage-B library sampling per plan
+3. Solver loop to plan quotas
+4. Output materialization to Parquet/USR + plots/report
 
 ### Contents
 
@@ -26,115 +42,142 @@ You need:
 2. MEME Suite (`fimo` on `PATH`)
 3. A supported solver backend (`CBC` or `GUROBI`)
 
-From repo root:
+Run from repo root:
 
 ```bash
+# Install Python dependencies from the lockfile.
 uv sync --locked
+
+# Install pixi environment (includes MEME Suite tooling).
 pixi install
+
+# Confirm FIMO is available.
 pixi run fimo --version
 ```
 
 ## 1) Stage workspace
 
 ```bash
+# Create a new workspace from the packaged three-TF demo.
 uv run dense workspace init --id meme_three_tfs_trial --from-workspace demo_meme_three_tfs --copy-inputs --output-mode usr
+
+# Move into the workspace.
 cd src/dnadesign/densegen/workspaces/meme_three_tfs_trial
-```
 
-If `meme_three_tfs_trial` already exists, choose a new `--id` or remove the existing workspace directory first.
-
-`workspace init --output-mode usr` seeds `outputs/usr_datasets/registry.yaml` in the workspace when a repo registry seed file is available.
-
-Optional wrapper (if you want shorter commands):
-
-```bash
-unalias dense 2>/dev/null
-# pixi-backed
-dense() { pixi run dense -- "$@"; }
-# or uv-backed
-# dense() { uv run dense "$@"; }
-```
-
-Set a config variable once and pass it explicitly:
-
-```bash
+# Store config path once for the rest of the demo.
 CONFIG="$PWD/config.yaml"
 ```
+
+If `meme_three_tfs_trial` already exists, choose a new `--id` or remove that workspace first.
+
+`workspace init --output-mode usr` also seeds `outputs/usr_datasets/registry.yaml`
+when a repo registry seed file is available.
+
+If `fimo` is only available through pixi on your machine, run the same command flow with
+`pixi run dense -- ...` instead of `uv run dense ...`.
 
 ## 2) Validate and inspect
 
 ```bash
-dense validate-config --probe-solver -c "$CONFIG"
-dense inspect inputs -c "$CONFIG"
-dense inspect plan -c "$CONFIG"
-dense inspect config -c "$CONFIG"
+# Validate config structure and probe solver availability.
+uv run dense validate-config --probe-solver -c "$CONFIG"
+
+# Inspect resolved Stage-A inputs.
+uv run dense inspect inputs -c "$CONFIG"
+
+# Inspect resolved plan/quota settings.
+uv run dense inspect plan -c "$CONFIG"
+
+# Inspect full resolved runtime config summary.
+uv run dense inspect config -c "$CONFIG"
 ```
 
 ## 3) Build Stage-A pools
 
-The demo ships motif artifact JSON files in `inputs/motif_artifacts/`.
-To regenerate those files from source data, use:
+The workspace already includes motif artifact JSON files under `inputs/motif_artifacts/`.
 
+If you need to regenerate those files from upstream data, follow:
 - [../workflows/cruncher_pwm_pipeline.md](../workflows/cruncher_pwm_pipeline.md)
 
-Build Stage-A pools:
+Now build Stage-A pools:
 
 ```bash
-dense stage-a build-pool --fresh -c "$CONFIG"
+# Build pools from motif artifacts, replacing any prior pool outputs.
+uv run dense stage-a build-pool --fresh -c "$CONFIG"
 ```
 
-Quick Stage-A plot:
+What this packaged demo does in Stage-A:
+
+- For each PWM input (`lexA`, `cpxR`, `baeR`), DenseGen mines **1,000,000** candidates and
+  retains **250** TFBS rows after scoring, dedupe, and MMR selection.
+- For the `background` input, DenseGen retains **500** rows.
+- In plain terms:
+  - `mining.budget.candidates` = search effort
+  - `n_sites` = final retained pool size
+
+This split lets you increase search coverage without forcing the solver to handle a much
+larger retained pool.
+
+Optional quick check plot:
 
 ```bash
-dense plot --only stage_a_summary -c "$CONFIG"
+# Render only Stage-A summary plots.
+uv run dense plot --only stage_a_summary -c "$CONFIG"
 ```
 
 ## 4) Run generation to quota
 
 ```bash
-dense run --fresh --no-plot -c "$CONFIG"
+# Run from a clean outputs state and skip auto-plotting for speed.
+uv run dense run --fresh --no-plot -c "$CONFIG"
 ```
 
-`demo_meme_three_tfs` defaults to `logging.progress_style: auto`, so DenseGen
-adapts progress output by terminal capability (screen/stream/summary) without
-manual terminal setup.
+`demo_meme_three_tfs` uses `logging.progress_style: auto`, so progress output adapts to
+terminal capabilities automatically.
 
-Useful debug flags:
+Useful debug variants:
 
 ```bash
-dense run --show-tfbs --no-plot -c "$CONFIG"
-dense run --show-solutions --no-plot -c "$CONFIG"
+# Show TFBS names in progress output.
+uv run dense run --show-tfbs --no-plot -c "$CONFIG"
+
+# Show full solution sequences in progress output.
+uv run dense run --show-solutions --no-plot -c "$CONFIG"
 ```
 
 ## 5) Resume with no changes (safety check)
 
-Rerunning with `--resume` should be a no-op once quota is met:
+After quota is met, a resume run should be a no-op:
 
 ```bash
-dense run --resume --no-plot -c "$CONFIG"
+# Confirm resume behavior with no config changes.
+uv run dense run --resume --no-plot -c "$CONFIG"
 ```
 
 ## 6) Increase quota and resume
 
 To generate more sequences in the same workspace:
 
-1. Increase one or more `generation.plan[*].quota` values in `config.yaml` (example: each plan quota 10 -> 13).
-2. Resume:
+1. edit `config.yaml`
+2. increase one or more `generation.plan[*].quota` values (for example 10 -> 13)
+3. resume
 
 ```bash
-dense run --resume --no-plot -c "$CONFIG"
+# Continue from prior state after quota-only plan increase.
+uv run dense run --resume --no-plot -c "$CONFIG"
 ```
 
 Rules:
 
-- Plan quotas must not decrease.
-- Quota-only plan increases are auto-accepted on resume.
-- Any other config change fails fast and requires `dense run --fresh` or `dense campaign-reset`.
+- plan quotas must not decrease
+- quota-only plan increases are allowed on resume
+- any other config change requires a fresh run (`uv run dense run --fresh`) or reset (`uv run dense campaign-reset`)
 
 ## 7) Inspect outputs
 
 ```bash
-dense inspect run --events --library -c "$CONFIG"
+# Show run summary with event and library diagnostics.
+uv run dense inspect run --events --library -c "$CONFIG"
 ```
 
 Key files:
@@ -150,20 +193,24 @@ Key files:
 
 ## 8) Wire Notify to a real endpoint (deployed pressure test)
 
-Notify setup and secret-handling details live in:
+Notify setup details (profiles, secrets, spool/drain) are in:
+- [../../../../../docs/notify/usr_events.md](../../../../../docs/notify/usr_events.md)
 
-- `../../../../../docs/notify/usr_events.md`
-
-Slack-first pressure test flow:
+Slack-first flow:
 
 ```bash
+# Capture webhook URL securely in the current shell.
 read -rsp "Webhook URL: " DENSEGEN_WEBHOOK; echo
+
+# Export so Notify can read it by env var.
 export DENSEGEN_WEBHOOK
 ```
 
 ```bash
-EVENTS_PATH="$(dense inspect run --usr-events-path -c "$CONFIG")"
+# Resolve the exact USR events log for this run.
+EVENTS_PATH="$(uv run dense inspect run --usr-events-path -c "$CONFIG")"
 
+# Create a Notify profile with DenseGen-focused defaults.
 uv run notify profile wizard \
   --profile outputs/notify.profile.json \
   --provider slack \
@@ -175,88 +222,99 @@ uv run notify profile wizard \
 ```
 
 ```bash
+# Validate profile wiring.
 uv run notify profile doctor --profile outputs/notify.profile.json
+
+# Preview payloads without sending.
 uv run notify usr-events watch --profile outputs/notify.profile.json --dry-run
 ```
 
 If payloads look correct, remove `--dry-run` to send for real.
 
-Then trigger more events by increasing quota and resuming:
+To generate additional events, increase quota and resume:
 
 ```bash
-dense run --resume --no-plot -c "$CONFIG"
+# Emit more USR events by continuing generation.
+uv run dense run --resume --no-plot -c "$CONFIG"
 ```
 
 Email note: use `--provider generic` with your email relay webhook endpoint.
 
 ## 9) Plot and report
 
-DenseGen automatically uses a repo-local Matplotlib cache at `.cache/matplotlib/densegen`.
-Set `MPLCONFIGDIR` only if you need to override that location.
-
-Then run:
+DenseGen uses a repo-local Matplotlib cache at `.cache/matplotlib/densegen`.
+Set `MPLCONFIGDIR` only if you need to override this path.
 
 ```bash
-dense plot --only stage_a_summary,placement_map -c "$CONFIG"
-dense report --plots include -c "$CONFIG"
+# Render core plots for this run.
+uv run dense plot --only stage_a_summary,placement_map -c "$CONFIG"
+
+# Build report files and include plot links.
+uv run dense report --plots include -c "$CONFIG"
 ```
 
 ## 10) Reset workspace
 
 ```bash
-dense campaign-reset -c "$CONFIG"
+# Delete outputs and run state only.
+uv run dense campaign-reset -c "$CONFIG"
 ```
 
-This removes `outputs/` and keeps `config.yaml` plus `inputs/`.
+This keeps `config.yaml` and `inputs/` in place.
 
 ## 11) Troubleshooting
 
 ### `fimo: command not found`
 
 ```bash
+# Verify FIMO from pixi environment.
 pixi run fimo --version
 ```
 
 ### Solver backend not available
 
 ```bash
-dense validate-config --probe-solver -c "$CONFIG"
+# Probe solver and fail fast if unavailable.
+uv run dense validate-config --probe-solver -c "$CONFIG"
 ```
 
 ### `logging.progress_style=screen requires ...`
 
-`progress_style: screen` is strict and needs an interactive terminal with cursor controls.
+`progress_style: screen` requires an interactive terminal with cursor controls.
 
 For interactive shells:
 
 ```bash
+# Set terminal type and rerun.
 export TERM=xterm-256color
-dense run --fresh --no-plot -c "$CONFIG"
+uv run dense run --fresh --no-plot -c "$CONFIG"
 ```
 
-For non-interactive runs (CI, redirected logs), set `densegen.logging.progress_style: stream` in `config.yaml`.
+For non-interactive runs (CI, redirected logs), set `densegen.logging.progress_style: stream`.
 
 ### USR registry missing
 
 DenseGen fails fast if `outputs/usr_datasets/registry.yaml` is missing or incompatible.
-`workspace init --output-mode usr` seeds this file. If you changed `output.usr.root`, ensure the new root has a valid `registry.yaml`.
+`workspace init --output-mode usr` seeds this file. If you changed `output.usr.root`,
+ensure that new root has a valid `registry.yaml`.
 
 ### Resume/config mismatch
 
-If config changed beyond allowed quota growth, start clean:
+If config changed beyond allowed quota growth, restart clean:
 
 ```bash
-dense run --fresh --no-plot -c "$CONFIG"
-# or
-dense campaign-reset -c "$CONFIG"
+# Fresh run path.
+uv run dense run --fresh --no-plot -c "$CONFIG"
+
+# Full outputs reset path.
+uv run dense campaign-reset -c "$CONFIG"
 ```
 
 ### Regulator label mismatch
 
-Check exact labels used by Stage-A:
-
 ```bash
-dense inspect inputs --show-motif-ids -c "$CONFIG"
+# Inspect exact Stage-A labels used for constraint matching.
+uv run dense inspect inputs --show-motif-ids -c "$CONFIG"
 ```
 
 ---

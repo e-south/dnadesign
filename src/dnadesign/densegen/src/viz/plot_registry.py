@@ -15,8 +15,8 @@ from __future__ import annotations
 PLOT_SPECS = {
     "placement_map": {
         "fn": "plot_placement_map",
-        "description": "Stage-B fingerprint: per-position occupancy + TFBS leaderboard.",
-        "requires": ["outputs", "composition", "config", "libraries"],
+        "description": "Stage-B fingerprint: per-position occupancy across accepted outputs.",
+        "requires": ["outputs", "composition", "config"],
     },
     "tfbs_usage": {
         "fn": "plot_tfbs_usage",
@@ -26,7 +26,7 @@ PLOT_SPECS = {
     "run_health": {
         "fn": "plot_run_health",
         "description": "Run health summary (outcomes, waste pressure, reason families, plan quota progress).",
-        "requires": ["attempts", "config"],
+        "requires": ["outputs", "composition", "attempts", "config"],
     },
     "stage_a_summary": {
         "fn": "plot_stage_a_summary",

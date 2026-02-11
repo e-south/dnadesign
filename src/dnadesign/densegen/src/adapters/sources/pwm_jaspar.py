@@ -21,7 +21,12 @@ from ...config import PWMSamplingConfig
 from ...core.artifacts.ids import hash_pwm_motif, hash_tfbs_id
 from ...core.run_paths import candidates_root
 from .base import BaseDataSource, resolve_path
-from .pwm_sampling import sample_pwm_sites, sampling_kwargs_from_config, validate_mmr_core_length
+from .pwm_sampling import (
+    enforce_cross_regulator_core_collisions,
+    sample_pwm_sites,
+    sampling_kwargs_from_config,
+    validate_mmr_core_length,
+)
 from .stage_a.stage_a_sampling_utils import normalize_background
 from .stage_a.stage_a_types import PWMMotif
 
@@ -108,6 +113,7 @@ class PWMJasparDataSource(BaseDataSource):
                 raise ValueError(f"No motifs matched motif_ids in {jaspar_path}")
 
         sampling_kwargs = sampling_kwargs_from_config(self.sampling)
+        collision_mode = str(sampling_kwargs.get("cross_regulator_core_collisions") or "warn")
         selection_cfg = sampling_kwargs.get("selection")
         selection_policy = str(getattr(selection_cfg, "policy", None) or "top_score")
         bgfile = sampling_kwargs.get("bgfile")
@@ -205,5 +211,11 @@ class PWMJasparDataSource(BaseDataSource):
 
         import pandas as pd
 
+        enforce_cross_regulator_core_collisions(
+            all_rows,
+            mode=collision_mode,
+            input_name=self.input_name,
+            source_kind="pwm_jaspar",
+        )
         df = pd.DataFrame(all_rows)
         return entries, df, summaries

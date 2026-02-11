@@ -1,85 +1,131 @@
 ## DenseGen — Dense Array Generator
 
-DenseGen places transcription factor binding sites (TFBSs) into synthetic sequences by driving the [dense-arrays](https://github.com/e-south/dense-arrays) ILP solver.
+DenseGen builds synthetic DNA arrays by placing TF binding sites under explicit constraints.
 
-Pipeline stages:
+If you want one sentence:
+DenseGen takes Stage-A site pools, samples Stage-B solver libraries, solves layouts, and writes
+run artifacts you can audit.
 
-1. **Stage-A sampling**: build TFBS pools from inputs (PWM mining via [FIMO](https://meme-suite.org/meme/doc/fimo.html), binding sites, or sequence sources).
-2. **Stage-B library sampling**: choose per-run solver libraries from Stage-A pools.
-3. **Optimization + postprocess**: solve sequence layouts under plan constraints.
-4. **Artifacts**: write tables, manifests, plots, and reports under `outputs/`.
+### What DenseGen is for
 
-Start with the demo index:
-- [docs/demo/README.md](docs/demo/README.md)
+- generating quota-bounded sequence libraries with explicit composition constraints
+- testing promoter/fixed-element constraints alongside TF placements
+- producing diagnostics (attempts, manifests, plots, reports)
 
-If you are integrating the full stack (DenseGen -> USR -> Notify), start here:
-- [docs/demo/demo_usr_notify.md](docs/demo/demo_usr_notify.md)
+### What DenseGen is not for
 
-Note on event logs:
-- DenseGen writes runtime diagnostics to `outputs/meta/events.jsonl`.
-- Notify consumes USR dataset mutation events from `<usr_root>/<dataset>/.events.log`.
+- canonical storage (use USR)
+- webhook/alert delivery (use Notify)
+
+### Event boundary (important)
+
+- DenseGen runtime diagnostics: `outputs/meta/events.jsonl`
+- Notify input stream: USR `<usr_root>/<dataset>/.events.log`
+
+Notify consumes USR `.events.log` only.
 
 ---
 
 ### Contents
 
-- [Choose a demo](#choose-a-demo)
-- [Quick start (binding-sites baseline)](#quick-start-binding-sites-baseline)
-- [Quick start (canonical PWM)](#quick-start-canonical-pwm)
-- [Documentation map](#documentation-map)
+- [Pick your first run](#pick-your-first-run)
+- [Runtime subprocess flow](#runtime-subprocess-flow)
+- [Quick start: binding-sites baseline](#quick-start-binding-sites-baseline)
+- [Quick start: canonical PWM path](#quick-start-canonical-pwm-path)
+- [Docs map](#docs-map)
 
 ---
 
-### Choose a demo
+### Pick your first run
 
-- **Binding-sites baseline demo** (recommended first): no added plan constraints.
-  - [docs/demo/demo_binding_sites.md](docs/demo/demo_binding_sites.md)
-- **Canonical Cruncher PWM flow** (main workflow): three-TF motif artifacts from Cruncher.
-  - [docs/workflows/cruncher_pwm_pipeline.md](docs/workflows/cruncher_pwm_pipeline.md)
-  - [docs/demo/demo_pwm_artifacts.md](docs/demo/demo_pwm_artifacts.md)
+- Fastest learning path: [docs/demo/demo_binding_sites.md](docs/demo/demo_binding_sites.md)
+- Canonical PWM workflow: [docs/demo/demo_pwm_artifacts.md](docs/demo/demo_pwm_artifacts.md)
+- Full stack (DenseGen -> USR -> Notify): [docs/demo/demo_usr_notify.md](docs/demo/demo_usr_notify.md)
 
-### Quick start (binding-sites baseline)
+### Runtime subprocess flow
 
-From the repo root:
+DenseGen runtime is intentionally sequential:
+
+1. Stage-A: build or load input pools (`dense stage-a build-pool`, or auto-built by `dense run`)
+2. Stage-B: sample plan-scoped libraries from Stage-A pools (`dense stage-b build-libraries`, or auto-built by `dense run`)
+3. Solve: generate arrays under plan constraints to quota (`dense run`)
+4. Materialize diagnostics: write tables/manifests/events, then optional plots/report (`dense plot`, `dense report`)
+
+If you keep this order in mind, most diagnostics become easy to interpret:
+
+- pool quality issues are Stage-A
+- coverage/composition issues are Stage-B sampling + solver outcomes
+- storage/event delivery issues are output-target specific (Parquet vs USR)
+
+### Quick start: binding-sites baseline
+
+Run from repo root:
 
 ```bash
+# Install dependencies from lockfile.
 uv sync --locked
+
+# Create a workspace from the binding-sites demo template.
 uv run dense workspace init --id binding_sites_trial --from-workspace demo_binding_sites --copy-inputs --output-mode local
+
+# Enter the workspace.
 cd src/dnadesign/densegen/workspaces/binding_sites_trial
+
+# Validate config + solver.
 uv run dense validate-config --probe-solver
+
+# Run generation from a clean state.
 uv run dense run --fresh
+
+# Inspect run diagnostics.
 uv run dense inspect run --library --events
 ```
 
-### Quick start (canonical PWM)
+### Quick start: canonical PWM path
 
-The canonical demo requires MEME Suite (`fimo` on `PATH`) in addition to solver availability.
+This path needs MEME Suite (`fimo`) in addition to solver availability.
 
 ```bash
+# Install Python dependencies.
 uv sync --locked
+
+# Install pixi environment (includes MEME tooling).
 pixi install
+
+# Confirm FIMO is available.
 pixi run fimo --version
 
+# Create workspace from the packaged three-TF demo.
 uv run dense workspace init --id meme_three_tfs_trial --from-workspace demo_meme_three_tfs --copy-inputs --output-mode usr
+
+# Enter workspace.
 cd src/dnadesign/densegen/workspaces/meme_three_tfs_trial
+
+# Validate config + solver.
 uv run dense validate-config --probe-solver
+
+# Build Stage-A pools.
 uv run dense stage-a build-pool --fresh
+
+# Run generation from a clean state.
 uv run dense run --fresh --no-plot
+
+# Inspect library + event diagnostics.
 uv run dense inspect run --library --events
 ```
 
-To generate additional sequences later, increase quotas in `config.yaml` and resume with:
+To continue generation later, increase plan quotas in `config.yaml`, then run:
 
 ```bash
+# Resume from existing outputs/state.
 uv run dense run --resume --no-plot
 ```
 
 ---
 
-### Documentation map
+### Docs map
 
 Guides:
-
 - [docs/guide/workspace.md](docs/guide/workspace.md)
 - [docs/guide/inputs.md](docs/guide/inputs.md)
 - [docs/guide/sampling.md](docs/guide/sampling.md)
@@ -88,16 +134,15 @@ Guides:
 - [docs/guide/postprocess.md](docs/guide/postprocess.md)
 
 Reference:
-
 - [docs/reference/cli.md](docs/reference/cli.md)
 - [docs/reference/config.md](docs/reference/config.md)
 - [docs/reference/outputs.md](docs/reference/outputs.md)
 - [docs/reference/motif_artifacts.md](docs/reference/motif_artifacts.md)
 
 Workflows:
-
 - [docs/workflows/cruncher_pwm_pipeline.md](docs/workflows/cruncher_pwm_pipeline.md)
 - [docs/workflows/usr_notify_hpc.md](docs/workflows/usr_notify_hpc.md)
+- [docs/workflows/bu_scc_end_to_end.md](docs/workflows/bu_scc_end_to_end.md)
 
 ---
 

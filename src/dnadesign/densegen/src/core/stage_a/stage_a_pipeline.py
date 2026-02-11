@@ -487,6 +487,7 @@ def run_stage_a_pipeline(
             selection_pool_min_score_norm_used=None,
             selection_pool_capped=False,
             selection_pool_cap_value=None,
+            selection_pool_sequences=tuple(cand.seq for cand in ranked),
         )
     retained_tier_counts = [0, 0, 0, 0]
     for cand in picked:
@@ -744,6 +745,8 @@ def run_stage_a_pipeline(
             else None,
             selection_pool_capped=selection_diag.selection_pool_capped if selection_diag else None,
             selection_pool_cap_value=selection_diag.selection_pool_cap_value if selection_diag else None,
+            selection_pool_target_size=selection_diag.selection_pool_target_size if selection_diag else None,
+            selection_pool_degenerate=selection_diag.selection_pool_degenerate if selection_diag else None,
             tier_target_fraction=budget_target_tier_fraction,
             tier_target_required_unique=tier_target_required_unique,
             tier_target_met=tier_target_met,
@@ -832,6 +835,10 @@ def run_stage_a_pipeline(
             else None,
             selection_pool_capped=selection_diag.selection_pool_capped if selection_diag is not None else None,
             selection_pool_cap_value=selection_diag.selection_pool_cap_value if selection_diag is not None else None,
+            selection_pool_target_size=selection_diag.selection_pool_target_size
+            if selection_diag is not None
+            else None,
+            selection_pool_degenerate=selection_diag.selection_pool_degenerate if selection_diag is not None else None,
             selection_score_norm_max_raw=selection_diag.selection_score_norm_max_raw
             if selection_diag is not None
             else None,

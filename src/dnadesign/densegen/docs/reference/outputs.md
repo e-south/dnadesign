@@ -1,6 +1,9 @@
-## DenseGen Output Formats
+# DenseGen output formats
 
-DenseGen can emit Parquet datasets (stored locally or in the sibling USR package).
+This page defines what DenseGen writes, where it writes it, and which event stream each
+consumer should read.
+
+DenseGen can emit Parquet outputs locally and/or write through USR.
 
 ### Contents
 - [Canonical IDs](#canonical-ids) - deterministic sequence identifiers.
@@ -8,7 +11,7 @@ DenseGen can emit Parquet datasets (stored locally or in the sibling USR package
 - [USR](#usr) - attach semantics and optional dependency.
 - [Metadata (common)](#metadata-common) - namespacing and core categories.
 - [Run-level manifests](#run-level-manifests) - run-level JSON summaries.
-- [Library manifests](#library-manifests) - libraries offered to the solver.
+- [Library provenance](#library-provenance-library-artifacts-attempts) - libraries offered to the solver.
 - [Source column](#source-column) - provenance string.
 - [Rejected solutions](#rejected-solutions) - constraint rejections audit.
 
@@ -74,6 +77,11 @@ does not (or IDs differ), DenseGen fails fast.
 ### Metadata (common)
 
 Keys are namespaced as `densegen__<key>`.
+
+Retention labels in the table:
+- `record_keep`: keep at record level for downstream analysis/provenance.
+- `record_conditional`: keep at record level when applicable.
+- `artifact_candidate`: better suited for run/library artifacts to avoid per-record redundancy.
 
 Curated record fields:
 
@@ -214,11 +222,13 @@ Core diagnostics plots (canonical set):
 - `stage_a_summary` — Stage-A pool diagnostics (interpretation in the sampling guide).
 - `placement_map` — Stage-B fingerprint: per-position occupancy/event counts across the final
   accepted sequences from `plots.source`, with overlaid categories for regulators and fixed elements (e.g., promoter -35/-10),
-  plus a TFBS allocation view (rank–frequency + cumulative share).
+  showing where motifs land along the sequence.
 - `run_health` — adaptive run diagnostics dashboard:
   outcome timeline by plan (discrete attempts for small runs, binned fractions for large runs),
-  acceptance/waste/duplicate rates, rejected/failed reason Pareto, and quota-aware accepted progress by plan.
-- `tfbs_usage` — TFBS allocation rank/distribution summary from accepted placements.
+  acceptance/waste/duplicate rates, rejected/failed reason Pareto, quota-aware accepted progress by plan,
+  compression-ratio distribution by plan, and regulator-by-length TFBS usage counts.
+- `tfbs_usage` — TFBS usage diagnostics from accepted placements: specific TFBS rank-count curve
+  plus cumulative share by regulator.
 
 The canonical `demo_meme_three_tfs` workspace defaults to all four plot families.
 
@@ -229,16 +239,18 @@ with outputs under `outputs/plots/stage_a/`:
 - `diversity.pdf`
 - `<input>__background_logo.pdf` (background pools only)
 
-`placement_map` writes two images under:
+`placement_map` writes one image under:
 `outputs/plots/stage_b/<plan>/` (or `outputs/plots/stage_b/<plan>/<input>/` when multiple non-redundant inputs map to the same plan)
 - `occupancy.pdf`
-- `tfbs_allocation.pdf`
 
 `tfbs_usage` writes one image into the same plan directory:
 `outputs/plots/stage_b/<plan>/tfbs_usage.pdf` (or under `<input>/` for multi-input plans)
 
 `run_health` writes:
+`outputs/plots/run_health/outcomes_over_time.pdf`
 `outputs/plots/run_health/run_health.pdf`
+`outputs/plots/run_health/compression_ratio_distribution.pdf`
+`outputs/plots/run_health/tfbs_length_by_regulator.pdf`
 `outputs/plots/run_health/summary.csv`
 
 `run_health` uses status taxonomy `ok|rejected|duplicate|failed` from
@@ -313,6 +325,18 @@ densegen:{input_name}:{plan_name}
 ```
 
 Per-placement provenance (TFBS, offsets, orientations) is recorded in `densegen__used_tfbs_detail` (including `motif_id`/`tfbs_id`), `outputs/tables/composition.parquet`, and the attempts log.
+
+---
+
+### Rejected solutions
+
+DenseGen records non-success solver attempts in `outputs/tables/attempts.parquet` with:
+
+- `status` (`rejected`, `failed`, `duplicate`, `ok`)
+- `reason` (normalized reason-family label)
+- `reason_detail_json` (structured context for constraint audits)
+
+This is the canonical source for rejection audits and post-run failure triage.
 
 ---
 

@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 
@@ -20,23 +21,28 @@ import numpy as np
 import pandas as pd
 import pytest
 from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
 from matplotlib.patches import ConnectionPatch
 
 from dnadesign.densegen.src.core.artifacts.pool import TFBSPoolArtifact
 from dnadesign.densegen.src.viz.plot_run import (
     _aggregate_reason_pareto,
+    _build_run_health_compression_ratio_figure,
     _build_run_health_detail_figure,
     _build_run_health_figure,
     _build_run_health_outcomes_figure,
+    _build_run_health_tfbs_length_by_regulator_figure,
     _build_tfbs_usage_breakdown_figure,
     _extract_plan_quotas,
     _progress_axis,
     _rate_series_from_counts,
+    _usage_category_label,
     plot_run_health,
     plot_tfbs_usage,
 )
 from dnadesign.densegen.src.viz.plot_stage_a_diversity import _build_stage_a_diversity_figure
 from dnadesign.densegen.src.viz.plot_stage_a_strata import _build_stage_a_strata_overview_figure
+from dnadesign.densegen.src.viz.plot_stage_a_yield import _build_stage_a_yield_bias_figure
 from dnadesign.densegen.src.viz.plot_stage_b_placement import (
     _allocation_summary_lines,
     _build_tfbs_count_records,
@@ -109,12 +115,14 @@ def _dense_arrays_df() -> pd.DataFrame:
                 "sequence": "TTGACACCCCTATAATGGGG",
                 "densegen__input_name": PLAN_POOL_LABEL,
                 "densegen__plan": "demo_plan",
+                "densegen__compression_ratio": 0.68,
             },
             {
                 "id": "s2",
                 "sequence": "TTGACAGGGGTATAATCCCC",
                 "densegen__input_name": PLAN_POOL_LABEL,
                 "densegen__plan": "demo_plan",
+                "densegen__compression_ratio": 0.74,
             },
         ]
     )
@@ -581,21 +589,98 @@ def test_plot_run_health(tmp_path: Path) -> None:
     matplotlib.use("Agg", force=True)
     out_path = tmp_path / "run_health.png"
     paths = plot_run_health(
-        pd.DataFrame(),
+        _dense_arrays_df(),
         out_path,
         attempts_df=_attempts_df(),
+        composition_df=_composition_df(),
         events_df=_events_df(),
         cfg={"config": {"generation": {"plan": [{"name": "demo_plan", "quota": 12}]}}},
         style={},
     )
-    assert len(paths) == 2
+    assert len(paths) == 4
     rel_paths = {str(Path(path).relative_to(tmp_path)) for path in paths}
     assert "run_health/outcomes_over_time.png" in rel_paths
     assert "run_health/run_health.png" in rel_paths
+    assert "run_health/compression_ratio_distribution.png" in rel_paths
+    assert "run_health/tfbs_length_by_regulator.png" in rel_paths
     assert (tmp_path / "run_health" / "outcomes_over_time.png").exists()
     assert (tmp_path / "run_health" / "run_health.png").exists()
+    assert (tmp_path / "run_health" / "compression_ratio_distribution.png").exists()
+    assert (tmp_path / "run_health" / "tfbs_length_by_regulator.png").exists()
     assert not (tmp_path / "run_health" / "run_health_detail.png").exists()
     assert (tmp_path / "run_health" / "summary.csv").exists()
+
+
+def test_run_health_compression_ratio_distribution_uses_plan_hue() -> None:
+    dense_arrays = pd.DataFrame(
+        [
+            {"densegen__plan": "plan_a", "densegen__compression_ratio": 0.42},
+            {"densegen__plan": "plan_a", "densegen__compression_ratio": 0.55},
+            {"densegen__plan": "plan_b", "densegen__compression_ratio": 0.71},
+            {"densegen__plan": "plan_b", "densegen__compression_ratio": 0.83},
+        ]
+    )
+    fig, axes = _build_run_health_compression_ratio_figure(dense_arrays, style={})
+    try:
+        ax = axes["compression"]
+        assert ax.get_xlabel() == "Compression ratio"
+        assert ax.get_ylabel() == "Count"
+        assert ax.get_title() == "Compression ratio distribution by plan"
+        legend = ax.get_legend()
+        assert legend is not None
+        assert getattr(legend, "_loc", None) == 2
+        labels = [text.get_text() for text in legend.get_texts()]
+        assert any("plan_a" in label for label in labels)
+        assert any("plan_b" in label for label in labels)
+        assert not ax.spines["top"].get_visible()
+        assert not ax.spines["right"].get_visible()
+    finally:
+        fig.clf()
+
+
+def test_run_health_tfbs_length_by_regulator_groups_lengths() -> None:
+    composition = pd.DataFrame(
+        [
+            {"tf": "TF_A", "tfbs": "AAAA", "length": 4},
+            {"tf": "TF_A", "tfbs": "AAAAT", "length": 5},
+            {"tf": "TF_A", "tfbs": "AAAAT", "length": 5},
+            {"tf": "TF_B", "tfbs": "CCCC", "length": 4},
+            {"tf": "fixed:sigma70:-35", "tfbs": "TTGACA", "length": 6},
+        ]
+    )
+    library_members = pd.DataFrame(
+        [
+            {"tf": "TF_A", "tfbs": "AAAA"},
+            {"tf": "TF_A", "tfbs": "AAAAT"},
+            {"tf": "TF_A", "tfbs": "AAAATT"},
+            {"tf": "TF_B", "tfbs": "CCCC"},
+            {"tf": "TF_B", "tfbs": "CCCCC"},
+        ]
+    )
+    fig, axes = _build_run_health_tfbs_length_by_regulator_figure(
+        composition,
+        style={},
+        library_members_df=library_members,
+    )
+    try:
+        ax = axes["length"]
+        assert ax.get_xlabel() == "Regulator"
+        assert ax.get_ylabel() == "Count in accepted outputs"
+        assert ax.get_title() == "TFBS length counts by regulator across accepted outputs"
+        labels = [tick.get_text() for tick in ax.get_xticklabels()]
+        assert any("TF_A" in label for label in labels)
+        assert any("TF_B" in label for label in labels)
+        assert any("\n(n=" in label for label in labels)
+        assert not any("fixed:" in label for label in labels)
+        legend = ax.get_legend()
+        assert legend is not None
+        legend_labels = [text.get_text() for text in legend.get_texts()]
+        assert "4 bp" in legend_labels
+        assert "5 bp" in legend_labels
+        assert not ax.spines["top"].get_visible()
+        assert not ax.spines["right"].get_visible()
+    finally:
+        fig.clf()
 
 
 def test_run_health_outcomes_legend_and_waste_subtitle() -> None:
@@ -771,6 +856,37 @@ def test_run_health_outcomes_connectors_follow_actual_run_order() -> None:
         fig.clf()
 
 
+def test_run_health_outcomes_xticks_use_regular_spacing() -> None:
+    matplotlib.use("Agg", force=True)
+    attempts = pd.DataFrame(
+        [
+            {
+                "attempt_index": idx + 1,
+                "created_at": f"2026-01-26T00:00:{idx:02d}+00:00",
+                "status": "ok",
+                "reason": "ok",
+                "plan_name": "plan_a",
+                "sampling_library_index": value,
+            }
+            for idx, value in enumerate([1, 2, 3, 4, 8, 12, 16, 24, 28, 32])
+        ]
+    )
+    fig, axes = _build_run_health_outcomes_figure(
+        attempts,
+        events_df=None,
+        style={},
+        plan_quotas={"plan_a": 20},
+    )
+    try:
+        ticks = axes["outcome"].get_xticks()
+        assert len(ticks) >= 4
+        diffs = np.diff(np.asarray(ticks, dtype=float))
+        assert diffs.size > 0
+        assert float(np.max(diffs) - np.min(diffs)) <= 1.0
+    finally:
+        fig.clf()
+
+
 def test_run_health_detail_plot_has_square_panels_without_subtitles() -> None:
     matplotlib.use("Agg", force=True)
     attempts = _attempts_df().copy()
@@ -808,14 +924,269 @@ def test_run_health_detail_plot_has_square_panels_without_subtitles() -> None:
         assert axes["fail"].get_title() == "Reason for failed solve"
         labels = [tick.get_text() for tick in axes["fail"].get_yticklabels()]
         assert any("ATGC" in label or "GGGG" in label for label in labels)
-        assert axes["fail"].get_xlim()[1] == pytest.approx(1.0)
+        assert axes["fail"].get_xlim()[1] > 1.0
+        y0, y1 = axes["fail"].get_ylim()
+        low, high = min(y0, y1), max(y0, y1)
+        assert low < -0.5
+        assert high > (len(axes["fail"].get_yticks()) - 0.5)
+        assert not axes["fail"].texts
         assert fig.legends
         assert fig.legends[0]._ncols == 2
         assert axes["plan"].get_title() == "Quota progress"
         quota_text = next(text for text in axes["plan"].texts if "Quota (" in text.get_text())
         assert quota_text.get_ha() == "left"
         assert quota_text.get_position()[0] <= 0.1
-        assert all(bar.get_height() < 0.7 for bar in axes["fail"].patches)
+        assert not axes["fail"].patches
+        assert axes["fail"].collections
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        fail_title_bbox = (
+            axes["fail"].title.get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+        )
+        plan_title_bbox = (
+            axes["plan"].title.get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+        )
+        assert (1.0 - fail_title_bbox.y1) >= 0.05
+        assert (1.0 - plan_title_bbox.y1) >= 0.05
+    finally:
+        fig.clf()
+
+
+def test_run_health_quota_progress_legend_encodes_plan_color_and_marker() -> None:
+    matplotlib.use("Agg", force=True)
+    attempts = pd.DataFrame(
+        [
+            {
+                "attempt_index": 1,
+                "created_at": "2026-01-26T00:00:00+00:00",
+                "status": "ok",
+                "reason": "ok",
+                "plan_name": "plan_a",
+                "sampling_library_index": 1,
+            },
+            {
+                "attempt_index": 2,
+                "created_at": "2026-01-26T00:00:10+00:00",
+                "status": "ok",
+                "reason": "ok",
+                "plan_name": "plan_b",
+                "sampling_library_index": 1,
+            },
+            {
+                "attempt_index": 3,
+                "created_at": "2026-01-26T00:00:20+00:00",
+                "status": "failed",
+                "reason": "no_solution",
+                "plan_name": "plan_a",
+                "sampling_library_index": 1,
+            },
+            {
+                "attempt_index": 4,
+                "created_at": "2026-01-26T00:00:30+00:00",
+                "status": "failed",
+                "reason": "no_solution",
+                "plan_name": "plan_b",
+                "sampling_library_index": 1,
+            },
+        ]
+    )
+    fig, axes = _build_run_health_detail_figure(
+        attempts,
+        events_df=None,
+        style={},
+        plan_quotas={"plan_a": 1, "plan_b": 2},
+    )
+    try:
+        assert fig.legends
+        legend = fig.legends[0]
+        handles = [handle for handle in getattr(legend, "legend_handles", []) if isinstance(handle, Line2D)]
+        assert len(handles) == 2
+        marker_symbols = [str(handle.get_marker()) for handle in handles]
+        assert all(marker not in {"None", "", " "} for marker in marker_symbols)
+        assert len(set(marker_symbols)) == 2
+        collections = axes["plan"].collections
+        assert len(collections) == 2
+        marker_x = sorted(float(np.asarray(coll.get_offsets())[-1][0]) for coll in collections)
+        assert marker_x == [3.0, 4.0]
+    finally:
+        fig.clf()
+
+
+def test_stage_a_strata_tier_marker_font_is_larger(tmp_path: Path) -> None:
+    matplotlib.use("Agg", force=True)
+    manifest = _pool_manifest(tmp_path, include_diversity=True)
+    sampling = manifest.entry_for("demo_input").stage_a_sampling
+    assert sampling is not None
+    pool_df = pd.DataFrame(
+        {
+            "input_name": ["demo_input", "demo_input"],
+            "tf": ["TF_A", "TF_A"],
+            "tfbs_sequence": ["AAAA", "AAAT"],
+            "best_hit_score": [2.0, 1.5],
+            "tier": [0, 1],
+        }
+    )
+    fig, axes_left, _ax_right = _build_stage_a_strata_overview_figure(
+        input_name="demo_input",
+        pool_df=pool_df,
+        sampling=sampling,
+        style={},
+    )
+    try:
+        percent_labels = [text for text in axes_left[0].texts if "%" in text.get_text()]
+        assert percent_labels
+        assert min(text.get_fontsize() for text in percent_labels) >= 7.8
+    finally:
+        fig.clf()
+
+
+def test_stage_a_yield_stepwise_x_ticks_are_slightly_smaller(tmp_path: Path) -> None:
+    matplotlib.use("Agg", force=True)
+    manifest = _pool_manifest(tmp_path, include_diversity=True)
+    sampling = manifest.entry_for("demo_input").stage_a_sampling
+    assert sampling is not None
+    pool_df = pd.DataFrame(
+        {
+            "input_name": ["demo_input", "demo_input"],
+            "tf": ["TF_A", "TF_A"],
+            "tfbs_sequence": ["AAAA", "AAAT"],
+            "tfbs_core": ["AAAA", "AAAT"],
+            "best_hit_score": [2.0, 1.5],
+            "tier": [0, 1],
+            "rank_within_regulator": [1, 2],
+            "selection_rank": [1, 2],
+            "nearest_selected_similarity": [0.0, 0.5],
+            "selection_score_norm": [1.0, 0.5],
+            "nearest_selected_distance_norm": [0.2, 0.4],
+        }
+    )
+    fig, axes_left, _axes_right, _cbar_ax = _build_stage_a_yield_bias_figure(
+        input_name="demo_input",
+        pool_df=pool_df,
+        sampling=sampling,
+        style={},
+    )
+    try:
+        fig.canvas.draw()
+        x_tick_labels = [tick for tick in axes_left[-1].get_xticklabels() if tick.get_text()]
+        assert x_tick_labels
+        assert x_tick_labels[0].get_fontsize() <= 10.9
+    finally:
+        fig.clf()
+
+
+def test_stage_a_yield_right_column_shows_x_labels_only_on_bottom_row(tmp_path: Path) -> None:
+    matplotlib.use("Agg", force=True)
+    manifest = _pool_manifest(tmp_path, include_diversity=True)
+    sampling = copy.deepcopy(manifest.entry_for("demo_input").stage_a_sampling)
+    assert sampling is not None
+    assert sampling["eligible_score_hist"]
+    second = copy.deepcopy(sampling["eligible_score_hist"][0])
+    second["regulator"] = "TF_B"
+    sampling["eligible_score_hist"].append(second)
+    pool_df = pd.DataFrame(
+        {
+            "input_name": ["demo_input"] * 4,
+            "tf": ["TF_A", "TF_A", "TF_B", "TF_B"],
+            "tfbs_sequence": ["AAAA", "AAAT", "CCCC", "CCCA"],
+            "tfbs_core": ["AAAA", "AAAT", "CCCC", "CCCA"],
+            "best_hit_score": [2.0, 1.5, 2.1, 1.6],
+            "tier": [0, 1, 0, 1],
+            "rank_within_regulator": [1, 2, 1, 2],
+            "selection_rank": [1, 2, 1, 2],
+            "nearest_selected_similarity": [0.0, 0.5, 0.0, 0.5],
+            "selection_score_norm": [1.0, 0.5, 1.0, 0.5],
+            "nearest_selected_distance_norm": [0.2, 0.4, 0.2, 0.4],
+        }
+    )
+    fig, _axes_left, axes_right, _cbar_ax = _build_stage_a_yield_bias_figure(
+        input_name="demo_input",
+        pool_df=pool_df,
+        sampling=sampling,
+        style={},
+    )
+    try:
+        assert axes_right[0].get_xlabel() == ""
+        assert axes_right[-1].get_xlabel() == "Core position"
+        top_tick_text = [tick.get_text() for tick in axes_right[0].get_xticklabels() if tick.get_visible()]
+        assert all(text == "" for text in top_tick_text)
+    finally:
+        fig.clf()
+
+
+def test_stage_a_diversity_score_vs_max_ylabel_is_closer_to_axis(tmp_path: Path) -> None:
+    matplotlib.use("Agg", force=True)
+    manifest = _pool_manifest(tmp_path, include_diversity=True)
+    sampling = manifest.entry_for("demo_input").stage_a_sampling
+    assert sampling is not None
+    pool_df = pd.DataFrame(
+        {
+            "input_name": ["demo_input", "demo_input"],
+            "tf": ["TF_A", "TF_A"],
+            "tfbs_sequence": ["AAAA", "AAAAT"],
+            "tfbs_core": ["AAAA", "AAAT"],
+            "best_hit_score": [2.0, 1.5],
+            "tier": [0, 1],
+            "rank_within_regulator": [1, 2],
+            "selection_rank": [1, 2],
+            "nearest_selected_similarity": [0.0, 0.5],
+            "selection_score_norm": [1.0, 0.5],
+            "nearest_selected_distance_norm": [0.2, 0.4],
+        }
+    )
+    fig, _axes_left, axes_right = _build_stage_a_diversity_figure(
+        input_name="demo_input",
+        pool_df=pool_df,
+        sampling=sampling,
+        style={},
+    )
+    try:
+        right_bbox = axes_right[0].get_position()
+        score_label = next(text for text in fig.texts if text.get_text() == "Score vs max")
+        assert (score_label.get_position()[0] - right_bbox.x1) <= 0.045
+    finally:
+        fig.clf()
+
+
+def test_stage_a_diversity_shows_x_labels_only_on_bottom_row(tmp_path: Path) -> None:
+    matplotlib.use("Agg", force=True)
+    manifest = _pool_manifest(tmp_path, include_diversity=True)
+    sampling = copy.deepcopy(manifest.entry_for("demo_input").stage_a_sampling)
+    assert sampling is not None
+    assert sampling["eligible_score_hist"]
+    second = copy.deepcopy(sampling["eligible_score_hist"][0])
+    second["regulator"] = "TF_B"
+    sampling["eligible_score_hist"].append(second)
+    pool_df = pd.DataFrame(
+        {
+            "input_name": ["demo_input"] * 4,
+            "tf": ["TF_A", "TF_A", "TF_B", "TF_B"],
+            "tfbs_sequence": ["AAAA", "AAAT", "CCCC", "CCCA"],
+            "tfbs_core": ["AAAA", "AAAT", "CCCC", "CCCA"],
+            "best_hit_score": [2.0, 1.5, 2.1, 1.6],
+            "tier": [0, 1, 0, 1],
+            "rank_within_regulator": [1, 2, 1, 2],
+            "selection_rank": [1, 2, 1, 2],
+            "nearest_selected_similarity": [0.0, 0.5, 0.0, 0.5],
+            "selection_score_norm": [1.0, 0.5, 1.0, 0.5],
+            "nearest_selected_distance_norm": [0.2, 0.4, 0.2, 0.4],
+        }
+    )
+    fig, axes_left, axes_right = _build_stage_a_diversity_figure(
+        input_name="demo_input",
+        pool_df=pool_df,
+        sampling=sampling,
+        style={},
+    )
+    try:
+        assert axes_left[0].get_xlabel() == ""
+        assert axes_right[0].get_xlabel() == ""
+        assert axes_left[-1].get_xlabel() == "Pairwise Hamming NN"
+        assert axes_right[-1].get_xlabel() == "MMR selection step"
+        top_left_ticks = [tick.get_text() for tick in axes_left[0].get_xticklabels() if tick.get_visible()]
+        top_right_ticks = [tick.get_text() for tick in axes_right[0].get_xticklabels() if tick.get_visible()]
+        assert all(text == "" for text in top_left_ticks)
+        assert all(text == "" for text in top_right_ticks)
     finally:
         fig.clf()
 
@@ -1062,6 +1433,24 @@ def test_run_health_reason_breaks_out_forbidden_kmer_list_tokens() -> None:
         fig.clf()
 
 
+def test_run_health_reason_breaks_out_forbidden_kmer_from_detail_json() -> None:
+    attempts = _attempts_df().copy()
+    attempts.loc[1, "status"] = "rejected"
+    attempts.loc[1, "reason"] = "postprocess_forbidden_kmer"
+    attempts.loc[1, "detail_json"] = '{"kmer":"ATGC","position":9}'
+    fig, axes = _build_run_health_figure(
+        attempts,
+        events_df=None,
+        style={},
+        plan_quotas={"demo_plan": 12},
+    )
+    try:
+        labels = [tick.get_text() for tick in axes["fail"].get_yticklabels()]
+        assert any("forbidden kmer" in label.lower() and "ATGC" in label for label in labels)
+    finally:
+        fig.clf()
+
+
 def test_plot_placement_map(tmp_path: Path) -> None:
     matplotlib.use("Agg", force=True)
     out_path = tmp_path / "placement_map.png"
@@ -1074,10 +1463,9 @@ def test_plot_placement_map(tmp_path: Path) -> None:
         cfg=_cfg(),
         style={},
     )
-    assert len(paths) == 2
+    assert len(paths) == 1
     rel = {str(Path(path).relative_to(tmp_path)) for path in paths}
     assert "stage_b/demo_plan/occupancy.png" in rel
-    assert "stage_b/demo_plan/tfbs_allocation.png" in rel
     for path in paths:
         path = Path(path)
         assert path.exists()
@@ -1096,7 +1484,7 @@ def test_plot_placement_map_accepts_effective_config(tmp_path: Path) -> None:
         cfg={"config": _cfg()},
         style={},
     )
-    assert len(paths) == 2
+    assert len(paths) == 1
     for path in paths:
         path = Path(path)
         assert path.exists()
@@ -1157,10 +1545,12 @@ def test_tfbs_usage_breakdown_figure_has_category_curves() -> None:
         style={},
     )
     try:
-        left_lines = axes["usage"].get_lines()
+        assert axes["usage"].collections
+        assert axes["usage"].get_yscale() == "linear"
         right_lines = axes["cum"].get_lines()
-        assert len(left_lines) >= 2
-        assert len(right_lines) >= 2
+        expected_regulators = composition["tf"].map(_usage_category_label).nunique()
+        assert len(right_lines) == expected_regulators
+        assert axes["cum"].get_xlabel() == "TFBS rank within regulator"
         legend = axes["usage"].get_legend()
         if legend is not None:
             legend_text = "\n".join(t.get_text() for t in legend.get_texts())
@@ -1168,6 +1558,7 @@ def test_tfbs_usage_breakdown_figure_has_category_curves() -> None:
             assert fig.legends
             legend_text = "\n".join(t.get_text() for t in fig.legends[0].get_texts())
         assert "fixed:sigma70:-35" in legend_text
+        assert axes["cum"].get_ylim()[1] > 1.0
     finally:
         fig.clf()
 
@@ -1230,7 +1621,8 @@ def test_occupancy_legend_is_below_xlabel() -> None:
     try:
         fig.canvas.draw()
         assert ax.get_title().startswith("Occupancy across sequence positions")
-        assert ax.get_title().endswith(".")
+        assert not ax.get_title().endswith(".")
+        assert len(ax.patches) > 0
         assert fig.legends
         legend = fig.legends[0]
         assert getattr(legend, "_ncols", None) < len(categories)
@@ -1245,6 +1637,23 @@ def test_occupancy_legend_is_below_xlabel() -> None:
         legend_bbox = legend.get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
         assert legend_bbox.y1 < xlab_bbox.y0
         assert fig.subplotpars.bottom >= 0.28
+        x_min, x_max = ax.get_xlim()
+        assert x_min < 0.0
+        assert x_max > float(seq_len)
+        nonzero = [patch for patch in ax.patches if float(patch.get_height()) > 0.0]
+        assert nonzero
+        assert all(float(patch.get_edgecolor()[3]) == pytest.approx(1.0, abs=1e-6) for patch in nonzero)
+        pairs = []
+        for patch in nonzero:
+            face = patch.get_facecolor()
+            edge = patch.get_edgecolor()
+            face_luma = (0.2126 * float(face[0])) + (0.7152 * float(face[1])) + (0.0722 * float(face[2]))
+            edge_luma = (0.2126 * float(edge[0])) + (0.7152 * float(edge[1])) + (0.0722 * float(edge[2]))
+            if face_luma > 0.02:
+                pairs.append((edge_luma, face_luma))
+        assert pairs
+        assert all(edge_luma <= face_luma for edge_luma, face_luma in pairs)
+        assert any(edge_luma < face_luma for edge_luma, face_luma in pairs)
     finally:
         fig.clf()
 
@@ -1302,6 +1711,8 @@ def test_tfbs_allocation_legend_layout_is_compact_and_wrapped() -> None:
         assert getattr(legend, "_ncols", 0) <= 4
         assert legend.get_frame_on() is False
         assert min(text.get_fontsize() for text in legend.get_texts()) >= 8.6
+        assert axes["cum"].get_ylim()[1] > 1.0
+        assert axes["rank"].get_ylim()[1] > float(counts["count"].max())
     finally:
         fig.clf()
 
@@ -1451,6 +1862,52 @@ def test_plot_stage_a_summary_includes_background_logo(tmp_path: Path) -> None:
     assert paths
     assert len(paths) == 1
     assert Path(paths[0]).exists()
+
+
+def test_plot_stage_a_summary_background_logo_filename_avoids_double_background(tmp_path: Path) -> None:
+    matplotlib.use("Agg", force=True)
+    out_path = tmp_path / "stage_a_summary_bg_name.png"
+    pool_df = pd.DataFrame(
+        {
+            "input_name": ["background"] * 2,
+            "tf": ["background"] * 2,
+            "tfbs": ["AAAA", "AAAT"],
+            "tfbs_core": ["AAAA", "AAAT"],
+            "tfbs_id": ["a", "b"],
+        }
+    )
+    pools = {"background": pool_df}
+    pools_dir = tmp_path / "pools_bg_name"
+    pools_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = pools_dir / "pool_manifest.json"
+    manifest_payload = {
+        "schema_version": "1.6",
+        "run_id": "demo",
+        "run_root": ".",
+        "config_path": "config.yaml",
+        "inputs": [
+            {
+                "name": "background",
+                "type": "background_pool",
+                "pool_path": "background__pool.parquet",
+                "rows": 2,
+                "columns": ["input_name", "tf", "tfbs", "tfbs_core", "tfbs_id"],
+                "pool_mode": "tfbs",
+                "stage_a_sampling": None,
+            }
+        ],
+    }
+    manifest_path.write_text(json.dumps(manifest_payload, indent=2), encoding="utf-8")
+    manifest = TFBSPoolArtifact.load(manifest_path)
+    paths = plot_stage_a_summary(
+        pd.DataFrame(),
+        out_path,
+        pools=pools,
+        pool_manifest=manifest,
+        style={},
+    )
+    assert paths
+    assert Path(paths[0]).name == "background_logo.png"
 
 
 def test_plot_stage_a_summary_requires_diversity(tmp_path: Path) -> None:

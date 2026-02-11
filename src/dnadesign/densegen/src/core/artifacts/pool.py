@@ -268,6 +268,8 @@ def _build_stage_a_sampling_manifest(
     selection_relevance_norm = {summary.selection_relevance_norm for summary in fimo_summaries}
     selection_pool_min_score_norm = {summary.selection_pool_min_score_norm_used for summary in fimo_summaries}
     selection_pool_cap_value = {summary.selection_pool_cap_value for summary in fimo_summaries}
+    selection_pool_target_size = {summary.selection_pool_target_size for summary in fimo_summaries}
+    selection_pool_degenerate = {summary.selection_pool_degenerate for summary in fimo_summaries}
     tier_target_fraction = {summary.tier_target_fraction for summary in fimo_summaries}
     tier_fractions_values: list[tuple[float, float, float]] = []
     tier_fractions_sources: list[str] = []
@@ -338,6 +340,8 @@ def _build_stage_a_sampling_manifest(
                 "selection_pool_min_score_norm_used": summary.selection_pool_min_score_norm_used,
                 "selection_pool_capped": summary.selection_pool_capped,
                 "selection_pool_cap_value": summary.selection_pool_cap_value,
+                "selection_pool_target_size": summary.selection_pool_target_size,
+                "selection_pool_degenerate": summary.selection_pool_degenerate,
                 "selection_score_norm_max_raw": summary.selection_score_norm_max_raw,
                 "selection_score_norm_clipped": summary.selection_score_norm_clipped,
                 "collapsed_by_core_identity": summary.collapsed_by_core_identity,
@@ -374,6 +378,12 @@ def _build_stage_a_sampling_manifest(
     selection_pool_cap_value_value = (
         next(iter(selection_pool_cap_value)) if len(selection_pool_cap_value) == 1 else None
     )
+    selection_pool_target_size_value = (
+        next(iter(selection_pool_target_size)) if len(selection_pool_target_size) == 1 else None
+    )
+    selection_pool_degenerate_value = (
+        next(iter(selection_pool_degenerate)) if len(selection_pool_degenerate) == 1 else None
+    )
     tier_target_fraction_value = next(iter(tier_target_fraction)) if len(tier_target_fraction) == 1 else None
     tier_fractions_value: list[float] | None = None
     tier_scheme_label = "mixed"
@@ -403,6 +413,8 @@ def _build_stage_a_sampling_manifest(
         "selection_relevance_norm": selection_relevance_norm_value,
         "selection_pool_min_score_norm": selection_pool_min_score_norm_value,
         "selection_pool_cap_value": selection_pool_cap_value_value,
+        "selection_pool_target_size": selection_pool_target_size_value,
+        "selection_pool_degenerate": selection_pool_degenerate_value,
         "target_tier_fraction": tier_target_fraction_value,
         "bgfile": base_bgfile,
         "background_source": background_source,

@@ -22,7 +22,12 @@ from ...core.artifacts.ids import hash_pwm_motif, hash_tfbs_id
 from ...core.run_paths import candidates_root
 from .base import BaseDataSource, resolve_path
 from .pwm_artifact import load_artifact
-from .pwm_sampling import sample_pwm_sites, sampling_kwargs_from_config, validate_mmr_core_length
+from .pwm_sampling import (
+    enforce_cross_regulator_core_collisions,
+    sample_pwm_sites,
+    sampling_kwargs_from_config,
+    validate_mmr_core_length,
+)
 from .stage_a.stage_a_progress import StageAProgressManager
 
 
@@ -58,9 +63,11 @@ class PWMArtifactSetDataSource(BaseDataSource):
                 raise ValueError(f"pwm_artifact_set.overrides_by_motif_id contains unknown motif_id: {preview}")
 
         sampling_kwargs_by_motif: dict[str, dict] = {}
+        collision_modes: set[str] = set()
         for motif in motifs:
             sampling_cfg = overrides.get(motif.motif_id, sampling)
             sampling_kwargs = sampling_kwargs_from_config(sampling_cfg)
+            collision_modes.add(str(sampling_kwargs.get("cross_regulator_core_collisions") or "warn"))
             selection_cfg = sampling_kwargs.get("selection")
             selection_policy = str(getattr(selection_cfg, "policy", None) or "top_score")
             validate_mmr_core_length(
@@ -72,6 +79,12 @@ class PWMArtifactSetDataSource(BaseDataSource):
                 trim_window_length=sampling_kwargs.get("trim_window_length"),
             )
             sampling_kwargs_by_motif[motif.motif_id] = sampling_kwargs
+        if len(collision_modes) != 1:
+            raise ValueError(
+                "pwm_artifact_set.overrides_by_motif_id must keep "
+                "pwm.sampling.uniqueness.cross_regulator_core_collisions consistent across motifs."
+            )
+        collision_mode = next(iter(collision_modes)) if collision_modes else "warn"
 
         progress_manager = StageAProgressManager(stream=sys.stdout)
         entries = []
@@ -161,5 +174,11 @@ class PWMArtifactSetDataSource(BaseDataSource):
 
         import pandas as pd
 
+        enforce_cross_regulator_core_collisions(
+            all_rows,
+            mode=collision_mode,
+            input_name=self.input_name,
+            source_kind="pwm_artifact_set",
+        )
         df = pd.DataFrame(all_rows)
         return entries, df, summaries

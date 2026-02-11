@@ -37,6 +37,8 @@ class TFBSMeta:
     selection_pool_min_score_norm_used: Optional[float]
     selection_pool_capped: Optional[bool]
     selection_pool_cap_value: Optional[int]
+    selection_pool_target_size: Optional[int]
+    selection_pool_degenerate: Optional[bool]
     tier_target_fraction: Optional[float]
     tier_target_required_unique: Optional[int]
     tier_target_met: Optional[bool]
@@ -70,6 +72,8 @@ class TFBSMeta:
             "selection_pool_min_score_norm_used": self.selection_pool_min_score_norm_used,
             "selection_pool_capped": self.selection_pool_capped,
             "selection_pool_cap_value": self.selection_pool_cap_value,
+            "selection_pool_target_size": self.selection_pool_target_size,
+            "selection_pool_degenerate": self.selection_pool_degenerate,
             "tier_target_fraction": self.tier_target_fraction,
             "tier_target_required_unique": self.tier_target_required_unique,
             "tier_target_met": self.tier_target_met,

@@ -18,6 +18,7 @@ from typing import Optional
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.colors import to_rgb, to_rgba
 
 from .plot_common import _apply_style, _palette, _stage_b_plan_output_dir, _style
 
@@ -248,6 +249,12 @@ def _colorblind_palette(style: dict, n: int) -> list:
     palette_style = dict(style)
     palette_style["palette"] = "okabe_ito"
     return _palette(palette_style, n)
+
+
+def _darken_color(color: object, *, factor: float) -> tuple[float, float, float]:
+    r, g, b = to_rgb(color)
+    scale = min(1.0, max(0.0, float(factor)))
+    return (r * scale, g * scale, b * scale)
 
 
 def _build_occupancy(
@@ -531,7 +538,7 @@ def _render_occupancy(
 ) -> tuple[plt.Figure, plt.Axes]:
     width = max(8.4, float(seq_len) * 0.2, float(len(categories)) * 1.6)
     fig, ax = plt.subplots(1, 1, figsize=(width, 3.25))
-    x_edges = np.arange(seq_len + 1, dtype=float)
+    x_positions = np.arange(seq_len, dtype=float)
     colors = dict(zip(categories, _colorblind_palette(style, len(categories))))
     fixed_categories = [label for label in categories if str(label).startswith("fixed:")]
     regular_categories = [label for label in categories if label not in fixed_categories]
@@ -544,23 +551,28 @@ def _render_occupancy(
                 "Occupancy series length mismatch; expected one value per nucleotide "
                 f"(seq_len={seq_len}, got={y.shape[0]} for '{label}')."
             )
-        y_edges = np.concatenate([y.astype(float), y[-1:].astype(float)])
         is_fixed = str(label).startswith("fixed:")
-        fill_alpha = max(0.05, alpha * (1.05 if is_fixed else 1.0))
-        line_width = 1.35 if is_fixed else 1.0
+        fill_alpha = max(0.12, alpha * (1.1 if is_fixed else 1.0))
+        fill_rgb = _darken_color(color, factor=0.84 if is_fixed else 0.88)
+        edge_rgb = _darken_color(color, factor=0.56 if is_fixed else 0.62)
+        line_width = 0.75 if is_fixed else 0.6
         z_base = 8 if is_fixed else 2
-        ax.step(x_edges, y_edges, where="post", color=color, linewidth=line_width, zorder=z_base + 1)
-        ax.fill_between(
-            x_edges,
-            y_edges,
-            step="post",
-            alpha=fill_alpha,
-            color=color,
+        fill_color = to_rgba(fill_rgb, alpha=fill_alpha)
+        edge_color = to_rgba(edge_rgb, alpha=1.0)
+        ax.bar(
+            x_positions,
+            y.astype(float),
+            width=0.96,
+            align="edge",
+            color=fill_color,
+            edgecolor=edge_color,
+            linewidth=line_width,
             label=_category_display_label(label, fixed_label_sequences=fixed_label_sequences),
-            zorder=z_base,
+            zorder=z_base + (0.5 if is_fixed else 0.0),
         )
 
-    ax.set_xlim(0, seq_len)
+    x_pad = max(0.8, float(seq_len) * 0.015)
+    ax.set_xlim(0.0 - x_pad, float(seq_len) + x_pad)
     ax.set_xticks(np.arange(0, seq_len + 1, 5, dtype=int))
     ax.set_xlabel("Position (nt)", labelpad=8)
     ax.set_ylabel("Occurrences")
@@ -570,7 +582,7 @@ def _render_occupancy(
         scope = plan_label
     else:
         scope = f"{plan_label} / {input_label}"
-    ax.set_title(f"Occupancy across sequence positions for {scope} (n={n_solutions}).")
+    ax.set_title(f"Occupancy across sequence positions for {scope} (n={n_solutions})")
     _apply_style(ax, style)
     handles, labels = ax.get_legend_handles_labels()
     legend_rows = 1
@@ -654,7 +666,7 @@ def _render_tfbs_allocation(
     )
     ax_cum.set_ylabel("Cumulative share")
     ax_cum.set_xlabel("TFBS rank within category")
-    ax_cum.set_ylim(0.0, 1.0)
+    ax_cum.set_ylim(0.0, 1.03)
 
     available_category_unique = (
         available.groupby("category_label")[["tfbs"]].nunique().rename(columns={"tfbs": "unique_available"})
@@ -679,6 +691,13 @@ def _render_tfbs_allocation(
         color = color_map[label]
         ax_rank.plot(cat_ranks, cat_values, color=color, linewidth=1.2, marker="o", markersize=2.5, label=legend_label)
         ax_cum.plot(cat_ranks, cat_cum, color=color, linewidth=1.2, marker="o", markersize=2.5, label=legend_label)
+
+    if values.size > 0:
+        y_min = max(0.8, float(np.nanmin(values)) * 0.9)
+        y_max = float(np.nanmax(values)) * 1.08
+        if y_max <= y_min:
+            y_max = y_min * 1.1
+        ax_rank.set_ylim(y_min, y_max)
 
     top10 = values[: min(10, len(values))].sum() / total if total > 0 else 0.0
     top50 = values[: min(50, len(values))].sum() / total if total > 0 else 0.0
@@ -750,20 +769,16 @@ def plot_placement_map(
     *,
     composition_df: pd.DataFrame,
     dense_arrays_df: pd.DataFrame,
-    library_members_df: pd.DataFrame,
+    library_members_df: pd.DataFrame | None,
     cfg: dict,
     style: Optional[dict] = None,
     occupancy_alpha: float | None = None,
     occupancy_max_categories: int | None = None,
-    tfbs_top_k_annotation: int | None = None,
 ) -> list[Path]:
     if composition_df is None or composition_df.empty:
         raise ValueError("placement_map requires composition.parquet with placements.")
     if dense_arrays_df is None or dense_arrays_df.empty:
         raise ValueError("placement_map requires dense_arrays.parquet with final sequences.")
-    if library_members_df is None or library_members_df.empty:
-        raise ValueError("placement_map requires library_members.parquet for TFBS pool denominators.")
-
     _require_columns(
         dense_arrays_df,
         {"id", "sequence", "densegen__input_name", "densegen__plan"},
@@ -784,9 +799,6 @@ def plot_placement_map(
     max_cats = int(occupancy_max_categories) if occupancy_max_categories is not None else 12
     if max_cats <= 0:
         raise ValueError("placement_map occupancy_max_categories must be positive.")
-    top_k_annotation = int(tfbs_top_k_annotation) if tfbs_top_k_annotation is not None else 0
-    if top_k_annotation < 0:
-        raise ValueError("placement_map tfbs_top_k_annotation must be >= 0.")
 
     seq_len = _sequence_length_from_cfg(cfg)
     dense_arrays_df = dense_arrays_df.copy()
@@ -812,12 +824,6 @@ def plot_placement_map(
         constraints = _promoter_constraints(cfg, str(plan_name))
         fixed_label_sequences = _fixed_label_sequences(constraints)
         n_solutions = len(solution_ids)
-        members = _selected_library_members(
-            library_members_df,
-            input_name=str(input_name),
-            plan_name=str(plan_name),
-            sub=sub,
-        )
         occupancy, categories, missing_counts = _build_occupancy(
             sub,
             solutions=solutions,
@@ -848,28 +854,4 @@ def plot_placement_map(
         plt.close(fig_occ)
         paths.append(occ_path)
 
-        counts = _build_tfbs_count_records(
-            sub,
-            solutions=solutions,
-            constraints=constraints,
-        )
-        available = _build_available_tfbs_records(
-            members,
-            n_solutions=n_solutions,
-            constraints=constraints,
-        )
-        fig_tfbs, _ = _render_tfbs_allocation(
-            counts,
-            available=available,
-            input_name=str(input_name),
-            plan_name=str(plan_name),
-            n_solutions=n_solutions,
-            top_k_annotation=top_k_annotation,
-            fixed_label_sequences=fixed_label_sequences,
-            style=style,
-        )
-        tfbs_path = base_dir / f"tfbs_allocation{out_path.suffix}"
-        fig_tfbs.savefig(tfbs_path)
-        plt.close(fig_tfbs)
-        paths.append(tfbs_path)
     return paths

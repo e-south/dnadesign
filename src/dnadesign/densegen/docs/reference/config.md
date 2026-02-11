@@ -1,6 +1,17 @@
-## DenseGen Config Reference
+# DenseGen config reference
 
-This is the YAML schema for DenseGen. Unknown keys are errors and all paths resolve relative to the config file directory. Stage‑A sampling lives under `densegen.inputs[].sampling`, Stage‑B sampling lives under `densegen.generation.sampling`. Use this reference for exact field names; see the guide for conceptual flow.
+Use this page when you need exact YAML keys and constraints.
+Unknown keys are hard errors.
+All relative paths resolve from the config file directory.
+
+Sampling split:
+- Stage-A sampling keys live under `densegen.inputs[].sampling`
+- Stage-B sampling keys live under `densegen.generation.sampling`
+
+If you want concepts first, read:
+- [inputs guide](../guide/inputs.md)
+- [sampling guide](../guide/sampling.md)
+- [generation guide](../guide/generation.md)
 
 ### Contents
 - [Top-level](#top-level) - required roots and plotting.
@@ -8,7 +19,7 @@ This is the YAML schema for DenseGen. Unknown keys are errors and all paths reso
 - [`densegen.run`](#densegenrun) - run identifier and root.
 - [`densegen.output`](#densegenoutput) - output targets and schema.
 - [`densegen.generation`](#densegengeneration) - plan and fixed elements.
-- [`densegen.generation.sampling`](#densegengenerationsampling) - Stage‑B library building controls.
+- [`densegen.generation.sampling`](#densegengenerationsampling-stage-b-sampling) - Stage-B library building controls.
 - [`densegen.solver`](#densegensolver) - backend and strategy.
 - [`densegen.runtime`](#densegenruntime) - retry and guard rails.
 - [`densegen.postprocess.pad`](#densegenpostprocesspad) - pad policy.
@@ -110,15 +121,22 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
       - `window_strategy`: `max_info` (window selection strategy)
     - `uniqueness`
       - `key`: `sequence | core` (default `core` for PWM inputs)
+      - `cross_regulator_core_collisions`: `allow | warn | error` (default `warn`).
+        For multi-motif PWM inputs, this checks for the same `tfbs_core` appearing under
+        different regulators in the same Stage-A pool build.
     - `selection`
       - `policy`: `top_score | mmr` (default `top_score`)
       - `rank_by`: `score | score_norm` (default `score`; `score_norm` is length-normalized)
       - `alpha` (float in (0, 1]; MMR score weight)
       - `pool` (required when `policy=mmr`)
-        - `min_score_norm` (optional float in (0, 1]; recorded as a “within τ of max” reference in reports)
-        - `max_candidates` (optional int > 0; cap the MMR pool to the top-by-score slice)
+        - `min_score_norm` (optional float in (0, 1]; hard lower bound for MMR pool inclusion using
+          the fraction of theoretical max log-odds score:
+          `best_hit_score / pwm_theoretical_max_score`)
+        - `max_candidates` (optional int > 0; upper bound on the deterministic MMR target pool size;
+          default target pool is `ceil(10.0 * n_sites)`)
         - `relevance_norm` (optional: `percentile | minmax_raw_score`; default `minmax_raw_score`)
-      - MMR pool selection uses the cumulative rung ladder derived from `sampling.tier_fractions`.
+      - MMR pool selection uses the cumulative rung ladder derived from `sampling.tier_fractions`,
+        evaluated by post-gate counts, then slices to a deterministic target pool.
     - `consensus` requires `n_sites: 1`
     - `background` samples cores from the PWM background distribution before padding
     - FIMO resolves `fimo` via `MEME_BIN` or PATH; pixi users should run `pixi run dense ...` so it is available.
@@ -146,6 +164,7 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
   - `sampling` (required Stage‑A config) - same fields as `pwm_meme`
   - `overrides_by_motif_id` (optional dict) - per‑motif Stage‑A sampling overrides (deep‑merged
     onto the base `sampling`, so partial overrides are allowed)
+    - `uniqueness.cross_regulator_core_collisions` must stay consistent across base and overrides
 - `type: usr_sequences`
   - `dataset` - USR dataset name
   - `root` - USR root path (required; no fallback)
@@ -209,7 +228,7 @@ Outputs (tables), logs, and plots must resolve inside `outputs/` under `densegen
 
 ---
 
-### `densegen.generation.sampling` (Stage‑B sampling)
+### `densegen.generation.sampling` (Stage-B sampling)
 
 These controls apply to **Stage‑B sampling** (library construction) after Stage‑A input sampling.
 `library_size` does not change Stage‑A sampling counts. `library_size` also bounds the motif count

@@ -1,4 +1,14 @@
-## USR — Universal Sequence Record
+# USR - Universal Sequence Record
+
+## Contents
+- [At a glance](#at-a-glance)
+- [Start here (mental model and stack boundary)](#start-here-mental-model-and-stack-boundary)
+- [CLI quickstart (run from anywhere)](#cli-quickstart-run-from-anywhere)
+- [Remote sync (SSH)](#remote-sync-ssh)
+- [Python API](#python-api)
+- [Schema contract](#schema-contract)
+- [Namespace registry (required)](#namespace-registry-required)
+- [Event log schema](#event-log-schema)
 
 ## At a glance
 
@@ -120,8 +130,11 @@ Operational implications:
 In this monorepo, run the CLI as:
 
 ```bash
+# Show full CLI command surface.
 uv run usr --help
 ```
+
+Command snippets below use `usr ...` for readability; when running from this repo, prefix them with `uv run` (for example, `uv run usr ls`).
 
 ---
 
@@ -142,12 +155,14 @@ Demo inputs in this repo:
 **Create a dataset** (namespace is recommended)
 
 ```bash
+# Create dataset directory and base records file.
 usr init densegen/demo --source "readme quickstart" --notes "hello, world"
 ```
 
 **Import sequences** (only essential USR columns are ingested; extra CSV columns are ignored)
 
 ```bash
+# Import sequence rows into base records.
 usr import densegen/demo --from csv \
   --path src/dnadesign/usr/demo_material/demo_sequences.csv \
   --bio-type dna --alphabet dna_4
@@ -158,6 +173,7 @@ usr import densegen/demo --from csv \
 **Register an overlay namespace** (required on fresh roots)
 
 ```bash
+# Register namespace and allowed derived columns.
 usr namespace register quickstart \
   --columns quickstart__X_value:list<float64>,quickstart__intensity_log2_offset_delta:float64
 ```
@@ -167,10 +183,12 @@ usr namespace register quickstart \
 **Attach namespaced metadata** (namespacing required)
 
 ```bash
+# Attach first derived field set by sequence key.
 usr attach densegen/demo \
   --path src/dnadesign/usr/demo_material/demo_attachment_one.csv \
   --namespace quickstart --key sequence --key-col sequence --columns X_value
 
+# Attach second derived field set (allow unmatched rows).
 usr attach densegen/demo \
   --path src/dnadesign/usr/demo_material/demo_y_sfxi.csv \
   --namespace quickstart --key sequence --key-col sequence --columns intensity_log2_offset_delta --allow-missing
@@ -192,80 +210,115 @@ Examples of resulting columns:
 **Materialize overlays** (merge derived columns into `records.parquet`)
 
 ```bash
+# Materialize overlays into base table.
 usr materialize densegen/demo
+
+# Materialize with confirmation bypass and pre-write snapshot.
 usr materialize densegen/demo --yes --snapshot-before
 ```
 
 By default, overlays are **kept**. To remove or archive overlays after materialize:
 
 ```bash
+# Materialize and then drop overlay parts.
 usr materialize densegen/demo --drop-overlays
+
+# Materialize and archive overlay parts.
 usr materialize densegen/demo --archive-overlays
 ```
 
 **Inspect & validate**
 
 ```bash
-usr ls                        # list datasets (pretty)
-usr ls --format json          # JSON output (stable)
-usr info densegen/demo        # rows, columns, namespaces
+# List datasets in human-friendly table.
+usr ls
+
+# List datasets as JSON.
+usr ls --format json
+
+# Show dataset summary (rows, columns, namespaces).
+usr info densegen/demo
 usr info densegen/demo --format json
-usr head densegen/demo -n 5   # first N rows (pretty by default)
+
+# Preview first rows.
+usr head densegen/demo -n 5
 usr head densegen/demo -n 5 --columns id,sequence
 usr head densegen/demo -n 5 --include-deleted
 usr grep densegen/demo --pattern ATG --limit 10
 
-usr schema densegen/demo               # Arrow schema (plain)
-usr schema densegen/demo --tree        # pretty tree view
+# Show schema (plain and tree forms).
+usr schema densegen/demo
+usr schema densegen/demo --tree
 usr schema densegen/demo --format json
+
+# Tail mutation events.
 usr events tail densegen/demo --format json --follow
 usr events tail /abs/path/to/datasets/densegen/demo --format json --n 5
 
-usr validate densegen/demo             # checks schema, uniqueness, namespacing
+# Validate schema and registry contracts.
+usr validate densegen/demo
 usr validate densegen/demo --strict
 usr validate densegen/demo --registry-mode frozen
 usr validate densegen/demo --registry-mode either
 usr validate /abs/path/to/datasets/densegen/demo --strict
-
-
 ```
 
 **Maintenance (registry + overlays)**
 
 ```bash
+# Freeze active registry into dataset artifact.
 usr maintenance registry-freeze densegen/demo
+
+# Compact overlay parts for one namespace.
 usr maintenance overlay-compact densegen/demo --namespace densegen
 ```
 
 **Delete & restore (tombstones)**
 
 ```bash
+# Tombstone one record.
 usr delete densegen/demo --id e153ebc4...
+
+# Tombstone many records by id list.
 usr delete densegen/demo --id-file /tmp/ids.txt --reason "bad input"
+
+# Restore a tombstoned record.
 usr restore densegen/demo --id e153ebc4...
 
+# Set state fields.
 usr state set densegen/demo --id e153ebc4... --masked
 usr state set densegen/demo --id e153ebc4... --qc-status pass --split train
+
+# Clear all reserved state fields.
 usr state clear densegen/demo --id e153ebc4...
 ```
 
 **Column-wise summary (types, null %, list stats)**
 ```bash
+# Summarize columns and null rates from a sample.
 usr describe densegen/demo --sample 2048
 ```
 
 **Fetch a single record by id (pretty table)**
 
 ```bash
+# Fetch one record by id and selected columns.
 usr get densegen/demo --id e153ebc4... --columns id,sequence,densegen__used_tfbs
 ```
 
 **Export**
 
 ```bash
+# Export full dataset to CSV.
 usr export densegen/demo --fmt csv   --out src/dnadesign/usr/demo_material/out.csv
+
+# Export selected columns.
 usr export densegen/demo --fmt csv   --columns id,sequence --out src/dnadesign/usr/demo_material/out_small.csv
+
+# Export JSONL.
 usr export densegen/demo --fmt jsonl --out src/dnadesign/usr/demo_material/out.jsonl
+
+# Export including tombstoned rows.
 usr export densegen/demo --fmt csv --out src/dnadesign/usr/demo_material/out_with_deleted.csv --include-deleted
 
 # or if you're in the cwd of records.parquet
@@ -275,6 +328,7 @@ usr export --fmt csv --out records.csv
 **Snapshots**
 
 ```bash
+# Write timestamped snapshot under _snapshots/.
 usr snapshot densegen/demo   # writes records-YYYYMMDDThhmmssffffff.parquet under _snapshots/
 ```
 
@@ -285,7 +339,10 @@ usr snapshot densegen/demo   # writes records-YYYYMMDDThhmmssffffff.parquet unde
 There is a marimo notebook for interactive exploration (filters + summaries):
 
 ```bash
+# Install notebook deps.
 uv sync --locked --group notebooks
+
+# Open marimo explorer notebook.
 uv run marimo edit --sandbox --watch src/dnadesign/usr/notebooks/usr_explorer.py
 ```
 
@@ -296,9 +353,14 @@ Use the widgets to choose a dataset, sample size, and panel configuration.
 These commands accept a dataset name **or** a file/directory path. When a directory contains multiple Parquet files, USR presents an interactive picker.
 
 ```bash
-usr head .                       # head of a Parquet in the current directory (picker if needed)
-usr cols                         # list columns for ./records.parquet (or the file you pick)
-usr cell --row 0 --col sequence  # print a single cell from ./records.parquet (or the file you pick)
+# Preview current directory parquet (interactive picker if needed).
+usr head .
+
+# List columns for selected file.
+usr cols
+
+# Print one cell.
+usr cell --row 0 --col sequence
 
 # Explicit file path examples
 usr head permuter/run42/records.parquet
@@ -314,12 +376,19 @@ usr cols ./some/dir --glob 'events*.parquet'
 Each `id` must map to exactly one sequence. De‑duplicate with an explicit key:
 
 ```bash
-usr maintenance dedupe <dataset> --key sequence_ci --keep keep-first  # case-insensitive (dna_4 only)
-usr maintenance dedupe <dataset> --key sequence --keep keep-last      # case-preserving
-usr maintenance dedupe <dataset> --dry-run             # preview
+# Case-insensitive dedupe (dna_4 only).
+usr maintenance dedupe <dataset> --key sequence_ci --keep keep-first
+
+# Case-preserving dedupe.
+usr maintenance dedupe <dataset> --key sequence --keep keep-last
+
+# Preview dedupe impact.
+usr maintenance dedupe <dataset> --dry-run
+
+# DenseGen-focused cleanup helpers.
 usr densegen repair --dedupe keep-first
-usr densegen repair --filter-single-tf  # remove rows that only contain one type of TF among their TFBSs
-usr densegen repair --drop-id-seq-only  # remove rows that only contain 'id' and 'sequence'
+usr densegen repair --filter-single-tf
+usr densegen repair --drop-id-seq-only
 ```
 
 `sequence_ci` is only valid for `dna_4` datasets; other keys preserve case.
@@ -345,6 +414,7 @@ Align columns and control duplicates while merging rows from a source dataset in
 **Example**
 
 ```bash
+# Merge source dataset into destination dataset.
 usr maintenance merge \
   --dest 60bp_dual_promoter_cpxR_LexA \
   --src  60bp_dual_promoter_cpxR_LexA_v2 \
@@ -360,7 +430,10 @@ Built-in SSH + rsync moves dataset folders and single files. `USR_REMOTES_PATH` 
 Use this for HPC workflows where datasets are not Git-tracked.
 
 ```bash
+# Point USR at remote config file.
 export USR_REMOTES_PATH="$HOME/.config/dnadesign/usr-remotes.yaml"
+
+# Create BU SCC remote profile.
 usr remotes wizard \
   --preset bu-scc \
   --name bu-scc \
@@ -368,6 +441,7 @@ usr remotes wizard \
   --host scc1.bu.edu \
   --base-dir /project/<cluster-user>/densegen_runs/outputs/usr_datasets
 
+# Validate remote connectivity and config.
 usr remotes doctor --remote bu-scc
 
 # Preview, then transfer
@@ -379,14 +453,20 @@ usr push densegen/60bp_dual_promoter_cpxR_LexA bu-scc -y
 **Dataset directory mode** supports explicit dataset paths outside `--root`:
 
 ```bash
+# Diff dataset directory path outside --root.
 usr diff /path/to/outputs/usr_datasets/densegen/demo_hpc bu-scc
+
+# Pull dataset directory by path.
 usr pull /path/to/outputs/usr_datasets/densegen/demo_hpc bu-scc -y
+
+# Push dataset directory by path.
 usr push /path/to/outputs/usr_datasets/densegen/demo_hpc bu-scc -y
 ```
 
 **FILE mode** lets you diff/pull/push arbitrary files by path:
 
 ```bash
+# Diff/pull one file by path.
 usr diff permuter/run42/records.parquet bu-scc
 usr pull permuter/run42/records.parquet bu-scc -y
 ```
@@ -462,6 +542,7 @@ The registry must include the reserved `usr_state` namespace with the standardiz
 Register a namespace:
 
 ```bash
+# Register namespace and derived columns.
 usr namespace register mock \
   --columns mock__score:float64,mock__vec:list<float64> \
   --owner "your-name" \
@@ -471,13 +552,17 @@ usr namespace register mock \
 List or show registered namespaces:
 
 ```bash
+# List namespaces.
 usr namespace list
+
+# Inspect one namespace.
 usr namespace show mock
 ```
 
 Freeze the registry into a dataset (for historic compatibility):
 
 ```bash
+# Freeze current registry into dataset.
 usr maintenance registry-freeze densegen/demo
 ```
 

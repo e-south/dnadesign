@@ -39,6 +39,7 @@ def test_sampling_kwargs_from_config_maps_fields() -> None:
     assert kwargs["n_sites"] == 10
     assert kwargs["strategy"] == "stochastic"
     assert kwargs["selection"] is sampling.selection
+    assert kwargs["cross_regulator_core_collisions"] == "warn"
 
 
 def test_sample_pwm_sites_requires_config_objects() -> None:
@@ -106,5 +107,20 @@ def test_sampling_tier_fractions_validation() -> None:
                 },
                 "selection": {"policy": "top_score"},
                 "tier_fractions": [0.1, 0.2],
+            }
+        )
+
+
+def test_sampling_uniqueness_cross_regulator_core_collisions_validation() -> None:
+    with pytest.raises(ValueError, match="cross_regulator_core_collisions"):
+        PWMSamplingConfig.model_validate(
+            {
+                "n_sites": 10,
+                "mining": {
+                    "batch_size": 50,
+                    "budget": {"mode": "fixed_candidates", "candidates": 100},
+                },
+                "selection": {"policy": "top_score"},
+                "uniqueness": {"key": "core", "cross_regulator_core_collisions": "invalid"},
             }
         )

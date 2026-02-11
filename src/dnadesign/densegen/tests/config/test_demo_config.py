@@ -16,6 +16,7 @@ from pathlib import Path
 
 from dnadesign.densegen.src.adapters.sources.base import resolve_path
 from dnadesign.densegen.src.config import load_config
+from dnadesign.densegen.src.config.base import LATEST_SCHEMA_VERSION
 
 
 def _demo_config_path(workspace_id: str) -> Path:
@@ -87,6 +88,24 @@ def test_demo_meme_three_tfs_uses_background_and_plan_specific_sigma70_spacers()
         assert tuple(pc.spacer_length or ()) == spacer
 
 
+def test_demo_meme_three_tfs_stage_a_sampling_targets() -> None:
+    cfg_path = _demo_config_path("demo_meme_three_tfs")
+    cfg = load_config(cfg_path)
+    inputs = list(cfg.root.densegen.inputs)
+    pwm_inputs = [inp for inp in inputs if inp.type == "pwm_artifact"]
+    assert pwm_inputs
+    for inp in pwm_inputs:
+        sampling = inp.sampling
+        assert sampling.n_sites == 250
+        assert sampling.mining.budget.mode == "fixed_candidates"
+        assert sampling.mining.budget.candidates == 1_000_000
+        assert sampling.uniqueness.cross_regulator_core_collisions == "error"
+
+    background_inputs = [inp for inp in inputs if inp.type == "background_pool"]
+    assert len(background_inputs) == 1
+    assert background_inputs[0].sampling.n_sites == 500
+
+
 def test_binding_sites_demo_config_exists_and_loads() -> None:
     cfg_path = _demo_config_path("demo_binding_sites")
     assert cfg_path.exists(), f"Missing demo config: {cfg_path}"
@@ -145,3 +164,9 @@ def test_binding_sites_demo_uses_local_output_with_padding_enabled() -> None:
     output = cfg.root.densegen.output
     assert output.targets == ["parquet"]
     assert cfg.root.densegen.postprocess.pad.mode == "adaptive"
+
+
+def test_packaged_demo_configs_track_latest_schema_version() -> None:
+    for workspace_id in ("demo_binding_sites", "demo_meme_three_tfs"):
+        cfg = load_config(_demo_config_path(workspace_id))
+        assert cfg.root.densegen.schema_version == LATEST_SCHEMA_VERSION

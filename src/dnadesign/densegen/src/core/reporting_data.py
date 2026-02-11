@@ -144,6 +144,30 @@ def collect_report_data(
     else:
         attempts_df = pd.read_parquet(attempts_path)
     library_df = _explode_library_from_attempts(attempts_df)
+    if (
+        not used_df.empty
+        and "library_hash_is_fallback" in used_df.columns
+        and bool(used_df["library_hash_is_fallback"].fillna(False).astype(bool).any())
+        and not library_df.empty
+    ):
+        map_cols = ["input_name", "plan_name", "library_index", "library_hash"]
+        if all(col in library_df.columns for col in map_cols):
+            hash_map = library_df[map_cols].copy()
+            hash_map["library_hash"] = hash_map["library_hash"].astype(str).str.strip()
+            hash_map = hash_map[hash_map["library_hash"] != ""]
+            hash_map["library_index"] = pd.to_numeric(hash_map["library_index"], errors="coerce").fillna(0).astype(int)
+            hash_map = hash_map.rename(columns={"plan_name": "plan", "library_hash": "library_hash_from_attempt"})
+            hash_map = hash_map.drop_duplicates(["input_name", "plan", "library_index"], keep="first")
+
+            used_df = used_df.copy()
+            used_df["library_index"] = pd.to_numeric(used_df["library_index"], errors="coerce").fillna(0).astype(int)
+            used_df = used_df.merge(hash_map, on=["input_name", "plan", "library_index"], how="left")
+            fallback_mask = used_df["library_hash_is_fallback"].fillna(False).astype(bool)
+            mapped_hash = used_df["library_hash_from_attempt"].fillna("").astype(str).str.strip()
+            replace_mask = fallback_mask & (mapped_hash != "")
+            used_df.loc[replace_mask, "library_hash"] = mapped_hash.loc[replace_mask]
+            used_df = used_df.drop(columns=["library_hash_from_attempt"])
+
     solutions_path = tables_root / "solutions.parquet"
     if not solutions_path.exists():
         message = (

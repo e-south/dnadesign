@@ -66,6 +66,8 @@ class PWMSamplingSummary:
     selection_pool_min_score_norm_used: Optional[float] = None
     selection_pool_capped: Optional[bool] = None
     selection_pool_cap_value: Optional[int] = None
+    selection_pool_target_size: Optional[int] = None
+    selection_pool_degenerate: Optional[bool] = None
     selection_score_norm_max_raw: Optional[float] = None
     selection_score_norm_clipped: Optional[bool] = None
     diversity_nearest_distance_mean: Optional[float] = None
@@ -191,6 +193,8 @@ def _build_summary(
     selection_pool_min_score_norm_used: Optional[float] = None,
     selection_pool_capped: Optional[bool] = None,
     selection_pool_cap_value: Optional[int] = None,
+    selection_pool_target_size: Optional[int] = None,
+    selection_pool_degenerate: Optional[bool] = None,
     selection_score_norm_max_raw: Optional[float] = None,
     selection_score_norm_clipped: Optional[bool] = None,
     diversity_nearest_distance_mean: Optional[float] = None,
@@ -271,6 +275,8 @@ def _build_summary(
         else None,
         selection_pool_capped=bool(selection_pool_capped) if selection_pool_capped is not None else None,
         selection_pool_cap_value=int(selection_pool_cap_value) if selection_pool_cap_value is not None else None,
+        selection_pool_target_size=int(selection_pool_target_size) if selection_pool_target_size is not None else None,
+        selection_pool_degenerate=bool(selection_pool_degenerate) if selection_pool_degenerate is not None else None,
         selection_score_norm_max_raw=float(selection_score_norm_max_raw)
         if selection_score_norm_max_raw is not None
         else None,

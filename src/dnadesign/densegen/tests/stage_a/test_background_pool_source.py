@@ -87,3 +87,46 @@ def test_background_pool_fimo_zero_hit_rejects_any_hit() -> None:
         max_score_norm=None,
     )
     assert accepted == ["CCCCCCCC"]
+
+
+@pytest.mark.skipif(
+    _FIMO_MISSING,
+    reason="fimo executable not available (run tests via `pixi run pytest` or set MEME_BIN).",
+)
+def test_background_pool_fimo_zero_hit_requires_no_hits_across_all_input_pwms() -> None:
+    motif_a = PWMMotif(
+        motif_id="motif_A",
+        matrix=[
+            {"A": 0.99, "C": 0.0033, "G": 0.0033, "T": 0.0034},
+            {"A": 0.99, "C": 0.0033, "G": 0.0033, "T": 0.0034},
+            {"A": 0.99, "C": 0.0033, "G": 0.0033, "T": 0.0034},
+            {"A": 0.99, "C": 0.0033, "G": 0.0033, "T": 0.0034},
+            {"A": 0.99, "C": 0.0033, "G": 0.0033, "T": 0.0034},
+            {"A": 0.99, "C": 0.0033, "G": 0.0033, "T": 0.0034},
+            {"A": 0.99, "C": 0.0033, "G": 0.0033, "T": 0.0034},
+            {"A": 0.99, "C": 0.0033, "G": 0.0033, "T": 0.0034},
+        ],
+        background={"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+    )
+    motif_t = PWMMotif(
+        motif_id="motif_T",
+        matrix=[
+            {"A": 0.0034, "C": 0.0033, "G": 0.0033, "T": 0.99},
+            {"A": 0.0034, "C": 0.0033, "G": 0.0033, "T": 0.99},
+            {"A": 0.0034, "C": 0.0033, "G": 0.0033, "T": 0.99},
+            {"A": 0.0034, "C": 0.0033, "G": 0.0033, "T": 0.99},
+            {"A": 0.0034, "C": 0.0033, "G": 0.0033, "T": 0.99},
+            {"A": 0.0034, "C": 0.0033, "G": 0.0033, "T": 0.99},
+            {"A": 0.0034, "C": 0.0033, "G": 0.0033, "T": 0.99},
+            {"A": 0.0034, "C": 0.0033, "G": 0.0033, "T": 0.99},
+        ],
+        background={"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+    )
+    accepted, scores = _run_fimo_exclusion(
+        motifs=[motif_a, motif_t],
+        sequences=["AAAAAAAA", "TTTTTTTT", "CCCCCCCC"],
+        allow_zero_hit_only=True,
+        max_score_norm=None,
+    )
+    assert accepted == ["CCCCCCCC"]
+    assert scores == {"CCCCCCCC": None}

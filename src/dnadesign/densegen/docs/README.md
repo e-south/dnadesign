@@ -1,56 +1,78 @@
 # DenseGen docs
 
+This docs hub helps you choose the right path quickly.
+
+If you only need one answer:
+- use demos for step-by-step runs
+- use guides for concepts
+- use reference pages for exact contracts
+
+## Contents
+- [At a glance](#at-a-glance)
+- [Read order](#read-order)
+- [Runtime subprocess flow](#runtime-subprocess-flow)
+- [Event boundary](#event-boundary)
+- [Demos](#demos)
+- [Guides](#guides)
+- [Reference](#reference)
+- [Workflows](#workflows)
+- [Development](#development)
+
 ## At a glance
 
-**Intent:** Generate constrained synthetic DNA sequences via staged sampling and optimization.
+**Intent:** generate constrained synthetic DNA sequences with auditable outputs.
 
-**When to use:**
-- Build controlled libraries for perturbation screens.
-- Enforce regulatory composition constraints (required regulators, min counts, fixed promoter elements).
-- Generate quota-bounded sequence datasets with audit artifacts.
-- Produce run diagnostics (attempts, manifests, plots, reports).
+Use DenseGen when you need:
+- controlled library generation with explicit constraints
+- repeatable run state and resume behavior
+- diagnostics and report artifacts
 
-**When not to use:**
-- Do not use for canonical storage (use USR).
-- Do not use for operational alerts directly (use Notify via USR events).
-- Do not use DenseGen runtime events as Notify input.
+Current config schema version: `2.9`.
 
-**Boundary / contracts:**
-- DenseGen runtime diagnostics live at `outputs/meta/events.jsonl`.
-- USR mutation events live at `<usr_root>/<dataset>/.events.log`.
-- Notify consumes USR `.events.log` only.
-- Integration boundary details are canonical in `reference/outputs.md#event-streams-and-consumers-densegen-vs-usr`.
+Do not use DenseGen for:
+- canonical dataset ownership (use USR)
+- alert/webhook delivery (use Notify)
 
-**Start here:**
-- [Binding-sites baseline demo](demo/demo_binding_sites.md)
-- [Three-TF PWM demo](demo/demo_pwm_artifacts.md)
-- [DenseGen -> USR -> Notify demo](demo/demo_usr_notify.md)
-- [CLI reference (config resolution)](reference/cli.md#config-resolution)
+## Read order
 
-## Start here
-
-Pick the path that matches what you are trying to do:
-
-1) Understand DenseGen end-to-end with the smallest moving parts.
+1. Minimal run with low moving parts:
    - [Binding-sites baseline demo](demo/demo_binding_sites.md)
-
-2) Run the canonical PWM workflow (Cruncher -> motif artifacts -> Stage-A PWM mining).
+2. Canonical PWM path:
    - [Three-TF PWM demo](demo/demo_pwm_artifacts.md)
    - [Cruncher PWM pipeline](workflows/cruncher_pwm_pipeline.md)
-
-3) Run the full stack locally (DenseGen -> USR -> Notify).
+3. Full stack integration:
    - [DenseGen -> USR -> Notify demo](demo/demo_usr_notify.md)
-   - (For clusters) [DenseGen -> USR -> Notify on HPC](workflows/usr_notify_hpc.md)
-   - (BU SCC) [DenseGen -> USR -> Notify on BU SCC](workflows/bu_scc_end_to_end.md)
-   - (Platform BU SCC docs) `docs/hpc/bu_scc_install.md` and `docs/hpc/bu_scc_batch_notify.md`
+   - [DenseGen -> USR -> Notify on HPC](workflows/usr_notify_hpc.md)
+   - [DenseGen -> USR -> Notify on BU SCC](workflows/bu_scc_end_to_end.md)
+   - [docs/hpc/bu_scc_install.md](../../../../docs/hpc/bu_scc_install.md)
+   - [docs/hpc/bu_scc_batch_notify.md](../../../../docs/hpc/bu_scc_batch_notify.md)
+
+## Runtime subprocess flow
+
+DenseGen has four runtime subprocesses with clear boundaries:
+
+1. **Stage-A pool build**: sample/ingest candidate sites per input, score/filter, and write pool artifacts.
+2. **Stage-B library build**: create plan-scoped solver libraries from Stage-A pools.
+3. **Solve to quota**: generate accepted arrays under constraints and runtime limits.
+4. **Post-run rendering**: generate plots and reports from written tables/manifests.
+
+Command mapping:
+- `dense stage-a build-pool`
+- `dense stage-b build-libraries`
+- `dense run`
+- `dense plot` and `dense report`
+
+`dense run` orchestrates this pipeline end-to-end and auto-builds missing Stage-A/Stage-B artifacts.
 
 ## Event boundary
 
-DenseGen writes runtime diagnostics to `outputs/meta/events.jsonl`.
-Notify does not read this stream.
+DenseGen and Notify intentionally use different event streams:
 
-Notify reads USR mutation events at `<usr_root>/<dataset>/.events.log`.
-See `reference/outputs.md#event-streams-and-consumers-densegen-vs-usr`.
+- DenseGen runtime telemetry: `outputs/meta/events.jsonl`
+- Notify input stream: USR `<usr_root>/<dataset>/.events.log`
+
+Canonical contract details:
+- [reference/outputs.md#event-streams-and-consumers-densegen-vs-usr](reference/outputs.md#event-streams-and-consumers-densegen-vs-usr)
 
 ---
 
@@ -69,8 +91,8 @@ See `reference/outputs.md#event-streams-and-consumers-densegen-vs-usr`.
 - [Outputs + metadata](guide/outputs-metadata.md)
 
 ## Reference
-- [Config](reference/config.md)
 - [CLI](reference/cli.md)
+- [Config](reference/config.md)
 - [Outputs](reference/outputs.md)
 - [Motif artifacts contract](reference/motif_artifacts.md)
 
@@ -78,7 +100,6 @@ See `reference/outputs.md#event-streams-and-consumers-densegen-vs-usr`.
 - [Cruncher PWM pipeline](workflows/cruncher_pwm_pipeline.md)
 - [DenseGen -> USR -> Notify on HPC](workflows/usr_notify_hpc.md)
 - [DenseGen -> USR -> Notify on BU SCC](workflows/bu_scc_end_to_end.md)
-- Platform BU SCC docs: `docs/hpc/bu_scc_install.md`, `docs/hpc/bu_scc_batch_notify.md`
 
 ## Development
 - [Dev README](dev/README.md)

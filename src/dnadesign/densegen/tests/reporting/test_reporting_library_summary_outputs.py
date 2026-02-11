@@ -228,3 +228,80 @@ def test_report_outputs_section_uses_usr_records_path(tmp_path: Path, monkeypatc
     report_md = _render_report_md(bundle)
     assert "- outputs/usr_datasets/densegen/demo_usr/records.parquet" in report_md
     assert "- outputs/tables/dense_arrays.parquet" not in report_md
+
+
+def test_collect_report_data_maps_used_rows_when_record_library_hash_missing(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    cfg_path = run_root / "config.yaml"
+    _write_config(cfg_path)
+    (run_root / "inputs.csv").write_text("tf,tfbs\nTF1,AAA\nTF2,CCC\n")
+
+    attempts_path = run_root / "outputs" / "tables" / "attempts.parquet"
+    attempts_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {
+                "attempt_id": "a1",
+                "attempt_index": 1,
+                "run_id": "demo",
+                "input_name": PLAN_POOL_LABEL,
+                "plan_name": "demo_plan",
+                "created_at": "2026-01-14T00:00:01+00:00",
+                "status": "success",
+                "reason": "ok",
+                "detail_json": "{}",
+                "sequence": "ATGCATGCAT",
+                "sequence_hash": "hash1",
+                "solution_id": "out1",
+                "used_tf_counts_json": "{}",
+                "used_tf_list": ["TF1", "TF2"],
+                "sampling_library_index": 1,
+                "sampling_library_hash": "abc123",
+                "solver_status": "optimal",
+                "solver_objective": 0.0,
+                "solver_solve_time_s": 0.1,
+                "dense_arrays_version": None,
+                "library_tfbs": ["AAA", "CCC"],
+                "library_tfs": ["TF1", "TF2"],
+                "library_site_ids": ["s1", "s2"],
+                "library_sources": ["demo", "demo"],
+            }
+        ]
+    ).to_parquet(attempts_path, index=False)
+
+    # Dense-array records may omit sampling_library_hash after schema curation;
+    # reporting still needs to map usage back to attempts by input/plan/library_index.
+    records_df = pd.DataFrame(
+        [
+            {
+                "id": "out1",
+                "sequence": "ATGCATGCAT",
+                "densegen__plan": "demo_plan",
+                "densegen__input_name": PLAN_POOL_LABEL,
+                "densegen__sampling_library_index": 1,
+                "densegen__used_tfbs_detail": [
+                    {"tf": "TF1", "tfbs": "AAA"},
+                    {"tf": "TF2", "tfbs": "CCC"},
+                ],
+                "densegen__required_regulators": [],
+                "densegen__covers_all_tfs_in_solution": True,
+                "densegen__used_tf_counts": [{"tf": "TF1", "count": 1}, {"tf": "TF2", "count": 1}],
+                "densegen__min_count_by_regulator": [],
+            }
+        ]
+    )
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.core.reporting_data.load_records_from_config",
+        lambda *_args, **_kwargs: (records_df.copy(), "parquet:outputs/tables/dense_arrays.parquet"),
+    )
+
+    loaded = load_config(cfg_path)
+    bundle = collect_report_data(loaded.root, cfg_path, include_combinatorics=False)
+    offered_vs_used_tf = bundle.tables["offered_vs_used_tf"]
+    assert not offered_vs_used_tf.empty
+
+    tf1 = offered_vs_used_tf[offered_vs_used_tf["tf"] == "TF1"].iloc[0]
+    tf2 = offered_vs_used_tf[offered_vs_used_tf["tf"] == "TF2"].iloc[0]
+    assert int(tf1["used_placements"]) == 1
+    assert int(tf2["used_placements"]) == 1

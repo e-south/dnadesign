@@ -21,11 +21,15 @@ import pytest
 
 from dnadesign.densegen.src.adapters.sources import PWMArtifactSetDataSource
 from dnadesign.densegen.src.adapters.sources.pwm_sampling import build_log_odds
+from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_metadata import TFBSMeta
+from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_types import SelectionMeta
+from dnadesign.densegen.src.config import PWMSamplingConfig
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
 from dnadesign.densegen.tests.pwm_sampling_fixtures import (
     fixed_candidates_mining,
     sampling_config,
     selection_mmr,
+    selection_top_score,
 )
 
 _FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
@@ -52,6 +56,35 @@ def _write_artifact(path: Path, motif_id: str, *, length: int = 3) -> None:
         "log_odds": log_odds,
     }
     path.write_text(json.dumps(artifact))
+
+
+def _tfbs_meta(*, score: float, core: str) -> TFBSMeta:
+    return TFBSMeta(
+        best_hit_score=float(score),
+        rank_within_regulator=1,
+        tier=0,
+        fimo_start=1,
+        fimo_stop=len(core),
+        fimo_strand="+",
+        tfbs_core=str(core),
+        fimo_matched_sequence=str(core),
+        selection_meta=SelectionMeta(selection_rank=1, selection_utility=1.0, selection_score_norm=1.0),
+        selection_policy="top_score",
+        selection_alpha=None,
+        selection_similarity=None,
+        selection_relevance_norm=None,
+        selection_pool_size_final=1,
+        selection_pool_rung_fraction_used=1.0,
+        selection_pool_min_score_norm_used=None,
+        selection_pool_capped=False,
+        selection_pool_cap_value=None,
+        selection_pool_target_size=1,
+        selection_pool_degenerate=True,
+        tier_target_fraction=None,
+        tier_target_required_unique=None,
+        tier_target_met=None,
+        tier_target_eligible_unique=1,
+    )
 
 
 @pytest.mark.skipif(
@@ -163,3 +196,125 @@ def test_pwm_artifact_set_prevalidates_mmr_range(tmp_path: Path, monkeypatch) ->
     )
     with pytest.raises(ValueError, match="MMR requires a fixed trim window"):
         ds.load_data(rng=np.random.default_rng(3))
+
+
+def test_pwm_artifact_set_rejects_mixed_cross_regulator_collision_modes(tmp_path: Path) -> None:
+    a_path = tmp_path / "m1.json"
+    b_path = tmp_path / "m2.json"
+    _write_artifact(a_path, "M1")
+    _write_artifact(b_path, "M2")
+
+    ds = PWMArtifactSetDataSource(
+        paths=[str(a_path), str(b_path)],
+        cfg_path=tmp_path / "config.yaml",
+        sampling=sampling_config(
+            n_sites=1,
+            strategy="stochastic",
+            mining=fixed_candidates_mining(batch_size=10, candidates=20),
+            length_policy="exact",
+            cross_regulator_core_collisions="warn",
+        ),
+        overrides_by_motif_id={
+            "M2": sampling_config(
+                n_sites=1,
+                strategy="stochastic",
+                mining=fixed_candidates_mining(batch_size=10, candidates=20),
+                length_policy="exact",
+                cross_regulator_core_collisions="error",
+            )
+        },
+    )
+
+    with pytest.raises(ValueError, match="cross_regulator_core_collisions consistent"):
+        ds.load_data(rng=np.random.default_rng(10))
+
+
+def test_pwm_artifact_set_warns_on_cross_regulator_core_collisions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    a_path = tmp_path / "m1.json"
+    b_path = tmp_path / "m2.json"
+    _write_artifact(a_path, "M1")
+    _write_artifact(b_path, "M2")
+
+    def _fake_sample_pwm_sites(_rng, motif, **_kwargs):
+        if str(motif.motif_id) == "M1":
+            seq = "AAAAAA"
+            core = "AAA"
+            score = 8.0
+        else:
+            seq = "TTTAAA"
+            core = "AAA"
+            score = 7.0
+        return [seq], {seq: _tfbs_meta(score=score, core=core)}, None
+
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.adapters.sources.pwm_artifact_set.sample_pwm_sites",
+        _fake_sample_pwm_sites,
+    )
+
+    ds = PWMArtifactSetDataSource(
+        paths=[str(a_path), str(b_path)],
+        cfg_path=tmp_path / "config.yaml",
+        sampling=sampling_config(
+            n_sites=1,
+            strategy="stochastic",
+            mining=fixed_candidates_mining(batch_size=10, candidates=20),
+            length_policy="exact",
+        ),
+    )
+
+    with caplog.at_level("WARNING"):
+        entries, df, _summaries = ds.load_data(rng=np.random.default_rng(11))
+    assert len(entries) == 2
+    assert df is not None
+    assert "Stage-A run-global core collision across regulators detected" in caplog.text
+    assert '"collision_core_count": 1' in caplog.text
+
+
+def test_pwm_artifact_set_rejects_cross_regulator_core_collisions_in_error_mode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    a_path = tmp_path / "m1.json"
+    b_path = tmp_path / "m2.json"
+    _write_artifact(a_path, "M1")
+    _write_artifact(b_path, "M2")
+
+    def _fake_sample_pwm_sites(_rng, motif, **_kwargs):
+        if str(motif.motif_id) == "M1":
+            seq = "AAAAAA"
+            core = "AAA"
+            score = 8.0
+        else:
+            seq = "TTTAAA"
+            core = "AAA"
+            score = 7.0
+        return [seq], {seq: _tfbs_meta(score=score, core=core)}, None
+
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.adapters.sources.pwm_artifact_set.sample_pwm_sites",
+        _fake_sample_pwm_sites,
+    )
+
+    strict_sampling = PWMSamplingConfig(
+        n_sites=1,
+        strategy="stochastic",
+        mining=fixed_candidates_mining(batch_size=10, candidates=20),
+        selection=selection_top_score(),
+        keep_all_candidates_debug=False,
+        include_matched_sequence=True,
+        uniqueness={"key": "core", "cross_regulator_core_collisions": "error"},
+        length={"policy": "exact"},
+        trimming={"window_strategy": "max_info"},
+    )
+    ds = PWMArtifactSetDataSource(
+        paths=[str(a_path), str(b_path)],
+        cfg_path=tmp_path / "config.yaml",
+        sampling=strict_sampling,
+    )
+
+    with pytest.raises(ValueError, match="Stage-A run-global core collision across regulators detected"):
+        ds.load_data(rng=np.random.default_rng(12))

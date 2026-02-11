@@ -2,6 +2,18 @@
 
 Notify consumes USR mutation events from `.events.log` JSONL files and sends selected events to webhook providers. The integration contract is USR `.events.log` only; DenseGen runtime diagnostics (`outputs/meta/events.jsonl`) are out of scope for Notify.
 
+## Contents
+- [Minimal operator quickstart](#minimal-operator-quickstart)
+- [Slack wizard onboarding (3 minutes)](#slack-wizard-onboarding-3-minutes)
+- [Common mistakes](#common-mistakes)
+- [Required event fields (minimum contract)](#required-event-fields-minimum-contract)
+- [Quickstart: watch an event log and POST to a webhook](#quickstart-watch-an-event-log-and-post-to-a-webhook)
+- [Secure webhook setup (real endpoints)](#secure-webhook-setup-real-endpoints)
+- [Profile setup notes](#profile-setup-notes)
+- [Deployed pressure test: DenseGen USR Notify](#deployed-pressure-test-densegen-usr-notify)
+- [Filtering (reduce noise first, then tighten)](#filtering-reduce-noise-first-then-tighten)
+- [Spool and drain (HPC-friendly)](#spool-and-drain-hpc-friendly)
+
 See also:
 - USR event schema: [USR README: event log schema](../../src/dnadesign/usr/README.md#event-log-schema)
 - DenseGen end-to-end demo: [DenseGen -> USR -> Notify demo](../../src/dnadesign/densegen/docs/demo/demo_usr_notify.md)
@@ -11,9 +23,16 @@ See also:
 ## Minimal operator quickstart
 
 ```bash
+# Validate profile and secret resolution.
 uv run notify profile doctor --profile outputs/notify.profile.json
+
+# Preview payloads without posting.
 uv run notify usr-events watch --profile outputs/notify.profile.json --dry-run
+
+# Run live watcher.
 uv run notify usr-events watch --profile outputs/notify.profile.json --follow
+
+# Retry failed payloads from spool.
 uv run notify spool drain --profile outputs/notify.profile.json
 ```
 
@@ -37,7 +56,10 @@ uv run dense inspect run --usr-events-path -c /abs/path/to/config.yaml
 Concrete example for the three-TF demo workspace (run from repo root):
 
 ```bash
+# Create a workspace before resolving events path from config.
 uv run dense workspace init --id meme_three_tfs_trial --from-workspace demo_meme_three_tfs --copy-inputs --output-mode usr
+
+# Resolve USR events path directly from that workspace config.
 EVENTS_PATH="$(uv run dense inspect run --usr-events-path -c src/dnadesign/densegen/workspaces/meme_three_tfs_trial/config.yaml)"
 ```
 
@@ -66,9 +88,13 @@ uv run notify usr-events watch --profile outputs/notify.profile.json --follow
 If `--secret-source auto` fails (no keychain/secretservice backend), use env mode:
 
 ```bash
+# Capture webhook URL without shell echo.
 read -rsp "Slack Webhook URL: " DENSEGEN_WEBHOOK; echo
+
+# Export for this shell session.
 export DENSEGEN_WEBHOOK
 
+# Create profile using env-backed secret mode.
 uv run notify profile wizard \
   --profile outputs/notify.profile.json \
   --provider slack \
@@ -120,6 +146,7 @@ Use `--allow-unknown-version` only during controlled migrations.
 ## Quickstart: watch an event log and POST to a webhook
 
 ```bash
+# Start a watcher on a concrete .events.log path.
 uv run notify usr-events watch \
   --events /path/to/.events.log \
   --cursor /path/to/notify.cursor \
@@ -146,17 +173,23 @@ Use `--url-env` or `--secret-ref` for deployed runs so webhook URLs are not comm
 One-time per shell (no terminal echo):
 
 ```bash
+# Read webhook URL safely from stdin.
 read -rsp "Webhook URL: " DENSEGEN_WEBHOOK; echo
+
+# Export for notify commands.
 export DENSEGEN_WEBHOOK
 ```
 
 Persistent local setup (`.env.local` is a file, not a folder):
 
 ```bash
+# Write URL into local env file (do not commit this file).
 cat > .env.local <<'EOF'
 DENSEGEN_WEBHOOK=https://...
 EOF
 chmod 600 .env.local
+
+# Load values into current shell.
 set -a; source .env.local; set +a
 ```
 
@@ -184,6 +217,7 @@ Use the Slack wizard quickstart above for onboarding. If you already have a prof
 Validate wiring before posting:
 
 ```bash
+# Validate profile before posting any payload.
 uv run notify profile doctor --profile outputs/notify.profile.json
 ```
 
@@ -200,11 +234,12 @@ Profile security contract:
 
 ---
 
-## Deployed pressure test: DenseGen -> USR -> Notify
+## Deployed pressure test: DenseGen USR Notify
 
 Run the watcher in dry-run mode first:
 
 ```bash
+# Dry-run with action and tool filters to verify payloads first.
 uv run notify usr-events watch \
   --events outputs/usr_datasets/demo_pwm/.events.log \
   --cursor outputs/notify.cursor \
@@ -220,6 +255,7 @@ If payloads look correct, remove `--dry-run` to deliver for real.
 Generate additional events by increasing quota and resuming DenseGen:
 
 ```bash
+# Emit additional USR events by resuming DenseGen.
 uv run dense run --resume --no-plot
 ```
 
@@ -236,6 +272,7 @@ uv run dense run --resume --no-plot
 ## Local test (no dependencies): run a tiny webhook receiver
 
 ```bash
+# Start local webhook receiver for end-to-end validation.
 python - <<'PY'
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -257,7 +294,10 @@ PY
 Then:
 
 ```bash
+# Point notify at the local receiver.
 export WEBHOOK_URL="http://127.0.0.1:8787/webhook"
+
+# Follow events and post to local endpoint.
 uv run notify usr-events watch \
   --events /path/to/.events.log \
   --cursor /tmp/notify.cursor \
@@ -294,6 +334,7 @@ If delivery fails and `--spool-dir` is set, Notify writes payload files locally.
 Drain later from a host with stable network access.
 
 ```bash
+# Watch with spooling enabled and limited retries.
 uv run notify usr-events watch \
   --events /path/to/.events.log \
   --cursor /path/to/notify.cursor \
@@ -306,6 +347,7 @@ uv run notify usr-events watch \
 Drain:
 
 ```bash
+# Retry payloads that were written to spool.
 uv run notify spool drain \
   --spool-dir /path/to/spool \
   --provider slack \

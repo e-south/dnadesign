@@ -1,19 +1,20 @@
 ## Postprocess (pad)
 
-If dense-arrays returns a sequence shorter than `sequence_length`, DenseGen can pad with
-random bases. Postprocess runs after optimization and is recorded in metadata.
+This page explains what happens when solver output is shorter than your target sequence length.
+
+Postprocess runs after solving and records what it did in metadata.
 
 ### Contents
-- [Modes](#modes) - off, strict, or adaptive pad.
-- [GC feasibility](#gc-feasibility) - why some targets are impossible.
+- [Modes](#modes)
+- [GC feasibility](#gc-feasibility)
 
 ---
 
 ### Modes
 
-- `off` - fail if the sequence is short.
-- `strict` - pad while enforcing GC targets; raise on infeasible targets.
-- `adaptive` - relax GC targets when infeasible and record the relaxation.
+- `off`: fail if sequence is short
+- `strict`: pad while enforcing GC targets; fail if infeasible
+- `adaptive`: relax GC constraints when strict targets are impossible; record final target/achieved GC
 
 ```yaml
 postprocess:
@@ -34,9 +35,10 @@ postprocess:
 
 ### GC feasibility
 
-Very short pads (for example, a 1 nt pad) cannot hit mid-range GC targets. `strict` fails fast
-in these cases; `adaptive` relaxes bounds (via `gc.min_pad_length`) and records the final target and achieved GC in
-metadata.
+Short pads can make some GC targets impossible (for example, a 1-nt pad cannot hit middle GC ranges).
+
+- `strict` fails fast on impossible targets
+- `adaptive` relaxes bounds and records the relaxed values
 
 ---
 

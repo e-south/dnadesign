@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 import logging
 import sys
 from pathlib import Path
@@ -82,6 +83,58 @@ def validate_mmr_core_length(
         )
 
 
+def enforce_cross_regulator_core_collisions(
+    rows: Sequence[dict[str, object]],
+    *,
+    mode: str,
+    input_name: str,
+    source_kind: str,
+) -> None:
+    mode_value = str(mode or "warn").strip().lower()
+    if mode_value not in {"allow", "warn", "error"}:
+        raise ValueError("pwm.sampling.uniqueness.cross_regulator_core_collisions must be one of: allow, warn, error.")
+    if mode_value == "allow":
+        return
+
+    regulators_by_core: dict[str, set[str]] = {}
+    rows_by_core: dict[str, int] = {}
+    for row in rows:
+        core_raw = row.get("tfbs_core")
+        tf_raw = row.get("tf")
+        if core_raw is None or tf_raw is None:
+            continue
+        core = str(core_raw).strip()
+        tf = str(tf_raw).strip()
+        if not core or not tf:
+            continue
+        regulators_by_core.setdefault(core, set()).add(tf)
+        rows_by_core[core] = int(rows_by_core.get(core, 0)) + 1
+
+    collisions = [
+        (core, sorted(regulators), int(rows_by_core.get(core, 0)))
+        for core, regulators in regulators_by_core.items()
+        if len(regulators) > 1
+    ]
+    if not collisions:
+        return
+
+    collisions.sort(key=lambda item: (-len(item[1]), -item[2], item[0]))
+    preview = [
+        {"tfbs_core": core, "regulators": regulators, "rows": rows} for core, regulators, rows in collisions[:10]
+    ]
+    payload = {
+        "input_name": str(input_name),
+        "source_kind": str(source_kind),
+        "collision_core_count": int(len(collisions)),
+        "collision_row_count": int(sum(rows for _, _, rows in collisions)),
+        "preview": preview,
+    }
+    message = "Stage-A run-global core collision across regulators detected: " + json.dumps(payload, sort_keys=True)
+    if mode_value == "error":
+        raise ValueError(message)
+    log.warning(message)
+
+
 def sampling_kwargs_from_config(sampling: PWMSamplingConfig) -> dict:
     if not isinstance(sampling, PWMSamplingConfig):
         raise ValueError("pwm.sampling config must be a PWMSamplingConfig instance.")
@@ -98,6 +151,7 @@ def sampling_kwargs_from_config(sampling: PWMSamplingConfig) -> dict:
         "include_matched_sequence": bool(sampling.include_matched_sequence),
         "tier_fractions": sampling.tier_fractions,
         "uniqueness_key": str(uniqueness_cfg.key),
+        "cross_regulator_core_collisions": str(uniqueness_cfg.cross_regulator_core_collisions),
         "selection": sampling.selection,
         "length_policy": str(length_cfg.policy),
         "length_range": length_cfg.range,

@@ -39,3 +39,6 @@
 - Added explicit actor plumbing for mutation events: `Dataset.import_rows`, `Dataset.add_sequences`, and `Dataset.write_overlay_part` now accept `actor` and pass it through to `record_event`.
 - Added USR event-schema tests verifying explicit actor retention for `import_rows` and `write_overlay_part`.
 - Public API decoupling: exported `USR_EVENT_VERSION` through `dnadesign.usr` (`src/api.py`, package `__init__.py`) so consumers do not import internal `usr.src.*` modules.
+- Event-version decoupling update (historical): `USR_EVENT_VERSION` was briefly moved to `src/dnadesign/event_schema.py`; ownership is now back in `src/dnadesign/usr/src/event_schema.py` and Notify resolves it from USR at runtime.
+- Docs audit pass: refreshed `usr/docs/README.md` and `usr/docs/operations/sync.md` with local TOCs/cross-links, normalized SSH sync command examples to `uv run usr ...`, and fixed stale section-anchor links from docs-wide integrity checks.
+- Event-schema ownership correction: removed root-level `src/dnadesign/event_schema.py`; canonical `USR_EVENT_VERSION` now lives in `src/dnadesign/usr/src/event_schema.py` and Notify resolves it from USR at runtime.

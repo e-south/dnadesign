@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Optional, Protocol, Sequence
 
@@ -35,8 +36,11 @@ class SelectionDiagnostics:
     selection_pool_min_score_norm_used: float | None
     selection_pool_capped: bool
     selection_pool_cap_value: int | None
+    selection_pool_target_size: int | None = None
+    selection_pool_degenerate: bool | None = None
     selection_score_norm_max_raw: float | None = None
     selection_score_norm_clipped: bool | None = None
+    selection_pool_sequences: tuple[str, ...] | None = None
 
     def __post_init__(self) -> None:
         if int(self.selection_pool_size_final) < 0:
@@ -51,10 +55,21 @@ class SelectionDiagnostics:
                 raise ValueError("Selection pool min score norm must be in (0, 1].")
         if self.selection_pool_cap_value is not None and int(self.selection_pool_cap_value) <= 0:
             raise ValueError("Selection pool cap value must be > 0 when set.")
+        if self.selection_pool_target_size is not None and int(self.selection_pool_target_size) <= 0:
+            raise ValueError("Selection pool target size must be > 0 when set.")
+        if self.selection_pool_target_size is not None and int(self.selection_pool_size_final) > int(
+            self.selection_pool_target_size
+        ):
+            raise ValueError("Selection pool size cannot exceed target size.")
         if self.selection_score_norm_max_raw is not None:
             value = float(self.selection_score_norm_max_raw)
             if not np.isfinite(value):
                 raise ValueError("Selection score norm max must be finite when set.")
+        if self.selection_pool_sequences is not None:
+            if len(self.selection_pool_sequences) != len(set(self.selection_pool_sequences)):
+                raise ValueError("Selection pool sequences must be unique when set.")
+            if any(not str(seq).strip() for seq in self.selection_pool_sequences):
+                raise ValueError("Selection pool sequences must be non-empty when set.")
 
     def pool_size(self) -> int:
         return int(self.selection_pool_size_final)
@@ -74,6 +89,12 @@ class SelectionDiagnostics:
             ),
             "selection_pool_capped": bool(self.selection_pool_capped),
             "selection_pool_cap_value": int(self.selection_pool_cap_value) if self.selection_pool_cap_value else None,
+            "selection_pool_target_size": (
+                int(self.selection_pool_target_size) if self.selection_pool_target_size is not None else None
+            ),
+            "selection_pool_degenerate": (
+                bool(self.selection_pool_degenerate) if self.selection_pool_degenerate is not None else None
+            ),
             "selection_score_norm_max_raw": (
                 float(self.selection_score_norm_max_raw) if self.selection_score_norm_max_raw is not None else None
             ),
@@ -195,6 +216,11 @@ def _select_diversity_candidate_pool(
 ) -> list[_CandidateLike]:
     candidate_slice: list[_CandidateLike] = list(ranked)
     if selection_policy == "mmr" and selection_diag is not None:
+        if selection_diag.selection_pool_sequences:
+            ranked_by_seq = {cand.seq: cand for cand in ranked}
+            resolved = [ranked_by_seq[seq] for seq in selection_diag.selection_pool_sequences if seq in ranked_by_seq]
+            if resolved:
+                return resolved
         pool_size = int(selection_diag.selection_pool_size_final)
         if pool_size > 0:
             candidate_slice = candidate_slice[:pool_size]
@@ -518,59 +544,70 @@ def _select_by_mmr(
         selected, meta = _run_mmr()
         return selected, meta
 
+    def _apply_pool_gate(candidates: Sequence[_CandidateLike]) -> list[_CandidateLike]:
+        if pool_min_score_norm_value is None or not candidates:
+            return list(candidates)
+        scores_arr = np.array([float(cand.score) for cand in candidates], dtype=float)
+        denom_arr, _, _ = _score_norm_denominators(candidates)
+        score_norm = np.clip(scores_arr / denom_arr, 0.0, 1.0)
+        keep_idx = np.flatnonzero(score_norm >= pool_min_score_norm_value)
+        return [candidates[int(idx)] for idx in keep_idx]
+
+    def _rank_pool_candidates(candidates: Sequence[_CandidateLike]) -> list[_CandidateLike]:
+        if not candidates:
+            return []
+        if rank_by == "score_norm":
+            scores_arr = np.array([float(cand.score) for cand in candidates], dtype=float)
+            denom_arr, _, _ = _score_norm_denominators(candidates)
+            scores_norm = np.clip(scores_arr / denom_arr, 0.0, 1.0)
+            seqs = [cand.seq for cand in candidates]
+            cores = [core_by_seq[cand.seq] for cand in candidates]
+            order = np.lexsort((seqs, cores, -scores_arr, -scores_norm))
+            return [candidates[int(idx)] for idx in order]
+        return sorted(
+            candidates,
+            key=lambda cand: (-float(cand.score), core_by_seq[cand.seq], cand.seq),
+        )
+
+    target_pool = max(int(n_sites), int(np.ceil(10.0 * int(n_sites))))
+    target_pool = min(target_pool, total)
+    pool_capped = False
+    pool_cap_value = int(pool_max_candidates_value) if pool_max_candidates_value is not None else None
+    if pool_cap_value is not None and target_pool > pool_cap_value:
+        pool_capped = True
+        target_pool = min(target_pool, pool_cap_value)
+
     pool_candidates: list[_CandidateLike] = []
-    fraction_used = None
+    fraction_used: float | None = None
     for fraction in ladder:
         if float(fraction) <= 0:
             continue
         tier_limit = min(total, max(1, int(np.ceil(float(fraction) * total))))
         subset = list(ranked[:tier_limit])
-        pool_candidates = subset
+        pool_candidates = _apply_pool_gate(subset)
         fraction_used = float(fraction)
-        if len(pool_candidates) >= int(n_sites):
+        if len(pool_candidates) >= target_pool:
             break
     if fraction_used is None:
         fraction_used = 1.0
-        pool_candidates = list(ranked)
-    pool_capped = False
-    pool_cap_value = None
-    if pool_max_candidates_value is not None and len(pool_candidates) > pool_max_candidates_value:
-        pool_capped = True
-        pool_cap_value = int(pool_max_candidates_value)
-        if rank_by == "score_norm":
-            scores_arr = np.array([float(cand.score) for cand in pool_candidates], dtype=float)
-            denom_arr, _, _ = _score_norm_denominators(pool_candidates)
-            scores_norm = scores_arr / denom_arr
-            seqs = [cand.seq for cand in pool_candidates]
-            cores = [core_by_seq[cand.seq] for cand in pool_candidates]
-            order = np.lexsort((seqs, cores, -scores_arr, -scores_norm))
-            pool_candidates = [pool_candidates[int(idx)] for idx in order[:pool_max_candidates_value]]
-        else:
-            pool_candidates = sorted(
-                pool_candidates,
-                key=lambda cand: (-float(cand.score), core_by_seq[cand.seq], cand.seq),
-            )[:pool_max_candidates_value]
-    if len(pool_candidates) <= int(n_sites):
-        import logging
+        pool_candidates = _apply_pool_gate(list(ranked))
 
-        details = []
-        if fraction_used is not None:
-            details.append(f"rung={float(fraction_used) * 100:.3f}%")
-        if pool_capped and pool_cap_value is not None:
-            details.append(f"cap={int(pool_cap_value)}")
-        detail_label = f" ({', '.join(details)})" if details else ""
+    pool_candidates = _rank_pool_candidates(pool_candidates)
+    if len(pool_candidates) > target_pool:
+        pool_candidates = pool_candidates[:target_pool]
+
+    pool_degenerate = len(pool_candidates) <= int(n_sites)
+    if pool_degenerate:
         logging.getLogger(__name__).warning(
-            "Stage-A MMR degenerate: pool size %d <= n_sites=%d%s; returning pool in score order.",
+            "Stage-A MMR degenerate: pool_size=%d n_sites=%d target_pool=%d "
+            "rung=%.3f min_score_norm=%s capped=%s cap_value=%s",
             len(pool_candidates),
             int(n_sites),
-            detail_label,
-        )
-    if pool_max_candidates_value is None and len(pool_candidates) > 100_000:
-        import logging
-
-        logging.getLogger(__name__).warning(
-            "Stage-A MMR pool size is %d candidates; consider setting selection.pool.max_candidates.",
-            len(pool_candidates),
+            int(target_pool),
+            float(fraction_used),
+            float(pool_min_score_norm_value) if pool_min_score_norm_value is not None else None,
+            bool(pool_capped),
+            int(pool_cap_value) if pool_cap_value is not None else None,
         )
     selected, meta = _select_from_pool(pool_candidates)
     diag = SelectionDiagnostics(
@@ -579,7 +616,10 @@ def _select_by_mmr(
         selection_pool_min_score_norm_used=pool_min_score_norm_value,
         selection_pool_capped=bool(pool_capped),
         selection_pool_cap_value=int(pool_cap_value) if pool_cap_value is not None else None,
+        selection_pool_target_size=int(target_pool),
+        selection_pool_degenerate=bool(pool_degenerate),
         selection_score_norm_max_raw=score_norm_max_raw,
         selection_score_norm_clipped=score_norm_clipped,
+        selection_pool_sequences=tuple(cand.seq for cand in pool_candidates),
     )
     return selected, meta, diag

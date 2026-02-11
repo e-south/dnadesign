@@ -189,6 +189,8 @@ def test_pwm_artifact_sampling_generates_tfbs_rows_without_fimo(
             selection_pool_min_score_norm_used=None,
             selection_pool_capped=False,
             selection_pool_cap_value=None,
+            selection_pool_target_size=1,
+            selection_pool_degenerate=True,
             tier_target_fraction=0.01,
             tier_target_required_unique=100,
             tier_target_met=True,

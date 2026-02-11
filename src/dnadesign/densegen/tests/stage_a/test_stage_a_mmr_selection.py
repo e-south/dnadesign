@@ -227,11 +227,12 @@ def test_mmr_pool_includes_full_rung_without_cap() -> None:
         pwm_theoretical_max_score=100.0,
     )
     assert len(selected) == 3
-    assert diag.selection_pool_size_final == 4
+    assert diag.selection_pool_size_final == 12
+    assert diag.selection_pool_rung_fraction_used == pytest.approx(1.0)
     assert diag.selection_pool_capped is False
 
 
-def test_mmr_pool_min_score_norm_is_report_only() -> None:
+def test_mmr_pool_min_score_norm_filters_candidates() -> None:
     matrix = [
         {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
         {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
@@ -252,9 +253,9 @@ def test_mmr_pool_min_score_norm_is_report_only() -> None:
         tier_fractions=[0.1, 0.2, 0.3],
         pwm_theoretical_max_score=100.0,
     )
-    assert len(selected) == 3
-    assert diag.selection_pool_size_final == 4
-    assert diag.selection_pool_rung_fraction_used == pytest.approx(0.3)
+    assert len(selected) == 2
+    assert diag.selection_pool_size_final == 2
+    assert diag.selection_pool_rung_fraction_used == pytest.approx(1.0)
 
 
 def test_mmr_pool_shortfall_warns(caplog: pytest.LogCaptureFixture) -> None:
@@ -283,7 +284,7 @@ def test_mmr_pool_shortfall_warns(caplog: pytest.LogCaptureFixture) -> None:
     assert "MMR degenerate" in caplog.text
 
 
-def test_mmr_pool_degenerate_warns_when_equal_to_n_sites(caplog: pytest.LogCaptureFixture) -> None:
+def test_mmr_pool_degenerate_warns_when_final_pool_at_or_below_n_sites(caplog: pytest.LogCaptureFixture) -> None:
     matrix = [
         {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
         {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
@@ -293,20 +294,22 @@ def test_mmr_pool_degenerate_warns_when_equal_to_n_sites(caplog: pytest.LogCaptu
     seqs = _seqs(12, length=3)
     ranked = [_cand(seqs[i], float(100 - i)) for i in range(12)]
     with caplog.at_level(logging.WARNING):
-        selected, _meta, _diag = stage_a_selection._select_by_mmr(
+        selected, _meta, diag = stage_a_selection._select_by_mmr(
             ranked,
             matrix=matrix,
             background=background,
             n_sites=3,
             alpha=0.5,
-            pool_min_score_norm=None,
+            pool_min_score_norm=0.99,
             pool_max_candidates=None,
             relevance_norm="minmax_raw_score",
             tier_fractions=[0.2, 0.3, 0.4],
             pwm_theoretical_max_score=100.0,
         )
-    assert [cand.seq for cand in selected] == seqs[:3]
+    assert [cand.seq for cand in selected] == seqs[:2]
     assert "MMR degenerate" in caplog.text
+    assert "target_pool" in caplog.text
+    assert diag.selection_pool_degenerate is True
 
 
 def test_mmr_pool_cap_is_deterministic() -> None:
@@ -334,6 +337,98 @@ def test_mmr_pool_cap_is_deterministic() -> None:
     assert diag.selection_pool_size_final == 4
     assert diag.selection_pool_capped is True
     assert diag.selection_pool_cap_value == 4
+
+
+def test_mmr_pool_selects_rung_using_post_gate_count() -> None:
+    matrix = [
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+    ]
+    background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
+    seqs = _seqs(20, length=3)
+    ranked = [_cand(seqs[i], float(100 - i)) for i in range(20)]
+    _selected, _meta, diag = stage_a_selection._select_by_mmr(
+        ranked,
+        matrix=matrix,
+        background=background,
+        n_sites=4,
+        alpha=0.5,
+        pool_min_score_norm=0.97,
+        pool_max_candidates=None,
+        relevance_norm="minmax_raw_score",
+        tier_fractions=[0.1, 0.2, 0.3],
+        pwm_theoretical_max_score=100.0,
+    )
+    assert diag.selection_pool_rung_fraction_used == pytest.approx(1.0)
+    assert diag.selection_pool_size_final == 4
+
+
+def test_mmr_pool_slices_frontier_to_deterministic_target_size() -> None:
+    matrix = [
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+    ]
+    background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
+    seqs = _seqs(13, length=3)
+    ranked = [_cand(seqs[i], float(100 - i)) for i in range(13)]
+    _selected, _meta, diag = stage_a_selection._select_by_mmr(
+        ranked,
+        matrix=matrix,
+        background=background,
+        n_sites=4,
+        alpha=0.5,
+        pool_min_score_norm=None,
+        pool_max_candidates=None,
+        relevance_norm="minmax_raw_score",
+        tier_fractions=[0.1, 0.2, 0.3],
+        pwm_theoretical_max_score=100.0,
+    )
+    assert diag.selection_pool_rung_fraction_used == pytest.approx(1.0)
+    assert diag.selection_pool_size_final == 13
+    assert diag.selection_pool_sequences == tuple(seqs[:13])
+
+
+def test_diversity_pool_matches_capped_score_norm_candidates() -> None:
+    matrix = [
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+        {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+    ]
+    background = {"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25}
+    seqs = _seqs(6, length=3)
+    ranked = [_cand(seqs[i], float(100 - i)) for i in range(6)]
+    denom_by_seq = {
+        seqs[0]: 200.0,
+        seqs[1]: 100.0,
+        seqs[2]: 100.0,
+        seqs[3]: 100.0,
+        seqs[4]: 100.0,
+        seqs[5]: 100.0,
+    }
+    selected, _meta, diag = stage_a_selection._select_by_mmr(
+        ranked,
+        matrix=matrix,
+        background=background,
+        n_sites=2,
+        alpha=1.0,
+        pool_min_score_norm=None,
+        pool_max_candidates=2,
+        relevance_norm="minmax_raw_score",
+        tier_fractions=[0.01, 0.49, 0.5],
+        pwm_theoretical_max_score=100.0,
+        score_norm_denominator_by_seq=denom_by_seq,
+        rank_by="score_norm",
+    )
+    candidate_pool = stage_a_selection._select_diversity_candidate_pool(
+        ranked,
+        selection_policy="mmr",
+        selection_diag=diag,
+    )
+    pool_seq = {cand.seq for cand in candidate_pool}
+    selected_seq = {cand.seq for cand in selected}
+    assert selected_seq.issubset(pool_seq)
 
 
 def test_selection_score_norm_clips_and_warns(caplog: pytest.LogCaptureFixture) -> None:
