@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-src/dnadesign/usr/src/pretty.py
+dnadesign
+dnadesign/src/dnadesign/usr/src/pretty.py
+
+Pretty-printing utilities and column profiling helpers.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -42,7 +44,7 @@ def _ellipsize(s: str, max_len: int) -> str:
 def _fmt_num(x: Any, prec: int) -> str:
     try:
         xf = float(x)
-    except Exception:
+    except (TypeError, ValueError):
         return str(x)
     if xf == 0:
         return "0"
@@ -58,7 +60,7 @@ def _shape_of(obj: Any) -> Tuple[int, ...] | None:
 
         if isinstance(obj, np.ndarray):
             return tuple(int(d) for d in obj.shape)
-    except Exception:
+    except ImportError:
         pass
     # best-effort for nested lists
     if isinstance(obj, (list, tuple)):
@@ -129,7 +131,7 @@ def fmt_value(v: Any, opts: PrettyOpts = PrettyOpts(), depth: int = 0) -> str:
 
         if isinstance(v, np.ndarray):
             return _fmt_list(v.tolist(), opts, depth)
-    except Exception:
+    except ImportError:
         pass
     if isinstance(v, (list, tuple)):
         return _fmt_list(v, opts, depth)
@@ -214,6 +216,56 @@ def profile_table(
                 "non_null": nn,
                 "nulls": (arr.null_count or 0),
                 "null_pct": (100.0 * (arr.null_count or 0) / n) if n else 0.0,
+                "example": example_s,
+                "list_min": minL,
+                "list_max": maxL,
+                "list_avg": round(avgL, 2) if isinstance(avgL, (int, float)) else None,
+            }
+        )
+    return out
+
+
+def profile_batches(
+    batches: Iterable[pa.RecordBatch],
+    schema: pa.Schema,
+    opts: PrettyOpts,
+    columns: List[str] | None = None,
+    sample: int = 1024,
+    total_rows: int | None = None,
+) -> List[dict]:
+    cols = columns or list(schema.names)
+    for name in cols:
+        if schema.get_field_index(name) < 0:
+            raise KeyError(f"Column not found in schema: {name}")
+    null_counts = {name: 0 for name in cols}
+    samples = {name: [] for name in cols}
+    rows_seen = 0
+    for batch in batches:
+        rows_seen += batch.num_rows
+        for idx, name in enumerate(cols):
+            arr = batch.column(idx)
+            null_counts[name] += arr.null_count or 0
+            if sample > 0 and len(samples[name]) < sample:
+                take = sample - len(samples[name])
+                samples[name].extend(arr.slice(0, take).to_pylist())
+    n = total_rows if total_rows is not None else rows_seen
+    out = []
+    for name in cols:
+        arr_type = schema.field(name).type
+        vals = samples[name]
+        example = next((v for v in vals if v is not None), None)
+        example_s = fmt_value(example, opts) if example is not None else opts.null_token
+        minL = maxL = avgL = None
+        if pa.types.is_list(arr_type) or pa.types.is_large_list(arr_type):
+            minL, maxL, avgL = _list_len_stats(vals)
+        nulls = null_counts[name]
+        out.append(
+            {
+                "column": name,
+                "type": str(arr_type),
+                "non_null": (n - nulls) if n else 0,
+                "nulls": nulls,
+                "null_pct": (100.0 * nulls / n) if n else 0.0,
                 "example": example_s,
                 "list_min": minL,
                 "list_max": maxL,

@@ -1,8 +1,13 @@
 ## Workspace layout
 
-DenseGen is most ergonomic when each run is self-contained and uses config-relative paths.
+This page explains what a healthy DenseGen workspace looks like and why.
 
-```
+DenseGen works best when each run is self-contained: one `config.yaml`, one `inputs/`, one `outputs/` tree.
+Packaged demos use schema `2.9`, and `config.yaml` is the contract anchor for all subprocesses.
+
+### Expected layout
+
+```text
 workspace/
   config.yaml
   inputs/
@@ -16,13 +21,29 @@ workspace/
     report/
 ```
 
-Notes:
-- CLI resolves config from `-c`, `DENSEGEN_CONFIG_PATH`, `./config.yaml`, then nearest parent.
-- Outputs live under `densegen.run.root` (typically `.`).
-- If run outputs already exist, choose explicitly:
-  `dense run --resume` to continue, or `dense run --fresh` to clear outputs.
+### Why this layout matters
 
-Tip: `dense workspace init --id <run_name> --template-id <template>` scaffolds a workspace.
+- path resolution is predictable (`config.yaml` is the anchor)
+- run state is easy to reset without touching inputs
+- diagnostics stay with the run they came from
+- Stage-A/Stage-B/solver artifacts stay co-located for one-run debugging
+
+### Practical notes
+
+- Config resolution policy: [../reference/cli.md#config-resolution](../reference/cli.md#config-resolution)
+- Outputs live under `densegen.run.root` (typically `.`)
+- If outputs already exist, `dense run` resumes by default; use `dense run --fresh` for a clean run
+- `dense workspace init` defaults to `src/dnadesign/densegen/workspaces` (or `$DENSEGEN_WORKSPACE_ROOT`)
+
+### Useful commands
+
+```bash
+# Create a workspace from a packaged demo template.
+uv run dense workspace init --id my_run --from-workspace demo_binding_sites --copy-inputs --output-mode local
+
+# Show the effective workspace roots DenseGen will use.
+uv run dense workspace where --format json
+```
 
 ---
 

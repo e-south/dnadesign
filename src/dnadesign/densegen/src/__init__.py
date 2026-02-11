@@ -18,6 +18,10 @@ Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
+from .utils.logging_utils import install_native_stderr_filters as _install_native_stderr_filters
+
+_install_native_stderr_filters(suppress_solver_messages=False)
+
 __all__ = [
     "adapters",
     "cli",

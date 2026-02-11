@@ -70,6 +70,14 @@ class IdIndex:
         row = self._conn.execute("SELECT 1 FROM ids WHERE id=? LIMIT 1", (seq_id,)).fetchone()
         return row is not None
 
+    def contains_many(self, ids: Iterable[str]) -> set[str]:
+        ids_list = [str(i) for i in ids if str(i)]
+        if not ids_list:
+            return set()
+        if self._count <= 0:
+            return set()
+        return self._existing_in_batch(ids_list)
+
     def existing_ids(self) -> set[str]:
         rows = self._conn.execute("SELECT id FROM ids").fetchall()
         return {str(r[0]) for r in rows}

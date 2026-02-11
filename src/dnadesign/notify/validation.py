@@ -1,0 +1,39 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/notify/validation.py
+
+Validation helpers for notifier inputs.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import os
+from urllib.parse import urlparse
+
+from .errors import NotifyConfigError
+from .secrets import resolve_secret_ref
+
+
+def resolve_webhook_url(*, url: str | None, url_env: str | None, secret_ref: str | None = None) -> str:
+    source_count = int(bool(url)) + int(bool(url_env)) + int(bool(secret_ref))
+    if source_count != 1:
+        raise NotifyConfigError("Specify exactly one of --url, --url-env, or --secret-ref.")
+    if url_env:
+        env_value = os.environ.get(url_env, "").strip()
+        if not env_value:
+            raise NotifyConfigError(f"--url-env {url_env} is not set or empty.")
+        resolved = env_value
+    elif secret_ref:
+        resolved = resolve_secret_ref(secret_ref)
+    else:
+        resolved = str(url).strip() if url is not None else ""
+    if not resolved:
+        raise NotifyConfigError("Webhook URL is empty.")
+    parsed = urlparse(resolved)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise NotifyConfigError("Webhook URL must be http(s) with a host.")
+    return resolved

@@ -1,0 +1,60 @@
+# USR docs
+
+## Contents
+- [At a glance](#at-a-glance)
+- [Read order](#read-order)
+- [Integration](#integration)
+- [Operations](#operations)
+
+## At a glance
+
+**Intent:** USR is the canonical, auditable sequence store and mutation/event boundary for `dnadesign`.
+
+If you are new here:
+- read `../README.md` for the mental model and CLI quickstart
+- use `operations/sync.md` when you need SSH/HPC transfer workflows
+- use `dev/journal.md` for maintainers-only history and decisions
+
+**When to use:**
+- Store canonical sequence datasets (generated and curated).
+- Attach derived metrics or annotations without rewriting base records.
+- Emit mutation events for operators and automation (Notify).
+- Govern derived columns with explicit namespace registry contracts.
+
+**When not to use:**
+- Not a sequence generator (use DenseGen and related tools).
+- Not an alerting transport (use Notify).
+
+**Boundary / contracts:**
+- `.events.log` is the integration boundary; Notify consumes this stream.
+- Derived columns must be namespaced as `<namespace>__<field>`.
+- Namespaces must be registered before attach/materialize operations.
+
+**Start here:**
+- [../README.md](../README.md) (concepts + CLI quickstart)
+- [../README.md#namespace-registry-required](../README.md#namespace-registry-required)
+- [../README.md#event-log-schema](../README.md#event-log-schema)
+- [operations/sync.md](operations/sync.md) (remote sync)
+
+## Read order
+
+- USR concepts plus CLI quickstart: [../README.md](../README.md)
+- Overlay plus registry contract: [../README.md#namespace-registry-required](../README.md#namespace-registry-required)
+- Overlay merge semantics: [../README.md#how-overlays-merge-conflict-resolution](../README.md#how-overlays-merge-conflict-resolution)
+- Event log schema (Notify input): [../README.md#event-log-schema](../README.md#event-log-schema)
+
+## Integration
+
+- DenseGen writes into USR via the `densegen` namespace:
+  - DenseGen outputs reference: [../../densegen/docs/reference/outputs.md](../../densegen/docs/reference/outputs.md)
+- Notify consumes USR `.events.log`:
+  - Notify operators doc: [../../../../docs/notify/usr_events.md](../../../../docs/notify/usr_events.md)
+
+Boundary reminder:
+- DenseGen runtime telemetry (`outputs/meta/events.jsonl`) is not Notify input.
+- Notify reads USR dataset `.events.log` only.
+
+## Operations
+
+- Remote sync: [operations/sync.md](operations/sync.md)
+- Dev notes: [dev/journal.md](dev/journal.md)

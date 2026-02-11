@@ -65,7 +65,7 @@ from .inputs import (
     SequenceLibraryInput,
     USRSequencesInput,
 )
-from .logging import LoggingConfig
+from .logging import LoggingConfig, LoggingVisualsConfig
 from .output import OutputConfig, OutputParquetConfig, OutputSchemaConfig, OutputUSRConfig
 from .plots import PlotConfig
 from .postprocess import (
@@ -101,6 +101,7 @@ __all__ = [
     "LATEST_SCHEMA_VERSION",
     "LoadedConfig",
     "LoggingConfig",
+    "LoggingVisualsConfig",
     "OutputConfig",
     "OutputParquetConfig",
     "OutputSchemaConfig",

@@ -15,7 +15,6 @@ import hashlib
 import logging
 import os
 import random
-import shutil
 import sys
 import time
 from dataclasses import dataclass
@@ -88,12 +87,13 @@ from .stage_b import (
     _compute_sampling_fraction,
     _compute_sampling_fraction_pairs,
     _fixed_elements_dump,
+    _fixed_elements_label,
     _merge_min_counts,
     _min_count_by_regulator,
 )
 from .stage_b_library_builder import LibraryBuilder, LibraryContext
 from .stage_b_sampler import LibraryRunResult, SamplingCounters, StageBSampler
-from .usage_tracking import _compute_used_tf_info
+from .usage_tracking import _compute_used_tf_info, _update_usage_summary
 from .versioning import _resolve_dense_arrays_version
 
 log = logging.getLogger(__name__)
@@ -103,195 +103,171 @@ log = logging.getLogger(__name__)
 class RunSummary:
     total_generated: int
     per_plan: dict[tuple[str, str], int]
+    generated_this_run: int = 0
 
 
-def _candidate_logging_enabled(cfg: DenseGenConfig) -> bool:
-    for inp in cfg.inputs:
-        sampling = getattr(inp, "sampling", None)
-        if sampling is None:
-            continue
-        if getattr(sampling, "keep_all_candidates_debug", False):
-            return True
-    return False
+@dataclass(frozen=True)
+class RuntimeSettings:
+    max_per_subsample: int
+    min_count_per_tf: int
+    max_dupes: int
+    stall_seconds: int
+    stall_warn_every: int
+    max_consecutive_failures: int
+    max_seconds_per_plan: int
+    max_failed_solutions: int
+    leaderboard_every: int
+    checkpoint_every: int
 
 
-def _plan_pool_input_meta(spec: PlanPoolSpec) -> dict:
-    meta = {
-        "input_type": PLAN_POOL_INPUT_TYPE,
-        "input_name": spec.pool_name,
-        "input_source_names": list(spec.include_inputs),
-    }
-    if spec.pool.pool_mode == POOL_MODE_TFBS:
-        meta["input_mode"] = "binding_sites"
-        if spec.pool.df is not None and "tf" in spec.pool.df.columns:
-            meta["input_pwm_ids"] = sorted(set(spec.pool.df["tf"].tolist()))
-        else:
-            meta["input_pwm_ids"] = []
-    else:
-        meta["input_mode"] = "sequence_library"
-        meta["input_pwm_ids"] = []
-    return meta
+@dataclass(frozen=True)
+class PadSettings:
+    enabled: bool
+    mode: str
+    end: str
+    gc_mode: str
+    gc_min: float
+    gc_max: float
+    gc_target: float
+    gc_tolerance: float
+    gc_min_length: int
+    max_tries: int
+    forbid_kmers: list[str]
 
 
-def resolve_plan(loaded: LoadedConfig) -> List[ResolvedPlanItem]:
-    return loaded.root.densegen.generation.resolve_plan()
+@dataclass(frozen=True)
+class SolverSettings:
+    strategy: str
+    strands: str
+    time_limit_seconds: float | None
+    threads: int | None
 
 
-def select_solver(
-    preferred: str | None,
-    optimizer: OptimizerAdapter,
+@dataclass(frozen=True)
+class ProgressSettings:
+    progress_style: str
+    progress_every: int
+    progress_refresh_seconds: float
+    print_visual: bool
+    tf_colors: dict[str, str] | None
+    show_tfbs: bool
+    show_solutions: bool
+    dashboard: _ScreenDashboard | None
+    reporter: PlanProgressReporter
+
+
+@dataclass(frozen=True)
+class PlanRunSettings:
+    source_label: str
+    plan_name: str
+    quota: int
+    seq_len: int
+    sampling_cfg: object
+    pool_strategy: str
+    runtime: RuntimeSettings
+    pad: PadSettings
+    solver: SolverSettings
+    extra_library_label: str | None
+    progress: ProgressSettings
+    policy: RuntimePolicy
+    policy_pad: str
+    policy_sampling: str
+    policy_solver: str
+    plan_start: float
+
+
+@dataclass(frozen=True)
+class PlanInputState:
+    pool: PoolData
+    data_entries: list
+    meta_df: pd.DataFrame | None
+    input_meta: dict
+    input_row_count: int
+    input_tf_count: int
+    input_tfbs_count: int
+    input_tf_tfbs_pair_count: int | None
+
+
+def _progress_terminal_probe(
     *,
-    strategy: str,
-    test_length: int = 10,
-) -> str | None:
-    """Probe the requested solver once and fail fast if unavailable."""
-    if strategy == "approximate":
-        return preferred
-    if not preferred:
-        raise ValueError("solver.backend is required unless strategy=approximate")
-    try:
-        optimizer.probe_solver(preferred, test_length=test_length)
-        return preferred
-    except Exception as exc:
-        raise RuntimeError(
-            f"Requested solver '{preferred}' failed during probe: {exc}\n"
-            "Please install/configure this solver or choose another in solver.backend."
-        ) from exc
-
-
-def _process_plan_for_source(
-    source_cfg,
-    plan_item: ResolvedPlanItem,
-    context: PlanRunContext,
-    *,
-    one_subsample_only: bool = False,
-    already_generated: int = 0,
-    execution_state: PlanExecutionState,
-) -> tuple[int, dict]:
-    global_cfg = context.global_cfg
-    sinks = context.sinks
-    chosen_solver = context.chosen_solver
-    deps = context.deps
-    rng = context.rng
-    np_rng = context.np_rng
-    cfg_path = context.cfg_path
-    run_id = context.run_id
-    run_root = context.run_root
-    run_config_path = context.run_config_path
-    run_config_sha256 = context.run_config_sha256
-    random_seed = context.random_seed
-    dense_arrays_version = context.dense_arrays_version
-    dense_arrays_version_source = context.dense_arrays_version_source
-    show_tfbs = context.show_tfbs
-    show_solutions = context.show_solutions
-    output_bio_type = context.output_bio_type
-    output_alphabet = context.output_alphabet
-
-    inputs_manifest = execution_state.inputs_manifest
-    existing_usage_counts = execution_state.existing_usage_counts
-    state_counts = execution_state.state_counts
-    checkpoint_every = execution_state.checkpoint_every
-    write_state = execution_state.write_state
-    site_failure_counts = execution_state.site_failure_counts
-    source_cache = execution_state.source_cache
-    pool_override = execution_state.pool_override
-    input_meta_override = execution_state.input_meta_override
-    attempt_counters = execution_state.attempt_counters
-    library_records = execution_state.library_records
-    library_cursor = execution_state.library_cursor
-    library_source = execution_state.library_source
-    library_build_rows = execution_state.library_build_rows
-    library_member_rows = execution_state.library_member_rows
-    solution_rows = execution_state.solution_rows
-    composition_rows = execution_state.composition_rows
-    events_path = execution_state.events_path
-    display_map_by_input = execution_state.display_map_by_input
-
-    source_label = source_cfg.name
-    plan_name = plan_item.name
-    quota = int(plan_item.quota)
-    attempt_counters = attempt_counters or {}
-    display_map = display_map_by_input.get(source_label, {}) if display_map_by_input else {}
-
-    def _display_tf_label(label: str) -> str:
-        if not label:
-            return label
-        if label in display_map:
-            return display_map[label]
-        return motif_display_name(label, None)
-
-    def _next_attempt_index() -> int:
-        key = (source_label, plan_name)
-        current = int(attempt_counters.get(key, 0)) + 1
-        attempt_counters[key] = current
-        return current
-
-    gen = global_cfg.generation
-    seq_len = int(gen.sequence_length)
-    sampling_cfg = gen.sampling
-    pool_strategy = str(sampling_cfg.pool_strategy)
-
-    runtime_cfg = global_cfg.runtime
-    max_per_subsample = int(runtime_cfg.arrays_generated_before_resample)
-    min_count_per_tf = int(runtime_cfg.min_count_per_tf)
-    max_dupes = int(runtime_cfg.max_duplicate_solutions)
-    stall_seconds = int(runtime_cfg.stall_seconds_before_resample)
-    stall_warn_every = int(runtime_cfg.stall_warning_every_seconds)
-    max_consecutive_failures = int(runtime_cfg.max_consecutive_failures)
-    max_seconds_per_plan = int(runtime_cfg.max_seconds_per_plan)
-    max_failed_solutions = int(runtime_cfg.max_failed_solutions)
-    leaderboard_every = int(runtime_cfg.leaderboard_every)
-    checkpoint_every = int(checkpoint_every or 0)
-
-    post = global_cfg.postprocess
-    pad_cfg = post.pad
-    pad_enabled = pad_cfg.mode != "off"
-    pad_mode = pad_cfg.mode
-    pad_end = pad_cfg.end
-    pad_gc_cfg = pad_cfg.gc
-    pad_gc_mode = pad_gc_cfg.mode
-    pad_gc_min = float(pad_gc_cfg.min)
-    pad_gc_max = float(pad_gc_cfg.max)
-    pad_gc_target = float(pad_gc_cfg.target)
-    pad_gc_tolerance = float(pad_gc_cfg.tolerance)
-    pad_gc_min_length = int(pad_gc_cfg.min_pad_length)
-    pad_max_tries = int(pad_cfg.max_tries)
-    validate_cfg = getattr(post, "validate_final_sequence", None)
-    forbid_kmers_cfg = getattr(validate_cfg, "forbid_kmers_outside_promoter_windows", None) if validate_cfg else None
-    forbid_kmers = list(getattr(forbid_kmers_cfg, "kmers", []) or [])
-
-    solver_cfg = global_cfg.solver
-    solver_strategy = str(solver_cfg.strategy)
-    solver_strands = str(solver_cfg.strands)
-    solver_time_limit_seconds = (
-        float(solver_cfg.time_limit_seconds) if solver_cfg.time_limit_seconds is not None else None
+    shared_dashboard: _ScreenDashboard | None = None,
+) -> tuple[Console | None, bool | None, str | None]:
+    console = getattr(shared_dashboard, "_console", None) if shared_dashboard is not None else None
+    if console is None:
+        console = logging_utils.get_logging_console()
+    if console is None:
+        return None, None, os.environ.get("TERM")
+    is_tty = bool(getattr(console, "is_terminal", False))
+    console_environ = getattr(console, "_environ", None)
+    console_term = None
+    if isinstance(console_environ, dict):
+        console_term = console_environ.get("TERM")
+    term_value = (
+        "dumb" if bool(getattr(console, "is_dumb_terminal", False)) else (console_term or os.environ.get("TERM"))
     )
-    solver_threads = int(solver_cfg.threads) if solver_cfg.threads is not None else None
+    return console, is_tty, term_value
 
-    log_cfg = global_cfg.logging
-    print_visual = bool(log_cfg.print_visual)
-    progress_style = str(getattr(log_cfg, "progress_style", "stream"))
+
+def _init_progress_settings(
+    *,
+    log_cfg,
+    source_label: str,
+    plan_name: str,
+    quota: int,
+    max_per_subsample: int,
+    show_tfbs: bool,
+    show_solutions: bool,
+    extra_library_label: str | None,
+    shared_dashboard: _ScreenDashboard | None = None,
+) -> ProgressSettings:
+    requested_progress_style = str(getattr(log_cfg, "progress_style", "stream"))
+    probed_console, probed_tty, probed_term = _progress_terminal_probe(shared_dashboard=shared_dashboard)
+    progress_style, _progress_reason = logging_utils.resolve_progress_style(
+        requested_progress_style,
+        stdout=sys.stdout,
+        term=probed_term,
+        is_tty=probed_tty,
+    )
     progress_every = int(getattr(log_cfg, "progress_every", 1))
     progress_refresh_seconds = float(getattr(log_cfg, "progress_refresh_seconds", 1.0))
     logging_utils.set_progress_style(progress_style)
     logging_utils.set_progress_enabled(progress_style in {"stream", "screen"})
     screen_console = None
     if progress_style == "screen":
-        tty = bool(getattr(sys.stdout, "isatty", lambda: False)())
-        pixi_shell = os.environ.get("PIXI_IN_SHELL") == "1"
-        if tty and not pixi_shell:
-            screen_console = Console()
-        else:
-            width = shutil.get_terminal_size(fallback=(140, 40)).columns
-            screen_console = Console(file=sys.stdout, width=int(width), force_terminal=False)
-            log.warning("progress_style=screen requires an interactive terminal; using static output.")
+        if shared_dashboard is None:
+            screen_console = probed_console
+            if screen_console is None:
+                tty = bool(getattr(sys.stdout, "isatty", lambda: False)())
+                if tty:
+                    screen_console = Console()
+                else:
+                    raise RuntimeError(
+                        "logging.progress_style=screen requires an interactive terminal. "
+                        "Use logging.progress_style=stream for non-interactive output."
+                    )
     show_tfbs = bool(show_tfbs or getattr(log_cfg, "show_tfbs", False))
     show_solutions = bool(show_solutions or getattr(log_cfg, "show_solutions", False))
-    dashboard = (
-        _ScreenDashboard(console=screen_console, refresh_seconds=progress_refresh_seconds)
-        if progress_style == "screen" and screen_console is not None
-        else None
-    )
+    tf_colors = None
+    if bool(getattr(log_cfg, "print_visual", False)):
+        visuals = getattr(log_cfg, "visuals", None)
+        tf_colors = getattr(visuals, "tf_colors", None) if visuals is not None else None
+        if not tf_colors:
+            raise ValueError("logging.visuals.tf_colors must be set when logging.print_visual is true")
+    if progress_style == "screen":
+        if shared_dashboard is not None:
+            dashboard = shared_dashboard
+        else:
+            dashboard = (
+                _ScreenDashboard(
+                    console=screen_console,
+                    refresh_seconds=progress_refresh_seconds,
+                    append=_dashboard_append_mode(screen_console),
+                )
+                if screen_console is not None
+                else None
+            )
+    else:
+        dashboard = None
     progress_reporter = PlanProgressReporter(
         source_label=source_label,
         plan_name=plan_name,
@@ -302,47 +278,203 @@ def _process_plan_for_source(
         progress_refresh_seconds=progress_refresh_seconds,
         show_tfbs=show_tfbs,
         show_solutions=show_solutions,
-        print_visual=bool(print_visual),
+        print_visual=bool(getattr(log_cfg, "print_visual", False)),
+        tf_colors=tf_colors,
+        extra_library_label=extra_library_label,
         dashboard=dashboard,
         logger=log,
     )
-
-    policy_pad = str(pad_mode)
-    policy_sampling = pool_strategy
-    policy_solver = solver_strategy
-
-    policy = RuntimePolicy(
-        pool_strategy=pool_strategy,
-        arrays_generated_before_resample=max_per_subsample,
-        stall_seconds_before_resample=stall_seconds,
-        stall_warning_every_seconds=stall_warn_every,
-        max_consecutive_failures=max_consecutive_failures,
-        max_seconds_per_plan=max_seconds_per_plan,
+    return ProgressSettings(
+        progress_style=progress_style,
+        progress_every=progress_every,
+        progress_refresh_seconds=progress_refresh_seconds,
+        print_visual=bool(getattr(log_cfg, "print_visual", False)),
+        tf_colors=tf_colors,
+        show_tfbs=show_tfbs,
+        show_solutions=show_solutions,
+        dashboard=dashboard,
+        reporter=progress_reporter,
     )
 
-    plan_start = time.monotonic()
-    counters = SamplingCounters()
-    failed_solutions = 0
-    duplicate_records = 0
-    stall_events = 0
-    failed_min_count_per_tf = 0
-    failed_required_regulators = 0
-    failed_min_count_by_regulator = 0
-    failed_min_required_regulators = 0
-    duplicate_solutions = 0
-    usage_counts: dict[tuple[str, str], int] = dict(existing_usage_counts or {})
-    tf_usage_counts: dict[str, int] = {}
-    for (tf, _tfbs), count in usage_counts.items():
-        tf_usage_counts[tf] = tf_usage_counts.get(tf, 0) + int(count)
-    track_failures = site_failure_counts is not None
-    failure_counts = site_failure_counts if site_failure_counts is not None else {}
-    attempts_buffer: list[dict] = []
-    run_root_path = Path(run_root)
-    outputs_root = run_outputs_root(run_root_path)
-    tables_root = run_tables_root(run_root_path)
-    existing_library_builds = _load_existing_library_index(tables_root)
 
-    # Load source (cache Stage-A PWM sampling results across round-robin passes).
+def _dashboard_append_mode(console: Console) -> bool:
+    if not bool(getattr(console, "is_terminal", False)):
+        raise RuntimeError(
+            "logging.progress_style=screen requires an interactive terminal. "
+            "Use logging.progress_style=stream for non-interactive output."
+        )
+    if bool(getattr(console, "is_dumb_terminal", False)):
+        raise RuntimeError(
+            "logging.progress_style=screen requires TERM with cursor controls (TERM must not be 'dumb'). "
+            "Set TERM=xterm-256color or switch logging.progress_style to 'stream'."
+        )
+    return False
+
+
+def _close_plan_dashboard(*, dashboard, shared_dashboard) -> None:
+    if dashboard is None:
+        return
+    if shared_dashboard is not None and dashboard is shared_dashboard:
+        return
+    dashboard.close()
+
+
+def _build_shared_dashboard(log_cfg) -> _ScreenDashboard | None:
+    requested_progress_style = str(getattr(log_cfg, "progress_style", "stream"))
+    probed_console, probed_tty, probed_term = _progress_terminal_probe()
+    progress_style, _progress_reason = logging_utils.resolve_progress_style(
+        requested_progress_style,
+        stdout=sys.stdout,
+        term=probed_term,
+        is_tty=probed_tty,
+    )
+    progress_refresh_seconds = float(getattr(log_cfg, "progress_refresh_seconds", 1.0))
+    if progress_style != "screen":
+        return None
+    console = probed_console
+    if console is None:
+        tty = bool(getattr(sys.stdout, "isatty", lambda: False)())
+        if tty:
+            console = Console()
+        else:
+            raise RuntimeError(
+                "logging.progress_style=screen requires an interactive terminal. "
+                "Use logging.progress_style=stream for non-interactive output."
+            )
+    return _ScreenDashboard(
+        console=console,
+        refresh_seconds=progress_refresh_seconds,
+        append=_dashboard_append_mode(console),
+    )
+
+
+def _init_plan_settings(
+    *,
+    source_cfg,
+    plan_item: ResolvedPlanItem,
+    context: PlanRunContext,
+    execution_state: PlanExecutionState,
+    one_subsample_only: bool,
+) -> PlanRunSettings:
+    source_label = source_cfg.name
+    plan_name = plan_item.name
+    quota = int(plan_item.quota)
+    global_cfg = context.global_cfg
+
+    gen = global_cfg.generation
+    seq_len = int(gen.sequence_length)
+    sampling_cfg = gen.sampling
+    pool_strategy = str(sampling_cfg.pool_strategy)
+
+    runtime_cfg = global_cfg.runtime
+    max_per_subsample = int(runtime_cfg.arrays_generated_before_resample)
+    if pool_strategy != "iterative_subsample" and not one_subsample_only:
+        max_per_subsample = quota
+    runtime = RuntimeSettings(
+        max_per_subsample=max_per_subsample,
+        min_count_per_tf=int(runtime_cfg.min_count_per_tf),
+        max_dupes=int(runtime_cfg.max_duplicate_solutions),
+        stall_seconds=int(runtime_cfg.stall_seconds_before_resample),
+        stall_warn_every=int(runtime_cfg.stall_warning_every_seconds),
+        max_consecutive_failures=int(runtime_cfg.max_consecutive_failures),
+        max_seconds_per_plan=int(runtime_cfg.max_seconds_per_plan),
+        max_failed_solutions=int(runtime_cfg.max_failed_solutions),
+        leaderboard_every=int(runtime_cfg.leaderboard_every),
+        checkpoint_every=int(execution_state.checkpoint_every or 0),
+    )
+
+    post = global_cfg.postprocess
+    pad_cfg = post.pad
+    pad_gc_cfg = pad_cfg.gc
+    validate_cfg = getattr(post, "validate_final_sequence", None)
+    forbid_kmers_cfg = getattr(validate_cfg, "forbid_kmers_outside_promoter_windows", None) if validate_cfg else None
+    pad = PadSettings(
+        enabled=pad_cfg.mode != "off",
+        mode=pad_cfg.mode,
+        end=pad_cfg.end,
+        gc_mode=pad_gc_cfg.mode,
+        gc_min=float(pad_gc_cfg.min),
+        gc_max=float(pad_gc_cfg.max),
+        gc_target=float(pad_gc_cfg.target),
+        gc_tolerance=float(pad_gc_cfg.tolerance),
+        gc_min_length=int(pad_gc_cfg.min_pad_length),
+        max_tries=int(pad_cfg.max_tries),
+        forbid_kmers=list(getattr(forbid_kmers_cfg, "kmers", []) or []),
+    )
+
+    solver_cfg = global_cfg.solver
+    solver = SolverSettings(
+        strategy=str(solver_cfg.strategy),
+        strands=str(solver_cfg.strands),
+        time_limit_seconds=(
+            float(solver_cfg.time_limit_seconds) if solver_cfg.time_limit_seconds is not None else None
+        ),
+        threads=int(solver_cfg.threads) if solver_cfg.threads is not None else None,
+    )
+
+    extra_library_label = _fixed_elements_label(plan_item.fixed_elements)
+    log_cfg = global_cfg.logging
+    progress = _init_progress_settings(
+        log_cfg=log_cfg,
+        source_label=source_label,
+        plan_name=plan_name,
+        quota=quota,
+        max_per_subsample=runtime.max_per_subsample,
+        show_tfbs=context.show_tfbs,
+        show_solutions=context.show_solutions,
+        extra_library_label=extra_library_label,
+        shared_dashboard=execution_state.shared_dashboard,
+    )
+
+    policy_pad = str(pad.mode)
+    policy_sampling = pool_strategy
+    policy_solver = solver.strategy
+    policy = RuntimePolicy(
+        pool_strategy=pool_strategy,
+        arrays_generated_before_resample=runtime.max_per_subsample,
+        stall_seconds_before_resample=runtime.stall_seconds,
+        stall_warning_every_seconds=runtime.stall_warn_every,
+        max_consecutive_failures=runtime.max_consecutive_failures,
+        max_seconds_per_plan=runtime.max_seconds_per_plan,
+    )
+
+    return PlanRunSettings(
+        source_label=source_label,
+        plan_name=plan_name,
+        quota=quota,
+        seq_len=seq_len,
+        sampling_cfg=sampling_cfg,
+        pool_strategy=pool_strategy,
+        runtime=runtime,
+        pad=pad,
+        solver=solver,
+        extra_library_label=extra_library_label,
+        progress=progress,
+        policy=policy,
+        policy_pad=policy_pad,
+        policy_sampling=policy_sampling,
+        policy_solver=policy_solver,
+        plan_start=time.monotonic(),
+    )
+
+
+def _load_plan_pool(
+    *,
+    source_cfg,
+    cfg_path: Path,
+    deps: PipelineDeps,
+    np_rng: np.random.Generator,
+    outputs_root: Path,
+    run_id: str,
+    pool_override: PoolData | None,
+    source_cache: dict[str, PoolData] | None,
+    input_meta_override: dict | None,
+    inputs_manifest: dict[str, dict] | None,
+    source_label: str,
+    plan_name: str,
+    progress_style: str,
+    display_tf_label,
+) -> PlanInputState:
     cache_key = source_label
     cached = source_cache.get(cache_key) if source_cache is not None else None
     if pool_override is not None:
@@ -379,6 +511,7 @@ def _process_plan_for_source(
             source_cache[cache_key] = pool
     else:
         pool = cached
+
     data_entries = pool.sequences
     meta_df = pool.df
     input_meta = dict(input_meta_override) if input_meta_override is not None else _input_metadata(source_cfg, cfg_path)
@@ -416,6 +549,7 @@ def _process_plan_for_source(
             input_tfbs_count,
             pair_label,
         )
+
     source_type = getattr(source_cfg, "type", None)
     if source_type in PWM_INPUT_TYPES and meta_df is not None and "tf" in meta_df.columns:
         input_meta["input_pwm_ids"] = sorted(set(meta_df["tf"].tolist()))
@@ -440,7 +574,7 @@ def _process_plan_for_source(
             length_label = str(length_policy)
             if length_policy == "range" and length_range:
                 length_label = f"{length_policy}({length_range[0]}..{length_range[1]})"
-            counts_label = _summarize_tf_counts([_display_tf_label(tf) for tf in meta_df["tf"].tolist()])
+            counts_label = _summarize_tf_counts([display_tf_label(tf) for tf in meta_df["tf"].tolist()])
             mining_label = "-"
             if mining_cfg is not None:
                 parts = []
@@ -497,6 +631,138 @@ def _process_plan_for_source(
             input_tf_tfbs_pair_count=input_tf_tfbs_pair_count,
             meta_df=meta_df,
         )
+
+    return PlanInputState(
+        pool=pool,
+        data_entries=data_entries,
+        meta_df=meta_df,
+        input_meta=input_meta,
+        input_row_count=input_row_count,
+        input_tf_count=input_tf_count,
+        input_tfbs_count=input_tfbs_count,
+        input_tf_tfbs_pair_count=input_tf_tfbs_pair_count,
+    )
+
+
+def _run_stage_b_sampling(
+    *,
+    settings: PlanRunSettings,
+    input_state: PlanInputState,
+    plan_item: ResolvedPlanItem,
+    context: PlanRunContext,
+    execution_state: PlanExecutionState,
+    existing_library_builds: int,
+    already_generated: int,
+    one_subsample_only: bool,
+    display_tf_label,
+    next_attempt_index,
+) -> tuple[int, dict]:
+    source_label = settings.source_label
+    plan_name = settings.plan_name
+    quota = settings.quota
+    seq_len = settings.seq_len
+    sampling_cfg = settings.sampling_cfg
+    pool_strategy = settings.pool_strategy
+    runtime = settings.runtime
+    pad = settings.pad
+    solver = settings.solver
+    progress = settings.progress
+    policy = settings.policy
+    policy_pad = settings.policy_pad
+    policy_sampling = settings.policy_sampling
+    policy_solver = settings.policy_solver
+    plan_start = settings.plan_start
+
+    sinks = context.sinks
+    chosen_solver = context.chosen_solver
+    deps = context.deps
+    rng = context.rng
+    np_rng = context.np_rng
+    run_id = context.run_id
+    run_root = context.run_root
+    run_config_path = context.run_config_path
+    run_config_sha256 = context.run_config_sha256
+    random_seed = context.random_seed
+    dense_arrays_version = context.dense_arrays_version
+    dense_arrays_version_source = context.dense_arrays_version_source
+    output_bio_type = context.output_bio_type
+    output_alphabet = context.output_alphabet
+
+    existing_usage_counts = execution_state.existing_usage_counts
+    state_counts = execution_state.state_counts
+    total_quota = execution_state.total_quota
+    write_state = execution_state.write_state
+    site_failure_counts = execution_state.site_failure_counts
+    library_records = execution_state.library_records
+    library_cursor = execution_state.library_cursor
+    library_source = execution_state.library_source
+    library_build_rows = execution_state.library_build_rows
+    library_member_rows = execution_state.library_member_rows
+    solution_rows = execution_state.solution_rows
+    composition_rows = execution_state.composition_rows
+    events_path = execution_state.events_path
+
+    pool = input_state.pool
+    input_meta = input_state.input_meta
+    input_row_count = input_state.input_row_count
+    input_tf_count = input_state.input_tf_count
+    input_tfbs_count = input_state.input_tfbs_count
+    input_tf_tfbs_pair_count = input_state.input_tf_tfbs_pair_count
+
+    progress_style = progress.progress_style
+    show_tfbs = progress.show_tfbs
+    show_solutions = progress.show_solutions
+    progress_reporter = progress.reporter
+    dashboard = progress.dashboard
+    shared_dashboard = execution_state.shared_dashboard
+
+    max_per_subsample = runtime.max_per_subsample
+    min_count_per_tf = runtime.min_count_per_tf
+    max_dupes = runtime.max_dupes
+    stall_seconds = runtime.stall_seconds
+    max_failed_solutions = runtime.max_failed_solutions
+    leaderboard_every = runtime.leaderboard_every
+    checkpoint_every = runtime.checkpoint_every
+
+    pad_enabled = pad.enabled
+    pad_mode = pad.mode
+    pad_end = pad.end
+    pad_gc_mode = pad.gc_mode
+    pad_gc_min = pad.gc_min
+    pad_gc_max = pad.gc_max
+    pad_gc_target = pad.gc_target
+    pad_gc_tolerance = pad.gc_tolerance
+    pad_gc_min_length = pad.gc_min_length
+    pad_max_tries = pad.max_tries
+    forbid_kmers = pad.forbid_kmers
+
+    solver_strategy = solver.strategy
+    solver_strands = solver.strands
+    solver_time_limit_seconds = solver.time_limit_seconds
+    solver_threads = solver.threads
+    extra_library_label = settings.extra_library_label
+
+    backend = str(chosen_solver) if chosen_solver is not None else "-"
+    strategy = str(solver_strategy)
+    strands = str(solver_strands)
+    time_limit = "-" if solver_time_limit_seconds is None else str(solver_time_limit_seconds)
+    threads = "-" if solver_threads is None else str(solver_threads)
+    progress_reporter.solver_settings = (
+        f"backend={backend} strategy={strategy} strands={strands} "
+        f"time_limit={time_limit}s threads={threads} seq_len={seq_len}"
+    )
+    if progress_style != "screen":
+        log.info(
+            "Stage-B solver settings: backend=%s strategy=%s strands=%s "
+            "time_limit_seconds=%s threads=%s sequence_length=%s",
+            backend,
+            strategy,
+            strands,
+            time_limit,
+            threads,
+            seq_len,
+        )
+
     fixed_elements = plan_item.fixed_elements
     constraints = plan_item.regulator_constraints
     plan_min_count_by_regulator = dict(constraints.min_count_by_regulator or {})
@@ -516,8 +782,15 @@ def _process_plan_for_source(
     iterative_max_libraries = int(sampling_cfg.iterative_max_libraries)
     iterative_min_new_solutions = int(sampling_cfg.iterative_min_new_solutions)
 
-    if pool_strategy != "iterative_subsample" and not one_subsample_only:
-        max_per_subsample = quota
+    usage_counts: dict[tuple[str, str], int] = dict(existing_usage_counts or {})
+    tf_usage_counts: dict[str, int] = {}
+    for (tf, _tfbs), count in usage_counts.items():
+        tf_usage_counts[tf] = tf_usage_counts.get(tf, 0) + int(count)
+    track_failures = site_failure_counts is not None
+    failure_counts = site_failure_counts if site_failure_counts is not None else {}
+    attempts_buffer: list[dict] = []
+    run_root_path = Path(run_root)
+    tables_root = run_tables_root(run_root_path)
 
     builder = LibraryBuilder(
         source_label=source_label,
@@ -527,7 +800,7 @@ def _process_plan_for_source(
         seq_len=seq_len,
         min_count_per_tf=min_count_per_tf,
         usage_counts=usage_counts,
-        failure_counts=failure_counts if failure_counts else None,
+        failure_counts=site_failure_counts,
         rng=rng,
         np_rng=np_rng,
         library_source_label=library_source_label,
@@ -554,7 +827,7 @@ def _process_plan_for_source(
         failure_counts=failure_counts,
         source_label=source_label,
         plan_name=plan_name,
-        display_tf_label=_display_tf_label,
+        display_tf_label=display_tf_label,
         progress_style=progress_style,
         show_tfbs=show_tfbs,
         track_failures=track_failures,
@@ -592,8 +865,19 @@ def _process_plan_for_source(
             min_required_regulators=min_required_regulators_local,
             solver_time_limit_seconds=solver_time_limit_seconds,
             solver_threads=solver_threads,
+            extra_label=extra_library_label,
         )
         return run
+
+    failed_solutions = 0
+    duplicate_records = 0
+    stall_events = 0
+    failed_min_count_per_tf = 0
+    failed_required_regulators = 0
+    failed_min_count_by_regulator = 0
+    failed_min_required_regulators = 0
+    duplicate_solutions = 0
+    counters = SamplingCounters()
 
     def _run_library(
         library_context: LibraryContext,
@@ -624,6 +908,15 @@ def _process_plan_for_source(
         source_by_index = sampling_info.get("source_by_index")
         tfbs_id_by_index = sampling_info.get("tfbs_id_by_index")
         motif_id_by_index = sampling_info.get("motif_id_by_index")
+        stage_a_best_hit_score_by_index = sampling_info.get("stage_a_best_hit_score_by_index")
+        stage_a_rank_within_regulator_by_index = sampling_info.get("stage_a_rank_within_regulator_by_index")
+        stage_a_tier_by_index = sampling_info.get("stage_a_tier_by_index")
+        stage_a_fimo_start_by_index = sampling_info.get("stage_a_fimo_start_by_index")
+        stage_a_fimo_stop_by_index = sampling_info.get("stage_a_fimo_stop_by_index")
+        stage_a_fimo_strand_by_index = sampling_info.get("stage_a_fimo_strand_by_index")
+        stage_a_selection_rank_by_index = sampling_info.get("stage_a_selection_rank_by_index")
+        stage_a_selection_score_norm_by_index = sampling_info.get("stage_a_selection_score_norm_by_index")
+        stage_a_tfbs_core_by_index = sampling_info.get("stage_a_tfbs_core_by_index")
 
         diagnostics.update_library(
             library_tfs=library_tfs,
@@ -644,9 +937,7 @@ def _process_plan_for_source(
             pool_strategy=pool_strategy,
         )
         input_meta["sampling_fraction_pairs"] = sampling_fraction_pairs
-        tf_summary = _summarize_tf_counts(
-            [_display_tf_label(tf) for tf in regulator_labels] if regulator_labels else []
-        )
+        tf_summary = _summarize_tf_counts([display_tf_label(tf) for tf in regulator_labels] if regulator_labels else [])
         library_index = sampling_info.get("library_index")
         strategy_label = sampling_info.get("library_sampling_strategy", library_sampling_strategy)
         pool_label = sampling_info.get("pool_strategy")
@@ -723,8 +1014,8 @@ def _process_plan_for_source(
                                 "library_hash": str(sampling_library_hash),
                             },
                         )
-                    except Exception:
-                        log.debug("Failed to emit STALL_DETECTED event.", exc_info=True)
+                    except Exception as exc:
+                        raise RuntimeError("Failed to emit STALL_DETECTED event.") from exc
                 stall_triggered = True
 
             for sol in generator:
@@ -776,6 +1067,15 @@ def _process_plan_for_source(
                     source_by_index,
                     tfbs_id_by_index,
                     motif_id_by_index,
+                    stage_a_best_hit_score_by_index,
+                    stage_a_rank_within_regulator_by_index,
+                    stage_a_tier_by_index,
+                    stage_a_fimo_start_by_index,
+                    stage_a_fimo_stop_by_index,
+                    stage_a_fimo_strand_by_index,
+                    stage_a_selection_rank_by_index,
+                    stage_a_selection_score_norm_by_index,
+                    stage_a_tfbs_core_by_index,
                 )
                 solver_status = getattr(sol, "status", None)
                 if solver_status is not None:
@@ -798,7 +1098,7 @@ def _process_plan_for_source(
                         failed_solutions += 1
                         failed_min_count_per_tf += 1
                         diagnostics.record_site_failures("min_count_per_tf")
-                        attempt_index = _next_attempt_index()
+                        attempt_index = next_attempt_index()
                         _log_rejection(
                             tables_root,
                             run_id=run_id,
@@ -839,7 +1139,7 @@ def _process_plan_for_source(
                         failed_solutions += 1
                         failed_required_regulators += 1
                         diagnostics.record_site_failures("required_regulators")
-                        attempt_index = _next_attempt_index()
+                        attempt_index = next_attempt_index()
                         _log_rejection(
                             tables_root,
                             run_id=run_id,
@@ -883,7 +1183,7 @@ def _process_plan_for_source(
                         failed_solutions += 1
                         failed_min_count_by_regulator += 1
                         diagnostics.record_site_failures("min_count_by_regulator")
-                        attempt_index = _next_attempt_index()
+                        attempt_index = next_attempt_index()
                         _log_rejection(
                             tables_root,
                             run_id=run_id,
@@ -942,11 +1242,11 @@ def _process_plan_for_source(
                         rng=rng,
                     )
                     if isinstance(rf, tuple) and len(rf) == 2:
-                        pad, pad_info = rf
+                        pad_seq, pad_info = rf
                         pad_info = pad_info or {}
                     else:
-                        pad, pad_info = rf, {}
-                    final_seq = (pad + final_seq) if pad_end == "5prime" else (final_seq + pad)
+                        pad_seq, pad_info = rf, {}
+                    final_seq = (pad_seq + final_seq) if pad_end == "5prime" else (final_seq + pad_seq)
                     pad_meta = {
                         "used": True,
                         "bases": gap,
@@ -971,7 +1271,7 @@ def _process_plan_for_source(
                     hit = _find_forbidden_kmer(final_seq, forbid_kmers, allowed_windows)
                     if hit is not None:
                         failed_solutions += 1
-                        attempt_index = _next_attempt_index()
+                        attempt_index = next_attempt_index()
                         _log_rejection(
                             tables_root,
                             run_id=run_id,
@@ -1022,7 +1322,7 @@ def _process_plan_for_source(
                     actual_length=len(final_seq),
                     pad_meta=pad_meta,
                     sampling_meta=sampling_info,
-                    schema_version=str(global_cfg.schema_version),
+                    schema_version=str(context.global_cfg.schema_version),
                     created_at=created_at,
                     run_id=run_id,
                     run_root=run_root,
@@ -1073,7 +1373,7 @@ def _process_plan_for_source(
                     output_alphabet=output_alphabet,
                     tables_root=tables_root,
                     run_id=run_id,
-                    next_attempt_index=_next_attempt_index,
+                    next_attempt_index=next_attempt_index,
                     used_tf_counts=used_tf_counts,
                     used_tf_list=used_tf_list,
                     sampling_library_index=int(sampling_library_index),
@@ -1102,6 +1402,7 @@ def _process_plan_for_source(
                 global_generated += 1
                 local_generated += 1
                 produced_this_library += 1
+                _update_usage_summary(usage_counts, tf_usage_counts, used_tfbs_detail)
 
                 if checkpoint_every > 0 and global_generated % max(1, checkpoint_every) == 0:
                     _flush_attempts(tables_root, attempts_buffer)
@@ -1111,6 +1412,12 @@ def _process_plan_for_source(
                         state_counts[(source_label, plan_name)] = int(global_generated)
                         if write_state is not None:
                             write_state()
+
+                global_total_generated = None
+                if state_counts is not None:
+                    state_counts[(source_label, plan_name)] = int(global_generated)
+                    if total_quota is not None:
+                        global_total_generated = sum(state_counts.values())
 
                 progress_reporter.record_solution(
                     global_generated=global_generated,
@@ -1131,6 +1438,8 @@ def _process_plan_for_source(
                     tf_usage_counts=tf_usage_counts,
                     tf_usage_display=diagnostics.map_tf_usage(tf_usage_counts),
                     tfbs_usage_display=diagnostics.map_tfbs_usage(usage_counts),
+                    global_total_generated=global_total_generated,
+                    global_total_quota=total_quota,
                 )
                 progress_reporter.record_leaderboard(
                     global_generated=global_generated,
@@ -1168,7 +1477,7 @@ def _process_plan_for_source(
         )
 
     def _on_no_solution(library_context: LibraryContext, reason: str) -> None:
-        attempt_index = _next_attempt_index()
+        attempt_index = next_attempt_index()
         detail = {"stall_seconds": stall_seconds} if reason == "stall_no_solution" else {}
         _append_attempt(
             tables_root,
@@ -1212,8 +1521,8 @@ def _process_plan_for_source(
                     "library_hash": str(library_context.sampling_library_hash),
                 },
             )
-        except Exception:
-            log.debug("Failed to emit RESAMPLE_TRIGGERED event.", exc_info=True)
+        except Exception as exc:
+            raise RuntimeError("Failed to emit RESAMPLE_TRIGGERED event.") from exc
 
     sampler = StageBSampler(
         source_label=source_label,
@@ -1251,8 +1560,7 @@ def _process_plan_for_source(
             snapshot = diagnostics.snapshot()
             if global_generated >= quota and (usage_counts or tf_usage_counts or failure_counts):
                 diagnostics.log_snapshot()
-            if dashboard is not None:
-                dashboard.close()
+            _close_plan_dashboard(dashboard=dashboard, shared_dashboard=shared_dashboard)
             return produced_total_this_call, {
                 "generated": produced_total_this_call,
                 "duplicates_skipped": duplicate_records,
@@ -1279,8 +1587,7 @@ def _process_plan_for_source(
     snapshot = diagnostics.snapshot()
     if usage_counts or tf_usage_counts or failure_counts:
         diagnostics.log_snapshot()
-    if dashboard is not None:
-        dashboard.close()
+    _close_plan_dashboard(dashboard=dashboard, shared_dashboard=shared_dashboard)
     return produced_total_this_call, {
         "generated": produced_total_this_call,
         "duplicates_skipped": duplicate_records,
@@ -1297,6 +1604,148 @@ def _process_plan_for_source(
     }
 
 
+def _candidate_logging_enabled(cfg: DenseGenConfig) -> bool:
+    for inp in cfg.inputs:
+        sampling = getattr(inp, "sampling", None)
+        if sampling is None:
+            continue
+        if getattr(sampling, "keep_all_candidates_debug", False):
+            return True
+    return False
+
+
+def _plan_pool_input_meta(spec: PlanPoolSpec) -> dict:
+    meta = {
+        "input_type": PLAN_POOL_INPUT_TYPE,
+        "input_name": spec.pool_name,
+        "input_source_names": list(spec.include_inputs),
+    }
+    if spec.pool.pool_mode == POOL_MODE_TFBS:
+        meta["input_mode"] = "binding_sites"
+        if spec.pool.df is not None and "tf" in spec.pool.df.columns:
+            meta["input_pwm_ids"] = sorted(set(spec.pool.df["tf"].tolist()))
+        else:
+            meta["input_pwm_ids"] = []
+    else:
+        meta["input_mode"] = "sequence_library"
+        meta["input_pwm_ids"] = []
+    return meta
+
+
+def resolve_plan(loaded: LoadedConfig) -> List[ResolvedPlanItem]:
+    return loaded.root.densegen.generation.resolve_plan()
+
+
+def select_solver(
+    preferred: str | None,
+    optimizer: OptimizerAdapter,
+    *,
+    strategy: str,
+    test_length: int = 10,
+) -> str | None:
+    """Probe the requested solver once and fail fast if unavailable."""
+    if strategy == "approximate":
+        return preferred
+    if not preferred:
+        raise ValueError("solver.backend is required unless strategy=approximate")
+    try:
+        optimizer.probe_solver(preferred, test_length=test_length)
+        return preferred
+    except Exception as exc:
+        raise RuntimeError(
+            f"Requested solver '{preferred}' failed during probe: {exc}\n"
+            "Please install/configure this solver or choose another in solver.backend."
+        ) from exc
+
+
+def _process_plan_for_source(
+    source_cfg,
+    plan_item: ResolvedPlanItem,
+    context: PlanRunContext,
+    *,
+    one_subsample_only: bool = False,
+    already_generated: int = 0,
+    execution_state: PlanExecutionState,
+) -> tuple[int, dict]:
+    deps = context.deps
+    np_rng = context.np_rng
+    cfg_path = context.cfg_path
+    run_id = context.run_id
+    run_root = context.run_root
+
+    inputs_manifest = execution_state.inputs_manifest
+    source_cache = execution_state.source_cache
+    pool_override = execution_state.pool_override
+    input_meta_override = execution_state.input_meta_override
+    attempt_counters = execution_state.attempt_counters
+    display_map_by_input = execution_state.display_map_by_input
+
+    source_label = source_cfg.name
+    plan_name = plan_item.name
+    attempt_counters = attempt_counters or {}
+    display_map = display_map_by_input.get(source_label, {}) if display_map_by_input else {}
+
+    def _display_tf_label(label: str) -> str:
+        if not label:
+            return label
+        if label in {"neutral_bg", "neutral"}:
+            return "background"
+        if label in display_map:
+            return display_map[label]
+        return motif_display_name(label, None)
+
+    def _next_attempt_index() -> int:
+        key = (source_label, plan_name)
+        current = int(attempt_counters.get(key, 0)) + 1
+        attempt_counters[key] = current
+        return current
+
+    settings = _init_plan_settings(
+        source_cfg=source_cfg,
+        plan_item=plan_item,
+        context=context,
+        execution_state=execution_state,
+        one_subsample_only=one_subsample_only,
+    )
+    settings.progress.reporter.display_tf_label = _display_tf_label
+    progress_style = settings.progress.progress_style
+
+    run_root_path = Path(run_root)
+    outputs_root = run_outputs_root(run_root_path)
+    tables_root = run_tables_root(run_root_path)
+    existing_library_builds = _load_existing_library_index(tables_root)
+
+    input_state = _load_plan_pool(
+        source_cfg=source_cfg,
+        cfg_path=cfg_path,
+        deps=deps,
+        np_rng=np_rng,
+        outputs_root=outputs_root,
+        run_id=str(run_id),
+        pool_override=pool_override,
+        source_cache=source_cache,
+        input_meta_override=input_meta_override,
+        inputs_manifest=inputs_manifest,
+        source_label=source_label,
+        plan_name=plan_name,
+        progress_style=progress_style,
+        display_tf_label=_display_tf_label,
+    )
+
+    return _run_stage_b_sampling(
+        settings=settings,
+        input_state=input_state,
+        plan_item=plan_item,
+        context=context,
+        execution_state=execution_state,
+        existing_library_builds=existing_library_builds,
+        already_generated=already_generated,
+        one_subsample_only=one_subsample_only,
+        display_tf_label=_display_tf_label,
+        next_attempt_index=_next_attempt_index,
+    )
+
+
 def run_pipeline(
     loaded: LoadedConfig,
     *,
@@ -1304,6 +1753,7 @@ def run_pipeline(
     build_stage_a: bool = False,
     show_tfbs: bool = False,
     show_solutions: bool = False,
+    allow_config_mismatch: bool = False,
     deps: PipelineDeps | None = None,
 ) -> RunSummary:
     deps = deps or default_deps()
@@ -1371,8 +1821,8 @@ def run_pipeline(
         _write_effective_config(
             cfg=cfg, cfg_path=loaded.path, run_root=run_root, seeds=seeds, outputs_root=outputs_root
         )
-    except Exception:
-        log.debug("Failed to write effective_config.json.", exc_info=True)
+    except Exception as exc:
+        raise RuntimeError("Failed to write effective_config.json.") from exc
     stage_a_state = prepare_stage_a_pools(
         cfg=cfg,
         cfg_path=loaded.path,
@@ -1415,6 +1865,7 @@ def run_pipeline(
         run_id=str(cfg.run.id),
         schema_version=str(cfg.schema_version),
         config_sha256=config_sha,
+        allow_config_mismatch=allow_config_mismatch,
     )
 
     resume_state = load_resume_state(
@@ -1422,6 +1873,7 @@ def run_pipeline(
         loaded=loaded,
         tables_root=tables_root,
         config_sha=config_sha,
+        allowed_config_sha256=state_ctx.accepted_config_sha256,
     )
     existing_counts = resume_state.existing_counts
     existing_usage_by_plan = resume_state.existing_usage_by_plan
@@ -1436,6 +1888,7 @@ def run_pipeline(
             len(existing_counts),
         )
     assert_state_matches_outputs(state_path=state_ctx.path, existing_counts=existing_counts)
+    existing_total = sum(existing_counts.values())
 
     plan_stats, plan_order = init_plan_stats(
         plan_items=pl,
@@ -1482,6 +1935,8 @@ def run_pipeline(
         plan_pools=plan_pools,
         existing_counts=existing_counts,
     )
+    total_quota = sum(int(item.quota) for item in pl)
+    shared_dashboard = _build_shared_dashboard(cfg.logging)
 
     def _write_state() -> None:
         write_run_state(
@@ -1489,6 +1944,7 @@ def run_pipeline(
             run_id=str(cfg.run.id),
             schema_version=str(cfg.schema_version),
             config_sha256=config_sha,
+            accepted_config_sha256=state_ctx.accepted_config_sha256,
             run_root=str(run_root),
             counts=state_counts,
             created_at=state_ctx.created_at,
@@ -1519,8 +1975,10 @@ def run_pipeline(
     execution_state = PlanExecutionState(
         inputs_manifest=inputs_manifest_entries,
         state_counts=state_counts,
+        total_quota=total_quota,
         checkpoint_every=checkpoint_every,
         write_state=_write_state,
+        shared_dashboard=shared_dashboard,
         site_failure_counts=site_failure_counts,
         source_cache=source_cache,
         attempt_counters=attempt_counters,
@@ -1534,52 +1992,60 @@ def run_pipeline(
         events_path=events_path,
         display_map_by_input=display_map_by_input,
     )
-    plan_execution = run_plan_schedule(
-        plan_items=pl,
-        plan_pools=plan_pools,
-        plan_pool_sources=plan_pool_sources,
-        existing_counts=existing_counts,
-        round_robin=round_robin,
-        process_plan=_process_plan_for_source,
-        plan_context=plan_context,
-        execution_state=execution_state,
-        accumulate_stats=_accumulate_stats,
-        plan_pool_input_meta=_plan_pool_input_meta,
-        existing_usage_by_plan=existing_usage_by_plan,
-    )
-    per_plan = plan_execution.per_plan
-    total = plan_execution.total
-    plan_leaderboards = plan_execution.plan_leaderboards
+    try:
+        plan_execution = run_plan_schedule(
+            plan_items=pl,
+            plan_pools=plan_pools,
+            plan_pool_sources=plan_pool_sources,
+            existing_counts=existing_counts,
+            round_robin=round_robin,
+            process_plan=_process_plan_for_source,
+            plan_context=plan_context,
+            execution_state=execution_state,
+            accumulate_stats=_accumulate_stats,
+            plan_pool_input_meta=_plan_pool_input_meta,
+            existing_usage_by_plan=existing_usage_by_plan,
+        )
+        per_plan = plan_execution.per_plan
+        total = plan_execution.total
+        plan_leaderboards = plan_execution.plan_leaderboards
 
-    for sink in sinks:
-        sink.finalize()
+        for sink in sinks:
+            sink.finalize()
 
-    finalize_run_outputs(
-        cfg=cfg,
-        run_root=run_root,
-        run_root_str=run_root_str,
-        cfg_path=loaded.path,
-        config_sha=config_sha,
-        seed=seed,
-        seeds=seeds,
-        chosen_solver=chosen_solver,
-        solver_time_limit_seconds=solver_time_limit_seconds,
-        solver_threads=solver_threads,
-        dense_arrays_version=dense_arrays_version,
-        dense_arrays_version_source=dense_arrays_version_source,
-        plan_stats=plan_stats,
-        plan_order=plan_order,
-        plan_leaderboards=plan_leaderboards,
-        plan_pools=plan_pools,
-        plan_items=pl,
-        inputs_manifest_entries=inputs_manifest_entries,
-        library_source=library_source,
-        library_artifact=library_artifact,
-        library_build_rows=library_build_rows,
-        library_member_rows=library_member_rows,
-        composition_rows=composition_rows,
-    )
+        finalize_run_outputs(
+            cfg=cfg,
+            run_root=run_root,
+            run_root_str=run_root_str,
+            cfg_path=loaded.path,
+            config_sha=config_sha,
+            seed=seed,
+            seeds=seeds,
+            chosen_solver=chosen_solver,
+            solver_time_limit_seconds=solver_time_limit_seconds,
+            solver_threads=solver_threads,
+            dense_arrays_version=dense_arrays_version,
+            dense_arrays_version_source=dense_arrays_version_source,
+            plan_stats=plan_stats,
+            plan_order=plan_order,
+            plan_leaderboards=plan_leaderboards,
+            plan_pools=plan_pools,
+            plan_items=pl,
+            inputs_manifest_entries=inputs_manifest_entries,
+            library_source=library_source,
+            library_artifact=library_artifact,
+            library_build_rows=library_build_rows,
+            library_member_rows=library_member_rows,
+            composition_rows=composition_rows,
+        )
 
-    _write_state()
+        _write_state()
 
-    return RunSummary(total_generated=total, per_plan=per_plan)
+        return RunSummary(
+            total_generated=total,
+            per_plan=per_plan,
+            generated_this_run=max(0, int(total) - int(existing_total)),
+        )
+    finally:
+        if shared_dashboard is not None:
+            shared_dashboard.close()

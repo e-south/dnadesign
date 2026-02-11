@@ -30,71 +30,33 @@ def _meta_arrow_type(name: str, pa):
         "tf_list",
         "tfbs_parts",
         "used_tfbs",
-        "used_tf_list",
         "input_pwm_ids",
-        "input_source_names",
         "required_regulators",
     }
-    list_float = {"input_pwm_tier_fractions"}
+    list_float = set()
     list_int = set()
     int_fields = {
         "length",
         "random_seed",
-        "solver_threads",
-        "min_count_per_tf",
-        "min_required_regulators",
-        "input_pwm_n_sites",
-        "input_pwm_mining_batch_size",
-        "input_pwm_mining_log_every_batches",
-        "input_pwm_budget_candidates",
-        "input_pwm_budget_max_candidates",
-        "input_pwm_budget_min_candidates",
-        "input_pwm_selection_pool_max_candidates",
-        "input_row_count",
-        "input_tf_count",
-        "input_tfbs_count",
         "input_tf_tfbs_pair_count",
         "library_size",
         "library_unique_tf_count",
         "library_unique_tfbs_count",
-        "sequence_length",
-        "sampling_achieved_length",
-        "sampling_final_cap",
         "sampling_library_size",
         "sampling_iterative_max_libraries",
-        "sampling_iterative_min_new_solutions",
         "sampling_library_index",
         "pad_bases",
-        "pad_attempts",
     }
     float_fields = {
         "compression_ratio",
-        "input_pwm_budget_target_tier_fraction",
-        "input_pwm_budget_max_seconds",
-        "input_pwm_budget_growth_factor",
-        "input_pwm_selection_alpha",
-        "input_pwm_selection_pool_min_score_norm",
         "sampling_fraction",
         "sampling_fraction_pairs",
-        "pad_gc_min",
-        "pad_gc_max",
-        "pad_gc_target_min",
-        "pad_gc_target_max",
-        "pad_gc_actual",
         "gc_total",
         "gc_core",
-        "solver_objective",
-        "solver_solve_time_s",
-        "solver_time_limit_seconds",
     }
     bool_fields = {
         "covers_all_tfs_in_solution",
-        "covers_required_regulators",
-        "sampling_relaxed_cap",
         "pad_used",
-        "pad_relaxed",
-        "input_pwm_keep_all_candidates_debug",
-        "input_pwm_include_matched_sequence",
     }
 
     if name in list_str:
@@ -119,6 +81,15 @@ def _meta_arrow_type(name: str, pa):
                     pa.field("pad_left", pa.int64()),
                     pa.field("site_id", pa.string()),
                     pa.field("source", pa.string()),
+                    pa.field("stage_a_best_hit_score", pa.float64()),
+                    pa.field("stage_a_rank_within_regulator", pa.int64()),
+                    pa.field("stage_a_tier", pa.int64()),
+                    pa.field("stage_a_fimo_start", pa.int64()),
+                    pa.field("stage_a_fimo_stop", pa.int64()),
+                    pa.field("stage_a_fimo_strand", pa.string()),
+                    pa.field("stage_a_selection_rank", pa.int64()),
+                    pa.field("stage_a_selection_score_norm", pa.float64()),
+                    pa.field("stage_a_tfbs_core", pa.string()),
                 ]
             )
         )

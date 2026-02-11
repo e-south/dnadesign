@@ -18,7 +18,6 @@ from typing import Optional
 import typer
 
 from ..cli_commands.context import CliContext
-from ..config import resolve_run_root
 from ..utils.logging_utils import install_native_stderr_filters
 from ..utils.mpl_utils import ensure_mpl_cache_dir
 
@@ -48,12 +47,14 @@ def register_plot_commands(app: typer.Typer, *, context: CliContext) -> None:
             cfg_path,
             missing_message=context.default_config_missing_message if is_default else None,
         )
-        run_root = resolve_run_root(loaded.path, loaded.root.densegen.run.root)
         try:
-            ensure_mpl_cache_dir(run_root / "outputs" / ".mpl-cache")
+            ensure_mpl_cache_dir()
         except Exception as exc:
             console.print(f"[bold red]Matplotlib cache setup failed:[/] {exc}")
-            console.print("[bold]Tip[/]: set MPLCONFIGDIR=outputs/.mpl-cache inside the workspace.")
+            console.print(
+                "[bold]Tip[/]: DenseGen defaults to a repo-local cache at .cache/matplotlib/densegen; "
+                "set MPLCONFIGDIR to override."
+            )
             raise typer.Exit(code=1)
         install_native_stderr_filters(suppress_solver_messages=False)
         from ..viz.plotting import run_plots_from_config

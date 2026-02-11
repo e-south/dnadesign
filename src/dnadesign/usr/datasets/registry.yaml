@@ -1,0 +1,127 @@
+namespaces:
+  audit:
+    columns:
+    - name: audit__X_value
+      type: list<float64>
+    description: Audit overlay for demo dataset examples.
+    owner: usr
+  usr_state:
+    columns:
+    - name: usr_state__masked
+      type: bool
+    - name: usr_state__qc_status
+      type: string
+    - name: usr_state__split
+      type: string
+    - name: usr_state__supersedes
+      type: string
+    - name: usr_state__lineage
+      type: list<string>
+    description: Reserved record-state overlay (masked/qc/split/lineage).
+    owner: usr
+  densegen:
+    columns:
+    - name: densegen__schema_version
+      type: string
+    - name: densegen__created_at
+      type: string
+    - name: densegen__run_id
+      type: string
+    - name: densegen__run_config_path
+      type: string
+    - name: densegen__length
+      type: int64
+    - name: densegen__random_seed
+      type: int64
+    - name: densegen__policy_sampling
+      type: string
+    - name: densegen__solver_backend
+      type: string
+    - name: densegen__solver_strands
+      type: string
+    - name: densegen__dense_arrays_version
+      type: string
+    - name: densegen__plan
+      type: string
+    - name: densegen__tf_list
+      type: list<string>
+    - name: densegen__tfbs_parts
+      type: list<string>
+    - name: densegen__used_tfbs
+      type: list<string>
+    - name: densegen__used_tfbs_detail
+      type: list<struct<tf:string,tfbs:string,motif_id:string,tfbs_id:string,orientation:string,offset:int64,offset_raw:int64,length:int64,end:int64,pad_left:int64,site_id:string,source:string,stage_a_best_hit_score:float64,stage_a_rank_within_regulator:int64,stage_a_tier:int64,stage_a_fimo_start:int64,stage_a_fimo_stop:int64,stage_a_fimo_strand:string,stage_a_selection_rank:int64,stage_a_selection_score_norm:float64,stage_a_tfbs_core:string>>
+    - name: densegen__used_tf_counts
+      type: list<struct<tf:string,count:int64>>
+    - name: densegen__covers_all_tfs_in_solution
+      type: bool
+    - name: densegen__required_regulators
+      type: list<string>
+    - name: densegen__min_count_by_regulator
+      type: list<struct<tf:string,min_count:int64>>
+    - name: densegen__input_name
+      type: string
+    - name: densegen__input_mode
+      type: string
+    - name: densegen__input_pwm_ids
+      type: list<string>
+    - name: densegen__input_tf_tfbs_pair_count
+      type: int64
+    - name: densegen__sampling_fraction
+      type: float64
+    - name: densegen__sampling_fraction_pairs
+      type: float64
+    - name: densegen__fixed_elements
+      type: struct<promoter_constraints:list<struct<name:string,upstream:string,downstream:string,spacer_length:list<int64>,upstream_pos:list<int64>,downstream_pos:list<int64>>>,side_biases:struct<left:list<string>,right:list<string>>>
+    - name: densegen__visual
+      type: string
+    - name: densegen__compression_ratio
+      type: float64
+    - name: densegen__library_size
+      type: int64
+    - name: densegen__library_unique_tf_count
+      type: int64
+    - name: densegen__library_unique_tfbs_count
+      type: int64
+    - name: densegen__promoter_constraint
+      type: string
+    - name: densegen__sampling_pool_strategy
+      type: string
+    - name: densegen__sampling_library_size
+      type: int64
+    - name: densegen__sampling_library_strategy
+      type: string
+    - name: densegen__sampling_iterative_max_libraries
+      type: int64
+    - name: densegen__sampling_library_index
+      type: int64
+    - name: densegen__pad_used
+      type: bool
+    - name: densegen__pad_bases
+      type: int64
+    - name: densegen__pad_end
+      type: string
+    - name: densegen__gc_total
+      type: float64
+    - name: densegen__gc_core
+      type: float64
+    - name: densegen__npz_ref
+      type: string
+    - name: densegen__npz_sha256
+      type: string
+    - name: densegen__npz_bytes
+      type: int64
+    - name: densegen__npz_fields
+      type: list<string>
+    description: DenseGen derived outputs.
+    owner: densegen
+  mock:
+    columns:
+    - name: mock__X_value
+      type: float64
+    - name: mock__some_other_value
+      type: float64
+    - name: mock__y_label
+      type: list<float64>
+    description: Mock attachment columns used in README examples.
+    owner: usr

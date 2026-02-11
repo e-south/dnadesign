@@ -25,7 +25,6 @@ from dnadesign.cruncher.io.parsers.meme import parse_meme_file
 
 from ...config import BackgroundPoolSamplingConfig, resolve_relative_path
 from ...core.artifacts.ids import hash_label_motif, hash_tfbs_id
-from ...core.stage_a_constants import FIMO_REPORT_THRESH
 from ...utils.sequence_utils import gc_fraction
 from .base import BaseDataSource
 from .pwm_artifact import load_artifact as load_pwm_artifact
@@ -48,6 +47,8 @@ from .stage_a.stage_a_sampling_utils import (
 from .stage_a.stage_a_types import PWMMotif
 
 log = logging.getLogger(__name__)
+
+BACKGROUND_FIMO_PVALUE_THRESH = 1e-4
 
 
 def _parse_pwm_matrix_csv(path: Path, *, motif_id: str, columns: dict[str, str]) -> PWMMotif:
@@ -222,12 +223,12 @@ def _run_fimo_exclusion(
             rows, _ = run_fimo(
                 meme_motif_path=meme_path,
                 fasta_path=fasta_path,
-                thresh=FIMO_REPORT_THRESH,
-                norc=True,
+                thresh=BACKGROUND_FIMO_PVALUE_THRESH,
+                norc=False,
                 include_matched_sequence=False,
                 return_tsv=False,
             )
-            best_hits = aggregate_best_hits(rows)
+            best_hits = aggregate_best_hits(rows, allowed_strands={"+", "-"})
             for rec_id, hit in best_hits.items():
                 idx = record_index.get(rec_id)
                 if idx is None:
@@ -316,6 +317,17 @@ class BackgroundPoolDataSource(BaseDataSource):
         )
         if fimo_cfg is not None:
             progress.set_phase("fimo")
+        progress.update(
+            generated=0,
+            accepted=0,
+            batch_index=0,
+            batch_total=batch_total,
+            reject_fimo=0,
+            reject_kmer=0,
+            reject_gc=0,
+            reject_dup=0,
+            force=True,
+        )
 
         try:
             while len(accepted) < target and generated < max_candidates:

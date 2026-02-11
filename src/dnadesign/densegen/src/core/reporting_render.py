@@ -124,6 +124,11 @@ def _render_report_md(bundle: ReportBundle) -> str:
         tf_usage_label = f"{tf_usage.get('min'):.0f}/{tf_usage.get('median'):.0f}/{tf_usage.get('max'):.0f}"
     if tfbs_usage.get("min") is not None:
         tfbs_usage_label = f"{tfbs_usage.get('min'):.0f}/{tfbs_usage.get('median'):.0f}/{tfbs_usage.get('max'):.0f}"
+    output_records_path = report.get("outputs_path")
+    if output_records_path:
+        output_records_line = f"- {output_records_path}"
+    else:
+        output_records_line = f"- {report.get('output_source')} (output records source)"
     lines = [
         "# DenseGen Report",
         "",
@@ -142,7 +147,7 @@ def _render_report_md(bundle: ReportBundle) -> str:
         f"- Warnings: {len(report.get('warnings') or [])}",
         "",
         "## Outputs",
-        "- outputs/tables/dense_arrays.parquet",
+        output_records_line,
         "- outputs/tables/attempts.parquet",
         "- outputs/tables/solutions.parquet",
         "- outputs/tables/composition.parquet",
@@ -221,7 +226,6 @@ def _render_report_md(bundle: ReportBundle) -> str:
                     "coverage_required_rate",
                     "coverage_all_tfs_rate",
                     "avg_used_tf_count",
-                    "min_required_regulators",
                 ],
                 max_rows=20,
             )

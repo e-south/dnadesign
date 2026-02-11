@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from pathlib import Path
 from typing import Callable
@@ -65,71 +66,60 @@ def record_solution_outputs(
     if not _write_to_sinks(sinks, record):
         return False
 
-    attempts_buffer.append(
-        {
-            "created_at": derived.get("created_at"),
-            "input_name": source_label,
-            "plan_name": plan_name,
-            "attempt_index": next_attempt_index(),
-            "status": "ok",
-            "reason": None,
-            "detail": None,
-            "sequence": final_seq,
-            "used_tf_counts": used_tf_counts,
-            "used_tf_list": used_tf_list,
-            "sampling_library_index": int(sampling_library_index),
-            "sampling_library_hash": str(sampling_library_hash),
-            "solver_status": solver_status,
-            "solver_objective": solver_objective,
-            "solver_solve_time_s": solver_solve_time_s,
-            "dense_arrays_version": dense_arrays_version,
-            "dense_arrays_version_source": dense_arrays_version_source,
-            "library_tfbs": library_tfbs,
-            "library_tfs": library_tfs,
-            "library_site_ids": library_site_ids,
-            "library_sources": library_sources,
-        }
+    attempt_index = next_attempt_index()
+    attempt_id = _append_attempt(
+        tables_root,
+        run_id=run_id,
+        input_name=source_label,
+        plan_name=plan_name,
+        attempt_index=attempt_index,
+        status="ok",
+        reason=None,
+        detail=None,
+        sequence=final_seq,
+        used_tf_counts=used_tf_counts,
+        used_tf_list=used_tf_list,
+        sampling_library_index=int(sampling_library_index),
+        sampling_library_hash=str(sampling_library_hash),
+        solver_status=solver_status,
+        solver_objective=solver_objective,
+        solver_solve_time_s=solver_solve_time_s,
+        dense_arrays_version=dense_arrays_version,
+        dense_arrays_version_source=dense_arrays_version_source,
+        library_tfbs=library_tfbs,
+        library_tfs=library_tfs,
+        library_site_ids=library_site_ids,
+        library_sources=library_sources,
+        attempts_buffer=attempts_buffer,
     )
     if solution_rows is not None:
         solution_rows.append(
-            _append_attempt(
-                tables_root,
-                run_id=run_id,
-                input_name=source_label,
-                plan_name=plan_name,
-                attempt_index=next_attempt_index(),
-                status="ok",
-                reason=None,
-                detail=None,
-                sequence=final_seq,
-                used_tf_counts=used_tf_counts,
-                used_tf_list=used_tf_list,
-                sampling_library_index=int(sampling_library_index),
-                sampling_library_hash=str(sampling_library_hash),
-                solver_status=solver_status,
-                solver_objective=solver_objective,
-                solver_solve_time_s=solver_solve_time_s,
-                dense_arrays_version=dense_arrays_version,
-                dense_arrays_version_source=dense_arrays_version_source,
-                library_tfbs=library_tfbs,
-                library_tfs=library_tfs,
-                library_site_ids=library_site_ids,
-                library_sources=library_sources,
-                attempts_buffer=attempts_buffer,
-            )
+            {
+                "solution_id": record.id,
+                "attempt_id": attempt_id,
+                "run_id": run_id,
+                "input_name": source_label,
+                "plan_name": plan_name,
+                "created_at": str(derived.get("created_at") or ""),
+                "sequence": final_seq,
+                "sequence_hash": hashlib.sha256(final_seq.encode("utf-8")).hexdigest(),
+                "sampling_library_index": int(sampling_library_index),
+                "sampling_library_hash": str(sampling_library_hash),
+            }
         )
     if composition_rows is not None:
-        composition_rows.append(
-            {
+        solution_id = record.id
+        for entry in used_tfbs_detail:
+            row = {
+                "solution_id": solution_id,
                 "input_name": source_label,
                 "plan_name": plan_name,
                 "library_index": int(sampling_library_index),
                 "library_hash": str(sampling_library_hash),
-                "sequence": final_seq,
-                "used_tfbs": used_tfbs,
-                "used_tfbs_detail": used_tfbs_detail,
             }
-        )
+            if isinstance(entry, dict):
+                row.update(entry)
+            composition_rows.append(row)
     if events_path is not None:
         try:
             _emit_event(

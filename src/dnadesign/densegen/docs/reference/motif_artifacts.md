@@ -1,6 +1,11 @@
-## Motif artifact contract (JSON)
+# Motif artifact contract (JSON)
 
-DenseGen can consume **per‑motif JSON artifacts** that encode a single PWM. This keeps DenseGen decoupled from parsing code e.g., from Cruncher, and DenseGen only reads the artifact path specified in `config.yaml`. Cruncher produces these artifacts via `cruncher catalog export-densegen` (implemented in `cruncher/src/app/motif_artifacts.py`).
+DenseGen can consume one JSON file per motif.
+This keeps producer tooling and DenseGen decoupled:
+- producer tools own parsing and conversion
+- DenseGen only validates and consumes a stable artifact contract
+
+Cruncher can emit these artifacts with `cruncher catalog export-densegen`.
 
 ### Contents
 - [Context](#context) - why artifacts exist and where they fit.
@@ -95,20 +100,32 @@ inputs:
     path: inputs/artifacts/lexA.json
     sampling:  # Stage‑A sampling
       strategy: stochastic
-      n_sites: 200
+      n_sites: 250
       mining:
         batch_size: 5000
         budget:
-          mode: tier_target
-          target_tier_fraction: 0.001
-          max_candidates: 200000
+          mode: fixed_candidates
+          candidates: 1000000
+          growth_factor: 1.25
+      selection:
+        policy: mmr
+        rank_by: score_norm
+        alpha: 0.35
+        pool:
+          min_score_norm: 0.75  # fraction of theoretical max log-odds score
+          relevance_norm: minmax_raw_score
+      tier_fractions: [0.001, 0.01, 0.09]
       length:
-        policy: exact
+        policy: range
+        range: [16, 20]
 ```
 
-Exact length is the default. To enable variable length, set `length.policy: range` and
-provide `length.range: [min, max]`. If `min` is below the motif length, Stage‑A trims to the
-max‑information window per candidate (and MMR requires a fixed trimming window length).
+`fixed_candidates` is the recommended mining mode for predictable runtime behavior. Use
+`tier_target` only when you intentionally want mining to continue until a tier target is met
+or caps/time terminate early.
+
+If `min` is below motif length, Stage‑A trims to a max-information window per candidate.
+When you use MMR, cores must have consistent length; set a fixed trimming window if needed.
 
 ---
 

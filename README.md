@@ -34,7 +34,13 @@ dnadesign/
 
 1. [Installation](docs/installation.md)
 2. [Maintaining dependencies](docs/dependencies.md)
-3. [CUDA/GPU install notes (BU SCC)](docs/INSTALL_BU_SCC.md)
+3. [Notifications](docs/notify.md)
+
+### HPC / BU SCC
+
+1. [BU SCC quickstart (interactive -> batch -> notify)](docs/hpc/bu_scc_quickstart.md)
+2. [BU SCC install (interactive bootstrap)](docs/hpc/bu_scc_install.md)
+3. [BU SCC batch + Notify runbook](docs/hpc/bu_scc_batch_notify.md)
 
 ---
 
@@ -43,6 +49,10 @@ dnadesign/
 1. [**usr**](src/dnadesign/usr) (Universal Sequence Record)
 
       Consists of utility commands to inspect datasets/Parquet files used across the `dnadesign` project.
+
+2. [**notify**](src/dnadesign/notify)
+
+      Tool-agnostic webhook notifier for batch runs (Slack/Discord/generic webhooks).
 
 2. [**densegen**](src/dnadesign/densegen)
 

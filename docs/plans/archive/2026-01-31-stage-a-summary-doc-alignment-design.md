@@ -42,7 +42,7 @@ Add a short glossary for the inline metrics that appear in the plots:
 
 ### 2) Remove interpretive duplication elsewhere
 - `src/dnadesign/densegen/docs/reference/outputs.md`: keep plot inventory only; add a link to the sampling guide for interpretation.
-- `src/dnadesign/densegen/docs/demo/demo_basic.md`: replace interpretive text with a short link to the sampling guide section.
+- `src/dnadesign/densegen/docs/demo/demo_pwm_artifacts.md`: replace interpretive text with a short link to the sampling guide section.
 - `src/dnadesign/densegen/docs/dev/audit_2026-01-30_stage_a.md`: keep run notes but remove plot interpretation; link to the sampling guide section.
 
 ### 3) Drift prevention note

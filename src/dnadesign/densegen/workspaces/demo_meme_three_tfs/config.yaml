@@ -12,7 +12,7 @@ densegen:
       path: inputs/motif_artifacts/lexA__meme_suite_meme__lexA_CTGTATAWAWWHACA.json
       sampling:
         strategy: stochastic
-        n_sites: 200
+        n_sites: 250
         mining:
           batch_size: 5000
           budget:
@@ -25,12 +25,13 @@ densegen:
           range: [16, 20]
         uniqueness:
           key: core
+          cross_regulator_core_collisions: error
         selection:
           policy: mmr
           rank_by: score_norm
-          alpha: 0.5
+          alpha: 0.35
           pool:
-            min_score_norm: 0.85
+            min_score_norm: 0.75
             max_candidates: null
             relevance_norm: minmax_raw_score
         tier_fractions: [0.001, 0.01, 0.09]
@@ -39,7 +40,7 @@ densegen:
       path: inputs/motif_artifacts/cpxR__meme_suite_meme__cpxR_MANWWHTTTAM.json
       sampling:
         strategy: stochastic
-        n_sites: 200
+        n_sites: 250
         mining:
           batch_size: 5000
           budget:
@@ -52,12 +53,13 @@ densegen:
           range: [16, 20]
         uniqueness:
           key: core
+          cross_regulator_core_collisions: error
         selection:
           policy: mmr
           rank_by: score_norm
-          alpha: 0.5
+          alpha: 0.35
           pool:
-            min_score_norm: 0.85
+            min_score_norm: 0.75
             max_candidates: null
             relevance_norm: minmax_raw_score
         tier_fractions: [0.001, 0.01, 0.09]
@@ -66,7 +68,7 @@ densegen:
       path: inputs/motif_artifacts/baeR__meme_suite_meme__baeR_WWDTYTCTSCMNNA.json
       sampling:
         strategy: stochastic
-        n_sites: 200
+        n_sites: 250
         mining:
           batch_size: 5000
           budget:
@@ -79,19 +81,20 @@ densegen:
           range: [16, 20]
         uniqueness:
           key: core
+          cross_regulator_core_collisions: error
         selection:
           policy: mmr
           rank_by: score_norm
-          alpha: 0.5
+          alpha: 0.35
           pool:
-            min_score_norm: 0.85
+            min_score_norm: 0.75
             max_candidates: null
             relevance_norm: minmax_raw_score
         tier_fractions: [0.001, 0.01, 0.09]
-    - name: neutral_bg
+    - name: background
       type: background_pool
       sampling:
-        n_sites: 200
+        n_sites: 500
         mining:
           batch_size: 20000
           budget:
@@ -123,7 +126,6 @@ densegen:
 
   generation:
     sequence_length: 60
-    quota: 48
     sampling:
       pool_strategy: subsample
       library_size: 10
@@ -135,26 +137,26 @@ densegen:
 
     plan:
       - name: controls
-        quota: 12
+        quota: 10
         sampling:
-          include_inputs: [neutral_bg]
+          include_inputs: [background]
         fixed_elements:
           promoter_constraints:
             - name: sigma70_consensus
               upstream: TTGACA
               downstream: TATAAT
-              spacer_length: [16, 20]
+              spacer_length: [16, 18]
               upstream_pos: [0, 60]
         regulator_constraints:
           groups:
             - name: control
               members:
-                - neutral_bg
+                - background
               min_required: 1
       - name: ethanol
-        quota: 12
+        quota: 10
         sampling:
-          include_inputs: [cpxR_pwm, baeR_pwm, neutral_bg]
+          include_inputs: [cpxR_pwm, baeR_pwm, background]
         fixed_elements:
           promoter_constraints:
             - name: sigma70_consensus
@@ -170,15 +172,15 @@ densegen:
                 - baeR_WWDTYTCTSCMNNA
               min_required: 1
       - name: ciprofloxacin
-        quota: 12
+        quota: 10
         sampling:
-          include_inputs: [lexA_pwm, neutral_bg]
+          include_inputs: [lexA_pwm, background]
         fixed_elements:
           promoter_constraints:
             - name: sigma70_consensus
               upstream: TTGACA
               downstream: TATAAT
-              spacer_length: [16, 20]
+              spacer_length: [16, 18]
               upstream_pos: [0, 60]
         regulator_constraints:
           groups:
@@ -187,9 +189,9 @@ densegen:
                 - lexA_CTGTATAWAWWHACA
               min_required: 1
       - name: ethanol_ciprofloxacin
-        quota: 12
+        quota: 10
         sampling:
-          include_inputs: [lexA_pwm, cpxR_pwm, baeR_pwm, neutral_bg]
+          include_inputs: [lexA_pwm, cpxR_pwm, baeR_pwm, background]
         fixed_elements:
           promoter_constraints:
             - name: sigma70_consensus
@@ -247,7 +249,14 @@ densegen:
     level: INFO
     suppress_solver_stderr: true
     print_visual: true
-    progress_style: screen
+    visuals:
+      tf_colors:
+        lexA: "#66C2A5"
+        cpxR: "#FC8D62"
+        baeR: "#8DA0CB"
+        background: "#B3B3B3"
+        sigma70_consensus: "#E78AC3"
+    progress_style: auto
     progress_every: 1
     progress_refresh_seconds: 1.0
 
@@ -255,4 +264,4 @@ plots:
   source: parquet
   out_dir: outputs/plots
   format: pdf
-  default: [stage_a_summary, placement_map]
+  default: [stage_a_summary, placement_map, run_health, tfbs_usage]

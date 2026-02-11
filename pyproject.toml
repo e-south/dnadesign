@@ -32,6 +32,7 @@ dependencies = [
   "seaborn",
   "tqdm",
   "typer",
+  "duckdb>=0.10.0",
   "xlrd",
   # Torch 2.8 includes the CVE-2025-3730 fix.
   "torch>=2.8,<2.9; (sys_platform == 'darwin' and platform_machine == 'arm64') or (sys_platform == 'linux' and platform_machine == 'x86_64')",
@@ -51,6 +52,7 @@ dependencies = [
 usr        = "dnadesign.usr.src.cli:main"
 opal       = "dnadesign.opal.src.cli:main"
 dense      = "dnadesign.densegen.src.cli:app"
+notify     = "dnadesign.notify.cli:app"
 infer      = "dnadesign.infer.cli:app"
 cluster    = "dnadesign.cluster.src.cli.app:main"
 permuter   = "dnadesign.permuter.src.cli.app:main"

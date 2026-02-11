@@ -1,6 +1,17 @@
-## DenseGen Config Reference
+# DenseGen config reference
 
-This is the YAML schema for DenseGen. Unknown keys are errors and all paths resolve relative to the config file directory. Stage‑A sampling lives under `densegen.inputs[].sampling`, Stage‑B sampling lives under `densegen.generation.sampling`. Use this reference for exact field names; see the guide for conceptual flow.
+Use this page when you need exact YAML keys and constraints.
+Unknown keys are hard errors.
+All relative paths resolve from the config file directory.
+
+Sampling split:
+- Stage-A sampling keys live under `densegen.inputs[].sampling`
+- Stage-B sampling keys live under `densegen.generation.sampling`
+
+If you want concepts first, read:
+- [inputs guide](../guide/inputs.md)
+- [sampling guide](../guide/sampling.md)
+- [generation guide](../guide/generation.md)
 
 ### Contents
 - [Top-level](#top-level) - required roots and plotting.
@@ -8,7 +19,7 @@ This is the YAML schema for DenseGen. Unknown keys are errors and all paths reso
 - [`densegen.run`](#densegenrun) - run identifier and root.
 - [`densegen.output`](#densegenoutput) - output targets and schema.
 - [`densegen.generation`](#densegengeneration) - plan and fixed elements.
-- [`densegen.generation.sampling`](#densegengenerationsampling) - Stage‑B library building controls.
+- [`densegen.generation.sampling`](#densegengenerationsampling-stage-b-sampling) - Stage-B library building controls.
 - [`densegen.solver`](#densegensolver) - backend and strategy.
 - [`densegen.runtime`](#densegenruntime) - retry and guard rails.
 - [`densegen.postprocess.pad`](#densegenpostprocesspad) - pad policy.
@@ -71,6 +82,7 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
         - `pwms_input`: list of PWM input names to screen against
         - `allow_zero_hit_only`: when true, reject any FIMO hit
         - `max_score_norm`: required when `allow_zero_hit_only=false`
+        - FIMO exclusion uses a p-value threshold of 1e-4 and scans both strands
   - FIMO resolves via `MEME_BIN` or PATH (pixi users should run `pixi run dense ...`).
 - `type: pwm_meme`
   - `path` - MEME PWM file
@@ -95,7 +107,7 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
       e.g., `A 0.25`); also used for Stage-A score normalization and MMR information-content weights
     - `keep_all_candidates_debug` (bool, default false) - write candidate Parquet logs to
       `outputs/pools/candidates/` for inspection (overwritten by `stage-a build-pool --fresh`
-      or `dense run --rebuild-stage-a`)
+      or `dense run --fresh`)
     - `include_matched_sequence` (bool, default true; must be true for PWM sampling) - include
       `fimo_matched_sequence` in TFBS outputs (config validation rejects false)
     - `tier_fractions` (optional list of three floats in (0, 1], non‑decreasing, sum ≤ 1.0; default
@@ -109,15 +121,22 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
       - `window_strategy`: `max_info` (window selection strategy)
     - `uniqueness`
       - `key`: `sequence | core` (default `core` for PWM inputs)
+      - `cross_regulator_core_collisions`: `allow | warn | error` (default `warn`).
+        For multi-motif PWM inputs, this checks for the same `tfbs_core` appearing under
+        different regulators in the same Stage-A pool build.
     - `selection`
       - `policy`: `top_score | mmr` (default `top_score`)
       - `rank_by`: `score | score_norm` (default `score`; `score_norm` is length-normalized)
       - `alpha` (float in (0, 1]; MMR score weight)
       - `pool` (required when `policy=mmr`)
-        - `min_score_norm` (optional float in (0, 1]; recorded as a “within τ of max” reference in reports)
-        - `max_candidates` (optional int > 0; cap the MMR pool to the top-by-score slice)
+        - `min_score_norm` (optional float in (0, 1]; hard lower bound for MMR pool inclusion using
+          the fraction of theoretical max log-odds score:
+          `best_hit_score / pwm_theoretical_max_score`)
+        - `max_candidates` (optional int > 0; upper bound on the deterministic MMR target pool size;
+          default target pool is `ceil(10.0 * n_sites)`)
         - `relevance_norm` (optional: `percentile | minmax_raw_score`; default `minmax_raw_score`)
-      - MMR pool selection uses the cumulative rung ladder derived from `sampling.tier_fractions`.
+      - MMR pool selection uses the cumulative rung ladder derived from `sampling.tier_fractions`,
+        evaluated by post-gate counts, then slices to a deterministic target pool.
     - `consensus` requires `n_sites: 1`
     - `background` samples cores from the PWM background distribution before padding
     - FIMO resolves `fimo` via `MEME_BIN` or PATH; pixi users should run `pixi run dense ...` so it is available.
@@ -145,6 +164,7 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
   - `sampling` (required Stage‑A config) - same fields as `pwm_meme`
   - `overrides_by_motif_id` (optional dict) - per‑motif Stage‑A sampling overrides (deep‑merged
     onto the base `sampling`, so partial overrides are allowed)
+    - `uniqueness.cross_regulator_core_collisions` must stay consistent across base and overrides
 - `type: usr_sequences`
   - `dataset` - USR dataset name
   - `root` - USR root path (required; no fallback)
@@ -169,7 +189,10 @@ Outputs (tables), logs, and plots must resolve inside `outputs/` under `densegen
 - `targets`: list of sinks to write (`usr`, `parquet`)
 - When multiple targets are set, outputs must be in sync before a run; mismatches are errors.
 - `usr` (required when `targets` includes `usr`)
-  - `dataset`, `root`, `chunk_size`, `allow_overwrite`
+  - `dataset`, `root`, `chunk_size`, `health_event_interval_seconds`, `allow_overwrite`
+  - `health_event_interval_seconds` (float > 0; default 60) controls cadence for `densegen_health` USR events
+  - `npz_fields` (optional list of metadata keys to offload into NPZ artifacts; see outputs doc)
+  - `npz_root` (optional path for NPZ artifacts; defaults to `<dataset>/_artifacts/densegen_npz`)
 - `parquet` (required when `targets` includes `parquet`)
   - `path` (file), `deduplicate`, `chunk_size`
   - `path` must be a `.parquet` file (single-file output)
@@ -180,12 +203,11 @@ Outputs (tables), logs, and plots must resolve inside `outputs/` under `densegen
 ### `densegen.generation`
 
 - `sequence_length` (int > 0)
-- `sequence_length` must be >= the widest required motif (library TFBS or fixed elements)
-- `quota` (int > 0)
+- `sequence_length` should be >= the widest required motif (library TFBS or fixed elements); if it
+  is shorter, Stage‑B records infeasibility and warns.
 - `sampling` (Stage‑B; see below)
 - `plan` (required, non-empty)
-  - Each item: `name`, and either `quota` or `fraction`
-  - Mixing quotas and fractions across items is not allowed.
+  - Each item: `name` and `quota` (int > 0)
   - `sampling.include_inputs` (required) - input names that feed the plan‑scoped pool.
   - `fixed_elements.promoter_constraints[]` supports `name`, `upstream`, `downstream`,
     `spacer_length`, `upstream_pos`, `downstream_pos`
@@ -206,7 +228,7 @@ Outputs (tables), logs, and plots must resolve inside `outputs/` under `densegen
 
 ---
 
-### `densegen.generation.sampling` (Stage‑B sampling)
+### `densegen.generation.sampling` (Stage-B sampling)
 
 These controls apply to **Stage‑B sampling** (library construction) after Stage‑A input sampling.
 `library_size` does not change Stage‑A sampling counts. `library_size` also bounds the motif count
@@ -301,15 +323,43 @@ Notes:
   `outputs/` under `densegen.run.root`).
 - `level` (e.g., `INFO`)
 - `suppress_solver_stderr` (bool)
-- `print_visual` (bool; controls ASCII placement visuals when `show_solutions` is enabled)
-- `progress_style`: `stream | summary | screen` (default `screen`)
+- `print_visual` (bool; show dense-arrays ASCII placement visuals in progress output)
+- `progress_style`: `auto | stream | summary | screen` (default `summary`)
+  - `auto`: adapt at runtime:
+    - interactive + cursor-capable terminal → `screen`
+    - interactive + `TERM=dumb` → `stream`
+    - non-interactive output → `summary`
   - `stream`: per‑sequence logs (controlled by `progress_every`)
   - `summary`: suppress per‑sequence logs; keep periodic leaderboard summaries
-  - `screen`: redraw a compact dashboard at `progress_refresh_seconds`
+  - `screen`: use in-place Rich `Live` dashboard updates on interactive terminals.
+    - Requires a non-`dumb` terminal (`TERM` must support cursor controls). If `TERM=dumb`, DenseGen fails fast with an actionable error.
+    - Requires terminal output; if output is redirected/non-interactive, DenseGen fails fast and instructs you to use `summary` or `stream`.
 - `progress_every` (int >= 0) - log/refresh interval in sequences (`0` disables per‑sequence logging)
 - `progress_refresh_seconds` (float > 0) - minimum seconds between screen refreshes
 - `show_tfbs` (bool) - include TFBS sequences in progress output
 - `show_solutions` (bool) - include full solution sequences in progress output
+- `visuals.tf_colors` (mapping; required when `print_visual: true`)
+  - Maps display TF label → Rich color string for colored label lines in the dense-arrays visual.
+    Use the display name shown in progress output (e.g., `lexA` for `lexA_CTGT...`,
+    `background` for a background-pool input).
+  - Missing TFs are an error (no fallback).
+  - If promoter constraints add fixed motifs to the optimizer library, include a color for the
+    fixed-elements label derived from `promoter_constraints[].name`. Multiple names are joined
+    with `+` in the order they appear (e.g., `sigma70_consensus+sigma54`).
+
+Example:
+
+```yaml
+densegen:
+  logging:
+    print_visual: true
+    visuals:
+      tf_colors:
+        lexA: "#66C2A5"
+        cpxR: "#FC8D62"
+        baeR: "#8DA0CB"
+        sigma70_consensus: "#E78AC3"
+```
 
 ---
 
@@ -353,7 +403,6 @@ densegen:
 
   generation:
     sequence_length: 60
-    quota: 100
     plan:
       - name: default
         quota: 100

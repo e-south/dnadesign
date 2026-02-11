@@ -3,26 +3,17 @@
 dnadesign
 src/dnadesign/densegen/src/adapters/sources/stage_a/stage_a_tier_targets.py
 
-Tier-target calculations for Stage-A PWM mining.
+Re-exports Stage-A module 'stage_a_tier_targets' from core.stage_a.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-from __future__ import annotations
+from ....core.stage_a import stage_a_tier_targets as _impl
 
-import math
+for _name, _value in _impl.__dict__.items():
+    if _name.startswith("__") and _name != "__all__":
+        continue
+    globals()[_name] = _value
 
-
-def required_unique_for_tier_target(*, n_sites: int, target_tier_fraction: float) -> int:
-    if target_tier_fraction <= 0 or target_tier_fraction > 1:
-        raise ValueError("target_tier_fraction must be in (0, 1].")
-    return int(math.ceil(float(n_sites) / float(target_tier_fraction)))
-
-
-def evaluate_tier_target(*, n_sites: int, target_tier_fraction: float, eligible_unique: int) -> tuple[int, bool]:
-    required_unique = required_unique_for_tier_target(
-        n_sites=n_sites,
-        target_tier_fraction=target_tier_fraction,
-    )
-    return required_unique, int(eligible_unique) >= required_unique
+__all__ = getattr(_impl, "__all__", [])

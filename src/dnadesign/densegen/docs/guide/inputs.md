@@ -1,22 +1,35 @@
 ## Inputs (Stage-A)
 
-DenseGen Stage-A builds TFBS pools from inputs. This guide stays high level; use the config
-reference for exact schema details.
+This guide explains what DenseGen accepts as Stage-A input and how to think about each type.
+
+If you want exact YAML fields, use [../reference/config.md](../reference/config.md).
+
+### Mental model
+
+Stage-A turns raw input sources into a pool of candidate sites.
+
+- PWM inputs: sample candidates, score with FIMO, deduplicate, retain `n_sites`
+- Binding-site tables: ingest directly (no mining)
+- Sequence libraries: ingest directly
+
+Subprocess boundary:
+
+1. Inputs are consumed only in Stage-A.
+2. Stage-A writes pool parquet files under `outputs/pools/`.
+3. Stage-B and solver consume those Stage-A pools; they do not re-read original input files.
 
 ### Input types
 
 - **PWM-backed** (`pwm_*`, `pwm_artifact*`)
-  Stage-A samples candidate cores, scores them with FIMO, deduplicates, and retains `n_sites`.
 - **Binding sites** (`type: binding_sites`)
-  Stage-A ingests a table of sites; no mining.
 - **Sequence libraries** (`type: sequence_library`, `type: usr_sequences`)
-  Stage-A ingests sequences as provided (used as solver seeds in some workflows).
 
-For PWM artifact contracts, see `reference/motif_artifacts.md`.
+PWM artifact contract:
+- [../reference/motif_artifacts.md](../reference/motif_artifacts.md)
 
-### Minimal examples
+### Minimal YAML examples
 
-PWM artifacts:
+PWM artifact set:
 
 ```yaml
 inputs:
@@ -35,10 +48,10 @@ inputs:
         alpha: 0.5
         pool:
           relevance_norm: minmax_raw_score
-          min_score_norm: 0.85  # report-only reference
+          min_score_norm: 0.75  # active lower bound on score_norm
 ```
 
-Binding sites:
+Binding-site table:
 
 ```yaml
 inputs:
@@ -47,28 +60,25 @@ inputs:
     path: inputs/densegen_sites.parquet
 ```
 
-`selection.pool.min_score_norm` has no default; set it explicitly if you want the report-only
-"within tau of theoretical max" reference.
+`selection.pool.min_score_norm` has no default. Set it when you want to enforce a
+minimum score-normalized quality floor inside the MMR pool.
 
 ### Path resolution
 
-All input paths resolve relative to the config file location unless you pass an absolute path.
+Input paths resolve relative to `config.yaml` unless you pass absolute paths.
 
-### PWM Stage-A highlights
+### PWM-specific highlights
 
-- **Scoring**: FIMO log-odds, forward strand only (`--norc`). Cores are treated as bricks
-  and can be placed in either orientation later. If `sampling.bgfile` is set, DenseGen uses
-  that background for theoretical max, `score_norm`, and MMR weights.
-- **Eligibility**: candidate must have a FIMO hit and `best_hit_score > 0`.
-- **Deduplication**: `uniqueness.key` controls whether uniqueness is by `tfbs` or `tfbs_core`.
-- **Selection**: `top_score` or `mmr`. MMR uses a score normalization
-  (`selection.pool.relevance_norm`) plus weighted-Hamming diversity on `tfbs_core`.
-- **Score normalization**: `score_norm = best_hit_score / pwm_theoretical_max_score` is recorded
-  for cross-TF comparability. `selection.pool.min_score_norm` is a report-only
-  "within tau of theoretical max" reference.
+- **Scoring**: FIMO log-odds, forward strand only (`--norc`)
+- **Eligibility**: requires a FIMO hit and `best_hit_score > 0`
+- **Deduplication**: controlled by `uniqueness.key` (`tfbs` vs `tfbs_core`)
+- **Cross-regulator core guard**: for multi-motif PWM inputs, `uniqueness.cross_regulator_core_collisions`
+  controls whether same-core collisions across regulators are warned, rejected, or allowed
+- **Selection**: `top_score` or `mmr`
+- **Score normalization**: `score_norm = best_hit_score / pwm_theoretical_max_score`
 
-For Stage-A sampling semantics and MMR details, see `guide/sampling.md`.
-For the complete schema, see `reference/config.md`.
+For deeper behavior details:
+- [sampling guide](sampling.md)
 
 ---
 

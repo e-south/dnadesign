@@ -1,9 +1,11 @@
 ## Sampling (Stage-A + Stage-B)
 
-DenseGen sampling is staged:
+This page explains how DenseGen chooses sites before solving.
 
-- **Stage-A (inputs -> pools)**: mine or ingest TFBS candidates per input and retain `n_sites`.
-- **Stage-B (pools -> libraries)**: repeatedly build small solver libraries from those pools.
+Sampling happens in two steps:
+
+- **Stage-A (inputs -> pools)**: mine or ingest candidate TFBS rows and retain `n_sites`
+- **Stage-B (pools -> libraries)**: build smaller solver libraries from Stage-A pools
 
 Quick map:
 
@@ -12,7 +14,16 @@ densegen.inputs[].sampling   (Stage-A) -> outputs/pools/<input>__pool.parquet
 densegen.generation.sampling (Stage-B) -> outputs/libraries/* + outputs/tables/attempts.parquet
 ```
 
-This guide is semantic. For exact schema fields, use `reference/config.md`.
+Use this guide for behavior and intent. Use [../reference/config.md](../reference/config.md)
+for exact field names and allowed values.
+
+Two knobs are easy to confuse:
+
+- `mining.budget.candidates`: how many candidates Stage-A evaluates (search effort)
+- `sampling.n_sites`: how many rows Stage-A keeps in the final pool (retained size)
+
+If you want better diversity/coverage without exploding solver input size, increase
+`candidates` first, then tune `n_sites`.
 
 ---
 
@@ -21,11 +32,14 @@ This guide is semantic. For exact schema fields, use `reference/config.md`.
 Stage-A for PWM inputs is a mine -> score -> dedupe -> retain loop:
 
 1) **Generate cores** (and optional flanks) via `sampling.strategy`.
-2) **Score** with FIMO log-odds (`--norc` forward only). If `sampling.bgfile` is set, that background is also used for theoretical max, `score_norm`, and MMR information -content weights.
+2) **Score** with FIMO log-odds (`--norc` forward only). If `sampling.bgfile` is set, that background is also used for theoretical max, `score_norm`, and MMR information-content weights.
 3) **Eligibility**: candidate must have a FIMO hit and `best_hit_score > 0`.
 4) **Deduplication** via `uniqueness.key`:
    - `sequence` keeps unique full TFBS strings.
    - `core` collapses by `tfbs_core` (motif-aligned match).
+   - For multi-motif PWM inputs, `uniqueness.cross_regulator_core_collisions`
+     controls what happens when the same `tfbs_core` appears under different regulators
+     (`warn` by default, `error` for fail-fast, `allow` to disable).
 5) **Selection**: retain `n_sites` using `selection.policy`.
 
 Important: Stage-A PWM sampling is **not** full randomness. It is PWM-biased sampling,
@@ -89,8 +103,10 @@ per‑motif trimming metadata in `outputs/pools/pool_manifest.json` (stage‑A s
 histogram entries include `motif_width`, `trimmed_width`, `trim_window_length`,
 `trim_window_strategy`, `trim_window_start`, `trim_window_score`, and `trim_window_applied`).
 
-`selection.pool.min_score_norm` is a **report-only** reference for "within tau of theoretical max."
-It does not filter the MMR pool. There is no default; set it explicitly if you want the reference.
+`selection.pool.min_score_norm` is an active MMR pool gate using the **fraction of theoretical
+max log-odds score**:
+`best_hit_score / pwm_theoretical_max_score`. Candidates below the threshold are excluded before
+MMR selection. There is no default.
 
 #### Stage-A output contract
 
@@ -118,9 +134,14 @@ Use your preferred analysis environment to compute length counts from the
 
 #### Tiers + MMR pool
 
-`sampling.tier_fractions` defines diagnostic tiers and the **rung ladder** for MMR pool selection.
-The pool is the smallest rung that can supply `n_sites` (or the full list if none can).
-An explicit `selection.pool.max_candidates` cap truncates the pool by score if set.
+`sampling.tier_fractions` defines diagnostic tiers and the **rung ladder** for MMR frontier
+selection. Rungs are evaluated by **post-gate count** (after `selection.pool.min_score_norm`).
+DenseGen then slices that frontier to a deterministic MMR target pool (`ceil(10.0 * n_sites)`,
+bounded by available candidates and `selection.pool.max_candidates` when set). This avoids large,
+stepwise pool jumps at rung boundaries.
+In `outputs/plots/stage_a/pool_tiers.pdf`, dashed lollipops show the configured diagnostic tier
+boundaries, and one solid lollipop marks the worst retained percentile after MMR across
+non-background regulators.
 
 #### Mining budget
 
@@ -166,8 +187,9 @@ and `runtime.max_consecutive_failures` (see `densegen.runtime.*`). When diagnosi
 `dense inspect run --events --library` are the fastest way to see whether the run is rebuilding
 libraries too often or sampling is exhausted.
 
-Stage‑B also requires the total bp in a sampled library to meet or exceed `generation.sequence_length`.
-If you see a "library_bp" error, increase `library_size` or supply longer motifs.
+Stage‑B warns when the total bp in a sampled library is below `generation.sequence_length`.
+Solver coverage may be limited in that case; increase `library_size` or supply longer motifs if you
+need full coverage.
 
 For plan constraints and solver configuration, see `guide/generation.md`.
 

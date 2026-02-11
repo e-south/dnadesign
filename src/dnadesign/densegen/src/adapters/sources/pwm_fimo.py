@@ -129,10 +129,12 @@ def parse_fimo_tsv(text: str) -> list[dict]:
     return rows
 
 
-def aggregate_best_hits(rows: Iterable[dict]) -> dict[str, FimoHit]:
+def aggregate_best_hits(rows: Iterable[dict], *, allowed_strands: set[str] | None = None) -> dict[str, FimoHit]:
     best: dict[str, FimoHit] = {}
+    strand_filter = allowed_strands if allowed_strands is not None else {"+"}
     for row in rows:
-        if str(row.get("strand")) != "+":
+        strand = str(row.get("strand"))
+        if strand_filter and strand not in strand_filter:
             continue
         seq_name = row["sequence_name"]
         score = float(row["score"])
@@ -142,7 +144,7 @@ def aggregate_best_hits(rows: Iterable[dict]) -> dict[str, FimoHit]:
             sequence_name=seq_name,
             start=int(row["start"]),
             stop=int(row["stop"]),
-            strand=str(row["strand"]),
+            strand=strand,
             score=score,
             matched_sequence=row.get("matched_sequence"),
         )

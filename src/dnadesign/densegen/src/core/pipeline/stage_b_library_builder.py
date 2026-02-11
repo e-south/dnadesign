@@ -25,8 +25,6 @@ from ..artifacts.pool import PoolData
 from .outputs import _emit_event
 from .sequence_validation import _validate_library_constraints
 from .stage_b import (
-    _fixed_elements_dump,
-    _max_fixed_element_len,
     assess_library_feasibility,
     build_library_for_plan,
 )
@@ -79,8 +77,6 @@ class LibraryBuilder:
     def build_next(self, *, library_index_start: int) -> LibraryContext:
         pool_strategy = str(self.sampling_cfg.pool_strategy)
         library_sampling_strategy = str(self.sampling_cfg.library_sampling_strategy)
-        fixed_elements_dump = _fixed_elements_dump(self.plan_item.fixed_elements)
-        fixed_elements_max_len = _max_fixed_element_len(fixed_elements_dump)
         constraints = self.plan_item.regulator_constraints
         groups = list(constraints.groups or [])
         plan_min_count_by_regulator = dict(constraints.min_count_by_regulator or {})
@@ -154,27 +150,6 @@ class LibraryBuilder:
             sequence_length=self.seq_len,
         )
 
-        max_tfbs_len = max((len(str(m)) for m in library_tfbs), default=0)
-        required_len = max(max_tfbs_len, fixed_elements_max_len)
-        if self.seq_len < required_len:
-            raise ValueError(
-                "generation.sequence_length is shorter than the widest required motif "
-                f"(sequence_length={self.seq_len}, max_library_motif={max_tfbs_len}, "
-                f"max_fixed_element={fixed_elements_max_len}). "
-                "Increase densegen.generation.sequence_length or reduce motif lengths "
-                "(e.g., adjust Stage-A PWM sampling length.range or fixed-element motifs)."
-            )
-        if min_required_len > 0 and self.seq_len < min_required_len:
-            raise ValueError(
-                "generation.sequence_length is shorter than the minimum required length for constraints "
-                f"(sequence_length={self.seq_len}, min_required_length={min_required_len}, "
-                f"fixed_elements_min={min_breakdown['fixed_elements_min']}, "
-                f"per_tf_min={min_breakdown['per_tf_min']}, "
-                f"min_required_extra={min_breakdown['min_required_extra']}). "
-                "Increase densegen.generation.sequence_length or relax regulator_constraints, "
-                "min_count_by_regulator, or fixed-element constraints."
-            )
-
         return LibraryContext(
             library_for_opt=list(library_for_opt),
             tfbs_parts=list(tfbs_parts),
@@ -238,7 +213,7 @@ class LibraryBuilder:
                 f"Library artifact Stage-B sampling strategy mismatch for {self.source_label}/{self.plan_item.name}: "
                 f"artifact={record.library_sampling_strategy} config={library_sampling_strategy}."
             )
-        if pool_strategy != "full" and record.library_size != int(getattr(self.sampling_cfg, "library_size", 0)):
+        if pool_strategy != "full" and record.library_size != int(self.sampling_cfg.library_size):
             raise RuntimeError(
                 f"Library artifact size mismatch for {self.source_label}/{self.plan_item.name}: "
                 f"artifact={record.library_size} config={self.sampling_cfg.library_size}."
@@ -287,13 +262,12 @@ class LibraryBuilder:
         infeasible: bool,
         sequence_length: int,
     ) -> None:
-        if str(getattr(self.sampling_cfg, "library_source", "build")).lower() == "artifact":
-            return
-        if self.library_build_rows is None or self.library_member_rows is None:
+        if str(self.sampling_cfg.library_source).lower() == "artifact":
             return
         library_index = int(sampling_info.get("library_index") or 0)
         library_hash = str(sampling_info.get("library_hash") or "")
         library_id = library_hash or f"{self.source_label}:{self.plan_item.name}:{library_index}"
+        library_size = int(sampling_info.get("library_size") or len(library_tfbs))
         row = {
             "created_at": datetime.now(timezone.utc).isoformat(),
             "input_name": self.source_label,
@@ -303,7 +277,7 @@ class LibraryBuilder:
             "library_hash": library_hash,
             "pool_strategy": sampling_info.get("pool_strategy"),
             "library_sampling_strategy": sampling_info.get("library_sampling_strategy"),
-            "library_size": int(sampling_info.get("library_size") or len(library_tfbs)),
+            "library_size": library_size,
             "achieved_length": sampling_info.get("achieved_length"),
             "relaxed_cap": sampling_info.get("relaxed_cap"),
             "final_cap": sampling_info.get("final_cap"),
@@ -316,7 +290,8 @@ class LibraryBuilder:
             "infeasible": bool(infeasible),
             "sequence_length": int(sequence_length),
         }
-        self.library_build_rows.append(row)
+        if self.library_build_rows is not None:
+            self.library_build_rows.append(row)
         if self.events_path is not None:
             try:
                 _emit_event(
@@ -327,7 +302,7 @@ class LibraryBuilder:
                         "plan_name": self.plan_item.name,
                         "library_index": library_index,
                         "library_hash": library_hash,
-                        "library_size": int(row.get("library_size") or len(library_tfbs)),
+                        "library_size": library_size,
                     },
                 )
             except Exception:
@@ -351,20 +326,21 @@ class LibraryBuilder:
                     )
                 except Exception:
                     log.debug("Failed to emit LIBRARY_SAMPLING_PRESSURE event.", exc_info=True)
-        for idx, tfbs in enumerate(library_tfbs):
-            self.library_member_rows.append(
-                {
-                    "library_id": library_id,
-                    "library_hash": library_hash,
-                    "library_index": library_index,
-                    "input_name": self.source_label,
-                    "plan_name": self.plan_item.name,
-                    "position": int(idx),
-                    "tf": library_tfs[idx] if idx < len(library_tfs) else "",
-                    "tfbs": tfbs,
-                    "tfbs_id": library_tfbs_ids[idx] if idx < len(library_tfbs_ids) else None,
-                    "motif_id": library_motif_ids[idx] if idx < len(library_motif_ids) else None,
-                    "site_id": library_site_ids[idx] if idx < len(library_site_ids) else None,
-                    "source": library_sources[idx] if idx < len(library_sources) else None,
-                }
-            )
+        if self.library_member_rows is not None:
+            for idx, tfbs in enumerate(library_tfbs):
+                self.library_member_rows.append(
+                    {
+                        "library_id": library_id,
+                        "library_hash": library_hash,
+                        "library_index": library_index,
+                        "input_name": self.source_label,
+                        "plan_name": self.plan_item.name,
+                        "position": int(idx),
+                        "tf": library_tfs[idx] if idx < len(library_tfs) else "",
+                        "tfbs": tfbs,
+                        "tfbs_id": library_tfbs_ids[idx] if idx < len(library_tfbs_ids) else None,
+                        "motif_id": library_motif_ids[idx] if idx < len(library_motif_ids) else None,
+                        "site_id": library_site_ids[idx] if idx < len(library_site_ids) else None,
+                        "source": library_sources[idx] if idx < len(library_sources) else None,
+                    }
+                )

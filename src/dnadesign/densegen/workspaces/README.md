@@ -1,4 +1,10 @@
-Run-scoped workbenches live here. Each workspace should contain:
+DenseGen stores tracked demo workspaces and local generated workspaces here.
+
+- `demo_*` directories are representative workspaces with didactic configs/inputs.
+- New workspaces created by `dense workspace init` default to this same root.
+- `archived/` stores historical local artifacts that are not part of active work.
+
+Each workspace should contain:
 
 - `config.yaml`
 - `inputs/`
@@ -6,16 +12,19 @@ Run-scoped workbenches live here. Each workspace should contain:
   - `tables/` (dense_arrays + attempts/solutions/composition)
   - `plots/` (plot images)
   - `report/` (report.md/.json/.html + assets/)
-  - `pools/` (Stage‑A TFBS pools + optional candidates/)
-  - `libraries/` (Stage‑B library artifacts)
+  - `pools/` (Stage-A TFBS pools + optional candidates/)
+  - `libraries/` (Stage-B library artifacts)
   - `logs/` (optional; defaults to outputs/logs)
   - `meta/` (run manifests + run state + id index)
 
-Keep real production runs out of version control; use this directory for demo artifacts only.
+Keep real production outputs out of version control. Generated workspaces under
+`workspaces/` are ignored by default unless explicitly whitelisted.
 
-Archived or legacy artifacts live under `_archived/` so the active workspace list stays clean.
-The canonical demo lives under `demo_meme_three_tfs/` and uses DenseGen PWM artifacts stored in the
-workspace `inputs/motif_artifacts/` directory (packaged for reproducibility).
-Use `dense inspect run --root workspaces/_archive` if you want to inspect archived workspaces.
-Only `demo_meme_three_tfs/` is tracked in git; any other workspace directories here are ignored
-and intended for local experiments.
+Tracked demos:
+
+- `demo_binding_sites/` is the unconstrained baseline demo for didactic run/solver behavior.
+- `demo_meme_three_tfs/` is the canonical Cruncher PWM handoff demo with LexA/CpxR/BaeR artifacts.
+
+The canonical PWM demo uses DenseGen motif artifacts stored in
+`demo_meme_three_tfs/inputs/motif_artifacts/` (packaged for reproducibility).
+Use `dense inspect run --root src/dnadesign/densegen/workspaces` to inspect local workspaces.

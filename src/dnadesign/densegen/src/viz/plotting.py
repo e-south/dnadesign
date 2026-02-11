@@ -51,6 +51,19 @@ def _load_plot_manifest(out_dir: Path) -> dict:
     return json.loads(path.read_text())
 
 
+def _is_supported_plot_path(rel_path: str) -> bool:
+    parts = Path(rel_path).parts
+    if not parts:
+        return False
+    if parts[0] == "stage_a":
+        return len(parts) >= 2
+    if parts[0] == "stage_b":
+        return len(parts) >= 3
+    if parts[0] == "run_health":
+        return len(parts) >= 2
+    return False
+
+
 def _load_attempts(run_root: Path) -> pd.DataFrame:
     attempts_path = run_root / "outputs" / "tables" / "attempts.parquet"
     if not attempts_path.exists():
@@ -84,7 +97,7 @@ def _write_plot_manifest(
         rel_path = str(item.get("path") or "")
         if not rel_path:
             continue
-        if (out_dir / rel_path).exists():
+        if (out_dir / rel_path).exists() and _is_supported_plot_path(rel_path):
             merged[rel_path] = item
     for item in entries:
         rel_path = str(item.get("path") or "")
@@ -92,7 +105,7 @@ def _write_plot_manifest(
             continue
         merged[rel_path] = item
     payload = {
-        "schema_version": "1.0",
+        "schema_version": "2.0",
         "run_root": str(run_root),
         "config_path": str(cfg_path),
         "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -178,9 +191,9 @@ def _load_effective_config(run_root: Path) -> dict:
 
 def _load_dense_arrays(run_root: Path) -> pd.DataFrame:
     path = run_root / "outputs" / "tables" / "dense_arrays.parquet"
-    if not path.exists():
-        raise ValueError(f"dense_arrays.parquet not found: {path}")
-    return pd.read_parquet(path)
+    if path.exists():
+        return pd.read_parquet(path)
+    raise ValueError(f"dense_arrays.parquet not found: {path}")
 
 
 _PLOT_FNS = {
@@ -206,7 +219,7 @@ for _name, _spec in PLOT_SPECS.items():
 
 # Options explicitly supported by each plot; unknown options raise errors (strict).
 _ALLOWED_OPTIONS = {
-    "placement_map": {"occupancy_alpha", "occupancy_max_categories", "tfbs_top_k_annotation"},
+    "placement_map": {"occupancy_alpha", "occupancy_max_categories"},
     "tfbs_usage": set(),
     "run_health": set(),
     "stage_a_summary": set(),
@@ -243,6 +256,73 @@ def _plot_required_columns(selected: Iterable[str], options: Dict[str, Dict[str,
     return []
 
 
+def _cleanup_legacy_flat_outputs(out_dir: Path, selected: Iterable[str], plot_format: str) -> None:
+    selected_set = {str(name) for name in selected}
+    suffix = f".{plot_format.lstrip('.')}"
+    for path in out_dir.iterdir():
+        if not path.is_file():
+            continue
+        if path.name == "plot_manifest.json":
+            continue
+        if path.suffix != suffix:
+            continue
+        stem = path.stem
+        remove = False
+        if "stage_a_summary" in selected_set and stem.startswith("stage_a_summary__"):
+            remove = True
+        elif "placement_map" in selected_set and stem.startswith("placement_map__"):
+            remove = True
+        elif "tfbs_usage" in selected_set and stem.startswith("tfbs_usage__"):
+            remove = True
+        elif "run_health" in selected_set and stem == "run_health":
+            remove = True
+        if remove:
+            path.unlink(missing_ok=True)
+
+
+def _manifest_path_fields(name: str, rel_path: Path) -> dict:
+    fields: dict[str, str] = {"plot_id": str(name)}
+    parts = rel_path.parts
+    stem = rel_path.stem
+    if name == "stage_a_summary":
+        fields["group"] = "stage_a"
+        fields["family"] = "stage_a"
+        if stem == "background_logo":
+            fields["variant"] = "background_logo"
+            fields["input_name"] = "background"
+        elif stem.endswith("__background_logo"):
+            fields["variant"] = "background_logo"
+            fields["input_name"] = stem[: -len("__background_logo")]
+        else:
+            fields["variant"] = stem
+        return fields
+    if name == "placement_map":
+        fields["group"] = "stage_b"
+        fields["family"] = "plan"
+        if len(parts) >= 3:
+            fields["plan_name"] = parts[1]
+        if len(parts) >= 4:
+            fields["input_name"] = parts[2]
+        fields["variant"] = stem
+        return fields
+    if name == "tfbs_usage":
+        fields["group"] = "stage_b"
+        fields["family"] = "plan"
+        if len(parts) >= 3:
+            fields["plan_name"] = parts[1]
+        if len(parts) >= 4:
+            fields["input_name"] = parts[2]
+        fields["variant"] = stem
+        return fields
+    if name == "run_health":
+        fields["group"] = "run"
+        fields["family"] = "run_health"
+        fields["variant"] = stem
+        return fields
+    fields["variant"] = stem
+    return fields
+
+
 def run_plots_from_config(
     root_cfg: RootConfig,
     cfg_path: Path,
@@ -259,6 +339,7 @@ def run_plots_from_config(
     selected = [p.strip() for p in (only.split(",") if only else default_list)]
     options = plots_cfg.options if plots_cfg else {}
     global_style = plots_cfg.style if plots_cfg else {}
+    _cleanup_legacy_flat_outputs(out_dir, selected, plot_format)
     required_sources = _plot_required_sources(selected)
     cols: list[str] = []
     max_rows = plots_cfg.sample_rows if plots_cfg else None
@@ -364,12 +445,14 @@ def run_plots_from_config(
         out_path = out_dir / f"{name}.{plot_format}"
         try:
             if name == "placement_map":
+                placement_dense_arrays_df = dense_arrays_df if dense_arrays_df is not None else df
                 result = fn(
                     df,
                     out_path,
                     style=style,
                     composition_df=composition_df,
-                    dense_arrays_df=dense_arrays_df,
+                    dense_arrays_df=placement_dense_arrays_df,
+                    library_members_df=library_members_df,
                     cfg=cfg_effective,
                     **kwargs,
                 )
@@ -384,7 +467,17 @@ def run_plots_from_config(
                     **kwargs,
                 )
             elif name == "run_health":
-                result = fn(df, out_path, style=style, attempts_df=attempts_df, events_df=events_df, **kwargs)
+                result = fn(
+                    df,
+                    out_path,
+                    style=style,
+                    attempts_df=attempts_df,
+                    composition_df=composition_df,
+                    library_members_df=library_members_df,
+                    events_df=events_df,
+                    cfg=cfg_effective,
+                    **kwargs,
+                )
             elif name == "stage_a_summary":
                 result = fn(df, out_path, style=style, pools=pools, pool_manifest=pool_manifest, **kwargs)
             else:
@@ -392,23 +485,29 @@ def run_plots_from_config(
             if result is None:
                 paths = [out_path]
             elif isinstance(result, (list, tuple, set)):
-                paths = [Path(p) for p in result]
+                paths = [Path(p) for p in result if p is not None]
             else:
                 paths = [Path(result)]
+            if not paths:
+                summary.add_row(name, "-", "[yellow]skipped[/] (not applicable for available artifacts)")
+                continue
             saved_label = _format_plot_path(paths[0], run_root, absolute)
             if len(paths) > 1:
                 saved_label = f"{saved_label} (+{len(paths) - 1})"
             summary.add_row(name, saved_label, "[green]ok[/]")
             created_at = datetime.now(timezone.utc).isoformat()
             for path in paths:
+                rel_path = path.relative_to(out_dir)
+                manifest_fields = _manifest_path_fields(name, rel_path)
                 manifest_entries.append(
                     {
                         "name": name,
-                        "path": str(path.relative_to(out_dir)),
+                        "path": str(rel_path),
                         "description": AVAILABLE_PLOTS[name]["description"],
                         "figsize": list(style.get("figsize", [])) if style.get("figsize") else None,
                         "generated_at": created_at,
                         "source": str(source),
+                        **manifest_fields,
                     }
                 )
         except Exception as e:

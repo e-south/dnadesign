@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-src/dnadesign/usr/src/convert_legacy.py
+dnadesign
+dnadesign/src/dnadesign/usr/src/convert_legacy.py
+
+Conversion utilities for densegen .pt datasets into USR format.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -16,11 +18,11 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import pandas as pd
 import pyarrow as pa
-import torch
 
 from .dataset import Dataset
 from .errors import SchemaError, ValidationError
-from .io import append_event, read_parquet, write_parquet_atomic
+from .events import record_event
+from .io import read_parquet, write_parquet_atomic
 from .normalize import compute_id, normalize_sequence
 
 # ---------------- profile typing (60bp_dual_promoter_cpxR_LexA) ----------------
@@ -67,12 +69,24 @@ PA_LIST_STRUCT_TFBS_DETAIL = PA.list_(
 # ---------------- small helpers ----------------
 
 
+def _require_torch():
+    try:
+        import torch
+    except ImportError as e:
+        raise SchemaError("torch is required for legacy conversion (convert-legacy).") from e
+    return torch
+
+
 def _coerce_logits(v: Any, *, want_dim: int) -> Optional[List[float]]:
     """Return a flat list[float] of length want_dim, or None if unavailable."""
     if v is None:
         return None
     # torch.Tensor path
-    if isinstance(v, torch.Tensor):
+    mod = getattr(v.__class__, "__module__", "")
+    if mod.startswith("torch"):
+        torch = _require_torch()
+        if not isinstance(v, torch.Tensor):
+            raise ValidationError(f"logits type mismatch (module={mod})")
         t = v.detach().cpu()
         # Allow [1, D] or [D]
         if t.ndim == 2 and t.shape[0] == 1:
@@ -119,6 +133,7 @@ def _count_tf(parts: Sequence[str]) -> Dict[str, int]:
 
 
 def _ensure_pt_list_of_dicts(p: Path) -> List[dict]:
+    torch = _require_torch()
     checkpoint = torch.load(str(p), map_location=torch.device("cpu"))
     if not isinstance(checkpoint, list) or not checkpoint:
         raise SchemaError(f"{p} must be a non-empty list.")
@@ -290,14 +305,11 @@ def convert_legacy(
         if isinstance(e.get("meta_tfbs_parts_in_array"), list):
             derived["densegen__used_tfbs"] = [str(x) for x in e["meta_tfbs_parts_in_array"]]
 
-        # densegen__promoter_constraint (best-effort from fixed_elements.promoter_constraints[].name)
-        try:
-            fe = e.get("fixed_elements") or {}
-            pcs = fe.get("promoter_constraints") or []
-            if pcs and isinstance(pcs, list) and isinstance(pcs[0], dict) and "name" in pcs[0]:
-                derived["densegen__promoter_constraint"] = str(pcs[0]["name"])
-        except Exception:
-            pass
+        # densegen__promoter_constraint (from fixed_elements.promoter_constraints[].name)
+        fe = e.get("fixed_elements") or {}
+        pcs = fe.get("promoter_constraints") or []
+        if pcs and isinstance(pcs, list) and isinstance(pcs[0], dict) and "name" in pcs[0]:
+            derived["densegen__promoter_constraint"] = str(pcs[0]["name"])
 
         # logits → infer__...__logits_mean (list<double>[512])
         if prof.logits_key in e:
@@ -324,17 +336,17 @@ def convert_legacy(
                 for q in sorted(p.rglob("*")):
                     try:
                         q.unlink()
-                    except Exception:
-                        pass
+                    except OSError as e:
+                        raise ValidationError(f"Failed to delete {q}: {e}") from e
                 try:
                     p.rmdir()
-                except Exception:
-                    pass
+                except OSError as e:
+                    raise ValidationError(f"Failed to remove directory {p}: {e}") from e
             else:
                 try:
                     p.unlink()
-                except Exception:
-                    pass
+                except OSError as e:
+                    raise ValidationError(f"Failed to delete {p}: {e}") from e
 
     ds.init(source="convert-legacy")
     # import rows (Dataset will compute id/created_at; we pass per-row source)
@@ -401,18 +413,22 @@ def convert_legacy(
             out = out.add_column(out.num_columns, pa.field(name, t, nullable=True), arr)
 
     write_parquet_atomic(out, ds.records_path, ds.snapshot_dir)
-    append_event(ds.events_path, {"action": "convert_legacy", "dataset": ds.name, "rows": N})
+    record_event(
+        ds.events_path,
+        "convert_legacy",
+        dataset=ds.name,
+        args={"rows": N},
+        target_path=ds.records_path,
+        dataset_root=ds.root,
+    )
     # Append a helpful note to the scratch pad
-    try:
-        skipped_str = ""
-        if skipped_bad_len:
-            skipped_str += f"; skipped_bad_length={skipped_bad_len}"
-        if skipped_dups:
-            skipped_str += f"; duplicates={skipped_dups}"
-        note = f"Converted legacy .pt files into new dataset (rows={N}, files={len(files)}{skipped_str})."
-        ds.append_meta_note(note, f"# example\nusr convert-legacy {dataset_name} --paths ...")
-    except Exception:
-        pass
+    skipped_str = ""
+    if skipped_bad_len:
+        skipped_str += f"; skipped_bad_length={skipped_bad_len}"
+    if skipped_dups:
+        skipped_str += f"; duplicates={skipped_dups}"
+    note = f"Converted legacy .pt files into new dataset (rows={N}, files={len(files)}{skipped_str})."
+    ds.append_meta_note(note, f"# example\nusr convert-legacy {dataset_name} --paths ...")
 
     # ---------------- informative console summary ----------------
     valid_len = total_entries - skipped_bad_len
@@ -611,15 +627,13 @@ def repair_densegen_used_tfbs(
                         continue
                     try:
                         kidx = int(ans)
-                        if 1 <= kidx <= len(g_sorted):
-                            keep_ids.append(g_sorted.iloc[kidx - 1]["id"])
-                            drop_ids.extend(g_sorted.drop(g_sorted.index[kidx - 1])["id"].tolist())
-                            continue
-                    except Exception:
-                        pass
-                    # default: keep-first semantics on invalid input
-                    keep_ids.append(g_sorted.iloc[0]["id"])
-                    drop_ids.extend(g_sorted.iloc[1:]["id"].tolist())
+                    except ValueError as e:
+                        raise ValidationError(f"Invalid selection '{ans}' for de-duplication.") from e
+                    if 1 <= kidx <= len(g_sorted):
+                        keep_ids.append(g_sorted.iloc[kidx - 1]["id"])
+                        drop_ids.extend(g_sorted.drop(g_sorted.index[kidx - 1])["id"].tolist())
+                        continue
+                    raise ValidationError(f"Selection out of range for de-duplication: {kidx}.")
                 else:
                     keep_ids.append(g_sorted.iloc[0]["id"])
                     drop_ids.extend(g_sorted.iloc[1:]["id"].tolist())
@@ -688,7 +702,7 @@ def repair_densegen_used_tfbs(
 
         try:
             return json.dumps(x, sort_keys=True, separators=(",", ":"))
-        except Exception:
+        except (TypeError, ValueError):
             return str(x)
 
     for i in range(rows_total):
@@ -1039,15 +1053,13 @@ def repair_densegen_used_tfbs(
     _set("densegen__used_tf_list", arr_used_list, PA_LIST_STR)
 
     write_parquet_atomic(out, ds.records_path, ds.snapshot_dir, preserve_metadata_from=tbl)
-    append_event(
+    record_event(
         ds.events_path,
-        {
-            "action": "repair_densegen",
-            "dataset": ds.name,
-            "rows": rows_total,
-            "touched": touched,
-            "min_tfbs_len": min_tfbs_len,
-        },
+        "repair_densegen",
+        dataset=ds.name,
+        args={"rows": rows_total, "touched": touched, "min_tfbs_len": min_tfbs_len},
+        target_path=ds.records_path,
+        dataset_root=ds.root,
     )
 
     # ----------- Assertions (no fallbacks) -----------

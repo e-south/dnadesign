@@ -1,0 +1,44 @@
+# USR Refactoring Journal
+
+## 2026-02-05
+- Audit focus: streaming + dedup for large datasets; densegen/USR integration; notify integration patterns.
+- Observations:
+  - Dataset operations (`import_rows`, `attach`, `get`, `grep`, `export`, `merge`, `dedupe`) read the full `records.parquet` into memory and rewrite the full file. This preserves atomicity but scales poorly for large datasets and for frequent updates (e.g., densegen resume).
+  - `USRWriter` (densegen) caches existing ids but attaches metadata per flush. With small `chunk_size` this rewrites the dataset many times; larger chunks or deferring attach would reduce I/O.
+  - Remote config search paths do not include `src/dnadesign/usr/remotes.yaml`, but docs/AGENTS point there. This is a doc/code mismatch.
+  - PyArrow sysctl warnings appear in non-TTY environments unless `USR_SUPPRESS_PYARROW_SYSCTL=1` is set.
+- Next: propose minimal UX improvements and doc alignment; consider optional streaming writer or id index for large datasets.
+
+- Decision: dataset layout should be namespaced (no active/archive buckets). CLI resolution will accept unqualified names only when unambiguous; otherwise require `namespace/dataset` for clarity.
+- Decision: remotes config should be decoupled and explicit. Add `USR_REMOTES_PATH` override and fail fast if multiple config files are found.
+- Update: added column projection support for `head`/`export` and optimized `get` to scan via pyarrow.dataset. Added tests for read ops.
+- Update: grep now supports batch_size for large datasets (streamed scan with early cutoff).
+- Update: CLI entrypoint uses Typer only; argparse adapter removed.
+- Update: convert_legacy lazy-loads torch; CLI import does not pull torch.
+- Update: remotes config defaults to repo-local remotes.yaml with USR_REMOTES_PATH override.
+- Update: describe/head/export stream Parquet in batches; info/schema use metadata only.
+- Update: CLI meta notes and dataset selection are strict; no silent fallbacks.
+- Update: remote Parquet stats require python + pyarrow on remote; sysctl filter is explicit opt-in.
+- Update: datasets index README tracked; .gitignore allows the index file.
+- Decision: move to overlay-first datasets. Derived columns live in `_derived/*.parquet`; base `records.parquet` holds core fields only; `usr materialize` explicitly merges overlays.
+- Decision: explicit join keys only for `attach` and `dedupe`; no default key.
+- Decision: `USR_REMOTES_PATH` is required for remotes; no implicit defaults.
+- Decision: reads merge overlays by default; base-only output requires explicit flag.
+- Decision: dataset writes use a write lock only; reads are lock-free.
+- Decision: no backward compatibility or silent fallbacks.
+- Update: remotes config now requires `USR_REMOTES_PATH`; repo-local fallback removed.
+
+## 2026-02-10
+- Cross-stack audit focus: DenseGen -> USR -> Notify contracts (event stream boundaries, resume behavior, and docs alignment).
+- Performance fix: `usr events tail` now streams `.events.log` instead of loading the full file into memory before slicing.
+- Added regression test to enforce streaming behavior for `--n` tail mode:
+  `src/dnadesign/usr/tests/test_cli_events_tail.py::test_events_tail_does_not_read_full_file_for_tail_n`.
+- Docs organization change: moved sync guide to `src/dnadesign/usr/docs/operations/sync.md`, removed top-level `SYNC.md`, and updated all in-repo references.
+- Added shared USR event schema constant in `usr/src/event_schema.py` and switched event emission (`usr/src/events.py`) + Notify consumer validation (`notify/cli.py`) to use the same version source.
+- Notify `usr-events watch --follow` now handles mid-stream `.events.log` truncation/rotation according to `--on-truncate` (`restart` rewinds; `error` fails fast), with regression tests.
+- Added explicit actor plumbing for mutation events: `Dataset.import_rows`, `Dataset.add_sequences`, and `Dataset.write_overlay_part` now accept `actor` and pass it through to `record_event`.
+- Added USR event-schema tests verifying explicit actor retention for `import_rows` and `write_overlay_part`.
+- Public API decoupling: exported `USR_EVENT_VERSION` through `dnadesign.usr` (`src/api.py`, package `__init__.py`) so consumers do not import internal `usr.src.*` modules.
+- Event-version decoupling update (historical): `USR_EVENT_VERSION` was briefly moved to `src/dnadesign/event_schema.py`; ownership is now back in `src/dnadesign/usr/src/event_schema.py` and Notify resolves it from USR at runtime.
+- Docs audit pass: refreshed `usr/docs/README.md` and `usr/docs/operations/sync.md` with local TOCs/cross-links, normalized SSH sync command examples to `uv run usr ...`, and fixed stale section-anchor links from docs-wide integrity checks.
+- Event-schema ownership correction: removed root-level `src/dnadesign/event_schema.py`; canonical `USR_EVENT_VERSION` now lives in `src/dnadesign/usr/src/event_schema.py` and Notify resolves it from USR at runtime.

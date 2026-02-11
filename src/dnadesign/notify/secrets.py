@@ -1,0 +1,144 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/notify/secrets.py
+
+Secret reference parsing and OS-backed secret storage helpers for webhook URLs.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import shutil
+import subprocess
+from dataclasses import dataclass
+from urllib.parse import urlparse
+
+from .errors import NotifyConfigError
+
+_BACKEND_KEYCHAIN = "keychain"
+_BACKEND_SECRET_SERVICE = "secretservice"  # pragma: allowlist secret
+_SUPPORTED_SECRET_BACKENDS = {_BACKEND_KEYCHAIN, _BACKEND_SECRET_SERVICE}
+
+
+@dataclass(frozen=True)
+class SecretReference:
+    backend: str
+    service: str
+    account: str
+
+
+def _normalize_backend(value: str) -> str:
+    backend = str(value or "").strip().lower()
+    if backend not in _SUPPORTED_SECRET_BACKENDS:
+        allowed = ", ".join(sorted(_SUPPORTED_SECRET_BACKENDS))
+        raise NotifyConfigError(f"unsupported secret backend '{value}'; expected one of: {allowed}")
+    return backend
+
+
+def parse_secret_ref(secret_ref: str) -> SecretReference:
+    value = str(secret_ref or "").strip()
+    if not value:
+        raise NotifyConfigError("secret_ref must be a non-empty string")
+    parsed = urlparse(value)
+    backend = _normalize_backend(parsed.scheme)
+    service = str(parsed.netloc or "").strip()
+    account = str(parsed.path or "").strip("/ ")
+    if not service or not account:
+        raise NotifyConfigError(
+            "secret_ref must look like keychain://<service>/<account> or secretservice://<service>/<account>"
+        )
+    return SecretReference(backend=backend, service=service, account=account)
+
+
+def _backend_command(backend: str) -> str:
+    normalized = _normalize_backend(backend)
+    if normalized == _BACKEND_KEYCHAIN:
+        return "security"
+    return "secret-tool"
+
+
+def is_secret_backend_available(backend: str) -> bool:
+    command = _backend_command(backend)
+    return shutil.which(command) is not None
+
+
+def _run_command(args: list[str], *, input_text: str | None = None) -> str:
+    try:
+        result = subprocess.run(
+            args,
+            input=input_text,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError as exc:
+        raise NotifyConfigError(f"failed to run secret backend command '{args[0]}'") from exc
+    if result.returncode != 0:
+        message = str(result.stderr or result.stdout or "").strip() or "unknown command failure"
+        raise NotifyConfigError(f"secret backend command failed: {message}")
+    return str(result.stdout or "").strip()
+
+
+def resolve_secret_ref(secret_ref: str) -> str:
+    parsed = parse_secret_ref(secret_ref)
+    if not is_secret_backend_available(parsed.backend):
+        command = _backend_command(parsed.backend)
+        raise NotifyConfigError(f"secret backend '{parsed.backend}' is not available; missing command: {command}")
+
+    if parsed.backend == _BACKEND_KEYCHAIN:
+        return _run_command(
+            [
+                "security",
+                "find-generic-password",
+                "-s",
+                parsed.service,
+                "-a",
+                parsed.account,
+                "-w",
+            ]
+        )
+
+    return _run_command(["secret-tool", "lookup", "service", parsed.service, "account", parsed.account])
+
+
+def store_secret_ref(secret_ref: str, secret_value: str) -> None:
+    parsed = parse_secret_ref(secret_ref)
+    value = str(secret_value or "").strip()
+    if not value:
+        raise NotifyConfigError("webhook URL value must be non-empty when storing in a secret backend")
+    if not is_secret_backend_available(parsed.backend):
+        command = _backend_command(parsed.backend)
+        raise NotifyConfigError(f"secret backend '{parsed.backend}' is not available; missing command: {command}")
+
+    if parsed.backend == _BACKEND_KEYCHAIN:
+        _run_command(
+            [
+                "security",
+                "add-generic-password",
+                "-U",
+                "-s",
+                parsed.service,
+                "-a",
+                parsed.account,
+                "-w",
+                value,
+            ]
+        )
+        return
+
+    _run_command(
+        [
+            "secret-tool",
+            "store",
+            "--label",
+            f"dnadesign notify webhook ({parsed.service}/{parsed.account})",
+            "service",
+            parsed.service,
+            "account",
+            parsed.account,
+        ],
+        input_text=f"{value}\n",
+    )

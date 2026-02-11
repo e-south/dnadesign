@@ -15,6 +15,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.gridspec import SubplotSpec
 
 from ..utils.plot_style import format_regulator_label, stage_a_rcparams
 from .plot_common import _apply_style, _style
@@ -27,6 +28,10 @@ def _build_stage_a_diversity_figure(
     pool_df: pd.DataFrame,
     sampling: dict,
     style: dict,
+    fig: mpl.figure.Figure | None = None,
+    slot: SubplotSpec | None = None,
+    title: str | None = None,
+    show_column_titles: bool = True,
 ) -> tuple[mpl.figure.Figure, list[mpl.axes.Axes], list[mpl.axes.Axes]]:
     style = _style(style)
     style["seaborn_style"] = False
@@ -56,38 +61,23 @@ def _build_stage_a_diversity_figure(
         raise ValueError(f"Stage-A pool missing best_hit_score for input '{input_name}'.")
     reg_colors = _stage_a_regulator_colors(regulators, style)
     n_regs = max(1, len(regulators))
-    fig_width = float(style.get("figsize", (11, 4))[0])
-    fig_height = max(4.0, 1.5 * n_regs + 1.1)
+    fig_width = float(style.get("figsize", (11.6, 3.8))[0])
+    fig_height = max(2.75, 0.9 * n_regs + 0.7)
     subtitle_size = text_sizes["panel_title"] * 0.88
-    title_pad = 12
+    title_pad = 9
     with mpl.rc_context(rc):
-        fig = plt.figure(figsize=(fig_width, fig_height), constrained_layout=False)
-        header_height = min(0.95, fig_height * 0.18)
-        body_height = max(1.0, fig_height - header_height)
-        outer = fig.add_gridspec(
-            nrows=2,
-            ncols=1,
-            height_ratios=[header_height, body_height],
-            hspace=0.05,
-        )
-        ax_header = fig.add_subplot(outer[0, 0])
-        ax_header.set_axis_off()
-        ax_header.set_label("header")
-        ax_header.text(
-            0.5,
-            0.76,
-            f"Stage-A core diversity -- {input_name}",
-            ha="center",
-            va="center",
-            fontsize=text_sizes["fig_title"],
-            color="#111111",
-        )
-        body = outer[1].subgridspec(
+        if fig is None:
+            fig = plt.figure(figsize=(fig_width, fig_height), constrained_layout=False)
+        if slot is None:
+            panel = fig.add_gridspec(nrows=1, ncols=1)[0, 0]
+        else:
+            panel = slot
+        body = panel.subgridspec(
             nrows=n_regs,
             ncols=3,
             width_ratios=[0.22, 1.15, 1.0],
-            hspace=0.32,
-            wspace=0.35,
+            hspace=0.25,
+            wspace=0.28,
         )
         axes_left: list[mpl.axes.Axes] = []
         axes_right: list[mpl.axes.Axes] = []
@@ -123,9 +113,9 @@ def _build_stage_a_diversity_figure(
         metric_label = "Pairwise Hamming NN"
         top_color = "#cfe8dc"
         diversified_color = "#7fbf9b"
-        label_size = float(style.get("label_size", text_sizes["annotation"]))
-        axis_label_size = float(style.get("label_size", float(style.get("font_size", 13.0))))
-        tick_size = text_sizes["annotation"] * 0.8
+        label_size = float(style.get("label_size", float(style.get("font_size", 13.0))))
+        axis_label_size = label_size
+        tick_size = float(style.get("tick_size", label_size))
         for idx, reg in enumerate(regulators):
             hue = reg_colors.get(reg, "#4c78a8")
             row = row_by_reg[reg]
@@ -148,7 +138,7 @@ def _build_stage_a_diversity_figure(
                 ha="right",
                 va="center",
                 fontsize=text_sizes["regulator_label"] * 0.95,
-                color="#222222",
+                color="#111111",
             )
             core_hamming = diversity.get("core_hamming")
             if not isinstance(core_hamming, dict):
@@ -176,7 +166,7 @@ def _build_stage_a_diversity_figure(
                 y_base,
                 width=0.8,
                 color=top_color,
-                alpha=0.55,
+                alpha=0.45,
                 label="Top",
                 zorder=2,
             )
@@ -185,7 +175,7 @@ def _build_stage_a_diversity_figure(
                 y_act,
                 width=0.8,
                 color=diversified_color,
-                alpha=0.75,
+                alpha=0.6,
                 label="Diversified",
                 zorder=3,
             )
@@ -198,14 +188,17 @@ def _build_stage_a_diversity_figure(
             if x_base.size > 1:
                 tick_vals = x_base[::2]
             ax_left.set_xticks(tick_vals)
-            ax_left.tick_params(labelbottom=True)
+            if idx == len(regulators) - 1:
+                ax_left.tick_params(labelbottom=True)
+            else:
+                ax_left.tick_params(labelbottom=False)
             ax_left.tick_params(axis="x", labelsize=tick_size)
             if idx == 0:
                 ax_left.legend(
                     handles=[base_line, act_line],
                     loc="lower right",
                     frameon=False,
-                    fontsize=text_sizes["annotation"] * 0.8,
+                    fontsize=text_sizes["annotation"] * 0.95,
                 )
             selection_policy = str(row.get("selection_policy") or "").lower()
             pool_size_final = row.get("selection_pool_size_final")
@@ -237,7 +230,7 @@ def _build_stage_a_diversity_figure(
                     ha="center",
                     va="center",
                     fontsize=text_sizes["annotation"] * 0.8,
-                    color="#666666",
+                    color="#111111",
                 )
             elif not mask.any():
                 ax_right.text(
@@ -247,7 +240,7 @@ def _build_stage_a_diversity_figure(
                     ha="center",
                     va="center",
                     fontsize=text_sizes["annotation"] * 0.85,
-                    color="#666666",
+                    color="#111111",
                 )
             else:
                 dist_line = None
@@ -279,30 +272,28 @@ def _build_stage_a_diversity_figure(
                     else:
                         ax_right.set_xlim(1.0, x_max)
                 ax_score = ax_right.twinx()
-                score_label = "Score vs max"
-                min_score_norm = row.get("selection_pool_min_score_norm_used")
-                if min_score_norm is not None and np.isfinite(min_score_norm):
-                    score_label = f"Score vs max (τ={float(min_score_norm):.2f})"
                 score_line = ax_score.plot(
                     ordered,
                     score_vals,
                     color="#555555",
                     linestyle="--",
                     linewidth=1.0,
+                    marker="s",
+                    markersize=2.4,
                     alpha=0.6,
-                    label=score_label,
+                    label="Score vs max",
                 )
                 ax_score.set_ylim(0.0, 1.0)
-                ax_score.tick_params(labelright=True, labelsize=tick_size, pad=2)
+                ax_score.tick_params(labelright=True, labelsize=tick_size, pad=0)
                 _apply_style(ax_score, style)
                 if "right" in ax_score.spines:
                     ax_score.spines["right"].set_visible(True)
-                if idx == 0 and dist_line and score_line:
+                if dist_line and score_line:
                     ax_right.legend(
                         handles=[dist_line[0], score_line[0]],
-                        loc="upper right",
+                        loc="lower left",
                         frameon=False,
-                        fontsize=text_sizes["annotation"] * 0.75,
+                        fontsize=text_sizes["annotation"] * 1.05,
                     )
             if is_degenerate:
                 ax_right.text(
@@ -313,18 +304,19 @@ def _build_stage_a_diversity_figure(
                     va="top",
                     transform=ax_right.transAxes,
                     fontsize=text_sizes["annotation"] * 0.75,
-                    color="#666666",
+                    color="#111111",
                 )
             ax_right.set_ylabel("")
             ax_right.xaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=5))
-            ax_right.tick_params(labelbottom=True)
+            if idx == len(regulators) - 1:
+                ax_right.tick_params(labelbottom=True)
+            else:
+                ax_right.tick_params(labelbottom=False)
             ax_right.tick_params(axis="both", labelsize=tick_size)
-            ax_left.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
-            ax_right.grid(axis="y", alpha=float(style.get("grid_alpha", 0.2)))
-
-        if axes_left:
+        if axes_left and show_column_titles:
             axes_left[0].set_title("NN distance distribution", fontsize=subtitle_size, pad=title_pad)
             axes_right[0].set_title("Selection trajectory", fontsize=subtitle_size, pad=title_pad)
+        if axes_left:
             axes_left[-1].set_xlabel(metric_label, fontsize=label_size)
             axes_right[-1].set_xlabel("MMR selection step", fontsize=label_size)
             y_center = (axes_left[0].get_position().y1 + axes_left[-1].get_position().y0) / 2.0
@@ -338,7 +330,7 @@ def _build_stage_a_diversity_figure(
                 ha="right",
                 va="center",
                 fontsize=label_size,
-                color="#222222",
+                color="#111111",
             )
             fig.text(
                 right_bbox.x0 - 0.04,
@@ -348,17 +340,17 @@ def _build_stage_a_diversity_figure(
                 ha="right",
                 va="center",
                 fontsize=label_size,
-                color="#222222",
+                color="#111111",
             )
             fig.text(
-                right_bbox.x1 + 0.06,
+                right_bbox.x1 + 0.03,
                 y_center,
                 "Score vs max",
                 rotation="vertical",
                 ha="left",
                 va="center",
                 fontsize=label_size,
-                color="#222222",
+                color="#111111",
             )
 
         for ax in axes_left + axes_right:

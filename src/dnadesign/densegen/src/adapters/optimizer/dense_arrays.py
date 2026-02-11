@@ -47,10 +47,20 @@ class OptimizerAdapter(Protocol):
         min_required_regulators: int | None = None,
         solver_time_limit_seconds: float | None = None,
         solver_threads: int | None = None,
+        extra_label: str | None = None,
     ) -> OptimizerRun: ...
 
 
 _EXTRA_REGULATOR_LABEL = "__densegen__extra__"
+
+
+def _normalize_extra_label(extra_label: str | None) -> str:
+    if extra_label is None:
+        return _EXTRA_REGULATOR_LABEL
+    label = str(extra_label).strip()
+    if not label:
+        raise ValueError("extra_label must be a non-empty string")
+    return label
 
 
 def _normalize_regulator_labels(labels: list[str]) -> list[str]:
@@ -79,6 +89,7 @@ def _apply_regulator_constraints(
     required_regulators: list[str] | None,
     min_count_by_regulator: dict[str, int] | None,
     min_required_regulators: int | None,
+    extra_label: str | None = None,
 ) -> None:
     if not regulator_by_index:
         return
@@ -91,7 +102,7 @@ def _apply_regulator_constraints(
             f"regulator_by_index length exceeds optimizer library length ({len(labels)} > {len(opt.library)})"
         )
     if len(labels) < len(opt.library):
-        labels.extend([_EXTRA_REGULATOR_LABEL] * (len(opt.library) - len(labels)))
+        labels.extend([_normalize_extra_label(extra_label)] * (len(opt.library) - len(labels)))
 
     labels = _normalize_regulator_labels(labels)
     label_set = set(labels)
@@ -164,7 +175,7 @@ class DenseArraysAdapter:
         try:
             dummy = da.Optimizer(library=["AT"], sequence_length=test_length)
             _ = dummy.optimal(solver=backend)
-            log.info("Solver selected: %s", backend)
+            log.debug("Solver selected: %s", backend)
         except Exception as e:
             raise RuntimeError(
                 f"Requested solver '{backend}' failed during probe: {e}\n"
@@ -186,6 +197,7 @@ class DenseArraysAdapter:
         min_required_regulators: int | None = None,
         solver_time_limit_seconds: float | None = None,
         solver_threads: int | None = None,
+        extra_label: str | None = None,
     ) -> OptimizerRun:
         if strategy != "approximate" and not solver:
             raise ValueError("solver.backend is required unless strategy=approximate")
@@ -204,6 +216,7 @@ class DenseArraysAdapter:
             required_regulators=required_regulators,
             min_count_by_regulator=min_count_by_regulator,
             min_required_regulators=min_required_regulators,
+            extra_label=extra_label,
         )
         _apply_solver_controls(
             opt,

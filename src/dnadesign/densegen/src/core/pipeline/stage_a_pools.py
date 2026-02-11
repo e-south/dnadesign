@@ -12,10 +12,12 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import logging
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 from ...config import DenseGenConfig
+from ...utils import logging_utils
 from ..artifacts.candidates import build_candidate_artifact, find_candidate_files, prepare_candidates_dir
 from ..artifacts.pool import PoolData, build_pool_artifact, load_pool_data, pool_status_by_input
 from ..run_paths import display_path
@@ -50,6 +52,14 @@ def prepare_stage_a_pools(
     run_id: str,
     deps,
 ) -> StageAPoolState:
+    requested_progress_style = str(getattr(cfg.logging, "progress_style", "stream"))
+    progress_style, _progress_reason = logging_utils.resolve_progress_style(
+        requested_progress_style,
+        stdout=sys.stdout,
+    )
+    logging_utils.set_progress_style(progress_style)
+    logging_utils.set_progress_enabled(progress_style in {"stream", "screen"})
+
     pool_dir = outputs_root / "pools"
     pool_manifest = pool_dir / "pool_manifest.json"
     pool_data: dict[str, PoolData] | None = None

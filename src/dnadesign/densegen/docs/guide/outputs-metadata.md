@@ -1,13 +1,14 @@
 ## Outputs and metadata
 
-DenseGen writes Parquet outputs with a shared, deterministic ID scheme.
-This guide is a short map; see `reference/outputs.md` for full schemas.
+This guide is a quick map of what DenseGen writes and how to join outputs.
+
+For full schema details, use [../reference/outputs.md](../reference/outputs.md).
 
 ---
 
-### Outputs layout (common)
+### Common outputs layout
 
-```
+```text
 outputs/
   tables/
     dense_arrays.parquet
@@ -25,35 +26,76 @@ outputs/
 
 ---
 
-### What the artifacts mean (short)
+### Subprocess -> artifact map
 
-- `tables/dense_arrays.parquet` - final sequences (canonical dataset).
-- `tables/attempts.parquet` - solver attempt audit log.
-- `tables/solutions.parquet` - accepted solutions (join to attempts).
-- `tables/composition.parquet` - per-TFBS placements for accepted solutions.
-- `tables/run_metrics.parquet` - run-level diagnostics.
-- `pools/*` - Stage-A pools + manifests.
-- `libraries/*` - Stage-B library artifacts.
-- `meta/*` - run/inputs manifests, effective config, events.
-- `plots/*` - plot images + plot manifest.
+Read outputs by subprocess boundary:
+
+1. **Stage-A pool build**
+   - `outputs/pools/pool_manifest.json`
+   - `outputs/pools/<input>__pool.parquet`
+   - intent: what candidates were retained per input and why
+
+2. **Stage-B library build**
+   - `outputs/libraries/library_manifest.json`
+   - `outputs/libraries/library_builds.parquet`
+   - `outputs/libraries/library_members.parquet`
+   - intent: what each plan solved against (the sampled library)
+
+3. **Solve + runtime loop**
+   - `outputs/tables/attempts.parquet`
+   - `outputs/tables/solutions.parquet`
+   - `outputs/tables/composition.parquet`
+   - `outputs/tables/dense_arrays.parquet`
+   - intent: what was attempted, what was accepted, and final sequence composition
+
+4. **Run metadata + diagnostics**
+   - `outputs/meta/run_manifest.json`
+   - `outputs/meta/effective_config.json`
+   - `outputs/meta/events.jsonl`
+   - `outputs/tables/run_metrics.parquet`
+   - `outputs/plots/*`
+   - intent: provenance, reproducibility, and health diagnostics
 
 ---
 
-### Joining outputs (stable keys)
+### What each artifact means
 
-- `dense_arrays.parquet.id` -> `solutions.parquet.solution_id`
-- `solutions.parquet.attempt_id` -> `attempts.parquet.attempt_id`
-- `solutions.parquet.solution_id` -> `composition.parquet.solution_id`
-- `attempts.parquet.library_index` -> `libraries/library_builds.parquet`
-
-Stage-A pool joins are keyed by `tfbs_id` / `motif_id` where present.
+- `tables/dense_arrays.parquet`: final sequences (canonical run dataset)
+- `tables/attempts.parquet`: solver attempts (ok/rejected/duplicate/failed)
+- `tables/solutions.parquet`: accepted solutions with stable join keys
+- `tables/composition.parquet`: per-placement TFBS rows for accepted solutions
+- `tables/run_metrics.parquet`: aggregated run diagnostics
+- `pools/*`: Stage-A pools and manifest
+- `libraries/*`: Stage-B library artifacts and manifest
+- `meta/*`: run manifests, effective config, runtime events
+- `plots/*`: rendered plots and plot manifest
 
 ---
 
-### Metadata scheme
+### Stable join keys
 
-DenseGen metadata keys are prefixed with `densegen__*` and validated against a schema in
+- `dense_arrays.id` -> `solutions.solution_id`
+- `solutions.attempt_id` -> `attempts.attempt_id`
+- `solutions.solution_id` -> `composition.solution_id`
+- `attempts.library_index` -> `libraries/library_builds.parquet`
+
+Stage-A joins use `tfbs_id` / `motif_id` where present.
+
+Interpretation rule:
+- `dense_arrays` is the final accepted surface.
+- `solutions` and `composition` explain how each final row was assembled.
+- `attempts` explains why non-accepted work was rejected or failed.
+
+---
+
+### Metadata naming
+
+DenseGen metadata fields are namespaced as `densegen__*` and validated by
 `src/dnadesign/densegen/src/core/metadata_schema.py`.
+
+Design intent:
+- record-level fields carry sequence-specific provenance
+- run-wide fields should stay in manifests/tables unless needed for filtering
 
 ---
 

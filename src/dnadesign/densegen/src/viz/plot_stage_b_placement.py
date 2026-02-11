@@ -18,8 +18,9 @@ from typing import Optional
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.colors import to_rgb, to_rgba
 
-from .plot_common import _apply_style, _palette, _safe_filename, _style
+from .plot_common import _apply_style, _palette, _stage_b_plan_output_dir, _style
 
 log = logging.getLogger(__name__)
 
@@ -106,10 +107,27 @@ def _fixed_labels(constraints: list[dict]) -> list[str]:
     return labels
 
 
+def _fixed_label_sequences(constraints: list[dict]) -> dict[str, str]:
+    sequences: dict[str, str] = {}
+    for idx, pc in enumerate(constraints):
+        name = str(pc.get("name") or f"promoter_{idx + 1}")
+        upstream = str(pc.get("upstream") or "").strip().upper()
+        downstream = str(pc.get("downstream") or "").strip().upper()
+        if upstream:
+            sequences[f"fixed:{name}:-35"] = upstream
+        if downstream:
+            sequences[f"fixed:{name}:-10"] = downstream
+    return sequences
+
+
 def _sanitize_tf_label(label: str) -> str:
     label = str(label)
     if "_" in label:
-        return label.split("_", 1)[0]
+        head, tail = label.split("_", 1)
+        tail_upper = tail.upper()
+        iupac = set("ACGTURYSWKMBDHVN")
+        if len(tail_upper) >= 6 and set(tail_upper).issubset(iupac):
+            return head
     return label
 
 
@@ -212,10 +230,31 @@ def _placement_bounds(row: pd.Series, seq_len: int) -> tuple[int, int] | None:
     return lo, hi
 
 
-def _category_display_label(label: str) -> str:
+def _category_display_label(label: str, *, fixed_label_sequences: dict[str, str] | None = None) -> str:
     if label.startswith("fixed:"):
-        return _sanitize_fixed_label(label)
+        sequence = (fixed_label_sequences or {}).get(label)
+        if ":" in label:
+            suffix = label.rsplit(":", 1)[-1]
+        else:
+            suffix = _sanitize_fixed_label(label)
+        if sequence:
+            return f"{suffix} ({sequence})"
+        return str(suffix)
+    if str(label).strip() == "neutral_bg":
+        return "background"
     return label
+
+
+def _colorblind_palette(style: dict, n: int) -> list:
+    palette_style = dict(style)
+    palette_style["palette"] = "okabe_ito"
+    return _palette(palette_style, n)
+
+
+def _darken_color(color: object, *, factor: float) -> tuple[float, float, float]:
+    r, g, b = to_rgb(color)
+    scale = min(1.0, max(0.0, float(factor)))
+    return (r * scale, g * scale, b * scale)
 
 
 def _build_occupancy(
@@ -312,15 +351,177 @@ def _build_occupancy(
     return occupancy, categories, missing_counts
 
 
-def _build_tfbs_counts(sub: pd.DataFrame) -> pd.DataFrame:
-    counts = sub.groupby(["tf", "tfbs"]).size().reset_index(name="count")
-    if counts.empty:
+def _build_tfbs_count_records(
+    sub: pd.DataFrame,
+    *,
+    solutions: pd.DataFrame,
+    constraints: list[dict],
+) -> pd.DataFrame:
+    fixed_labels = _fixed_labels(constraints)
+    fixed_set = set(fixed_labels)
+    records: list[dict[str, str]] = []
+    for _, row in sub.iterrows():
+        tf_label = _normalize_tf_label(row.get("tf"), fixed_set)
+        tfbs = str(row.get("tfbs") or "").strip().upper()
+        if not tf_label or not tfbs:
+            continue
+        records.append({"category_label": tf_label, "tfbs": tfbs})
+
+    composition_has_fixed = bool(set(sub["tf"].astype(str).tolist()).intersection(fixed_set))
+    if not composition_has_fixed:
+        for pc_idx, pc in enumerate(constraints):
+            name = pc.get("name") or f"promoter_{pc_idx + 1}"
+            upstream = str(pc.get("upstream") or "").strip().upper()
+            downstream = str(pc.get("downstream") or "").strip().upper()
+            if not upstream or not downstream:
+                continue
+            label_up = f"fixed:{name}:-35"
+            label_down = f"fixed:{name}:-10"
+            for _, row in solutions.iterrows():
+                seq = str(row.get("sequence") or "")
+                pair = _select_promoter_pair(seq, pc)
+                if pair is None:
+                    continue
+                records.append({"category_label": label_up, "tfbs": upstream})
+                records.append({"category_label": label_down, "tfbs": downstream})
+
+    if not records:
         raise ValueError("placement_map found no TFBS usage for the selected solutions.")
-    counts["tf"] = counts["tf"].astype(str)
+    counts = pd.DataFrame(records).groupby(["category_label", "tfbs"]).size().reset_index(name="count")
+    counts["category_label"] = counts["category_label"].astype(str)
     counts["tfbs"] = counts["tfbs"].astype(str)
-    counts["rank_key"] = counts["tf"] + ":" + counts["tfbs"]
+    counts["rank_key"] = counts["category_label"] + ":" + counts["tfbs"]
     counts = counts.sort_values(by=["count", "rank_key"], ascending=[False, True]).reset_index(drop=True)
     return counts
+
+
+def _selected_library_members(
+    library_members_df: pd.DataFrame,
+    *,
+    input_name: str,
+    plan_name: str,
+    sub: pd.DataFrame,
+) -> pd.DataFrame:
+    _require_columns(library_members_df, {"input_name", "plan_name", "tf", "tfbs"}, "library_members.parquet")
+    members = library_members_df[
+        (library_members_df["input_name"].astype(str) == str(input_name))
+        & (library_members_df["plan_name"].astype(str) == str(plan_name))
+    ].copy()
+    if members.empty:
+        raise ValueError(f"library_members.parquet has no rows for placement_map scope {input_name}/{plan_name}.")
+
+    filters = []
+    if "library_hash" in sub.columns and "library_hash" in members.columns:
+        hashes = {str(h) for h in sub["library_hash"].dropna().astype(str).tolist() if str(h).strip()}
+        if hashes:
+            filters.append(members["library_hash"].astype(str).isin(hashes))
+    if "library_index" in sub.columns and "library_index" in members.columns:
+        indices = {int(i) for i in pd.to_numeric(sub["library_index"], errors="coerce").dropna().astype(int).tolist()}
+        if indices:
+            filters.append(pd.to_numeric(members["library_index"], errors="coerce").isin(sorted(indices)))
+
+    if filters:
+        mask = filters[0]
+        for extra in filters[1:]:
+            mask = mask | extra
+        scoped = members[mask].copy()
+        if scoped.empty:
+            raise ValueError(
+                f"library_members.parquet rows did not match selected libraries for {input_name}/{plan_name}."
+            )
+        return scoped
+    return members
+
+
+def _build_available_tfbs_records(
+    members: pd.DataFrame,
+    *,
+    n_solutions: int,
+    constraints: list[dict],
+) -> pd.DataFrame:
+    fixed_labels = _fixed_labels(constraints)
+    fixed_set = set(fixed_labels)
+    rows: list[dict[str, str | int]] = []
+    for _, row in members.iterrows():
+        tf_label = _normalize_tf_label(row.get("tf"), fixed_set)
+        tfbs = str(row.get("tfbs") or "").strip().upper()
+        if not tf_label or not tfbs:
+            continue
+        rows.append({"category_label": tf_label, "tfbs": tfbs, "weight": int(n_solutions)})
+
+    for pc_idx, pc in enumerate(constraints):
+        name = pc.get("name") or f"promoter_{pc_idx + 1}"
+        upstream = str(pc.get("upstream") or "").strip().upper()
+        downstream = str(pc.get("downstream") or "").strip().upper()
+        if not upstream or not downstream:
+            continue
+        rows.append({"category_label": f"fixed:{name}:-35", "tfbs": upstream, "weight": int(n_solutions)})
+        rows.append({"category_label": f"fixed:{name}:-10", "tfbs": downstream, "weight": int(n_solutions)})
+
+    if not rows:
+        raise ValueError("placement_map could not derive available TFBS records from library members.")
+    available = pd.DataFrame(rows)
+    available["category_label"] = available["category_label"].astype(str)
+    available["tfbs"] = available["tfbs"].astype(str)
+    available["weight"] = pd.to_numeric(available["weight"], errors="coerce").fillna(0).astype(int)
+    available = available[available["weight"] > 0]
+    if available.empty:
+        raise ValueError("placement_map derived no non-empty available TFBS records.")
+    return available
+
+
+def _allocation_summary_lines(
+    *,
+    placements_used: int,
+    placements_possible: int,
+    unique_used: int,
+    unique_available: int,
+    top10_share: float,
+    top50_share: float,
+) -> list[str]:
+    placements_possible = max(1, int(placements_possible))
+    unique_available = max(1, int(unique_available))
+    placements_ratio = float(placements_used) / float(placements_possible)
+    unique_ratio = float(unique_used) / float(unique_available)
+    return [
+        f"TFBS placements used / possible: {placements_used}/{placements_possible} ({placements_ratio:.1%})",
+        f"unique TFBS-pairs used / available: {unique_used}/{unique_available} ({unique_ratio:.1%})",
+        f"top10 share (all TFBS-pairs by usage): {top10_share:.2f}",
+        f"top50 share (all TFBS-pairs by usage): {top50_share:.2f}",
+    ]
+
+
+def _place_figure_legend_below_xlabel(
+    fig: plt.Figure,
+    *,
+    ax_xlabel: plt.Axes,
+    legend: plt.Legend,
+    gap: float = 0.012,
+    min_bottom: float = 0.01,
+    max_bottom: float = 0.60,
+) -> None:
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    xlabel_bbox = (
+        ax_xlabel.xaxis.get_label().get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+    )
+    target_top = float(xlabel_bbox.y0) - float(gap)
+    legend.set_bbox_to_anchor((0.5, target_top), transform=fig.transFigure)
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    legend_bbox = legend.get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+    if legend_bbox.y0 < float(min_bottom):
+        needed = float(min_bottom) - float(legend_bbox.y0)
+        new_bottom = min(float(max_bottom), float(fig.subplotpars.bottom) + needed + 0.005)
+        fig.subplots_adjust(bottom=new_bottom)
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        xlabel_bbox = (
+            ax_xlabel.xaxis.get_label().get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+        )
+        target_top = float(xlabel_bbox.y0) - float(gap)
+        legend.set_bbox_to_anchor((0.5, target_top), transform=fig.transFigure)
+        fig.canvas.draw()
 
 
 def _render_occupancy(
@@ -332,70 +533,183 @@ def _render_occupancy(
     plan_name: str,
     n_solutions: int,
     alpha: float,
+    fixed_label_sequences: dict[str, str] | None,
     style: dict,
 ) -> tuple[plt.Figure, plt.Axes]:
-    width = max(8.0, float(seq_len) * 0.2)
-    fig, ax = plt.subplots(1, 1, figsize=(width, 2.5))
-    x = np.arange(seq_len)
-    colors = _palette(style, len(categories))
-    for label, color in zip(categories, colors):
+    width = max(8.4, float(seq_len) * 0.2, float(len(categories)) * 1.6)
+    fig, ax = plt.subplots(1, 1, figsize=(width, 3.25))
+    x_positions = np.arange(seq_len, dtype=float)
+    colors = dict(zip(categories, _colorblind_palette(style, len(categories))))
+    fixed_categories = [label for label in categories if str(label).startswith("fixed:")]
+    regular_categories = [label for label in categories if label not in fixed_categories]
+    draw_order = regular_categories + fixed_categories
+    for label in draw_order:
+        color = colors[label]
         y = occupancy[label]
-        ax.step(x, y, where="mid", color=color, linewidth=1.0)
-        ax.fill_between(x, y, step="mid", alpha=alpha, color=color, label=_category_display_label(label))
+        if y.shape[0] != seq_len:
+            raise ValueError(
+                "Occupancy series length mismatch; expected one value per nucleotide "
+                f"(seq_len={seq_len}, got={y.shape[0]} for '{label}')."
+            )
+        is_fixed = str(label).startswith("fixed:")
+        fill_alpha = max(0.12, alpha * (1.1 if is_fixed else 1.0))
+        fill_rgb = _darken_color(color, factor=0.84 if is_fixed else 0.88)
+        edge_rgb = _darken_color(color, factor=0.56 if is_fixed else 0.62)
+        line_width = 0.75 if is_fixed else 0.6
+        z_base = 8 if is_fixed else 2
+        fill_color = to_rgba(fill_rgb, alpha=fill_alpha)
+        edge_color = to_rgba(edge_rgb, alpha=1.0)
+        ax.bar(
+            x_positions,
+            y.astype(float),
+            width=0.96,
+            align="edge",
+            color=fill_color,
+            edgecolor=edge_color,
+            linewidth=line_width,
+            label=_category_display_label(label, fixed_label_sequences=fixed_label_sequences),
+            zorder=z_base + (0.5 if is_fixed else 0.0),
+        )
 
-    ax.set_xlim(0, seq_len)
+    x_pad = max(0.8, float(seq_len) * 0.015)
+    ax.set_xlim(0.0 - x_pad, float(seq_len) + x_pad)
     ax.set_xticks(np.arange(0, seq_len + 1, 5, dtype=int))
-    ax.set_xlabel("Position (nt)")
+    ax.set_xlabel("Position (nt)", labelpad=8)
     ax.set_ylabel("Occurrences")
-    ax.set_title(f"Placement map - {input_name}/{plan_name} (n={n_solutions})")
-    ncol = min(4, max(1, len(categories)))
-    ax.legend(
-        loc="upper center",
-        bbox_to_anchor=(0.5, 1.32),
-        ncol=ncol,
-        frameon=bool(style.get("legend_frame", False)),
-    )
+    input_label = str(input_name).replace("plan_pool__", "").replace("_", " ")
+    plan_label = str(plan_name).replace("_", " ")
+    if input_label == plan_label:
+        scope = plan_label
+    else:
+        scope = f"{plan_label} / {input_label}"
+    ax.set_title(f"Occupancy across sequence positions for {scope} (n={n_solutions})")
     _apply_style(ax, style)
-    fig.tight_layout()
+    handles, labels = ax.get_legend_handles_labels()
+    legend_rows = 1
+    if handles:
+        deduped: dict[str, object] = {}
+        for handle, label in zip(handles, labels):
+            deduped[str(label)] = handle
+        entry_count = max(1, len(deduped))
+        ncol = max(1, min(3, int(np.ceil(np.sqrt(entry_count)))))
+        legend_rows = int(np.ceil(float(entry_count) / float(ncol)))
+        fig.legend(
+            deduped.values(),
+            deduped.keys(),
+            loc="lower center",
+            bbox_to_anchor=(0.5, 0.015),
+            ncol=ncol,
+            frameon=False,
+            fontsize=float(style.get("tick_size", style.get("font_size", 13.0) * 0.74)),
+        )
+    bottom = max(0.31, 0.22 + 0.07 * float(legend_rows))
+    fig.subplots_adjust(left=0.08, right=0.99, bottom=bottom, top=0.88)
     return fig, ax
 
 
 def _render_tfbs_allocation(
     counts: pd.DataFrame,
     *,
+    available: pd.DataFrame,
     input_name: str,
     plan_name: str,
     n_solutions: int,
     top_k_annotation: int,
+    fixed_label_sequences: dict[str, str] | None,
     style: dict,
 ) -> tuple[plt.Figure, dict[str, plt.Axes]]:
     ranks = np.arange(1, len(counts) + 1)
     values = counts["count"].astype(float).to_numpy()
     total = float(values.sum()) if len(values) else 0.0
     cum = np.cumsum(values) / total if total > 0 else np.zeros_like(values)
+    available_unique = int(len(available.drop_duplicates(subset=["category_label", "tfbs"])))
+    placements_possible = int(pd.to_numeric(available["weight"], errors="coerce").fillna(0).sum())
 
-    fig, axes = plt.subplots(2, 1, figsize=(8, 5), sharex=True)
+    figure_width = max(9.2, float(counts["category_label"].nunique()) * 2.0)
+    fig, axes = plt.subplots(2, 1, figsize=(figure_width, 6.0), sharex=False)
     ax_rank, ax_cum = axes
-    color = _palette(style, 1)[0]
-    ax_rank.plot(ranks, values, color=color, linewidth=1.5)
+    palette = _colorblind_palette(style, max(1, counts["category_label"].nunique() + 1))
+    category_order = (
+        counts.groupby("category_label")["count"].sum().sort_values(ascending=False).index.astype(str).tolist()
+    )
+    color_map = {label: palette[idx + 1] for idx, label in enumerate(category_order)}
+    ax_rank.plot(
+        ranks,
+        values,
+        color=palette[0],
+        linewidth=1.5,
+        marker="o",
+        markersize=2.9,
+        linestyle="-",
+        label="all TFBS-pairs",
+        zorder=4,
+    )
     ax_rank.set_yscale("log")
     ax_rank.set_ylabel("Usage count")
-    ax_rank.set_title(f"TFBS allocation - {input_name}/{plan_name} (n={n_solutions})")
-
-    ax_cum.plot(ranks, cum, color=color, linewidth=1.5)
+    input_label = str(input_name).replace("plan_pool__", "").replace("_", " ")
+    plan_label = str(plan_name).replace("_", " ")
+    if input_label == plan_label:
+        scope = plan_label
+    else:
+        scope = f"{plan_label} / {input_label}"
+    ax_rank.set_title(f"TFBS usage rank and cumulative share for {scope} (n={n_solutions}).")
+    ax_cum.plot(
+        ranks,
+        cum,
+        color=palette[0],
+        linewidth=1.5,
+        marker="o",
+        markersize=2.9,
+        linestyle="-",
+        label="all TFBS-pairs",
+        zorder=4,
+    )
     ax_cum.set_ylabel("Cumulative share")
-    ax_cum.set_xlabel("Rank")
-    ax_cum.set_ylim(0.0, 1.0)
+    ax_cum.set_xlabel("TFBS rank within category")
+    ax_cum.set_ylim(0.0, 1.03)
+
+    available_category_unique = (
+        available.groupby("category_label")[["tfbs"]].nunique().rename(columns={"tfbs": "unique_available"})
+    )
+    for label in category_order:
+        category = counts[counts["category_label"] == label].sort_values(by=["count", "tfbs"], ascending=[False, True])
+        if category.empty:
+            continue
+        cat_values = category["count"].astype(float).to_numpy()
+        cat_ranks = np.arange(1, len(category) + 1)
+        cat_total = float(cat_values.sum())
+        cat_cum = np.cumsum(cat_values) / cat_total if cat_total > 0 else np.zeros_like(cat_values)
+        available_unique_cat = int(
+            available_category_unique.loc[label, "unique_available"] if label in available_category_unique.index else 0
+        )
+        label_text = _category_display_label(str(label), fixed_label_sequences=fixed_label_sequences)
+        placement_share = (cat_total / total) if total > 0 else 0.0
+        legend_label = (
+            f"{label_text}: placements {int(cat_total)}/{int(total)} ({placement_share:.1%}), "
+            f"unique {len(category)}/{max(1, available_unique_cat)}"
+        )
+        color = color_map[label]
+        ax_rank.plot(cat_ranks, cat_values, color=color, linewidth=1.2, marker="o", markersize=2.5, label=legend_label)
+        ax_cum.plot(cat_ranks, cat_cum, color=color, linewidth=1.2, marker="o", markersize=2.5, label=legend_label)
+
+    if values.size > 0:
+        y_min = max(0.8, float(np.nanmin(values)) * 0.9)
+        y_max = float(np.nanmax(values)) * 1.08
+        if y_max <= y_min:
+            y_max = y_min * 1.1
+        ax_rank.set_ylim(y_min, y_max)
 
     top10 = values[: min(10, len(values))].sum() / total if total > 0 else 0.0
     top50 = values[: min(50, len(values))].sum() / total if total > 0 else 0.0
     summary = "\n".join(
-        [
-            f"placements: {int(total)}",
-            f"unique TFBS: {len(values)}",
-            f"top10 share: {top10:.2f}",
-            f"top50 share: {top50:.2f}",
-        ]
+        _allocation_summary_lines(
+            placements_used=int(total),
+            placements_possible=placements_possible,
+            unique_used=int(len(values)),
+            unique_available=available_unique,
+            top10_share=top10,
+            top50_share=top50,
+        )
     )
     ax_rank.text(
         0.98,
@@ -412,7 +726,10 @@ def _render_tfbs_allocation(
         k = min(top_k_annotation, len(values))
         for idx in range(k):
             row = counts.iloc[idx]
-            label = f"{_sanitize_tf_label(row['tf'])}:{_truncate_tfbs(row['tfbs'])}"
+            label = (
+                f"{_category_display_label(row['category_label'], fixed_label_sequences=fixed_label_sequences)}:"
+                f"{_truncate_tfbs(row['tfbs'])}"
+            )
             ax_rank.annotate(
                 label,
                 (ranks[idx], values[idx]),
@@ -426,6 +743,23 @@ def _render_tfbs_allocation(
     _apply_style(ax_rank, style)
     _apply_style(ax_cum, style)
     fig.tight_layout()
+    handles, labels = ax_rank.get_legend_handles_labels()
+    if handles:
+        deduped: dict[str, object] = {}
+        for handle, label in zip(handles, labels):
+            deduped[str(label)] = handle
+        entry_count = max(1, len(deduped))
+        ncol = max(1, min(4, int(np.ceil(np.sqrt(entry_count)))))
+        legend = fig.legend(
+            deduped.values(),
+            deduped.keys(),
+            loc="upper center",
+            bbox_to_anchor=(0.5, 0.0),
+            ncol=ncol,
+            frameon=False,
+            fontsize=float(style.get("tick_size", style.get("font_size", 13.0) * 0.68)),
+        )
+        _place_figure_legend_below_xlabel(fig, ax_xlabel=ax_cum, legend=legend)
     return fig, {"rank": ax_rank, "cum": ax_cum}
 
 
@@ -435,17 +769,16 @@ def plot_placement_map(
     *,
     composition_df: pd.DataFrame,
     dense_arrays_df: pd.DataFrame,
+    library_members_df: pd.DataFrame | None,
     cfg: dict,
     style: Optional[dict] = None,
     occupancy_alpha: float | None = None,
     occupancy_max_categories: int | None = None,
-    tfbs_top_k_annotation: int | None = None,
 ) -> list[Path]:
     if composition_df is None or composition_df.empty:
         raise ValueError("placement_map requires composition.parquet with placements.")
     if dense_arrays_df is None or dense_arrays_df.empty:
         raise ValueError("placement_map requires dense_arrays.parquet with final sequences.")
-
     _require_columns(
         dense_arrays_df,
         {"id", "sequence", "densegen__input_name", "densegen__plan"},
@@ -460,15 +793,12 @@ def plot_placement_map(
         raise ValueError("composition.parquet requires length or end columns.")
 
     style = _style(style)
-    alpha_val = float(occupancy_alpha) if occupancy_alpha is not None else 0.3
+    alpha_val = float(occupancy_alpha) if occupancy_alpha is not None else 0.22
     if not (0.0 < alpha_val <= 1.0):
         raise ValueError("placement_map occupancy_alpha must be between 0 and 1.")
     max_cats = int(occupancy_max_categories) if occupancy_max_categories is not None else 12
     if max_cats <= 0:
         raise ValueError("placement_map occupancy_max_categories must be positive.")
-    top_k_annotation = int(tfbs_top_k_annotation) if tfbs_top_k_annotation is not None else 0
-    if top_k_annotation < 0:
-        raise ValueError("placement_map tfbs_top_k_annotation must be >= 0.")
 
     seq_len = _sequence_length_from_cfg(cfg)
     dense_arrays_df = dense_arrays_df.copy()
@@ -492,6 +822,7 @@ def plot_placement_map(
             raise ValueError(f"placement_map has no placements for {input_name}/{plan_name}.")
 
         constraints = _promoter_constraints(cfg, str(plan_name))
+        fixed_label_sequences = _fixed_label_sequences(constraints)
         n_solutions = len(solution_ids)
         occupancy, categories, missing_counts = _build_occupancy(
             sub,
@@ -513,31 +844,14 @@ def plot_placement_map(
             plan_name=str(plan_name),
             n_solutions=n_solutions,
             alpha=alpha_val,
+            fixed_label_sequences=fixed_label_sequences,
             style=style,
         )
-        occ_name = (
-            f"{out_path.stem}__{_safe_filename(input_name)}__{_safe_filename(plan_name)}__occupancy{out_path.suffix}"
-        )
-        occ_path = out_path.parent / occ_name
+        base_dir = _stage_b_plan_output_dir(out_path, input_name=str(input_name), plan_name=str(plan_name))
+        base_dir.mkdir(parents=True, exist_ok=True)
+        occ_path = base_dir / f"occupancy{out_path.suffix}"
         fig_occ.savefig(occ_path)
         plt.close(fig_occ)
         paths.append(occ_path)
 
-        counts = _build_tfbs_counts(sub)
-        fig_tfbs, _ = _render_tfbs_allocation(
-            counts,
-            input_name=str(input_name),
-            plan_name=str(plan_name),
-            n_solutions=n_solutions,
-            top_k_annotation=top_k_annotation,
-            style=style,
-        )
-        tfbs_name = (
-            f"{out_path.stem}__{_safe_filename(input_name)}__{_safe_filename(plan_name)}"
-            f"__tfbs_allocation{out_path.suffix}"
-        )
-        tfbs_path = out_path.parent / tfbs_name
-        fig_tfbs.savefig(tfbs_path)
-        plt.close(fig_tfbs)
-        paths.append(tfbs_path)
     return paths

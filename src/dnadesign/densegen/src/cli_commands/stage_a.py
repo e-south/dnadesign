@@ -12,6 +12,8 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import os
+import sys
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -110,7 +112,15 @@ def register_stage_a_commands(
             logfile=str(logfile),
             suppress_solver_stderr=bool(log_cfg.suppress_solver_stderr),
         )
-        progress_style = str(log_cfg.progress_style)
+        requested_progress_style = str(log_cfg.progress_style)
+        progress_style, progress_reason = logging_utils.resolve_progress_style(
+            requested_progress_style,
+            stdout=sys.stdout,
+            term=os.environ.get("TERM"),
+        )
+        if progress_reason is not None:
+            console.print(f"[dim]logging.progress_style=auto -> {progress_style} ({progress_reason})[/]")
+        setattr(log_cfg, "progress_style", progress_style)
         logging_utils.set_progress_style(progress_style)
         logging_utils.set_progress_enabled(progress_style in {"stream", "screen"})
         out_dir = context.resolve_outputs_path_or_exit(cfg_path, run_root, out, label="stage-a.out")

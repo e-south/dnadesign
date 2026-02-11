@@ -77,7 +77,7 @@ Setup (notebooks):
 uv sync --locked --group notebooks
 ```
 
-> GPU/HPC install notes: see docs/INSTALL_BU_SCC.md. Don’t attempt CUDA-specific environment work unless asked.
+> GPU/HPC install notes: see docs/hpc/bu_scc_install.md. Don’t attempt CUDA-specific environment work unless asked.
 
 #### Commands
 

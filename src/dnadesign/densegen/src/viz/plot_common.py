@@ -41,9 +41,17 @@ def _style(style: Optional[dict]) -> dict:
     s.setdefault("seaborn_style", True)
     s.setdefault("despine", True)
     s.setdefault("legend_frame", False)
+    s.setdefault("grid", True)
+    s.setdefault("grid_color", "#d9d9d9")
+    s.setdefault("grid_alpha", 0.32)
+    s.setdefault("grid_linewidth", 0.7)
     s.setdefault("figsize", (8, 4))
     s.setdefault("palette", "okabe_ito")
     s.setdefault("font_size", 13)
+    s.setdefault("text_color", "#111111")
+    s.setdefault("tick_direction", "out")
+    s.setdefault("tick_length", 3.5)
+    s.setdefault("tick_width", 0.8)
     return s
 
 
@@ -91,13 +99,53 @@ def _apply_style(ax, style: dict):
         if "right" in ax.spines:
             ax.spines["right"].set_visible(False)
     fs = float(style.get("font_size", 13))
-    ax.tick_params(axis="both", labelsize=float(style.get("tick_size", fs * 0.9)))
+    text_color = str(style.get("text_color", "#111111"))
+    ax.tick_params(
+        axis="both",
+        labelsize=float(style.get("tick_size", fs)),
+        direction=str(style.get("tick_direction", "out")),
+        length=float(style.get("tick_length", 3.5)),
+        width=float(style.get("tick_width", 0.8)),
+        colors=text_color,
+        labelcolor=text_color,
+    )
+    ax.set_axisbelow(True)
+    if bool(style.get("grid", True)):
+        ax.grid(
+            True,
+            which="major",
+            color=str(style.get("grid_color", "#d9d9d9")),
+            alpha=float(style.get("grid_alpha", 0.32)),
+            linewidth=float(style.get("grid_linewidth", 0.7)),
+        )
     ax.xaxis.label.set_size(float(style.get("label_size", fs)))
     ax.yaxis.label.set_size(float(style.get("label_size", fs)))
+    ax.xaxis.label.set_color(text_color)
+    ax.yaxis.label.set_color(text_color)
     ax.title.set_size(float(style.get("title_size", fs * 1.1)))
+    ax.title.set_color(text_color)
     lg = ax.get_legend()
     if lg is not None:
         lg.set_frame_on(bool(style.get("legend_frame", False)))
+        for text in lg.get_texts():
+            text.set_color(text_color)
+
+
+def _legend_below(
+    ax: mpl.axes.Axes,
+    *,
+    ncol: int = 3,
+    yoffset: float = -0.2,
+    frameon: bool = False,
+    fontsize: float | None = None,
+) -> mpl.legend.Legend:
+    return ax.legend(
+        loc="upper center",
+        bbox_to_anchor=(0.5, yoffset),
+        ncol=max(1, int(ncol)),
+        frameon=frameon,
+        fontsize=fontsize,
+    )
 
 
 def _fig_ax(style: dict):
@@ -108,6 +156,16 @@ def _fig_ax(style: dict):
 def _safe_filename(text: str) -> str:
     cleaned = _SAFE_FILENAME_RE.sub("_", str(text).strip())
     return cleaned or "densegen"
+
+
+def _stage_b_plan_output_dir(out_path: Path, *, plan_name: str, input_name: str) -> Path:
+    plan_segment = _safe_filename(str(plan_name))
+    input_segment = _safe_filename(str(input_name))
+    base = out_path.parent / "stage_b" / plan_segment
+    redundant_inputs = {plan_segment, f"plan_pool__{plan_segment}"}
+    if input_segment in redundant_inputs:
+        return base
+    return base / input_segment
 
 
 def _format_percent(value: float) -> str:

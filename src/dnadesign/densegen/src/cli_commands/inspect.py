@@ -53,6 +53,20 @@ def _unique_preserve(values: list[str]) -> list[str]:
     return out
 
 
+def _resolve_usr_events_log_path(loaded, *, context: CliContext) -> Path:
+    cfg = loaded.root.densegen
+    out_cfg = cfg.output
+    usr_cfg = out_cfg.usr
+    if "usr" not in out_cfg.targets or usr_cfg is None:
+        raise ValueError("output.targets must include 'usr' with output.usr configured.")
+    run_root = context.run_root_for(loaded)
+    usr_root = resolve_outputs_scoped_path(loaded.path, run_root, usr_cfg.root, label="output.usr.root")
+    dataset = str(usr_cfg.dataset).strip()
+    if not dataset:
+        raise ValueError("output.usr.dataset must be a non-empty string.")
+    return (usr_root / dataset / ".events.log").resolve()
+
+
 def _print_inputs_summary(
     loaded,
     *,
@@ -144,9 +158,13 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
             help="Show full motif IDs instead of TF display names in summaries.",
         ),
         events: bool = typer.Option(False, "--events", help="Show events summary (stalls/resamples)."),
+        usr_events_path: bool = typer.Option(False, "--usr-events-path", help="Print USR .events.log path and exit."),
     ):
         if root is not None and run is not None:
             context.console.print("[bold red]Choose either --root or --run, not both.[/]")
+            raise typer.Exit(code=1)
+        if root is not None and usr_events_path:
+            context.console.print("[bold red]Choose either --root or --usr-events-path, not both.[/]")
             raise typer.Exit(code=1)
         if root is not None:
             workspaces_root = root.resolve()
@@ -171,16 +189,28 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
             run_root = context.run_root_for(loaded)
         else:
             run_root = run
-            if library:
-                cfg_path = run_root / "config.yaml"
+            if library or usr_events_path:
+                cfg_path = config if config is not None else (run_root / "config.yaml")
+                command_flag = "--library" if library else "--usr-events-path"
                 if not cfg_path.exists():
                     context.console.print(
-                        f"[bold red]Config not found for --library:[/] "
+                        f"[bold red]Config not found for {command_flag}:[/] "
                         f"{context.display_path(cfg_path, run_root, absolute=absolute)}. "
-                        "Provide --config or run inspect run without --library."
+                        f"Provide --config or run inspect run without {command_flag}."
                     )
                     raise typer.Exit(code=1)
                 loaded = context.load_config_or_exit(cfg_path, absolute=absolute, display_root=run_root)
+        if usr_events_path:
+            if loaded is None:
+                context.console.print("[bold red]Config is required for --usr-events-path.[/]")
+                raise typer.Exit(code=1)
+            try:
+                events_log_path = _resolve_usr_events_log_path(loaded, context=context)
+            except Exception as exc:
+                context.console.print(f"[bold red]Failed to resolve USR events path:[/] {exc}")
+                raise typer.Exit(code=1)
+            typer.echo(str(events_log_path))
+            return
         manifest_path = run_manifest_path(run_root)
         if not manifest_path.exists():
             state_path = run_state_path(run_root)
@@ -477,7 +507,7 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
 
         plan_table = context.make_table(
             "name",
-            "quota/fraction",
+            "quota",
             "promoter_constraints",
             "side_biases",
             "regulator_groups",
@@ -493,10 +523,9 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
             group_count = len(groups)
             group_min_total = sum(int(group.min_required) for group in groups)
             min_count_regs = len(item.regulator_constraints.min_count_by_regulator or {})
-            quota = str(item.quota) if item.quota is not None else f"{item.fraction:.3f}"
             plan_table.add_row(
                 item.name,
-                quota,
+                str(int(item.quota)),
                 str(len(pcs)),
                 str(bias_count),
                 str(group_count),

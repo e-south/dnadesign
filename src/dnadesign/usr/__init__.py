@@ -1,29 +1,44 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
+dnadesign
 src/dnadesign/usr/__init__.py
+
+Public re-exports for the USR library API.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
 # re-exported API
-from .src.dataset import Dataset  # noqa: F401
-from .src.errors import (  # noqa: F401
+from .src.api import (  # noqa: F401
+    ARROW_SCHEMA,
+    ID_HASH_SPEC,
+    REQUIRED_COLUMNS,
+    SCHEMA_VERSION,
+    USR_EVENT_VERSION,
+    AddSequencesResult,
     AlphabetError,
+    Dataset,
+    DatasetInfo,
     DuplicateIDError,
-    EmbeddingDimensionError,  # legacy, kept for compatibility
+    EmbeddingDimensionError,
+    Fingerprint,
+    Manifest,
     NamespaceError,
+    OverlayInfo,
     SchemaError,
     SequencesError,
     ValidationError,
+    __version__,
+    compute_id,
+    normalize_sequence,
+    validate_alphabet,
+    validate_bio_type,
 )
-from .src.normalize import compute_id, normalize_sequence  # noqa: F401
-from .src.schema import ARROW_SCHEMA, REQUIRED_COLUMNS  # noqa: F401
-from .src.version import __version__  # noqa: F401
 
 __all__ = [
     "Dataset",
+    "USR_EVENT_VERSION",
     "AlphabetError",
     "DuplicateIDError",
     "EmbeddingDimensionError",
@@ -33,7 +48,16 @@ __all__ = [
     "ValidationError",
     "compute_id",
     "normalize_sequence",
+    "validate_bio_type",
+    "validate_alphabet",
     "ARROW_SCHEMA",
     "REQUIRED_COLUMNS",
+    "SCHEMA_VERSION",
+    "ID_HASH_SPEC",
+    "Fingerprint",
+    "OverlayInfo",
+    "Manifest",
+    "DatasetInfo",
+    "AddSequencesResult",
     "__version__",
 ]

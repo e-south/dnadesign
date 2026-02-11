@@ -357,6 +357,7 @@ class PWMTrimmingConfig(BaseModel):
 class PWMUniquenessConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     key: Literal["sequence", "core"] = "core"
+    cross_regulator_core_collisions: Literal["allow", "warn", "error"] = "warn"
 
 
 class PWMSelectionPoolConfig(BaseModel):

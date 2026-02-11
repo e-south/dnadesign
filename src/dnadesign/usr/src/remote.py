@@ -1,7 +1,9 @@
 """
 --------------------------------------------------------------------------------
-<dnadesign project>
-src/dnadesign/usr/src/remote.py
+dnadesign
+dnadesign/src/dnadesign/usr/src/remote.py
+
+SSH remote stats and transfer helpers for USR datasets.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -121,25 +123,16 @@ class SSHRemote:
 
     def _remote_parquet_shape(self, path: str) -> Tuple[Optional[int], Optional[int]]:
         # Try python3 -> pyarrow; then python
-        py = "python3"
-        cmd = f"""{py} -c "import sys;import pyarrow.parquet as pq;f=pq.ParquetFile(sys.argv[1]);m=f.metadata;print(m.num_rows, m.num_columns)" {shlex.quote(path)}"""  # noqa
-        rc, out, _ = self._ssh_run(cmd, check=False)
-        if rc == 0 and out.strip():
-            try:
-                r, c = out.strip().split()
-                return int(r), int(c)
-            except Exception:
-                pass
-        py = "python"
-        cmd = f"""{py} -c "import sys;import pyarrow.parquet as pq;f=pq.ParquetFile(sys.argv[1]);m=f.metadata;print(m.num_rows, m.num_columns)" {shlex.quote(path)}"""  # noqa
-        rc, out, _ = self._ssh_run(cmd, check=False)
-        if rc == 0 and out.strip():
-            try:
-                r, c = out.strip().split()
-                return int(r), int(c)
-            except Exception:
-                pass
-        return None, None
+        for py in ("python3", "python"):
+            cmd = f"""{py} -c "import sys;import pyarrow.parquet as pq;f=pq.ParquetFile(sys.argv[1]);m=f.metadata;print(m.num_rows, m.num_columns)" {shlex.quote(path)}"""  # noqa
+            rc, out, _ = self._ssh_run(cmd, check=False)
+            if rc == 0 and out.strip():
+                try:
+                    r, c = out.strip().split()
+                    return int(r), int(c)
+                except ValueError as e:
+                    raise RemoteUnavailableError(f"Unexpected parquet stats output from {py} on remote: {out!r}") from e
+        raise RemoteUnavailableError("Remote parquet stats unavailable. Install python + pyarrow on the remote host.")
 
     def _remote_wc_lines(self, path: str) -> int:
         rc, out, _ = self._ssh_run(f"wc -l < {shlex.quote(path)}", check=False)
@@ -158,7 +151,7 @@ class SSHRemote:
 
     # ---- Public: stat/pull/push ----
 
-    def stat_dataset(self, dataset: str) -> RemoteDatasetStat:
+    def stat_dataset(self, dataset: str, *, verify: str = "auto") -> RemoteDatasetStat:
         base = self.cfg.dataset_path(dataset)
         primary = f"{base}/records.parquet"
         meta = f"{base}/meta.md"
@@ -168,8 +161,10 @@ class SSHRemote:
         exists, size_b, mtime = self._remote_stat_file(primary)
         sha = rows = cols = None
         if exists:
-            sha = self._remote_sha256(primary)
-            rows, cols = self._remote_parquet_shape(primary)
+            if verify in {"hash", "auto"}:
+                sha = self._remote_sha256(primary)
+            if verify == "parquet" or (verify == "auto" and not sha and size_b is None):
+                rows, cols = self._remote_parquet_shape(primary)
 
         meta_mtime = None
         m_exists, _, meta_mtime = self._remote_stat_file(meta)
@@ -194,13 +189,14 @@ class SSHRemote:
             snapshot_names=snapshot_names,
         )
 
-    def stat_file(self, remote_path: str) -> RemotePrimaryStat:
+    def stat_file(self, remote_path: str, *, verify: str = "auto") -> RemotePrimaryStat:
         exists, size_b, mtime = self._remote_stat_file(remote_path)
         if not exists:
             return RemotePrimaryStat(False, None, None, None, None, None)
-        sha = self._remote_sha256(remote_path)
+        sha = self._remote_sha256(remote_path) if verify in {"hash", "auto"} else None
         rows = cols = None
-        if remote_path.endswith(".parquet"):
+        wants_parquet = verify == "parquet" or (verify == "auto" and not sha and size_b is None)
+        if remote_path.endswith(".parquet") and wants_parquet:
             rows, cols = self._remote_parquet_shape(remote_path)
         return RemotePrimaryStat(True, size_b, sha, rows, cols, mtime)
 

@@ -24,7 +24,12 @@ from ...core.artifacts.ids import hash_pwm_motif, hash_tfbs_id
 from ...core.run_paths import candidates_root
 from .base import BaseDataSource, resolve_path
 from .pwm_meme import _background_from_meta, _motif_to_pwm
-from .pwm_sampling import sample_pwm_sites, sampling_kwargs_from_config, validate_mmr_core_length
+from .pwm_sampling import (
+    enforce_cross_regulator_core_collisions,
+    sample_pwm_sites,
+    sampling_kwargs_from_config,
+    validate_mmr_core_length,
+)
 from .stage_a.stage_a_progress import StageAProgressManager
 
 
@@ -80,6 +85,7 @@ class PWMMemeSetDataSource(BaseDataSource):
             raise ValueError("Duplicate motif_id values found across pwm_meme_set inputs.")
 
         sampling_kwargs = sampling_kwargs_from_config(self.sampling)
+        collision_mode = str(sampling_kwargs.get("cross_regulator_core_collisions") or "warn")
         selection_cfg = sampling_kwargs.get("selection")
         selection_policy = str(getattr(selection_cfg, "policy", None) or "top_score")
         for motif, _, _ in motifs_payload:
@@ -179,5 +185,11 @@ class PWMMemeSetDataSource(BaseDataSource):
 
         import pandas as pd
 
+        enforce_cross_regulator_core_collisions(
+            all_rows,
+            mode=collision_mode,
+            input_name=self.input_name,
+            source_kind="pwm_meme_set",
+        )
         df = pd.DataFrame(all_rows)
         return entries, df, summaries

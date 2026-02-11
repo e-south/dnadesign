@@ -12,16 +12,19 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import hashlib
+import logging
 import random
 
 import numpy as np
 import pandas as pd
 
-from ...config import ResolvedPlanItem
+from ...config import ResolvedPlanItem, SamplingConfig
 from ..artifacts.ids import hash_tfbs_id
 from ..artifacts.pool import POOL_MODE_TFBS, PoolData
 from ..sampler import TFSampler, compute_tf_weights
 from .progress import _aggregate_failure_counts_for_sampling
+
+log = logging.getLogger(__name__)
 
 
 def _min_count_by_regulator(labels: list[str] | None, min_count_per_tf: int) -> dict[str, int] | None:
@@ -42,19 +45,10 @@ def _merge_min_counts(base: dict[str, int] | None, override: dict[str, int] | No
 def _extract_side_biases(fixed_elements) -> tuple[list[str], list[str]]:
     if fixed_elements is None:
         return [], []
-    if hasattr(fixed_elements, "side_biases"):
-        sb = getattr(fixed_elements, "side_biases")
-    else:
-        sb = (fixed_elements or {}).get("side_biases")
+    sb = fixed_elements.side_biases
     if sb is None:
         return [], []
-    if hasattr(sb, "left") or hasattr(sb, "right"):
-        left = list(getattr(sb, "left", []) or [])
-        right = list(getattr(sb, "right", []) or [])
-    else:
-        left = list((sb or {}).get("left") or [])
-        right = list((sb or {}).get("right") or [])
-    return left, right
+    return list(sb.left or []), list(sb.right or [])
 
 
 def _fixed_elements_dump(fixed_elements) -> dict:
@@ -80,6 +74,32 @@ def _fixed_elements_dump(fixed_elements) -> dict:
     left, right = _extract_side_biases(fixed_elements)
 
     return {"promoter_constraints": pcs, "side_biases": {"left": left, "right": right}}
+
+
+def _fixed_elements_label(fixed_elements) -> str | None:
+    if fixed_elements is None:
+        return None
+    if hasattr(fixed_elements, "promoter_constraints"):
+        pcs = getattr(fixed_elements, "promoter_constraints") or []
+    else:
+        pcs = (fixed_elements or {}).get("promoter_constraints") or []
+    labels: list[str] = []
+    for pc in pcs:
+        name = None
+        if hasattr(pc, "name"):
+            name = pc.name
+        elif isinstance(pc, dict):
+            name = pc.get("name")
+        if name is None:
+            continue
+        s = str(name).strip()
+        if not s:
+            continue
+        if s not in labels:
+            labels.append(s)
+    if not labels:
+        return None
+    return "+".join(labels)
 
 
 def _max_fixed_element_len(fixed_elements_dump: dict) -> int:
@@ -116,15 +136,14 @@ def _min_fixed_elements_length(fixed_elements_dump: dict) -> int:
     return total
 
 
-def _require_library_bp(library: list[str], sequence_length: int) -> int:
-    total = sum(len(str(s)) for s in library)
-    if total < int(sequence_length):
-        raise ValueError(
-            "library_size selects too few total bp to cover sequence_length. "
-            f"library_bp={total} sequence_length={sequence_length}. "
-            "Increase library_size or provide longer motifs."
-        )
-    return total
+def _require_library_bp(
+    library: list[str],
+    sequence_length: int,
+    *,
+    library_size: int | None = None,
+    pool_strategy: str | None = None,
+) -> int:
+    return sum(len(str(s)) for s in library)
 
 
 def select_group_members(
@@ -309,7 +328,7 @@ def build_library_for_plan(
     source_label: str,
     plan_item: ResolvedPlanItem,
     pool: PoolData,
-    sampling_cfg: object,
+    sampling_cfg: SamplingConfig,
     seq_len: int,
     min_count_per_tf: int,
     usage_counts: dict[tuple[str, str], int],
@@ -318,16 +337,16 @@ def build_library_for_plan(
     np_rng: np.random.Generator,
     library_index_start: int,
 ) -> tuple[list[str], list[str], list[str], dict]:
-    pool_strategy = str(getattr(sampling_cfg, "pool_strategy", "subsample"))
-    library_size = int(getattr(sampling_cfg, "library_size", 0))
-    library_sampling_strategy = str(getattr(sampling_cfg, "library_sampling_strategy", "tf_balanced"))
-    cover_all_tfs = bool(getattr(sampling_cfg, "cover_all_regulators", False))
-    unique_binding_sites = bool(getattr(sampling_cfg, "unique_binding_sites", True))
-    unique_binding_cores = bool(getattr(sampling_cfg, "unique_binding_cores", True))
-    max_sites_per_tf = getattr(sampling_cfg, "max_sites_per_regulator", None)
-    relax_on_exhaustion = bool(getattr(sampling_cfg, "relax_on_exhaustion", False))
-    iterative_max_libraries = int(getattr(sampling_cfg, "iterative_max_libraries", 0))
-    iterative_min_new_solutions = int(getattr(sampling_cfg, "iterative_min_new_solutions", 0))
+    pool_strategy = sampling_cfg.pool_strategy
+    library_size = sampling_cfg.library_size
+    library_sampling_strategy = sampling_cfg.library_sampling_strategy
+    cover_all_tfs = sampling_cfg.cover_all_regulators
+    unique_binding_sites = sampling_cfg.unique_binding_sites
+    unique_binding_cores = sampling_cfg.unique_binding_cores
+    max_sites_per_tf = sampling_cfg.max_sites_per_regulator
+    relax_on_exhaustion = sampling_cfg.relax_on_exhaustion
+    iterative_max_libraries = sampling_cfg.iterative_max_libraries
+    iterative_min_new_solutions = sampling_cfg.iterative_min_new_solutions
 
     data_entries = list(pool.sequences or [])
     meta_df = pool.df if pool.pool_mode == POOL_MODE_TFBS else None
@@ -351,6 +370,15 @@ def build_library_for_plan(
         source_by_index: list[str | None] | None,
         tfbs_id_by_index: list[str | None] | None,
         motif_id_by_index: list[str | None] | None,
+        stage_a_best_hit_score_by_index: list[float | None] | None,
+        stage_a_rank_within_regulator_by_index: list[int | None] | None,
+        stage_a_tier_by_index: list[int | None] | None,
+        stage_a_fimo_start_by_index: list[int | None] | None,
+        stage_a_fimo_stop_by_index: list[int | None] | None,
+        stage_a_fimo_strand_by_index: list[str | None] | None,
+        stage_a_selection_rank_by_index: list[int | None] | None,
+        stage_a_selection_score_norm_by_index: list[float | None] | None,
+        stage_a_tfbs_core_by_index: list[str | None] | None,
     ) -> tuple[list[str], list[str], list[str], dict]:
         nonlocal libraries_built
         libraries_built += 1
@@ -360,6 +388,15 @@ def build_library_for_plan(
         info["source_by_index"] = source_by_index
         info["tfbs_id_by_index"] = tfbs_id_by_index
         info["motif_id_by_index"] = motif_id_by_index
+        info["stage_a_best_hit_score_by_index"] = stage_a_best_hit_score_by_index
+        info["stage_a_rank_within_regulator_by_index"] = stage_a_rank_within_regulator_by_index
+        info["stage_a_tier_by_index"] = stage_a_tier_by_index
+        info["stage_a_fimo_start_by_index"] = stage_a_fimo_start_by_index
+        info["stage_a_fimo_stop_by_index"] = stage_a_fimo_stop_by_index
+        info["stage_a_fimo_strand_by_index"] = stage_a_fimo_strand_by_index
+        info["stage_a_selection_rank_by_index"] = stage_a_selection_rank_by_index
+        info["stage_a_selection_score_norm_by_index"] = stage_a_selection_score_norm_by_index
+        info["stage_a_tfbs_core_by_index"] = stage_a_tfbs_core_by_index
         return library, parts, reg_labels, info
 
     if meta_df is not None and isinstance(meta_df, pd.DataFrame):
@@ -367,11 +404,6 @@ def build_library_for_plan(
             raise ValueError(
                 "generation.sampling.unique_binding_cores=true requires tfbs_core in the Stage-A pool. "
                 "Rebuild pools with core-aware sampling or disable unique_binding_cores."
-            )
-        if not groups:
-            raise ValueError(
-                "regulator_constraints.groups must be non-empty for TFBS inputs. "
-                "Define at least one regulator group in generation.plan[].regulator_constraints."
             )
         available_tfs = set(meta_df["tf"].tolist())
         all_group_members = list(dict.fromkeys([m for g in groups for m in g.members]))
@@ -417,7 +449,7 @@ def build_library_for_plan(
                 )
 
         failure_counts_by_tfbs: dict[tuple[str, str], int] | None = None
-        if library_sampling_strategy == "coverage_weighted" and getattr(sampling_cfg, "avoid_failed_motifs", False):
+        if library_sampling_strategy == "coverage_weighted" and sampling_cfg.avoid_failed_motifs:
             failure_counts_by_tfbs = _aggregate_failure_counts_for_sampling(
                 failure_counts,
                 input_name=source_label,
@@ -431,20 +463,23 @@ def build_library_for_plan(
             weight_by_tf, _, _ = compute_tf_weights(
                 weight_df,
                 usage_counts=usage_counts,
-                coverage_boost_alpha=float(getattr(sampling_cfg, "coverage_boost_alpha", 0.15)),
-                coverage_boost_power=float(getattr(sampling_cfg, "coverage_boost_power", 1.0)),
+                coverage_boost_alpha=float(sampling_cfg.coverage_boost_alpha),
+                coverage_boost_power=float(sampling_cfg.coverage_boost_power),
                 failure_counts=failure_counts_by_tfbs,
-                avoid_failed_motifs=bool(getattr(sampling_cfg, "avoid_failed_motifs", False)),
-                failure_penalty_alpha=float(getattr(sampling_cfg, "failure_penalty_alpha", 0.5)),
-                failure_penalty_power=float(getattr(sampling_cfg, "failure_penalty_power", 1.0)),
+                avoid_failed_motifs=bool(sampling_cfg.avoid_failed_motifs),
+                failure_penalty_alpha=float(sampling_cfg.failure_penalty_alpha),
+                failure_penalty_power=float(sampling_cfg.failure_penalty_power),
             )
-        required_regulators_selected, _ = select_group_members(
-            groups=groups,
-            available_tfs=available_tfs,
-            np_rng=np_rng,
-            sampling_strategy=library_sampling_strategy,
-            weight_by_tf=weight_by_tf,
-        )
+        if groups:
+            required_regulators_selected, _ = select_group_members(
+                groups=groups,
+                available_tfs=available_tfs,
+                np_rng=np_rng,
+                sampling_strategy=library_sampling_strategy,
+                weight_by_tf=weight_by_tf,
+            )
+        else:
+            required_regulators_selected = []
 
         if pool_strategy == "full":
             lib_df = meta_df.copy()
@@ -465,7 +500,29 @@ def build_library_for_plan(
             source_by_index = lib_df["source"].tolist() if "source" in lib_df.columns else None
             tfbs_id_by_index = lib_df["tfbs_id"].tolist() if "tfbs_id" in lib_df.columns else None
             motif_id_by_index = lib_df["motif_id"].tolist() if "motif_id" in lib_df.columns else None
-            library_bp = _require_library_bp(library, seq_len)
+            stage_a_best_hit_score_by_index = (
+                lib_df["best_hit_score"].tolist() if "best_hit_score" in lib_df.columns else None
+            )
+            stage_a_rank_within_regulator_by_index = (
+                lib_df["rank_within_regulator"].tolist() if "rank_within_regulator" in lib_df.columns else None
+            )
+            stage_a_tier_by_index = lib_df["tier"].tolist() if "tier" in lib_df.columns else None
+            stage_a_fimo_start_by_index = lib_df["fimo_start"].tolist() if "fimo_start" in lib_df.columns else None
+            stage_a_fimo_stop_by_index = lib_df["fimo_stop"].tolist() if "fimo_stop" in lib_df.columns else None
+            stage_a_fimo_strand_by_index = lib_df["fimo_strand"].tolist() if "fimo_strand" in lib_df.columns else None
+            stage_a_selection_rank_by_index = (
+                lib_df["selection_rank"].tolist() if "selection_rank" in lib_df.columns else None
+            )
+            stage_a_selection_score_norm_by_index = (
+                lib_df["selection_score_norm"].tolist() if "selection_score_norm" in lib_df.columns else None
+            )
+            stage_a_tfbs_core_by_index = lib_df["tfbs_core"].tolist() if "tfbs_core" in lib_df.columns else None
+            library_bp = _require_library_bp(
+                library,
+                seq_len,
+                library_size=len(library),
+                pool_strategy=pool_strategy,
+            )
             info = {
                 "achieved_length": library_bp,
                 "relaxed_cap": False,
@@ -485,6 +542,15 @@ def build_library_for_plan(
                 source_by_index=source_by_index,
                 tfbs_id_by_index=tfbs_id_by_index,
                 motif_id_by_index=motif_id_by_index,
+                stage_a_best_hit_score_by_index=stage_a_best_hit_score_by_index,
+                stage_a_rank_within_regulator_by_index=stage_a_rank_within_regulator_by_index,
+                stage_a_tier_by_index=stage_a_tier_by_index,
+                stage_a_fimo_start_by_index=stage_a_fimo_start_by_index,
+                stage_a_fimo_stop_by_index=stage_a_fimo_stop_by_index,
+                stage_a_fimo_strand_by_index=stage_a_fimo_strand_by_index,
+                stage_a_selection_rank_by_index=stage_a_selection_rank_by_index,
+                stage_a_selection_score_norm_by_index=stage_a_selection_score_norm_by_index,
+                stage_a_tfbs_core_by_index=stage_a_tfbs_core_by_index,
             )
 
         sampler = TFSampler(meta_df, np_rng)
@@ -512,22 +578,27 @@ def build_library_for_plan(
             relax_on_exhaustion=relax_on_exhaustion,
             sampling_strategy=library_sampling_strategy,
             usage_counts=usage_counts if library_sampling_strategy == "coverage_weighted" else None,
-            coverage_boost_alpha=float(getattr(sampling_cfg, "coverage_boost_alpha", 0.15)),
-            coverage_boost_power=float(getattr(sampling_cfg, "coverage_boost_power", 1.0)),
+            coverage_boost_alpha=float(sampling_cfg.coverage_boost_alpha),
+            coverage_boost_power=float(sampling_cfg.coverage_boost_power),
             failure_counts=failure_counts_by_tfbs,
-            avoid_failed_motifs=bool(getattr(sampling_cfg, "avoid_failed_motifs", False)),
-            failure_penalty_alpha=float(getattr(sampling_cfg, "failure_penalty_alpha", 0.5)),
-            failure_penalty_power=float(getattr(sampling_cfg, "failure_penalty_power", 1.0)),
+            avoid_failed_motifs=bool(sampling_cfg.avoid_failed_motifs),
+            failure_penalty_alpha=float(sampling_cfg.failure_penalty_alpha),
+            failure_penalty_power=float(sampling_cfg.failure_penalty_power),
         )
-        library_bp = _require_library_bp(library, seq_len)
+        library_bp = _require_library_bp(
+            library,
+            seq_len,
+            library_size=library_size,
+            pool_strategy=pool_strategy,
+        )
         info["achieved_length"] = library_bp
         info.update(
             {
                 "pool_strategy": pool_strategy,
                 "library_size": library_size,
                 "library_sampling_strategy": library_sampling_strategy,
-                "coverage_boost_alpha": float(getattr(sampling_cfg, "coverage_boost_alpha", 0.15)),
-                "coverage_boost_power": float(getattr(sampling_cfg, "coverage_boost_power", 1.0)),
+                "coverage_boost_alpha": float(sampling_cfg.coverage_boost_alpha),
+                "coverage_boost_power": float(sampling_cfg.coverage_boost_power),
                 "iterative_max_libraries": iterative_max_libraries,
                 "iterative_min_new_solutions": iterative_min_new_solutions,
                 "required_regulators_selected": required_regulators_selected,
@@ -537,6 +608,15 @@ def build_library_for_plan(
         source_by_index = info.get("source_by_index")
         tfbs_id_by_index = info.get("tfbs_id_by_index")
         motif_id_by_index = info.get("motif_id_by_index")
+        stage_a_best_hit_score_by_index = info.get("stage_a_best_hit_score_by_index")
+        stage_a_rank_within_regulator_by_index = info.get("stage_a_rank_within_regulator_by_index")
+        stage_a_tier_by_index = info.get("stage_a_tier_by_index")
+        stage_a_fimo_start_by_index = info.get("stage_a_fimo_start_by_index")
+        stage_a_fimo_stop_by_index = info.get("stage_a_fimo_stop_by_index")
+        stage_a_fimo_strand_by_index = info.get("stage_a_fimo_strand_by_index")
+        stage_a_selection_rank_by_index = info.get("stage_a_selection_rank_by_index")
+        stage_a_selection_score_norm_by_index = info.get("stage_a_selection_score_norm_by_index")
+        stage_a_tfbs_core_by_index = info.get("stage_a_tfbs_core_by_index")
         return _finalize(
             library,
             parts,
@@ -546,6 +626,15 @@ def build_library_for_plan(
             source_by_index=source_by_index,
             tfbs_id_by_index=tfbs_id_by_index,
             motif_id_by_index=motif_id_by_index,
+            stage_a_best_hit_score_by_index=stage_a_best_hit_score_by_index,
+            stage_a_rank_within_regulator_by_index=stage_a_rank_within_regulator_by_index,
+            stage_a_tier_by_index=stage_a_tier_by_index,
+            stage_a_fimo_start_by_index=stage_a_fimo_start_by_index,
+            stage_a_fimo_stop_by_index=stage_a_fimo_stop_by_index,
+            stage_a_fimo_strand_by_index=stage_a_fimo_strand_by_index,
+            stage_a_selection_rank_by_index=stage_a_selection_rank_by_index,
+            stage_a_selection_score_norm_by_index=stage_a_selection_score_norm_by_index,
+            stage_a_tfbs_core_by_index=stage_a_tfbs_core_by_index,
         )
 
     if groups or plan_min_count_by_regulator:
@@ -609,6 +698,15 @@ def build_library_for_plan(
         source_by_index=None,
         tfbs_id_by_index=tfbs_id_by_index,
         motif_id_by_index=None,
+        stage_a_best_hit_score_by_index=None,
+        stage_a_rank_within_regulator_by_index=None,
+        stage_a_tier_by_index=None,
+        stage_a_fimo_start_by_index=None,
+        stage_a_fimo_stop_by_index=None,
+        stage_a_fimo_strand_by_index=None,
+        stage_a_selection_rank_by_index=None,
+        stage_a_selection_score_norm_by_index=None,
+        stage_a_tfbs_core_by_index=None,
     )
 
 

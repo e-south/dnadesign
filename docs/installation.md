@@ -24,7 +24,7 @@ cd dnadesign
 
 ### Local install
 
-This is the default way to start working with most pipelines. For CUDA/GPU notes, see `docs/INSTALL_BU_SCC.md`.
+This is the default way to start working with most pipelines. For BU SCC CUDA/GPU setup and batch operations, see [BU SCC quickstart](hpc/bu_scc_quickstart.md), [BU SCC install bootstrap](hpc/bu_scc_install.md), and [BU SCC batch + Notify runbook](hpc/bu_scc_batch_notify.md).
 
 1) Ensure Python 3.12 is available:
 
@@ -44,6 +44,12 @@ uv sync --locked
 uv run python -c "import dnadesign, pandas, pyarrow; print('ok')"
 uv run usr ls || true
 ```
+
+### HPC (BU SCC)
+
+- [BU SCC quickstart](hpc/bu_scc_quickstart.md)
+- [BU SCC install bootstrap](hpc/bu_scc_install.md)
+- [BU SCC batch + Notify runbook](hpc/bu_scc_batch_notify.md)
 
 ### Dev tools (tests + lint)
 
