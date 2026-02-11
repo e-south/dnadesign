@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -60,9 +61,54 @@ def _backend_command(backend: str) -> str:
     return "secret-tool"
 
 
+def _probe_command(*, args: list[str], ok_codes: set[int], timeout_seconds: float = 2.0) -> bool:
+    try:
+        result = subprocess.run(
+            args,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=float(timeout_seconds),
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return int(result.returncode) in ok_codes
+
+
 def is_secret_backend_available(backend: str) -> bool:
-    command = _backend_command(backend)
-    return shutil.which(command) is not None
+    normalized = _normalize_backend(backend)
+    command = _backend_command(normalized)
+    if shutil.which(command) is None:
+        return False
+
+    if normalized == _BACKEND_KEYCHAIN:
+        return _probe_command(
+            args=[
+                "security",
+                "find-generic-password",
+                "-s",
+                "dnadesign.notify.probe",
+                "-a",
+                "dnadesign.notify.probe",
+                "-w",
+            ],
+            ok_codes={0, 44},
+        )
+
+    dbus_address = str(os.environ.get("DBUS_SESSION_BUS_ADDRESS", "")).strip()
+    if not dbus_address:
+        return False
+    return _probe_command(
+        args=[
+            "secret-tool",
+            "lookup",
+            "service",
+            "dnadesign.notify.probe",
+            "account",
+            "dnadesign.notify.probe",
+        ],
+        ok_codes={0, 1},
+    )
 
 
 def _run_command(args: list[str], *, input_text: str | None = None) -> str:

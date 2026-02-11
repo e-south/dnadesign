@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -63,6 +64,29 @@ def test_usr_events_watch_rejects_unknown_event_version(tmp_path: Path) -> None:
     )
     assert result.exit_code == 1
     assert "unknown event_version" in result.stdout
+
+
+def test_usr_events_watch_rejects_non_positive_poll_interval(tmp_path: Path) -> None:
+    events = tmp_path / "events.log"
+    _write_events(events, [_event()])
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--provider",
+            "generic",
+            "--events",
+            str(events),
+            "--dry-run",
+            "--poll-interval-seconds",
+            "0",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "poll_interval_seconds must be > 0" in result.stdout
 
 
 def test_usr_events_watch_rejects_non_object_actor(tmp_path: Path) -> None:
@@ -322,7 +346,7 @@ def test_iter_file_lines_follow_restarts_after_midstream_truncate(tmp_path: Path
             return
         raise RuntimeError("follow loop did not recover from truncation")
 
-    monkeypatch.setattr("dnadesign.notify.cli.time.sleep", _fake_sleep)
+    monkeypatch.setattr("dnadesign.notify.watch_ops.time.sleep", _fake_sleep)
 
     rows = _iter_file_lines(
         events,
@@ -351,7 +375,7 @@ def test_iter_file_lines_follow_errors_after_midstream_truncate(tmp_path: Path, 
             return
         raise RuntimeError("follow loop did not report truncation")
 
-    monkeypatch.setattr("dnadesign.notify.cli.time.sleep", _fake_sleep)
+    monkeypatch.setattr("dnadesign.notify.watch_ops.time.sleep", _fake_sleep)
 
     rows = _iter_file_lines(
         events,
@@ -360,6 +384,56 @@ def test_iter_file_lines_follow_errors_after_midstream_truncate(tmp_path: Path, 
         follow=True,
     )
     with pytest.raises(NotifyConfigError, match="truncated while following"):
+        next(rows)
+
+
+def test_iter_file_lines_waits_for_events_file_when_configured(tmp_path: Path, monkeypatch) -> None:
+    events = tmp_path / "events.log"
+    payload = json.dumps(_event(action="materialize")) + "\n"
+    sleep_calls = {"n": 0}
+
+    def _fake_sleep(_seconds: float) -> None:
+        sleep_calls["n"] += 1
+        if sleep_calls["n"] == 1:
+            events.write_text(payload, encoding="utf-8")
+            return
+        raise RuntimeError("wait-for-events did not observe created events file")
+
+    monkeypatch.setattr("dnadesign.notify.watch_ops.time.sleep", _fake_sleep)
+
+    rows = _iter_file_lines(
+        events,
+        start_offset=0,
+        on_truncate="error",
+        follow=True,
+        wait_for_events=True,
+        idle_timeout_seconds=2.0,
+    )
+    _offset, line = next(rows)
+    parsed = json.loads(line)
+    assert parsed["action"] == "materialize"
+
+
+def test_iter_file_lines_follow_exits_after_idle_timeout(tmp_path: Path, monkeypatch) -> None:
+    events = tmp_path / "events.log"
+    events.write_text("", encoding="utf-8")
+    now = {"value": 100.0}
+
+    def _fake_sleep(_seconds: float) -> None:
+        now["value"] += 0.11
+
+    monkeypatch.setattr("dnadesign.notify.watch_ops.time.sleep", _fake_sleep)
+    monkeypatch.setattr("dnadesign.notify.watch_ops.time.monotonic", lambda: now["value"])
+
+    rows = _iter_file_lines(
+        events,
+        start_offset=0,
+        on_truncate="error",
+        follow=True,
+        wait_for_events=False,
+        idle_timeout_seconds=0.1,
+    )
+    with pytest.raises(StopIteration):
         next(rows)
 
 
@@ -443,6 +517,49 @@ def test_spool_drain_sends_and_deletes_successful_files(tmp_path: Path, monkeypa
     )
     assert result.exit_code == 0
     assert len(sent) == 1
+    assert not spool_file.exists()
+
+
+def test_spool_drain_uses_spooled_provider_when_not_overridden(tmp_path: Path, monkeypatch) -> None:
+    spool_dir = tmp_path / "spool"
+    spool_dir.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "status": "running",
+        "tool": "densegen",
+        "run_id": "run-1",
+        "timestamp": "2026-02-06T00:00:00+00:00",
+        "host": "host",
+        "cwd": "/tmp",
+        "meta": {"usr_action": "write_overlay_part"},
+    }
+    spool_file = spool_dir / "item.json"
+    spool_file.write_text(
+        json.dumps({"provider": "discord", "payload": payload, "event": _event()}),
+        encoding="utf-8",
+    )
+
+    sent: list[dict] = []
+
+    def _fake_post(_url: str, body: dict, **_kwargs) -> None:
+        sent.append(body)
+
+    monkeypatch.setattr("dnadesign.notify.cli.post_json", _fake_post)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "spool",
+            "drain",
+            "--spool-dir",
+            str(spool_dir),
+            "--url",
+            "http://example.com",
+        ],
+    )
+    assert result.exit_code == 0
+    assert len(sent) == 1
+    assert "content" in sent[0]
     assert not spool_file.exists()
 
 
@@ -551,6 +668,62 @@ def test_usr_events_watch_formats_densegen_health_message(tmp_path: Path) -> Non
     assert "quota=10.0%" in result.stdout
 
 
+def test_usr_events_watch_includes_error_in_failed_densegen_health_message(tmp_path: Path) -> None:
+    events = tmp_path / "events.log"
+    event = _event(action="densegen_health")
+    event["args"] = {
+        "status": "failed",
+        "error": "solver timeout reached",
+    }
+    _write_events(events, [event])
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--provider",
+            "generic",
+            "--events",
+            str(events),
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "densegen failed on demo" in result.stdout
+    assert "error=solver timeout reached" in result.stdout
+
+
+def test_usr_events_watch_includes_error_in_densegen_flush_failed_message(tmp_path: Path) -> None:
+    events = tmp_path / "events.log"
+    event = _event(action="densegen_flush_failed")
+    event["args"] = {
+        "error_type": "OSError",
+        "error": "disk quota exceeded",
+    }
+    event["metrics"] = {"orphan_artifacts": 2}
+    _write_events(events, [event])
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--provider",
+            "generic",
+            "--events",
+            str(events),
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "densegen_flush_failed on demo" in result.stdout
+    assert "error=disk quota exceeded" in result.stdout
+    assert "orphan_artifacts=2" in result.stdout
+
+
 def test_usr_events_watch_maps_densegen_health_completed_to_success_status(tmp_path: Path) -> None:
     events = tmp_path / "events.log"
     event = _event(action="densegen_health")
@@ -572,3 +745,151 @@ def test_usr_events_watch_maps_densegen_health_completed_to_success_status(tmp_p
     )
     assert result.exit_code == 0
     assert '"status": "success"' in result.stdout
+
+
+def test_usr_events_watch_can_stop_on_terminal_status(tmp_path: Path) -> None:
+    events = tmp_path / "events.log"
+    cursor = tmp_path / "cursor.txt"
+    first = _event(action="densegen_health")
+    first["args"] = {"status": "completed"}
+    second = _event(action="materialize")
+    _write_events(events, [first, second])
+    first_line = json.dumps(first) + "\n"
+    expected_cursor = len(first_line)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--provider",
+            "generic",
+            "--events",
+            str(events),
+            "--cursor",
+            str(cursor),
+            "--dry-run",
+            "--stop-on-terminal-status",
+        ],
+    )
+    assert result.exit_code == 0
+    assert cursor.read_text(encoding="utf-8").strip() == str(expected_cursor)
+
+
+def test_usr_events_watch_dry_run_can_skip_cursor_advance_when_requested(tmp_path: Path) -> None:
+    events = tmp_path / "events.log"
+    cursor = tmp_path / "cursor.txt"
+    cursor.write_text("0", encoding="utf-8")
+    _write_events(events, [_event(action="materialize")])
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--provider",
+            "generic",
+            "--events",
+            str(events),
+            "--cursor",
+            str(cursor),
+            "--dry-run",
+            "--no-advance-cursor-on-dry-run",
+        ],
+    )
+    assert result.exit_code == 0
+    assert cursor.read_text(encoding="utf-8").strip() == "0"
+
+
+def test_usr_events_watch_rejects_when_cursor_lock_is_held(tmp_path: Path) -> None:
+    events = tmp_path / "events.log"
+    cursor = tmp_path / "cursor.txt"
+    lock_path = cursor.with_name(f"{cursor.name}.lock")
+    lock_path.write_text(json.dumps({"pid": os.getpid()}), encoding="utf-8")
+    _write_events(events, [_event(action="materialize")])
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--provider",
+            "generic",
+            "--events",
+            str(events),
+            "--cursor",
+            str(cursor),
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "cursor lock already held" in result.stdout.lower()
+
+
+def test_usr_events_watch_recovers_stale_cursor_lock(tmp_path: Path) -> None:
+    events = tmp_path / "events.log"
+    cursor = tmp_path / "cursor.txt"
+    lock_path = cursor.with_name(f"{cursor.name}.lock")
+    lock_path.write_text(json.dumps({"pid": 999999}), encoding="utf-8")
+    _write_events(events, [_event(action="materialize")])
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--provider",
+            "generic",
+            "--events",
+            str(events),
+            "--cursor",
+            str(cursor),
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0
+    assert not lock_path.exists()
+
+
+def test_usr_events_watch_profile_can_reresolve_events_from_tool_config(tmp_path: Path, monkeypatch) -> None:
+    stale_events = tmp_path / "stale.events.log"
+    live_events = tmp_path / "usr" / "demo" / ".events.log"
+    live_events.parent.mkdir(parents=True, exist_ok=True)
+    _write_events(live_events, [_event(action="materialize")])
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    profile = tmp_path / "notify.profile.json"
+    profile.write_text(
+        json.dumps(
+            {
+                "profile_version": 2,
+                "provider": "generic",
+                "events": str(stale_events),
+                "webhook": {"source": "env", "ref": "DENSEGEN_WEBHOOK"},
+                "events_source": {"tool": "densegen", "config": str(config_path)},
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "dnadesign.notify.cli._resolve_tool_events_path",
+        lambda *, tool, config: (live_events, "densegen"),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--profile",
+            str(profile),
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0
+    assert '"usr_action": "materialize"' in result.stdout

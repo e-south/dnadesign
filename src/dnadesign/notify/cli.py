@@ -11,56 +11,56 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import hashlib
 import importlib
 import json
-import os
 import random
-import stat
 import time
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import typer
 
-from .cli_commands import register_profile_commands, register_spool_drain_command, register_usr_events_watch_command
+from .cli_commands import (
+    register_profile_commands,
+    register_setup_commands,
+    register_spool_drain_command,
+    register_usr_events_watch_command,
+)
 from .cli_commands.providers import format_for_provider
 from .errors import NotifyConfigError, NotifyDeliveryError, NotifyError
+from .events_source import normalize_tool_name as _normalize_setup_tool_name
+from .events_source import resolve_tool_events_path as _resolve_tool_events_path
 from .http import post_json
 from .payload import build_payload
+from .profile_ops import sanitize_profile_name as _sanitize_profile_name
+from .profile_ops import wizard_next_steps as _wizard_next_steps
 from .secrets import is_secret_backend_available, store_secret_ref
+from .spool_ops import ensure_private_directory as _ensure_private_directory
+from .spool_ops import spool_payload as _spool_payload
 from .validation import resolve_webhook_url
+from .watch_ops import acquire_cursor_lock as _acquire_cursor_lock
+from .watch_ops import iter_file_lines as _iter_file_lines
+from .watch_ops import load_cursor_offset as _load_cursor_offset
+from .watch_ops import save_cursor_offset as _save_cursor_offset
 
 app = typer.Typer(help="Send notifications for dnadesign runs via webhooks.")
 usr_events_app = typer.Typer(help="Consume USR JSONL events and emit notifications.")
 spool_app = typer.Typer(help="Drain spooled notifications.")
 profile_app = typer.Typer(help="Manage reusable notify profiles.")
+setup_app = typer.Typer(help="Observer-only setup helpers for notify profiles.")
 app.add_typer(usr_events_app, name="usr-events")
 app.add_typer(spool_app, name="spool")
 app.add_typer(profile_app, name="profile")
+app.add_typer(setup_app, name="setup")
 
 PROFILE_VERSION = 2
-_PROFILE_V1_REQUIRED_KEYS = {"provider", "url_env", "events"}
-_PROFILE_V1_ALLOWED_KEYS = {
-    "profile_version",
-    "provider",
-    "url_env",
-    "events",
-    "cursor",
-    "only_actions",
-    "only_tools",
-    "spool_dir",
-    "include_args",
-    "include_context",
-    "include_raw_event",
-    "preset",
-}
 _PROFILE_V2_REQUIRED_KEYS = {"provider", "events", "webhook"}
 _PROFILE_V2_ALLOWED_KEYS = {
     "profile_version",
     "provider",
     "events",
+    "events_source",
     "webhook",
     "cursor",
     "only_actions",
@@ -69,7 +69,7 @@ _PROFILE_V2_ALLOWED_KEYS = {
     "include_args",
     "include_context",
     "include_raw_event",
-    "preset",
+    "policy",
 }
 _DENSEGEN_PROFILE_PRESET = {
     "only_actions": "densegen_health,densegen_flush_failed,materialize",
@@ -78,7 +78,29 @@ _DENSEGEN_PROFILE_PRESET = {
     "include_context": False,
     "include_raw_event": False,
 }
+_WORKFLOW_POLICY_DEFAULTS: dict[str, dict[str, Any]] = {
+    "densegen": dict(_DENSEGEN_PROFILE_PRESET),
+    "infer_evo2": {
+        "only_actions": "attach,materialize",
+        "only_tools": "infer",
+        "include_args": False,
+        "include_context": False,
+        "include_raw_event": False,
+    },
+    "generic": {},
+}
+_WORKFLOW_POLICY_ALIASES = {
+    "infer-evo2": "infer_evo2",
+}
 _WEBHOOK_SOURCES = {"env", "secret_ref"}
+_DEFAULT_WEBHOOK_ENV = "NOTIFY_WEBHOOK"
+_DEFAULT_PROFILE_PATH = Path("outputs/notify/generic/profile.json")
+
+
+def _default_profile_path_for_tool(tool_name: str | None) -> Path:
+    if tool_name is None:
+        return _DEFAULT_PROFILE_PATH
+    return Path("outputs") / "notify" / tool_name / "profile.json"
 
 
 @lru_cache(maxsize=1)
@@ -108,6 +130,45 @@ def _split_csv(value: str | None) -> list[str]:
     if not value:
         return []
     return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _normalize_policy_name(policy: str | None) -> str | None:
+    if policy is None:
+        return None
+    value = str(policy).strip().lower()
+    if not value:
+        raise NotifyConfigError("policy must be a non-empty string when provided")
+    return _WORKFLOW_POLICY_ALIASES.get(value, value)
+
+
+def _resolve_workflow_policy(*, policy: str | None) -> str | None:
+    policy_name = _normalize_policy_name(policy)
+    if policy_name is None:
+        return None
+    if policy_name not in _WORKFLOW_POLICY_DEFAULTS:
+        allowed = ", ".join(sorted(_WORKFLOW_POLICY_DEFAULTS))
+        raise NotifyConfigError(f"unsupported policy '{policy}'. Supported values: {allowed}")
+    return policy_name
+
+
+def _validate_events_source_config(data: dict[str, Any]) -> None:
+    events_source = data.get("events_source")
+    if events_source is None:
+        return
+    if not isinstance(events_source, dict):
+        raise NotifyConfigError("profile field 'events_source' must be an object")
+    unknown = sorted(set(events_source.keys()) - {"tool", "config"})
+    if unknown:
+        raise NotifyConfigError(
+            f"profile field 'events_source' contains unsupported keys: {', '.join(unknown)}"
+        )
+    tool = events_source.get("tool")
+    config = events_source.get("config")
+    if not isinstance(tool, str) or not tool.strip():
+        raise NotifyConfigError("profile field 'events_source.tool' must be a non-empty string")
+    if not isinstance(config, str) or not config.strip():
+        raise NotifyConfigError("profile field 'events_source.config' must be a non-empty string path")
+    _normalize_setup_tool_name(tool)
 
 
 def _validate_webhook_config(data: dict[str, Any]) -> None:
@@ -140,40 +201,49 @@ def _read_profile(profile_path: Path) -> dict[str, Any]:
         raise NotifyConfigError("profile file must contain a JSON object")
 
     if "url" in data:
-        raise NotifyConfigError("profile must not store plain webhook URLs; use url_env")
+        raise NotifyConfigError("profile must not store plain webhook URLs; use webhook refs")
+    if "preset" in data:
+        raise NotifyConfigError("legacy profile field 'preset' is not supported; use 'policy' with explicit filters")
 
     version = data.get("profile_version")
-    if version == 1:
-        unknown = sorted(set(data.keys()) - _PROFILE_V1_ALLOWED_KEYS)
-        if unknown:
-            raise NotifyConfigError(f"profile contains unsupported keys: {', '.join(unknown)}")
-        for key in _PROFILE_V1_REQUIRED_KEYS:
-            value = data.get(key)
-            if not isinstance(value, str) or not value.strip():
-                raise NotifyConfigError(f"profile missing required non-empty string field '{key}'")
-    elif version == 2:
-        unknown = sorted(set(data.keys()) - _PROFILE_V2_ALLOWED_KEYS)
-        if unknown:
-            raise NotifyConfigError(f"profile contains unsupported keys: {', '.join(unknown)}")
-        for key in _PROFILE_V2_REQUIRED_KEYS:
-            value = data.get(key)
-            if key == "webhook":
-                continue
-            if not isinstance(value, str) or not value.strip():
-                raise NotifyConfigError(f"profile missing required non-empty string field '{key}'")
-        _validate_webhook_config(data)
-    else:
-        raise NotifyConfigError(f"profile_version must be 1 or {PROFILE_VERSION}; found {version!r}")
+    if version != PROFILE_VERSION:
+        raise NotifyConfigError(f"profile_version must be {PROFILE_VERSION}; found {version!r}")
+    unknown = sorted(set(data.keys()) - _PROFILE_V2_ALLOWED_KEYS)
+    if unknown:
+        raise NotifyConfigError(f"profile contains unsupported keys: {', '.join(unknown)}")
+    for key in _PROFILE_V2_REQUIRED_KEYS:
+        value = data.get(key)
+        if key == "webhook":
+            continue
+        if not isinstance(value, str) or not value.strip():
+            raise NotifyConfigError(f"profile missing required non-empty string field '{key}'")
+    _validate_webhook_config(data)
+    _validate_events_source_config(data)
 
     for key in ("events", "cursor", "spool_dir"):
         value = data.get(key)
         if value is not None and (not isinstance(value, str) or not value.strip()):
             raise NotifyConfigError(f"profile field '{key}' must be a non-empty string path when provided")
 
-    for key in ("only_actions", "only_tools", "preset"):
+    for key in ("only_actions", "only_tools", "policy"):
         value = data.get(key)
         if value is not None and (not isinstance(value, str) or not value.strip()):
             raise NotifyConfigError(f"profile field '{key}' must be a non-empty string when provided")
+    policy_name = _normalize_policy_name(data.get("policy"))
+    if policy_name is not None and policy_name not in _WORKFLOW_POLICY_DEFAULTS:
+        allowed = ", ".join(sorted(_WORKFLOW_POLICY_DEFAULTS))
+        raise NotifyConfigError(f"profile field 'policy' must be one of: {allowed}")
+    if policy_name is not None and policy_name != "generic":
+        only_actions = data.get("only_actions")
+        only_tools = data.get("only_tools")
+        if not isinstance(only_actions, str) or not only_actions.strip():
+            raise NotifyConfigError(
+                f"profile policy '{policy_name}' requires explicit only_actions and only_tools fields in profile"
+            )
+        if not isinstance(only_tools, str) or not only_tools.strip():
+            raise NotifyConfigError(
+                f"profile policy '{policy_name}' requires explicit only_actions and only_tools fields in profile"
+            )
 
     include_args = data.get("include_args")
     if include_args is not None and not isinstance(include_args, bool):
@@ -200,26 +270,21 @@ def _resolve_profile_webhook_source(profile_data: dict[str, Any]) -> tuple[str |
     if not profile_data:
         return None, None
     version = profile_data.get("profile_version")
-    if version == 1:
-        env_value = profile_data.get("url_env")
-        if isinstance(env_value, str) and env_value.strip():
-            return env_value.strip(), None
-        raise NotifyConfigError("profile missing required non-empty string field 'url_env'")
-    if version == 2:
-        webhook = profile_data.get("webhook")
-        if not isinstance(webhook, dict):
-            raise NotifyConfigError("profile field 'webhook' must be an object")
-        source = str(webhook.get("source") or "").strip().lower()
-        ref = str(webhook.get("ref") or "").strip()
-        if source not in _WEBHOOK_SOURCES:
-            allowed = ", ".join(sorted(_WEBHOOK_SOURCES))
-            raise NotifyConfigError(f"profile field 'webhook.source' must be one of: {allowed}")
-        if not ref:
-            raise NotifyConfigError("profile field 'webhook.ref' must be a non-empty string")
-        if source == "env":
-            return ref, None
-        return None, ref
-    raise NotifyConfigError(f"profile_version must be 1 or {PROFILE_VERSION}; found {version!r}")
+    if version != PROFILE_VERSION:
+        raise NotifyConfigError(f"profile_version must be {PROFILE_VERSION}; found {version!r}")
+    webhook = profile_data.get("webhook")
+    if not isinstance(webhook, dict):
+        raise NotifyConfigError("profile field 'webhook' must be an object")
+    source = str(webhook.get("source") or "").strip().lower()
+    ref = str(webhook.get("ref") or "").strip()
+    if source not in _WEBHOOK_SOURCES:
+        allowed = ", ".join(sorted(_WEBHOOK_SOURCES))
+        raise NotifyConfigError(f"profile field 'webhook.source' must be one of: {allowed}")
+    if not ref:
+        raise NotifyConfigError("profile field 'webhook.ref' must be a non-empty string")
+    if source == "env":
+        return ref, None
+    return None, ref
 
 
 def _resolve_string_value(*, field: str, cli_value: str | None, profile_data: dict[str, Any]) -> str:
@@ -286,6 +351,29 @@ def _resolve_optional_path_value(
     raise NotifyConfigError(f"profile field '{field}' must be a non-empty string path when provided")
 
 
+def _resolve_profile_events_source(
+    *,
+    profile_data: dict[str, Any],
+    profile_path: Path | None,
+) -> tuple[str, Path] | None:
+    events_source = profile_data.get("events_source")
+    if events_source is None:
+        return None
+    if not isinstance(events_source, dict):
+        raise NotifyConfigError("profile field 'events_source' must be an object")
+    tool_raw = events_source.get("tool")
+    config_raw = events_source.get("config")
+    if not isinstance(tool_raw, str) or not tool_raw.strip():
+        raise NotifyConfigError("profile field 'events_source.tool' must be a non-empty string")
+    if not isinstance(config_raw, str) or not config_raw.strip():
+        raise NotifyConfigError("profile field 'events_source.config' must be a non-empty string path")
+    tool_name = _normalize_setup_tool_name(tool_raw)
+    config_path = Path(config_raw).expanduser()
+    if profile_path is not None and not config_path.is_absolute():
+        config_path = profile_path.parent / config_path
+    return tool_name or "", config_path.resolve()
+
+
 def _events_path_hint() -> str:
     return (
         "Find the USR .events.log path with `uv run dense inspect run --usr-events-path` from the DenseGen "
@@ -316,12 +404,14 @@ def _validate_usr_events_probe(events_path: Path) -> None:
             return
 
 
-def _resolve_usr_events_path(events_path: Path) -> Path:
+def _resolve_usr_events_path(events_path: Path, *, require_exists: bool = True) -> Path:
     resolved = events_path.expanduser().resolve()
     if resolved.suffix.lower() in {".yaml", ".yml"}:
         raise NotifyConfigError(
             f"events must point to a USR .events.log JSONL file, not a config file: {resolved}. {_events_path_hint()}"
         )
+    if not require_exists and not resolved.exists():
+        return resolved
     if not resolved.exists():
         raise NotifyConfigError(f"events file not found: {resolved}. {_events_path_hint()}")
     if not resolved.is_file():
@@ -352,33 +442,6 @@ def _write_profile_file(profile_path: Path, payload: dict[str, Any], *, force: b
         profile_path.chmod(0o600)
     except OSError as exc:
         raise NotifyConfigError(f"failed to set secure permissions on profile: {profile_path}") from exc
-
-
-def _sanitize_profile_name(profile_path: Path) -> str:
-    stem = str(profile_path.stem or "").strip()
-    cleaned = "".join(char if char.isalnum() else "-" for char in stem).strip("-")
-    return cleaned or "default"
-
-
-def _state_root_for_profile(profile_path: Path) -> Path:
-    state_home = str(os.environ.get("XDG_STATE_HOME", "")).strip()
-    root = Path(state_home).expanduser() if state_home else (Path.home() / ".local" / "state")
-    return root / "dnadesign" / "notify" / _sanitize_profile_name(profile_path)
-
-
-def _wizard_next_steps(*, profile_path: Path, webhook_config: dict[str, str]) -> list[str]:
-    profile_arg = str(profile_path)
-    steps = [
-        "Next steps:",
-        f"  1) uv run notify profile doctor --profile {profile_arg}",
-        f"  2) uv run notify usr-events watch --profile {profile_arg} --dry-run",
-        f"  3) uv run notify usr-events watch --profile {profile_arg} --follow",
-    ]
-    source = str(webhook_config.get("source") or "").strip().lower()
-    ref = str(webhook_config.get("ref") or "").strip()
-    if source == "env" and ref:
-        steps.append(f"  env: export {ref}=<your_webhook_url>")
-    return steps
 
 
 def _event_meta(
@@ -467,14 +530,21 @@ def _event_message(event: dict[str, Any]) -> str:
             parts.append(f"flushes={flush_count}")
         if compression is not None:
             parts.append(f"cr={float(compression):.3f}")
+        error_text = str(args.get("error") or "").strip()
+        status_norm = status.strip().lower()
+        if error_text and status_norm in {"failed", "failure", "error"}:
+            parts.append(f"error={error_text}")
         return " | ".join(parts)
 
     if action == "densegen_flush_failed":
         error_type = args.get("error_type")
+        error_text = str(args.get("error") or "").strip()
         orphan_count = metrics.get("orphan_artifacts")
         parts = [f"{action} on {dataset_name}"]
         if error_type:
             parts.append(f"error_type={error_type}")
+        if error_text:
+            parts.append(f"error={error_text}")
         if orphan_count is not None:
             parts.append(f"orphan_artifacts={orphan_count}")
         return " | ".join(parts)
@@ -505,138 +575,6 @@ def _validate_usr_event(event: dict[str, Any], *, allow_unknown_version: bool) -
     actor = event.get("actor")
     if actor is not None and not isinstance(actor, dict):
         raise NotifyConfigError("event field 'actor' must be an object when provided")
-
-
-def _load_cursor_offset(cursor_path: Path | None) -> int:
-    if cursor_path is None or not cursor_path.exists():
-        return 0
-    raw = cursor_path.read_text(encoding="utf-8").strip()
-    if not raw:
-        return 0
-    try:
-        offset = int(raw)
-    except ValueError as exc:
-        raise NotifyConfigError(f"cursor file must contain an integer byte offset: {cursor_path}") from exc
-    if offset < 0:
-        raise NotifyConfigError(f"cursor offset must be >= 0: {cursor_path}")
-    return offset
-
-
-def _save_cursor_offset(cursor_path: Path | None, offset: int) -> None:
-    if cursor_path is None:
-        return
-    cursor_path.parent.mkdir(parents=True, exist_ok=True)
-    cursor_path.write_text(str(int(offset)), encoding="utf-8")
-    try:
-        cursor_path.chmod(0o600)
-    except OSError as exc:
-        raise NotifyConfigError(f"failed to set secure permissions on cursor file: {cursor_path}") from exc
-
-
-def _iter_file_lines(
-    events_path: Path,
-    *,
-    start_offset: int,
-    on_truncate: str,
-    follow: bool,
-) -> Iterable[tuple[int, str]]:
-    if not events_path.exists():
-        raise NotifyConfigError(f"events file not found: {events_path}")
-    mode = str(on_truncate or "").strip().lower()
-    if mode not in {"error", "restart"}:
-        raise NotifyConfigError(f"unsupported on-truncate mode '{on_truncate}'")
-    size = int(events_path.stat().st_size)
-    offset = int(start_offset)
-    if offset > size:
-        if mode == "restart":
-            offset = 0
-        else:
-            raise NotifyConfigError(
-                f"cursor offset exceeds events file size: offset={offset} size={size}. "
-                "If the file was truncated or rotated, pass --on-truncate restart."
-            )
-
-    handle = events_path.open("r", encoding="utf-8")
-    try:
-        handle.seek(offset)
-        while True:
-            line = handle.readline()
-            if line:
-                yield handle.tell(), line
-                continue
-            if not follow:
-                return
-            time.sleep(0.2)
-            if not events_path.exists():
-                continue
-            try:
-                path_stat = events_path.stat()
-            except FileNotFoundError:
-                continue
-            handle_stat = os.fstat(handle.fileno())
-            handle_pos = int(handle.tell())
-            path_changed = (int(path_stat.st_dev), int(path_stat.st_ino)) != (
-                int(handle_stat.st_dev),
-                int(handle_stat.st_ino),
-            )
-            truncated = handle_pos > int(path_stat.st_size)
-            if not path_changed and not truncated:
-                continue
-            if mode == "error":
-                reason = (
-                    "events file was replaced while following"
-                    if path_changed
-                    else f"events file was truncated while following (pos={handle_pos} size={int(path_stat.st_size)})"
-                )
-                raise NotifyConfigError(f"{reason}. Pass --on-truncate restart to resume from start.")
-            handle.close()
-            handle = events_path.open("r", encoding="utf-8")
-            handle.seek(0)
-    finally:
-        if not handle.closed:
-            handle.close()
-
-
-def _spool_payload(
-    spool_dir: Path,
-    *,
-    provider: str,
-    payload: dict[str, Any],
-) -> Path:
-    _ensure_private_directory(spool_dir, label="spool_dir")
-    body = {"provider": provider, "payload": payload}
-    raw = json.dumps(body, sort_keys=True, separators=(",", ":"))
-    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
-    file_name = f"{int(time.time() * 1000)}-{digest}.json"
-    out_path = spool_dir / file_name
-    tmp_path = out_path.with_suffix(".json.tmp")
-    tmp_path.write_text(raw, encoding="utf-8")
-    try:
-        tmp_path.chmod(0o600)
-    except OSError as exc:
-        raise NotifyConfigError(f"failed to set secure permissions on spool temp file: {tmp_path}") from exc
-    tmp_path.replace(out_path)
-    try:
-        out_path.chmod(0o600)
-    except OSError as exc:
-        raise NotifyConfigError(f"failed to set secure permissions on spool file: {out_path}") from exc
-    return out_path
-
-
-def _ensure_private_directory(path: Path, *, label: str) -> None:
-    try:
-        path.mkdir(parents=True, exist_ok=True, mode=0o700)
-    except OSError as exc:
-        raise NotifyConfigError(f"failed to create {label}: {path}") from exc
-    try:
-        path.chmod(0o700)
-    except OSError as exc:
-        raise NotifyConfigError(f"failed to set secure permissions on {label}: {path}") from exc
-    mode = stat.S_IMODE(path.stat().st_mode)
-    if mode & 0o077:
-        raise NotifyConfigError(
-            f"{label} must not be group/world-accessible (expected mode 700): {path} (mode={oct(mode)})"
-        )
 
 
 def _post_with_backoff(
@@ -717,25 +655,27 @@ def _profile_init_impl(
     include_args: bool = typer.Option(False, "--include-args/--no-include-args"),
     include_context: bool = typer.Option(False, "--include-context/--no-include-context"),
     include_raw_event: bool = typer.Option(False, "--include-raw-event/--no-include-raw-event"),
-    preset: str | None = typer.Option(None, "--preset", help="Optional preset profile: densegen."),
+    policy: str | None = typer.Option(
+        None,
+        "--policy",
+        help="Workflow policy defaults: densegen|infer_evo2|generic.",
+    ),
     force: bool = typer.Option(False, "--force", help="Overwrite an existing profile file."),
 ) -> None:
     try:
         events_path = _resolve_usr_events_path(events)
-        preset_norm = str(preset or "").strip().lower()
-        if preset_norm and preset_norm != "densegen":
-            raise NotifyConfigError(f"unsupported preset '{preset}'. Supported values: densegen")
+        policy_name = _resolve_workflow_policy(policy=policy)
 
         cursor_path = cursor or (events_path.parent / "notify.cursor")
         payload: dict[str, Any] = {
-            "profile_version": 1,
+            "profile_version": PROFILE_VERSION,
             "provider": str(provider).strip(),
-            "url_env": str(url_env).strip(),
             "events": str(events_path),
             "cursor": str(cursor_path),
             "include_args": bool(include_args),
             "include_context": bool(include_context),
             "include_raw_event": bool(include_raw_event),
+            "webhook": {"source": "env", "ref": str(url_env).strip()},
         }
         if only_actions is not None:
             payload["only_actions"] = str(only_actions).strip()
@@ -743,14 +683,14 @@ def _profile_init_impl(
             payload["only_tools"] = str(only_tools).strip()
         if spool_dir is not None:
             payload["spool_dir"] = str(spool_dir)
-        if preset_norm == "densegen":
-            payload["preset"] = "densegen"
-            for key, value in _DENSEGEN_PROFILE_PRESET.items():
+        if policy_name is not None:
+            payload["policy"] = policy_name
+            for key, value in _WORKFLOW_POLICY_DEFAULTS[policy_name].items():
                 payload.setdefault(key, value)
 
         if not payload["provider"]:
             raise NotifyConfigError("provider must be a non-empty string")
-        if not payload["url_env"]:
+        if not payload["webhook"]["ref"]:
             raise NotifyConfigError("url_env must be a non-empty string")
 
         _write_profile_file(profile, payload, force=force)
@@ -760,8 +700,129 @@ def _profile_init_impl(
         raise typer.Exit(code=1)
 
 
+def _create_wizard_profile(
+    *,
+    profile: Path,
+    provider: str,
+    events: Path,
+    cursor: Path | None,
+    only_actions: str | None,
+    only_tools: str | None,
+    spool_dir: Path | None,
+    include_args: bool,
+    include_context: bool,
+    include_raw_event: bool,
+    policy: str | None,
+    secret_source: str,
+    url_env: str | None,
+    secret_ref: str | None,
+    webhook_url: str | None,
+    store_webhook: bool,
+    force: bool,
+    events_require_exists: bool = True,
+    events_source: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    profile_path = profile.expanduser().resolve()
+    events_path = _resolve_usr_events_path(events, require_exists=events_require_exists)
+    events_exists = events_path.exists()
+    provider_value = str(provider).strip()
+    if not provider_value:
+        raise NotifyConfigError("provider must be a non-empty string")
+    policy_name = _resolve_workflow_policy(policy=policy)
+
+    mode = str(secret_source or "").strip().lower()
+    if not mode:
+        raise NotifyConfigError("secret_source must be a non-empty string")
+    if mode == "auto":
+        if is_secret_backend_available("keychain"):
+            mode = "keychain"
+        elif is_secret_backend_available("secretservice"):
+            mode = "secretservice"
+        else:
+            raise NotifyConfigError(
+                "secret_source=auto requires keychain or secretservice on this system. "
+                "Pass --secret-source env to opt into environment-variable webhook storage."
+            )
+    if mode not in {"env", "keychain", "secretservice"}:
+        raise NotifyConfigError("secret_source must be one of: auto, env, keychain, secretservice")
+
+    webhook_config: dict[str, str]
+    if mode == "env":
+        env_name = _resolve_cli_optional_string(field="url_env", cli_value=url_env)
+        if env_name is None:
+            env_name = _DEFAULT_WEBHOOK_ENV
+        webhook_config = {"source": "env", "ref": env_name}
+    else:
+        if not is_secret_backend_available(mode):
+            raise NotifyConfigError(f"secret backend '{mode}' is not available on this system")
+        secret_value = _resolve_cli_optional_string(field="secret_ref", cli_value=secret_ref)
+        if secret_value is None:
+            secret_value = f"{mode}://dnadesign.notify/{_sanitize_profile_name(profile_path)}"
+        webhook_config = {"source": "secret_ref", "ref": secret_value}
+        if store_webhook:
+            webhook_value = _resolve_cli_optional_string(field="webhook_url", cli_value=webhook_url)
+            if webhook_value is None:
+                webhook_value = str(typer.prompt("Webhook URL", hide_input=True)).strip()
+            if not webhook_value:
+                raise NotifyConfigError("webhook_url is required when --store-webhook is enabled")
+            store_secret_ref(secret_value, webhook_value)
+
+    default_cursor = profile_path.parent / "cursor"
+    default_spool = profile_path.parent / "spool"
+    cursor_value = cursor or default_cursor
+    spool_value = spool_dir or default_spool
+    try:
+        _ensure_private_directory(cursor_value.parent, label="cursor directory")
+        _ensure_private_directory(spool_value, label="spool_dir")
+    except NotifyConfigError as exc:
+        raise NotifyConfigError(
+            f"{exc}. Pass --cursor and --spool-dir to writable paths "
+            "if the default profile-scoped paths are restricted."
+        ) from exc
+
+    payload: dict[str, Any] = {
+        "profile_version": PROFILE_VERSION,
+        "provider": provider_value,
+        "events": str(events_path),
+        "cursor": str(cursor_value),
+        "spool_dir": str(spool_value),
+        "include_args": bool(include_args),
+        "include_context": bool(include_context),
+        "include_raw_event": bool(include_raw_event),
+        "webhook": webhook_config,
+    }
+    if only_actions is not None:
+        payload["only_actions"] = str(only_actions).strip()
+    if only_tools is not None:
+        payload["only_tools"] = str(only_tools).strip()
+    if policy_name is not None:
+        payload["policy"] = policy_name
+        for key, value in _WORKFLOW_POLICY_DEFAULTS[policy_name].items():
+            payload.setdefault(key, value)
+    if events_source is not None:
+        payload["events_source"] = dict(events_source)
+
+    _write_profile_file(profile_path, payload, force=force)
+    next_steps = _wizard_next_steps(
+        profile_path=profile_path,
+        webhook_config=webhook_config,
+        events_exists=events_exists,
+    )
+    return {
+        "profile": str(profile_path),
+        "provider": provider_value,
+        "events": str(events_path),
+        "cursor": str(cursor_value),
+        "spool_dir": str(spool_value),
+        "policy": policy_name,
+        "webhook": webhook_config,
+        "next_steps": next_steps,
+        "events_exists": events_exists,
+    }
+
+
 def _profile_wizard_impl(
-    profile: Path = typer.Option(Path("outputs/notify.profile.json"), "--profile", help="Path to profile JSON file."),
+    profile: Path = typer.Option(_DEFAULT_PROFILE_PATH, "--profile", help="Path to profile JSON file."),
     provider: str = typer.Option("slack", help="Provider: generic|slack|discord."),
     events: Path = typer.Option(..., "--events", help="USR .events.log JSONL path."),
     cursor: Path | None = typer.Option(None, "--cursor", help="Cursor file storing byte offset."),
@@ -771,13 +832,21 @@ def _profile_wizard_impl(
     include_args: bool = typer.Option(False, "--include-args/--no-include-args"),
     include_context: bool = typer.Option(False, "--include-context/--no-include-context"),
     include_raw_event: bool = typer.Option(False, "--include-raw-event/--no-include-raw-event"),
-    preset: str | None = typer.Option(None, "--preset", help="Optional preset profile: densegen."),
+    policy: str | None = typer.Option(
+        None,
+        "--policy",
+        help="Workflow policy defaults: densegen|infer_evo2|generic.",
+    ),
     secret_source: str = typer.Option(
         "auto",
         "--secret-source",
         help="Webhook source: auto|env|keychain|secretservice.",
     ),
-    url_env: str | None = typer.Option(None, "--url-env", help="Environment variable holding webhook URL."),
+    url_env: str | None = typer.Option(
+        None,
+        "--url-env",
+        help="Environment variable holding webhook URL (default: NOTIFY_WEBHOOK for --secret-source env).",
+    ),
     secret_ref: str | None = typer.Option(
         None,
         "--secret-ref",
@@ -789,92 +858,48 @@ def _profile_wizard_impl(
         "--store-webhook/--no-store-webhook",
         help="Store webhook URL in the selected secure secret backend.",
     ),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON output."),
     force: bool = typer.Option(False, "--force", help="Overwrite an existing profile file."),
 ) -> None:
     try:
-        profile_path = profile.expanduser().resolve()
-        events_path = _resolve_usr_events_path(events)
-        provider_value = str(provider).strip()
-        if not provider_value:
-            raise NotifyConfigError("provider must be a non-empty string")
-        preset_norm = str(preset or "").strip().lower()
-        if preset_norm and preset_norm != "densegen":
-            raise NotifyConfigError(f"unsupported preset '{preset}'. Supported values: densegen")
-
-        mode = str(secret_source or "").strip().lower()
-        if not mode:
-            raise NotifyConfigError("secret_source must be a non-empty string")
-        if mode == "auto":
-            if is_secret_backend_available("keychain"):
-                mode = "keychain"
-            elif is_secret_backend_available("secretservice"):
-                mode = "secretservice"
-            else:
-                raise NotifyConfigError(
-                    "secret_source=auto requires keychain or secretservice on this system. "
-                    "Pass --secret-source env to opt into environment-variable webhook storage."
+        result = _create_wizard_profile(
+            profile=profile,
+            provider=provider,
+            events=events,
+            cursor=cursor,
+            only_actions=only_actions,
+            only_tools=only_tools,
+            spool_dir=spool_dir,
+            include_args=include_args,
+            include_context=include_context,
+            include_raw_event=include_raw_event,
+            policy=policy,
+            secret_source=secret_source,
+            url_env=url_env,
+            secret_ref=secret_ref,
+            webhook_url=webhook_url,
+            store_webhook=store_webhook,
+            force=force,
+        )
+        if json_output:
+            typer.echo(
+                json.dumps(
+                    {
+                        "ok": True,
+                        **result,
+                    },
+                    sort_keys=True,
                 )
-        if mode not in {"env", "keychain", "secretservice"}:
-            raise NotifyConfigError("secret_source must be one of: auto, env, keychain, secretservice")
-
-        webhook_config: dict[str, str]
-        if mode == "env":
-            env_name = _resolve_cli_optional_string(field="url_env", cli_value=url_env) or "DENSEGEN_WEBHOOK"
-            webhook_config = {"source": "env", "ref": env_name}
-        else:
-            if not is_secret_backend_available(mode):
-                raise NotifyConfigError(f"secret backend '{mode}' is not available on this system")
-            secret_value = _resolve_cli_optional_string(field="secret_ref", cli_value=secret_ref)
-            if secret_value is None:
-                secret_value = f"{mode}://dnadesign.notify/{_sanitize_profile_name(profile_path)}"
-            webhook_config = {"source": "secret_ref", "ref": secret_value}
-            if store_webhook:
-                webhook_value = _resolve_cli_optional_string(field="webhook_url", cli_value=webhook_url)
-                if webhook_value is None:
-                    webhook_value = str(typer.prompt("Webhook URL", hide_input=True)).strip()
-                if not webhook_value:
-                    raise NotifyConfigError("webhook_url is required when --store-webhook is enabled")
-                store_secret_ref(secret_value, webhook_value)
-
-        state_root = _state_root_for_profile(profile_path)
-        default_cursor = state_root / "notify.cursor"
-        default_spool = state_root / "spool"
-        cursor_value = cursor or default_cursor
-        spool_value = spool_dir or default_spool
-        try:
-            _ensure_private_directory(cursor_value.parent, label="cursor directory")
-            _ensure_private_directory(spool_value, label="spool_dir")
-        except NotifyConfigError as exc:
-            raise NotifyConfigError(
-                f"{exc}. Pass --cursor and --spool-dir to writable paths if the default state root is restricted."
-            ) from exc
-
-        payload: dict[str, Any] = {
-            "profile_version": PROFILE_VERSION,
-            "provider": provider_value,
-            "events": str(events_path),
-            "cursor": str(cursor_value),
-            "spool_dir": str(spool_value),
-            "include_args": bool(include_args),
-            "include_context": bool(include_context),
-            "include_raw_event": bool(include_raw_event),
-            "webhook": webhook_config,
-        }
-        if only_actions is not None:
-            payload["only_actions"] = str(only_actions).strip()
-        if only_tools is not None:
-            payload["only_tools"] = str(only_tools).strip()
-        if preset_norm == "densegen":
-            payload["preset"] = "densegen"
-            for key, value in _DENSEGEN_PROFILE_PRESET.items():
-                payload.setdefault(key, value)
-
-        _write_profile_file(profile_path, payload, force=force)
-        typer.echo(f"Profile written: {profile_path}")
-        for line in _wizard_next_steps(profile_path=profile_path, webhook_config=webhook_config):
+            )
+            return
+        typer.echo(f"Profile written: {result['profile']}")
+        for line in result["next_steps"]:
             typer.echo(line)
     except NotifyError as exc:
-        typer.echo(f"Notification failed: {exc}")
+        if json_output:
+            typer.echo(json.dumps({"ok": False, "error": str(exc)}, sort_keys=True))
+        else:
+            typer.echo(f"Notification failed: {exc}")
         raise typer.Exit(code=1)
 
 
@@ -892,6 +917,7 @@ def _profile_show_impl(
 
 def _profile_doctor_impl(
     profile: Path = typer.Option(..., "--profile", help="Path to profile JSON file."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON output."),
 ) -> None:
     try:
         profile_path = profile.expanduser().resolve()
@@ -905,7 +931,14 @@ def _profile_doctor_impl(
             profile_data=data,
             profile_path=profile_path,
         )
-        _resolve_usr_events_path(events_path)
+        profile_events_source = _resolve_profile_events_source(profile_data=data, profile_path=profile_path)
+        events_exists = events_path.exists()
+        if events_exists:
+            _resolve_usr_events_path(events_path)
+        elif profile_events_source is not None:
+            _resolve_usr_events_path(events_path, require_exists=False)
+        else:
+            _resolve_usr_events_path(events_path)
 
         cursor_path = _resolve_optional_path_value(
             field="cursor",
@@ -925,9 +958,192 @@ def _profile_doctor_impl(
         if spool_path is not None:
             _probe_path_writable(spool_path)
 
-        typer.echo("Profile wiring OK.")
+        if json_output:
+            payload: dict[str, Any] = {
+                "ok": True,
+                "profile": str(profile_path),
+                "provider": str(data.get("provider")),
+                "events": str(events_path),
+                "events_exists": bool(events_exists),
+            }
+            if cursor_path is not None:
+                payload["cursor"] = str(cursor_path)
+            if spool_path is not None:
+                payload["spool_dir"] = str(spool_path)
+            typer.echo(json.dumps(payload, sort_keys=True))
+            return
+        if events_exists:
+            typer.echo("Profile wiring OK.")
+        else:
+            typer.echo("Profile wiring OK. events file not created yet; start watcher with --wait-for-events.")
     except NotifyError as exc:
-        typer.echo(f"Notification failed: {exc}")
+        if json_output:
+            typer.echo(json.dumps({"ok": False, "error": str(exc)}, sort_keys=True))
+        else:
+            typer.echo(f"Notification failed: {exc}")
+        raise typer.Exit(code=1)
+
+
+def _setup_slack_impl(
+    profile: Path = typer.Option(_DEFAULT_PROFILE_PATH, "--profile", help="Path to profile JSON file."),
+    events: Path | None = typer.Option(None, "--events", help="USR .events.log path for existing runs."),
+    tool: str | None = typer.Option(None, "--tool", help="Tool name for resolver mode."),
+    config: Path | None = typer.Option(None, "--config", "-c", help="Tool config path for resolver mode."),
+    policy: str | None = typer.Option(
+        None,
+        "--policy",
+        help="Workflow policy defaults: densegen|infer_evo2|generic.",
+    ),
+    cursor: Path | None = typer.Option(None, "--cursor", help="Cursor file storing byte offset."),
+    spool_dir: Path | None = typer.Option(None, "--spool-dir", help="Directory for failed payload spool files."),
+    include_args: bool = typer.Option(False, "--include-args/--no-include-args"),
+    include_context: bool = typer.Option(False, "--include-context/--no-include-context"),
+    include_raw_event: bool = typer.Option(False, "--include-raw-event/--no-include-raw-event"),
+    secret_source: str = typer.Option(
+        "auto",
+        "--secret-source",
+        help="Webhook source: auto|env|keychain|secretservice.",
+    ),
+    url_env: str | None = typer.Option(
+        None,
+        "--url-env",
+        help="Environment variable holding webhook URL (default: NOTIFY_WEBHOOK for --secret-source env).",
+    ),
+    secret_ref: str | None = typer.Option(
+        None,
+        "--secret-ref",
+        help="Secret reference: keychain://service/account or secretservice://service/account.",
+    ),
+    webhook_url: str | None = typer.Option(None, "--webhook-url", help="Webhook URL to store in secure backend."),
+    store_webhook: bool = typer.Option(
+        True,
+        "--store-webhook/--no-store-webhook",
+        help="Store webhook URL in the selected secure secret backend.",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON output."),
+    force: bool = typer.Option(False, "--force", help="Overwrite an existing profile file."),
+) -> None:
+    try:
+        tool_name: str | None = None
+        has_events = events is not None
+        has_tool = tool is not None or config is not None
+        if has_events and has_tool:
+            raise NotifyConfigError("pass either --events or --tool with --config, not both")
+        if not has_events and not has_tool:
+            raise NotifyConfigError("pass either --events or --tool with --config")
+
+        events_path: Path
+        events_source: dict[str, str] | None = None
+        policy_value = policy
+        events_require_exists = True
+
+        if has_events:
+            events_path = events if events is not None else Path("")
+        else:
+            if tool is None or config is None:
+                raise NotifyConfigError("resolver mode requires both --tool and --config")
+            config_path = config.expanduser().resolve()
+            events_path, default_policy = _resolve_tool_events_path(tool=tool, config=config_path)
+            tool_name = _normalize_setup_tool_name(tool)
+            events_source = {
+                "tool": str(tool_name),
+                "config": str(config_path),
+            }
+            if policy_value is None:
+                policy_value = default_policy
+            events_require_exists = False
+
+        profile_value = profile
+        if profile_value == _DEFAULT_PROFILE_PATH:
+            namespace = tool_name
+            if namespace is None:
+                policy_namespace = _resolve_workflow_policy(policy=policy_value)
+                if policy_namespace is None:
+                    raise NotifyConfigError(
+                        "default profile path is ambiguous in --events mode; "
+                        "pass --policy or --profile to select a profile namespace"
+                    )
+                namespace = policy_namespace
+            profile_value = _default_profile_path_for_tool(namespace)
+
+        result = _create_wizard_profile(
+            profile=profile_value,
+            provider="slack",
+            events=events_path,
+            cursor=cursor,
+            only_actions=None,
+            only_tools=None,
+            spool_dir=spool_dir,
+            include_args=include_args,
+            include_context=include_context,
+            include_raw_event=include_raw_event,
+            policy=policy_value,
+            secret_source=secret_source,
+            url_env=url_env,
+            secret_ref=secret_ref,
+            webhook_url=webhook_url,
+            store_webhook=store_webhook,
+            force=force,
+            events_require_exists=events_require_exists,
+            events_source=events_source,
+        )
+        if json_output:
+            typer.echo(json.dumps({"ok": True, **result}, sort_keys=True))
+            return
+        typer.echo(f"Profile written: {result['profile']}")
+        for line in result["next_steps"]:
+            typer.echo(line)
+    except NotifyError as exc:
+        if json_output:
+            typer.echo(json.dumps({"ok": False, "error": str(exc)}, sort_keys=True))
+        else:
+            typer.echo(f"Notification failed: {exc}")
+        raise typer.Exit(code=1)
+
+
+def _setup_resolve_events_impl(
+    tool: str = typer.Option(..., "--tool", help="Tool name for resolver mode."),
+    config: Path = typer.Option(..., "--config", "-c", help="Tool config path for resolver mode."),
+    print_policy: bool = typer.Option(
+        False,
+        "--print-policy",
+        help="Print only the default policy for the resolved tool/config.",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON output."),
+) -> None:
+    try:
+        if print_policy and json_output:
+            raise NotifyConfigError("pass either --print-policy or --json, not both")
+        config_path = config.expanduser().resolve()
+        tool_name = _normalize_setup_tool_name(tool)
+        if tool_name is None:
+            raise NotifyConfigError("tool must be a non-empty string")
+        events_path, default_policy = _resolve_tool_events_path(tool=tool_name, config=config_path)
+
+        if json_output:
+            typer.echo(
+                json.dumps(
+                    {
+                        "ok": True,
+                        "tool": tool_name,
+                        "config": str(config_path),
+                        "events": str(events_path),
+                        "policy": default_policy,
+                    },
+                    sort_keys=True,
+                )
+            )
+            return
+        if print_policy:
+            if default_policy is not None:
+                typer.echo(default_policy)
+            return
+        typer.echo(str(events_path))
+    except NotifyError as exc:
+        if json_output:
+            typer.echo(json.dumps({"ok": False, "error": str(exc)}, sort_keys=True))
+        else:
+            typer.echo(f"Notification failed: {exc}")
         raise typer.Exit(code=1)
 
 
@@ -944,6 +1160,26 @@ def _usr_events_watch_impl(
     profile: Path | None = typer.Option(None, "--profile", help="Path to profile JSON file."),
     cursor: Path | None = typer.Option(None, "--cursor", help="Cursor file storing byte offset."),
     follow: bool = typer.Option(False, "--follow", help="Follow events file for new lines."),
+    wait_for_events: bool = typer.Option(
+        False,
+        "--wait-for-events",
+        help="When following, wait for events file creation instead of failing immediately.",
+    ),
+    idle_timeout: float | None = typer.Option(
+        None,
+        "--idle-timeout",
+        help="Exit after this many seconds without new events while following.",
+    ),
+    poll_interval_seconds: float = typer.Option(
+        0.2,
+        "--poll-interval-seconds",
+        help="Polling interval for follow/wait loops (seconds).",
+    ),
+    stop_on_terminal_status: bool = typer.Option(
+        False,
+        "--stop-on-terminal-status",
+        help="Exit after the first event mapped to success or failure status.",
+    ),
     on_truncate: str = typer.Option(
         "error",
         "--on-truncate",
@@ -974,8 +1210,17 @@ def _usr_events_watch_impl(
     fail_fast: bool = typer.Option(False, "--fail-fast", help="Abort on first unsent event."),
     spool_dir: Path | None = typer.Option(None, "--spool-dir", help="Write failed payloads to spool directory."),
     dry_run: bool = typer.Option(False, help="Print formatted payloads instead of posting."),
+    advance_cursor_on_dry_run: bool = typer.Option(
+        True,
+        "--advance-cursor-on-dry-run/--no-advance-cursor-on-dry-run",
+        help="When --dry-run is enabled, persist cursor offsets (default: enabled).",
+    ),
 ) -> None:
     try:
+        if idle_timeout is not None and float(idle_timeout) <= 0:
+            raise NotifyConfigError("idle_timeout must be > 0 when provided")
+        if float(poll_interval_seconds) <= 0:
+            raise NotifyConfigError("poll_interval_seconds must be > 0")
         profile_path = profile.expanduser().resolve() if profile is not None else None
         profile_data = _read_profile(profile_path) if profile_path is not None else {}
         provider_value = _resolve_string_value(field="provider", cli_value=provider, profile_data=profile_data)
@@ -985,6 +1230,15 @@ def _usr_events_watch_impl(
             profile_data=profile_data,
             profile_path=profile_path,
         )
+        if events is None:
+            profile_events_source = _resolve_profile_events_source(profile_data=profile_data, profile_path=profile_path)
+            if profile_events_source is not None:
+                source_tool, source_config = profile_events_source
+                resolved_events_path, _default_policy = _resolve_tool_events_path(
+                    tool=source_tool,
+                    config=source_config,
+                )
+                events_path = _resolve_usr_events_path(resolved_events_path, require_exists=False)
         cursor_path = _resolve_optional_path_value(
             field="cursor",
             cli_value=cursor,
@@ -1034,110 +1288,125 @@ def _usr_events_watch_impl(
             webhook_url = resolve_webhook_url(url=url, url_env=url_env_value, secret_ref=secret_ref_value)
         action_filter = set(_split_csv(only_actions_value))
         tool_filter = set(_split_csv(only_tools_value))
-        start_offset = _load_cursor_offset(cursor_path)
-        failed_unsent = 0
         on_invalid_event_mode = str(on_invalid_event or "").strip().lower()
         if on_invalid_event_mode not in {"error", "skip"}:
             raise NotifyConfigError(f"unsupported on-invalid-event mode '{on_invalid_event}'")
 
-        for next_offset, line in _iter_file_lines(
-            events_path,
-            start_offset=start_offset,
-            on_truncate=on_truncate,
-            follow=follow,
-        ):
-            text = line.strip()
-            if not text:
+        should_advance_cursor = (not dry_run) or bool(advance_cursor_on_dry_run)
+
+        def _save_cursor_if_enabled(next_offset: int) -> None:
+            if should_advance_cursor:
                 _save_cursor_offset(cursor_path, next_offset)
-                continue
-            try:
-                event = json.loads(text)
-            except json.JSONDecodeError as exc:
-                if on_invalid_event_mode == "skip":
-                    typer.echo(f"Skipping invalid event line: event line is not valid JSON: {exc}")
-                    _save_cursor_offset(cursor_path, next_offset)
+
+        with _acquire_cursor_lock(cursor_path):
+            start_offset = _load_cursor_offset(cursor_path)
+            failed_unsent = 0
+            for next_offset, line in _iter_file_lines(
+                events_path,
+                start_offset=start_offset,
+                on_truncate=on_truncate,
+                follow=follow,
+                wait_for_events=wait_for_events,
+                idle_timeout_seconds=idle_timeout,
+                poll_interval_seconds=poll_interval_seconds,
+            ):
+                text = line.strip()
+                if not text:
+                    _save_cursor_if_enabled(next_offset)
                     continue
-                raise NotifyConfigError(f"event line is not valid JSON: {exc}") from exc
-            try:
-                _validate_usr_event(event, allow_unknown_version=allow_unknown_version)
-            except NotifyConfigError as exc:
-                if on_invalid_event_mode == "skip":
-                    typer.echo(f"Skipping invalid event line: {exc}")
-                    _save_cursor_offset(cursor_path, next_offset)
-                    continue
-                raise
-
-            action = str(event.get("action"))
-            if action_filter and action not in action_filter:
-                _save_cursor_offset(cursor_path, next_offset)
-                continue
-
-            actor_raw = event.get("actor")
-            actor = actor_raw if isinstance(actor_raw, dict) else {}
-            actor_tool = actor.get("tool")
-            if tool_filter and actor_tool not in tool_filter:
-                _save_cursor_offset(cursor_path, next_offset)
-                continue
-            tool_name = tool or actor_tool
-            if not tool_name:
-                raise NotifyConfigError("event missing actor.tool; provide --tool to override")
-            run_value = run_id or actor.get("run_id")
-            if not run_value:
-                raise NotifyConfigError("event missing actor.run_id; provide --run-id to override")
-
-            payload = build_payload(
-                status=_status_for_action(action, event=event),
-                tool=tool_name,
-                run_id=run_value,
-                message=message or _event_message(event),
-                meta=_event_meta(
-                    event,
-                    include_args=bool(include_args_value),
-                    include_raw_event=bool(include_raw_event_value),
-                    include_context=bool(include_context_value),
-                ),
-                timestamp=event.get("timestamp_utc"),
-                host=(actor.get("host") if bool(include_context_value) else None),
-                cwd=(
-                    ((event.get("dataset") or {}) if isinstance(event.get("dataset"), dict) else {}).get("root")
-                    if bool(include_context_value)
-                    else None
-                ),
-                version=event.get("version"),
-            )
-            formatted = format_for_provider(provider_value, payload)
-            if dry_run:
-                typer.echo(json.dumps(formatted, sort_keys=True))
-                _save_cursor_offset(cursor_path, next_offset)
-                continue
-
-            sent_or_spooled = False
-            try:
-                if webhook_url is None:
-                    raise NotifyConfigError("webhook URL is required when not running in --dry-run mode")
-                _post_with_backoff(
-                    webhook_url,
-                    formatted,
-                    connect_timeout=connect_timeout,
-                    read_timeout=read_timeout,
-                    retry_max=retry_max,
-                    retry_base_seconds=retry_base_seconds,
-                )
-                sent_or_spooled = True
-            except NotifyDeliveryError:
-                if spool_dir_value is not None:
-                    _spool_payload(spool_dir_value, provider=provider_value, payload=payload)
-                    sent_or_spooled = True
-                elif fail_fast:
+                try:
+                    event = json.loads(text)
+                except json.JSONDecodeError as exc:
+                    if on_invalid_event_mode == "skip":
+                        typer.echo(f"Skipping invalid event line: event line is not valid JSON: {exc}")
+                        _save_cursor_if_enabled(next_offset)
+                        continue
+                    raise NotifyConfigError(f"event line is not valid JSON: {exc}") from exc
+                try:
+                    _validate_usr_event(event, allow_unknown_version=allow_unknown_version)
+                except NotifyConfigError as exc:
+                    if on_invalid_event_mode == "skip":
+                        typer.echo(f"Skipping invalid event line: {exc}")
+                        _save_cursor_if_enabled(next_offset)
+                        continue
                     raise
-                else:
-                    failed_unsent += 1
 
-            if sent_or_spooled:
-                _save_cursor_offset(cursor_path, next_offset)
+                action = str(event.get("action"))
+                if action_filter and action not in action_filter:
+                    _save_cursor_if_enabled(next_offset)
+                    continue
 
-        if failed_unsent:
-            raise NotifyDeliveryError(f"{failed_unsent} event(s) failed delivery and were not spooled")
+                actor_raw = event.get("actor")
+                actor = actor_raw if isinstance(actor_raw, dict) else {}
+                actor_tool = actor.get("tool")
+                if tool_filter and actor_tool not in tool_filter:
+                    _save_cursor_if_enabled(next_offset)
+                    continue
+                tool_name = tool or actor_tool
+                if not tool_name:
+                    raise NotifyConfigError("event missing actor.tool; provide --tool to override")
+                run_value = run_id or actor.get("run_id")
+                if not run_value:
+                    raise NotifyConfigError("event missing actor.run_id; provide --run-id to override")
+
+                status_value = _status_for_action(action, event=event)
+                payload = build_payload(
+                    status=status_value,
+                    tool=tool_name,
+                    run_id=run_value,
+                    message=message or _event_message(event),
+                    meta=_event_meta(
+                        event,
+                        include_args=bool(include_args_value),
+                        include_raw_event=bool(include_raw_event_value),
+                        include_context=bool(include_context_value),
+                    ),
+                    timestamp=event.get("timestamp_utc"),
+                    host=(actor.get("host") if bool(include_context_value) else None),
+                    cwd=(
+                        ((event.get("dataset") or {}) if isinstance(event.get("dataset"), dict) else {}).get("root")
+                        if bool(include_context_value)
+                        else None
+                    ),
+                    version=event.get("version"),
+                )
+                formatted = format_for_provider(provider_value, payload)
+                if dry_run:
+                    typer.echo(json.dumps(formatted, sort_keys=True))
+                    _save_cursor_if_enabled(next_offset)
+                    if stop_on_terminal_status and status_value in {"success", "failure"}:
+                        return
+                    continue
+
+                sent_or_spooled = False
+                try:
+                    if webhook_url is None:
+                        raise NotifyConfigError("webhook URL is required when not running in --dry-run mode")
+                    _post_with_backoff(
+                        webhook_url,
+                        formatted,
+                        connect_timeout=connect_timeout,
+                        read_timeout=read_timeout,
+                        retry_max=retry_max,
+                        retry_base_seconds=retry_base_seconds,
+                    )
+                    sent_or_spooled = True
+                except NotifyDeliveryError:
+                    if spool_dir_value is not None:
+                        _spool_payload(spool_dir_value, provider=provider_value, payload=payload)
+                        sent_or_spooled = True
+                    elif fail_fast:
+                        raise
+                    else:
+                        failed_unsent += 1
+
+                if sent_or_spooled:
+                    _save_cursor_if_enabled(next_offset)
+                    if stop_on_terminal_status and status_value in {"success", "failure"}:
+                        return
+
+            if failed_unsent:
+                raise NotifyDeliveryError(f"{failed_unsent} event(s) failed delivery and were not spooled")
     except NotifyError as exc:
         typer.echo(f"Notification failed: {exc}")
         raise typer.Exit(code=1)
@@ -1145,7 +1414,7 @@ def _usr_events_watch_impl(
 
 def _spool_drain_impl(
     spool_dir: Path | None = typer.Option(None, "--spool-dir", help="Directory containing spooled payload files."),
-    provider: str | None = typer.Option(None, help="Provider: generic|slack|discord."),
+    provider: str | None = typer.Option(None, help="Override provider: generic|slack|discord."),
     url: str | None = typer.Option(None, help="Webhook URL."),
     url_env: str | None = typer.Option(None, help="Environment variable holding webhook URL."),
     secret_ref: str | None = typer.Option(
@@ -1163,7 +1432,13 @@ def _spool_drain_impl(
     try:
         profile_path = profile.expanduser().resolve() if profile is not None else None
         profile_data = _read_profile(profile_path) if profile_path is not None else {}
-        provider_value = _resolve_string_value(field="provider", cli_value=provider, profile_data=profile_data)
+        provider_override = _resolve_cli_optional_string(field="provider", cli_value=provider)
+        profile_provider_value = profile_data.get("provider")
+        profile_provider: str | None = None
+        if profile_provider_value is not None:
+            if not isinstance(profile_provider_value, str) or not profile_provider_value.strip():
+                raise NotifyConfigError("profile field 'provider' must be a non-empty string")
+            profile_provider = profile_provider_value.strip()
         spool_dir_value = _resolve_path_value(
             field="spool_dir",
             cli_value=spool_dir,
@@ -1187,6 +1462,17 @@ def _spool_drain_impl(
                 payload = body.get("payload")
                 if not isinstance(payload, dict):
                     raise NotifyConfigError(f"invalid spool payload file: {path}")
+                spool_provider_value = body.get("provider")
+                spool_provider: str | None = None
+                if spool_provider_value is not None:
+                    if not isinstance(spool_provider_value, str) or not spool_provider_value.strip():
+                        raise NotifyConfigError(f"invalid spool payload provider value: {path}")
+                    spool_provider = spool_provider_value.strip()
+                provider_value = provider_override or spool_provider or profile_provider
+                if not provider_value:
+                    raise NotifyConfigError(
+                        f"spool payload missing provider: {path}. Pass --provider or include provider in spool files."
+                    )
                 formatted = format_for_provider(provider_value, payload)
                 _post_with_backoff(
                     webhook_url,
@@ -1216,6 +1502,11 @@ register_profile_commands(
     wizard_handler=_profile_wizard_impl,
     show_handler=_profile_show_impl,
     doctor_handler=_profile_doctor_impl,
+)
+register_setup_commands(
+    setup_app,
+    slack_handler=_setup_slack_impl,
+    resolve_events_handler=_setup_resolve_events_impl,
 )
 
 

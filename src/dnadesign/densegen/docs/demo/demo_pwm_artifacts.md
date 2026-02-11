@@ -195,6 +195,7 @@ Key files:
 
 Notify setup details (profiles, secrets, spool/drain) are in:
 - [../../../../../docs/notify/usr_events.md](../../../../../docs/notify/usr_events.md)
+- [Command anatomy: `notify setup slack`](../../../../../docs/notify/usr_events.md#command-anatomy-notify-setup-slack)
 
 Slack-first flow:
 
@@ -207,26 +208,27 @@ export DENSEGEN_WEBHOOK
 ```
 
 ```bash
-# Resolve the exact USR events log for this run.
-EVENTS_PATH="$(uv run dense inspect run --usr-events-path -c "$CONFIG")"
+# Keep Notify artifacts in this run workspace.
+NOTIFY_DIR="outputs/notify"
 
-# Create a Notify profile with DenseGen-focused defaults.
-uv run notify profile wizard \
-  --profile outputs/notify.profile.json \
-  --provider slack \
-  --events "$EVENTS_PATH" \
-  --cursor outputs/notify.cursor \
-  --spool-dir outputs/notify_spool \
-  --secret-source auto \
-  --preset densegen
+# Create a Notify profile from workspace config (auto-resolves USR events path).
+uv run notify setup slack \
+  --tool densegen \
+  --config "$CONFIG" \
+  --profile "$NOTIFY_DIR/profile.json" \
+  --cursor "$NOTIFY_DIR/cursor" \
+  --spool-dir "$NOTIFY_DIR/spool" \
+  --secret-source env \
+  --url-env DENSEGEN_WEBHOOK \
+  --policy densegen
 ```
 
 ```bash
 # Validate profile wiring.
-uv run notify profile doctor --profile outputs/notify.profile.json
+uv run notify profile doctor --profile "$NOTIFY_DIR/profile.json"
 
 # Preview payloads without sending.
-uv run notify usr-events watch --profile outputs/notify.profile.json --dry-run
+uv run notify usr-events watch --profile "$NOTIFY_DIR/profile.json" --dry-run
 ```
 
 If payloads look correct, remove `--dry-run` to send for real.

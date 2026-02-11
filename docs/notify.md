@@ -94,7 +94,8 @@ To avoid setup drift, USR-event onboarding lives in one canonical runbook:
 - BU SCC batch + Notify runbook: [BU SCC Batch + Notify runbook](hpc/bu_scc_batch_notify.md)
 
 Use that runbook for:
-- wizard-first setup (`profile wizard`)
+- setup-first onboarding (`notify setup slack --tool <tool> --config <workspace-config.yaml>`)
+- didactic flag reference for `notify setup slack`
 - secure secret wiring (`--secret-source auto|env`)
 - two-terminal watch workflow (`doctor` -> `dry-run` -> `follow`)
 - strict USR `.events.log` path contract

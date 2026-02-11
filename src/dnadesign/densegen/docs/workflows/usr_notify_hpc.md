@@ -1,12 +1,13 @@
 # DenseGen -> USR -> Notify on HPC
 
-This runbook covers the operational stack on HPC:
+This runbook explains the operational stack on HPC:
 
-DenseGen (generator) -> USR (canonical store + event log) -> Notify (webhook delivery)
+DenseGen (generator) -> USR (canonical dataset + event log) -> Notify (webhook delivery)
 
-For BU SCC platform specifics, also read:
-- [docs/hpc/bu_scc_install.md](../../../../../docs/hpc/bu_scc_install.md)
+For BU SCC policy and template authority, use:
+- [docs/hpc/bu_scc_quickstart.md](../../../../../docs/hpc/bu_scc_quickstart.md)
 - [docs/hpc/bu_scc_batch_notify.md](../../../../../docs/hpc/bu_scc_batch_notify.md)
+- [docs/hpc/jobs/README.md](../../../../../docs/hpc/jobs/README.md)
 
 ## Boundary contract
 
@@ -17,81 +18,64 @@ Notify consumes USR `.events.log` only.
 
 ---
 
-## 1) HPC prerequisites (BU SCC quick notes)
+## 1) Prerequisites
 
-- BU SCC batch system: SGE (`qsub` + `#$` directives)
-- Use `#!/bin/bash -l` for module-aware job scripts
-- Run compute jobs with `qsub`; run Notify watchers in login/OnDemand shells
+- Scheduler: SGE (`qsub` + `#$` directives)
+- Job scripts that use modules: `#!/bin/bash -l`
+- Batch jobs should declare project/runtime/resources explicitly (`-P`, `h_rt`, `pe omp`, memory)
 
 References:
 - [BU SCC submitting jobs](https://www.bu.edu/tech/support/research/system-usage/running-jobs/submitting-jobs/)
-- [BU SCC SSH access](https://www.bu.edu/tech/support/research/system-usage/connect-scc/ssh/)
-- [SCC OnDemand](https://www.bu.edu/tech/support/research/system-usage/connect-scc/scc-ondemand/)
+- [BU SCC interactive jobs](https://www.bu.edu/tech/support/research/system-usage/running-jobs/interactive-jobs/)
 
 ---
 
-## 2) Example SGE job script (single run)
+## 2) Single-run submission (DenseGen)
 
-`run_densegen.sh`:
+Use the canonical template and pass per-run values at submit time:
+
+```bash
+qsub -P <project> \
+  -pe omp 16 \
+  -l h_rt=08:00:00 \
+  -l mem_per_core=8G \
+  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/demo_hpc/config.yaml \
+  docs/hpc/jobs/bu_scc_densegen_cpu.qsub
+```
+
+Before submission:
+
+```bash
+uv run dense validate-config --probe-solver -c <dnadesign_repo>/src/dnadesign/densegen/workspaces/demo_hpc/config.yaml
+```
+
+---
+
+## 3) Array submission pattern
+
+If each task has a separate config, submit an array and consume `SGE_TASK_ID`:
 
 ```bash
 #!/bin/bash -l
-#$ -N densegen_demo
-#$ -cwd
-#$ -j y
-#$ -o densegen_demo.$JOB_ID.out
+#$ -P <project>
+#$ -N densegen_array
+#$ -t 1-16
 #$ -l h_rt=04:00:00
 #$ -pe omp 4
+#$ -l mem_per_core=8G
+#$ -j y
+#$ -o outputs/logs/$JOB_NAME.$JOB_ID.$TASK_ID.out
 
 set -euo pipefail
 
-# Point to your workspace config.
-CONFIG="/project/$USER/densegen_runs/demo_hpc/config.yaml"
-
-# Validate config + solver before running.
+CONFIG="<dnadesign_repo>/src/dnadesign/densegen/workspaces/task_${SGE_TASK_ID}/config.yaml"
 uv run dense validate-config --probe-solver -c "$CONFIG"
-
-# Run generation (no plotting in batch job).
 uv run dense run --no-plot -c "$CONFIG"
 ```
 
-Submit:
+Submit with:
 
 ```bash
-# Submit the batch job.
-qsub run_densegen.sh
-```
-
----
-
-## 3) Example SGE array pattern
-
-`run_densegen_array.sh`:
-
-```bash
-#!/bin/bash -l
-#$ -N densegen_array
-#$ -cwd
-#$ -j y
-#$ -o densegen_array.$JOB_ID.$TASK_ID.out
-#$ -t 1-16
-
-set -euo pipefail
-
-# Template workspace config; task index can select per-task config if needed.
-CONFIG_TEMPLATE="/project/$USER/densegen_runs/task_${SGE_TASK_ID}/config.yaml"
-
-# Validate each task config.
-uv run dense validate-config --probe-solver -c "$CONFIG_TEMPLATE"
-
-# Run each task.
-uv run dense run --no-plot -c "$CONFIG_TEMPLATE"
-```
-
-Submit:
-
-```bash
-# Submit array job.
 qsub run_densegen_array.sh
 ```
 
@@ -99,54 +83,74 @@ qsub run_densegen_array.sh
 
 ## 4) Resolve USR event path for Notify
 
-After DenseGen run completes:
+After DenseGen completes:
 
 ```bash
-# Print exact USR .events.log path for this run.
-uv run dense inspect run --usr-events-path -c /project/$USER/densegen_runs/demo_hpc/config.yaml
+uv run dense inspect run --usr-events-path -c <dnadesign_repo>/src/dnadesign/densegen/workspaces/demo_hpc/config.yaml
 ```
 
 Use this path in Notify. Do not use `outputs/meta/events.jsonl`.
 
 ---
 
-## 5) Configure and run Notify watcher
+## 5) Create Notify profile from workspace config
+
+Use resolver mode to avoid manual event-path copying:
 
 ```bash
-# Export webhook URL through env var (example name).
-export DENSEGEN_WEBHOOK="https://example.com/webhook"
+CONFIG="<dnadesign_repo>/src/dnadesign/densegen/workspaces/demo_hpc/config.yaml"
+NOTIFY_DIR="<dnadesign_repo>/src/dnadesign/densegen/workspaces/demo_hpc/outputs/notify/densegen"
 
-# Build a Notify profile against the USR event stream.
-uv run notify profile wizard \
-  --profile /project/$USER/densegen_runs/demo_hpc/outputs/notify.profile.json \
-  --provider slack \
-  --events /project/$USER/densegen_runs/demo_hpc/outputs/usr_datasets/densegen/demo_hpc/.events.log \
-  --cursor /project/$USER/densegen_runs/demo_hpc/outputs/notify.cursor \
-  --spool-dir /project/$USER/densegen_runs/demo_hpc/outputs/notify_spool \
-  --secret-source env \
-  --url-env DENSEGEN_WEBHOOK \
-  --only-tools densegen \
-  --only-actions densegen_health,densegen_flush_failed,materialize
-
-# Validate profile wiring.
-uv run notify profile doctor --profile /project/$USER/densegen_runs/demo_hpc/outputs/notify.profile.json
-
-# Dry-run first.
-uv run notify usr-events watch --profile /project/$USER/densegen_runs/demo_hpc/outputs/notify.profile.json --dry-run
-
-# Run live watcher.
-uv run notify usr-events watch --profile /project/$USER/densegen_runs/demo_hpc/outputs/notify.profile.json --follow
+uv run notify setup slack \
+  --tool densegen \
+  --config "$CONFIG" \
+  --profile "$NOTIFY_DIR/profile.json" \
+  --cursor "$NOTIFY_DIR/cursor" \
+  --spool-dir "$NOTIFY_DIR/spool" \
+  --secret-source auto \
+  --policy densegen
 ```
+
+Flag expectations:
+- `--config` must point to the run/workspace `config.yaml`, not a repo-root config
+- profile schema is v2 and stores `events_source` (`tool`, `config`) for re-resolution
+- setup may point at a future `.events.log`; watcher should start with `--wait-for-events`
+- flag-by-flag command rationale: [Notify command anatomy](../../../../../docs/notify/usr_events.md#command-anatomy-notify-setup-slack)
 
 ---
 
-## 6) Spool and drain (network-safe pattern)
+## 6) Deploy Notify watcher
 
-If webhook delivery fails, keep `--spool-dir` enabled and drain later from a stable network host.
+Recommended: dedicated watcher batch job for durable delivery.
+
+Profile mode (recommended):
 
 ```bash
-# Drain previously spooled payload files.
-uv run notify spool drain --profile /project/$USER/densegen_runs/demo_hpc/outputs/notify.profile.json
+qsub -P <project> \
+  -v NOTIFY_PROFILE="$NOTIFY_DIR/profile.json" \
+  docs/hpc/jobs/bu_scc_notify_watch.qsub
+```
+
+Env mode (if you intentionally do not use a profile):
+
+```bash
+qsub -P <project> \
+  -v NOTIFY_TOOL=densegen,NOTIFY_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/demo_hpc/config.yaml,WEBHOOK_ENV=NOTIFY_WEBHOOK \
+  docs/hpc/jobs/bu_scc_notify_watch.qsub
+```
+
+If `EVENTS_PATH` is explicit in env mode, set `NOTIFY_POLICY` (`densegen`, `infer_evo2`, or `generic`).
+
+For setup checks, run `profile doctor` and watcher `--dry-run` before live follow mode.
+
+---
+
+## 7) Spool and drain recovery
+
+If webhook delivery fails, keep spool enabled and drain later:
+
+```bash
+uv run notify spool drain --profile "$NOTIFY_DIR/profile.json"
 ```
 
 ---
