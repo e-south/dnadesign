@@ -316,9 +316,11 @@ Notes:
 - `analysis.pairwise` selects the TF pair used for the trajectory scatter axes (`plot__chain_trajectory_scatter.*`).
 - `analysis.trajectory_scatter_scale` controls whether scatter axes use per-TF raw LLR or normalized LLR.
 - `analysis.trajectory_sweep_y_column` controls the y-axis for `plot__chain_trajectory_sweep.*`; each point is the combined per-TF objective at that sweep.
-- `analysis.trajectory_sweep_mode` controls sweep-plot narrative: `best_so_far` (default), `raw`, or `all` (raw + best-so-far overlay).
+- `analysis.trajectory_sweep_mode` controls sweep-plot narrative: `best_so_far` (default optimizer narrative), `raw`, or `all` (raw exploration + best-so-far envelope).
 - Trajectory plots are chain-centric: chains are rendered categorically, and lineage follows each chain across sweeps.
 - `analysis.trajectory_chain_overlay=true` overlays chain markers as a diagnostic layer.
+- `plot__health_panel.*` reports MH acceptance only (Gibbs `S` moves are excluded by design) and shows attempted move mix over sweeps.
+- `plot__elites_nn_distance.*` now summarizes elite diversity as score-vs-distance and full-sequence pairwise distances, while retaining motif-core NN context.
 - If the `analysis` block is omitted, analyze resolves this section from schema defaults.
 
 ## campaigns

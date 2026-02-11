@@ -3,7 +3,7 @@
 <cruncher project>
 src/dnadesign/cruncher/src/analysis/plots/health_panel.py
 
-Render a compact optimization health panel.
+Render optimizer move diagnostics with MH acceptance and move-mix panels.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -14,8 +14,13 @@ from __future__ import annotations
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 
 from dnadesign.cruncher.analysis.plots._savefig import savefig
+from dnadesign.cruncher.analysis.plots._style import apply_axes_style, place_figure_caption
+
+_MH_KINDS = {"B", "M", "L", "W", "I"}
 
 
 def _empty_panel(ax: plt.Axes, message: str) -> None:
@@ -23,34 +28,164 @@ def _empty_panel(ax: plt.Axes, message: str) -> None:
     ax.text(0.5, 0.5, message, ha="center", va="center", fontsize=9, color="#555555")
 
 
-def _plot_move_acceptance(ax: plt.Axes, optimizer_stats: dict[str, object] | None) -> None:
+def _cooling_markers(optimizer_stats: dict[str, object] | None) -> list[int]:
+    if not isinstance(optimizer_stats, dict):
+        return []
+    payload = optimizer_stats.get("mcmc_cooling")
+    if not isinstance(payload, dict):
+        return []
+    kind = str(payload.get("kind") or "").strip().lower()
+    if kind != "piecewise":
+        return []
+    stages = payload.get("stages")
+    if not isinstance(stages, list):
+        return []
+    markers: list[int] = []
+    for stage in stages:
+        if not isinstance(stage, dict):
+            continue
+        sweeps = stage.get("sweeps")
+        if isinstance(sweeps, (int, float)):
+            markers.append(int(sweeps))
+    return sorted(set(markers))
+
+
+def _move_frame(optimizer_stats: dict[str, object] | None) -> pd.DataFrame:
     stats = optimizer_stats.get("move_stats") if isinstance(optimizer_stats, dict) else None
     if not isinstance(stats, list) or not stats:
-        _empty_panel(ax, "Move acceptance unavailable")
-        return
-    rows = []
+        return pd.DataFrame(columns=["sweep_idx", "chain", "move_kind", "attempted", "accepted"])
+    rows: list[dict[str, object]] = []
     for row in stats:
         if not isinstance(row, dict):
             continue
         sweep = row.get("sweep_idx")
         attempted = row.get("attempted")
         accepted = row.get("accepted")
-        if not isinstance(sweep, (int, float)) or not isinstance(attempted, (int, float)):
+        move_kind = row.get("move_kind")
+        if not isinstance(sweep, (int, float)):
             continue
-        if not isinstance(accepted, (int, float)):
+        if not isinstance(attempted, (int, float)) or int(attempted) < 0:
             continue
-        rows.append((int(sweep), int(attempted), int(accepted)))
+        if not isinstance(accepted, (int, float)) or int(accepted) < 0:
+            continue
+        if not isinstance(move_kind, str) or not move_kind:
+            continue
+        chain_raw = row.get("chain")
+        chain = int(chain_raw) if isinstance(chain_raw, (int, float)) else 0
+        rows.append(
+            {
+                "sweep_idx": int(sweep),
+                "chain": int(chain),
+                "move_kind": str(move_kind),
+                "attempted": int(attempted),
+                "accepted": int(accepted),
+            }
+        )
     if not rows:
-        _empty_panel(ax, "Move acceptance unavailable")
-        return
-    rows.sort(key=lambda x: x[0])
-    sweeps = [r[0] for r in rows]
-    rates = [r[2] / r[1] if r[1] else 0.0 for r in rows]
-    ax.plot(sweeps, rates, color="#f58518", linewidth=1.5)
-    ax.set_title("Move acceptance over time")
+        return pd.DataFrame(columns=["sweep_idx", "chain", "move_kind", "attempted", "accepted"])
+    return pd.DataFrame(rows)
+
+
+def _with_bins(move_df: pd.DataFrame) -> tuple[pd.DataFrame, int]:
+    if move_df.empty:
+        out = move_df.copy()
+        if "_bin" not in out.columns:
+            out["_bin"] = pd.Series(dtype=int)
+        if "_bin_center" not in out.columns:
+            out["_bin_center"] = pd.Series(dtype=float)
+        return out, 1
+    min_sweep = int(move_df["sweep_idx"].min())
+    max_sweep = int(move_df["sweep_idx"].max())
+    span = max_sweep - min_sweep + 1
+    bin_width = max(1, int(round(span / 60.0)))
+    out = move_df.copy()
+    out["_bin"] = ((out["sweep_idx"] - min_sweep) // bin_width).astype(int)
+    out["_bin_center"] = min_sweep + (out["_bin"] * bin_width) + (0.5 * bin_width)
+    return out, bin_width
+
+
+def _plot_mh_acceptance(ax: plt.Axes, binned_df: pd.DataFrame) -> bool:
+    if "move_kind" not in binned_df.columns:
+        _empty_panel(ax, "MH acceptance unavailable (no move stats).")
+        return False
+    mh_df = binned_df[binned_df["move_kind"].isin(_MH_KINDS)].copy()
+    if mh_df.empty:
+        _empty_panel(ax, "MH acceptance unavailable (no MH attempts in trace).")
+        return False
+    grouped = mh_df.groupby(["chain", "_bin", "_bin_center"], as_index=False)[["attempted", "accepted"]].sum().copy()
+    grouped = grouped[grouped["attempted"] > 0].copy()
+    if grouped.empty:
+        _empty_panel(ax, "MH acceptance unavailable (no MH attempts in trace).")
+        return False
+    grouped["accept_rate"] = grouped["accepted"] / grouped["attempted"].astype(float)
+    grouped = grouped.sort_values(["chain", "_bin"])
+    for chain, chain_df in grouped.groupby("chain", sort=True):
+        ax.plot(
+            chain_df["_bin_center"].to_numpy(dtype=float),
+            chain_df["accept_rate"].to_numpy(dtype=float),
+            color="#a8a8a8",
+            linewidth=0.8,
+            alpha=0.5,
+        )
+    by_bin = grouped.groupby("_bin_center")["accept_rate"]
+    x = np.array(sorted(by_bin.groups.keys()), dtype=float)
+    median = np.array([float(by_bin.get_group(val).median()) for val in x], dtype=float)
+    q25 = np.array([float(by_bin.get_group(val).quantile(0.25)) for val in x], dtype=float)
+    q75 = np.array([float(by_bin.get_group(val).quantile(0.75)) for val in x], dtype=float)
+    ax.fill_between(x, q25, q75, color="#4c78a8", alpha=0.20, linewidth=0)
+    ax.plot(x, median, color="#4c78a8", linewidth=1.8, label="median MH acceptance")
+    ax.set_title("MH acceptance rate over sweeps")
     ax.set_xlabel("Sweep")
-    ax.set_ylabel("Acceptance rate")
+    ax.set_ylabel("Acceptance rate (MH moves only)")
     ax.set_ylim(0.0, 1.0)
+    apply_axes_style(ax, ygrid=True)
+    handles, labels = ax.get_legend_handles_labels()
+    if handles:
+        ax.legend(frameon=False, fontsize=8, loc="upper right")
+    return True
+
+
+def _plot_move_mix(ax: plt.Axes, binned_df: pd.DataFrame) -> None:
+    if binned_df.empty or "move_kind" not in binned_df.columns:
+        _empty_panel(ax, "Move-mix unavailable")
+        return
+    mix = binned_df.groupby(["_bin_center", "move_kind"], as_index=False)["attempted"].sum()
+    if mix.empty:
+        _empty_panel(ax, "Move-mix unavailable")
+        return
+    pivot = mix.pivot(index="_bin_center", columns="move_kind", values="attempted").fillna(0.0)
+    totals = pivot.sum(axis=1)
+    valid = totals > 0
+    pivot = pivot.loc[valid]
+    totals = totals.loc[valid]
+    if pivot.empty:
+        _empty_panel(ax, "Move-mix unavailable")
+        return
+    fractions = pivot.div(totals, axis=0)
+    x = fractions.index.to_numpy(dtype=float)
+    kinds = [str(kind) for kind in fractions.columns]
+    y = [fractions[kind].to_numpy(dtype=float) for kind in kinds]
+    colors = plt.get_cmap("tab20")(np.linspace(0.0, 1.0, max(1, len(kinds))))
+    ax.stackplot(x, y, labels=kinds, colors=colors, alpha=0.85)
+    ax.set_title("Move mix over sweeps")
+    ax.set_xlabel("Sweep")
+    ax.set_ylabel("Attempted move fraction")
+    ax.set_ylim(0.0, 1.0)
+    apply_axes_style(ax, ygrid=True)
+    handles, labels = ax.get_legend_handles_labels()
+    if handles:
+        ax.legend(frameon=False, fontsize=7, ncol=min(4, len(labels)), loc="upper right")
+
+
+def _add_vertical_markers(axes: list[plt.Axes], markers: list[int]) -> None:
+    if not markers:
+        return
+    for ax in axes:
+        for idx, marker in enumerate(markers[:-1]):
+            ax.axvline(marker, color="#909090", linestyle=":", linewidth=0.8, alpha=0.65)
+            if idx == 0:
+                y_top = ax.get_ylim()[1]
+                ax.text(marker, y_top, " cooling stage", ha="left", va="bottom", fontsize=7, color="#666666")
 
 
 def plot_health_panel(
@@ -59,19 +194,27 @@ def plot_health_panel(
     *,
     dpi: int,
     png_compress_level: int,
-) -> None:
-    fig, ax = plt.subplots(1, 1, figsize=(6, 4))
-    _plot_move_acceptance(ax, optimizer_stats)
-    fig.text(
-        0.5,
-        0.01,
-        "Optimization health indicators (not posterior convergence).",
-        ha="center",
-        va="bottom",
-        fontsize=8,
-        color="#555555",
-    )
+) -> dict[str, object]:
+    move_df = _move_frame(optimizer_stats)
+    binned_df, _ = _with_bins(move_df)
+
+    fig, axes = plt.subplots(2, 1, figsize=(7.4, 6.0), sharex=True)
+    ax_accept, ax_mix = axes
+    has_mh_windows = _plot_mh_acceptance(ax_accept, binned_df)
+    _plot_move_mix(ax_mix, binned_df)
+
+    markers = _cooling_markers(optimizer_stats)
+    _add_vertical_markers([ax_accept, ax_mix], markers)
+    place_figure_caption(fig, "S (Gibbs) updates are accepted by construction; acceptance shown for MH moves only.")
+
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
     plt.close(fig)
+    move_kinds_present = sorted({str(kind) for kind in move_df["move_kind"].tolist()}) if not move_df.empty else []
+    return {
+        "has_mh_windows": bool(has_mh_windows),
+        "move_kinds_present": move_kinds_present,
+        "cooling_stage_count": len(markers),
+        "rows": int(len(move_df)),
+    }

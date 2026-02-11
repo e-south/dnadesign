@@ -42,3 +42,26 @@ def test_overlap_summary_metrics() -> None:
     assert "counts" in decoded and "bins" in decoded
     assert elite_df["overlap_total_bp"].tolist() == [2, 0]
     assert summary["overlap_total_bp_median"] == 1.0
+
+
+def test_overlap_total_bp_is_non_negative_and_bounded() -> None:
+    elites_df = pd.DataFrame(
+        {
+            "id": ["elite-1"],
+            "sequence": ["AAAAAA"],
+        }
+    )
+    hits_df = pd.DataFrame(
+        {
+            "elite_id": ["elite-1", "elite-1"],
+            "tf": ["tfA", "tfB"],
+            "best_start": [1, 2],
+            "best_strand": ["+", "+"],
+            "pwm_width": [3, 4],
+            "best_core_seq": ["AAA", "AAAA"],
+        }
+    )
+    _, elite_df, _ = compute_overlap_tables(elites_df, hits_df, ["tfA", "tfB"])
+    value = int(elite_df.loc[0, "overlap_total_bp"])
+    assert value >= 0
+    assert value <= 3

@@ -182,11 +182,11 @@ Sampling artifacts consumed by analysis:
 
 Plots (always generated when data is available):
 
-- `plots/plot__chain_trajectory_scatter.*` (chain-hued scatter in TF score-space, with random-baseline cloud and consensus anchors)
-- `plots/plot__chain_trajectory_sweep.*` (per-chain progression over sweep index for the selected objective column and sweep mode)
-- `plots/plot__elites_nn_distance.*`
-- `plots/plot__overlap_panel.*`
-- `plots/plot__health_panel.*` (only if `optimize/trace.nc` exists)
+- `plots/plot__chain_trajectory_scatter.*` (random-baseline cloud + chain best-so-far lineage updates in TF score-space, with selected elites overlaid and consensus anchors)
+- `plots/plot__chain_trajectory_sweep.*` (joint objective over sweep index by chain, with `best_so_far|raw|all` modes and tune/cooling boundary markers when available)
+- `plots/plot__elites_nn_distance.*` (elite diversity panel: score vs full-sequence NN distance plus pairwise full-sequence distance matrix; core-distance context retained)
+- `plots/plot__overlap_panel.*` (motif placement tracks per elite, pairwise best-hit placement scatter, and overlap summary panel)
+- `plots/plot__health_panel.*` (MH-only acceptance dynamics + move-mix over sweeps; `S` moves are excluded from acceptance rates)
 
 ## Diagnostics quick read
 
@@ -199,6 +199,8 @@ Key signals:
 - `optimizer.acceptance_tail_rugged` is the tail acceptance over rugged moves (`B`,`M`) and is more informative than all non-`S` acceptance when diagnosing warm tails.
 - `optimizer.downhill_accept_tail_rugged` isolates downhill rugged acceptance in the tail (cold-tail indicator).
 - `optimizer.gibbs_flip_rate_tail` and `optimizer.tail_step_hamming_mean` indicate whether late-chain motion is dominated by Gibbs micro-flips.
+- `plot__chain_trajectory_sweep.*` should be read as joint-objective progress; `best_so_far` is the default narrative, while `all` overlays raw exploration.
+- `plot__elites_nn_distance.*` distinguishes motif-core collapse (`d_core ~ 0`) from full-sequence diversity (`d_full > 0`) so degenerate elite sets are visible.
 - `objective_components.unique_fraction_canonical` is present only when canonicalization is enabled.
 - `elites_mmr_summary` and `elites_nn_distance` indicate diversity strength and collapse risk.
 

@@ -32,7 +32,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         ("sequences",),
         ("plot__chain_trajectory_scatter.{ext}",),
         "summary",
-        "Independent chain trajectories in TF score-space with random-baseline context.",
+        "Best-so-far chain lineage updates in TF score-space with baseline and selected elite overlays.",
     ),
     PlotSpec(
         "chain_trajectory_sweep",
@@ -40,7 +40,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         ("sequences",),
         ("plot__chain_trajectory_sweep.{ext}",),
         "diagnostics",
-        "Per-chain objective progression over sweeps with categorical chain hues.",
+        "Per-chain joint objective progression over sweeps with tune/cooling context when available.",
     ),
     PlotSpec(
         "elites_nn_distance",
@@ -48,7 +48,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         ("elites", "baseline_hits"),
         ("plot__elites_nn_distance.{ext}",),
         "summary",
-        "Nearest-neighbor distance distribution for elites in TFBS-core space.",
+        "Elite diversity panel combining motif-core context with full-sequence distance diagnostics.",
     ),
     PlotSpec(
         "overlap_panel",
@@ -56,7 +56,7 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         ("elites",),
         ("plot__overlap_panel.{ext}",),
         "overlap",
-        "Overlap heatmap and distribution (or compact summary for large TF sets).",
+        "Motif placement tracks with pairwise placement and overlap summaries.",
     ),
     PlotSpec(
         "health_panel",
@@ -64,6 +64,6 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         ("trace",),
         ("plot__health_panel.{ext}",),
         "diagnostics",
-        "Move acceptance summary.",
+        "MH acceptance dynamics and move-mix diagnostics over sweeps.",
     ),
 )

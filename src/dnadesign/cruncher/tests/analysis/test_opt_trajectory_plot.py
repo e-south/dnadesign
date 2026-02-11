@@ -71,12 +71,24 @@ def test_chain_trajectory_scatter_renders_background_chain_and_consensus(tmp_pat
         {"tf": "cpxR", "label": "cpxR consensus (max)", "x": 0.20, "y": 0.96},
     ]
     out_path = tmp_path / "plot__chain_trajectory_scatter.png"
+    elites_df = pd.DataFrame(
+        {
+            "id": ["elite-1", "elite-2"],
+            "raw_llr_lexA": [0.45, 0.35],
+            "raw_llr_cpxR": [0.47, 0.37],
+            "norm_llr_lexA": [0.35, 0.28],
+            "norm_llr_cpxR": [0.36, 0.29],
+            "rank": [1, 2],
+        }
+    )
     metadata = plot_chain_trajectory_scatter(
         trajectory_df=trajectory_df,
         baseline_df=baseline_df,
+        elites_df=elites_df,
         tf_pair=("lexA", "cpxR"),
         scatter_scale="llr",
         consensus_anchors=consensus_anchors,
+        objective_caption="Joint objective: maximize min_TF(score_TF).",
         out_path=out_path,
         dpi=72,
         png_compress_level=1,
@@ -91,6 +103,8 @@ def test_chain_trajectory_scatter_renders_background_chain_and_consensus(tmp_pat
     assert "consensus anchors" in labels
     assert metadata["chain_count"] == 2
     assert metadata["mode"] == "chain_scatter"
+    assert metadata["elite_points_plotted"] == 2
+    assert "maximize min_TF(score_TF)" in metadata["objective_caption"]
 
 
 def test_chain_trajectory_scatter_uses_only_new_best_updates(tmp_path: Path) -> None:
@@ -118,6 +132,7 @@ def test_chain_trajectory_scatter_uses_only_new_best_updates(tmp_path: Path) -> 
     metadata = plot_chain_trajectory_scatter(
         trajectory_df=trajectory_df,
         baseline_df=baseline_df,
+        elites_df=None,
         tf_pair=("lexA", "cpxR"),
         scatter_scale="llr",
         consensus_anchors=None,
@@ -165,6 +180,16 @@ def test_chain_trajectory_sweep_renders_raw_llr_by_sweep(tmp_path: Path) -> None
         trajectory_df=trajectory_df,
         y_column="raw_llr_objective",
         y_mode="all",
+        cooling_config={
+            "kind": "piecewise",
+            "stages": [
+                {"sweeps": 2, "beta": 0.2},
+                {"sweeps": 4, "beta": 1.0},
+                {"sweeps": 6, "beta": 4.0},
+            ],
+        },
+        tune_sweeps=2,
+        objective_caption="Joint objective: maximize min_TF(score_TF).",
         out_path=out_path,
         dpi=72,
         png_compress_level=1,
@@ -179,6 +204,9 @@ def test_chain_trajectory_sweep_renders_raw_llr_by_sweep(tmp_path: Path) -> None
     assert metadata["mode"] == "chain_sweep"
     assert metadata["chain_count"] == 2
     assert metadata["y_mode"] == "all"
+    assert metadata["cooling_stage_count"] == 3
+    assert metadata["tune_boundary_sweep"] == 2
+    assert "maximize min_TF(score_TF)" in metadata["objective_caption"]
 
 
 def test_chain_trajectory_sweep_best_so_far_mode_is_supported(tmp_path: Path) -> None:
@@ -203,7 +231,7 @@ def test_chain_trajectory_sweep_best_so_far_mode_is_supported(tmp_path: Path) ->
     assert out_path.exists()
     assert metadata["y_mode"] == "best_so_far"
     assert metadata["chain_count"] == 2
-    assert metadata["y_label"] == "Raw LLR objective (best-so-far cumulative maximum)"
+    assert metadata["y_label"] == "Joint score (best-window raw LLR; best-so-far)"
 
 
 def test_chain_trajectory_sweep_rejects_unknown_mode(tmp_path: Path) -> None:

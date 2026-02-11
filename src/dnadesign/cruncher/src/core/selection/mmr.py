@@ -78,8 +78,14 @@ def compute_core_distance(
         denom = float(np.sum(w))
         if denom <= 0:
             raise ValueError(f"Non-positive weight sum for TF '{tf}'.")
-        distances.append(float(np.sum(w * mismatches) / denom))
-    return float(np.mean(distances))
+        tf_distance = float(np.sum(w * mismatches) / denom)
+        if tf_distance < -1.0e-12 or tf_distance > 1.0 + 1.0e-12:
+            raise ValueError(f"TF core distance for '{tf}' must be in [0, 1], got {tf_distance}.")
+        distances.append(float(np.clip(tf_distance, 0.0, 1.0)))
+    value = float(np.mean(distances))
+    if value < -1.0e-12 or value > 1.0 + 1.0e-12:
+        raise ValueError(f"Core distance must be in [0, 1], got {value}.")
+    return float(np.clip(value, 0.0, 1.0))
 
 
 def core_from_hit(seq_arr: np.ndarray, *, offset: int, width: int, strand: str) -> np.ndarray:
@@ -147,6 +153,19 @@ def _sequence_string(seq_arr: np.ndarray) -> str:
 
 def _canonical_string(seq_arr: np.ndarray) -> str:
     return SequenceState(canon_int(seq_arr)).to_string()
+
+
+def _full_sequence_distance(a: np.ndarray, b: np.ndarray) -> float:
+    a_arr = np.asarray(a, dtype=np.int8)
+    b_arr = np.asarray(b, dtype=np.int8)
+    if a_arr.shape != b_arr.shape:
+        raise ValueError("Full-sequence distance requires equal-length sequence arrays.")
+    if a_arr.size == 0:
+        raise ValueError("Full-sequence distance requires non-empty sequence arrays.")
+    value = float(np.count_nonzero(a_arr != b_arr)) / float(a_arr.size)
+    if value < -1.0e-12 or value > 1.0 + 1.0e-12:
+        raise ValueError(f"Full-sequence distance must be in [0, 1], got {value}.")
+    return float(np.clip(value, 0.0, 1.0))
 
 
 def _percentile_ranks(values: Sequence[float]) -> list[float]:
@@ -309,6 +328,7 @@ def select_mmr_elites(
         best_idx = None
         best_utility = None
         best_nearest = None
+        best_nearest_full = None
         best_nearest_id = None
         for idx, cand in enumerate(pool):
             cand_id = _candidate_id(cand)
@@ -316,6 +336,7 @@ def select_mmr_elites(
                 continue
             core_cand = core_maps[_candidate_id(cand)]
             distances = []
+            full_distances = []
             nearest_id = None
             nearest_dist = None
             for sel in selected:
@@ -326,22 +347,40 @@ def select_mmr_elites(
                     tf_names=tf_names_resolved,
                 )
                 distances.append(dist)
+                full_distances.append(_full_sequence_distance(cand.seq_arr, sel.seq_arr))
                 if nearest_dist is None or dist < nearest_dist:
                     nearest_dist = dist
                     nearest_id = _candidate_id(sel)
             nearest_distance = min(distances) if distances else 0.0
+            nearest_full_distance = min(full_distances) if full_distances else 0.0
             nearest_similarity = 1.0 - nearest_distance
             utility = alpha * relevance_scaled[idx] - (1.0 - alpha) * nearest_similarity
             if best_utility is None or utility > best_utility:
                 best_utility = utility
                 best_idx = idx
                 best_nearest = (nearest_distance, nearest_similarity)
+                best_nearest_full = nearest_full_distance
                 best_nearest_id = nearest_id
             elif utility == best_utility and best_idx is not None:
                 if relevance_raw[idx] > relevance_raw[best_idx]:
                     best_idx = idx
                     best_nearest = (nearest_distance, nearest_similarity)
+                    best_nearest_full = nearest_full_distance
                     best_nearest_id = nearest_id
+                elif relevance_raw[idx] == relevance_raw[best_idx]:
+                    current_best_full = best_nearest_full if best_nearest_full is not None else -1.0
+                    if nearest_full_distance > current_best_full:
+                        best_idx = idx
+                        best_nearest = (nearest_distance, nearest_similarity)
+                        best_nearest_full = nearest_full_distance
+                        best_nearest_id = nearest_id
+                    elif nearest_full_distance == current_best_full:
+                        best_id = _candidate_id(pool[best_idx])
+                        if cand_id < best_id:
+                            best_idx = idx
+                            best_nearest = (nearest_distance, nearest_similarity)
+                            best_nearest_full = nearest_full_distance
+                            best_nearest_id = nearest_id
 
         if best_idx is None:
             break
@@ -362,6 +401,7 @@ def select_mmr_elites(
             "nearest_selected_id": best_nearest_id,
             "nearest_distance": nearest_distance,
             "nearest_similarity": nearest_similarity,
+            "nearest_distance_full": best_nearest_full,
         }
         if core_maps is not None:
             for tf, core in core_maps[cand_id].items():

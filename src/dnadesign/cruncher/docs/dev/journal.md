@@ -5,6 +5,7 @@
 - [2026-02-04](#2026-02-04)
 - [2026-02-05](#2026-02-05)
 - [2026-02-06](#2026-02-06)
+- [2026-02-11](#2026-02-11)
 
 ## 2026-02-04
 - Start refactor to remove core I/O dependencies and progress UI from optimizers.
@@ -86,3 +87,15 @@
 - Simplified overlap plotting to a single panel figure with best-hit labels and readability rules.
 - Updated analysis tests and docs to match the new plot suite and baseline artifacts.
 - Added an intent + lifecycle guide and linked it from docs index, demo, config, and architecture references.
+
+## 2026-02-11
+- Refactored the analysis plot suite to improve optimizer narrative and diagnostics while preserving existing output filenames.
+- Added shared plot styling utilities (`analysis/plots/_style.py`) and applied them across trajectory, diversity, overlap, and health plots.
+- Upgraded trajectory scatter to show best-so-far lineage updates with selected elite overlays and objective-caption footnotes.
+- Upgraded trajectory sweep to explicit joint-score labeling and optional tune/cooling boundary markers.
+- Replaced elite NN histogram output with a two-panel diversity view (score vs full-sequence NN distance + full-sequence pairwise distance matrix), while retaining motif-core distance context.
+- Replaced health panel with MH-only acceptance dynamics plus move-mix over sweeps; excluded Gibbs `S` moves from acceptance semantics.
+- Replaced overlap panel with placement-first motif tracks, pairwise placement scatter, and overlap summary subpanel.
+- Hardened MMR distance contracts (`compute_core_distance` bounded in [0,1]) and added deterministic tie-break behavior using full-sequence distance when core distances tie.
+- Updated plot registry descriptions and docs (`sampling_and_analysis.md`, `reference/config.md`) to match the new plot semantics and UX narrative.
+- Validated with full Cruncher analysis test suite and demo workspace CLI analyze runs.

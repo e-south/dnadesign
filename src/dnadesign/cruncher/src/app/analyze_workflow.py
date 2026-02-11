@@ -297,6 +297,18 @@ def _write_analysis_used(
     atomic_write_yaml(path, payload, sort_keys=False, default_flow_style=False)
 
 
+def _objective_caption(objective_cfg: dict[str, object]) -> str:
+    combine = str(objective_cfg.get("combine") or "min").strip().lower()
+    if combine == "sum":
+        base = "Joint objective: maximize sum_TF(score_TF). Each score_TF is the best-window scan score."
+    else:
+        base = "Joint objective: maximize min_TF(score_TF). Each score_TF is the best-window scan score."
+    softmin_cfg = objective_cfg.get("softmin")
+    if isinstance(softmin_cfg, dict) and bool(softmin_cfg.get("enabled")):
+        return f"{base} Soft-min shaping enabled."
+    return base
+
+
 def _resolve_baseline_seed(baseline_df: pd.DataFrame) -> int | None:
     if "baseline_seed" not in baseline_df.columns or baseline_df.empty:
         return None
@@ -641,6 +653,15 @@ def run_analyze(
                 pwm_pseudocounts=pseudocounts_raw,
                 log_odds_clip=log_odds_clip_raw,
             )
+            elites_plot_df = add_raw_llr_objective(
+                elites_df,
+                tf_names,
+                pwms=pwms,
+                objective_config=objective_from_manifest,
+                bidirectional=bidirectional,
+                pwm_pseudocounts=pseudocounts_raw,
+                log_odds_clip=log_odds_clip_raw,
+            )
         except Exception:
             shutil.rmtree(tmp_root, ignore_errors=True)
             raise
@@ -723,6 +744,7 @@ def run_analyze(
             raise ValueError("Run manifest missing sequence_length required for trajectory consensus anchors.")
         anchor_objective_cfg = dict(objective_from_manifest)
         anchor_objective_cfg["score_scale"] = trajectory_scale
+        objective_caption = _objective_caption(objective_from_manifest)
         consensus_anchors = compute_consensus_anchors(
             pwms=pwms,
             tf_names=tf_names,
@@ -788,9 +810,11 @@ def run_analyze(
                 plot_chain_trajectory_scatter(
                     trajectory_df=trajectory_lines_df,
                     baseline_df=baseline_plot_df,
+                    elites_df=elites_plot_df,
                     tf_pair=trajectory_tf_pair,
                     scatter_scale=trajectory_scale,
                     consensus_anchors=consensus_anchors,
+                    objective_caption=objective_caption,
                     out_path=plot_trajectory_path,
                     stride=analysis_cfg.trajectory_stride,
                     alpha_min=analysis_cfg.trajectory_particle_alpha_min,
@@ -807,6 +831,9 @@ def run_analyze(
                     trajectory_df=trajectory_lines_df,
                     y_column=str(analysis_cfg.trajectory_sweep_y_column),
                     y_mode=str(analysis_cfg.trajectory_sweep_mode),
+                    cooling_config=optimizer_stats.get("mcmc_cooling") if isinstance(optimizer_stats, dict) else None,
+                    tune_sweeps=sample_meta.tune,
+                    objective_caption=objective_caption,
                     out_path=plot_trajectory_sweep_path,
                     stride=analysis_cfg.trajectory_stride,
                     alpha_min=analysis_cfg.trajectory_particle_alpha_min,
@@ -819,7 +846,13 @@ def run_analyze(
                 _record_plot("chain_trajectory_sweep", plot_trajectory_sweep_path, False, str(exc))
 
         plot_nn_path = analysis_plot_path(tmp_root, "elites_nn_distance", plot_format)
-        plot_elites_nn_distance(nn_df, plot_nn_path, baseline_nn=pd.Series(baseline_nn), **plot_kwargs)
+        plot_elites_nn_distance(
+            nn_df,
+            plot_nn_path,
+            elites_df=elites_plot_df,
+            baseline_nn=pd.Series(baseline_nn),
+            **plot_kwargs,
+        )
         _record_plot("elites_nn_distance", plot_nn_path, True, None)
 
         plot_overlap_path = analysis_plot_path(tmp_root, "overlap_panel", plot_format)
@@ -836,6 +869,9 @@ def run_analyze(
                 elite_overlap_df,
                 tf_names,
                 plot_overlap_path,
+                hits_df=hits_df,
+                elites_df=elites_df,
+                sequence_length=int(sequence_length),
                 focus_pair=focus_pair,
                 **plot_kwargs,
             )

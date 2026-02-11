@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 
 from dnadesign.cruncher.analysis.plots._savefig import savefig
+from dnadesign.cruncher.analysis.plots._style import apply_axes_style, place_figure_caption
 
 
 def _require_df(df: pd.DataFrame | None, *, name: str) -> pd.DataFrame:
@@ -88,10 +89,50 @@ def _resolve_scatter_columns(*, tf_pair: tuple[str, str], scatter_scale: str) ->
     raise ValueError("scatter_scale must be 'llr' or 'normalized-llr'.")
 
 
-def _legend_labels(ax: plt.Axes) -> list[str]:
+def _clean_anchor_label(label: object) -> str:
+    text = str(label or "consensus anchor").strip()
+    return text.replace("(max)", "").replace("  ", " ").strip()
+
+
+def _sweep_ylabel(y_column: str, mode: str) -> str:
+    base = {
+        "raw_llr_objective": "best-window raw LLR",
+        "norm_llr_objective": "best-window normalized LLR",
+        "objective_scalar": "optimizer scalar objective",
+    }.get(y_column, y_column)
+    suffix = {
+        "raw": "per sweep",
+        "best_so_far": "best-so-far",
+        "all": "raw + best-so-far",
+    }[mode]
+    return f"Joint score ({base}; {suffix})"
+
+
+def _cooling_markers(cooling_config: dict[str, object] | None) -> list[tuple[int, float]]:
+    if not isinstance(cooling_config, dict):
+        return []
+    kind = str(cooling_config.get("kind") or "").strip().lower()
+    if kind != "piecewise":
+        return []
+    stages = cooling_config.get("stages")
+    if not isinstance(stages, list):
+        return []
+    points: list[tuple[int, float]] = []
+    for stage in stages:
+        if not isinstance(stage, dict):
+            continue
+        sweeps = stage.get("sweeps")
+        beta = stage.get("beta")
+        if not isinstance(sweeps, (int, float)) or not isinstance(beta, (int, float)):
+            continue
+        points.append((int(sweeps), float(beta)))
+    return sorted(points, key=lambda item: item[0])
+
+
+def _legend_labels(ax: plt.Axes, *, location: str = "best") -> list[str]:
     handles, labels = ax.get_legend_handles_labels()
     if handles:
-        ax.legend(frameon=False, fontsize=8, loc="best")
+        ax.legend(frameon=False, fontsize=8, loc=location)
     return labels
 
 
@@ -125,6 +166,53 @@ def _draw_chain_overlay(ax: plt.Axes, sampled: pd.DataFrame, *, x_col: str, y_co
     )
 
 
+def _overlay_selected_elites(
+    ax: plt.Axes,
+    elites_df: pd.DataFrame | None,
+    *,
+    x_col: str,
+    y_col: str,
+) -> int:
+    if elites_df is None or elites_df.empty:
+        return 0
+    if x_col not in elites_df.columns or y_col not in elites_df.columns:
+        return 0
+    x_vals = pd.to_numeric(elites_df[x_col], errors="coerce")
+    y_vals = pd.to_numeric(elites_df[y_col], errors="coerce")
+    valid = x_vals.notna() & y_vals.notna()
+    if not bool(valid.any()):
+        return 0
+    x = x_vals[valid].astype(float).to_numpy()
+    y = y_vals[valid].astype(float).to_numpy()
+    elite_rows = elites_df.loc[valid].copy()
+    ax.scatter(
+        x,
+        y,
+        s=42,
+        marker="o",
+        c="#2f7f3f",
+        edgecolors="#111111",
+        linewidths=0.8,
+        zorder=9,
+        label=f"selected elites (n={len(elite_rows)})",
+    )
+    if "rank" in elite_rows.columns:
+        for x_val, y_val, rank in zip(x, y, elite_rows["rank"], strict=False):
+            try:
+                rank_label = int(rank)
+            except (TypeError, ValueError):
+                continue
+            ax.annotate(
+                str(rank_label),
+                xy=(float(x_val), float(y_val)),
+                xytext=(4, 4),
+                textcoords="offset points",
+                fontsize=7,
+                color="#1f1f1f",
+            )
+    return int(len(elite_rows))
+
+
 def _draw_chain_lineage(
     ax: plt.Axes,
     sampled: pd.DataFrame,
@@ -133,12 +221,14 @@ def _draw_chain_lineage(
     y_col: str,
     alpha_lo: float,
     alpha_hi: float,
+    chain_label_limit: int = 8,
 ) -> tuple[list[int], dict[int, int]]:
     chain_ids = sorted(int(v) for v in sampled["chain"].unique())
     if not chain_ids:
         raise ValueError("Trajectory plot requires at least one chain.")
     points_by_chain: dict[int, int] = {}
     cmap = plt.get_cmap("tab20", max(1, len(chain_ids)))
+    label_each_chain = len(chain_ids) <= int(chain_label_limit)
     for idx, chain_id in enumerate(chain_ids):
         chain_df = sampled[sampled["chain"].astype(int) == chain_id].sort_values("sweep_idx")
         if chain_df.empty:
@@ -178,7 +268,19 @@ def _draw_chain_lineage(
             ]
         )
         ax.scatter(x, y, s=16, c=colors, edgecolors="none", zorder=5)
-        ax.plot([], [], color=rgb, linewidth=1.4, label=f"chain {chain_id}")
+        ax.scatter(
+            [x[-1]],
+            [y[-1]],
+            s=38,
+            facecolors=[rgb],
+            edgecolors="#111111",
+            linewidths=0.8,
+            zorder=7,
+        )
+        if label_each_chain:
+            ax.plot([], [], color=rgb, linewidth=1.4, label=f"chain {chain_id}")
+        elif idx == 0:
+            ax.plot([], [], color=rgb, linewidth=1.4, label=f"chains (n={len(chain_ids)})")
     return chain_ids, points_by_chain
 
 
@@ -186,9 +288,11 @@ def plot_chain_trajectory_scatter(
     *,
     trajectory_df: pd.DataFrame,
     baseline_df: pd.DataFrame,
+    elites_df: pd.DataFrame | None = None,
     tf_pair: tuple[str, str],
     scatter_scale: str,
     consensus_anchors: list[dict[str, object]] | None,
+    objective_caption: str | None = None,
     out_path: Path,
     dpi: int,
     png_compress_level: int,
@@ -196,6 +300,7 @@ def plot_chain_trajectory_scatter(
     alpha_min: float = 0.15,
     alpha_max: float = 0.95,
     slot_overlay: bool = False,
+    chain_label_limit: int = 8,
 ) -> dict[str, object]:
     if not isinstance(alpha_min, (int, float)) or not isinstance(alpha_max, (int, float)):
         raise ValueError("Chain alpha bounds must be numeric.")
@@ -219,13 +324,13 @@ def plot_chain_trajectory_scatter(
     baseline[x_col] = _require_numeric(baseline, x_col, context="Baseline")
     baseline[y_col] = _require_numeric(baseline, y_col, context="Baseline")
 
-    fig, ax = plt.subplots(figsize=(6.8, 5.1))
+    fig, ax = plt.subplots(figsize=(7.2, 5.4))
     ax.scatter(
         baseline[x_col].astype(float),
         baseline[y_col].astype(float),
-        s=8,
+        s=7,
         c="#c9c9c9",
-        alpha=0.28,
+        alpha=0.20,
         edgecolors="none",
         zorder=1,
         label=f"random baseline (n={len(baseline)})",
@@ -238,7 +343,10 @@ def plot_chain_trajectory_scatter(
         y_col=y_col,
         alpha_lo=alpha_lo,
         alpha_hi=alpha_hi,
+        chain_label_limit=chain_label_limit,
     )
+
+    elite_points_plotted = _overlay_selected_elites(ax, elites_df, x_col=x_col, y_col=y_col)
 
     if consensus_anchors:
         anchor_x = [float(item["x"]) for item in consensus_anchors]
@@ -257,7 +365,7 @@ def plot_chain_trajectory_scatter(
         for item in consensus_anchors:
             x = float(item["x"])
             y = float(item["y"])
-            label = str(item.get("label") or item.get("tf") or "consensus")
+            label = _clean_anchor_label(item.get("label") or item.get("tf") or "consensus anchor")
             ax.annotate(
                 label,
                 xy=(x, y),
@@ -271,10 +379,12 @@ def plot_chain_trajectory_scatter(
         _draw_chain_overlay(ax, best_updates, x_col=x_col, y_col=y_col)
 
     scale_label = "raw LLR" if normalized_scale == "llr" else "normalized LLR"
-    ax.set_xlabel(f"{tf_pair[0]} ({scale_label})")
-    ax.set_ylabel(f"{tf_pair[1]} ({scale_label})")
+    ax.set_xlabel(f"{tf_pair[0]} best-window {scale_label}")
+    ax.set_ylabel(f"{tf_pair[1]} best-window {scale_label}")
     ax.set_title(f"Chain trajectory ({tf_pair[0]} vs {tf_pair[1]})")
-    legend_labels = _legend_labels(ax)
+    apply_axes_style(ax, ygrid=True)
+    legend_labels = _legend_labels(ax, location="upper left")
+    place_figure_caption(fig, objective_caption)
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
@@ -287,6 +397,8 @@ def plot_chain_trajectory_scatter(
         "x_column": x_col,
         "y_column": y_col,
         "plotted_points_by_chain": points_by_chain,
+        "elite_points_plotted": elite_points_plotted,
+        "objective_caption": str(objective_caption or ""),
     }
 
 
@@ -295,6 +407,9 @@ def plot_chain_trajectory_sweep(
     trajectory_df: pd.DataFrame,
     y_column: str,
     y_mode: str = "best_so_far",
+    cooling_config: dict[str, object] | None = None,
+    tune_sweeps: int | None = None,
+    objective_caption: str | None = None,
     out_path: Path,
     dpi: int,
     png_compress_level: int,
@@ -319,7 +434,7 @@ def plot_chain_trajectory_sweep(
     sampled_plot = sampled.copy()
     sampled_plot["_y_plot"] = np.nan
 
-    fig, ax = plt.subplots(figsize=(6.8, 5.1))
+    fig, ax = plt.subplots(figsize=(7.2, 5.4))
     chain_ids = sorted(int(v) for v in sampled["chain"].unique())
     cmap = plt.get_cmap("tab20", max(1, len(chain_ids)))
     for idx, chain_id in enumerate(chain_ids):
@@ -387,16 +502,7 @@ def plot_chain_trajectory_sweep(
     if slot_overlay:
         _draw_chain_overlay(ax, sampled_plot, x_col="sweep_idx", y_col="_y_plot")
 
-    ylabel_base = {
-        "raw_llr_objective": "Raw LLR objective",
-        "norm_llr_objective": "Normalized LLR objective",
-        "objective_scalar": "Optimization score",
-    }.get(y_column, y_column)
-    ylabel = {
-        "raw": f"{ylabel_base} (per-sweep value)",
-        "best_so_far": f"{ylabel_base} (best-so-far cumulative maximum)",
-        "all": f"{ylabel_base} (per-sweep values with best-so-far envelope)",
-    }[mode]
+    ylabel = _sweep_ylabel(y_column, mode)
     ax.set_xlabel("Sweep index")
     ax.set_ylabel(ylabel)
     title_suffix = {
@@ -404,18 +510,41 @@ def plot_chain_trajectory_sweep(
         "best_so_far": "best-so-far",
         "all": "raw + best-so-far",
     }[mode]
-    ax.set_title(f"Chain trajectory over sweeps ({title_suffix})")
-    ax.text(
-        0.02,
-        0.98,
-        "Chains are colored independently; y-axis semantics are mode-dependent.",
-        transform=ax.transAxes,
-        ha="left",
-        va="top",
-        fontsize=8,
-        color="#4a4a4a",
-    )
-    legend_labels = _legend_labels(ax)
+    ax.set_title(f"Joint objective over sweeps ({title_suffix})")
+
+    tune_boundary = None
+    if isinstance(tune_sweeps, int) and tune_sweeps > 0:
+        tune_boundary = int(tune_sweeps)
+        ax.axvline(tune_boundary, color="#777777", linestyle="--", linewidth=1.0, alpha=0.75)
+        y_max = ax.get_ylim()[1]
+        ax.text(
+            tune_boundary,
+            y_max,
+            " tune end",
+            ha="left",
+            va="top",
+            fontsize=8,
+            color="#555555",
+        )
+
+    cooling_markers = _cooling_markers(cooling_config)
+    if cooling_markers:
+        y_max = ax.get_ylim()[1]
+        for sweep_boundary, beta_value in cooling_markers[:-1]:
+            ax.axvline(sweep_boundary, color="#aaaaaa", linestyle=":", linewidth=0.9, alpha=0.7)
+            ax.text(
+                sweep_boundary,
+                y_max,
+                f" β={beta_value:g}",
+                ha="left",
+                va="bottom",
+                fontsize=7,
+                color="#666666",
+            )
+
+    apply_axes_style(ax, ygrid=True)
+    legend_labels = _legend_labels(ax, location="upper left")
+    place_figure_caption(fig, objective_caption)
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
@@ -427,4 +556,7 @@ def plot_chain_trajectory_sweep(
         "chain_count": len(chain_ids),
         "y_column": y_column,
         "y_label": ylabel,
+        "tune_boundary_sweep": tune_boundary,
+        "cooling_stage_count": len(cooling_markers),
+        "objective_caption": str(objective_caption or ""),
     }

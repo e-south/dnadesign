@@ -58,6 +58,10 @@ def test_core_distance_is_normalized() -> None:
     dist = compute_core_distance(cores_a, cores_b, weights=weights, tf_names=["tf"])
     assert dist == pytest.approx(1.0 / 3.0)
     assert 0.0 <= dist <= 1.0
+    dist_symmetric = compute_core_distance(cores_b, cores_a, weights=weights, tf_names=["tf"])
+    assert dist_symmetric == pytest.approx(dist)
+    dist_identity = compute_core_distance(cores_a, cores_a, weights=weights, tf_names=["tf"])
+    assert dist_identity == pytest.approx(0.0)
 
 
 def test_mmr_selection_is_deterministic() -> None:
@@ -113,3 +117,28 @@ def test_mmr_dedupes_reverse_complements() -> None:
     selected = [row["sequence"] for row in result.meta]
     assert len(selected) == 2
     assert len({row["canonical_sequence"] for row in result.meta}) == 2
+
+
+def test_mmr_tiebreak_prefers_full_sequence_diversity_when_core_distance_ties() -> None:
+    candidates = [
+        _candidate("AAAA", chain=0, draw=1, combined=0.90, min_norm=0.90),
+        _candidate("AAAT", chain=0, draw=2, combined=0.80, min_norm=0.80),
+        _candidate("TTTT", chain=0, draw=3, combined=0.80, min_norm=0.80),
+    ]
+    # Force a motif-core tie (all core signatures are identical) so tie-break behavior is exercised.
+    shared_core = np.array([0, 0, 0, 0], dtype=np.int8)
+    core_maps = {f"{cand.chain_id}:{cand.draw_idx}": {"tf": shared_core.copy()} for cand in candidates}
+    result = select_mmr_elites(
+        candidates,
+        k=2,
+        pool_size=3,
+        alpha=0.7,
+        relevance="min_per_tf_norm",
+        dsdna=False,
+        tf_names=["tf"],
+        pwms={"tf": _pwm("tf", [[0.25, 0.25, 0.25, 0.25]] * 4)},
+        core_maps=core_maps,
+    )
+    selected_ids = [row["candidate_id"] for row in result.meta]
+    assert selected_ids[0] == "0:1"
+    assert selected_ids[1] == "0:3"
