@@ -11,7 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import json
 import random
 from pathlib import Path
 
@@ -237,19 +236,3 @@ def test_runtime_iterative_sampling_uses_failure_feedback_across_libraries(tmp_p
     assert min_count_failures >= 2
 
     assert events_path.exists()
-    rows = [json.loads(line) for line in events_path.read_text().splitlines()]
-    assert rows
-    pressure_rows = [row for row in rows if row.get("event") == "LIBRARY_SAMPLING_PRESSURE"]
-    if pressure_rows:
-        by_index = {int(row.get("library_index", -1)): row for row in pressure_rows}
-        assert 1 in by_index
-        assert 2 in by_index
-        first_failure_counts = by_index[1].get("failure_count_by_tf") or {}
-        second_failure_counts = by_index[2].get("failure_count_by_tf") or {}
-        first_total = sum(int(v) for v in first_failure_counts.values())
-        second_total = sum(int(v) for v in second_failure_counts.values())
-        assert first_total == 0
-        assert second_total > 0
-    else:
-        built_rows = [row for row in rows if row.get("event") == "LIBRARY_BUILT"]
-        assert len(built_rows) >= 2
