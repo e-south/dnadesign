@@ -50,6 +50,7 @@ def register_profile_commands(
             "--include-raw-event/--no-include-raw-event",
             help="Whether to include the full USR event blob in payload meta.",
         ),
+        tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
         policy: str | None = typer.Option(
             None,
             "--policy",
@@ -69,6 +70,7 @@ def register_profile_commands(
             include_args=include_args,
             include_context=include_context,
             include_raw_event=include_raw_event,
+            tls_ca_bundle=tls_ca_bundle,
             policy=policy,
             force=force,
         )
@@ -101,6 +103,7 @@ def register_profile_commands(
             "--include-raw-event/--no-include-raw-event",
             help="Whether to include the full USR event blob in payload meta.",
         ),
+        tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
         policy: str | None = typer.Option(
             None,
             "--policy",
@@ -151,6 +154,7 @@ def register_profile_commands(
             include_args=include_args,
             include_context=include_context,
             include_raw_event=include_raw_event,
+            tls_ca_bundle=tls_ca_bundle,
             policy=policy,
             secret_source=secret_source,
             url_env=url_env,

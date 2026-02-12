@@ -165,6 +165,66 @@ def test_usr_events_watch_dry_run_does_not_require_webhook_url(tmp_path: Path) -
     assert '"/tmp/datasets"' not in result.stdout
 
 
+def test_usr_events_watch_rejects_https_webhook_without_ca_bundle(tmp_path: Path, monkeypatch) -> None:
+    events = tmp_path / "events.log"
+    _write_events(events, [_event()])
+    monkeypatch.delenv("SSL_CERT_FILE", raising=False)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--provider",
+            "generic",
+            "--url",
+            "https://example.invalid/webhook",
+            "--events",
+            str(events),
+        ],
+    )
+    assert result.exit_code == 1
+    assert "requires an explicit CA bundle" in result.stdout
+
+
+def test_usr_events_watch_accepts_tls_ca_bundle_override(tmp_path: Path, monkeypatch) -> None:
+    events = tmp_path / "events.log"
+    ca_bundle = tmp_path / "ca.pem"
+    ca_bundle.write_text("dummy", encoding="utf-8")
+    _write_events(events, [_event()])
+    monkeypatch.delenv("SSL_CERT_FILE", raising=False)
+
+    sent_payloads: list[dict] = []
+    captured: list[dict] = []
+
+    def _fake_post(_url: str, payload: dict, **kwargs) -> None:
+        sent_payloads.append(payload)
+        captured.append(kwargs)
+
+    monkeypatch.setattr("dnadesign.notify.cli.post_json", _fake_post)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--provider",
+            "generic",
+            "--url",
+            "https://example.invalid/webhook",
+            "--tls-ca-bundle",
+            str(ca_bundle),
+            "--events",
+            str(events),
+        ],
+    )
+    assert result.exit_code == 0
+    assert len(sent_payloads) == 1
+    assert captured[0]["tls_ca_bundle"] == ca_bundle.resolve()
+
+
 def test_usr_events_watch_can_skip_invalid_events_when_configured(tmp_path: Path) -> None:
     events = tmp_path / "events.log"
     bad = _event()

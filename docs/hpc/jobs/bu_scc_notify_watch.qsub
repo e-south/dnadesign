@@ -22,6 +22,7 @@ NOTIFY_ACTIONS="${NOTIFY_ACTIONS:-}"
 NOTIFY_TOOLS="${NOTIFY_TOOLS:-}"
 NOTIFY_IDLE_TIMEOUT_SECONDS="${NOTIFY_IDLE_TIMEOUT_SECONDS:-3600}"
 NOTIFY_POLL_INTERVAL_SECONDS="${NOTIFY_POLL_INTERVAL_SECONDS:-1.0}"
+NOTIFY_TLS_CA_BUNDLE="${NOTIFY_TLS_CA_BUNDLE:-${SSL_CERT_FILE:-}}"
 
 if [[ -n "$NOTIFY_PROFILE" ]]; then
   if [[ ! -f "$NOTIFY_PROFILE" ]]; then
@@ -30,13 +31,18 @@ if [[ -n "$NOTIFY_PROFILE" ]]; then
     exit 2
   fi
 
-  uv run notify usr-events watch \
-    --profile "$NOTIFY_PROFILE" \
-    --wait-for-events \
-    --idle-timeout "$NOTIFY_IDLE_TIMEOUT_SECONDS" \
-    --poll-interval-seconds "$NOTIFY_POLL_INTERVAL_SECONDS" \
-    --stop-on-terminal-status \
+  PROFILE_WATCH_ARGS=(
+    --profile "$NOTIFY_PROFILE"
+    --wait-for-events
+    --idle-timeout "$NOTIFY_IDLE_TIMEOUT_SECONDS"
+    --poll-interval-seconds "$NOTIFY_POLL_INTERVAL_SECONDS"
+    --stop-on-terminal-status
     --follow
+  )
+  if [[ -n "$NOTIFY_TLS_CA_BUNDLE" ]]; then
+    PROFILE_WATCH_ARGS+=(--tls-ca-bundle "$NOTIFY_TLS_CA_BUNDLE")
+  fi
+  uv run notify usr-events watch "${PROFILE_WATCH_ARGS[@]}"
   exit 0
 fi
 
@@ -131,6 +137,9 @@ if [[ -n "$NOTIFY_ACTIONS_EFFECTIVE" ]]; then
 fi
 if [[ -n "$NOTIFY_TOOLS_EFFECTIVE" ]]; then
   WATCH_ARGS+=(--only-tools "$NOTIFY_TOOLS_EFFECTIVE")
+fi
+if [[ -n "$NOTIFY_TLS_CA_BUNDLE" ]]; then
+  WATCH_ARGS+=(--tls-ca-bundle "$NOTIFY_TLS_CA_BUNDLE")
 fi
 
 uv run notify usr-events watch "${WATCH_ARGS[@]}"
