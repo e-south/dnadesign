@@ -177,13 +177,18 @@ Dashboard notebooks (e.g., `prom60_eda.py`) now pull their shared logic from
    │  └─ labels.parquet          # label events (ingest-only)
    └─ rounds/
       └─ round_<k>/
-      ├─ model.joblib
-      ├─ model_meta.json
-      ├─ selection_top_k.csv
-      ├─ labels_used.parquet
-      ├─ round_ctx.json
-      ├─ objective_meta.json
-      └─ round.log.jsonl
+         ├─ model/
+         │  ├─ model.joblib
+         │  └─ model_meta.json
+         ├─ selection/
+         │  └─ selection_top_k.csv
+         ├─ labels/
+         │  └─ labels_used.parquet
+         ├─ metadata/
+         │  ├─ round_ctx.json
+         │  └─ objective_meta.json
+         └─ logs/
+            └─ round.log.jsonl
 ```
 
 > **Note:** sequences may live in USR datasets under `src/dnadesign/usr/datasets/<dataset>/records.parquet` and are not copied into campaigns.

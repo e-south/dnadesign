@@ -80,8 +80,9 @@ def _wrap_model_for_ctx(name: str, model: Any) -> Any:
     if getattr(model, "__opal_ctx_wrapped__", False):
         return model
 
-    def _has_stage_maps() -> bool:
-        return bool(getattr(contract, "requires_by_stage", None) or getattr(contract, "produces_by_stage", None))
+    def _has_predict_stage_produces() -> bool:
+        produces_by_stage = getattr(contract, "produces_by_stage", None) or {}
+        return bool(produces_by_stage.get("predict"))
 
     def _wrap_method(method_name: str, *, stage: str, postcheck: bool = True) -> None:
         orig = getattr(model, method_name, None)
@@ -92,7 +93,12 @@ def _wrap_model_for_ctx(name: str, model: Any) -> Any:
             ctx = kwargs.get("ctx")
             if ctx is not None:
                 ctx.precheck_requires(stage=stage)
-            out = orig(*args, **kwargs)
+            try:
+                out = orig(*args, **kwargs)
+            except Exception:
+                if ctx is not None:
+                    ctx.reset_stage_state()
+                raise
             if ctx is not None and postcheck:
                 ctx.postcheck_produces(stage=stage)
             return out
@@ -100,7 +106,7 @@ def _wrap_model_for_ctx(name: str, model: Any) -> Any:
         setattr(model, method_name, _wrapped)
 
     _wrap_method("fit", stage="fit", postcheck=True)
-    _wrap_method("predict", stage="predict", postcheck=not _has_stage_maps())
+    _wrap_method("predict", stage="predict", postcheck=not _has_predict_stage_produces())
     setattr(model, "__opal_ctx_wrapped__", True)
     return model
 

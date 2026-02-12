@@ -10,7 +10,9 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import dataclasses as _dc
+import os
 import re
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Set, Tuple
@@ -22,8 +24,15 @@ __all__ = [
     "RoundCtxPathError",
     "RoundCtxTypeError",
     "RoundCtxContractError",
+    "RoundCtxStageError",
     "PluginRegistryView",
 ]
+
+
+def _dbg(msg: str) -> None:
+    if str(os.getenv("OPAL_DEBUG", "")).strip().lower() in ("1", "true", "yes", "on"):
+        print(f"[opal.debug.round_ctx] {msg}", file=sys.stderr)
+
 
 # ---------------------------------------------------------------------------
 # Errors
@@ -72,6 +81,22 @@ class RoundCtxContractError(RuntimeError):
         self.missing_requires = missing_requires or []
         self.illegal_writes = illegal_writes or []
         self.missing_produces = missing_produces or []
+
+
+class RoundCtxStageError(RuntimeError):
+    def __init__(self, *, active_stage: Optional[str], requested_stage: str, action: str) -> None:
+        active = active_stage if active_stage is not None else "<none>"
+        if action == "enter":
+            msg = (
+                f"RoundCtx stage mismatch: already in stage '{active}', "
+                f"cannot enter '{requested_stage}' without closing."
+            )
+        else:
+            msg = f"RoundCtx stage mismatch: active stage '{active}', cannot postcheck '{requested_stage}'."
+        super().__init__(msg)
+        self.active_stage = active_stage
+        self.requested_stage = requested_stage
+        self.action = action
 
 
 # ---------------------------------------------------------------------------
@@ -416,6 +441,8 @@ class PluginCtx:
     category: str
     name: str
     contract: Contract
+    _active_stage: Optional[str] = field(init=False, default=None, repr=False)
+    _stage_buffer: Dict[str, Any] = field(init=False, default_factory=dict, repr=False)
 
     def __post_init__(self) -> None:
         if self.contract.produces_by_stage is not None and self.contract.produces:
@@ -483,9 +510,28 @@ class PluginCtx:
                 out.add(self._expand(p))
         return out
 
+    def _is_stage_buffer_eligible(self, path: str) -> bool:
+        if self._active_stage is None:
+            return False
+        stage_map = self.contract.produces_by_stage
+        if not stage_map:
+            return False
+        stage_paths = stage_map.get(self._active_stage, tuple())
+        return path in {self._expand(p) for p in stage_paths}
+
+    def _reset_stage_state(self) -> None:
+        self._stage_buffer.clear()
+        self._active_stage = None
+
+    def reset_stage_state(self) -> None:
+        self._reset_stage_state()
+
     def get(self, path: str, default: Any = None) -> Any:
         p = self._expand(path)
-        val = self.round_ctx.get(p, default=default)
+        if self._active_stage is not None and p in self._stage_buffer:
+            val = self._stage_buffer[p]
+        else:
+            val = self.round_ctx.get(p, default=default)
         self.round_ctx._audit.add_consumed(self.category, self.name, p)
         return val
 
@@ -499,10 +545,22 @@ class PluginCtx:
                 illegal_writes=[p],
                 msg="write to a key not declared in produces",
             )
-        self.round_ctx.set(p, value, allow_overwrite=False)
+        if self._is_stage_buffer_eligible(p):
+            _dbg(f"staging write for {self.category}/{self.name} stage={self._active_stage} path={p}")
+            self._stage_buffer[p] = _to_jsonable(p, value)
+        else:
+            _dbg(f"persisting write for {self.category}/{self.name} path={p}")
+            self.round_ctx.set(p, value, allow_overwrite=False)
         self.round_ctx._audit.add_produced(self.category, self.name, p)
 
     def precheck_requires(self, stage: Optional[str] = None) -> None:
+        if stage is not None and self._has_stage_maps():
+            stage_key = self._require_stage(stage)
+            if self._active_stage is None:
+                self._active_stage = stage_key
+                self._stage_buffer.clear()
+            elif self._active_stage != stage_key:
+                raise RoundCtxStageError(active_stage=self._active_stage, requested_stage=stage_key, action="enter")
         missing: List[str] = []
         for req in self._stage_requires(stage):
             p = req
@@ -514,6 +572,25 @@ class PluginCtx:
             raise RoundCtxContractError(category=self.category, name=self.name, missing_requires=missing)
 
     def postcheck_produces(self, stage: Optional[str] = None) -> None:
+        if stage is not None and self._has_stage_maps():
+            stage_key = self._require_stage(stage)
+            if self._active_stage is None:
+                raise RoundCtxStageError(active_stage=None, requested_stage=stage_key, action="postcheck")
+            if self._active_stage != stage_key:
+                raise RoundCtxStageError(
+                    active_stage=self._active_stage,
+                    requested_stage=stage_key,
+                    action="postcheck",
+                )
+            try:
+                _dbg(
+                    "committing staged writes for "
+                    f"{self.category}/{self.name} stage={stage_key} keys={len(self._stage_buffer)}"
+                )
+                for p in sorted(self._stage_buffer.keys()):
+                    self.round_ctx.set(p, self._stage_buffer[p], allow_overwrite=False)
+            finally:
+                self._reset_stage_state()
         missing: List[str] = []
         for prod in self._stage_produces(stage):
             p = prod

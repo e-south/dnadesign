@@ -42,3 +42,19 @@ def test_record_show_requires_run_id_when_multiple_runs(tmp_path: Path) -> None:
         ["--no-color", "record-show", "-c", str(campaign), "--id", "a", "--run-id", "r1", "--json"],
     )
     assert res_ok.exit_code == 0, res_ok.stdout
+
+
+def test_record_show_accepts_latest_run_id_alias(tmp_path: Path) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path)
+    write_ledger(workdir, run_id="r0", round_index=0)
+    write_ledger(workdir, run_id="r2", round_index=2)
+    write_ledger(workdir, run_id="r1", round_index=2)
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        ["--no-color", "record-show", "-c", str(campaign), "--id", "a", "--run-id", "latest", "--json"],
+    )
+    assert res.exit_code == 0, res.stdout
+    assert '"run_id": "r2"' in res.stdout

@@ -221,7 +221,7 @@ opal record-show --config <yaml> \
 * `--config, -c`: Path to `configs/campaign.yaml` (optional if auto-discovery works).
 * `<ID-or-SEQ>`: Positional id or sequence (use `--id/--sequence` to disambiguate).
 * `--id`, `--sequence`: Explicit lookup key (mutually exclusive).
-* `--run-id`: Explicit run_id for ledger predictions (required if multiple runs exist for a round).
+* `--run-id`: Explicit run_id for ledger predictions (or `latest` to pick the latest ledger run by `(as_of_round, run_id)`).
 * `--with-sequence/--no-sequence`: Include the sequence in output (default: on).
 * `--json`: Output as JSON.
 
@@ -288,6 +288,7 @@ opal verify-outputs --config <yaml> [--round <k|latest> | --run-id <id>] \
 * Uses the ledger’s `pred__y_obj_scalar` as the canonical score source.
 * `--selection-path` accepts `.csv` or `.parquet`.
 * `--round, -r`: Round selector (integer or `latest`).
+* If the selected round has multiple runs, pass `--run-id` to disambiguate.
 * `--profile/--no-profile`: Compute hue/size suitability stats (default: off).
 
 **Notes**

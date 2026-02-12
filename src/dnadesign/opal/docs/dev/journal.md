@@ -2,6 +2,29 @@
 
 Note: freeform working notes; prune/merge as they become cruft.
 
+## 2026-02-12
+- Starting RoundCtx stage-buffer hardening for batched `model.predict` writes.
+- Goal: keep persisted `RoundCtx` immutable while allowing stage-local repeated updates to stage-scoped keys.
+- Implementing stage lifecycle state in `PluginCtx` with explicit mismatch errors and no silent fallbacks.
+- Stage buffering is restricted to `produces_by_stage[active_stage]`; non-stage keys remain immediate strict writes.
+- `ctx.get` now overlays staged values during an active stage to support read-your-writes accumulation.
+- Stage commit is deterministic (sorted by path) and uses strict `RoundCtx.set(..., allow_overwrite=False)`.
+- Stage state is cleared in `finally` during postcheck commit to prevent staged leakage after failures.
+- Registry wrappers now reset stage state when plugin execution raises, preventing cross-stage lockups on retries.
+- Audit found a predict-stage leak when contracts had stage maps but no `produces_by_stage["predict"]`;
+  model wrapper now defers predict postcheck only when predict-stage produces are declared.
+- Added regression coverage for requires-only predict stages to ensure `predict` does not block subsequent `fit`.
+- `record-show` now accepts `--run-id latest` and resolves deterministically to the latest ledger run
+  (`as_of_round`, then `run_id`) with explicit errors when runs ledger is missing/empty.
+- Added contract regression tests for batched overwrite, stage mismatch, missing produces, strict non-stage immutability,
+  and failure-path stage-state reset.
+- Maintainer audit rerun: full OPAL test suite passes; demo CLI flow (`init/validate/ingest-y/run/status/runs/log/verify/plot/predict/record-show/notebook`)
+  passes end-to-end on an isolated campaign copy with expected run-id disambiguation behavior on reruns.
+- Added regression coverage for repeated `precheck_requires(stage)` idempotency and for mutable staged values
+  being frozen at `set()` time (no post-set mutation bleed-through at commit).
+- README campaign tree updated to current nested round artifact layout (`model/`, `selection/`, `labels/`,
+  `metadata/`, `logs/`) to remove stale flat-layout docs.
+
 ## 2026-01-23
 - Starting from a clean baseline commit on `opal-dashboard-debug`.
 - New campaign layout uses `configs/` for `campaign.yaml` + `plots.yaml`.

@@ -84,7 +84,12 @@ def _wrap_for_ctx_enforcement(name: str, fn: _ObjectiveFn) -> _ObjectiveFn:
                 ctx.precheck_requires(stage="objective")
             except Exception:
                 raise
-        out = fn(y_pred=y_pred, params=params, ctx=ctx, train_view=train_view)
+        try:
+            out = fn(y_pred=y_pred, params=params, ctx=ctx, train_view=train_view)
+        except Exception:
+            if ctx is not None:
+                ctx.reset_stage_state()
+            raise
         if ctx is not None:
             try:
                 ctx.postcheck_produces(stage="objective")
