@@ -20,6 +20,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+import click
 import typer
 
 from .cli_commands import (
@@ -1028,6 +1029,7 @@ def _create_wizard_profile(
 
 
 def _profile_wizard_impl(
+    ctx: typer.Context,
     profile: Path = typer.Option(_DEFAULT_PROFILE_PATH, "--profile", help="Path to profile JSON file."),
     provider: str = typer.Option("slack", help="Provider: generic|slack|discord."),
     events: Path = typer.Option(..., "--events", help="USR .events.log JSONL path."),
@@ -1069,8 +1071,19 @@ def _profile_wizard_impl(
     force: bool = typer.Option(False, "--force", help="Overwrite an existing profile file."),
 ) -> None:
     try:
+        profile_value = profile
+        profile_source = ctx.get_parameter_source("profile")
+        default_profile_selected = profile_source == click.core.ParameterSource.DEFAULT
+        if default_profile_selected and profile_value == _DEFAULT_PROFILE_PATH:
+            policy_namespace = _resolve_workflow_policy(policy=policy)
+            if policy_namespace is None:
+                raise NotifyConfigError(
+                    "default profile path is ambiguous in wizard mode; "
+                    "pass --policy or --profile to select a profile namespace"
+                )
+            profile_value = _default_profile_path_for_tool(policy_namespace)
         result = _create_wizard_profile(
-            profile=profile,
+            profile=profile_value,
             provider=provider,
             events=events,
             cursor=cursor,

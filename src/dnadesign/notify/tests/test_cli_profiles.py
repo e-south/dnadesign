@@ -231,17 +231,44 @@ def test_profile_wizard_defaults_to_namespaced_profile_and_runtime_paths(tmp_pat
             "slack",
             "--events",
             str(events),
+            "--policy",
+            "densegen",
             "--secret-source",
             "env",
         ],
     )
     assert result.exit_code == 0
-    profile = tmp_path / "outputs" / "notify" / "generic" / "profile.json"
+    profile = tmp_path / "outputs" / "notify" / "densegen" / "profile.json"
     assert profile.exists()
     data = json.loads(profile.read_text(encoding="utf-8"))
     assert data["webhook"] == {"source": "env", "ref": "NOTIFY_WEBHOOK"}
-    assert data["cursor"] == str((tmp_path / "outputs" / "notify" / "generic" / "cursor").resolve())
-    assert data["spool_dir"] == str((tmp_path / "outputs" / "notify" / "generic" / "spool").resolve())
+    assert data["cursor"] == str((tmp_path / "outputs" / "notify" / "densegen" / "cursor").resolve())
+    assert data["spool_dir"] == str((tmp_path / "outputs" / "notify" / "densegen" / "spool").resolve())
+
+
+def test_profile_wizard_requires_policy_or_profile_for_default_events_mode_profile(
+    tmp_path: Path, monkeypatch
+) -> None:
+    events = tmp_path / "events.log"
+    _write_events(events, [_event()])
+    monkeypatch.chdir(tmp_path)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "profile",
+            "wizard",
+            "--provider",
+            "slack",
+            "--events",
+            str(events),
+            "--secret-source",
+            "env",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "pass --policy or --profile" in result.stdout.lower()
 
 
 def test_profile_wizard_stores_tls_ca_bundle_path(tmp_path: Path, monkeypatch) -> None:
@@ -261,6 +288,8 @@ def test_profile_wizard_stores_tls_ca_bundle_path(tmp_path: Path, monkeypatch) -
             "slack",
             "--events",
             str(events),
+            "--policy",
+            "densegen",
             "--secret-source",
             "env",
             "--tls-ca-bundle",
@@ -268,7 +297,7 @@ def test_profile_wizard_stores_tls_ca_bundle_path(tmp_path: Path, monkeypatch) -
         ],
     )
     assert result.exit_code == 0
-    profile = tmp_path / "outputs" / "notify" / "generic" / "profile.json"
+    profile = tmp_path / "outputs" / "notify" / "densegen" / "profile.json"
     data = json.loads(profile.read_text(encoding="utf-8"))
     assert data["tls_ca_bundle"] == str(ca_bundle.resolve())
 

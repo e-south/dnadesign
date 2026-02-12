@@ -77,6 +77,7 @@ def register_profile_commands(
 
     @profile_app.command("wizard")
     def profile_wizard(
+        ctx: typer.Context,
         profile: Path = typer.Option(
             Path("outputs/notify/generic/profile.json"),
             "--profile",
@@ -144,6 +145,7 @@ def register_profile_commands(
         force: bool = typer.Option(False, "--force", help="Overwrite an existing profile file."),
     ) -> None:
         wizard_handler(
+            ctx=ctx,
             profile=profile,
             provider=provider,
             events=events,
