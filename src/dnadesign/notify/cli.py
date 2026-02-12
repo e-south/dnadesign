@@ -38,6 +38,10 @@ from .cli_resolve import resolve_path_value as _resolve_path_value
 from .cli_resolve import resolve_string_value as _resolve_string_value
 from .cli_resolve import resolve_usr_events_path as _resolve_usr_events_path_raw
 from .errors import NotifyConfigError, NotifyDeliveryError, NotifyError
+from .event_transforms import event_message as _event_message
+from .event_transforms import event_meta as _event_meta
+from .event_transforms import status_for_action as _status_for_action
+from .event_transforms import validate_usr_event as _validate_usr_event_data
 from .events_source import normalize_tool_name as _normalize_setup_tool_name
 from .events_source import resolve_tool_events_path as _resolve_tool_events_path
 from .http import post_json
@@ -129,84 +133,12 @@ def _write_profile_file(profile_path: Path, payload: dict[str, Any], *, force: b
         raise NotifyConfigError(f"failed to set secure permissions on profile: {profile_path}") from exc
 
 
-def _event_meta(
-    event: dict[str, Any],
-    *,
-    include_args: bool,
-    include_raw_event: bool,
-    include_context: bool,
-) -> dict[str, Any]:
-    dataset_raw = event.get("dataset")
-    dataset = dataset_raw if isinstance(dataset_raw, dict) else {}
-    meta = {
-        "usr_event_version": event.get("event_version"),
-        "usr_action": event.get("action"),
-        "usr_dataset_name": dataset.get("name"),
-        "usr_fingerprint": event.get("fingerprint"),
-        "usr_registry_hash": event.get("registry_hash"),
-        "usr_timestamp": event.get("timestamp_utc"),
-    }
-    if include_context:
-        meta["usr_dataset_root"] = dataset.get("root")
-    if include_args:
-        meta["usr_args"] = event.get("args")
-    if include_raw_event:
-        meta["usr_event"] = event
-    return meta
-
-
-def _status_for_action(action: str, *, event: dict[str, Any] | None = None) -> str:
-    action_norm = str(action or "").strip().lower()
-    if not action_norm:
-        return "running"
-    if "fail" in action_norm or "error" in action_norm:
-        return "failure"
-    if action_norm == "init":
-        return "started"
-    if action_norm in {"materialize", "compact_overlay", "overlay_compact", "registry_freeze"}:
-        return "running"
-    return "running"
-
-
-def _event_message(
-    event: dict[str, Any],
-    *,
-    run_id: str,
-    duration_seconds: float | None,
-) -> str:
-    action = str(event.get("action") or "event")
-    dataset_raw = event.get("dataset")
-    dataset = dataset_raw if isinstance(dataset_raw, dict) else {}
-    dataset_name = dataset.get("name") or "unknown-dataset"
-    metrics_raw = event.get("metrics")
-    metrics = metrics_raw if isinstance(metrics_raw, dict) else {}
-
-    rows_written = metrics.get("rows_written")
-    if rows_written is not None:
-        return f"{action} on {dataset_name} (rows_written={rows_written})"
-    return f"{action} on {dataset_name}"
-
-
 def _validate_usr_event(event: dict[str, Any], *, allow_unknown_version: bool) -> None:
-    if not isinstance(event, dict):
-        raise NotifyConfigError("event line must decode to a JSON object")
-    if "event_version" not in event:
-        raise NotifyConfigError("event missing required 'event_version'")
-    version = event.get("event_version")
-    if not isinstance(version, int):
-        raise NotifyConfigError("event_version must be an integer")
-    expected_version = _usr_event_version()
-    if version != expected_version and not allow_unknown_version:
-        raise NotifyConfigError(f"unknown event_version={version}; expected {expected_version}")
-    action = event.get("action")
-    if not isinstance(action, str) or not action.strip():
-        raise NotifyConfigError("event missing required 'action'")
-    dataset = event.get("dataset")
-    if dataset is not None and not isinstance(dataset, dict):
-        raise NotifyConfigError("event field 'dataset' must be an object when provided")
-    actor = event.get("actor")
-    if actor is not None and not isinstance(actor, dict):
-        raise NotifyConfigError("event field 'actor' must be an object when provided")
+    _validate_usr_event_data(
+        event,
+        expected_version=_usr_event_version(),
+        allow_unknown_version=allow_unknown_version,
+    )
 
 
 def _post_with_backoff(
