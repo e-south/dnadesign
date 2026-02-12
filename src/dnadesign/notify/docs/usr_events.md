@@ -12,14 +12,21 @@ For full operator procedures, use the canonical runbook:
 ## Fast path
 
 ```bash
+CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml
+RUN_ROOT="$(dirname "$CONFIG")"
+NOTIFY_DIR="$RUN_ROOT/outputs/notify/densegen"
+
 # Validate profile fields and secret wiring.
-uv run notify profile doctor --profile outputs/notify/profile.json
+uv run notify profile doctor --profile "$NOTIFY_DIR/profile.json"
 
 # Preview payloads first.
-uv run notify usr-events watch --profile outputs/notify/profile.json --dry-run
+uv run notify usr-events watch --profile "$NOTIFY_DIR/profile.json" --dry-run
 
 # Run live.
-uv run notify usr-events watch --profile outputs/notify/profile.json --follow
+uv run notify usr-events watch --profile "$NOTIFY_DIR/profile.json" --follow
+
+# Retry failed payloads from spool.
+uv run notify spool drain --profile "$NOTIFY_DIR/profile.json"
 ```
 
 ## Related stack docs

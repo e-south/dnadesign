@@ -4,6 +4,17 @@
 
 Operator onboarding for USR event watchers lives in [Notify USR events operator manual](notify/usr_events.md).
 
+## Start Here
+
+Choose the flow first:
+- Direct one-off notifications: use `notify send` (this page).
+- Long-running USR watcher workflows: use [notify/usr_events.md](notify/usr_events.md).
+
+Most DenseGen and Infer production usage should start with:
+- `notify setup slack --tool <tool> --config <workspace-config.yaml>`
+- `notify profile doctor --profile <profile.json>`
+- `notify usr-events watch --profile <profile.json> --follow`
+
 ## CLI
 
 ```
@@ -100,6 +111,12 @@ Use that runbook for:
 - two-terminal watch workflow (`doctor` -> `dry-run` -> `follow`)
 - strict USR `.events.log` path contract
 - spool/drain recovery patterns
+
+## Maintainer IA
+
+- User-facing operator procedures should live in `docs/notify/usr_events.md`.
+- `src/dnadesign/notify/README.md` should stay a module-local index and code map.
+- Keep this page focused on direct `notify send` usage plus cross-links to operator runbooks.
 
 ## Dry Run
 

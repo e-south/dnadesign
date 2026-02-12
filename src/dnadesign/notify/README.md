@@ -6,6 +6,7 @@ Notify reads USR mutation events and posts selected events to webhook providers.
 - [At a glance](#at-a-glance)
 - [Fast operator path](#fast-operator-path)
 - [Read order](#read-order)
+- [Maintainer code map](#maintainer-code-map)
 - [Key boundary](#key-boundary)
 - [Observer Contract](#observer-contract)
 
@@ -63,6 +64,21 @@ uv run notify spool drain --profile outputs/notify/densegen/profile.json
 - Setup onboarding: [Slack setup onboarding](../../../docs/notify/usr_events.md#slack-setup-onboarding-3-minutes)
 - End-to-end stack demo: [DenseGen -> USR -> Notify demo](../densegen/docs/demo/demo_usr_notify.md)
 - USR event schema source: [USR event log schema](../usr/README.md#event-log-schema)
+
+## Maintainer code map
+
+Runtime and option resolution:
+- `src/dnadesign/notify/cli.py`: Typer command surface and handler wiring.
+- `src/dnadesign/notify/cli_runtime.py`: watch and spool runtime execution logic.
+- `src/dnadesign/notify/cli_resolve.py`: profile and path resolution helpers.
+- `src/dnadesign/notify/profile_flows.py`: setup and wizard profile construction.
+
+Tool and workflow extension points:
+- `src/dnadesign/notify/events_source.py`: tool resolver registry.
+- `src/dnadesign/notify/events_source_builtin.py`: built-in resolver installs (`densegen`, `infer_evo2`).
+- `src/dnadesign/notify/tool_events.py`: tool-event override and evaluator registry.
+- `src/dnadesign/notify/tool_event_packs_builtin.py`: built-in tool-event pack installs.
+- `src/dnadesign/notify/workflow_policy.py`: policy defaults and profile-path defaults.
 
 ## Key boundary
 
