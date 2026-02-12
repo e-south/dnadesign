@@ -35,6 +35,77 @@ from .round.writebacks import (
     write_prediction_label_hist,
     write_round_artifacts,
 )
+from .preflight import preflight_run
+from .round_plan import plan_round
+
+
+@dataclass
+class RunRoundRequest:
+    cfg: RootConfig
+    as_of_round: int
+    config_path: Optional[Path] = None
+    k_override: Optional[int] = None
+    score_batch_size_override: Optional[int] = None
+    verbose: bool = True
+    allow_resume: bool = False
+    progress_factory: Optional[ProgressFactory] = None
+
+
+@dataclass
+class RunRoundResult:
+    ok: bool
+    run_id: str
+    as_of_round: int
+    trained_on: int
+    scored: int
+    top_k_requested: int
+    top_k_effective: int
+    ledger_path: str
+
+
+@dataclass
+class _TrainingBundle:
+    rep: Any
+    plan: Any
+    train_df: pd.DataFrame
+    train_ids: List[str]
+    Y_train: np.ndarray
+    R_train: np.ndarray
+    y_dim: int
+
+
+@dataclass
+class _XBundle:
+    X_train: np.ndarray
+    id_order_train: List[str]
+    X_pool: np.ndarray
+    id_order_pool: List[str]
+    cand_df: pd.DataFrame
+
+
+@dataclass
+class _ScoreBundle:
+    model: Any
+    fit_metrics: Any
+    fit_duration: float
+    Y_hat: np.ndarray
+    y_obj_scalar: np.ndarray
+    diag: Dict[str, Any]
+    obj_summary_stats: Optional[Dict[str, Any]]
+    obj_name: str
+    obj_params: Dict[str, Any]
+    obj_mode: str
+    sel_name: str
+    sel_params: Dict[str, Any]
+    tie_handling: str
+    mode: str
+    ranks_competition: np.ndarray
+    selected_bool: np.ndarray
+    selected_effective: int
+    top_k: int
+    obj_sha: str
+    uq_scalar: Optional[np.ndarray]
+    score: Optional[np.ndarray]
 
 
 def _log(enabled: bool, msg: str) -> None:
@@ -579,80 +650,312 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
         Y_train=training.Y_train,
         R_train=training.R_train,
         X_pool=xbundle.X_pool,
-        id_order_train=xbundle.id_order_train,
-        id_order_pool=xbundle.id_order_pool,
-        y_dim=training.y_dim,
+        id_order_train=id_order_train,
+        id_order_pool=id_order_pool,
+        y_dim=y_dim,
     )
-
-    artifacts = write_round_artifacts(
-        inputs=inputs,
-        run_id=run_id,
-        rctx=rctx,
-        training=training,
-        xbundle=xbundle,
-        score=score,
+    model = score.model
+    fit_metrics = score.fit_metrics
+    Y_hat = score.Y_hat
+    y_obj_scalar = score.y_obj_scalar
+    diag = score.diag
+    obj_name = score.obj_name
+    obj_params = score.obj_params
+    sel_name = score.sel_name
+    sel_params = score.sel_params
+    tie_handling = score.tie_handling
+    mode = score.mode
+    ranks_competition = score.ranks_competition
+    selected_bool = score.selected_bool
+    selected_effective = score.selected_effective
+    top_k = score.top_k
+    obj_sha = score.obj_sha
+    ss = score.obj_summary_stats
+    fit_duration = score.fit_duration
+    # --- Artifacts ---
+    apaths = ArtifactPaths(
+        model=rdir / "model.joblib",
+        selection_csv=rdir / "selection_top_k.csv",
+        round_log_jsonl=rdir / "round.log.jsonl",
+        round_ctx_json=rdir / "round_ctx.json",
+        objective_meta_json=rdir / "objective_meta.json",
     )
-
-    run_events = build_run_events(
-        inputs=inputs,
-        run_id=run_id,
-        training=training,
-        xbundle=xbundle,
-        score=score,
-        artifacts=artifacts,
-    )
-
-    append_ledgers(
-        ws=ws,
-        run_pred_events=run_events.run_pred_events,
-        run_meta_event=run_events.run_meta_event,
-        verbose=req.verbose,
-    )
-
-    metrics_by_name: Dict[str, List[float]] = {"score": score.y_obj_scalar.astype(float).tolist()}
-    for key in ("logic_fidelity", "effect_scaled", "effect_raw"):
-        if isinstance(score.diag, dict) and key in score.diag:
-            arr = np.asarray(score.diag[key], dtype=float).ravel()
-            if arr.size == len(xbundle.id_order_pool):
-                metrics_by_name[key] = arr.tolist()
-
-    objective_meta = {
-        "name": score.obj_name,
-        "params": score.obj_params,
-        "mode": score.mode,
+    model.save(str(apaths.model))
+    model_meta = {
+        "model__name": cfg.model.name,
+        "model__params": model.get_params(),
+        "training__y_ops": [{"name": p.name, "params": p.params} for p in (cfg.training.y_ops or [])],
+        "x_dim": int(X_train.shape[1]),
+        "y_dim": int(y_dim),
     }
-    _ = write_prediction_label_hist(
-        store=store,
-        df=df,
-        ids=list(map(str, xbundle.id_order_pool)),
-        y_hat=score.Y_hat,
-        as_of_round=int(req.as_of_round),
-        run_id=run_id,
-        objective=objective_meta,
-        metrics_by_name=metrics_by_name,
-        selection_rank=score.ranks_competition,
-        selection_top_k=score.selected_bool,
-        verbose=req.verbose,
+    model_meta_sha = write_model_meta(rdir / "model_meta.json", model_meta)
+
+    # Map sequences up-front for artifact emission
+    seq_map = df.set_index("id")["sequence"].astype(str).to_dict() if "sequence" in df.columns else {}
+
+    # Training snapshot (artifact only; not appended to ledger)
+    labels_used_df = None
+    if not train_df.empty:
+        labels_used_df = pd.DataFrame(
+            {
+                "run_id": [run_id] * len(train_df),
+                "as_of_round": [int(req.as_of_round)] * len(train_df),
+                "observed_round": train_df["r"].astype(int).tolist(),
+                "id": train_df["id"].astype(str).tolist(),
+                "sequence": [seq_map.get(i) for i in train_df["id"].astype(str).tolist()],
+                "y_obs": train_df["y"].tolist(),
+                "src": ["training_snapshot"] * len(train_df),
+                "note": [f"labels used in run {run_id} (as_of_round={int(req.as_of_round)})"] * len(train_df),
+            }
+        )
+    selected_df = (
+        pd.DataFrame(
+            {
+                "id": id_order_pool,
+                "sequence": [seq_map.get(i) for i in id_order_pool],
+                "sel__rank_competition": ranks_competition,
+                "selection_score": y_obj_scalar,
+                "sel__is_selected": selected_bool,
+            }
+        )
+        .loc[lambda d: d["sel__is_selected"]]
+        .sort_values("sel__rank_competition")[["id", "sequence", "sel__rank_competition", "selection_score"]]
+    )
+    sel_sha = write_selection_csv(apaths.selection_csv, selected_df)
+
+    ctx_sha = write_round_ctx(apaths.round_ctx_json, rctx.snapshot())
+    labels_used_sha = write_labels_used_parquet(rdir / "labels_used.parquet", labels_used_df)
+
+    # Collect artifact paths and hashes here so optional model artifacts can append to it.
+    artifacts_paths_and_hashes: Dict[str, tuple[str, str]] = {}
+
+    # ---- Optional model artifacts (e.g., RandomForest feature importance) ----
+    if hasattr(model, "model_artifacts") and callable(getattr(model, "model_artifacts")):
+        try:
+            m_arts = model.model_artifacts() or {}
+            if "feature_importance" in m_arts:
+                fi_df = m_arts["feature_importance"]
+                fi_path = rdir / "feature_importance.csv"
+                fi_sha = write_feature_importance_csv(fi_path, fi_df)
+                # small, helpful stats (logged; not persisted elsewhere)
+                imp = fi_df["importance"].to_numpy(dtype=float)
+                xdim = int(imp.shape[0])
+                nonzero = int((imp > 0).sum())
+                hhi = float(np.sum((imp / max(imp.sum(), 1e-12)) ** 2))
+                top5 = fi_df.sort_values("importance", ascending=False).head(5).to_dict(orient="records")
+                _log(
+                    req.verbose,
+                    f"[model] feature_importance: x_dim={xdim} nonzero={nonzero} HHI={hhi:.4f}",
+                )
+                append_round_log_event(
+                    rdir / "round.log.jsonl",
+                    {
+                        "ts": now_iso(),
+                        "stage": "model_feature_importance",
+                        "x_dim": xdim,
+                        "nonzero": nonzero,
+                        "hhi": hhi,
+                        "top5": top5,
+                        "artifact": "feature_importance.csv",
+                        "artifact_sha256": fi_sha,
+                    },
+                )
+                artifacts_paths_and_hashes["feature_importance.csv"] = (
+                    fi_sha,
+                    str(fi_path.resolve()),
+                )
+        except Exception as e:
+            raise OpalError(f"Failed to persist model artifacts: {e}")
+
+    _log(
+        req.verbose,
+        "[artifacts] model, selection_csv, round_ctx, objective_meta"
+        + (", feature_importance" if "feature_importance.csv" in artifacts_paths_and_hashes else "")
+        + " written",
     )
 
-    total_duration = time.perf_counter() - t0
-    update_campaign_state(
-        ws=ws,
-        cfg=cfg,
-        req=req,
-        rep=training.rep,
-        train_df=training.train_df,
-        id_order_train=xbundle.id_order_train,
-        id_order_pool=xbundle.id_order_pool,
-        top_k=score.top_k,
-        selected_effective=score.selected_effective,
-        apaths=artifacts.apaths,
-        run_id=run_id,
-        obj_name=score.obj_name,
-        store=store,
-        total_duration=total_duration,
-        fit_duration=score.fit_duration,
+    # --- Events ---
+    sequences_list: List[Optional[str]] = [seq_map.get(i) for i in id_order_pool]
+
+    # Uncertainty & QC masks (explicitly None in demo)
+    y_hat_model_sd = None
+    y_obj_scalar_sd = None
+
+    sel_emit = SelectionEmit(
+        ranks_competition=ranks_competition,
+        selected_bool=selected_bool,
+        diagnostics=None,
     )
+
+    run_pred_events = build_run_pred_events(
+        run_id=run_id,
+        as_of_round=int(req.as_of_round),
+        ids=list(map(str, id_order_pool)),
+        sequences=sequences_list,
+        y_hat_model=Y_hat,
+        y_obj_scalar=y_obj_scalar,
+        y_dim=y_dim,
+        y_hat_model_sd=y_hat_model_sd,
+        y_obj_scalar_sd=y_obj_scalar_sd,
+        obj_diagnostics=diag,
+        sel_emit=sel_emit,
+        uq_scalar=score.uq_scalar,
+        scores=score.score
+    )
+
+    # Now add the standard artifacts (model, selection, round ctx, objective meta)
+    artifacts_paths_and_hashes.update(
+        {
+            "model.joblib": (file_sha256(apaths.model), str(apaths.model.resolve())),
+            "selection_top_k.csv": (sel_sha, str(apaths.selection_csv.resolve())),
+            "round_ctx.json": (ctx_sha, str(apaths.round_ctx_json.resolve())),
+            "objective_meta.json": (obj_sha, str(apaths.objective_meta_json.resolve())),
+            "model_meta.json": (
+                model_meta_sha,
+                str((rdir / "model_meta.json").resolve()),
+            ),
+        }
+    )
+    artifacts_paths_and_hashes["labels_used.parquet"] = (
+        labels_used_sha,
+        str((rdir / "labels_used.parquet").resolve()),
+    )
+
+    run_meta_event = build_run_meta_event(
+        run_id=run_id,
+        as_of_round=int(req.as_of_round),
+        model_name=cfg.model.name,
+        model_params=model.get_params(),
+        y_ops=[{"name": p.name, "params": p.params} for p in (cfg.training.y_ops or [])],
+        x_transform_name=cfg.data.transforms_x.name,
+        x_transform_params=dict(cfg.data.transforms_x.params),
+        y_ingest_transform_name=cfg.data.transforms_y.name,
+        y_ingest_transform_params=dict(cfg.data.transforms_y.params),
+        objective_name=obj_name,
+        objective_params=obj_params,
+        selection_name=sel_name,
+        selection_params=sel_params,
+        selection_score_field=cfg.selection.selection.name,
+        selection_objective_mode=mode,
+        sel_tie_handling=tie_handling,
+        stats_n_train=len(id_order_train),
+        stats_n_scored=len(id_order_pool),
+        unc_mean_sd=y_hat_model_sd,  # None in demo
+        pred_rows_df=run_pred_events,
+        artifact_paths_and_hashes=artifacts_paths_and_hashes,
+        objective_summary_stats=ss,
+    )
+
+    ledger = LedgerWriter(ws)
+    ledger.append_run_pred(run_pred_events)
+    ledger.append_run_meta(run_meta_event)
+    _log(
+        req.verbose,
+        f"[ledger] appended run_pred({len(run_pred_events)}), run_meta(1) under {ws.ledger_dir}",
+    )
+
+    # --- records ergonomic caches ---
+    latest_scalar = dict(zip(id_order_pool, y_obj_scalar.tolist()))
+    df2 = store.update_latest_cache(
+        df,
+        slug=cfg.campaign.slug,
+        latest_as_of_round=int(req.as_of_round),
+        latest_scalar_by_id=latest_scalar,
+        require_columns_present=cfg.safety.write_back_requires_columns_present,
+    )
+    store.save_atomic(df2)
+    _log(
+        req.verbose,
+        "[writeback] records caches updated: latest_as_of_round, latest_pred_scalar",
+    )
+
+    # --- state.json summary ---
+    st = CampaignState.load(ws.state_path)
+    # If resuming on the same round, replace existing entries for this round index
+    if req.allow_resume:
+        try:
+            st.rounds = [r for r in st.rounds if int(getattr(r, "round_index", -1)) != int(req.as_of_round)]
+        except Exception:
+            pass
+
+    st.campaign_slug = cfg.campaign.slug
+    st.campaign_name = cfg.campaign.name
+    st.workdir = str(ws.workdir.resolve())
+    loc = cfg.data.location
+    if isinstance(loc, LocationUSR):
+        st.data_location = {
+            "kind": "usr",
+            "dataset": loc.dataset,
+            "path": str(Path(loc.path).resolve()),
+            "records_path": str(store.records_path.resolve()),
+        }
+    elif isinstance(loc, LocationLocal):
+        st.data_location = {
+            "kind": "local",
+            "path": str(Path(loc.path).resolve()),
+            "records_path": str(store.records_path.resolve()),
+        }
+    st.x_column_name = cfg.data.x_column_name
+    st.y_column_name = cfg.data.y_column_name
+    st.representation_vector_dimension = rep.x_dim or 0
+    st.representation_transform = {
+        "name": cfg.data.transforms_x.name,
+        "params": cfg.data.transforms_x.params,
+    }
+    st.training_policy = dict(cfg.training.policy or {})
+    st.performance = {
+        "score_batch_size": req.score_batch_size_override or cfg.scoring.score_batch_size,
+        "objective": obj_name,
+    }
+    labels_used_rounds = sorted(set(train_df["r"].astype(int).tolist()))
+    st.add_round(
+        RoundEntry(
+            round_index=int(req.as_of_round),
+            run_id=str(run_id),
+            round_name=f"round_{int(req.as_of_round)}",
+            round_dir=str(rdir.resolve()),
+            labels_used_rounds=labels_used_rounds,
+            number_of_training_examples_used_in_round=len(id_order_train),
+            number_of_candidates_scored_in_round=len(id_order_pool),
+            selection_top_k_requested=int(top_k),
+            selection_top_k_effective_after_ties=int(selected_effective),
+            model={
+                "type": cfg.model.name,
+                "params": cfg.model.params,
+                "artifact_path": str(apaths.model.resolve()),
+                "artifact_sha256": file_sha256(apaths.model),
+            },
+            metrics={},
+            durations_sec={},  # filled below
+            seeds={
+                "global": cfg.model.params.get("random_state"),
+                "model": cfg.model.params.get("random_state"),
+            },
+            artifacts={
+                "selection_top_k_csv": str(apaths.selection_csv.resolve()),
+                # New, explicit ledger sinks:
+                "ledger_predictions_dir": str(ws.ledger_predictions_dir.resolve()),
+                "ledger_runs_parquet": str(ws.ledger_runs_path.resolve()),
+                "ledger_labels_parquet": str(ws.ledger_labels_path.resolve()),
+                "round_ctx_json": str(apaths.round_ctx_json.resolve()),
+                "objective_meta_json": str(apaths.objective_meta_json.resolve()),
+                "model_meta_json": str((rdir / "model_meta.json").resolve()),
+                "labels_used_parquet": str((rdir / "labels_used.parquet").resolve()),
+                "round_log_jsonl": str((rdir / "round.log.jsonl").resolve()),
+            },
+            writebacks={
+                "records_caches_updated": [
+                    "opal__<slug>__latest_as_of_round",
+                    "opal__<slug>__latest_pred_scalar",
+                ]
+            },
+            warnings=[],
+        )
+    )
+    t1 = time.perf_counter()
+    # Dataclass field update (not dict-style)
+    st.rounds[-1].durations_sec = {"total": t1 - t0, "fit": fit_duration}
+    st.save(ws.state_path)
 
     append_round_log_event(
         rdir / "logs" / "round.log.jsonl",
