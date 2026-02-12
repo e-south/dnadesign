@@ -28,7 +28,8 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from .dataset_events import record_dataset_event
+from .dataset_activity import append_meta_note as append_dataset_meta_note
+from .dataset_activity import record_dataset_activity_event
 from .dataset_query import create_overlay_view, sql_ident, sql_str
 from .dataset_state import (
     clear_state as dataset_clear_state,
@@ -232,18 +233,13 @@ class Dataset:
 
     # --- lightweight, best-effort scratch-pad logging in meta.md ---
     def append_meta_note(self, title: str, code_block: Optional[str] = None) -> None:
-        ts = now_utc()
-        self.dir.mkdir(parents=True, exist_ok=True)
-        if not self.meta_path.exists():
-            # create minimal header if missing
-            hdr = f"name: {self.name}\ncreated_at: {ts}\nsource: \nnotes: \nschema: USR v1\n\n### Updates ({ts.split('T')[0]})\n"  # noqa
-            self.meta_path.write_text(hdr, encoding="utf-8")
-        with self.meta_path.open("a", encoding="utf-8") as f:
-            f.write(f"- {ts}: {title}\n")
-            if code_block:
-                f.write("```bash\n")
-                f.write(code_block.strip() + "\n")
-                f.write("```\n")
+        append_dataset_meta_note(
+            dataset_dir=self.dir,
+            dataset_name=self.name,
+            meta_path=self.meta_path,
+            title=title,
+            code_block=code_block,
+        )
 
     def _record_event(
         self,
@@ -257,16 +253,17 @@ class Dataset:
         registry_hash: Optional[str] = None,
         actor: Optional[dict] = None,
     ) -> None:
-        record_dataset_event(
+        record_dataset_activity_event(
             events_path=self.events_path,
             action=action,
             dataset_name=self.name,
             dataset_root=self.root,
-            target_path=target_path or self.records_path,
+            records_path=self.records_path,
             args=args,
             metrics=metrics,
             artifacts=artifacts,
             maintenance=maintenance,
+            target_path=target_path,
             registry_hash=registry_hash,
             actor=actor,
         )
