@@ -31,6 +31,8 @@ from .cli_commands import read as read_commands
 from .cli_commands import state as state_commands
 from .cli_commands import sync as sync_commands
 from .cli_commands import write as write_commands
+from .cli_event_output import emit_event_line as _emit_event_line_value
+from .cli_merge_policy import resolve_merge_policy
 from .cli_paths import (
     LEGACY_DATASET_PATH_ERROR as _LEGACY_DATASET_PATH_ERROR,
 )
@@ -56,7 +58,6 @@ from .events import record_event
 from .io import read_parquet_head
 from .merge_datasets import (
     MergeColumnsMode,
-    MergePolicy,
     merge_usr_to_usr,
 )
 from .mock import MockSpec, add_demo_columns, create_mock_dataset
@@ -716,17 +717,9 @@ def cmd_overlay_compact(args) -> None:
 
 
 def _emit_event_line(line: str, fmt: str) -> None:
-    text = line.strip()
-    if not text:
-        return
-    if fmt == "raw":
-        print(text)
-        return
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError as e:
-        raise SequencesError(f"Invalid JSONL event line: {e}") from e
-    print(json.dumps(payload, separators=(",", ":")))
+    emitted = _emit_event_line_value(line, fmt)
+    if emitted is not None:
+        print(emitted)
 
 
 def cmd_events_tail(args) -> None:
@@ -743,8 +736,6 @@ def cmd_events_tail(args) -> None:
         raise SequencesError(f"Events log not found: {events_path}")
 
     fmt = str(getattr(args, "format", "json")).strip().lower()
-    if fmt not in {"json", "raw"}:
-        raise SequencesError("format must be 'json' or 'raw'.")
     n = int(getattr(args, "n", 0))
     follow = bool(getattr(args, "follow", False))
 
@@ -1010,22 +1001,13 @@ def cmd_add_demo(args):
 
 
 # ---------- MERGE DATASETS ----------
-def _policy_from_str(s: str) -> MergePolicy:
-    return {
-        "error": MergePolicy.ERROR,
-        "skip": MergePolicy.SKIP,
-        "prefer-src": MergePolicy.PREFER_SRC,
-        "prefer-dest": MergePolicy.PREFER_DEST,
-    }[s]
-
-
 def cmd_merge_datasets(args):
     columns = str(getattr(args, "columns", "") or "")
     cols_subset = [c.strip() for c in columns.split(",") if c.strip()] if columns else None
     require_same = bool(getattr(args, "require_same", False))
     mode = MergeColumnsMode.REQUIRE_SAME if require_same else MergeColumnsMode.UNION
     dup_policy = str(getattr(args, "dup_policy", "error") or "error")
-    policy = _policy_from_str(dup_policy)
+    policy = resolve_merge_policy(dup_policy)
     coerce_overlap = str(getattr(args, "coerce_overlap", "none") or "none")
     if coerce_overlap not in {"none", "to-dest"}:
         raise SequencesError("--coerce-overlap must be one of: none, to-dest")
