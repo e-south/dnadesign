@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from dnadesign.notify.errors import NotifyConfigError
-from dnadesign.notify.events_source import resolve_tool_events_path
+from dnadesign.notify.events_source import register_tool_events_source, resolve_tool_events_path
 
 
 def test_resolve_tool_events_path_infer_evo2_from_single_usr_writeback_job(tmp_path: Path) -> None:
@@ -186,3 +186,34 @@ def test_resolve_tool_events_path_infer_evo2_requires_usr_writeback_job(tmp_path
 
     with pytest.raises(NotifyConfigError, match="ingest.source='usr'"):
         resolve_tool_events_path(tool="infer_evo2", config=config)
+
+
+def test_register_tool_events_source_supports_custom_tool(tmp_path: Path) -> None:
+    config = tmp_path / "custom.yaml"
+    config.write_text("x: 1\n", encoding="utf-8")
+    resolved = tmp_path / "custom" / ".events.log"
+
+    register_tool_events_source(
+        tool="custom_tool",
+        resolver=lambda path: resolved if path == config else Path("unexpected"),
+        default_policy="custom_tool",
+        aliases=("custom-tool",),
+    )
+
+    events_path, policy = resolve_tool_events_path(tool="custom-tool", config=config)
+    assert events_path == resolved
+    assert policy == "custom_tool"
+
+
+def test_register_tool_events_source_rejects_duplicate_alias() -> None:
+    register_tool_events_source(
+        tool="custom_alpha",
+        resolver=lambda path: path,
+        aliases=("custom-alpha",),
+    )
+    with pytest.raises(NotifyConfigError, match="alias 'custom-alpha' is already registered"):
+        register_tool_events_source(
+            tool="custom_beta",
+            resolver=lambda path: path,
+            aliases=("custom-alpha",),
+        )
