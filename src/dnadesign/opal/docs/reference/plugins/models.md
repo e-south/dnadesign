@@ -120,3 +120,16 @@ For stage-scoped model contracts (`produces_by_stage` / `requires_by_stage`):
 * Writes outside the active stage mapping are immediate and keep strict immutable semantics (no differing overwrite).
 * For running summaries, use repeated `ctx.get(...)` + `ctx.set(...)` on a stage-scoped key.
 * Avoid storing unbounded per-batch payloads in `RoundCtx`; write per-batch/per-row data to ledgers or logs.
+
+Example pattern for batched accumulation in `predict`:
+
+```python
+prev = ctx.get("model/<self>/predict_summary", default={"n_batches": 0, "n_rows": 0})
+next_summary = {
+    "n_batches": int(prev["n_batches"]) + 1,
+    "n_rows": int(prev["n_rows"]) + int(X.shape[0]),
+}
+ctx.set("model/<self>/predict_summary", next_summary)
+```
+
+The key is staged for the active predict stage and committed once at stage end.
