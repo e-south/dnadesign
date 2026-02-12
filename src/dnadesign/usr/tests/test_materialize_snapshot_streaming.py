@@ -15,7 +15,6 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from dnadesign.usr import Dataset
-from dnadesign.usr.src import dataset as dataset_module
 from dnadesign.usr.src.overlays import overlay_path
 from dnadesign.usr.tests.registry_helpers import register_test_namespace
 
@@ -39,7 +38,7 @@ def test_snapshot_does_not_read_parquet(tmp_path: Path, monkeypatch) -> None:
     def _boom(*_args, **_kwargs):
         raise AssertionError("read_parquet should not be called during snapshot")
 
-    monkeypatch.setattr(dataset_module, "read_parquet", _boom)
+    monkeypatch.setattr(pq, "read_table", _boom)
     ds.snapshot()
 
 
@@ -65,7 +64,7 @@ def test_materialize_does_not_read_parquet(tmp_path: Path, monkeypatch) -> None:
     def _boom(*_args, **_kwargs):
         raise AssertionError("read_parquet should not be called during materialize")
 
-    monkeypatch.setattr(dataset_module, "read_parquet", _boom)
+    monkeypatch.setattr(pq, "read_table", _boom)
     with ds.maintenance(reason="materialize"):
         ds.materialize()
 

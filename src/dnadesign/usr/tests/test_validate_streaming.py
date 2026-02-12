@@ -17,7 +17,6 @@ import pyarrow.parquet as pq
 import pytest
 
 from dnadesign.usr import Dataset, DuplicateIDError
-from dnadesign.usr.src import dataset as dataset_module
 from dnadesign.usr.src.normalize import compute_id
 from dnadesign.usr.src.schema import ARROW_SCHEMA
 from dnadesign.usr.tests.registry_helpers import ensure_registry
@@ -46,7 +45,7 @@ def test_validate_detects_duplicates_without_full_read(tmp_path: Path, monkeypat
     def _fail_read(*_args, **_kwargs):
         raise AssertionError("read_parquet should not be used by validate")
 
-    monkeypatch.setattr(dataset_module, "read_parquet", _fail_read)
+    monkeypatch.setattr(pq, "read_table", _fail_read)
 
     with pytest.raises(DuplicateIDError):
         ds.validate()
