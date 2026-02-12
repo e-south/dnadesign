@@ -1,0 +1,27 @@
+version: 3
+input:
+  kind: parquet
+  path: data/cruncher_demo_elites.parquet
+  adapter:
+    kind: cruncher_best_window
+    columns:
+      sequence: sequence
+      id: id
+      hits_path: data/cruncher_demo_elites_hits.parquet
+      config_path: data/cruncher_demo_config.yaml
+    policies:
+      on_missing_hit: error
+      on_missing_pwm: error
+  alphabet: DNA
+render:
+  renderer: sequence_rows
+  style:
+    preset: presentation_default
+    overrides: {}
+outputs:
+  - kind: images
+    fmt: png
+run:
+  strict: false
+  fail_on_skips: false
+  emit_report: true
