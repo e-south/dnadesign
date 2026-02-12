@@ -30,6 +30,13 @@ from .cli_commands import (
     register_usr_events_watch_command,
 )
 from .cli_commands.providers import format_for_provider
+from .cli_resolve import resolve_cli_optional_string as _resolve_cli_optional_string
+from .cli_resolve import resolve_existing_file_path as _resolve_existing_file_path
+from .cli_resolve import resolve_optional_path_value as _resolve_optional_path_value
+from .cli_resolve import resolve_optional_string_value as _resolve_optional_string_value
+from .cli_resolve import resolve_path_value as _resolve_path_value
+from .cli_resolve import resolve_string_value as _resolve_string_value
+from .cli_resolve import resolve_usr_events_path as _resolve_usr_events_path_raw
 from .errors import NotifyConfigError, NotifyDeliveryError, NotifyError
 from .events_source import normalize_tool_name as _normalize_setup_tool_name
 from .events_source import resolve_tool_events_path as _resolve_tool_events_path
@@ -90,132 +97,12 @@ def _split_csv(value: str | None) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
-def _resolve_cli_optional_string(*, field: str, cli_value: str | None) -> str | None:
-    if cli_value is None:
-        return None
-    value = str(cli_value).strip()
-    if not value:
-        raise NotifyConfigError(f"{field} must be a non-empty string when provided")
-    return value
-
-
-def _resolve_string_value(*, field: str, cli_value: str | None, profile_data: dict[str, Any]) -> str:
-    if cli_value is not None:
-        value = str(cli_value).strip()
-        if value:
-            return value
-        raise NotifyConfigError(f"{field} must be a non-empty string")
-    profile_value = profile_data.get(field)
-    if isinstance(profile_value, str) and profile_value.strip():
-        return profile_value
-    raise NotifyConfigError(f"{field} is required; pass --{field.replace('_', '-')} or provide it in --profile")
-
-
-def _resolve_optional_string_value(*, field: str, cli_value: str | None, profile_data: dict[str, Any]) -> str | None:
-    if cli_value is not None:
-        value = str(cli_value).strip()
-        if not value:
-            raise NotifyConfigError(f"{field} must be a non-empty string when provided")
-        return value
-    profile_value = profile_data.get(field)
-    if profile_value is None:
-        return None
-    if isinstance(profile_value, str) and profile_value.strip():
-        return profile_value
-    raise NotifyConfigError(f"profile field '{field}' must be a non-empty string when provided")
-
-
-def _resolve_path_value(
-    *,
-    field: str,
-    cli_value: Path | None,
-    profile_data: dict[str, Any],
-    profile_path: Path | None,
-) -> Path:
-    if cli_value is not None:
-        return cli_value
-    profile_value = profile_data.get(field)
-    if isinstance(profile_value, str) and profile_value.strip():
-        resolved = Path(profile_value)
-        if profile_path is not None and not resolved.is_absolute():
-            return profile_path.parent / resolved
-        return resolved
-    raise NotifyConfigError(f"{field} is required; pass --{field.replace('_', '-')} or provide it in --profile")
-
-
-def _resolve_optional_path_value(
-    *,
-    field: str,
-    cli_value: Path | None,
-    profile_data: dict[str, Any],
-    profile_path: Path | None,
-) -> Path | None:
-    if cli_value is not None:
-        return cli_value
-    profile_value = profile_data.get(field)
-    if profile_value is None:
-        return None
-    if isinstance(profile_value, str) and profile_value.strip():
-        resolved = Path(profile_value)
-        if profile_path is not None and not resolved.is_absolute():
-            return profile_path.parent / resolved
-        return resolved
-    raise NotifyConfigError(f"profile field '{field}' must be a non-empty string path when provided")
-
-
-def _resolve_existing_file_path(*, field: str, path_value: Path) -> Path:
-    resolved = path_value.expanduser().resolve()
-    if not resolved.exists():
-        raise NotifyConfigError(f"{field} file not found: {resolved}")
-    if not resolved.is_file():
-        raise NotifyConfigError(f"{field} path is not a file: {resolved}")
-    return resolved
-
-
-def _events_path_hint() -> str:
-    return (
-        "Find the USR .events.log path with `uv run dense inspect run --usr-events-path` from the DenseGen "
-        "workspace, or use `uv run dense inspect run --usr-events-path -c <config.yaml>`."
-    )
-
-
-def _validate_usr_events_probe(events_path: Path) -> None:
-    with events_path.open("r", encoding="utf-8") as handle:
-        for line_no, line in enumerate(handle, start=1):
-            raw = str(line).strip()
-            if not raw:
-                continue
-            try:
-                event = json.loads(raw)
-            except json.JSONDecodeError as exc:
-                raise NotifyConfigError(
-                    f"events must be a USR .events.log JSONL file; first non-empty line is not JSON "
-                    f"(line {line_no}) in {events_path}. {_events_path_hint()}"
-                ) from exc
-            try:
-                _validate_usr_event(event, allow_unknown_version=True)
-            except NotifyConfigError as exc:
-                raise NotifyConfigError(
-                    f"events file does not look like USR .events.log (line {line_no}) in {events_path}: "
-                    f"{exc}. {_events_path_hint()}"
-                ) from exc
-            return
-
-
 def _resolve_usr_events_path(events_path: Path, *, require_exists: bool = True) -> Path:
-    resolved = events_path.expanduser().resolve()
-    if resolved.suffix.lower() in {".yaml", ".yml"}:
-        raise NotifyConfigError(
-            f"events must point to a USR .events.log JSONL file, not a config file: {resolved}. {_events_path_hint()}"
-        )
-    if not require_exists and not resolved.exists():
-        return resolved
-    if not resolved.exists():
-        raise NotifyConfigError(f"events file not found: {resolved}. {_events_path_hint()}")
-    if not resolved.is_file():
-        raise NotifyConfigError(f"events path is not a file: {resolved}")
-    _validate_usr_events_probe(resolved)
-    return resolved
+    return _resolve_usr_events_path_raw(
+        events_path,
+        require_exists=require_exists,
+        validate_usr_event=_validate_usr_event,
+    )
 
 
 def _probe_path_writable(path: Path) -> None:
