@@ -36,10 +36,19 @@ from .http import post_json
 from .payload import build_payload
 from .profile_ops import sanitize_profile_name as _sanitize_profile_name
 from .profile_ops import wizard_next_steps as _wizard_next_steps
+from .profile_schema import PROFILE_VERSION
+from .profile_schema import read_profile as _read_profile
+from .profile_schema import resolve_profile_events_source as _resolve_profile_events_source
+from .profile_schema import resolve_profile_webhook_source as _resolve_profile_webhook_source
 from .secrets import is_secret_backend_available, store_secret_ref
 from .spool_ops import ensure_private_directory as _ensure_private_directory
 from .usr_events_watch import watch_usr_events_loop
 from .validation import resolve_tls_ca_bundle, resolve_webhook_url
+from .workflow_policy import DEFAULT_PROFILE_PATH as _DEFAULT_PROFILE_PATH
+from .workflow_policy import DEFAULT_WEBHOOK_ENV as _DEFAULT_WEBHOOK_ENV
+from .workflow_policy import default_profile_path_for_tool as _default_profile_path_for_tool
+from .workflow_policy import policy_defaults as _policy_defaults_for
+from .workflow_policy import resolve_workflow_policy as _resolve_workflow_policy
 
 app = typer.Typer(help="Send notifications for dnadesign runs via webhooks.")
 usr_events_app = typer.Typer(help="Consume USR JSONL events and emit notifications.")
@@ -50,56 +59,6 @@ app.add_typer(usr_events_app, name="usr-events")
 app.add_typer(spool_app, name="spool")
 app.add_typer(profile_app, name="profile")
 app.add_typer(setup_app, name="setup")
-
-PROFILE_VERSION = 2
-_PROFILE_V2_REQUIRED_KEYS = {"provider", "events", "webhook"}
-_PROFILE_V2_ALLOWED_KEYS = {
-    "profile_version",
-    "provider",
-    "events",
-    "events_source",
-    "webhook",
-    "cursor",
-    "only_actions",
-    "only_tools",
-    "spool_dir",
-    "include_args",
-    "include_context",
-    "include_raw_event",
-    "policy",
-    "tls_ca_bundle",
-}
-_DENSEGEN_PROFILE_PRESET = {
-    "only_actions": "densegen_health,densegen_flush_failed,materialize",
-    "only_tools": "densegen",
-    "include_args": False,
-    "include_context": False,
-    "include_raw_event": False,
-}
-_WORKFLOW_POLICY_DEFAULTS: dict[str, dict[str, Any]] = {
-    "densegen": dict(_DENSEGEN_PROFILE_PRESET),
-    "infer_evo2": {
-        "only_actions": "attach,materialize",
-        "only_tools": "infer",
-        "include_args": False,
-        "include_context": False,
-        "include_raw_event": False,
-    },
-    "generic": {},
-}
-_WORKFLOW_POLICY_ALIASES = {
-    "infer-evo2": "infer_evo2",
-}
-_WEBHOOK_SOURCES = {"env", "secret_ref"}
-_DEFAULT_WEBHOOK_ENV = "NOTIFY_WEBHOOK"
-_DEFAULT_PROFILE_PATH = Path("outputs/notify/generic/profile.json")
-
-
-def _default_profile_path_for_tool(tool_name: str | None) -> Path:
-    if tool_name is None:
-        return _DEFAULT_PROFILE_PATH
-    return Path("outputs") / "notify" / tool_name / "profile.json"
-
 
 @lru_cache(maxsize=1)
 def _usr_event_version() -> int:
@@ -130,131 +89,6 @@ def _split_csv(value: str | None) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
-def _normalize_policy_name(policy: str | None) -> str | None:
-    if policy is None:
-        return None
-    value = str(policy).strip().lower()
-    if not value:
-        raise NotifyConfigError("policy must be a non-empty string when provided")
-    return _WORKFLOW_POLICY_ALIASES.get(value, value)
-
-
-def _resolve_workflow_policy(*, policy: str | None) -> str | None:
-    policy_name = _normalize_policy_name(policy)
-    if policy_name is None:
-        return None
-    if policy_name not in _WORKFLOW_POLICY_DEFAULTS:
-        allowed = ", ".join(sorted(_WORKFLOW_POLICY_DEFAULTS))
-        raise NotifyConfigError(f"unsupported policy '{policy}'. Supported values: {allowed}")
-    return policy_name
-
-
-def _validate_events_source_config(data: dict[str, Any]) -> None:
-    events_source = data.get("events_source")
-    if events_source is None:
-        return
-    if not isinstance(events_source, dict):
-        raise NotifyConfigError("profile field 'events_source' must be an object")
-    unknown = sorted(set(events_source.keys()) - {"tool", "config"})
-    if unknown:
-        raise NotifyConfigError(
-            f"profile field 'events_source' contains unsupported keys: {', '.join(unknown)}"
-        )
-    tool = events_source.get("tool")
-    config = events_source.get("config")
-    if not isinstance(tool, str) or not tool.strip():
-        raise NotifyConfigError("profile field 'events_source.tool' must be a non-empty string")
-    if not isinstance(config, str) or not config.strip():
-        raise NotifyConfigError("profile field 'events_source.config' must be a non-empty string path")
-    _normalize_setup_tool_name(tool)
-
-
-def _validate_webhook_config(data: dict[str, Any]) -> None:
-    webhook = data.get("webhook")
-    if not isinstance(webhook, dict):
-        raise NotifyConfigError("profile field 'webhook' must be an object")
-    unknown = sorted(set(webhook.keys()) - {"source", "ref"})
-    if unknown:
-        raise NotifyConfigError(f"profile field 'webhook' contains unsupported keys: {', '.join(unknown)}")
-    source = webhook.get("source")
-    ref = webhook.get("ref")
-    if not isinstance(source, str) or not source.strip():
-        raise NotifyConfigError("profile field 'webhook.source' must be a non-empty string")
-    source_norm = source.strip().lower()
-    if source_norm not in _WEBHOOK_SOURCES:
-        allowed = ", ".join(sorted(_WEBHOOK_SOURCES))
-        raise NotifyConfigError(f"profile field 'webhook.source' must be one of: {allowed}")
-    if not isinstance(ref, str) or not ref.strip():
-        raise NotifyConfigError("profile field 'webhook.ref' must be a non-empty string")
-
-
-def _read_profile(profile_path: Path) -> dict[str, Any]:
-    if not profile_path.exists():
-        raise NotifyConfigError(f"profile file not found: {profile_path}")
-    try:
-        data = json.loads(profile_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise NotifyConfigError(f"profile file is not valid JSON: {profile_path}") from exc
-    if not isinstance(data, dict):
-        raise NotifyConfigError("profile file must contain a JSON object")
-
-    if "url" in data:
-        raise NotifyConfigError("profile must not store plain webhook URLs; use webhook refs")
-    if "preset" in data:
-        raise NotifyConfigError("legacy profile field 'preset' is not supported; use 'policy' with explicit filters")
-
-    version = data.get("profile_version")
-    if version != PROFILE_VERSION:
-        raise NotifyConfigError(f"profile_version must be {PROFILE_VERSION}; found {version!r}")
-    unknown = sorted(set(data.keys()) - _PROFILE_V2_ALLOWED_KEYS)
-    if unknown:
-        raise NotifyConfigError(f"profile contains unsupported keys: {', '.join(unknown)}")
-    for key in _PROFILE_V2_REQUIRED_KEYS:
-        value = data.get(key)
-        if key == "webhook":
-            continue
-        if not isinstance(value, str) or not value.strip():
-            raise NotifyConfigError(f"profile missing required non-empty string field '{key}'")
-    _validate_webhook_config(data)
-    _validate_events_source_config(data)
-
-    for key in ("events", "cursor", "spool_dir", "tls_ca_bundle"):
-        value = data.get(key)
-        if value is not None and (not isinstance(value, str) or not value.strip()):
-            raise NotifyConfigError(f"profile field '{key}' must be a non-empty string path when provided")
-
-    for key in ("only_actions", "only_tools", "policy"):
-        value = data.get(key)
-        if value is not None and (not isinstance(value, str) or not value.strip()):
-            raise NotifyConfigError(f"profile field '{key}' must be a non-empty string when provided")
-    policy_name = _normalize_policy_name(data.get("policy"))
-    if policy_name is not None and policy_name not in _WORKFLOW_POLICY_DEFAULTS:
-        allowed = ", ".join(sorted(_WORKFLOW_POLICY_DEFAULTS))
-        raise NotifyConfigError(f"profile field 'policy' must be one of: {allowed}")
-    if policy_name is not None and policy_name != "generic":
-        only_actions = data.get("only_actions")
-        only_tools = data.get("only_tools")
-        if not isinstance(only_actions, str) or not only_actions.strip():
-            raise NotifyConfigError(
-                f"profile policy '{policy_name}' requires explicit only_actions and only_tools fields in profile"
-            )
-        if not isinstance(only_tools, str) or not only_tools.strip():
-            raise NotifyConfigError(
-                f"profile policy '{policy_name}' requires explicit only_actions and only_tools fields in profile"
-            )
-
-    include_args = data.get("include_args")
-    if include_args is not None and not isinstance(include_args, bool):
-        raise NotifyConfigError("profile field 'include_args' must be a boolean when provided")
-    include_context = data.get("include_context")
-    if include_context is not None and not isinstance(include_context, bool):
-        raise NotifyConfigError("profile field 'include_context' must be a boolean when provided")
-    include_raw_event = data.get("include_raw_event")
-    if include_raw_event is not None and not isinstance(include_raw_event, bool):
-        raise NotifyConfigError("profile field 'include_raw_event' must be a boolean when provided")
-    return data
-
-
 def _resolve_cli_optional_string(*, field: str, cli_value: str | None) -> str | None:
     if cli_value is None:
         return None
@@ -262,27 +96,6 @@ def _resolve_cli_optional_string(*, field: str, cli_value: str | None) -> str | 
     if not value:
         raise NotifyConfigError(f"{field} must be a non-empty string when provided")
     return value
-
-
-def _resolve_profile_webhook_source(profile_data: dict[str, Any]) -> tuple[str | None, str | None]:
-    if not profile_data:
-        return None, None
-    version = profile_data.get("profile_version")
-    if version != PROFILE_VERSION:
-        raise NotifyConfigError(f"profile_version must be {PROFILE_VERSION}; found {version!r}")
-    webhook = profile_data.get("webhook")
-    if not isinstance(webhook, dict):
-        raise NotifyConfigError("profile field 'webhook' must be an object")
-    source = str(webhook.get("source") or "").strip().lower()
-    ref = str(webhook.get("ref") or "").strip()
-    if source not in _WEBHOOK_SOURCES:
-        allowed = ", ".join(sorted(_WEBHOOK_SOURCES))
-        raise NotifyConfigError(f"profile field 'webhook.source' must be one of: {allowed}")
-    if not ref:
-        raise NotifyConfigError("profile field 'webhook.ref' must be a non-empty string")
-    if source == "env":
-        return ref, None
-    return None, ref
 
 
 def _resolve_string_value(*, field: str, cli_value: str | None, profile_data: dict[str, Any]) -> str:
@@ -356,29 +169,6 @@ def _resolve_existing_file_path(*, field: str, path_value: Path) -> Path:
     if not resolved.is_file():
         raise NotifyConfigError(f"{field} path is not a file: {resolved}")
     return resolved
-
-
-def _resolve_profile_events_source(
-    *,
-    profile_data: dict[str, Any],
-    profile_path: Path | None,
-) -> tuple[str, Path] | None:
-    events_source = profile_data.get("events_source")
-    if events_source is None:
-        return None
-    if not isinstance(events_source, dict):
-        raise NotifyConfigError("profile field 'events_source' must be an object")
-    tool_raw = events_source.get("tool")
-    config_raw = events_source.get("config")
-    if not isinstance(tool_raw, str) or not tool_raw.strip():
-        raise NotifyConfigError("profile field 'events_source.tool' must be a non-empty string")
-    if not isinstance(config_raw, str) or not config_raw.strip():
-        raise NotifyConfigError("profile field 'events_source.config' must be a non-empty string path")
-    tool_name = _normalize_setup_tool_name(tool_raw)
-    config_path = Path(config_raw).expanduser()
-    if profile_path is not None and not config_path.is_absolute():
-        config_path = profile_path.parent / config_path
-    return tool_name or "", config_path.resolve()
 
 
 def _events_path_hint() -> str:
@@ -657,7 +447,7 @@ def _profile_init_impl(
             payload["tls_ca_bundle"] = str(_resolve_existing_file_path(field="tls_ca_bundle", path_value=tls_ca_bundle))
         if policy_name is not None:
             payload["policy"] = policy_name
-            for key, value in _WORKFLOW_POLICY_DEFAULTS[policy_name].items():
+            for key, value in _policy_defaults_for(policy_name).items():
                 payload.setdefault(key, value)
 
         if not payload["provider"]:
@@ -772,7 +562,7 @@ def _create_wizard_profile(
         payload["only_tools"] = str(only_tools).strip()
     if policy_name is not None:
         payload["policy"] = policy_name
-        for key, value in _WORKFLOW_POLICY_DEFAULTS[policy_name].items():
+        for key, value in _policy_defaults_for(policy_name).items():
             payload.setdefault(key, value)
     if events_source is not None:
         payload["events_source"] = dict(events_source)
