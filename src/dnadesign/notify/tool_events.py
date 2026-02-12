@@ -15,12 +15,13 @@ from collections.abc import Callable
 from typing import Any
 
 from .errors import NotifyConfigError
+from .tool_event_packs_builtin import register_builtin_tool_event_packs
 from .tool_event_types import ToolEventDecision, ToolEventState
-from .tool_events_densegen import register_densegen_handlers
 
 StatusOverride = Callable[[dict[str, Any]], str | None]
 MessageOverride = Callable[..., str]
 Evaluator = Callable[[dict[str, Any], str, ToolEventState], ToolEventDecision]
+ToolEventPackInstaller = Callable[[Callable[..., None]], None]
 
 
 class ToolEventRegistry:
@@ -97,12 +98,8 @@ class ToolEventRegistry:
 
 
 _DEFAULT_REGISTRY = ToolEventRegistry()
-
-register_densegen_handlers(
-    register_status_override=_DEFAULT_REGISTRY.register_status_override,
-    register_message_override=_DEFAULT_REGISTRY.register_message_override,
-    register_evaluator=_DEFAULT_REGISTRY.register_evaluator,
-)
+_PACK_INSTALLERS: dict[str, ToolEventPackInstaller] = {}
+_ACTIVATED_PACKS: set[str] = set()
 
 
 def register_tool_event_handlers(
@@ -118,6 +115,38 @@ def register_tool_event_handlers(
         message_override=message_override,
         evaluator=evaluator,
     )
+
+
+def _normalize_pack_name(pack: str) -> str:
+    value = str(pack or "").strip().lower()
+    if not value:
+        raise NotifyConfigError("tool-event pack must be a non-empty string")
+    return value
+
+
+def register_tool_event_pack(*, pack: str, installer: ToolEventPackInstaller) -> None:
+    pack_name = _normalize_pack_name(pack)
+    if pack_name in _PACK_INSTALLERS:
+        raise NotifyConfigError(f"tool-event pack '{pack_name}' is already registered")
+    if not callable(installer):
+        raise NotifyConfigError("tool-event pack installer must be callable")
+    _PACK_INSTALLERS[pack_name] = installer
+
+
+def supported_tool_event_packs() -> tuple[str, ...]:
+    return tuple(sorted(_PACK_INSTALLERS))
+
+
+def activate_tool_event_pack(pack: str) -> None:
+    pack_name = _normalize_pack_name(pack)
+    installer = _PACK_INSTALLERS.get(pack_name)
+    if installer is None:
+        allowed = ", ".join(supported_tool_event_packs())
+        raise NotifyConfigError(f"unknown tool-event pack '{pack}'. Supported values: {allowed}")
+    if pack_name in _ACTIVATED_PACKS:
+        raise NotifyConfigError(f"tool-event pack '{pack_name}' is already activated")
+    installer(register_tool_event_handlers)
+    _ACTIVATED_PACKS.add(pack_name)
 
 
 def tool_event_status_override(action: str, event: dict[str, Any]) -> str | None:
@@ -141,3 +170,7 @@ def tool_event_message_override(
 
 def evaluate_tool_event(action: str, event: dict[str, Any], *, run_id: str, state: ToolEventState) -> ToolEventDecision:
     return _DEFAULT_REGISTRY.evaluate(action, event, run_id=run_id, state=state)
+
+
+register_builtin_tool_event_packs(register_tool_event_pack)
+activate_tool_event_pack("densegen")
