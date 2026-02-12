@@ -38,16 +38,8 @@ from .profile_ops import sanitize_profile_name as _sanitize_profile_name
 from .profile_ops import wizard_next_steps as _wizard_next_steps
 from .secrets import is_secret_backend_available, store_secret_ref
 from .spool_ops import ensure_private_directory as _ensure_private_directory
-from .spool_ops import spool_payload as _spool_payload
-from .tool_events import ToolEventState
-from .tool_events import evaluate_tool_event as _evaluate_tool_event
-from .tool_events import tool_event_message_override as _tool_event_message_override
-from .tool_events import tool_event_status_override as _tool_event_status_override
+from .usr_events_watch import watch_usr_events_loop
 from .validation import resolve_tls_ca_bundle, resolve_webhook_url
-from .watch_ops import acquire_cursor_lock as _acquire_cursor_lock
-from .watch_ops import iter_file_lines as _iter_file_lines
-from .watch_ops import load_cursor_offset as _load_cursor_offset
-from .watch_ops import save_cursor_offset as _save_cursor_offset
 
 app = typer.Typer(help="Send notifications for dnadesign runs via webhooks.")
 usr_events_app = typer.Typer(help="Consume USR JSONL events and emit notifications.")
@@ -1313,138 +1305,42 @@ def _usr_events_watch_impl(
         if on_invalid_event_mode not in {"error", "skip"}:
             raise NotifyConfigError(f"unsupported on-invalid-event mode '{on_invalid_event}'")
 
-        should_advance_cursor = (not dry_run) or bool(advance_cursor_on_dry_run)
-        tool_event_state = ToolEventState()
-
-        def _save_cursor_if_enabled(next_offset: int) -> None:
-            if should_advance_cursor:
-                _save_cursor_offset(cursor_path, next_offset)
-
-        with _acquire_cursor_lock(cursor_path):
-            start_offset = _load_cursor_offset(cursor_path)
-            failed_unsent = 0
-            for next_offset, line in _iter_file_lines(
-                events_path,
-                start_offset=start_offset,
-                on_truncate=on_truncate,
-                follow=follow,
-                wait_for_events=wait_for_events,
-                idle_timeout_seconds=idle_timeout,
-                poll_interval_seconds=poll_interval_seconds,
-            ):
-                text = line.strip()
-                if not text:
-                    _save_cursor_if_enabled(next_offset)
-                    continue
-                try:
-                    event = json.loads(text)
-                except json.JSONDecodeError as exc:
-                    if on_invalid_event_mode == "skip":
-                        typer.echo(f"Skipping invalid event line: event line is not valid JSON: {exc}")
-                        _save_cursor_if_enabled(next_offset)
-                        continue
-                    raise NotifyConfigError(f"event line is not valid JSON: {exc}") from exc
-                try:
-                    _validate_usr_event(event, allow_unknown_version=allow_unknown_version)
-                except NotifyConfigError as exc:
-                    if on_invalid_event_mode == "skip":
-                        typer.echo(f"Skipping invalid event line: {exc}")
-                        _save_cursor_if_enabled(next_offset)
-                        continue
-                    raise
-
-                action = str(event.get("action"))
-                if action_filter and action not in action_filter:
-                    _save_cursor_if_enabled(next_offset)
-                    continue
-
-                actor_raw = event.get("actor")
-                actor = actor_raw if isinstance(actor_raw, dict) else {}
-                actor_tool = actor.get("tool")
-                if tool_filter and actor_tool not in tool_filter:
-                    _save_cursor_if_enabled(next_offset)
-                    continue
-                tool_name = tool or actor_tool
-                if not tool_name:
-                    raise NotifyConfigError("event missing actor.tool; provide --tool to override")
-                run_value = run_id or actor.get("run_id")
-                if not run_value:
-                    raise NotifyConfigError("event missing actor.run_id; provide --run-id to override")
-
-                tool_decision = _evaluate_tool_event(action, event, run_id=str(run_value), state=tool_event_state)
-                if not tool_decision.emit:
-                    _save_cursor_if_enabled(next_offset)
-                    continue
-                status_value = _tool_event_status_override(action, event) or _status_for_action(action, event=event)
-                payload = build_payload(
-                    status=status_value,
-                    tool=tool_name,
-                    run_id=run_value,
-                    message=message
-                    or _tool_event_message_override(
-                        action,
-                        event,
-                        run_id=str(run_value),
-                        duration_seconds=tool_decision.duration_seconds,
-                    )
-                    or _event_message(
-                        event,
-                        run_id=str(run_value),
-                        duration_seconds=tool_decision.duration_seconds,
-                    ),
-                    meta=_event_meta(
-                        event,
-                        include_args=bool(include_args_value),
-                        include_raw_event=bool(include_raw_event_value),
-                        include_context=bool(include_context_value),
-                    ),
-                    timestamp=event.get("timestamp_utc"),
-                    host=(actor.get("host") if bool(include_context_value) else None),
-                    cwd=(
-                        ((event.get("dataset") or {}) if isinstance(event.get("dataset"), dict) else {}).get("root")
-                        if bool(include_context_value)
-                        else None
-                    ),
-                    version=event.get("version"),
-                )
-                formatted = format_for_provider(provider_value, payload)
-                if dry_run:
-                    typer.echo(json.dumps(formatted, sort_keys=True))
-                    _save_cursor_if_enabled(next_offset)
-                    if stop_on_terminal_status and status_value in {"success", "failure"}:
-                        return
-                    continue
-
-                sent_or_spooled = False
-                try:
-                    if webhook_url is None:
-                        raise NotifyConfigError("webhook URL is required when not running in --dry-run mode")
-                    _post_with_backoff(
-                        webhook_url,
-                        formatted,
-                        tls_ca_bundle=resolved_tls_ca_bundle,
-                        connect_timeout=connect_timeout,
-                        read_timeout=read_timeout,
-                        retry_max=retry_max,
-                        retry_base_seconds=retry_base_seconds,
-                    )
-                    sent_or_spooled = True
-                except NotifyDeliveryError:
-                    if spool_dir_value is not None:
-                        _spool_payload(spool_dir_value, provider=provider_value, payload=payload)
-                        sent_or_spooled = True
-                    elif fail_fast:
-                        raise
-                    else:
-                        failed_unsent += 1
-
-                if sent_or_spooled:
-                    _save_cursor_if_enabled(next_offset)
-                    if stop_on_terminal_status and status_value in {"success", "failure"}:
-                        return
-
-            if failed_unsent:
-                raise NotifyDeliveryError(f"{failed_unsent} event(s) failed delivery and were not spooled")
+        watch_usr_events_loop(
+            events_path=events_path,
+            cursor_path=cursor_path,
+            on_truncate=on_truncate,
+            follow=follow,
+            wait_for_events=wait_for_events,
+            idle_timeout_seconds=idle_timeout,
+            poll_interval_seconds=poll_interval_seconds,
+            should_advance_cursor=(not dry_run) or bool(advance_cursor_on_dry_run),
+            on_invalid_event_mode=on_invalid_event_mode,
+            allow_unknown_version=allow_unknown_version,
+            action_filter=action_filter,
+            tool_filter=tool_filter,
+            tool=tool,
+            run_id=run_id,
+            provider_value=provider_value,
+            message=message,
+            include_args_value=bool(include_args_value),
+            include_context_value=bool(include_context_value),
+            include_raw_event_value=bool(include_raw_event_value),
+            dry_run=dry_run,
+            stop_on_terminal_status=stop_on_terminal_status,
+            webhook_url=webhook_url,
+            resolved_tls_ca_bundle=resolved_tls_ca_bundle,
+            connect_timeout=connect_timeout,
+            read_timeout=read_timeout,
+            retry_max=retry_max,
+            retry_base_seconds=retry_base_seconds,
+            fail_fast=fail_fast,
+            spool_dir_value=spool_dir_value,
+            validate_usr_event=_validate_usr_event,
+            status_for_action=_status_for_action,
+            event_message=_event_message,
+            event_meta=_event_meta,
+            post_with_backoff=_post_with_backoff,
+        )
     except NotifyError as exc:
         typer.echo(f"Notification failed: {exc}")
         raise typer.Exit(code=1)

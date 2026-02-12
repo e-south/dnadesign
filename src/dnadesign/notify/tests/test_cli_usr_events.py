@@ -18,8 +18,9 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from dnadesign.notify.cli import _iter_file_lines, app
+from dnadesign.notify.cli import app
 from dnadesign.notify.errors import NotifyConfigError, NotifyDeliveryError
+from dnadesign.notify.watch_ops import iter_file_lines as _iter_file_lines
 from dnadesign.usr import USR_EVENT_VERSION
 
 
