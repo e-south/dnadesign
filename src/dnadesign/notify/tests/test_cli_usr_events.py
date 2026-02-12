@@ -706,6 +706,16 @@ def test_usr_events_watch_formats_densegen_health_message(tmp_path: Path) -> Non
         "quota_progress_pct": 10.0,
         "compression_ratio": 1.13,
         "flush_count": 3,
+        "densegen": {
+            "tfbs_total_library": 80,
+            "tfbs_unique_used": 20,
+            "tfbs_coverage_pct": 25.0,
+            "plans_attempted": 10,
+            "plans_solved": 8,
+            "rows_written_session": 12,
+            "run_quota": 120,
+            "quota_progress_pct": 10.0,
+        },
     }
     _write_events(events, [event])
 
@@ -723,9 +733,10 @@ def test_usr_events_watch_formats_densegen_health_message(tmp_path: Path) -> Non
         ],
     )
     assert result.exit_code == 0
-    assert "densegen running on demo" in result.stdout
-    assert "rows=12/120" in result.stdout
-    assert "quota=10.0%" in result.stdout
+    assert "DenseGen health | run=run-1 | dataset=demo" in result.stdout
+    assert "- Quota: 10.0% (12/120 rows)" in result.stdout
+    assert "- TFBS library coverage: 25.0% (20/80)" in result.stdout
+    assert "- Plan success: 8/10 (80.0%)" in result.stdout
 
 
 def test_usr_events_watch_includes_error_in_failed_densegen_health_message(tmp_path: Path) -> None:
@@ -751,8 +762,8 @@ def test_usr_events_watch_includes_error_in_failed_densegen_health_message(tmp_p
         ],
     )
     assert result.exit_code == 0
-    assert "densegen failed on demo" in result.stdout
-    assert "error=solver timeout reached" in result.stdout
+    assert "DenseGen failed | run=run-1 | dataset=demo" in result.stdout
+    assert "- Error: solver timeout reached" in result.stdout
 
 
 def test_usr_events_watch_includes_error_in_densegen_flush_failed_message(tmp_path: Path) -> None:
@@ -788,6 +799,18 @@ def test_usr_events_watch_maps_densegen_health_completed_to_success_status(tmp_p
     events = tmp_path / "events.log"
     event = _event(action="densegen_health")
     event["args"] = {"status": "completed"}
+    event["metrics"] = {
+        "densegen": {
+            "run_quota": 10,
+            "rows_written_session": 10,
+            "quota_progress_pct": 100.0,
+            "tfbs_total_library": 4,
+            "tfbs_unique_used": 4,
+            "tfbs_coverage_pct": 100.0,
+            "plans_attempted": 3,
+            "plans_solved": 3,
+        }
+    }
     _write_events(events, [event])
 
     runner = CliRunner()
@@ -807,11 +830,185 @@ def test_usr_events_watch_maps_densegen_health_completed_to_success_status(tmp_p
     assert '"status": "success"' in result.stdout
 
 
+def test_usr_events_watch_suppresses_densegen_running_health_without_progress_step_or_heartbeat(tmp_path: Path) -> None:
+    events = tmp_path / "events.log"
+    first = _event(action="densegen_health")
+    first["args"] = {"status": "running"}
+    first["timestamp_utc"] = "2026-02-06T00:00:00+00:00"
+    first["metrics"] = {
+        "densegen": {
+            "run_quota": 100,
+            "rows_written_session": 1,
+            "quota_progress_pct": 1.0,
+            "tfbs_total_library": 40,
+            "tfbs_unique_used": 10,
+            "tfbs_coverage_pct": 25.0,
+            "plans_attempted": 1,
+            "plans_solved": 1,
+        }
+    }
+    second = _event(action="densegen_health")
+    second["args"] = {"status": "running"}
+    second["timestamp_utc"] = "2026-02-06T00:05:00+00:00"
+    second["metrics"] = {
+        "densegen": {
+            "run_quota": 100,
+            "rows_written_session": 5,
+            "quota_progress_pct": 5.0,
+            "tfbs_total_library": 40,
+            "tfbs_unique_used": 10,
+            "tfbs_coverage_pct": 25.0,
+            "plans_attempted": 1,
+            "plans_solved": 1,
+        }
+    }
+    _write_events(events, [first, second])
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--provider",
+            "generic",
+            "--events",
+            str(events),
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0
+    payload_lines = [line for line in result.stdout.splitlines() if line.strip().startswith("{")]
+    assert len(payload_lines) == 1
+
+
+def test_usr_events_watch_emits_densegen_running_health_on_quota_step_boundary(tmp_path: Path) -> None:
+    events = tmp_path / "events.log"
+    first = _event(action="densegen_health")
+    first["args"] = {"status": "running"}
+    first["timestamp_utc"] = "2026-02-06T00:00:00+00:00"
+    first["metrics"] = {
+        "densegen": {
+            "run_quota": 100,
+            "rows_written_session": 9,
+            "quota_progress_pct": 9.0,
+            "tfbs_total_library": 40,
+            "tfbs_unique_used": 10,
+            "tfbs_coverage_pct": 25.0,
+            "plans_attempted": 2,
+            "plans_solved": 2,
+        }
+    }
+    second = _event(action="densegen_health")
+    second["args"] = {"status": "running"}
+    second["timestamp_utc"] = "2026-02-06T00:01:00+00:00"
+    second["metrics"] = {
+        "densegen": {
+            "run_quota": 100,
+            "rows_written_session": 10,
+            "quota_progress_pct": 10.0,
+            "tfbs_total_library": 40,
+            "tfbs_unique_used": 11,
+            "tfbs_coverage_pct": 27.5,
+            "plans_attempted": 3,
+            "plans_solved": 2,
+        }
+    }
+    _write_events(events, [first, second])
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--provider",
+            "generic",
+            "--events",
+            str(events),
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0
+    payload_lines = [line for line in result.stdout.splitlines() if line.strip().startswith("{")]
+    assert len(payload_lines) == 2
+
+
+def test_usr_events_watch_formats_densegen_completion_summary_with_runtime(tmp_path: Path) -> None:
+    events = tmp_path / "events.log"
+    started = _event(action="densegen_health")
+    started["args"] = {"status": "started"}
+    started["timestamp_utc"] = "2026-02-06T00:00:00+00:00"
+    started["metrics"] = {
+        "densegen": {
+            "run_quota": 100,
+            "rows_written_session": 0,
+            "quota_progress_pct": 0.0,
+            "tfbs_total_library": 40,
+            "tfbs_unique_used": 0,
+            "tfbs_coverage_pct": 0.0,
+            "plans_attempted": 0,
+            "plans_solved": 0,
+        }
+    }
+    completed = _event(action="densegen_health")
+    completed["args"] = {"status": "completed"}
+    completed["timestamp_utc"] = "2026-02-06T00:10:30+00:00"
+    completed["metrics"] = {
+        "rows_written_session": 100,
+        "run_quota": 100,
+        "quota_progress_pct": 100.0,
+        "densegen": {
+            "run_quota": 100,
+            "rows_written_session": 100,
+            "quota_progress_pct": 100.0,
+            "tfbs_total_library": 40,
+            "tfbs_unique_used": 30,
+            "tfbs_coverage_pct": 75.0,
+            "plans_attempted": 20,
+            "plans_solved": 18,
+        },
+    }
+    _write_events(events, [started, completed])
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--provider",
+            "generic",
+            "--events",
+            str(events),
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0
+    assert "DenseGen complete | run=run-1 | dataset=demo" in result.stdout
+    assert "- Duration: 00:10:30" in result.stdout
+    assert "- Final quota: 100.0% (100/100 rows)" in result.stdout
+    assert "- Final TFBS coverage: 75.0% (30/40)" in result.stdout
+    assert "- Final plan success: 18/20 (90.0%)" in result.stdout
+
+
 def test_usr_events_watch_can_stop_on_terminal_status(tmp_path: Path) -> None:
     events = tmp_path / "events.log"
     cursor = tmp_path / "cursor.txt"
     first = _event(action="densegen_health")
     first["args"] = {"status": "completed"}
+    first["metrics"] = {
+        "densegen": {
+            "run_quota": 10,
+            "rows_written_session": 10,
+            "quota_progress_pct": 100.0,
+            "tfbs_total_library": 4,
+            "tfbs_unique_used": 4,
+            "tfbs_coverage_pct": 100.0,
+            "plans_attempted": 3,
+            "plans_solved": 3,
+        }
+    }
     second = _event(action="materialize")
     _write_events(events, [first, second])
     first_line = json.dumps(first) + "\n"

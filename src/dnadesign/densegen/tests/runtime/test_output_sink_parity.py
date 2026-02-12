@@ -182,6 +182,47 @@ def test_usr_writer_passes_explicit_actor_to_usr_mutations(tmp_path: Path, monke
         assert actor.get("run_id") == expected_run
 
 
+def test_usr_writer_emits_densegen_health_lifecycle_and_metrics_namespace(tmp_path: Path, monkeypatch) -> None:
+    _root, writer = _make_usr_writer(tmp_path)
+    meta = output_meta(library_hash="demo_hash", library_index=1)
+    meta["run_id"] = "run-health"
+    rec = OutputRecord.from_sequence(
+        sequence="ACGTACGTAA",
+        meta=meta,
+        source="unit",
+        bio_type="dna",
+        alphabet="dna_4",
+    )
+    events: list[tuple[str, dict]] = []
+
+    def _capture_event(action, **kwargs):
+        events.append((str(action), kwargs))
+        return None
+
+    monkeypatch.setattr(writer.ds, "log_event", _capture_event)
+
+    assert writer.add(rec) is True
+    writer.finalize()
+
+    densegen_health = [entry for entry in events if entry[0] == "densegen_health"]
+    assert densegen_health
+    statuses = [str((kwargs.get("args") or {}).get("status")) for _, kwargs in densegen_health]
+    assert "started" in statuses
+    assert "completed" in statuses
+    running_events = [
+        kwargs for _, kwargs in densegen_health if str((kwargs.get("args") or {}).get("status")) == "running"
+    ]
+    assert running_events
+    metrics = running_events[-1].get("metrics") or {}
+    densegen_metrics = metrics.get("densegen")
+    assert isinstance(densegen_metrics, dict)
+    assert densegen_metrics.get("tfbs_total_library") == 2
+    assert densegen_metrics.get("tfbs_unique_used") == 2
+    assert densegen_metrics.get("tfbs_coverage_pct") == 100.0
+    assert densegen_metrics.get("plans_attempted") == 1
+    assert densegen_metrics.get("plans_solved") == 1
+
+
 def test_usr_writer_updates_id_index_when_dedup_disabled(tmp_path: Path) -> None:
     _root, writer = _make_usr_writer(tmp_path, deduplicate=False)
     rec = OutputRecord.from_sequence(
