@@ -37,6 +37,7 @@ from .cli_resolve import resolve_optional_string_value as _resolve_optional_stri
 from .cli_resolve import resolve_path_value as _resolve_path_value
 from .cli_resolve import resolve_string_value as _resolve_string_value
 from .cli_resolve import resolve_usr_events_path as _resolve_usr_events_path_raw
+from .cli_runtime import run_spool_drain, run_usr_events_watch
 from .errors import NotifyConfigError, NotifyDeliveryError, NotifyError
 from .event_transforms import event_message as _event_message
 from .event_transforms import event_meta as _event_meta
@@ -688,122 +689,53 @@ def _usr_events_watch_impl(
     ),
 ) -> None:
     try:
-        if idle_timeout is not None and float(idle_timeout) <= 0:
-            raise NotifyConfigError("idle_timeout must be > 0 when provided")
-        if float(poll_interval_seconds) <= 0:
-            raise NotifyConfigError("poll_interval_seconds must be > 0")
-        profile_path = profile.expanduser().resolve() if profile is not None else None
-        profile_data = _read_profile(profile_path) if profile_path is not None else {}
-        provider_value = _resolve_string_value(field="provider", cli_value=provider, profile_data=profile_data)
-        events_path = _resolve_path_value(
-            field="events",
-            cli_value=events,
-            profile_data=profile_data,
-            profile_path=profile_path,
-        )
-        if events is None:
-            profile_events_source = _resolve_profile_events_source(profile_data=profile_data, profile_path=profile_path)
-            if profile_events_source is not None:
-                source_tool, source_config = profile_events_source
-                resolved_events_path, _default_policy = _resolve_tool_events_path(
-                    tool=source_tool,
-                    config=source_config,
-                )
-                events_path = _resolve_usr_events_path(resolved_events_path, require_exists=False)
-        cursor_path = _resolve_optional_path_value(
-            field="cursor",
-            cli_value=cursor,
-            profile_data=profile_data,
-            profile_path=profile_path,
-        )
-        only_actions_value = _resolve_optional_string_value(
-            field="only_actions",
-            cli_value=only_actions,
-            profile_data=profile_data,
-        )
-        only_tools_value = _resolve_optional_string_value(
-            field="only_tools",
-            cli_value=only_tools,
-            profile_data=profile_data,
-        )
-        spool_dir_value = _resolve_optional_path_value(
-            field="spool_dir",
-            cli_value=spool_dir,
-            profile_data=profile_data,
-            profile_path=profile_path,
-        )
-        include_args_value = include_args
-        if include_args_value is None:
-            include_args_profile = profile_data.get("include_args")
-            include_args_value = bool(include_args_profile) if include_args_profile is not None else False
-        include_context_value = include_context
-        if include_context_value is None:
-            include_context_profile = profile_data.get("include_context")
-            include_context_value = bool(include_context_profile) if include_context_profile is not None else False
-        include_raw_event_value = include_raw_event
-        if include_raw_event_value is None:
-            include_raw_event_profile = profile_data.get("include_raw_event")
-            include_raw_event_value = (
-                bool(include_raw_event_profile) if include_raw_event_profile is not None else False
-            )
-        profile_url_env, profile_secret_ref = _resolve_profile_webhook_source(profile_data)
-        url_env_value = _resolve_cli_optional_string(field="url_env", cli_value=url_env)
-        if url_env_value is None:
-            url_env_value = profile_url_env
-        secret_ref_value = _resolve_cli_optional_string(field="secret_ref", cli_value=secret_ref)
-        if secret_ref_value is None:
-            secret_ref_value = profile_secret_ref
-        profile_tls_ca_bundle = _resolve_optional_path_value(
-            field="tls_ca_bundle",
-            cli_value=tls_ca_bundle,
-            profile_data=profile_data,
-            profile_path=profile_path,
-        )
-
-        webhook_url: str | None = None
-        resolved_tls_ca_bundle: Path | None = None
-        if not dry_run:
-            webhook_url = resolve_webhook_url(url=url, url_env=url_env_value, secret_ref=secret_ref_value)
-            resolved_tls_ca_bundle = resolve_tls_ca_bundle(
-                webhook_url=webhook_url,
-                tls_ca_bundle=profile_tls_ca_bundle,
-            )
-        action_filter = set(_split_csv(only_actions_value))
-        tool_filter = set(_split_csv(only_tools_value))
-        on_invalid_event_mode = str(on_invalid_event or "").strip().lower()
-        if on_invalid_event_mode not in {"error", "skip"}:
-            raise NotifyConfigError(f"unsupported on-invalid-event mode '{on_invalid_event}'")
-
-        watch_usr_events_loop(
-            events_path=events_path,
-            cursor_path=cursor_path,
-            on_truncate=on_truncate,
+        run_usr_events_watch(
+            provider=provider,
+            url=url,
+            url_env=url_env,
+            secret_ref=secret_ref,
+            tls_ca_bundle=tls_ca_bundle,
+            events=events,
+            profile=profile,
+            cursor=cursor,
             follow=follow,
             wait_for_events=wait_for_events,
-            idle_timeout_seconds=idle_timeout,
+            idle_timeout=idle_timeout,
             poll_interval_seconds=poll_interval_seconds,
-            should_advance_cursor=(not dry_run) or bool(advance_cursor_on_dry_run),
-            on_invalid_event_mode=on_invalid_event_mode,
+            stop_on_terminal_status=stop_on_terminal_status,
+            on_truncate=on_truncate,
+            only_actions=only_actions,
+            only_tools=only_tools,
+            on_invalid_event=on_invalid_event,
             allow_unknown_version=allow_unknown_version,
-            action_filter=action_filter,
-            tool_filter=tool_filter,
             tool=tool,
             run_id=run_id,
-            provider_value=provider_value,
             message=message,
-            include_args_value=bool(include_args_value),
-            include_context_value=bool(include_context_value),
-            include_raw_event_value=bool(include_raw_event_value),
-            dry_run=dry_run,
-            stop_on_terminal_status=stop_on_terminal_status,
-            webhook_url=webhook_url,
-            resolved_tls_ca_bundle=resolved_tls_ca_bundle,
+            include_args=include_args,
+            include_context=include_context,
+            include_raw_event=include_raw_event,
             connect_timeout=connect_timeout,
             read_timeout=read_timeout,
             retry_max=retry_max,
             retry_base_seconds=retry_base_seconds,
             fail_fast=fail_fast,
-            spool_dir_value=spool_dir_value,
+            spool_dir=spool_dir,
+            dry_run=dry_run,
+            advance_cursor_on_dry_run=advance_cursor_on_dry_run,
+            read_profile=_read_profile,
+            resolve_string_value=_resolve_string_value,
+            resolve_path_value=_resolve_path_value,
+            resolve_optional_path_value=_resolve_optional_path_value,
+            resolve_optional_string_value=_resolve_optional_string_value,
+            resolve_profile_events_source=_resolve_profile_events_source,
+            resolve_tool_events_path=_resolve_tool_events_path,
+            resolve_usr_events_path=_resolve_usr_events_path,
+            resolve_profile_webhook_source=_resolve_profile_webhook_source,
+            resolve_cli_optional_string=_resolve_cli_optional_string,
+            resolve_webhook_url=resolve_webhook_url,
+            resolve_tls_ca_bundle=resolve_tls_ca_bundle,
+            split_csv=_split_csv,
+            watch_usr_events_loop=watch_usr_events_loop,
             validate_usr_event=_validate_usr_event,
             status_for_action=_status_for_action,
             event_message=_event_message,
@@ -834,76 +766,29 @@ def _spool_drain_impl(
     fail_fast: bool = typer.Option(False, "--fail-fast", help="Abort on first failed spool item."),
 ) -> None:
     try:
-        profile_path = profile.expanduser().resolve() if profile is not None else None
-        profile_data = _read_profile(profile_path) if profile_path is not None else {}
-        provider_override = _resolve_cli_optional_string(field="provider", cli_value=provider)
-        profile_provider_value = profile_data.get("provider")
-        profile_provider: str | None = None
-        if profile_provider_value is not None:
-            if not isinstance(profile_provider_value, str) or not profile_provider_value.strip():
-                raise NotifyConfigError("profile field 'provider' must be a non-empty string")
-            profile_provider = profile_provider_value.strip()
-        spool_dir_value = _resolve_path_value(
-            field="spool_dir",
-            cli_value=spool_dir,
-            profile_data=profile_data,
-            profile_path=profile_path,
+        run_spool_drain(
+            spool_dir=spool_dir,
+            provider=provider,
+            url=url,
+            url_env=url_env,
+            secret_ref=secret_ref,
+            tls_ca_bundle=tls_ca_bundle,
+            profile=profile,
+            connect_timeout=connect_timeout,
+            read_timeout=read_timeout,
+            retry_max=retry_max,
+            retry_base_seconds=retry_base_seconds,
+            fail_fast=fail_fast,
+            read_profile=_read_profile,
+            resolve_cli_optional_string=_resolve_cli_optional_string,
+            resolve_path_value=_resolve_path_value,
+            resolve_profile_webhook_source=_resolve_profile_webhook_source,
+            resolve_optional_path_value=_resolve_optional_path_value,
+            resolve_webhook_url=resolve_webhook_url,
+            resolve_tls_ca_bundle=resolve_tls_ca_bundle,
+            format_for_provider=format_for_provider,
+            post_with_backoff=_post_with_backoff,
         )
-        profile_url_env, profile_secret_ref = _resolve_profile_webhook_source(profile_data)
-        url_env_value = _resolve_cli_optional_string(field="url_env", cli_value=url_env)
-        if url_env_value is None:
-            url_env_value = profile_url_env
-        secret_ref_value = _resolve_cli_optional_string(field="secret_ref", cli_value=secret_ref)
-        if secret_ref_value is None:
-            secret_ref_value = profile_secret_ref
-        profile_tls_ca_bundle = _resolve_optional_path_value(
-            field="tls_ca_bundle",
-            cli_value=tls_ca_bundle,
-            profile_data=profile_data,
-            profile_path=profile_path,
-        )
-        webhook_url = resolve_webhook_url(url=url, url_env=url_env_value, secret_ref=secret_ref_value)
-        resolved_tls_ca_bundle = resolve_tls_ca_bundle(
-            webhook_url=webhook_url,
-            tls_ca_bundle=profile_tls_ca_bundle,
-        )
-        if not spool_dir_value.exists():
-            raise NotifyConfigError(f"spool directory not found: {spool_dir_value}")
-        failed = 0
-        for path in sorted(spool_dir_value.glob("*.json")):
-            try:
-                body = json.loads(path.read_text(encoding="utf-8"))
-                payload = body.get("payload")
-                if not isinstance(payload, dict):
-                    raise NotifyConfigError(f"invalid spool payload file: {path}")
-                spool_provider_value = body.get("provider")
-                spool_provider: str | None = None
-                if spool_provider_value is not None:
-                    if not isinstance(spool_provider_value, str) or not spool_provider_value.strip():
-                        raise NotifyConfigError(f"invalid spool payload provider value: {path}")
-                    spool_provider = spool_provider_value.strip()
-                provider_value = provider_override or spool_provider or profile_provider
-                if not provider_value:
-                    raise NotifyConfigError(
-                        f"spool payload missing provider: {path}. Pass --provider or include provider in spool files."
-                    )
-                formatted = format_for_provider(provider_value, payload)
-                _post_with_backoff(
-                    webhook_url,
-                    formatted,
-                    tls_ca_bundle=resolved_tls_ca_bundle,
-                    connect_timeout=connect_timeout,
-                    read_timeout=read_timeout,
-                    retry_max=retry_max,
-                    retry_base_seconds=retry_base_seconds,
-                )
-                path.unlink()
-            except NotifyError:
-                failed += 1
-                if fail_fast:
-                    raise
-        if failed:
-            raise NotifyDeliveryError(f"{failed} spool file(s) failed delivery")
     except NotifyError as exc:
         typer.echo(f"Notification failed: {exc}")
         raise typer.Exit(code=1)
