@@ -64,6 +64,7 @@ def register_setup_commands(
             "--include-raw-event/--no-include-raw-event",
             help="Whether to include the full USR event blob in payload meta.",
         ),
+        tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
         secret_source: str = typer.Option(
             "auto",
             "--secret-source",
@@ -103,6 +104,7 @@ def register_setup_commands(
             include_args=include_args,
             include_context=include_context,
             include_raw_event=include_raw_event,
+            tls_ca_bundle=tls_ca_bundle,
             secret_source=secret_source,
             url_env=url_env,
             secret_ref=secret_ref,

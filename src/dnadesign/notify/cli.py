@@ -38,7 +38,7 @@ from .profile_ops import wizard_next_steps as _wizard_next_steps
 from .secrets import is_secret_backend_available, store_secret_ref
 from .spool_ops import ensure_private_directory as _ensure_private_directory
 from .spool_ops import spool_payload as _spool_payload
-from .validation import resolve_webhook_url
+from .validation import resolve_tls_ca_bundle, resolve_webhook_url
 from .watch_ops import acquire_cursor_lock as _acquire_cursor_lock
 from .watch_ops import iter_file_lines as _iter_file_lines
 from .watch_ops import load_cursor_offset as _load_cursor_offset
@@ -70,6 +70,7 @@ _PROFILE_V2_ALLOWED_KEYS = {
     "include_context",
     "include_raw_event",
     "policy",
+    "tls_ca_bundle",
 }
 _DENSEGEN_PROFILE_PRESET = {
     "only_actions": "densegen_health,densegen_flush_failed,materialize",
@@ -220,7 +221,7 @@ def _read_profile(profile_path: Path) -> dict[str, Any]:
     _validate_webhook_config(data)
     _validate_events_source_config(data)
 
-    for key in ("events", "cursor", "spool_dir"):
+    for key in ("events", "cursor", "spool_dir", "tls_ca_bundle"):
         value = data.get(key)
         if value is not None and (not isinstance(value, str) or not value.strip()):
             raise NotifyConfigError(f"profile field '{key}' must be a non-empty string path when provided")
@@ -349,6 +350,15 @@ def _resolve_optional_path_value(
             return profile_path.parent / resolved
         return resolved
     raise NotifyConfigError(f"profile field '{field}' must be a non-empty string path when provided")
+
+
+def _resolve_existing_file_path(*, field: str, path_value: Path) -> Path:
+    resolved = path_value.expanduser().resolve()
+    if not resolved.exists():
+        raise NotifyConfigError(f"{field} file not found: {resolved}")
+    if not resolved.is_file():
+        raise NotifyConfigError(f"{field} path is not a file: {resolved}")
+    return resolved
 
 
 def _resolve_profile_events_source(
@@ -581,6 +591,7 @@ def _post_with_backoff(
     webhook_url: str,
     formatted_payload: dict[str, Any],
     *,
+    tls_ca_bundle: Path | None,
     connect_timeout: float,
     read_timeout: float,
     retry_max: int,
@@ -592,7 +603,13 @@ def _post_with_backoff(
     attempt = 0
     while True:
         try:
-            post_json(webhook_url, formatted_payload, timeout=total_timeout, retries=0)
+            post_json(
+                webhook_url,
+                formatted_payload,
+                timeout=total_timeout,
+                retries=0,
+                tls_ca_bundle=tls_ca_bundle,
+            )
             return
         except NotifyDeliveryError:
             if attempt >= retries:
@@ -616,6 +633,7 @@ def send(
         "--secret-ref",
         help="Secret reference: keychain://service/account or secretservice://service/account.",
     ),
+    tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
     message: str | None = typer.Option(None, help="Optional message."),
     meta: Path | None = typer.Option(None, help="Path to JSON metadata file."),
     timeout: float = typer.Option(10.0, help="HTTP timeout (seconds)."),
@@ -624,6 +642,7 @@ def send(
 ) -> None:
     try:
         webhook_url = resolve_webhook_url(url=url, url_env=url_env, secret_ref=secret_ref)
+        tls_ca_bundle_value = resolve_tls_ca_bundle(webhook_url=webhook_url, tls_ca_bundle=tls_ca_bundle)
         meta_data = _load_meta(meta)
         payload = build_payload(
             status=status,
@@ -636,7 +655,13 @@ def send(
         if dry_run:
             typer.echo(json.dumps(formatted, indent=2, sort_keys=True))
             return
-        post_json(webhook_url, formatted, timeout=timeout, retries=retries)
+        post_json(
+            webhook_url,
+            formatted,
+            timeout=timeout,
+            retries=retries,
+            tls_ca_bundle=tls_ca_bundle_value,
+        )
         typer.echo("Notification sent.")
     except NotifyError as exc:
         typer.echo(f"Notification failed: {exc}")
@@ -655,6 +680,7 @@ def _profile_init_impl(
     include_args: bool = typer.Option(False, "--include-args/--no-include-args"),
     include_context: bool = typer.Option(False, "--include-context/--no-include-context"),
     include_raw_event: bool = typer.Option(False, "--include-raw-event/--no-include-raw-event"),
+    tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
     policy: str | None = typer.Option(
         None,
         "--policy",
@@ -683,6 +709,8 @@ def _profile_init_impl(
             payload["only_tools"] = str(only_tools).strip()
         if spool_dir is not None:
             payload["spool_dir"] = str(spool_dir)
+        if tls_ca_bundle is not None:
+            payload["tls_ca_bundle"] = str(_resolve_existing_file_path(field="tls_ca_bundle", path_value=tls_ca_bundle))
         if policy_name is not None:
             payload["policy"] = policy_name
             for key, value in _WORKFLOW_POLICY_DEFAULTS[policy_name].items():
@@ -712,6 +740,7 @@ def _create_wizard_profile(
     include_args: bool,
     include_context: bool,
     include_raw_event: bool,
+    tls_ca_bundle: Path | None,
     policy: str | None,
     secret_source: str,
     url_env: str | None,
@@ -791,6 +820,8 @@ def _create_wizard_profile(
         "include_raw_event": bool(include_raw_event),
         "webhook": webhook_config,
     }
+    if tls_ca_bundle is not None:
+        payload["tls_ca_bundle"] = str(_resolve_existing_file_path(field="tls_ca_bundle", path_value=tls_ca_bundle))
     if only_actions is not None:
         payload["only_actions"] = str(only_actions).strip()
     if only_tools is not None:
@@ -832,6 +863,7 @@ def _profile_wizard_impl(
     include_args: bool = typer.Option(False, "--include-args/--no-include-args"),
     include_context: bool = typer.Option(False, "--include-context/--no-include-context"),
     include_raw_event: bool = typer.Option(False, "--include-raw-event/--no-include-raw-event"),
+    tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
     policy: str | None = typer.Option(
         None,
         "--policy",
@@ -873,6 +905,7 @@ def _profile_wizard_impl(
             include_args=include_args,
             include_context=include_context,
             include_raw_event=include_raw_event,
+            tls_ca_bundle=tls_ca_bundle,
             policy=policy,
             secret_source=secret_source,
             url_env=url_env,
@@ -923,7 +956,6 @@ def _profile_doctor_impl(
         profile_path = profile.expanduser().resolve()
         data = _read_profile(profile_path)
         profile_url_env, profile_secret_ref = _resolve_profile_webhook_source(data)
-        _ = resolve_webhook_url(url=None, url_env=profile_url_env, secret_ref=profile_secret_ref)
 
         events_path = _resolve_path_value(
             field="events",
@@ -958,6 +990,15 @@ def _profile_doctor_impl(
         if spool_path is not None:
             _probe_path_writable(spool_path)
 
+        webhook_url = resolve_webhook_url(url=None, url_env=profile_url_env, secret_ref=profile_secret_ref)
+        profile_tls_ca_bundle = _resolve_optional_path_value(
+            field="tls_ca_bundle",
+            cli_value=None,
+            profile_data=data,
+            profile_path=profile_path,
+        )
+        resolved_tls_ca_bundle = resolve_tls_ca_bundle(webhook_url=webhook_url, tls_ca_bundle=profile_tls_ca_bundle)
+
         if json_output:
             payload: dict[str, Any] = {
                 "ok": True,
@@ -970,6 +1011,8 @@ def _profile_doctor_impl(
                 payload["cursor"] = str(cursor_path)
             if spool_path is not None:
                 payload["spool_dir"] = str(spool_path)
+            if resolved_tls_ca_bundle is not None:
+                payload["tls_ca_bundle"] = str(resolved_tls_ca_bundle)
             typer.echo(json.dumps(payload, sort_keys=True))
             return
         if events_exists:
@@ -999,6 +1042,7 @@ def _setup_slack_impl(
     include_args: bool = typer.Option(False, "--include-args/--no-include-args"),
     include_context: bool = typer.Option(False, "--include-context/--no-include-context"),
     include_raw_event: bool = typer.Option(False, "--include-raw-event/--no-include-raw-event"),
+    tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
     secret_source: str = typer.Option(
         "auto",
         "--secret-source",
@@ -1077,6 +1121,7 @@ def _setup_slack_impl(
             include_args=include_args,
             include_context=include_context,
             include_raw_event=include_raw_event,
+            tls_ca_bundle=tls_ca_bundle,
             policy=policy_value,
             secret_source=secret_source,
             url_env=url_env,
@@ -1156,6 +1201,7 @@ def _usr_events_watch_impl(
         "--secret-ref",
         help="Secret reference: keychain://service/account or secretservice://service/account.",
     ),
+    tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
     events: Path | None = typer.Option(None, "--events", help="USR .events.log JSONL path."),
     profile: Path | None = typer.Option(None, "--profile", help="Path to profile JSON file."),
     cursor: Path | None = typer.Option(None, "--cursor", help="Cursor file storing byte offset."),
@@ -1282,10 +1328,21 @@ def _usr_events_watch_impl(
         secret_ref_value = _resolve_cli_optional_string(field="secret_ref", cli_value=secret_ref)
         if secret_ref_value is None:
             secret_ref_value = profile_secret_ref
+        profile_tls_ca_bundle = _resolve_optional_path_value(
+            field="tls_ca_bundle",
+            cli_value=tls_ca_bundle,
+            profile_data=profile_data,
+            profile_path=profile_path,
+        )
 
         webhook_url: str | None = None
+        resolved_tls_ca_bundle: Path | None = None
         if not dry_run:
             webhook_url = resolve_webhook_url(url=url, url_env=url_env_value, secret_ref=secret_ref_value)
+            resolved_tls_ca_bundle = resolve_tls_ca_bundle(
+                webhook_url=webhook_url,
+                tls_ca_bundle=profile_tls_ca_bundle,
+            )
         action_filter = set(_split_csv(only_actions_value))
         tool_filter = set(_split_csv(only_tools_value))
         on_invalid_event_mode = str(on_invalid_event or "").strip().lower()
@@ -1385,6 +1442,7 @@ def _usr_events_watch_impl(
                     _post_with_backoff(
                         webhook_url,
                         formatted,
+                        tls_ca_bundle=resolved_tls_ca_bundle,
                         connect_timeout=connect_timeout,
                         read_timeout=read_timeout,
                         retry_max=retry_max,
@@ -1422,6 +1480,7 @@ def _spool_drain_impl(
         "--secret-ref",
         help="Secret reference: keychain://service/account or secretservice://service/account.",
     ),
+    tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
     profile: Path | None = typer.Option(None, "--profile", help="Path to profile JSON file."),
     connect_timeout: float = typer.Option(5.0, help="HTTP connect timeout seconds."),
     read_timeout: float = typer.Option(10.0, help="HTTP read timeout seconds."),
@@ -1452,7 +1511,17 @@ def _spool_drain_impl(
         secret_ref_value = _resolve_cli_optional_string(field="secret_ref", cli_value=secret_ref)
         if secret_ref_value is None:
             secret_ref_value = profile_secret_ref
+        profile_tls_ca_bundle = _resolve_optional_path_value(
+            field="tls_ca_bundle",
+            cli_value=tls_ca_bundle,
+            profile_data=profile_data,
+            profile_path=profile_path,
+        )
         webhook_url = resolve_webhook_url(url=url, url_env=url_env_value, secret_ref=secret_ref_value)
+        resolved_tls_ca_bundle = resolve_tls_ca_bundle(
+            webhook_url=webhook_url,
+            tls_ca_bundle=profile_tls_ca_bundle,
+        )
         if not spool_dir_value.exists():
             raise NotifyConfigError(f"spool directory not found: {spool_dir_value}")
         failed = 0
@@ -1477,6 +1546,7 @@ def _spool_drain_impl(
                 _post_with_backoff(
                     webhook_url,
                     formatted,
+                    tls_ca_bundle=resolved_tls_ca_bundle,
                     connect_timeout=connect_timeout,
                     read_timeout=read_timeout,
                     retry_max=retry_max,

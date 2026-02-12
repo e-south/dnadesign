@@ -41,6 +41,13 @@ def _write_events(path: Path, events: list[dict]) -> None:
     path.write_text("\n".join(json.dumps(event) for event in events) + "\n", encoding="utf-8")
 
 
+def _set_ssl_cert_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    ca_bundle = tmp_path / "ca.pem"
+    ca_bundle.write_text("dummy", encoding="utf-8")
+    monkeypatch.setenv("SSL_CERT_FILE", str(ca_bundle))
+    return ca_bundle
+
+
 def test_profile_init_writes_densegen_policy_defaults(tmp_path: Path) -> None:
     events = tmp_path / "events.log"
     profile = tmp_path / "notify.profile.json"
@@ -235,6 +242,35 @@ def test_profile_wizard_defaults_to_namespaced_profile_and_runtime_paths(tmp_pat
     assert data["webhook"] == {"source": "env", "ref": "NOTIFY_WEBHOOK"}
     assert data["cursor"] == str((tmp_path / "outputs" / "notify" / "generic" / "cursor").resolve())
     assert data["spool_dir"] == str((tmp_path / "outputs" / "notify" / "generic" / "spool").resolve())
+
+
+def test_profile_wizard_stores_tls_ca_bundle_path(tmp_path: Path, monkeypatch) -> None:
+    events = tmp_path / "events.log"
+    ca_bundle = tmp_path / "ca.pem"
+    ca_bundle.write_text("dummy", encoding="utf-8")
+    _write_events(events, [_event()])
+    monkeypatch.chdir(tmp_path)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "profile",
+            "wizard",
+            "--provider",
+            "slack",
+            "--events",
+            str(events),
+            "--secret-source",
+            "env",
+            "--tls-ca-bundle",
+            str(ca_bundle),
+        ],
+    )
+    assert result.exit_code == 0
+    profile = tmp_path / "outputs" / "notify" / "generic" / "profile.json"
+    data = json.loads(profile.read_text(encoding="utf-8"))
+    assert data["tls_ca_bundle"] == str(ca_bundle.resolve())
 
 
 def test_profile_wizard_can_emit_json_output(tmp_path: Path, monkeypatch) -> None:
@@ -521,6 +557,40 @@ def test_setup_slack_defaults_to_tool_namespaced_profile_and_runtime_paths(tmp_p
     assert data["policy"] == "densegen"
     assert data["cursor"] == str((tmp_path / "outputs" / "notify" / "densegen" / "cursor").resolve())
     assert data["spool_dir"] == str((tmp_path / "outputs" / "notify" / "densegen" / "spool").resolve())
+
+
+def test_setup_slack_stores_tls_ca_bundle_path(tmp_path: Path, monkeypatch) -> None:
+    config_path = tmp_path / "config.yaml"
+    ca_bundle = tmp_path / "ca.pem"
+    resolved_events = tmp_path / "usr" / "demo" / ".events.log"
+    config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    ca_bundle.write_text("dummy", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "dnadesign.notify.cli._resolve_tool_events_path",
+        lambda *, tool, config: (resolved_events, "densegen"),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "setup",
+            "slack",
+            "--tool",
+            "densegen",
+            "--config",
+            str(config_path),
+            "--secret-source",
+            "env",
+            "--tls-ca-bundle",
+            str(ca_bundle),
+        ],
+    )
+    assert result.exit_code == 0
+    profile = tmp_path / "outputs" / "notify" / "densegen" / "profile.json"
+    data = json.loads(profile.read_text(encoding="utf-8"))
+    assert data["tls_ca_bundle"] == str(ca_bundle.resolve())
 
 
 def test_setup_resolve_events_emits_plain_events_path(tmp_path: Path, monkeypatch) -> None:
@@ -975,6 +1045,7 @@ def test_profile_doctor_passes_when_wiring_is_valid(tmp_path: Path, monkeypatch)
         encoding="utf-8",
     )
     monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://example.invalid/webhook")
+    _set_ssl_cert_file(monkeypatch, tmp_path)
 
     runner = CliRunner()
     result = runner.invoke(app, ["profile", "doctor", "--profile", str(profile)])
@@ -999,6 +1070,7 @@ def test_profile_doctor_can_emit_json_output(tmp_path: Path, monkeypatch) -> Non
         encoding="utf-8",
     )
     monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://example.invalid/webhook")
+    _set_ssl_cert_file(monkeypatch, tmp_path)
 
     runner = CliRunner()
     result = runner.invoke(app, ["profile", "doctor", "--profile", str(profile), "--json"])
@@ -1052,6 +1124,7 @@ def test_profile_doctor_passes_with_secret_ref_profile(tmp_path: Path, monkeypat
     monkeypatch.setattr(
         "dnadesign.notify.validation.resolve_secret_ref", lambda _ref: "https://example.invalid/webhook"
     )
+    _set_ssl_cert_file(monkeypatch, tmp_path)
 
     runner = CliRunner()
     result = runner.invoke(app, ["profile", "doctor", "--profile", str(profile)])
@@ -1077,6 +1150,7 @@ def test_profile_doctor_allows_missing_events_when_profile_has_events_source(tmp
         encoding="utf-8",
     )
     monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://example.invalid/webhook")
+    _set_ssl_cert_file(monkeypatch, tmp_path)
 
     runner = CliRunner()
     result = runner.invoke(app, ["profile", "doctor", "--profile", str(profile)])
@@ -1104,6 +1178,7 @@ def test_profile_doctor_json_reports_missing_events_as_pending_for_events_source
         encoding="utf-8",
     )
     monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://example.invalid/webhook")
+    _set_ssl_cert_file(monkeypatch, tmp_path)
 
     runner = CliRunner()
     result = runner.invoke(app, ["profile", "doctor", "--profile", str(profile), "--json"])
@@ -1205,6 +1280,7 @@ def test_usr_events_watch_can_use_profile_secret_ref(tmp_path: Path, monkeypatch
         "dnadesign.notify.validation.resolve_secret_ref", lambda _ref: "https://example.invalid/webhook"
     )
     monkeypatch.setattr("dnadesign.notify.cli.post_json", _fake_post)
+    _set_ssl_cert_file(monkeypatch, tmp_path)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -1291,6 +1367,7 @@ def test_spool_drain_can_use_profile_defaults(tmp_path: Path, monkeypatch) -> No
 
     monkeypatch.setattr("dnadesign.notify.cli.post_json", _fake_post)
     monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://example.invalid/webhook")
+    _set_ssl_cert_file(monkeypatch, tmp_path)
 
     runner = CliRunner()
     result = runner.invoke(app, ["spool", "drain", "--profile", str(profile)])

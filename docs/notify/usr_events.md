@@ -30,6 +30,9 @@ CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yam
 RUN_ROOT="$(dirname "$CONFIG")"
 NOTIFY_DIR="$RUN_ROOT/outputs/notify/densegen"
 
+# SCC TLS trust chain for HTTPS webhook delivery.
+export SSL_CERT_FILE=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+
 # Create profile from tool config (observer-only setup).
 uv run notify setup slack \
   --tool densegen \
@@ -134,6 +137,7 @@ Optional flags you may need:
 - `--url-env <ENV_VAR>`: explicit env-backed secret source (defaults to `NOTIFY_WEBHOOK` when `--secret-source env` and omitted)
 - `--secret-ref <backend://service/account>`: explicit key name/location for secure backend
 - `--events /abs/path/to/.events.log`: bypass resolver mode and point directly to an existing USR events file
+- `--tls-ca-bundle /path/to/ca-bundle.pem`: explicit CA bundle for HTTPS webhook delivery
 - if `--events` is used with default profile path, pass `--policy` (for namespace) or pass an explicit `--profile`
 
 After setup:
@@ -288,6 +292,10 @@ If you run env mode with explicit `EVENTS_PATH` instead of resolver mode, set bo
 3) Writing profile-relative paths as shell-relative paths:
 - `events`, `cursor`, and `spool_dir` resolve relative to the profile file location.
 
+4) HTTPS webhook TLS failures on SCC:
+- Symptom: `CERTIFICATE_VERIFY_FAILED`
+- Fix: set `SSL_CERT_FILE=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem` or pass `--tls-ca-bundle` explicitly.
+
 ---
 
 ## Required event fields (minimum contract)
@@ -319,7 +327,8 @@ uv run notify usr-events watch \
   --events /path/to/.events.log \
   --cursor /path/to/notify.cursor \
   --provider generic \
-  --url https://example.com/webhook
+  --url https://example.com/webhook \
+  --tls-ca-bundle /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
 ```
 
 Behavior:
@@ -348,6 +357,9 @@ read -rsp "Webhook URL: " NOTIFY_WEBHOOK; echo
 
 # Export for notify commands.
 export NOTIFY_WEBHOOK
+
+# SCC: export CA bundle for HTTPS delivery.
+export SSL_CERT_FILE=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
 ```
 
 Persistent local setup (`.env.local` is a file, not a folder):
