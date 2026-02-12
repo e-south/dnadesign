@@ -11,6 +11,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import ast
+import inspect
 from pathlib import Path
 
 import pytest
@@ -217,3 +219,18 @@ def test_register_tool_events_source_rejects_duplicate_alias() -> None:
             resolver=lambda path: path,
             aliases=("custom-alpha",),
         )
+
+
+def test_events_source_module_is_registry_only() -> None:
+    import dnadesign.notify.events_source as events_source_module
+
+    parsed = ast.parse(inspect.getsource(events_source_module))
+    imported_modules: set[str] = set()
+    for node in ast.walk(parsed):
+        if isinstance(node, ast.Import):
+            imported_modules.update(alias.name for alias in node.names)
+        if isinstance(node, ast.ImportFrom):
+            imported_modules.add(str(node.module or ""))
+
+    assert "yaml" not in imported_modules
+    assert "os" not in imported_modules
