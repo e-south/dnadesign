@@ -77,15 +77,20 @@ def _wrap_for_ctx_enforcement(name: str, fn: Callable[..., Any]) -> Callable[...
                 ctx.precheck_requires(stage="selection")
             except Exception:
                 raise
-        out = fn(
-            ids=ids,
-            scores=scores,
-            top_k=top_k,
-            objective=objective,
-            tie_handling=tie_handling,
-            ctx=ctx,
-            **kw,
-        )
+        try:
+            out = fn(
+                ids=ids,
+                scores=scores,
+                top_k=top_k,
+                objective=objective,
+                tie_handling=tie_handling,
+                ctx=ctx,
+                **kw,
+            )
+        except Exception:
+            if ctx is not None:
+                ctx.reset_stage_state()
+            raise
         if ctx is not None:
             try:
                 ctx.postcheck_produces(stage="selection")

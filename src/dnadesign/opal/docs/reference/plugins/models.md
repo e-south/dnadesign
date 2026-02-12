@@ -110,3 +110,26 @@ model:
 Models may declare `@roundctx_contract(category="model", ...)` to enforce and audit
 runtime keys in `round_ctx.json`. If a contract is declared, OPAL enforces it on
 `fit` and `predict` when a `ctx` is provided.
+
+For stage-scoped model contracts (`produces_by_stage` / `requires_by_stage`):
+
+* `predict` is commonly batched, so a model may be called many times in one predict stage.
+* During an active stage, writes to keys declared in `produces_by_stage[stage]` are staged in-memory.
+* Stage-scoped staged writes use last-write-wins semantics within the stage and commit once at stage end.
+* `ctx.get(...)` is read-your-writes during the active stage and prefers staged values before persisted `RoundCtx`.
+* Writes outside the active stage mapping are immediate and keep strict immutable semantics (no differing overwrite).
+* For running summaries, use repeated `ctx.get(...)` + `ctx.set(...)` on a stage-scoped key.
+* Avoid storing unbounded per-batch payloads in `RoundCtx`; write per-batch/per-row data to ledgers or logs.
+
+Example pattern for batched accumulation in `predict`:
+
+```python
+prev = ctx.get("model/<self>/predict_summary", default={"n_batches": 0, "n_rows": 0})
+next_summary = {
+    "n_batches": int(prev["n_batches"]) + 1,
+    "n_rows": int(prev["n_rows"]) + int(X.shape[0]),
+}
+ctx.set("model/<self>/predict_summary", next_summary)
+```
+
+The key is staged for the active predict stage and committed once at stage end.

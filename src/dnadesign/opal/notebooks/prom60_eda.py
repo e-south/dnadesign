@@ -2271,8 +2271,8 @@ def _(
         <div>References (local files):</div>
         <ul style="margin-top: 0; margin-bottom: 0; padding-left: 1.1rem;">
           <li><code>src/dnadesign/opal/README.md</code></li>
-          <li><code>src/dnadesign/opal/src/cli/README.md</code></li>
-          <li><code>src/dnadesign/opal/docs/setpoint_fidelity_x_intensity.md</code></li>
+          <li><code>src/dnadesign/opal/docs/reference/cli.md</code></li>
+          <li><code>src/dnadesign/opal/docs/objectives/sfxi.md</code></li>
         </ul>
         """
     )

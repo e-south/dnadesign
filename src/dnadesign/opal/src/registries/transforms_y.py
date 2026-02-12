@@ -63,7 +63,12 @@ def _wrap_for_ctx_enforcement(name: str, fn: Callable[..., Any]) -> Callable[...
             raise ValueError(f"transform_y[{name}] requires ctx for contract enforcement.")
         if ctx is not None:
             ctx.precheck_requires(stage="transform_y")
-        out = fn(df_tidy, params, ctx=ctx)
+        try:
+            out = fn(df_tidy, params, ctx=ctx)
+        except Exception:
+            if ctx is not None:
+                ctx.reset_stage_state()
+            raise
         if ctx is not None:
             ctx.postcheck_produces(stage="transform_y")
         return out

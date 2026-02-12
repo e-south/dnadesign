@@ -45,7 +45,7 @@ dist_to_labeled_logic = min_j ||v_hat(candidate) - v_obs(label_j)||_2
 
 ### SFXI objective components (reused from `sfxi_v1`)
 
-See `docs/setpoint_fidelity_x_intensity.md` for full derivation. The dashboard reuses the same math:
+See `docs/objectives/sfxi.md` for full derivation. The dashboard reuses the same math:
 
 ```
 F_logic = 1 - ||v_hat - p||_2 / D(p)

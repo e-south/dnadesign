@@ -38,6 +38,8 @@ uv run opal status -c configs/campaign.yaml
 uv run opal runs list -c configs/campaign.yaml
 uv run opal log -c configs/campaign.yaml --round latest
 uv run opal verify-outputs -c configs/campaign.yaml --round latest
+uv run opal ctx show -c configs/campaign.yaml --round latest --keys core/contracts/model
+uv run opal ctx audit -c configs/campaign.yaml --round latest
 
 # 5) Plot
 uv run opal plot -c configs/campaign.yaml
@@ -56,6 +58,8 @@ uv run opal notebook run
 - Demo plots live in `configs/plots.yaml` and include SFXI diagnostics (factorial effects,
   setpoint sweep, logic support, uncertainty, intensity scaling).
 - Use `uv run opal ...` to ensure the correct environment.
+- If you run this campaign from outside the repo checkout, use
+  `uv run --project /path/to/dnadesign opal ...`.
 - If `outputs/rounds/round_0/` already exists from a prior run, `opal run` will refuse to overwrite
   unless you pass `--resume` (which wipes the round directory) or delete the existing artifacts first.
 
@@ -74,6 +78,7 @@ uv run opal prune-source -c configs/campaign.yaml --scope any --yes --no-backup
 ```
 
 The reset removes `outputs/`, `notebooks/`, and `state.json`, and prunes OPAL columns from `records.parquet`.
+`prune-source` only rewrites `records.parquet`; it does not remove `outputs/`, `notebooks/`, or `state.json`.
 
 ---
 

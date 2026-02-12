@@ -13,7 +13,7 @@ Commands are registry-driven and plugin‑agnostic: they operate on the configur
 5. [Extending the CLI](#extending-the-cli)
 6. [CLI directory map](#cli-directory-map)
 
-For architecture & concepts, see the **[Top-level README](../README.md)**.
+For architecture & concepts, see the **[Top-level README](../../README.md)**.
 
 ---
 
@@ -22,8 +22,23 @@ For architecture & concepts, see the **[Top-level README](../README.md)**.
 See all available commands and flags:
 
 ```bash
-opal --help
+uv run opal --help
 ```
+
+If `opal` is already on your PATH, you can use `opal ...` directly.
+If you're running from outside this repo checkout, use:
+
+```bash
+uv run --project /path/to/dnadesign opal --help
+```
+
+If `opal` is not on PATH, prefix commands with `uv run` (for example, `uv run opal run ...`).
+
+Round/run mental model (important for reruns):
+
+* `--round` selects a training cutoff (`as_of_round`).
+* A single round can have multiple `run_id` values after reruns.
+* When commands read ledger predictions for one run, pass `--run-id` to disambiguate.
 
 ---
 
@@ -38,12 +53,13 @@ Initialize/validate a campaign workspace and write `state.json`.
 **Usage**
 
 ```bash
-opal init --config <yaml>
+opal init --config <yaml> [--json]
 ```
 
 **Flags**
 
 * `--config, -c`: Path to `configs/campaign.yaml` (optional if auto-discovery works).
+* `--json`: Output as machine-readable JSON (default output is plain text).
 
 **Notes**
 
@@ -63,7 +79,7 @@ Transform a tidy CSV/Parquet/XLSX to model-ready **Y**, preview, confirm, and ap
 opal ingest-y --config <yaml> --round <r> --csv <path> \
   [--transform <name>] [--params <transform_params.json>] \
   [--unknown-sequences create|drop|error] [--infer-missing-required] \
-  [--if-exists fail|skip|replace] [--yes]
+  [--if-exists fail|skip|replace] [--yes] [--json]
 ```
 
 **Flags**
@@ -79,6 +95,7 @@ opal ingest-y --config <yaml> --round <r> --csv <path> \
   using the most common values found in `records.parquet`.
 * `--if-exists`: Behavior if `(id, round)` already exists in label history (`fail`/`skip`/`replace`).
 * `--yes, -y`: Skip interactive prompt.
+* `--json`: Output as machine-readable JSON (default output is plain text).
 
 **Behavior & checks**
 
@@ -110,7 +127,7 @@ apply the objective, select top-k, write artifacts, and append run-aware label h
 
 ```bash
 opal run --config <yaml> --round <r> \
-  [--k <n>] [--resume] [--score-batch-size <n>] [--verbose|--quiet]
+  [--k <n>] [--resume] [--score-batch-size <n>] [--verbose|--quiet] [--json]
 ```
 
 **Flags**
@@ -121,6 +138,7 @@ opal run --config <yaml> --round <r> \
 * `--score-batch-size`: Override `scoring.score_batch_size` for this run.
 * `--resume`: Allow overwriting existing per-round artifacts (required if `outputs/rounds/round_<r>/` already contains artifacts). When set, the round directory is wiped before writing new artifacts.
 * `--verbose/--quiet`: Control log verbosity (default: verbose).
+* `--json`: Output as machine-readable JSON (default output is plain text).
 
 **Pipeline**
 
@@ -221,7 +239,7 @@ opal record-show --config <yaml> \
 * `--config, -c`: Path to `configs/campaign.yaml` (optional if auto-discovery works).
 * `<ID-or-SEQ>`: Positional id or sequence (use `--id/--sequence` to disambiguate).
 * `--id`, `--sequence`: Explicit lookup key (mutually exclusive).
-* `--run-id`: Explicit run_id for ledger predictions (required if multiple runs exist for a round).
+* `--run-id`: Explicit run_id for ledger predictions (or `latest` to pick the latest ledger run by `(as_of_round, run_id)`).
 * `--with-sequence/--no-sequence`: Include the sequence in output (default: on).
 * `--json`: Output as JSON.
 
@@ -239,7 +257,7 @@ Inspect a saved model; optionally dump full feature importances.
 opal model-show \
   [--model-path <path> | --config <yaml> --round <k|latest>] \
   [--model-name <registry_name> --model-params <params.json>] \
-  [--out-dir <dir>]
+  [--out-dir <dir>] [--json]
 ```
 
 **Flags**
@@ -249,6 +267,7 @@ opal model-show \
 * `--round, -r`: Round selector (integer or `latest`) to resolve model.
 * `--model-name` / `--model-params`: Required if `model_meta.json` is missing. `--model-params` must be a `.json`.
 * `--out-dir`: Write `feature_importance_full.csv` and print top-20 in JSON.
+* `--json`: Output as machine-readable JSON (default output is plain text).
 
 #### `objective-meta`
 
@@ -258,12 +277,16 @@ List objective metadata and diagnostic keys for a round.
 
 ```bash
 opal objective-meta --config <yaml-or-dir> [--round <k|latest> | --run-id <id>] [--profile|--no-profile]
+  [--json]
 ```
 
 **Flags**
 
 * `--config, -c`: Path to `configs/campaign.yaml` (directories supported for `opal plot`, `opal notebook`, `opal objective-meta`; optional if auto-discovery works in a campaign folder).
+* `--round, -r`: Round selector (integer or `latest`; default: latest).
 * `--run-id`: Explicit run_id to disambiguate when a round has multiple runs.
+* `--profile/--no-profile`: Profile candidate hue/size fields from the selected run.
+* `--json`: Output as machine-readable JSON (default output is plain text).
 
 **Notes**
 
@@ -288,10 +311,7 @@ opal verify-outputs --config <yaml> [--round <k|latest> | --run-id <id>] \
 * Uses the ledger’s `pred__y_obj_scalar` as the canonical score source.
 * `--selection-path` accepts `.csv` or `.parquet`.
 * `--round, -r`: Round selector (integer or `latest`).
-* `--profile/--no-profile`: Compute hue/size suitability stats (default: off).
-
-**Notes**
-
+* If the selected round has multiple runs, pass `--run-id` to disambiguate.
 * Reads from `outputs/ledger/runs.parquet` and `outputs/ledger/predictions/`.
 
 ---
@@ -303,9 +323,9 @@ Inspect `round_ctx.json` carriers.
 **Usage**
 
 ```bash
-opal ctx show  --config <yaml> [--round <k|latest>] [--keys <prefix> ...]
-opal ctx audit --config <yaml> [--round <k|latest>]
-opal ctx diff  --config <yaml> --round-a <k|latest> --round-b <k|latest> [--keys <prefix> ...]
+opal ctx show  --config <yaml> [--round <k|latest>] [--keys <prefix> ...] [--json]
+opal ctx audit --config <yaml> [--round <k|latest>] [--json]
+opal ctx diff  --config <yaml> --round-a <k|latest> --round-b <k|latest> [--keys <prefix> ...] [--json]
 ```
 
 **Flags**
@@ -314,6 +334,26 @@ opal ctx diff  --config <yaml> --round-a <k|latest> --round-b <k|latest> [--keys
 * `--round, -r`: Round selector for `show`/`audit`.
 * `--round-a`, `--round-b`: Round selectors for `diff`.
 * `--keys`: Filter by key prefix (repeatable; applies to `show`/`diff`).
+
+**How to read ctx output**
+
+* `ctx show`: raw key/value snapshot for one round.
+* `ctx audit`: per-plugin contract audit (`consumed` / `produced` keys).
+* `ctx diff`: key-level change summary between two rounds (`added`, `removed`, `changed`).
+* Stage-scoped keys (for example model `predict` summaries) appear as final committed values after stage-end checks.
+
+**Common checks**
+
+```bash
+# Model contract keys captured in the latest round
+opal ctx show -c <yaml> --round latest --keys core/contracts/model
+
+# Full per-plugin consumed/produced audit
+opal ctx audit -c <yaml> --round latest
+
+# What changed in objective/runtime keys between two rounds
+opal ctx diff -c <yaml> --round-a 0 --round-b 1 --keys objective/
+```
 
 ---
 
@@ -325,12 +365,14 @@ Dry-run planner for a round: counts, plan, warnings. **No writes.**
 
 ```bash
 opal explain --config <yaml> --round <k>
+  [--json]
 ```
 
 **Flags**
 
 * `--config, -c`: Path to `configs/campaign.yaml` (optional if auto-discovery works).
 * `--round, -r, --labels-as-of`: Training cutoff (alias of `--round`).
+* `--json`: Output as machine-readable JSON (default output is plain text).
 
 Prints: number of training labels, candidate universe size, transforms/models/selection used,
 vector dimension, and any preflight warnings.
@@ -362,8 +404,8 @@ List or inspect `run_meta` entries from `outputs/ledger/runs.parquet`.
 **Usage**
 
 ```bash
-opal runs list --config <yaml> [--round <k|latest>]
-opal runs show --config <yaml> [--round <k|latest> | --run-id <rid>]
+opal runs list --config <yaml> [--round <k|latest>] [--json]
+opal runs show --config <yaml> [--round <k|latest> | --run-id <rid>] [--json]
 ```
 
 **Flags**
@@ -371,6 +413,11 @@ opal runs show --config <yaml> [--round <k|latest> | --run-id <rid>]
 * `--config, -c`: Path to `configs/campaign.yaml` (optional if auto-discovery works).
 * `--round, -r`: Round selector (integer or `latest`).
 * `--run-id`: Explicit run_id to display (show only).
+* `--json`: Output as machine-readable JSON (default output is plain text).
+
+**Notes**
+
+* `runs show --round <k>` requires `--run-id` if round `<k>` has multiple runs.
 
 ---
 
@@ -381,13 +428,14 @@ Summarize `round.log.jsonl` for a round.
 **Usage**
 
 ```bash
-opal log --config <yaml> [--round <k|latest>]
+opal log --config <yaml> [--round <k|latest>] [--json]
 ```
 
 **Flags**
 
 * `--config, -c`: Path to `configs/campaign.yaml` (optional if auto-discovery works).
 * `--round, -r`: Round selector (integer or `latest`).
+* `--json`: Output as machine-readable JSON (default output is plain text).
 
 **Notes**
 
@@ -422,7 +470,7 @@ Validate, repair, or explicitly attach-from-y into the label history column (no 
 **Usage**
 
 ```bash
-opal label-hist <validate|repair|attach-from-y> --config <yaml> [--apply] [--round <int>]
+opal label-hist <validate|repair|attach-from-y> --config <yaml> [--apply] [--round <int>] [--json]
 ```
 
 **Flags**
@@ -432,6 +480,7 @@ opal label-hist <validate|repair|attach-from-y> --config <yaml> [--apply] [--rou
 * `--apply`: Apply changes for `repair` or `attach-from-y` (default: dry-run).
 * `--round, -r`: Required for `attach-from-y`; round stamp to attach.
 * `--src`: Optional label_hist source tag for `attach-from-y` (default: `manual_attach`).
+* `--json`: Output as machine-readable JSON (default output is plain text).
 
 **Notes**
 
@@ -485,31 +534,6 @@ opal plot --describe <plot-kind>
 * If a round has multiple run_ids, plots require `--run-id` to avoid mixing reruns.
 * If `--run-id` is provided, OPAL resolves its round from `outputs/ledger/runs.parquet`; `--round all` is invalid and conflicting `--round` values error.
 
----
-
-#### `notebook`
-
-Generate or run a campaign-tied marimo notebook for interactive analysis.
-
-**Usage**
-
-```bash
-uv run opal notebook
-uv run opal notebook generate --config <yaml-or-dir> [--round <latest|k>] [--out <path>] [--name <file>] [--force] [--validate/--no-validate]
-uv run opal notebook run --config <yaml-or-dir> [--path <notebook.py>]
-```
-
-**Notes**
-
-* `generate` writes a marimo notebook that loads ledger artifacts (runs/predictions/labels).
-* `generate` requires the campaign `records.parquet` to exist because the notebook loads records on startup.
-* By default, `generate` validates ledger artifacts exist. Use `--no-validate` to scaffold a notebook before any runs.
-* When `--validate` is on, `--round` must exist in ledger runs (otherwise use `--no-validate`).
-* `run` launches `marimo edit` if marimo is installed; otherwise it prints install guidance.
-* `run` resolves the notebook under `<workdir>/notebooks`. If multiple exist, it prompts in TTY or requires `--path` in non-interactive mode.
-* Running `uv run opal notebook` (no subcommand) lists available notebooks and nudges the next step.
-* If you run from inside a campaign directory, you can omit `--config` entirely.
-
 **Campaign YAML (example)**
 
 ```yaml
@@ -556,6 +580,54 @@ Built-ins injected for plots:
 
 ---
 
+#### `notebook`
+
+Generate or run a campaign-tied marimo notebook for interactive analysis.
+
+**Usage**
+
+```bash
+uv run opal notebook
+uv run opal notebook generate --config <yaml-or-dir> [--round <latest|k>] [--out <path>] [--name <file>] [--force] [--validate/--no-validate]
+uv run opal notebook run --config <yaml-or-dir> [--path <notebook.py>]
+```
+
+**Notes**
+
+* `generate` writes a marimo notebook that loads ledger artifacts (runs/predictions/labels).
+* `generate` requires the campaign `records.parquet` to exist because the notebook loads records on startup.
+* By default, `generate` validates ledger artifacts exist. Use `--no-validate` to scaffold a notebook before any runs.
+* When `--validate` is on, `--round` must exist in ledger runs (otherwise use `--no-validate`).
+* `run` launches `marimo edit` if marimo is installed; otherwise it prints install guidance.
+* `run` resolves the notebook under `<workdir>/notebooks`. If multiple exist, it prompts in TTY or requires `--path` in non-interactive mode.
+* Running `uv run opal notebook` (no subcommand) lists available notebooks and nudges the next step.
+* If you run from inside a campaign directory, you can omit `--config` entirely.
+
+---
+
+#### `ledger-compact`
+
+Compact ledger datasets after repeated append cycles.
+
+**Usage**
+
+```bash
+opal ledger-compact --config <yaml> --runs [--yes] [--json]
+```
+
+**Flags**
+
+* `--config, -c`: Path to `configs/campaign.yaml` (optional if auto-discovery works).
+* `--runs`: Compact `outputs/ledger/runs.parquet` (required; command exits if omitted).
+* `--yes, -y`: Skip interactive confirmation.
+* `--json`: Output as machine-readable JSON (default output is plain text).
+
+**Notes**
+
+* Rewrites ledger datasets in place and should be run when no other OPAL process is writing.
+
+---
+
 #### `prune-source`
 
 Remove OPAL-derived columns (`opal__*`) and the configured Y column from `records.parquet`.
@@ -564,7 +636,7 @@ Remove OPAL-derived columns (`opal__*`) and the configured Y column from `record
 
 ```bash
 opal prune-source --config <yaml> [--scope any|campaign] [--keep <col> ...] \
-  [--yes] [--backup|--no-backup]
+  [--yes] [--backup|--no-backup] [--json]
 ```
 
 **Flags**
@@ -574,6 +646,7 @@ opal prune-source --config <yaml> [--scope any|campaign] [--keep <col> ...] \
 * `--keep, -k`: Column name(s) to keep even if matched for deletion (repeatable).
 * `--yes, -y`: Skip interactive prompt.
 * `--backup/--no-backup`: Backup original file before pruning (default: on).
+* `--json`: Output as machine-readable JSON (default output is plain text).
 
 **Notes**
 
@@ -582,6 +655,8 @@ opal prune-source --config <yaml> [--scope any|campaign] [--keep <col> ...] \
 ---
 
 ## Typical workflows
+
+Examples below use the `opal` shorthand. If `opal` is not on PATH, run the same commands as `uv run opal ...`.
 
 #### Initialize a campaign
 
@@ -652,6 +727,7 @@ Passing a **directory** to `--config` is supported for `opal plot`, `opal notebo
 The `.opal/` folder is a lightweight marker created by `opal init` and contains a single `config` file
 pointing to `configs/campaign.yaml` (or `campaign.yaml`). It is safe to delete and will be regenerated.
 `plot_config` paths are resolved **relative to the configs/campaign.yaml** that declares them.
+For scripts and CI, prefer passing `--config` explicitly to avoid selecting the wrong campaign via discovery.
 
 Shell completions:
 
@@ -712,10 +788,13 @@ opal/src/cli/
   registry.py       # @cli_command; discovery; install into app
   commands/
     _common.py      # resolve_config_path, store_from_cfg, json_out, internal_error
+    campaign_reset.py   # hidden reset helper used by demo workflows
     ctx.py
     init.py
     ingest_y.py
+    ledger_compact.py
     log.py
+    notebook.py
     run.py
     runs.py
     explain.py
@@ -725,6 +804,7 @@ opal/src/cli/
     record_show.py
     status.py
     validate.py
+    verify_outputs.py
     label_hist.py
     plot.py
     prune_source.py

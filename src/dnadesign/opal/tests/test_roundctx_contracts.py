@@ -23,6 +23,8 @@ from dnadesign.opal.src.core.round_context import (
     PluginRegistryView,
     RoundCtx,
     RoundCtxContractError,
+    RoundCtxPathError,
+    RoundCtxStageError,
     roundctx_contract,
 )
 from dnadesign.opal.src.registries.models import (
@@ -261,6 +263,66 @@ def _ensure_model_stage_contract() -> None:
                 "fit": ("model/<self>/x_dim",),
                 "predict": ("model/<self>/predict_summary",),
             },
+        )
+
+
+def _ensure_model_stage_predict_error_contract() -> None:
+    if "test_model_stage_predict_error" not in list_models():
+
+        @register_model("test_model_stage_predict_error")
+        class _Model:
+            def __init__(self, params: Dict[str, Any]) -> None:
+                self._raised = False
+
+            def fit(self, X: np.ndarray, Y: np.ndarray, *, ctx=None):
+                if ctx is not None:
+                    ctx.set("model/<self>/x_dim", int(X.shape[1]))
+                return None
+
+            def predict(self, X: np.ndarray, *, ctx=None) -> np.ndarray:
+                if ctx is not None:
+                    ctx.set("model/<self>/predict_summary", {"rows": int(X.shape[0])})
+                if not self._raised:
+                    self._raised = True
+                    raise RuntimeError("predict boom")
+                return np.zeros((X.shape[0], 1), dtype=float)
+
+        _Model.__opal_contract__ = _StageContract(
+            category="model",
+            requires=tuple(),
+            produces=tuple(),
+            requires_by_stage={"fit": tuple(), "predict": tuple()},
+            produces_by_stage={
+                "fit": ("model/<self>/x_dim",),
+                "predict": ("model/<self>/predict_summary",),
+            },
+        )
+
+
+def _ensure_model_predict_requires_only_stage_contract() -> None:
+    if "test_model_predict_requires_only_stage" not in list_models():
+
+        @register_model("test_model_predict_requires_only_stage")
+        class _Model:
+            def __init__(self, params: Dict[str, Any]) -> None:
+                del params
+
+            def fit(self, X: np.ndarray, Y: np.ndarray, *, ctx=None):
+                if ctx is not None:
+                    ctx.set("model/<self>/x_dim", int(X.shape[1]))
+                return None
+
+            def predict(self, X: np.ndarray, *, ctx=None) -> np.ndarray:
+                if ctx is not None:
+                    _ = ctx.get("core/round_index")
+                return np.zeros((X.shape[0], 1), dtype=float)
+
+        _Model.__opal_contract__ = _StageContract(
+            category="model",
+            requires=tuple(),
+            produces=tuple(),
+            requires_by_stage={"fit": tuple(), "predict": ("core/round_index",)},
+            produces_by_stage={"fit": ("model/<self>/x_dim",)},
         )
 
 
@@ -544,6 +606,37 @@ def test_model_predict_stage_postcheck_deferred():
         pytest.fail(f"predict produces should pass at stage end: {exc}")
 
 
+def test_model_predict_exception_clears_stage_state():
+    _ensure_model_stage_predict_error_contract()
+    model = get_model("test_model_stage_predict_error", {})
+    rctx = _rctx({"core/round_index": 0})
+    mctx = rctx.for_plugin(category="model", name="test_model_stage_predict_error", plugin=model)
+    X = np.zeros((2, 2), dtype=float)
+    Y = np.zeros((2, 1), dtype=float)
+
+    with pytest.raises(RuntimeError, match="predict boom"):
+        model.predict(X[:1], ctx=mctx)
+
+    # If stage state leaks after exception, fit precheck raises stage mismatch.
+    model.fit(X, Y, ctx=mctx)
+    assert rctx.get("model/test_model_stage_predict_error/x_dim") == 2
+    with pytest.raises(KeyError):
+        rctx.get("model/test_model_stage_predict_error/predict_summary")
+
+
+def test_model_predict_requires_only_stage_does_not_leak_stage_state():
+    _ensure_model_predict_requires_only_stage_contract()
+    model = get_model("test_model_predict_requires_only_stage", {})
+    rctx = _rctx({"core/round_index": 0})
+    mctx = rctx.for_plugin(category="model", name="test_model_predict_requires_only_stage", plugin=model)
+    X = np.zeros((2, 2), dtype=float)
+    Y = np.zeros((2, 1), dtype=float)
+
+    model.predict(X[:1], ctx=mctx)
+    model.fit(X, Y, ctx=mctx)
+    assert rctx.get("model/test_model_predict_requires_only_stage/x_dim") == 2
+
+
 def test_objective_stage_contract_via_registry():
     _ensure_objective_stage_contract()
     obj = get_objective("test_obj_stage_contract")
@@ -588,3 +681,105 @@ def test_transform_y_stage_contract_via_registry():
     out = ty(df_tidy, {}, ctx=tctx)
     assert out["id"].tolist() == ["a", "b"]
     assert rctx.get("transform_y/test_transform_y_stage/stage_seen") is True
+
+
+def _stage_buffer_model_ctx(*, name: str = "dummy", core: Dict[str, Any] | None = None) -> tuple[RoundCtx, Any]:
+    class _Dummy:
+        pass
+
+    dummy = _Dummy()
+    dummy.__opal_contract__ = _StageContract(
+        category="model",
+        requires=tuple(),
+        produces=tuple(),
+        requires_by_stage={"predict": tuple(), "fit": tuple()},
+        produces_by_stage={
+            "fit": ("model/<self>/x_dim",),
+            "predict": ("model/<self>/predict_summary",),
+        },
+    )
+    rctx = _rctx(core or {})
+    return rctx, rctx.for_plugin(category="model", name=name, plugin=dummy)
+
+
+def test_stage_buffer_predict_allows_read_your_writes_and_commits_last_value():
+    rctx, mctx = _stage_buffer_model_ctx(core={"core/round_index": 0})
+    mctx.precheck_requires(stage="predict")
+    mctx.set("model/<self>/predict_summary", {"calls": 1, "parts": ["a"]})
+    assert mctx.get("model/<self>/predict_summary") == {"calls": 1, "parts": ["a"]}
+
+    mctx.set("model/<self>/predict_summary", {"calls": 2, "parts": ["a", "b"]})
+    assert mctx.get("model/<self>/predict_summary") == {"calls": 2, "parts": ["a", "b"]}
+
+    with pytest.raises(KeyError):
+        rctx.get("model/dummy/predict_summary")
+    mctx.postcheck_produces(stage="predict")
+    assert rctx.get("model/dummy/predict_summary") == {"calls": 2, "parts": ["a", "b"]}
+
+
+def test_stage_buffer_predict_precheck_is_idempotent_for_same_stage():
+    rctx, mctx = _stage_buffer_model_ctx(core={"core/round_index": 0})
+    mctx.precheck_requires(stage="predict")
+    mctx.set("model/<self>/predict_summary", {"calls": 1})
+
+    # Repeated precheck for the same stage must not clear staged writes.
+    mctx.precheck_requires(stage="predict")
+    assert mctx.get("model/<self>/predict_summary") == {"calls": 1}
+
+    mctx.postcheck_produces(stage="predict")
+    assert rctx.get("model/dummy/predict_summary") == {"calls": 1}
+
+
+def test_stage_buffer_predict_freezes_mutable_values_at_set_time():
+    rctx, mctx = _stage_buffer_model_ctx(core={"core/round_index": 0})
+    mctx.precheck_requires(stage="predict")
+    payload = {"parts": ["a"]}
+    mctx.set("model/<self>/predict_summary", payload)
+
+    # Mutating the original object after set() must not affect staged commit payload.
+    payload["parts"].append("b")
+
+    mctx.postcheck_produces(stage="predict")
+    assert rctx.get("model/dummy/predict_summary") == {"parts": ["a"]}
+
+
+def test_stage_buffer_predict_does_not_relax_non_stage_overwrite_rules():
+    rctx, mctx = _stage_buffer_model_ctx(core={"core/round_index": 0})
+    mctx.precheck_requires(stage="predict")
+    mctx.set("model/<self>/x_dim", 8)
+    with pytest.raises(RoundCtxPathError):
+        mctx.set("model/<self>/x_dim", 16)
+
+    mctx.set("model/<self>/predict_summary", {"calls": 1})
+    mctx.postcheck_produces(stage="predict")
+    assert rctx.get("model/dummy/x_dim") == 8
+    assert rctx.get("model/dummy/predict_summary") == {"calls": 1}
+
+
+def test_stage_buffer_predict_missing_produce_still_fails():
+    _, mctx = _stage_buffer_model_ctx(core={"core/round_index": 0})
+    mctx.precheck_requires(stage="predict")
+    with pytest.raises(RoundCtxContractError):
+        mctx.postcheck_produces(stage="predict")
+
+
+def test_stage_buffer_stage_mismatch_is_rejected():
+    _, mctx = _stage_buffer_model_ctx(core={"core/round_index": 0})
+    mctx.precheck_requires(stage="predict")
+    with pytest.raises(RoundCtxStageError, match="stage mismatch"):
+        mctx.precheck_requires(stage="fit")
+    with pytest.raises(RoundCtxStageError, match="stage mismatch"):
+        mctx.postcheck_produces(stage="fit")
+
+
+def test_stage_buffer_clears_state_after_commit_failure():
+    _, mctx = _stage_buffer_model_ctx(core={"model/dummy/predict_summary": {"calls": 0}})
+    mctx.precheck_requires(stage="predict")
+    mctx.set("model/<self>/predict_summary", {"calls": 1})
+    with pytest.raises(RoundCtxPathError):
+        mctx.postcheck_produces(stage="predict")
+
+    # If stage state is not reset on failure, this second pass will keep replaying stale staged data.
+    mctx.precheck_requires(stage="predict")
+    mctx.set("model/<self>/predict_summary", {"calls": 0})
+    mctx.postcheck_produces(stage="predict")

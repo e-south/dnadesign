@@ -8,7 +8,7 @@ This document covers **plot plugins** and the `PlotContext` helper. Plots are be
 - Run plots with:
 
 ```bash
-opal plot --config /path/to/campaign.yaml \
+uv run opal plot --config /path/to/campaign.yaml \
   [--plot-config /path/to/plots.yaml] \
   [--round latest|all|3|1,3,7|2-5] \
   [--name my_plot] \
@@ -18,9 +18,9 @@ opal plot --config /path/to/campaign.yaml \
 - Discover available plot kinds:
 
 ```bash
-opal plot --list
-opal plot --list-config --config /path/to/campaign.yaml
-opal plot --describe scatter_score_vs_rank
+uv run opal plot --list
+uv run opal plot --list-config --config /path/to/campaign.yaml
+uv run opal plot --describe scatter_score_vs_rank
 ```
 
 ### Minimal YAML schema
