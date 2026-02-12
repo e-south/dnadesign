@@ -3,6 +3,7 @@
 ## Contents
 - [At a glance](#at-a-glance)
 - [Start here (mental model and stack boundary)](#start-here-mental-model-and-stack-boundary)
+- [Maintainer code map](#maintainer-code-map)
 - [CLI quickstart (run from anywhere)](#cli-quickstart-run-from-anywhere)
 - [Remote sync (SSH)](#remote-sync-ssh)
 - [Python API](#python-api)
@@ -62,6 +63,24 @@ Relevant docs:
 - How overlays merge (conflict resolution): `#how-overlays-merge-conflict-resolution`
 - Event log schema (Notify input): `#event-log-schema`
 - Remote sync: `docs/operations/sync.md`
+
+## Maintainer code map
+
+Core dataset orchestration:
+- `src/dnadesign/usr/src/dataset.py`: public dataset methods and lifecycle entrypoints.
+- `src/dnadesign/usr/src/dataset_activity.py`: metadata notes and event recording helpers.
+- `src/dnadesign/usr/src/dataset_materialize.py`: overlay materialization engine.
+- `src/dnadesign/usr/src/dataset_overlay_ops.py`: attach and overlay write operations.
+- `src/dnadesign/usr/src/dataset_registry_modes.py`: registry-mode normalization and validation.
+- `src/dnadesign/usr/src/dataset_dedupe.py`: dedupe execution flow.
+
+CLI decomposition:
+- `src/dnadesign/usr/src/cli.py`: Typer command surface and command wiring.
+- `src/dnadesign/usr/src/cli_commands/read.py`: read/info/schema handlers.
+- `src/dnadesign/usr/src/cli_commands/write.py`: init/import/attach handlers.
+- `src/dnadesign/usr/src/cli_commands/state.py`: delete/restore/state handlers.
+- `src/dnadesign/usr/src/cli_commands/sync.py`: diff/pull/push handlers.
+- `src/dnadesign/usr/src/cli_commands/remotes.py`: remotes list/show/add/wizard/doctor handlers.
 
 ---
 
