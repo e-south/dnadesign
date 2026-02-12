@@ -36,6 +36,7 @@ from .dataset_overlay_ops import (
     write_overlay_part_dataset,
 )
 from .dataset_query import create_overlay_view, sql_ident, sql_str
+from .dataset_registry_modes import normalize_registry_mode, validate_overlays_for_registry_mode
 from .dataset_state import (
     clear_state as dataset_clear_state,
 )
@@ -79,7 +80,6 @@ from .overlays import (
 from .registry import (
     USR_STATE_NAMESPACE,
     load_registry,
-    load_registry_file,
     registry_bytes,
     registry_hash,
     validate_overlay_schema,
@@ -1394,9 +1394,7 @@ class Dataset:
         In strict mode, warnings become errors for alphabet/namespacing issues.
         """
         self._require_exists()
-        mode = str(registry_mode or "current").strip()
-        if mode not in {"current", "frozen", "either"}:
-            raise SchemaError(f"Unsupported registry_mode '{registry_mode}'.")
+        mode = normalize_registry_mode(registry_mode)
         pf = pq.ParquetFile(str(self.records_path))
         schema = pf.schema_arrow
         names = set(schema.names)
@@ -1442,57 +1440,12 @@ class Dataset:
 
         overlays = list_overlays(self.dir)
         if overlays:
-            if mode == "current":
-                allowed_hashes = {registry_hash(self.root, required=True)}
-            elif mode == "frozen":
-                allowed_hashes = {self._dataset_registry_hash()}
-            else:
-                allowed_hashes: set[str] = set()
-                try:
-                    allowed_hashes.add(registry_hash(self.root, required=True))
-                except SchemaError:
-                    pass
-                try:
-                    allowed_hashes.add(self._dataset_registry_hash())
-                except SchemaError:
-                    pass
-                if not allowed_hashes:
-                    raise SchemaError("No registry hash available for overlay validation.")
-
-            def _validate_overlays(registry: dict) -> None:
-                for path in overlays:
-                    meta = overlay_metadata(path)
-                    key = meta.get("key")
-                    if not key:
-                        raise SchemaError(f"Overlay missing required metadata key: {path}")
-                    ns = meta.get("namespace") or path.stem
-                    reg_hash = meta.get("registry_hash")
-                    if reg_hash is None:
-                        raise SchemaError(f"Overlay missing registry_hash metadata: {path}")
-                    if reg_hash not in allowed_hashes:
-                        allowed = ", ".join(sorted(allowed_hashes))
-                        raise SchemaError(f"Overlay registry_hash mismatch for {path}: {reg_hash} not in [{allowed}].")
-                    if ns in RESERVED_NAMESPACES:
-                        continue
-                    schema = overlay_schema(path)
-                    validate_overlay_schema(ns, schema, registry=registry, key=key)
-
-            if mode == "current":
-                registry = load_registry(self.root, required=True)
-                _validate_overlays(registry)
-            elif mode == "frozen":
-                frozen_path = self._frozen_registry_path()
-                registry = load_registry_file(frozen_path)
-                _validate_overlays(registry)
-            else:
-                try:
-                    registry = load_registry(self.root, required=True)
-                    _validate_overlays(registry)
-                except SchemaError:
-                    frozen_path = self._frozen_registry_path()
-                    registry = load_registry_file(frozen_path)
-                    _validate_overlays(registry)
-                    # frozen ok -> suppress current error
+            validate_overlays_for_registry_mode(
+                dataset=self,
+                overlays=overlays,
+                mode=mode,
+                reserved_namespaces=RESERVED_NAMESPACES,
+            )
 
         # streaming validation + uniqueness check
         with tempfile.TemporaryDirectory() as tmpdir:
