@@ -28,6 +28,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from .dataset_events import record_dataset_event
 from .dataset_query import create_overlay_view, sql_ident, sql_str
 from .dataset_state import (
     clear_state as dataset_clear_state,
@@ -55,7 +56,7 @@ from .errors import (
     SchemaError,
     SequencesError,
 )
-from .events import fingerprint_parquet, record_event
+from .events import fingerprint_parquet
 from .maintenance import maintenance as maintenance_context
 from .maintenance import require_maintenance
 from .normalize import compute_id, normalize_sequence, validate_alphabet, validate_bio_type  # case-preserving
@@ -224,13 +225,9 @@ class Dataset:
                 f"- {ts}: initialized dataset.\n"
             )
             self.meta_path.write_text(meta_md, encoding="utf-8")
-            record_event(
-                self.events_path,
+            self._record_event(
                 "init",
-                dataset=self.name,
                 args={"source": source},
-                target_path=self.records_path,
-                dataset_root=self.root,
             )
 
     # --- lightweight, best-effort scratch-pad logging in meta.md ---
@@ -248,6 +245,32 @@ class Dataset:
                 f.write(code_block.strip() + "\n")
                 f.write("```\n")
 
+    def _record_event(
+        self,
+        action: str,
+        *,
+        args: Optional[dict] = None,
+        metrics: Optional[dict] = None,
+        artifacts: Optional[dict] = None,
+        maintenance: Optional[dict] = None,
+        target_path: Optional[Path] = None,
+        registry_hash: Optional[str] = None,
+        actor: Optional[dict] = None,
+    ) -> None:
+        record_dataset_event(
+            events_path=self.events_path,
+            action=action,
+            dataset_name=self.name,
+            dataset_root=self.root,
+            target_path=target_path or self.records_path,
+            args=args,
+            metrics=metrics,
+            artifacts=artifacts,
+            maintenance=maintenance,
+            registry_hash=registry_hash,
+            actor=actor,
+        )
+
     def log_event(
         self,
         action: str,
@@ -260,16 +283,13 @@ class Dataset:
         actor: Optional[dict] = None,
     ) -> None:
         self._require_exists()
-        record_event(
-            self.events_path,
+        self._record_event(
             action,
-            dataset=self.name,
             args=args,
             metrics=metrics,
             artifacts=artifacts,
             maintenance=maintenance,
-            target_path=target_path or self.records_path,
-            dataset_root=self.root,
+            target_path=target_path,
             actor=actor,
         )
 
@@ -281,14 +301,10 @@ class Dataset:
         self._require_exists()
         with dataset_write_lock(self.dir):
             snap_path, reg_hash, updated = self._auto_freeze_registry(record_auto_event=False)
-            record_event(
-                self.events_path,
+            self._record_event(
                 "registry_freeze",
-                dataset=self.name,
                 args={"registry_hash": reg_hash, "snapshot": str(snap_path), "auto": False, "updated": updated},
                 maintenance={"reason": ctx.reason},
-                target_path=self.records_path,
-                dataset_root=self.root,
                 actor=ctx.actor,
             )
             return snap_path
@@ -367,13 +383,9 @@ class Dataset:
             created = True
 
         if created and record_auto_event:
-            record_event(
-                self.events_path,
+            self._record_event(
                 "registry_freeze",
-                dataset=self.name,
                 args={"registry_hash": reg_hash, "snapshot": str(snap_path), "auto": True},
-                target_path=self.records_path,
-                dataset_root=self.root,
             )
         return snap_path, reg_hash, created
 
@@ -993,14 +1005,10 @@ class Dataset:
                 ids_skipped = []
 
             self._auto_freeze_registry()
-            record_event(
-                self.events_path,
+            self._record_event(
                 "import_rows",
-                dataset=self.name,
                 args={"n": int(out_count), "source_param": source or "", "on_conflict": on_conflict},
                 metrics={"rows_written": int(out_count), "rows_skipped": len(ids_skipped)},
-                target_path=self.records_path,
-                dataset_root=self.root,
                 actor=actor,
             )
             if return_ids:
@@ -1392,10 +1400,8 @@ class Dataset:
             os.replace(tmp, out_path)
 
             rows_matched = int(overlay_df.shape[0])
-            record_event(
-                self.events_path,
+            self._record_event(
                 "attach",
-                dataset=self.name,
                 args={
                     "namespace": namespace,
                     "key": key,
@@ -1406,7 +1412,6 @@ class Dataset:
                     "note": note,
                 },
                 target_path=out_path,
-                dataset_root=self.root,
             )
             return rows_matched
 
@@ -1652,10 +1657,8 @@ class Dataset:
                 )
                 tmp_path.unlink(missing_ok=True)
 
-                record_event(
-                    self.events_path,
+                self._record_event(
                     "attach",
-                    dataset=self.name,
                     args={
                         "namespace": namespace,
                         "key": key,
@@ -1666,7 +1669,6 @@ class Dataset:
                         "note": note,
                     },
                     target_path=out_path,
-                    dataset_root=self.root,
                 )
                 return rows_matched
             finally:
@@ -1901,10 +1903,8 @@ class Dataset:
                 if tmp_path.exists():
                     tmp_path.unlink(missing_ok=True)
 
-            record_event(
-                self.events_path,
+            self._record_event(
                 "write_overlay_part",
-                dataset=self.name,
                 args={
                     "namespace": namespace,
                     "key": key,
@@ -1920,7 +1920,6 @@ class Dataset:
                 },
                 artifacts={"overlay": {"namespace": namespace, "key": key}},
                 target_path=part_path,
-                dataset_root=self.root,
                 actor=actor,
             )
             return rows_written
@@ -1990,13 +1989,9 @@ class Dataset:
                 suffix = ".parquet" if path.is_file() else ""
                 archived = archive_dir / f"{path.stem}-{stamp}{suffix}"
                 path.replace(archived)
-                record_event(
-                    self.events_path,
+                self._record_event(
                     "archive_overlay",
-                    dataset=self.name,
                     args={"namespace": namespace, "archived": str(archived)},
-                    target_path=self.records_path,
-                    dataset_root=self.root,
                 )
                 return {"removed": True, "namespace": namespace, "archived_path": str(archived)}
 
@@ -2004,13 +1999,9 @@ class Dataset:
                 shutil.rmtree(path)
             else:
                 path.unlink()
-            record_event(
-                self.events_path,
+            self._record_event(
                 "remove_overlay",
-                dataset=self.name,
                 args={"namespace": namespace},
-                target_path=self.records_path,
-                dataset_root=self.root,
             )
             return {"removed": True, "namespace": namespace}
 
@@ -2068,14 +2059,11 @@ class Dataset:
             archived = archive_dir / stamp
             shutil.move(str(dir_path), str(archived))
 
-            record_event(
-                self.events_path,
+            self._record_event(
                 "compact_overlay",
-                dataset=self.name,
                 args={"namespace": namespace, "archived": str(archived), "maintenance_reason": ctx.reason},
                 maintenance={"reason": ctx.reason},
                 target_path=file_path,
-                dataset_root=self.root,
                 actor=ctx.actor,
             )
             return file_path
@@ -2392,10 +2380,8 @@ class Dataset:
                         compression=PARQUET_COMPRESSION,
                         metadata=metadata,
                     )
-                    record_event(
-                        self.events_path,
+                    self._record_event(
                         "dedupe",
-                        dataset=self.name,
                         args={
                             "key": key,
                             "keep": keep,
@@ -2405,8 +2391,6 @@ class Dataset:
                             "maintenance_reason": ctx.reason,
                         },
                         maintenance={"reason": ctx.reason},
-                        target_path=self.records_path,
-                        dataset_root=self.root,
                         actor=ctx.actor,
                     )
                     return stats
@@ -2917,10 +2901,8 @@ class Dataset:
                     else:
                         p.unlink()
 
-            record_event(
-                self.events_path,
+            self._record_event(
                 "materialize",
-                dataset=self.name,
                 args={
                     "namespaces": list(namespaces) if namespaces is not None else None,
                     "drop_overlays": bool(not keep_overlays or archive_overlays),
@@ -2932,8 +2914,6 @@ class Dataset:
                 },
                 artifacts={"overlays": overlay_fingerprints, "tombstone": tomb_fp},
                 maintenance={"reason": ctx.reason},
-                target_path=self.records_path,
-                dataset_root=self.root,
                 actor=ctx.actor,
             )
 
@@ -2943,11 +2923,7 @@ class Dataset:
             self._require_exists()
             self._require_registry_for_mutation("snapshot")
             snapshot_parquet_file(self.records_path, self.snapshot_dir)
-            record_event(
-                self.events_path,
+            self._record_event(
                 "snapshot",
-                dataset=self.name,
                 args={},
-                target_path=self.records_path,
-                dataset_root=self.root,
             )
