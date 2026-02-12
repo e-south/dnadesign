@@ -145,3 +145,12 @@
     - optional centralized Notify workspaces under `/project/...` with tool/run-qualified watch IDs
     - explicit note that Notify stays decoupled from sink choices (parquet/USR), and always watches USR `.events.log`.
   - Updated workflow demos (`demo_usr_notify`, `demo_pwm_artifacts`) to use `notify setup slack` with workspace config resolution and run-local cursor/spool paths.
+
+## 2026-02-12
+- Continued pragmatic decoupling/extraction pass across Notify and USR with registry-oriented boundaries:
+  - Notify: extracted command/runtime helpers and registry wiring to reduce tool coupling in command-line orchestration.
+  - USR: extracted command-line and dataset hotspots into smaller operation modules to reduce monolith pressure and improve change isolation.
+- Performed contiguous semantic-history cleanup on the active feature branch (no cross-branch rewriting), consolidating tightly related extraction commits to keep history reviewable.
+- Completed documentation alignment pass for Notify + USR after refactors so command examples and architecture narrative reflect current behavior.
+- Completed a didactic clarity pass to expand dense acronym-heavy prose in operator guides while preserving executable command syntax and environment variable names.
+- Current branch state after the above: `dev/densegen-hpc-patching` remains the active working branch for this stream of changes.
