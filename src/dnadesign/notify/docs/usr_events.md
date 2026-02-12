@@ -1,4 +1,4 @@
-# Notify: consuming USR events
+# Notify: consuming Universal Sequence Record events
 
 This module-local page is a short index.
 For full operator procedures, use the canonical runbook:
@@ -33,10 +33,10 @@ uv run notify spool drain --profile "$NOTIFY_DIR/profile.json"
 
 - DenseGen local end-to-end demo: [../../densegen/docs/demo/demo_usr_notify.md](../../densegen/docs/demo/demo_usr_notify.md)
 - DenseGen event-boundary contract: [../../densegen/docs/reference/outputs.md#event-streams-and-consumers-densegen-vs-usr](../../densegen/docs/reference/outputs.md#event-streams-and-consumers-densegen-vs-usr)
-- USR event schema: [../../usr/README.md#event-log-schema](../../usr/README.md#event-log-schema)
+- Universal Sequence Record event schema: [../../usr/README.md#event-log-schema](../../usr/README.md#event-log-schema)
 - Setup command guide: [../../../../docs/notify/usr_events.md#command-anatomy-notify-setup-slack](../../../../docs/notify/usr_events.md#command-anatomy-notify-setup-slack)
 
 ## Boundary reminder
 
-Notify consumes USR `<dataset>/.events.log` only.
+Notify consumes Universal Sequence Record `<dataset>/.events.log` only.
 DenseGen `outputs/meta/events.jsonl` is runtime telemetry, not Notify input.

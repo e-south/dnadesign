@@ -1,6 +1,6 @@
 # Notify
 
-Notify reads USR mutation events and posts selected events to webhook providers.
+Notify reads Universal Sequence Record mutation events and posts selected events to webhook providers.
 
 ## Contents
 - [At a glance](#at-a-glance)
@@ -22,8 +22,8 @@ Do not use Notify for:
 - generic log shipping
 
 Contract:
-- input stream is USR `<dataset>/.events.log` JSONL
-- Notify treats USR events as an external, versioned contract
+- input stream is Universal Sequence Record `<dataset>/.events.log` newline-delimited JSON
+- Notify treats Universal Sequence Record events as an external, versioned contract
 - without `--profile`, choose exactly one webhook source:
   - `--url`
   - `--url-env`
@@ -62,8 +62,8 @@ uv run notify spool drain --profile outputs/notify/densegen/profile.json
 - Module-local pointer page: [docs/usr_events.md](docs/usr_events.md)
 - Command anatomy: [notify setup slack flags and expectations](../../../docs/notify/usr_events.md#command-anatomy-notify-setup-slack)
 - Setup onboarding: [Slack setup onboarding](../../../docs/notify/usr_events.md#slack-setup-onboarding-3-minutes)
-- End-to-end stack demo: [DenseGen -> USR -> Notify demo](../densegen/docs/demo/demo_usr_notify.md)
-- USR event schema source: [USR event log schema](../usr/README.md#event-log-schema)
+- End-to-end stack demo: [DenseGen -> Universal Sequence Record -> Notify demo](../densegen/docs/demo/demo_usr_notify.md)
+- Universal Sequence Record event schema source: [Universal Sequence Record event log schema](../usr/README.md#event-log-schema)
 
 ## Maintainer code map
 
@@ -83,7 +83,7 @@ Tool and workflow extension points:
 ## Key boundary
 
 Notify reads:
-- `<usr_root>/<dataset>/.events.log`
+- `<usr_root>/<dataset>/.events.log` (Universal Sequence Record event stream)
 
 Notify does not read:
 - `densegen/.../outputs/meta/events.jsonl`
@@ -92,11 +92,11 @@ Notify does not read:
 
 Notify is an observer control plane:
 - it does not launch tool runs
-- it does not mutate tool CLI args, env, or runtime behavior
-- it only resolves where USR events are expected and watches that stream
+- it does not mutate tool command-line arguments, environment variables, or runtime behavior
+- it only resolves where Universal Sequence Record events are expected and watches that stream
 
 Tool integration contract:
-- `notify setup slack --tool <tool> --config <workspace-config.yaml>` resolves expected USR `.events.log` destination
+- `notify setup slack --tool <tool> --config <workspace-config.yaml>` resolves expected Universal Sequence Record `.events.log` destination
 - `notify setup resolve-events --tool <tool> --config <config.yaml>` resolves events path/policy without writing a profile
 - supported resolvers: `densegen`, `infer_evo2`
 - profile stores `events_source` metadata (`tool`, `config`) so watcher restarts can re-resolve paths and avoid stale bindings

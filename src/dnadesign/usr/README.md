@@ -1,12 +1,12 @@
-# USR - Universal Sequence Record
+# Universal Sequence Record
 
 ## Contents
 - [At a glance](#at-a-glance)
 - [Start here (mental model and stack boundary)](#start-here-mental-model-and-stack-boundary)
 - [Maintainer code map](#maintainer-code-map)
-- [CLI quickstart (run from anywhere)](#cli-quickstart-run-from-anywhere)
-- [Remote sync (SSH)](#remote-sync-ssh)
-- [Python API](#python-api)
+- [Command-line quickstart (run from anywhere)](#command-line-quickstart-run-from-anywhere)
+- [Remote synchronization (secure shell)](#remote-synchronization-secure-shell)
+- [Python application programming interface](#python-application-programming-interface)
 - [Schema contract](#schema-contract)
 - [Namespace registry (required)](#namespace-registry-required)
 - [Event log schema](#event-log-schema)
@@ -32,7 +32,7 @@
 - Commands can target a dataset id or explicit file/path modes.
 
 **Start here:**
-- CLI quickstart: `#cli-quickstart-run-from-anywhere`
+- command-line quickstart: `#command-line-quickstart-run-from-anywhere`
 - Overlay contract: `#namespace-registry-required`
 - Event schema: `#event-log-schema`
 - Remote sync: `docs/operations/sync.md`
@@ -41,16 +41,16 @@
 
 ## Start here (mental model and stack boundary)
 
-USR is the canonical store and the mutation/event boundary:
+Universal Sequence Record is the canonical store and the mutation and event boundary:
 
 1) Base records live in `records.parquet` (atomic, audit-friendly).
 2) Derived data is written as namespaced overlays in `_derived/` (append-only parts).
-3) All mutations emit events to `.events.log` (JSONL). This is the integration boundary.
+3) All mutations emit events to `.events.log` (newline-delimited JSON). This is the integration boundary.
 
 When running the full stack:
 
-- DenseGen can write sequences plus a `densegen` overlay namespace into a USR dataset.
-- Notify reads USR `.events.log` and sends webhook notifications.
+- DenseGen can write sequences plus a `densegen` overlay namespace into a Universal Sequence Record dataset.
+- Notify reads Universal Sequence Record `.events.log` and sends webhook notifications.
 
 Relevant docs:
 - DenseGen outputs plus event streams: `../densegen/docs/reference/outputs.md`
@@ -58,7 +58,7 @@ Relevant docs:
 
 ## Doc map
 
-- Quickstart CLI: `#cli-quickstart-run-from-anywhere`
+- Quickstart command line: `#command-line-quickstart-run-from-anywhere`
 - Overlay plus registry contract: `#namespace-registry-required`
 - How overlays merge (conflict resolution): `#how-overlays-merge-conflict-resolution`
 - Event log schema (Notify input): `#event-log-schema`
@@ -74,7 +74,7 @@ Core dataset orchestration:
 - `src/dnadesign/usr/src/dataset_registry_modes.py`: registry-mode normalization and validation.
 - `src/dnadesign/usr/src/dataset_dedupe.py`: dedupe execution flow.
 
-CLI decomposition:
+Command-line decomposition:
 - `src/dnadesign/usr/src/cli.py`: Typer command surface and command wiring.
 - `src/dnadesign/usr/src/cli_commands/read.py`: read/info/schema handlers.
 - `src/dnadesign/usr/src/cli_commands/write.py`: init/import/attach handlers.
@@ -95,7 +95,7 @@ src/dnadesign/usr/
 │    │         ├─ records.parquet     # base table
 │    │         ├─ _derived/           # derived overlays (namespace.parquet or namespace/part-*.parquet)
 │    │         ├─ meta.md             # notes + command snippets
-│    │         ├─ .events.log         # append‑only JSONL event stream
+│    │         ├─ .events.log         # append-only newline-delimited JSON event stream
 │    │         ├─ _registry/          # frozen registry snapshots (optional)
 │    │         └─ _snapshots/         # rolling copies of records.parquet
 │    └─ _archive/
@@ -103,7 +103,7 @@ src/dnadesign/usr/
 └─ demo_material/                      # example CSVs used in this README
 ```
 
-**Dataset ids** are typically `namespace/dataset`. If you pass an unqualified name (e.g., `demo`), USR resolves it only when the match is unique; ambiguous names require the full `namespace/dataset` id.
+**Dataset ids** are typically `namespace/dataset`. If you pass an unqualified name (for example, `demo`), Universal Sequence Record resolves it only when the match is unique; ambiguous names require the full `namespace/dataset` id.
 Legacy dataset ids under `archived/` are rejected with a hard error.
 Path-first commands also hard-error on legacy archive locations (`datasets/archived/**` and `usr/archived/**`).
 
@@ -119,7 +119,7 @@ Path-first commands also hard-error on legacy archive locations (`datasets/archi
 | `alphabet`   | string             | `dna_4`, `dna_5`, `rna_4`, `rna_5`, `protein_20`, `protein_21` |
 | `length`     | int32              | `len(sequence_norm)`           |
 | `source`     | string             | ingest provenance              |
-| `created_at` | timestamp(us, UTC) | ingest time                    |
+| `created_at` | timestamp(us, coordinated universal time) | ingest time                    |
 
 `sequence_norm` is `sequence.strip()` and is the value used for ID hashing. `bio_type` must not contain the `|` delimiter.
 
@@ -130,8 +130,8 @@ Path-first commands also hard-error on legacy archive locations (`datasets/archi
 
 ## How overlays merge (conflict resolution)
 
-USR overlays are append-only parts under `_derived/<namespace>/`.
-When reading (or when materializing), USR constructs an overlay view with deterministic last-writer-wins semantics across parts:
+Universal Sequence Record overlays are append-only parts under `_derived/<namespace>/`.
+When reading (or when materializing), Universal Sequence Record constructs an overlay view with deterministic last-writer-wins semantics across parts:
 
 1) Overlay parts are ordered by `created_at` descending, then filename descending.
 2) For each join key (`id` or `sequence`, depending on the operation), the newest value wins per column.
@@ -144,12 +144,12 @@ Operational implications:
 - If you re-attach the same namespace and columns in a new part, the new part overrides earlier parts.
 - For large runs, compact parts periodically (`usr maintenance overlay-compact ...`) to reduce read overhead while preserving semantics.
 
-### CLI availability
+### Command-line interface availability
 
-In this monorepo, run the CLI as:
+In this monorepo, run the command-line interface as:
 
 ```bash
-# Show full CLI command surface.
+# Show full command-line interface command surface.
 uv run usr --help
 ```
 
@@ -157,7 +157,7 @@ Command snippets below use `usr ...` for readability; when running from this rep
 
 ---
 
-## CLI quickstart (run from anywhere)
+## Command-line quickstart (run from anywhere)
 
 Demo inputs in this repo:
 
@@ -165,7 +165,7 @@ Demo inputs in this repo:
 * Attachments: `src/dnadesign/usr/demo_material/demo_attachment_{one|two}.csv`
 * OPAL labels (SFXI vec8): `src/dnadesign/usr/demo_material/demo_y_sfxi.csv` (includes `intensity_log2_offset_delta`)
 
-**macOS note:** USR suppresses PyArrow `sysctlbyname` warnings by default. Set `USR_SHOW_PYARROW_SYSCTL=1` to force showing warnings. Back-compat flag `USR_SUPPRESS_PYARROW_SYSCTL` still works and takes precedence when explicitly set (`1` suppress, `0` show).
+**macOS note:** Universal Sequence Record suppresses PyArrow `sysctlbyname` warnings by default. Set `USR_SHOW_PYARROW_SYSCTL=1` to force showing warnings. Backward-compatible flag `USR_SUPPRESS_PYARROW_SYSCTL` still works and takes precedence when explicitly set (`1` suppress, `0` show).
 
 **Demo dataset note:** `src/dnadesign/usr/datasets/demo` is tracked. If you want a scratch run, copy it first (or point `--root` to a scratch datasets folder) before running attach/materialize/snapshot.
 
@@ -178,7 +178,7 @@ Demo inputs in this repo:
 usr init densegen/demo --source "readme quickstart" --notes "hello, world"
 ```
 
-**Import sequences** (only essential USR columns are ingested; extra CSV columns are ignored)
+**Import sequences** (only essential Universal Sequence Record columns are ingested; extra comma-separated value columns are ignored)
 
 ```bash
 # Import sequence rows into base records.
@@ -252,7 +252,7 @@ usr materialize densegen/demo --archive-overlays
 # List datasets in human-friendly table.
 usr ls
 
-# List datasets as JSON.
+# List datasets as JavaScript Object Notation.
 usr ls --format json
 
 # Show dataset summary (rows, columns, namespaces).
@@ -328,13 +328,13 @@ usr get densegen/demo --id e153ebc4... --columns id,sequence,densegen__used_tfbs
 **Export**
 
 ```bash
-# Export full dataset to CSV.
+# Export full dataset to comma-separated values.
 usr export densegen/demo --fmt csv   --out src/dnadesign/usr/demo_material/out.csv
 
 # Export selected columns.
 usr export densegen/demo --fmt csv   --columns id,sequence --out src/dnadesign/usr/demo_material/out_small.csv
 
-# Export JSONL.
+# Export newline-delimited JSON.
 usr export densegen/demo --fmt jsonl --out src/dnadesign/usr/demo_material/out.jsonl
 
 # Export including tombstoned rows.
@@ -369,7 +369,7 @@ Use the widgets to choose a dataset, sample size, and panel configuration.
 
 ### Path‑first tools (work on files or directories anywhere)
 
-These commands accept a dataset name **or** a file/directory path. When a directory contains multiple Parquet files, USR presents an interactive picker.
+These commands accept a dataset name **or** a file/directory path. When a directory contains multiple Parquet files, Universal Sequence Record presents an interactive picker.
 
 ```bash
 # Preview current directory parquet (interactive picker if needed).
@@ -414,7 +414,7 @@ usr densegen repair --drop-id-seq-only
 
 ---
 
-## Merge datasets (USR ↔ USR)
+## Merge datasets (Universal Sequence Record to Universal Sequence Record)
 
 Align columns and control duplicates while merging rows from a source dataset into a destination dataset.
 
@@ -443,16 +443,16 @@ usr maintenance merge \
 
 ---
 
-## Remote sync (SSH)
+## Remote synchronization (secure shell)
 
-Built-in SSH + rsync moves dataset folders and single files. `USR_REMOTES_PATH` is required.
-Use this for HPC workflows where datasets are not Git-tracked.
+Built-in secure shell plus `rsync` moves dataset folders and single files. `USR_REMOTES_PATH` is required.
+Use this for shared cluster workflows where datasets are not Git-tracked.
 
 ```bash
-# Point USR at remote config file.
+# Point Universal Sequence Record tooling at remote config file.
 export USR_REMOTES_PATH="$HOME/.config/dnadesign/usr-remotes.yaml"
 
-# Create BU SCC remote profile.
+# Create Boston University Shared Computing Cluster remote profile.
 usr remotes wizard \
   --preset bu-scc \
   --name bu-scc \
@@ -482,7 +482,7 @@ usr pull /path/to/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets/
 usr push /path/to/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets/densegen/demo_hpc bu-scc -y
 ```
 
-**FILE mode** lets you diff/pull/push arbitrary files by path:
+**File mode** lets you diff, pull, and push arbitrary files by path:
 
 ```bash
 # Diff/pull one file by path.
@@ -494,7 +494,7 @@ See **docs/operations/sync.md** for full setup, storage-location guidance, and f
 
 ---
 
-## Python API
+## Python application programming interface
 
 ```python
 from pathlib import Path
@@ -534,7 +534,7 @@ Required columns (non‑null):
 | `alphabet` | `string`                   | `dna_4`, `dna_5`, `rna_4`, `rna_5`, `protein_20`, `protein_21` |
 | `length`   | `int32`                    | `len(sequence_norm)` |
 | `source`   | `string`                   | Source label or file |
-| `created_at` | `timestamp[us, UTC]`     | Ingest time (UTC) |
+| `created_at` | `timestamp[us, coordinated universal time]`     | Ingest time (coordinated universal time) |
 
 `sequence_norm` is `sequence.strip()` and is the value used for ID hashing. IDs are computed with UTF‑8 encoding and the `|` delimiter; `bio_type` must not contain `|`.
 
@@ -554,9 +554,9 @@ Base table metadata (Parquet key/value):
 
 ### Namespace registry (required)
 
-USR enforces a strict registry for overlay namespaces. Create `registry.yaml` under your datasets root (default: `src/dnadesign/usr/datasets/registry.yaml`) and register each namespace before attaching overlays. **All dataset mutations (init/import/attach/snapshot/maintenance) require a registry.**
+Universal Sequence Record enforces a strict registry for overlay namespaces. Create `registry.yaml` under your datasets root (default: `src/dnadesign/usr/datasets/registry.yaml`) and register each namespace before attaching overlays. **All dataset mutations (init/import/attach/snapshot/maintenance) require a registry.**
 
-The registry must include the reserved `usr_state` namespace with the standardized columns listed above; USR will fail fast if it is missing or modified.
+The registry must include the reserved `usr_state` namespace with the standardized columns listed above; Universal Sequence Record will fail fast if it is missing or modified.
 
 Register a namespace:
 
@@ -585,7 +585,7 @@ Freeze the registry into a dataset (for historic compatibility):
 usr maintenance registry-freeze densegen/demo
 ```
 
-USR also auto-freezes the registry on the first dataset mutation when a registry is present. Freezing writes `_registry/registry.<hash>.yaml` and stamps `usr:registry_hash` into `records.parquet`. Use `usr validate --registry-mode frozen` when you want to validate against the frozen registry rather than the repo-wide current registry.
+Universal Sequence Record also auto-freezes the registry on the first dataset mutation when a registry is present. Freezing writes `_registry/registry.<hash>.yaml` and stamps `usr:registry_hash` into `records.parquet`. Use `usr validate --registry-mode frozen` when you want to validate against the frozen registry rather than the repository-wide current registry.
 
 ### Design notes & contracts
 
@@ -593,19 +593,19 @@ USR also auto-freezes the registry on the first dataset mutation when a registry
 * **Namespacing:** All derived values must be namespaced `<namespace>__<field>`. Non‑namespaced derived columns are rejected.
 * **Deterministic IDs:** `id = sha1(f"{bio_type}|{sequence_norm}".encode("utf-8"))` with case preserved; `bio_type` must not contain `|`.
 * **Safety:** Writes are atomic; snapshots are kept in `_snapshots/`; operations append to `.events.log`.
-* **Tombstones:** Deletions are logical (`usr__deleted`, `usr__deleted_at`, `usr__deleted_reason`) and live in the reserved `usr` namespace. `usr__deleted_at` is `timestamp[us, UTC]`. Deleted rows are hidden by default unless `include_deleted=True`. Use `usr materialize --drop-deleted` to physically remove them.
+* **Tombstones:** Deletions are logical (`usr__deleted`, `usr__deleted_at`, `usr__deleted_reason`) and live in the reserved `usr` namespace. `usr__deleted_at` is `timestamp[us, coordinated universal time]`. Deleted rows are hidden by default unless `include_deleted=True`. Use `usr materialize --drop-deleted` to physically remove them.
 * **Record state:** The reserved `usr_state` namespace defines standardized state fields: `usr_state__masked` (bool), `usr_state__qc_status` (string), `usr_state__split` (string), `usr_state__supersedes` (string), `usr_state__lineage` (list<string>). Allowed `usr_state__qc_status`: `pass`, `fail`, `warn`, `unknown`. Allowed `usr_state__split`: `train`, `val`, `test`, `holdout`. Unset values are `null`. These are registry-governed like any other namespace.
-* **Update policy:** Base records are append-only. Updates are overlays only; base rewrites are maintenance operations. In the library, use `with ds.maintenance(reason=...): ds.materialize(...)` (CLI handles this).
+* **Update policy:** Base records are append-only. Updates are overlays only; base rewrites are maintenance operations. In the library, use `with ds.maintenance(reason=...): ds.materialize(...)` (the command-line interface handles this).
 * **Registry:** Namespaces must be registered in `registry.yaml` before attaching or materializing overlays.
 * **Registry hash:** `usr:registry_hash` is persisted in base and overlay metadata; overlay validation requires the hash to match the dataset's registry (current or frozen, depending on `--registry-mode`).
 * **Overlay parts:** Overlays may be stored as append-only parts under `_derived/<namespace>/part-*.parquet`; compact with `usr maintenance overlay-compact`. **Compaction guidance:** compact at run end or when parts exceed ~200 files or the overlay exceeds ~1–2GB.
 
 ### Event log schema
 
-Each line of `.events.log` is JSONL with:
+Each line of `.events.log` is newline-delimited JSON with:
 
 * `event_version` (integer)
-* `timestamp_utc` (RFC3339 UTC string)
+* `timestamp_utc` (RFC 3339 Coordinated Universal Time string)
 * `action` (string)
 * `dataset` (object with `name` and `root`)
 * `args` (object, key-based secret redaction applied)
@@ -615,7 +615,7 @@ Each line of `.events.log` is JSONL with:
 * `fingerprint` (object with `rows`, `cols`, `size_bytes`, and optional `sha256` when `USR_EVENT_SHA256=1`)
 * `registry_hash` (string or null)
 * `actor` (object with `tool`, `run_id`, `host`, `pid`)
-* `version` (USR package version)
+* `version` (Universal Sequence Record package version)
 
 Notify expects at minimum `event_version` and `action`. See: `../../../docs/notify/usr_events.md`.
 

@@ -1,21 +1,21 @@
 # Notifications
 
-`dnadesign` includes a tool-agnostic notifier CLI for sending webhook updates from batch jobs or local runs.
+`dnadesign` includes a tool-agnostic command-line notifier for sending webhook updates from batch jobs or local runs.
 
-Operator onboarding for USR event watchers lives in [Notify USR events operator manual](notify/usr_events.md).
+Operator onboarding for Universal Sequence Record event watchers lives in [Notify Universal Sequence Record events operator manual](notify/usr_events.md).
 
 ## Start Here
 
 Choose the flow first:
 - Direct one-off notifications: use `notify send` (this page).
-- Long-running USR watcher workflows: use [notify/usr_events.md](notify/usr_events.md).
+- Long-running Universal Sequence Record watcher workflows: use [notify/usr_events.md](notify/usr_events.md).
 
 Most DenseGen and Infer production usage should start with:
 - `notify setup slack --tool <tool> --config <workspace-config.yaml>`
 - `notify profile doctor --profile <profile.json>`
 - `notify usr-events watch --profile <profile.json> --follow`
 
-## CLI
+## Command line usage
 
 ```
 notify send \
@@ -28,7 +28,7 @@ notify send \
 ```
 
 Supported providers:
-- `generic` (JSON payload)
+- `generic` (JavaScript Object Notation payload)
 - `slack` (text payload)
 - `discord` (text payload)
 
@@ -36,7 +36,7 @@ Exactly one of `--url`, `--url-env`, or `--secret-ref` is required. The notifier
 
 ## Metadata
 
-Include additional metadata with a JSON file:
+Include additional metadata with a JavaScript Object Notation file:
 
 ```
 notify send \
@@ -48,7 +48,7 @@ notify send \
   --meta outputs/meta/run_manifest.json
 ```
 
-The notifier expects a JSON object in the file and attaches it to the `meta` field.
+The notifier expects a JavaScript Object Notation object in the file and attaches it to the `meta` field.
 
 ## Usage Patterns
 
@@ -98,21 +98,21 @@ notify send --provider generic --status success --tool densegen --run-id demo --
 
 ## Operator Runbooks (Canonical)
 
-To avoid setup drift, USR-event onboarding lives in one canonical runbook:
+To avoid setup drift, Universal Sequence Record event onboarding lives in one canonical runbook:
 
-- Canonical runbook: [Notify USR events operator manual](notify/usr_events.md)
-- DenseGen local end-to-end demo: [DenseGen -> USR -> Notify demo](../src/dnadesign/densegen/docs/demo/demo_usr_notify.md)
-- BU SCC batch + Notify runbook: [BU SCC Batch + Notify runbook](hpc/bu_scc_batch_notify.md)
+- Canonical runbook: [Notify Universal Sequence Record events operator manual](notify/usr_events.md)
+- DenseGen local end-to-end demo: [DenseGen -> Universal Sequence Record -> Notify demo](../src/dnadesign/densegen/docs/demo/demo_usr_notify.md)
+- Boston University Shared Computing Cluster batch + Notify runbook: [Boston University Shared Computing Cluster batch + Notify runbook](hpc/bu_scc_batch_notify.md)
 
 Use that runbook for:
 - setup-first onboarding (`notify setup slack --tool <tool> --config <workspace-config.yaml>`)
 - didactic flag reference for `notify setup slack`
 - secure secret wiring (`--secret-source auto|env`)
 - two-terminal watch workflow (`doctor` -> `dry-run` -> `follow`)
-- strict USR `.events.log` path contract
+- strict Universal Sequence Record `.events.log` path contract
 - spool/drain recovery patterns
 
-## Maintainer IA
+## Maintainer information architecture
 
 - User-facing operator procedures should live in `docs/notify/usr_events.md`.
 - `src/dnadesign/notify/README.md` should stay a module-local index and code map.
