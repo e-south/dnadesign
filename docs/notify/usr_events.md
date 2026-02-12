@@ -1,6 +1,6 @@
-# Notify: consuming USR events
+# Notify: consuming Universal Sequence Record events
 
-Notify consumes USR mutation events from `.events.log` JSONL files and sends selected events to webhook providers. The integration contract is USR `.events.log` only; DenseGen runtime diagnostics (`outputs/meta/events.jsonl`) are out of scope for Notify.
+Notify consumes Universal Sequence Record mutation events from `.events.log` newline-delimited JSON files and sends selected events to webhook providers. The integration contract is Universal Sequence Record `.events.log` only; DenseGen runtime diagnostics (`outputs/meta/events.jsonl`) are out of scope for Notify.
 
 ## Contents
 - [Minimal operator quickstart](#minimal-operator-quickstart)
@@ -9,16 +9,16 @@ Notify consumes USR mutation events from `.events.log` JSONL files and sends sel
 - [Slack setup onboarding (3 minutes)](#slack-setup-onboarding-3-minutes)
 - [Common mistakes](#common-mistakes)
 - [Required event fields (minimum contract)](#required-event-fields-minimum-contract)
-- [Quickstart: watch an event log and POST to a webhook](#quickstart-watch-an-event-log-and-post-to-a-webhook)
+- [Quickstart: watch an event log and send to a webhook](#quickstart-watch-an-event-log-and-send-to-a-webhook)
 - [Secure webhook setup (real endpoints)](#secure-webhook-setup-real-endpoints)
 - [Profile setup notes](#profile-setup-notes)
-- [Deployed pressure test: DenseGen USR Notify](#deployed-pressure-test-densegen-usr-notify)
+- [Deployed pressure test: DenseGen Universal Sequence Record Notify](#deployed-pressure-test-densegen-universal-sequence-record-notify)
 - [Filtering (reduce noise first, then tighten)](#filtering-reduce-noise-first-then-tighten)
-- [Spool and drain (HPC-friendly)](#spool-and-drain-hpc-friendly)
+- [Spool and drain (cluster-friendly)](#spool-and-drain-cluster-friendly)
 
 See also:
-- USR event schema: [USR README: event log schema](../../src/dnadesign/usr/README.md#event-log-schema)
-- DenseGen end-to-end demo: [DenseGen -> USR -> Notify demo](../../src/dnadesign/densegen/docs/demo/demo_usr_notify.md)
+- Universal Sequence Record event schema: [Universal Sequence Record README: event log schema](../../src/dnadesign/usr/README.md#event-log-schema)
+- DenseGen end-to-end demo: [DenseGen -> Universal Sequence Record -> Notify demo](../../src/dnadesign/densegen/docs/demo/demo_usr_notify.md)
 
 ---
 
@@ -30,7 +30,7 @@ CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yam
 RUN_ROOT="$(dirname "$CONFIG")"
 NOTIFY_DIR="$RUN_ROOT/outputs/notify/densegen"
 
-# SCC TLS trust chain for HTTPS webhook delivery.
+# Shared computing cluster certificate trust chain for secure webhook delivery.
 export SSL_CERT_FILE=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
 
 # Create profile from tool config (observer-only setup).
@@ -43,7 +43,7 @@ uv run notify setup slack \
   --secret-source auto \
   --policy densegen
 
-# Resolve expected USR events path from a tool config (no profile write).
+# Resolve expected Universal Sequence Record events path from a tool config (no profile write).
 uv run notify setup resolve-events --tool densegen --config "$CONFIG"
 
 # Validate profile and secret resolution.
@@ -75,7 +75,7 @@ Default (recommended):
   - `<run_workspace>/outputs/notify/<tool>/cursor`
   - `<run_workspace>/outputs/notify/<tool>/spool/`
 - this keeps run-local observability state co-located with run-local outputs and avoids cross-run drift
-- this remains decoupled from tool sink choices: tools may write parquet and/or USR, but Notify always watches the USR `.events.log` contract
+- this remains decoupled from tool sink choices: tools may write parquet and/or Universal Sequence Record outputs, but Notify always watches the Universal Sequence Record `.events.log` contract
 
 Optional centralized mode:
 - use a dedicated Notify workspace only when you need shared operator ownership across many runs
@@ -112,10 +112,10 @@ uv run notify setup slack \
 What each flag does:
 - `--tool densegen`: selects the DenseGen events-path resolver.
 - `--config .../config.yaml`: the workspace-scoped DenseGen run config used by the resolver.
-- `--profile .../outputs/notify/<tool>/profile.json`: profile JSON location (run-local by default).
+- `--profile .../outputs/notify/<tool>/profile.json`: profile JavaScript Object Notation location (run-local by default).
 - `--cursor .../outputs/notify/<tool>/cursor`: restart-safe byte offset for watcher resume.
 - `--spool-dir .../outputs/notify/<tool>/spool`: durable queue for failed webhook deliveries.
-- `--secret-source auto`: selects secure backend (`keychain`/`secretservice`) and prompts for webhook URL if needed.
+- `--secret-source auto`: selects secure backend (`keychain`/`secretservice`) and prompts for webhook address if needed.
 - `--policy densegen`: applies DenseGen defaults for action/tool filters.
 
 Critical expectation for `--config`:
@@ -123,7 +123,7 @@ Critical expectation for `--config`:
 - pass the workspace/run config path, for example:
   - `<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml`
   - `src/dnadesign/densegen/workspaces/<workspace>/config.yaml`
-- resolver mode reads output destination settings from this config and computes expected USR `.events.log`
+- resolver mode reads output destination settings from this config and computes expected Universal Sequence Record `.events.log`
 
 Profile expectations:
 - profile schema is v2 only (`profile_version: 2`)
@@ -136,8 +136,8 @@ Profile expectations:
 Optional flags you may need:
 - `--url-env <ENV_VAR>`: explicit env-backed secret source (defaults to `NOTIFY_WEBHOOK` when `--secret-source env` and omitted)
 - `--secret-ref <backend://service/account>`: explicit key name/location for secure backend
-- `--events /abs/path/to/.events.log`: bypass resolver mode and point directly to an existing USR events file
-- `--tls-ca-bundle /path/to/ca-bundle.pem`: explicit CA bundle for HTTPS webhook delivery
+- `--events /abs/path/to/.events.log`: bypass resolver mode and point directly to an existing Universal Sequence Record events file
+- `--tls-ca-bundle /path/to/ca-bundle.pem`: explicit certificate-authority bundle for secure webhook delivery
 - if `--events` is used with default profile path, pass `--policy` (for namespace) or pass an explicit `--profile`
 
 After setup:
@@ -152,7 +152,7 @@ uv run notify usr-events watch --profile "$NOTIFY_DIR/profile.json" --follow --w
 ## Slack setup onboarding (3 minutes)
 
 Use observer-only setup with DenseGen config resolution.  
-`--config` below means your DenseGen `config.yaml` (not a notify file and not a USR path).
+`--config` below means your DenseGen `config.yaml` (not a notify file and not a Universal Sequence Record path).
 
 ```bash
 CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml
@@ -184,11 +184,11 @@ uv run notify setup slack \
 ```
 
 The setup command is safe before the run starts:
-- it resolves the expected USR `.events.log` destination from config
+- it resolves the expected Universal Sequence Record `.events.log` destination from config
 - it stores tool/config metadata so watcher runs can re-resolve paths and avoid config-drift
 - it does not launch DenseGen or modify DenseGen runtime behavior
 
-Manual Slack URL entry via wizard/setup (recommended when secure backend is available):
+Manual Slack webhook address entry via wizard/setup (recommended when secure backend is available):
 
 ```bash
 # Do not pass --webhook-url. Setup will prompt for it with hidden input.
@@ -215,7 +215,7 @@ uv run notify setup slack \
 ```
 
 When prompted:
-- paste your Slack webhook URL
+- paste your Slack webhook address
 - press Enter (input stays hidden)
 
 For automation/agents, append `--json` to `setup slack`, `setup resolve-events`, and `profile doctor`
@@ -233,7 +233,7 @@ uv run notify usr-events watch --profile "$NOTIFY_DIR/profile.json" --follow --w
 `notify profile doctor` treats resolver-backed profiles as valid before `.events.log` is created and reports this as a pending events file state.
 
 ```bash
-# 3) Run the watcher in BU SCC batch (profile mode, recommended)
+# 3) Run the watcher in Boston University Shared Computing Cluster batch mode (recommended)
 qsub -P <project> \
   -v NOTIFY_PROFILE=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/outputs/notify/densegen/profile.json \
   docs/hpc/jobs/bu_scc_notify_watch.qsub
@@ -242,8 +242,8 @@ qsub -P <project> \
 If `--secret-source auto` fails (no keychain/secretservice backend), use env mode:
 
 ```bash
-# Capture webhook URL without shell echo.
-read -rsp "Slack Webhook URL: " NOTIFY_WEBHOOK; echo
+# Capture webhook address without shell echo.
+read -rsp "Slack webhook address: " NOTIFY_WEBHOOK; echo
 
 # Export for this shell session.
 export NOTIFY_WEBHOOK
@@ -267,7 +267,7 @@ Policy options:
 - `--policy infer_evo2`: infer/Evo2-focused filters (`attach,materialize`, tool `infer`)
 - `--policy generic`: no default filters
 
-For BU SCC batch in env mode (no profile):
+For Boston University Shared Computing Cluster batch mode with environment variables (no profile):
 
 ```bash
 qsub -P <project> \
@@ -283,16 +283,16 @@ If you run env mode with explicit `EVENTS_PATH` instead of resolver mode, set bo
 ## Common mistakes
 
 1) Watching the wrong event log:
-- Correct: USR `<dataset>/.events.log`
+- Correct: Universal Sequence Record `<dataset>/.events.log`
 - Incorrect: DenseGen `outputs/meta/events.jsonl` or DenseGen `config.yaml`
 
 2) Pointing `--events` to `config.yaml`:
-- `--events` must be JSONL, first non-empty line must be a USR event object.
+- `--events` must be newline-delimited JSON, and the first non-empty line must be a Universal Sequence Record event object.
 
 3) Writing profile-relative paths as shell-relative paths:
 - `events`, `cursor`, and `spool_dir` resolve relative to the profile file location.
 
-4) HTTPS webhook TLS failures on SCC:
+4) Secure webhook certificate failures on shared computing cluster nodes:
 - Symptom: `CERTIFICATE_VERIFY_FAILED`
 - Fix: set `SSL_CERT_FILE=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem` or pass `--tls-ca-bundle` explicitly.
 
@@ -300,7 +300,7 @@ If you run env mode with explicit `EVENTS_PATH` instead of resolver mode, set bo
 
 ## Required event fields (minimum contract)
 
-Each JSONL line must include:
+Each newline-delimited JSON line must include:
 
 - `event_version` (integer)
 - `action` (string)
@@ -319,7 +319,7 @@ Use `--allow-unknown-version` only during controlled migrations.
 
 ---
 
-## Quickstart: watch an event log and POST to a webhook
+## Quickstart: watch an event log and send to a webhook
 
 ```bash
 # Start a watcher on a concrete .events.log path.
@@ -333,7 +333,7 @@ uv run notify usr-events watch \
 
 Behavior:
 
-- reads to EOF in batch mode by default
+- reads to end-of-file in batch mode by default
 - use `--follow` to tail continuously
 - cursor stores a byte offset for restart-safe resume
 - filter by action/tool with `--only-actions` and `--only-tools`
@@ -352,13 +352,13 @@ Use `--url-env` or `--secret-ref` for deployed runs so webhook URLs are not comm
 One-time per shell (no terminal echo):
 
 ```bash
-# Read webhook URL safely from stdin.
-read -rsp "Webhook URL: " NOTIFY_WEBHOOK; echo
+# Read webhook address safely from standard input.
+read -rsp "Webhook address: " NOTIFY_WEBHOOK; echo
 
 # Export for notify commands.
 export NOTIFY_WEBHOOK
 
-# SCC: export CA bundle for HTTPS delivery.
+# Shared computing cluster: export certificate bundle for secure delivery.
 export SSL_CERT_FILE=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
 ```
 
@@ -420,7 +420,7 @@ Profile security contract:
 
 ---
 
-## Deployed pressure test: DenseGen USR Notify
+## Deployed pressure test: DenseGen Universal Sequence Record Notify
 
 Run the watcher in dry-run mode first:
 
@@ -441,7 +441,7 @@ If payloads look correct, remove `--dry-run` to deliver for real.
 Generate additional events by increasing quota and resuming DenseGen:
 
 ```bash
-# Emit additional USR events by resuming DenseGen.
+# Emit additional Universal Sequence Record events by resuming DenseGen.
 uv run dense run --resume --no-plot
 ```
 
@@ -449,9 +449,9 @@ uv run dense run --resume --no-plot
 
 ## Provider choice: Slack vs email
 
-- Slack (recommended pressure-test path): `--provider slack` with a Slack webhook URL.
+- Slack (recommended pressure-test path): `--provider slack` with a Slack webhook address.
 - Email: use `--provider generic` to post to your email relay webhook endpoint.
-  Notify does not send SMTP directly.
+  Notify does not send Simple Mail Transfer Protocol traffic directly.
 
 ---
 
@@ -503,7 +503,7 @@ Two common filters:
 - Only events from these tools (based on `actor.tool`):
   - `--only-tools densegen`
 
-For DenseGen-in-USR runs, start with:
+For DenseGen-in-Universal-Sequence-Record runs, start with:
 
 ```bash
 --only-tools densegen
@@ -519,7 +519,7 @@ Then refine once you have seen real traffic.
 
 ---
 
-## Spool and drain (HPC-friendly)
+## Spool and drain (cluster-friendly)
 
 If delivery fails and `--spool-dir` is set, Notify writes payload files locally.
 Drain later from a host with stable network access.
