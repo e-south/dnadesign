@@ -24,6 +24,7 @@ import typer
 
 from .cli_commands import (
     register_profile_commands,
+    register_send_command,
     register_setup_commands,
     register_spool_drain_command,
     register_usr_events_watch_command,
@@ -354,25 +355,21 @@ def _post_with_backoff(
             attempt += 1
 
 
-@app.command("send")
-def send(
-    status: str = typer.Option(..., help="Status: success|failure|started|running."),
-    tool: str = typer.Option(..., help="Tool name (densegen, infer, opal, etc.)."),
-    run_id: str = typer.Option(..., help="Run identifier."),
-    provider: str = typer.Option(..., help="Provider: generic|slack|discord."),
-    url: str | None = typer.Option(None, help="Webhook URL."),
-    url_env: str | None = typer.Option(None, help="Environment variable holding webhook URL."),
-    secret_ref: str | None = typer.Option(
-        None,
-        "--secret-ref",
-        help="Secret reference: keychain://service/account or secretservice://service/account.",
-    ),
-    tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
-    message: str | None = typer.Option(None, help="Optional message."),
-    meta: Path | None = typer.Option(None, help="Path to JSON metadata file."),
-    timeout: float = typer.Option(10.0, help="HTTP timeout (seconds)."),
-    retries: int = typer.Option(0, help="Number of retries on failure."),
-    dry_run: bool = typer.Option(False, help="Print payload and exit without sending."),
+def _send_impl(
+    *,
+    status: str,
+    tool: str,
+    run_id: str,
+    provider: str,
+    url: str | None,
+    url_env: str | None,
+    secret_ref: str | None,
+    tls_ca_bundle: Path | None,
+    message: str | None,
+    meta: Path | None,
+    timeout: float,
+    retries: int,
+    dry_run: bool,
 ) -> None:
     try:
         webhook_url = resolve_webhook_url(url=url, url_env=url_env, secret_ref=secret_ref)
@@ -1232,6 +1229,7 @@ def _spool_drain_impl(
 
 register_usr_events_watch_command(usr_events_app, watch_handler=_usr_events_watch_impl)
 register_spool_drain_command(spool_app, drain_handler=_spool_drain_impl)
+register_send_command(app, send_handler=_send_impl)
 register_profile_commands(
     profile_app,
     init_handler=_profile_init_impl,
