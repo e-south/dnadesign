@@ -46,8 +46,10 @@ from .events_source import normalize_tool_name as _normalize_setup_tool_name
 from .events_source import resolve_tool_events_path as _resolve_tool_events_path
 from .http import post_json
 from .payload import build_payload
-from .profile_ops import sanitize_profile_name as _sanitize_profile_name
-from .profile_ops import wizard_next_steps as _wizard_next_steps
+from .profile_flows import create_wizard_profile as _create_wizard_profile_flow
+from .profile_flows import resolve_profile_path_for_setup as _resolve_profile_path_for_setup
+from .profile_flows import resolve_profile_path_for_wizard as _resolve_profile_path_for_wizard
+from .profile_flows import resolve_setup_events as _resolve_setup_events
 from .profile_schema import PROFILE_VERSION
 from .profile_schema import read_profile as _read_profile
 from .profile_schema import resolve_profile_events_source as _resolve_profile_events_source
@@ -57,8 +59,6 @@ from .spool_ops import ensure_private_directory as _ensure_private_directory
 from .usr_events_watch import watch_usr_events_loop
 from .validation import resolve_tls_ca_bundle, resolve_webhook_url
 from .workflow_policy import DEFAULT_PROFILE_PATH as _DEFAULT_PROFILE_PATH
-from .workflow_policy import DEFAULT_WEBHOOK_ENV as _DEFAULT_WEBHOOK_ENV
-from .workflow_policy import default_profile_path_for_tool as _default_profile_path_for_tool
 from .workflow_policy import policy_defaults as _policy_defaults_for
 from .workflow_policy import resolve_workflow_policy as _resolve_workflow_policy
 
@@ -278,130 +278,6 @@ def _profile_init_impl(
         raise typer.Exit(code=1)
 
 
-def _create_wizard_profile(
-    *,
-    profile: Path,
-    provider: str,
-    events: Path,
-    cursor: Path | None,
-    only_actions: str | None,
-    only_tools: str | None,
-    spool_dir: Path | None,
-    include_args: bool,
-    include_context: bool,
-    include_raw_event: bool,
-    tls_ca_bundle: Path | None,
-    policy: str | None,
-    secret_source: str,
-    url_env: str | None,
-    secret_ref: str | None,
-    webhook_url: str | None,
-    store_webhook: bool,
-    force: bool,
-    events_require_exists: bool = True,
-    events_source: dict[str, str] | None = None,
-) -> dict[str, Any]:
-    profile_path = profile.expanduser().resolve()
-    events_path = _resolve_usr_events_path(events, require_exists=events_require_exists)
-    events_exists = events_path.exists()
-    provider_value = str(provider).strip()
-    if not provider_value:
-        raise NotifyConfigError("provider must be a non-empty string")
-    policy_name = _resolve_workflow_policy(policy=policy)
-
-    mode = str(secret_source or "").strip().lower()
-    if not mode:
-        raise NotifyConfigError("secret_source must be a non-empty string")
-    if mode == "auto":
-        if is_secret_backend_available("keychain"):
-            mode = "keychain"
-        elif is_secret_backend_available("secretservice"):
-            mode = "secretservice"
-        else:
-            raise NotifyConfigError(
-                "secret_source=auto requires keychain or secretservice on this system. "
-                "Pass --secret-source env to opt into environment-variable webhook storage."
-            )
-    if mode not in {"env", "keychain", "secretservice"}:
-        raise NotifyConfigError("secret_source must be one of: auto, env, keychain, secretservice")
-
-    webhook_config: dict[str, str]
-    if mode == "env":
-        env_name = _resolve_cli_optional_string(field="url_env", cli_value=url_env)
-        if env_name is None:
-            env_name = _DEFAULT_WEBHOOK_ENV
-        webhook_config = {"source": "env", "ref": env_name}
-    else:
-        if not is_secret_backend_available(mode):
-            raise NotifyConfigError(f"secret backend '{mode}' is not available on this system")
-        secret_value = _resolve_cli_optional_string(field="secret_ref", cli_value=secret_ref)
-        if secret_value is None:
-            secret_value = f"{mode}://dnadesign.notify/{_sanitize_profile_name(profile_path)}"
-        webhook_config = {"source": "secret_ref", "ref": secret_value}
-        if store_webhook:
-            webhook_value = _resolve_cli_optional_string(field="webhook_url", cli_value=webhook_url)
-            if webhook_value is None:
-                webhook_value = str(typer.prompt("Webhook URL", hide_input=True)).strip()
-            if not webhook_value:
-                raise NotifyConfigError("webhook_url is required when --store-webhook is enabled")
-            store_secret_ref(secret_value, webhook_value)
-
-    default_cursor = profile_path.parent / "cursor"
-    default_spool = profile_path.parent / "spool"
-    cursor_value = cursor or default_cursor
-    spool_value = spool_dir or default_spool
-    try:
-        _ensure_private_directory(cursor_value.parent, label="cursor directory")
-        _ensure_private_directory(spool_value, label="spool_dir")
-    except NotifyConfigError as exc:
-        raise NotifyConfigError(
-            f"{exc}. Pass --cursor and --spool-dir to writable paths "
-            "if the default profile-scoped paths are restricted."
-        ) from exc
-
-    payload: dict[str, Any] = {
-        "profile_version": PROFILE_VERSION,
-        "provider": provider_value,
-        "events": str(events_path),
-        "cursor": str(cursor_value),
-        "spool_dir": str(spool_value),
-        "include_args": bool(include_args),
-        "include_context": bool(include_context),
-        "include_raw_event": bool(include_raw_event),
-        "webhook": webhook_config,
-    }
-    if tls_ca_bundle is not None:
-        payload["tls_ca_bundle"] = str(_resolve_existing_file_path(field="tls_ca_bundle", path_value=tls_ca_bundle))
-    if only_actions is not None:
-        payload["only_actions"] = str(only_actions).strip()
-    if only_tools is not None:
-        payload["only_tools"] = str(only_tools).strip()
-    if policy_name is not None:
-        payload["policy"] = policy_name
-        for key, value in _policy_defaults_for(policy_name).items():
-            payload.setdefault(key, value)
-    if events_source is not None:
-        payload["events_source"] = dict(events_source)
-
-    _write_profile_file(profile_path, payload, force=force)
-    next_steps = _wizard_next_steps(
-        profile_path=profile_path,
-        webhook_config=webhook_config,
-        events_exists=events_exists,
-    )
-    return {
-        "profile": str(profile_path),
-        "provider": provider_value,
-        "events": str(events_path),
-        "cursor": str(cursor_value),
-        "spool_dir": str(spool_value),
-        "policy": policy_name,
-        "webhook": webhook_config,
-        "next_steps": next_steps,
-        "events_exists": events_exists,
-    }
-
-
 def _profile_wizard_impl(
     ctx: typer.Context,
     profile: Path = typer.Option(_DEFAULT_PROFILE_PATH, "--profile", help="Path to profile JSON file."),
@@ -449,14 +325,8 @@ def _profile_wizard_impl(
         profile_source = ctx.get_parameter_source("profile")
         default_profile_selected = profile_source == click.core.ParameterSource.DEFAULT
         if default_profile_selected and profile_value == _DEFAULT_PROFILE_PATH:
-            policy_namespace = _resolve_workflow_policy(policy=policy)
-            if policy_namespace is None:
-                raise NotifyConfigError(
-                    "default profile path is ambiguous in wizard mode; "
-                    "pass --policy or --profile to select a profile namespace"
-                )
-            profile_value = _default_profile_path_for_tool(policy_namespace)
-        result = _create_wizard_profile(
+            profile_value = _resolve_profile_path_for_wizard(profile=profile_value, policy=policy)
+        result = _create_wizard_profile_flow(
             profile=profile_value,
             provider=provider,
             events=events,
@@ -475,6 +345,17 @@ def _profile_wizard_impl(
             webhook_url=webhook_url,
             store_webhook=store_webhook,
             force=force,
+            events_require_exists=True,
+            events_source=None,
+            resolve_events_path=lambda p, required: _resolve_usr_events_path(p, require_exists=required),
+            ensure_private_directory_fn=_ensure_private_directory,
+            secret_backend_available_fn=is_secret_backend_available,
+            store_secret_ref_fn=store_secret_ref,
+            write_profile_file_fn=lambda path, payload, overwrite: _write_profile_file(
+                path,
+                payload,
+                force=overwrite,
+            ),
         )
         if json_output:
             typer.echo(
@@ -630,52 +511,25 @@ def _setup_slack_impl(
     force: bool = typer.Option(False, "--force", help="Overwrite an existing profile file."),
 ) -> None:
     try:
-        tool_name: str | None = None
-        has_events = events is not None
-        has_tool = tool is not None or config is not None
-        if has_events and has_tool:
-            raise NotifyConfigError("pass either --events or --tool with --config, not both")
-        if not has_events and not has_tool:
-            raise NotifyConfigError("pass either --events or --tool with --config")
+        setup_resolution = _resolve_setup_events(
+            events=events,
+            tool=tool,
+            config=config,
+            policy=policy,
+            resolve_tool_events_path_fn=_resolve_tool_events_path,
+            normalize_tool_name_fn=_normalize_setup_tool_name,
+        )
 
-        events_path: Path
-        events_source: dict[str, str] | None = None
-        policy_value = policy
-        events_require_exists = True
+        profile_value = _resolve_profile_path_for_setup(
+            profile=profile,
+            tool_name=setup_resolution.tool_name,
+            policy=setup_resolution.policy,
+        )
 
-        if has_events:
-            events_path = events if events is not None else Path("")
-        else:
-            if tool is None or config is None:
-                raise NotifyConfigError("resolver mode requires both --tool and --config")
-            config_path = config.expanduser().resolve()
-            events_path, default_policy = _resolve_tool_events_path(tool=tool, config=config_path)
-            tool_name = _normalize_setup_tool_name(tool)
-            events_source = {
-                "tool": str(tool_name),
-                "config": str(config_path),
-            }
-            if policy_value is None:
-                policy_value = default_policy
-            events_require_exists = False
-
-        profile_value = profile
-        if profile_value == _DEFAULT_PROFILE_PATH:
-            namespace = tool_name
-            if namespace is None:
-                policy_namespace = _resolve_workflow_policy(policy=policy_value)
-                if policy_namespace is None:
-                    raise NotifyConfigError(
-                        "default profile path is ambiguous in --events mode; "
-                        "pass --policy or --profile to select a profile namespace"
-                    )
-                namespace = policy_namespace
-            profile_value = _default_profile_path_for_tool(namespace)
-
-        result = _create_wizard_profile(
+        result = _create_wizard_profile_flow(
             profile=profile_value,
             provider="slack",
-            events=events_path,
+            events=setup_resolution.events_path,
             cursor=cursor,
             only_actions=None,
             only_tools=None,
@@ -684,15 +538,24 @@ def _setup_slack_impl(
             include_context=include_context,
             include_raw_event=include_raw_event,
             tls_ca_bundle=tls_ca_bundle,
-            policy=policy_value,
+            policy=setup_resolution.policy,
             secret_source=secret_source,
             url_env=url_env,
             secret_ref=secret_ref,
             webhook_url=webhook_url,
             store_webhook=store_webhook,
             force=force,
-            events_require_exists=events_require_exists,
-            events_source=events_source,
+            events_require_exists=setup_resolution.events_require_exists,
+            events_source=setup_resolution.events_source,
+            resolve_events_path=lambda p, required: _resolve_usr_events_path(p, require_exists=required),
+            ensure_private_directory_fn=_ensure_private_directory,
+            secret_backend_available_fn=is_secret_backend_available,
+            store_secret_ref_fn=store_secret_ref,
+            write_profile_file_fn=lambda path, payload, overwrite: _write_profile_file(
+                path,
+                payload,
+                force=overwrite,
+            ),
         )
         if json_output:
             typer.echo(json.dumps({"ok": True, **result}, sort_keys=True))
