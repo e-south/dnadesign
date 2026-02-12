@@ -15,6 +15,7 @@ import importlib
 import json
 import random
 import time
+from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -96,6 +97,8 @@ _WORKFLOW_POLICY_ALIASES = {
 _WEBHOOK_SOURCES = {"env", "secret_ref"}
 _DEFAULT_WEBHOOK_ENV = "NOTIFY_WEBHOOK"
 _DEFAULT_PROFILE_PATH = Path("outputs/notify/generic/profile.json")
+_DENSEGEN_HEALTH_PROGRESS_STEP_PCT = 10
+_DENSEGEN_HEALTH_HEARTBEAT_SECONDS = 1800.0
 
 
 def _default_profile_path_for_tool(tool_name: str | None) -> Path:
@@ -494,6 +497,8 @@ def _status_for_action(action: str, *, event: dict[str, Any] | None = None) -> s
                 return "failure"
             if status in {"started", "start"}:
                 return "started"
+            if status in {"resumed", "resume"}:
+                return "running"
     if "fail" in action_norm or "error" in action_norm:
         return "failure"
     if action_norm == "init":
@@ -503,7 +508,207 @@ def _status_for_action(action: str, *, event: dict[str, Any] | None = None) -> s
     return "running"
 
 
-def _event_message(event: dict[str, Any]) -> str:
+def _event_timestamp_seconds(event: dict[str, Any]) -> float | None:
+    raw = event.get("timestamp_utc")
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    ts = raw.strip()
+    if ts.endswith("Z"):
+        ts = f"{ts[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(ts)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return float(parsed.timestamp())
+
+
+def _duration_hhmmss(seconds: float) -> str:
+    total = max(0, int(round(float(seconds))))
+    hours = total // 3600
+    minutes = (total % 3600) // 60
+    secs = total % 60
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
+
+def _to_int_or_none(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _to_float_or_none(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _densegen_metrics(event: dict[str, Any], *, required: bool) -> dict[str, Any]:
+    metrics_raw = event.get("metrics")
+    metrics = metrics_raw if isinstance(metrics_raw, dict) else {}
+    densegen_raw = metrics.get("densegen")
+    if not isinstance(densegen_raw, dict):
+        if required:
+            raise NotifyConfigError("densegen_health events require metrics.densegen object")
+        return {}
+    return densegen_raw
+
+
+def _densegen_metric_int(densegen_metrics: dict[str, Any], *, key: str) -> int:
+    value = _to_int_or_none(densegen_metrics.get(key))
+    if value is None:
+        raise NotifyConfigError(f"densegen_health metrics.densegen.{key} must be an integer")
+    return value
+
+
+def _densegen_metric_float(densegen_metrics: dict[str, Any], *, key: str) -> float:
+    value = _to_float_or_none(densegen_metrics.get(key))
+    if value is None:
+        raise NotifyConfigError(f"densegen_health metrics.densegen.{key} must be numeric")
+    return value
+
+
+def _densegen_health_signature(densegen_metrics: dict[str, Any]) -> tuple[Any, ...]:
+    quota_progress = _densegen_metric_float(densegen_metrics, key="quota_progress_pct")
+    rows_written = _densegen_metric_int(densegen_metrics, key="rows_written_session")
+    plans_attempted = _densegen_metric_int(densegen_metrics, key="plans_attempted")
+    plans_solved = _densegen_metric_int(densegen_metrics, key="plans_solved")
+    tfbs_coverage = _densegen_metric_float(densegen_metrics, key="tfbs_coverage_pct")
+    step = int(max(0.0, min(100.0, quota_progress)) // float(_DENSEGEN_HEALTH_PROGRESS_STEP_PCT))
+    return (step, round(tfbs_coverage, 2), plans_solved, plans_attempted, rows_written)
+
+
+def _should_emit_densegen_running_health(
+    *,
+    run_id: str,
+    densegen_metrics: dict[str, Any],
+    event_ts_seconds: float | None,
+    state: dict[str, dict[str, Any]],
+) -> bool:
+    quota_progress = _densegen_metric_float(densegen_metrics, key="quota_progress_pct")
+    quota_step = int(max(0.0, min(100.0, quota_progress)) // float(_DENSEGEN_HEALTH_PROGRESS_STEP_PCT))
+    now_seconds = float(event_ts_seconds) if event_ts_seconds is not None else float(time.time())
+    entry = state.get(run_id) or {}
+    last_step_raw = entry.get("last_step")
+    last_step = int(last_step_raw) if last_step_raw is not None else -1
+    last_sent_raw = entry.get("last_sent")
+    last_sent = float(last_sent_raw) if last_sent_raw is not None else None
+
+    step_trigger = quota_step > last_step
+    heartbeat_trigger = last_sent is None or (now_seconds - last_sent) >= float(_DENSEGEN_HEALTH_HEARTBEAT_SECONDS)
+    if not step_trigger and not heartbeat_trigger:
+        return False
+
+    signature = _densegen_health_signature(densegen_metrics)
+    last_signature = entry.get("last_signature")
+    if signature == last_signature and not heartbeat_trigger:
+        return False
+
+    state[run_id] = {
+        "last_step": max(last_step, quota_step),
+        "last_sent": now_seconds,
+        "last_signature": signature,
+    }
+    return True
+
+
+def _densegen_health_message(
+    *,
+    event: dict[str, Any],
+    run_id: str,
+    duration_seconds: float | None,
+) -> str:
+    dataset_raw = event.get("dataset")
+    dataset = dataset_raw if isinstance(dataset_raw, dict) else {}
+    dataset_name = str(dataset.get("name") or "unknown-dataset")
+    args_raw = event.get("args")
+    args = args_raw if isinstance(args_raw, dict) else {}
+    status = str(args.get("status") or "running").strip().lower()
+    densegen_required = status in {"running", "completed", "complete", "success", "succeeded"}
+    densegen_metrics = _densegen_metrics(event, required=densegen_required)
+
+    if status in {"started", "start"}:
+        lines = [f"DenseGen started | run={run_id} | dataset={dataset_name}"]
+        if densegen_metrics:
+            run_quota = _to_int_or_none(densegen_metrics.get("run_quota"))
+            if run_quota is not None:
+                lines.append(f"- Quota: {run_quota} rows")
+        return "\n".join(lines)
+
+    if status in {"resumed", "resume"}:
+        lines = [f"DenseGen resumed | run={run_id} | dataset={dataset_name}"]
+        if densegen_metrics:
+            quota_progress = _to_float_or_none(densegen_metrics.get("quota_progress_pct"))
+            rows_written = _to_int_or_none(densegen_metrics.get("rows_written_session"))
+            run_quota = _to_int_or_none(densegen_metrics.get("run_quota"))
+            if quota_progress is not None and rows_written is not None and run_quota is not None:
+                lines.append(f"- Progress: {quota_progress:.1f}% ({rows_written}/{run_quota} rows)")
+        return "\n".join(lines)
+
+    if status in {"failed", "failure", "error"}:
+        stage = str(args.get("plan") or args.get("input_name") or "densegen_health")
+        error_text = str(args.get("error") or "").strip()
+        lines = [f"DenseGen failed | run={run_id} | dataset={dataset_name}"]
+        lines.append(f"- Stage: {stage}")
+        if error_text:
+            lines.append(f"- Error: {error_text}")
+        return "\n".join(lines)
+
+    if status in {"completed", "complete", "success", "succeeded"}:
+        run_quota = _densegen_metric_int(densegen_metrics, key="run_quota")
+        rows_written = _densegen_metric_int(densegen_metrics, key="rows_written_session")
+        quota_progress = _densegen_metric_float(densegen_metrics, key="quota_progress_pct")
+        tfbs_total = _densegen_metric_int(densegen_metrics, key="tfbs_total_library")
+        tfbs_used = _densegen_metric_int(densegen_metrics, key="tfbs_unique_used")
+        tfbs_coverage = _densegen_metric_float(densegen_metrics, key="tfbs_coverage_pct")
+        plans_attempted = _densegen_metric_int(densegen_metrics, key="plans_attempted")
+        plans_solved = _densegen_metric_int(densegen_metrics, key="plans_solved")
+        success_pct = (float(plans_solved) / float(plans_attempted) * 100.0) if plans_attempted > 0 else 0.0
+        elapsed = _to_float_or_none(densegen_metrics.get("run_elapsed_seconds"))
+        if elapsed is None:
+            elapsed = duration_seconds
+        lines = [f"DenseGen complete | run={run_id} | dataset={dataset_name}"]
+        if elapsed is not None:
+            lines.append(f"- Duration: {_duration_hhmmss(elapsed)}")
+        lines.append(f"- Final quota: {quota_progress:.1f}% ({rows_written}/{run_quota} rows)")
+        lines.append(f"- Final TFBS coverage: {tfbs_coverage:.1f}% ({tfbs_used}/{tfbs_total})")
+        lines.append(f"- Final plan success: {plans_solved}/{plans_attempted} ({success_pct:.1f}%)")
+        return "\n".join(lines)
+
+    run_quota = _densegen_metric_int(densegen_metrics, key="run_quota")
+    rows_written = _densegen_metric_int(densegen_metrics, key="rows_written_session")
+    quota_progress = _densegen_metric_float(densegen_metrics, key="quota_progress_pct")
+    tfbs_total = _densegen_metric_int(densegen_metrics, key="tfbs_total_library")
+    tfbs_used = _densegen_metric_int(densegen_metrics, key="tfbs_unique_used")
+    tfbs_coverage = _densegen_metric_float(densegen_metrics, key="tfbs_coverage_pct")
+    plans_attempted = _densegen_metric_int(densegen_metrics, key="plans_attempted")
+    plans_solved = _densegen_metric_int(densegen_metrics, key="plans_solved")
+    success_pct = (float(plans_solved) / float(plans_attempted) * 100.0) if plans_attempted > 0 else 0.0
+    elapsed = _to_float_or_none(densegen_metrics.get("run_elapsed_seconds"))
+    if elapsed is None:
+        elapsed = duration_seconds
+    lines = [f"DenseGen health | run={run_id} | dataset={dataset_name}"]
+    lines.append(f"- Quota: {quota_progress:.1f}% ({rows_written}/{run_quota} rows)")
+    lines.append(f"- TFBS library coverage: {tfbs_coverage:.1f}% ({tfbs_used}/{tfbs_total})")
+    lines.append(f"- Plan success: {plans_solved}/{plans_attempted} ({success_pct:.1f}%)")
+    if elapsed is not None:
+        lines.append(f"- Runtime: {_duration_hhmmss(elapsed)}")
+    return "\n".join(lines)
+
+
+def _event_message(
+    event: dict[str, Any],
+    *,
+    run_id: str,
+    duration_seconds: float | None,
+) -> str:
     action = str(event.get("action") or "event")
     dataset_raw = event.get("dataset")
     dataset = dataset_raw if isinstance(dataset_raw, dict) else {}
@@ -514,37 +719,7 @@ def _event_message(event: dict[str, Any]) -> str:
     args = args_raw if isinstance(args_raw, dict) else {}
 
     if action == "densegen_health":
-        status = str(args.get("status") or "running")
-        rows_written_session = metrics.get("rows_written_session")
-        run_quota = metrics.get("run_quota")
-        quota_progress = metrics.get("quota_progress_pct")
-        compression = metrics.get("compression_ratio")
-        flush_count = metrics.get("flush_count")
-        plan = args.get("plan")
-        input_name = args.get("input_name")
-        library_index = args.get("sampling_library_index")
-        parts = [f"densegen {status} on {dataset_name}"]
-        if rows_written_session is not None and run_quota is not None:
-            parts.append(f"rows={rows_written_session}/{run_quota}")
-        elif rows_written_session is not None:
-            parts.append(f"rows={rows_written_session}")
-        if quota_progress is not None:
-            parts.append(f"quota={float(quota_progress):.1f}%")
-        if plan:
-            parts.append(f"plan={plan}")
-        if input_name:
-            parts.append(f"input={input_name}")
-        if library_index is not None:
-            parts.append(f"library={library_index}")
-        if flush_count is not None:
-            parts.append(f"flushes={flush_count}")
-        if compression is not None:
-            parts.append(f"cr={float(compression):.3f}")
-        error_text = str(args.get("error") or "").strip()
-        status_norm = status.strip().lower()
-        if error_text and status_norm in {"failed", "failure", "error"}:
-            parts.append(f"error={error_text}")
-        return " | ".join(parts)
+        return _densegen_health_message(event=event, run_id=run_id, duration_seconds=duration_seconds)
 
     if action == "densegen_flush_failed":
         error_type = args.get("error_type")
@@ -1350,6 +1525,8 @@ def _usr_events_watch_impl(
             raise NotifyConfigError(f"unsupported on-invalid-event mode '{on_invalid_event}'")
 
         should_advance_cursor = (not dry_run) or bool(advance_cursor_on_dry_run)
+        densegen_started_at: dict[str, float] = {}
+        densegen_running_state: dict[str, dict[str, Any]] = {}
 
         def _save_cursor_if_enabled(next_offset: int) -> None:
             if should_advance_cursor:
@@ -1407,11 +1584,42 @@ def _usr_events_watch_impl(
                     raise NotifyConfigError("event missing actor.run_id; provide --run-id to override")
 
                 status_value = _status_for_action(action, event=event)
+                densegen_duration_seconds: float | None = None
+                if action == "densegen_health":
+                    args_raw = event.get("args")
+                    args = args_raw if isinstance(args_raw, dict) else {}
+                    densegen_status = str(args.get("status") or "").strip().lower()
+                    event_ts_seconds = _event_timestamp_seconds(event)
+                    if densegen_status in {"started", "start"} and event_ts_seconds is not None:
+                        densegen_started_at[str(run_value)] = event_ts_seconds
+                    elif densegen_status in {"resumed", "resume"} and event_ts_seconds is not None:
+                        densegen_started_at.setdefault(str(run_value), event_ts_seconds)
+
+                    if densegen_status in {"running"}:
+                        densegen_metrics = _densegen_metrics(event, required=True)
+                        if not _should_emit_densegen_running_health(
+                            run_id=str(run_value),
+                            densegen_metrics=densegen_metrics,
+                            event_ts_seconds=event_ts_seconds,
+                            state=densegen_running_state,
+                        ):
+                            _save_cursor_if_enabled(next_offset)
+                            continue
+
+                    if densegen_status in {"completed", "complete", "success", "succeeded"}:
+                        start_seconds = densegen_started_at.get(str(run_value))
+                        if start_seconds is not None and event_ts_seconds is not None:
+                            densegen_duration_seconds = max(0.0, float(event_ts_seconds - start_seconds))
                 payload = build_payload(
                     status=status_value,
                     tool=tool_name,
                     run_id=run_value,
-                    message=message or _event_message(event),
+                    message=message
+                    or _event_message(
+                        event,
+                        run_id=str(run_value),
+                        duration_seconds=densegen_duration_seconds,
+                    ),
                     meta=_event_meta(
                         event,
                         include_args=bool(include_args_value),

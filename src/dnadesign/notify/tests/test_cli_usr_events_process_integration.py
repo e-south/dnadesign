@@ -167,6 +167,18 @@ def test_watch_process_resumes_after_interrupt_without_duplicate_posts(tmp_path:
 
         terminal_event = _event(action="densegen_health")
         terminal_event["args"] = {"status": "completed"}
+        terminal_event["metrics"] = {
+            "densegen": {
+                "run_quota": 10,
+                "rows_written_session": 10,
+                "quota_progress_pct": 100.0,
+                "tfbs_total_library": 4,
+                "tfbs_unique_used": 4,
+                "tfbs_coverage_pct": 100.0,
+                "plans_attempted": 3,
+                "plans_solved": 3,
+            }
+        }
         _append_events(events, [terminal_event])
 
         proc2 = _spawn_watch_process(
