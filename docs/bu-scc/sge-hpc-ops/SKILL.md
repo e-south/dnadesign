@@ -42,6 +42,7 @@ Not for:
 - **Bound watchers.** Never create unbounded loops without a stop/teardown rule.
 - **Gate submissions.** Do not run real `qsub` until verify and runtime prechecks pass.
 - **Re-probe when context changes.** If login host/site context changes, regenerate the capability map before new commands.
+- **Use an explicit interactive state machine.** Never "try again" silently; every submit/reattach decision must be state-driven and user-visible.
 
 ## Operator objects to maintain
 
@@ -52,6 +53,7 @@ A small mapping that records what *this* cluster supports and the correct resour
 Minimum fields (extend as needed):
 - `accounting`: `{ supported: bool, flag: "-P" | "-A" | ..., notes }`
 - `interactive_cmd`: `"qrsh"` or `"qlogin"` (or unsupported)
+- `interactive_cmd_capabilities`: `{ qrsh: { supports: [...] }, qlogin: { supports: [...] }, notes }`
 - `pe`: `{ supported: bool, flag: "-pe", names: [...], default_pe }`
 - `walltime`: `{ supported: bool, key: "h_rt"|..., examples }`
 - `memory`: `{ supported: bool, style: "per_core"|"total", key: "mem_per_core"|..., examples }`
@@ -63,13 +65,68 @@ Minimum fields (extend as needed):
 
 ### 2) Run handle (per job/session)
 
-- `mode`: `interactive` | `batch`
-- `job_id` (batch) or `session_id` (interactive/OnDemand)
+- `mode`: `interactive_cli_qrsh` | `interactive_ondemand_duo` | `batch`
+- `queue_safe`: `true|false` (default `true` for interactive)
+- `intent`: `rejoinable` | `direct_exec` | `unknown`
+- `job_id` (batch/qrsh) or `session_id` (OnDemand/UI tracking id if available)
 - `job_name`
 - `workdir`
+- `submit_time_utc`
+- `state` (`qw`/`r`/`Eqw`/`done`/`unknown`)
+- `queue`
 - `log_path` (stdout/stderr)
 - `exec_host` (if discoverable)
+- `fingerprint`: `{ account_or_project, pe_slots, mem_request, walltime_request, cwd, mode, intent }`
+- `auth_state`: `not_required` | `pending_user_confirmation` | `pending_verification` | `verified` | `unknown`
+- `recovery_attempts`: integer (for guarded retry accounting)
+- `last_seen_utc`
 - `watchers`: list of watcher subprocesses with **timeout + teardown plan**
+
+### 3) Interactive request fingerprint (mandatory)
+
+Define a request fingerprint before interactive submission:
+- `account_or_project` (exact selected accounting value)
+- `pe_slots` (PE name + slots, or `none`)
+- `mem_request` (exact resource key/value tuple, or `none`)
+- `walltime_request` (exact key/value tuple, or `none`)
+- `cwd` (resolved absolute working directory)
+- `mode` (`interactive_cli_qrsh` or `interactive_ondemand_duo`)
+- `intent` (`rejoinable` or `direct_exec`)
+
+Matching contract:
+- A "matching interactive job" must match all non-empty fingerprint fields.
+- If multiple matches exist, stop and ask user which handle to continue with.
+- If no exact match exists, treat as non-match (do not reuse).
+
+### 4) Interactive state machine (mandatory)
+
+Use this finite-state flow for all interactive requests:
+
+1. `route_intent`: choose mode from user intent:
+   - `rejoinable` => `interactive_ondemand_duo`
+   - `direct_exec` => `interactive_cli_qrsh`
+2. `derive_fingerprint`: compute the full request fingerprint after mode/intent are known.
+3. `detect_existing`: inspect `qstat -u "$USER"` and classify fingerprint-matching interactive jobs (`qw`/`r`/none).
+4. `submit_once` (qrsh mode only): if no matching job exists, submit exactly one request with `-now n`.
+5. `wait_bounded`: watch only the tracked job id (no new submissions), bounded by timeout.
+6. `attach_or_handshake`:
+   - qrsh mode: attach when state becomes `r`
+   - OnDemand mode: pause for user confirmation after Duo
+7. `post_handshake_verify` (OnDemand mode): set `auth_state=pending_verification` and require a verification check before claiming the session is active.
+8. `interrupted_recover`: on next turn, always re-run `detect_existing` before any new submit.
+9. `orphan_decision`: if orphaned/unusable, ask user `keep` vs `qdel`.
+10. `guarded_retry_once`: allow one retry only when all conditions hold:
+   - explicit reason is reported (for example client interruption, scheduler transient)
+   - same fingerprint is reused
+   - user confirms retry in this turn
+   - `recovery_attempts` has not exceeded one
+11. `closed`: after clean `exit`/completion, confirm with `qstat -u "$USER"`.
+
+State-machine hard rules:
+- Never submit a second interactive request by default.
+- Use only `guarded_retry_once` for one retry under explicit conditions.
+- Never try queue-bypass/priority tricks unless user explicitly asks.
+- Always report the tracked handle (`mode`, `job_id/session_id`, `state`, `queue`, `exec_host`, `last_seen_utc`) in updates.
 
 ## Step 0: Mandatory capability probe (before giving commands)
 
@@ -152,6 +209,15 @@ qmod -help 2>&1 | grep -E -- '-cj|clear' || true
 qacct -help 2>&1 | sed -n '1,60p' || true
 ```
 
+### Probe F: interactive command option capabilities (mandatory for interactive commands)
+
+Do not assume `qrsh` and `qlogin` share the same options. Build `interactive_cmd_capabilities` from help output.
+
+```bash
+qrsh -help 2>&1 | sed -n '1,120p' || true
+qlogin -help 2>&1 | sed -n '1,120p' || true
+```
+
 ## Step 0.5: Capability snapshot output (mandatory before command generation)
 
 Before proposing interactive or batch commands, print a compact capability snapshot for the current host.
@@ -163,6 +229,7 @@ Capability snapshot
 - host: <hostname>
 - scheduler_tools: qsub=<yes/no> qstat=<yes/no> qdel=<yes/no>
 - interactive_cmd: <qrsh|qlogin|unknown>
+- interactive_cmd_capabilities: qrsh=<supported|unknown> qlogin=<supported|unknown>
 - accounting_flag: <none|-P|-A|both(choose -P for BU SCC)>
 - pe_known: <yes/no> default_pe=<name|unknown>
 - walltime_key: <h_rt|unknown>
@@ -182,6 +249,9 @@ If unknowns remain, call them out and use the safe-default flow.
 - debugging environment issues
 - iterating quickly
 - you need a real shell "inside the node" as the primary workspace
+- you need either:
+  - agent-controlled command execution (`interactive_cli_qrsh`)
+  - user-authenticated reconnectability (`interactive_ondemand_duo`)
 
 ### Choose batch when:
 
@@ -189,6 +259,19 @@ If unknowns remain, call them out and use the safe-default flow.
 - you need restart safety + durable logs
 - you want deterministic scheduler-managed resources
 - you want to run watchers/daemons without keeping an interactive terminal open
+
+### Interactive intent routing (mandatory)
+
+Route interactive requests by stated intent before generating commands:
+
+- If user says "must be rejoinable", "browser/portal is fine", or equivalent:
+  - route to `interactive_ondemand_duo`
+  - do not default to plain `qrsh`
+- If user says agent must execute commands directly in the allocation:
+  - route to `interactive_cli_qrsh`
+  - explicitly warn this path is less reconnectable after client interruption
+- If intent is unclear:
+  - ask one short routing question before submitting anything
 
 ## Step 2: Pick a workload pattern (portable categories)
 
@@ -225,28 +308,44 @@ Then escalate once the site's resource vocabulary is confirmed.
 
 ## Interactive sessions (portable)
 
-### Interactive command selection
+### Interactive mode summary
 
-- Prefer `qrsh` when available.
-- Else use `qlogin` if that's the site's interactive entrypoint.
-- Else use site UI (e.g. OnDemand) if provided (site-specific; see references).
+| User intent | Mode | Authentication path | Reconnectability | Primary control |
+|---|---|---|---|---|
+| agent executes commands directly in allocation | `interactive_cli_qrsh` | scheduler CLI (`qrsh`/`qlogin`) | lower (client interruption can break attach) | agent |
+| session should be rejoinable | `interactive_ondemand_duo` | browser + Duo via OnDemand | higher (portal-managed sessions) | user + portal |
 
-### Generic interactive template (fill from capability map)
+### Queue-safe policy (`queue_safe=true`, default)
+
+Before any interactive submit:
 
 ```bash
-# ACCOUNT_ARG may be empty if unknown / not required
-# PE_ARG may be empty if PE unknown (then you are effectively single-core)
-# WALLTIME_ARG may be empty if walltime key is unknown and site default is acceptable
-<interactive_cmd> \
-  <ACCOUNT_ARG> \
-  <WALLTIME_ARG> \
-  <PE_ARG> \
-  <MEM_ARG> \
-  -cwd \
-  -now n
+qstat -u "$USER"
 ```
 
-**Inside the interactive node**, print minimal provenance to the log/output:
+Rules:
+- If a fingerprint-matching interactive request is already `qw`/`r`, reuse/watch it; do not submit another.
+- If none exists and mode is `interactive_cli_qrsh`, submit exactly one interactive request.
+- If mode is `interactive_ondemand_duo`, run handshake + verification instead of scheduler submit.
+- Use `-now n` and bounded polling (default 20s interval, 600s max) for queue patience.
+- Never resubmit automatically on timeout.
+- If timeout/recovery is needed, use `guarded_retry_once` with explicit reason + same fingerprint + user confirmation.
+
+### Mode A: `interactive_cli_qrsh` (agent-controlled, less reconnectable)
+
+Use when the user wants the agent to execute commands directly in the interactive allocation.
+
+Command template:
+
+```bash
+# Build flags from interactive_cmd_capabilities; do not assume qlogin/qrsh parity.
+# ACCOUNT_ARG may be empty if unknown / not required.
+# PE_ARG may be empty if PE unknown (then you are effectively single-core).
+# WALLTIME_ARG may be empty if walltime key is unknown and site default is acceptable.
+<interactive_cmd> <supported_flags_only> <ACCOUNT_ARG> <WALLTIME_ARG> <PE_ARG> <MEM_ARG>
+```
+
+After attach, print minimal provenance:
 
 ```bash
 hostname
@@ -255,6 +354,95 @@ date
 echo "NSLOTS=${NSLOTS:-unset}"
 echo "TMPDIR=${TMPDIR:-unset}"
 ```
+
+Recovery note:
+- if the controlling client is interrupted, this mode may lose attachability; treat recovery as `detect_existing` + explicit `keep|qdel` decision.
+
+### Mode B: `interactive_ondemand_duo` (human-authenticated, reconnect-friendly)
+
+Use when the user prioritizes reconnectability and accepts browser-based authentication.
+
+Handshake contract:
+1. Agent provides OnDemand URL and exact next steps.
+2. User performs login + Duo in browser.
+3. Agent pauses and waits for explicit user confirmation:
+   - `Duo approved and session started`
+4. Agent sets `auth_state=pending_verification` and runs verification checks.
+5. Agent proceeds only after verification succeeds (`auth_state=verified`), else reports `unverified` and asks for next action.
+
+Recommended BU endpoint:
+- `https://scc-ondemand.bu.edu/`
+
+Important constraints:
+- agent cannot complete Duo itself
+- agent cannot inherit browser-authenticated session cookies
+- agent must wait for user confirmation before proceeding with OnDemand-dependent actions
+
+#### OnDemand verification rubric (mandatory)
+
+Purpose:
+- prevent false-positive "session started" claims
+- preserve queue discipline (no hidden replacement submits)
+- keep user interaction explicit and low-friction
+
+Verification states:
+- `pending_user_confirmation`: waiting for user to complete Duo/login
+- `pending_verification`: user confirmed, evidence threshold not yet met
+- `verified`: evidence threshold met
+- `unverified`: verification failed or timed out
+- `unknown`: evidence is partial or ambiguous
+
+Evidence sources:
+- `E1_USER_CONFIRM` (required): user states `Duo approved and session started`
+- `E2_PORTAL_SESSION`: OnDemand session metadata (session/app id, app type, start time, state)
+- `E3_SCHEDULER_MATCH`: `qstat -u "$USER"` shows a job consistent with fingerprint and time window
+- `E4_EXEC_PROOF`: user provides in-session proof (`hostname`, `pwd`, `date`)
+
+Verification threshold:
+- set `auth_state=verified` only when all conditions hold:
+  - `E1_USER_CONFIRM` is present
+  - at least one of `E2_PORTAL_SESSION` or `E3_SCHEDULER_MATCH` is present
+  - if multiple candidate sessions exist, require `E4_EXEC_PROOF` or explicit user selection of a session id
+- otherwise keep `auth_state=pending_verification` or set `auth_state=unknown`
+
+Failure codes:
+- `VFY-001`: user confirmation missing
+- `VFY-002`: no portal/scheduler evidence after confirmation
+- `VFY-003`: evidence does not match fingerprint (project/resources/cwd/mode/intent)
+- `VFY-004`: multiple candidate sessions; identity unresolved
+- `VFY-005`: verification timeout reached
+
+UX contract:
+- ask for one action per turn
+- always show a compact status card:
+  - `mode`, `auth_state`, `fingerprint_summary`, `candidate_sessions`, `next_required_action`
+- use bounded waits for verification polling (default 20s interval, 600s max)
+- never claim active session ownership before `auth_state=verified`
+- never auto-submit replacement interactive requests while verification is unresolved
+
+User prompts:
+- auth prompt: `Please complete Duo and start the OnDemand session. Reply: done.`
+- identity prompt: `I found multiple candidates. Reply with session number: 1 or 2.`
+- proof prompt: `Run hostname; pwd; date in the new session and paste output.`
+- timeout prompt: `Verification timed out (VFY-005). Reply: retry verify, keep waiting, or cancel.`
+
+Post-confirmation verification rules:
+- Use best-effort evidence from portal metadata, scheduler visibility, and user-provided session proof.
+- Treat verification as successful only when threshold conditions are satisfied and attributable to this run handle.
+- If evidence is missing, keep `auth_state=pending_verification`, report failure code, and request one concrete next action.
+
+### Interruption recovery (mandatory)
+
+At the start of every turn that touches interactive state:
+
+```bash
+qstat -u "$USER"
+```
+
+Then:
+- if tracked job exists (`qw`/`r`), continue watching/using that handle
+- if no tracked job exists, set interactive status to `ended_or_unknown`
+- if job exists but appears unusable/orphaned, ask user: `keep` or `qdel <job_id>`
 
 ## Batch submission (portable)
 
@@ -385,6 +573,7 @@ qstat -u "$USER" | grep -E 'qrsh|qlogin|interact' || true
 
 Interpretation rule:
 - if `qstat -u "$USER"` returns no job rows and no command error, treat this as "no active jobs for this user", not as a probe failure.
+- name-based filters are advisory only; do not use them as sole proof of absence/presence.
 
 For web portal sessions (for example OnDemand), include a best-effort name filter and then use platform docs for authoritative session control:
 
@@ -396,12 +585,15 @@ Ambiguity contract (interactive-sensitive tasks):
 - if `qstat -u "$USER"` is empty and session status matters, set `session_status=unknown` (not `none`)
 - consult BU OnDemand session docs via `../README.md`
 - ask the user to confirm active portal sessions before launching a new interactive session
-- hard-stop interactive launch until status is confirmed
+- by default, pause launch while status is unresolved
+- if user explicitly requests to proceed despite unresolved status, allow one launch attempt with full risk note and fingerprint tracking
+- do not submit replacement interactive requests automatically while status is unresolved
 
 ### Start and stop gracefully
 
 Start:
-- interactive: launch `qrsh`/`qlogin` per capability map
+- interactive (agent-controlled): launch `qrsh`/`qlogin` per capability map and `queue_safe=true`
+- interactive (rejoinable): use OnDemand + Duo handshake, then require post-confirmation verification before continuing
 - batch: submit with `qsub` and capture job id
 
 Stop:
@@ -647,3 +839,8 @@ When executing this skill against a real cluster, return concise didactic update
 4. **Risk/unknowns:** what remains unconfirmed and how to resolve it
 
 Keep updates brief, specific, and operational. Do not return raw command dumps without interpretation.
+
+Interactive session reporting requirements:
+- Always include current run handle fields (`mode`, `job_id/session_id`, `state`, `queue`, `exec_host`, `last_seen_utc`).
+- Always include request fingerprint summary (`account_or_project`, `pe_slots`, `mem_request`, `walltime_request`, `cwd`, `mode`, `intent`).
+- When Duo/user auth is required, set status to `pending_user_confirmation`, then `pending_verification`, and proceed only after `verified`.

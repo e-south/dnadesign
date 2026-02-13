@@ -154,3 +154,50 @@
 - Completed documentation alignment pass for Notify + USR after refactors so command examples and architecture narrative reflect current behavior.
 - Completed a didactic clarity pass to expand dense acronym-heavy prose in operator guides while preserving executable command syntax and environment variable names.
 - Current branch state after the above: `dev/densegen-hpc-patching` remains the active working branch for this stream of changes.
+
+## 2026-02-13
+- Investigated rejoin behavior for BU SCC interactive sessions after client-side interruptions from the agent harness.
+- Prior state and evidence:
+  - `qstat -u esouth` was empty at check time, so there was no active interactive job to rejoin.
+  - `qacct -j 3125614` showed:
+    - `qsub_time`: `Fri Feb 13 14:07:21 2026`
+    - `start_time`: `Fri Feb 13 14:10:42 2026`
+    - `end_time`: `Fri Feb 13 14:10:44 2026`
+    - `failed=100` and `exit_status=129`
+  - Interpretation of this record is consistent with abrupt client/session termination rather than a clean shell exit.
+- Reattach mechanism experiment (`qrsh -inherit`) from login context:
+  - `qrsh -help` confirms `-inherit` is supported.
+  - Attempt with explicit job id argument failed because required environment values were absent from login shell.
+  - Follow-up attempts with `JOB_ID` and `SGE_TASK_ID` set still failed to provide a reliable terminal reattach flow.
+  - Conclusion: `qrsh -inherit` is useful for job-context command execution but was not a dependable "reattach old interactive terminal" mechanism in this agent/login context.
+- Capability snapshot captured from probes on `scc1`:
+  - `scheduler_tools`: `qsub=yes`, `qstat=yes`, `qdel=yes`, `qmod=yes`, `qacct=yes`
+  - `interactive_cmd`: `qrsh` (and `qlogin` available)
+  - `accounting_flag`: both `-P` and `-A` visible; BU guidance remains `-P <project>`
+  - `pe_known`: yes (`omp*`, `mpi*`)
+  - `walltime_key`: `h_rt`
+  - `memory_key`: `mem_per_core` (also `h_vmem`, `mem_free`)
+  - `gpu_keys`: includes `gpus` plus capability complexes (`gpu_c`, `gpu_m`, `gpu_t`, `gpu_dp`)
+  - `transfer_key`: `download`
+  - `lifecycle`: `qdel=yes`, `qmod -cj=yes`, `qacct=yes`
+  - `unknowns`: `ssh_to_compute_allowed` (policy not confirmed in this session)
+- Safe OnDemand interactive-session experiment (no compute job submissions):
+  - Goal: validate whether an OnDemand-backed reconnectable control plane is reachable from this environment and whether it can be started non-interactively.
+  - Baseline checks:
+    - `qstat -u esouth | grep -E 'ood-|ood_|ondemand|jupyter|rstudio|desktop'` returned no active OnDemand-pattern jobs.
+    - No local `ood` or `ondemand` CLI entrypoint was present; no `ondemand` module was available via `module avail`.
+  - Web-path probes:
+    - `curl -I https://scc-ondemand.bu.edu/` returned `301` to `https://scc-ondemand1.bu.edu:443/`.
+    - `curl -I https://scc-ondemand1.bu.edu/pun/sys/dashboard` returned `302` redirect to BU Shibboleth SAML login flow (`https://shib.bu.edu/...`).
+    - `curl -L` with cookie jar reached BU login HTML ("Boston University | Login"), confirming portal reachability and web-auth requirement.
+  - Post-check:
+    - `qstat -u esouth` remained empty; no accidental interactive job/session was launched by probe traffic.
+- Consolidated interpretation:
+  - In this harness, interrupting the agent can terminate the attached `qrsh` client process.
+  - Plain `qrsh` sessions should be treated as non-rejoinable after client loss from this control path.
+  - OnDemand is the safer reconnectable interactive UX for humans because session state is mediated by web auth/session management rather than a single CLI client process.
+  - Non-interactive probes can verify OnDemand endpoint reachability and auth redirects, but creating/continuing a real OnDemand interactive session requires authenticated browser steps (including Duo).
+- Operational guidance recorded for future runs:
+  - Use `qsub` batch for long or interruption-sensitive workflows.
+  - Use OnDemand for reconnectable human-interactive workflows.
+  - If an interactive job is orphaned and unusable, explicitly clean with `qdel <job_id>` before requesting a replacement allocation.
