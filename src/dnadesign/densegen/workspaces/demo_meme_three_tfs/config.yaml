@@ -212,9 +212,10 @@ densegen:
               min_required: 1
 
   solver:
-    backend: CBC
+    backend: GUROBI
     strategy: iterate
     time_limit_seconds: 5
+    threads: 16
 
   runtime:
     round_robin: true
