@@ -23,6 +23,7 @@ from .sfxi_math import (
     logic_fidelity,
     parse_setpoint_vector,
     weights_from_setpoint,
+    worst_corner_distance,
 )
 
 
@@ -103,6 +104,7 @@ def _parse_scaling_cfg(raw: Any) -> Tuple[int, int, float]:
     produces=[
         "objective/<self>/denom_percentile",
         "objective/<self>/denom_value",
+        "objective/<self>/scalar_uncertainty",
     ],
 )
 @register_objective("sfxi_v1")
@@ -112,7 +114,12 @@ def sfxi_v1(
     params: Dict[str, Any],
     ctx: Optional[PluginCtx] = None,
     train_view=None,
+    var: np.ndarray,
 ) -> ObjectiveResult:
+        
+    var = np.asarray(var, dtype=float) if var is not None else None
+    var = var**2 if var is not None else None
+
     # assert y_pred dims
     if not (isinstance(y_pred, np.ndarray) and y_pred.ndim == 2 and y_pred.shape[1] >= 8):
         raise ValueError(f"[sfxi_v1] Expected y_pred shape (n, 8+); got {getattr(y_pred, 'shape', None)}.")
@@ -189,6 +196,51 @@ def sfxi_v1(
         "all_off_setpoint": bool(intensity_disabled),
     }
 
+    # ---- creating scalar uncertainty ----
+    if var is not None:
+        # Starting with effect intensity (because it is a lot easier)
+        effect_var_unwt = (np.exp2(var[:, 4:8]) - 1)*np.exp2(var[:, 4:8]+2*y_pred[:, 4:8])
+        effect_var = np.sum(np.multiply(effect_var_unwt, w**2), axis=1)
+        effect_var = effect_var / (denom**2)
+        effect_exp = np.sum(np.multiply(np.exp2(y_pred[:, 4:8] + var[:, 4:8]/2), w), axis=1) / denom
+        # y_lin = (np.exp2(y_pred[:, 4:8])*np.log(2))**2
+        # var = np.asarray(var, dtype=float)
+        # ind_var = np.multiply(y_lin, var[:, 4:8])
+        # wt_var = np.multiply(ind_var, w**2)
+        # effect_var = np.sum(wt_var, axis = 1)
+        # effect_exp = np.sum(np.multiply(w, np.exp2(y_pred[:, 4:8])), axis=1)
+        # Now on to logic fidelity
+        c = 1/(worst_corner_distance(setpoint)**4)
+        ph2 = 4*(y_pred[:,0:4]**2)*var[:,0:4] + 4*(setpoint**2)*var[:,0:4] \
+                + 2*(var[:,0:4]**2) - 8*y_pred[:,0:4]*setpoint*var[:,0:4]
+        lf_var = c * np.sum(ph2, axis=1)
+        lf_exp = c * np.sum((y_pred[:,0:4]**2 + var[:,0:4] - (2*y_pred[:,0:4] * setpoint ) + setpoint**2), axis=1)
+        # Combine into scalar uncertainty
+        scalar_uncertainty = effect_var * lf_var + effect_var * lf_exp**2 + lf_var * effect_exp**2
+
+        """
+        N = 1000
+        rng = np.random.default_rng()
+        samples = rng.normal(loc = y_pred, scale = np.sqrt(var), size = (N, y_pred.shape[0], y_pred.shape[1]))
+        s_scores = np.zeros((N, y_pred.shape[0]), dtype = float)
+        for i in range(N):
+            SE_raw, _ = effect_raw_from_y_star(
+            samples[i,:,4:8],
+            setpoint,
+            delta=delta,
+            eps=1e-12,
+            state_order=STATE_ORDER,)
+            SE_scaled = effect_scaled(SE_raw, float(denom))
+            S_LF = logic_fidelity(samples[i,:,0:4], setpoint)
+            s_scores[i,:] = S_LF**beta * SE_scaled**gamma
+            
+        scalar_uncertainty = np.var(s_scores, axis = 0, ddof = 1)
+        """
+
+    else:
+        scalar_uncertainty = None
+    ctx.set("objective/<self>/scalar_uncertainty", scalar_uncertainty)
+
     # Emit optional, named summary stats so the runner can log them generically
     try:
         clip_hi_frac = float(np.mean(diagnostics["clip_hi_mask"])) if "clip_hi_mask" in diagnostics else 0.0  # type: ignore[index]
@@ -207,6 +259,6 @@ def sfxi_v1(
 
     return ObjectiveResult(
         score=np.asarray(score, dtype=float).ravel(),
-        scalar_uncertainty=None,
+        scalar_uncertainty=scalar_uncertainty,
         diagnostics=diagnostics,
     )
