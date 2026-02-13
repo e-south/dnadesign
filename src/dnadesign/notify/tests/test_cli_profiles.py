@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import shlex
 from pathlib import Path
 
 import pytest
@@ -114,6 +115,42 @@ def test_profile_init_writes_infer_evo2_policy_defaults(tmp_path: Path) -> None:
     assert data["policy"] == "infer_evo2"
     assert data["only_tools"] == "infer"
     assert data["only_actions"] == "attach,materialize"
+
+
+def test_profile_init_resolves_runtime_paths_from_cli_cwd(tmp_path: Path, monkeypatch) -> None:
+    events = tmp_path / "events.log"
+    profile = tmp_path / "profiles" / "notify.profile.json"
+    _write_events(events, [_event()])
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir(parents=True, exist_ok=True)
+    monkeypatch.chdir(workspace)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "profile",
+            "init",
+            "--profile",
+            str(profile),
+            "--provider",
+            "slack",
+            "--url-env",
+            "DENSEGEN_WEBHOOK",
+            "--events",
+            str(events),
+            "--cursor",
+            "outputs/notify/densegen/cursor",
+            "--spool-dir",
+            "outputs/notify/densegen/spool",
+        ],
+    )
+
+    assert result.exit_code == 0
+    data = json.loads(profile.read_text(encoding="utf-8"))
+    assert data["cursor"] == str((workspace / "outputs" / "notify" / "densegen" / "cursor").resolve())
+    assert data["spool_dir"] == str((workspace / "outputs" / "notify" / "densegen" / "spool").resolve())
 
 
 def test_profile_wizard_writes_generic_policy_without_filters(tmp_path: Path, monkeypatch) -> None:
@@ -551,7 +588,83 @@ def test_setup_slack_can_resolve_densegen_events_from_config_without_existing_ev
     assert data["events"] == str(resolved_events.resolve())
     assert data["policy"] == "densegen"
     assert data["events_source"] == {"tool": "densegen", "config": str(config_path.resolve())}
+    assert f"notify usr-events watch --tool densegen --config {config_path.resolve()} --follow" in result.stdout
     assert "--wait-for-events" in result.stdout
+
+
+def test_setup_slack_next_steps_use_tool_config_watch_when_events_exist(tmp_path: Path, monkeypatch) -> None:
+    config_path = tmp_path / "config.yaml"
+    profile = tmp_path / "notify.profile.json"
+    resolved_events = tmp_path / "usr" / "demo" / ".events.log"
+    resolved_events.parent.mkdir(parents=True, exist_ok=True)
+    _write_events(resolved_events, [_event()])
+    config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    monkeypatch.setattr(
+        "dnadesign.notify.cli._resolve_tool_events_path",
+        lambda *, tool, config: (resolved_events, "densegen"),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "setup",
+            "slack",
+            "--profile",
+            str(profile),
+            "--tool",
+            "densegen",
+            "--config",
+            str(config_path),
+            "--secret-source",
+            "env",
+            "--url-env",
+            "DENSEGEN_WEBHOOK",
+        ],
+    )
+    assert result.exit_code == 0
+    assert f"notify usr-events watch --tool densegen --config {config_path.resolve()} --dry-run" in result.stdout
+    assert f"notify usr-events watch --tool densegen --config {config_path.resolve()} --follow" in result.stdout
+    assert "notify usr-events watch --profile" not in result.stdout
+
+
+def test_setup_slack_next_steps_quote_paths_with_spaces(tmp_path: Path, monkeypatch) -> None:
+    config_path = tmp_path / "workspace with space" / "config.yaml"
+    profile = tmp_path / "notify.profile.json"
+    resolved_events = tmp_path / "usr" / "demo" / ".events.log"
+    resolved_events.parent.mkdir(parents=True, exist_ok=True)
+    _write_events(resolved_events, [_event()])
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    monkeypatch.setattr(
+        "dnadesign.notify.cli._resolve_tool_events_path",
+        lambda *, tool, config: (resolved_events, "densegen"),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "setup",
+            "slack",
+            "--profile",
+            str(profile),
+            "--tool",
+            "densegen",
+            "--config",
+            str(config_path),
+            "--secret-source",
+            "env",
+            "--url-env",
+            "DENSEGEN_WEBHOOK",
+        ],
+    )
+    assert result.exit_code == 0
+    quoted_config = shlex.quote(str(config_path.resolve()))
+    assert f"--config {quoted_config} --dry-run" in result.stdout
+    assert f"--config {quoted_config} --follow" in result.stdout
 
 
 def test_setup_slack_defaults_to_tool_namespaced_profile_and_runtime_paths(tmp_path: Path, monkeypatch) -> None:
@@ -586,6 +699,75 @@ def test_setup_slack_defaults_to_tool_namespaced_profile_and_runtime_paths(tmp_p
     assert data["policy"] == "densegen"
     assert data["cursor"] == str((tmp_path / "outputs" / "notify" / "densegen" / "cursor").resolve())
     assert data["spool_dir"] == str((tmp_path / "outputs" / "notify" / "densegen" / "spool").resolve())
+
+
+def test_setup_slack_defaults_profile_under_config_directory(tmp_path: Path, monkeypatch) -> None:
+    config_path = tmp_path / "workspaces" / "demo" / "config.yaml"
+    resolved_events = tmp_path / "usr" / "demo" / ".events.log"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    outside_cwd = tmp_path / "outside"
+    outside_cwd.mkdir(parents=True, exist_ok=True)
+    monkeypatch.chdir(outside_cwd)
+    monkeypatch.setattr(
+        "dnadesign.notify.cli._resolve_tool_events_path",
+        lambda *, tool, config: (resolved_events, "densegen"),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "setup",
+            "slack",
+            "--tool",
+            "densegen",
+            "--config",
+            str(config_path),
+            "--secret-source",
+            "env",
+        ],
+    )
+    assert result.exit_code == 0
+    expected_profile = config_path.parent / "outputs" / "notify" / "densegen" / "profile.json"
+    assert expected_profile.exists()
+    assert not (outside_cwd / "outputs" / "notify" / "densegen" / "profile.json").exists()
+
+
+def test_setup_slack_accepts_workspace_shorthand_for_config(tmp_path: Path, monkeypatch) -> None:
+    workspace = "demo_workspace"
+    config_path = tmp_path / "src" / "dnadesign" / "densegen" / "workspaces" / workspace / "config.yaml"
+    resolved_events = tmp_path / "usr" / "demo" / ".events.log"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "dnadesign.notify.cli._resolve_tool_workspace_config_path",
+        lambda *, tool, workspace, search_start: config_path,
+    )
+    monkeypatch.setattr(
+        "dnadesign.notify.cli._resolve_tool_events_path",
+        lambda *, tool, config: (resolved_events, "densegen"),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "setup",
+            "slack",
+            "--tool",
+            "densegen",
+            "--workspace",
+            workspace,
+            "--secret-source",
+            "env",
+        ],
+    )
+    assert result.exit_code == 0
+    expected_profile = config_path.parent / "outputs" / "notify" / "densegen" / "profile.json"
+    assert expected_profile.exists()
+    assert f"--config {config_path.resolve()} --follow" in result.stdout
 
 
 def test_setup_slack_stores_tls_ca_bundle_path(tmp_path: Path, monkeypatch) -> None:
@@ -647,6 +829,38 @@ def test_setup_resolve_events_emits_plain_events_path(tmp_path: Path, monkeypatc
     assert result.stdout.strip() == str(resolved_events.resolve())
 
 
+def test_setup_resolve_events_accepts_workspace_shorthand(tmp_path: Path, monkeypatch) -> None:
+    workspace = "demo_workspace"
+    config_path = tmp_path / "src" / "dnadesign" / "densegen" / "workspaces" / workspace / "config.yaml"
+    resolved_events = tmp_path / "usr" / "demo" / ".events.log"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "dnadesign.notify.cli._resolve_tool_workspace_config_path",
+        lambda *, tool, workspace, search_start: config_path,
+    )
+    monkeypatch.setattr(
+        "dnadesign.notify.cli._resolve_tool_events_path",
+        lambda *, tool, config: (resolved_events, "densegen"),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "setup",
+            "resolve-events",
+            "--tool",
+            "densegen",
+            "--workspace",
+            workspace,
+        ],
+    )
+    assert result.exit_code == 0
+    assert result.stdout.strip() == str(resolved_events.resolve())
+
+
 def test_setup_resolve_events_can_emit_json_output(tmp_path: Path, monkeypatch) -> None:
     config_path = tmp_path / "config.yaml"
     resolved_events = tmp_path / "usr" / "demo" / ".events.log"
@@ -676,6 +890,42 @@ def test_setup_resolve_events_can_emit_json_output(tmp_path: Path, monkeypatch) 
     assert payload["config"] == str(config_path.resolve())
     assert payload["events"] == str(resolved_events.resolve())
     assert payload["policy"] == "densegen"
+
+
+def test_setup_list_workspaces_emits_names_and_json(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "dnadesign.notify.cli._list_tool_workspaces",
+        lambda *, tool, search_start: ["demo_a", "demo_b"],
+    )
+
+    runner = CliRunner()
+    text_result = runner.invoke(
+        app,
+        [
+            "setup",
+            "list-workspaces",
+            "--tool",
+            "densegen",
+        ],
+    )
+    assert text_result.exit_code == 0
+    assert text_result.stdout.splitlines() == ["demo_a", "demo_b"]
+
+    json_result = runner.invoke(
+        app,
+        [
+            "setup",
+            "list-workspaces",
+            "--tool",
+            "densegen",
+            "--json",
+        ],
+    )
+    assert json_result.exit_code == 0
+    payload = json.loads(json_result.stdout)
+    assert payload["ok"] is True
+    assert payload["workspaces"] == ["demo_a", "demo_b"]
 
 
 def test_setup_resolve_events_can_print_policy_only(tmp_path: Path, monkeypatch) -> None:

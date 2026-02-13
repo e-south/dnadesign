@@ -35,6 +35,25 @@ def register_usr_events_watch_command(
         tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
         events: Path | None = typer.Option(None, "--events", help="USR events JSONL path."),
         profile: Path | None = typer.Option(None, "--profile", help="Path to profile JSON file."),
+        config: Path | None = typer.Option(
+            None,
+            "--config",
+            "-c",
+            help=(
+                "Tool config path for auto-profile mode. "
+                "Use either --config or --workspace. "
+                "When set with --tool and without --profile/--events, notify auto-loads "
+                "profile from <config-dir>/outputs/notify/<tool>/profile.json."
+            ),
+        ),
+        workspace: str | None = typer.Option(
+            None,
+            "--workspace",
+            help=(
+                "Workspace name for auto-profile mode (shorthand for tool workspace config path). "
+                "Use with --tool and without --profile/--events."
+            ),
+        ),
         cursor: Path | None = typer.Option(None, "--cursor", help="Cursor file storing byte offset."),
         follow: bool = typer.Option(False, "--follow", help="Follow events file for new lines."),
         wait_for_events: bool = typer.Option(
@@ -74,7 +93,13 @@ def register_usr_events_watch_command(
             "--allow-unknown-version",
             help="Allow unknown event_version values.",
         ),
-        tool: str | None = typer.Option(None, help="Override tool name."),
+        tool: str | None = typer.Option(
+            None,
+            help=(
+                "Override tool name. Also required with --config/--workspace for auto-profile mode "
+                "(profile path namespace)."
+            ),
+        ),
         run_id: str | None = typer.Option(None, help="Override run id."),
         message: str | None = typer.Option(None, help="Override message."),
         include_args: bool | None = typer.Option(None, "--include-args/--no-include-args"),
@@ -101,6 +126,8 @@ def register_usr_events_watch_command(
             tls_ca_bundle=tls_ca_bundle,
             events=events,
             profile=profile,
+            config=config,
+            workspace=workspace,
             cursor=cursor,
             follow=follow,
             wait_for_events=wait_for_events,

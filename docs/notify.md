@@ -11,9 +11,10 @@ Choose the flow first:
 - Long-running Universal Sequence Record watcher workflows: use [notify/usr_events.md](notify/usr_events.md).
 
 Most DenseGen and Infer production usage should start with:
-- `notify setup slack --tool <tool> --config <workspace-config.yaml>`
-- `notify profile doctor --profile <profile.json>`
-- `notify usr-events watch --profile <profile.json> --follow`
+- `notify setup list-workspaces --tool <tool>`
+- `notify setup slack --tool <tool> --workspace <workspace-name>`
+- `notify profile doctor --profile <config-dir>/outputs/notify/<tool>/profile.json`
+- `notify usr-events watch --tool <tool> --workspace <workspace-name> --follow`
 
 ## Command line usage
 

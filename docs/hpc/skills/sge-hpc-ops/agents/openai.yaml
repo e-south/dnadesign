@@ -1,0 +1,4 @@
+interface:
+  display_name: "SGE HPC Ops"
+  short_description: "Operate SGE jobs end-to-end with watcher-based monitoring"
+  default_prompt: "Use $sge-hpc-ops to run BU SCC (SGE) interactive or batch workloads with resource selection, submission, watcher monitoring, and step-in diagnostics."

@@ -1,0 +1,23 @@
+namespaces:
+  quickstart:
+    columns:
+    - name: quickstart__X_value
+      type: list<float64>
+    - name: quickstart__intensity_log2_offset_delta
+      type: float64
+    description: audit
+    owner: audit
+  usr_state:
+    columns:
+    - name: usr_state__masked
+      type: bool
+    - name: usr_state__qc_status
+      type: string
+    - name: usr_state__split
+      type: string
+    - name: usr_state__supersedes
+      type: string
+    - name: usr_state__lineage
+      type: list<string>
+    description: Reserved record-state overlay (masked/qc/split/lineage).
+    owner: usr

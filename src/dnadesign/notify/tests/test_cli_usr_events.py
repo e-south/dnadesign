@@ -1151,3 +1151,234 @@ def test_usr_events_watch_profile_can_reresolve_events_from_tool_config(tmp_path
     )
     assert result.exit_code == 0
     assert '"usr_action": "materialize"' in result.stdout
+
+
+def test_usr_events_watch_can_autoload_profile_from_tool_config(tmp_path: Path, monkeypatch) -> None:
+    events = tmp_path / "usr" / "demo" / ".events.log"
+    events.parent.mkdir(parents=True, exist_ok=True)
+    _write_events(events, [_event(action="materialize")])
+    config_path = tmp_path / "workspaces" / "demo" / "config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+
+    profile = config_path.parent / "outputs" / "notify" / "densegen" / "profile.json"
+    profile.parent.mkdir(parents=True, exist_ok=True)
+    profile.write_text(
+        json.dumps(
+            {
+                "profile_version": 2,
+                "provider": "generic",
+                "events": str(events.resolve()),
+                "webhook": {"source": "env", "ref": "DENSEGEN_WEBHOOK"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("DENSEGEN_WEBHOOK", "http://example.com/webhook")
+    monkeypatch.setattr(
+        "dnadesign.notify.cli._resolve_tool_events_path",
+        lambda *, tool, config: (events, "densegen"),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--tool",
+            "densegen",
+            "--config",
+            str(config_path),
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0
+    assert '"usr_action": "materialize"' in result.stdout
+
+
+def test_usr_events_watch_autoload_rejects_profile_events_source_mismatch(tmp_path: Path, monkeypatch) -> None:
+    cli_events = tmp_path / "usr" / "cli" / ".events.log"
+    stale_events = tmp_path / "usr" / "stale" / ".events.log"
+    cli_events.parent.mkdir(parents=True, exist_ok=True)
+    stale_events.parent.mkdir(parents=True, exist_ok=True)
+    _write_events(cli_events, [_event(action="materialize")])
+    _write_events(stale_events, [_event(action="attach")])
+
+    cli_config = tmp_path / "workspaces" / "demo" / "config.yaml"
+    stale_config = tmp_path / "workspaces" / "stale" / "config.yaml"
+    cli_config.parent.mkdir(parents=True, exist_ok=True)
+    stale_config.parent.mkdir(parents=True, exist_ok=True)
+    cli_config.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    stale_config.write_text("densegen:\n  run:\n    id: stale\n", encoding="utf-8")
+
+    profile = cli_config.parent / "outputs" / "notify" / "densegen" / "profile.json"
+    profile.parent.mkdir(parents=True, exist_ok=True)
+    profile.write_text(
+        json.dumps(
+            {
+                "profile_version": 2,
+                "provider": "generic",
+                "events": str(stale_events.resolve()),
+                "webhook": {"source": "env", "ref": "DENSEGEN_WEBHOOK"},
+                "events_source": {"tool": "densegen", "config": str(stale_config.resolve())},
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("DENSEGEN_WEBHOOK", "http://example.com/webhook")
+
+    def _resolve_events(*, tool, config):
+        if Path(config).resolve() == cli_config.resolve():
+            return (cli_events, "densegen")
+        if Path(config).resolve() == stale_config.resolve():
+            return (stale_events, "densegen")
+        raise AssertionError(f"unexpected config path: {config}")
+
+    monkeypatch.setattr("dnadesign.notify.cli._resolve_tool_events_path", _resolve_events)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--tool",
+            "densegen",
+            "--config",
+            str(cli_config),
+            "--dry-run",
+            "--cursor",
+            str(tmp_path / "cursor"),
+        ],
+    )
+    assert result.exit_code == 1
+    assert "profile events_source does not match --tool/--config" in result.stdout
+
+
+def test_usr_events_watch_autoload_uses_cli_events_when_profile_events_field_is_stale(
+    tmp_path: Path, monkeypatch
+) -> None:
+    cli_events = tmp_path / "usr" / "cli" / ".events.log"
+    stale_events = tmp_path / "usr" / "stale" / ".events.log"
+    cli_events.parent.mkdir(parents=True, exist_ok=True)
+    stale_events.parent.mkdir(parents=True, exist_ok=True)
+    _write_events(cli_events, [_event(action="materialize")])
+    _write_events(stale_events, [_event(action="attach")])
+
+    cli_config = tmp_path / "workspaces" / "demo" / "config.yaml"
+    cli_config.parent.mkdir(parents=True, exist_ok=True)
+    cli_config.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+
+    profile = cli_config.parent / "outputs" / "notify" / "densegen" / "profile.json"
+    profile.parent.mkdir(parents=True, exist_ok=True)
+    profile.write_text(
+        json.dumps(
+            {
+                "profile_version": 2,
+                "provider": "generic",
+                "events": str(stale_events.resolve()),
+                "webhook": {"source": "env", "ref": "DENSEGEN_WEBHOOK"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("DENSEGEN_WEBHOOK", "http://example.com/webhook")
+    monkeypatch.setattr(
+        "dnadesign.notify.cli._resolve_tool_events_path",
+        lambda *, tool, config: (cli_events, "densegen"),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--tool",
+            "densegen",
+            "--config",
+            str(cli_config),
+            "--dry-run",
+            "--cursor",
+            str(tmp_path / "cursor"),
+        ],
+    )
+    assert result.exit_code == 0
+    assert '"usr_action": "materialize"' in result.stdout
+    assert '"usr_action": "attach"' not in result.stdout
+
+
+def test_usr_events_watch_autoload_prompts_setup_when_profile_missing(tmp_path: Path, monkeypatch) -> None:
+    config_path = tmp_path / "workspaces" / "demo" / "config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    monkeypatch.setattr(
+        "dnadesign.notify.cli._resolve_tool_events_path",
+        lambda *, tool, config: (tmp_path / "usr" / "demo" / ".events.log", "densegen"),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--tool",
+            "densegen",
+            "--config",
+            str(config_path),
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "notify setup slack --tool densegen --config" in result.stdout
+
+
+def test_usr_events_watch_autoload_supports_workspace_shorthand(tmp_path: Path, monkeypatch) -> None:
+    workspace = "demo_workspace"
+    events = tmp_path / "usr" / "demo" / ".events.log"
+    events.parent.mkdir(parents=True, exist_ok=True)
+    _write_events(events, [_event(action="materialize")])
+    config_path = tmp_path / "src" / "dnadesign" / "densegen" / "workspaces" / workspace / "config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    profile = config_path.parent / "outputs" / "notify" / "densegen" / "profile.json"
+    profile.parent.mkdir(parents=True, exist_ok=True)
+    profile.write_text(
+        json.dumps(
+            {
+                "profile_version": 2,
+                "provider": "generic",
+                "events": str(events.resolve()),
+                "webhook": {"source": "env", "ref": "DENSEGEN_WEBHOOK"},
+                "events_source": {"tool": "densegen", "config": str(config_path.resolve())},
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("DENSEGEN_WEBHOOK", "http://example.com/webhook")
+    monkeypatch.setattr(
+        "dnadesign.notify.cli._resolve_tool_workspace_config_path",
+        lambda *, tool, workspace, search_start: config_path,
+    )
+    monkeypatch.setattr(
+        "dnadesign.notify.cli._resolve_tool_events_path",
+        lambda *, tool, config: (events, "densegen"),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--tool",
+            "densegen",
+            "--workspace",
+            workspace,
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0
+    assert '"usr_action": "materialize"' in result.stdout

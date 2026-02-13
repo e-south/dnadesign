@@ -171,6 +171,16 @@ Demo inputs in this repo:
 
 **Subapps:** tool-specific utilities live under `usr maintenance`, `usr densegen`, `usr legacy`, `usr state`, and `usr dev` (dev commands are hidden unless `USR_SHOW_DEV_COMMANDS=1`).
 
+**Register an overlay namespace** (required on fresh roots)
+
+```bash
+# Register namespace and allowed derived columns.
+usr namespace register quickstart \
+  --columns 'quickstart__X_value:list<float64>,quickstart__intensity_log2_offset_delta:float64'
+```
+
+> The first successful namespace registration creates `registry.yaml` and includes the reserved `usr_state` namespace automatically.
+
 **Create a dataset** (namespace is recommended)
 
 ```bash
@@ -188,16 +198,6 @@ usr import densegen/demo --from csv \
 ```
 
 > Sequences must be non-empty. If you include `bio_type` or `alphabet` columns in your file, all rows must be filled; missing values are treated as errors.
-
-**Register an overlay namespace** (required on fresh roots)
-
-```bash
-# Register namespace and allowed derived columns.
-usr namespace register quickstart \
-  --columns quickstart__X_value:list<float64>,quickstart__intensity_log2_offset_delta:float64
-```
-
-> The first successful namespace registration creates `registry.yaml` and includes the reserved `usr_state` namespace automatically.
 
 **Attach namespaced metadata** (namespacing required)
 
@@ -496,6 +496,13 @@ See **docs/operations/sync.md** for full setup, storage-location guidance, and f
 
 ## Python application programming interface
 
+Mutation methods require a registry at the dataset root. Bootstrap one first:
+
+```bash
+uv run usr --root src/dnadesign/usr/datasets namespace register mock \
+  --columns 'mock__score:float64'
+```
+
 ```python
 from pathlib import Path
 from dnadesign.usr import Dataset
@@ -563,7 +570,7 @@ Register a namespace:
 ```bash
 # Register namespace and derived columns.
 usr namespace register mock \
-  --columns mock__score:float64,mock__vec:list<float64> \
+  --columns 'mock__score:float64,mock__vec:list<float64>' \
   --owner "your-name" \
   --description "example derived metrics"
 ```

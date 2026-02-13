@@ -1,0 +1,14 @@
+{
+  "cursor": "/project/dunlop/esouth/dnadesign/.codex_tmp/audit_notify2/workspace/outputs/notify/densegen/cursor",
+  "events": "/project/dunlop/esouth/dnadesign/.codex_tmp/audit_usr_datasets2/densegen/demo/.events.log",
+  "include_args": false,
+  "include_context": false,
+  "include_raw_event": false,
+  "profile_version": 2,
+  "provider": "slack",
+  "spool_dir": "/project/dunlop/esouth/dnadesign/.codex_tmp/audit_notify2/workspace/outputs/notify/densegen/spool",
+  "webhook": {
+    "ref": "NOTIFY_WEBHOOK",
+    "source": "env"
+  }
+}

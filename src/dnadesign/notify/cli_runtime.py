@@ -27,6 +27,8 @@ def run_usr_events_watch(
     tls_ca_bundle: Path | None,
     events: Path | None,
     profile: Path | None,
+    config: Path | None,
+    workspace: str | None,
     cursor: Path | None,
     follow: bool,
     wait_for_events: bool,
@@ -58,9 +60,12 @@ def run_usr_events_watch(
     resolve_optional_path_value: Callable[..., Path | None],
     resolve_optional_string_value: Callable[..., str | None],
     resolve_profile_events_source: Callable[..., tuple[str, Path] | None],
+    normalize_tool_name: Callable[[str | None], str | None],
     resolve_tool_events_path: Callable[..., tuple[Path, str | None]],
+    resolve_tool_workspace_config: Callable[..., Path],
     resolve_usr_events_path: Callable[..., Path],
     resolve_profile_webhook_source: Callable[[dict[str, Any]], tuple[str | None, str | None]],
+    default_profile_path_for_tool: Callable[[str | None], Path],
     resolve_cli_optional_string: Callable[..., str | None],
     resolve_webhook_url: Callable[..., str],
     resolve_tls_ca_bundle: Callable[..., Path | None],
@@ -76,8 +81,62 @@ def run_usr_events_watch(
         raise NotifyConfigError("idle_timeout must be > 0 when provided")
     if float(poll_interval_seconds) <= 0:
         raise NotifyConfigError("poll_interval_seconds must be > 0")
-    profile_path = profile.expanduser().resolve() if profile is not None else None
+    has_resolver_mode = config is not None or workspace is not None
+    if profile is None and events is None and not has_resolver_mode:
+        raise NotifyConfigError("pass --profile, --events, or --tool with --config/--workspace")
+    if has_resolver_mode and (profile is not None or events is not None):
+        raise NotifyConfigError("--config/--workspace cannot be combined with --profile or --events")
+    if config is not None and workspace is not None:
+        raise NotifyConfigError("pass either --config or --workspace, not both")
+
+    tool_value_for_events = tool
+    tool_name_for_config_mode: str | None = None
+    config_path_for_config_mode: Path | None = None
+    events_path_from_cli_tool_config: Path | None = None
+    if has_resolver_mode:
+        tool_name = normalize_tool_name(tool)
+        if tool_name is None:
+            raise NotifyConfigError("--config/--workspace requires --tool")
+        if config is not None:
+            config_path = config.expanduser().resolve()
+            setup_hint = f"uv run notify setup slack --tool {tool_name} --config {config_path}"
+        else:
+            workspace_name = str(workspace or "").strip()
+            if not workspace_name:
+                raise NotifyConfigError("--workspace must be a non-empty string")
+            config_path = resolve_tool_workspace_config(
+                tool=tool_name,
+                workspace=workspace_name,
+                search_start=Path.cwd(),
+            )
+            if not isinstance(config_path, Path):
+                config_path = Path(config_path)
+            config_path = config_path.expanduser().resolve()
+            setup_hint = f"uv run notify setup slack --tool {tool_name} --workspace {workspace_name}"
+        events_path_from_cli_tool_config, _default_policy = resolve_tool_events_path(tool=tool_name, config=config_path)
+        auto_profile_path = (config_path.parent / default_profile_path_for_tool(tool_name)).resolve()
+        if not auto_profile_path.exists():
+            raise NotifyConfigError(
+                f"profile not found for tool '{tool_name}' at {auto_profile_path}. "
+                f"Run `{setup_hint}` once."
+            )
+        profile_path = auto_profile_path
+        tool_value_for_events = None
+        tool_name_for_config_mode = tool_name
+        config_path_for_config_mode = config_path
+    else:
+        profile_path = profile.expanduser().resolve() if profile is not None else None
     profile_data = read_profile(profile_path) if profile_path is not None else {}
+    if tool_name_for_config_mode is not None and config_path_for_config_mode is not None:
+        profile_events_source = resolve_profile_events_source(profile_data=profile_data, profile_path=profile_path)
+        if profile_events_source is not None:
+            source_tool, source_config = profile_events_source
+            if source_tool != tool_name_for_config_mode or source_config != config_path_for_config_mode:
+                raise NotifyConfigError(
+                    "profile events_source does not match --tool/--config (or resolved --tool/--workspace); "
+                    f"expected tool={tool_name_for_config_mode!r} config={config_path_for_config_mode}, "
+                    f"found tool={source_tool!r} config={source_config}"
+                )
     provider_value = resolve_string_value(field="provider", cli_value=provider, profile_data=profile_data)
     events_path = resolve_path_value(
         field="events",
@@ -85,7 +144,9 @@ def run_usr_events_watch(
         profile_data=profile_data,
         profile_path=profile_path,
     )
-    if events is None:
+    if events_path_from_cli_tool_config is not None:
+        events_path = resolve_usr_events_path(events_path_from_cli_tool_config, require_exists=False)
+    elif events is None:
         profile_events_source = resolve_profile_events_source(profile_data=profile_data, profile_path=profile_path)
         if profile_events_source is not None:
             source_tool, source_config = profile_events_source
@@ -169,7 +230,7 @@ def run_usr_events_watch(
         allow_unknown_version=allow_unknown_version,
         action_filter=action_filter,
         tool_filter=tool_filter,
-        tool=tool,
+        tool=tool_value_for_events,
         run_id=run_id,
         provider_value=provider_value,
         message=message,
