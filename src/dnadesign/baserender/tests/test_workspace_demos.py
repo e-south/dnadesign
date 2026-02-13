@@ -47,10 +47,21 @@ def test_curated_workspace_demos_are_self_contained() -> None:
         job = load_job_v3(job_path, caller_root=root)
         assert _is_under(job.input.path, ws / "inputs"), f"{name} input path must be within workspace inputs/"
 
-        if job.input.adapter.kind == "cruncher_best_window":
+        if name == "demo_cruncher_render":
             cols = job.input.adapter.columns
-            assert _is_under(Path(str(cols["hits_path"])), ws / "inputs")
-            assert _is_under(Path(str(cols["config_path"])), ws / "inputs")
+            assert job.input.adapter.kind == "generic_features"
+            assert cols["features"] == "features"
+            assert cols["effects"] == "effects"
+            assert cols["display"] == "display"
+            import pyarrow.parquet as pq
+
+            rows = pq.read_table(ws / "inputs" / "elites_showcase_records.parquet").to_pylist()
+            assert len(rows) == 2
+            for row in rows:
+                assert {"id", "sequence", "features", "effects", "display"} <= set(row.keys())
+                assert isinstance(row["features"], list)
+                assert isinstance(row["effects"], list)
+                assert isinstance(row["display"], dict)
 
 
 def test_docs_cruncher_example_uses_local_examples_data() -> None:
@@ -72,7 +83,7 @@ def test_curated_workspace_demos_run_in_isolated_copy(tmp_path: Path) -> None:
 
     expected_fmt = {
         "demo_densegen_render": ".png",
-        "demo_cruncher_render": ".pdf",
+        "demo_cruncher_render": ".png",
     }
 
     for name, suffix in expected_fmt.items():

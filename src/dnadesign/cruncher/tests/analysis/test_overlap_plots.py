@@ -9,12 +9,14 @@ Author(s): Eric J. South
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
-from dnadesign.cruncher.analysis.plots.overlap import plot_overlap_panel
+from dnadesign.cruncher.analysis.plots.elites_showcase import plot_elites_showcase
+from dnadesign.cruncher.core.pwm import PWM
 
 
-def test_overlap_plot_smoke(tmp_path) -> None:
+def test_elites_showcase_plot_smoke(tmp_path) -> None:
     elites_df = pd.DataFrame(
         [
             {"id": "elite-1", "rank": 1, "sequence": "AAAACCCC"},
@@ -22,12 +24,7 @@ def test_overlap_plot_smoke(tmp_path) -> None:
             {"id": "elite-3", "rank": 3, "sequence": "AACCGAAT"},
         ]
     )
-    summary_df = pd.DataFrame(
-        [
-            {"tf_i": "tfA", "tf_j": "tfB", "overlap_rate": 0.5},
-        ]
-    )
-    elite_df = pd.DataFrame(
+    elite_overlap_df = pd.DataFrame(
         {
             "id": ["elite-1", "elite-2", "elite-3"],
             "rank": [1, 2, 3],
@@ -41,67 +38,82 @@ def test_overlap_plot_smoke(tmp_path) -> None:
             {"elite_id": "elite-2", "tf": "tfA", "best_start": 1, "pwm_width": 4, "best_strand": "+"},
             {"elite_id": "elite-2", "tf": "tfB", "best_start": 3, "pwm_width": 4, "best_strand": "-"},
             {"elite_id": "elite-3", "tf": "tfA", "best_start": 2, "pwm_width": 4, "best_strand": "+"},
-            {"elite_id": "elite-3", "tf": "tfB", "best_start": 5, "pwm_width": 3, "best_strand": "+"},
+            {"elite_id": "elite-3", "tf": "tfB", "best_start": 4, "pwm_width": 4, "best_strand": "+"},
         ]
     )
-    panel_path = tmp_path / "plot__overlap__panel.png"
-    plot_overlap_panel(
-        summary_df,
-        elite_df,
-        ["tfA", "tfB"],
-        panel_path,
-        hits_df=hits_df,
+    pwms = {
+        "tfA": PWM(
+            name="tfA",
+            matrix=np.array(
+                [
+                    [0.8, 0.1, 0.05, 0.05],
+                    [0.1, 0.8, 0.05, 0.05],
+                    [0.05, 0.05, 0.8, 0.1],
+                    [0.05, 0.05, 0.1, 0.8],
+                ],
+                dtype=float,
+            ),
+        ),
+        "tfB": PWM(
+            name="tfB",
+            matrix=np.array(
+                [
+                    [0.25, 0.25, 0.25, 0.25],
+                    [0.1, 0.1, 0.7, 0.1],
+                    [0.1, 0.7, 0.1, 0.1],
+                    [0.7, 0.1, 0.1, 0.1],
+                ],
+                dtype=float,
+            ),
+        ),
+    }
+
+    panel_path = tmp_path / "plot__elites_showcase.png"
+    plot_elites_showcase(
         elites_df=elites_df,
-        sequence_length=8,
+        hits_df=hits_df,
+        elite_overlap_df=elite_overlap_df,
+        tf_names=["tfA", "tfB"],
+        pwms=pwms,
+        out_path=panel_path,
+        max_panels=12,
         dpi=150,
         png_compress_level=9,
     )
     assert panel_path.exists()
 
 
-def test_overlap_plot_handles_constant_overlap_distribution(tmp_path) -> None:
+def test_elites_showcase_fails_fast_when_panel_limit_exceeded(tmp_path) -> None:
     elites_df = pd.DataFrame(
         [
             {"id": "elite-1", "rank": 1, "sequence": "AAAACCCC"},
             {"id": "elite-2", "rank": 2, "sequence": "CCCCAAAA"},
-            {"id": "elite-3", "rank": 3, "sequence": "AACCGAAT"},
-            {"id": "elite-4", "rank": 4, "sequence": "AATTGGCC"},
         ]
     )
-    summary_df = pd.DataFrame(
-        [
-            {"tf_i": "tfA", "tf_j": "tfB", "overlap_rate": 1.0},
-        ]
-    )
-    elite_df = pd.DataFrame(
-        {
-            "id": ["elite-1", "elite-2", "elite-3", "elite-4"],
-            "rank": [1, 2, 3, 4],
-            "overlap_total_bp": [7, 7, 7, 7],
-        }
-    )
+    elite_overlap_df = pd.DataFrame({"id": ["elite-1", "elite-2"], "overlap_total_bp": [7, 7]})
     hits_df = pd.DataFrame(
         [
             {"elite_id": "elite-1", "tf": "tfA", "best_start": 0, "pwm_width": 4, "best_strand": "+"},
-            {"elite_id": "elite-1", "tf": "tfB", "best_start": 1, "pwm_width": 4, "best_strand": "+"},
             {"elite_id": "elite-2", "tf": "tfA", "best_start": 0, "pwm_width": 4, "best_strand": "+"},
-            {"elite_id": "elite-2", "tf": "tfB", "best_start": 1, "pwm_width": 4, "best_strand": "+"},
-            {"elite_id": "elite-3", "tf": "tfA", "best_start": 0, "pwm_width": 4, "best_strand": "+"},
-            {"elite_id": "elite-3", "tf": "tfB", "best_start": 1, "pwm_width": 4, "best_strand": "+"},
-            {"elite_id": "elite-4", "tf": "tfA", "best_start": 0, "pwm_width": 4, "best_strand": "+"},
-            {"elite_id": "elite-4", "tf": "tfB", "best_start": 1, "pwm_width": 4, "best_strand": "+"},
         ]
     )
-    panel_path = tmp_path / "plot__overlap__panel_constant.png"
-    plot_overlap_panel(
-        summary_df,
-        elite_df,
-        ["tfA", "tfB"],
-        panel_path,
-        hits_df=hits_df,
-        elites_df=elites_df,
-        sequence_length=8,
-        dpi=150,
-        png_compress_level=9,
-    )
-    assert panel_path.exists()
+    pwms = {"tfA": PWM(name="tfA", matrix=np.array([[0.25, 0.25, 0.25, 0.25]] * 4, dtype=float))}
+
+    panel_path = tmp_path / "plot__elites_showcase.png"
+    try:
+        plot_elites_showcase(
+            elites_df=elites_df,
+            hits_df=hits_df,
+            elite_overlap_df=elite_overlap_df,
+            tf_names=["tfA"],
+            pwms=pwms,
+            out_path=panel_path,
+            max_panels=1,
+            dpi=150,
+            png_compress_level=9,
+        )
+        raised = False
+    except ValueError as exc:
+        raised = True
+        assert "analysis.elites_showcase.max_panels" in str(exc)
+    assert raised

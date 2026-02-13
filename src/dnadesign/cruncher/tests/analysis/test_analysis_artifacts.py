@@ -209,7 +209,9 @@ def _write_basic_run_artifacts(
         yaml.safe_dump(
             {
                 "n_elites": int(len(elites_df)),
-                "mmr_alpha": 0.85,
+                "selection_score_weight": 1.0,
+                "selection_diversity_weight": 0.0,
+                "selection_relevance": "joint_score",
                 "pool_size": max(top_k, len(elites_df)),
             }
         )
@@ -390,10 +392,57 @@ def test_analyze_fails_fast_when_run_lock_exists(tmp_path: Path) -> None:
 
     analyze_lock = run_dir / ".analysis_tmp"
     analyze_lock.mkdir(parents=True, exist_ok=True)
+    (analyze_lock / ".analyze_lock.json").write_text(json.dumps({"pid": 1}))
 
     cfg = load_config(config_path)
     with pytest.raises(RuntimeError, match="Analyze already in progress"):
         run_analyze(cfg, config_path)
+
+
+def test_analyze_recovers_stale_lock_owned_by_current_process(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    config = _base_config(
+        catalog_root=catalog_root,
+        regulator_sets=[["lexA", "cpxR"]],
+        sample=_sample_block(save_trace=False, top_k=1),
+        analysis={
+            "run_selector": "explicit",
+            "runs": ["sample_stale_lock_recover"],
+            "pairwise": ["lexA", "cpxR"],
+            "plot_format": "png",
+            "plot_dpi": 72,
+            "table_format": "parquet",
+            "max_points": 1000,
+        },
+    )
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    run_dir = _make_sample_run_dir(tmp_path, "sample_stale_lock_recover")
+
+    lock_dir = tmp_path / ".cruncher" / "locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = lock_dir / "config.lock.json"
+    lock_path.write_text("{}")
+    lock_sha = sha256_path(lock_path)
+
+    _write_basic_run_artifacts(
+        run_dir=run_dir,
+        config=config,
+        config_path=config_path,
+        lock_path=lock_path,
+        lock_sha=lock_sha,
+        tf_names=["lexA", "cpxR"],
+        include_trace=False,
+        top_k=1,
+    )
+
+    analyze_lock = run_dir / ".analysis_tmp"
+    analyze_lock.mkdir(parents=True, exist_ok=True)
+
+    cfg = load_config(config_path)
+    analysis_runs = run_analyze(cfg, config_path)
+    assert analysis_runs
 
 
 def test_analyze_without_trace_does_not_import_arviz(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1174,9 +1223,9 @@ def test_analyze_auto_tf_pair_selection(tmp_path: Path) -> None:
     assert used_payload["tf_pair_selected"] == ["lexA", "cpxR"]
 
     plot_manifest = json.loads(plot_manifest_path(analysis_dir).read_text())
-    overlap = next(entry for entry in plot_manifest.get("plots", []) if entry.get("key") == "overlap_panel")
-    assert overlap.get("generated") is False
-    assert "elites_count < 2" in str(overlap.get("skip_reason"))
+    showcase = next(entry for entry in plot_manifest.get("plots", []) if entry.get("key") == "elites_showcase")
+    assert showcase.get("generated") is True
+    assert showcase.get("skip_reason") is None
 
 
 def test_analyze_prunes_stale_analysis_artifacts_when_not_archiving(tmp_path: Path) -> None:
@@ -1289,7 +1338,7 @@ def test_analyze_fails_on_lockfile_mismatch(tmp_path: Path) -> None:
         run_analyze(cfg, config_path)
 
 
-def test_analyze_plot_manifest_single_tf_overlap_skip_and_trace_skip(tmp_path: Path) -> None:
+def test_analyze_plot_manifest_single_tf_showcase_and_trace_skip(tmp_path: Path) -> None:
     catalog_root = tmp_path / ".cruncher"
     config = _base_config(
         catalog_root=catalog_root,
@@ -1339,19 +1388,22 @@ def test_analyze_plot_manifest_single_tf_overlap_skip_and_trace_skip(tmp_path: P
         "chain_trajectory_scatter",
         "chain_trajectory_sweep",
         "elites_nn_distance",
-        "overlap_panel",
+        "elites_showcase",
         "health_panel",
+        "optimizer_vs_fimo",
     }
     assert plots_by_key["chain_trajectory_scatter"]["generated"] is True
     assert plots_by_key["chain_trajectory_sweep"]["generated"] is True
     assert plots_by_key["elites_nn_distance"]["generated"] is True
-    assert plots_by_key["overlap_panel"]["generated"] is False
-    assert "n_tf < 2" in str(plots_by_key["overlap_panel"].get("skip_reason"))
+    assert plots_by_key["elites_showcase"]["generated"] is True
+    assert plots_by_key["elites_showcase"].get("skip_reason") is None
     assert plots_by_key["health_panel"]["generated"] is False
     assert plots_by_key["health_panel"].get("skip_reason") == "trace disabled"
+    assert plots_by_key["optimizer_vs_fimo"]["generated"] is False
+    assert plots_by_key["optimizer_vs_fimo"].get("skip_reason") == "analysis.fimo_compare.enabled=false"
 
 
-def test_analyze_plot_manifest_skips_overlap_when_elites_count_lt_two(tmp_path: Path) -> None:
+def test_analyze_showcase_fails_when_elites_count_exceeds_max_panels(tmp_path: Path) -> None:
     catalog_root = tmp_path / ".cruncher"
     config = _base_config(
         catalog_root=catalog_root,
@@ -1365,6 +1417,7 @@ def test_analyze_plot_manifest_skips_overlap_when_elites_count_lt_two(tmp_path: 
             "plot_dpi": 72,
             "table_format": "parquet",
             "max_points": 2000,
+            "elites_showcase": {"max_panels": 1},
         },
     )
     config_path = tmp_path / "config.yaml"
@@ -1389,6 +1442,183 @@ def test_analyze_plot_manifest_skips_overlap_when_elites_count_lt_two(tmp_path: 
         draws=2,
         tune=1,
     )
+    elites_two = pd.DataFrame(
+        [
+            {
+                "id": "elite-1",
+                "sequence": "ACGTACGTACGT",
+                "rank": 1,
+                "norm_sum": 2.0,
+                "score_lexA": 1.0,
+                "score_cpxR": 1.1,
+            },
+            {
+                "id": "elite-2",
+                "sequence": "TGCATGCATGCA",
+                "rank": 2,
+                "norm_sum": 1.8,
+                "score_lexA": 0.9,
+                "score_cpxR": 0.9,
+            },
+        ]
+    )
+    elites_two.to_parquet(elites_path(run_dir), engine="fastparquet")
+    hits_two = pd.DataFrame(
+        [
+            {
+                "elite_id": "elite-1",
+                "tf": "lexA",
+                "rank": 1,
+                "chain": 0,
+                "draw_idx": 0,
+                "best_start": 0,
+                "best_core_offset": 0,
+                "best_strand": "+",
+                "best_window_seq": "ACGT",
+                "best_core_seq": "ACGT",
+                "best_score_raw": 1.0,
+                "best_score_scaled": 1.0,
+                "best_score_norm": 1.0,
+                "tiebreak_rule": "max_leftmost_plus",
+                "pwm_ref": "demo:lexA",
+                "pwm_hash": "sha256",
+                "pwm_width": 4,
+                "core_width": 4,
+                "core_def_hash": "corehash",
+            },
+            {
+                "elite_id": "elite-1",
+                "tf": "cpxR",
+                "rank": 1,
+                "chain": 0,
+                "draw_idx": 0,
+                "best_start": 4,
+                "best_core_offset": 4,
+                "best_strand": "+",
+                "best_window_seq": "ACGT",
+                "best_core_seq": "ACGT",
+                "best_score_raw": 1.0,
+                "best_score_scaled": 1.0,
+                "best_score_norm": 1.0,
+                "tiebreak_rule": "max_leftmost_plus",
+                "pwm_ref": "demo:cpxR",
+                "pwm_hash": "sha256",
+                "pwm_width": 4,
+                "core_width": 4,
+                "core_def_hash": "corehash",
+            },
+            {
+                "elite_id": "elite-2",
+                "tf": "lexA",
+                "rank": 2,
+                "chain": 0,
+                "draw_idx": 0,
+                "best_start": 1,
+                "best_core_offset": 1,
+                "best_strand": "-",
+                "best_window_seq": "TGCA",
+                "best_core_seq": "TGCA",
+                "best_score_raw": 0.9,
+                "best_score_scaled": 0.9,
+                "best_score_norm": 0.9,
+                "tiebreak_rule": "max_leftmost_plus",
+                "pwm_ref": "demo:lexA",
+                "pwm_hash": "sha256",
+                "pwm_width": 4,
+                "core_width": 4,
+                "core_def_hash": "corehash",
+            },
+            {
+                "elite_id": "elite-2",
+                "tf": "cpxR",
+                "rank": 2,
+                "chain": 0,
+                "draw_idx": 0,
+                "best_start": 5,
+                "best_core_offset": 5,
+                "best_strand": "+",
+                "best_window_seq": "TGCA",
+                "best_core_seq": "TGCA",
+                "best_score_raw": 0.9,
+                "best_score_scaled": 0.9,
+                "best_score_norm": 0.9,
+                "tiebreak_rule": "max_leftmost_plus",
+                "pwm_ref": "demo:cpxR",
+                "pwm_hash": "sha256",
+                "pwm_width": 4,
+                "core_width": 4,
+                "core_def_hash": "corehash",
+            },
+        ]
+    )
+    hits_two.to_parquet(elites_hits_path(run_dir), engine="fastparquet")
+
+    cfg = load_config(config_path)
+    with pytest.raises(ValueError, match="analysis.elites_showcase.max_panels"):
+        run_analyze(cfg, config_path)
+
+
+def test_analyze_generates_optimizer_vs_fimo_plot_when_enabled(tmp_path: Path, monkeypatch) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    config = _base_config(
+        catalog_root=catalog_root,
+        regulator_sets=[["lexA", "cpxR"]],
+        sample=_sample_block(save_trace=False, top_k=1),
+        analysis={
+            "run_selector": "explicit",
+            "runs": ["sample_fimo_compare_enabled"],
+            "pairwise": "auto",
+            "plot_format": "png",
+            "plot_dpi": 72,
+            "table_format": "parquet",
+            "max_points": 2000,
+            "fimo_compare": {"enabled": True},
+        },
+    )
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    run_dir = _make_sample_run_dir(tmp_path, "sample_fimo_compare_enabled")
+    lock_dir = tmp_path / ".cruncher" / "locks"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = lock_dir / "config.lock.json"
+    lock_path.write_text("{}")
+    lock_sha = sha256_path(lock_path)
+
+    _write_basic_run_artifacts(
+        run_dir=run_dir,
+        config=config,
+        config_path=config_path,
+        lock_path=lock_path,
+        lock_sha=lock_sha,
+        tf_names=["lexA", "cpxR"],
+        include_trace=False,
+        top_k=1,
+        draws=2,
+        tune=1,
+    )
+
+    seen_kwargs: dict[str, object] = {}
+
+    def _fake_build_fimo_concordance_table(**kwargs):
+        seen_kwargs.update(kwargs)
+        return (
+            pd.DataFrame({"objective_scalar": [0.3, 0.6], "fimo_joint_weakest_score": [0.1, 0.5]}),
+            {"n_rows": 2},
+        )
+
+    def _fake_plot_optimizer_vs_fimo(concordance_df, out_path, **kwargs):
+        out_path.write_text("plot")
+        return {"n_points": int(len(concordance_df))}
+
+    monkeypatch.setattr(
+        "dnadesign.cruncher.app.analyze_workflow.build_fimo_concordance_table",
+        _fake_build_fimo_concordance_table,
+    )
+    monkeypatch.setattr(
+        "dnadesign.cruncher.analysis.plots.fimo_concordance.plot_optimizer_vs_fimo",
+        _fake_plot_optimizer_vs_fimo,
+    )
 
     cfg = load_config(config_path)
     analysis_runs = run_analyze(cfg, config_path)
@@ -1397,8 +1627,11 @@ def test_analyze_plot_manifest_skips_overlap_when_elites_count_lt_two(tmp_path: 
 
     plot_manifest = json.loads(plot_manifest_path(analysis_dir).read_text())
     plots_by_key = {entry.get("key"): entry for entry in plot_manifest.get("plots", [])}
-    assert plots_by_key["overlap_panel"]["generated"] is False
-    assert "elites_count < 2" in str(plots_by_key["overlap_panel"].get("skip_reason"))
+    assert plots_by_key["optimizer_vs_fimo"]["generated"] is True
+    assert analysis_plot_path(analysis_dir, "optimizer_vs_fimo", "png").exists()
+    assert not analysis_table_path(analysis_dir, "optimizer_vs_fimo", "parquet").exists()
+    assert "tool_path" in seen_kwargs
+    assert seen_kwargs["tool_path"] is None
 
 
 def test_analyze_fails_when_required_plot_generation_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

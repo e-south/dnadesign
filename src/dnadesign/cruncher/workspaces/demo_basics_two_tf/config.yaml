@@ -32,6 +32,7 @@ cruncher:
     enabled: true
     tool: meme
     source_id: demo_merged_meme_oops
+    tool_path: ../../../../../.pixi/envs/default/bin
     minw: null
     maxw: null
     meme_mod: oops
@@ -109,13 +110,9 @@ cruncher:
         beta_end: 12.0
     elites:
       k: 8
-      filter:
-        min_per_tf_norm: null
-        require_all_tfs: true
-        pwm_sum_min: 0.0
       select:
-        alpha: 0.85
-        pool_size: auto
+        diversity: 0.15
+        pool_size: 32000
     moves:
       profile: balanced
       overrides:
@@ -153,22 +150,22 @@ cruncher:
           max_scale: 2.50
           target_low: 0.14
           target_high: 0.32
-          freeze_after_beta: 9.0
+          freeze_after_beta: 6.0
         gibbs_inertia:
           enabled: true
           kind: linear
           p_stay_start: 0.0
-          p_stay_end: 0.75
+          p_stay_end: 0.85
         move_schedule:
           enabled: true
           kind: linear
           end:
-            S: 0.62
-            B: 0.20
-            M: 0.10
+            S: 0.50
+            B: 0.24
+            M: 0.14
             L: 0.00
             W: 0.00
-            I: 0.08
+            I: 0.12
     optimizer:
       kind: gibbs_anneal
       chains: 6
@@ -180,11 +177,11 @@ cruncher:
           - sweeps: 90000
             beta: 1.2
           - sweeps: 140000
-            beta: 5.0
-          - sweeps: 148000
-            beta: 9.0
+            beta: 6.0
+          - sweeps: 147000
+            beta: 12.0
           - sweeps: 150000
-            beta: 14.0
+            beta: 22.0
       early_stop:
         enabled: false
         patience: 0
@@ -203,13 +200,17 @@ cruncher:
     run_selector: latest
     runs: []
     pairwise: [lexA, cpxR]
-    plot_format: png
-    plot_dpi: 150
+    plot_format: pdf
+    plot_dpi: 300
     table_format: parquet
     archive: false
-    max_points: 5000
+    max_points: 20000
     trajectory_stride: 5
     trajectory_scatter_scale: llr
     trajectory_sweep_mode: best_so_far
     trajectory_chain_overlay: false
     trajectory_particle_alpha_max: 0.45
+    elites_showcase:
+      max_panels: 12
+    fimo_compare:
+      enabled: true

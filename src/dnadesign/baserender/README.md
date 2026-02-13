@@ -1,139 +1,113 @@
-## baserender
+## baserender vNext
 
-Minimal rendering of biological sequences with annotations.
+Contract-first sequence rendering with explicit adapters, strict schemas, and pluggable feature/effect rendering.
 
-**Layout**:
-``` bash
+### Package layout
+
+```text
 src/dnadesign/baserender/
-├─ src/       # package
-├─ jobs/      # YAML presets (call by name)
-├─ styles/    # YAML style presets
-└─ results/   # outputs per job
+  src/         # runtime package (import root: dnadesign.baserender.src)
+    workspace.py # workspace discovery + init + resolution
+    core/      # model + contracts
+    config/    # job_v3 + style_v1 schema
+    io/        # parquet row source
+    adapters/  # densegen, generic, cruncher adapters
+    pipeline/  # transforms/plugins + selection service
+    render/    # renderer + effects
+    outputs/   # images + video
+    reporting/ # run report
+  docs/        # contracts + architecture + examples
+  tests/       # package-level tests
+  styles/      # style presets
+  workspaces/  # run-scoped workbenches
 ```
 
-### Install
-`pyproject.toml`:
-
-```toml
-[project.scripts]
-baserender = "dnadesign.baserender.src.cli:app"
-```
-
-### System dependencies
-
-* **FFmpeg** (required for video export). Confirm:
-
-  ```bash
-  which ffmpeg
-  ffmpeg -version
-  ```
-
-  - On macOS (Homebrew): `brew install ffmpeg`
-  - On Ubuntu/Debian: `sudo apt-get install -y ffmpeg`
-  - On Conda (any OS): `conda install -c conda-forge ffmpeg`
-
-**Compatibility:** Videos are encoded as **H.264** with **yuv420p** pixel format and `+faststart`, producing `.mp4` files that open in QuickTime Player and are drag‑and‑drop compatible with PowerPoint.
-
-### CLI quick start
-
-#### Help
+### CLI
 
 ```bash
-baserender --help
+baserender job validate <job.yml>
+baserender job run <job.yml|name>
+baserender job validate --workspace <name>
+baserender job run --workspace <name>
+baserender job run --workspace <name> --workspace-root <dir>
+baserender workspace init <name>
+baserender workspace list
+baserender style list
+baserender style show <preset>
 ```
 
-#### Run a Job (uses `jobs/` and writes into `results/`)
+No v1/v2 job support is included.
+
+### Job v3 summary
+
+- `version: 3`
+- strict unknown-key rejection at every nesting level
+- explicit adapter declaration (`densegen_tfbs`, `generic_features`, `cruncher_best_window`)
+- explicit `outputs[]` list (required, non-empty)
+- no implicit outputs: only declared outputs are produced
+- non-workspace default `results_root` resolves to `<caller_root>/results` (`caller_root` defaults to current working directory)
+- workspace jobs (`job.yml` with sibling `inputs/` and `outputs/`) default `results_root` to `<workspace>/outputs`
+
+See:
+- `docs/contracts/job_v3.md`
+- `docs/contracts/record_v1.md`
+- `docs/contracts/style_v1.md`
+- `docs/architecture/overview.md`
+
+### Adapters
+
+- `densegen_tfbs`: DenseGen TFBS list-of-dicts -> `Feature(kind="kmer")`
+- `generic_features`: normalized feature/effect/display payload columns
+- `cruncher_best_window`: Cruncher elites + hits + PWM metadata -> kmer + motif_logo
+
+### Feature/Effect model
+
+Rendering consumes `Record` objects with:
+- `features[]` (typed by `kind`)
+- `effects[]` (typed by `kind`)
+- `display` metadata for overlay text and legend labels
+
+Unknown feature/effect kinds are fatal by policy.
+
+### Public API
+
+Supported integration surface is exported from `dnadesign.baserender`:
+
+- `initialize_runtime`
+- `run_job_v3`
+- `validate_job`
+- `load_record_from_parquet`
+- `Record`, `Feature`, `Effect`, `Display`, `Span`
+- `render_record_figure`
+- `render_record_grid_figure`
+- `render_parquet_record_figure`
+
+Internal modules under `dnadesign.baserender.src.*` are non-contractual and may change.
+
+### Examples
+
+- DenseGen job: `docs/examples/densegen_job.yml`
+- Cruncher job: `docs/examples/cruncher_job.yml`
+
+### Workspace demos
+
+Two curated self-contained workspaces are included:
+
+- `workspaces/demo_densegen_render`
+- `workspaces/demo_cruncher_render`
+
+Run them with:
 
 ```bash
-baserender job run jobs/foo.yml
-# or by name (looked up in jobs/):
-baserender job run foo
+uv run baserender job run --workspace demo_densegen_render --workspace-root src/dnadesign/baserender/workspaces
+uv run baserender job run --workspace demo_cruncher_render --workspace-root src/dnadesign/baserender/workspaces
 ```
+`demo_cruncher_render` is the fast iteration path for the Cruncher elites-showcase visual contract. It runs from normalized Record-shape rows (`id`, `sequence`, `features`, `effects`, `display`) via `generic_features`, and keeps source-like Cruncher artifacts in `inputs/` for runtime-shape reference.
 
-#### Direct (dataset → images), with progress and plugin(s)
+### Video encoding
 
-```bash
-baserender render /path/to/records.parquet \
-  --out-dir ./out/images \
-  --plugin sigma70 \
-  --limit 500   # default; set 0 for all
-```
-
-### Dataset contract
-
-* `sequence` (str)
-* `densegen__used_tfbs_detail` (list of dicts: `{"offset": int, "orientation": "fwd"|"rev", "tf": str, "tfbs": str}`)
-* optional `id` (str)
-
-### Selection (CSV-driven)
-
-Jobs can optionally select specific records via a CSV:
-
-```yaml
-selection:
-  path: selections.csv
-  match_on: id              # id | sequence | row
-  column: id                # CSV column to read
-  overlay_column: details   # optional text overlay column (must exist if set)
-  keep_order: true
-  on_missing: warn          # skip | warn | error
-```
-
-Row selection uses **Parquet row index (0‑based)** from the dataset.
-
-### Style presets
-
-Style presets live in `styles/`. The default is `presentation_default.yml`.
-Use `baserender style list` to see available presets and `baserender style show` to inspect the effective mapping.
-
-### Output path resolution
-
-Output paths are resolved relative to `results_dir/<job_name>/`:
-
-* Absolute paths are used as‑is.
-* Relative paths resolve under `results_dir/<job_name>/...`.
-
-### Preset example
-
-`src/dnadesign/baserender/jobs/cpxR_LexA.yml`
-
-```yaml
-version: 2
-input:
-  # Relative paths resolve from the repo root when the job is under jobs/.
-  path: inputs/records.parquet
-  format: parquet
-  columns:
-    id: id
-    sequence: sequence
-    annotations: densegen__used_tfbs_detail
-  alphabet: DNA
-  # Limit how many sequences to process (default 500). Set 0 to process all.
-  limit: 500
-
-pipeline:
-  plugins:
-    - sigma70
-
-style:
-  preset: presentation_default
-  overrides: {}
-
-output:
-  video:
-    # If omitted, defaults to results/<job>/<job>.mp4
-    path: results/CpxR_LexA/cpxR_LexA.mp4
-    fmt: mp4
-    fps: 2
-    frames_per_record: 1
-    pauses: {}
-    width_px: 1400
-    height_px: null
-  images:
-    dir: results/CpxR_LexA/images
-    fmt: png
-```
-
----
-
-@e-south
+Video output uses MP4/H.264 with:
+- even dimensions
+- `yuv420p`
+- `+faststart`
+- letterboxing when target frame is larger than rendered frame

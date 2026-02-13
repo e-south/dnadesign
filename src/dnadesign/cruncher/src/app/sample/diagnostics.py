@@ -47,27 +47,6 @@ def _norm_map_for_elites(
     return scorer.normalized_llr_map(seq_arr)
 
 
-def _elite_filter_passes(
-    *,
-    norm_map: dict[str, float],
-    min_norm: float,
-    sum_norm: float,
-    min_per_tf_norm: float | None,
-    require_all_tfs_over_min_norm: bool,
-    pwm_sum_min: float,
-) -> bool:
-    if min_per_tf_norm is not None:
-        if require_all_tfs_over_min_norm:
-            if not all(score >= min_per_tf_norm for score in norm_map.values()):
-                return False
-        else:
-            if min_norm < min_per_tf_norm:
-                return False
-    if pwm_sum_min > 0 and sum_norm < pwm_sum_min:
-        return False
-    return True
-
-
 def resolve_dsdna_mode(*, elites_cfg: object, bidirectional: bool) -> bool:
     _ = elites_cfg
     return bool(bidirectional)

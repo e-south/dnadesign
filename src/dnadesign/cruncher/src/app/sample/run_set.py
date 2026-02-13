@@ -229,14 +229,24 @@ def _assert_init_length_fits_pwms(sample_cfg: SampleConfig, pwms: dict[str, PWM]
         )
 
 
-def _resolve_min_per_tf_norm(
+def _resolve_elite_pool_size(
     *,
-    sample_cfg: SampleConfig,
-) -> tuple[float | None, dict[str, object] | None]:
-    cfg_value = sample_cfg.elites.filter.min_per_tf_norm
-    if cfg_value is None:
-        return None, None
-    return float(cfg_value), None
+    pool_size_cfg: str | int,
+    elite_k: int,
+    candidate_count: int,
+) -> int:
+    if candidate_count < 0:
+        raise ValueError("candidate_count must be >= 0")
+    if pool_size_cfg == "all":
+        return int(candidate_count)
+    if pool_size_cfg == "auto":
+        auto_target = max(4000, 500 * max(int(elite_k), 1))
+        auto_target = min(auto_target, 20_000)
+        return min(int(candidate_count), int(auto_target))
+    value = int(pool_size_cfg)
+    if value < 1:
+        raise ValueError("pool_size must be >= 1")
+    return min(value, int(candidate_count))
 
 
 def _core_def_hash(pwm: PWM, pwm_hash: str | None) -> str:
@@ -559,7 +569,6 @@ def _run_sample_for_set(
                 )
                 min_norm = float(min(norm_map.values())) if norm_map else 0.0
                 row["min_norm"] = min_norm
-                row["min_per_tf_norm"] = min_norm
                 for tf in tf_order:
                     row[f"score_{tf}"] = float(per_tf_map[tf])
                 yield row
@@ -672,18 +681,12 @@ def _run_sample_for_set(
     )
     logger.debug("Saved random baseline -> %s", baseline_path.relative_to(out_dir.parent))
 
-    # 9) BUILD elites list — filter (representativeness), rank (objective), diversify
-    min_per_tf_norm, auto_norm_meta = _resolve_min_per_tf_norm(
-        sample_cfg=sample_cfg,
-    )
-    require_all = bool(sample_cfg.elites.filter.require_all_tfs)
+    # 9) BUILD elites list — score-driven candidates, then MMR diversity selection
     pool_result = build_elite_pool(
         optimizer=optimizer,
         evaluator=evaluator,
         scorer=scorer,
         sample_cfg=sample_cfg,
-        min_per_tf_norm=min_per_tf_norm,
-        require_all_tfs=require_all,
         beta_softmin_final=beta_softmin_final,
     )
     raw_elites = pool_result.raw_elites
@@ -703,7 +706,7 @@ def _run_sample_for_set(
             p90,
             100 * p90 / n_tf if n_tf else 0.0,
         )
-    if min_norms and min_per_tf_norm is not None:
+    if min_norms:
         p50_min, p90_min = np.percentile(min_norms, [50, 90])
         logger.debug("Normalised-min percentiles |  median %.2f   90%% %.2f", p50_min, p90_min)
 
@@ -711,19 +714,19 @@ def _run_sample_for_set(
     if elite_k > 0 and not raw_elites:
         _finish_failed(
             RunError(
-                "No elite candidates passed filtering. "
-                "Try one or more of: relax cruncher.sample.elites.filter.min_per_tf_norm, "
-                "increase cruncher.sample.sequence_length, or increase cruncher.sample.budget.draws."
+                "No elite candidates were generated from sampled draws. "
+                "Increase cruncher.sample.sequence_length or cruncher.sample.budget.draws."
             )
         )
 
     dsdna_mode = bool(sample_cfg.objective.bidirectional)
     pool_size_cfg = sample_cfg.elites.select.pool_size
-    if pool_size_cfg == "auto":
-        pool_size = max(200, min(5000, 200 * max(elite_k, 1)))
-        pool_size = min(pool_size, len(raw_elites)) if raw_elites else pool_size
-    else:
-        pool_size = int(pool_size_cfg)
+    pool_size = _resolve_elite_pool_size(
+        pool_size_cfg=pool_size_cfg,
+        elite_k=elite_k,
+        candidate_count=len(raw_elites),
+    )
+    diversity_value = float(sample_cfg.elites.select.diversity)
     mmr_meta_rows: list[dict[str, object]] | None = None
     mmr_summary: dict[str, object] | None = None
     mmr_meta_path: Path | None = None
@@ -732,24 +735,29 @@ def _run_sample_for_set(
     selection_result = select_elites_mmr(
         raw_elites=raw_elites,
         elite_k=elite_k,
-        alpha=sample_cfg.elites.select.alpha,
         pool_size=pool_size,
         scorer=scorer,
         pwms=pwms,
         dsdna_mode=dsdna_mode,
+        diversity=diversity_value,
+        sample_sequence_length=int(sample_cfg.sequence_length),
+        cooling_config=sample_cfg.optimizer.cooling.model_dump(mode="json"),
     )
     kept_elites = selection_result.kept_elites
     kept_after_mmr = selection_result.kept_after_mmr
     mmr_meta_rows = selection_result.mmr_meta_rows
     mmr_summary = selection_result.mmr_summary
+    if isinstance(mmr_summary, dict):
+        summary_pool = mmr_summary.get("pool_size")
+        if isinstance(summary_pool, (int, float)):
+            pool_size = int(summary_pool)
 
     if elite_k > 0 and len(kept_elites) < elite_k:
         _finish_failed(
             RunError(
                 f"Elite selection returned {len(kept_elites)} candidates, "
                 f"fewer than cruncher.sample.elites.k={elite_k}. "
-                "Try one or more of: relax cruncher.sample.elites.filter.min_per_tf_norm, "
-                "increase cruncher.sample.sequence_length, or increase cruncher.sample.budget.draws."
+                "Increase cruncher.sample.sequence_length or cruncher.sample.budget.draws."
             )
         )
 
@@ -764,12 +772,25 @@ def _run_sample_for_set(
         want_canonical=want_canonical,
         meta_source=out_dir.name,
     )
+    dedupe_key = "canonical_sequence" if want_canonical else "sequence"
+    seen_keys: set[str] = set()
+    duplicate_keys: set[str] = set()
+    for entry in elites:
+        key_val = entry.get(dedupe_key)
+        if not isinstance(key_val, str) or not key_val:
+            _finish_failed(RunError(f"Elite entry missing required '{dedupe_key}' for uniqueness validation."))
+        if key_val in seen_keys:
+            duplicate_keys.add(key_val)
+        seen_keys.add(key_val)
+    if duplicate_keys:
+        _finish_failed(
+            RunError(
+                "Elite selection produced duplicate sequences after MMR selection "
+                f"(key={dedupe_key}, duplicates={len(duplicate_keys)})."
+            )
+        )
 
-    run_logger(
-        "Final elite count: %d (min_per_tf_norm=%s)",
-        len(elites),
-        f"{min_per_tf_norm:.2f}" if min_per_tf_norm is not None else "off",
-    )
+    run_logger("Final elite count: %d", len(elites))
 
     tf_label = format_regulator_slug(tfs)
 
@@ -855,20 +876,37 @@ def _run_sample_for_set(
 
     # 2)  .yaml run-metadata -----------------------------------------------
     optimizer_stats = optimizer.stats() if hasattr(optimizer, "stats") else {}
+    selection_policy = "mmr"
+    relevance_label = "min_tf_score"
+    pool_strategy = "stratified"
+    score_weight = 1.0 - diversity_value
+    diversity_weight = diversity_value
+    if isinstance(mmr_summary, dict):
+        selection_policy = str(mmr_summary.get("selection_policy") or selection_policy)
+        relevance_label = str(mmr_summary.get("relevance") or relevance_label)
+        pool_strategy = str(mmr_summary.get("pool_strategy") or pool_strategy)
+        score_weight_meta = mmr_summary.get("score_weight")
+        diversity_weight_meta = mmr_summary.get("diversity_weight")
+        if score_weight_meta is not None:
+            score_weight = float(score_weight_meta)
+        if diversity_weight_meta is not None:
+            diversity_weight = float(diversity_weight_meta)
     meta = {
         "generated": datetime.now(timezone.utc).isoformat(),
         "n_elites": len(elites),
-        "min_per_tf_norm": min_per_tf_norm,
-        "require_all_tfs_over_min_norm": require_all,
-        "selection_policy": "mmr",
-        "mmr_alpha": sample_cfg.elites.select.alpha,
+        "selection_policy": selection_policy,
+        "selection_relevance": relevance_label,
+        "selection_score_weight": score_weight,
+        "selection_diversity_weight": diversity_weight,
+        "selection_diversity": diversity_value,
         "dsdna_canonicalize": want_canonical,
         "total_draws_seen": total_draws_seen,
-        "passed_pre_filter": len(raw_elites),
+        "candidate_count": len(raw_elites),
         "kept_after_mmr": kept_after_mmr,
         "objective_combine": combine_resolved,
         "softmin_final_beta_used": beta_softmin_final,
         "pool_size": pool_size,
+        "pool_strategy": pool_strategy,
         "indexing_note": (
             "chain is a 0-based independent chain index; chain_1based is 1-based; "
             "draw_idx/sweep_idx are absolute sweeps; "
@@ -880,8 +918,6 @@ def _run_sample_for_set(
         "config_file": str(config_used_path(out_dir).resolve()),
         "regulator_set": {"index": set_index, "tfs": tfs},
     }
-    if auto_norm_meta is not None:
-        meta["min_per_tf_norm_auto"] = auto_norm_meta
     if isinstance(optimizer_stats, dict) and optimizer_stats:
 
         def _float_list(value: object) -> list[float] | None:
@@ -963,8 +999,6 @@ def _run_sample_for_set(
         optimizer_kind=optimizer_kind,
         combine_resolved=combine_resolved,
         beta_softmin_final=beta_softmin_final,
-        min_per_tf_norm=min_per_tf_norm,
-        min_per_tf_norm_auto=auto_norm_meta,
         parse_signature=parse_signature,
         parse_inputs=parse_inputs,
         status_writer=status_writer,

@@ -1,0 +1,33 @@
+version: 3
+input:
+  kind: parquet
+  path: inputs/elites_showcase_records.parquet
+  adapter:
+    kind: generic_features
+    columns:
+      sequence: sequence
+      features: features
+      effects: effects
+      display: display
+      id: id
+    policies: {}
+  alphabet: DNA
+render:
+  renderer: sequence_rows
+  style:
+    preset: presentation_default
+    overrides:
+      palette:
+        tf:lexA: "#B45309"
+        tf:cpxR: "#0F766E"
+      connectors: false
+      legend_font_size: 10
+      kmer:
+        fill_alpha: 0.94
+outputs:
+  - kind: images
+    fmt: png
+run:
+  strict: false
+  fail_on_skips: false
+  emit_report: true

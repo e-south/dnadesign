@@ -188,3 +188,64 @@ def test_add_raw_llr_objective_adds_combined_raw_llr_column() -> None:
     assert "norm_llr_objective" in enriched.columns
     assert enriched["raw_llr_objective"].notna().all()
     assert enriched["norm_llr_objective"].notna().all()
+
+
+def test_build_trajectory_points_replays_softmin_schedule_per_sweep() -> None:
+    sequences_df = pd.DataFrame(
+        {
+            "chain": [0, 0],
+            "sweep_idx": [0, 9],
+            "phase": ["draw", "draw"],
+            "score_lexA": [0.4, 0.4],
+            "score_cpxR": [0.8, 0.8],
+        }
+    )
+
+    trajectory_df = build_trajectory_points(
+        sequences_df,
+        ["lexA", "cpxR"],
+        max_points=0,
+        objective_config={
+            "combine": "min",
+            "total_sweeps": 10,
+            "softmin": {
+                "enabled": True,
+                "schedule": "linear",
+                "beta_start": 0.5,
+                "beta_end": 5.0,
+            },
+        },
+    )
+
+    assert len(trajectory_df) == 2
+    first = float(trajectory_df.iloc[0]["objective_scalar"])
+    last = float(trajectory_df.iloc[1]["objective_scalar"])
+    assert last > first
+
+
+def test_build_trajectory_points_softmin_requires_total_sweeps() -> None:
+    sequences_df = pd.DataFrame(
+        {
+            "chain": [0],
+            "sweep_idx": [0],
+            "phase": ["draw"],
+            "score_lexA": [0.4],
+            "score_cpxR": [0.8],
+        }
+    )
+
+    with pytest.raises(ValueError, match="objective.total_sweeps"):
+        build_trajectory_points(
+            sequences_df,
+            ["lexA", "cpxR"],
+            max_points=0,
+            objective_config={
+                "combine": "min",
+                "softmin": {
+                    "enabled": True,
+                    "schedule": "linear",
+                    "beta_start": 0.5,
+                    "beta_end": 5.0,
+                },
+            },
+        )

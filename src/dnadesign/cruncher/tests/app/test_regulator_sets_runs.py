@@ -89,8 +89,7 @@ def test_sample_runs_split_by_regulator_set(tmp_path: Path) -> None:
                 "objective": {"bidirectional": True, "score_scale": "llr", "combine": "min"},
                 "elites": {
                     "k": 1,
-                    "filter": {"min_per_tf_norm": None, "require_all_tfs": True, "pwm_sum_min": 0.0},
-                    "select": {"alpha": 0.85, "pool_size": "auto"},
+                    "select": {"diversity": 0.0, "pool_size": "auto"},
                 },
                 "moves": {
                     "profile": "balanced",

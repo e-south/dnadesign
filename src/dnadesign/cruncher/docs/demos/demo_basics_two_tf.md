@@ -50,12 +50,12 @@ pixi run cruncher -- parse --force-overwrite -c "$CONFIG"
 pixi run cruncher -- sample --force-overwrite -c "$CONFIG"
 pixi run cruncher -- analyze --summary -c "$CONFIG"
 pixi run cruncher -- catalog logos --source demo_merged_meme_oops --tf lexA --tf cpxR -c "$CONFIG"
-find outputs -type f -name 'plot__*.png' | sort
+find outputs -type f -name 'plot__*.*' | sort
 find outputs -type f -path '*/logos/*' -name '*.png' | sort
 ```
 
-If `sample` fails due elite filters, adjust `sample.elites.filter.min_per_tf_norm`,
-`sample.sequence_length`, or `sample.budget.draws`, then rerun.
+If `sample` fails to produce enough elites, increase `sample.budget.draws`, set `sample.elites.select.pool_size: all`,
+or lower `sample.elites.select.diversity`, then rerun.
 If `lock` fails after reset, run `discover motifs` first; this demo intentionally locks only to discovered motifs.
 
 ## Demo setup
@@ -101,6 +101,17 @@ The local MEME files provide DAP-seq sites; RegulonDB adds curated sites.
 Run MEME in OOPS mode over the merged site sets and write discovered motifs under
 source `demo_merged_meme_oops`.
 
+Preflight once per machine:
+
+```bash
+cruncher discover check
+```
+
+This demo config sets `discover.tool_path` to the repo-local Pixi MEME bin
+(`.pixi/envs/default/bin`), so discovery/analyze should run without setting
+`MEME_BIN`. If your MEME install lives elsewhere, update `discover.tool_path`
+or set `MEME_BIN` before running discovery.
+
 ```bash
 cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --source-id demo_merged_meme_oops -c "$CONFIG"
 ```
@@ -143,8 +154,8 @@ During sampling, logs now print `Sampling PWM width <TF>: source=<...> effective
 so it is explicit when `sample.motif_width` changed widths versus leaving discovered widths unchanged.
 
 If `outputs/` already exists from a prior run, re-run sample with `--force-overwrite`.
-If sample fails with an elite-filter message, relax `sample.elites.filter.min_per_tf_norm`, increase
-`sample.sequence_length`, or increase `sample.budget.draws`, then re-run sample.
+If sample fails with an elite-count message, increase `sample.budget.draws`, set
+`sample.elites.select.pool_size: all`, or lower `sample.elites.select.diversity`, then re-run sample.
 
 ## Fast rerun after config edits
 
@@ -186,8 +197,8 @@ Key files:
 - `analysis/report.json`
 - motif logos under `logos/catalog/<run_name>/`
 - curated plots in `plots/`: `plot__chain_trajectory_scatter.*`,
-  `plot__chain_trajectory_sweep.*`, `plot__elites_nn_distance.*`, `plot__overlap_panel.*`
-  (and `plot__health_panel.*` if a trace is present; `plot__overlap_panel.*` is skipped when `n_elites < 2`)
+  `plot__chain_trajectory_sweep.*`, `plot__elites_nn_distance.*`, `plot__elites_showcase.*`
+  (and `plot__health_panel.*` if a trace is present)
 - analysis tables in `analysis/` use `table__*` filenames (for example
   `table__scores_summary.parquet` and `table__metrics_joint.parquet`)
 - elite hit metadata: `optimize/elites_hits.parquet`

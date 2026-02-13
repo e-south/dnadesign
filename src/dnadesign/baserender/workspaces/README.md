@@ -29,9 +29,11 @@ Curated demos tracked in git:
   - Input: `inputs/input.parquet` (DenseGen-style TFBS annotations)
   - Output: PNG stills under `outputs/images/`
 - `demo_cruncher_render`
-  - Input: `inputs/elites.parquet` + `inputs/elites_hits.parquet` + `inputs/config_used.yaml`
-    (Cruncher-style elite + hit + PWM artifacts)
-  - Output: PDF stills under `outputs/images/`
+  - Input (hotpath): `inputs/elites_showcase_records.parquet`
+    (normalized Record-shape rows for fast visual iteration)
+  - Input (runtime-adjacent references kept in the same workspace):
+    `inputs/elites.parquet` + `inputs/elites_hits.parquet` + `inputs/config_used.yaml`
+  - Output: PNG stills under `outputs/images/`
 
 Run demos:
 

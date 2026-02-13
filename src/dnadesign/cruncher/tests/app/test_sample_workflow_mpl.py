@@ -35,8 +35,7 @@ def _config_payload(*, catalog_root: Path, save_trace: bool) -> dict:
                 "objective": {"bidirectional": True, "score_scale": "llr", "combine": "min"},
                 "elites": {
                     "k": 1,
-                    "filter": {"min_per_tf_norm": None, "require_all_tfs": True, "pwm_sum_min": 0.0},
-                    "select": {"alpha": 0.85, "pool_size": "auto"},
+                    "select": {"diversity": 0.0, "pool_size": "auto"},
                 },
                 "output": {
                     "save_trace": save_trace,

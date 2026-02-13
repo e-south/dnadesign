@@ -68,21 +68,21 @@ def test_demo_configs_use_tuned_gibbs_annealing_defaults() -> None:
         root / "demo_basics_two_tf" / "config.yaml": {
             "chains": 6,
             "cooling_kind": "piecewise",
-            "final_beta": 14.0,
+            "final_beta": 22.0,
             "draws": 150000,
             "tune": 25000,
         },
         root / "demo_campaigns_multi_tf" / "config.yaml": {
             "chains": 10,
             "cooling_kind": "piecewise",
-            "final_beta": 18.0,
+            "final_beta": 24.0,
             "draws": 12000,
             "tune": 4000,
         },
         root / "densegen_prep_three_tf" / "config.yaml": {
             "chains": 8,
             "cooling_kind": "piecewise",
-            "final_beta": 18.0,
+            "final_beta": 24.0,
             "draws": 8000,
             "tune": 2500,
         },
@@ -111,6 +111,8 @@ def test_demo_configs_use_modern_schema_keys() -> None:
         sample = cruncher["sample"]
         optimizer = sample["optimizer"]
         assert "early_stop" in optimizer, f"{config_path} should expose sample.optimizer.early_stop."
+        elites_select = sample["elites"]["select"]
+        assert "diversity" in elites_select, f"{config_path} should expose sample.elites.select.diversity."
 
         analysis = cruncher["analysis"]
         assert "trajectory_chain_overlay" in analysis, f"{config_path} should use analysis.trajectory_chain_overlay."

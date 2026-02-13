@@ -16,6 +16,7 @@ from typing import Iterable, Tuple
 import numpy as np
 import pandas as pd
 
+from dnadesign.cruncher.core.optimizers.cooling import make_beta_scheduler
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.core.scoring import Scorer
 
@@ -110,14 +111,13 @@ def _resolve_objective_scalar(
     *,
     objective_config: dict[str, object] | None,
 ) -> pd.Series:
-    direct_columns = ("objective_scalar", "score_aggregate", "combined_score_final", "combined_score")
-    for column in direct_columns:
-        if column in df.columns:
-            return _validate_numeric(df[column], column=column)
-
     score_cols = _score_columns(tf_names)
     missing = [col for col in score_cols if col not in df.columns]
     if missing:
+        direct_columns = ("objective_scalar", "score_aggregate", "combined_score_final", "combined_score")
+        for column in direct_columns:
+            if column in df.columns:
+                return _validate_numeric(df[column], column=column)
         raise ValueError(f"Cannot reconstruct trajectory objective scalar; missing score columns: {missing}")
 
     objective_cfg = objective_config if isinstance(objective_config, dict) else {}
@@ -132,15 +132,68 @@ def _resolve_objective_scalar(
 
     softmin_cfg = objective_cfg.get("softmin")
     softmin_enabled = isinstance(softmin_cfg, dict) and bool(softmin_cfg.get("enabled"))
-    beta_value = objective_cfg.get("softmin_final_beta_used")
-    beta_final: float | None = None
-    if beta_value is not None:
+    if softmin_enabled:
+        sweep_values: pd.Series | None = None
+        if "sweep_idx" in df.columns:
+            sweep_values = _validate_numeric(df["sweep_idx"], column="sweep_idx").astype(int)
+        elif "sweep" in df.columns:
+            sweep_values = _validate_numeric(df["sweep"], column="sweep").astype(int)
+        elif "draw" in df.columns:
+            sweep_values = _validate_numeric(df["draw"], column="draw").astype(int)
+
+        if sweep_values is None:
+            beta_value = objective_cfg.get("softmin_final_beta_used")
+            if beta_value is None:
+                raise ValueError(
+                    "Cannot reconstruct softmin objective scalar without sweep columns; "
+                    "objective.softmin_final_beta_used is required."
+                )
+            try:
+                beta_final = float(beta_value)
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise ValueError("objective.softmin_final_beta_used must be numeric.") from exc
+            if beta_final <= 0:
+                return pd.Series(scores.min(axis=1), index=df.index, dtype=float)
+            objective_vals = np.asarray([_softmin(row, beta_final) for row in scores], dtype=float)
+            return pd.Series(objective_vals, index=df.index, dtype=float)
+
+        total_sweeps_raw = objective_cfg.get("total_sweeps")
+        if total_sweeps_raw is None:
+            raise ValueError(
+                "Cannot reconstruct softmin objective scalar: objective.total_sweeps is required in run metadata."
+            )
         try:
-            beta_final = float(beta_value)
-        except (TypeError, ValueError) as exc:
-            raise ValueError("objective.softmin_final_beta_used must be numeric when provided.") from exc
-    if softmin_enabled and beta_final is not None and beta_final > 0:
-        objective_vals = np.asarray([_softmin(row, beta_final) for row in scores], dtype=float)
+            total_sweeps = int(total_sweeps_raw)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("objective.total_sweeps must be an integer.") from exc
+        if total_sweeps < 1:
+            raise ValueError("objective.total_sweeps must be >= 1.")
+
+        schedule_name = str(softmin_cfg.get("schedule") or "fixed").strip().lower()
+        if schedule_name == "fixed":
+            beta_value = softmin_cfg.get("beta_end")
+            if beta_value is None:
+                raise ValueError("objective.softmin.beta_end is required when softmin.schedule='fixed'.")
+            schedule_cfg = {"kind": "fixed", "beta": float(beta_value)}
+        elif schedule_name == "linear":
+            beta_start = softmin_cfg.get("beta_start")
+            beta_end = softmin_cfg.get("beta_end")
+            if beta_start is None or beta_end is None:
+                raise ValueError(
+                    "objective.softmin.beta_start and objective.softmin.beta_end are required for linear softmin."
+                )
+            schedule_cfg = {"kind": "linear", "beta": (float(beta_start), float(beta_end))}
+        else:
+            raise ValueError(
+                f"Unsupported softmin schedule '{schedule_name}' while reconstructing trajectory objective scalar."
+            )
+
+        beta_of = make_beta_scheduler(schedule_cfg, total_sweeps)
+        beta_rows = np.asarray([float(beta_of(int(sweep))) for sweep in sweep_values.tolist()], dtype=float)
+        objective_vals = np.asarray(
+            [_softmin(row, beta) if beta > 0 else float(np.min(row)) for row, beta in zip(scores, beta_rows)],
+            dtype=float,
+        )
         return pd.Series(objective_vals, index=df.index, dtype=float)
     return pd.Series(scores.min(axis=1), index=df.index, dtype=float)
 
@@ -335,6 +388,11 @@ def add_raw_llr_objective(
     norm_df = pd.DataFrame(norm_payload, index=out.index)
     raw_score_df = pd.DataFrame(index=out.index)
     norm_score_df = pd.DataFrame(index=out.index)
+    for sweep_col in ("sweep_idx", "sweep", "draw"):
+        if sweep_col in out.columns:
+            raw_score_df[sweep_col] = pd.to_numeric(out[sweep_col], errors="coerce")
+            norm_score_df[sweep_col] = pd.to_numeric(out[sweep_col], errors="coerce")
+            break
     for tf in tf_list:
         if tf not in raw_df.columns:
             raise ValueError(f"Raw-LLR scorer output missing TF '{tf}'.")

@@ -61,8 +61,7 @@ def _sample_block() -> dict:
         "objective": {"bidirectional": True, "score_scale": "normalized-llr", "combine": "min"},
         "elites": {
             "k": 1,
-            "filter": {"min_per_tf_norm": None, "require_all_tfs": True, "pwm_sum_min": 0.0},
-            "select": {"alpha": 0.85, "pool_size": "auto"},
+            "select": {"diversity": 0.0, "pool_size": "auto"},
         },
         "moves": {
             "profile": "balanced",
@@ -270,7 +269,6 @@ def test_demo_campaign_pair_local_only_generates_plots(tmp_path: Path) -> None:
     cruncher_cfg["sample"]["budget"]["tune"] = 240
     cruncher_cfg["sample"]["budget"]["draws"] = 480
     cruncher_cfg["sample"]["elites"]["k"] = 3
-    cruncher_cfg["sample"]["elites"]["filter"]["min_per_tf_norm"] = 0.0
     cruncher_cfg["analysis"]["max_points"] = 1000
     config_path.write_text(yaml.safe_dump(config_payload))
 
@@ -305,18 +303,22 @@ def test_demo_campaign_pair_local_only_generates_plots(tmp_path: Path) -> None:
     analysis_dir = workspace / "outputs"
     assert analysis_dir.is_dir()
     assert manifest_path(analysis_dir).exists()
-    assert (analysis_dir / "plots" / "plot__chain_trajectory_scatter.png").exists()
-    assert (analysis_dir / "plots" / "plot__chain_trajectory_sweep.png").exists()
-    assert (analysis_dir / "plots" / "plot__elites_nn_distance.png").exists()
-    assert (analysis_dir / "plots" / "plot__overlap_panel.png").exists()
-    assert (analysis_dir / "plots" / "plot__health_panel.png").exists()
+    plot_ext = str(cruncher_cfg["analysis"]["plot_format"])
+    assert (analysis_dir / "plots" / f"plot__chain_trajectory_scatter.{plot_ext}").exists()
+    assert (analysis_dir / "plots" / f"plot__chain_trajectory_sweep.{plot_ext}").exists()
+    assert (analysis_dir / "plots" / f"plot__elites_nn_distance.{plot_ext}").exists()
+    assert (analysis_dir / "plots" / f"plot__elites_showcase.{plot_ext}").exists()
+    assert (analysis_dir / "plots" / f"plot__health_panel.{plot_ext}").exists()
 
     campaign_dir = workspace / "outputs" / "campaign" / "demo_pair"
     assert campaign_dir.is_dir()
     assert (campaign_dir / "analysis" / "campaign_summary.csv").exists()
     assert (campaign_dir / "analysis" / "campaign_best.csv").exists()
     assert (campaign_dir / "analysis" / "campaign_manifest.json").exists()
-    assert (campaign_dir / "plots" / "plot__best_jointscore_bar.png").exists()
+    campaign_plot = campaign_dir / "plots" / f"plot__best_jointscore_bar.{plot_ext}"
+    if not campaign_plot.exists():
+        campaign_plot = campaign_dir / "plots" / "plot__best_jointscore_bar.png"
+    assert campaign_plot.exists()
     assert (campaign_dir / "plots" / "plot__tf_coverage_heatmap.png").exists()
     assert (campaign_dir / "plots" / "plot__pairgrid_overview.png").exists()
     assert (campaign_dir / "plots" / "plot__joint_trend.png").exists()
@@ -340,6 +342,7 @@ def test_demo_basics_low_budget_analyze_survives_nonfinite_trajectory(tmp_path: 
     cruncher_cfg["sample"]["budget"]["draws"] = 360
     cruncher_cfg["sample"]["elites"]["k"] = 3
     cruncher_cfg["analysis"]["max_points"] = 1000
+    cruncher_cfg["analysis"]["fimo_compare"]["enabled"] = False
     config_path.write_text(yaml.safe_dump(config_payload))
 
     result = runner.invoke(

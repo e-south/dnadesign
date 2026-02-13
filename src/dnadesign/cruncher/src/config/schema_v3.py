@@ -505,14 +505,6 @@ class CatalogConfig(StrictBaseModel):
     def catalog_root(self) -> Path:
         return self.root
 
-    @property
-    def pwm_window_lengths(self) -> Dict[str, int]:
-        return {}
-
-    @property
-    def pwm_window_strategy(self) -> str:
-        return "max_info"
-
 
 class DiscoverConfig(StrictBaseModel):
     enabled: bool = False
@@ -1074,54 +1066,29 @@ class SampleOptimizerConfig(StrictBaseModel):
         return int(v)
 
 
-class SampleEliteFilterConfig(StrictBaseModel):
-    min_per_tf_norm: float | None = None
-    require_all_tfs: bool = True
-    pwm_sum_min: float = 0.0
-
-    @field_validator("min_per_tf_norm")
-    @classmethod
-    def _check_min_per_tf_norm(cls, v):
-        if v is None:
-            return v
-        if not isinstance(v, (int, float)) or v < 0 or v > 1:
-            raise ValueError("elites.filter.min_per_tf_norm must be null or between 0 and 1")
-        return float(v)
-
-    @field_validator("pwm_sum_min")
-    @classmethod
-    def _check_pwm_sum_min(cls, v: float) -> float:
-        if not isinstance(v, (int, float)) or v < 0:
-            raise ValueError("elites.filter.pwm_sum_min must be >= 0")
-        return float(v)
-
-
 class SampleEliteSelectConfig(StrictBaseModel):
-    policy: Literal["mmr"] = "mmr"
-    alpha: float = 0.85
-    pool_size: Union[Literal["auto"], int] = "auto"
-    diversity_metric: Literal["tfbs_core_weighted_hamming"] = "tfbs_core_weighted_hamming"
+    diversity: float = 0.0
+    pool_size: Union[Literal["auto", "all"], int] = "auto"
 
-    @field_validator("alpha")
+    @field_validator("diversity")
     @classmethod
-    def _check_alpha(cls, v: float) -> float:
-        if not isinstance(v, (int, float)) or v <= 0 or v > 1:
-            raise ValueError("elites.select.alpha must be in (0, 1]")
+    def _check_diversity(cls, v: float) -> float:
+        if not isinstance(v, (int, float)) or v < 0 or v > 1:
+            raise ValueError("elites.select.diversity must be between 0 and 1")
         return float(v)
 
     @field_validator("pool_size")
     @classmethod
     def _check_pool_size(cls, v):
-        if v == "auto":
+        if v in {"auto", "all"}:
             return v
         if not isinstance(v, int) or v < 1:
-            raise ValueError("elites.select.pool_size must be 'auto' or >= 1")
+            raise ValueError("elites.select.pool_size must be 'auto', 'all', or >= 1")
         return v
 
 
 class SampleElitesConfig(StrictBaseModel):
     k: int = 10
-    filter: SampleEliteFilterConfig = SampleEliteFilterConfig()
     select: SampleEliteSelectConfig = SampleEliteSelectConfig()
 
     @field_validator("k")
@@ -1130,6 +1097,64 @@ class SampleElitesConfig(StrictBaseModel):
         if v < 1:
             raise ValueError("sample.elites.k must be >= 1")
         return int(v)
+
+
+class AnalysisMmrSweepConfig(StrictBaseModel):
+    enabled: bool = False
+    diversity_values: list[float] = Field(default_factory=lambda: [0.0, 0.25, 0.50, 0.75, 1.0])
+    pool_size_values: list[Union[Literal["auto", "all"], int]] = Field(default_factory=lambda: ["auto"])
+
+    @field_validator("pool_size_values")
+    @classmethod
+    def _check_pool_size_values(
+        cls,
+        values: list[Union[Literal["auto", "all"], int]],
+    ) -> list[Union[Literal["auto", "all"], int]]:
+        if not values:
+            raise ValueError("analysis.mmr_sweep.pool_size_values must contain at least one value")
+        cleaned: list[Union[Literal["auto", "all"], int]] = []
+        for value in values:
+            if value in {"auto", "all"}:
+                cleaned.append(value)
+                continue
+            if not isinstance(value, int) or value < 1:
+                raise ValueError("analysis.mmr_sweep.pool_size_values entries must be 'auto', 'all', or >= 1")
+            cleaned.append(int(value))
+        return cleaned
+
+    @field_validator("diversity_values")
+    @classmethod
+    def _check_diversity_values(cls, values: list[float]) -> list[float]:
+        if not values:
+            raise ValueError("analysis.mmr_sweep.diversity_values must contain at least one value")
+        cleaned: list[float] = []
+        for value in values:
+            if not isinstance(value, (int, float)) or value < 0 or value > 1:
+                raise ValueError("analysis.mmr_sweep.diversity_values entries must be in [0, 1]")
+            cleaned.append(float(value))
+        return cleaned
+
+    @model_validator(mode="after")
+    def _check_grid_size(self) -> "AnalysisMmrSweepConfig":
+        n = len(self.pool_size_values) * len(self.diversity_values)
+        if n > 500:
+            raise ValueError("analysis.mmr_sweep grid is too large (>500 combinations); reduce pool/diversity lists")
+        return self
+
+
+class AnalysisFimoCompareConfig(StrictBaseModel):
+    enabled: bool = False
+
+
+class AnalysisElitesShowcaseConfig(StrictBaseModel):
+    max_panels: int = 12
+
+    @field_validator("max_panels")
+    @classmethod
+    def _check_max_panels(cls, value: int) -> int:
+        if not isinstance(value, int) or value < 1:
+            raise ValueError("analysis.elites_showcase.max_panels must be >= 1")
+        return value
 
 
 class SampleOutputConfig(StrictBaseModel):
@@ -1207,20 +1232,23 @@ class AnalysisConfig(StrictBaseModel):
     run_selector: Literal["latest", "explicit"] = "latest"
     runs: List[str] = Field(default_factory=list)
     pairwise: Union[Literal["off", "auto"], List[str]] = "auto"
-    plot_format: Literal["png", "pdf", "svg"] = "png"
-    plot_dpi: int = 150
+    plot_format: Literal["png", "pdf"] = "pdf"
+    plot_dpi: int = 300
     table_format: Literal["parquet", "csv"] = "parquet"
     archive: bool = False
     max_points: int = 5000
     trajectory_stride: int = 5
     trajectory_scatter_scale: Literal["normalized-llr", "llr"] = "llr"
     trajectory_sweep_y_column: Literal["raw_llr_objective", "objective_scalar", "norm_llr_objective"] = (
-        "raw_llr_objective"
+        "objective_scalar"
     )
     trajectory_sweep_mode: Literal["best_so_far", "raw", "all"] = "best_so_far"
-    trajectory_particle_alpha_min: float = 0.15
+    trajectory_particle_alpha_min: float = 0.25
     trajectory_particle_alpha_max: float = 0.45
     trajectory_chain_overlay: bool = False
+    elites_showcase: AnalysisElitesShowcaseConfig = AnalysisElitesShowcaseConfig()
+    mmr_sweep: AnalysisMmrSweepConfig = AnalysisMmrSweepConfig()
+    fimo_compare: AnalysisFimoCompareConfig = AnalysisFimoCompareConfig()
 
     @field_validator(
         "plot_dpi",

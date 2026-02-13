@@ -17,20 +17,7 @@ import numpy as np
 import pandas as pd
 
 from dnadesign.cruncher.core.pwm import PWM
-
-
-def _info_norm_weights(pwm: PWM) -> np.ndarray:
-    matrix = np.asarray(pwm.matrix, dtype=float)
-    p = matrix + 1e-9
-    info = 2.0 + (p * np.log2(p)).sum(axis=1)
-    max_info = float(np.max(info)) if info.size else 0.0
-    if max_info <= 0:
-        return np.ones_like(info, dtype=float)
-    info_norm = info / max_info
-    weights = 1.0 - info_norm
-    if float(weights.sum()) <= 0:
-        return np.ones_like(info, dtype=float)
-    return weights
+from dnadesign.cruncher.core.selection.mmr import compute_position_weights
 
 
 def _weighted_hamming(a: str, b: str, weights: np.ndarray) -> float:
@@ -94,7 +81,7 @@ def compute_distance_matrix(
         pwm = pwms.get(tf)
         if pwm is None:
             continue
-        weights_by_tf[tf] = _info_norm_weights(pwm)
+        weights_by_tf[tf] = compute_position_weights(pwm)
 
     for i, item_i in enumerate(item_ids):
         dist[i, i] = 0.0
@@ -225,6 +212,147 @@ def compute_elites_nn_distance_table(
         row["elite_id"] = elite_id
         expanded_rows.append(row)
     return pd.DataFrame(expanded_rows)
+
+
+def compute_elites_full_sequence_nn_table(
+    elites_df: pd.DataFrame,
+    *,
+    identity_mode: str,
+    identity_by_elite_id: dict[str, str] | None = None,
+    rank_by_elite_id: dict[str, int] | None = None,
+) -> tuple[pd.DataFrame, dict[str, float | int | None]]:
+    empty_df = pd.DataFrame(
+        columns=[
+            "elite_id",
+            "nn_full_bp",
+            "mean_full_bp",
+            "min_full_bp",
+            "nn_full_dist",
+            "mean_full_dist",
+            "min_full_dist",
+            "identity_mode",
+        ]
+    )
+    empty_summary: dict[str, float | int | None] = {
+        "sequence_length_bp": None,
+        "mean_pairwise_full_bp": None,
+        "min_pairwise_full_bp": None,
+        "median_nn_full_bp": None,
+        "mean_pairwise_full_distance": None,
+        "min_pairwise_full_distance": None,
+        "median_nn_full_distance": None,
+    }
+    if elites_df is None or elites_df.empty:
+        return empty_df, empty_summary
+    required_cols = ["id", "sequence"]
+    missing = [col for col in required_cols if col not in elites_df.columns]
+    if missing:
+        raise ValueError(
+            "elites.parquet missing required columns for full-sequence diversity: " + ", ".join(sorted(missing))
+        )
+
+    work = elites_df[required_cols].copy()
+    work["id"] = work["id"].astype(str)
+    work["sequence"] = work["sequence"].astype(str)
+    lengths = {len(seq) for seq in work["sequence"]}
+    if not lengths:
+        return empty_df, empty_summary
+    if 0 in lengths:
+        raise ValueError("elites.parquet contains empty sequence values; full-sequence diversity cannot be computed.")
+    if len(lengths) != 1:
+        raise ValueError(
+            "elites.parquet contains mixed sequence lengths; full-sequence diversity requires fixed-length sequences."
+        )
+    sequence_length = int(next(iter(lengths)))
+
+    rep_by_identity: dict[str, str] | None = None
+    if identity_by_elite_id:
+        rep_by_identity = _representative_by_identity(identity_by_elite_id, rank_by_elite_id)
+        keep_ids = set(rep_by_identity.values())
+        work = work[work["id"].isin(keep_ids)].copy()
+    if work.empty:
+        return empty_df, empty_summary
+
+    ids = work["id"].tolist()
+    seq_by_id = dict(zip(work["id"], work["sequence"], strict=True))
+    n_items = len(ids)
+    matrix = np.zeros((n_items, n_items), dtype=float)
+    for i in range(n_items):
+        seq_i = seq_by_id[ids[i]]
+        for j in range(i + 1, n_items):
+            seq_j = seq_by_id[ids[j]]
+            mismatches = float(sum(int(a != b) for a, b in zip(seq_i, seq_j, strict=False)))
+            matrix[i, j] = mismatches
+            matrix[j, i] = mismatches
+
+    rows: list[dict[str, object]] = []
+    nn_values_bp: list[float] = []
+    for i, elite_id in enumerate(ids):
+        other = np.delete(matrix[i, :], i)
+        if other.size == 0:
+            nn_bp = None
+            mean_bp = None
+            min_bp = None
+        else:
+            finite_other = other[np.isfinite(other)]
+            if finite_other.size == 0:
+                nn_bp = None
+                mean_bp = None
+                min_bp = None
+            else:
+                nn_bp = float(np.min(finite_other))
+                mean_bp = float(np.mean(finite_other))
+                min_bp = nn_bp
+                nn_values_bp.append(nn_bp)
+        rows.append(
+            {
+                "elite_id": elite_id,
+                "nn_full_bp": nn_bp,
+                "mean_full_bp": mean_bp,
+                "min_full_bp": min_bp,
+                "nn_full_dist": (nn_bp / float(sequence_length)) if nn_bp is not None else None,
+                "mean_full_dist": (mean_bp / float(sequence_length)) if mean_bp is not None else None,
+                "min_full_dist": (min_bp / float(sequence_length)) if min_bp is not None else None,
+                "identity_mode": identity_mode,
+            }
+        )
+    full_df = pd.DataFrame(rows)
+
+    if identity_by_elite_id and rep_by_identity:
+        metrics_by_rep = {str(row["elite_id"]): row for row in full_df.to_dict(orient="records")}
+        expanded_rows: list[dict[str, object]] = []
+        for elite_id, identity in identity_by_elite_id.items():
+            rep_id = rep_by_identity.get(identity)
+            if rep_id is None:
+                continue
+            metrics = metrics_by_rep.get(str(rep_id))
+            if metrics is None:
+                continue
+            row = dict(metrics)
+            row["elite_id"] = elite_id
+            expanded_rows.append(row)
+        full_df = pd.DataFrame(expanded_rows)
+
+    upper = matrix[np.triu_indices(n_items, k=1)]
+    upper = upper[np.isfinite(upper)]
+    if upper.size == 0:
+        pair_mean_bp = None
+        pair_min_bp = None
+    else:
+        pair_mean_bp = float(np.mean(upper))
+        pair_min_bp = float(np.min(upper))
+
+    median_nn_bp = float(np.median(nn_values_bp)) if nn_values_bp else None
+    summary: dict[str, float | int | None] = {
+        "sequence_length_bp": sequence_length,
+        "mean_pairwise_full_bp": pair_mean_bp,
+        "min_pairwise_full_bp": pair_min_bp,
+        "median_nn_full_bp": median_nn_bp,
+        "mean_pairwise_full_distance": (pair_mean_bp / float(sequence_length) if pair_mean_bp is not None else None),
+        "min_pairwise_full_distance": (pair_min_bp / float(sequence_length) if pair_min_bp is not None else None),
+        "median_nn_full_distance": (median_nn_bp / float(sequence_length) if median_nn_bp is not None else None),
+    }
+    return full_df, summary
 
 
 def compute_baseline_nn_distances(

@@ -46,7 +46,7 @@ Notes:
 - `campaigns` are optional helpers for expanding regulator sets.
 - `campaign` metadata is optional runtime metadata (for generated or campaign-driven runs).
 - `sample` is required for `cruncher sample`, but analyze/reporting consume run artifacts and do not require `sample` in the current config.
-- `analysis` is optional; when omitted, analyze uses default settings (`run_selector=latest`, `pairwise=auto`, `plot_format=png`, `table_format=parquet`).
+- `analysis` is optional; when omitted, analyze uses default settings (`run_selector=latest`, `pairwise=auto`, `plot_format=pdf`, `table_format=parquet`).
 
 ## Workspace
 
@@ -254,15 +254,9 @@ sample:
 
   elites:
     k: 10
-    filter:
-      min_per_tf_norm: null       # float | null
-      require_all_tfs: true
-      pwm_sum_min: 0.0
     select:
-      policy: mmr
-      alpha: 0.85
-      pool_size: auto
-      diversity_metric: tfbs_core_weighted_hamming
+      diversity: 0.0              # 0..1
+      pool_size: auto             # auto | all | int>=1
 
   output:
     save_sequences: true
@@ -275,8 +269,10 @@ Notes:
 - `sequence_length` must be at least the widest PWM after applying `sample.motif_width` bounds.
 - `motif_width.maxw` enforces a contiguous max-information trim during sampling only.
 - Canonicalization is automatic when `objective.bidirectional=true`.
-- MMR distance is TFBS-core weighted Hamming (tolerant weighting, low-information positions emphasized).
+- MMR uses a hybrid distance: full-sequence Hamming + motif-core weighted Hamming (low-information core positions get higher weight).
 - `moves.overrides.*` contains optional expert controls (operator mix + adaptation). Leave unset unless you are actively tuning proposals.
+- Default operator mix is `S=0.85, B=0.07, M=0.04, I=0.04, L=0, W=0` (not `P(S)=1`).
+- `S` is a Gibbs single-site update (accepted by construction); `B/M/L/W/I` are MH proposals (accept/reject).
 - `moves.overrides.gibbs_inertia` dampens late single-site Gibbs flips (`p_stay_*`), which can reduce raw-trajectory jitter.
 - `moves.overrides.adaptive_weights.freeze_after_*` and `moves.overrides.proposal_adapt.freeze_after_*` freeze adaptation late so the kernel stops drifting.
 - `sample.optimizer.kind` currently supports `gibbs_anneal`.
@@ -286,11 +282,20 @@ Notes:
   - `fixed`: `beta`
   - `linear`: `beta_start`, `beta_end`
   - `piecewise`: `stages` (strictly increasing `sweeps`)
-- `sample.elites.filter.min_per_tf_norm` defaults to `null` (off). Set a numeric value only when you explicitly want a hard per-TF gate.
+- When beta changes over sweeps, behavior is simulated annealing. With fixed beta, it is fixed-temperature hybrid MCMC.
+- `sample.elites.select.diversity` is the primary quality-vs-diversity knob (`0..1`):
+  - `0.0`: disables MMR diversity pressure and uses greedy top-k selection by final optimizer score (`combined_score_final`), with normal uniqueness dedupe.
+  - `1.0`: strongest diversity pressure.
+  - For `diversity > 0`, Cruncher uses direct weights:
+    `score_weight = 1 - diversity`, `diversity_weight = diversity`, plus minimum full/core Hamming constraints derived from `diversity`.
+- `sample.elites.select.pool_size` controls the MMR candidate sandbox:
+  - `auto`: `min(candidate_count, min(20000, max(4000, 500*k)))`
+  - `all`: use every candidate draw
+  - integer: clamp to available candidates
 
 ## analysis
 
-Curated plot + table suite with data-driven skipping only (no plot booleans).
+Curated plot + table suite with explicit contracts (no per-plot enable toggles).
 
 ```yaml
 analysis:
@@ -298,29 +303,47 @@ analysis:
   run_selector: latest      # latest | explicit
   runs: []                  # used only if run_selector=explicit
   pairwise: auto            # off | auto | [tf1, tf2]
-  plot_format: png          # png | pdf | svg
-  plot_dpi: 150
+  plot_format: pdf          # pdf | png
+  plot_dpi: 300
   table_format: parquet     # parquet | csv
   archive: false
   max_points: 5000
   trajectory_stride: 5
   trajectory_scatter_scale: llr   # normalized-llr | llr
-  trajectory_sweep_y_column: raw_llr_objective  # raw_llr_objective | objective_scalar | norm_llr_objective
+  trajectory_sweep_y_column: objective_scalar  # objective_scalar | raw_llr_objective | norm_llr_objective
   trajectory_sweep_mode: best_so_far  # best_so_far | raw | all
-  trajectory_particle_alpha_min: 0.15
+  trajectory_particle_alpha_min: 0.25
   trajectory_particle_alpha_max: 0.45
   trajectory_chain_overlay: false
+  elites_showcase:
+    max_panels: 12
+  fimo_compare:
+    enabled: false
+  mmr_sweep:
+    enabled: false
+    pool_size_values: [auto, all]
+    diversity_values: [0.0, 0.25, 0.50, 0.75, 1.0]
 ```
 
 Notes:
 - `analysis.pairwise` selects the TF pair used for the trajectory scatter axes (`plot__chain_trajectory_scatter.*`).
 - `analysis.trajectory_scatter_scale` controls whether scatter axes use per-TF raw LLR or normalized LLR.
-- `analysis.trajectory_sweep_y_column` controls the y-axis for `plot__chain_trajectory_sweep.*`; each point is the combined per-TF objective at that sweep.
+- `analysis.trajectory_sweep_y_column` controls the y-axis for `plot__chain_trajectory_sweep.*`:
+  - `objective_scalar`: optimizer scalar objective at each sweep (`min`/`sum` over TF best-window scores, with soft-min shaping when enabled).
+  - `raw_llr_objective`: replay objective on raw-LLR per-TF scores.
+  - `norm_llr_objective`: replay objective on normalized-LLR per-TF scores.
 - `analysis.trajectory_sweep_mode` controls sweep-plot narrative: `best_so_far` (default optimizer narrative), `raw`, or `all` (raw exploration + best-so-far envelope).
 - Trajectory plots are chain-centric: chains are rendered categorically, and lineage follows each chain across sweeps.
 - `analysis.trajectory_chain_overlay=true` overlays chain markers as a diagnostic layer.
+- `analysis.elites_showcase.max_panels` sets a hard cap for the baserender-backed elites showcase panel count; analyze fails fast when elites exceed this cap.
+- `analysis.fimo_compare.enabled=true` adds `plot__optimizer_vs_fimo.*`, a descriptive QA scatter:
+  - x: Cruncher joint optimizer score (same scalar used during optimization)
+  - y: FIMO weakest-TF score (`min_tf(-log10 p_seq_tf)`), where each TF score is based on the best FIMO hit p-value corrected to sequence-level.
+  - no-hit/poor-hit rows are retained with score `0` (not dropped), so the comparison shows full sampled coverage.
+- `analysis.mmr_sweep.enabled=true` writes `analysis/table__elites_mmr_sweep.*` by replaying MMR over pool-size and diversity grids.
 - `plot__health_panel.*` reports MH acceptance only (Gibbs `S` moves are excluded by design) and shows attempted move mix over sweeps.
-- `plot__elites_nn_distance.*` now summarizes elite diversity as score-vs-distance and full-sequence pairwise distances, while retaining motif-core NN context.
+- `plot__elites_nn_distance.*` uses the final optimizer scalar score (`combined_score_final`) on the y-axis and summarizes full-sequence diversity as score-vs-distance plus a pairwise distance matrix, while retaining motif-core NN context.
+  - In the score-vs-distance panel, x is nearest-neighbor full-sequence Hamming distance (bp) to the closest other selected elite (not average pairwise distance).
 - If the `analysis` block is omitted, analyze resolves this section from schema defaults.
 
 ## campaigns

@@ -26,6 +26,8 @@ _BASE_COLORS = {
     "T": "#d62728",
 }
 
+_LOGO_GAP_FACTOR = 0.2
+
 
 def _info_content(prob: float, n_bases: int = 4) -> float:
     if prob <= 0:
@@ -38,6 +40,16 @@ def _normalize_row(row: list[float]) -> list[float]:
     if s <= 0:
         raise RenderingError("motif_logo matrix rows must have positive sum")
     return [float(x) / s for x in row]
+
+
+def reverse_complement_matrix(matrix: list[list[float]]) -> list[list[float]]:
+    rc: list[list[float]] = []
+    for row in reversed(matrix):
+        if len(row) < 4:
+            raise RenderingError("motif_logo matrix rows must contain at least 4 probabilities [A,C,G,T]")
+        a, c, g, t = float(row[0]), float(row[1]), float(row[2]), float(row[3])
+        rc.append([t, g, c, a])
+    return rc
 
 
 def draw_motif_logo(
@@ -72,15 +84,27 @@ def draw_motif_logo(
 
     label = feature.label.upper()
     observed = list(label)
+    if len(matrix_raw) != len(observed):
+        raise RenderingError("motif_logo matrix length must match target kmer length")
+
+    matrix_rows = [[float(v) for v in row] for row in matrix_raw]
+    if feature.span.strand == "rev":
+        matrix_rows = reverse_complement_matrix(matrix_rows)
 
     width = x2 - x1
     height = y2 - y1
-    n = len(matrix_raw)
+    n = len(matrix_rows)
     if n == 0:
         return
     col_w = width / n
+    gap = _LOGO_GAP_FACTOR * height
 
-    for i, row_raw in enumerate(matrix_raw):
+    if feature.span.strand == "rev":
+        logo_y1 = y1 - gap - height
+    else:
+        logo_y1 = y2 + gap
+
+    for i, row_raw in enumerate(matrix_rows):
         if not isinstance(row_raw, (list, tuple)) or len(row_raw) < 4:
             raise RenderingError("motif_logo matrix rows must contain at least 4 probabilities [A,C,G,T]")
         row = _normalize_row([float(row_raw[0]), float(row_raw[1]), float(row_raw[2]), float(row_raw[3])])
@@ -93,7 +117,7 @@ def draw_motif_logo(
         stacks.sort(key=lambda item: item[1])
 
         x = x1 + i * col_w
-        y = y1
+        y = logo_y1
         total = sum(v for _, v in stacks) or 1.0
         for base, raw_h in stacks:
             frac = raw_h / total

@@ -33,8 +33,7 @@ def _base_config() -> dict:
                 "objective": {"bidirectional": True, "score_scale": "normalized-llr", "combine": "min"},
                 "elites": {
                     "k": 1,
-                    "filter": {"min_per_tf_norm": 0.0, "require_all_tfs": True, "pwm_sum_min": 0.0},
-                    "select": {"alpha": 0.85, "pool_size": "auto"},
+                    "select": {"diversity": 0.0, "pool_size": "auto"},
                 },
                 "moves": {
                     "profile": "balanced",

@@ -117,6 +117,17 @@ class _MotifLogoEffectContract:
             "motif_logo params.matrix must be a non-empty list",
             ContractError,
         )
+        ensure(
+            len(matrix) == feat.span.length(),
+            "motif_logo matrix length must match target feature span length",
+            ContractError,
+        )
+        for row in matrix:
+            ensure(
+                isinstance(row, (list, tuple)) and len(row) >= 4,
+                "motif_logo matrix rows must contain at least 4 values [A,C,G,T]",
+                ContractError,
+            )
 
 
 _FEATURE_CONTRACTS: dict[str, FeatureKindContract] = {}

@@ -18,9 +18,17 @@ import numpy as np
 import pandas as pd
 
 from dnadesign.cruncher.analysis.plots._savefig import savefig
-from dnadesign.cruncher.analysis.plots._style import apply_axes_style, place_figure_caption
+from dnadesign.cruncher.analysis.plots._style import apply_axes_style
 
 _MH_KINDS = {"B", "M", "L", "W", "I"}
+_MOVE_LABELS = {
+    "S": "Single-site Gibbs",
+    "B": "Block replace",
+    "M": "Multi-site replace",
+    "L": "Block slide",
+    "W": "Block swap",
+    "I": "Motif insertion",
+}
 
 
 def _empty_panel(ax: plt.Axes, message: str) -> None:
@@ -133,12 +141,21 @@ def _plot_mh_acceptance(ax: plt.Axes, binned_df: pd.DataFrame) -> bool:
     q25 = np.array([float(by_bin.get_group(val).quantile(0.25)) for val in x], dtype=float)
     q75 = np.array([float(by_bin.get_group(val).quantile(0.75)) for val in x], dtype=float)
     ax.fill_between(x, q25, q75, color="#4c78a8", alpha=0.20, linewidth=0)
-    ax.plot(x, median, color="#4c78a8", linewidth=1.8, label="median MH acceptance")
-    ax.set_title("MH acceptance rate over sweeps")
-    ax.set_xlabel("Sweep")
-    ax.set_ylabel("Acceptance rate (MH moves only)")
+    ax.plot(x, median, color="#4c78a8", linewidth=1.8, label="Median MH acceptance")
+    ax.set_title("MH acceptance over sweeps (B/M/L/W/I moves only)")
+    ax.set_ylabel("MH acceptance rate")
     ax.set_ylim(0.0, 1.0)
-    apply_axes_style(ax, ygrid=True)
+    ax.text(
+        0.02,
+        0.08,
+        "MH excludes single-site Gibbs updates.",
+        transform=ax.transAxes,
+        ha="left",
+        va="bottom",
+        fontsize=9,
+        color="#5a5a5a",
+    )
+    apply_axes_style(ax, ygrid=True, xgrid=False)
     handles, labels = ax.get_legend_handles_labels()
     if handles:
         ax.legend(frameon=False, fontsize=8, loc="upper right")
@@ -164,28 +181,36 @@ def _plot_move_mix(ax: plt.Axes, binned_df: pd.DataFrame) -> None:
     fractions = pivot.div(totals, axis=0)
     x = fractions.index.to_numpy(dtype=float)
     kinds = [str(kind) for kind in fractions.columns]
+    labels = [_MOVE_LABELS.get(kind, kind) for kind in kinds]
     y = [fractions[kind].to_numpy(dtype=float) for kind in kinds]
     colors = plt.get_cmap("tab20")(np.linspace(0.0, 1.0, max(1, len(kinds))))
-    ax.stackplot(x, y, labels=kinds, colors=colors, alpha=0.85)
+    ax.stackplot(x, y, labels=labels, colors=colors, alpha=0.85)
     ax.set_title("Move mix over sweeps")
     ax.set_xlabel("Sweep")
-    ax.set_ylabel("Attempted move fraction")
+    ax.set_ylabel("Move fraction")
     ax.set_ylim(0.0, 1.0)
-    apply_axes_style(ax, ygrid=True)
+    apply_axes_style(ax, ygrid=True, xgrid=False)
     handles, labels = ax.get_legend_handles_labels()
     if handles:
-        ax.legend(frameon=False, fontsize=7, ncol=min(4, len(labels)), loc="upper right")
+        ax.legend(
+            frameon=False,
+            fontsize=9,
+            ncol=max(1, len(labels)),
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.18),
+        )
 
 
 def _add_vertical_markers(axes: list[plt.Axes], markers: list[int]) -> None:
     if not markers:
         return
     for ax in axes:
+        y_min, y_max = ax.get_ylim()
+        y_text = y_min + ((y_max - y_min) * 0.02)
         for idx, marker in enumerate(markers[:-1]):
             ax.axvline(marker, color="#909090", linestyle=":", linewidth=0.8, alpha=0.65)
             if idx == 0:
-                y_top = ax.get_ylim()[1]
-                ax.text(marker, y_top, " cooling stage", ha="left", va="bottom", fontsize=7, color="#666666")
+                ax.text(marker, y_text, "Cooling stage", ha="left", va="bottom", fontsize=8, color="#666666")
 
 
 def plot_health_panel(
@@ -202,12 +227,12 @@ def plot_health_panel(
     ax_accept, ax_mix = axes
     has_mh_windows = _plot_mh_acceptance(ax_accept, binned_df)
     _plot_move_mix(ax_mix, binned_df)
+    ax_accept.set_xlabel("")
 
     markers = _cooling_markers(optimizer_stats)
     _add_vertical_markers([ax_accept, ax_mix], markers)
-    place_figure_caption(fig, "S (Gibbs) updates are accepted by construction; acceptance shown for MH moves only.")
 
-    fig.tight_layout()
+    fig.tight_layout(rect=(0.0, 0.05, 1.0, 1.0))
     out_path.parent.mkdir(parents=True, exist_ok=True)
     savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
     plt.close(fig)

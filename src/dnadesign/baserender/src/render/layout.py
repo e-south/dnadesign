@@ -175,6 +175,9 @@ def compute_layout(record: Record, style: Style, *, fixed_n: int | None = None) 
 
     top = y_forward + n_up_tracks * style.track_spacing + h + label_pad_y
     bottom = y_reverse - n_dn_tracks * style.track_spacing - h - label_pad_y
+    if any(effect.kind == "motif_logo" for effect in record.effects):
+        top += h
+        bottom -= h
     margin = max(2.0, 0.5 * style.kmer.round_px)
     top += margin
     bottom -= margin

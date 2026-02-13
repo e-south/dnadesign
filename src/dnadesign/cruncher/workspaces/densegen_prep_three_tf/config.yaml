@@ -33,6 +33,7 @@ cruncher:
     meme_mod: oops
     meme_prior: addone
     source_id: meme_suite_meme
+    tool_path: ../../../../../.pixi/envs/default/bin
 
   ingest:
     genome_source: ncbi
@@ -97,12 +98,8 @@ cruncher:
         beta_end: 10.0
     elites:
       k: 8
-      filter:
-        min_per_tf_norm: null
-        require_all_tfs: true
-        pwm_sum_min: 0.0
       select:
-        alpha: 0.85
+        diversity: 0.30
         pool_size: auto
     moves:
       profile: balanced
@@ -136,20 +133,20 @@ cruncher:
           max_scale: 3.00
           target_low: 0.10
           target_high: 0.28
-          freeze_after_beta: 8.0
+          freeze_after_beta: 6.0
         gibbs_inertia:
           enabled: true
           kind: linear
           p_stay_start: 0.0
-          p_stay_end: 0.70
+          p_stay_end: 0.85
         move_schedule:
           enabled: true
           kind: linear
           end:
-            S: 0.50
-            B: 0.25
-            M: 0.12
-            I: 0.13
+            S: 0.42
+            B: 0.29
+            M: 0.15
+            I: 0.14
     optimizer:
       kind: gibbs_anneal
       chains: 8
@@ -161,11 +158,11 @@ cruncher:
           - sweeps: 5200
             beta: 1.0
           - sweeps: 7400
-            beta: 6.0
-          - sweeps: 7900
-            beta: 12.0
+            beta: 8.0
+          - sweeps: 7850
+            beta: 16.0
           - sweeps: 8000
-            beta: 18.0
+            beta: 24.0
       early_stop:
         enabled: false
         patience: 0
@@ -184,10 +181,12 @@ cruncher:
     run_selector: latest
     runs: []
     pairwise: auto
-    plot_format: png
-    plot_dpi: 150
+    plot_format: pdf
+    plot_dpi: 300
     table_format: parquet
     archive: false
     max_points: 5000
     trajectory_sweep_mode: best_so_far
     trajectory_chain_overlay: false
+    fimo_compare:
+      enabled: false

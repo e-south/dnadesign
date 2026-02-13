@@ -22,6 +22,7 @@ import yaml
 from dnadesign.cruncher.artifacts.layout import config_used_path
 from dnadesign.cruncher.core.optimizers.kinds import resolve_optimizer_kind
 from dnadesign.cruncher.core.pwm import PWM
+from dnadesign.cruncher.core.pwm_window import select_pwm_window
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,40 @@ class SampleMeta:
     mode: str
 
 
+def _resolve_sampling_window(used_cfg: dict) -> tuple[int, int | None, str] | None:
+    sample_payload = used_cfg.get("sample")
+    if not isinstance(sample_payload, dict):
+        return None
+    motif_width = sample_payload.get("motif_width")
+    if motif_width is None:
+        return None
+    if not isinstance(motif_width, dict):
+        raise ValueError("config_used.yaml sample.motif_width must be an object when provided.")
+    seq_len = sample_payload.get("sequence_length")
+    if not isinstance(seq_len, int) or seq_len < 1:
+        raise ValueError("config_used.yaml sample.sequence_length must be an integer >= 1 when motif_width is set.")
+    maxw = motif_width.get("maxw")
+    if maxw is not None and (not isinstance(maxw, int) or maxw < 1):
+        raise ValueError("config_used.yaml sample.motif_width.maxw must be null or an integer >= 1.")
+    strategy = str(motif_width.get("strategy") or "max_info")
+    if strategy != "max_info":
+        raise ValueError("config_used.yaml sample.motif_width.strategy must be 'max_info'.")
+    return seq_len, maxw, strategy
+
+
+def _effective_sampling_pwm(
+    pwm: PWM,
+    *,
+    seq_len: int,
+    maxw: int | None,
+    strategy: str,
+) -> PWM:
+    max_allowed = seq_len if maxw is None else min(maxw, seq_len)
+    if pwm.length <= max_allowed:
+        return pwm
+    return select_pwm_window(pwm, length=max_allowed, strategy=strategy)
+
+
 def _load_pwms_from_config(run_dir: Path) -> tuple[dict[str, PWM], dict]:
     config_path = config_used_path(run_dir)
     if not config_path.exists():
@@ -46,12 +81,18 @@ def _load_pwms_from_config(run_dir: Path) -> tuple[dict[str, PWM], dict]:
     pwms_info = cruncher_cfg.get("pwms_info")
     if not isinstance(pwms_info, dict) or not pwms_info:
         raise ValueError("config_used.yaml missing pwms_info; re-run `cruncher sample`.")
+    sampling_window = _resolve_sampling_window(cruncher_cfg)
     pwms: dict[str, PWM] = {}
     for tf_name, info in pwms_info.items():
         matrix = info.get("pwm_matrix")
         if not matrix:
             raise ValueError(f"config_used.yaml missing pwm_matrix for TF '{tf_name}'.")
-        pwms[tf_name] = PWM(name=tf_name, matrix=np.array(matrix, dtype=float))
+        full_pwm = PWM(name=tf_name, matrix=np.array(matrix, dtype=float))
+        if sampling_window is None:
+            pwms[tf_name] = full_pwm
+        else:
+            seq_len, maxw, strategy = sampling_window
+            pwms[tf_name] = _effective_sampling_pwm(full_pwm, seq_len=seq_len, maxw=maxw, strategy=strategy)
     return pwms, cruncher_cfg
 
 

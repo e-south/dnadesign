@@ -51,12 +51,12 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         "Elite diversity panel combining motif-core context with full-sequence distance diagnostics.",
     ),
     PlotSpec(
-        "overlap_panel",
-        "Overlap panel",
+        "elites_showcase",
+        "Elites showcase",
         ("elites",),
-        ("plot__overlap_panel.{ext}",),
-        "overlap",
-        "Motif placement tracks with pairwise placement and overlap summaries.",
+        ("plot__elites_showcase.{ext}",),
+        "summary",
+        "Baserender-backed motif placement panels (sense/antisense + windows + logos) per elite.",
     ),
     PlotSpec(
         "health_panel",
@@ -65,5 +65,13 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         ("plot__health_panel.{ext}",),
         "diagnostics",
         "MH acceptance dynamics and move-mix diagnostics over sweeps.",
+    ),
+    PlotSpec(
+        "optimizer_vs_fimo",
+        "Optimizer vs FIMO",
+        ("sequences",),
+        ("plot__optimizer_vs_fimo.{ext}",),
+        "diagnostics",
+        "Descriptive concordance between Cruncher joint score and FIMO weakest-TF score.",
     ),
 )

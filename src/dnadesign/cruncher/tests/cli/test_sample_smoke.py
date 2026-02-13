@@ -99,8 +99,7 @@ def test_sample_cli_smoke_matrix(tmp_path: Path) -> None:
                 "objective": {"bidirectional": True, "score_scale": "normalized-llr", "combine": "min"},
                 "elites": {
                     "k": 1,
-                    "filter": {"min_per_tf_norm": None, "require_all_tfs": True, "pwm_sum_min": 0.0},
-                    "select": {"alpha": 0.85, "pool_size": "auto"},
+                    "select": {"diversity": 0.0, "pool_size": "auto"},
                 },
                 "moves": {"profile": "balanced"},
                 "output": {
@@ -146,9 +145,8 @@ def test_sample_cli_smoke_matrix(tmp_path: Path) -> None:
     assert logo_path.exists()
     seq_path = sequences_path(sample_runs[0])
     seq_df = pd.read_parquet(seq_path)
-    assert "min_per_tf_norm" in seq_df.columns
     assert "min_norm" in seq_df.columns
-    assert (seq_df["min_per_tf_norm"] == seq_df["min_norm"]).all()
+    assert "min_per_tf_norm" not in seq_df.columns
     assert "chain" in seq_df.columns
     assert "chain_1based" in seq_df.columns
     assert "beta" in seq_df.columns

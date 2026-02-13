@@ -16,12 +16,17 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from dnadesign.cruncher.app.sample.diagnostics import _elite_filter_passes, _EliteCandidate, _norm_map_for_elites
+from dnadesign.cruncher.app.sample.diagnostics import _EliteCandidate, _norm_map_for_elites
 from dnadesign.cruncher.config.schema_v3 import SampleConfig
 from dnadesign.cruncher.core.evaluator import SequenceEvaluator
 from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.core.scoring import Scorer
-from dnadesign.cruncher.core.selection.mmr import MmrCandidate, select_mmr_elites, tfbs_cores_from_hits
+from dnadesign.cruncher.core.selection.mmr import (
+    MmrCandidate,
+    select_mmr_elites,
+    select_score_elites,
+    tfbs_cores_from_hits,
+)
 from dnadesign.cruncher.core.sequence import canon_int
 from dnadesign.cruncher.core.state import SequenceState
 
@@ -50,8 +55,6 @@ def build_elite_pool(
     evaluator: SequenceEvaluator,
     scorer: Scorer,
     sample_cfg: SampleConfig,
-    min_per_tf_norm: float | None,
-    require_all_tfs: bool,
     beta_softmin_final: float | None,
 ) -> ElitePoolResult:
     raw_elites: list[_EliteCandidate] = []
@@ -72,16 +75,6 @@ def build_elite_pool(
         sum_norm = float(sum(norm_map.values()))
         norm_sums.append(sum_norm)
         min_norms.append(min_norm)
-
-        if not _elite_filter_passes(
-            norm_map=norm_map,
-            min_norm=min_norm,
-            sum_norm=sum_norm,
-            min_per_tf_norm=min_per_tf_norm,
-            require_all_tfs_over_min_norm=require_all_tfs,
-            pwm_sum_min=float(sample_cfg.elites.filter.pwm_sum_min),
-        ):
-            continue
 
         combined_score = evaluator.combined_from_scores(
             per_tf_map,
@@ -122,11 +115,13 @@ def select_elites_mmr(
     *,
     raw_elites: list[_EliteCandidate],
     elite_k: int,
-    alpha: float,
     pool_size: int,
     scorer: Scorer,
     pwms: dict[str, PWM],
     dsdna_mode: bool,
+    diversity: float,
+    sample_sequence_length: int,
+    cooling_config: object,
 ) -> EliteSelectionResult:
     kept_elites: list[_EliteCandidate] = []
     kept_after_mmr = 0
@@ -135,6 +130,73 @@ def select_elites_mmr(
 
     if elite_k > 0 and raw_elites:
         pool_size = max(1, pool_size)
+        requested_pool_size = int(pool_size)
+        diversity_value = float(diversity)
+        score_only = diversity_value <= 0.0
+        score_weight = 1.0 if score_only else float(max(0.0, 1.0 - diversity_value))
+        diversity_weight = 0.0 if score_only else float(diversity_value)
+        metric = "none" if score_only else "hybrid"
+        min_hamming_eff = None
+        min_core_hamming_eff = None
+        if not score_only:
+            min_hamming_eff = int(round(diversity_value * max(0, int(sample_sequence_length) // 4)))
+            core_width = sum(int(pwms[tf].length) for tf in scorer.tf_names)
+            min_core_hamming_eff = int(round(diversity_value * max(0, core_width // 4)))
+
+        def _candidate_relevance_value(cand: MmrCandidate) -> float:
+            if score_only:
+                return float(cand.combined_score)
+            return float(cand.min_norm)
+
+        def _cooling_stage_index(draw_idx: int) -> int:
+            cfg = cooling_config if isinstance(cooling_config, dict) else {}
+            if str(cfg.get("kind", "")).strip().lower() != "piecewise":
+                return 0
+            stages = cfg.get("stages")
+            if not isinstance(stages, list) or not stages:
+                return 0
+            for idx, stage in enumerate(stages):
+                if not isinstance(stage, dict):
+                    continue
+                sweeps = stage.get("sweeps")
+                if isinstance(sweeps, (int, float)) and draw_idx <= int(sweeps):
+                    return idx
+            return max(0, len(stages) - 1)
+
+        def _build_pool(candidates: list[MmrCandidate], max_size: int) -> list[MmrCandidate]:
+            max_size = max(1, int(max_size))
+            ordered = sorted(
+                candidates,
+                key=lambda cand: (_candidate_relevance_value(cand), f"{cand.chain_id}:{cand.draw_idx}"),
+                reverse=True,
+            )
+            if score_only:
+                return ordered[:max_size]
+            buckets: dict[tuple[int, int], list[MmrCandidate]] = {}
+            for cand in ordered:
+                key = (int(cand.chain_id), _cooling_stage_index(int(cand.draw_idx)))
+                buckets.setdefault(key, []).append(cand)
+            if not buckets:
+                return []
+            bucket_keys = sorted(buckets.keys())
+            cursor = {key: 0 for key in bucket_keys}
+            pooled: list[MmrCandidate] = []
+            while len(pooled) < max_size:
+                progressed = False
+                for key in bucket_keys:
+                    idx = cursor[key]
+                    bucket = buckets[key]
+                    if idx >= len(bucket):
+                        continue
+                    pooled.append(bucket[idx])
+                    cursor[key] = idx + 1
+                    progressed = True
+                    if len(pooled) >= max_size:
+                        break
+                if not progressed:
+                    break
+            return pooled
+
         mmr_candidates = [
             MmrCandidate(
                 seq_arr=cand.seq_arr,
@@ -149,37 +211,74 @@ def select_elites_mmr(
             for cand in raw_elites
         ]
         raw_by_id = {f"{cand.chain_id}:{cand.draw_idx}": cand for cand in raw_elites}
-        mmr_pool = sorted(
-            mmr_candidates,
-            key=lambda cand: (cand.min_norm, f"{cand.chain_id}:{cand.draw_idx}"),
-            reverse=True,
-        )[:pool_size]
-        core_maps = {
-            f"{cand.chain_id}:{cand.draw_idx}": tfbs_cores_from_hits(
-                cand.seq_arr,
-                per_tf_hits=raw_by_id[f"{cand.chain_id}:{cand.draw_idx}"].per_tf_hits,
-                tf_names=scorer.tf_names,
-            )
-            for cand in mmr_pool
-        }
-        result = select_mmr_elites(
-            mmr_pool,
-            k=elite_k,
-            pool_size=pool_size,
-            alpha=alpha,
-            relevance="min_per_tf_norm",
-            dsdna=dsdna_mode,
-            tf_names=scorer.tf_names,
-            pwms=pwms,
-            core_maps=core_maps,
-        )
+        pool_size_active = int(pool_size)
+        max_pool_size = min(len(mmr_candidates), 50_000)
+        pool_expansions = 0
+        result = None
+        while True:
+            mmr_pool = _build_pool(mmr_candidates, pool_size_active)
+            if score_only:
+                result = select_score_elites(
+                    mmr_pool,
+                    k=elite_k,
+                    pool_size=pool_size_active,
+                    dsdna=dsdna_mode,
+                )
+            else:
+                core_maps = {
+                    f"{cand.chain_id}:{cand.draw_idx}": tfbs_cores_from_hits(
+                        cand.seq_arr,
+                        per_tf_hits=raw_by_id[f"{cand.chain_id}:{cand.draw_idx}"].per_tf_hits,
+                        tf_names=scorer.tf_names,
+                    )
+                    for cand in mmr_pool
+                }
+                result = select_mmr_elites(
+                    mmr_pool,
+                    k=elite_k,
+                    pool_size=pool_size_active,
+                    alpha=score_weight,
+                    relevance="min_tf_score",
+                    dsdna=dsdna_mode,
+                    tf_names=scorer.tf_names,
+                    pwms=pwms,
+                    core_maps=core_maps,
+                    distance_metric=metric,
+                    min_hamming_bp=min_hamming_eff,
+                    min_core_hamming_bp=min_core_hamming_eff,
+                    constraint_policy="relax",
+                    relax_step_bp=1,
+                    relax_min_bp=0,
+                )
+            if len(result.selected) >= elite_k:
+                break
+            if pool_size_active >= max_pool_size:
+                break
+            pool_size_active = min(max_pool_size, pool_size_active * 2)
+            pool_expansions += 1
+        if result is None:
+            raise RuntimeError("MMR selection did not produce a result.")
         kept_elites = [raw_by_id[f"{cand.chain_id}:{cand.draw_idx}"] for cand in result.selected]
         kept_after_mmr = len(kept_elites)
         mmr_meta_rows = result.meta
         mmr_summary = {
-            "pool_size": pool_size,
+            "pool_size": pool_size_active,
+            "pool_size_initial": requested_pool_size,
+            "pool_expansions": pool_expansions,
             "k": elite_k,
-            "alpha": alpha,
+            "diversity": diversity_value,
+            "score_weight": score_weight,
+            "diversity_weight": diversity_weight,
+            "selection_policy": "score_topk" if score_only else "mmr",
+            "relevance": "joint_score" if score_only else "min_tf_score",
+            "distance_metric": metric,
+            "constraint_policy": "disabled" if score_only else "relax",
+            "min_hamming_bp_requested": min_hamming_eff,
+            "min_hamming_bp_final": result.min_hamming_bp_final,
+            "min_core_hamming_bp_requested": min_core_hamming_eff,
+            "min_core_hamming_bp_final": result.min_core_hamming_bp_final,
+            "relax_steps_used": result.relax_steps_used,
+            "pool_strategy": "top_score" if score_only else "stratified",
             "median_relevance_raw": result.median_relevance_raw,
             "mean_pairwise_distance": result.mean_pairwise_distance,
             "min_pairwise_distance": result.min_pairwise_distance,

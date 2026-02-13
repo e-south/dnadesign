@@ -34,8 +34,7 @@ def _base_config() -> dict:
                 "objective": {"bidirectional": True, "score_scale": "normalized-llr", "combine": "min"},
                 "elites": {
                     "k": 1,
-                    "filter": {"min_per_tf_norm": 0.0, "require_all_tfs": True, "pwm_sum_min": 0.0},
-                    "select": {"alpha": 0.85, "pool_size": "auto"},
+                    "select": {"diversity": 0.0, "pool_size": "auto"},
                 },
                 "moves": {"profile": "balanced"},
                 "output": {
@@ -151,8 +150,38 @@ def test_analysis_trajectory_defaults_prefer_best_so_far_and_dense_lineage(tmp_p
     assert cfg.analysis is not None
     assert cfg.analysis.trajectory_scatter_scale == "llr"
     assert cfg.analysis.trajectory_stride == 5
+    assert cfg.analysis.trajectory_sweep_y_column == "objective_scalar"
     assert cfg.analysis.trajectory_sweep_mode == "best_so_far"
     assert cfg.analysis.trajectory_particle_alpha_max == pytest.approx(0.45)
+    assert cfg.analysis.mmr_sweep.enabled is False
+    assert cfg.analysis.fimo_compare.enabled is False
+
+
+def test_analysis_fimo_compare_toggle_loads(tmp_path: Path) -> None:
+    payload = _base_config()
+    payload["cruncher"]["analysis"] = {"run_selector": "latest", "fimo_compare": {"enabled": True}}
+    config_path = _write_config(tmp_path, payload)
+    cfg = load_config(config_path)
+    assert cfg.analysis is not None
+    assert cfg.analysis.fimo_compare.enabled is True
+
+
+def test_elites_removed_filter_key_is_rejected(tmp_path: Path) -> None:
+    payload = _base_config()
+    payload["cruncher"]["sample"]["elites"]["filter"] = {"min_per_tf_norm": 0.6}
+    config_path = _write_config(tmp_path, payload)
+    with pytest.raises(ValidationError) as exc:
+        load_config(config_path)
+    assert any(err.get("type") == "extra_forbidden" for err in exc.value.errors())
+
+
+def test_elites_removed_select_alpha_key_is_rejected(tmp_path: Path) -> None:
+    payload = _base_config()
+    payload["cruncher"]["sample"]["elites"]["select"]["alpha"] = 0.7
+    config_path = _write_config(tmp_path, payload)
+    with pytest.raises(ValidationError) as exc:
+        load_config(config_path)
+    assert any(err.get("type") == "extra_forbidden" for err in exc.value.errors())
 
 
 def test_move_overrides_load_gibbs_inertia_and_freeze_controls(tmp_path: Path) -> None:

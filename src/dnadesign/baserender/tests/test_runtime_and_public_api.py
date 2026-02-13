@@ -17,11 +17,13 @@ import pytest
 import dnadesign.baserender as baserender
 from dnadesign.baserender import render_parquet_record_figure
 from dnadesign.baserender.src.core import ContractError, RenderingError
+from dnadesign.baserender.src.core.record import Display, Feature
 from dnadesign.baserender.src.core.registry import (
     clear_feature_effect_contracts,
     get_effect_contract,
     get_feature_contract,
 )
+from dnadesign.baserender.src.core.types import Span
 from dnadesign.baserender.src.render.effects.registry import clear_effect_drawers, get_effect_drawer
 from dnadesign.baserender.src.runtime import initialize_runtime
 
@@ -83,3 +85,46 @@ def test_public_parquet_render_helper_renders_record_figure(tmp_path) -> None:
 
 def test_public_api_does_not_export_tool_specific_helpers() -> None:
     assert not hasattr(baserender, "render_densegen_record_figure")
+
+
+def test_public_record_grid_render_helper_renders_multi_panel_figure() -> None:
+    from dnadesign.baserender import Record, render_record_grid_figure
+
+    records = (
+        Record(
+            id="r1",
+            alphabet="DNA",
+            sequence="TTGACAAAAAAAAAAAAAAAATATAAT",
+            features=(
+                Feature(
+                    id="f1",
+                    kind="kmer",
+                    span=Span(start=0, end=6, strand="fwd"),
+                    label="TTGACA",
+                    tags=("tf:lexA",),
+                    render={"priority": 10},
+                ),
+            ),
+            display=Display(overlay_text="elite-1", tag_labels={"tf:lexA": "lexA"}),
+        ),
+        Record(
+            id="r2",
+            alphabet="DNA",
+            sequence="TTGACAAAAAAAAAAAAAAAATATAAT",
+            features=(
+                Feature(
+                    id="f1",
+                    kind="kmer",
+                    span=Span(start=21, end=27, strand="fwd"),
+                    label="TATAAT",
+                    tags=("tf:cpxR",),
+                    render={"priority": 10},
+                ),
+            ),
+            display=Display(overlay_text="elite-2", tag_labels={"tf:cpxR": "cpxR"}),
+        ),
+    )
+
+    fig = render_record_grid_figure(records, ncols=2)
+    assert fig is not None
+    plt.close(fig)

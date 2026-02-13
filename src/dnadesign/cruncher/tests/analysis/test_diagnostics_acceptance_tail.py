@@ -80,7 +80,6 @@ def test_acceptance_tail_from_move_stats() -> None:
         optimizer_kind="gibbs_anneal",
     )
     optimizer_metrics = diagnostics["metrics"]["optimizer"]
-    assert optimizer_metrics["acceptance_rate_mh_tail"] == 2.0 / 3.0
     assert optimizer_metrics["acceptance_rate_non_s_tail"] == 2.0 / 3.0
     assert optimizer_metrics["acceptance_tail_B"] == 0.5
     assert optimizer_metrics["acceptance_tail_M"] == 1.0

@@ -79,8 +79,7 @@ def test_sample_abort_marks_run_status(tmp_path: Path, monkeypatch: pytest.Monke
                 "objective": {"bidirectional": True, "score_scale": "llr", "combine": "min"},
                 "elites": {
                     "k": 1,
-                    "filter": {"min_per_tf_norm": None, "require_all_tfs": True, "pwm_sum_min": 0.0},
-                    "select": {"alpha": 0.85, "pool_size": "auto"},
+                    "select": {"diversity": 0.0, "pool_size": "auto"},
                 },
                 "moves": {"profile": "balanced", "overrides": {"move_probs": {"S": 1.0, "B": 0.0, "M": 0.0}}},
                 "output": {

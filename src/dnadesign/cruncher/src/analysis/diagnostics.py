@@ -545,13 +545,12 @@ def summarize_sampling_diagnostics(
         if isinstance(move_stats, list):
             tail_rows, tail_window, tail_total = _tail_move_window_records(move_stats)
             if tail_window is not None:
-                optimizer_metrics["acceptance_rate_mh_tail_window"] = tail_window
+                optimizer_metrics["acceptance_rate_non_s_tail_window"] = tail_window
             if tail_total is not None:
-                optimizer_metrics["acceptance_rate_mh_tail_sweeps"] = tail_total
+                optimizer_metrics["acceptance_rate_non_s_tail_sweeps"] = tail_total
 
             tail_non_s, tail_non_s_attempts = _acceptance_rate(tail_rows, move_kinds={"B", "M", "L", "W", "I"})
             if tail_non_s is not None:
-                optimizer_metrics["acceptance_rate_mh_tail"] = tail_non_s
                 optimizer_metrics["acceptance_rate_non_s_tail"] = tail_non_s
                 optimizer_metrics["acceptance_rate_non_s_tail_attempts"] = tail_non_s_attempts
                 if tail_non_s < thresholds["acceptance_low"] or tail_non_s > thresholds["acceptance_high"]:

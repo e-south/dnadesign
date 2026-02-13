@@ -1,0 +1,30 @@
+version: 3
+input:
+  kind: parquet
+  path: inputs/input.parquet
+  adapter:
+    kind: densegen_tfbs
+    columns:
+      sequence: sequence
+      annotations: densegen__used_tfbs_detail
+      id: id
+      details: details
+    policies: {}
+  alphabet: DNA
+render:
+  renderer: sequence_rows
+  style:
+    preset: presentation_default
+    overrides:
+      palette:
+        tf:lexa: "#1f77b4"
+        tf:cpxr: "#2ca02c"
+      legend_font_size: 10
+      connector_alpha: 0.35
+outputs:
+  - kind: images
+    fmt: png
+run:
+  strict: false
+  fail_on_skips: false
+  emit_report: true

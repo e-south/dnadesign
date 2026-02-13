@@ -28,7 +28,7 @@ connector_alpha: 0.45
 connector_width: 0.6
 connector_dash: [1.0, 3.0]
 
-sigma_link_inner_margin_bp: 0.50
+span_link_inner_margin_bp: 0.50
 
 kmer:
   height_factor: 1.10
@@ -40,6 +40,5 @@ kmer:
   text_color: "#ffffff"
   text_v_offset_px: 0.0
 
-# Palette is optional. Keep it minimal by default.
-palette:
-  sigma: "#969eba"
+# Palette is optional. Keep it empty by default.
+palette: {}

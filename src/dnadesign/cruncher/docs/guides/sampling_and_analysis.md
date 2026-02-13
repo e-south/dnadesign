@@ -59,25 +59,29 @@ Cruncher is intentionally strict and will error instead of silently degrading:
 - Elite constraints cannot be satisfied (after filtering/selection) -> error (no silent threshold relaxation).
 - Invalid `sample.optimizer.*` cooling settings -> error (no implicit schedule fallbacks).
 - `analyze` requires required artifacts and will not write partial reports on missing/invalid inputs.
+- `analyze` enforces an in-progress lock at `<run_dir>/.analysis_tmp`; active locks fail fast, stale interrupted locks are auto-pruned.
+- `analysis.fimo_compare.enabled=true` requires MEME Suite `fimo` to be resolvable (`discover.tool_path`, `MEME_BIN`, or `PATH`).
 
 ## Gibbs annealing optimization model
 
-Cruncher uses Gibbs-style Metropolis updates with a configurable annealing schedule (`sample.optimizer.cooling.*`) as the optimizer.
-Replica exchange is disabled, so chains run independently while sharing the same move policy and objective.
+Cruncher uses a hybrid Gibbs/MH optimizer with an explicit beta schedule
+(`sample.optimizer.cooling.*`). Replica exchange is disabled, so chains run
+independently while sharing the same objective and move policy.
 
-1. Multiple chains run under `sample.optimizer.chains`.
-2. Each chain performs local Metropolis-Hastings updates on sequence proposals (`sample.moves.*`).
-3. The cooling schedule controls inverse temperature over sweeps (`sample.optimizer.cooling.kind` with fixed/linear/piecewise parameters).
-4. Optional adaptation adjusts move probabilities and proposal scales during tune (`sample.moves.overrides.*`).
-5. Chain identity is preserved across sweeps, so trajectory outputs can track each chain directly.
+What "hybrid" means in practice:
 
-This keeps exploration and exploitation in one consistent optimizer surface without slot/particle swap semantics.
+1. At each sweep, each chain samples one move kind from `sample.moves.*`.
+2. Default move mix is not `P(S)=1`: `S=0.85, B=0.07, M=0.04, I=0.04, L=0, W=0`.
+3. If move kind is `S`, Cruncher performs a single-site Gibbs update.
+4. If move kind is `B/M/L/W/I`, Cruncher performs a Metropolis-Hastings proposal with accept/reject.
+5. Optional adaptation can update move probabilities and proposal scales during tune (`sample.moves.overrides.*`).
+6. Chain identity is preserved across sweeps, so trajectory outputs are chain-lineage plots (not slot/particle swap traces).
 
-Terminology alignment with common methods:
+Terminology alignment:
 
-- `gibbs_anneal` = Gibbs/Metropolis sequence proposals under an explicit cooling schedule
-- chain diagnostics are interpreted per chain over sweep index
-- tune windows adapt proposal mechanics; draw windows produce the retained sample set
+- `gibbs_anneal` = Metropolis-within-Gibbs sequence optimization.
+- With changing `beta_t` over sweeps, this is simulated annealing.
+- With fixed `beta`, it is fixed-temperature hybrid MCMC (not annealing).
 
 ## What The Optimizer Is Optimizing
 
@@ -107,17 +111,28 @@ adjusted to sequence-level p-values:
 p_seq = 1 - (1 - p_win)^n_tests
 ```
 
-Move acceptance:
+Move updates:
 
-- `S` (single-site Gibbs): sample from a conditional distribution proportional
-  to `exp(beta_mcmc * f(.))`; accepted by construction.
+- `S` (single-site Gibbs): sample from a conditional distribution over bases:
+
+```
+P(base=b | rest) proportional to exp(beta_mcmc * f_b)
+```
+
+  `S` is accepted by construction because Gibbs samples directly from a
+  conditional kernel. "Always accepted" does not mean "no beta effect":
+  `beta_mcmc` controls how sharp this distribution is.
+  - low `beta_mcmc`: flatter distribution (more exploratory)
+  - high `beta_mcmc`: concentrated on better bases (more greedy)
 - `B/M/L/W/I`: Metropolis acceptance:
 
 ```
 alpha = min(1, exp(beta_mcmc * (f(x') - f(x))))
 ```
 
-So trajectory stability is controlled by both cooling (`beta_mcmc`) and move
+This is why analysis reports MH acceptance separately from `S`: including
+always-accepted Gibbs updates would hide whether MH proposals are calibrated.
+Trajectory stability is controlled by both cooling (`beta_mcmc`) and move
 proposal scale/mix.
 
 ## Interpreting Noisy Trajectories
@@ -139,24 +154,31 @@ For optimization narrative, prioritize:
 Treat raw trajectory plots as exploration diagnostics, not monotone progress
 curves.
 
-## Elites: filter -> MMR select
+## Elites: MMR select
 
 Elite selection is aligned with the optimization objective:
 
-1. **Filter (representativeness)**: `sample.elites.filter.min_per_tf_norm` and `require_all_tfs` gate candidates.
-2. **Select (MMR)**: a filtered pool is scored for relevance and then greedily selected for diversity.
+1. Build the candidate pool from sampled draw states.
+2. Run MMR selection on that pool using `sample.elites.select.diversity` (`0..1`) as the primary quality-vs-diversity control.
+3. Return exactly `sample.elites.k` unique elites or fail fast if impossible.
 
-Current MMR behavior (TFBS-core mode) is:
+Current MMR behavior is:
 
 - For each sequence in the candidate pool, extract the best-hit window for each TF and orient each core to its PWM.
-- When comparing two sequences, compute LexA-core vs LexA-core and CpxR-core vs CpxR-core Hamming distances (weighted per PWM position), then average across TFs.
+- Compare candidates with a hybrid distance: full-sequence Hamming + motif-core weighted Hamming.
+- Use direct tradeoff weights from `sample.elites.select.diversity`: score weight `1 - diversity`, diversity weight `diversity`, plus minimum-distance constraints derived from the same knob.
 - We never compare LexA vs CpxR within the same sequence.
+
+`sample.elites.select.diversity=0.0` is an explicit score-only mode:
+- Selection policy switches to greedy top-k by final optimizer scalar score (`combined_score_final`).
+- No diversity constraints are derived or applied.
+- This gives a clear baseline for diversity-vs-score sweeps.
 
 "Tolerant" weights are hard-coded: low-information PWM positions are weighted more (weight = `1 - info_norm`). This preserves consensus-critical positions while encouraging diversity where the motif is flexible.
 
 When `objective.bidirectional=true`, canonicalization is automatic: reverse complements (including palindromes) count as the same identity for uniqueness and MMR dedupe.
 
-If Cruncher cannot produce `sample.elites.k` elites that satisfy the configured filter gates, the run fails fast (it does not silently lower thresholds).
+If Cruncher cannot produce `sample.elites.k` elites from the available candidate pool, the run fails fast.
 
 ## Analysis outputs
 
@@ -172,6 +194,7 @@ Analysis writes a curated, orthogonal suite of plots and tables (no plot boolean
 - `analysis/table__diagnostics_summary.json`
 - `analysis/table__objective_components.json`
 - `analysis/table__elites_mmr_summary.parquet`
+- `analysis/table__elites_mmr_sweep.parquet` (when `analysis.mmr_sweep.enabled=true`)
 - `analysis/table__elites_nn_distance.parquet`
 
 Sampling artifacts consumed by analysis:
@@ -183,10 +206,11 @@ Sampling artifacts consumed by analysis:
 Plots (always generated when data is available):
 
 - `plots/plot__chain_trajectory_scatter.*` (random-baseline cloud + chain best-so-far lineage updates in TF score-space, with selected elites overlaid and consensus anchors)
-- `plots/plot__chain_trajectory_sweep.*` (joint objective over sweep index by chain, with `best_so_far|raw|all` modes and tune/cooling boundary markers when available)
-- `plots/plot__elites_nn_distance.*` (elite diversity panel: score vs full-sequence NN distance plus pairwise full-sequence distance matrix; core-distance context retained)
-- `plots/plot__overlap_panel.*` (motif placement tracks per elite, pairwise best-hit placement scatter, and overlap summary panel)
+- `plots/plot__chain_trajectory_sweep.*` (optimizer scalar score over sweeps by chain, with `best_so_far|raw|all` modes and tune/cooling boundary markers when available; scalar semantics follow `sample.objective.combine` and optional soft-min shaping)
+- `plots/plot__elites_nn_distance.*` (elite diversity panel: y-axis is final optimizer scalar score, x-axis is full-sequence nearest-neighbor Hamming distance in bp to each elite's closest other selected elite, plus pairwise full-sequence distance matrix; core-distance context retained)
+- `plots/plot__elites_showcase.*` (baserender-backed elite panels with sense/antisense sequence rows, TF best-window placement, and per-window motif logos)
 - `plots/plot__health_panel.*` (MH-only acceptance dynamics + move-mix over sweeps; `S` moves are excluded from acceptance rates)
+- `plots/plot__optimizer_vs_fimo.*` (optional via `analysis.fimo_compare.enabled=true`: descriptive QA scatter comparing Cruncher joint optimizer score vs FIMO weakest-TF sequence score; no-hit rows are retained at 0)
 
 ## Diagnostics quick read
 
@@ -199,7 +223,7 @@ Key signals:
 - `optimizer.acceptance_tail_rugged` is the tail acceptance over rugged moves (`B`,`M`) and is more informative than all non-`S` acceptance when diagnosing warm tails.
 - `optimizer.downhill_accept_tail_rugged` isolates downhill rugged acceptance in the tail (cold-tail indicator).
 - `optimizer.gibbs_flip_rate_tail` and `optimizer.tail_step_hamming_mean` indicate whether late-chain motion is dominated by Gibbs micro-flips.
-- `plot__chain_trajectory_sweep.*` should be read as joint-objective progress; `best_so_far` is the default narrative, while `all` overlays raw exploration.
+- `plot__chain_trajectory_sweep.*` should be read as optimizer-scalar progress; `best_so_far` is the default narrative, while `all` overlays raw exploration.
 - `plot__elites_nn_distance.*` distinguishes motif-core collapse (`d_core ~ 0`) from full-sequence diversity (`d_full > 0`) so degenerate elite sets are visible.
 - `objective_components.unique_fraction_canonical` is present only when canonicalization is enabled.
 - `elites_mmr_summary` and `elites_nn_distance` indicate diversity strength and collapse risk.

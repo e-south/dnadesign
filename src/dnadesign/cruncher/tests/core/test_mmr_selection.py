@@ -20,6 +20,8 @@ from dnadesign.cruncher.core.selection.mmr import (
     compute_core_distance,
     compute_position_weights,
     select_mmr_elites,
+    select_score_elites,
+    tfbs_cores_from_scorer,
 )
 
 
@@ -75,7 +77,7 @@ def test_mmr_selection_is_deterministic() -> None:
         k=2,
         pool_size=3,
         alpha=0.8,
-        relevance="min_per_tf_norm",
+        relevance="min_tf_score",
         dsdna=False,
         tf_names=["tf"],
         pwms={"tf": _pwm("tf", [[0.25, 0.25, 0.25, 0.25]] * 4)},
@@ -86,7 +88,7 @@ def test_mmr_selection_is_deterministic() -> None:
         k=2,
         pool_size=3,
         alpha=0.8,
-        relevance="min_per_tf_norm",
+        relevance="min_tf_score",
         dsdna=False,
         tf_names=["tf"],
         pwms={"tf": _pwm("tf", [[0.25, 0.25, 0.25, 0.25]] * 4)},
@@ -95,6 +97,23 @@ def test_mmr_selection_is_deterministic() -> None:
     ids_one = [row["candidate_id"] for row in selection_one.meta]
     ids_two = [row["candidate_id"] for row in selection_two.meta]
     assert ids_one == ids_two
+
+
+def test_score_selection_is_greedy_on_joint_score() -> None:
+    candidates = [
+        _candidate("AAAA", chain=0, draw=1, combined=0.90, min_norm=0.30),
+        _candidate("AAAT", chain=0, draw=2, combined=0.85, min_norm=0.95),
+        _candidate("AATT", chain=0, draw=3, combined=0.80, min_norm=0.99),
+    ]
+    result = select_score_elites(
+        candidates,
+        k=2,
+        pool_size=3,
+        dsdna=False,
+    )
+    assert [row["candidate_id"] for row in result.meta] == ["0:1", "0:2"]
+    assert result.alpha == pytest.approx(1.0)
+    assert result.constraint_policy == "disabled"
 
 
 def test_mmr_dedupes_reverse_complements() -> None:
@@ -108,7 +127,7 @@ def test_mmr_dedupes_reverse_complements() -> None:
         k=2,
         pool_size=3,
         alpha=0.7,
-        relevance="min_per_tf_norm",
+        relevance="min_tf_score",
         dsdna=True,
         tf_names=["tf"],
         pwms={"tf": _pwm("tf", [[0.25, 0.25, 0.25, 0.25]] * 4)},
@@ -133,7 +152,7 @@ def test_mmr_tiebreak_prefers_full_sequence_diversity_when_core_distance_ties() 
         k=2,
         pool_size=3,
         alpha=0.7,
-        relevance="min_per_tf_norm",
+        relevance="min_tf_score",
         dsdna=False,
         tf_names=["tf"],
         pwms={"tf": _pwm("tf", [[0.25, 0.25, 0.25, 0.25]] * 4)},
@@ -142,3 +161,100 @@ def test_mmr_tiebreak_prefers_full_sequence_diversity_when_core_distance_ties() 
     selected_ids = [row["candidate_id"] for row in result.meta]
     assert selected_ids[0] == "0:1"
     assert selected_ids[1] == "0:3"
+
+
+def test_constrained_mmr_enforces_min_full_distance() -> None:
+    candidates = [
+        _candidate("AAAA", chain=0, draw=1, combined=0.90, min_norm=0.90),
+        _candidate("AAAT", chain=0, draw=2, combined=0.89, min_norm=0.89),
+        _candidate("TTTT", chain=0, draw=3, combined=0.88, min_norm=0.88),
+    ]
+    core_maps = {f"{cand.chain_id}:{cand.draw_idx}": {"tf": cand.seq_arr.copy()} for cand in candidates}
+    result = select_mmr_elites(
+        candidates,
+        k=2,
+        pool_size=3,
+        alpha=0.8,
+        relevance="min_tf_score",
+        dsdna=False,
+        tf_names=["tf"],
+        pwms={"tf": _pwm("tf", [[0.25, 0.25, 0.25, 0.25]] * 4)},
+        core_maps=core_maps,
+        min_hamming_bp=2,
+        min_core_hamming_bp=0,
+        distance_metric="hybrid",
+        constraint_policy="strict",
+    )
+    assert [row["candidate_id"] for row in result.meta] == ["0:1", "0:3"]
+    assert result.min_hamming_bp_final == 2
+    assert result.relax_steps_used == 0
+
+
+def test_constrained_mmr_relaxes_threshold_when_needed() -> None:
+    candidates = [
+        _candidate("AAAA", chain=0, draw=1, combined=0.90, min_norm=0.90),
+        _candidate("AAAT", chain=0, draw=2, combined=0.89, min_norm=0.89),
+        _candidate("AATT", chain=0, draw=3, combined=0.88, min_norm=0.88),
+    ]
+    core_maps = {f"{cand.chain_id}:{cand.draw_idx}": {"tf": cand.seq_arr.copy()} for cand in candidates}
+    result = select_mmr_elites(
+        candidates,
+        k=3,
+        pool_size=3,
+        alpha=0.8,
+        relevance="min_tf_score",
+        dsdna=False,
+        tf_names=["tf"],
+        pwms={"tf": _pwm("tf", [[0.25, 0.25, 0.25, 0.25]] * 4)},
+        core_maps=core_maps,
+        min_hamming_bp=3,
+        min_core_hamming_bp=0,
+        distance_metric="hybrid",
+        constraint_policy="relax",
+        relax_step_bp=1,
+        relax_min_bp=0,
+    )
+    assert len(result.selected) == 3
+    assert result.min_hamming_bp_requested == 3
+    assert result.min_hamming_bp_final < 3
+    assert result.relax_steps_used >= 1
+
+
+def test_constrained_mmr_strict_mode_fails_when_k_infeasible() -> None:
+    candidates = [
+        _candidate("AAAA", chain=0, draw=1, combined=0.90, min_norm=0.90),
+        _candidate("AAAT", chain=0, draw=2, combined=0.89, min_norm=0.89),
+    ]
+    core_maps = {f"{cand.chain_id}:{cand.draw_idx}": {"tf": cand.seq_arr.copy()} for cand in candidates}
+    with pytest.raises(ValueError, match="Strict constrained MMR could not select"):
+        select_mmr_elites(
+            candidates,
+            k=2,
+            pool_size=2,
+            alpha=0.8,
+            relevance="min_tf_score",
+            dsdna=False,
+            tf_names=["tf"],
+            pwms={"tf": _pwm("tf", [[0.25, 0.25, 0.25, 0.25]] * 4)},
+            core_maps=core_maps,
+            min_hamming_bp=2,
+            min_core_hamming_bp=4,
+            distance_metric="hybrid",
+            constraint_policy="strict",
+        )
+
+
+def test_tfbs_cores_from_scorer_clips_width_to_sequence_length() -> None:
+    class _StubScorer:
+        def best_llr(self, seq_arr: np.ndarray, tf: str) -> tuple[float, int, str]:
+            _ = tf
+            return 0.0, 0, "+"
+
+        def pwm_width(self, tf: str) -> int:
+            _ = tf
+            return 8
+
+    seq = np.array([0, 1, 2, 3], dtype=np.int8)
+    cores = tfbs_cores_from_scorer(seq, scorer=_StubScorer(), tf_names=["tf"])
+    assert "tf" in cores
+    assert cores["tf"].shape == (4,)

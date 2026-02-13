@@ -92,15 +92,15 @@ def test_chain_trajectory_scatter_renders_background_chain_and_consensus(tmp_pat
         out_path=out_path,
         dpi=72,
         png_compress_level=1,
-        slot_overlay=True,
+        chain_overlay=True,
     )
 
     assert out_path.exists()
     labels = metadata["legend_labels"]
-    assert any(label.startswith("random baseline") for label in labels)
-    assert any(label.startswith("chain 0") for label in labels)
-    assert any(label.startswith("chain 1") for label in labels)
-    assert "consensus anchors" in labels
+    assert any(label.startswith("Random baseline") for label in labels)
+    assert any(label.startswith("Chain 0") for label in labels)
+    assert any(label.startswith("Chain 1") for label in labels)
+    assert "Consensus anchors" in labels
     assert metadata["chain_count"] == 2
     assert metadata["mode"] == "chain_scatter"
     assert metadata["elite_points_plotted"] == 2
@@ -145,6 +145,57 @@ def test_chain_trajectory_scatter_uses_only_new_best_updates(tmp_path: Path) -> 
     assert out_path.exists()
     assert metadata["scatter_mode"] == "best_so_far_updates"
     assert metadata["plotted_points_by_chain"] == {0: 3, 1: 2}
+
+
+def test_chain_trajectory_scatter_reports_elite_coordinate_collisions(tmp_path: Path) -> None:
+    trajectory_df = pd.DataFrame(
+        {
+            "chain": [0, 0, 1, 1],
+            "sweep_idx": [0, 1, 0, 1],
+            "raw_llr_lexA": [0.10, 0.30, 0.08, 0.35],
+            "raw_llr_cpxR": [0.12, 0.33, 0.09, 0.37],
+            "norm_llr_lexA": [0.05, 0.20, 0.03, 0.28],
+            "norm_llr_cpxR": [0.07, 0.22, 0.04, 0.29],
+            "objective_scalar": [0.10, 0.30, 0.08, 0.35],
+            "raw_llr_objective": [0.10, 0.30, 0.08, 0.35],
+        }
+    )
+    baseline_df = pd.DataFrame(
+        {
+            "raw_llr_lexA": [0.02, 0.04, 0.06, 0.08],
+            "raw_llr_cpxR": [0.03, 0.05, 0.07, 0.09],
+            "norm_llr_lexA": [0.01, 0.03, 0.05, 0.07],
+            "norm_llr_cpxR": [0.02, 0.04, 0.06, 0.08],
+        }
+    )
+    elites_df = pd.DataFrame(
+        {
+            "id": ["elite-1", "elite-2", "elite-3"],
+            "raw_llr_lexA": [0.35, 0.35, 0.30],
+            "raw_llr_cpxR": [0.37, 0.37, 0.33],
+            "norm_llr_lexA": [0.28, 0.28, 0.20],
+            "norm_llr_cpxR": [0.29, 0.29, 0.22],
+            "rank": [1, 2, 3],
+        }
+    )
+    out_path = tmp_path / "plot__chain_trajectory_scatter_elite_collisions.png"
+    metadata = plot_chain_trajectory_scatter(
+        trajectory_df=trajectory_df,
+        baseline_df=baseline_df,
+        elites_df=elites_df,
+        tf_pair=("lexA", "cpxR"),
+        scatter_scale="llr",
+        consensus_anchors=None,
+        out_path=out_path,
+        dpi=72,
+        png_compress_level=1,
+    )
+
+    assert out_path.exists()
+    assert metadata["elite_points_plotted"] == 3
+    assert metadata["elite_unique_coordinates"] == 2
+    assert metadata["elite_coordinate_collisions"] == 1
+    assert metadata["elite_rendered_points"] == 3
 
 
 def test_chain_trajectory_sweep_requires_selected_y_column(tmp_path: Path) -> None:
@@ -194,13 +245,13 @@ def test_chain_trajectory_sweep_renders_raw_llr_by_sweep(tmp_path: Path) -> None
         dpi=72,
         png_compress_level=1,
         stride=1,
-        slot_overlay=True,
+        chain_overlay=True,
     )
 
     assert out_path.exists()
     legend_labels = metadata["legend_labels"]
-    assert "chain 0" in legend_labels
-    assert "chain 1" in legend_labels
+    assert "Chain 0" in legend_labels
+    assert "Chain 1" in legend_labels
     assert metadata["mode"] == "chain_sweep"
     assert metadata["chain_count"] == 2
     assert metadata["y_mode"] == "all"
@@ -231,7 +282,34 @@ def test_chain_trajectory_sweep_best_so_far_mode_is_supported(tmp_path: Path) ->
     assert out_path.exists()
     assert metadata["y_mode"] == "best_so_far"
     assert metadata["chain_count"] == 2
-    assert metadata["y_label"] == "Joint score (best-window raw LLR; best-so-far)"
+    assert metadata["y_label"] == "Replay objective (raw-LLR)"
+
+
+def test_chain_trajectory_sweep_objective_scalar_label_is_compact_and_specific(tmp_path: Path) -> None:
+    trajectory_df = pd.DataFrame(
+        {
+            "chain": [0, 0],
+            "sweep_idx": [0, 1],
+            "objective_scalar": [0.4, 0.5],
+        }
+    )
+    out_path = tmp_path / "plot__chain_trajectory_sweep_objective_scalar.png"
+    metadata = plot_chain_trajectory_sweep(
+        trajectory_df=trajectory_df,
+        y_column="objective_scalar",
+        y_mode="best_so_far",
+        objective_config={
+            "combine": "min",
+            "score_scale": "normalized-llr",
+            "softmin": {"enabled": True},
+        },
+        out_path=out_path,
+        dpi=72,
+        png_compress_level=1,
+    )
+
+    assert out_path.exists()
+    assert metadata["y_label"] == "Soft-min TF best-window norm-LLR"
 
 
 def test_chain_trajectory_sweep_rejects_unknown_mode(tmp_path: Path) -> None:

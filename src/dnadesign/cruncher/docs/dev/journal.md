@@ -99,3 +99,49 @@
 - Hardened MMR distance contracts (`compute_core_distance` bounded in [0,1]) and added deterministic tie-break behavior using full-sequence distance when core distances tie.
 - Updated plot registry descriptions and docs (`sampling_and_analysis.md`, `reference/config.md`) to match the new plot semantics and UX narrative.
 - Validated with full Cruncher analysis test suite and demo workspace CLI analyze runs.
+- Ran a cold-tail Gibbs sweep across all three demo workspaces (`baseline` vs `cold_tail`) and selected `cold_tail` for each based on combined quality/diversity/stability metrics.
+- Promoted winning defaults into canonical demo configs: earlier adaptation freeze (`freeze_after_beta=6`), higher Gibbs inertia (`p_stay_end=0.85`), lower tail `S` move share, and colder final piecewise cooling stages.
+- Verified updated canonical demos end-to-end (`lock -> parse -> sample -> analyze`) and recorded improved tail diagnostics (notably reduced rugged downhill acceptance and Gibbs tail flip rate) while maintaining 8 elites and high per-TF scores.
+- Ran a focused elite-selection alpha sweep on campaign+densegen at fixed cold-tail kernels; campaign results were alpha-invariant on selected metrics, while densegen showed a quality/diversity tradeoff and settled on `alpha=0.70` as the default balance point.
+- Ran a two-TF alpha spot-check (`0.55` vs `0.85`) and observed identical elite set/metrics under fixed seed+kernel, so the existing `alpha=0.85` remains unchanged there.
+- Fixed analyze crash in overlap plotting by replacing unsupported colormap `mako` with matplotlib-native `viridis`.
+- Updated the elite diversity panel to show full-sequence Hamming distances in base pairs (bp) on both the score-vs-diversity axis and distance-matrix colorbar, so effective elite diversity is directly interpretable without normalization.
+- Revalidated `demo_basics_two_tf` canonical outputs after rerun: elites remain `8/8` unique sequences, with full-sequence pairwise Hamming distance `min/median/max = 1/13/14 bp` (sequence length 16 bp), confirming no exact duplicates while exposing remaining near-duplicate tails.
+- Clarified optimizer score semantics in plots: sweep y-axis now labels optimizer scalar meaning explicitly (`min` vs `sum`, soft-min on/off, and score scale), and elite diversity y-axis labels final optimizer scalar source.
+- Hardened elite score fallback reconstruction to respect objective combine mode (`sum` no longer falls back to `min`), with regression coverage in `test_nn_distance_identity`.
+- Tightened score-axis wording to reduce label verbosity while preserving semantics; y-labels now use compact forms like `Opt scalar (...)` and `Replay objective (...)` with explicit combine/scale context.
+- Investigated why selected elites appeared as a single point in `plot__chain_trajectory_scatter`: confirmed this was not duplicate-sequence selection; elites were unique in primary sequence but had identical per-TF best-window scores, yielding identical scatter coordinates.
+- Confirmed core-space collapse for the two-TF demo (`core_lexA/core_cpxR` identical across elites) with non-zero full-sequence diversity, so MMR tie-breaks were operating on full-sequence distance under score ties.
+- Hardened trajectory scatter UX by aggregating overlapping elite coordinates, scaling marker size by multiplicity, and annotating stacked points with `×N` counts.
+- Added scatter metadata fields `elite_unique_coordinates` and `elite_coordinate_collisions` for explicit diagnostics and regression testing.
+- Added a fail-fast uniqueness validation in sampling (`run_set.py`) to raise if duplicate elite sequence keys survive selection/output assembly.
+- Refined `plot__chain_trajectory_scatter` elite rendering for coordinate-collision cases: colliding elites now render as separate markers arranged around the true score coordinate with faint spokes, preventing single-marker information collapse while preserving score-space semantics.
+- Added scatter metadata field `elite_rendered_points` and regression coverage in `test_opt_trajectory_plot.py` to ensure each elite is visually represented even when coordinates collide.
+- Added a diversity-first elite selection surface under `sample.elites.select` with macro knob `diversity` (`0..1`) plus advanced constrained-MMR controls (`distance_metric`, `min_hamming_bp`, `min_core_hamming_bp`, `constraint_policy`, `relax_step_bp`, `relax_min_bp`, `pool_strategy`).
+- Implemented constrained MMR in `core/selection/mmr.py` with deterministic hard-distance feasibility checks, strict/relax policies, hybrid/full/core distance modes, and persisted threshold outcomes (`*_requested`, `*_final`, `relax_steps_used`).
+- Added deterministic full-sequence/core tie handling and expanded MMR metadata (`nearest_distance_core`, `nearest_distance_core_bp`) for better auditability.
+- Added stratified candidate-pool construction across `(chain, cooling_stage)` plus geometric pool expansion in `app/sample/elites_mmr.py` when diversity-constrained selection cannot initially fill `k`.
+- Wired effective selection parameters into sample metadata (`mmr_alpha`, `mmr_alpha_user`, `mmr_diversity`, `pool_strategy`, constraint finals), so analysis/reporting reflects actual optimization-time selection behavior.
+- Extended `analysis.mmr_sweep` with diversity-aware replay (`diversity_values`, `distance_metric`, `constraint_policy`) and new table outputs (`alpha_eff`, requested/final constraints, relax steps, selection_error).
+- Fixed `analysis.mmr_sweep` core replay failure when PWM width exceeds sequence length by clipping replay core width to sequence length in `tfbs_cores_from_scorer`; added regression coverage.
+- Updated demo workspace configs to use the diversity macro (`sample.elites.select.diversity`) and updated reference/sampling docs plus optimizer-surface tests to match.
+- Audited `schema_v3` surface against runtime usage and removed-key regression tests: no new stale/no-op keys found in active Cruncher v3 paths; existing removed keys remain enforced by `tests/config/test_removed_config_keys.py`.
+- Fixed `analysis.mmr_sweep` parquet serialization failure when `pool_size_input` mixes `'auto'` and integers by normalizing `pool_size_input` to string before table write; added regression test `test_run_mmr_sweep_table_is_parquet_writable_with_mixed_pool_size_inputs`.
+- Generated demo variant matrix (`score_focus`, `balanced`, `diversity_focus`, `strict_probe`) for `demo_basics_two_tf`, `demo_campaigns_multi_tf`, and `densegen_prep_three_tf` under `workspaces/*/variants/`.
+- Ran bounded offline MMR diversity sweeps (`alpha=0.85`, `pool_size in {auto,1600,4000}`, `diversity in {0,0.25,0.5,0.75,0.9}`) for all three demos and updated balanced variants with measured settings:
+  - `two_tf`: balanced -> `diversity=0.25` (higher values relaxed to zero constraints with no added full-sequence separation).
+  - `campaign`: balanced -> `diversity=0.5`, `pool_size=4000` (non-zero diversity pressure with strong score retention).
+  - `densegen`: balanced -> `diversity=0.5` (large gain in minimum pairwise full-sequence distance with small score drop).
+- Culled stale elite schema surface: removed `sample.elites.filter` and advanced `sample.elites.select.*` controls (`alpha`, `relevance`, distance/constraint/pool-strategy knobs) so the user-facing knobs are now only `k`, `select.diversity`, and `select.pool_size`.
+- Removed pre-MMR threshold gating in sampling (`_elite_filter_passes` path), so MMR now always operates directly on the candidate draw pool.
+- Added explicit pool-size resolver policy with `pool_size: auto|all|int`, where `auto = min(candidate_count, min(20000, max(4000, 500*k)))`.
+- Updated analysis sweep defaults to diversity/pool-size grids, with fixed internal MMR relevance (`min_tf_score`) and fixed base alpha (`0.85`) to reduce config cognitive load.
+- Updated canonical demos and generated variant configs to the cleaned schema; removed temporary `_mmr_sweep_tmp` configs that still referenced removed keys.
+- Added/updated schema and runtime tests (including new `test_elite_pool_policy.py`) and revalidated with full Cruncher test suite + Ruff check/format.
+- Aligned offline `analysis.mmr_sweep` with sampling-time MMR distance semantics (`hybrid` at `diversity=0` as well), eliminating the analysis/runtime mismatch.
+- Renamed tail acceptance summary/report surface from ambiguous `acceptance_rate_mh_tail` to explicit `acceptance_rate_non_s_tail`.
+- Removed residual threading of removed catalog PWM-window config keys by deleting `CatalogConfig` compatibility properties and dropping those no-op args from parse/sample/campaign/catalog store construction paths.
+- Ran a direct two-TF sampling sweep over `sample.elites.select.diversity` using real `sample` outputs (not replay-only sweep) and measured score/diversity tradeoff from each run's `optimize/elites.parquet`.
+- Two-TF score vs diversity table (full-sequence Hamming in bp): `0.00 -> median_score 0.7122, median_nn 1.0, min_pairwise 1.0`; `0.05 -> 0.6749, 5.5, 3.0`; `0.10 -> 0.6540, 5.5, 4.0`; `0.15 -> 0.6426, 6.5, 5.0`; `0.20 -> 0.6366, 6.0, 4.0`; `0.25 -> 0.6306, 7.0, 6.0`; `0.35 -> 0.5949, 7.0, 5.0`; `0.40 -> 0.5929, 7.0, 5.0`; `0.60 -> 0.5563, 8.0, 5.0`; `0.80 -> 0.5069, 8.0, 6.0`; `1.00 -> 0.2785, 7.5, 7.0`.
+- Interpretation: `diversity=0.00` now correctly maps to score-only selection and collapses (`NN=1 bp`). Practical knee for two-TF is `0.10..0.25`; chose `0.15` as score-favoring default with non-collapsed elites.
+- Plot candidate to add in analysis: `plot__elites_diversity_tradeoff_curve` from `analysis.mmr_sweep` table, with x=`diversity`, left y=`median_score_selected`, right y=`median_nn_full_bp` and `min_pairwise_full_bp`, plus a marked knee/default point. This would make default selection evidence visible from a single run artifact.

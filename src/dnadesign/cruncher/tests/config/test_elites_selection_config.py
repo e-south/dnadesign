@@ -12,12 +12,12 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from dnadesign.cruncher.config.schema_v3 import (
     SampleBudgetConfig,
     SampleConfig,
     SampleElitesConfig,
-    SampleEliteSelectConfig,
     SampleObjectiveConfig,
 )
 
@@ -38,20 +38,44 @@ def test_elites_defaults() -> None:
     cfg = _base_sample_config()
     elites = cfg.elites
     assert elites.k == 10
-    assert elites.filter.min_per_tf_norm is None
-    assert elites.filter.require_all_tfs is True
-    assert elites.select.alpha == pytest.approx(0.85)
+    assert elites.select.pool_size == "auto"
+    assert elites.select.diversity == pytest.approx(0.0)
 
 
-def test_elites_mmr_alpha_must_be_positive() -> None:
-    with pytest.raises(ValueError, match="elites.select.alpha"):
-        _base_sample_config(elites=SampleElitesConfig(select=SampleEliteSelectConfig(alpha=0.0)))
+def test_elites_pool_size_accepts_all_literal() -> None:
+    cfg = _base_sample_config(elites=SampleElitesConfig(select={"pool_size": "all"}))
+    assert cfg.elites.select.pool_size == "all"
 
 
-def test_elites_filter_rejects_auto_threshold_value() -> None:
-    with pytest.raises(ValueError, match="filter.min_per_tf_norm"):
-        _base_sample_config(
-            elites=SampleElitesConfig(
-                filter={"min_per_tf_norm": "auto"},
-            )
-        )
+def test_elites_pool_size_rejects_invalid_values() -> None:
+    with pytest.raises(ValueError, match="elites.select.pool_size"):
+        _base_sample_config(elites=SampleElitesConfig(select={"pool_size": 0}))
+    with pytest.raises(ValidationError):
+        _base_sample_config(elites=SampleElitesConfig(select={"pool_size": "huge"}))
+
+
+def test_elites_diversity_must_be_in_closed_unit_interval() -> None:
+    with pytest.raises(ValueError, match="elites.select.diversity"):
+        _base_sample_config(elites=SampleElitesConfig(select={"diversity": -0.01}))
+    with pytest.raises(ValueError, match="elites.select.diversity"):
+        _base_sample_config(elites=SampleElitesConfig(select={"diversity": 1.01}))
+
+
+@pytest.mark.parametrize(
+    "key,value",
+    [
+        ("filter", {"min_per_tf_norm": 0.6}),
+        ("select", {"alpha": 0.8}),
+        ("select", {"relevance": "min_tf_score"}),
+        ("select", {"distance_metric": "hybrid"}),
+        ("select", {"constraint_policy": "relax"}),
+        ("select", {"min_hamming_bp": 3}),
+        ("select", {"min_core_hamming_bp": 2}),
+        ("select", {"pool_strategy": "stratified"}),
+    ],
+)
+def test_removed_elite_keys_are_rejected(key: str, value: object) -> None:
+    payload = {"k": 10}
+    payload[key] = value
+    with pytest.raises(ValidationError):
+        _base_sample_config(elites=SampleElitesConfig(**payload))

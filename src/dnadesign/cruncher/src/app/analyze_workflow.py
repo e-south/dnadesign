@@ -14,6 +14,7 @@ from __future__ import annotations
 import gzip
 import json
 import logging
+import os
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,10 +27,12 @@ from dnadesign.cruncher.analysis.diagnostics import summarize_sampling_diagnosti
 from dnadesign.cruncher.analysis.diversity import (
     compute_baseline_nn_distances,
     compute_elite_distance_matrix,
+    compute_elites_full_sequence_nn_table,
     compute_elites_nn_distance_table,
     representative_elite_ids,
     summarize_elite_distances,
 )
+from dnadesign.cruncher.analysis.fimo_concordance import build_fimo_concordance_table
 from dnadesign.cruncher.analysis.hits import load_baseline_hits, load_elites_hits
 from dnadesign.cruncher.analysis.layout import (
     analysis_manifest_path,
@@ -43,6 +46,7 @@ from dnadesign.cruncher.analysis.layout import (
     summary_path,
     table_manifest_path,
 )
+from dnadesign.cruncher.analysis.mmr_sweep import run_mmr_sweep
 from dnadesign.cruncher.analysis.objective import compute_objective_components
 from dnadesign.cruncher.analysis.overlap import compute_overlap_tables
 from dnadesign.cruncher.analysis.parquet import read_parquet, write_parquet
@@ -78,6 +82,7 @@ from dnadesign.cruncher.artifacts.layout import (
 from dnadesign.cruncher.artifacts.manifest import load_manifest, write_manifest
 from dnadesign.cruncher.config.schema_v3 import AnalysisConfig, CruncherConfig
 from dnadesign.cruncher.core.sequence import identity_key
+from dnadesign.cruncher.integrations.meme_suite import resolve_tool_path
 from dnadesign.cruncher.utils.arviz_cache import ensure_arviz_data_dir
 from dnadesign.cruncher.utils.hashing import sha256_path
 from dnadesign.cruncher.utils.paths import resolve_catalog_root
@@ -86,6 +91,8 @@ from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
 logger = logging.getLogger(__name__)
 
 __all__ = ["run_analyze"]
+
+_ANALYZE_LOCK_META_FILE = ".analyze_lock.json"
 
 
 def _status_text(status: object) -> str:
@@ -309,6 +316,22 @@ def _objective_caption(objective_cfg: dict[str, object]) -> str:
     return base
 
 
+def _objective_axis_label(objective_cfg: dict[str, object]) -> str:
+    score_scale = str(objective_cfg.get("score_scale") or "normalized-llr").strip().lower()
+    if score_scale in {"llr", "raw-llr", "raw_llr"}:
+        scale_label = "raw-LLR"
+    else:
+        scale_label = "norm-LLR"
+    combine = str(objective_cfg.get("combine") or "min").strip().lower()
+    softmin_cfg = objective_cfg.get("softmin")
+    softmin_enabled = isinstance(softmin_cfg, dict) and bool(softmin_cfg.get("enabled"))
+    if combine == "sum":
+        return f"Cruncher sum-TF best-window {scale_label}"
+    if softmin_enabled:
+        return f"Cruncher soft-min TF best-window {scale_label}"
+    return f"Cruncher min-TF best-window {scale_label}"
+
+
 def _resolve_baseline_seed(baseline_df: pd.DataFrame) -> int | None:
     if "baseline_seed" not in baseline_df.columns or baseline_df.empty:
         return None
@@ -359,6 +382,18 @@ def _summarize_elites_mmr(
         identity_by_elite_id=identity_by_elite_id or None,
         rank_by_elite_id=rank_by_elite_id or None,
     )
+    full_nn_df, full_summary = compute_elites_full_sequence_nn_table(
+        elites_df,
+        identity_mode=identity_mode,
+        identity_by_elite_id=identity_by_elite_id or None,
+        rank_by_elite_id=rank_by_elite_id or None,
+    )
+    if not full_nn_df.empty:
+        nn_df = nn_df.merge(
+            full_nn_df,
+            on=["elite_id", "identity_mode"],
+            how="left",
+        )
     rep_by_identity = representative_elite_ids(identity_by_elite_id, rank_by_elite_id) if identity_by_elite_id else {}
     hits_for_dist = hits_df
     if rep_by_identity:
@@ -368,6 +403,14 @@ def _summarize_elites_mmr(
     dist_summary = summarize_elite_distances(dist)
     min_norm = pd.to_numeric(elites_df.get("min_norm"), errors="coerce") if "min_norm" in elites_df.columns else None
     median_relevance_raw = float(min_norm.median()) if min_norm is not None and not min_norm.empty else None
+    mmr_summary_meta = elites_meta.get("mmr_summary")
+    if isinstance(mmr_summary_meta, dict):
+        mmr_relevance_meta = mmr_summary_meta.get("median_relevance_raw")
+        try:
+            if mmr_relevance_meta is not None:
+                median_relevance_raw = float(mmr_relevance_meta)
+        except (TypeError, ValueError, OverflowError):
+            pass
     draw_df = sequences_df[sequences_df.get("phase") == "draw"] if "phase" in sequences_df.columns else sequences_df
     unique_draws = None
     if "sequence" in draw_df.columns:
@@ -383,11 +426,20 @@ def _summarize_elites_mmr(
         unique_elites = source.map(lambda seq: identity_key(seq, bidirectional=bidirectional)).nunique()
     summary = {
         "k": int(elites_meta.get("n_elites") or len(elites_df)),
-        "alpha": elites_meta.get("mmr_alpha"),
+        "score_weight": elites_meta.get("selection_score_weight"),
+        "diversity_weight": elites_meta.get("selection_diversity_weight"),
         "pool_size": elites_meta.get("pool_size"),
+        "relevance": elites_meta.get("selection_relevance"),
         "median_relevance_raw": median_relevance_raw,
         "mean_pairwise_distance": dist_summary.get("mean_pairwise_distance"),
         "min_pairwise_distance": dist_summary.get("min_pairwise_distance"),
+        "sequence_length_bp": full_summary.get("sequence_length_bp"),
+        "mean_pairwise_full_bp": full_summary.get("mean_pairwise_full_bp"),
+        "min_pairwise_full_bp": full_summary.get("min_pairwise_full_bp"),
+        "median_nn_full_bp": full_summary.get("median_nn_full_bp"),
+        "mean_pairwise_full_distance": full_summary.get("mean_pairwise_full_distance"),
+        "min_pairwise_full_distance": full_summary.get("min_pairwise_full_distance"),
+        "median_nn_full_distance": full_summary.get("median_nn_full_distance"),
         "unique_fraction_canonical_draws": (
             unique_draws / float(len(draw_df)) if unique_draws is not None and len(draw_df) else None
         ),
@@ -476,6 +528,53 @@ def _delete_path(path: Path) -> None:
     path.unlink()
 
 
+def _analyze_lock_meta_path(tmp_root: Path) -> Path:
+    return tmp_root / _ANALYZE_LOCK_META_FILE
+
+
+def _is_pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def _read_analyze_lock_pid(tmp_root: Path) -> int | None:
+    lock_meta_file = _analyze_lock_meta_path(tmp_root)
+    if not lock_meta_file.exists():
+        return None
+    try:
+        payload = json.loads(lock_meta_file.read_text())
+    except (OSError, ValueError, TypeError):
+        return None
+    pid = payload.get("pid") if isinstance(payload, dict) else None
+    if isinstance(pid, int):
+        return pid
+    if isinstance(pid, str):
+        stripped = pid.strip()
+        if stripped.isdigit():
+            return int(stripped)
+    return None
+
+
+def _recoverable_analyze_lock_reason(tmp_root: Path) -> str | None:
+    pid = _read_analyze_lock_pid(tmp_root)
+    if pid is None:
+        return "lock metadata missing"
+    if pid == os.getpid():
+        return f"lock owned by current process pid={pid}"
+    if not _is_pid_alive(pid):
+        return f"lock owned by non-running pid={pid}"
+    return None
+
+
 def run_analyze(
     cfg: CruncherConfig,
     config_path: Path,
@@ -486,14 +585,16 @@ def run_analyze(
     catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     ensure_mpl_cache(catalog_root)
     ensure_arviz_data_dir(catalog_root)
+    resolved_meme_tool_path = resolve_tool_path(cfg.discover.tool_path, config_path=config_path)
 
     from dnadesign.cruncher.analysis.plots.elites_nn_distance import plot_elites_nn_distance
+    from dnadesign.cruncher.analysis.plots.elites_showcase import plot_elites_showcase
+    from dnadesign.cruncher.analysis.plots.fimo_concordance import plot_optimizer_vs_fimo
     from dnadesign.cruncher.analysis.plots.health_panel import plot_health_panel
     from dnadesign.cruncher.analysis.plots.opt_trajectory import (
         plot_chain_trajectory_scatter,
         plot_chain_trajectory_sweep,
     )
-    from dnadesign.cruncher.analysis.plots.overlap import plot_overlap_panel
 
     plan = resolve_analysis_plan(cfg)
     analysis_cfg = plan.analysis_cfg
@@ -530,10 +631,20 @@ def run_analyze(
         analysis_root_path = analysis_root(run_dir)
         tmp_root = analysis_root_path / ".analysis_tmp"
         if tmp_root.exists():
-            raise RuntimeError(
-                f"Analyze already in progress for run '{run_name}' (lock: {tmp_root}). "
-                "If no analyze is running, remove the stale analysis temp directory."
-            )
+            recoverable_reason = _recoverable_analyze_lock_reason(tmp_root)
+            if recoverable_reason is not None:
+                logger.warning(
+                    "Recovering stale analyze lock for run '%s' at %s (%s).",
+                    run_name,
+                    tmp_root,
+                    recoverable_reason,
+                )
+                shutil.rmtree(tmp_root, ignore_errors=True)
+            else:
+                raise RuntimeError(
+                    f"Analyze already in progress for run '{run_name}' (lock: {tmp_root}). "
+                    "If no analyze is running, remove the stale analysis temp directory."
+                )
         try:
             tmp_root.mkdir(parents=True, exist_ok=False)
         except FileExistsError as exc:
@@ -541,6 +652,15 @@ def run_analyze(
                 f"Analyze already in progress for run '{run_name}' (lock: {tmp_root}). "
                 "If no analyze is running, remove the stale analysis temp directory."
             ) from exc
+        atomic_write_json(
+            _analyze_lock_meta_path(tmp_root),
+            {
+                "analysis_id": analysis_id,
+                "run": run_name,
+                "created_at": created_at,
+                "pid": os.getpid(),
+            },
+        )
 
         prev_root = None
 
@@ -586,6 +706,7 @@ def run_analyze(
         diagnostics_path = analysis_table_path(tmp_root, "diagnostics_summary", "json")
         objective_path = analysis_table_path(tmp_root, "objective_components", "json")
         elites_mmr_path = analysis_table_path(tmp_root, "elites_mmr_summary", table_ext)
+        elites_mmr_sweep_path = analysis_table_path(tmp_root, "elites_mmr_sweep", table_ext)
         nn_distance_path = analysis_table_path(tmp_root, "elites_nn_distance", table_ext)
         trajectory_path = analysis_table_path(tmp_root, "chain_trajectory_points", table_ext)
         trajectory_lines_path = analysis_table_path(tmp_root, "chain_trajectory_lines", table_ext)
@@ -609,6 +730,20 @@ def run_analyze(
             objective_from_manifest = {}
         if not isinstance(objective_from_manifest, dict):
             raise ValueError("Run manifest field 'objective' must be an object when provided.")
+        total_sweeps_raw = manifest.get("total_sweeps")
+        if total_sweeps_raw is None:
+            if sample_meta.tune is None or sample_meta.draws is None:
+                raise ValueError(
+                    "Run metadata missing total_sweeps and sample tune/draws required for objective replay."
+                )
+            total_sweeps_raw = int(sample_meta.tune) + int(sample_meta.draws)
+        try:
+            total_sweeps = int(total_sweeps_raw)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("Run manifest field 'total_sweeps' must be an integer.") from exc
+        if total_sweeps < 1:
+            raise ValueError("Run manifest field 'total_sweeps' must be >= 1.")
+        objective_from_manifest = {**objective_from_manifest, "total_sweeps": total_sweeps}
         sample_payload = used_cfg.get("sample") if isinstance(used_cfg, dict) else None
         objective_used = sample_payload.get("objective") if isinstance(sample_payload, dict) else None
         scoring_used = objective_used.get("scoring") if isinstance(objective_used, dict) else None
@@ -721,6 +856,40 @@ def run_analyze(
         )
         _write_table(elites_mmr_df, elites_mmr_path)
         _write_table(nn_df, nn_distance_path)
+        mmr_sweep_df = pd.DataFrame()
+        if analysis_cfg.mmr_sweep.enabled:
+            baseline_pool_size: str | int | None = None
+            if isinstance(sample_payload, dict):
+                elites_payload = sample_payload.get("elites")
+                if isinstance(elites_payload, dict):
+                    select_payload = elites_payload.get("select")
+                    if isinstance(select_payload, dict):
+                        baseline_pool_size = select_payload.get("pool_size")
+            if baseline_pool_size is None:
+                baseline_pool_size = elites_meta.get("pool_size")
+
+            baseline_diversity = elites_meta.get("selection_diversity")
+            try:
+                baseline_diversity = float(baseline_diversity) if baseline_diversity is not None else None
+            except (TypeError, ValueError, OverflowError):
+                baseline_diversity = None
+
+            mmr_sweep_df = run_mmr_sweep(
+                sequences_df=sequences_df,
+                elites_df=elites_df,
+                tf_names=tf_names,
+                pwms=pwms,
+                objective_config=objective_from_manifest,
+                bidirectional=bool(sample_meta.bidirectional),
+                elite_k=int(sample_meta.top_k or len(elites_df)),
+                pwm_pseudocounts=float(pseudocounts_raw),
+                log_odds_clip=log_odds_clip_raw,
+                pool_size_values=analysis_cfg.mmr_sweep.pool_size_values,
+                diversity_values=analysis_cfg.mmr_sweep.diversity_values,
+                baseline_pool_size=baseline_pool_size,
+                baseline_diversity=baseline_diversity,
+            )
+            _write_table(mmr_sweep_df, elites_mmr_sweep_path)
 
         baseline_seed = _resolve_baseline_seed(baseline_df)
         baseline_nn = compute_baseline_nn_distances(
@@ -819,7 +988,7 @@ def run_analyze(
                     stride=analysis_cfg.trajectory_stride,
                     alpha_min=analysis_cfg.trajectory_particle_alpha_min,
                     alpha_max=analysis_cfg.trajectory_particle_alpha_max,
-                    slot_overlay=analysis_cfg.trajectory_chain_overlay,
+                    chain_overlay=analysis_cfg.trajectory_chain_overlay,
                     **plot_kwargs,
                 )
                 _record_plot("chain_trajectory_scatter", plot_trajectory_path, True, None)
@@ -831,6 +1000,7 @@ def run_analyze(
                     trajectory_df=trajectory_lines_df,
                     y_column=str(analysis_cfg.trajectory_sweep_y_column),
                     y_mode=str(analysis_cfg.trajectory_sweep_mode),
+                    objective_config=objective_from_manifest,
                     cooling_config=optimizer_stats.get("mcmc_cooling") if isinstance(optimizer_stats, dict) else None,
                     tune_sweeps=sample_meta.tune,
                     objective_caption=objective_caption,
@@ -838,7 +1008,7 @@ def run_analyze(
                     stride=analysis_cfg.trajectory_stride,
                     alpha_min=analysis_cfg.trajectory_particle_alpha_min,
                     alpha_max=analysis_cfg.trajectory_particle_alpha_max,
-                    slot_overlay=analysis_cfg.trajectory_chain_overlay,
+                    chain_overlay=analysis_cfg.trajectory_chain_overlay,
                     **plot_kwargs,
                 )
                 _record_plot("chain_trajectory_sweep", plot_trajectory_sweep_path, True, None)
@@ -851,31 +1021,23 @@ def run_analyze(
             plot_nn_path,
             elites_df=elites_plot_df,
             baseline_nn=pd.Series(baseline_nn),
+            objective_config=objective_from_manifest,
             **plot_kwargs,
         )
         _record_plot("elites_nn_distance", plot_nn_path, True, None)
 
-        plot_overlap_path = analysis_plot_path(tmp_root, "overlap_panel", plot_format)
-        overlap_skip_reason = None
-        if len(tf_names) < 2:
-            overlap_skip_reason = "n_tf < 2"
-        elif len(elites_df) < 2:
-            overlap_skip_reason = "elites_count < 2"
-        if overlap_skip_reason is not None:
-            _record_plot("overlap_panel", plot_overlap_path, False, overlap_skip_reason)
-        else:
-            plot_overlap_panel(
-                overlap_summary_df,
-                elite_overlap_df,
-                tf_names,
-                plot_overlap_path,
-                hits_df=hits_df,
-                elites_df=elites_df,
-                sequence_length=int(sequence_length),
-                focus_pair=focus_pair,
-                **plot_kwargs,
-            )
-            _record_plot("overlap_panel", plot_overlap_path, True, None)
+        plot_showcase_path = analysis_plot_path(tmp_root, "elites_showcase", plot_format)
+        plot_elites_showcase(
+            elites_df=elites_df,
+            hits_df=hits_df,
+            elite_overlap_df=elite_overlap_df,
+            tf_names=tf_names,
+            pwms=pwms,
+            out_path=plot_showcase_path,
+            max_panels=int(analysis_cfg.elites_showcase.max_panels),
+            **plot_kwargs,
+        )
+        _record_plot("elites_showcase", plot_showcase_path, True, None)
 
         plot_health_path = analysis_plot_path(tmp_root, "health_panel", plot_format)
         if trace_idata is None:
@@ -883,6 +1045,33 @@ def run_analyze(
         else:
             plot_health_panel(optimizer_stats, plot_health_path, **plot_kwargs)
             _record_plot("health_panel", plot_health_path, True, None)
+
+        plot_fimo_path = analysis_plot_path(tmp_root, "optimizer_vs_fimo", plot_format)
+        if not analysis_cfg.fimo_compare.enabled:
+            _record_plot("optimizer_vs_fimo", plot_fimo_path, False, "analysis.fimo_compare.enabled=false")
+        else:
+            fimo_tmp_dir = tmp_root / "_fimo_compare_tmp"
+            try:
+                concordance_df, _ = build_fimo_concordance_table(
+                    points_df=trajectory_df,
+                    tf_names=tf_names,
+                    pwms=pwms,
+                    bidirectional=bidirectional,
+                    threshold=1.0,
+                    work_dir=fimo_tmp_dir,
+                    tool_path=resolved_meme_tool_path,
+                )
+                plot_optimizer_vs_fimo(
+                    concordance_df,
+                    plot_fimo_path,
+                    x_label=_objective_axis_label(objective_from_manifest),
+                    y_label="FIMO weakest-TF score (-log10 sequence p-value)",
+                    title="Cruncher optimizer vs FIMO weakest-TF score",
+                    **plot_kwargs,
+                )
+                _record_plot("optimizer_vs_fimo", plot_fimo_path, True, None)
+            finally:
+                shutil.rmtree(fimo_tmp_dir, ignore_errors=True)
 
         table_entries = [
             {
@@ -948,6 +1137,13 @@ def run_analyze(
                 "exists": True,
             },
             {
+                "key": "elites_mmr_sweep",
+                "label": "Elites MMR sweep",
+                "path": elites_mmr_sweep_path.name,
+                "exists": bool(analysis_cfg.mmr_sweep.enabled),
+                "skip_reason": None if analysis_cfg.mmr_sweep.enabled else "analysis.mmr_sweep.enabled=false",
+            },
+            {
                 "key": "elites_nn_distance",
                 "label": "Elites NN distance",
                 "path": nn_distance_path.name,
@@ -984,6 +1180,14 @@ def run_analyze(
                 analysis_root_path / elites_mmr_path.relative_to(tmp_root), run_dir, kind="table", stage="analysis"
             ),
             artifact_entry(
+                analysis_root_path / elites_mmr_sweep_path.relative_to(tmp_root),
+                run_dir,
+                kind="table",
+                stage="analysis",
+            )
+            if analysis_cfg.mmr_sweep.enabled
+            else None,
+            artifact_entry(
                 analysis_root_path / nn_distance_path.relative_to(tmp_root), run_dir, kind="table", stage="analysis"
             ),
             artifact_entry(
@@ -992,7 +1196,8 @@ def run_analyze(
                 kind="table",
                 stage="analysis",
             ),
-        ] + plot_artifacts
+        ]
+        analysis_artifacts = [item for item in analysis_artifacts if item is not None] + plot_artifacts
 
         build_analysis_manifests(
             analysis_id=analysis_id,

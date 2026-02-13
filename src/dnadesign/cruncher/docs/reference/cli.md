@@ -390,9 +390,9 @@ Preconditions:
 
 * provide runs via `analysis.runs`/`--run` or rely on the default latest run
 * trace-dependent plots require `optimize/trace.nc`
-* if `<run_dir>/analysis/` exists without `summary.json`, remove the incomplete `analysis/` folder before re-running `cruncher analyze`
 * each sample run snapshots the lockfile under `input/lockfile.json`; analysis uses that snapshot to avoid mismatch if the workspace lockfile changes later
 * if `analysis` is omitted from config, analyze uses schema defaults (including `run_selector=latest`)
+* if `analysis.fimo_compare.enabled=true`, MEME Suite `fimo` must be resolvable via `discover.tool_path`, `MEME_BIN`, or `PATH`
 
 Outputs:
 
@@ -400,10 +400,11 @@ Outputs:
   `analysis/table__metrics_joint.parquet`, `analysis/table__chain_trajectory_points.parquet`,
   `analysis/table__chain_trajectory_lines.parquet`,
   `analysis/table__diagnostics_summary.json`, `analysis/table__objective_components.json`,
-  `analysis/table__elites_mmr_summary.parquet`, `analysis/table__elites_nn_distance.parquet`
+  `analysis/table__elites_mmr_summary.parquet`, `analysis/table__elites_nn_distance.parquet`,
+  `analysis/table__elites_mmr_sweep.parquet` (when `analysis.mmr_sweep.enabled=true`)
 * plots: `plots/plot__chain_trajectory_scatter.<plot_format>`,
   `plots/plot__chain_trajectory_sweep.<plot_format>`,
-  `plots/plot__elites_nn_distance.<plot_format>`, `plots/plot__overlap_panel.<plot_format>`,
+  `plots/plot__elites_nn_distance.<plot_format>`, `plots/plot__elites_showcase.<plot_format>`,
   `plots/plot__health_panel.<plot_format>` (trace only)
 * reports: `analysis/report.json`, `analysis/report.md`
 * summaries: `analysis/summary.json`, `analysis/manifest.json`, `analysis/plot_manifest.json`, `analysis/table_manifest.json`
@@ -411,6 +412,7 @@ Outputs:
 Note:
 
 * Analyze rewrites the latest analysis outputs each run; set `analysis.archive=true` to keep prior reports.
+* Analyze uses `<run_dir>/.analysis_tmp` as a run-local lock. Stale temp locks from interrupted runs are auto-pruned; active locks still fail fast.
 * Use `cruncher analyze --summary` to print the highlights from `report.json`.
 
 ---
@@ -439,7 +441,7 @@ Notes:
 * plot output status is refreshed from disk so missing files are shown accurately
 * the Refresh button re-scans analysis entries and updates plot/table status without restarting marimo
 * the notebook infers `run_dir` from its location; keep it under `<run_dir>/` or regenerate it
-* plots are loaded from `analysis/plot_manifest.json`; the curated keys are `chain_trajectory_scatter`, `chain_trajectory_sweep`, `elites_nn_distance`, plus optional `overlap_panel` and `health_panel` entries when generated
+* plots are loaded from `analysis/plot_manifest.json`; the curated keys are `chain_trajectory_scatter`, `chain_trajectory_sweep`, `elites_nn_distance`, `elites_showcase`, plus optional `health_panel` and `optimizer_vs_fimo` entries when generated
 * the notebook includes:
   * Overview tab with run metadata and explicit warnings for missing/invalid analysis artifacts
   * Tables tab with a Top-K slider and per-table previews from `analysis/table_manifest.json`

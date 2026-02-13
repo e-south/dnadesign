@@ -99,7 +99,7 @@ Summary artifacts live under:
   analysis/campaign_summary.csv
   analysis/campaign_best.csv
   analysis/campaign_manifest.json
-  plots/plot__*.png
+  plots/plot__*.<plot_format>
 ```
 
 ## Related docs

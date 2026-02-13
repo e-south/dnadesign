@@ -33,8 +33,7 @@ def _base_config() -> dict:
                 "objective": {"bidirectional": True, "score_scale": "normalized-llr", "combine": "min"},
                 "elites": {
                     "k": 1,
-                    "filter": {"min_per_tf_norm": 0.0, "require_all_tfs": True, "pwm_sum_min": 0.0},
-                    "select": {"alpha": 0.85, "pool_size": "auto"},
+                    "select": {"diversity": 0.0, "pool_size": "auto"},
                 },
                 "moves": {"profile": "balanced"},
                 "output": {
@@ -84,6 +83,18 @@ def _write_config(tmp_path: Path, payload: dict) -> Path:
         (("cruncher", "sample", "elites", "selection", "distance"), {"kind": "sequence_hamming"}),
         (("cruncher", "sample", "elites", "selection", "relevance_norm"), "percentile"),
         (("cruncher", "sample", "elites", "selection", "min_distance"), 0.1),
+        (("cruncher", "sample", "elites", "filter", "require_all_tfs"), True),
+        (("cruncher", "sample", "elites", "select", "policy"), "mmr"),
+        (("cruncher", "sample", "elites", "select", "diversity_metric"), "tfbs_core_weighted_hamming"),
+        (("cruncher", "sample", "elites", "select", "alpha"), 0.8),
+        (("cruncher", "sample", "elites", "select", "relevance"), "joint_score"),
+        (("cruncher", "sample", "elites", "select", "distance_metric"), "hybrid"),
+        (("cruncher", "sample", "elites", "select", "constraint_policy"), "strict"),
+        (("cruncher", "sample", "elites", "select", "min_hamming_bp"), 2),
+        (("cruncher", "sample", "elites", "select", "min_core_hamming_bp"), 2),
+        (("cruncher", "sample", "elites", "select", "relax_step_bp"), 1),
+        (("cruncher", "sample", "elites", "select", "relax_min_bp"), 0),
+        (("cruncher", "sample", "elites", "select", "pool_strategy"), "stratified"),
         (("cruncher", "sample", "budget", "restarts"), 2),
     ],
 )

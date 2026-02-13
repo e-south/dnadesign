@@ -199,8 +199,8 @@ def summary(
             str(early_stop["success_min_per_tf_norm"]),
         )
         table.add_row("elites.k", str(sample["elites"]["k"]))
-        table.add_row("elites.min_per_tf_norm", str(sample["elites"]["filter"]["min_per_tf_norm"]))
-        table.add_row("elites.alpha", str(sample["elites"]["select"]["alpha"]))
+        table.add_row("elites.diversity", str(sample["elites"]["select"]["diversity"]))
+        table.add_row("elites.pool_size", str(sample["elites"]["select"]["pool_size"]))
         table.add_row("output.save_sequences", str(sample["output"]["save_sequences"]))
         table.add_row("output.save_trace", str(sample["output"]["save_trace"]))
 
@@ -217,5 +217,8 @@ def summary(
         table.add_row("analysis.table_format", analysis["table_format"])
         table.add_row("analysis.max_points", str(analysis["max_points"]))
         table.add_row("analysis.archive", str(analysis["archive"]))
+        table.add_row("analysis.elites_showcase.max_panels", str(analysis["elites_showcase"]["max_panels"]))
+        table.add_row("analysis.mmr_sweep.enabled", str(analysis["mmr_sweep"]["enabled"]))
+        table.add_row("analysis.mmr_sweep.diversity_values", str(analysis["mmr_sweep"]["diversity_values"]))
 
     console.print(table)

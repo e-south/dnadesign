@@ -300,3 +300,80 @@ Conclusion: base track/kmer rendering is already compatible.
 - Render flows still pass:
   - `uv run baserender job run --workspace demo_densegen_render --workspace-root src/dnadesign/baserender/workspaces`
   - `uv run baserender job run --workspace demo_cruncher_render --workspace-root src/dnadesign/baserender/workspaces`
+
+## 2026-02-13 - Cruncher elites showcase integration hardening
+
+### Findings
+
+1. High: replacing `overlap_panel` with baserender-backed `elites_showcase` exposed a real contract mismatch between Cruncher analysis PWMs and sampled hit widths.
+   - `run_analyze` loaded full PWMs from `config_used.yaml` (`pwms_info.pwm_matrix`), while sampled hits were generated with motif-width capping (`sample.motif_width.maxw`), causing hard failures like:
+     - `PWM length mismatch ... matrix rows=22 but hit pwm_width=16`
+2. Medium: multi-panel baserender API support was needed for one-figure-per-run elite showcases.
+3. Medium: motif logos needed explicit strand-aware placement and matrix orientation for reverse-strand windows.
+
+### Changes
+
+- Added baserender public helper for multi-panel composition:
+  - `render_record_grid_figure(...)` in `src/dnadesign/baserender/src/api.py`
+  - exported from:
+    - `src/dnadesign/baserender/src/__init__.py`
+    - `src/dnadesign/baserender/__init__.py`
+- Hardened motif logo rendering contract and geometry:
+  - added `reverse_complement_matrix(...)`
+  - enforced matrix-length == target kmer length
+  - forward logos render above windows; reverse logos render below windows
+  - files:
+    - `src/dnadesign/baserender/src/render/effects/motif_logo.py`
+    - `src/dnadesign/baserender/src/render/layout.py`
+    - `src/dnadesign/baserender/src/core/registry.py`
+- Implemented new Cruncher plot module and wiring:
+  - added `src/dnadesign/cruncher/src/analysis/plots/elites_showcase.py`
+  - replaced overlap panel invocation in:
+    - `src/dnadesign/cruncher/src/app/analyze_workflow.py`
+    - `src/dnadesign/cruncher/src/analysis/plot_registry.py`
+  - removed old `src/dnadesign/cruncher/src/analysis/plots/overlap.py`
+- Fixed root-cause PWM-width mismatch by reconstructing effective sampling PWM windows in analyze metadata when `sample.motif_width` is present:
+  - `src/dnadesign/cruncher/src/app/analyze/metadata.py`
+  - behavior is strict-but-conditional:
+    - if `sample.motif_width` exists, apply deterministic `max_info` windowing to analysis PWMs;
+    - if absent, preserve legacy full-width behavior.
+- Updated Cruncher config/docs/tests for `elites_showcase` output and `analysis.elites_showcase.max_panels`.
+
+### Verification
+
+- Focused tests:
+  - `uv run pytest -q src/dnadesign/baserender/tests/test_runtime_and_public_api.py src/dnadesign/baserender/tests/test_motif_logo_effect.py src/dnadesign/cruncher/tests/analysis/test_overlap_plots.py src/dnadesign/cruncher/tests/analysis/test_analysis_artifacts.py src/dnadesign/cruncher/tests/app/test_end_to_end_demo.py` -> passed
+- Lint (touched files):
+  - `uv run ruff check <touched files>` -> passed
+- Workspace demo CLI runs:
+  - `uv run baserender workspace list --root src/dnadesign/baserender/workspaces` -> lists densegen + cruncher demos
+  - `uv run baserender job validate|run src/dnadesign/baserender/workspaces/demo_densegen_render/job.yml` -> passed
+  - `uv run baserender job validate|run src/dnadesign/baserender/workspaces/demo_cruncher_render/job.yml` -> passed
+- Cruncher two-TF runtime behavior:
+  - `uv run cruncher analyze --summary -c src/dnadesign/cruncher/workspaces/demo_basics_two_tf/config.yaml` -> passed
+  - output plot set now includes `plot__elites_showcase.pdf` and no longer includes `plot__overlap_panel.pdf` after rerun.
+
+## 2026-02-13 - Cruncher workspace consolidation to one hotpath demo
+
+### Decision
+
+- Keep one Cruncher-focused baserender workspace only: `demo_cruncher_render`.
+- Use Record-shape hotpath input (`generic_features`) as the canonical iteration path.
+- Keep Cruncher runtime-adjacent source artifacts in the same workspace `inputs/` as references.
+
+### Implementation
+
+- `demo_cruncher_render/job.yml` now targets:
+  - `inputs/elites_showcase_records.parquet`
+  - adapter `kind: generic_features`
+- Kept source-like reference artifacts in `demo_cruncher_render/inputs/`:
+  - `elites.parquet`
+  - `elites_hits.parquet`
+  - `config_used.yaml`
+- Removed separate `demo_elites_showcase_hotpath` workspace to avoid duplicate intent.
+- Updated docs/tests to assert one Cruncher demo workspace model.
+
+### Why
+
+- Fast visual iteration should target the exact baserender Record boundary used for design work.
+- Reference artifacts from Cruncher remain co-located for accurate runtime-shape grounding and future regeneration.

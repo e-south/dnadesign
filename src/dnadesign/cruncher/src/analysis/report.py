@@ -113,7 +113,7 @@ def build_report_payload(
     if isinstance(analysis_used_payload, dict):
         analysis_cfg = analysis_used_payload.get("analysis") or analysis_used_payload.get("analysis_base") or {}
     table_format = "parquet"
-    plot_format = "png"
+    plot_format = "pdf"
     if isinstance(analysis_cfg, dict):
         table_format = str(analysis_cfg.get("table_format") or table_format)
         plot_format = str(analysis_cfg.get("plot_format") or plot_format)
@@ -174,7 +174,7 @@ def build_report_payload(
         "rhat": _safe_float((trace_metrics or {}).get("rhat")),
         "ess": _safe_float((trace_metrics or {}).get("ess")),
         "ess_ratio": _safe_float((trace_metrics or {}).get("ess_ratio")),
-        "acceptance_rate_mh_tail": _safe_float((optimizer_metrics or {}).get("acceptance_rate_mh_tail")),
+        "acceptance_rate_non_s_tail": _safe_float((optimizer_metrics or {}).get("acceptance_rate_non_s_tail")),
         "acceptance_tail_rugged": _safe_float((optimizer_metrics or {}).get("acceptance_tail_rugged")),
         "downhill_accept_tail_rugged": _safe_float((optimizer_metrics or {}).get("downhill_accept_tail_rugged")),
         "gibbs_flip_rate_tail": _safe_float((optimizer_metrics or {}).get("gibbs_flip_rate_tail")),
@@ -228,6 +228,7 @@ def build_report_payload(
         "diagnostics": _table_path(analysis_root, "diagnostics_summary", "json"),
         "objective_components": _table_path(analysis_root, "objective_components", "json"),
         "elites_mmr_summary": _table_path(analysis_root, "elites_mmr_summary", table_format),
+        "elites_mmr_sweep": _table_path(analysis_root, "elites_mmr_sweep", table_format),
         "overlap_summary": _table_path(analysis_root, "overlap_pair_summary", table_format),
         "elite_topk": _table_path(analysis_root, "elites_topk", table_format),
         "manifest": _relative_if_exists(analysis_root, analysis_manifest_path(analysis_root)),
@@ -302,7 +303,7 @@ def write_report_md(
         f"- Elites: {_fmt(diversity.get('n_elites'))}",
         f"- Overlap rate median: {_fmt(overlap.get('overlap_rate_median'))}",
         f"- Overlap bp median: {_fmt(overlap.get('overlap_total_bp_median'))}",
-        f"- MH acceptance (tail): {_fmt(sampling.get('acceptance_rate_mh_tail'))}",
+        f"- Non-S acceptance (tail): {_fmt(sampling.get('acceptance_rate_non_s_tail'))}",
         f"- Rugged acceptance (tail, B/M): {_fmt(sampling.get('acceptance_tail_rugged'))}",
         f"- Rugged downhill acceptance (tail): {_fmt(sampling.get('downhill_accept_tail_rugged'))}",
         f"- Gibbs flip rate (tail): {_fmt(sampling.get('gibbs_flip_rate_tail'))}",
@@ -341,6 +342,9 @@ def write_report_md(
     elites_mmr_path = pointers.get("elites_mmr_summary")
     if elites_mmr_path:
         lines.append(f"- {elites_mmr_path}")
+    elites_mmr_sweep_path = pointers.get("elites_mmr_sweep")
+    if elites_mmr_sweep_path:
+        lines.append(f"- {elites_mmr_sweep_path}")
     overlap_path = pointers.get("overlap_summary") or (
         f"analysis/{analysis_table_filename('overlap_pair_summary', table_format)}"
     )
@@ -363,6 +367,7 @@ def write_report_md(
         pointers.get("diagnostics") or "analysis/table__diagnostics_summary.json",
         pointers.get("objective_components") or "analysis/table__objective_components.json",
         pointers.get("elites_mmr_summary") or None,
+        pointers.get("elites_mmr_sweep") or None,
         overlap_path,
         elite_topk_path,
         pointers.get("manifest") or "analysis/manifest.json",
