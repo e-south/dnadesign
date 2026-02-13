@@ -8,6 +8,7 @@ This directory is the canonical source for BU SCC platform policy, submission vo
 - One-time environment bootstrap and diagnostics: [BU SCC Install bootstrap](install.md)
 - Batch patterns, arrays, Notify deployment, and transfer-node usage: [BU SCC Batch + Notify runbook](batch-notify.md)
 - Submit-ready scripts and override examples: [BU SCC job templates](jobs/README.md)
+- Web interactive sessions and portal workflows: [BU SCC OnDemand sessions](https://www.bu.edu/tech/support/research/system-usage/connect-scc/scc-ondemand/sessions/)
 - Scheduler-generic execution contract: [SGE HPC Ops skill package](sge-hpc-ops/SKILL.md)
 
 ## Semantic boundaries
@@ -22,3 +23,4 @@ This directory is the canonical source for BU SCC platform policy, submission vo
 
 - Notify USR events operator manual: [../notify/usr-events.md](../notify/usr-events.md)
 - Large model and dataset transfer guidance: [batch-notify.md#7-large-downloads-and-datasetmodel-transfer](batch-notify.md#7-large-downloads-and-datasetmodel-transfer)
+- BU SCC OnDemand overview: [https://www.bu.edu/tech/support/research/system-usage/connect-scc/scc-ondemand/](https://www.bu.edu/tech/support/research/system-usage/connect-scc/scc-ondemand/)
