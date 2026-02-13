@@ -169,7 +169,7 @@ DenseGen participates in two distinct event streams when you enable the USR sink
 Important: Notify consumes USR `.events.log`, not DenseGen `outputs/meta/events.jsonl`.
 See also:
 - USR event schema: `../../../usr/README.md#event-log-schema`
-- Notify operators doc: `../../../../../docs/notify/usr_events.md`
+- Notify operators doc: `../../../../../docs/notify/usr-events.md`
 
 ---
 

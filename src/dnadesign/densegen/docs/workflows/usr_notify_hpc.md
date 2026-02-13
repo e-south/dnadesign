@@ -5,9 +5,9 @@ This runbook explains the operational stack on HPC:
 DenseGen (generator) -> USR (canonical dataset + event log) -> Notify (webhook delivery)
 
 For BU SCC policy and template authority, use:
-- [docs/hpc/bu_scc_quickstart.md](../../../../../docs/hpc/bu_scc_quickstart.md)
-- [docs/hpc/bu_scc_batch_notify.md](../../../../../docs/hpc/bu_scc_batch_notify.md)
-- [docs/hpc/jobs/README.md](../../../../../docs/hpc/jobs/README.md)
+- [docs/bu-scc/quickstart.md](../../../../../docs/bu-scc/quickstart.md)
+- [docs/bu-scc/batch-notify.md](../../../../../docs/bu-scc/batch-notify.md)
+- [docs/bu-scc/jobs/README.md](../../../../../docs/bu-scc/jobs/README.md)
 
 ## Boundary contract
 
@@ -40,7 +40,7 @@ qsub -P <project> \
   -l h_rt=08:00:00 \
   -l mem_per_core=8G \
   -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/demo_hpc/config.yaml \
-  docs/hpc/jobs/bu_scc_densegen_cpu.qsub
+  docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
 Before submission:
@@ -115,7 +115,7 @@ Flag expectations:
 - `--config` must point to the run/workspace `config.yaml`, not a repo-root config
 - profile schema is v2 and stores `events_source` (`tool`, `config`) for re-resolution
 - setup may point at a future `.events.log`; watcher should start with `--wait-for-events`
-- flag-by-flag command rationale: [Notify command anatomy](../../../../../docs/notify/usr_events.md#command-anatomy-notify-setup-slack)
+- flag-by-flag command rationale: [Notify command anatomy](../../../../../docs/notify/usr-events.md#command-anatomy-notify-setup-slack)
 
 ---
 
@@ -128,7 +128,7 @@ Profile mode (recommended):
 ```bash
 qsub -P <project> \
   -v NOTIFY_PROFILE="$NOTIFY_DIR/profile.json" \
-  docs/hpc/jobs/bu_scc_notify_watch.qsub
+  docs/bu-scc/jobs/notify-watch.qsub
 ```
 
 Env mode (if you intentionally do not use a profile):
@@ -136,7 +136,7 @@ Env mode (if you intentionally do not use a profile):
 ```bash
 qsub -P <project> \
   -v NOTIFY_TOOL=densegen,NOTIFY_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/demo_hpc/config.yaml,WEBHOOK_ENV=NOTIFY_WEBHOOK \
-  docs/hpc/jobs/bu_scc_notify_watch.qsub
+  docs/bu-scc/jobs/notify-watch.qsub
 ```
 
 If `EVENTS_PATH` is explicit in env mode, set `NOTIFY_POLICY` (`densegen`, `infer_evo2`, or `generic`).

@@ -211,7 +211,7 @@ uv run usr events tail "$DATASET_PATH" --follow --format json
 
 Use setup resolver mode so you do not have to manually copy the events path:
 flag-by-flag rationale and profile expectations are documented in
-[Notify command anatomy](../../../../../docs/notify/usr_events.md#command-anatomy-notify-setup-slack).
+[Notify command anatomy](../../../../../docs/notify/usr-events.md#command-anatomy-notify-setup-slack).
 
 ```bash
 # Workspace-scoped DenseGen config for this run (not a repo-root config path).
@@ -265,7 +265,7 @@ uv run dense run --resume --no-plot -c "$CONFIG"
 ```
 
 For deployed endpoints and secret-safe setup (`.env.local`, `--url-env`), see:
-- [Notify operators manual](../../../../../docs/notify/usr_events.md)
+- [Notify operators manual](../../../../../docs/notify/usr-events.md)
 
 ---
 
@@ -273,7 +273,7 @@ For deployed endpoints and secret-safe setup (`.env.local`, `--url-env`), see:
 
 - DenseGen output contracts: [../reference/outputs.md](../reference/outputs.md)
 - USR overlay semantics: [../../../usr/README.md](../../../usr/README.md)
-- Notify operators manual: [../../../../../docs/notify/usr_events.md](../../../../../docs/notify/usr_events.md)
+- Notify operators manual: [../../../../../docs/notify/usr-events.md](../../../../../docs/notify/usr-events.md)
 
 ---
 
