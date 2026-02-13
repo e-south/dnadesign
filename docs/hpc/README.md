@@ -6,6 +6,8 @@
 - [BU SCC Install bootstrap](bu_scc_install.md)
 - [BU SCC Batch + Notify runbook](bu_scc_batch_notify.md)
 - [Job templates](jobs/README.md)
+- [Agent cheat sheet (interactive + batch commands)](agent_cheatsheet.md)
+- [BU SCC ops skill for agents](skills/bu_scc_ops/SKILL.md)
 
 ## Decision guide
 
