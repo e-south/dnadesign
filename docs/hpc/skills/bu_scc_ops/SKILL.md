@@ -28,6 +28,7 @@ Do not use this skill for:
 4. Use template command from `docs/hpc/agent_cheatsheet.md`.
 5. Run preflight checks before expensive jobs.
 6. Submit and monitor with `qstat` + log tail.
+7. Keep interactive/OnDemand usage within BU policy limits for high-resource sessions.
 
 ## Workload classes
 
@@ -54,6 +55,8 @@ Before submitting DenseGen jobs:
 Before relying on Notify:
 - confirm events source is USR `.events.log`
 - do not wire Notify to DenseGen `outputs/meta/events.jsonl`
+- run resolver preflight: `uv run notify setup resolve-events --tool <tool> --config <config.yaml>`
+- ensure events are schema-valid (must include `event_version`)
 
 ## Command references
 

@@ -6,6 +6,7 @@ Resource defaults derived from:
 - `docs/hpc/jobs/*.qsub`
 
 Tune from these baselines after measuring runtime, memory, and queue wait.
+When feasible, keep walltime requests at or below 12 hours for better shared-cluster scheduling access.
 
 ## Profiles
 
@@ -16,6 +17,8 @@ Tune from these baselines after measuring runtime, memory, and queue wait.
   - `-l h_rt=01:00:00`
   - `-pe omp 8`
   - `-l mem_per_core=8G`
+- shared-node hint:
+  - BU docs recommend `-pe omp` values `1-4`, `8`, `16`, `28`, `36`
 - use for:
   - config validation
   - short smoke runs
