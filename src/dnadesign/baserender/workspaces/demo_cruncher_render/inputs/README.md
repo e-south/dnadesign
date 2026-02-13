@@ -21,3 +21,5 @@ It keeps both shapes needed for practical iteration:
 - `display`
 
 The workspace `job.yaml` is wired to the hotpath record-shape file so design iteration stays fast, while the source-like artifacts remain available for contract checks and future adapter regeneration.
+
+The demo job also enables `attach_motifs_from_config` so motif logos are always sourced from `config_used.yaml` (optimization motif library provenance) even when iterating from record-shaped parquet inputs.

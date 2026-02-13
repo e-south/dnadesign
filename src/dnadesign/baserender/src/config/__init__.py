@@ -27,11 +27,20 @@ from .cruncher_showcase_job import (
     resolve_job_path,
     validate_cruncher_showcase_job,
 )
-from .style_v1 import GlyphStyle, MotifLogoStyle, Style, list_style_presets, resolve_preset_path, resolve_style
+from .style_v1 import (
+    GlyphStyle,
+    MotifLogoStyle,
+    MotifScaleBarStyle,
+    Style,
+    list_style_presets,
+    resolve_preset_path,
+    resolve_style,
+)
 
 __all__ = [
     "GlyphStyle",
     "MotifLogoStyle",
+    "MotifScaleBarStyle",
     "Style",
     "list_style_presets",
     "resolve_preset_path",

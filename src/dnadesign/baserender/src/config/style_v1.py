@@ -26,17 +26,24 @@ class GlyphStyle:
     round_px: float = 4.0
     edge_width: float = 0.0
     fill_alpha: float = 0.92
-    height_factor: float = 1.15
+    box_height_cells: float = 1.15
     text_color: str = "#ffffff"
     pad_x_px: float = 1.0
-    text_v_align: str = "baseline"
-    text_v_offset_px: float = 0.0
+    text_y_nudge_cells: float = 0.0
+
+
+@dataclass(frozen=True)
+class MotifScaleBarStyle:
+    enabled: bool = False
+    location: str = "top_right"
+    font_size: int = 8
+    color: str = "#6b7280"
 
 
 @dataclass(frozen=True)
 class MotifLogoStyle:
     height_bits: float = 2.0
-    height_cells: float = 1.05
+    bits_to_cells: float = 0.90
     y_pad_cells: float = 0.35
     letter_x_pad_frac: float = 0.10
     alpha_other: float = 0.65
@@ -50,7 +57,10 @@ class MotifLogoStyle:
         }
     )
     layout: str = "stack"
+    lane_mode: str = "follow_feature_track"
+    display_mode: str = "information"
     debug_bounds: bool = False
+    scale_bar: MotifScaleBarStyle = field(default_factory=MotifScaleBarStyle)
 
 
 @dataclass(frozen=True)
@@ -94,8 +104,25 @@ class Style:
     def __post_init__(self) -> None:
         if isinstance(self.kmer, dict):
             object.__setattr__(self, "kmer", GlyphStyle(**self.kmer))
-        if isinstance(self.motif_logo, dict):
-            object.__setattr__(self, "motif_logo", MotifLogoStyle(**self.motif_logo))
+        motif_logo = self.motif_logo
+        if isinstance(motif_logo, dict):
+            motif_logo = MotifLogoStyle(**motif_logo)
+        if isinstance(motif_logo.scale_bar, dict):
+            motif_logo = MotifLogoStyle(
+                height_bits=motif_logo.height_bits,
+                bits_to_cells=motif_logo.bits_to_cells,
+                y_pad_cells=motif_logo.y_pad_cells,
+                letter_x_pad_frac=motif_logo.letter_x_pad_frac,
+                alpha_other=motif_logo.alpha_other,
+                alpha_observed=motif_logo.alpha_observed,
+                colors=motif_logo.colors,
+                layout=motif_logo.layout,
+                lane_mode=motif_logo.lane_mode,
+                display_mode=motif_logo.display_mode,
+                debug_bounds=motif_logo.debug_bounds,
+                scale_bar=MotifScaleBarStyle(**motif_logo.scale_bar),
+            )
+        object.__setattr__(self, "motif_logo", motif_logo)
 
         ensure(self.dpi >= 72, "style.dpi must be >= 72", SchemaError)
         ensure(self.font_size_seq >= 6, "style.font_size_seq must be >= 6", SchemaError)
@@ -104,11 +131,11 @@ class Style:
         ensure(self.padding_y >= 0, "style.padding_y must be >= 0", SchemaError)
         ensure(self.track_spacing > 0, "style.track_spacing must be > 0", SchemaError)
         ensure(self.baseline_spacing > 0, "style.baseline_spacing must be > 0", SchemaError)
-        ensure(self.kmer.height_factor > 0, "style.kmer.height_factor must be > 0", SchemaError)
+        ensure(self.kmer.box_height_cells > 0, "style.kmer.box_height_cells must be > 0", SchemaError)
         ensure(self.kmer.pad_x_px >= 0, "style.kmer.pad_x_px must be >= 0", SchemaError)
         ensure(self.span_link_inner_margin_bp >= 0, "style.span_link_inner_margin_bp must be >= 0", SchemaError)
         ensure(self.motif_logo.height_bits > 0, "style.motif_logo.height_bits must be > 0", SchemaError)
-        ensure(self.motif_logo.height_cells > 0, "style.motif_logo.height_cells must be > 0", SchemaError)
+        ensure(self.motif_logo.bits_to_cells > 0, "style.motif_logo.bits_to_cells must be > 0", SchemaError)
         ensure(self.motif_logo.y_pad_cells >= 0, "style.motif_logo.y_pad_cells must be >= 0", SchemaError)
         ensure(
             0.0 <= self.motif_logo.letter_x_pad_frac < 1.0,
@@ -130,6 +157,16 @@ class Style:
             "style.motif_logo.layout must be 'stack' or 'overlay'",
             SchemaError,
         )
+        ensure(
+            str(self.motif_logo.lane_mode).lower() in {"follow_feature_track", "independent"},
+            "style.motif_logo.lane_mode must be 'follow_feature_track' or 'independent'",
+            SchemaError,
+        )
+        ensure(
+            str(self.motif_logo.display_mode).lower() in {"information", "probability"},
+            "style.motif_logo.display_mode must be 'information' or 'probability'",
+            SchemaError,
+        )
         ensure(isinstance(self.motif_logo.colors, Mapping), "style.motif_logo.colors must be a mapping", SchemaError)
         bad_keys = sorted(set(self.motif_logo.colors.keys()) - {"A", "C", "G", "T"})
         ensure(
@@ -144,8 +181,13 @@ class Style:
             SchemaError,
         )
         ensure(
-            str(self.kmer.text_v_align).lower() in {"baseline", "center"},
-            "style.kmer.text_v_align must be 'baseline' or 'center'",
+            self.motif_logo.scale_bar.font_size >= 6,
+            "style.motif_logo.scale_bar.font_size must be >= 6",
+            SchemaError,
+        )
+        ensure(
+            str(self.motif_logo.scale_bar.location).lower() in {"top_right", "bottom_right"},
+            "style.motif_logo.scale_bar.location must be 'top_right' or 'bottom_right'",
             SchemaError,
         )
 
@@ -155,7 +197,7 @@ class Style:
             raise SchemaError("style must be a mapping/dict")
         data = dict(mapping)
         if "height_factor" in data:
-            raise SchemaError("Unknown style key 'height_factor' — use 'style.kmer.height_factor'.")
+            raise SchemaError("Unknown style key 'height_factor' — use 'style.kmer.box_height_cells'.")
         allowed = {f.name for f in fields(cls)}
         unknown = sorted(set(data.keys()) - allowed)
         if unknown:
@@ -184,6 +226,14 @@ class Style:
                 unknown_bases = sorted(set(motif_colors.keys()) - allowed_bases)
                 if unknown_bases:
                     raise SchemaError(f"Unknown style.motif_logo.colors key(s): {unknown_bases}")
+            motif_scale_bar = motif_raw.get("scale_bar")
+            if motif_scale_bar is not None:
+                if not isinstance(motif_scale_bar, Mapping):
+                    raise SchemaError("style.motif_logo.scale_bar must be a mapping")
+                allowed_scale_bar = {f.name for f in fields(MotifScaleBarStyle)}
+                unknown_scale_bar = sorted(set(motif_scale_bar.keys()) - allowed_scale_bar)
+                if unknown_scale_bar:
+                    raise SchemaError(f"Unknown style.motif_logo.scale_bar key(s): {unknown_scale_bar}")
         return cls(**data)
 
 

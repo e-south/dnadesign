@@ -218,3 +218,30 @@ def test_absolute_input_path_must_exist_at_config_boundary(tmp_path: Path) -> No
 
     with pytest.raises(SchemaError, match="input.path does not exist"):
         load_cruncher_showcase_job(job_path)
+
+
+def test_attach_motifs_plugin_path_resolves_at_config_boundary(tmp_path: Path) -> None:
+    parquet = _make_input_parquet(tmp_path)
+    motif_cfg = tmp_path / "config_used.yaml"
+    motif_cfg.write_text("cruncher:\n  pwms_info: {}\n")
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        results_root=tmp_path / "results",
+        outputs=[{"kind": "images", "fmt": "png"}],
+    )
+    payload["pipeline"] = {
+        "plugins": [
+            {
+                "attach_motifs_from_config": {
+                    "config_path": "config_used.yaml",
+                    "require_effect": False,
+                }
+            }
+        ]
+    }
+    job_path = write_job(tmp_path / "job.yaml", payload)
+
+    job = load_cruncher_showcase_job(job_path)
+    plugin = job.pipeline.plugins[0]
+    assert plugin.name == "attach_motifs_from_config"
+    assert Path(str(plugin.params["config_path"])) == motif_cfg.resolve()

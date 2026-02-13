@@ -22,15 +22,21 @@ Effective style is merged in this order:
 - Unknown top-level style keys fail.
 - Unknown `kmer.*` keys fail.
 - Unknown `motif_logo.*` keys fail.
-- Invalid value domains fail (e.g. non-positive dpi, bad align mode).
+- Unknown `motif_logo.scale_bar.*` keys fail.
+- Invalid value domains fail (e.g. non-positive dpi, unsupported enum values).
 
 ## `motif_logo` keys
 - `layout`: `stack | overlay`
+- `lane_mode`: `follow_feature_track | independent`
+- `display_mode`: `information | probability`
 - `height_bits`: information-content ceiling (DNA default 2.0)
-- `height_cells`: logo lane height in sequence-cell units
+- `bits_to_cells`: vertical scale factor (sequence-cell units per bit)
 - `y_pad_cells`: vertical gap between kmer band and nearest logo lane
 - `letter_x_pad_frac`: horizontal letter inset in each base column
 - `alpha_other`: alpha for non-observed bases in a column
 - `alpha_observed`: alpha for observed base in a column
 - `colors`: mapping for `A/C/G/T`
 - `debug_bounds`: optional logo bounding-box overlay
+- `scale_bar.enabled`: draw a motif y-scale reference bar
+- `scale_bar.location`: `top_right | bottom_right`
+- `scale_bar.font_size`: scale bar label font size

@@ -25,6 +25,7 @@ from matplotlib.transforms import Affine2D
 
 from ..config import Style
 from ..core import Record
+from .effects.motif_logo import MotifLogoGeometry, compute_motif_logo_geometry
 from .effects.registry import draw_effect
 from .layout import LayoutContext, comp, compute_layout
 from .palette import Palette
@@ -66,8 +67,8 @@ class SequenceRowsRenderer:
                 label,
                 color,
                 style,
-                above=placement.above,
                 cw=layout.cw,
+                ch=layout.ch,
             )
 
             feature_boxes[placement.feature_id] = (
@@ -80,6 +81,21 @@ class SequenceRowsRenderer:
         # Draw effects with strict unknown-kind failure from registry.
         for effect in record.effects:
             draw_effect(ax, effect, record, layout, style, palette, feature_boxes)
+
+        motif_geometries: list[MotifLogoGeometry] = []
+        for effect_index, effect in enumerate(record.effects):
+            if effect.kind != "motif_logo":
+                continue
+            motif_geometries.append(
+                compute_motif_logo_geometry(
+                    record=record,
+                    effect_index=effect_index,
+                    layout=layout,
+                    style=style,
+                    feature_boxes=feature_boxes,
+                )
+            )
+        _draw_motif_scale_bar(ax, motif_geometries, layout, style)
 
         if style.legend:
             from .legend import legend_entries_for_record
@@ -97,7 +113,7 @@ class SequenceRowsRenderer:
 def _draw_overlay(ax, layout: LayoutContext, style: Style, text: str) -> None:
     ax.text(
         style.padding_x,
-        layout.height - 6.0,
+        layout.height - max(4.0, style.padding_y * 0.5),
         text,
         ha="left",
         va="top",
@@ -191,16 +207,15 @@ def _draw_feature_box(
     facecolor,
     style: Style,
     *,
-    above: bool,
     cw: float,
+    ch: float,
 ) -> None:
     r = style.kmer.round_px
     pad_x = float(style.kmer.pad_x_px)
-    yy = y + (h * 0.5 if above else -h * 0.5)
 
     ax.add_patch(
         FancyBboxPatch(
-            (x - pad_x, yy - h / 2),
+            (x - pad_x, y - h / 2),
             w + 2 * pad_x,
             h,
             boxstyle=f"round,pad=0.0,rounding_size={r}",
@@ -215,20 +230,19 @@ def _draw_feature_box(
 
     prop = FontProperties(family=style.font_mono, size=style.font_size_seq)
     px_per_pt = style.dpi / 72.0
-    ag = TextPath((0, 0), "Ag", prop=prop, usetex=False).get_extents()
-    y_mid_px = ((ag.y0 + ag.y1) / 2.0) * px_per_pt
     cache: dict[str, TextPath] = {}
 
-    xx = x
-    for char in label:
+    y_text_center = y + float(style.kmer.text_y_nudge_cells) * ch
+    for idx, char in enumerate(label):
         tp = cache.get(char)
         if tp is None:
             tp = TextPath((0, 0), char, prop=prop, usetex=False)
             cache[char] = tp
-        align = str(style.kmer.text_v_align).lower()
-        y_text_center = yy if align == "center" else y
-        y_text_center += float(style.kmer.text_v_offset_px)
-        trans = Affine2D().scale(px_per_pt).translate(xx, y_text_center - y_mid_px) + ax.transData
+        gb = tp.get_extents()
+        gx = ((gb.x0 + gb.x1) / 2.0) * px_per_pt
+        gy = ((gb.y0 + gb.y1) / 2.0) * px_per_pt
+        x_center = x + (idx + 0.5) * cw
+        trans = Affine2D().scale(px_per_pt).translate(x_center - gx, y_text_center - gy) + ax.transData
         ax.add_patch(
             PathPatch(
                 tp,
@@ -240,7 +254,72 @@ def _draw_feature_box(
                 clip_on=False,
             )
         )
-        xx += cw
+
+
+def _draw_motif_scale_bar(
+    ax,
+    geometries: Sequence[MotifLogoGeometry],
+    layout: LayoutContext,
+    style: Style,
+) -> None:
+    cfg = style.motif_logo.scale_bar
+    if not cfg.enabled:
+        return
+    if not geometries:
+        return
+
+    location = str(cfg.location).lower()
+    if location == "top_right":
+        candidates = [g for g in geometries if g.above]
+        if not candidates:
+            return
+        ref = max(candidates, key=lambda g: g.y0)
+    elif location == "bottom_right":
+        candidates = [g for g in geometries if not g.above]
+        if not candidates:
+            return
+        ref = min(candidates, key=lambda g: g.y0)
+    else:
+        return
+
+    x = layout.width - max(10.0, style.padding_x * 0.55)
+    y0 = ref.y0
+    y1 = ref.y0 + ref.height
+    tick_w = 4.0
+
+    ax.plot([x, x], [y0, y1], color=cfg.color, lw=0.9, zorder=7, clip_on=False)
+    ax.plot([x - tick_w, x + tick_w], [y0, y0], color=cfg.color, lw=0.9, zorder=7, clip_on=False)
+    ax.plot([x - tick_w, x + tick_w], [y1, y1], color=cfg.color, lw=0.9, zorder=7, clip_on=False)
+
+    if str(style.motif_logo.display_mode).lower() == "information":
+        top_label = f"{style.motif_logo.height_bits:g} bits"
+    else:
+        top_label = "1.0"
+
+    ax.text(
+        x + 5.0,
+        y0,
+        "0",
+        ha="left",
+        va="bottom",
+        fontsize=cfg.font_size,
+        family=style.font_label,
+        color=cfg.color,
+        zorder=8,
+        clip_on=False,
+    )
+    ax.text(
+        x + 5.0,
+        y1,
+        top_label,
+        ha="left",
+        va="top",
+        fontsize=cfg.font_size,
+        family=style.font_label,
+        color=cfg.color,
+        zorder=8,
+        clip_on=False,
+    )
 
 
 def _text_px_width(text: str, family: str, size_pt: int, dpi: int) -> float:

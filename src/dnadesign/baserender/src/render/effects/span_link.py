@@ -81,9 +81,11 @@ def draw_span_link(
         raise RenderingError("span_link render.track must be int") from exc
 
     if lane == "top":
-        y = layout.y_forward + (track + 1) * style.track_spacing + (layout.ch * style.kmer.height_factor * 0.5)
+        center = layout.y_forward + layout.feature_track_base_offset + track * layout.feature_track_step
+        y = center + layout.kmer_box_height * 0.5
     else:
-        y = layout.y_reverse - (track + 1) * style.track_spacing - (layout.ch * style.kmer.height_factor * 0.5)
+        center = layout.y_reverse - layout.feature_track_base_offset - track * layout.feature_track_step
+        y = center - layout.kmer_box_height * 0.5
 
     inner_margin_bp = effect.params.get("inner_margin_bp", style.span_link_inner_margin_bp)
     try:

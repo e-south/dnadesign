@@ -31,24 +31,29 @@ connector_dash: [1.0, 3.0]
 span_link_inner_margin_bp: 0.50
 
 kmer:
-  height_factor: 1.10
-  text_v_align: center
+  box_height_cells: 1.10
   round_px: 5.0
   pad_x_px: 1.025
   fill_alpha: 0.88
   edge_width: 0.0
   text_color: "#ffffff"
-  text_v_offset_px: 0.0
+  text_y_nudge_cells: 0.0
 
 motif_logo:
   layout: stack
+  lane_mode: follow_feature_track
+  display_mode: information
   height_bits: 2.0
-  height_cells: 1.05
+  bits_to_cells: 1.05
   y_pad_cells: 0.35
   letter_x_pad_frac: 0.10
   alpha_other: 0.65
   alpha_observed: 1.0
   debug_bounds: false
+  scale_bar:
+    enabled: false
+    location: top_right
+    font_size: 8
 
 # Palette is optional. Keep it empty by default.
 palette: {}

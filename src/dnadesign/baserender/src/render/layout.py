@@ -73,14 +73,22 @@ class LayoutContext:
     x_left: float
     n_up_tracks: int
     n_dn_tracks: int
+    kmer_box_height: float
+    feature_track_step: float
+    feature_track_base_offset: float
     placements: tuple[FeaturePlacement, ...]
     feature_boxes: Mapping[str, tuple[float, float, float, float]]
+    feature_track_by_id: Mapping[str, int]
+    feature_above_by_id: Mapping[str, bool]
     motif_logo_height: float
     motif_logo_gap: float
     motif_logo_lane_by_effect: Mapping[int, int]
     motif_logo_above_by_effect: Mapping[int, bool]
+    motif_logo_y0_by_effect: Mapping[int, float]
     motif_logo_lanes_up: int
     motif_logo_lanes_down: int
+    content_top: float
+    content_bottom: float
 
     def grid_x_left(self, col_idx: int) -> float:
         return self.x_left + col_idx * self.cw
@@ -223,14 +231,60 @@ def _resolve_motif_logo_feature(
     return feature
 
 
+def _feature_index_for_id(record: Record, feature_id: str) -> int:
+    for idx, feature in enumerate(record.features):
+        if feature.id == feature_id:
+            return idx
+    raise BoundsError(f"Unknown feature_id '{feature_id}'")
+
+
 def assign_motif_logo_lanes(
     record: Record,
     *,
     layout_mode: str,
+    lane_mode: str,
+    feature_track_by_index: Mapping[int, int],
+    feature_above_by_index: Mapping[int, bool],
 ) -> tuple[dict[int, int], dict[int, bool], int, int]:
     mode = str(layout_mode).lower()
     if mode not in {"stack", "overlay"}:
         raise BoundsError(f"motif_logo layout must be 'stack' or 'overlay', got {layout_mode!r}")
+
+    lane_mode_norm = str(lane_mode).lower()
+    if lane_mode_norm not in {"follow_feature_track", "independent"}:
+        raise BoundsError(f"motif_logo lane mode must be 'follow_feature_track' or 'independent', got {lane_mode!r}")
+
+    if lane_mode_norm == "follow_feature_track":
+        lane_by_effect: dict[int, int] = {}
+        above_by_effect: dict[int, bool] = {}
+        up_max = -1
+        dn_max = -1
+        for effect_index, effect in enumerate(record.effects):
+            if effect.kind != "motif_logo":
+                continue
+            feature = _resolve_motif_logo_feature(record, effect, effect_index=effect_index)
+            if feature.id is None:
+                raise BoundsError(f"motif_logo effect[{effect_index}] target feature must have a stable id")
+            feature_index = _feature_index_for_id(record, feature.id)
+            if feature_index not in feature_track_by_index:
+                raise BoundsError(
+                    f"motif_logo effect[{effect_index}] target feature '{feature.id}' has no assigned feature track"
+                )
+            lane = int(feature_track_by_index[feature_index])
+            fixed_lane = _effect_track(effect)
+            if fixed_lane is not None and fixed_lane != lane:
+                raise BoundsError(
+                    f"motif_logo effect[{effect_index}] render.track={fixed_lane} "
+                    f"does not match target feature track={lane} in follow_feature_track mode"
+                )
+            above = bool(feature_above_by_index.get(feature_index, feature.span.strand != "rev"))
+            lane_by_effect[effect_index] = lane
+            above_by_effect[effect_index] = above
+            if above:
+                up_max = max(up_max, lane)
+            else:
+                dn_max = max(dn_max, lane)
+        return lane_by_effect, above_by_effect, up_max + 1, dn_max + 1
 
     up_items: list[_IntervalItem] = []
     dn_items: list[_IntervalItem] = []
@@ -271,11 +325,26 @@ def assign_motif_logo_lanes(
 def compute_layout(record: Record, style: Style, *, fixed_n: int | None = None) -> LayoutContext:
     cell = measure_char_cell(style.font_mono, style.font_size_seq, style.dpi)
     cw, ch = cell.width, cell.height
-    h = ch * style.kmer.height_factor
-    n = fixed_n if fixed_n is not None else len(record.sequence)
+    n = len(record.sequence) if fixed_n is None else max(len(record.sequence), int(fixed_n))
+
+    show_two = bool(style.show_reverse_complement and record.alphabet == "DNA")
+    y_reverse_base = 0.0
+    y_forward_base = style.baseline_spacing if show_two else 0.0
+
+    kmer_box_height = ch * style.kmer.box_height_cells
+    motif_logo_height = style.motif_logo.height_bits * style.motif_logo.bits_to_cells * ch
+    motif_logo_gap = style.motif_logo.y_pad_cells * ch
+    has_motif_logo = any(effect.kind == "motif_logo" for effect in record.effects)
+    if has_motif_logo and str(style.motif_logo.lane_mode).lower() == "follow_feature_track":
+        min_track_step = kmer_box_height + motif_logo_height + (2.0 * motif_logo_gap)
+    else:
+        min_track_step = kmer_box_height + ch * 0.2
+    feature_track_step = max(style.track_spacing, min_track_step)
+    feature_track_base_offset = max(kmer_box_height * 0.5 + ch * 0.35, feature_track_step * 0.5)
 
     label_pad_x = style.font_size_label / 72.0 * style.dpi * 1.6
     x_left = style.padding_x + label_pad_x
+    width = x_left + n * cw + style.padding_x + label_pad_x
 
     up_indices = [i for i, feat in enumerate(record.features) if feat.span.strand == "fwd"]
     dn_indices = [i for i, feat in enumerate(record.features) if feat.span.strand == "rev"]
@@ -284,91 +353,144 @@ def compute_layout(record: Record, style: Style, *, fixed_n: int | None = None) 
     dn_features = [record.features[i] for i in dn_indices]
     up_tracks = assign_tracks(up_features)
     dn_tracks = assign_tracks(dn_features)
-    motif_lane_by_effect, motif_above_by_effect, motif_lanes_up, motif_lanes_down = assign_motif_logo_lanes(
-        record,
-        layout_mode=style.motif_logo.layout,
-    )
 
     n_up_tracks = (max(up_tracks) + 1) if up_tracks else 0
     n_dn_tracks = (max(dn_tracks) + 1) if dn_tracks else 0
 
-    y_forward = style.padding_y + n_up_tracks * style.track_spacing + ch
-    y_reverse = (
-        y_forward - style.baseline_spacing
-        if (style.show_reverse_complement and record.alphabet == "DNA")
-        else y_forward
-    )
-
-    label_pad_y = style.font_size_label / 72.0 * style.dpi * 1.2
-    legend_space = (style.legend_height_px + style.legend_pad_px) if style.legend else 0.0
-
-    top = y_forward + n_up_tracks * style.track_spacing + h + label_pad_y
-    bottom = y_reverse - n_dn_tracks * style.track_spacing - h - label_pad_y
-    motif_logo_height = style.motif_logo.height_cells * ch
-    motif_logo_gap = style.motif_logo.y_pad_cells * ch
-    if motif_lanes_up > 0:
-        top += motif_lanes_up * (motif_logo_height + motif_logo_gap)
-    if motif_lanes_down > 0:
-        bottom -= motif_lanes_down * (motif_logo_height + motif_logo_gap)
-    margin = max(2.0, 0.5 * style.kmer.round_px)
-    top += margin
-    bottom -= margin
-
-    if legend_space > 0 and bottom < legend_space:
-        delta = legend_space - bottom
-        y_forward += delta
-        y_reverse += delta
-        top += delta
-        bottom += delta
-
-    content_height = top - bottom + style.padding_y
-    height = content_height + legend_space
-    width = x_left + n * cw + style.padding_x + label_pad_x
-
+    feature_ids = [feat.id if feat.id is not None else f"f{idx}" for idx, feat in enumerate(record.features)]
     placements: list[FeaturePlacement] = []
     feature_boxes: dict[str, tuple[float, float, float, float]] = {}
-
-    feature_ids = [feat.id if feat.id is not None else f"f{idx}" for idx, feat in enumerate(record.features)]
+    feature_track_by_index: dict[int, int] = {}
+    feature_above_by_index: dict[int, bool] = {}
+    feature_track_by_id: dict[str, int] = {}
+    feature_above_by_id: dict[str, bool] = {}
 
     for local_idx, feat_idx in enumerate(up_indices):
         feat = record.features[feat_idx]
         track = up_tracks[local_idx]
         x = x_left + feat.span.start * cw
         x_end = x_left + feat.span.end * cw
-        y = y_forward + (track + 1) * style.track_spacing
         w = x_end - x
+        y = y_forward_base + feature_track_base_offset + track * feature_track_step
+        feature_id = feature_ids[feat_idx]
         placement = FeaturePlacement(
             feature_index=feat_idx,
-            feature_id=feature_ids[feat_idx],
+            feature_id=feature_id,
             track=track,
             above=True,
             x=x,
             y=y,
             w=w,
-            h=h,
+            h=kmer_box_height,
         )
         placements.append(placement)
-        feature_boxes[placement.feature_id] = (x, y - h / 2.0, x + w, y + h / 2.0)
+        feature_boxes[feature_id] = (x, y - kmer_box_height / 2.0, x + w, y + kmer_box_height / 2.0)
+        feature_track_by_index[feat_idx] = track
+        feature_above_by_index[feat_idx] = True
+        feature_track_by_id[feature_id] = track
+        feature_above_by_id[feature_id] = True
 
     for local_idx, feat_idx in enumerate(dn_indices):
         feat = record.features[feat_idx]
         track = dn_tracks[local_idx]
         x = x_left + feat.span.start * cw
         x_end = x_left + feat.span.end * cw
-        y = y_reverse - (track + 1) * style.track_spacing
         w = x_end - x
+        y = y_reverse_base - feature_track_base_offset - track * feature_track_step
+        feature_id = feature_ids[feat_idx]
         placement = FeaturePlacement(
             feature_index=feat_idx,
-            feature_id=feature_ids[feat_idx],
+            feature_id=feature_id,
             track=track,
             above=False,
             x=x,
             y=y,
             w=w,
-            h=h,
+            h=kmer_box_height,
         )
         placements.append(placement)
-        feature_boxes[placement.feature_id] = (x, y - h / 2.0, x + w, y + h / 2.0)
+        feature_boxes[feature_id] = (x, y - kmer_box_height / 2.0, x + w, y + kmer_box_height / 2.0)
+        feature_track_by_index[feat_idx] = track
+        feature_above_by_index[feat_idx] = False
+        feature_track_by_id[feature_id] = track
+        feature_above_by_id[feature_id] = False
+
+    motif_logo_lane_by_effect, motif_above_by_effect, motif_lanes_up, motif_lanes_down = assign_motif_logo_lanes(
+        record,
+        layout_mode=style.motif_logo.layout,
+        lane_mode=style.motif_logo.lane_mode,
+        feature_track_by_index=feature_track_by_index,
+        feature_above_by_index=feature_above_by_index,
+    )
+
+    motif_stride = motif_logo_height + motif_logo_gap
+    motif_logo_y0_by_effect: dict[int, float] = {}
+    lane_mode = str(style.motif_logo.lane_mode).lower()
+    for effect_index, lane in motif_logo_lane_by_effect.items():
+        effect = record.effects[effect_index]
+        feature = _resolve_motif_logo_feature(record, effect, effect_index=effect_index)
+        if feature.id is None:
+            raise BoundsError(f"motif_logo effect[{effect_index}] target feature must have a stable id")
+        box = feature_boxes.get(feature.id)
+        if box is None:
+            raise BoundsError(f"motif_logo effect[{effect_index}] target feature '{feature.id}' has no placement box")
+        above = bool(motif_above_by_effect.get(effect_index, feature.span.strand != "rev"))
+        if lane_mode == "follow_feature_track":
+            y0 = box[3] + motif_logo_gap if above else box[1] - motif_logo_gap - motif_logo_height
+        else:
+            lane_offset = lane * motif_stride
+            y0 = (
+                box[3] + motif_logo_gap + lane_offset
+                if above
+                else box[1] - motif_logo_gap - motif_logo_height - lane_offset
+            )
+        motif_logo_y0_by_effect[effect_index] = y0
+
+    y_mins = [y_forward_base - ch * 0.6]
+    y_maxs = [y_forward_base + ch * 0.6]
+    if show_two:
+        y_mins.append(y_reverse_base - ch * 0.6)
+        y_maxs.append(y_reverse_base + ch * 0.6)
+    for x0, y0, x1, y1 in feature_boxes.values():
+        _ = (x0, x1)
+        y_mins.append(y0)
+        y_maxs.append(y1)
+    for y0 in motif_logo_y0_by_effect.values():
+        y_mins.append(y0)
+        y_maxs.append(y0 + motif_logo_height)
+
+    content_bottom_raw = min(y_mins)
+    content_top_raw = max(y_maxs)
+    legend_space = (style.legend_height_px + style.legend_pad_px) if style.legend else 0.0
+    desired_bottom = style.padding_y + legend_space
+    shift = desired_bottom - content_bottom_raw
+
+    shifted_placements: list[FeaturePlacement] = []
+    for placement in placements:
+        shifted_placements.append(
+            FeaturePlacement(
+                feature_index=placement.feature_index,
+                feature_id=placement.feature_id,
+                track=placement.track,
+                above=placement.above,
+                x=placement.x,
+                y=placement.y + shift,
+                w=placement.w,
+                h=placement.h,
+            )
+        )
+
+    shifted_boxes: dict[str, tuple[float, float, float, float]] = {}
+    for fid, (x0, y0, x1, y1) in feature_boxes.items():
+        shifted_boxes[fid] = (x0, y0 + shift, x1, y1 + shift)
+
+    shifted_motif_y0 = {idx: y0 + shift for idx, y0 in motif_logo_y0_by_effect.items()}
+    y_forward = y_forward_base + shift
+    y_reverse = y_reverse_base + shift
+    content_bottom = content_bottom_raw + shift
+    content_top = content_top_raw + shift
+    title_space = max((style.font_size_label / 72.0 * style.dpi) * 1.6, ch * 0.8)
+    height = content_top + style.padding_y + title_space
 
     return LayoutContext(
         cw=cw,
@@ -380,12 +502,20 @@ def compute_layout(record: Record, style: Style, *, fixed_n: int | None = None) 
         x_left=x_left,
         n_up_tracks=n_up_tracks,
         n_dn_tracks=n_dn_tracks,
-        placements=tuple(placements),
-        feature_boxes=feature_boxes,
+        kmer_box_height=kmer_box_height,
+        feature_track_step=feature_track_step,
+        feature_track_base_offset=feature_track_base_offset,
+        placements=tuple(shifted_placements),
+        feature_boxes=shifted_boxes,
+        feature_track_by_id=feature_track_by_id,
+        feature_above_by_id=feature_above_by_id,
         motif_logo_height=motif_logo_height,
         motif_logo_gap=motif_logo_gap,
-        motif_logo_lane_by_effect=motif_lane_by_effect,
+        motif_logo_lane_by_effect=motif_logo_lane_by_effect,
         motif_logo_above_by_effect=motif_above_by_effect,
+        motif_logo_y0_by_effect=shifted_motif_y0,
         motif_logo_lanes_up=motif_lanes_up,
         motif_logo_lanes_down=motif_lanes_down,
+        content_top=content_top,
+        content_bottom=content_bottom,
     )

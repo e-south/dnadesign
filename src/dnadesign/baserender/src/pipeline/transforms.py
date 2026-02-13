@@ -17,6 +17,7 @@ from typing import Protocol, Sequence
 
 from ..config import PluginSpec
 from ..core import PluginError, Record
+from .attach_motifs_from_config import AttachMotifsFromConfigTransform
 from .sigma70 import Sigma70Transform
 
 
@@ -42,6 +43,9 @@ def load_transforms(requested: Sequence[PluginSpec]) -> tuple[Transform, ...]:
         params = spec.params
         if name == "sigma70":
             transforms.append(Sigma70Transform(**params))
+            continue
+        if name == "attach_motifs_from_config":
+            transforms.append(AttachMotifsFromConfigTransform(**params))
             continue
 
         if ":" in name:

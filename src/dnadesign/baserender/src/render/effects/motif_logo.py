@@ -139,6 +139,10 @@ def _logo_stack_bits(row: tuple[float, float, float, float], *, max_bits: float)
     return [(base, row[idx] * info_bits) for idx, base in enumerate(_DNA_BASES)]
 
 
+def _logo_stack_probs(row: tuple[float, float, float, float]) -> list[tuple[str, float]]:
+    return [(base, row[idx]) for idx, base in enumerate(_DNA_BASES)]
+
+
 def compute_motif_logo_geometry(
     *,
     record: Record,
@@ -147,6 +151,7 @@ def compute_motif_logo_geometry(
     style,
     feature_boxes: Mapping[str, tuple[float, float, float, float]] | None = None,
 ) -> MotifLogoGeometry:
+    _ = feature_boxes
     if effect_index < 0 or effect_index >= len(record.effects):
         raise RenderingError(f"motif_logo effect index out of bounds: {effect_index}")
     effect = record.effects[effect_index]
@@ -176,19 +181,9 @@ def compute_motif_logo_geometry(
 
     lane = int(layout.motif_logo_lane_by_effect.get(effect_index, 0))
     above = bool(layout.motif_logo_above_by_effect.get(effect_index, feature.span.strand != "rev"))
-
-    boxes = dict(layout.feature_boxes)
-    if feature_boxes is not None:
-        boxes.update(feature_boxes)
-    box = boxes.get(feature_id)
-    if box is None:
-        raise RenderingError(f"motif_logo target feature '{feature_id}' not found in feature boxes")
-
-    lane_stride = layout.motif_logo_height + layout.motif_logo_gap
-    if above:
-        y0 = box[3] + layout.motif_logo_gap + lane * lane_stride
-    else:
-        y0 = box[1] - layout.motif_logo_gap - layout.motif_logo_height - lane * lane_stride
+    y0 = layout.motif_logo_y0_by_effect.get(effect_index)
+    if y0 is None:
+        raise RenderingError(f"motif_logo effect[{effect_index}] is missing precomputed y-placement in layout context")
 
     return MotifLogoGeometry(
         feature_id=feature_id,
@@ -265,12 +260,21 @@ def draw_motif_logo(
     )
 
     base_colors = _style_base_colors(style)
-    bits_to_px = geometry.height / float(style.motif_logo.height_bits)
+    display_mode = str(style.motif_logo.display_mode).lower()
+    if display_mode == "information":
+        unit_to_px = geometry.height / float(style.motif_logo.height_bits)
+    elif display_mode == "probability":
+        unit_to_px = geometry.height
+    else:
+        raise RenderingError(f"Unknown motif_logo display mode: {display_mode!r}")
     alpha_other = float(style.motif_logo.alpha_other)
     alpha_observed = float(style.motif_logo.alpha_observed)
 
     for col_index, row in enumerate(geometry.matrix):
-        stack = _logo_stack_bits(row, max_bits=float(style.motif_logo.height_bits))
+        if display_mode == "information":
+            stack = _logo_stack_bits(row, max_bits=float(style.motif_logo.height_bits))
+        else:
+            stack = _logo_stack_probs(row)
         stack.sort(key=lambda item: item[1])
 
         col_x0, col_x1 = geometry.columns[col_index]
@@ -278,7 +282,7 @@ def draw_motif_logo(
         observed_base = geometry.observed[col_index] if col_index < len(geometry.observed) else ""
 
         for base, bits in stack:
-            letter_h = bits * bits_to_px
+            letter_h = bits * unit_to_px
             if letter_h <= 0:
                 continue
             is_observed = observed_base == base

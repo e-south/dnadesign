@@ -234,7 +234,7 @@ def _parse_sample(raw: Any) -> SampleCfg:
     return SampleCfg(mode=mode, n=n, seed=seed)
 
 
-def _parse_plugin_specs(raw: Any) -> tuple[PluginSpec, ...]:
+def _parse_plugin_specs(job_path: Path, raw: Any) -> tuple[PluginSpec, ...]:
     if raw is None:
         return ()
     if not isinstance(raw, (list, tuple)):
@@ -250,7 +250,20 @@ def _parse_plugin_specs(raw: Any) -> tuple[PluginSpec, ...]:
             name, params = next(iter(item.items()))
             if not isinstance(params, Mapping):
                 raise SchemaError(f"plugin params must be a mapping for '{name}'")
-            out.append(PluginSpec(name=str(name), params=dict(params)))
+            parsed_params = dict(params)
+            plugin_name = str(name)
+            if plugin_name == "attach_motifs_from_config":
+                config_path_raw = parsed_params.get("config_path")
+                if config_path_raw is None:
+                    raise SchemaError("pipeline plugin 'attach_motifs_from_config' requires params.config_path")
+                parsed_params["config_path"] = str(
+                    _resolve_path(
+                        job_path,
+                        str(config_path_raw),
+                        field="pipeline.plugins.attach_motifs_from_config.config_path",
+                    )
+                )
+            out.append(PluginSpec(name=plugin_name, params=parsed_params))
         else:
             raise SchemaError(f"Unsupported plugin spec: {item!r}")
     return tuple(out)
@@ -572,7 +585,7 @@ def load_cruncher_showcase_job(path: str | Path, *, caller_root: str | Path | No
 
         pipeline_raw = require_mapping(data.get("pipeline", {}), "pipeline")
         reject_unknown_keys(pipeline_raw, {"plugins"}, "pipeline")
-        pipeline_cfg = PipelineCfg(plugins=_parse_plugin_specs(pipeline_raw.get("plugins")))
+        pipeline_cfg = PipelineCfg(plugins=_parse_plugin_specs(job_path, pipeline_raw.get("plugins")))
 
         render_cfg = _parse_render(data.get("render"))
 
