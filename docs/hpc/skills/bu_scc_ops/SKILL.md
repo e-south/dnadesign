@@ -13,6 +13,17 @@ Operational source of truth:
 
 Keep this skill focused on triggering and execution flow. Do not duplicate command/resource defaults here.
 
+## First-class install
+
+Install this skill into Codex home so it is available across sessions:
+
+```bash
+mkdir -p ~/.codex/skills
+ln -sfn /project/dunlop/esouth/dnadesign/docs/hpc/skills/bu_scc_ops ~/.codex/skills/bu_scc_ops
+```
+
+Restart Codex after linking so the skill index refreshes.
+
 ## Scope
 
 Use this skill for:
@@ -54,6 +65,51 @@ Before relying on Notify:
 - run resolver preflight: `uv run notify setup resolve-events --tool <tool> --config <config.yaml>`
 - ensure events are schema-valid (must include `event_version`)
 
+## General usage patterns
+
+Use these patterns for common requests. Keep placeholders explicit and fill values before execution.
+
+Interactive CPU debug session (1 hour):
+
+```bash
+qrsh -P <project> -l h_rt=01:00:00 -pe omp 8 -l mem_per_core=8G -cwd -now n
+```
+
+DenseGen batch submit (CPU):
+
+```bash
+qsub -P <project> \
+  -pe omp 16 \
+  -l h_rt=08:00:00 \
+  -l mem_per_core=8G \
+  -v DENSEGEN_CONFIG=<config.yaml> \
+  docs/hpc/jobs/bu_scc_densegen_cpu.qsub
+```
+
+Notify preflight plus watcher setup:
+
+```bash
+uv run notify setup resolve-events --tool densegen --config <config.yaml>
+uv run notify setup slack --tool densegen --config <config.yaml> --secret-source auto --policy densegen
+```
+
+Evo2 GPU submit:
+
+```bash
+qsub -P <project> \
+  -v CUDA_MODULE=cuda/<version>,GCC_MODULE=gcc/<version> \
+  docs/hpc/jobs/bu_scc_evo2_gpu_infer.qsub
+```
+
+Queue state checks:
+
+```bash
+qstat -u "$USER"
+qstat -j <job_id>
+```
+
+For exact curated command sets, use `docs/hpc/bu_scc_ops_cheatsheet.md`.
+
 ## Command references
 
 Load only the needed references:
@@ -61,3 +117,11 @@ Load only the needed references:
 - `docs/hpc/bu_scc_quickstart.md` for bootstrap flow
 - `docs/hpc/bu_scc_batch_notify.md` for runbook details
 - `docs/hpc/jobs/README.md` for template-specific submits
+
+## Source links
+
+- BU SCC OnDemand overview: https://www.bu.edu/tech/support/research/system-usage/connect-scc/scc-ondemand/
+- BU SCC My Interactive Sessions: https://www.bu.edu/tech/support/research/system-usage/connect-scc/scc-ondemand/sessions/
+- BU SCC interactive jobs: https://www.bu.edu/tech/support/research/system-usage/running-jobs/interactive-jobs/
+- BU SCC submitting jobs: https://www.bu.edu/tech/support/research/system-usage/running-jobs/submitting-jobs/
+- BU SCC technical summary: https://www.bu.edu/tech/support/research/system-usage/running-jobs/technical-summary/

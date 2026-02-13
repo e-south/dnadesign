@@ -6,6 +6,7 @@ Use this with:
 - `docs/hpc/bu_scc_quickstart.md`
 - `docs/hpc/bu_scc_batch_notify.md`
 - `docs/hpc/jobs/README.md`
+- `docs/hpc/skills/bu_scc_ops/SKILL.md`
 
 ## Core rules
 
@@ -111,3 +112,11 @@ qstat -u "$USER"
 qstat -j <job_id>
 tail -f outputs/logs/<job_name>.<job_id>.out
 ```
+
+## Source links
+
+- BU SCC OnDemand overview: https://www.bu.edu/tech/support/research/system-usage/connect-scc/scc-ondemand/
+- BU SCC My Interactive Sessions: https://www.bu.edu/tech/support/research/system-usage/connect-scc/scc-ondemand/sessions/
+- BU SCC interactive jobs: https://www.bu.edu/tech/support/research/system-usage/running-jobs/interactive-jobs/
+- BU SCC submitting jobs: https://www.bu.edu/tech/support/research/system-usage/running-jobs/submitting-jobs/
+- BU SCC technical summary: https://www.bu.edu/tech/support/research/system-usage/running-jobs/technical-summary/
