@@ -27,7 +27,7 @@ When you work inside a tool directory (e.g. `src/dnadesign/permuter/`), **also r
 
 When running on BU SCC, use these first:
 
-- `docs/hpc/agent_cheatsheet.md` (copy/paste command paths + resource matrix)
+- `docs/hpc/bu_scc_ops_cheatsheet.md` (copy/paste command paths + resource matrix)
 - `docs/hpc/bu_scc_quickstart.md` (interactive/bootstrap path)
 - `docs/hpc/bu_scc_batch_notify.md` (batch + Notify runbook)
 - `docs/hpc/jobs/README.md` (submit-ready template scripts)

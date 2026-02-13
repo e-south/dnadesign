@@ -1,4 +1,4 @@
-# BU SCC Agent Cheat Sheet (`dnadesign`)
+# BU SCC Ops Cheat Sheet (`dnadesign`)
 
 Pragmatic command + resource defaults for BU SCC runs.
 

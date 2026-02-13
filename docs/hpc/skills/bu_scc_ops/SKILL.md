@@ -8,6 +8,11 @@ version: 0.1.0
 
 Use this skill to run `dnadesign` workloads on BU SCC with explicit scheduler resources, predictable job behavior, and clear Notify wiring.
 
+Operational source of truth:
+- `docs/hpc/bu_scc_ops_cheatsheet.md`
+
+Keep this skill focused on triggering and execution flow. Do not duplicate command/resource defaults here.
+
 ## Scope
 
 Use this skill for:
@@ -24,27 +29,18 @@ Do not use this skill for:
 
 1. Identify workload class first.
 2. Pick interactive or batch mode.
-3. Apply resource profile from `references/resource_profiles.md`.
-4. Use template command from `docs/hpc/agent_cheatsheet.md`.
+3. Apply the matching row from `docs/hpc/bu_scc_ops_cheatsheet.md` task-to-resource mapping.
+4. Use template command from `docs/hpc/bu_scc_ops_cheatsheet.md`.
 5. Run preflight checks before expensive jobs.
 6. Submit and monitor with `qstat` + log tail.
 7. Keep interactive/OnDemand usage within BU policy limits for high-resource sessions.
 
 ## Workload classes
 
-- DenseGen solver runs:
-  - CPU only
-  - request `-pe omp <N>` and `-l mem_per_core=<...>`
-  - ensure `densegen.solver.threads <= N`
-- Notify watcher:
-  - lightweight CPU watcher
-  - long walltime, minimal slots
-- Evo2 inference:
-  - GPU required (`-l gpus=1 -l gpu_c=8.9`)
-  - load CUDA/GCC modules in script
-- large transfer/prefetch:
-  - transfer-node queue (`-l download`)
-  - no compute-heavy workloads
+- DenseGen solver runs: CPU-only, thread count must align with requested `omp` slots.
+- Notify watcher: low-footprint CPU watcher for USR event delivery.
+- Evo2 inference: GPU-required workloads only.
+- large transfer/prefetch: transfer-node queue only.
 
 ## Required checks
 
@@ -61,8 +57,7 @@ Before relying on Notify:
 ## Command references
 
 Load only the needed references:
-- `docs/hpc/agent_cheatsheet.md` for copy/paste commands
+- `docs/hpc/bu_scc_ops_cheatsheet.md` for copy/paste commands
 - `docs/hpc/bu_scc_quickstart.md` for bootstrap flow
 - `docs/hpc/bu_scc_batch_notify.md` for runbook details
 - `docs/hpc/jobs/README.md` for template-specific submits
-- `references/resource_profiles.md` for workload-to-resource defaults
