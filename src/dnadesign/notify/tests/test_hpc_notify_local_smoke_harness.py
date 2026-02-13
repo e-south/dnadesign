@@ -30,7 +30,7 @@ def _repo_root() -> Path:
 @pytest.mark.skipif(shutil.which("bash") is None or shutil.which("uv") is None, reason="bash and uv are required")
 def test_local_notify_smoke_harness_env_mode(tmp_path: Path) -> None:
     repo_root = _repo_root()
-    script_path = repo_root / "docs/hpc/jobs/local_notify_watch_smoke.sh"
+    script_path = repo_root / "docs/bu-scc/jobs/notify-watch-local-smoke.sh"
     workdir = tmp_path / "env-smoke"
 
     result = subprocess.run(
@@ -64,7 +64,7 @@ def test_local_notify_smoke_harness_env_mode(tmp_path: Path) -> None:
 @pytest.mark.skipif(shutil.which("bash") is None or shutil.which("uv") is None, reason="bash and uv are required")
 def test_local_notify_smoke_harness_profile_mode(tmp_path: Path) -> None:
     repo_root = _repo_root()
-    script_path = repo_root / "docs/hpc/jobs/local_notify_watch_smoke.sh"
+    script_path = repo_root / "docs/bu-scc/jobs/notify-watch-local-smoke.sh"
     workdir = tmp_path / "profile-smoke"
 
     result = subprocess.run(
