@@ -31,6 +31,7 @@ When running on BU SCC, use these first:
 - `docs/bu-scc/quickstart.md` (interactive/bootstrap path)
 - `docs/bu-scc/batch-notify.md` (batch + Notify runbook)
 - `docs/bu-scc/jobs/README.md` (submit-ready template scripts)
+- `docs/bu-scc/agent_cheatsheet.md` (copy/paste command paths + resource matrix)
 
 Within `src/dnadesign/`, many tools follow one of these patterns:
 
