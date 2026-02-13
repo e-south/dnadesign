@@ -114,9 +114,9 @@ def sfxi_v1(
     params: Dict[str, Any],
     ctx: Optional[PluginCtx] = None,
     train_view=None,
-    var=None,
+    var: np.ndarray,
 ) -> ObjectiveResult:
-    
+        
     var = np.asarray(var, dtype=float) if var is not None else None
     var = var**2 if var is not None else None
 
@@ -198,7 +198,6 @@ def sfxi_v1(
 
     # ---- creating scalar uncertainty ----
     if var is not None:
-
         # Starting with effect intensity (because it is a lot easier)
         effect_var_unwt = (np.exp2(var[:, 4:8]) - 1)*np.exp2(var[:, 4:8]+2*y_pred[:, 4:8])
         effect_var = np.sum(np.multiply(effect_var_unwt, w**2), axis=1)

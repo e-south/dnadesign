@@ -307,7 +307,7 @@ def stage_scoring(
         sd = mctx.get("model/<self>/std_devs", None)
     except:
         sd = None
-    obj_res = obj_fn(y_pred=Y_hat, params=obj_params, var = sd, ctx=octx, train_view=tv)
+    obj_res = obj_fn(y_pred=Y_hat, params=obj_params, ctx=octx, train_view=tv, var=sd)
     y_obj_scalar = np.asarray(obj_res.score, dtype=float).ravel()
     if y_obj_scalar.size != len(id_order_pool):
         raise OpalError(f"Objective produced {y_obj_scalar.size} scores for {len(id_order_pool)} candidates.")

@@ -78,14 +78,14 @@ def _wrap_for_ctx_enforcement(name: str, fn: _ObjectiveFn) -> _ObjectiveFn:
     """
     contract = getattr(fn, "__opal_contract__", None)
 
-    def _wrapped(*, y_pred, params: Dict[str, Any], var, ctx: PluginCtx | None = None, train_view=None):
+    def _wrapped(*, y_pred, params: Dict[str, Any], var = None, ctx: PluginCtx | None = None, train_view=None):
         if ctx is not None:
             try:
                 ctx.precheck_requires(stage="objective")
             except Exception:
                 raise
         try:
-            out = fn(y_pred=y_pred, params=params, ctx=ctx, train_view=train_view)
+            out = fn(y_pred=y_pred, params=params, ctx=ctx, train_view=train_view, var = var)
         except Exception:
             if ctx is not None:
                 ctx.reset_stage_state()

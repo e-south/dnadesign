@@ -41,6 +41,8 @@ def ei(
     ids = np.asarray(ids, dtype = str)
     preds = np.asarray(scores, dtype=float)
     std_devs = np.asarray(scalar_uncertainty, dtype=float)
+
+
     if ids.shape[0] != preds.shape[0]:
         raise ValueError("ids and predictions must have same length")
     

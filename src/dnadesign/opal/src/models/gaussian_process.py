@@ -94,6 +94,11 @@ class GaussianProcessModel:
         y = np.asarray(y, dtype=float)
         sd = np.asarray(sd, dtype=float)
         if ctx is not None:
+            try:
+                old_sd = ctx.get("model/<self>/std_devs", None) 
+            except:
+                old_sd = None
+            sd = np.vstack([old_sd, sd]) if old_sd is not None else sd
             ctx.set("model/<self>/std_devs", sd)
         if y.ndim == 1:
             y = y.reshape(-1, 1)
