@@ -13,17 +13,6 @@ Operational source of truth:
 
 Keep this skill focused on triggering and execution flow. Do not duplicate command/resource defaults here.
 
-## First-class install
-
-Install this skill into Codex home so it is available across sessions:
-
-```bash
-mkdir -p ~/.codex/skills
-ln -sfn /project/dunlop/esouth/dnadesign/docs/hpc/skills/bu_scc_ops ~/.codex/skills/bu_scc_ops
-```
-
-Restart Codex after linking so the skill index refreshes.
-
 ## Scope
 
 Use this skill for:
