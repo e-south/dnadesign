@@ -60,8 +60,11 @@ from .spool_ops import ensure_private_directory as _ensure_private_directory
 from .usr_events_watch import watch_usr_events_loop
 from .validation import resolve_tls_ca_bundle, resolve_webhook_url
 from .workflow_policy import DEFAULT_PROFILE_PATH as _DEFAULT_PROFILE_PATH
+from .workflow_policy import default_profile_path_for_tool as _default_profile_path_for_tool
 from .workflow_policy import policy_defaults as _policy_defaults_for
 from .workflow_policy import resolve_workflow_policy as _resolve_workflow_policy
+from .workspace_source import list_tool_workspaces as _list_tool_workspaces
+from .workspace_source import resolve_tool_workspace_config_path as _resolve_tool_workspace_config_path
 
 app = typer.Typer(help="Send notifications for dnadesign runs via webhooks.")
 usr_events_app = typer.Typer(help="Consume USR JSONL events and emit notifications.")
@@ -240,10 +243,11 @@ def _profile_init_impl(
     force: bool = typer.Option(False, "--force", help="Overwrite an existing profile file."),
 ) -> None:
     try:
+        profile_path = profile.expanduser().resolve()
         events_path = _resolve_usr_events_path(events)
         policy_name = _resolve_workflow_policy(policy=policy)
 
-        cursor_path = cursor or (events_path.parent / "notify.cursor")
+        cursor_path = cursor.expanduser().resolve() if cursor is not None else (events_path.parent / "notify.cursor")
         payload: dict[str, Any] = {
             "profile_version": PROFILE_VERSION,
             "provider": str(provider).strip(),
@@ -259,7 +263,7 @@ def _profile_init_impl(
         if only_tools is not None:
             payload["only_tools"] = str(only_tools).strip()
         if spool_dir is not None:
-            payload["spool_dir"] = str(spool_dir)
+            payload["spool_dir"] = str(spool_dir.expanduser().resolve())
         if tls_ca_bundle is not None:
             payload["tls_ca_bundle"] = str(_resolve_existing_file_path(field="tls_ca_bundle", path_value=tls_ca_bundle))
         if policy_name is not None:
@@ -272,8 +276,8 @@ def _profile_init_impl(
         if not payload["webhook"]["ref"]:
             raise NotifyConfigError("url_env must be a non-empty string")
 
-        _write_profile_file(profile, payload, force=force)
-        typer.echo(f"Profile written: {profile}")
+        _write_profile_file(profile_path, payload, force=force)
+        typer.echo(f"Profile written: {profile_path}")
     except NotifyError as exc:
         typer.echo(f"Notification failed: {exc}")
         raise typer.Exit(code=1)
@@ -476,6 +480,11 @@ def _setup_slack_impl(
     events: Path | None = typer.Option(None, "--events", help="USR .events.log path for existing runs."),
     tool: str | None = typer.Option(None, "--tool", help="Tool name for resolver mode."),
     config: Path | None = typer.Option(None, "--config", "-c", help="Tool config path for resolver mode."),
+    workspace: str | None = typer.Option(
+        None,
+        "--workspace",
+        help="Workspace name for resolver mode (shorthand for tool workspace config path).",
+    ),
     policy: str | None = typer.Option(
         None,
         "--policy",
@@ -516,15 +525,24 @@ def _setup_slack_impl(
             events=events,
             tool=tool,
             config=config,
+            workspace=workspace,
             policy=policy,
+            search_start=Path.cwd(),
             resolve_tool_events_path_fn=_resolve_tool_events_path,
+            resolve_tool_workspace_config_fn=_resolve_tool_workspace_config_path,
             normalize_tool_name_fn=_normalize_setup_tool_name,
         )
+        resolved_config: Path | None = None
+        if setup_resolution.events_source is not None:
+            config_value = setup_resolution.events_source.get("config")
+            if config_value is not None:
+                resolved_config = Path(str(config_value))
 
         profile_value = _resolve_profile_path_for_setup(
             profile=profile,
             tool_name=setup_resolution.tool_name,
             policy=setup_resolution.policy,
+            config=resolved_config,
         )
 
         result = _create_wizard_profile_flow(
@@ -574,7 +592,12 @@ def _setup_slack_impl(
 
 def _setup_resolve_events_impl(
     tool: str = typer.Option(..., "--tool", help="Tool name for resolver mode."),
-    config: Path = typer.Option(..., "--config", "-c", help="Tool config path for resolver mode."),
+    config: Path | None = typer.Option(None, "--config", "-c", help="Tool config path for resolver mode."),
+    workspace: str | None = typer.Option(
+        None,
+        "--workspace",
+        help="Workspace name for resolver mode (shorthand for tool workspace config path).",
+    ),
     print_policy: bool = typer.Option(
         False,
         "--print-policy",
@@ -585,10 +608,22 @@ def _setup_resolve_events_impl(
     try:
         if print_policy and json_output:
             raise NotifyConfigError("pass either --print-policy or --json, not both")
-        config_path = config.expanduser().resolve()
+        if (config is None) == (workspace is None):
+            raise NotifyConfigError("pass exactly one of --config or --workspace")
         tool_name = _normalize_setup_tool_name(tool)
         if tool_name is None:
             raise NotifyConfigError("tool must be a non-empty string")
+        if config is not None:
+            config_path = config.expanduser().resolve()
+        else:
+            workspace_name = str(workspace or "").strip()
+            if not workspace_name:
+                raise NotifyConfigError("workspace must be a non-empty string")
+            config_path = _resolve_tool_workspace_config_path(
+                tool=tool_name,
+                workspace=workspace_name,
+                search_start=Path.cwd(),
+            )
         events_path, default_policy = _resolve_tool_events_path(tool=tool_name, config=config_path)
 
         if json_output:
@@ -618,6 +653,28 @@ def _setup_resolve_events_impl(
         raise typer.Exit(code=1)
 
 
+def _setup_list_workspaces_impl(
+    tool: str = typer.Option(..., "--tool", help="Tool name (for example: densegen)."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON output."),
+) -> None:
+    try:
+        names = _list_tool_workspaces(tool=tool, search_start=Path.cwd())
+        if json_output:
+            typer.echo(json.dumps({"ok": True, "tool": str(tool).strip(), "workspaces": names}, sort_keys=True))
+            return
+        if not names:
+            typer.echo("No workspaces found.")
+            return
+        for name in names:
+            typer.echo(name)
+    except NotifyError as exc:
+        if json_output:
+            typer.echo(json.dumps({"ok": False, "error": str(exc)}, sort_keys=True))
+        else:
+            typer.echo(f"Notification failed: {exc}")
+        raise typer.Exit(code=1)
+
+
 def _usr_events_watch_impl(
     provider: str | None = typer.Option(None, help="Provider: generic|slack|discord."),
     url: str | None = typer.Option(None, help="Webhook URL."),
@@ -630,6 +687,25 @@ def _usr_events_watch_impl(
     tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
     events: Path | None = typer.Option(None, "--events", help="USR .events.log JSONL path."),
     profile: Path | None = typer.Option(None, "--profile", help="Path to profile JSON file."),
+    config: Path | None = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help=(
+            "Tool config path for auto-profile mode. "
+            "Use either --config or --workspace. "
+            "When set with --tool and without --profile/--events, notify auto-loads "
+            "profile from <config-dir>/outputs/notify/<tool>/profile.json."
+        ),
+    ),
+    workspace: str | None = typer.Option(
+        None,
+        "--workspace",
+        help=(
+            "Workspace name for auto-profile mode (shorthand for tool workspace config path). "
+            "Use with --tool and without --profile/--events."
+        ),
+    ),
     cursor: Path | None = typer.Option(None, "--cursor", help="Cursor file storing byte offset."),
     follow: bool = typer.Option(False, "--follow", help="Follow events file for new lines."),
     wait_for_events: bool = typer.Option(
@@ -669,7 +745,13 @@ def _usr_events_watch_impl(
         "--allow-unknown-version",
         help="Allow unknown event_version values.",
     ),
-    tool: str | None = typer.Option(None, help="Override tool name."),
+    tool: str | None = typer.Option(
+        None,
+        help=(
+            "Override tool name. Also required with --config/--workspace for auto-profile mode "
+            "(profile path namespace)."
+        ),
+    ),
     run_id: str | None = typer.Option(None, help="Override run id."),
     message: str | None = typer.Option(None, help="Override message."),
     include_args: bool | None = typer.Option(None, "--include-args/--no-include-args"),
@@ -697,6 +779,8 @@ def _usr_events_watch_impl(
             tls_ca_bundle=tls_ca_bundle,
             events=events,
             profile=profile,
+            config=config,
+            workspace=workspace,
             cursor=cursor,
             follow=follow,
             wait_for_events=wait_for_events,
@@ -728,9 +812,12 @@ def _usr_events_watch_impl(
             resolve_optional_path_value=_resolve_optional_path_value,
             resolve_optional_string_value=_resolve_optional_string_value,
             resolve_profile_events_source=_resolve_profile_events_source,
+            normalize_tool_name=_normalize_setup_tool_name,
             resolve_tool_events_path=_resolve_tool_events_path,
+            resolve_tool_workspace_config=_resolve_tool_workspace_config_path,
             resolve_usr_events_path=_resolve_usr_events_path,
             resolve_profile_webhook_source=_resolve_profile_webhook_source,
+            default_profile_path_for_tool=_default_profile_path_for_tool,
             resolve_cli_optional_string=_resolve_cli_optional_string,
             resolve_webhook_url=resolve_webhook_url,
             resolve_tls_ca_bundle=resolve_tls_ca_bundle,
@@ -808,6 +895,7 @@ register_setup_commands(
     setup_app,
     slack_handler=_setup_slack_impl,
     resolve_events_handler=_setup_resolve_events_impl,
+    list_workspaces_handler=_setup_list_workspaces_impl,
 )
 
 

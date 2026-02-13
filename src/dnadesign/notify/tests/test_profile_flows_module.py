@@ -33,17 +33,56 @@ def test_resolve_profile_path_for_setup_prefers_tool_namespace() -> None:
         profile=Path("outputs/notify/generic/profile.json"),
         tool_name="densegen",
         policy=None,
+        config=None,
     )
     assert str(resolved) == "outputs/notify/densegen/profile.json"
+
+
+def test_resolve_profile_path_for_setup_anchors_default_to_config_directory(tmp_path: Path) -> None:
+    config_path = tmp_path / "workspaces" / "demo" / "config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    resolved = resolve_profile_path_for_setup(
+        profile=Path("outputs/notify/generic/profile.json"),
+        tool_name="densegen",
+        policy=None,
+        config=config_path,
+    )
+    assert resolved == config_path.parent / "outputs" / "notify" / "densegen" / "profile.json"
 
 
 def test_resolve_setup_events_rejects_mixed_events_and_resolver_modes(tmp_path: Path) -> None:
     events = tmp_path / "events.log"
     config = tmp_path / "tool.yaml"
-    with pytest.raises(NotifyConfigError, match="pass either --events or --tool with --config, not both"):
+    with pytest.raises(NotifyConfigError, match="pass either --events or --tool with --config/--workspace, not both"):
         resolve_setup_events(
             events=events,
             tool="densegen",
             config=config,
+            workspace=None,
             policy=None,
         )
+
+
+def test_resolve_setup_events_workspace_mode_resolves_config_before_events(tmp_path: Path) -> None:
+    resolved_config = tmp_path / "workspaces" / "demo" / "config.yaml"
+    resolved_config.parent.mkdir(parents=True, exist_ok=True)
+    resolved_config.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    resolved_events = tmp_path / "usr" / "demo" / ".events.log"
+
+    result = resolve_setup_events(
+        events=None,
+        tool="densegen",
+        config=None,
+        workspace="demo",
+        policy=None,
+        resolve_tool_workspace_config_fn=lambda *, tool, workspace, search_start: resolved_config,
+        resolve_tool_events_path_fn=lambda *, tool, config: (resolved_events, "densegen"),
+        normalize_tool_name_fn=lambda value: str(value),
+    )
+
+    assert result.events_path == resolved_events
+    assert result.events_source == {"tool": "densegen", "config": str(resolved_config.resolve())}
+    assert result.policy == "densegen"
+    assert result.tool_name == "densegen"
+    assert result.events_require_exists is False

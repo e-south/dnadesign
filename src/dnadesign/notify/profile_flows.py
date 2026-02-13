@@ -32,6 +32,7 @@ from .workflow_policy import (
     policy_defaults,
     resolve_workflow_policy,
 )
+from .workspace_source import resolve_tool_workspace_config_path
 
 
 @dataclass(frozen=True)
@@ -48,16 +49,19 @@ def resolve_setup_events(
     events: Path | None,
     tool: str | None,
     config: Path | None,
+    workspace: str | None,
     policy: str | None,
+    search_start: Path | None = None,
     resolve_tool_events_path_fn: Callable[..., tuple[Path, str | None]] = resolve_tool_events_path,
+    resolve_tool_workspace_config_fn: Callable[..., Path] = resolve_tool_workspace_config_path,
     normalize_tool_name_fn: Callable[[str | None], str | None] = normalize_tool_name,
 ) -> SetupEventsResolution:
     has_events = events is not None
-    has_tool = tool is not None or config is not None
+    has_tool = tool is not None or config is not None or workspace is not None
     if has_events and has_tool:
-        raise NotifyConfigError("pass either --events or --tool with --config, not both")
+        raise NotifyConfigError("pass either --events or --tool with --config/--workspace, not both")
     if not has_events and not has_tool:
-        raise NotifyConfigError("pass either --events or --tool with --config")
+        raise NotifyConfigError("pass either --events or --tool with --config/--workspace")
 
     if has_events:
         events_path = events if events is not None else Path("")
@@ -69,9 +73,21 @@ def resolve_setup_events(
             events_require_exists=True,
         )
 
-    if tool is None or config is None:
-        raise NotifyConfigError("resolver mode requires both --tool and --config")
-    config_path = config.expanduser().resolve()
+    has_config = config is not None
+    has_workspace = workspace is not None
+    if tool is None or has_config == has_workspace:
+        raise NotifyConfigError("resolver mode requires --tool with exactly one of --config or --workspace")
+    if has_workspace:
+        config_path = resolve_tool_workspace_config_fn(
+            tool=tool,
+            workspace=str(workspace),
+            search_start=search_start,
+        )
+        if not isinstance(config_path, Path):
+            config_path = Path(config_path)
+        config_path = config_path.expanduser().resolve()
+    else:
+        config_path = config.expanduser().resolve() if config is not None else Path("")
     events_path, default_policy = resolve_tool_events_path_fn(tool=tool, config=config_path)
     tool_name = normalize_tool_name_fn(tool)
     events_source = {
@@ -100,7 +116,13 @@ def resolve_profile_path_for_wizard(*, profile: Path, policy: str | None) -> Pat
     return default_profile_path_for_tool(policy_namespace)
 
 
-def resolve_profile_path_for_setup(*, profile: Path, tool_name: str | None, policy: str | None) -> Path:
+def resolve_profile_path_for_setup(
+    *,
+    profile: Path,
+    tool_name: str | None,
+    policy: str | None,
+    config: Path | None,
+) -> Path:
     if profile != DEFAULT_PROFILE_PATH:
         return profile
     namespace = tool_name
@@ -112,6 +134,9 @@ def resolve_profile_path_for_setup(*, profile: Path, tool_name: str | None, poli
                 "pass --policy or --profile to select a profile namespace"
             )
         namespace = policy_namespace
+    if config is not None and tool_name is not None:
+        config_path = config.expanduser().resolve()
+        return config_path.parent / default_profile_path_for_tool(namespace)
     return default_profile_path_for_tool(namespace)
 
 
@@ -235,6 +260,7 @@ def create_wizard_profile(
         profile_path=profile_path,
         webhook_config=webhook_config,
         events_exists=events_exists,
+        events_source=events_source,
     )
     return {
         "profile": str(profile_path),
@@ -247,4 +273,3 @@ def create_wizard_profile(
         "next_steps": next_steps,
         "events_exists": events_exists,
     }
-

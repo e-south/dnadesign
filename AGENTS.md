@@ -23,6 +23,15 @@ When you work inside a tool directory (e.g. `src/dnadesign/permuter/`), **also r
 - CI: `.github/workflows/ci.yaml`
 - Tooling: `.pre-commit-config.yaml`, `pyproject.toml`, `uv.lock`
 
+### BU SCC operations quick refs
+
+When running on BU SCC, use these first:
+
+- `docs/hpc/skills/sge-hpc-ops/SKILL.md` (operational source of truth: resource matrix + commands + checks)
+- `docs/hpc/bu_scc_quickstart.md` (interactive/bootstrap path)
+- `docs/hpc/bu_scc_batch_notify.md` (batch + Notify runbook)
+- `docs/hpc/jobs/README.md` (submit-ready template scripts)
+
 Within `src/dnadesign/`, many tools follow one of these patterns:
 
 1) **Direct package layout**

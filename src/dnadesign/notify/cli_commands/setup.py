@@ -22,6 +22,7 @@ def register_setup_commands(
     *,
     slack_handler: Callable[..., None],
     resolve_events_handler: Callable[..., None],
+    list_workspaces_handler: Callable[..., None],
 ) -> None:
     @setup_app.command("slack")
     def setup_slack(
@@ -41,6 +42,11 @@ def register_setup_commands(
             "--config",
             "-c",
             help="Tool config path for resolver mode.",
+        ),
+        workspace: str | None = typer.Option(
+            None,
+            "--workspace",
+            help="Workspace name for resolver mode (shorthand for tool workspace config path).",
         ),
         policy: str | None = typer.Option(
             None,
@@ -98,6 +104,7 @@ def register_setup_commands(
             events=events,
             tool=tool,
             config=config,
+            workspace=workspace,
             policy=policy,
             cursor=cursor,
             spool_dir=spool_dir,
@@ -117,7 +124,12 @@ def register_setup_commands(
     @setup_app.command("resolve-events")
     def resolve_events(
         tool: str = typer.Option(..., "--tool", help="Tool name for resolver mode."),
-        config: Path = typer.Option(..., "--config", "-c", help="Tool config path for resolver mode."),
+        config: Path | None = typer.Option(None, "--config", "-c", help="Tool config path for resolver mode."),
+        workspace: str | None = typer.Option(
+            None,
+            "--workspace",
+            help="Workspace name for resolver mode (shorthand for tool workspace config path).",
+        ),
         print_policy: bool = typer.Option(
             False,
             "--print-policy",
@@ -128,6 +140,17 @@ def register_setup_commands(
         resolve_events_handler(
             tool=tool,
             config=config,
+            workspace=workspace,
             print_policy=print_policy,
+            json_output=json_output,
+        )
+
+    @setup_app.command("list-workspaces")
+    def list_workspaces(
+        tool: str = typer.Option(..., "--tool", help="Tool name (for example: densegen)."),
+        json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON output."),
+    ) -> None:
+        list_workspaces_handler(
+            tool=tool,
             json_output=json_output,
         )

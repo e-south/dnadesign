@@ -6,6 +6,7 @@
 - [BU SCC Install bootstrap](bu_scc_install.md)
 - [BU SCC Batch + Notify runbook](bu_scc_batch_notify.md)
 - [Job templates](jobs/README.md)
+- [SGE HPC ops skill](skills/sge-hpc-ops/SKILL.md)
 
 ## Decision guide
 

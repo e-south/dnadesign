@@ -35,25 +35,36 @@ Default profile privacy is strict:
 - `include_raw_event=false`
 
 Artifact placement default:
-- keep Notify artifacts with the run workspace being watched:
-  - `outputs/notify/<tool>/profile.json`
-  - `outputs/notify/<tool>/cursor`
-  - `outputs/notify/<tool>/spool/`
+- keep Notify artifacts with the run workspace being watched (relative to the tool config directory):
+  - `<config-dir>/outputs/notify/<tool>/profile.json`
+  - `<config-dir>/outputs/notify/<tool>/cursor`
+  - `<config-dir>/outputs/notify/<tool>/spool/`
 
 ## Fast operator path
 
 ```bash
-# Validate a saved profile.
-uv run notify profile doctor --profile outputs/notify/densegen/profile.json
+WORKSPACE=<workspace>
+CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/$WORKSPACE/config.yaml
 
-# Preview payloads without posting.
-uv run notify usr-events watch --profile outputs/notify/densegen/profile.json --dry-run
+# Discover available workspace names for your tool.
+uv run notify setup list-workspaces --tool densegen
 
-# Run live watcher.
-uv run notify usr-events watch --profile outputs/notify/densegen/profile.json --follow
+# One-time setup by workspace shorthand (stores webhook securely and writes profile under <config-dir>/outputs/notify/<tool>/).
+uv run notify setup slack --tool densegen --workspace "$WORKSPACE" --secret-source auto
+# Explicit path fallback:
+# uv run notify setup slack --tool densegen --config "$CONFIG" --secret-source auto
+
+# Validate the resolved profile.
+uv run notify profile doctor --profile "src/dnadesign/densegen/workspaces/$WORKSPACE/outputs/notify/densegen/profile.json"
+
+# Preview payloads without posting (autoload profile from --tool/--workspace).
+uv run notify usr-events watch --tool densegen --workspace "$WORKSPACE" --dry-run
+
+# Run live watcher (same autoload mode).
+uv run notify usr-events watch --tool densegen --workspace "$WORKSPACE" --follow
 
 # Retry failed payloads from spool.
-uv run notify spool drain --profile outputs/notify/densegen/profile.json
+uv run notify spool drain --profile "src/dnadesign/densegen/workspaces/$WORKSPACE/outputs/notify/densegen/profile.json"
 ```
 
 ## Read order
@@ -76,6 +87,7 @@ Runtime and option resolution:
 Tool and workflow extension points:
 - `src/dnadesign/notify/events_source.py`: tool resolver registry.
 - `src/dnadesign/notify/events_source_builtin.py`: built-in resolver installs (`densegen`, `infer_evo2`).
+- `src/dnadesign/notify/workspace_source.py`: workspace-name to config-path resolver registry.
 - `src/dnadesign/notify/tool_events.py`: tool-event override and evaluator registry.
 - `src/dnadesign/notify/tool_event_packs_builtin.py`: built-in tool-event pack installs.
 - `src/dnadesign/notify/workflow_policy.py`: policy defaults and profile-path defaults.
@@ -97,6 +109,11 @@ Notify is an observer control plane:
 
 Tool integration contract:
 - `notify setup slack --tool <tool> --config <workspace-config.yaml>` resolves expected Universal Sequence Record `.events.log` destination
+- `notify setup slack --tool <tool> --workspace <workspace-name>` resolves config path from tool workspace root and then resolves expected Universal Sequence Record `.events.log` destination
+- `notify setup list-workspaces --tool <tool>` lists discoverable workspace names for shorthand mode
+- `notify usr-events watch --tool <tool> --config <workspace-config.yaml>` auto-loads profile from `<config-dir>/outputs/notify/<tool>/profile.json`
+- `notify usr-events watch --tool <tool> --workspace <workspace-name>` uses workspace shorthand for the same auto-profile flow
+- auto-profile mode is fail-fast: if profile `events_source` exists and does not match `--tool/--config` or `--tool/--workspace`, watch exits with a mismatch error
 - `notify setup resolve-events --tool <tool> --config <config.yaml>` resolves events path/policy without writing a profile
 - supported resolvers: `densegen`, `infer_evo2`
 - profile stores `events_source` metadata (`tool`, `config`) so watcher restarts can re-resolve paths and avoid stale bindings
@@ -105,3 +122,4 @@ Tool integration contract:
 Webhook contract:
 - secure mode `--secret-source auto|keychain|secretservice`
 - env mode supports `--url-env <ENV_VAR>` and defaults to `NOTIFY_WEBHOOK` when omitted
+- Python keyring support is included in the project lockfile; Notify uses it first and falls back to OS commands (`security`/`secret-tool`) when needed
