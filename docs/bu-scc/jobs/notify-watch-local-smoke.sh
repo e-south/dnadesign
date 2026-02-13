@@ -6,7 +6,7 @@ usage() {
 Run a local qsub-like notify watcher smoke flow without scheduler access.
 
 Usage:
-  docs/hpc/jobs/local_notify_watch_smoke.sh --mode <env|profile> [options]
+  docs/bu-scc/jobs/notify-watch-local-smoke.sh --mode <env|profile> [options]
 
 Options:
   --mode <env|profile>            Required. Harness mode.
@@ -189,7 +189,7 @@ fi
 PORT="$(cat "$PORT_PATH")"
 export NOTIFY_WEBHOOK="http://127.0.0.1:${PORT}/webhook"
 
-QSUB_SCRIPT="$REPO_ROOT/docs/hpc/jobs/bu_scc_notify_watch.qsub"
+QSUB_SCRIPT="$REPO_ROOT/docs/bu-scc/jobs/notify-watch.qsub"
 if [[ ! -x "$QSUB_SCRIPT" ]]; then
   echo "Missing qsub watcher script: $QSUB_SCRIPT" >&2
   exit 1

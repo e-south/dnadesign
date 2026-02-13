@@ -170,7 +170,7 @@ Rollout order:
 4. run notify + harness test suites in CI
 
 Docs to update during implementation:
-- `docs/notify/usr_events.md`
+- `docs/notify/usr-events.md`
 - DenseGen workflow docs that describe USR/Notify observability
 - qsub runbook examples where health cadence is relevant
 

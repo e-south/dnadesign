@@ -48,7 +48,7 @@ If you are new here:
 - DenseGen writes into USR via the `densegen` namespace:
   - DenseGen outputs reference: [../../densegen/docs/reference/outputs.md](../../densegen/docs/reference/outputs.md)
 - Notify consumes USR `.events.log`:
-  - Notify operators doc: [../../../../docs/notify/usr_events.md](../../../../docs/notify/usr_events.md)
+  - Notify operators doc: [../../../../docs/notify/usr-events.md](../../../../docs/notify/usr-events.md)
 
 Boundary reminder:
 - DenseGen runtime telemetry (`outputs/meta/events.jsonl`) is not Notify input.

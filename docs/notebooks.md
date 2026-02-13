@@ -1,5 +1,6 @@
 ## Running marimo notebooks
 
+More in depth marimo guidance lives at `docs/marimo-reference.md`.
 
 ## Contents
 - [Running marimo notebooks](#running-marimo-notebooks)
@@ -61,7 +62,7 @@ This writes inline metadata into the notebook so its sandbox can install dnadesi
     uv remove --script notebooks/sandbox_example.py numpy
     ```
 
-    Note: If you run an agent to edit a marimo notebook, launch with `--watch` so changes appear live:
+    Note: If you use automated edits for a marimo notebook, launch with `--watch` so changes appear live:
 
     ```bash
     uv run marimo edit --watch notebook.py

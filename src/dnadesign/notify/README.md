@@ -69,10 +69,10 @@ uv run notify spool drain --profile "src/dnadesign/densegen/workspaces/$WORKSPAC
 
 ## Read order
 
-- Canonical operators runbook: [docs/notify/usr_events.md](../../../docs/notify/usr_events.md)
-- Module-local pointer page: [docs/usr_events.md](docs/usr_events.md)
-- Command anatomy: [notify setup slack flags and expectations](../../../docs/notify/usr_events.md#command-anatomy-notify-setup-slack)
-- Setup onboarding: [Slack setup onboarding](../../../docs/notify/usr_events.md#slack-setup-onboarding-3-minutes)
+- Canonical operators runbook: [docs/notify/usr-events.md](../../../docs/notify/usr-events.md)
+- Module-local quick ops page: [docs/usr-events.md](docs/usr-events.md)
+- Command anatomy: [notify setup slack flags and expectations](../../../docs/notify/usr-events.md#command-anatomy-notify-setup-slack)
+- Setup onboarding: [Slack setup onboarding](../../../docs/notify/usr-events.md#slack-setup-onboarding-3-minutes)
 - End-to-end stack demo: [DenseGen -> Universal Sequence Record -> Notify demo](../densegen/docs/demo/demo_usr_notify.md)
 - Universal Sequence Record event schema source: [Universal Sequence Record event log schema](../usr/README.md#event-log-schema)
 

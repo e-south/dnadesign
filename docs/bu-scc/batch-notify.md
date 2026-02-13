@@ -12,10 +12,10 @@
 **Key boundary:** Notify consumes **USR `<dataset>/.events.log`** (JSONL), not DenseGen `outputs/meta/events.jsonl`.
 
 Related docs:
-- Install/bootstrap: [BU SCC Install bootstrap](bu_scc_install.md)
-- End-to-end quick path: [BU SCC Quickstart](bu_scc_quickstart.md)
-- Job templates: [HPC jobs README](jobs/README.md)
-- Notify operator manual: [Notify USR events operator manual](../notify/usr_events.md)
+- Install/bootstrap: [BU SCC Install bootstrap](install.md)
+- End-to-end quick path: [BU SCC Quickstart](quickstart.md)
+- Job templates: [BU SCC jobs README](jobs/README.md)
+- Notify operator manual: [Notify USR events operator manual](../notify/usr-events.md)
 
 ---
 
@@ -55,17 +55,17 @@ set -euo pipefail
 
 ## 3) Canonical job scripts
 
-Use versioned templates from [HPC jobs README](jobs/README.md):
-- [DenseGen CPU batch template](jobs/bu_scc_densegen_cpu.qsub)
-- [Evo2 GPU template](jobs/bu_scc_evo2_gpu_infer.qsub)
-- [Notify watcher template](jobs/bu_scc_notify_watch.qsub)
+Use versioned templates from [BU SCC jobs README](jobs/README.md):
+- [DenseGen CPU batch template](jobs/densegen-cpu.qsub)
+- [Evo2 GPU template](jobs/evo2-gpu-infer.qsub)
+- [Notify watcher template](jobs/notify-watch.qsub)
 
 Submit examples:
 
 ```bash
-qsub -P <project> docs/hpc/jobs/bu_scc_densegen_cpu.qsub
-qsub -P <project> docs/hpc/jobs/bu_scc_evo2_gpu_infer.qsub
-qsub -P <project> docs/hpc/jobs/bu_scc_notify_watch.qsub
+qsub -P <project> docs/bu-scc/jobs/densegen-cpu.qsub
+qsub -P <project> docs/bu-scc/jobs/evo2-gpu-infer.qsub
+qsub -P <project> docs/bu-scc/jobs/notify-watch.qsub
 ```
 
 ---
@@ -107,7 +107,7 @@ qsub -P <project> \
   -l h_rt=08:00:00 \
   -l mem_per_core=8G \
   -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml \
-  docs/hpc/jobs/bu_scc_densegen_cpu.qsub
+  docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
 Before long runs:
@@ -169,7 +169,7 @@ uv run notify setup slack \
 
 qsub -P <project> \
   -v NOTIFY_PROFILE="$NOTIFY_DIR/profile.json" \
-  docs/hpc/jobs/bu_scc_notify_watch.qsub
+  docs/bu-scc/jobs/notify-watch.qsub
 ```
 
 ### Mode B: explicit env wiring (no profile)
@@ -182,7 +182,7 @@ and `NOTIFY_NAMESPACE` (for example, `densegen`).
 ```bash
 qsub -P <project> \
   -v NOTIFY_TOOL=densegen,NOTIFY_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,WEBHOOK_ENV=NOTIFY_WEBHOOK \
-  docs/hpc/jobs/bu_scc_notify_watch.qsub
+  docs/bu-scc/jobs/notify-watch.qsub
 ```
 
 ### Mode C: short-lived validation in login/OnDemand shell
@@ -232,8 +232,8 @@ Do not configure Notify against DenseGen runtime events.
 
 ---
 
-Back: [HPC index](README.md)
+Back: [BU SCC index](README.md)
 
-Next: [BU SCC Quickstart](bu_scc_quickstart.md)
+Next: [BU SCC Quickstart](quickstart.md)
 
-Next: [HPC job templates](jobs/README.md)
+Next: [BU SCC job templates](jobs/README.md)

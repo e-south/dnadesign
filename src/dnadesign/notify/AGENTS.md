@@ -5,7 +5,7 @@ Supplement to repo-root `AGENTS.md` with `notify`-specific operator defaults.
 ### Key paths
 - Code: `src/dnadesign/notify/`
 - Tests: `src/dnadesign/notify/tests/`
-- Canonical operators runbook: `docs/notify/usr_events.md`
+- Canonical operators runbook: `docs/notify/usr-events.md`
 - Module-local index: `src/dnadesign/notify/README.md`
 
 ### Default low-friction flow

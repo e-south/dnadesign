@@ -11,7 +11,7 @@
 
 ## 2026-02-05
 - Added a tool-agnostic notifier CLI (`notify`) with generic/Slack/Discord payloads and explicit URL validation.
-- Documented notifier usage in `docs/notify.md` and registered the CLI entry in `pyproject.toml`.
+- Documented notifier usage in `docs/notify/README.md` and registered the CLI entry in `pyproject.toml`.
 - Expanded notifier docs with Slurm and BU SCC examples plus local testing guidance.
 
 ## 2026-02-11
@@ -140,7 +140,7 @@
     - `outputs/notify/cursor`
     - `outputs/notify/spool`
   - Removed `/projectnb/.../notify/...` examples for watcher profile paths in Notify + DenseGen + HPC runbooks.
-  - Added explicit “artifact placement strategy” guidance in `docs/notify/usr_events.md`:
+  - Added explicit “artifact placement strategy” guidance in `docs/notify/usr-events.md`:
     - default run-local co-location with producing run workspace
     - optional centralized Notify workspaces under `/project/...` with tool/run-qualified watch IDs
     - explicit note that Notify stays decoupled from sink choices (parquet/USR), and always watches USR `.events.log`.

@@ -2,18 +2,18 @@
 
 These scripts are submit-ready templates for BU SCC SGE jobs:
 
-- `bu_scc_densegen_cpu.qsub`: DenseGen CPU batch run
-- `bu_scc_evo2_gpu_infer.qsub`: Evo2 GPU smoke/inference job shell
-- `bu_scc_notify_watch.qsub`: Notify watcher for USR `.events.log`
+- `densegen-cpu.qsub`: DenseGen CPU batch run
+- `evo2-gpu-infer.qsub`: Evo2 GPU smoke/inference job shell
+- `notify-watch.qsub`: Notify watcher for USR `.events.log`
 
 ## Quick start
 
 Use project (`-P`) and runtime/config overrides at submit time.
 
 ```bash
-qsub -P <project> docs/hpc/jobs/bu_scc_densegen_cpu.qsub
-qsub -P <project> docs/hpc/jobs/bu_scc_evo2_gpu_infer.qsub
-qsub -P <project> docs/hpc/jobs/bu_scc_notify_watch.qsub
+qsub -P <project> docs/bu-scc/jobs/densegen-cpu.qsub
+qsub -P <project> docs/bu-scc/jobs/evo2-gpu-infer.qsub
+qsub -P <project> docs/bu-scc/jobs/notify-watch.qsub
 ```
 
 ## DenseGen CPU submissions
@@ -23,7 +23,7 @@ Default template run:
 ```bash
 qsub -P <project> \
   -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml \
-  docs/hpc/jobs/bu_scc_densegen_cpu.qsub
+  docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
 DenseGen + GUROBI with explicit 16-slot cap:
@@ -34,7 +34,7 @@ qsub -P <project> \
   -l h_rt=08:00:00 \
   -l mem_per_core=8G \
   -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml \
-  docs/hpc/jobs/bu_scc_densegen_cpu.qsub
+  docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
 When using GUROBI, keep config aligned with scheduler slots:
@@ -47,7 +47,7 @@ When using GUROBI, keep config aligned with scheduler slots:
 ```bash
 qsub -P <project> \
   -v CUDA_MODULE=cuda/<version>,GCC_MODULE=gcc/<version> \
-  docs/hpc/jobs/bu_scc_evo2_gpu_infer.qsub
+  docs/bu-scc/jobs/evo2-gpu-infer.qsub
 ```
 
 ## Notify watcher submissions
@@ -72,7 +72,7 @@ export SSL_CERT_FILE=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
 
 qsub -P <project> \
   -v NOTIFY_PROFILE="$NOTIFY_DIR/profile.json" \
-  docs/hpc/jobs/bu_scc_notify_watch.qsub
+  docs/bu-scc/jobs/notify-watch.qsub
 ```
 
 Explicit env mode (no profile):
@@ -80,10 +80,10 @@ Explicit env mode (no profile):
 ```bash
 qsub -P <project> \
   -v NOTIFY_TOOL=densegen,NOTIFY_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,WEBHOOK_ENV=NOTIFY_WEBHOOK,NOTIFY_TLS_CA_BUNDLE=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem \
-  docs/hpc/jobs/bu_scc_notify_watch.qsub
+  docs/bu-scc/jobs/notify-watch.qsub
 ```
 
-`bu_scc_notify_watch.qsub` mode selection:
+`notify-watch.qsub` mode selection:
 - if `NOTIFY_PROFILE` is set, it runs `notify usr-events watch --profile ... --follow`
 - otherwise it requires `EVENTS_PATH` or auto-resolves from `NOTIFY_TOOL` + `NOTIFY_CONFIG`
 - it accepts future `.events.log` paths and uses `--wait-for-events` for run-before-events startup
@@ -101,13 +101,13 @@ Run a real watcher flow locally without SCC scheduler access:
 
 ```bash
 # Env mode: explicit events/policy/namespace wiring.
-docs/hpc/jobs/local_notify_watch_smoke.sh \
+docs/bu-scc/jobs/notify-watch-local-smoke.sh \
   --mode env \
   --repo-root "$(pwd)" \
   --workdir /tmp/notify-smoke-env
 
 # Profile mode: setup profile + watcher profile flow.
-docs/hpc/jobs/local_notify_watch_smoke.sh \
+docs/bu-scc/jobs/notify-watch-local-smoke.sh \
   --mode profile \
   --repo-root "$(pwd)" \
   --workdir /tmp/notify-smoke-profile
@@ -116,7 +116,7 @@ docs/hpc/jobs/local_notify_watch_smoke.sh \
 What it does:
 - writes a terminal USR event into a local test events file
 - starts a local HTTP capture endpoint (no external Slack posting)
-- runs `docs/hpc/jobs/bu_scc_notify_watch.qsub` with real `uv run notify ...` commands
+- runs `docs/bu-scc/jobs/notify-watch.qsub` with real `uv run notify ...` commands
 - verifies at least one success payload was delivered
 - keeps all runtime artifacts under the specified `--workdir`
 
@@ -136,7 +136,7 @@ tail -f outputs/logs/<job_name>.<job_id>.out
 
 For arrays, use `qsub -t ...` and consume `SGE_TASK_ID` inside scripts.
 
-Reference: [BU SCC Batch + Notify runbook: Job arrays](../bu_scc_batch_notify.md#5-job-arrays-parameter-sweeps)
+Reference: [BU SCC Batch + Notify runbook: Job arrays](../batch-notify.md#5-job-arrays-parameter-sweeps)
 
 ## Edit vs submit-time overrides
 
@@ -146,5 +146,5 @@ Reference: [BU SCC Batch + Notify runbook: Job arrays](../bu_scc_batch_notify.md
 
 ## References
 
-- Runbook: [BU SCC Batch + Notify runbook](../bu_scc_batch_notify.md)
+- Runbook: [BU SCC Batch + Notify runbook](../batch-notify.md)
 - BU scheduler docs: <https://www.bu.edu/tech/support/research/system-usage/running-jobs/submitting-jobs/>

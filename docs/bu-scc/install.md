@@ -10,14 +10,14 @@
 - You want to verify toolchain health before running long jobs.
 
 **Not for:**
-- Long-running production jobs (use [BU SCC Batch + Notify runbook](bu_scc_batch_notify.md)).
-- Operational monitoring setup (use [BU SCC Batch + Notify runbook](bu_scc_batch_notify.md) and [Notify USR events operator manual](../notify/usr_events.md)).
+- Long-running production jobs (use [BU SCC Batch + Notify runbook](batch-notify.md)).
+- Operational monitoring setup (use [BU SCC Batch + Notify runbook](batch-notify.md) and [Notify USR events operator manual](../notify/usr-events.md)).
 - Large model or dataset transfers on compute nodes (use BU data transfer node workflows).
 
 ## Choose your path
 
 - Interactive install + smoke tests (this doc).
-- Batch usage + Notify setup ([BU SCC Batch + Notify runbook](bu_scc_batch_notify.md)).
+- Batch usage + Notify setup ([BU SCC Batch + Notify runbook](batch-notify.md)).
 
 Run this from an SCC login shell:
 - `ssh <BU_USERNAME>@scc1.bu.edu`
@@ -182,7 +182,7 @@ PY
 ## 7) Next step
 
 For long jobs, arrays, Notify watchers, and transfer-node workflows, use:
-- [BU SCC Batch + Notify runbook](bu_scc_batch_notify.md)
+- [BU SCC Batch + Notify runbook](batch-notify.md)
 
 ---
 
@@ -322,8 +322,8 @@ PY
 
 ---
 
-Back: [HPC index](README.md)
+Back: [BU SCC index](README.md)
 
-Next: [BU SCC Quickstart](bu_scc_quickstart.md)
+Next: [BU SCC Quickstart](quickstart.md)
 
-Next: [BU SCC Batch + Notify runbook](bu_scc_batch_notify.md)
+Next: [BU SCC Batch + Notify runbook](batch-notify.md)

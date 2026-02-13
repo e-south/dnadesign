@@ -37,7 +37,7 @@ Given a large pool of sequences, **libshuffle** repeatedly draws fixed‑size su
 
 <img src="images/flag_composition.png" alt="Literal Flag Composition" width="300"/>
 
-> **Note:** We also use a **Leiden flag**, clustering Evo 2 embeddings with the Leiden algorithm (see [**clustering**](../clustering/README.md)). Any subsample that contains more than one sequence from the same cluster is flagged, ensuring we sample across distinct semantic “islands.”
+> **Note:** We also use a **Leiden flag**, clustering Evo 2 embeddings with the Leiden algorithm (see [**cluster**](../cluster/README.md)). Any subsample that contains more than one sequence from the same cluster is flagged, ensuring we sample across distinct semantic “islands.”
 
 ### Outlier Ranking: Minimum‑Gap Selection
 
@@ -47,7 +47,7 @@ Given a large pool of sequences, **libshuffle** repeatedly draws fixed‑size su
 
 <img src="images/hitzone_summary.png" alt="Outlier Ranking by Max-Min E-dist" width="300"/>
 
-> **Follow‑up:** Apply UMAP to each sequence’s Evo 2 mean‑pooled embedding (see [**clustering**](../clustering/README.md)) and then overlay the selected subsample onto the full projection—confirming that the chosen library spans the diverse “semantic islands” of the embedding space.
+> **Follow‑up:** Apply UMAP to each sequence’s Evo 2 mean‑pooled embedding (see [**cluster**](../cluster/README.md)) and then overlay the selected subsample onto the full projection—confirming that the chosen library spans the diverse “semantic islands” of the embedding space.
 
 <img src="images/umap.png" alt="UMAP of Selected Sublibrary" width="500"/>
 
