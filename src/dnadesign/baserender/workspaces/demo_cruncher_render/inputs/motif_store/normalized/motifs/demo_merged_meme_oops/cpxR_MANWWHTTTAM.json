@@ -1,0 +1,185 @@
+{
+  "descriptor": {
+    "source": "demo_merged_meme_oops",
+    "motif_id": "cpxR_MANWWHTTTAM",
+    "tf_name": "cpxR",
+    "length": 11,
+    "alphabet": "ACGT",
+    "kind": "PFM",
+    "organism": {
+      "taxon": null,
+      "name": "Escherichia coli",
+      "strain": null,
+      "assembly": null
+    },
+    "tags": {
+      "matrix_source": "meme",
+      "discovery_tool": "meme",
+      "discovery_tool_path": "/Users/Shockwing/Dropbox/projects/phd/cruncher-refine/.pixi/envs/default/bin/meme",
+      "discovery_tool_version": "5.5.9",
+      "discovery_run": "discover_cpxR_20260212_124852_4d8dda",
+      "discovery_nsites": "204",
+      "discovery_minw": "tool_default",
+      "discovery_maxw": "tool_default",
+      "discovery_nmotifs": "1"
+    }
+  },
+  "matrix": [
+    [
+      0.313725,
+      0.514706,
+      0.04902,
+      0.122549
+    ],
+    [
+      0.588235,
+      0.107843,
+      0.142157,
+      0.161765
+    ],
+    [
+      0.2352942352942353,
+      0.1960781960781961,
+      0.20098020098020097,
+      0.36764736764736766
+    ],
+    [
+      0.44607844607844604,
+      0.10294110294110295,
+      0.09803909803909805,
+      0.352941352941353
+    ],
+    [
+      0.269608,
+      0.093137,
+      0.156863,
+      0.480392
+    ],
+    [
+      0.367647,
+      0.29902,
+      0.127451,
+      0.205882
+    ],
+    [
+      0.07843107843107844,
+      0.08333308333308334,
+      0.2745102745102745,
+      0.5637255637255638
+    ],
+    [
+      0.078431,
+      0.034314,
+      0.176471,
+      0.710784
+    ],
+    [
+      0.176471,
+      0.009804,
+      0.093137,
+      0.720588
+    ],
+    [
+      0.8235298235298235,
+      0.06372506372506373,
+      0.06862706862706862,
+      0.04411804411804412
+    ],
+    [
+      0.377451,
+      0.607843,
+      0.0,
+      0.014706
+    ]
+  ],
+  "log_odds_matrix": [
+    [
+      -16.0,
+      171.0,
+      -136.0,
+      -158.0
+    ],
+    [
+      75.0,
+      -54.0,
+      18.0,
+      -118.0
+    ],
+    [
+      -57.0,
+      32.0,
+      68.0,
+      0.0
+    ],
+    [
+      35.0,
+      -61.0,
+      -36.0,
+      -6.0
+    ],
+    [
+      -38.0,
+      -75.0,
+      32.0,
+      39.0
+    ],
+    [
+      7.0,
+      93.0,
+      2.0,
+      -84.0
+    ],
+    [
+      -216.0,
+      -91.0,
+      113.0,
+      62.0
+    ],
+    [
+      -216.0,
+      -219.0,
+      49.0,
+      95.0
+    ],
+    [
+      -99.0,
+      -400.0,
+      -43.0,
+      97.0
+    ],
+    [
+      123.0,
+      -130.0,
+      -87.0,
+      -306.0
+    ],
+    [
+      11.0,
+      195.0,
+      -1432.0,
+      -464.0
+    ]
+  ],
+  "matrix_semantics": "probabilities",
+  "background": [
+    0.35,
+    0.157,
+    0.126,
+    0.367
+  ],
+  "provenance": {
+    "retrieved_at": "2026-02-12T17:48:53.148930+00:00",
+    "source_version": null,
+    "source_url": null,
+    "license": null,
+    "citation": null,
+    "raw_artifact_paths": [
+      "/Users/Shockwing/Dropbox/projects/phd/cruncher-refine/src/dnadesign/cruncher/.cruncher/discoveries/discover_cpxR_20260212_124852_4d8dda/meme.txt"
+    ],
+    "tags": {}
+  },
+  "checksums": {
+    "sha256_raw": "demo_raw_cpxR",
+    "sha256_norm": "demo_norm_cpxR"
+  }
+}

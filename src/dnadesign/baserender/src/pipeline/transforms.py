@@ -18,6 +18,7 @@ from typing import Protocol, Sequence
 from ..config import PluginSpec
 from ..core import PluginError, Record
 from .attach_motifs_from_config import AttachMotifsFromConfigTransform
+from .attach_motifs_from_cruncher_lockfile import AttachMotifsFromCruncherLockfileTransform
 from .sigma70 import Sigma70Transform
 
 
@@ -46,6 +47,9 @@ def load_transforms(requested: Sequence[PluginSpec]) -> tuple[Transform, ...]:
             continue
         if name == "attach_motifs_from_config":
             transforms.append(AttachMotifsFromConfigTransform(**params))
+            continue
+        if name == "attach_motifs_from_cruncher_lockfile":
+            transforms.append(AttachMotifsFromCruncherLockfileTransform(**params))
             continue
 
         if ":" in name:

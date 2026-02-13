@@ -297,10 +297,10 @@ def _draw_motif_scale_bar(
         top_label = "1.0"
 
     ax.text(
-        x + 5.0,
+        x - 6.0,
         y0,
         "0",
-        ha="left",
+        ha="right",
         va="bottom",
         fontsize=cfg.font_size,
         family=style.font_label,
@@ -309,10 +309,10 @@ def _draw_motif_scale_bar(
         clip_on=False,
     )
     ax.text(
-        x + 5.0,
+        x - 6.0,
         y1,
         top_label,
-        ha="left",
+        ha="right",
         va="top",
         fontsize=cfg.font_size,
         family=style.font_label,

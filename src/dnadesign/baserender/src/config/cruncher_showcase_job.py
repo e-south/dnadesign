@@ -263,6 +263,26 @@ def _parse_plugin_specs(job_path: Path, raw: Any) -> tuple[PluginSpec, ...]:
                         field="pipeline.plugins.attach_motifs_from_config.config_path",
                     )
                 )
+            if plugin_name == "attach_motifs_from_cruncher_lockfile":
+                for key in ("run_manifest_path", "lockfile_path", "motif_store_root"):
+                    value = parsed_params.get(key)
+                    if value is not None:
+                        parsed_params[key] = str(
+                            _resolve_path(
+                                job_path,
+                                str(value),
+                                field=f"pipeline.plugins.attach_motifs_from_cruncher_lockfile.{key}",
+                            )
+                        )
+                has_manifest = parsed_params.get("run_manifest_path") is not None
+                has_lock_bundle = (
+                    parsed_params.get("lockfile_path") is not None and parsed_params.get("motif_store_root") is not None
+                )
+                if not has_manifest and not has_lock_bundle:
+                    raise SchemaError(
+                        "pipeline plugin 'attach_motifs_from_cruncher_lockfile' requires "
+                        "params.run_manifest_path or both params.lockfile_path + params.motif_store_root"
+                    )
             out.append(PluginSpec(name=plugin_name, params=parsed_params))
         else:
             raise SchemaError(f"Unsupported plugin spec: {item!r}")

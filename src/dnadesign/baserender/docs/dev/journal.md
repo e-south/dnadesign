@@ -459,3 +459,53 @@ Conclusion: base track/kmer rendering is already compatible.
 - `uv run ruff check src/dnadesign/baserender/src src/dnadesign/baserender/tests`
 - `uv run pytest -q src/dnadesign/baserender/tests` -> passed
 - `uv run baserender job run --workspace demo_cruncher_render --workspace-root src/dnadesign/baserender/workspaces` -> passed
+
+## 2026-02-13 - Cruncher motif provenance hardening (lockfile + motif store)
+
+### Findings
+
+1. Baserender cruncher demo was sourcing motif logos from `config_used.yaml` via `attach_motifs_from_config`.
+2. Cruncher motif discovery/usage provenance chain is explicit and stricter:
+   - MEME OOPS output -> catalog normalized motif JSON (`.cruncher/normalized/motifs/...`)
+   - lockfile resolves TF -> `source:motif_id` + checksum
+   - sample/analyze consume those resolved motifs.
+3. To match the intended contract, baserender should source logo matrices from lockfile-resolved motif artifacts, not from convenience copies in config.
+
+### Changes
+
+- Added strict transform:
+  - `attach_motifs_from_cruncher_lockfile`
+  - file: `src/dnadesign/baserender/src/pipeline/attach_motifs_from_cruncher_lockfile.py`
+  - behavior:
+    - loads lockfile + motif store artifacts
+    - resolves TF tag (`tf:<name>`) to lockfile entry
+    - replaces `motif_logo` effect matrix from `normalized/motifs/<source>/<motif_id>.json`
+    - enforces checksum match (`lockfile.sha256 == motif.checksums.sha256_norm`)
+    - fails fast on missing paths/entries/checksums/length mismatches.
+- Registered transform in plugin loader:
+  - `src/dnadesign/baserender/src/pipeline/transforms.py`
+- Added strict plugin param path resolution:
+  - `src/dnadesign/baserender/src/config/cruncher_showcase_job.py`
+  - requires `run_manifest_path` or `lockfile_path + motif_store_root`.
+- Updated demo cruncher workspace job to use canonical provenance transform:
+  - `src/dnadesign/baserender/workspaces/demo_cruncher_render/job.yaml`
+- Bootstrapped demo inputs with Cruncher runtime-shape provenance artifacts:
+  - `src/dnadesign/baserender/workspaces/demo_cruncher_render/inputs/lockfile.json`
+  - `src/dnadesign/baserender/workspaces/demo_cruncher_render/inputs/motif_store/normalized/motifs/demo_merged_meme_oops/*.json`
+- Updated demo input docs:
+  - `src/dnadesign/baserender/workspaces/demo_cruncher_render/inputs/README.md`
+
+### Tests and verification
+
+- Added provenance tests:
+  - `src/dnadesign/baserender/tests/test_motif_provenance_transform.py`
+    - lockfile+motif-store rewrite path
+    - checksum mismatch failure path
+- Verified:
+  - `uv run pytest -q src/dnadesign/baserender/tests/test_motif_provenance_transform.py` -> passed
+  - `uv run pytest -q src/dnadesign/baserender/tests` -> passed
+  - `uv run baserender job validate src/dnadesign/baserender/workspaces/demo_cruncher_render/job.yaml` -> passed
+  - `uv run baserender job run src/dnadesign/baserender/workspaces/demo_cruncher_render/job.yaml` -> passed
+  - plots regenerated at:
+    - `src/dnadesign/baserender/workspaces/demo_cruncher_render/outputs/plots/elite_showcase_1.png`
+    - `src/dnadesign/baserender/workspaces/demo_cruncher_render/outputs/plots/elite_showcase_2.png`

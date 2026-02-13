@@ -14,8 +14,9 @@ input:
   alphabet: DNA
 pipeline:
   plugins:
-    - attach_motifs_from_config:
-        config_path: inputs/config_used.yaml
+    - attach_motifs_from_cruncher_lockfile:
+        lockfile_path: inputs/lockfile.json
+        motif_store_root: inputs/motif_store
 render:
   renderer: sequence_rows
   style:

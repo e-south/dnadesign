@@ -1,0 +1,20 @@
+{
+  "generated_at": "2026-02-12T17:48:53.469235+00:00",
+  "pwm_source": "matrix",
+  "site_kinds": null,
+  "combine_sites": true,
+  "resolved": {
+    "lexA": {
+      "source": "demo_merged_meme_oops",
+      "motif_id": "lexA_CTGTATAWAWWHACA",
+      "sha256": "demo_norm_lexA",
+      "dataset_id": null
+    },
+    "cpxR": {
+      "source": "demo_merged_meme_oops",
+      "motif_id": "cpxR_MANWWHTTTAM",
+      "sha256": "demo_norm_cpxR",
+      "dataset_id": null
+    }
+  }
+}
