@@ -36,6 +36,53 @@ jobs:
       - name: Install dependencies (locked)
         run: uv sync --locked --dev
 
+      - name: Docs checks (links + naming)
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          docs_root = Path("docs")
+          if not docs_root.exists():
+            raise SystemExit("docs/ directory is missing")
+
+          docs_md_files = sorted(docs_root.rglob("*.md"))
+          bad_names = [p for p in docs_md_files if "_" in p.name]
+          if bad_names:
+            print("Docs naming check failed: use kebab-case markdown filenames.")
+            for path in bad_names:
+              print(f" - {path}")
+            raise SystemExit(1)
+
+          md_files = list(docs_md_files)
+          root_readme = Path("README.md")
+          if root_readme.exists():
+            md_files.append(root_readme)
+
+          link_pattern = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+          broken = []
+          for src in md_files:
+            text = src.read_text(encoding="utf-8")
+            for raw in link_pattern.findall(text):
+              link = raw.strip().split()[0]
+              if link.startswith(("http://", "https://", "mailto:")):
+                continue
+              target_rel = link.split("#", 1)[0]
+              if not target_rel:
+                continue
+              target = (src.parent / target_rel).resolve()
+              if not target.exists():
+                broken.append((src, link))
+
+          if broken:
+            print("Docs link check failed:")
+            for src, link in broken:
+              print(f" - {src}: {link}")
+            raise SystemExit(1)
+
+          print(f"Docs checks passed ({len(md_files)} markdown files, including root README if present).")
+          PY
+
       - name: Pre-commit (non-Ruff hooks)
         env:
           SKIP: ruff-check,ruff-format

@@ -76,7 +76,7 @@ def wizard_next_steps(
         [
             "  batch: qsub -P <project> \\",
             f"    -v NOTIFY_PROFILE={profile_arg_shell} \\",
-            "    docs/hpc/jobs/bu_scc_notify_watch.qsub",
+            "    docs/bu-scc/jobs/notify-watch.qsub",
         ]
     )
     webhook_source = str(webhook_config.get("source") or "").strip().lower()
