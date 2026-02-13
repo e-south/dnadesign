@@ -1,24 +1,23 @@
 # Documentation Index
 
-This page is the canonical docs navigation.
-Keep curated docs links here and avoid duplicating curated navigation elsewhere.
+This is the canonical docs entrypoint. Keep curated navigation here.
 
-## Start by task
+## Recommended entry flow
 
-- Local workstation setup and environment sync: `installation.md`
-- Dependency maintenance policy: `dependencies.md`
-- Notebook workflow: `notebooks.md`
-- BU SCC operations and job submission: `bu-scc/README.md`
-- Notify CLI usage and watcher operations: `notify/README.md`
-- SGE operations skill package: `bu-scc/sge-hpc-ops/SKILL.md`
+1. Local setup and environment sync: `installation.md`
+2. Dependency policy: `dependencies.md`
+3. Notebook workflow: `notebooks.md`
+4. BU SCC operations and job submission: `bu-scc/README.md`
+5. Notify CLI usage and watcher operations: `notify/README.md`
+6. SGE operations skill package: `bu-scc/sge-hpc-ops/SKILL.md`
 
-## Semantic ownership (single source rules)
+## Ownership map
 
 - `bu-scc/`: BU SCC platform policy, scheduler vocabulary, and submit templates.
 - `bu-scc/sge-hpc-ops/`: SGE-family operations contract; core guidance is scheduler-generic.
 - `notify/`: Notify operator procedures and watcher semantics.
 
-## Edit here for changes
+## Edit map
 
 - Change BU queue/resource examples or `qsub` templates: edit `bu-scc/` and `bu-scc/jobs/`.
 - Change skill trigger/probe behavior: edit `bu-scc/sge-hpc-ops/SKILL.md`.
