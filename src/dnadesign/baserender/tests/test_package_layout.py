@@ -24,7 +24,7 @@ def _baserender_root() -> Path:
 def test_default_style_preset_resolves_from_package_root() -> None:
     preset = resolve_preset_path("presentation_default")
     assert preset is not None
-    assert preset.resolve() == (_baserender_root() / "styles" / "presentation_default.yml").resolve()
+    assert preset.resolve() == (_baserender_root() / "styles" / "presentation_default.yaml").resolve()
 
 
 def test_default_workspaces_root_resolves_from_current_working_directory(monkeypatch, tmp_path) -> None:
@@ -35,5 +35,5 @@ def test_default_workspaces_root_resolves_from_current_working_directory(monkeyp
 def test_resolve_job_path_finds_docs_example_by_name() -> None:
     assert (
         resolve_job_path("densegen_job").resolve()
-        == (_baserender_root() / "docs" / "examples" / "densegen_job.yml").resolve()
+        == (_baserender_root() / "docs" / "examples" / "densegen_job.yaml").resolve()
     )

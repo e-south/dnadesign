@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/baserender/src/cli.py
 
-Baserender vNext CLI (Job v3 only).
+Baserender vNext CLI for Cruncher showcase job configs.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -17,13 +17,20 @@ from pathlib import Path
 import typer
 import yaml
 
-from .api import run_job_v3
-from .config import list_style_presets, load_job_v3, resolve_preset_path, validate_job_v3
+from .cli_actions import (
+    discover_workspaces_action,
+    init_workspace_action,
+    list_style_presets_action,
+    normalize_job_action,
+    run_job_action,
+    show_style_action,
+    validate_job_action,
+)
 from .core import BaseRenderError
-from .workspace import default_workspaces_root, discover_workspaces, init_workspace, resolve_workspace_job_path
+from .workspace import default_workspaces_root
 
 app = typer.Typer(help="Baserender vNext CLI")
-job_app = typer.Typer(help="Job v3 commands")
+job_app = typer.Typer(help="Cruncher showcase job commands")
 style_app = typer.Typer(help="Style commands")
 workspace_app = typer.Typer(help="Workspace commands")
 app.add_typer(job_app, name="job")
@@ -31,56 +38,44 @@ app.add_typer(style_app, name="style")
 app.add_typer(workspace_app, name="workspace")
 
 
-def _resolve_job_spec(job: str | None, workspace: str | None, workspace_root: Path | None) -> str:
-    if (job is None and workspace is None) or (job is not None and workspace is not None):
-        raise BaseRenderError("Provide exactly one of <job> or --workspace")
-    if workspace is not None:
-        return str(resolve_workspace_job_path(workspace, root=workspace_root))
-    assert job is not None
-    return job
+def _exit_cli_error(exc: Exception) -> None:
+    typer.echo(f"ERROR: {exc}", err=True)
+    raise typer.Exit(code=2) from exc
 
 
 @job_app.command("validate")
 def job_validate(
-    job: str | None = typer.Argument(None, help="Path to Job v3 YAML (or job name)."),
-    workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace name containing job.yml."),
+    job: str | None = typer.Argument(None, help="Path to Cruncher showcase job YAML (or job name)."),
+    workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace name containing job.yaml."),
     workspace_root: Path | None = typer.Option(
         None,
         "--workspace-root",
         help="Workspace root directory (default: <cwd>/workspaces).",
     ),
 ) -> None:
-    """Validate a Job v3 config."""
+    """Validate a Cruncher showcase job config."""
     try:
-        parsed = validate_job_v3(
-            _resolve_job_spec(job, workspace, workspace_root),
-            caller_root=Path.cwd(),
-        )
+        parsed = validate_job_action(job, workspace, workspace_root, caller_root=Path.cwd())
     except BaseRenderError as exc:
-        typer.echo(f"ERROR: {exc}", err=True)
-        raise typer.Exit(code=2)
+        _exit_cli_error(exc)
     typer.echo(f"OK: {parsed.path}")
 
 
 @job_app.command("run")
 def job_run(
-    job: str | None = typer.Argument(None, help="Path to Job v3 YAML (or job name)."),
-    workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace name containing job.yml."),
+    job: str | None = typer.Argument(None, help="Path to Cruncher showcase job YAML (or job name)."),
+    workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace name containing job.yaml."),
     workspace_root: Path | None = typer.Option(
         None,
         "--workspace-root",
         help="Workspace root directory (default: <cwd>/workspaces).",
     ),
 ) -> None:
-    """Run a Job v3 config."""
+    """Run a Cruncher showcase job config."""
     try:
-        report = run_job_v3(
-            _resolve_job_spec(job, workspace, workspace_root),
-            caller_root=Path.cwd(),
-        )
+        report = run_job_action(job, workspace, workspace_root, caller_root=Path.cwd())
     except BaseRenderError as exc:
-        typer.echo(f"ERROR: {exc}", err=True)
-        raise typer.Exit(code=2)
+        _exit_cli_error(exc)
 
     typer.echo("Run complete")
     for key, value in report.outputs.items():
@@ -89,8 +84,8 @@ def job_run(
 
 @job_app.command("normalize")
 def job_normalize(
-    job: str | None = typer.Argument(None, help="Path to Job v3 YAML (or job name)."),
-    workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace name containing job.yml."),
+    job: str | None = typer.Argument(None, help="Path to Cruncher showcase job YAML (or job name)."),
+    workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace name containing job.yaml."),
     workspace_root: Path | None = typer.Option(
         None,
         "--workspace-root",
@@ -98,103 +93,24 @@ def job_normalize(
     ),
     out: Path = typer.Option(..., "--out", help="Output path for normalized YAML."),
 ) -> None:
-    """Normalize and rewrite a Job v3 config with absolute resolved paths."""
+    """Normalize and rewrite a Cruncher showcase job config with absolute resolved paths."""
     try:
-        parsed = load_job_v3(
-            _resolve_job_spec(job, workspace, workspace_root),
+        written = normalize_job_action(
+            job,
+            workspace,
+            workspace_root,
+            out=out,
             caller_root=Path.cwd(),
         )
     except BaseRenderError as exc:
-        typer.echo(f"ERROR: {exc}", err=True)
-        raise typer.Exit(code=2)
-
-    data = {
-        "version": 3,
-        "results_root": str(parsed.results_root),
-        "input": {
-            "kind": parsed.input.kind,
-            "path": str(parsed.input.path),
-            "adapter": {
-                "kind": parsed.input.adapter.kind,
-                "columns": dict(parsed.input.adapter.columns),
-                "policies": dict(parsed.input.adapter.policies),
-            },
-            "alphabet": parsed.input.alphabet,
-            "limit": parsed.input.limit,
-            "sample": (
-                None
-                if parsed.input.sample is None
-                else {
-                    "mode": parsed.input.sample.mode,
-                    "n": parsed.input.sample.n,
-                    "seed": parsed.input.sample.seed,
-                }
-            ),
-        },
-        "selection": (
-            None
-            if parsed.selection is None
-            else {
-                "path": str(parsed.selection.path),
-                "match_on": parsed.selection.match_on,
-                "column": parsed.selection.column,
-                "overlay_column": parsed.selection.overlay_column,
-                "keep_order": parsed.selection.keep_order,
-                "on_missing": parsed.selection.on_missing,
-            }
-        ),
-        "pipeline": {
-            "plugins": [
-                (spec.name if not spec.params else {spec.name: dict(spec.params)}) for spec in parsed.pipeline.plugins
-            ]
-        },
-        "render": {
-            "renderer": parsed.render.renderer,
-            "style": {
-                "preset": parsed.render.style_preset,
-                "overrides": dict(parsed.render.style_overrides),
-            },
-        },
-        "outputs": [
-            (
-                {
-                    "kind": "images",
-                    "dir": str(cfg.dir),
-                    "fmt": cfg.fmt,
-                }
-                if cfg.kind == "images"
-                else {
-                    "kind": "video",
-                    "path": str(cfg.path),
-                    "fmt": cfg.fmt,
-                    "fps": cfg.fps,
-                    "frames_per_record": cfg.frames_per_record,
-                    "pauses": dict(cfg.pauses),
-                    "width_px": cfg.width_px,
-                    "height_px": cfg.height_px,
-                    "aspect": cfg.aspect_ratio,
-                    "total_duration": cfg.total_duration,
-                }
-            )
-            for cfg in parsed.outputs
-        ],
-        "run": {
-            "strict": parsed.run.strict,
-            "fail_on_skips": parsed.run.fail_on_skips,
-            "emit_report": parsed.run.emit_report,
-            "report_path": str(parsed.run.report_path) if parsed.run.report_path else None,
-        },
-    }
-
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(yaml.safe_dump(data, sort_keys=False))
-    typer.echo(f"Wrote: {out}")
+        _exit_cli_error(exc)
+    typer.echo(f"Wrote: {written}")
 
 
 @style_app.command("list")
 def style_list() -> None:
     """List available style presets."""
-    presets = list_style_presets()
+    presets = list_style_presets_action()
     for name in presets:
         typer.echo(name)
 
@@ -206,13 +122,9 @@ def style_show(
 ) -> None:
     """Show a style preset file."""
     try:
-        path = resolve_preset_path(preset)
-        if path is None:
-            raise ValueError("Preset path is null")
-        data = yaml.safe_load(path.read_text())
-    except Exception as exc:
-        typer.echo(f"ERROR: {exc}", err=True)
-        raise typer.Exit(code=2)
+        data = show_style_action(preset)
+    except BaseRenderError as exc:
+        _exit_cli_error(exc)
 
     if as_json:
         typer.echo(json.dumps(data, indent=2, sort_keys=True))
@@ -230,10 +142,9 @@ def workspace_list(
 ) -> None:
     """List discovered baserender workspaces."""
     try:
-        workspaces = discover_workspaces(root=root)
+        workspaces = discover_workspaces_action(root)
     except BaseRenderError as exc:
-        typer.echo(f"ERROR: {exc}", err=True)
-        raise typer.Exit(code=2)
+        _exit_cli_error(exc)
 
     if not workspaces:
         target = (default_workspaces_root() if root is None else root).resolve()
@@ -254,12 +165,11 @@ def workspace_init(
         help="Workspace root directory (default: <cwd>/workspaces).",
     ),
 ) -> None:
-    """Create a workspace scaffold with job.yml, inputs/, outputs/, and reports/."""
+    """Create a workspace scaffold with job.yaml, inputs/, outputs/, and reports/."""
     try:
-        workspace = init_workspace(name, root=root)
+        workspace = init_workspace_action(name, root)
     except BaseRenderError as exc:
-        typer.echo(f"ERROR: {exc}", err=True)
-        raise typer.Exit(code=2)
+        _exit_cli_error(exc)
 
     typer.echo(f"Workspace created: {workspace.root}")
     typer.echo(f"- job: {workspace.job_path}")

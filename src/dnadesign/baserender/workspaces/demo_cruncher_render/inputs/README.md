@@ -20,4 +20,4 @@ It keeps both shapes needed for practical iteration:
 - `effects`
 - `display`
 
-The workspace `job.yml` is wired to the hotpath record-shape file so design iteration stays fast, while the source-like artifacts remain available for contract checks and future adapter regeneration.
+The workspace `job.yaml` is wired to the hotpath record-shape file so design iteration stays fast, while the source-like artifacts remain available for contract checks and future adapter regeneration.

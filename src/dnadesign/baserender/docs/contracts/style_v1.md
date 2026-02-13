@@ -4,7 +4,7 @@ Style v1 controls typography, geometry, connectors, legend, and palette.
 
 ## Sources
 Effective style is merged in this order:
-1. `styles/presentation_default.yml`
+1. `styles/presentation_default.yaml`
 2. optional preset file
 3. inline `render.style.overrides`
 
@@ -12,6 +12,7 @@ Effective style is merged in this order:
 - Typography: `font_*`, `font_size_*`, `dpi`
 - Geometry: `padding_*`, `track_spacing`, `baseline_spacing`
 - Feature box style: `kmer.*`
+- Motif logo style: `motif_logo.*`
 - Legend: `legend*`
 - Connectors: `connectors`, `connector_*`
 - Effects: `span_link_inner_margin_bp`
@@ -20,4 +21,16 @@ Effective style is merged in this order:
 ## Strictness
 - Unknown top-level style keys fail.
 - Unknown `kmer.*` keys fail.
+- Unknown `motif_logo.*` keys fail.
 - Invalid value domains fail (e.g. non-positive dpi, bad align mode).
+
+## `motif_logo` keys
+- `layout`: `stack | overlay`
+- `height_bits`: information-content ceiling (DNA default 2.0)
+- `height_cells`: logo lane height in sequence-cell units
+- `y_pad_cells`: vertical gap between kmer band and nearest logo lane
+- `letter_x_pad_frac`: horizontal letter inset in each base column
+- `alpha_other`: alpha for non-observed bases in a column
+- `alpha_observed`: alpha for observed base in a column
+- `colors`: mapping for `A/C/G/T`
+- `debug_bounds`: optional logo bounding-box overlay

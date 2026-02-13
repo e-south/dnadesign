@@ -1,6 +1,6 @@
 Run-scoped baserender workbenches live here. Each workspace should contain:
 
-- `job.yml`
+- `job.yaml`
 - `inputs/`
 - `outputs/` (render artifacts + reports by default)
 - `reports/` (optional workspace notes or review docs)
@@ -18,8 +18,8 @@ uv run baserender job run --workspace demo_run --workspace-root /path/to/workspa
 
 Design notes:
 
-- `job.yml` paths are resolved relative to the workspace root.
-- If `results_root` is omitted in a workspace `job.yml`, baserender uses `outputs/`.
+- `job.yaml` paths are resolved relative to the workspace root.
+- If `results_root` is omitted in a workspace `job.yaml`, baserender uses `outputs/`.
 - Default image/report outputs for workspace jobs are written under `outputs/` directly.
 - Keep ad-hoc workspaces out of git; track only curated demos here.
 
@@ -27,13 +27,13 @@ Curated demos tracked in git:
 
 - `demo_densegen_render`
   - Input: `inputs/input.parquet` (DenseGen-style TFBS annotations)
-  - Output: PNG stills under `outputs/images/`
+  - Output: PNG stills under `outputs/plots/`
 - `demo_cruncher_render`
   - Input (hotpath): `inputs/elites_showcase_records.parquet`
     (normalized Record-shape rows for fast visual iteration)
   - Input (runtime-adjacent references kept in the same workspace):
     `inputs/elites.parquet` + `inputs/elites_hits.parquet` + `inputs/config_used.yaml`
-  - Output: PNG stills under `outputs/images/`
+  - Output: PNG stills under `outputs/plots/`
 
 Run demos:
 

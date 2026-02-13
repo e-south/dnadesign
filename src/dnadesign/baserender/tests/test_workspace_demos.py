@@ -16,8 +16,8 @@ from pathlib import Path
 
 import yaml
 
-from dnadesign.baserender.src.api import run_job_v3
-from dnadesign.baserender.src.config import load_job_v3
+from dnadesign.baserender.src.api import run_cruncher_showcase_job
+from dnadesign.baserender.src.config import load_cruncher_showcase_job
 
 
 def _pkg_root() -> Path:
@@ -36,15 +36,15 @@ def test_curated_workspace_demos_are_self_contained() -> None:
 
     for name in demos:
         ws = root / "workspaces" / name
-        job_path = ws / "job.yml"
+        job_path = ws / "job.yaml"
         assert ws.exists(), f"missing workspace: {ws}"
         assert (ws / "inputs").exists(), f"missing inputs dir for {name}"
-        assert job_path.exists(), f"missing job.yml for {name}"
+        assert job_path.exists(), f"missing job.yaml for {name}"
 
         raw = yaml.safe_load(job_path.read_text())
         assert raw["render"]["style"]["overrides"], f"{name} must define style overrides"
 
-        job = load_job_v3(job_path, caller_root=root)
+        job = load_cruncher_showcase_job(job_path, caller_root=root)
         assert _is_under(job.input.path, ws / "inputs"), f"{name} input path must be within workspace inputs/"
 
         if name == "demo_cruncher_render":
@@ -66,7 +66,7 @@ def test_curated_workspace_demos_are_self_contained() -> None:
 
 def test_docs_cruncher_example_uses_local_examples_data() -> None:
     root = _pkg_root()
-    job = load_job_v3(root / "docs" / "examples" / "cruncher_job.yml", caller_root=root)
+    job = load_cruncher_showcase_job(root / "docs" / "examples" / "cruncher_job.yaml", caller_root=root)
     docs_data = root / "docs" / "examples" / "data"
 
     assert _is_under(job.input.path, docs_data)
@@ -91,7 +91,7 @@ def test_curated_workspace_demos_run_in_isolated_copy(tmp_path: Path) -> None:
         dst_ws = copied_root / name
         shutil.copytree(src_ws, dst_ws)
 
-        report = run_job_v3(dst_ws / "job.yml", caller_root=tmp_path)
+        report = run_cruncher_showcase_job(dst_ws / "job.yaml", caller_root=tmp_path)
         images_dir = Path(report.outputs["images_dir"])
         assert images_dir.exists()
         assert any(p.suffix.lower() == suffix for p in images_dir.iterdir())

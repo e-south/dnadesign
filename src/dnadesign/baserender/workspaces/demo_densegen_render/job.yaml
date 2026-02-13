@@ -23,6 +23,7 @@ render:
       connector_alpha: 0.35
 outputs:
   - kind: images
+    dir: plots
     fmt: png
 run:
   strict: false

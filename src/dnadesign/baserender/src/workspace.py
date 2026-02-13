@@ -56,9 +56,9 @@ def workspace_root(name: str, *, root: Path | None = None) -> Path:
 
 def workspace_job_path(name: str, *, root: Path | None = None) -> Path:
     ws_root = workspace_root(name, root=root)
-    job_path = ws_root / "job.yml"
+    job_path = ws_root / "job.yaml"
     if not job_path.exists():
-        raise SchemaError(f"workspace '{name}' does not contain job.yml: {job_path}")
+        raise SchemaError(f"workspace '{name}' does not contain job.yaml: {job_path}")
     return job_path
 
 
@@ -79,7 +79,7 @@ def discover_workspaces(*, root: Path | None = None) -> tuple[Workspace, ...]:
             continue
         if child.name.startswith("_"):
             continue
-        job_path = child / "job.yml"
+        job_path = child / "job.yaml"
         if not job_path.exists():
             continue
         out.append(
@@ -115,7 +115,7 @@ def _workspace_job_template() -> dict:
             "alphabet": "DNA",
         },
         "render": {"renderer": "sequence_rows", "style": {"preset": "presentation_default", "overrides": {}}},
-        "outputs": [{"kind": "images", "fmt": "png"}],
+        "outputs": [{"kind": "images", "dir": "plots", "fmt": "png"}],
         "run": {"strict": False, "fail_on_skips": False, "emit_report": True},
     }
 
@@ -133,7 +133,7 @@ def init_workspace(name: str, *, root: Path | None = None) -> Workspace:
     inputs_dir = ws_root / "inputs"
     outputs_dir = ws_root / "outputs"
     reports_dir = ws_root / "reports"
-    job_path = ws_root / "job.yml"
+    job_path = ws_root / "job.yaml"
 
     ws_root.mkdir(parents=False, exist_ok=False)
     inputs_dir.mkdir(parents=False, exist_ok=False)

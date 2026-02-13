@@ -209,7 +209,7 @@ src/dnadesign/densegen/workspaces/**
 src/dnadesign/baserender/workspaces/**
 !src/dnadesign/baserender/workspaces/README.md
 !src/dnadesign/baserender/workspaces/demo_densegen_render/
-!src/dnadesign/baserender/workspaces/demo_densegen_render/job.yml
+!src/dnadesign/baserender/workspaces/demo_densegen_render/job.yaml
 !src/dnadesign/baserender/workspaces/demo_densegen_render/inputs/
 !src/dnadesign/baserender/workspaces/demo_densegen_render/inputs/input.parquet
 !src/dnadesign/baserender/workspaces/demo_densegen_render/outputs/
@@ -217,7 +217,7 @@ src/dnadesign/baserender/workspaces/**
 !src/dnadesign/baserender/workspaces/demo_densegen_render/reports/
 !src/dnadesign/baserender/workspaces/demo_densegen_render/reports/.gitkeep
 !src/dnadesign/baserender/workspaces/demo_cruncher_render/
-!src/dnadesign/baserender/workspaces/demo_cruncher_render/job.yml
+!src/dnadesign/baserender/workspaces/demo_cruncher_render/job.yaml
 !src/dnadesign/baserender/workspaces/demo_cruncher_render/inputs/
 !src/dnadesign/baserender/workspaces/demo_cruncher_render/inputs/README.md
 !src/dnadesign/baserender/workspaces/demo_cruncher_render/inputs/config_used.yaml

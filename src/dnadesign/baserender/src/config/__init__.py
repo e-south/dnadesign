@@ -3,17 +3,17 @@
 <dnadesign project>
 src/dnadesign/baserender/src/config/__init__.py
 
-Config schema exports for Job v3 and Style v1.
+Config schema exports for Cruncher showcase job and Style v1.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-from .job_v3 import (
+from .cruncher_showcase_job import (
     AdapterCfg,
+    CruncherShowcaseJob,
     ImagesOutputCfg,
     InputCfg,
-    JobV3,
     OutputCfg,
     PipelineCfg,
     PluginSpec,
@@ -22,20 +22,21 @@ from .job_v3 import (
     SampleCfg,
     SelectionCfg,
     VideoOutputCfg,
-    load_job_v3,
+    load_cruncher_showcase_job,
     output_kind,
     resolve_job_path,
-    validate_job_v3,
+    validate_cruncher_showcase_job,
 )
-from .style_v1 import GlyphStyle, Style, list_style_presets, resolve_preset_path, resolve_style
+from .style_v1 import GlyphStyle, MotifLogoStyle, Style, list_style_presets, resolve_preset_path, resolve_style
 
 __all__ = [
     "GlyphStyle",
+    "MotifLogoStyle",
     "Style",
     "list_style_presets",
     "resolve_preset_path",
     "resolve_style",
-    "JobV3",
+    "CruncherShowcaseJob",
     "InputCfg",
     "AdapterCfg",
     "SampleCfg",
@@ -47,8 +48,8 @@ __all__ = [
     "VideoOutputCfg",
     "OutputCfg",
     "RunCfg",
-    "load_job_v3",
-    "validate_job_v3",
+    "load_cruncher_showcase_job",
+    "validate_cruncher_showcase_job",
     "resolve_job_path",
     "output_kind",
 ]

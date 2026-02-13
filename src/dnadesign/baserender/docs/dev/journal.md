@@ -377,3 +377,85 @@ Conclusion: base track/kmer rendering is already compatible.
 
 - Fast visual iteration should target the exact baserender Record boundary used for design work.
 - Reference artifacts from Cruncher remain co-located for accurate runtime-shape grounding and future regeneration.
+
+## 2026-02-13 - Contract naming hardening: explicit Cruncher showcase job
+
+### Change
+
+- Replaced vague `job_v3` naming in runtime/config/public API with explicit Cruncher showcase naming.
+- Canonical config module is now:
+  - `src/dnadesign/baserender/src/config/cruncher_showcase_job.py`
+- Canonical types/functions are now:
+  - `CruncherShowcaseJob`
+  - `load_cruncher_showcase_job(...)`
+  - `validate_cruncher_showcase_job(...)`
+  - `run_cruncher_showcase_job(...)`
+
+### Refactor outcomes
+
+- CLI action logic extracted out of command wiring:
+  - `src/dnadesign/baserender/src/cli_actions.py`
+- Job orchestration extracted from API helper module:
+  - `src/dnadesign/baserender/src/runner.py`
+- API import path no longer preloads matplotlib; plotting deps are lazy-imported in render helpers.
+- Contract/docs/tests updated to use Cruncher-showcase naming:
+  - `src/dnadesign/baserender/docs/contracts/cruncher_showcase_job.md`
+  - `src/dnadesign/baserender/tests/test_cruncher_showcase_job_schema.py`
+
+### Verification
+
+- `uv run ruff check --fix src/dnadesign/baserender/src src/dnadesign/baserender/tests`
+- `uv run ruff format src/dnadesign/baserender/src src/dnadesign/baserender/tests`
+- `uv run pytest -q src/dnadesign/baserender/tests` -> passed
+- `uv run baserender job validate src/dnadesign/baserender/docs/examples/densegen_job.yml` -> passed
+- `uv run baserender job run --workspace demo_densegen_render --workspace-root src/dnadesign/baserender/workspaces` -> passed
+- `uv run baserender job run --workspace demo_cruncher_render --workspace-root src/dnadesign/baserender/workspaces` -> passed
+
+## 2026-02-13 - Motif-logo rendering hardening (alignment + stacked lanes)
+
+### Findings
+
+1. Current motif logos were rectangle heat tiles rather than sequence-logo letter stacks, so PWM semantics were visually weak.
+2. Motif x placement used local effect math instead of the canonical base-grid span mapping, which risked column drift.
+3. Overlapping motif windows lacked deterministic lane allocation and could visually occlude each other.
+
+### Changes
+
+- Replaced motif tile drawing with vector letter stacks (A/C/G/T) using `TextPath` + `PathPatch`:
+  - information-content scaling per column (`R = max_bits - entropy`)
+  - observed-base emphasis by alpha + edge stroke
+  - deterministic glyph geometry and vector-safe export
+  - file: `src/dnadesign/baserender/src/render/effects/motif_logo.py`
+- Added canonical base-grid mappers:
+  - `grid_x_left`, `grid_x_right`, `span_to_x` (layout helpers)
+  - motif logo geometry now locks each logo column to `[start+i, start+i+1)` span bounds
+  - file: `src/dnadesign/baserender/src/render/layout.py`
+- Added deterministic motif lane assignment in layout:
+  - per-orientation interval coloring (`stack` mode)
+  - `overlay` mode support
+  - optional fixed lane via `effect.render.track`
+  - layout now reserves explicit vertical space by motif lane count.
+- Extended style schema with strict `motif_logo.*` section:
+  - `layout`, `height_bits`, `height_cells`, `y_pad_cells`, `letter_x_pad_frac`,
+    `alpha_other`, `alpha_observed`, `colors`, `debug_bounds`
+  - unknown keys still fail fast.
+  - file: `src/dnadesign/baserender/src/config/style_v1.py`
+- Updated Cruncher demo style overrides to set readable motif-logo defaults:
+  - `src/dnadesign/baserender/workspaces/demo_cruncher_render/job.yaml`
+  - `src/dnadesign/baserender/docs/examples/cruncher_job.yaml`
+
+### Tests
+
+- Added regression tests:
+  - `src/dnadesign/baserender/tests/test_motif_logo_alignment.py`
+    - motif logo geometry aligns exactly to feature span grid
+    - overlapping motif logos get distinct lanes in `stack` mode
+    - unknown `style.motif_logo` key is rejected
+- Existing test suite still passes.
+
+### Verification
+
+- `uv run ruff format --check src/dnadesign/baserender/src src/dnadesign/baserender/tests`
+- `uv run ruff check src/dnadesign/baserender/src src/dnadesign/baserender/tests`
+- `uv run pytest -q src/dnadesign/baserender/tests` -> passed
+- `uv run baserender job run --workspace demo_cruncher_render --workspace-root src/dnadesign/baserender/workspaces` -> passed

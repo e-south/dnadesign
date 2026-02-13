@@ -15,9 +15,9 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from dnadesign.baserender.src.api import run_job_v3
+from dnadesign.baserender.src.api import run_cruncher_showcase_job
 from dnadesign.baserender.src.cli import app
-from dnadesign.baserender.src.config import load_job_v3
+from dnadesign.baserender.src.config import load_cruncher_showcase_job
 from dnadesign.baserender.src.workspace import discover_workspaces, init_workspace, resolve_workspace_job_path
 
 from .conftest import write_job, write_parquet
@@ -52,7 +52,7 @@ def test_workspace_init_scaffolds_standard_layout(tmp_path: Path) -> None:
 
     assert workspace.name == "demo_workspace"
     assert workspace.root == (tmp_path / "demo_workspace").resolve()
-    assert workspace.job_path == workspace.root / "job.yml"
+    assert workspace.job_path == workspace.root / "job.yaml"
     assert (workspace.root / "inputs").exists()
     assert (workspace.root / "outputs").exists()
     assert (workspace.root / "reports").exists()
@@ -82,7 +82,7 @@ def test_workspace_job_uses_workspace_outputs_by_default(tmp_path: Path) -> None
     )
     write_job(workspace.job_path, _workspace_job_payload())
 
-    parsed = load_job_v3(workspace.job_path)
+    parsed = load_cruncher_showcase_job(workspace.job_path)
     assert parsed.results_root == (workspace.root / "outputs").resolve()
 
 
@@ -161,6 +161,6 @@ def test_workspace_run_defaults_outputs_to_workspace_outputs_root(tmp_path: Path
     )
     write_job(workspace.job_path, _workspace_job_payload())
 
-    report = run_job_v3(str(workspace.job_path))
-    assert Path(report.outputs["images_dir"]) == (workspace.root / "outputs" / "images").resolve()
+    report = run_cruncher_showcase_job(str(workspace.job_path))
+    assert Path(report.outputs["images_dir"]) == (workspace.root / "outputs" / "plots").resolve()
     assert Path(report.outputs["report_path"]) == (workspace.root / "outputs" / "run_report.json").resolve()

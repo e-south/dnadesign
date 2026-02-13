@@ -17,7 +17,19 @@ render:
   renderer: sequence_rows
   style:
     preset: presentation_default
-    overrides: {}
+    overrides:
+      connectors: false
+      legend_font_size: 10
+      kmer:
+        fill_alpha: 0.94
+      motif_logo:
+        layout: stack
+        height_bits: 2.0
+        y_pad_cells: 0.35
+        letter_x_pad_frac: 0.10
+        alpha_other: 0.65
+        alpha_observed: 1.0
+        debug_bounds: false
 outputs:
   - kind: images
     fmt: png

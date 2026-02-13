@@ -15,7 +15,7 @@ under `dnadesign.baserender.src.*` are non-contractual implementation detail.
   - No file IO.
   - No matplotlib.
   - No pyarrow.
-- `src/config/`: strict schema parsing and normalization (`job_v3`, `style_v1`).
+- `src/config/`: strict schema parsing and normalization (`cruncher_showcase_job`, `style_v1`).
   - Unknown keys fail.
   - Ambiguous types fail (for example, string booleans).
   - Adapter shape is centralized in `config/adapter_contracts.py`.
@@ -41,7 +41,7 @@ under `dnadesign.baserender.src.*` are non-contractual implementation detail.
 
 ## Runtime flow
 
-1. Parse Job v3 (`config/`).
+1. Parse Cruncher showcase job config (`config/`).
 2. Resolve source columns from adapter registry (`adapters/registry.py`).
 3. Read rows (`io/parquet_source.py`).
 4. Convert rows to records (`adapters/*`).
@@ -50,7 +50,7 @@ under `dnadesign.baserender.src.*` are non-contractual implementation detail.
 7. Write declared outputs only (`outputs/*`).
 8. Emit run report (`reporting/*`).
 
-When a job is loaded from `job.yml` and sibling `inputs/` + `outputs/` directories exist,
+When a job is loaded from `job.yaml` and sibling `inputs/` + `outputs/` directories exist,
 omitted `results_root` defaults to `<workspace>/outputs`.
 
 ## Extension points
@@ -61,7 +61,7 @@ omitted `results_root` defaults to `<workspace>/outputs`.
 2. Register it in `adapters/registry.py`:
    - factory
    - required and optional row column keys
-3. Add config schema support in `config/job_v3.py`:
+3. Add config schema support in `config/cruncher_showcase_job.py`:
    - adapter kind
    - allowed `columns` keys
    - allowed `policies` keys + value constraints

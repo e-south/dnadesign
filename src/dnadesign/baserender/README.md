@@ -9,7 +9,7 @@ src/dnadesign/baserender/
   src/         # runtime package (import root: dnadesign.baserender.src)
     workspace.py # workspace discovery + init + resolution
     core/      # model + contracts
-    config/    # job_v3 + style_v1 schema
+    config/    # cruncher_showcase_job + style_v1 schema
     io/        # parquet row source
     adapters/  # densegen, generic, cruncher adapters
     pipeline/  # transforms/plugins + selection service
@@ -25,8 +25,8 @@ src/dnadesign/baserender/
 ### CLI
 
 ```bash
-baserender job validate <job.yml>
-baserender job run <job.yml|name>
+baserender job validate <job.yaml>
+baserender job run <job.yaml|name>
 baserender job validate --workspace <name>
 baserender job run --workspace <name>
 baserender job run --workspace <name> --workspace-root <dir>
@@ -38,18 +38,18 @@ baserender style show <preset>
 
 No v1/v2 job support is included.
 
-### Job v3 summary
+### Cruncher Showcase Job Summary
 
-- `version: 3`
+- `version: 3` (Cruncher showcase job contract)
 - strict unknown-key rejection at every nesting level
 - explicit adapter declaration (`densegen_tfbs`, `generic_features`, `cruncher_best_window`)
 - explicit `outputs[]` list (required, non-empty)
 - no implicit outputs: only declared outputs are produced
 - non-workspace default `results_root` resolves to `<caller_root>/results` (`caller_root` defaults to current working directory)
-- workspace jobs (`job.yml` with sibling `inputs/` and `outputs/`) default `results_root` to `<workspace>/outputs`
+- workspace jobs (`job.yaml` with sibling `inputs/` and `outputs/`) default `results_root` to `<workspace>/outputs`
 
 See:
-- `docs/contracts/job_v3.md`
+- `docs/contracts/cruncher_showcase_job.md`
 - `docs/contracts/record_v1.md`
 - `docs/contracts/style_v1.md`
 - `docs/architecture/overview.md`
@@ -74,8 +74,8 @@ Unknown feature/effect kinds are fatal by policy.
 Supported integration surface is exported from `dnadesign.baserender`:
 
 - `initialize_runtime`
-- `run_job_v3`
-- `validate_job`
+- `run_cruncher_showcase_job`
+- `validate_cruncher_showcase_job`
 - `load_record_from_parquet`
 - `Record`, `Feature`, `Effect`, `Display`, `Span`
 - `render_record_figure`
@@ -86,8 +86,8 @@ Internal modules under `dnadesign.baserender.src.*` are non-contractual and may 
 
 ### Examples
 
-- DenseGen job: `docs/examples/densegen_job.yml`
-- Cruncher job: `docs/examples/cruncher_job.yml`
+- DenseGen job: `docs/examples/densegen_job.yaml`
+- Cruncher job: `docs/examples/cruncher_job.yaml`
 
 ### Workspace demos
 

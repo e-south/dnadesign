@@ -1,6 +1,6 @@
-# Job v3 Contract
+# Cruncher Showcase Job Contract
 
-Job v3 is strict and explicit. Unknown keys fail.
+This contract is strict and explicit. Unknown keys fail.
 
 ## Top-level keys
 - `version` (must be `3`)
@@ -14,7 +14,7 @@ Job v3 is strict and explicit. Unknown keys fail.
 
 ### `results_root` default
 - For non-workspace jobs: `<caller_root>/results` where `caller_root` defaults to current working directory.
-- For workspace jobs loaded from `job.yml` where sibling `inputs/` and `outputs/` exist:
+- For workspace jobs loaded from `job.yaml` where sibling `inputs/` and `outputs/` exist:
   `<workspace>/outputs`
 
 ## Input

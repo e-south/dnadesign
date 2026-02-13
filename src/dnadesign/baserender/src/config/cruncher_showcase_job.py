@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/baserender/src/config/job_v3.py
+src/dnadesign/baserender/src/config/cruncher_showcase_job.py
 
-Job v3 schema and loader with strict nested key validation and explicit outputs.
+Cruncher showcase job schema and loader with strict nested key validation.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -114,7 +114,7 @@ class RunCfg:
 
 
 @dataclass(frozen=True)
-class JobV3:
+class CruncherShowcaseJob:
     version: int
     name: str
     path: Path
@@ -133,7 +133,7 @@ def _baserender_root() -> Path:
 
 def _workspace_root_from_job_path(job_path: Path) -> Path | None:
     job_abs = job_path.resolve()
-    if job_abs.name != "job.yml":
+    if job_abs.name != "job.yaml":
         return None
     workspace_root = job_abs.parent
     if not workspace_root.is_dir():
@@ -161,7 +161,7 @@ def _job_output_root(job_path: Path, results_root: Path) -> Path:
 
 def resolve_job_path(spec: str | Path) -> Path:
     p = Path(spec)
-    if p.suffix.lower() in {".yml", ".yaml"}:
+    if p.suffix.lower() == ".yaml":
         if p.exists():
             return p
         rooted = _baserender_root() / p
@@ -170,7 +170,7 @@ def resolve_job_path(spec: str | Path) -> Path:
         raise FileNotFoundError(f"Could not resolve job file: {spec}")
 
     root = _baserender_root()
-    for candidate in (root / "jobs" / f"{p}.yml", root / "docs" / "examples" / f"{p}.yml"):
+    for candidate in (root / "jobs" / f"{p}.yaml", root / "docs" / "examples" / f"{p}.yaml"):
         if candidate.exists():
             return candidate
     raise FileNotFoundError(f"Could not resolve job name '{spec}' in jobs/ or docs/examples/")
@@ -390,7 +390,11 @@ def _parse_render(raw: Any) -> RenderCfg:
 
 def _resolve_output_dir(job: Path, results_root: Path, raw_dir: str | None) -> Path:
     root = _job_output_root(job, results_root)
-    default = root / "images"
+    workspace_root = _workspace_root_from_job_path(job)
+    if workspace_root is not None and results_root.resolve() == (workspace_root / "outputs").resolve():
+        default = root / "plots"
+    else:
+        default = root / "images"
     if raw_dir is None:
         return default
     p = Path(raw_dir)
@@ -535,7 +539,7 @@ def _parse_run(job_path: Path, results_root: Path, raw: Any) -> RunCfg:
     )
 
 
-def load_job_v3(path: str | Path, *, caller_root: str | Path | None = None) -> JobV3:
+def load_cruncher_showcase_job(path: str | Path, *, caller_root: str | Path | None = None) -> CruncherShowcaseJob:
     try:
         job_path = resolve_job_path(path)
         caller_scope = Path.cwd().resolve() if caller_root is None else Path(caller_root).expanduser().resolve()
@@ -576,7 +580,7 @@ def load_job_v3(path: str | Path, *, caller_root: str | Path | None = None) -> J
 
         run_cfg = _parse_run(job_path, results_root, data.get("run"))
 
-        return JobV3(
+        return CruncherShowcaseJob(
             version=3,
             name=job_path.stem,
             path=job_path,
@@ -592,12 +596,12 @@ def load_job_v3(path: str | Path, *, caller_root: str | Path | None = None) -> J
         raise SchemaError(str(exc)) from exc
 
 
-def output_kind(job: JobV3, kind: str) -> OutputCfg | None:
+def output_kind(job: CruncherShowcaseJob, kind: str) -> OutputCfg | None:
     for entry in job.outputs:
         if entry.kind == kind:
             return entry
     return None
 
 
-def validate_job_v3(path: str | Path, *, caller_root: str | Path | None = None) -> JobV3:
-    return load_job_v3(path, caller_root=caller_root)
+def validate_cruncher_showcase_job(path: str | Path, *, caller_root: str | Path | None = None) -> CruncherShowcaseJob:
+    return load_cruncher_showcase_job(path, caller_root=caller_root)

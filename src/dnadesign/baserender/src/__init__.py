@@ -14,16 +14,16 @@ from .api import (
     render_parquet_record_figure,
     render_record_figure,
     render_record_grid_figure,
-    run_job_v3,
-    validate_job,
+    run_cruncher_showcase_job,
+    validate_cruncher_showcase_job,
 )
 from .core import Display, Effect, Feature, Record, Span
 from .runtime import initialize_runtime
 
 __all__ = [
     "initialize_runtime",
-    "run_job_v3",
-    "validate_job",
+    "run_cruncher_showcase_job",
+    "validate_cruncher_showcase_job",
     "Record",
     "Feature",
     "Effect",

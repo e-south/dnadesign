@@ -16,7 +16,7 @@ from pathlib import Path
 import matplotlib.animation as animation
 import pytest
 
-from dnadesign.baserender.src.api import run_job_v3
+from dnadesign.baserender.src.api import run_cruncher_showcase_job
 
 from .conftest import densegen_job_payload, write_job, write_parquet
 
@@ -47,9 +47,9 @@ def test_images_output_does_not_produce_video(tmp_path: Path) -> None:
         results_root=results_root,
         outputs=[{"kind": "images", "fmt": "png"}],
     )
-    job_path = write_job(tmp_path / "images_only.yml", payload)
+    job_path = write_job(tmp_path / "images_only.yaml", payload)
 
-    report = run_job_v3(str(job_path))
+    report = run_cruncher_showcase_job(str(job_path))
 
     images_dir = Path(report.outputs["images_dir"])
     assert images_dir.exists()
@@ -71,9 +71,9 @@ def test_video_output_does_not_produce_images(tmp_path: Path) -> None:
         results_root=results_root,
         outputs=[{"kind": "video", "fmt": "mp4", "fps": 2, "frames_per_record": 1}],
     )
-    job_path = write_job(tmp_path / "video_only.yml", payload)
+    job_path = write_job(tmp_path / "video_only.yaml", payload)
 
-    report = run_job_v3(str(job_path))
+    report = run_cruncher_showcase_job(str(job_path))
 
     video_path = Path(report.outputs["video_path"])
     assert video_path.exists()

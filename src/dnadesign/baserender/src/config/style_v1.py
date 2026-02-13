@@ -34,6 +34,26 @@ class GlyphStyle:
 
 
 @dataclass(frozen=True)
+class MotifLogoStyle:
+    height_bits: float = 2.0
+    height_cells: float = 1.05
+    y_pad_cells: float = 0.35
+    letter_x_pad_frac: float = 0.10
+    alpha_other: float = 0.65
+    alpha_observed: float = 1.0
+    colors: Mapping[str, str] = field(
+        default_factory=lambda: {
+            "A": "#1f77b4",
+            "C": "#2ca02c",
+            "G": "#ff7f0e",
+            "T": "#d62728",
+        }
+    )
+    layout: str = "stack"
+    debug_bounds: bool = False
+
+
+@dataclass(frozen=True)
 class Style:
     dpi: int = 180
     font_mono: str = "DejaVu Sans Mono"
@@ -69,10 +89,13 @@ class Style:
     span_link_inner_margin_bp: float = 0.25
 
     kmer: GlyphStyle = field(default_factory=GlyphStyle)
+    motif_logo: MotifLogoStyle = field(default_factory=MotifLogoStyle)
 
     def __post_init__(self) -> None:
         if isinstance(self.kmer, dict):
             object.__setattr__(self, "kmer", GlyphStyle(**self.kmer))
+        if isinstance(self.motif_logo, dict):
+            object.__setattr__(self, "motif_logo", MotifLogoStyle(**self.motif_logo))
 
         ensure(self.dpi >= 72, "style.dpi must be >= 72", SchemaError)
         ensure(self.font_size_seq >= 6, "style.font_size_seq must be >= 6", SchemaError)
@@ -84,6 +107,42 @@ class Style:
         ensure(self.kmer.height_factor > 0, "style.kmer.height_factor must be > 0", SchemaError)
         ensure(self.kmer.pad_x_px >= 0, "style.kmer.pad_x_px must be >= 0", SchemaError)
         ensure(self.span_link_inner_margin_bp >= 0, "style.span_link_inner_margin_bp must be >= 0", SchemaError)
+        ensure(self.motif_logo.height_bits > 0, "style.motif_logo.height_bits must be > 0", SchemaError)
+        ensure(self.motif_logo.height_cells > 0, "style.motif_logo.height_cells must be > 0", SchemaError)
+        ensure(self.motif_logo.y_pad_cells >= 0, "style.motif_logo.y_pad_cells must be >= 0", SchemaError)
+        ensure(
+            0.0 <= self.motif_logo.letter_x_pad_frac < 1.0,
+            "style.motif_logo.letter_x_pad_frac must be in [0, 1)",
+            SchemaError,
+        )
+        ensure(
+            0.0 <= self.motif_logo.alpha_other <= 1.0,
+            "style.motif_logo.alpha_other must be in [0, 1]",
+            SchemaError,
+        )
+        ensure(
+            0.0 <= self.motif_logo.alpha_observed <= 1.0,
+            "style.motif_logo.alpha_observed must be in [0, 1]",
+            SchemaError,
+        )
+        ensure(
+            str(self.motif_logo.layout).lower() in {"stack", "overlay"},
+            "style.motif_logo.layout must be 'stack' or 'overlay'",
+            SchemaError,
+        )
+        ensure(isinstance(self.motif_logo.colors, Mapping), "style.motif_logo.colors must be a mapping", SchemaError)
+        bad_keys = sorted(set(self.motif_logo.colors.keys()) - {"A", "C", "G", "T"})
+        ensure(
+            not bad_keys,
+            f"style.motif_logo.colors unknown base key(s): {bad_keys}",
+            SchemaError,
+        )
+        missing = sorted({"A", "C", "G", "T"} - set(self.motif_logo.colors.keys()))
+        ensure(
+            not missing,
+            f"style.motif_logo.colors missing base key(s): {missing}",
+            SchemaError,
+        )
         ensure(
             str(self.kmer.text_v_align).lower() in {"baseline", "center"},
             "style.kmer.text_v_align must be 'baseline' or 'center'",
@@ -109,6 +168,22 @@ class Style:
             unknown_kmer = sorted(set(kmer_raw.keys()) - allowed_kmer)
             if unknown_kmer:
                 raise SchemaError(f"Unknown style.kmer key(s): {unknown_kmer}")
+        motif_raw = data.get("motif_logo")
+        if motif_raw is not None and not isinstance(motif_raw, Mapping):
+            raise SchemaError("style.motif_logo must be a mapping")
+        if isinstance(motif_raw, Mapping):
+            allowed_motif = {f.name for f in fields(MotifLogoStyle)}
+            unknown_motif = sorted(set(motif_raw.keys()) - allowed_motif)
+            if unknown_motif:
+                raise SchemaError(f"Unknown style.motif_logo key(s): {unknown_motif}")
+            motif_colors = motif_raw.get("colors")
+            if motif_colors is not None:
+                if not isinstance(motif_colors, Mapping):
+                    raise SchemaError("style.motif_logo.colors must be a mapping")
+                allowed_bases = {"A", "C", "G", "T"}
+                unknown_bases = sorted(set(motif_colors.keys()) - allowed_bases)
+                if unknown_bases:
+                    raise SchemaError(f"Unknown style.motif_logo.colors key(s): {unknown_bases}")
         return cls(**data)
 
 
@@ -134,8 +209,7 @@ def list_style_presets() -> list[str]:
     if not styles_dir.exists():
         return []
     names: set[str] = set()
-    for pattern in ("*.yml", "*.yaml"):
-        names.update(p.stem for p in styles_dir.glob(pattern))
+    names.update(p.stem for p in styles_dir.glob("*.yaml"))
     return sorted(names)
 
 
@@ -150,7 +224,7 @@ def resolve_preset_path(spec: str | Path | None) -> Path | None:
             raise SchemaError(f"Style preset not found: {raw}")
         return raw
 
-    if len(raw.parts) > 1 or raw.suffix.lower() in {".yml", ".yaml"}:
+    if len(raw.parts) > 1 or raw.suffix.lower() == ".yaml":
         direct = root / raw
         if direct.exists():
             return direct
@@ -159,7 +233,7 @@ def resolve_preset_path(spec: str | Path | None) -> Path | None:
             return styles_guess
         raise SchemaError(f"Style preset not found: {spec}")
 
-    for suffix in (".yml", ".yaml"):
+    for suffix in (".yaml",):
         candidate = root / "styles" / f"{raw}{suffix}"
         if candidate.exists():
             return candidate

@@ -1,4 +1,4 @@
-# styles/presentation_default.yml
+# styles/presentation_default.yaml
 dpi: 180
 
 font_mono: DejaVu Sans Mono
@@ -39,6 +39,16 @@ kmer:
   edge_width: 0.0
   text_color: "#ffffff"
   text_v_offset_px: 0.0
+
+motif_logo:
+  layout: stack
+  height_bits: 2.0
+  height_cells: 1.05
+  y_pad_cells: 0.35
+  letter_x_pad_frac: 0.10
+  alpha_other: 0.65
+  alpha_observed: 1.0
+  debug_bounds: false
 
 # Palette is optional. Keep it empty by default.
 palette: {}

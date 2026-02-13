@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dnadesign.baserender.src.api import run_job_v3
+from dnadesign.baserender.src.api import run_cruncher_showcase_job
 
 from .conftest import write_job, write_parquet
 
@@ -94,8 +94,8 @@ def test_limit_short_circuits_row_iteration_when_selection_is_disabled(tmp_path:
         results_root=tmp_path / "results",
         limit=1,
     )
-    job_path = write_job(tmp_path / "job.yml", payload)
+    job_path = write_job(tmp_path / "job.yaml", payload)
 
-    report = run_job_v3(str(job_path))
+    report = run_cruncher_showcase_job(str(job_path))
     assert report.total_rows_seen == 1
     assert report.yielded_records == 1
