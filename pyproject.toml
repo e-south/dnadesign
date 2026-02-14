@@ -19,7 +19,7 @@ dependencies = [
   "matplotlib",
   "numpy",
   "openpyxl",
-  "ortools>=9.15.6755",
+  "ortools>=9.9,<9.10",
   "pandas",
   "pyarrow>=16",
   "pydantic",

@@ -475,7 +475,7 @@ requires-dist = [
     { name = "ninja", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'" },
     { name = "numpy" },
     { name = "openpyxl" },
-    { name = "ortools", specifier = ">=9.15.6755" },
+    { name = "ortools", specifier = ">=9.9,<9.10" },
     { name = "packaging", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'" },
     { name = "pandas" },
     { name = "pip", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'" },
@@ -1586,7 +1586,7 @@ wheels = [
 
 [[package]]
 name = "ortools"
-version = "9.15.6755"
+version = "9.9.3963"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "absl-py", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
@@ -1594,12 +1594,11 @@ dependencies = [
     { name = "numpy", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "pandas", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
     { name = "protobuf", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
-    { name = "typing-extensions", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or sys_platform == 'darwin'" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6a/fc/9fa53f1a13710e6183df4d00fe4988c79a55b501e282645d49f1e250437f/ortools-9.15.6755-cp312-cp312-macosx_10_15_x86_64.whl", hash = "sha256:ae1c6e1fd844b4d756b22eb6c0ed574ea4342ee206d807c4f903039e748228fa", size = 23926322, upload-time = "2026-01-14T15:39:01.626Z" },
-    { url = "https://files.pythonhosted.org/packages/f1/b6/7e6618ef7a88e8eb706a8a876806b4d336f1bef8c574f8a02d2da3e483ef/ortools-9.15.6755-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:1e16686c2b457fa6242c474ab890ee1712347ab53678e0d2fab307ae03e97a4b", size = 21912940, upload-time = "2026-01-14T15:39:04.403Z" },
-    { url = "https://files.pythonhosted.org/packages/49/0f/6d6d722102a0ceccf4a5038e2bc91d023da84a6dba98482a4634df3d27ab/ortools-9.15.6755-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:033836c0eb33bc72697a299e0caedbb25fc9d1cee0b13832d69cb30405f57b3e", size = 29838435, upload-time = "2026-01-14T15:38:01.047Z" },
+    { url = "https://files.pythonhosted.org/packages/de/ad/95504cd7d0bedab94cc3cbcbf4b87003bb82eb9fab7149c115c0246fa78d/ortools-9.9.3963-cp312-cp312-macosx_10_15_x86_64.whl", hash = "sha256:6dcf1974f278952034c727cdaec13de817b9f84d477c97ffb9a5441fccad36dd", size = 19383019, upload-time = "2024-03-07T13:37:01.361Z" },
+    { url = "https://files.pythonhosted.org/packages/79/68/0dd518cb682e0d6f7b7f77862d774d2c0eace55ebb4209b2e0ad8c57a9ff/ortools-9.9.3963-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:05b233c700788a2df1869f3579056c5ccca87bc2e74172b94997c3a45507bd4d", size = 18236664, upload-time = "2024-03-07T13:37:05.298Z" },
+    { url = "https://files.pythonhosted.org/packages/3b/e8/d2c34853ddf4e1769d999844a0940a2ec5e5579d54e62978f480d988eb44/ortools-9.9.3963-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:55f4f600492f34fc2313c46413c67cea74a637c2b12d03e24694fac3ac68a313", size = 24752048, upload-time = "2024-03-07T13:37:14.005Z" },
 ]
 
 [[package]]
