@@ -807,14 +807,32 @@ def cmd_grep(args):
         _print_df(df)
 
 
+def _default_export_filename(dataset_name: str, fmt: str) -> str:
+    stem = Path(dataset_name).as_posix().strip("/").replace("/", "_")
+    return f"{stem}.{fmt}"
+
+
+def _resolve_export_target(out_path: Path, *, dataset_name: str, fmt: str) -> Path:
+    target = Path(out_path)
+    if target.exists() and target.is_dir():
+        return target / _default_export_filename(dataset_name, fmt)
+    return target
+
+
 def cmd_export(args):
-    ds_name = _resolve_dataset_name_interactive(args.root, getattr(args, "dataset", None), False)
-    if not ds_name:
-        return
-    d = Dataset(args.root, ds_name)
+    dataset_arg = getattr(args, "dataset", None)
+    if dataset_arg:
+        d = _resolve_dataset_for_read(args.root, str(dataset_arg))
+    else:
+        ds_name = _resolve_dataset_name_interactive(args.root, dataset_arg, False)
+        if not ds_name:
+            return
+        d = Dataset(args.root, ds_name)
+    fmt = str(args.fmt or "").strip().lower()
+    out_target = _resolve_export_target(Path(args.out), dataset_name=d.name, fmt=fmt)
     cols = [c.strip() for c in args.columns.split(",") if c.strip()] if args.columns else None
-    d.export(args.fmt, args.out, columns=cols, include_deleted=bool(getattr(args, "include_deleted", False)))
-    print(f"Wrote {args.out}")
+    d.export(fmt, out_target, columns=cols, include_deleted=bool(getattr(args, "include_deleted", False)))
+    print(f"Wrote {out_target}")
 
 
 def _collect_ids(ids: list[str] | None, id_file: Path | None) -> list[str]:
@@ -1443,8 +1461,13 @@ def cli_grep(
 def cli_export(
     ctx: typer.Context,
     dataset: str = typer.Argument(None),
-    fmt: str = typer.Option(..., "--fmt"),
-    out: Path = typer.Option(..., "--out", path_type=Path),
+    fmt: str = typer.Option(..., "--fmt", help="Export format: csv|jsonl|parquet."),
+    out: Path = typer.Option(
+        ...,
+        "--out",
+        path_type=Path,
+        help="Output file path, or an existing directory for auto-named export output.",
+    ),
     columns: str = typer.Option("", "--columns"),
     include_deleted: bool = typer.Option(False, "--include-deleted"),
 ) -> None:
