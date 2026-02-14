@@ -216,7 +216,7 @@ def plot_elites_showcase(
             )
         )
 
-    ncols = min(3, len(records))
+    ncols = len(records)
     fig = render_record_grid_figure(
         records,
         ncols=ncols,

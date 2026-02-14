@@ -38,6 +38,7 @@ from dnadesign.cruncher.analysis.layout import (
     analysis_manifest_path,
     analysis_plot_path,
     analysis_root,
+    analysis_state_root,
     analysis_table_path,
     analysis_used_path,
     plot_manifest_path,
@@ -493,7 +494,7 @@ def _finalize_analysis_root(
             prev_id = None
     if not prev_id:
         prev_id = prev_root.name.replace(".analysis_prev_", "")
-    archive_root = analysis_root_path / "_archive" / str(prev_id)
+    archive_root = analysis_state_root(analysis_root_path) / "_archive" / str(prev_id)
     archive_root.parent.mkdir(parents=True, exist_ok=True)
     if archive_root.exists():
         shutil.rmtree(archive_root)
@@ -502,20 +503,13 @@ def _finalize_analysis_root(
 
 def _analysis_managed_paths(analysis_root_path: Path) -> list[Path]:
     managed = [
-        analysis_root_path / "analysis",
-        analysis_root_path / "plots",
-        analysis_root_path / "notebook__run_overview.py",
+        analysis_root_path / "reports",
+        analysis_root_path / "manifests",
         analysis_root_path / "tables",
-        analysis_root_path / "analysis_used.yaml",
-        analysis_root_path / "summary.json",
-        analysis_root_path / "report.json",
-        analysis_root_path / "report.md",
-        analysis_root_path / "plot_manifest.json",
-        analysis_root_path / "table_manifest.json",
-        analysis_root_path / "manifest.json",
+        analysis_root_path / "plots",
+        analysis_state_root(analysis_root_path) / "_archive",
+        analysis_root_path / "notebook__run_overview.py",
     ]
-    managed.extend(sorted(analysis_root_path.glob("plot__*")))
-    managed.extend(sorted(analysis_root_path.glob("table__*")))
     return [path for path in managed if path.exists()]
 
 
@@ -629,7 +623,7 @@ def run_analyze(
         created_at = datetime.now(timezone.utc).isoformat()
 
         analysis_root_path = analysis_root(run_dir)
-        tmp_root = analysis_root_path / ".analysis_tmp"
+        tmp_root = analysis_state_root(analysis_root_path) / "tmp"
         if tmp_root.exists():
             recoverable_reason = _recoverable_analyze_lock_reason(tmp_root)
             if recoverable_reason is not None:

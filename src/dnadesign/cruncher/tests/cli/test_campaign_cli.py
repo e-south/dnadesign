@@ -16,8 +16,16 @@ import pandas as pd
 import yaml
 from typer.testing import CliRunner
 
+from dnadesign.cruncher.analysis.layout import (
+    analysis_root,
+    analysis_table_path,
+    report_json_path,
+    summary_path,
+    table_manifest_path,
+)
 from dnadesign.cruncher.app.campaign_service import expand_campaign
 from dnadesign.cruncher.app.run_service import load_run_index, save_run_index
+from dnadesign.cruncher.artifacts.layout import manifest_path as run_manifest_path
 from dnadesign.cruncher.cli.app import app
 from dnadesign.cruncher.config.load import load_config
 
@@ -155,9 +163,12 @@ def test_campaign_summarize_cli(tmp_path: Path) -> None:
         (run_a, ["A", "B"]),
         (run_b, ["C", "D"]),
     ):
-        (run_dir / "analysis").mkdir(parents=True, exist_ok=True)
-        (run_dir / "analysis" / "summary.json").write_text(json.dumps({"analysis_id": "analysis-1", "tf_names": tfs}))
-        (run_dir / "analysis" / "table_manifest.json").write_text(
+        analysis_dir = analysis_root(run_dir)
+        (analysis_dir / "reports").mkdir(parents=True, exist_ok=True)
+        (analysis_dir / "manifests").mkdir(parents=True, exist_ok=True)
+        (analysis_dir / "tables").mkdir(parents=True, exist_ok=True)
+        summary_path(analysis_dir).write_text(json.dumps({"analysis_id": "analysis-1", "tf_names": tfs}))
+        table_manifest_path(analysis_dir).write_text(
             json.dumps(
                 {
                     "analysis_id": "analysis-1",
@@ -174,7 +185,7 @@ def test_campaign_summarize_cli(tmp_path: Path) -> None:
                 {"tf": tfs[1], "mean": 0.9, "median": 0.9, "std": 0.1, "min": 0.7, "max": 1.1},
             ]
         )
-        score_summary_df.to_parquet(run_dir / "analysis" / "table__scores_summary.parquet", index=False)
+        score_summary_df.to_parquet(analysis_table_path(analysis_dir, "scores_summary", "parquet"), index=False)
         joint_metrics_df = pd.DataFrame(
             [
                 {
@@ -188,15 +199,15 @@ def test_campaign_summarize_cli(tmp_path: Path) -> None:
                 }
             ]
         )
-        joint_metrics_df.to_parquet(run_dir / "analysis" / "table__metrics_joint.parquet", index=False)
-        manifest_path = run_dir / "run_manifest.json"
-        manifest_path.parent.mkdir(parents=True, exist_ok=True)
-        manifest_path.write_text(
+        joint_metrics_df.to_parquet(analysis_table_path(analysis_dir, "metrics_joint", "parquet"), index=False)
+        manifest_file = run_manifest_path(run_dir)
+        manifest_file.parent.mkdir(parents=True, exist_ok=True)
+        manifest_file.write_text(
             json.dumps({"stage": "sample", "run_dir": str(run_dir), "regulator_set": {"tfs": tfs}})
         )
-        report_path = run_dir / "analysis" / "report.json"
-        report_path.parent.mkdir(parents=True, exist_ok=True)
-        report_path.write_text(json.dumps({"run": {"n_sequences": 2, "n_elites": 1}}))
+        report_file = report_json_path(analysis_dir)
+        report_file.parent.mkdir(parents=True, exist_ok=True)
+        report_file.write_text(json.dumps({"run": {"n_sequences": 2, "n_elites": 1}}))
 
     result = runner.invoke(
         app,
@@ -221,11 +232,11 @@ def test_campaign_summarize_cli(tmp_path: Path) -> None:
     assert (out_dir / "analysis" / "campaign_summary.csv").exists()
     assert (out_dir / "analysis" / "campaign_best.csv").exists()
     assert (out_dir / "analysis" / "campaign_manifest.json").exists()
-    assert (out_dir / "plots" / "plot__best_jointscore_bar.png").exists()
-    assert (out_dir / "plots" / "plot__tf_coverage_heatmap.png").exists()
-    assert (out_dir / "plots" / "plot__pairgrid_overview.png").exists()
-    assert (out_dir / "plots" / "plot__joint_trend.png").exists()
-    assert (out_dir / "plots" / "plot__pareto_projection.png").exists()
+    assert (out_dir / "plots" / "best_jointscore_bar.png").exists()
+    assert (out_dir / "plots" / "tf_coverage_heatmap.png").exists()
+    assert (out_dir / "plots" / "pairgrid_overview.png").exists()
+    assert (out_dir / "plots" / "joint_trend.png").exists()
+    assert (out_dir / "plots" / "pareto_projection.png").exists()
 
 
 def test_campaign_summarize_uses_table_manifest_contract(tmp_path: Path) -> None:
@@ -252,13 +263,15 @@ def test_campaign_summarize_uses_table_manifest_contract(tmp_path: Path) -> None
     config_path.write_text(yaml.safe_dump(config))
 
     run_dir = tmp_path / "runs" / "sample" / "sample_manifest_tables"
-    analysis_dir = run_dir / "analysis"
-    analysis_dir.mkdir(parents=True, exist_ok=True)
+    analysis_dir = analysis_root(run_dir)
+    (analysis_dir / "reports").mkdir(parents=True, exist_ok=True)
+    (analysis_dir / "manifests").mkdir(parents=True, exist_ok=True)
+    (analysis_dir / "tables").mkdir(parents=True, exist_ok=True)
     tfs = ["A", "B"]
-    (analysis_dir / "summary.json").write_text(
+    summary_path(analysis_dir).write_text(
         json.dumps({"analysis_id": "analysis-1", "tf_names": tfs, "analysis_config": {"table_format": "parquet"}})
     )
-    (analysis_dir / "table_manifest.json").write_text(
+    table_manifest_path(analysis_dir).write_text(
         json.dumps(
             {
                 "analysis_id": "analysis-1",
@@ -269,13 +282,12 @@ def test_campaign_summarize_uses_table_manifest_contract(tmp_path: Path) -> None
             }
         )
     )
-    analysis_dir.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(
         [
             {"tf": tfs[0], "mean": 1.0, "median": 1.0, "std": 0.1, "min": 0.8, "max": 1.2},
             {"tf": tfs[1], "mean": 0.9, "median": 0.9, "std": 0.1, "min": 0.7, "max": 1.1},
         ]
-    ).to_parquet(analysis_dir / "table__scores_summary.parquet", index=False)
+    ).to_parquet(analysis_table_path(analysis_dir, "scores_summary", "parquet"), index=False)
     pd.DataFrame(
         [
             {
@@ -288,13 +300,13 @@ def test_campaign_summarize_uses_table_manifest_contract(tmp_path: Path) -> None
                 "pareto_fraction": 0.5,
             }
         ]
-    ).to_parquet(analysis_dir / "table__metrics_joint.parquet", index=False)
-    manifest_path = run_dir / "run_manifest.json"
-    manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({"stage": "sample", "run_dir": str(run_dir), "regulator_set": {"tfs": tfs}}))
-    report_path = run_dir / "analysis" / "report.json"
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(json.dumps({"run": {"n_sequences": 2, "n_elites": 1}}))
+    ).to_parquet(analysis_table_path(analysis_dir, "metrics_joint", "parquet"), index=False)
+    manifest_file = run_manifest_path(run_dir)
+    manifest_file.parent.mkdir(parents=True, exist_ok=True)
+    manifest_file.write_text(json.dumps({"stage": "sample", "run_dir": str(run_dir), "regulator_set": {"tfs": tfs}}))
+    report_file = report_json_path(analysis_dir)
+    report_file.parent.mkdir(parents=True, exist_ok=True)
+    report_file.write_text(json.dumps({"run": {"n_sequences": 2, "n_elites": 1}}))
 
     result = runner.invoke(
         app,
@@ -338,11 +350,14 @@ def test_campaign_summarize_auto_repairs_stale_index_entries(tmp_path: Path) -> 
 
     run_dir = tmp_path / "runs" / "sample" / "sample_valid"
     tfs = ["A", "B"]
-    (run_dir / "analysis").mkdir(parents=True, exist_ok=True)
-    (run_dir / "analysis" / "summary.json").write_text(
+    analysis_dir = analysis_root(run_dir)
+    (analysis_dir / "reports").mkdir(parents=True, exist_ok=True)
+    (analysis_dir / "manifests").mkdir(parents=True, exist_ok=True)
+    (analysis_dir / "tables").mkdir(parents=True, exist_ok=True)
+    summary_path(analysis_dir).write_text(
         json.dumps({"analysis_id": "analysis-1", "tf_names": tfs, "analysis_config": {"table_format": "parquet"}})
     )
-    (run_dir / "analysis" / "table_manifest.json").write_text(
+    table_manifest_path(analysis_dir).write_text(
         json.dumps(
             {
                 "analysis_id": "analysis-1",
@@ -358,7 +373,7 @@ def test_campaign_summarize_auto_repairs_stale_index_entries(tmp_path: Path) -> 
             {"tf": tfs[0], "mean": 1.0, "median": 1.0, "std": 0.1, "min": 0.8, "max": 1.2},
             {"tf": tfs[1], "mean": 0.9, "median": 0.9, "std": 0.1, "min": 0.7, "max": 1.1},
         ]
-    ).to_parquet(run_dir / "analysis" / "table__scores_summary.parquet", index=False)
+    ).to_parquet(analysis_table_path(analysis_dir, "scores_summary", "parquet"), index=False)
     pd.DataFrame(
         [
             {
@@ -371,8 +386,9 @@ def test_campaign_summarize_auto_repairs_stale_index_entries(tmp_path: Path) -> 
                 "pareto_fraction": 0.5,
             }
         ]
-    ).to_parquet(run_dir / "analysis" / "table__metrics_joint.parquet", index=False)
-    (run_dir / "run_manifest.json").write_text(
+    ).to_parquet(analysis_table_path(analysis_dir, "metrics_joint", "parquet"), index=False)
+    run_manifest_path(run_dir).parent.mkdir(parents=True, exist_ok=True)
+    run_manifest_path(run_dir).write_text(
         json.dumps(
             {
                 "stage": "sample",
@@ -381,7 +397,8 @@ def test_campaign_summarize_auto_repairs_stale_index_entries(tmp_path: Path) -> 
             }
         )
     )
-    (run_dir / "analysis" / "report.json").write_text(json.dumps({"run": {"n_sequences": 2, "n_elites": 1}}))
+    report_json_path(analysis_dir).parent.mkdir(parents=True, exist_ok=True)
+    report_json_path(analysis_dir).write_text(json.dumps({"run": {"n_sequences": 2, "n_elites": 1}}))
 
     stale_dir = tmp_path / "runs" / "sample" / "deleted_run"
     save_run_index(

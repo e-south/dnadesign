@@ -196,11 +196,11 @@ def summarize_campaign(
     best_df.to_csv(best_path, index=False)
 
     plot_paths = [
-        _plot_best_jointscore(best_df, output_plots_root / "plot__best_jointscore_bar.png"),
-        _plot_tf_coverage(expansion, output_plots_root / "plot__tf_coverage_heatmap.png"),
-        _plot_pairgrid_overview(summary_df, output_plots_root / "plot__pairgrid_overview.png"),
-        _plot_joint_trend(summary_df, output_plots_root / "plot__joint_trend.png"),
-        _plot_pareto_projection(summary_df, output_plots_root / "plot__pareto_projection.png"),
+        _plot_best_jointscore(best_df, output_plots_root / "best_jointscore_bar.png"),
+        _plot_tf_coverage(expansion, output_plots_root / "tf_coverage_heatmap.png"),
+        _plot_pairgrid_overview(summary_df, output_plots_root / "pairgrid_overview.png"),
+        _plot_joint_trend(summary_df, output_plots_root / "joint_trend.png"),
+        _plot_pareto_projection(summary_df, output_plots_root / "pareto_projection.png"),
     ]
 
     return CampaignSummaryResult(

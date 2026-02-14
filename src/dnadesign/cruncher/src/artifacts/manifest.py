@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
 from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json
-from dnadesign.cruncher.artifacts.layout import manifest_path
+from dnadesign.cruncher.artifacts.layout import RUN_META_DIR, manifest_path
 from dnadesign.cruncher.config.schema_v3 import CruncherConfig
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 from dnadesign.cruncher.store.lockfile import LockedMotif
@@ -105,14 +105,23 @@ def write_manifest(run_dir: Path, manifest: Dict[str, Any]) -> Path:
 def load_manifest(run_dir: Path) -> Dict[str, Any]:
     path = manifest_path(run_dir)
     if not path.exists():
-        run_root = path.parent
+        # Resolve the run root from <run_dir>/<run-meta-dir>/run_manifest.json.
+        run_root = path.parent.parent
         existing = []
         if run_root.exists() and run_root.is_dir():
             root_files = [p.name for p in run_root.iterdir() if p.is_file()]
-            legacy_meta = run_root / "meta"
+            run_meta_dirs = [run_root / RUN_META_DIR, run_root / "meta"]
             meta_files: list[str] = []
-            if legacy_meta.exists() and legacy_meta.is_dir():
-                meta_files = [f"meta/{p.name}" for p in legacy_meta.iterdir() if p.is_file()]
+            seen_dirs: set[str] = set()
+            for meta_dir in run_meta_dirs:
+                if not meta_dir.exists() or not meta_dir.is_dir():
+                    continue
+                key = str(meta_dir.resolve())
+                if key in seen_dirs:
+                    continue
+                seen_dirs.add(key)
+                rel_prefix = meta_dir.name
+                meta_files.extend([f"{rel_prefix}/{p.name}" for p in meta_dir.iterdir() if p.is_file()])
             existing = sorted(root_files + meta_files)
         hint = (
             "run_manifest.json not found. This often means the sample run was interrupted before metadata was written."

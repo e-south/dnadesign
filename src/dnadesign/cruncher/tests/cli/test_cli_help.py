@@ -21,7 +21,7 @@ from typer.testing import CliRunner
 import dnadesign.cruncher.app.analyze_workflow as analyze_workflow
 import dnadesign.cruncher.cli.commands.discover as discover_module
 import dnadesign.cruncher.cli.commands.sources as sources_module
-from dnadesign.cruncher.artifacts.layout import config_used_path, elites_path, sequences_path
+from dnadesign.cruncher.artifacts.layout import config_used_path, elites_path, manifest_path, sequences_path
 from dnadesign.cruncher.cli.app import app
 from dnadesign.cruncher.cli.config_resolver import (
     CONFIG_ENV_VAR,
@@ -656,7 +656,8 @@ def test_analyze_latest_requires_complete_artifacts(tmp_path: Path) -> None:
         }
     ).to_parquet(elites_path(run_dir), engine="fastparquet")
 
-    (run_dir / "run_manifest.json").write_text(
+    manifest_path(run_dir).parent.mkdir(parents=True, exist_ok=True)
+    manifest_path(run_dir).write_text(
         json.dumps(
             {
                 "stage": "sample",

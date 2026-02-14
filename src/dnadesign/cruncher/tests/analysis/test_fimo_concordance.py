@@ -76,7 +76,7 @@ def test_plot_optimizer_vs_fimo_smoke(tmp_path) -> None:
             "fimo_joint_weakest_score": [0.0, 1.2, 2.4],
         }
     )
-    out_path = tmp_path / "plot__optimizer_vs_fimo.png"
+    out_path = tmp_path / "optimizer_vs_fimo.png"
     metadata = plot_optimizer_vs_fimo(df, out_path, dpi=150, png_compress_level=9)
 
     assert out_path.exists()

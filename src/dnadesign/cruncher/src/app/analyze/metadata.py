@@ -70,7 +70,7 @@ def _effective_sampling_pwm(
     return select_pwm_window(pwm, length=max_allowed, strategy=strategy)
 
 
-def _load_pwms_from_config(run_dir: Path) -> tuple[dict[str, PWM], dict]:
+def load_pwms_from_config(run_dir: Path) -> tuple[dict[str, PWM], dict]:
     config_path = config_used_path(run_dir)
     if not config_path.exists():
         raise FileNotFoundError(f"Missing config_used.yaml in {run_dir}")
@@ -94,6 +94,11 @@ def _load_pwms_from_config(run_dir: Path) -> tuple[dict[str, PWM], dict]:
             seq_len, maxw, strategy = sampling_window
             pwms[tf_name] = _effective_sampling_pwm(full_pwm, seq_len=seq_len, maxw=maxw, strategy=strategy)
     return pwms, cruncher_cfg
+
+
+def _load_pwms_from_config(run_dir: Path) -> tuple[dict[str, PWM], dict]:
+    # Backward-compatible alias used by existing analysis imports.
+    return load_pwms_from_config(run_dir)
 
 
 def _resolve_sample_meta(used_cfg: dict, manifest: dict) -> SampleMeta:

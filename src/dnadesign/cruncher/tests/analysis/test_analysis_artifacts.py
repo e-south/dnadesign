@@ -22,6 +22,7 @@ import yaml
 
 from dnadesign.cruncher.analysis.layout import (
     analysis_plot_path,
+    analysis_root,
     analysis_table_path,
     analysis_used_path,
     plot_manifest_path,
@@ -37,10 +38,12 @@ from dnadesign.cruncher.artifacts.layout import (
     elites_hits_path,
     elites_path,
     elites_yaml_path,
+    ensure_run_dirs,
     manifest_path,
     random_baseline_hits_path,
     random_baseline_path,
     sequences_path,
+    status_path,
     trace_path,
 )
 from dnadesign.cruncher.config.load import load_config
@@ -73,6 +76,7 @@ def test_load_elites_meta_requires_mapping(tmp_path: Path) -> None:
 def _make_sample_run_dir(tmp_path: Path, name: str) -> Path:
     run_dir = tmp_path / "results" / "runs" / name
     run_dir.mkdir(parents=True, exist_ok=True)
+    ensure_run_dirs(run_dir, meta=True, artifacts=True, live=False)
     return run_dir
 
 
@@ -322,7 +326,7 @@ def test_analyze_creates_analysis_run_and_manifest_updates(tmp_path: Path) -> No
     analysis_dir = analysis_runs[0]
     assert analysis_used_path(analysis_dir).exists()
     assert summary_path(analysis_dir).exists()
-    assert (analysis_dir / "analysis" / "manifest.json").exists()
+    assert (analysis_dir / "manifests" / "manifest.json").exists()
     assert analysis_table_path(analysis_dir, "scores_summary", "parquet").exists()
     assert analysis_table_path(analysis_dir, "metrics_joint", "parquet").exists()
     assert analysis_table_path(analysis_dir, "diagnostics_summary", "json").exists()
@@ -333,9 +337,9 @@ def test_analyze_creates_analysis_run_and_manifest_updates(tmp_path: Path) -> No
     assert report_payload["run"]["draws"] == 2
     assert report_payload["run"]["tune"] == 1
     report_paths = report_payload["paths"]
-    assert report_paths["manifest"] == "analysis/manifest.json"
-    assert report_paths["plot_manifest"] == "analysis/plot_manifest.json"
-    assert report_paths["table_manifest"] == "analysis/table_manifest.json"
+    assert report_paths["manifest"] == "manifests/manifest.json"
+    assert report_paths["plot_manifest"] == "manifests/plot_manifest.json"
+    assert report_paths["table_manifest"] == "manifests/table_manifest.json"
 
     table_manifest = json.loads(table_manifest_path(analysis_dir).read_text())
     keys = {entry.get("key") for entry in table_manifest.get("tables", [])}
@@ -390,7 +394,7 @@ def test_analyze_fails_fast_when_run_lock_exists(tmp_path: Path) -> None:
         top_k=1,
     )
 
-    analyze_lock = run_dir / ".analysis_tmp"
+    analyze_lock = analysis_root(run_dir) / "state" / "tmp"
     analyze_lock.mkdir(parents=True, exist_ok=True)
     (analyze_lock / ".analyze_lock.json").write_text(json.dumps({"pid": 1}))
 
@@ -437,7 +441,7 @@ def test_analyze_recovers_stale_lock_owned_by_current_process(tmp_path: Path) ->
         top_k=1,
     )
 
-    analyze_lock = run_dir / ".analysis_tmp"
+    analyze_lock = analysis_root(run_dir) / "state" / "tmp"
     analyze_lock.mkdir(parents=True, exist_ok=True)
 
     cfg = load_config(config_path)
@@ -689,7 +693,7 @@ def test_analyze_restores_previous_analysis_when_generation_fails(
         tune=1,
     )
 
-    analysis_dir = run_dir
+    analysis_dir = analysis_root(run_dir)
     summary_path(analysis_dir).parent.mkdir(parents=True, exist_ok=True)
     summary_path(analysis_dir).write_text(json.dumps({"analysis_id": "old-analysis"}))
     (analysis_dir / "old_marker.txt").write_text("preserve")
@@ -706,8 +710,8 @@ def test_analyze_restores_previous_analysis_when_generation_fails(
     restored_summary = json.loads(summary_path(analysis_dir).read_text())
     assert restored_summary["analysis_id"] == "old-analysis"
     assert (analysis_dir / "old_marker.txt").read_text() == "preserve"
-    assert not (run_dir / ".analysis_tmp").exists()
-    assert not list(run_dir.glob(".analysis_prev_*"))
+    assert not (analysis_root(run_dir) / "state" / "tmp").exists()
+    assert not list(analysis_root(run_dir).glob(".analysis_prev_*"))
 
 
 def test_analyze_defaults_to_latest_when_runs_empty(tmp_path: Path) -> None:
@@ -797,8 +801,8 @@ def test_analyze_uses_defaults_when_analysis_section_missing(tmp_path: Path) -> 
     cfg = load_config(config_path)
     analysis_runs = run_analyze(cfg, config_path, runs_override=["sample_defaults"])
 
-    assert analysis_runs == [run_dir]
-    analysis_used = yaml.safe_load(analysis_used_path(run_dir).read_text())
+    assert analysis_runs == [analysis_root(run_dir)]
+    analysis_used = yaml.safe_load(analysis_used_path(analysis_root(run_dir)).read_text())
     assert analysis_used["analysis"]["run_selector"] == "latest"
 
 
@@ -845,8 +849,8 @@ def test_analyze_reads_sample_metadata_without_sample_section(tmp_path: Path) ->
     cfg = load_config(config_path)
     analysis_runs = run_analyze(cfg, config_path, runs_override=["sample_no_sample_section"])
 
-    assert analysis_runs == [run_dir]
-    report_payload = json.loads(report_json_path(run_dir).read_text())
+    assert analysis_runs == [analysis_root(run_dir)]
+    report_payload = json.loads(report_json_path(analysis_root(run_dir)).read_text())
     assert report_payload["run"]["optimizer_kind"] == "gibbs_anneal"
 
 
@@ -890,7 +894,8 @@ def test_analyze_latest_skips_failed_index_run(tmp_path: Path) -> None:
         draws=1,
         tune=1,
     )
-    (failed_run / "run_status.json").write_text(
+    status_path(failed_run).parent.mkdir(parents=True, exist_ok=True)
+    status_path(failed_run).write_text(
         json.dumps(
             {
                 "stage": "sample",
@@ -924,7 +929,7 @@ def test_analyze_latest_skips_failed_index_run(tmp_path: Path) -> None:
     cfg = load_config(config_path)
     analysis_runs = run_analyze(cfg, config_path)
     assert analysis_runs
-    assert analysis_runs[0] == completed_run
+    assert analysis_runs[0] == analysis_root(completed_run)
 
 
 def test_analyze_latest_reports_failed_reason_when_no_completed_runs(tmp_path: Path) -> None:
@@ -948,7 +953,8 @@ def test_analyze_latest_reports_failed_reason_when_no_completed_runs(tmp_path: P
 
     failed_run = _make_sample_run_dir(tmp_path, "sample_failed")
     failed_error = "Elite selection returned 1 candidates, fewer than cruncher.sample.elites.k=5."
-    (failed_run / "run_status.json").write_text(
+    status_path(failed_run).parent.mkdir(parents=True, exist_ok=True)
+    status_path(failed_run).write_text(
         json.dumps(
             {
                 "stage": "sample",
@@ -1773,4 +1779,4 @@ def test_analyze_accepts_run_directory_path_override(tmp_path: Path) -> None:
     cfg = load_config(config_path)
     analysis_runs = run_analyze(cfg, config_path, runs_override=[str(run_dir.resolve())])
     assert len(analysis_runs) == 1
-    assert analysis_runs[0] == run_dir
+    assert analysis_runs[0] == analysis_root(run_dir)

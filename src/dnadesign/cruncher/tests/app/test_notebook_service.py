@@ -18,16 +18,18 @@ from dnadesign.cruncher.artifacts.layout import manifest_path
 def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
     run_dir = tmp_path / "run"
     analysis_id = "20250101T000000Z_test"
-    analysis_dir = run_dir
-    (analysis_dir / "analysis").mkdir(parents=True)
+    analysis_dir = run_dir / "analysis"
+    (analysis_dir / "reports").mkdir(parents=True, exist_ok=True)
+    (analysis_dir / "manifests").mkdir(parents=True, exist_ok=True)
+    (analysis_dir / "tables").mkdir(parents=True, exist_ok=True)
     manifest_file = manifest_path(run_dir)
     manifest_file.parent.mkdir(parents=True, exist_ok=True)
     manifest_file.write_text(json.dumps({"artifacts": [], "config_path": ""}))
-    (analysis_dir / "analysis" / "summary.json").write_text(
+    (analysis_dir / "reports" / "summary.json").write_text(
         json.dumps({"tf_names": ["LexA"], "analysis_id": analysis_id})
     )
-    (analysis_dir / "analysis" / "plot_manifest.json").write_text(json.dumps({"plots": []}))
-    (analysis_dir / "analysis" / "table_manifest.json").write_text(
+    (analysis_dir / "manifests" / "plot_manifest.json").write_text(json.dumps({"plots": []}))
+    (analysis_dir / "manifests" / "table_manifest.json").write_text(
         json.dumps(
             {
                 "tables": [
@@ -38,9 +40,9 @@ def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
             }
         )
     )
-    (analysis_dir / "analysis" / "table__scores_summary.parquet").write_text("placeholder")
-    (analysis_dir / "analysis" / "table__metrics_joint.parquet").write_text("placeholder")
-    (analysis_dir / "analysis" / "table__elites_topk.parquet").write_text("placeholder")
+    (analysis_dir / "tables" / "table__scores_summary.parquet").write_text("placeholder")
+    (analysis_dir / "tables" / "table__metrics_joint.parquet").write_text("placeholder")
+    (analysis_dir / "tables" / "table__elites_topk.parquet").write_text("placeholder")
 
     monkeypatch.setattr(notebook_service, "ensure_marimo", lambda: None)
 
@@ -50,8 +52,9 @@ def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
     assert f"default_id_hint = {analysis_id!r}" in content
     assert "Path(__file__).resolve()" in content
     assert "analysis_dir = notebook_path.parent" in content
-    assert 'if analysis_dir.parent.name == "_archive"' in content
-    assert "run_dir = analysis_dir" in content
+    assert 'if "_archive" in analysis_dir.parts:' in content
+    assert "run_dir = analysis_dir.parent" in content
+    assert 'analysis_root = run_dir / "analysis"' in content
     assert "Refresh analysis list" in content
     assert "plot_options" in content
     assert "table_manifest.json" in content
@@ -73,8 +76,8 @@ def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
 
 def test_generate_notebook_strict_requires_summary(tmp_path, monkeypatch) -> None:
     run_dir = tmp_path / "run"
-    analysis_dir = run_dir
-    (analysis_dir / "analysis").mkdir(parents=True)
+    analysis_dir = run_dir / "analysis"
+    analysis_dir.mkdir(parents=True, exist_ok=True)
     manifest_file = manifest_path(run_dir)
     manifest_file.parent.mkdir(parents=True, exist_ok=True)
     manifest_file.write_text(json.dumps({"artifacts": [], "config_path": ""}))
@@ -87,12 +90,12 @@ def test_generate_notebook_strict_requires_summary(tmp_path, monkeypatch) -> Non
 
 def test_generate_notebook_rejects_lenient_mode(tmp_path, monkeypatch) -> None:
     run_dir = tmp_path / "run"
-    analysis_dir = run_dir
-    (analysis_dir / "analysis").mkdir(parents=True)
+    analysis_dir = run_dir / "analysis"
+    (analysis_dir / "manifests").mkdir(parents=True, exist_ok=True)
     manifest_file = manifest_path(run_dir)
     manifest_file.parent.mkdir(parents=True, exist_ok=True)
     manifest_file.write_text(json.dumps({"artifacts": [], "config_path": ""}))
-    (analysis_dir / "analysis" / "plot_manifest.json").write_text(json.dumps({"plots": []}))
+    (analysis_dir / "manifests" / "plot_manifest.json").write_text(json.dumps({"plots": []}))
 
     monkeypatch.setattr(notebook_service, "ensure_marimo", lambda: None)
 
@@ -112,16 +115,17 @@ def test_generate_notebook_rejects_latest_and_analysis_id(tmp_path, monkeypatch)
 def test_generate_notebook_requires_table_manifest_contract_keys(tmp_path, monkeypatch) -> None:
     run_dir = tmp_path / "run"
     analysis_id = "20250101T000000Z_test"
-    analysis_dir = run_dir
-    (analysis_dir / "analysis").mkdir(parents=True)
+    analysis_dir = run_dir / "analysis"
+    (analysis_dir / "reports").mkdir(parents=True, exist_ok=True)
+    (analysis_dir / "manifests").mkdir(parents=True, exist_ok=True)
     manifest_file = manifest_path(run_dir)
     manifest_file.parent.mkdir(parents=True, exist_ok=True)
     manifest_file.write_text(json.dumps({"artifacts": [], "config_path": ""}))
-    (analysis_dir / "analysis" / "summary.json").write_text(
+    (analysis_dir / "reports" / "summary.json").write_text(
         json.dumps({"tf_names": ["LexA"], "analysis_id": analysis_id})
     )
-    (analysis_dir / "analysis" / "plot_manifest.json").write_text(json.dumps({"plots": []}))
-    (analysis_dir / "analysis" / "table_manifest.json").write_text(json.dumps({"tables": []}))
+    (analysis_dir / "manifests" / "plot_manifest.json").write_text(json.dumps({"plots": []}))
+    (analysis_dir / "manifests" / "table_manifest.json").write_text(json.dumps({"tables": []}))
 
     monkeypatch.setattr(notebook_service, "ensure_marimo", lambda: None)
 

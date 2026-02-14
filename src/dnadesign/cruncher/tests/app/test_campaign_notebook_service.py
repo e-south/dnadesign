@@ -23,7 +23,7 @@ def test_generate_campaign_notebook_reads_output_and_plots_dirs(tmp_path, monkey
     (output_dir / "campaign_summary.csv").write_text("set_index,joint_hmean\n1,0.9\n")
     (output_dir / "campaign_best.csv").write_text("set_index,joint_hmean\n1,0.95\n")
     (output_dir / "campaign_manifest.json").write_text(json.dumps({"campaign_name": "demo"}))
-    (plots_dir / "plot__best_jointscore_bar.png").write_text("placeholder")
+    (plots_dir / "best_jointscore_bar.png").write_text("placeholder")
 
     monkeypatch.setattr(campaign_notebook_service, "ensure_marimo", lambda: None)
 

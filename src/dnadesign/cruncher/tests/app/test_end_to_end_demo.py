@@ -266,6 +266,9 @@ def test_demo_campaign_pair_local_only_generates_plots(tmp_path: Path) -> None:
     cruncher_cfg = config_payload["cruncher"]
     cruncher_cfg["workspace"]["regulator_sets"] = []
     cruncher_cfg["catalog"]["root"] = str(workspace / ".cruncher" / "demo_campaigns_multi_tf")
+    # Keep this test local-only and MEME-independent.
+    cruncher_cfg["catalog"]["pwm_source"] = "sites"
+    cruncher_cfg["catalog"]["source_preference"] = ["demo_local_meme", "regulondb"]
     cruncher_cfg["sample"]["budget"]["tune"] = 240
     cruncher_cfg["sample"]["budget"]["draws"] = 480
     cruncher_cfg["sample"]["elites"]["k"] = 3
@@ -303,26 +306,27 @@ def test_demo_campaign_pair_local_only_generates_plots(tmp_path: Path) -> None:
     analysis_dir = workspace / "outputs"
     assert analysis_dir.is_dir()
     assert manifest_path(analysis_dir).exists()
+    analysis_plots_dir = analysis_dir / "analysis" / "plots"
     plot_ext = str(cruncher_cfg["analysis"]["plot_format"])
-    assert (analysis_dir / "plots" / f"plot__chain_trajectory_scatter.{plot_ext}").exists()
-    assert (analysis_dir / "plots" / f"plot__chain_trajectory_sweep.{plot_ext}").exists()
-    assert (analysis_dir / "plots" / f"plot__elites_nn_distance.{plot_ext}").exists()
-    assert (analysis_dir / "plots" / f"plot__elites_showcase.{plot_ext}").exists()
-    assert (analysis_dir / "plots" / f"plot__health_panel.{plot_ext}").exists()
+    assert (analysis_plots_dir / f"chain_trajectory_scatter.{plot_ext}").exists()
+    assert (analysis_plots_dir / f"chain_trajectory_sweep.{plot_ext}").exists()
+    assert (analysis_plots_dir / f"elites_nn_distance.{plot_ext}").exists()
+    assert (analysis_plots_dir / f"elites_showcase.{plot_ext}").exists()
+    assert (analysis_plots_dir / f"health_panel.{plot_ext}").exists()
 
     campaign_dir = workspace / "outputs" / "campaign" / "demo_pair"
     assert campaign_dir.is_dir()
     assert (campaign_dir / "analysis" / "campaign_summary.csv").exists()
     assert (campaign_dir / "analysis" / "campaign_best.csv").exists()
     assert (campaign_dir / "analysis" / "campaign_manifest.json").exists()
-    campaign_plot = campaign_dir / "plots" / f"plot__best_jointscore_bar.{plot_ext}"
+    campaign_plot = campaign_dir / "plots" / f"best_jointscore_bar.{plot_ext}"
     if not campaign_plot.exists():
-        campaign_plot = campaign_dir / "plots" / "plot__best_jointscore_bar.png"
+        campaign_plot = campaign_dir / "plots" / "best_jointscore_bar.png"
     assert campaign_plot.exists()
-    assert (campaign_dir / "plots" / "plot__tf_coverage_heatmap.png").exists()
-    assert (campaign_dir / "plots" / "plot__pairgrid_overview.png").exists()
-    assert (campaign_dir / "plots" / "plot__joint_trend.png").exists()
-    assert (campaign_dir / "plots" / "plot__pareto_projection.png").exists()
+    assert (campaign_dir / "plots" / "tf_coverage_heatmap.png").exists()
+    assert (campaign_dir / "plots" / "pairgrid_overview.png").exists()
+    assert (campaign_dir / "plots" / "joint_trend.png").exists()
+    assert (campaign_dir / "plots" / "pareto_projection.png").exists()
 
 
 def test_demo_basics_low_budget_analyze_survives_nonfinite_trajectory(tmp_path: Path) -> None:
@@ -372,8 +376,8 @@ def test_demo_basics_low_budget_analyze_survives_nonfinite_trajectory(tmp_path: 
         result = runner.invoke(app, command)
         assert result.exit_code == 0
 
-    summary_file = workspace / "outputs" / "analysis" / "summary.json"
-    manifest_file = workspace / "outputs" / "analysis" / "plot_manifest.json"
+    summary_file = workspace / "outputs" / "analysis" / "reports" / "summary.json"
+    manifest_file = workspace / "outputs" / "analysis" / "manifests" / "plot_manifest.json"
     assert summary_file.exists()
     assert manifest_file.exists()
 

@@ -24,7 +24,7 @@ matplotlib.use("Agg", force=True)
 def test_plot_elites_nn_distance_supports_small_k_text_panel(tmp_path: Path) -> None:
     nn_df = pd.DataFrame({"elite_id": ["elite-1"], "nn_dist": [None]})
     elites_df = pd.DataFrame({"id": ["elite-1"], "sequence": ["ACGTACGT"], "combined_score_final": [1.2], "rank": [1]})
-    out_path = Path(tmp_path) / "plot__elites__nn_distance.png"
+    out_path = Path(tmp_path) / "elites__nn_distance.png"
     metadata = plot_elites_nn_distance(
         nn_df,
         out_path,
@@ -54,7 +54,7 @@ def test_plot_elites_nn_distance_handles_constant_values(tmp_path: Path) -> None
             "rank": [1, 2, 3],
         }
     )
-    out_path = Path(tmp_path) / "plot__elites__nn_distance__constant.png"
+    out_path = Path(tmp_path) / "elites__nn_distance__constant.png"
     metadata = plot_elites_nn_distance(
         nn_df,
         out_path,

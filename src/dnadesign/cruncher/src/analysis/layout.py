@@ -16,12 +16,16 @@ from typing import Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
-ANALYSIS_LAYOUT_VERSION = "v11"
+ANALYSIS_LAYOUT_VERSION = "v12"
 ANALYSIS_DIR_NAME = "analysis"
 ARCHIVE_DIR_NAME = "_archive"
-ANALYSIS_OUTPUT_DIR = ANALYSIS_DIR_NAME
+ANALYSIS_TABLES_DIR = "tables"
 ANALYSIS_PLOTS_DIR = "plots"
-PLOT_FILE_PREFIX = "plot__"
+ANALYSIS_REPORTS_DIR = "reports"
+ANALYSIS_MANIFESTS_DIR = "manifests"
+ANALYSIS_STATE_DIR = "state"
+# Plot files intentionally use plain semantic names (no synthetic prefix).
+PLOT_FILE_PREFIX = ""
 TABLE_FILE_PREFIX = "table__"
 PLOT_MANIFEST_FILE_NAME = "plot_manifest.json"
 TABLE_MANIFEST_FILE_NAME = "table_manifest.json"
@@ -29,7 +33,7 @@ MANIFEST_FILE_NAME = "manifest.json"
 
 
 def analysis_root(run_dir: Path) -> Path:
-    return run_dir
+    return run_dir / ANALYSIS_DIR_NAME
 
 
 def analysis_plots_root(analysis_root: Path) -> Path:
@@ -37,7 +41,19 @@ def analysis_plots_root(analysis_root: Path) -> Path:
 
 
 def analysis_tables_root(analysis_root: Path) -> Path:
-    return analysis_root / ANALYSIS_OUTPUT_DIR
+    return analysis_root / ANALYSIS_TABLES_DIR
+
+
+def analysis_reports_root(analysis_root: Path) -> Path:
+    return analysis_root / ANALYSIS_REPORTS_DIR
+
+
+def analysis_manifests_root(analysis_root: Path) -> Path:
+    return analysis_root / ANALYSIS_MANIFESTS_DIR
+
+
+def analysis_state_root(analysis_root: Path) -> Path:
+    return analysis_root / ANALYSIS_STATE_DIR
 
 
 def analysis_plot_filename(plot_key: str, plot_format: str) -> str:
@@ -73,31 +89,31 @@ def analysis_table_path(analysis_root: Path, table_key: str, table_format: str) 
 
 
 def summary_path(analysis_root: Path) -> Path:
-    return analysis_tables_root(analysis_root) / "summary.json"
+    return analysis_reports_root(analysis_root) / "summary.json"
 
 
 def report_json_path(analysis_root: Path) -> Path:
-    return analysis_tables_root(analysis_root) / "report.json"
+    return analysis_reports_root(analysis_root) / "report.json"
 
 
 def report_md_path(analysis_root: Path) -> Path:
-    return analysis_tables_root(analysis_root) / "report.md"
+    return analysis_reports_root(analysis_root) / "report.md"
 
 
 def analysis_used_path(analysis_root: Path) -> Path:
-    return analysis_tables_root(analysis_root) / "analysis_used.yaml"
+    return analysis_reports_root(analysis_root) / "analysis_used.yaml"
 
 
 def plot_manifest_path(analysis_root: Path) -> Path:
-    return analysis_tables_root(analysis_root) / PLOT_MANIFEST_FILE_NAME
+    return analysis_manifests_root(analysis_root) / PLOT_MANIFEST_FILE_NAME
 
 
 def table_manifest_path(analysis_root: Path) -> Path:
-    return analysis_tables_root(analysis_root) / TABLE_MANIFEST_FILE_NAME
+    return analysis_manifests_root(analysis_root) / TABLE_MANIFEST_FILE_NAME
 
 
 def analysis_manifest_path(analysis_root: Path) -> Path:
-    return analysis_tables_root(analysis_root) / MANIFEST_FILE_NAME
+    return analysis_manifests_root(analysis_root) / MANIFEST_FILE_NAME
 
 
 def load_summary(path: Path, *, required: bool = False) -> Optional[dict]:
@@ -225,7 +241,7 @@ def list_analysis_entries(run_dir: Path) -> list[dict]:
         else:
             logger.warning("analysis summary missing analysis_id: %s", summary_path(root))
 
-    archive_root = root / ARCHIVE_DIR_NAME
+    archive_root = analysis_state_root(root) / ARCHIVE_DIR_NAME
     if archive_root.exists():
         for child in sorted(archive_root.iterdir()):
             if not child.is_dir():
@@ -313,7 +329,7 @@ def list_analysis_entries_verbose(run_dir: Path) -> list[dict]:
             warnings=warnings,
         )
 
-    archive_root = root / ARCHIVE_DIR_NAME
+    archive_root = analysis_state_root(root) / ARCHIVE_DIR_NAME
     if archive_root.exists():
         for child in sorted(archive_root.iterdir()):
             if not child.is_dir():

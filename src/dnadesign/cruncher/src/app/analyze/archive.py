@@ -18,7 +18,11 @@ from pathlib import Path
 
 from dnadesign.cruncher.analysis.layout import (
     ANALYSIS_LAYOUT_VERSION,
-    PLOT_FILE_PREFIX,
+    ANALYSIS_MANIFESTS_DIR,
+    ANALYSIS_PLOTS_DIR,
+    ANALYSIS_REPORTS_DIR,
+    ANALYSIS_STATE_DIR,
+    ANALYSIS_TABLES_DIR,
     TABLE_FILE_PREFIX,
     summary_path,
 )
@@ -26,28 +30,23 @@ from dnadesign.cruncher.artifacts.entries import normalize_artifacts
 from dnadesign.cruncher.config.schema_v3 import AnalysisConfig
 from dnadesign.cruncher.utils.hashing import sha256_bytes, sha256_path
 
-ANALYSIS_TOP_LEVEL_FILES = {
-    "analysis_used.yaml",
-    "summary.json",
-    "report.json",
-    "report.md",
-    "plot_manifest.json",
-    "table_manifest.json",
-    "manifest.json",
-    "notebook__run_overview.py",
+ANALYSIS_TOP_LEVEL_FILES = {"notebook__run_overview.py"}
+ANALYSIS_TOP_LEVEL_DIRS = {
+    ANALYSIS_REPORTS_DIR,
+    ANALYSIS_MANIFESTS_DIR,
+    ANALYSIS_TABLES_DIR,
+    ANALYSIS_PLOTS_DIR,
 }
-ANALYSIS_TOP_LEVEL_DIRS = {"analysis", "plots", "tables"}
+LEGACY_PLOT_FILE_PREFIX = "plot__"
 
 
 def _is_analysis_relpath(path: str) -> bool:
-    if path in ANALYSIS_TOP_LEVEL_FILES:
+    norm_path = str(path).replace("\\", "/").lstrip("./")
+    if norm_path in ANALYSIS_TOP_LEVEL_FILES:
         return True
-    if path.startswith(PLOT_FILE_PREFIX) or path.startswith(TABLE_FILE_PREFIX):
+    if norm_path.startswith(LEGACY_PLOT_FILE_PREFIX) or norm_path.startswith(TABLE_FILE_PREFIX):
         return True
-    for root in ANALYSIS_TOP_LEVEL_DIRS:
-        if path == root or path.startswith(f"{root}/"):
-            return True
-    return False
+    return norm_path == "analysis" or norm_path.startswith("analysis/")
 
 
 def _analysis_item_paths(analysis_root: Path) -> list[Path]:
@@ -58,7 +57,7 @@ def _analysis_item_paths(analysis_root: Path) -> list[Path]:
         path = analysis_root / name
         if path.exists():
             items.append(path)
-    for pattern in (f"{PLOT_FILE_PREFIX}*", f"{TABLE_FILE_PREFIX}*"):
+    for pattern in (f"{LEGACY_PLOT_FILE_PREFIX}*", f"{TABLE_FILE_PREFIX}*"):
         for path in sorted(analysis_root.glob(pattern)):
             if path.exists():
                 items.append(path)
@@ -74,7 +73,7 @@ def _prune_latest_analysis_artifacts(manifest: dict) -> None:
         path = str(item.get("path") or "")
         norm_path = path.replace("\\", "/")
         if norm_path == "analysis" or norm_path.startswith("analysis/"):
-            if not norm_path.startswith("analysis/_archive/"):
+            if not norm_path.startswith(f"analysis/{ANALYSIS_STATE_DIR}/_archive/"):
                 continue
         if _is_analysis_relpath(norm_path):
             continue
@@ -145,13 +144,14 @@ def _rewrite_manifest_paths(manifest: dict, analysis_id: str, moved_prefixes: li
         path = str(item.get("path") or "")
         for prefix in moved_prefixes:
             old_prefix = f"analysis/{prefix}"
+            archive_prefix = f"analysis/{ANALYSIS_STATE_DIR}/_archive/{analysis_id}/{prefix}"
             if path == prefix or path.startswith(prefix):
                 suffix = path[len(prefix) :]
-                item["path"] = f"_archive/{analysis_id}/{prefix}{suffix}"
+                item["path"] = f"{archive_prefix}{suffix}"
                 break
             if path == old_prefix or path.startswith(old_prefix):
                 suffix = path[len(old_prefix) :]
-                item["path"] = f"_archive/{analysis_id}/{prefix}{suffix}"
+                item["path"] = f"{archive_prefix}{suffix}"
                 break
 
 
@@ -166,12 +166,13 @@ def _update_archived_summary(archive_root: Path, analysis_id: str, moved_prefixe
     def _rewrite_path(value: str) -> str:
         for prefix in moved_prefixes:
             old_prefix = f"analysis/{prefix}"
+            archive_prefix = f"analysis/{ANALYSIS_STATE_DIR}/_archive/{analysis_id}/{prefix}"
             if value == prefix or value.startswith(prefix):
                 suffix = value[len(prefix) :]
-                return f"_archive/{analysis_id}/{prefix}{suffix}"
+                return f"{archive_prefix}{suffix}"
             if value == old_prefix or value.startswith(old_prefix):
                 suffix = value[len(old_prefix) :]
-                return f"_archive/{analysis_id}/{prefix}{suffix}"
+                return f"{archive_prefix}{suffix}"
         return value
 
     for key in ("analysis_used", "plot_manifest", "table_manifest"):
@@ -189,7 +190,7 @@ def _update_archived_summary(archive_root: Path, analysis_id: str, moved_prefixe
 
 
 def _archive_existing_analysis(analysis_root: Path, manifest: dict, analysis_id: str) -> None:
-    archive_root = analysis_root / "_archive" / analysis_id
+    archive_root = analysis_root / ANALYSIS_STATE_DIR / "_archive" / analysis_id
     archive_root.mkdir(parents=True, exist_ok=True)
     moved_prefixes: list[str] = []
     for path in _analysis_item_paths(analysis_root):

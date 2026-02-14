@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 from dnadesign.cruncher.artifacts.entries import normalize_artifacts
-from dnadesign.cruncher.artifacts.layout import manifest_path, status_path
+from dnadesign.cruncher.artifacts.layout import RUN_META_DIR, manifest_path, status_path
 from dnadesign.cruncher.config.schema_v3 import CruncherConfig
 from dnadesign.cruncher.utils.paths import resolve_run_index_path
 
@@ -151,7 +151,7 @@ def _iter_run_dirs(stage_dir: Path) -> list[Path]:
     runs: list[Path] = []
     seen: set[Path] = set()
     for manifest_file in sorted(stage_dir.rglob("run_manifest.json")):
-        run_dir = manifest_file.parent
+        run_dir = _run_dir_from_manifest_path(manifest_file)
         try:
             rel = run_dir.relative_to(stage_dir)
         except ValueError:
@@ -170,6 +170,13 @@ def _iter_workspace_run_dirs(out_dir: Path) -> list[Path]:
     if not out_dir.exists():
         return []
     return _iter_run_dirs(out_dir)
+
+
+def _run_dir_from_manifest_path(manifest_file: Path) -> Path:
+    run_meta_dir = manifest_file.parent
+    if run_meta_dir.name in {RUN_META_DIR, "meta"}:
+        return run_meta_dir.parent
+    return run_meta_dir
 
 
 def _merge_payload(existing: dict, updates: dict) -> dict:
@@ -371,7 +378,7 @@ def _resolve_run_dir_from_arg(config_path: Path, run_name: str) -> Path | None:
             return None
     if resolved.is_file():
         if resolved.name == "run_manifest.json":
-            resolved = resolved.parent
+            resolved = _run_dir_from_manifest_path(resolved)
         else:
             raise FileNotFoundError(f"Run path points to a file (expected directory): {resolved}")
     if not manifest_path(resolved).exists():

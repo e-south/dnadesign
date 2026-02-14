@@ -74,6 +74,24 @@ def test_densegen_demo_pins_merged_discovery_source() -> None:
     assert cfg.discover.meme_mod == "oops"
 
 
+def test_core_demo_configs_pin_merged_meme_oops_sources() -> None:
+    root = Path(__file__).resolve().parents[2] / "workspaces"
+    expected = {
+        root / "demo_basics_two_tf" / "config.yaml": "demo_merged_meme_oops",
+        root / "demo_campaigns_multi_tf" / "config.yaml": "demo_merged_meme_oops_campaign",
+        root / "densegen_prep_three_tf" / "config.yaml": "demo_merged_meme_oops_three_tf",
+    }
+
+    for config_path, source_id in expected.items():
+        cfg = load_config(config_path)
+        assert cfg.catalog.pwm_source == "matrix", f"{config_path} must sample against discovered motif matrices."
+        assert cfg.catalog.combine_sites is True, f"{config_path} must merge TFBS sets before discovery."
+        assert cfg.catalog.source_preference == [source_id], f"{config_path} must pin discovered source preference."
+        assert cfg.discover.source_id == source_id, f"{config_path} discover.source_id must match catalog pin."
+        assert cfg.discover.tool == "meme", f"{config_path} must use MEME for OOPS discovery."
+        assert cfg.discover.meme_mod == "oops", f"{config_path} must run MEME in OOPS mode."
+
+
 def test_demo_configs_use_tuned_gibbs_annealing_defaults() -> None:
     root = Path(__file__).resolve().parents[2] / "workspaces"
     expected = {

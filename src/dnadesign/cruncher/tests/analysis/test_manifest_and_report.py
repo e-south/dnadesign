@@ -229,7 +229,7 @@ def test_report_payload_preserves_zero_highlights() -> None:
     assert overlap["overlap_total_bp_median"] == 0.0
 
 
-def test_report_payload_paths_use_flat_output_and_plots_schema(tmp_path: Path) -> None:
+def test_report_payload_paths_use_structured_output_and_plots_schema(tmp_path: Path) -> None:
     analysis_dir = tmp_path / "run"
     analysis_plot_path(analysis_dir, "chain_trajectory_scatter", "png").parent.mkdir(parents=True, exist_ok=True)
     analysis_plot_path(analysis_dir, "chain_trajectory_scatter", "png").write_text("png")
@@ -237,6 +237,7 @@ def test_report_payload_paths_use_flat_output_and_plots_schema(tmp_path: Path) -
     analysis_table_path(analysis_dir, "diagnostics_summary", "json").parent.mkdir(parents=True, exist_ok=True)
     analysis_table_path(analysis_dir, "diagnostics_summary", "json").write_text("{}")
     analysis_table_path(analysis_dir, "objective_components", "json").write_text("{}")
+    analysis_manifest_path(analysis_dir).parent.mkdir(parents=True, exist_ok=True)
     analysis_manifest_path(analysis_dir).write_text("{}")
     plot_manifest_path(analysis_dir).write_text('{"plots": []}')
     table_manifest_path(analysis_dir).write_text('{"tables": []}')
@@ -250,14 +251,14 @@ def test_report_payload_paths_use_flat_output_and_plots_schema(tmp_path: Path) -
         analysis_used_payload={"analysis": {"table_format": "parquet", "plot_format": "png"}},
     )
     pointers = payload["paths"]
-    assert pointers["start_here_plot"] == "plots/plot__chain_trajectory_scatter.png"
-    assert pointers["trajectory_plot"] == "plots/plot__chain_trajectory_scatter.png"
-    assert pointers["trajectory_sweep_plot"] == "plots/plot__chain_trajectory_sweep.png"
-    assert pointers["diagnostics"] == "analysis/table__diagnostics_summary.json"
-    assert pointers["objective_components"] == "analysis/table__objective_components.json"
-    assert pointers["manifest"] == "analysis/manifest.json"
-    assert pointers["plot_manifest"] == "analysis/plot_manifest.json"
-    assert pointers["table_manifest"] == "analysis/table_manifest.json"
+    assert pointers["start_here_plot"] == "plots/chain_trajectory_scatter.png"
+    assert pointers["trajectory_plot"] == "plots/chain_trajectory_scatter.png"
+    assert pointers["trajectory_sweep_plot"] == "plots/chain_trajectory_sweep.png"
+    assert pointers["diagnostics"] == "tables/table__diagnostics_summary.json"
+    assert pointers["objective_components"] == "tables/table__objective_components.json"
+    assert pointers["manifest"] == "manifests/manifest.json"
+    assert pointers["plot_manifest"] == "manifests/plot_manifest.json"
+    assert pointers["table_manifest"] == "manifests/table_manifest.json"
 
 
 def test_ensure_report_requires_summary_json_when_payload_not_provided(tmp_path: Path) -> None:

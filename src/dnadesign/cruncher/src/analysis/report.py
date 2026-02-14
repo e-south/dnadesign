@@ -333,10 +333,10 @@ def write_report_md(
             "",
             "## Start here",
             "",
-            f"- {pointers.get('start_here_plot') or 'plots/plot__chain_trajectory_scatter.<ext>'}",
-            f"- {pointers.get('trajectory_sweep_plot') or 'plots/plot__chain_trajectory_sweep.<ext>'}",
-            f"- {pointers.get('diagnostics') or 'analysis/table__diagnostics_summary.json'}",
-            f"- {pointers.get('objective_components') or 'analysis/table__objective_components.json'}",
+            f"- {pointers.get('start_here_plot') or 'plots/chain_trajectory_scatter.<ext>'}",
+            f"- {pointers.get('trajectory_sweep_plot') or 'plots/chain_trajectory_sweep.<ext>'}",
+            f"- {pointers.get('diagnostics') or 'tables/table__diagnostics_summary.json'}",
+            f"- {pointers.get('objective_components') or 'tables/table__objective_components.json'}",
         ]
     )
     elites_mmr_path = pointers.get("elites_mmr_summary")
@@ -346,9 +346,9 @@ def write_report_md(
     if elites_mmr_sweep_path:
         lines.append(f"- {elites_mmr_sweep_path}")
     overlap_path = pointers.get("overlap_summary") or (
-        f"analysis/{analysis_table_filename('overlap_pair_summary', table_format)}"
+        f"tables/{analysis_table_filename('overlap_pair_summary', table_format)}"
     )
-    elite_topk_path = pointers.get("elite_topk") or f"analysis/{analysis_table_filename('elites_topk', table_format)}"
+    elite_topk_path = pointers.get("elite_topk") or f"tables/{analysis_table_filename('elites_topk', table_format)}"
     lines.extend([f"- {overlap_path}", f"- {elite_topk_path}"])
 
     autopicks = payload.get("autopicks")
@@ -362,17 +362,17 @@ def write_report_md(
         lines.extend([f"- {item}" for item in warnings])
 
     artifact_index = [
-        pointers.get("start_here_plot") or "plots/plot__chain_trajectory_scatter.<ext>",
-        pointers.get("trajectory_sweep_plot") or "plots/plot__chain_trajectory_sweep.<ext>",
-        pointers.get("diagnostics") or "analysis/table__diagnostics_summary.json",
-        pointers.get("objective_components") or "analysis/table__objective_components.json",
+        pointers.get("start_here_plot") or "plots/chain_trajectory_scatter.<ext>",
+        pointers.get("trajectory_sweep_plot") or "plots/chain_trajectory_sweep.<ext>",
+        pointers.get("diagnostics") or "tables/table__diagnostics_summary.json",
+        pointers.get("objective_components") or "tables/table__objective_components.json",
         pointers.get("elites_mmr_summary") or None,
         pointers.get("elites_mmr_sweep") or None,
         overlap_path,
         elite_topk_path,
-        pointers.get("manifest") or "analysis/manifest.json",
-        pointers.get("plot_manifest") or "analysis/plot_manifest.json",
-        pointers.get("table_manifest") or "analysis/table_manifest.json",
+        pointers.get("manifest") or "manifests/manifest.json",
+        pointers.get("plot_manifest") or "manifests/plot_manifest.json",
+        pointers.get("table_manifest") or "manifests/table_manifest.json",
     ]
     artifact_index = [item for item in artifact_index if item]
     move_summary = _table_path(analysis_root, "move_stats_summary", table_format)

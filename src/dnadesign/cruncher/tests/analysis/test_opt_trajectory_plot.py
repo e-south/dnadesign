@@ -30,7 +30,7 @@ def test_chain_trajectory_scatter_requires_scale_columns(tmp_path: Path) -> None
         }
     )
     baseline_df = pd.DataFrame({"raw_llr_lexA": [0.1], "raw_llr_cpxR": [0.2]})
-    out_path = tmp_path / "plot__chain_trajectory_scatter.png"
+    out_path = tmp_path / "chain_trajectory_scatter.png"
 
     with pytest.raises(ValueError, match="raw_llr_lexA"):
         plot_chain_trajectory_scatter(
@@ -70,7 +70,7 @@ def test_chain_trajectory_scatter_renders_background_chain_and_consensus(tmp_pat
         {"tf": "lexA", "label": "lexA consensus (max)", "x": 0.95, "y": 0.20},
         {"tf": "cpxR", "label": "cpxR consensus (max)", "x": 0.20, "y": 0.96},
     ]
-    out_path = tmp_path / "plot__chain_trajectory_scatter.png"
+    out_path = tmp_path / "chain_trajectory_scatter.png"
     elites_df = pd.DataFrame(
         {
             "id": ["elite-1", "elite-2"],
@@ -128,7 +128,7 @@ def test_chain_trajectory_scatter_uses_only_new_best_updates(tmp_path: Path) -> 
             "norm_llr_cpxR": [0.02, 0.04, 0.06, 0.08],
         }
     )
-    out_path = tmp_path / "plot__chain_trajectory_scatter_best_updates.png"
+    out_path = tmp_path / "chain_trajectory_scatter_best_updates.png"
     metadata = plot_chain_trajectory_scatter(
         trajectory_df=trajectory_df,
         baseline_df=baseline_df,
@@ -178,7 +178,7 @@ def test_chain_trajectory_scatter_reports_elite_coordinate_collisions(tmp_path: 
             "rank": [1, 2, 3],
         }
     )
-    out_path = tmp_path / "plot__chain_trajectory_scatter_elite_collisions.png"
+    out_path = tmp_path / "chain_trajectory_scatter_elite_collisions.png"
     metadata = plot_chain_trajectory_scatter(
         trajectory_df=trajectory_df,
         baseline_df=baseline_df,
@@ -205,7 +205,7 @@ def test_chain_trajectory_sweep_requires_selected_y_column(tmp_path: Path) -> No
             "sweep_idx": [0, 1],
         }
     )
-    out_path = tmp_path / "plot__chain_trajectory_sweep.png"
+    out_path = tmp_path / "chain_trajectory_sweep.png"
 
     with pytest.raises(ValueError, match="raw_llr_objective"):
         plot_chain_trajectory_sweep(
@@ -226,7 +226,7 @@ def test_chain_trajectory_sweep_renders_raw_llr_by_sweep(tmp_path: Path) -> None
             "phase": ["tune", "draw", "draw", "tune", "draw", "draw"],
         }
     )
-    out_path = tmp_path / "plot__chain_trajectory_sweep.png"
+    out_path = tmp_path / "chain_trajectory_sweep.png"
     metadata = plot_chain_trajectory_sweep(
         trajectory_df=trajectory_df,
         y_column="raw_llr_objective",
@@ -269,7 +269,7 @@ def test_chain_trajectory_sweep_best_so_far_mode_is_supported(tmp_path: Path) ->
             "phase": ["tune", "draw", "draw", "tune", "draw", "draw"],
         }
     )
-    out_path = tmp_path / "plot__chain_trajectory_sweep_best.png"
+    out_path = tmp_path / "chain_trajectory_sweep_best.png"
     metadata = plot_chain_trajectory_sweep(
         trajectory_df=trajectory_df,
         y_column="raw_llr_objective",
@@ -293,7 +293,7 @@ def test_chain_trajectory_sweep_objective_scalar_label_is_compact_and_specific(t
             "objective_scalar": [0.4, 0.5],
         }
     )
-    out_path = tmp_path / "plot__chain_trajectory_sweep_objective_scalar.png"
+    out_path = tmp_path / "chain_trajectory_sweep_objective_scalar.png"
     metadata = plot_chain_trajectory_sweep(
         trajectory_df=trajectory_df,
         y_column="objective_scalar",
@@ -320,7 +320,7 @@ def test_chain_trajectory_sweep_rejects_unknown_mode(tmp_path: Path) -> None:
             "raw_llr_objective": [0.4, 0.5],
         }
     )
-    out_path = tmp_path / "plot__chain_trajectory_sweep_invalid.png"
+    out_path = tmp_path / "chain_trajectory_sweep_invalid.png"
     with pytest.raises(ValueError, match="y_mode"):
         plot_chain_trajectory_sweep(
             trajectory_df=trajectory_df,

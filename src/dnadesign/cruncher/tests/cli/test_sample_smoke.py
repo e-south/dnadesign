@@ -42,6 +42,8 @@ def _find_runs(runs_root: Path) -> list[Path]:
         return runs
     for manifest_file in runs_root.rglob("run_manifest.json"):
         run_dir = manifest_file.parent
+        if run_dir.name in {"run", "meta"}:
+            run_dir = run_dir.parent
         if run_dir.name == "previous":
             continue
         runs.append(run_dir)
@@ -132,7 +134,7 @@ def test_sample_cli_smoke_matrix(tmp_path: Path) -> None:
     assert result.exit_code == 0
     sample_runs = _find_runs(tmp_path / "runs")
     assert sample_runs
-    logos_dir = tmp_path / "runs" / "logos" / "catalog" / "demo"
+    logos_dir = tmp_path / "runs" / "plots" / "logos" / "catalog" / "demo"
     logos_dir.mkdir(parents=True, exist_ok=True)
     logo_path = logos_dir / "lexA_logo.png"
     logo_path.write_text("logo")

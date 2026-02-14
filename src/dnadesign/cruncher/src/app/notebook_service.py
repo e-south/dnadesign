@@ -166,13 +166,20 @@ def _(Path, json, mo, refresh_button):
     _ = refresh_button.value
     notebook_path = Path(__file__).resolve()
     analysis_dir = notebook_path.parent
-    if analysis_dir.parent.name == "_archive":
-        run_dir = analysis_dir.parent.parent
+    if analysis_dir.name == "analysis":
+        run_dir = analysis_dir.parent
+    elif "_archive" in analysis_dir.parts:
+        parts = analysis_dir.parts
+        if "analysis" in parts:
+            analysis_idx = parts.index("analysis")
+            run_dir = Path(*parts[:analysis_idx])
+        else:
+            run_dir = analysis_dir
     else:
-        run_dir = analysis_dir
+        run_dir = analysis_dir.parent
     if not run_dir.exists():
         mo.stop(True, mo.md(f"Run directory not found: {{run_dir}}"))
-    analysis_root = run_dir
+    analysis_root = run_dir / "analysis"
     from dnadesign.cruncher.analysis.layout import list_analysis_entries_verbose
 
     analysis_entries = list_analysis_entries_verbose(run_dir)

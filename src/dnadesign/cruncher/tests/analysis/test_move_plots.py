@@ -23,7 +23,7 @@ def test_health_panel_plot(tmp_path) -> None:
         ],
         "mcmc_cooling": {"kind": "piecewise", "stages": [{"sweeps": 2, "beta": 0.2}, {"sweeps": 4, "beta": 1.0}]},
     }
-    out_path = tmp_path / "plot__health__panel.png"
+    out_path = tmp_path / "health__panel.png"
     metadata = plot_health_panel(optimizer_stats, out_path, dpi=150, png_compress_level=9)
     assert out_path.exists()
     assert metadata["has_mh_windows"] is True
@@ -38,7 +38,7 @@ def test_health_panel_handles_s_only_without_false_acceptance_signal(tmp_path) -
             {"sweep_idx": 2, "chain": 0, "move_kind": "S", "attempted": 1, "accepted": 1},
         ]
     }
-    out_path = tmp_path / "plot__health__panel_s_only.png"
+    out_path = tmp_path / "health__panel_s_only.png"
     metadata = plot_health_panel(optimizer_stats, out_path, dpi=150, png_compress_level=9)
     assert out_path.exists()
     assert metadata["has_mh_windows"] is False

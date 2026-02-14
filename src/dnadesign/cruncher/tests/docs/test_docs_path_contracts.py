@@ -39,3 +39,26 @@ def test_docs_define_baserender_public_api_boundary() -> None:
     analysis_guide = (_package_root() / "docs" / "guides" / "sampling_and_analysis.md").read_text()
     assert "minimal rendering primitives" in analysis_guide
     assert "dnadesign.baserender" in analysis_guide
+
+
+def test_demo_docs_encode_merged_meme_oops_provenance_pattern() -> None:
+    docs_root = _package_root() / "docs" / "demos"
+    two_tf = (docs_root / "demo_basics_two_tf.md").read_text()
+    campaign = (docs_root / "demo_campaigns_multi_tf.md").read_text()
+    three_tf = (docs_root / "demo_densegen_prep_three_tf.md").read_text()
+
+    assert "fetch sites --source demo_local_meme --tf lexA --tf cpxR" in two_tf
+    assert "fetch sites --source regulondb      --tf lexA --tf cpxR" in two_tf
+    assert "--tool meme --meme-mod oops --source-id demo_merged_meme_oops" in two_tf
+
+    assert "fetch sites --source demo_local_meme --tf lexA --tf cpxR" in campaign
+    assert "fetch sites --source regulondb      --tf lexA --tf cpxR" in campaign
+    assert "fetch sites --source baer_chip_exo --tf baeR" in campaign
+    assert "fetch sites --source regulondb    --tf baeR" in campaign
+    assert "--tool meme --meme-mod oops --source-id demo_merged_meme_oops_campaign" in campaign
+
+    assert "fetch sites --source demo_local_meme --tf lexA --tf cpxR" in three_tf
+    assert "fetch sites --source regulondb      --tf lexA --tf cpxR" in three_tf
+    assert "fetch sites --source baer_chip_exo --tf baeR" in three_tf
+    assert "fetch sites --source regulondb      --tf baeR" in three_tf
+    assert "--tool meme --meme-mod oops --source-id demo_merged_meme_oops_three_tf" in three_tf

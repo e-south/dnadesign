@@ -20,7 +20,7 @@ from dnadesign.cruncher.artifacts.manifest import load_manifest
 
 def test_missing_run_manifest_hint(tmp_path: Path) -> None:
     run_dir = tmp_path / "sample_run"
-    meta_dir = run_dir / "meta"
+    meta_dir = run_dir / "run"
     meta_dir.mkdir(parents=True, exist_ok=True)
     (meta_dir / "dummy.json").write_text("{}")
 

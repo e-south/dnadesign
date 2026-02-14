@@ -173,9 +173,9 @@ def _(manifest_summary, mo, overview_block):
 def _(plots_dir, mo):
     images = []
     for name in [
-        "plot__best_jointscore_bar.png",
-        "plot__tf_coverage_heatmap.png",
-        "plot__pairgrid_overview.png",
+        "best_jointscore_bar.png",
+        "tf_coverage_heatmap.png",
+        "pairgrid_overview.png",
     ]:
         path = plots_dir / name
         if path.exists():
