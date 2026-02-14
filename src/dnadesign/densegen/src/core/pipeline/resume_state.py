@@ -16,7 +16,11 @@ from pathlib import Path
 
 from ...adapters.outputs import scan_records_from_config
 from ...config import LoadedConfig
-from .attempts import _load_existing_attempt_index_by_plan, _load_failure_counts_from_attempts
+from .attempts import (
+    _load_existing_attempt_index_by_plan,
+    _load_existing_library_build_count_by_plan,
+    _load_failure_counts_from_attempts,
+)
 from .usage_tracking import _parse_used_tfbs_detail, _update_usage_counts
 
 
@@ -26,6 +30,7 @@ class ResumeState:
     existing_usage_by_plan: dict[tuple[str, str], dict[tuple[str, str], int]]
     site_failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]]
     attempt_counters: dict[tuple[str, str], int]
+    library_build_counts: dict[tuple[str, str], int]
 
 
 def load_resume_state(
@@ -40,16 +45,19 @@ def load_resume_state(
     existing_usage_by_plan: dict[tuple[str, str], dict[tuple[str, str], int]] = {}
     site_failure_counts: dict[tuple[str, str, str, str, str | None], dict[str, int]] = {}
     attempt_counters: dict[tuple[str, str], int] = {}
+    library_build_counts: dict[tuple[str, str], int] = {}
     if not resume:
         return ResumeState(
             existing_counts=existing_counts,
             existing_usage_by_plan=existing_usage_by_plan,
             site_failure_counts=site_failure_counts,
             attempt_counters=attempt_counters,
+            library_build_counts=library_build_counts,
         )
 
     site_failure_counts = _load_failure_counts_from_attempts(tables_root)
     attempt_counters = _load_existing_attempt_index_by_plan(tables_root)
+    library_build_counts = _load_existing_library_build_count_by_plan(tables_root)
     if loaded.root.densegen.output.targets:
         scan_ok = False
         run_ids: set[str] = set()
@@ -96,4 +104,5 @@ def load_resume_state(
         existing_usage_by_plan=existing_usage_by_plan,
         site_failure_counts=site_failure_counts,
         attempt_counters=attempt_counters,
+        library_build_counts=library_build_counts,
     )

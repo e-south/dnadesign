@@ -138,6 +138,87 @@ def _load_previous_densegen_config(run_root: Path) -> dict:
     return previous_cfg
 
 
+def _distribute_quota_extension(*, quotas: list[int], extension_rows: int) -> list[int]:
+    if extension_rows <= 0:
+        raise ValueError("--extend-quota must be > 0")
+    if not quotas:
+        raise ValueError("generation.plan must contain at least one item")
+    total_quota = sum(int(value) for value in quotas)
+    if total_quota <= 0:
+        raise ValueError("generation.plan quotas must sum to > 0")
+    additions = [0 for _ in quotas]
+    remainders: list[tuple[int, int]] = []
+    allocated = 0
+    for index, quota_value in enumerate(quotas):
+        scaled = int(quota_value) * int(extension_rows)
+        add = scaled // total_quota
+        remainder = scaled % total_quota
+        additions[index] = add
+        remainders.append((remainder, index))
+        allocated += add
+    remaining = int(extension_rows) - int(allocated)
+    for _remainder, index in sorted(remainders, key=lambda pair: (-pair[0], pair[1]))[:remaining]:
+        additions[index] += 1
+    return [int(quota) + int(additions[index]) for index, quota in enumerate(quotas)]
+
+
+def _apply_extend_quota(
+    *,
+    cfg,
+    extension_rows: int,
+    generated_by_plan: dict[str, int] | None = None,
+) -> list[tuple[str, int, int]]:
+    plan_items = list(cfg.generation.plan or [])
+    existing = generated_by_plan or {}
+    anchor_quotas = [max(int(item.quota), int(existing.get(str(item.name), 0))) for item in plan_items]
+    updated = _distribute_quota_extension(quotas=anchor_quotas, extension_rows=extension_rows)
+    changes: list[tuple[str, int, int]] = []
+    for item, old_quota, new_quota in zip(plan_items, anchor_quotas, updated):
+        item.quota = int(new_quota)
+        changes.append((str(item.name), int(old_quota), int(new_quota)))
+    return changes
+
+
+def _load_generated_counts_by_plan(*, state_path: Path, run_id: str) -> dict[str, int]:
+    if not state_path.exists():
+        return {}
+    state = load_run_state(state_path)
+    if str(state.run_id) != str(run_id):
+        return {}
+    counts: dict[str, int] = {}
+    for item in state.items:
+        plan_name = str(item.plan_name)
+        counts[plan_name] = counts.get(plan_name, 0) + int(item.generated)
+    return counts
+
+
+def _apply_resume_quota_floor(
+    *,
+    cfg,
+    run_root: Path,
+    generated_by_plan: dict[str, int],
+) -> list[tuple[str, int, int]]:
+    previous_quotas: dict[str, int] = {}
+    try:
+        previous_cfg = _load_previous_densegen_config(run_root)
+        _names, previous_quotas, _total = _extract_quota_profile(previous_cfg)
+    except ValueError:
+        previous_quotas = {}
+    changes: list[tuple[str, int, int]] = []
+    for item in list(cfg.generation.plan or []):
+        name = str(item.name)
+        old_quota = int(item.quota)
+        floor_quota = max(
+            old_quota,
+            int(previous_quotas.get(name, 0)),
+            int(generated_by_plan.get(name, 0)),
+        )
+        if floor_quota != old_quota:
+            item.quota = int(floor_quota)
+            changes.append((name, old_quota, floor_quota))
+    return changes
+
+
 def _capture_usr_registry_snapshots(*, cfg, cfg_path: Path, run_root: Path, context: CliContext) -> dict[Path, str]:
     snapshots: dict[Path, str] = {}
     out_cfg = cfg.output
@@ -161,6 +242,17 @@ def _restore_usr_registry_snapshots(*, snapshots: dict[Path, str]) -> None:
         registry_path.write_text(content)
 
 
+def _clear_outputs_preserving_notify(*, outputs_root: Path) -> None:
+    notify_root = outputs_root / "notify"
+    for child in outputs_root.iterdir():
+        if child == notify_root:
+            continue
+        if child.is_dir() and not child.is_symlink():
+            shutil.rmtree(child)
+        else:
+            child.unlink()
+
+
 def register_run_commands(
     app: typer.Typer,
     *,
@@ -177,6 +269,11 @@ def register_run_commands(
         no_plot: bool = typer.Option(False, help="Do not auto-run plots even if configured."),
         fresh: bool = typer.Option(False, "--fresh", help="Clear outputs and start a new run."),
         resume: bool = typer.Option(False, "--resume", help="Resume from existing outputs."),
+        extend_quota: Optional[int] = typer.Option(
+            None,
+            "--extend-quota",
+            help="Increase total plan quota by this many rows for this run without editing config.yaml.",
+        ),
         log_file: Optional[Path] = typer.Option(
             None,
             help="Override logfile path (must be inside outputs/ under the run root).",
@@ -224,7 +321,7 @@ def register_run_commands(
             )
             if outputs_root.exists():
                 try:
-                    shutil.rmtree(outputs_root)
+                    _clear_outputs_preserving_notify(outputs_root=outputs_root)
                 except Exception as exc:
                     console.print(f"[bold red]Failed to clear outputs:[/] {exc}")
                     raise typer.Exit(code=1)
@@ -258,6 +355,10 @@ def register_run_commands(
                 resume_run = False
 
         state_path = run_state_path(run_root)
+        generated_by_plan: dict[str, int] = _load_generated_counts_by_plan(
+            state_path=state_path,
+            run_id=str(cfg.run.id),
+        )
         if not fresh and state_path.exists():
             existing_state = load_run_state(state_path)
             config_sha = hashlib.sha256(cfg_path.read_bytes()).hexdigest()
@@ -325,6 +426,38 @@ def register_run_commands(
                 console.print(f"  - {reset_cmd}")
                 console.print("  - or restore outputs/ before resuming")
                 raise typer.Exit(code=1)
+
+        if resume_run:
+            quota_floor_changes = _apply_resume_quota_floor(
+                cfg=cfg,
+                run_root=run_root,
+                generated_by_plan=generated_by_plan,
+            )
+            if quota_floor_changes:
+                updates = ", ".join(f"{name}:{old}->{new}" for name, old, new in quota_floor_changes)
+                console.print(
+                    "[yellow]Resuming with prior effective quota floor[/]: "
+                    f"{updates}"
+                )
+
+        if extend_quota is not None:
+            extend_value = int(extend_quota)
+            if extend_value <= 0:
+                console.print("[bold red]--extend-quota must be > 0[/]")
+                raise typer.Exit(code=1)
+            try:
+                quota_changes = _apply_extend_quota(
+                    cfg=cfg,
+                    extension_rows=extend_value,
+                    generated_by_plan=generated_by_plan,
+                )
+            except ValueError as exc:
+                console.print(f"[bold red]{exc}[/]")
+                raise typer.Exit(code=1)
+            updates = ", ".join(f"{name}:{old}->{new}" for name, old, new in quota_changes)
+            console.print(
+                f"[yellow]Extended total quota by {extend_value} rows for this run[/]: {updates}"
+            )
 
         if fresh:
             build_stage_a = True

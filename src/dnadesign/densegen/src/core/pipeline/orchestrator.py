@@ -1879,6 +1879,7 @@ def run_pipeline(
     existing_usage_by_plan = resume_state.existing_usage_by_plan
     site_failure_counts = resume_state.site_failure_counts
     attempt_counters = resume_state.attempt_counters
+    library_build_counts = resume_state.library_build_counts
     if existing_counts:
         total = sum(existing_counts.values())
         per_plan = dict(existing_counts)
@@ -1894,6 +1895,7 @@ def run_pipeline(
         plan_items=pl,
         plan_pools=plan_pools,
         existing_counts=existing_counts,
+        existing_library_build_counts=library_build_counts,
     )
 
     def _accumulate_stats(key: tuple[str, str], stats: dict) -> None:

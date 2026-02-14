@@ -65,3 +65,13 @@ def test_existing_outputs_detects_usr_dataset_records(tmp_path: Path) -> None:
     (usr_root / "registry.yaml").write_text("namespaces: {}\n")
     (dataset_dir / "records.parquet").write_text("stub")
     assert has_existing_run_outputs(run_root)
+
+
+def test_existing_outputs_ignores_notify_runtime_artifacts(tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    outputs_root = run_outputs_root(run_root)
+    notify_root = outputs_root / "notify" / "densegen"
+    notify_root.mkdir(parents=True)
+    (notify_root / "profile.json").write_text("{}\n")
+    (notify_root / "cursor").write_text("0\n")
+    assert not has_existing_run_outputs(run_root)

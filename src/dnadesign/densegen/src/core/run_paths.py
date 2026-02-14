@@ -23,6 +23,7 @@ RUN_LIBRARIES_DIR = "libraries"
 RUN_TABLES_DIR = "tables"
 RUN_PLOTS_DIR = "plots"
 RUN_REPORT_DIR = "report"
+RUN_NOTIFY_DIR = "notify"
 CANDIDATES_DIR = "candidates"
 
 RUN_MANIFEST_NAME = "run_manifest.json"
@@ -44,6 +45,7 @@ NON_BLOCKING_OUTPUT_DIRS = {
     RUN_LIBRARIES_DIR,
     RUN_PLOTS_DIR,
     RUN_REPORT_DIR,
+    RUN_NOTIFY_DIR,
 }
 META_BLOCKING_FILES = {
     RUN_MANIFEST_NAME,
