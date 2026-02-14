@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from dnadesign.baserender.src.config import load_cruncher_showcase_job
+from dnadesign.baserender.src.config import load_cruncher_showcase_job, load_sequence_rows_job_from_mapping
 from dnadesign.baserender.src.core import SchemaError
 
 from .conftest import densegen_job_payload, write_job, write_parquet
@@ -192,7 +192,7 @@ def test_densegen_bool_policies_require_bool_type(tmp_path: Path) -> None:
         load_cruncher_showcase_job(job_path)
 
 
-def test_default_results_root_scopes_to_caller_root(tmp_path: Path) -> None:
+def test_default_results_root_scopes_to_job_directory(tmp_path: Path) -> None:
     parquet = _make_input_parquet(tmp_path)
     payload = densegen_job_payload(
         parquet_path=parquet,
@@ -202,8 +202,30 @@ def test_default_results_root_scopes_to_caller_root(tmp_path: Path) -> None:
     del payload["results_root"]
     job_path = write_job(tmp_path / "job.yaml", payload)
 
-    job = load_cruncher_showcase_job(job_path, caller_root=tmp_path)
+    job = load_cruncher_showcase_job(job_path)
     assert job.results_root == (tmp_path / "results").resolve()
+
+
+def test_named_example_job_default_results_root_is_job_local(tmp_path: Path) -> None:
+    job = load_cruncher_showcase_job("densegen_job")
+    assert job.path.name == "densegen_job.yaml"
+    assert job.results_root == (job.path.parent / "results").resolve()
+
+
+def test_explicit_caller_root_overrides_default_results_scope(tmp_path: Path) -> None:
+    parquet = _make_input_parquet(tmp_path)
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        results_root=tmp_path / "ignored_results",
+        outputs=[{"kind": "images", "fmt": "png"}],
+    )
+    del payload["results_root"]
+    job_path = write_job(tmp_path / "job.yaml", payload)
+
+    caller_root = tmp_path / "caller"
+    caller_root.mkdir()
+    job = load_cruncher_showcase_job(job_path, caller_root=caller_root)
+    assert job.results_root == (caller_root / "results").resolve()
 
 
 def test_absolute_input_path_must_exist_at_config_boundary(tmp_path: Path) -> None:
@@ -245,3 +267,69 @@ def test_attach_motifs_plugin_path_resolves_at_config_boundary(tmp_path: Path) -
     plugin = job.pipeline.plugins[0]
     assert plugin.name == "attach_motifs_from_config"
     assert Path(str(plugin.params["config_path"])) == motif_cfg.resolve()
+
+
+def test_attach_motifs_from_library_path_resolves_at_config_boundary(tmp_path: Path) -> None:
+    parquet = _make_input_parquet(tmp_path)
+    library = tmp_path / "motif_library.json"
+    library.write_text(
+        (
+            "{\n"
+            '  "schema_version": "1",\n'
+            '  "alphabet": "DNA",\n'
+            '  "motifs": {\n'
+            '    "lexA": {\n'
+            '      "source": "demo",\n'
+            '      "motif_id": "lexA_demo",\n'
+            '      "matrix": [[0.1, 0.8, 0.05, 0.05]]\n'
+            "    }\n"
+            "  }\n"
+            "}\n"
+        )
+    )
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        results_root=tmp_path / "results",
+        outputs=[{"kind": "images", "fmt": "png"}],
+    )
+    payload["pipeline"] = {
+        "plugins": [
+            {
+                "attach_motifs_from_library": {
+                    "library_path": "motif_library.json",
+                    "require_effect": False,
+                }
+            }
+        ]
+    }
+    job_path = write_job(tmp_path / "job.yaml", payload)
+
+    job = load_cruncher_showcase_job(job_path)
+    plugin = job.pipeline.plugins[0]
+    assert plugin.name == "attach_motifs_from_library"
+    assert Path(str(plugin.params["library_path"])) == library.resolve()
+
+
+def test_inline_job_source_name_rejects_directory_components(tmp_path: Path) -> None:
+    parquet = _make_input_parquet(tmp_path)
+    payload = densegen_job_payload(
+        parquet_path=Path("input.parquet"),
+        results_root=Path("results"),
+        outputs=[{"kind": "images", "fmt": "png"}],
+    )
+
+    with pytest.raises(SchemaError, match="source_name must be a simple filename"):
+        load_sequence_rows_job_from_mapping(
+            payload,
+            caller_root=tmp_path,
+            source_name="nested/job.yaml",
+        )
+
+    # Baseline behavior remains explicit and valid with a plain filename.
+    job = load_sequence_rows_job_from_mapping(
+        payload,
+        caller_root=tmp_path,
+        source_name="inline_job.yaml",
+    )
+    assert job.path == (tmp_path / "inline_job.yaml").resolve()
+    assert job.input.path == parquet.resolve()

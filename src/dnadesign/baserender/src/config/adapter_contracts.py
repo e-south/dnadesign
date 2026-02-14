@@ -145,6 +145,13 @@ ADAPTER_CONTRACTS: dict[str, AdapterContract] = {
         resolved_path_columns=("hits_path", "config_path"),
         normalize_policies=_normalize_cruncher_policies,
     ),
+    "sequence_windows_v1": AdapterContract(
+        allowed_config_columns=("id", "sequence", "regulator_windows", "motifs", "display"),
+        required_config_columns=("sequence", "regulator_windows"),
+        required_source_columns=("sequence", "regulator_windows"),
+        optional_source_columns=("id", "motifs", "display"),
+        normalize_policies=_normalize_policies_passthrough,
+    ),
 }
 
 

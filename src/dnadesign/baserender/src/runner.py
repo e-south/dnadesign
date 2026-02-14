@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/baserender/src/runner.py
 
-Cruncher showcase job orchestration for adapter, pipeline, selection, and output execution.
+Sequence-rows job orchestration for adapter, pipeline, selection, and output execution.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -17,10 +17,10 @@ from typing import Iterable, Iterator
 
 from .adapters import build_adapter, required_source_columns
 from .config import (
-    CruncherShowcaseJob,
     ImagesOutputCfg,
+    SequenceRowsJobV3,
     VideoOutputCfg,
-    load_cruncher_showcase_job,
+    load_sequence_rows_job,
     output_kind,
     resolve_style,
 )
@@ -31,7 +31,7 @@ from .reporting import RunReport
 from .runtime import initialize_runtime
 
 
-def _iter_records(job: CruncherShowcaseJob, report: RunReport) -> Iterator[Record]:
+def _iter_records(job: SequenceRowsJobV3, report: RunReport) -> Iterator[Record]:
     adapter = build_adapter(job.input.adapter, alphabet=job.input.alphabet)
     transforms = load_transforms(job.pipeline.plugins)
     columns = required_source_columns(job.input.adapter)
@@ -46,7 +46,7 @@ def _iter_records(job: CruncherShowcaseJob, report: RunReport) -> Iterator[Recor
             report.note_skip_row(str(skip) or "skip_record")
 
 
-def _sample_or_limit_unselected(records: Iterable[Record], job: CruncherShowcaseJob) -> Iterable[Record] | list[Record]:
+def _sample_or_limit_unselected(records: Iterable[Record], job: SequenceRowsJobV3) -> Iterable[Record] | list[Record]:
     sample = job.input.sample
     if sample is not None:
         if sample.mode == "first_n":
@@ -65,16 +65,16 @@ def _sample_or_limit_unselected(records: Iterable[Record], job: CruncherShowcase
     return records
 
 
-def run_cruncher_showcase_job(
-    job_or_path: CruncherShowcaseJob | str,
+def run_sequence_rows_job(
+    job_or_path: SequenceRowsJobV3 | str,
     *,
     caller_root: str | Path | None = None,
 ) -> RunReport:
     initialize_runtime()
     job = (
         job_or_path
-        if isinstance(job_or_path, CruncherShowcaseJob)
-        else load_cruncher_showcase_job(
+        if isinstance(job_or_path, SequenceRowsJobV3)
+        else load_sequence_rows_job(
             job_or_path,
             caller_root=caller_root,
         )
@@ -182,3 +182,12 @@ def run_cruncher_showcase_job(
             raise SchemaError("Run completed with skipped rows/records; strict mode is enabled")
 
     return report
+
+
+def run_cruncher_showcase_job(
+    job_or_path: SequenceRowsJobV3 | str,
+    *,
+    caller_root: str | Path | None = None,
+) -> RunReport:
+    # Backward-compatible alias; sequence_rows_v3 is the canonical contract surface.
+    return run_sequence_rows_job(job_or_path, caller_root=caller_root)

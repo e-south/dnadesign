@@ -39,6 +39,8 @@ def default_workspaces_root(*, base_root: Path | None = None) -> Path:
 def _validate_workspace_name(name: str) -> str:
     raw = str(name).strip()
     ensure(raw != "", "workspace name must be a non-empty string", SchemaError)
+    if "/" in raw or "\\" in raw:
+        raise SchemaError(f"invalid workspace name: {raw!r} (use --root <dir> and provide a simple workspace name)")
     ensure(_WORKSPACE_NAME_RE.fullmatch(raw) is not None, f"invalid workspace name: {raw!r}", SchemaError)
     return raw
 
@@ -116,7 +118,7 @@ def _workspace_job_template() -> dict:
         },
         "render": {"renderer": "sequence_rows", "style": {"preset": "presentation_default", "overrides": {}}},
         "outputs": [{"kind": "images", "dir": "plots", "fmt": "png"}],
-        "run": {"strict": False, "fail_on_skips": False, "emit_report": True},
+        "run": {"strict": False, "fail_on_skips": False, "emit_report": False},
     }
 
 
@@ -132,13 +134,11 @@ def init_workspace(name: str, *, root: Path | None = None) -> Workspace:
 
     inputs_dir = ws_root / "inputs"
     outputs_dir = ws_root / "outputs"
-    reports_dir = ws_root / "reports"
     job_path = ws_root / "job.yaml"
 
     ws_root.mkdir(parents=False, exist_ok=False)
     inputs_dir.mkdir(parents=False, exist_ok=False)
     outputs_dir.mkdir(parents=False, exist_ok=False)
-    reports_dir.mkdir(parents=False, exist_ok=False)
 
     job_path.write_text(yaml.safe_dump(_workspace_job_template(), sort_keys=False))
 

@@ -57,6 +57,28 @@ class _KmerFeatureContract:
 
 
 @dataclass(frozen=True)
+class _RegulatorWindowFeatureContract:
+    kind: str = "regulator_window"
+
+    def validate_feature(self, feature: Feature, record: Record) -> None:
+        ensure(
+            feature.label is not None and feature.label != "",
+            "regulator_window feature requires label",
+            ContractError,
+        )
+        ensure(
+            feature.span.strand in {"fwd", "rev"},
+            "regulator_window feature requires strand=fwd|rev",
+            ContractError,
+        )
+        ensure(
+            len(feature.label or "") == feature.span.length(),
+            "regulator_window label length must equal span length",
+            ContractError,
+        )
+
+
+@dataclass(frozen=True)
 class _SpanLinkEffectContract:
     kind: str = "span_link"
 
@@ -109,23 +131,47 @@ class _MotifLogoEffectContract:
         feature_id = target["feature_id"]
         feat = next((f for f in record.features if f.id == feature_id), None)
         ensure(feat is not None, f"motif_logo target feature '{feature_id}' not found", ContractError)
-        ensure(feat.kind == "kmer", "motif_logo target feature must be kind='kmer'", ContractError)
-        reject_unknown_keys(effect.params, {"matrix"}, "motif_logo.params")
+        ensure(
+            feat.kind in {"kmer", "regulator_window"},
+            "motif_logo target feature must be kind='kmer' or 'regulator_window'",
+            ContractError,
+        )
+        reject_unknown_keys(effect.params, {"matrix", "motif_ref"}, "motif_logo.params")
         matrix = effect.params.get("matrix")
+        motif_ref = effect.params.get("motif_ref")
         ensure(
-            isinstance(matrix, list) and len(matrix) > 0,
-            "motif_logo params.matrix must be a non-empty list",
+            matrix is not None or motif_ref is not None,
+            "motif_logo params must include matrix and/or motif_ref",
             ContractError,
         )
-        ensure(
-            len(matrix) == feat.span.length(),
-            "motif_logo matrix length must match target feature span length",
-            ContractError,
-        )
-        for row in matrix:
+        if matrix is not None:
             ensure(
-                isinstance(row, (list, tuple)) and len(row) >= 4,
-                "motif_logo matrix rows must contain at least 4 values [A,C,G,T]",
+                isinstance(matrix, list) and len(matrix) > 0,
+                "motif_logo params.matrix must be a non-empty list",
+                ContractError,
+            )
+            ensure(
+                len(matrix) == feat.span.length(),
+                "motif_logo matrix length must match target feature span length",
+                ContractError,
+            )
+            for row in matrix:
+                ensure(
+                    isinstance(row, (list, tuple)) and len(row) >= 4,
+                    "motif_logo matrix rows must contain at least 4 values [A,C,G,T]",
+                    ContractError,
+                )
+        if motif_ref is not None:
+            ensure(isinstance(motif_ref, Mapping), "motif_logo params.motif_ref must be a mapping", ContractError)
+            reject_unknown_keys(motif_ref, {"source", "motif_id"}, "motif_logo.params.motif_ref")
+            ensure(
+                str(motif_ref.get("source", "")).strip() != "",
+                "motif_logo params.motif_ref.source is required",
+                ContractError,
+            )
+            ensure(
+                str(motif_ref.get("motif_id", "")).strip() != "",
+                "motif_logo params.motif_ref.motif_id is required",
                 ContractError,
             )
 
@@ -170,5 +216,6 @@ def validate_record_kinds(record: Record) -> None:
 
 def register_builtin_contracts() -> None:
     register_feature_contract(_KmerFeatureContract())
+    register_feature_contract(_RegulatorWindowFeatureContract())
     register_effect_contract(_SpanLinkEffectContract())
     register_effect_contract(_MotifLogoEffectContract())

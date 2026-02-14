@@ -3,7 +3,9 @@
 <dnadesign project>
 src/dnadesign/baserender/src/config/cruncher_showcase_job.py
 
-Cruncher showcase job schema and loader with strict nested key validation.
+Sequence Rows v3 job schema and loader with strict nested key validation.
+This module remains as a compatibility path; the organized namespace is
+`dnadesign.baserender.src.config.jobs.sequence_rows_v3`.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -114,7 +116,7 @@ class RunCfg:
 
 
 @dataclass(frozen=True)
-class CruncherShowcaseJob:
+class SequenceRowsJobV3:
     version: int
     name: str
     path: Path
@@ -125,6 +127,9 @@ class CruncherShowcaseJob:
     render: RenderCfg
     outputs: tuple[OutputCfg, ...]
     run: RunCfg
+
+
+CruncherShowcaseJob = SequenceRowsJobV3
 
 
 def _baserender_root() -> Path:
@@ -261,6 +266,17 @@ def _parse_plugin_specs(job_path: Path, raw: Any) -> tuple[PluginSpec, ...]:
                         job_path,
                         str(config_path_raw),
                         field="pipeline.plugins.attach_motifs_from_config.config_path",
+                    )
+                )
+            if plugin_name == "attach_motifs_from_library":
+                library_path_raw = parsed_params.get("library_path")
+                if library_path_raw is None:
+                    raise SchemaError("pipeline plugin 'attach_motifs_from_library' requires params.library_path")
+                parsed_params["library_path"] = str(
+                    _resolve_path(
+                        job_path,
+                        str(library_path_raw),
+                        field="pipeline.plugins.attach_motifs_from_library.library_path",
                     )
                 )
             if plugin_name == "attach_motifs_from_cruncher_lockfile":
@@ -572,59 +588,93 @@ def _parse_run(job_path: Path, results_root: Path, raw: Any) -> RunCfg:
     )
 
 
-def load_cruncher_showcase_job(path: str | Path, *, caller_root: str | Path | None = None) -> CruncherShowcaseJob:
+def _parse_sequence_rows_job_mapping(
+    raw_mapping: Any,
+    *,
+    job_path: Path,
+    caller_scope: Path,
+) -> SequenceRowsJobV3:
+    data = require_mapping(raw_mapping, "top-level")
+    reject_unknown_keys(
+        data,
+        {"version", "results_root", "input", "selection", "pipeline", "render", "outputs", "run"},
+        "top-level",
+    )
+
+    version = data.get("version")
+    ensure(version == 3, "Job YAML must specify version: 3", SchemaError)
+
+    results_root_raw = data.get("results_root")
+    if results_root_raw is None:
+        results_root = _default_results_root(job_path, caller_root=caller_scope)
+    else:
+        p = Path(str(results_root_raw))
+        results_root = p if p.is_absolute() else (job_path.parent / p).resolve()
+
+    input_cfg = _parse_input(job_path, data.get("input"))
+
+    selection_raw = data.get("selection")
+    selection_cfg = None if selection_raw is None else _parse_selection(job_path, selection_raw)
+
+    pipeline_raw = require_mapping(data.get("pipeline", {}), "pipeline")
+    reject_unknown_keys(pipeline_raw, {"plugins"}, "pipeline")
+    pipeline_cfg = PipelineCfg(plugins=_parse_plugin_specs(job_path, pipeline_raw.get("plugins")))
+
+    render_cfg = _parse_render(data.get("render"))
+    outputs_cfg = _parse_outputs(job_path, results_root, data.get("outputs"))
+    run_cfg = _parse_run(job_path, results_root, data.get("run"))
+
+    return SequenceRowsJobV3(
+        version=3,
+        name=job_path.stem,
+        path=job_path,
+        results_root=results_root,
+        input=input_cfg,
+        selection=selection_cfg,
+        pipeline=pipeline_cfg,
+        render=render_cfg,
+        outputs=outputs_cfg,
+        run=run_cfg,
+    )
+
+
+def load_cruncher_showcase_job(path: str | Path, *, caller_root: str | Path | None = None) -> SequenceRowsJobV3:
     try:
         job_path = resolve_job_path(path)
-        caller_scope = Path.cwd().resolve() if caller_root is None else Path(caller_root).expanduser().resolve()
+        if caller_root is None:
+            # Default non-workspace outputs to job-local scope.
+            caller_scope = job_path.parent.resolve()
+        else:
+            caller_scope = Path(caller_root).expanduser().resolve()
         try:
             raw = yaml.safe_load(job_path.read_text())
         except Exception as exc:
             raise SchemaError(f"Could not parse job YAML: {job_path}") from exc
+        return _parse_sequence_rows_job_mapping(raw, job_path=job_path, caller_scope=caller_scope)
+    except ContractError as exc:
+        raise SchemaError(str(exc)) from exc
 
-        data = require_mapping(raw, "top-level")
-        reject_unknown_keys(
-            data,
-            {"version", "results_root", "input", "selection", "pipeline", "render", "outputs", "run"},
-            "top-level",
+
+def load_sequence_rows_job_from_mapping(
+    mapping: Mapping[str, Any],
+    *,
+    caller_root: str | Path | None = None,
+    source_name: str = "inline_job.yaml",
+) -> SequenceRowsJobV3:
+    try:
+        caller_scope = Path.cwd().resolve() if caller_root is None else Path(caller_root).expanduser().resolve()
+        name = str(source_name).strip()
+        ensure(name != "", "source_name must be non-empty", SchemaError)
+        source_path = Path(name)
+        ensure(source_path.is_absolute() is False, "source_name must be relative, not absolute", SchemaError)
+        ensure(
+            source_path.name == name,
+            "source_name must be a simple filename (no directory components)",
+            SchemaError,
         )
-
-        version = data.get("version")
-        ensure(version == 3, "Job YAML must specify version: 3", SchemaError)
-
-        results_root_raw = data.get("results_root")
-        if results_root_raw is None:
-            results_root = _default_results_root(job_path, caller_root=caller_scope)
-        else:
-            p = Path(str(results_root_raw))
-            results_root = p if p.is_absolute() else (job_path.parent / p).resolve()
-
-        input_cfg = _parse_input(job_path, data.get("input"))
-
-        selection_raw = data.get("selection")
-        selection_cfg = None if selection_raw is None else _parse_selection(job_path, selection_raw)
-
-        pipeline_raw = require_mapping(data.get("pipeline", {}), "pipeline")
-        reject_unknown_keys(pipeline_raw, {"plugins"}, "pipeline")
-        pipeline_cfg = PipelineCfg(plugins=_parse_plugin_specs(job_path, pipeline_raw.get("plugins")))
-
-        render_cfg = _parse_render(data.get("render"))
-
-        outputs_cfg = _parse_outputs(job_path, results_root, data.get("outputs"))
-
-        run_cfg = _parse_run(job_path, results_root, data.get("run"))
-
-        return CruncherShowcaseJob(
-            version=3,
-            name=job_path.stem,
-            path=job_path,
-            results_root=results_root,
-            input=input_cfg,
-            selection=selection_cfg,
-            pipeline=pipeline_cfg,
-            render=render_cfg,
-            outputs=outputs_cfg,
-            run=run_cfg,
-        )
+        job_path = (caller_scope / source_path).resolve()
+        mapping_data = require_mapping(mapping, "top-level")
+        return _parse_sequence_rows_job_mapping(dict(mapping_data), job_path=job_path, caller_scope=caller_scope)
     except ContractError as exc:
         raise SchemaError(str(exc)) from exc
 
@@ -638,3 +688,19 @@ def output_kind(job: CruncherShowcaseJob, kind: str) -> OutputCfg | None:
 
 def validate_cruncher_showcase_job(path: str | Path, *, caller_root: str | Path | None = None) -> CruncherShowcaseJob:
     return load_cruncher_showcase_job(path, caller_root=caller_root)
+
+
+def load_sequence_rows_job(path: str | Path, *, caller_root: str | Path | None = None) -> SequenceRowsJobV3:
+    return load_cruncher_showcase_job(path, caller_root=caller_root)
+
+
+def validate_sequence_rows_job(path: str | Path, *, caller_root: str | Path | None = None) -> SequenceRowsJobV3:
+    return load_sequence_rows_job(path, caller_root=caller_root)
+
+
+def load_job(path: str | Path, *, caller_root: str | Path | None = None) -> SequenceRowsJobV3:
+    return load_sequence_rows_job(path, caller_root=caller_root)
+
+
+def validate_job(path: str | Path, *, caller_root: str | Path | None = None) -> SequenceRowsJobV3:
+    return validate_sequence_rows_job(path, caller_root=caller_root)

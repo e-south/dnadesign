@@ -1,15 +1,15 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/baserender/src/config/__init__.py
+src/dnadesign/baserender/src/config/jobs/__init__.py
 
-Config schema exports for Sequence Rows v3 jobs and Style v1.
+Job schema namespace for baserender config contracts.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-from .jobs.sequence_rows_v3 import (
+from .sequence_rows_v3 import (
     AdapterCfg,
     CruncherShowcaseJob,
     ImagesOutputCfg,
@@ -33,30 +33,8 @@ from .jobs.sequence_rows_v3 import (
     validate_job,
     validate_sequence_rows_job,
 )
-from .style_v1 import (
-    GlyphStyle,
-    LayoutStyle,
-    MotifLetterColoringStyle,
-    MotifLogoStyle,
-    MotifScaleBarStyle,
-    SequenceStyle,
-    Style,
-    list_style_presets,
-    resolve_preset_path,
-    resolve_style,
-)
 
 __all__ = [
-    "GlyphStyle",
-    "LayoutStyle",
-    "SequenceStyle",
-    "MotifLetterColoringStyle",
-    "MotifLogoStyle",
-    "MotifScaleBarStyle",
-    "Style",
-    "list_style_presets",
-    "resolve_preset_path",
-    "resolve_style",
     "CruncherShowcaseJob",
     "SequenceRowsJobV3",
     "InputCfg",

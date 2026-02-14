@@ -153,7 +153,7 @@ Conclusion: base track/kmer rendering is already compatible.
 ### Decisions resolved
 
 1. IO default scope is caller/job scoped by default.
-   - Non-workspace jobs now default `results_root` to `<caller_root>/results` (caller root defaults to current working directory).
+   - Non-workspace jobs now default `results_root` to `<job_dir>/results` (job-local).
    - Workspace jobs still default to `<workspace>/outputs`.
 2. Effect contracts are strict globally.
    - `span_link` and `motif_logo` now reject unknown `target`/`params` keys.
@@ -509,3 +509,110 @@ Conclusion: base track/kmer rendering is already compatible.
   - plots regenerated at:
     - `src/dnadesign/baserender/workspaces/demo_cruncher_render/outputs/plots/elite_showcase_1.png`
     - `src/dnadesign/baserender/workspaces/demo_cruncher_render/outputs/plots/elite_showcase_2.png`
+
+## 2026-02-13 - Public Cruncher/Baserender primitives boundary (no deep catalog paths in runtime contract)
+
+### Boundary update
+
+- Baserender now supports a tool-agnostic motif primitives contract:
+  - plugin: `attach_motifs_from_library`
+  - input artifact: `motif_library.json`
+  - contract:
+    - top-level keys: `schema_version`, `alphabet`, `motifs`
+    - `schema_version` must be `"1"`
+    - `alphabet` must be `"DNA"`
+    - each motif entry requires `source`, `motif_id`, `matrix`
+    - unknown keys are rejected.
+- This makes baserender runtime wiring independent from Cruncher lockfile/catalog filesystem shape.
+
+### Runtime implications
+
+- Cruncher remains owner of motif provenance resolution (MEME/OOPS -> lockfile -> motif records).
+- Baserender consumes normalized primitives (`Record` + optional `motif_library.json`) and renders.
+- Deep lockfile/catalog paths are still supported via `attach_motifs_from_cruncher_lockfile` for strict audits, but not required for the default integration contract.
+
+### Workspace demo updates
+
+- `demo_cruncher_render/job.yaml` now uses:
+  - `attach_motifs_from_library`
+  - `inputs/motif_library.json`
+- Added `inputs/motif_library.json` derived from lockfile-resolved motif records.
+- Kept lockfile/motif-store artifacts under `inputs/` as source-like references.
+
+### Tests and verification
+
+- Added:
+  - `src/dnadesign/baserender/tests/test_motif_library_transform.py`
+  - schema path-resolution coverage for the new plugin in:
+    - `src/dnadesign/baserender/tests/test_cruncher_showcase_job_schema.py`
+- Verified:
+  - `uv run pytest -q src/dnadesign/baserender/tests`
+  - `uv run ruff check src/dnadesign/baserender/src src/dnadesign/baserender/tests`
+  - `uv run baserender job run src/dnadesign/baserender/workspaces/demo_cruncher_render/job.yaml`
+
+## 2026-02-13 - Elites showcase layout + API ergonomics hardening pass
+
+### Rendering and style contract updates
+
+- Added strict style schema extensions for explicit vertical composition control:
+  - `layout.outer_pad_cells`
+  - `sequence.strand_gap_cells`
+  - `sequence.to_kmer_gap_cells`
+  - `kmer.to_logo_gap_cells`
+  - `motif_logo.letter_coloring.mode`
+  - `motif_logo.letter_coloring.other_color`
+  - `motif_logo.letter_coloring.observed_color_source`
+  - `motif_logo.scale_bar.location` now supports `left_of_logo`
+  - `motif_logo.scale_bar.pad_cells`
+- Updated layout math to use sequence/kmer/logo spacing keys and tighter outer padding.
+- Updated motif logo rendering:
+  - per-position `match_window_seq` letter coloring mode
+  - feature-fill based observed letter coloring option
+  - bottom-lane logos now use top-baseline stacking (letters upright, grow downward)
+- Updated scale-bar drawing:
+  - supports `left_of_logo` placement anchored to logo stack bounds
+  - top/bottom baseline label semantics are explicit (`0` and `2 bits` swap for top-baseline logos)
+
+### Cruncher integration boundary + API updates
+
+- Added adapter kind `sequence_windows_v1` for contract-first sequence-window payloads:
+  - new file: `src/dnadesign/baserender/src/adapters/sequence_windows_v1.py`
+  - maps `sequence + regulator_windows + motifs + display` into `Record`
+  - emits `Feature(kind="regulator_window")` + `Effect(kind="motif_logo")`
+- Registered adapter in:
+  - `src/dnadesign/baserender/src/config/adapter_contracts.py`
+  - `src/dnadesign/baserender/src/adapters/registry.py`
+- Added feature contract for `regulator_window` and expanded motif effect contract to allow:
+  - `params.matrix`
+  - `params.motif_ref`
+- Added stable generic public API wrappers:
+  - `validate_job`
+  - `run_job`
+  - `render`
+- Added public `LayoutError` export and config naming alias:
+  - `SequenceRowsJobV3` alias for the internal job model
+
+### Demo workspace updates
+
+- Updated `workspaces/demo_cruncher_render/job.yaml` style overrides to exercise:
+  - reduced vertical spacing
+  - `left_of_logo` scale bar
+  - `match_window_seq` logo coloring with `feature_fill`
+
+### Tests added/updated
+
+- Added:
+  - `src/dnadesign/baserender/tests/test_motif_logo_coloring.py`
+  - `src/dnadesign/baserender/tests/test_sequence_windows_adapter.py`
+- Extended:
+  - `src/dnadesign/baserender/tests/test_motif_logo_alignment.py`
+  - `src/dnadesign/baserender/tests/test_runtime_and_public_api.py`
+- Full suite remains green.
+
+### Verification
+
+- `uv run pytest -q src/dnadesign/baserender/tests` -> passed
+- `uv run ruff check src/dnadesign/baserender` -> passed
+- `uv run ruff format --check src/dnadesign/baserender` -> passed
+- `uv run baserender job validate --workspace demo_cruncher_render --workspace-root src/dnadesign/baserender/workspaces` -> passed
+- `uv run baserender job run --workspace demo_cruncher_render --workspace-root src/dnadesign/baserender/workspaces` -> passed

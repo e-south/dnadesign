@@ -16,13 +16,12 @@ from typing import Any
 
 import yaml
 
-from .api import run_cruncher_showcase_job
+from .api import run_job as run_job_public
+from .api import validate_job as validate_job_public
 from .config import (
-    CruncherShowcaseJob,
+    SequenceRowsJobV3,
     list_style_presets,
-    load_cruncher_showcase_job,
     resolve_preset_path,
-    validate_cruncher_showcase_job,
 )
 from .core import BaseRenderError
 from .workspace import Workspace, discover_workspaces, init_workspace, resolve_workspace_job_path
@@ -42,16 +41,30 @@ def validate_job_action(
     workspace: str | None,
     workspace_root: Path | None,
     *,
-    caller_root: Path,
-) -> CruncherShowcaseJob:
-    return validate_cruncher_showcase_job(resolve_job_spec(job, workspace, workspace_root), caller_root=caller_root)
+    caller_root: Path | None = None,
+) -> SequenceRowsJobV3:
+    return validate_job_public(
+        resolve_job_spec(job, workspace, workspace_root),
+        kind="sequence_rows_v3",
+        caller_root=caller_root,
+    )
 
 
-def run_job_action(job: str | None, workspace: str | None, workspace_root: Path | None, *, caller_root: Path):
-    return run_cruncher_showcase_job(resolve_job_spec(job, workspace, workspace_root), caller_root=caller_root)
+def run_job_action(
+    job: str | None,
+    workspace: str | None,
+    workspace_root: Path | None,
+    *,
+    caller_root: Path | None = None,
+):
+    return run_job_public(
+        resolve_job_spec(job, workspace, workspace_root),
+        kind="sequence_rows_v3",
+        caller_root=caller_root,
+    )
 
 
-def _job_to_mapping(parsed: CruncherShowcaseJob) -> dict[str, Any]:
+def _job_to_mapping(parsed: SequenceRowsJobV3) -> dict[str, Any]:
     return {
         "version": 3,
         "results_root": str(parsed.results_root),
@@ -137,9 +150,13 @@ def normalize_job_action(
     workspace_root: Path | None,
     *,
     out: Path,
-    caller_root: Path,
+    caller_root: Path | None = None,
 ) -> Path:
-    parsed = load_cruncher_showcase_job(resolve_job_spec(job, workspace, workspace_root), caller_root=caller_root)
+    parsed = validate_job_public(
+        resolve_job_spec(job, workspace, workspace_root),
+        kind="sequence_rows_v3",
+        caller_root=caller_root,
+    )
     data = _job_to_mapping(parsed)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(yaml.safe_dump(data, sort_keys=False))

@@ -32,6 +32,10 @@ class BoundsError(ContractError):
     pass
 
 
+class LayoutError(BoundsError):
+    pass
+
+
 class RenderingError(BaseRenderError):
     pass
 

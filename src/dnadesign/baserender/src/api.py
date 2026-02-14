@@ -12,21 +12,23 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 from pathlib import Path
 from typing import Iterable, Mapping
 
 from .adapters import build_adapter, required_source_columns
 from .config import (
     AdapterCfg,
-    CruncherShowcaseJob,
+    SequenceRowsJobV3,
+    load_sequence_rows_job_from_mapping,
     resolve_style,
 )
 from .config import (
-    validate_cruncher_showcase_job as _validate_cruncher_showcase_job,
+    validate_sequence_rows_job as _validate_sequence_rows_job,
 )
 from .core import Record, SchemaError, ensure
 from .io import iter_parquet_rows
-from .runner import run_cruncher_showcase_job as _run_cruncher_showcase_job
+from .runner import run_sequence_rows_job as _run_sequence_rows_job
 from .runtime import initialize_runtime
 
 
@@ -180,13 +182,121 @@ def render_parquet_record_figure(
     )
 
 
+def validate_sequence_rows_job(
+    job_or_path: str,
+    *,
+    caller_root: str | Path | None = None,
+) -> SequenceRowsJobV3:
+    return _validate_sequence_rows_job(job_or_path, caller_root=caller_root)
+
+
+def run_sequence_rows_job(job_or_path: SequenceRowsJobV3 | str, *, caller_root: str | Path | None = None):
+    return _run_sequence_rows_job(job_or_path, caller_root=caller_root)
+
+
 def validate_cruncher_showcase_job(
     job_or_path: str,
     *,
     caller_root: str | Path | None = None,
-) -> CruncherShowcaseJob:
-    return _validate_cruncher_showcase_job(job_or_path, caller_root=caller_root)
+) -> SequenceRowsJobV3:
+    # Backward-compatible alias; sequence_rows_v3 is the canonical contract surface.
+    return validate_sequence_rows_job(job_or_path, caller_root=caller_root)
 
 
-def run_cruncher_showcase_job(job_or_path: CruncherShowcaseJob | str, *, caller_root: str | Path | None = None):
-    return _run_cruncher_showcase_job(job_or_path, caller_root=caller_root)
+def run_cruncher_showcase_job(job_or_path: SequenceRowsJobV3 | str, *, caller_root: str | Path | None = None):
+    # Backward-compatible alias; sequence_rows_v3 is the canonical contract surface.
+    return run_sequence_rows_job(job_or_path, caller_root=caller_root)
+
+
+def _check_job_kind(kind: str | None) -> None:
+    if kind is None:
+        return
+    normalized = str(kind).strip().lower()
+    ensure(
+        normalized in {"sequence_rows_v3", "cruncher_showcase_v3"},
+        "kind must be one of: sequence_rows_v3, cruncher_showcase_v3",
+        SchemaError,
+    )
+
+
+def validate_job(
+    path_or_dict: str | Path | Mapping[str, object],
+    *,
+    kind: str | None = None,
+    caller_root: str | Path | None = None,
+) -> SequenceRowsJobV3:
+    _check_job_kind(kind)
+    if isinstance(path_or_dict, Mapping):
+        return load_sequence_rows_job_from_mapping(path_or_dict, caller_root=caller_root)
+    return validate_sequence_rows_job(path_or_dict, caller_root=caller_root)
+
+
+def run_job(
+    path_or_dict: SequenceRowsJobV3 | str | Path | Mapping[str, object],
+    *,
+    kind: str | None = None,
+    strict: bool | None = None,
+    caller_root: str | Path | None = None,
+):
+    _check_job_kind(kind)
+    if isinstance(path_or_dict, SequenceRowsJobV3):
+        job = path_or_dict
+    elif isinstance(path_or_dict, Mapping):
+        job = load_sequence_rows_job_from_mapping(path_or_dict, caller_root=caller_root)
+    else:
+        job = validate_sequence_rows_job(path_or_dict, caller_root=caller_root)
+
+    if strict is not None:
+        job = replace(job, run=replace(job.run, strict=bool(strict)))
+    return run_sequence_rows_job(job, caller_root=caller_root)
+
+
+def render(
+    record_or_records: Record | Iterable[Record],
+    *,
+    renderer: str = "sequence_rows",
+    style: Mapping[str, object] | None = None,
+    grid: Mapping[str, object] | None = None,
+):
+    if style is None:
+        style_preset = None
+        style_overrides: Mapping[str, object] | None = None
+    else:
+        style_preset_raw = style.get("preset") if isinstance(style, Mapping) else None
+        style_preset = None if style_preset_raw is None else str(style_preset_raw)
+        if isinstance(style, Mapping) and "overrides" in style:
+            overrides_raw = style.get("overrides") or {}
+            if not isinstance(overrides_raw, Mapping):
+                raise SchemaError("style.overrides must be a mapping")
+            style_overrides = dict(overrides_raw)
+        elif isinstance(style, Mapping):
+            style_overrides = {k: v for k, v in style.items() if k not in {"preset", "overrides"}}
+        else:
+            raise SchemaError("style must be a mapping")
+
+    if isinstance(record_or_records, Record):
+        return render_record_figure(
+            record_or_records,
+            renderer_name=renderer,
+            style_preset=style_preset,
+            style_overrides=style_overrides,
+        )
+
+    ncols = 3
+    if grid is not None:
+        if not isinstance(grid, Mapping):
+            raise SchemaError("grid must be a mapping")
+        unknown = sorted(str(k) for k in grid.keys() if str(k) != "ncols")
+        if unknown:
+            raise SchemaError(f"grid contains unknown keys: {unknown}; allowed keys: ['ncols']")
+        if "ncols" in grid:
+            ncols = int(grid["ncols"])
+    if ncols < 1:
+        raise SchemaError("grid.ncols must be >= 1")
+    return render_record_grid_figure(
+        record_or_records,
+        renderer_name=renderer,
+        style_preset=style_preset,
+        style_overrides=style_overrides,
+        ncols=ncols,
+    )

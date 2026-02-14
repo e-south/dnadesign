@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/baserender/src/cli.py
 
-Baserender vNext CLI for Cruncher showcase job configs.
+Baserender vNext CLI for Sequence Rows v3 job configs.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -30,7 +30,7 @@ from .core import BaseRenderError
 from .workspace import default_workspaces_root
 
 app = typer.Typer(help="Baserender vNext CLI")
-job_app = typer.Typer(help="Cruncher showcase job commands")
+job_app = typer.Typer(help="Sequence Rows v3 job commands")
 style_app = typer.Typer(help="Style commands")
 workspace_app = typer.Typer(help="Workspace commands")
 app.add_typer(job_app, name="job")
@@ -45,7 +45,7 @@ def _exit_cli_error(exc: Exception) -> None:
 
 @job_app.command("validate")
 def job_validate(
-    job: str | None = typer.Argument(None, help="Path to Cruncher showcase job YAML (or job name)."),
+    job: str | None = typer.Argument(None, help="Path to Sequence Rows v3 job YAML (or job name)."),
     workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace name containing job.yaml."),
     workspace_root: Path | None = typer.Option(
         None,
@@ -53,9 +53,9 @@ def job_validate(
         help="Workspace root directory (default: <cwd>/workspaces).",
     ),
 ) -> None:
-    """Validate a Cruncher showcase job config."""
+    """Validate a Sequence Rows v3 job config."""
     try:
-        parsed = validate_job_action(job, workspace, workspace_root, caller_root=Path.cwd())
+        parsed = validate_job_action(job, workspace, workspace_root)
     except BaseRenderError as exc:
         _exit_cli_error(exc)
     typer.echo(f"OK: {parsed.path}")
@@ -63,7 +63,7 @@ def job_validate(
 
 @job_app.command("run")
 def job_run(
-    job: str | None = typer.Argument(None, help="Path to Cruncher showcase job YAML (or job name)."),
+    job: str | None = typer.Argument(None, help="Path to Sequence Rows v3 job YAML (or job name)."),
     workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace name containing job.yaml."),
     workspace_root: Path | None = typer.Option(
         None,
@@ -71,9 +71,9 @@ def job_run(
         help="Workspace root directory (default: <cwd>/workspaces).",
     ),
 ) -> None:
-    """Run a Cruncher showcase job config."""
+    """Run a Sequence Rows v3 job config."""
     try:
-        report = run_job_action(job, workspace, workspace_root, caller_root=Path.cwd())
+        report = run_job_action(job, workspace, workspace_root)
     except BaseRenderError as exc:
         _exit_cli_error(exc)
 
@@ -84,7 +84,7 @@ def job_run(
 
 @job_app.command("normalize")
 def job_normalize(
-    job: str | None = typer.Argument(None, help="Path to Cruncher showcase job YAML (or job name)."),
+    job: str | None = typer.Argument(None, help="Path to Sequence Rows v3 job YAML (or job name)."),
     workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace name containing job.yaml."),
     workspace_root: Path | None = typer.Option(
         None,
@@ -93,14 +93,13 @@ def job_normalize(
     ),
     out: Path = typer.Option(..., "--out", help="Output path for normalized YAML."),
 ) -> None:
-    """Normalize and rewrite a Cruncher showcase job config with absolute resolved paths."""
+    """Normalize and rewrite a Sequence Rows v3 job config with absolute resolved paths."""
     try:
         written = normalize_job_action(
             job,
             workspace,
             workspace_root,
             out=out,
-            caller_root=Path.cwd(),
         )
     except BaseRenderError as exc:
         _exit_cli_error(exc)
@@ -165,7 +164,7 @@ def workspace_init(
         help="Workspace root directory (default: <cwd>/workspaces).",
     ),
 ) -> None:
-    """Create a workspace scaffold with job.yaml, inputs/, outputs/, and reports/."""
+    """Create a workspace scaffold with job.yaml, inputs/, and outputs/."""
     try:
         workspace = init_workspace_action(name, root)
     except BaseRenderError as exc:

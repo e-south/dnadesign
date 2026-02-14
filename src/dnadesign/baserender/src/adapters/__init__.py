@@ -15,6 +15,7 @@ from .cruncher_best_window import CruncherBestWindowAdapter
 from .densegen_tfbs import DensegenTfbsAdapter
 from .generic_features import GenericFeaturesAdapter
 from .registry import Adapter, build_adapter, required_source_columns
+from .sequence_windows_v1 import SequenceWindowsV1Adapter
 
 __all__ = [
     "Adapter",
@@ -23,4 +24,5 @@ __all__ = [
     "DensegenTfbsAdapter",
     "GenericFeaturesAdapter",
     "CruncherBestWindowAdapter",
+    "SequenceWindowsV1Adapter",
 ]

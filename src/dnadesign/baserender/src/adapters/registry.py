@@ -20,6 +20,7 @@ from ..core import Record, SchemaError
 from .cruncher_best_window import CruncherBestWindowAdapter
 from .densegen_tfbs import DensegenTfbsAdapter
 from .generic_features import GenericFeaturesAdapter
+from .sequence_windows_v1 import SequenceWindowsV1Adapter
 
 
 class Adapter(Protocol):
@@ -46,10 +47,15 @@ def _build_cruncher(cfg: AdapterCfg, alphabet: str) -> Adapter:
     return CruncherBestWindowAdapter.from_config(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
 
 
+def _build_sequence_windows(cfg: AdapterCfg, alphabet: str) -> Adapter:
+    return SequenceWindowsV1Adapter(columns=cfg.columns, policies=cfg.policies, alphabet=alphabet)
+
+
 ADAPTER_SPECS: dict[str, AdapterSpec] = {
     "densegen_tfbs": AdapterSpec(factory=_build_densegen),
     "generic_features": AdapterSpec(factory=_build_generic),
     "cruncher_best_window": AdapterSpec(factory=_build_cruncher),
+    "sequence_windows_v1": AdapterSpec(factory=_build_sequence_windows),
 }
 
 
