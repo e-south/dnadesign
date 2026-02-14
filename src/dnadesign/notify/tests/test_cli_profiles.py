@@ -987,6 +987,46 @@ def test_setup_webhook_auto_falls_back_to_file_secret_ref(tmp_path: Path, monkey
     assert resolve_secret_ref(secret_ref) == "https://example.invalid/webhook"
 
 
+def test_setup_webhook_auto_falls_back_to_file_when_secretservice_write_fails(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str((tmp_path / "config_home").resolve()))
+    monkeypatch.setattr(
+        "dnadesign.notify.cli.is_secret_backend_available",
+        lambda backend: backend in {"secretservice", "file"},
+    )
+
+    def _store(secret_ref: str, secret_value: str) -> None:
+        if secret_ref.startswith("secretservice://"):
+            raise NotifyConfigError("secret backend keyring write failed")
+        from dnadesign.notify.secrets import store_secret_ref as _store_secret_ref
+
+        _store_secret_ref(secret_ref, secret_value)
+
+    monkeypatch.setattr("dnadesign.notify.cli.store_secret_ref", _store)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "setup",
+            "webhook",
+            "--secret-source",
+            "auto",
+            "--name",
+            "densegen-shared",
+            "--webhook-url",
+            "https://example.invalid/webhook",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is True
+    assert payload["webhook"]["source"] == "secret_ref"
+    secret_ref = str(payload["webhook"]["ref"])
+    assert secret_ref.startswith("file://")
+    assert resolve_secret_ref(secret_ref) == "https://example.invalid/webhook"
+
+
 def test_setup_webhook_auto_reuses_existing_secret_without_prompt(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("XDG_CONFIG_HOME", str((tmp_path / "config_home").resolve()))
     monkeypatch.setattr("dnadesign.notify.cli.is_secret_backend_available", lambda backend: backend == "file")
