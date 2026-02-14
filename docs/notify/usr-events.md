@@ -63,17 +63,27 @@ uv run notify profile doctor --profile "$PROFILE"
 # Machine-friendly validation output for automation.
 uv run notify profile doctor --profile "$PROFILE" --json
 
-# Preview payloads without posting (autoloads profile from --tool/--workspace).
-uv run notify usr-events watch --tool densegen --workspace "$WORKSPACE" --dry-run
+# Preview payloads without posting (and without cursor advance).
+uv run notify usr-events watch \
+  --tool densegen \
+  --workspace "$WORKSPACE" \
+  --dry-run \
+  --no-advance-cursor-on-dry-run
 
-# Run live watcher (same autoload mode).
-uv run notify usr-events watch --tool densegen --workspace "$WORKSPACE" --follow
+# Run live watcher.
+uv run notify usr-events watch \
+  --tool densegen \
+  --workspace "$WORKSPACE" \
+  --follow \
+  --wait-for-events \
+  --stop-on-terminal-status \
+  --idle-timeout 900
 
-# If this command reports an events_source mismatch, regenerate the profile:
-# uv run notify setup slack --tool densegen --workspace "$WORKSPACE" --force
-
-# Tune polling cadence for lower idle overhead on batch nodes.
+# Optional: tune polling cadence for lower idle overhead on batch nodes.
 uv run notify usr-events watch --tool densegen --workspace "$WORKSPACE" --follow --poll-interval-seconds 1.0
+
+# If watch reports an events_source mismatch, regenerate the profile:
+# uv run notify setup slack --tool densegen --workspace "$WORKSPACE" --force
 
 # Retry failed payloads from spool.
 uv run notify spool drain --profile "$PROFILE"
@@ -89,6 +99,7 @@ Default (recommended):
   - `<config-dir>/outputs/notify/<tool>/cursor`
   - `<config-dir>/outputs/notify/<tool>/spool/`
 - this keeps run-local observability state co-located with run-local outputs and avoids cross-run drift
+- `dense run --fresh` preserves `outputs/notify/` so profile/cursor/spool survive fresh restarts
 - this remains decoupled from tool sink choices: tools may write parquet and/or Universal Sequence Record outputs, but Notify always watches the Universal Sequence Record `.events.log` contract
 
 Optional centralized mode:
@@ -176,6 +187,8 @@ Optional flags you may need:
 - `--secret-ref <backend://service/account>`: explicit key name/location for secure backend
 - `--events /abs/path/to/.events.log`: bypass resolver mode and point directly to an existing Universal Sequence Record events file
 - `--tls-ca-bundle /path/to/ca-bundle.pem`: explicit certificate-authority bundle for secure webhook delivery
+- `--progress-step-pct <1..100>`: profile-level DenseGen heartbeat milestone threshold
+- `--progress-min-seconds <seconds>`: profile-level anti-spam floor between running heartbeats
 - if `--events` is used with default profile path, pass `--policy` (for namespace) or pass an explicit `--profile`
 
 After setup:
@@ -205,7 +218,9 @@ uv run notify setup slack \
   --config "$CONFIG" \
   --secret-ref "$WEBHOOK_REF" \
   --secret-source auto \
-  --policy densegen
+  --policy densegen \
+  --progress-step-pct 25 \
+  --progress-min-seconds 60
 ```
 
 Infer/Evo2 config setup follows the same observer contract:
@@ -258,15 +273,14 @@ to emit structured output with `ok` and error fields.
 # If the run has not started yet, skip dry-run and use --wait-for-events.
 PROFILE="$(dirname "$CONFIG")/outputs/notify/densegen/profile.json"
 uv run notify profile doctor --profile "$PROFILE"
-uv run notify usr-events watch --tool densegen --config "$CONFIG" --dry-run
-uv run notify usr-events watch --tool densegen --config "$CONFIG" --follow
+uv run notify usr-events watch --tool densegen --config "$CONFIG" --dry-run --no-advance-cursor-on-dry-run
 uv run notify usr-events watch --tool densegen --config "$CONFIG" --follow --wait-for-events --stop-on-terminal-status --idle-timeout 900
 ```
 
 `notify profile doctor` treats resolver-backed profiles as valid before `.events.log` is created and reports this as a pending events file state.
 
 ```bash
-# 3) Run the watcher in Boston University Shared Computing Cluster batch mode (recommended)
+# 4) Run the watcher in Boston University Shared Computing Cluster batch mode (recommended)
 qsub -P <project> \
   -v NOTIFY_PROFILE="$(dirname "$CONFIG")/outputs/notify/densegen/profile.json" \
   docs/bu-scc/jobs/notify-watch.qsub
@@ -307,8 +321,6 @@ qsub -P <project> \
 
 If you run env mode with explicit `EVENTS_PATH` instead of resolver mode, set both
 `NOTIFY_POLICY` and `NOTIFY_NAMESPACE` so filter defaults and state paths stay deterministic.
-
----
 
 ## Common mistakes
 
@@ -372,6 +384,7 @@ Behavior:
 - `--dry-run` prints formatted payloads and does not require `--url`, `--url-env`, or `--secret-ref`
 - by default, `--dry-run` still advances cursor offsets to prevent replay drift
 - use `--no-advance-cursor-on-dry-run` when you need a non-mutating preview
+- resolver mode (`--tool` with `--config` or `--workspace`) is preferred when profile paths should follow run/workspace layout
 
 ---
 
@@ -468,11 +481,11 @@ uv run notify usr-events watch \
 
 If payloads look correct, remove `--dry-run` to deliver for real.
 
-Generate additional events by increasing quota and resuming DenseGen:
+Generate additional events by extending quota and resuming DenseGen:
 
 ```bash
 # Emit additional Universal Sequence Record events by resuming DenseGen.
-uv run dense run --resume --no-plot
+uv run dense run --resume --extend-quota 8 --no-plot
 ```
 
 ---

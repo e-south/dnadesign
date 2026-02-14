@@ -198,9 +198,10 @@ fi
 if [[ "$MODE" == "profile" ]]; then
   (
     cd "$REPO_ROOT"
-    uv run notify setup slack \
+    uv run notify profile wizard \
       --events "$EVENTS_PATH" \
       --profile "$PROFILE_PATH" \
+      --provider generic \
       --policy densegen \
       --secret-source env \
       --url-env NOTIFY_WEBHOOK \
@@ -220,6 +221,7 @@ else
     EVENTS_PATH="$EVENTS_PATH" \
     CURSOR_PATH="$CURSOR_PATH" \
     SPOOL_DIR="$SPOOL_DIR" \
+    NOTIFY_PROVIDER="generic" \
     NOTIFY_POLICY="densegen" \
     NOTIFY_NAMESPACE="densegen" \
     WEBHOOK_ENV="NOTIFY_WEBHOOK" \
@@ -241,7 +243,11 @@ lines = [line for line in capture_path.read_text(encoding="utf-8").splitlines() 
 if not lines:
     raise SystemExit("No webhook requests were captured.")
 payloads = [json.loads(line) for line in lines]
-if not any("SUCCESS" in str(payload.get("text", "")) for payload in payloads):
+if not any(
+    ("SUCCESS" in str(payload.get("text", "")))
+    or (str(payload.get("status", "")).lower() == "success")
+    for payload in payloads
+):
     raise SystemExit("Captured payloads did not include a success notification.")
 print(len(payloads))
 PY

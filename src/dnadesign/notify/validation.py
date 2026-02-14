@@ -18,6 +18,8 @@ from urllib.parse import urlparse
 from .errors import NotifyConfigError
 from .secrets import resolve_secret_ref
 
+_SLACK_WEBHOOK_HOSTS = {"hooks.slack.com", "hooks.slack-gov.com"}
+
 
 def resolve_webhook_url(*, url: str | None, url_env: str | None, secret_ref: str | None = None) -> str:
     source_count = int(bool(url)) + int(bool(url_env)) + int(bool(secret_ref))
@@ -71,3 +73,18 @@ def resolve_tls_ca_bundle(*, webhook_url: str, tls_ca_bundle: Path | None) -> Pa
     if not resolved.is_file():
         raise NotifyConfigError(f"CA bundle path is not a file: {resolved}")
     return resolved
+
+
+def validate_provider_webhook_url(*, provider: str, webhook_url: str) -> None:
+    provider_name = str(provider or "").strip().lower()
+    parsed = urlparse(str(webhook_url).strip())
+    host = str(parsed.hostname or "").strip().lower()
+    if provider_name != "slack":
+        return
+    if host not in _SLACK_WEBHOOK_HOSTS:
+        allowed = ", ".join(sorted(_SLACK_WEBHOOK_HOSTS))
+        raise NotifyConfigError(
+            f"slack provider requires webhook host in {{{allowed}}}; found: {host or '<missing>'}"
+        )
+    if not str(parsed.path or "").startswith("/services/"):
+        raise NotifyConfigError("slack provider requires webhook path beginning with /services/")

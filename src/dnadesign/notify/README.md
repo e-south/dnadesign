@@ -45,30 +45,45 @@ Artifact placement default:
 ```bash
 WORKSPACE=<workspace>
 CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/$WORKSPACE/config.yaml
+PROFILE=<dnadesign_repo>/src/dnadesign/densegen/workspaces/$WORKSPACE/outputs/notify/densegen/profile.json
 
-# Discover available workspace names for your tool.
+# 1) Discover available workspace names for your tool.
 uv run notify setup list-workspaces --tool densegen
 
-# One-time webhook secret setup (config-agnostic).
-# Save the returned webhook.ref value for profile setup reuse.
-uv run notify setup webhook --secret-source auto --name densegen-shared --json
+# 2) Configure webhook secret once (config-agnostic) and keep webhook ref.
+WEBHOOK_REF="$(uv run notify setup webhook --secret-source auto --name densegen-shared --json | python -c 'import json,sys; print(json.load(sys.stdin)[\"webhook\"][\"ref\"])')"
 
-# One-time profile setup by workspace shorthand (writes profile under <config-dir>/outputs/notify/<tool>/).
-uv run notify setup slack --tool densegen --workspace "$WORKSPACE" --secret-source auto --secret-ref "<webhook-ref>"
-# Explicit path fallback:
-# uv run notify setup slack --tool densegen --config "$CONFIG" --secret-source auto
+# 3) Create/update watcher profile (default path: outputs/notify/densegen/profile.json).
+uv run notify setup slack \
+  --tool densegen \
+  --workspace "$WORKSPACE" \
+  --secret-source auto \
+  --secret-ref "$WEBHOOK_REF" \
+  --policy densegen \
+  --progress-step-pct 25 \
+  --progress-min-seconds 60
 
-# Validate the resolved profile.
-uv run notify profile doctor --profile "src/dnadesign/densegen/workspaces/$WORKSPACE/outputs/notify/densegen/profile.json"
+# 4) Validate profile wiring and secret resolution.
+uv run notify profile doctor --profile "$PROFILE"
 
-# Preview payloads without posting (autoload profile from --tool/--workspace).
-uv run notify usr-events watch --tool densegen --workspace "$WORKSPACE" --dry-run
+# 5) Preview payload mapping without posting (cursor stays unchanged).
+uv run notify usr-events watch \
+  --tool densegen \
+  --workspace "$WORKSPACE" \
+  --dry-run \
+  --no-advance-cursor-on-dry-run
 
-# Run live watcher (same autoload mode).
-uv run notify usr-events watch --tool densegen --workspace "$WORKSPACE" --follow
+# 6) Run live watcher (start before tool run if you want STARTED events).
+uv run notify usr-events watch \
+  --tool densegen \
+  --workspace "$WORKSPACE" \
+  --follow \
+  --wait-for-events \
+  --stop-on-terminal-status \
+  --idle-timeout 900
 
-# Retry failed payloads from spool.
-uv run notify spool drain --profile "src/dnadesign/densegen/workspaces/$WORKSPACE/outputs/notify/densegen/profile.json"
+# 7) Retry failed payloads from spool.
+uv run notify spool drain --profile "$PROFILE"
 ```
 
 ## Read order

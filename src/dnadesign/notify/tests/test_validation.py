@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from dnadesign.notify.errors import NotifyConfigError
-from dnadesign.notify.validation import resolve_tls_ca_bundle, resolve_webhook_url
+from dnadesign.notify.validation import resolve_tls_ca_bundle, resolve_webhook_url, validate_provider_webhook_url
 
 
 def test_resolve_webhook_url_requires_source(monkeypatch) -> None:
@@ -82,3 +82,18 @@ def test_resolve_tls_ca_bundle_rejects_missing_file(tmp_path: Path, monkeypatch)
 def test_resolve_tls_ca_bundle_returns_none_for_http(monkeypatch) -> None:
     monkeypatch.delenv("SSL_CERT_FILE", raising=False)
     assert resolve_tls_ca_bundle(webhook_url="http://example.com/hook", tls_ca_bundle=None) is None
+
+
+def test_validate_provider_webhook_url_allows_valid_slack_host() -> None:
+    validate_provider_webhook_url(
+        provider="slack",
+        webhook_url="https://hooks.slack.com/services/T000/B000/XXX",
+    )
+
+
+def test_validate_provider_webhook_url_rejects_non_slack_host_for_slack_provider() -> None:
+    with pytest.raises(NotifyConfigError, match="slack provider requires webhook host"):
+        validate_provider_webhook_url(
+            provider="slack",
+            webhook_url="https://example.invalid/webhook",
+        )

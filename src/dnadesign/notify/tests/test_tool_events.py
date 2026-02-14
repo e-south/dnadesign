@@ -96,6 +96,34 @@ def test_evaluate_tool_event_densegen_running_is_gated_by_progress_step() -> Non
     assert second_decision.emit is False
 
 
+def test_evaluate_tool_event_densegen_running_uses_25pct_step_for_small_quotas() -> None:
+    state = ToolEventState()
+    first = _event("densegen_health", status="running")
+    first["metrics"] = _densegen_metrics(run_quota=100, quota_progress_pct=24.0)
+    second = _event("densegen_health", status="running", timestamp="2026-02-06T00:10:00+00:00")
+    second["metrics"] = _densegen_metrics(run_quota=100, quota_progress_pct=25.0)
+
+    first_decision = evaluate_tool_event("densegen_health", first, run_id="run-1", state=state)
+    second_decision = evaluate_tool_event("densegen_health", second, run_id="run-1", state=state)
+
+    assert first_decision.emit is True
+    assert second_decision.emit is True
+
+
+def test_evaluate_tool_event_densegen_running_uses_10pct_step_for_large_quotas() -> None:
+    state = ToolEventState()
+    first = _event("densegen_health", status="running")
+    first["metrics"] = _densegen_metrics(run_quota=1000, quota_progress_pct=9.0)
+    second = _event("densegen_health", status="running", timestamp="2026-02-06T00:10:00+00:00")
+    second["metrics"] = _densegen_metrics(run_quota=1000, quota_progress_pct=10.0)
+
+    first_decision = evaluate_tool_event("densegen_health", first, run_id="run-1", state=state)
+    second_decision = evaluate_tool_event("densegen_health", second, run_id="run-1", state=state)
+
+    assert first_decision.emit is True
+    assert second_decision.emit is True
+
+
 def test_evaluate_tool_event_densegen_completion_exposes_duration() -> None:
     state = ToolEventState()
     started = _event("densegen_health", status="started", timestamp="2026-02-06T00:00:00+00:00")
@@ -120,6 +148,82 @@ def test_evaluate_tool_event_densegen_completion_exposes_duration() -> None:
     assert decision.duration_seconds == 30.0
 
 
+def test_evaluate_tool_event_densegen_resumed_is_suppressed() -> None:
+    state = ToolEventState()
+    resumed = _event("densegen_health", status="resumed")
+    resumed["metrics"] = _densegen_metrics(
+        run_quota=100,
+        rows_written_session=0,
+        quota_progress_pct=0.0,
+        plans_attempted=0,
+        plans_solved=0,
+    )
+
+    decision = evaluate_tool_event("densegen_health", resumed, run_id="run-1", state=state)
+
+    assert decision.emit is False
+
+
+def test_evaluate_tool_event_densegen_completed_with_zero_progress_is_suppressed() -> None:
+    state = ToolEventState()
+    started = _event("densegen_health", status="started", timestamp="2026-02-06T00:00:00+00:00")
+    started["metrics"] = _densegen_metrics(
+        run_quota=40,
+        rows_written_session=0,
+        quota_progress_pct=0.0,
+        plans_attempted=0,
+        plans_solved=0,
+    )
+    completed = _event("densegen_health", status="completed", timestamp="2026-02-06T00:00:05+00:00")
+    completed["metrics"] = _densegen_metrics(
+        run_quota=40,
+        rows_written_session=0,
+        quota_progress_pct=0.0,
+        plans_attempted=0,
+        plans_solved=0,
+    )
+
+    _ = evaluate_tool_event("densegen_health", started, run_id="run-1", state=state)
+    decision = evaluate_tool_event("densegen_health", completed, run_id="run-1", state=state)
+
+    assert decision.emit is False
+
+
+def test_evaluate_tool_event_densegen_completed_is_emitted_once_per_run() -> None:
+    state = ToolEventState()
+    started = _event("densegen_health", status="started", timestamp="2026-02-06T00:00:00+00:00")
+    started["metrics"] = _densegen_metrics(
+        run_quota=40,
+        rows_written_session=0,
+        quota_progress_pct=0.0,
+        plans_attempted=0,
+        plans_solved=0,
+    )
+    completed_first = _event("densegen_health", status="completed", timestamp="2026-02-06T00:00:05+00:00")
+    completed_first["metrics"] = _densegen_metrics(
+        run_quota=40,
+        rows_written_session=2,
+        quota_progress_pct=5.0,
+        plans_attempted=2,
+        plans_solved=2,
+    )
+    completed_second = _event("densegen_health", status="completed", timestamp="2026-02-06T00:00:06+00:00")
+    completed_second["metrics"] = _densegen_metrics(
+        run_quota=40,
+        rows_written_session=2,
+        quota_progress_pct=5.0,
+        plans_attempted=2,
+        plans_solved=2,
+    )
+
+    _ = evaluate_tool_event("densegen_health", started, run_id="run-1", state=state)
+    first_decision = evaluate_tool_event("densegen_health", completed_first, run_id="run-1", state=state)
+    second_decision = evaluate_tool_event("densegen_health", completed_second, run_id="run-1", state=state)
+
+    assert first_decision.emit is True
+    assert second_decision.emit is False
+
+
 def test_tool_event_message_override_formats_densegen_health_message() -> None:
     event = _event("densegen_health", status="running")
     event["metrics"] = _densegen_metrics()
@@ -127,7 +231,7 @@ def test_tool_event_message_override_formats_densegen_health_message() -> None:
     msg = tool_event_message_override("densegen_health", event, run_id="run-1", duration_seconds=12.0)
 
     assert msg is not None
-    assert "DenseGen health | run=run-1 | dataset=demo" in msg
+    assert "DenseGen progress | run=run-1 | dataset=demo" in msg
     assert "- Quota: 10.0% (10/100 rows)" in msg
 
 

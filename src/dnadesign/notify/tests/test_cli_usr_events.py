@@ -226,6 +226,32 @@ def test_usr_events_watch_accepts_tls_ca_bundle_override(tmp_path: Path, monkeyp
     assert captured[0]["tls_ca_bundle"] == ca_bundle.resolve()
 
 
+def test_usr_events_watch_rejects_non_slack_webhook_host_for_slack_provider(tmp_path: Path) -> None:
+    events = tmp_path / "events.log"
+    ca_bundle = tmp_path / "ca.pem"
+    ca_bundle.write_text("dummy", encoding="utf-8")
+    _write_events(events, [_event()])
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "usr-events",
+            "watch",
+            "--provider",
+            "slack",
+            "--url",
+            "https://example.invalid/webhook",
+            "--tls-ca-bundle",
+            str(ca_bundle),
+            "--events",
+            str(events),
+        ],
+    )
+    assert result.exit_code == 1
+    assert "slack provider requires webhook host" in result.stdout
+
+
 def test_usr_events_watch_can_skip_invalid_events_when_configured(tmp_path: Path) -> None:
     events = tmp_path / "events.log"
     bad = _event()
@@ -734,10 +760,10 @@ def test_usr_events_watch_formats_densegen_health_message(tmp_path: Path) -> Non
         ],
     )
     assert result.exit_code == 0
-    assert "DenseGen health | run=run-1 | dataset=demo" in result.stdout
+    assert "DenseGen progress | run=run-1 | dataset=demo" in result.stdout
     assert "- Quota: 10.0% (12/120 rows)" in result.stdout
-    assert "- TFBS library coverage: 25.0% (20/80)" in result.stdout
     assert "- Plan success: 8/10 (80.0%)" in result.stdout
+    assert "- TFBS coverage: 25.0% (20/80)" in result.stdout
 
 
 def test_usr_events_watch_includes_error_in_failed_densegen_health_message(tmp_path: Path) -> None:
@@ -759,6 +785,8 @@ def test_usr_events_watch_includes_error_in_failed_densegen_health_message(tmp_p
             "generic",
             "--events",
             str(events),
+            "--progress-step-pct",
+            "10",
             "--dry-run",
         ],
     )
@@ -890,7 +918,7 @@ def test_usr_events_watch_emits_densegen_running_health_on_quota_step_boundary(t
     first["timestamp_utc"] = "2026-02-06T00:00:00+00:00"
     first["metrics"] = {
         "densegen": {
-            "run_quota": 100,
+            "run_quota": 1000,
             "rows_written_session": 9,
             "quota_progress_pct": 9.0,
             "tfbs_total_library": 40,
@@ -905,7 +933,7 @@ def test_usr_events_watch_emits_densegen_running_health_on_quota_step_boundary(t
     second["timestamp_utc"] = "2026-02-06T00:01:00+00:00"
     second["metrics"] = {
         "densegen": {
-            "run_quota": 100,
+            "run_quota": 1000,
             "rows_written_session": 10,
             "quota_progress_pct": 10.0,
             "tfbs_total_library": 40,
@@ -986,11 +1014,11 @@ def test_usr_events_watch_formats_densegen_completion_summary_with_runtime(tmp_p
         ],
     )
     assert result.exit_code == 0
-    assert "DenseGen complete | run=run-1 | dataset=demo" in result.stdout
+    assert "DenseGen completed | run=run-1 | dataset=demo" in result.stdout
     assert "- Duration: 00:10:30" in result.stdout
-    assert "- Final quota: 100.0% (100/100 rows)" in result.stdout
-    assert "- Final TFBS coverage: 75.0% (30/40)" in result.stdout
-    assert "- Final plan success: 18/20 (90.0%)" in result.stdout
+    assert "- Quota: 100.0% (100/100 rows)" in result.stdout
+    assert "- TFBS coverage: 75.0% (30/40)" in result.stdout
+    assert "- Plans: 18/20 (90.0%)" in result.stdout
 
 
 def test_usr_events_watch_can_stop_on_terminal_status(tmp_path: Path) -> None:

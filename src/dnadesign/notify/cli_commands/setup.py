@@ -71,6 +71,16 @@ def register_setup_commands(
             "--include-raw-event/--no-include-raw-event",
             help="Whether to include the full USR event blob in payload meta.",
         ),
+        progress_step_pct: int | None = typer.Option(
+            None,
+            "--progress-step-pct",
+            help="DenseGen progress heartbeat threshold as percentage points (1-100).",
+        ),
+        progress_min_seconds: float | None = typer.Option(
+            None,
+            "--progress-min-seconds",
+            help="Minimum spacing between DenseGen progress heartbeats in seconds.",
+        ),
         tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
         secret_source: str = typer.Option(
             "auto",
@@ -112,6 +122,8 @@ def register_setup_commands(
             include_args=include_args,
             include_context=include_context,
             include_raw_event=include_raw_event,
+            progress_step_pct=progress_step_pct,
+            progress_min_seconds=progress_min_seconds,
             tls_ca_bundle=tls_ca_bundle,
             secret_source=secret_source,
             url_env=url_env,

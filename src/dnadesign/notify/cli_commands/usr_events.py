@@ -30,7 +30,7 @@ def register_usr_events_watch_command(
         secret_ref: str | None = typer.Option(
             None,
             "--secret-ref",
-            help="Secret reference: keychain://service/account or secretservice://service/account.",
+            help="Secret reference: keychain://service/account, secretservice://service/account, or file:///path.",
         ),
         tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
         events: Path | None = typer.Option(None, "--events", help="USR events JSONL path."),
@@ -83,6 +83,16 @@ def register_usr_events_watch_command(
         ),
         only_actions: str | None = typer.Option(None, "--only-actions", help="Comma-separated action filter."),
         only_tools: str | None = typer.Option(None, "--only-tools", help="Comma-separated actor tool filter."),
+        progress_step_pct: int | None = typer.Option(
+            None,
+            "--progress-step-pct",
+            help="DenseGen progress heartbeat threshold as percentage points (1-100).",
+        ),
+        progress_min_seconds: float | None = typer.Option(
+            None,
+            "--progress-min-seconds",
+            help="Minimum spacing between DenseGen progress heartbeats in seconds.",
+        ),
         on_invalid_event: str = typer.Option(
             "error",
             "--on-invalid-event",
@@ -137,6 +147,8 @@ def register_usr_events_watch_command(
             on_truncate=on_truncate,
             only_actions=only_actions,
             only_tools=only_tools,
+            progress_step_pct=progress_step_pct,
+            progress_min_seconds=progress_min_seconds,
             on_invalid_event=on_invalid_event,
             allow_unknown_version=allow_unknown_version,
             tool=tool,
