@@ -57,6 +57,23 @@ If you keep this order in mind, most diagnostics become easy to interpret:
 - coverage/composition issues are Stage-B sampling + solver outcomes
 - storage/event delivery issues are output-target specific (Parquet vs USR)
 
+### Output modes and handoff paths
+
+- `--output-mode local`: canonical run artifact is `outputs/tables/dense_arrays.parquet`.
+- `--output-mode usr`: canonical run artifact is USR dataset `outputs/usr_datasets/<dataset>/records.parquet` plus overlays and `.events.log`.
+- `--output-mode both`: writes both sinks and enforces sink-alignment checks during the run.
+
+For `local`, copy `outputs/tables/dense_arrays.parquet`.  
+For `usr`, resolve the dataset path from the run, then export:
+
+```bash
+# Resolve USR dataset path from the run and export a portable parquet handoff.
+EVENTS_PATH="$(uv run dense inspect run --usr-events-path -c "$CONFIG")"
+DATASET_PATH="$(dirname "$EVENTS_PATH")"
+mkdir -p /tmp/densegen_handoff
+uv run usr export "$DATASET_PATH" --fmt parquet --out /tmp/densegen_handoff
+```
+
 ### Quick start: binding-sites baseline
 
 Run from repo root:
@@ -79,6 +96,14 @@ uv run dense run --fresh
 
 # Inspect run diagnostics.
 uv run dense inspect run --library --events
+```
+
+Local-mode handoff output:
+
+```bash
+# Canonical local parquet artifact for downstream copy/use.
+ls -lh outputs/tables/dense_arrays.parquet
+cp outputs/tables/dense_arrays.parquet /path/to/handoff/binding_sites_trial.parquet
 ```
 
 ### Quick start: canonical PWM path
@@ -114,12 +139,17 @@ uv run dense run --no-plot
 uv run dense inspect run --library --events
 ```
 
-To continue generation later, increase plan quotas in `config.yaml`, then run:
+To continue generation later without editing `config.yaml`, extend quotas at runtime and resume:
 
 ```bash
 # Resume from existing outputs/state.
-uv run dense run --resume --no-plot
+uv run dense run --resume --extend-quota 8 --no-plot
 ```
+
+If a run is interrupted after `--extend-quota`, the next plain `uv run dense run --resume` reuses
+the last effective quota target until that target is satisfied.
+
+You can still edit plan quotas in `config.yaml`; runtime `--extend-quota` is for iterative sampling sessions.
 
 ---
 

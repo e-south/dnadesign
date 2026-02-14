@@ -182,14 +182,12 @@ uv run dense inspect run --usr-events-path -c "$CONFIG"
 Use only the USR `.events.log` path for Notify.
 `outputs/meta/events.jsonl` is DenseGen runtime telemetry and is not Notify input.
 
-Pick dataset path that matches your config:
-
 ```bash
-# Default dataset path from workspace init.
-DATASET_PATH="outputs/usr_datasets/usr_notify_trial"
-
-# If you set densegen.output.usr.dataset: densegen/usr_notify_trial.
-DATASET_PATH="outputs/usr_datasets/densegen/usr_notify_trial"
+# Derive dataset path directly from the resolved events file (no path guessing).
+EVENTS_PATH="$(uv run dense inspect run --usr-events-path -c "$CONFIG")"
+DATASET_PATH="$(dirname "$EVENTS_PATH")"
+echo "$EVENTS_PATH"
+echo "$DATASET_PATH"
 ```
 
 Optional USR inspection:
@@ -216,18 +214,19 @@ flag-by-flag rationale and profile expectations are documented in
 ```bash
 # Workspace-scoped DenseGen config for this run (not a repo-root config path).
 echo "$CONFIG"
-NOTIFY_DIR="outputs/notify"
 
 # Create Notify profile from DenseGen config.
 uv run notify setup slack \
   --tool densegen \
   --config "$CONFIG" \
-  --profile "$NOTIFY_DIR/profile.json" \
-  --cursor "$NOTIFY_DIR/cursor" \
-  --spool-dir "$NOTIFY_DIR/spool" \
   --secret-source env \
   --url-env DENSEGEN_WEBHOOK \
-  --policy densegen
+  --policy densegen \
+  --progress-step-pct 25 \
+  --progress-min-seconds 60
+
+# Default profile path for resolver mode.
+PROFILE="outputs/notify/densegen/profile.json"
 ```
 
 For existing runs, `--events` is also valid if you want direct path mode:
@@ -236,9 +235,7 @@ For existing runs, `--events` is also valid if you want direct path mode:
 EVENTS_PATH="$(uv run dense inspect run --usr-events-path -c "$CONFIG")"
 uv run notify setup slack \
   --events "$EVENTS_PATH" \
-  --profile "$NOTIFY_DIR/profile.json" \
-  --cursor "$NOTIFY_DIR/cursor" \
-  --spool-dir "$NOTIFY_DIR/spool" \
+  --profile "$PROFILE" \
   --secret-source env \
   --url-env DENSEGEN_WEBHOOK \
   --policy densegen
@@ -246,13 +243,13 @@ uv run notify setup slack \
 
 ```bash
 # Validate profile.
-uv run notify profile doctor --profile "$NOTIFY_DIR/profile.json"
+uv run notify profile doctor --profile "$PROFILE"
 
-# Preview payloads without sending.
-uv run notify usr-events watch --profile "$NOTIFY_DIR/profile.json" --dry-run --wait-for-events
+# Preview payloads without sending (no cursor advance).
+uv run notify usr-events watch --profile "$PROFILE" --dry-run --no-advance-cursor-on-dry-run
 
 # Run live watcher.
-uv run notify usr-events watch --profile "$NOTIFY_DIR/profile.json" --follow --wait-for-events
+uv run notify usr-events watch --profile "$PROFILE" --follow --wait-for-events --stop-on-terminal-status --idle-timeout 900
 ```
 
 You should now see webhook POST payloads in Terminal A.
