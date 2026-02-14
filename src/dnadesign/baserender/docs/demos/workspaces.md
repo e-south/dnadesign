@@ -38,6 +38,18 @@ uv run baserender job run --workspace demo_run --workspace-root /path/to/workspa
 - input: `inputs/motif_library.json` (canonical motif primitives)
 - output: PDF files under `outputs/plots/`
 
+Input contract intent:
+- keep only runtime-essential primitives in `inputs/` (YAGNI)
+- no deep Cruncher catalog/path coupling inside baserender demos
+- motif logos come from `motif_library.json` (optimization motifs), not inferred from elite windows
+
+`elites_showcase_records.parquet` includes normalized columns consumed by `generic_features`:
+- `id`
+- `sequence`
+- `features`
+- `effects`
+- `display`
+
 #### `demo_cruncher_render/job.yaml` visual contract
 
 Sequence text tone in this demo is controlled by:

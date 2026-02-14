@@ -49,6 +49,11 @@ Primary entrypoints:
 - `run_job(path_or_dict, kind=..., strict=..., caller_root=...)`
 - `render(record_or_records, renderer=..., style=..., grid=...)`
 
+Grid behavior in `render(...)`:
+- single record: one panel
+- multiple records: default is one row (`ncols = number of records`)
+- override explicitly with `grid={"ncols": <int>}`
+
 Compatibility aliases are still exported:
 - `validate_cruncher_showcase_job`
 - `run_cruncher_showcase_job`

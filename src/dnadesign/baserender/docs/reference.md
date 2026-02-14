@@ -136,6 +136,11 @@ Stable API surface:
 - `Record`, `Feature`, `Effect`, `Display`, `Span`
 - `SchemaError`, `ContractError`, `LayoutError`
 
+`render(...)` grid default:
+- record list input defaults to a single-row layout (`ncols = len(records)`).
+- callers can override with `grid.ncols`.
+- invalid/unknown `grid` keys fail fast (`SchemaError`).
+
 Compatibility aliases:
 - `validate_cruncher_showcase_job`
 - `run_cruncher_showcase_job`

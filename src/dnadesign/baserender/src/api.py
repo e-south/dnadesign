@@ -283,7 +283,8 @@ def render(
             style_overrides=style_overrides,
         )
 
-    ncols = 3
+    records_list = list(record_or_records)
+    ncols = len(records_list)
     if grid is not None:
         if not isinstance(grid, Mapping):
             raise SchemaError("grid must be a mapping")
@@ -295,7 +296,7 @@ def render(
     if ncols < 1:
         raise SchemaError("grid.ncols must be >= 1")
     return render_record_grid_figure(
-        record_or_records,
+        records_list,
         renderer_name=renderer,
         style_preset=style_preset,
         style_overrides=style_overrides,

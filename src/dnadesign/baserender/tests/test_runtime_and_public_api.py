@@ -238,6 +238,50 @@ def test_public_render_rejects_unknown_grid_keys() -> None:
         baserender.render(records, grid={"cols": 2})
 
 
+def test_public_render_defaults_to_single_row_for_record_lists(monkeypatch: pytest.MonkeyPatch) -> None:
+    records = (
+        baserender.Record(
+            id="r1",
+            alphabet="DNA",
+            sequence="TTGACAAAAAAAAAAAAAAAATATAAT",
+            features=(),
+            display=baserender.Display(overlay_text="elite-1", tag_labels={}),
+        ),
+        baserender.Record(
+            id="r2",
+            alphabet="DNA",
+            sequence="TTGACAAAAAAAAAAAAAAAATATAAT",
+            features=(),
+            display=baserender.Display(overlay_text="elite-2", tag_labels={}),
+        ),
+        baserender.Record(
+            id="r3",
+            alphabet="DNA",
+            sequence="TTGACAAAAAAAAAAAAAAAATATAAT",
+            features=(),
+            display=baserender.Display(overlay_text="elite-3", tag_labels={}),
+        ),
+    )
+    seen: dict[str, int] = {}
+
+    def _fake_grid(
+        _records,
+        *,
+        renderer_name: str,
+        style_preset,
+        style_overrides,
+        ncols: int,
+    ):
+        seen["ncols"] = int(ncols)
+        assert renderer_name == "sequence_rows"
+        return plt.figure(figsize=(2, 2), dpi=100)
+
+    monkeypatch.setattr("dnadesign.baserender.src.api.render_record_grid_figure", _fake_grid)
+    fig = baserender.render(records)
+    assert seen["ncols"] == 3
+    plt.close(fig)
+
+
 def test_public_api_rejects_unknown_kind() -> None:
     with pytest.raises(baserender.SchemaError, match="kind must be one of"):
         baserender.validate_job("densegen_job", kind="v4")
