@@ -16,6 +16,7 @@ from pathlib import Path
 
 import yaml
 
+from dnadesign.baserender import cruncher_showcase_style_overrides
 from dnadesign.baserender.src.api import run_cruncher_showcase_job
 from dnadesign.baserender.src.config import load_cruncher_showcase_job
 
@@ -48,11 +49,15 @@ def test_curated_workspace_demos_are_self_contained() -> None:
         assert _is_under(job.input.path, ws / "inputs"), f"{name} input path must be within workspace inputs/"
 
         if name == "demo_cruncher_render":
+            assert raw["render"]["style"]["overrides"] == cruncher_showcase_style_overrides()
             cols = job.input.adapter.columns
             assert job.input.adapter.kind == "generic_features"
             assert cols["features"] == "features"
             assert cols["effects"] == "effects"
             assert cols["display"] == "display"
+            assert (ws / "inputs" / "motif_library.json").exists()
+            plugins = [spec.name for spec in job.pipeline.plugins]
+            assert "attach_motifs_from_library" in plugins
             import pyarrow.parquet as pq
 
             rows = pq.read_table(ws / "inputs" / "elites_showcase_records.parquet").to_pylist()
@@ -83,7 +88,7 @@ def test_curated_workspace_demos_run_in_isolated_copy(tmp_path: Path) -> None:
 
     expected_fmt = {
         "demo_densegen_render": ".png",
-        "demo_cruncher_render": ".png",
+        "demo_cruncher_render": ".pdf",
     }
 
     for name, suffix in expected_fmt.items():

@@ -28,4 +28,4 @@ outputs:
 run:
   strict: false
   fail_on_skips: false
-  emit_report: true
+  emit_report: false

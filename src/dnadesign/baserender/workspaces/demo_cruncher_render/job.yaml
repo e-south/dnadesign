@@ -14,42 +14,60 @@ input:
   alphabet: DNA
 pipeline:
   plugins:
-    - attach_motifs_from_cruncher_lockfile:
-        lockfile_path: inputs/lockfile.json
-        motif_store_root: inputs/motif_store
+    - attach_motifs_from_library:
+        library_path: inputs/motif_library.json
 render:
   renderer: sequence_rows
   style:
     preset: presentation_default
     overrides:
+      figure_scale: 1.60
+      overlay_align: center
+      layout:
+        outer_pad_cells: 0.20
+      sequence:
+        strand_gap_cells: 0.18
+        to_kmer_gap_cells: 0.12
+        bold_consensus_bases: true
+        non_consensus_color: "#9CA3AF"
+        tone_quantile_low: 0.10
+        tone_quantile_high: 0.90
       palette:
         tf:lexA: "#B45309"
         tf:cpxR: "#0F766E"
       connectors: false
+      legend_mode: inline
+      legend_inline_side: auto
+      legend_inline_margin_cells: 0.28
       legend_font_size: 10
       kmer:
         box_height_cells: 1.12
         fill_alpha: 0.94
         text_y_nudge_cells: 0.0
+        to_logo_gap_cells: 0.12
       motif_logo:
         layout: stack
         lane_mode: follow_feature_track
         display_mode: information
         height_bits: 2.0
-        bits_to_cells: 1.25
-        y_pad_cells: 0.20
+        bits_to_cells: 1.35
+        y_pad_cells: 0.0
         letter_x_pad_frac: 0.06
         alpha_other: 0.80
         alpha_observed: 1.0
         debug_bounds: false
+        letter_coloring:
+          mode: match_window_seq
+          other_color: "#D1D5DB"
+          observed_color_source: feature_fill
         scale_bar:
           enabled: true
-          location: top_right
+          location: left_of_logo
 outputs:
   - kind: images
     dir: plots
-    fmt: png
+    fmt: pdf
 run:
   strict: false
   fail_on_skips: false
-  emit_report: true
+  emit_report: false

@@ -70,12 +70,17 @@ class LayoutContext:
     height: float
     y_forward: float
     y_reverse: float
+    sequence_half_height: float
+    sequence_extent_up: float
+    sequence_extent_down: float
     x_left: float
     n_up_tracks: int
     n_dn_tracks: int
     kmer_box_height: float
     feature_track_step: float
     feature_track_base_offset: float
+    feature_track_base_offset_up: float
+    feature_track_base_offset_down: float
     placements: tuple[FeaturePlacement, ...]
     feature_boxes: Mapping[str, tuple[float, float, float, float]]
     feature_track_by_id: Mapping[str, int]
@@ -117,6 +122,32 @@ def measure_char_cell(font_family: str, font_size: int, dpi: int) -> CharCell:
     cw_pt = bbox_w.width / 64
     ch_pt = TextPath((0, 0), "Ag", prop=prop).get_extents().height
     return CharCell(width=cw_pt / 72.0 * dpi, height=ch_pt / 72.0 * dpi)
+
+
+@lru_cache(maxsize=64)
+def measure_sequence_extents(font_family: str, font_size: int, dpi: int) -> tuple[float, float]:
+    prop = FontProperties(family=font_family, size=font_size)
+    px_per_pt = dpi / 72.0
+    ag_bbox = TextPath((0, 0), "Ag", prop=prop).get_extents()
+    y_mid = ((ag_bbox.y0 + ag_bbox.y1) / 2.0) * px_per_pt
+    max_up = 0.0
+    max_down = 0.0
+    for base in ("A", "C", "G", "T", "N"):
+        bbox = TextPath((0, 0), base, prop=prop).get_extents()
+        y0 = bbox.y0 * px_per_pt
+        y1 = bbox.y1 * px_per_pt
+        max_up = max(max_up, y1 - y_mid)
+        max_down = max(max_down, y_mid - y0)
+    max_half = max(max_up, max_down)
+    if max_half <= 0:
+        raise BoundsError("Failed to measure sequence glyph half-height")
+    return max_up, max_down
+
+
+@lru_cache(maxsize=64)
+def measure_sequence_half_height(font_family: str, font_size: int, dpi: int) -> float:
+    max_up, max_down = measure_sequence_extents(font_family, font_size, dpi)
+    return max(max_up, max_down)
 
 
 def _feature_priority(feature: Feature) -> int:
@@ -328,19 +359,29 @@ def compute_layout(record: Record, style: Style, *, fixed_n: int | None = None) 
     n = len(record.sequence) if fixed_n is None else max(len(record.sequence), int(fixed_n))
 
     show_two = bool(style.show_reverse_complement and record.alphabet == "DNA")
+    sequence_extent_up, sequence_extent_down = measure_sequence_extents(style.font_mono, style.font_size_seq, style.dpi)
+    sequence_half_height = max(sequence_extent_up, sequence_extent_down)
+    strand_gap = style.sequence.strand_gap_cells * ch
+    baseline_spacing = style.baseline_spacing
+    min_baseline = sequence_extent_down + strand_gap + sequence_extent_up
+    if show_two:
+        baseline_spacing = max(baseline_spacing, min_baseline)
     y_reverse_base = 0.0
-    y_forward_base = style.baseline_spacing if show_two else 0.0
+    y_forward_base = baseline_spacing if show_two else 0.0
 
     kmer_box_height = ch * style.kmer.box_height_cells
     motif_logo_height = style.motif_logo.height_bits * style.motif_logo.bits_to_cells * ch
-    motif_logo_gap = style.motif_logo.y_pad_cells * ch
+    motif_logo_gap = style.kmer.to_logo_gap_cells * ch
+    sequence_to_kmer_gap = style.sequence.to_kmer_gap_cells * ch
     has_motif_logo = any(effect.kind == "motif_logo" for effect in record.effects)
     if has_motif_logo and str(style.motif_logo.lane_mode).lower() == "follow_feature_track":
         min_track_step = kmer_box_height + motif_logo_height + (2.0 * motif_logo_gap)
     else:
         min_track_step = kmer_box_height + ch * 0.2
     feature_track_step = max(style.track_spacing, min_track_step)
-    feature_track_base_offset = max(kmer_box_height * 0.5 + ch * 0.35, feature_track_step * 0.5)
+    feature_track_base_offset_up = sequence_extent_up + sequence_to_kmer_gap + (0.5 * kmer_box_height)
+    feature_track_base_offset_down = sequence_extent_down + sequence_to_kmer_gap + (0.5 * kmer_box_height)
+    feature_track_base_offset = feature_track_base_offset_up
 
     label_pad_x = style.font_size_label / 72.0 * style.dpi * 1.6
     x_left = style.padding_x + label_pad_x
@@ -371,7 +412,7 @@ def compute_layout(record: Record, style: Style, *, fixed_n: int | None = None) 
         x = x_left + feat.span.start * cw
         x_end = x_left + feat.span.end * cw
         w = x_end - x
-        y = y_forward_base + feature_track_base_offset + track * feature_track_step
+        y = y_forward_base + feature_track_base_offset_up + track * feature_track_step
         feature_id = feature_ids[feat_idx]
         placement = FeaturePlacement(
             feature_index=feat_idx,
@@ -396,7 +437,7 @@ def compute_layout(record: Record, style: Style, *, fixed_n: int | None = None) 
         x = x_left + feat.span.start * cw
         x_end = x_left + feat.span.end * cw
         w = x_end - x
-        y = y_reverse_base - feature_track_base_offset - track * feature_track_step
+        y = y_reverse_base - feature_track_base_offset_down - track * feature_track_step
         feature_id = feature_ids[feat_idx]
         placement = FeaturePlacement(
             feature_index=feat_idx,
@@ -446,11 +487,11 @@ def compute_layout(record: Record, style: Style, *, fixed_n: int | None = None) 
             )
         motif_logo_y0_by_effect[effect_index] = y0
 
-    y_mins = [y_forward_base - ch * 0.6]
-    y_maxs = [y_forward_base + ch * 0.6]
+    y_mins = [y_forward_base - sequence_extent_down]
+    y_maxs = [y_forward_base + sequence_extent_up]
     if show_two:
-        y_mins.append(y_reverse_base - ch * 0.6)
-        y_maxs.append(y_reverse_base + ch * 0.6)
+        y_mins.append(y_reverse_base - sequence_extent_down)
+        y_maxs.append(y_reverse_base + sequence_extent_up)
     for x0, y0, x1, y1 in feature_boxes.values():
         _ = (x0, x1)
         y_mins.append(y0)
@@ -461,8 +502,11 @@ def compute_layout(record: Record, style: Style, *, fixed_n: int | None = None) 
 
     content_bottom_raw = min(y_mins)
     content_top_raw = max(y_maxs)
-    legend_space = (style.legend_height_px + style.legend_pad_px) if style.legend else 0.0
-    desired_bottom = style.padding_y + legend_space
+    outer_pad = style.layout.outer_pad_cells * ch
+    legend_mode = str(style.legend_mode).lower()
+    draw_bottom_legend = bool(style.legend) and legend_mode == "bottom"
+    legend_space = (style.legend_height_px + style.legend_pad_px) if draw_bottom_legend else 0.0
+    desired_bottom = style.padding_y + outer_pad + legend_space
     shift = desired_bottom - content_bottom_raw
 
     shifted_placements: list[FeaturePlacement] = []
@@ -490,7 +534,7 @@ def compute_layout(record: Record, style: Style, *, fixed_n: int | None = None) 
     content_bottom = content_bottom_raw + shift
     content_top = content_top_raw + shift
     title_space = max((style.font_size_label / 72.0 * style.dpi) * 1.6, ch * 0.8)
-    height = content_top + style.padding_y + title_space
+    height = content_top + style.padding_y + outer_pad + title_space
 
     return LayoutContext(
         cw=cw,
@@ -499,12 +543,17 @@ def compute_layout(record: Record, style: Style, *, fixed_n: int | None = None) 
         height=height,
         y_forward=y_forward,
         y_reverse=y_reverse,
+        sequence_half_height=sequence_half_height,
+        sequence_extent_up=sequence_extent_up,
+        sequence_extent_down=sequence_extent_down,
         x_left=x_left,
         n_up_tracks=n_up_tracks,
         n_dn_tracks=n_dn_tracks,
         kmer_box_height=kmer_box_height,
         feature_track_step=feature_track_step,
         feature_track_base_offset=feature_track_base_offset,
+        feature_track_base_offset_up=feature_track_base_offset_up,
+        feature_track_base_offset_down=feature_track_base_offset_down,
         placements=tuple(shifted_placements),
         feature_boxes=shifted_boxes,
         feature_track_by_id=feature_track_by_id,

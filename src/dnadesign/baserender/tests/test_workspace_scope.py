@@ -55,7 +55,7 @@ def test_workspace_init_scaffolds_standard_layout(tmp_path: Path) -> None:
     assert workspace.job_path == workspace.root / "job.yaml"
     assert (workspace.root / "inputs").exists()
     assert (workspace.root / "outputs").exists()
-    assert (workspace.root / "reports").exists()
+    assert not (workspace.root / "reports").exists()
 
 
 def test_workspace_job_uses_workspace_outputs_by_default(tmp_path: Path) -> None:
@@ -135,6 +135,13 @@ def test_job_validate_requires_exactly_one_job_source() -> None:
     result = runner.invoke(app, ["job", "validate"])
     assert result.exit_code == 2
     assert "Provide exactly one of <job> or --workspace" in result.output
+
+
+def test_workspace_init_rejects_path_like_name_with_actionable_error() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["workspace", "init", "/tmp/path_like_name"])
+    assert result.exit_code == 2
+    assert "use --root <dir>" in result.output
 
 
 def test_workspace_run_defaults_outputs_to_workspace_outputs_root(tmp_path: Path) -> None:

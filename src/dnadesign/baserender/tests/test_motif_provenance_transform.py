@@ -25,18 +25,60 @@ from dnadesign.baserender.src.pipeline.attach_motifs_from_cruncher_lockfile impo
 )
 
 
-def _demo_config_path() -> Path:
-    return (
-        Path(__file__).resolve().parent.parent / "workspaces" / "demo_cruncher_render" / "inputs" / "config_used.yaml"
+def _make_matrix(length: int) -> list[list[float]]:
+    return [[0.10, 0.10, 0.70, 0.10] for _ in range(length)]
+
+
+def _write_config_used(tmp_path: Path, *, tf_name: str, matrix: list[list[float]]) -> Path:
+    path = tmp_path / "config_used.yaml"
+    payload = {
+        "cruncher": {
+            "pwms_info": {
+                tf_name: {
+                    "pwm_matrix": matrix,
+                }
+            }
+        }
+    }
+    path.write_text(yaml.safe_dump(payload, sort_keys=False))
+    return path
+
+
+def _write_lockfile_and_store(
+    tmp_path: Path,
+    *,
+    tf_name: str,
+    source: str,
+    motif_id: str,
+    checksum: str,
+    matrix: list[list[float]],
+) -> tuple[Path, Path]:
+    store_root = tmp_path / "motif_store"
+    motif_path = store_root / "normalized" / "motifs" / source / f"{motif_id}.json"
+    motif_path.parent.mkdir(parents=True, exist_ok=True)
+    motif_path.write_text(
+        json.dumps(
+            {
+                "matrix": matrix,
+                "checksums": {"sha256_norm": checksum},
+            }
+        )
     )
-
-
-def _demo_lockfile_path() -> Path:
-    return Path(__file__).resolve().parent.parent / "workspaces" / "demo_cruncher_render" / "inputs" / "lockfile.json"
-
-
-def _demo_motif_store_root() -> Path:
-    return Path(__file__).resolve().parent.parent / "workspaces" / "demo_cruncher_render" / "inputs" / "motif_store"
+    lockfile_path = tmp_path / "lockfile.json"
+    lockfile_path.write_text(
+        json.dumps(
+            {
+                "resolved": {
+                    tf_name: {
+                        "source": source,
+                        "motif_id": motif_id,
+                        "sha256": checksum,
+                    }
+                }
+            }
+        )
+    )
+    return lockfile_path, store_root
 
 
 def _build_single_feature_record(*, label: str, start: int, end: int, tf_tag: str) -> Record:
@@ -68,16 +110,19 @@ def _build_single_feature_record(*, label: str, start: int, end: int, tf_tag: st
     )
 
 
-def test_attach_motifs_from_cruncher_lockfile_rewrites_effect_matrix() -> None:
-    lockfile = json.loads(_demo_lockfile_path().read_text())
-    lexa_ref = lockfile["resolved"]["lexA"]
-    motif_path = (
-        _demo_motif_store_root() / "normalized" / "motifs" / str(lexa_ref["source"]) / f"{lexa_ref['motif_id']}.json"
+def test_attach_motifs_from_cruncher_lockfile_rewrites_effect_matrix(tmp_path: Path) -> None:
+    expected_lexa = _make_matrix(15)
+    lockfile_path, store_root = _write_lockfile_and_store(
+        tmp_path,
+        tf_name="lexA",
+        source="demo",
+        motif_id="lexa_demo",
+        checksum="sha256-demo-lexa",
+        matrix=expected_lexa,
     )
-    expected_lexa = json.loads(motif_path.read_text())["matrix"]
     transform = AttachMotifsFromCruncherLockfileTransform(
-        lockfile_path=str(_demo_lockfile_path()),
-        motif_store_root=str(_demo_motif_store_root()),
+        lockfile_path=str(lockfile_path),
+        motif_store_root=str(store_root),
     )
     record = _build_single_feature_record(
         label="TGCATATATTTACAG",
@@ -92,7 +137,15 @@ def test_attach_motifs_from_cruncher_lockfile_rewrites_effect_matrix() -> None:
 
 
 def test_attach_motifs_from_cruncher_lockfile_errors_on_checksum_mismatch(tmp_path: Path) -> None:
-    payload = json.loads(_demo_lockfile_path().read_text())
+    lockfile_path, store_root = _write_lockfile_and_store(
+        tmp_path,
+        tf_name="lexA",
+        source="demo",
+        motif_id="lexa_demo",
+        checksum="sha256-demo-lexa",
+        matrix=_make_matrix(15),
+    )
+    payload = json.loads(lockfile_path.read_text())
     payload["resolved"]["lexA"]["sha256"] = "deadbeef"
     bad_lockfile = tmp_path / "lockfile_bad.json"
     bad_lockfile.write_text(json.dumps(payload))
@@ -100,14 +153,15 @@ def test_attach_motifs_from_cruncher_lockfile_errors_on_checksum_mismatch(tmp_pa
     with pytest.raises(PluginError, match="checksum mismatch"):
         AttachMotifsFromCruncherLockfileTransform(
             lockfile_path=str(bad_lockfile),
-            motif_store_root=str(_demo_motif_store_root()),
+            motif_store_root=str(store_root),
         )
 
 
-def test_attach_motifs_from_config_rewrites_effect_matrix() -> None:
-    config = yaml.safe_load(_demo_config_path().read_text())
+def test_attach_motifs_from_config_rewrites_effect_matrix(tmp_path: Path) -> None:
+    config_path = _write_config_used(tmp_path, tf_name="lexA", matrix=_make_matrix(15))
+    config = yaml.safe_load(config_path.read_text())
     expected_lexa = config["cruncher"]["pwms_info"]["lexA"]["pwm_matrix"]
-    transform = AttachMotifsFromConfigTransform(config_path=str(_demo_config_path()))
+    transform = AttachMotifsFromConfigTransform(config_path=str(config_path))
     record = _build_single_feature_record(
         label="TGCATATATTTACAG",
         start=1,
@@ -120,8 +174,9 @@ def test_attach_motifs_from_config_rewrites_effect_matrix() -> None:
     assert matrix == expected_lexa
 
 
-def test_attach_motifs_from_config_errors_on_missing_tf_matrix() -> None:
-    transform = AttachMotifsFromConfigTransform(config_path=str(_demo_config_path()))
+def test_attach_motifs_from_config_errors_on_missing_tf_matrix(tmp_path: Path) -> None:
+    config_path = _write_config_used(tmp_path, tf_name="lexA", matrix=_make_matrix(15))
+    transform = AttachMotifsFromConfigTransform(config_path=str(config_path))
     record = _build_single_feature_record(
         label="TGCATATATTTACAG",
         start=1,
@@ -133,8 +188,9 @@ def test_attach_motifs_from_config_errors_on_missing_tf_matrix() -> None:
         transform.apply(record)
 
 
-def test_attach_motifs_from_config_errors_on_length_mismatch() -> None:
-    transform = AttachMotifsFromConfigTransform(config_path=str(_demo_config_path()))
+def test_attach_motifs_from_config_errors_on_length_mismatch(tmp_path: Path) -> None:
+    config_path = _write_config_used(tmp_path, tf_name="lexA", matrix=_make_matrix(15))
+    transform = AttachMotifsFromConfigTransform(config_path=str(config_path))
     record = _build_single_feature_record(
         label="GCATATATTT",
         start=2,

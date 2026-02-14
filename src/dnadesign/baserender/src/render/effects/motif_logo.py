@@ -45,6 +45,7 @@ class MotifLogoGeometry:
     height: float
     lane: int
     above: bool
+    baseline: str
     observed: str
     matrix: tuple[tuple[float, float, float, float], ...]
 
@@ -85,16 +86,16 @@ def _resolve_feature(record: Record, feature_id: str):
     feature = next((f for f in record.features if f.id == feature_id), None)
     if feature is None:
         raise RenderingError(f"motif_logo target feature '{feature_id}' not found")
-    if feature.kind != "kmer":
-        raise RenderingError("motif_logo target feature must be kind='kmer'")
+    if feature.kind not in {"kmer", "regulator_window"}:
+        raise RenderingError("motif_logo target feature must be kind='kmer' or 'regulator_window'")
     if feature.label is None:
-        raise RenderingError("motif_logo target kmer feature must have label")
+        raise RenderingError("motif_logo target feature must have label")
     return feature
 
 
 def _coerce_matrix_rows(matrix_raw: object) -> list[list[float]]:
     if not isinstance(matrix_raw, list) or not matrix_raw:
-        raise RenderingError("motif_logo params.matrix must be a non-empty list")
+        raise RenderingError("motif_logo params.matrix must be a non-empty list at draw time")
     matrix_rows: list[list[float]] = []
     for row in matrix_raw:
         if not isinstance(row, (list, tuple)):
@@ -194,6 +195,7 @@ def compute_motif_logo_geometry(
         height=layout.motif_logo_height,
         lane=lane,
         above=above,
+        baseline="bottom" if above else "top",
         observed=observed,
         matrix=tuple(tuple(_normalize_row(row)) for row in matrix_rows),
     )
@@ -249,7 +251,6 @@ def draw_motif_logo(
     palette: Palette,
     feature_boxes: dict[str, tuple[float, float, float, float]],
 ) -> None:
-    _ = palette
     effect_index = _effect_index(record, effect)
     geometry = compute_motif_logo_geometry(
         record=record,
@@ -260,6 +261,18 @@ def draw_motif_logo(
     )
 
     base_colors = _style_base_colors(style)
+    target_feature = _resolve_feature(record, geometry.feature_id)
+    feature_tag = target_feature.tags[0] if target_feature.tags else target_feature.kind
+    feature_fill_color = palette.color_for(feature_tag)
+    letter_coloring_mode = str(style.motif_logo.letter_coloring.mode).lower()
+    if letter_coloring_mode not in {"classic", "match_window_seq"}:
+        raise RenderingError(f"Unknown motif_logo letter coloring mode: {letter_coloring_mode!r}")
+    observed_color_source = str(style.motif_logo.letter_coloring.observed_color_source).lower()
+    if observed_color_source not in {"nucleotide_palette", "feature_fill"}:
+        raise RenderingError(
+            f"Unknown motif_logo observed color source: {style.motif_logo.letter_coloring.observed_color_source!r}"
+        )
+    other_color = str(style.motif_logo.letter_coloring.other_color)
     display_mode = str(style.motif_logo.display_mode).lower()
     if display_mode == "information":
         unit_to_px = geometry.height / float(style.motif_logo.height_bits)
@@ -278,28 +291,47 @@ def draw_motif_logo(
         stack.sort(key=lambda item: item[1])
 
         col_x0, col_x1 = geometry.columns[col_index]
-        y = geometry.y0
+        y_cursor = geometry.y0 if geometry.baseline == "bottom" else (geometry.y0 + geometry.height)
         observed_base = geometry.observed[col_index] if col_index < len(geometry.observed) else ""
+        if letter_coloring_mode == "match_window_seq" and observed_base in _DNA_BASES:
+            observed_color = (
+                base_colors[observed_base] if observed_color_source == "nucleotide_palette" else feature_fill_color
+            )
+        else:
+            observed_color = None
 
         for base, bits in stack:
             letter_h = bits * unit_to_px
             if letter_h <= 0:
                 continue
             is_observed = observed_base == base
+            if geometry.baseline == "bottom":
+                y_draw = y_cursor
+                y_cursor += letter_h
+            else:
+                y_cursor -= letter_h
+                y_draw = y_cursor
+            if letter_coloring_mode == "classic":
+                letter_color = base_colors[base]
+            elif observed_color is None:
+                letter_color = other_color
+            elif is_observed:
+                letter_color = observed_color
+            else:
+                letter_color = other_color
             _draw_letter(
                 ax,
                 base=base,
                 x0=col_x0,
                 x1=col_x1,
-                y0=y,
+                y0=y_draw,
                 height=letter_h,
                 style=style,
-                color=base_colors[base],
+                color=letter_color,
                 alpha=alpha_observed if is_observed else alpha_other,
                 observed=is_observed,
                 gid=f"motif_logo:{geometry.feature_id}:{col_index}:{base}",
             )
-            y += letter_h
 
     if bool(style.motif_logo.debug_bounds):
         ax.add_patch(

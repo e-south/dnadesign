@@ -22,6 +22,21 @@ from ..core import SchemaError, ensure
 
 
 @dataclass(frozen=True)
+class LayoutStyle:
+    outer_pad_cells: float = 0.50
+
+
+@dataclass(frozen=True)
+class SequenceStyle:
+    strand_gap_cells: float = 0.75
+    to_kmer_gap_cells: float = 0.45
+    bold_consensus_bases: bool = False
+    non_consensus_color: str = "#9ca3af"
+    tone_quantile_low: float = 0.10
+    tone_quantile_high: float = 0.90
+
+
+@dataclass(frozen=True)
 class GlyphStyle:
     round_px: float = 4.0
     edge_width: float = 0.0
@@ -30,6 +45,7 @@ class GlyphStyle:
     text_color: str = "#ffffff"
     pad_x_px: float = 1.0
     text_y_nudge_cells: float = 0.0
+    to_logo_gap_cells: float = 0.30
 
 
 @dataclass(frozen=True)
@@ -38,6 +54,14 @@ class MotifScaleBarStyle:
     location: str = "top_right"
     font_size: int = 8
     color: str = "#6b7280"
+    pad_cells: float = 0.20
+
+
+@dataclass(frozen=True)
+class MotifLetterColoringStyle:
+    mode: str = "classic"
+    other_color: str = "#d1d5db"
+    observed_color_source: str = "nucleotide_palette"
 
 
 @dataclass(frozen=True)
@@ -61,11 +85,13 @@ class MotifLogoStyle:
     display_mode: str = "information"
     debug_bounds: bool = False
     scale_bar: MotifScaleBarStyle = field(default_factory=MotifScaleBarStyle)
+    letter_coloring: MotifLetterColoringStyle = field(default_factory=MotifLetterColoringStyle)
 
 
 @dataclass(frozen=True)
 class Style:
     dpi: int = 180
+    figure_scale: float = 1.0
     font_mono: str = "DejaVu Sans Mono"
     font_label: str = "DejaVu Sans"
     font_size_seq: int = 14
@@ -76,11 +102,17 @@ class Style:
     track_spacing: float = 22.0
     baseline_spacing: float = 56.0
     show_reverse_complement: bool = True
+    layout: LayoutStyle = field(default_factory=LayoutStyle)
+    sequence: SequenceStyle = field(default_factory=SequenceStyle)
 
     color_sequence: str = "#4b5563"
     color_ticks: str = "#9ca3af"
+    overlay_align: str = "left"
 
     legend: bool = True
+    legend_mode: str = "bottom"
+    legend_inline_side: str = "auto"
+    legend_inline_margin_cells: float = 0.35
     legend_font_size: int = 11
     legend_patch_w: float = 18.0
     legend_patch_h: float = 12.0
@@ -102,11 +134,31 @@ class Style:
     motif_logo: MotifLogoStyle = field(default_factory=MotifLogoStyle)
 
     def __post_init__(self) -> None:
+        if isinstance(self.layout, dict):
+            object.__setattr__(self, "layout", LayoutStyle(**self.layout))
+        if isinstance(self.sequence, dict):
+            object.__setattr__(self, "sequence", SequenceStyle(**self.sequence))
         if isinstance(self.kmer, dict):
             object.__setattr__(self, "kmer", GlyphStyle(**self.kmer))
         motif_logo = self.motif_logo
         if isinstance(motif_logo, dict):
             motif_logo = MotifLogoStyle(**motif_logo)
+        if isinstance(motif_logo.letter_coloring, dict):
+            motif_logo = MotifLogoStyle(
+                height_bits=motif_logo.height_bits,
+                bits_to_cells=motif_logo.bits_to_cells,
+                y_pad_cells=motif_logo.y_pad_cells,
+                letter_x_pad_frac=motif_logo.letter_x_pad_frac,
+                alpha_other=motif_logo.alpha_other,
+                alpha_observed=motif_logo.alpha_observed,
+                colors=motif_logo.colors,
+                layout=motif_logo.layout,
+                lane_mode=motif_logo.lane_mode,
+                display_mode=motif_logo.display_mode,
+                debug_bounds=motif_logo.debug_bounds,
+                scale_bar=motif_logo.scale_bar,
+                letter_coloring=MotifLetterColoringStyle(**motif_logo.letter_coloring),
+            )
         if isinstance(motif_logo.scale_bar, dict):
             motif_logo = MotifLogoStyle(
                 height_bits=motif_logo.height_bits,
@@ -121,18 +173,64 @@ class Style:
                 display_mode=motif_logo.display_mode,
                 debug_bounds=motif_logo.debug_bounds,
                 scale_bar=MotifScaleBarStyle(**motif_logo.scale_bar),
+                letter_coloring=motif_logo.letter_coloring,
             )
         object.__setattr__(self, "motif_logo", motif_logo)
 
         ensure(self.dpi >= 72, "style.dpi must be >= 72", SchemaError)
+        ensure(self.figure_scale > 0, "style.figure_scale must be > 0", SchemaError)
         ensure(self.font_size_seq >= 6, "style.font_size_seq must be >= 6", SchemaError)
         ensure(self.font_size_label >= 6, "style.font_size_label must be >= 6", SchemaError)
         ensure(self.padding_x >= 0, "style.padding_x must be >= 0", SchemaError)
         ensure(self.padding_y >= 0, "style.padding_y must be >= 0", SchemaError)
+        ensure(self.layout.outer_pad_cells >= 0, "style.layout.outer_pad_cells must be >= 0", SchemaError)
         ensure(self.track_spacing > 0, "style.track_spacing must be > 0", SchemaError)
         ensure(self.baseline_spacing > 0, "style.baseline_spacing must be > 0", SchemaError)
+        ensure(
+            str(self.overlay_align).lower() in {"left", "center", "right"},
+            "style.overlay_align must be 'left', 'center', or 'right'",
+            SchemaError,
+        )
+        ensure(
+            str(self.legend_mode).lower() in {"bottom", "inline", "none"},
+            "style.legend_mode must be 'bottom', 'inline', or 'none'",
+            SchemaError,
+        )
+        ensure(
+            str(self.legend_inline_side).lower() in {"auto", "left", "right"},
+            "style.legend_inline_side must be 'auto', 'left', or 'right'",
+            SchemaError,
+        )
+        ensure(
+            self.legend_inline_margin_cells >= 0,
+            "style.legend_inline_margin_cells must be >= 0",
+            SchemaError,
+        )
+        ensure(self.sequence.strand_gap_cells >= 0, "style.sequence.strand_gap_cells must be >= 0", SchemaError)
+        ensure(self.sequence.to_kmer_gap_cells >= 0, "style.sequence.to_kmer_gap_cells must be >= 0", SchemaError)
+        ensure(
+            str(self.sequence.non_consensus_color).strip() != "",
+            "style.sequence.non_consensus_color must be non-empty",
+            SchemaError,
+        )
+        ensure(
+            0.0 <= self.sequence.tone_quantile_low < 1.0,
+            "style.sequence.tone_quantile_low must be in [0, 1)",
+            SchemaError,
+        )
+        ensure(
+            0.0 < self.sequence.tone_quantile_high <= 1.0,
+            "style.sequence.tone_quantile_high must be in (0, 1]",
+            SchemaError,
+        )
+        ensure(
+            self.sequence.tone_quantile_low < self.sequence.tone_quantile_high,
+            "style.sequence.tone_quantile_low must be < style.sequence.tone_quantile_high",
+            SchemaError,
+        )
         ensure(self.kmer.box_height_cells > 0, "style.kmer.box_height_cells must be > 0", SchemaError)
         ensure(self.kmer.pad_x_px >= 0, "style.kmer.pad_x_px must be >= 0", SchemaError)
+        ensure(self.kmer.to_logo_gap_cells >= 0, "style.kmer.to_logo_gap_cells must be >= 0", SchemaError)
         ensure(self.span_link_inner_margin_bp >= 0, "style.span_link_inner_margin_bp must be >= 0", SchemaError)
         ensure(self.motif_logo.height_bits > 0, "style.motif_logo.height_bits must be > 0", SchemaError)
         ensure(self.motif_logo.bits_to_cells > 0, "style.motif_logo.bits_to_cells must be > 0", SchemaError)
@@ -186,8 +284,24 @@ class Style:
             SchemaError,
         )
         ensure(
-            str(self.motif_logo.scale_bar.location).lower() in {"top_right", "bottom_right"},
-            "style.motif_logo.scale_bar.location must be 'top_right' or 'bottom_right'",
+            str(self.motif_logo.scale_bar.location).lower() in {"top_right", "bottom_right", "left_of_logo"},
+            "style.motif_logo.scale_bar.location must be 'top_right', 'bottom_right', or 'left_of_logo'",
+            SchemaError,
+        )
+        ensure(
+            self.motif_logo.scale_bar.pad_cells >= 0,
+            "style.motif_logo.scale_bar.pad_cells must be >= 0",
+            SchemaError,
+        )
+        ensure(
+            str(self.motif_logo.letter_coloring.mode).lower() in {"classic", "match_window_seq"},
+            "style.motif_logo.letter_coloring.mode must be 'classic' or 'match_window_seq'",
+            SchemaError,
+        )
+        ensure(
+            str(self.motif_logo.letter_coloring.observed_color_source).lower()
+            in {"nucleotide_palette", "feature_fill"},
+            "style.motif_logo.letter_coloring.observed_color_source must be 'nucleotide_palette' or 'feature_fill'",
             SchemaError,
         )
 
@@ -202,6 +316,22 @@ class Style:
         unknown = sorted(set(data.keys()) - allowed)
         if unknown:
             raise SchemaError(f"Unknown style key(s): {unknown}")
+        layout_raw = data.get("layout")
+        if layout_raw is not None and not isinstance(layout_raw, Mapping):
+            raise SchemaError("style.layout must be a mapping")
+        if isinstance(layout_raw, Mapping):
+            allowed_layout = {f.name for f in fields(LayoutStyle)}
+            unknown_layout = sorted(set(layout_raw.keys()) - allowed_layout)
+            if unknown_layout:
+                raise SchemaError(f"Unknown style.layout key(s): {unknown_layout}")
+        seq_raw = data.get("sequence")
+        if seq_raw is not None and not isinstance(seq_raw, Mapping):
+            raise SchemaError("style.sequence must be a mapping")
+        if isinstance(seq_raw, Mapping):
+            allowed_sequence = {f.name for f in fields(SequenceStyle)}
+            unknown_sequence = sorted(set(seq_raw.keys()) - allowed_sequence)
+            if unknown_sequence:
+                raise SchemaError(f"Unknown style.sequence key(s): {unknown_sequence}")
         kmer_raw = data.get("kmer")
         if kmer_raw is not None and not isinstance(kmer_raw, Mapping):
             raise SchemaError("style.kmer must be a mapping")
@@ -234,11 +364,23 @@ class Style:
                 unknown_scale_bar = sorted(set(motif_scale_bar.keys()) - allowed_scale_bar)
                 if unknown_scale_bar:
                     raise SchemaError(f"Unknown style.motif_logo.scale_bar key(s): {unknown_scale_bar}")
+            motif_letter_coloring = motif_raw.get("letter_coloring")
+            if motif_letter_coloring is not None:
+                if not isinstance(motif_letter_coloring, Mapping):
+                    raise SchemaError("style.motif_logo.letter_coloring must be a mapping")
+                allowed_coloring = {f.name for f in fields(MotifLetterColoringStyle)}
+                unknown_coloring = sorted(set(motif_letter_coloring.keys()) - allowed_coloring)
+                if unknown_coloring:
+                    raise SchemaError(f"Unknown style.motif_logo.letter_coloring key(s): {unknown_coloring}")
         return cls(**data)
 
 
 def _baserender_root() -> Path:
     return Path(__file__).resolve().parent.parent.parent
+
+
+def _styles_v1_root() -> Path:
+    return _baserender_root() / "styles" / "style_v1"
 
 
 @lru_cache(maxsize=64)
@@ -255,7 +397,7 @@ def _load_yaml_mapping(path: Path) -> dict[str, Any]:
 
 
 def list_style_presets() -> list[str]:
-    styles_dir = _baserender_root() / "styles"
+    styles_dir = _styles_v1_root()
     if not styles_dir.exists():
         return []
     names: set[str] = set()
@@ -278,13 +420,13 @@ def resolve_preset_path(spec: str | Path | None) -> Path | None:
         direct = root / raw
         if direct.exists():
             return direct
-        styles_guess = root / "styles" / raw.name
+        styles_guess = _styles_v1_root() / raw.name
         if styles_guess.exists():
             return styles_guess
         raise SchemaError(f"Style preset not found: {spec}")
 
     for suffix in (".yaml",):
-        candidate = root / "styles" / f"{raw}{suffix}"
+        candidate = _styles_v1_root() / f"{raw}{suffix}"
         if candidate.exists():
             return candidate
     raise SchemaError(f"Style preset not found: {spec}")

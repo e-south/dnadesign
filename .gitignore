@@ -214,20 +214,14 @@ src/dnadesign/baserender/workspaces/**
 !src/dnadesign/baserender/workspaces/demo_densegen_render/inputs/input.parquet
 !src/dnadesign/baserender/workspaces/demo_densegen_render/outputs/
 !src/dnadesign/baserender/workspaces/demo_densegen_render/outputs/.gitkeep
-!src/dnadesign/baserender/workspaces/demo_densegen_render/reports/
-!src/dnadesign/baserender/workspaces/demo_densegen_render/reports/.gitkeep
 !src/dnadesign/baserender/workspaces/demo_cruncher_render/
 !src/dnadesign/baserender/workspaces/demo_cruncher_render/job.yaml
 !src/dnadesign/baserender/workspaces/demo_cruncher_render/inputs/
 !src/dnadesign/baserender/workspaces/demo_cruncher_render/inputs/README.md
-!src/dnadesign/baserender/workspaces/demo_cruncher_render/inputs/config_used.yaml
-!src/dnadesign/baserender/workspaces/demo_cruncher_render/inputs/elites.parquet
-!src/dnadesign/baserender/workspaces/demo_cruncher_render/inputs/elites_hits.parquet
 !src/dnadesign/baserender/workspaces/demo_cruncher_render/inputs/elites_showcase_records.parquet
+!src/dnadesign/baserender/workspaces/demo_cruncher_render/inputs/motif_library.json
 !src/dnadesign/baserender/workspaces/demo_cruncher_render/outputs/
 !src/dnadesign/baserender/workspaces/demo_cruncher_render/outputs/.gitkeep
-!src/dnadesign/baserender/workspaces/demo_cruncher_render/reports/
-!src/dnadesign/baserender/workspaces/demo_cruncher_render/reports/.gitkeep
 
 # Legacy DenseGen runs (ignored to avoid local artifact noise)
 src/dnadesign/densegen/runs/**

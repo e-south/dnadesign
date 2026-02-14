@@ -30,6 +30,7 @@ from .core import Record, SchemaError, ensure
 from .io import iter_parquet_rows
 from .runner import run_sequence_rows_job as _run_sequence_rows_job
 from .runtime import initialize_runtime
+from .showcase_style import cruncher_showcase_style_overrides as _cruncher_showcase_style_overrides
 
 
 def load_record_from_parquet(
@@ -300,3 +301,7 @@ def render(
         style_overrides=style_overrides,
         ncols=ncols,
     )
+
+
+def cruncher_showcase_style_overrides() -> Mapping[str, object]:
+    return _cruncher_showcase_style_overrides()
