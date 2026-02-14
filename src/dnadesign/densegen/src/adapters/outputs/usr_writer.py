@@ -58,6 +58,7 @@ class USRWriter:
     npz_fields: List[str] = field(default_factory=list)
     npz_root: Optional[Path] = None
     run_quota: Optional[int] = None
+    run_id: Optional[str] = None
 
     # internal buffers
     _records: List[OutputRecord] = field(default_factory=list)
@@ -73,6 +74,7 @@ class USRWriter:
     _run_started_monotonic: float = field(default_factory=time.monotonic, init=False, repr=False)
     _resume_detected: bool = field(default=False, init=False, repr=False)
     _lifecycle_emitted: bool = field(default=False, init=False, repr=False)
+    _default_run_id: str = field(default="", init=False, repr=False)
 
     def __post_init__(self):
         if self.root is None:
@@ -83,6 +85,10 @@ class USRWriter:
             raise ValueError("USRWriter.health_event_interval_seconds must be > 0.")
         if self.run_quota is not None and int(self.run_quota) <= 0:
             raise ValueError("USRWriter.run_quota must be > 0 when provided.")
+        configured_run_id = str(self.run_id or "").strip()
+        if self.run_id is not None and not configured_run_id:
+            raise ValueError("USRWriter.run_id must be a non-empty string when provided.")
+        self._default_run_id = configured_run_id or f"densegen-pid-{os.getpid()}"
         self.root = Path(self.root).resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         self._ensure_registry()
@@ -190,11 +196,12 @@ class USRWriter:
         run_id = records_new[0].meta.get("run_id") if records_new else None
         if run_id is None and self._pending_overlay_records:
             run_id = self._pending_overlay_records[0].meta.get("run_id")
-        actor = self._densegen_actor(run_id)
+        actor_run_id = self._resolve_run_id(run_id)
+        actor = self._densegen_actor(actor_run_id)
         tx = DensegenUsrFlushTransaction(
             self.ds,
             self.namespace,
-            run_id=None if run_id is None else str(run_id),
+            run_id=actor_run_id,
             actor=actor,
         )
         tx.begin(rows_incoming=len(incoming_records), rows_new=len(rows_new))
@@ -392,19 +399,19 @@ class USRWriter:
         if meta:
             self._last_health_meta = dict(meta)
 
-        run_id = meta.get("run_id")
-        quota = int(self.run_quota) if self.run_quota is not None else None
-        quota_progress_pct = None
-        if quota and quota > 0:
+        run_id = self._resolve_run_id(meta.get("run_id"))
+        quota = int(self.run_quota) if self.run_quota is not None else 0
+        quota_progress_pct = 0.0
+        if quota > 0:
             quota_progress_pct = float(self._rows_written_session) / float(quota) * 100.0
         run_elapsed_seconds = max(0.0, float(now - self._run_started_monotonic))
         used_tfbs_raw = meta.get("used_tfbs")
-        used_tfbs_unique_count = None
+        used_tfbs_unique_count = 0
         if isinstance(used_tfbs_raw, list):
             used_tfbs_unique_count = len({str(item).strip() for item in used_tfbs_raw if str(item).strip()})
-        tfbs_total_library = self._to_int(meta.get("library_unique_tfbs_count"))
-        tfbs_coverage_pct = None
-        if tfbs_total_library is not None and tfbs_total_library > 0 and used_tfbs_unique_count is not None:
+        tfbs_total_library = self._to_int(meta.get("library_unique_tfbs_count")) or 0
+        tfbs_coverage_pct = 0.0
+        if tfbs_total_library > 0:
             tfbs_coverage_pct = float(used_tfbs_unique_count) / float(tfbs_total_library) * 100.0
         plans_attempted = int(self._rows_incoming_session)
         plans_solved = int(self._rows_written_session)
@@ -506,11 +513,20 @@ class USRWriter:
             return
         self._id_index.add([str(seq_id) for seq_id in ids if seq_id])
 
+    def _resolve_run_id(self, run_id: Any) -> str:
+        run_id_text = str(run_id or "").strip()
+        if run_id_text:
+            return run_id_text
+        return self._default_run_id
+
     @staticmethod
     def _densegen_actor(run_id: Any) -> dict[str, Any]:
+        run_id_text = str(run_id or "").strip()
+        if not run_id_text:
+            raise ValueError("USRWriter actor run_id must be a non-empty string.")
         return {
             "tool": "densegen",
-            "run_id": None if run_id is None else str(run_id),
+            "run_id": run_id_text,
             "host": socket.gethostname(),
             "pid": os.getpid(),
         }

@@ -107,8 +107,8 @@ uv run dense validate-config --probe-solver
 # Build Stage-A pools.
 uv run dense stage-a build-pool --fresh
 
-# Run generation from a clean state.
-uv run dense run --fresh --no-plot
+# Run generation without clearing Stage-A pools.
+uv run dense run --no-plot
 
 # Inspect library + event diagnostics.
 uv run dense inspect run --library --events

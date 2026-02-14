@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pyarrow.parquet as pq
@@ -221,6 +222,35 @@ def test_usr_writer_emits_densegen_health_lifecycle_and_metrics_namespace(tmp_pa
     assert densegen_metrics.get("tfbs_coverage_pct") == 100.0
     assert densegen_metrics.get("plans_attempted") == 1
     assert densegen_metrics.get("plans_solved") == 1
+
+
+def test_usr_writer_finalize_without_records_still_emits_valid_actor_run_id(tmp_path: Path) -> None:
+    root, writer = _make_usr_writer(tmp_path)
+    writer.finalize()
+
+    events_path = root / "demo" / ".events.log"
+    assert events_path.exists()
+    events = [json.loads(line) for line in events_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    completed = [
+        event
+        for event in events
+        if event.get("action") == "densegen_health" and str((event.get("args") or {}).get("status")) == "completed"
+    ]
+    assert completed
+    actor = completed[-1].get("actor") or {}
+    run_id = str(actor.get("run_id") or "").strip()
+    assert run_id
+
+    metrics = completed[-1].get("metrics") or {}
+    densegen_metrics = metrics.get("densegen") or {}
+    assert densegen_metrics.get("run_quota") == 0
+    assert densegen_metrics.get("rows_written_session") == 0
+    assert densegen_metrics.get("quota_progress_pct") == 0.0
+    assert densegen_metrics.get("tfbs_total_library") == 0
+    assert densegen_metrics.get("tfbs_unique_used") == 0
+    assert densegen_metrics.get("tfbs_coverage_pct") == 0.0
+    assert densegen_metrics.get("plans_attempted") == 0
+    assert densegen_metrics.get("plans_solved") == 0
 
 
 def test_usr_writer_updates_id_index_when_dedup_disabled(tmp_path: Path) -> None:

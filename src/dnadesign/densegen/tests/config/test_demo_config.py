@@ -106,6 +106,22 @@ def test_demo_meme_three_tfs_stage_a_sampling_targets() -> None:
     assert background_inputs[0].sampling.n_sites == 500
 
 
+def test_demo_meme_three_tfs_uses_usr_output_and_gurobi_with_thread_cap() -> None:
+    cfg_path = _demo_config_path("demo_meme_three_tfs")
+    cfg = load_config(cfg_path)
+    output = cfg.root.densegen.output
+    solver = cfg.root.densegen.solver
+    plots = cfg.root.plots
+
+    assert output.targets == ["usr"]
+    assert output.usr is not None
+    assert output.usr.root == "outputs/usr_datasets"
+    assert solver.backend == "GUROBI"
+    assert solver.threads == 8
+    assert plots is not None
+    assert plots.source == "usr"
+
+
 def test_binding_sites_demo_config_exists_and_loads() -> None:
     cfg_path = _demo_config_path("demo_binding_sites")
     assert cfg_path.exists(), f"Missing demo config: {cfg_path}"
