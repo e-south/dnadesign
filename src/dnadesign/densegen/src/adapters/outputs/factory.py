@@ -58,6 +58,7 @@ def build_sinks(cfg: DenseGenConfig, cfg_path: Path) -> Iterable[SinkBase]:
             npz_fields=list(usr_cfg.npz_fields),
             npz_root=usr_cfg.npz_root,
             run_quota=int(cfg.generation.total_quota()),
+            run_id=str(cfg.run.id),
         )
         sinks.append(USRSink(writer))
 
