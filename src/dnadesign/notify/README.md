@@ -49,8 +49,12 @@ CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/$WORKSPACE/config.yaml
 # Discover available workspace names for your tool.
 uv run notify setup list-workspaces --tool densegen
 
-# One-time setup by workspace shorthand (stores webhook securely and writes profile under <config-dir>/outputs/notify/<tool>/).
-uv run notify setup slack --tool densegen --workspace "$WORKSPACE" --secret-source auto
+# One-time webhook secret setup (config-agnostic).
+# Save the returned webhook.ref value for profile setup reuse.
+uv run notify setup webhook --secret-source auto --name densegen-shared --json
+
+# One-time profile setup by workspace shorthand (writes profile under <config-dir>/outputs/notify/<tool>/).
+uv run notify setup slack --tool densegen --workspace "$WORKSPACE" --secret-source auto --secret-ref "<webhook-ref>"
 # Explicit path fallback:
 # uv run notify setup slack --tool densegen --config "$CONFIG" --secret-source auto
 
@@ -71,6 +75,7 @@ uv run notify spool drain --profile "src/dnadesign/densegen/workspaces/$WORKSPAC
 
 - Canonical operators runbook: [docs/notify/usr-events.md](../../../docs/notify/usr-events.md)
 - Module-local quick ops page: [docs/usr-events.md](docs/usr-events.md)
+- Command anatomy: [notify setup webhook flags and expectations](../../../docs/notify/usr-events.md#command-anatomy-notify-setup-webhook)
 - Command anatomy: [notify setup slack flags and expectations](../../../docs/notify/usr-events.md#command-anatomy-notify-setup-slack)
 - Setup onboarding: [Slack setup onboarding](../../../docs/notify/usr-events.md#slack-setup-onboarding-3-minutes)
 - End-to-end stack demo: [DenseGen -> Universal Sequence Record -> Notify demo](../densegen/docs/demo/demo_usr_notify.md)
@@ -120,6 +125,7 @@ Tool integration contract:
 - unsupported tools fail fast with explicit errors (no implicit tool fallback)
 
 Webhook contract:
-- secure mode `--secret-source auto|keychain|secretservice`
+- `notify setup webhook` configures webhook secret references without requiring tool/workspace/profile paths
+- secure mode `--secret-source auto|keychain|secretservice|file`
 - env mode supports `--url-env <ENV_VAR>` and defaults to `NOTIFY_WEBHOOK` when omitted
 - Python keyring support is included in the project lockfile; Notify uses it first and falls back to OS commands (`security`/`secret-tool`) when needed

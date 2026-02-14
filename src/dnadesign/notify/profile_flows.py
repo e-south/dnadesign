@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,7 +24,7 @@ from .errors import NotifyConfigError
 from .events_source import normalize_tool_name, resolve_tool_events_path
 from .profile_ops import sanitize_profile_name, wizard_next_steps
 from .profile_schema import PROFILE_VERSION
-from .secrets import is_secret_backend_available, store_secret_ref
+from .secrets import is_secret_backend_available, resolve_secret_ref, store_secret_ref
 from .spool_ops import ensure_private_directory
 from .workflow_policy import (
     DEFAULT_PROFILE_PATH,
@@ -42,6 +43,76 @@ class SetupEventsResolution:
     policy: str | None
     tool_name: str | None
     events_require_exists: bool
+
+
+def resolve_webhook_config(
+    *,
+    secret_source: str,
+    url_env: str | None,
+    secret_ref: str | None,
+    webhook_url: str | None,
+    store_webhook: bool,
+    secret_name: str,
+    secret_backend_available_fn: Callable[[str], bool] = is_secret_backend_available,
+    resolve_secret_ref_fn: Callable[[str], str] = resolve_secret_ref,
+    store_secret_ref_fn: Callable[[str, str], None] = store_secret_ref,
+) -> dict[str, str]:
+    mode = str(secret_source or "").strip().lower()
+    if not mode:
+        raise NotifyConfigError("secret_source must be a non-empty string")
+    if mode == "auto":
+        if secret_backend_available_fn("keychain"):
+            mode = "keychain"
+        elif secret_backend_available_fn("secretservice"):
+            mode = "secretservice"
+        elif secret_backend_available_fn("file"):
+            mode = "file"
+        else:
+            raise NotifyConfigError(
+                "secret_source=auto requires keychain, secretservice, or file backend availability. "
+                "Pass --secret-source env to opt into environment-variable webhook storage."
+            )
+    if mode not in {"env", "keychain", "secretservice", "file"}:
+        raise NotifyConfigError("secret_source must be one of: auto, env, keychain, secretservice, file")
+
+    if mode == "env":
+        env_name = resolve_cli_optional_string(field="url_env", cli_value=url_env)
+        if env_name is None:
+            env_name = DEFAULT_WEBHOOK_ENV
+        return {"source": "env", "ref": env_name}
+
+    if not secret_backend_available_fn(mode):
+        raise NotifyConfigError(f"secret backend '{mode}' is not available on this system")
+    secret_value = resolve_cli_optional_string(field="secret_ref", cli_value=secret_ref)
+    if secret_value is None:
+        if mode == "file":
+            xdg_config_home = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config")))
+            secret_path = (
+                xdg_config_home.expanduser()
+                / "dnadesign"
+                / "notify"
+                / "secrets"
+                / f"{secret_name}.webhook"
+            ).resolve()
+            secret_value = secret_path.as_uri()
+        else:
+            secret_value = f"{mode}://dnadesign.notify/{secret_name}"
+    webhook_config = {"source": "secret_ref", "ref": secret_value}
+
+    if not store_webhook:
+        return webhook_config
+
+    webhook_value = resolve_cli_optional_string(field="webhook_url", cli_value=webhook_url)
+    if webhook_value is None:
+        try:
+            _ = resolve_secret_ref_fn(secret_value)
+        except NotifyConfigError:
+            webhook_value = str(typer.prompt("Webhook URL", hide_input=True)).strip()
+    if webhook_value is not None:
+        if not webhook_value:
+            raise NotifyConfigError("webhook_url is required when --store-webhook is enabled")
+        store_secret_ref_fn(secret_value, webhook_value)
+    return webhook_config
 
 
 def resolve_setup_events(
@@ -165,6 +236,7 @@ def create_wizard_profile(
     resolve_events_path: Callable[[Path, bool], Path],
     ensure_private_directory_fn: Callable[[Path, str], None] = ensure_private_directory,
     secret_backend_available_fn: Callable[[str], bool] = is_secret_backend_available,
+    resolve_secret_ref_fn: Callable[[str], str] = resolve_secret_ref,
     store_secret_ref_fn: Callable[[str, str], None] = store_secret_ref,
     write_profile_file_fn: Callable[[Path, dict[str, Any], bool], None] | None = None,
 ) -> dict[str, Any]:
@@ -179,42 +251,17 @@ def create_wizard_profile(
         raise NotifyConfigError("provider must be a non-empty string")
     policy_name = resolve_workflow_policy(policy=policy)
 
-    mode = str(secret_source or "").strip().lower()
-    if not mode:
-        raise NotifyConfigError("secret_source must be a non-empty string")
-    if mode == "auto":
-        if secret_backend_available_fn("keychain"):
-            mode = "keychain"
-        elif secret_backend_available_fn("secretservice"):
-            mode = "secretservice"
-        else:
-            raise NotifyConfigError(
-                "secret_source=auto requires keychain or secretservice on this system. "
-                "Pass --secret-source env to opt into environment-variable webhook storage."
-            )
-    if mode not in {"env", "keychain", "secretservice"}:
-        raise NotifyConfigError("secret_source must be one of: auto, env, keychain, secretservice")
-
-    webhook_config: dict[str, str]
-    if mode == "env":
-        env_name = resolve_cli_optional_string(field="url_env", cli_value=url_env)
-        if env_name is None:
-            env_name = DEFAULT_WEBHOOK_ENV
-        webhook_config = {"source": "env", "ref": env_name}
-    else:
-        if not secret_backend_available_fn(mode):
-            raise NotifyConfigError(f"secret backend '{mode}' is not available on this system")
-        secret_value = resolve_cli_optional_string(field="secret_ref", cli_value=secret_ref)
-        if secret_value is None:
-            secret_value = f"{mode}://dnadesign.notify/{sanitize_profile_name(profile_path)}"
-        webhook_config = {"source": "secret_ref", "ref": secret_value}
-        if store_webhook:
-            webhook_value = resolve_cli_optional_string(field="webhook_url", cli_value=webhook_url)
-            if webhook_value is None:
-                webhook_value = str(typer.prompt("Webhook URL", hide_input=True)).strip()
-            if not webhook_value:
-                raise NotifyConfigError("webhook_url is required when --store-webhook is enabled")
-            store_secret_ref_fn(secret_value, webhook_value)
+    webhook_config = resolve_webhook_config(
+        secret_source=secret_source,
+        url_env=url_env,
+        secret_ref=secret_ref,
+        webhook_url=webhook_url,
+        store_webhook=store_webhook,
+        secret_name=sanitize_profile_name(profile_path),
+        secret_backend_available_fn=secret_backend_available_fn,
+        resolve_secret_ref_fn=resolve_secret_ref_fn,
+        store_secret_ref_fn=store_secret_ref_fn,
+    )
 
     default_cursor = profile_path.parent / "cursor"
     default_spool = profile_path.parent / "spool"

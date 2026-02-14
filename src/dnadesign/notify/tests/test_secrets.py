@@ -12,9 +12,14 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import subprocess
+from pathlib import Path
 
+import pytest
+
+from dnadesign.notify.errors import NotifyConfigError
 from dnadesign.notify.secrets import (
     is_secret_backend_available,
+    parse_secret_ref,
     resolve_secret_ref,
     store_secret_ref,
 )
@@ -119,3 +124,15 @@ def test_secretservice_store_and_resolve_use_keyring_without_external_binary(mon
     secret_ref = "secretservice://dnadesign.notify/default"
     store_secret_ref(secret_ref, "https://example.invalid/webhook")
     assert resolve_secret_ref(secret_ref) == "https://example.invalid/webhook"
+
+
+def test_file_secret_store_and_resolve_round_trip(tmp_path: Path) -> None:
+    secret_path = (tmp_path / "notify" / "secret.txt").resolve()
+    secret_ref = secret_path.as_uri()
+    store_secret_ref(secret_ref, "https://example.invalid/webhook")
+    assert resolve_secret_ref(secret_ref) == "https://example.invalid/webhook"
+
+
+def test_parse_file_secret_ref_requires_absolute_path() -> None:
+    with pytest.raises(NotifyConfigError, match="must not include a host"):
+        parse_secret_ref("file://relative/path")

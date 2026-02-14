@@ -16,11 +16,15 @@ Run setup once per tool/workspace, then run watch by tool/workspace shorthand.
 # discover workspace names for shorthand mode
 uv run notify setup list-workspaces --tool <tool>
 
-# one-time setup (stores webhook in secure backend; prompts for URL if needed)
+# one-time webhook setup (config/profile independent)
+uv run notify setup webhook --secret-source auto --name <shared-name> --json
+
+# one-time profile setup (stores/reuses webhook and writes profile)
 uv run notify setup slack \
   --tool <tool> \
   --workspace <workspace-name> \
-  --secret-source auto
+  --secret-source auto \
+  --secret-ref <webhook-ref>
 
 # validate
 uv run notify profile doctor --profile src/dnadesign/<tool-family>/workspaces/<workspace-name>/outputs/notify/<tool>/profile.json
@@ -39,7 +43,7 @@ If that file does not exist, `notify usr-events watch --tool ... --workspace ...
 If profile `events_source` exists but disagrees with the current `--tool/--workspace` (or `--tool/--config`), watch fails fast; rerun setup with `--force`.
 
 ### Secret handling
-- Preferred: `--secret-source auto` (uses keychain or secretservice).
+- Preferred: `--secret-source auto` (uses keychain/secretservice when available, otherwise secure local file secrets).
 - Env fallback: `--secret-source env --url-env <ENV_VAR>`.
 - Never store plaintext webhook URLs in profile files.
 

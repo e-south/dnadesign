@@ -5,6 +5,7 @@ Notify consumes Universal Sequence Record mutation events from `.events.log` new
 ## Contents
 - [Minimal operator quickstart](#minimal-operator-quickstart)
 - [Artifact placement strategy](#artifact-placement-strategy)
+- [Command anatomy: `notify setup webhook`](#command-anatomy-notify-setup-webhook)
 - [Command anatomy: `notify setup slack`](#command-anatomy-notify-setup-slack)
 - [Slack setup onboarding (3 minutes)](#slack-setup-onboarding-3-minutes)
 - [Common mistakes](#common-mistakes)
@@ -36,10 +37,14 @@ export SSL_CERT_FILE=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
 # List available workspace names for shorthand mode.
 uv run notify setup list-workspaces --tool densegen
 
+# Configure webhook secret once (independent of any watch profile/config).
+WEBHOOK_REF="$(uv run notify setup webhook --secret-source auto --name densegen-shared --json | python -c 'import json,sys; print(json.load(sys.stdin)[\"webhook\"][\"ref\"])')"
+
 # Create profile from workspace shorthand (observer-only setup).
 uv run notify setup slack \
   --tool densegen \
   --workspace "$WORKSPACE" \
+  --secret-ref "$WEBHOOK_REF" \
   --secret-source auto \
   --policy densegen
 
@@ -47,7 +52,7 @@ uv run notify setup slack \
 # uv run notify setup slack --tool densegen --config "$CONFIG" --secret-source auto --policy densegen
 
 # Note: notify ships with Python keyring support in uv.lock and uses it first.
-# If no secure backend is available at runtime, setup fails with actionable guidance.
+# In auto mode, setup prefers keychain/secretservice and falls back to secure local file secrets.
 
 # Resolve expected Universal Sequence Record events path from workspace shorthand (no profile write).
 uv run notify setup resolve-events --tool densegen --workspace "$WORKSPACE"
@@ -99,7 +104,35 @@ Avoid by default:
 
 ---
 
+## Command anatomy: `notify setup webhook`
+
+Canonical command:
+
+```bash
+uv run notify setup webhook \
+  --secret-source auto \
+  --name densegen-shared \
+  --json
+```
+
+What this command does:
+- configures a webhook secret reference without requiring `--tool`, `--config`, `--workspace`, `--events`, or `--profile`
+- returns a reusable `webhook.ref` value for later profile setup
+- stores the URL in the selected secret backend (or resolves existing secret when already present)
+
+Common options:
+- `--secret-source auto|env|keychain|secretservice|file`: webhook secret mode
+- `--name <logical-name>`: default reference key name when `--secret-ref` is omitted
+- `--secret-ref <backend://...>`: explicit secret location
+- `--webhook-url <url>`: non-interactive URL input
+- `--store-webhook/--no-store-webhook`: control whether setup writes a secret value
+
+---
+
 ## Command anatomy: `notify setup slack`
+
+This command creates or updates a watch profile, so it must also resolve an events source.
+Pass either `--events` or resolver mode (`--tool` with exactly one of `--config`/`--workspace`).
 
 Canonical command:
 
@@ -120,7 +153,7 @@ What each flag does:
 - `--profile` (optional): defaults to `<config-dir>/outputs/notify/<tool>/profile.json` in resolver mode.
 - `--cursor` (optional): defaults to `<config-dir>/outputs/notify/<tool>/cursor`.
 - `--spool-dir` (optional): defaults to `<config-dir>/outputs/notify/<tool>/spool`.
-- `--secret-source auto`: selects secure backend (`keychain`/`secretservice`) and prompts for webhook address if needed.
+- `--secret-source auto`: prefers `keychain`/`secretservice`; falls back to secure local `file` secrets and prompts for webhook address if needed.
 - `--policy densegen`: applies DenseGen defaults for action/tool filters.
 
 Critical expectation for `--config`:
@@ -163,10 +196,14 @@ Use observer-only setup with DenseGen config resolution.
 ```bash
 CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml
 
-# 1) Create a profile from DenseGen config (events path auto-resolved)
+# 1) Configure webhook secret once (config/profile independent)
+WEBHOOK_REF="$(uv run notify setup webhook --secret-source auto --name densegen-shared --json | python -c 'import json,sys; print(json.load(sys.stdin)[\"webhook\"][\"ref\"])')"
+
+# 2) Create a profile from DenseGen config (events path auto-resolved)
 uv run notify setup slack \
   --tool densegen \
   --config "$CONFIG" \
+  --secret-ref "$WEBHOOK_REF" \
   --secret-source auto \
   --policy densegen
 ```
@@ -217,7 +254,7 @@ For automation, append `--json` to `setup slack`, `setup resolve-events`, and `p
 to emit structured output with `ok` and error fields.
 
 ```bash
-# 2) Validate and preview, then run live
+# 3) Validate and preview, then run live
 # If the run has not started yet, skip dry-run and use --wait-for-events.
 PROFILE="$(dirname "$CONFIG")/outputs/notify/densegen/profile.json"
 uv run notify profile doctor --profile "$PROFILE"
@@ -235,7 +272,7 @@ qsub -P <project> \
   docs/bu-scc/jobs/notify-watch.qsub
 ```
 
-If `--secret-source auto` fails (no keychain/secretservice backend), use env mode:
+If you explicitly want env mode instead of secure secret refs:
 
 ```bash
 # Capture webhook address without shell echo.
@@ -384,7 +421,7 @@ Use the Slack wizard quickstart above for onboarding. If you already have a prof
 
 - `--events`, `--cursor`, and `--spool-dir` are resolved relative to the profile file location.
 - If the profile is under `outputs/`, use `usr_datasets/...` rather than `outputs/usr_datasets/...`.
-- `--secret-source auto` requires Keychain (macOS) or Secret Service (Linux).
+- `--secret-source auto` prefers Keychain (macOS) or Secret Service (Linux), then falls back to `file` secret refs.
 - Use `--secret-source env --url-env NOTIFY_WEBHOOK` only when you explicitly want env-based secrets.
 - Keep watcher state run-local by passing explicit paths:
   `--cursor outputs/notify/densegen/cursor --spool-dir outputs/notify/densegen/spool`.
@@ -403,7 +440,7 @@ Profile security contract:
 - Profile files are created with private file mode (`0600`).
 - Secrets are resolved via one explicit source:
   - environment variable (`webhook.source=env`)
-  - secret reference (`webhook.source=secret_ref`, for example keychain/secretservice)
+  - secret reference (`webhook.source=secret_ref`, for example keychain/secretservice/file)
 - Unknown profile keys hard-fail to prevent silent config drift.
 - `events_source` records (`tool`, `config`) so watcher runs can re-resolve event paths.
 - Profiles may reference events files that are not created yet; start watcher with `--wait-for-events`.

@@ -114,7 +114,7 @@ def register_profile_commands(
             "auto",
             "--secret-source",
             help=(
-                "Webhook source. auto requires keychain/secretservice; "
+                "Webhook source. auto prefers keychain/secretservice then file; "
                 "use env with --url-env for environment-based wiring."
             ),
         ),
@@ -127,8 +127,8 @@ def register_profile_commands(
             None,
             "--secret-ref",
             help=(
-                "Secret reference for keychain/secretservice mode: "
-                "keychain://service/account or secretservice://service/account."
+                "Secret reference for keychain/secretservice/file mode: "
+                "keychain://service/account, secretservice://service/account, or file:///path."
             ),
         ),
         webhook_url: str | None = typer.Option(

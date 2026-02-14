@@ -51,11 +51,12 @@ from .profile_flows import create_wizard_profile as _create_wizard_profile_flow
 from .profile_flows import resolve_profile_path_for_setup as _resolve_profile_path_for_setup
 from .profile_flows import resolve_profile_path_for_wizard as _resolve_profile_path_for_wizard
 from .profile_flows import resolve_setup_events as _resolve_setup_events
+from .profile_flows import resolve_webhook_config as _resolve_webhook_config
 from .profile_schema import PROFILE_VERSION
 from .profile_schema import read_profile as _read_profile
 from .profile_schema import resolve_profile_events_source as _resolve_profile_events_source
 from .profile_schema import resolve_profile_webhook_source as _resolve_profile_webhook_source
-from .secrets import is_secret_backend_available, store_secret_ref
+from .secrets import is_secret_backend_available, resolve_secret_ref, store_secret_ref
 from .spool_ops import ensure_private_directory as _ensure_private_directory
 from .usr_events_watch import watch_usr_events_loop
 from .validation import resolve_tls_ca_bundle, resolve_webhook_url
@@ -304,7 +305,7 @@ def _profile_wizard_impl(
     secret_source: str = typer.Option(
         "auto",
         "--secret-source",
-        help="Webhook source: auto|env|keychain|secretservice.",
+        help="Webhook source: auto|env|keychain|secretservice|file.",
     ),
     url_env: str | None = typer.Option(
         None,
@@ -314,7 +315,7 @@ def _profile_wizard_impl(
     secret_ref: str | None = typer.Option(
         None,
         "--secret-ref",
-        help="Secret reference: keychain://service/account or secretservice://service/account.",
+        help="Secret reference: keychain://service/account, secretservice://service/account, or file:///path.",
     ),
     webhook_url: str | None = typer.Option(None, "--webhook-url", help="Webhook URL to store in secure backend."),
     store_webhook: bool = typer.Option(
@@ -355,6 +356,7 @@ def _profile_wizard_impl(
             resolve_events_path=lambda p, required: _resolve_usr_events_path(p, require_exists=required),
             ensure_private_directory_fn=_ensure_private_directory,
             secret_backend_available_fn=is_secret_backend_available,
+            resolve_secret_ref_fn=resolve_secret_ref,
             store_secret_ref_fn=store_secret_ref,
             write_profile_file_fn=lambda path, payload, overwrite: _write_profile_file(
                 path,
@@ -499,7 +501,7 @@ def _setup_slack_impl(
     secret_source: str = typer.Option(
         "auto",
         "--secret-source",
-        help="Webhook source: auto|env|keychain|secretservice.",
+        help="Webhook source: auto|env|keychain|secretservice|file.",
     ),
     url_env: str | None = typer.Option(
         None,
@@ -509,7 +511,7 @@ def _setup_slack_impl(
     secret_ref: str | None = typer.Option(
         None,
         "--secret-ref",
-        help="Secret reference: keychain://service/account or secretservice://service/account.",
+        help="Secret reference: keychain://service/account, secretservice://service/account, or file:///path.",
     ),
     webhook_url: str | None = typer.Option(None, "--webhook-url", help="Webhook URL to store in secure backend."),
     store_webhook: bool = typer.Option(
@@ -569,6 +571,7 @@ def _setup_slack_impl(
             resolve_events_path=lambda p, required: _resolve_usr_events_path(p, require_exists=required),
             ensure_private_directory_fn=_ensure_private_directory,
             secret_backend_available_fn=is_secret_backend_available,
+            resolve_secret_ref_fn=resolve_secret_ref,
             store_secret_ref_fn=store_secret_ref,
             write_profile_file_fn=lambda path, payload, overwrite: _write_profile_file(
                 path,
@@ -582,6 +585,70 @@ def _setup_slack_impl(
         typer.echo(f"Profile written: {result['profile']}")
         for line in result["next_steps"]:
             typer.echo(line)
+    except NotifyError as exc:
+        if json_output:
+            typer.echo(json.dumps({"ok": False, "error": str(exc)}, sort_keys=True))
+        else:
+            typer.echo(f"Notification failed: {exc}")
+        raise typer.Exit(code=1)
+
+
+def _setup_webhook_impl(
+    name: str = typer.Option("default", "--name", help="Logical secret name used for default secure references."),
+    secret_source: str = typer.Option(
+        "auto",
+        "--secret-source",
+        help="Webhook source: auto|env|keychain|secretservice|file.",
+    ),
+    url_env: str | None = typer.Option(
+        None,
+        "--url-env",
+        help="Environment variable holding webhook URL (default: NOTIFY_WEBHOOK for --secret-source env).",
+    ),
+    secret_ref: str | None = typer.Option(
+        None,
+        "--secret-ref",
+        help="Secret reference: keychain://service/account, secretservice://service/account, or file:///path.",
+    ),
+    webhook_url: str | None = typer.Option(None, "--webhook-url", help="Webhook URL to store in secure backend."),
+    store_webhook: bool = typer.Option(
+        True,
+        "--store-webhook/--no-store-webhook",
+        help="Store webhook URL in the selected secure secret backend.",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON output."),
+) -> None:
+    try:
+        name_value = _resolve_cli_optional_string(field="name", cli_value=name)
+        if name_value is None:
+            name_value = "default"
+        secret_name = "".join(char if char.isalnum() else "-" for char in str(name_value)).strip("-")
+        if not secret_name:
+            secret_name = "default"
+
+        webhook_config = _resolve_webhook_config(
+            secret_source=secret_source,
+            url_env=url_env,
+            secret_ref=secret_ref,
+            webhook_url=webhook_url,
+            store_webhook=store_webhook,
+            secret_name=secret_name,
+            secret_backend_available_fn=is_secret_backend_available,
+            resolve_secret_ref_fn=resolve_secret_ref,
+            store_secret_ref_fn=store_secret_ref,
+        )
+
+        payload = {
+            "ok": True,
+            "name": secret_name,
+            "webhook": webhook_config,
+        }
+        if json_output:
+            typer.echo(json.dumps(payload, sort_keys=True))
+            return
+        typer.echo("Webhook reference configured.")
+        typer.echo(f"  source: {webhook_config['source']}")
+        typer.echo(f"  ref: {webhook_config['ref']}")
     except NotifyError as exc:
         if json_output:
             typer.echo(json.dumps({"ok": False, "error": str(exc)}, sort_keys=True))
@@ -682,7 +749,7 @@ def _usr_events_watch_impl(
     secret_ref: str | None = typer.Option(
         None,
         "--secret-ref",
-        help="Secret reference: keychain://service/account or secretservice://service/account.",
+        help="Secret reference: keychain://service/account, secretservice://service/account, or file:///path.",
     ),
     tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
     events: Path | None = typer.Option(None, "--events", help="USR .events.log JSONL path."),
@@ -842,7 +909,7 @@ def _spool_drain_impl(
     secret_ref: str | None = typer.Option(
         None,
         "--secret-ref",
-        help="Secret reference: keychain://service/account or secretservice://service/account.",
+        help="Secret reference: keychain://service/account, secretservice://service/account, or file:///path.",
     ),
     tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
     profile: Path | None = typer.Option(None, "--profile", help="Path to profile JSON file."),
@@ -894,6 +961,7 @@ register_profile_commands(
 register_setup_commands(
     setup_app,
     slack_handler=_setup_slack_impl,
+    webhook_handler=_setup_webhook_impl,
     resolve_events_handler=_setup_resolve_events_impl,
     list_workspaces_handler=_setup_list_workspaces_impl,
 )
