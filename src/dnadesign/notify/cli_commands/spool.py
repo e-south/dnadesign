@@ -31,7 +31,7 @@ def register_spool_drain_command(
         secret_ref: str | None = typer.Option(
             None,
             "--secret-ref",
-            help="Secret reference: keychain://service/account or secretservice://service/account.",
+            help="Secret reference: keychain://service/account, secretservice://service/account, or file:///path.",
         ),
         tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
         profile: Path | None = typer.Option(None, "--profile", help="Path to profile JSON file."),

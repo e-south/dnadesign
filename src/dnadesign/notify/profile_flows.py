@@ -11,7 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -43,6 +42,28 @@ class SetupEventsResolution:
     policy: str | None
     tool_name: str | None
     events_require_exists: bool
+
+
+def _default_file_secret_path(secret_name: str) -> Path:
+    return (Path(__file__).resolve().parent / ".secrets" / f"{secret_name}.webhook").resolve()
+
+
+def _validate_progress_step_pct(value: int | None) -> int | None:
+    if value is None:
+        return None
+    step = int(value)
+    if step < 1 or step > 100:
+        raise NotifyConfigError("progress_step_pct must be an integer between 1 and 100")
+    return step
+
+
+def _validate_progress_min_seconds(value: float | None) -> float | None:
+    if value is None:
+        return None
+    minimum = float(value)
+    if minimum <= 0.0:
+        raise NotifyConfigError("progress_min_seconds must be a positive number")
+    return minimum
 
 
 def resolve_webhook_config(
@@ -83,17 +104,10 @@ def resolve_webhook_config(
                 "secret_source=auto requires keychain, secretservice, or file backend availability. "
                 "Pass --secret-source env to opt into environment-variable webhook storage."
             )
-        xdg_config_home = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config")))
         secret_refs = []
         for candidate in candidate_modes:
             if candidate == "file":
-                secret_path = (
-                    xdg_config_home.expanduser()
-                    / "dnadesign"
-                    / "notify"
-                    / "secrets"
-                    / f"{secret_name}.webhook"
-                ).resolve()
+                secret_path = _default_file_secret_path(secret_name)
                 secret_refs.append(secret_path.as_uri())
             else:
                 secret_refs.append(f"{candidate}://dnadesign.notify/{secret_name}")
@@ -101,14 +115,7 @@ def resolve_webhook_config(
         if not secret_backend_available_fn(mode):
             raise NotifyConfigError(f"secret backend '{mode}' is not available on this system")
         if mode == "file":
-            xdg_config_home = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config")))
-            secret_path = (
-                xdg_config_home.expanduser()
-                / "dnadesign"
-                / "notify"
-                / "secrets"
-                / f"{secret_name}.webhook"
-            ).resolve()
+            secret_path = _default_file_secret_path(secret_name)
             secret_refs = [secret_path.as_uri()]
         else:
             secret_refs = [f"{mode}://dnadesign.notify/{secret_name}"]
@@ -250,6 +257,8 @@ def create_wizard_profile(
     include_args: bool,
     include_context: bool,
     include_raw_event: bool,
+    progress_step_pct: int | None,
+    progress_min_seconds: float | None,
     tls_ca_bundle: Path | None,
     policy: str | None,
     secret_source: str,
@@ -277,6 +286,8 @@ def create_wizard_profile(
     if not provider_value:
         raise NotifyConfigError("provider must be a non-empty string")
     policy_name = resolve_workflow_policy(policy=policy)
+    progress_step_pct_value = _validate_progress_step_pct(progress_step_pct)
+    progress_min_seconds_value = _validate_progress_min_seconds(progress_min_seconds)
 
     webhook_config = resolve_webhook_config(
         secret_source=secret_source,
@@ -328,6 +339,10 @@ def create_wizard_profile(
             payload.setdefault(key, value)
     if events_source is not None:
         payload["events_source"] = dict(events_source)
+    if progress_step_pct_value is not None:
+        payload["progress_step_pct"] = int(progress_step_pct_value)
+    if progress_min_seconds_value is not None:
+        payload["progress_min_seconds"] = float(progress_min_seconds_value)
 
     write_profile_file_fn(profile_path, payload, force)
     next_steps = wizard_next_steps(

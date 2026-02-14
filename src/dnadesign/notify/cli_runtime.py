@@ -38,6 +38,8 @@ def run_usr_events_watch(
     on_truncate: str,
     only_actions: str | None,
     only_tools: str | None,
+    progress_step_pct: int | None,
+    progress_min_seconds: float | None,
     on_invalid_event: str,
     allow_unknown_version: bool,
     tool: str | None,
@@ -69,6 +71,7 @@ def run_usr_events_watch(
     resolve_cli_optional_string: Callable[..., str | None],
     resolve_webhook_url: Callable[..., str],
     resolve_tls_ca_bundle: Callable[..., Path | None],
+    validate_provider_webhook_url: Callable[..., None],
     split_csv: Callable[[str | None], list[str]],
     watch_usr_events_loop: Callable[..., None],
     validate_usr_event: Callable[..., None],
@@ -171,6 +174,32 @@ def run_usr_events_watch(
         cli_value=only_tools,
         profile_data=profile_data,
     )
+    progress_step_pct_raw: object
+    if progress_step_pct is not None:
+        progress_step_pct_raw = progress_step_pct
+    else:
+        progress_step_pct_raw = profile_data.get("progress_step_pct")
+    progress_step_pct_value: int | None = None
+    if progress_step_pct_raw is not None:
+        try:
+            progress_step_pct_value = int(progress_step_pct_raw)
+        except (TypeError, ValueError) as exc:
+            raise NotifyConfigError("progress_step_pct must be an integer between 1 and 100") from exc
+        if progress_step_pct_value < 1 or progress_step_pct_value > 100:
+            raise NotifyConfigError("progress_step_pct must be an integer between 1 and 100")
+    progress_min_seconds_raw: object
+    if progress_min_seconds is not None:
+        progress_min_seconds_raw = progress_min_seconds
+    else:
+        progress_min_seconds_raw = profile_data.get("progress_min_seconds")
+    progress_min_seconds_value: float | None = None
+    if progress_min_seconds_raw is not None:
+        try:
+            progress_min_seconds_value = float(progress_min_seconds_raw)
+        except (TypeError, ValueError) as exc:
+            raise NotifyConfigError("progress_min_seconds must be a positive number") from exc
+        if progress_min_seconds_value <= 0.0:
+            raise NotifyConfigError("progress_min_seconds must be a positive number")
     spool_dir_value = resolve_optional_path_value(
         field="spool_dir",
         cli_value=spool_dir,
@@ -207,6 +236,7 @@ def run_usr_events_watch(
     resolved_tls_ca_bundle: Path | None = None
     if not dry_run:
         webhook_url = resolve_webhook_url(url=url, url_env=url_env_value, secret_ref=secret_ref_value)
+        validate_provider_webhook_url(provider=provider_value, webhook_url=webhook_url)
         resolved_tls_ca_bundle = resolve_tls_ca_bundle(
             webhook_url=webhook_url,
             tls_ca_bundle=profile_tls_ca_bundle,
@@ -230,6 +260,8 @@ def run_usr_events_watch(
         allow_unknown_version=allow_unknown_version,
         action_filter=action_filter,
         tool_filter=tool_filter,
+        progress_step_pct=progress_step_pct_value,
+        progress_min_seconds=progress_min_seconds_value,
         tool=tool_value_for_events,
         run_id=run_id,
         provider_value=provider_value,
@@ -276,6 +308,7 @@ def run_spool_drain(
     resolve_optional_path_value: Callable[..., Path | None],
     resolve_webhook_url: Callable[..., str],
     resolve_tls_ca_bundle: Callable[..., Path | None],
+    validate_provider_webhook_url: Callable[..., None],
     format_for_provider: Callable[[str, dict[str, Any]], dict[str, Any]],
     post_with_backoff: Callable[..., None],
 ) -> None:
@@ -332,6 +365,7 @@ def run_spool_drain(
                 raise NotifyConfigError(
                     f"spool payload missing provider: {path}. Pass --provider or include provider in spool files."
                 )
+            validate_provider_webhook_url(provider=provider_value, webhook_url=webhook_url)
             formatted = format_for_provider(provider_value, payload)
             post_with_backoff(
                 webhook_url,

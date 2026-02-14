@@ -46,6 +46,8 @@ def watch_usr_events_loop(
     allow_unknown_version: bool,
     action_filter: set[str],
     tool_filter: set[str],
+    progress_step_pct: int | None,
+    progress_min_seconds: float | None,
     tool: str | None,
     run_id: str | None,
     provider_value: str,
@@ -70,6 +72,11 @@ def watch_usr_events_loop(
     post_with_backoff: Callable[..., None],
 ) -> None:
     tool_event_state = ToolEventState()
+    densegen_bucket = tool_event_state.get_bucket("densegen_health")
+    densegen_bucket["notify_config"] = {
+        "progress_step_pct": progress_step_pct,
+        "progress_min_seconds": progress_min_seconds,
+    }
 
     def _save_cursor_if_enabled(next_offset: int) -> None:
         if should_advance_cursor:

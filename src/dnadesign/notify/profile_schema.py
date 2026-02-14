@@ -30,6 +30,8 @@ PROFILE_ALLOWED_KEYS = {
     "cursor",
     "only_actions",
     "only_tools",
+    "progress_step_pct",
+    "progress_min_seconds",
     "spool_dir",
     "include_args",
     "include_context",
@@ -143,6 +145,18 @@ def read_profile(profile_path: Path) -> dict[str, Any]:
     include_raw_event = data.get("include_raw_event")
     if include_raw_event is not None and not isinstance(include_raw_event, bool):
         raise NotifyConfigError("profile field 'include_raw_event' must be a boolean when provided")
+    progress_step_pct = data.get("progress_step_pct")
+    if progress_step_pct is not None:
+        if not isinstance(progress_step_pct, int):
+            raise NotifyConfigError("profile field 'progress_step_pct' must be an integer when provided")
+        if progress_step_pct < 1 or progress_step_pct > 100:
+            raise NotifyConfigError("profile field 'progress_step_pct' must be between 1 and 100 when provided")
+    progress_min_seconds = data.get("progress_min_seconds")
+    if progress_min_seconds is not None:
+        if not isinstance(progress_min_seconds, (int, float)):
+            raise NotifyConfigError("profile field 'progress_min_seconds' must be numeric when provided")
+        if float(progress_min_seconds) <= 0.0:
+            raise NotifyConfigError("profile field 'progress_min_seconds' must be > 0 when provided")
     return data
 
 

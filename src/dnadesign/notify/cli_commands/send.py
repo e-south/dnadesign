@@ -33,7 +33,7 @@ def register_send_command(
         secret_ref: str | None = typer.Option(
             None,
             "--secret-ref",
-            help="Secret reference: keychain://service/account or secretservice://service/account.",
+            help="Secret reference: keychain://service/account, secretservice://service/account, or file:///path.",
         ),
         tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
         message: str | None = typer.Option(None, help="Optional message."),
