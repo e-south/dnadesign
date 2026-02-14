@@ -62,6 +62,18 @@ def test_densegen_demo_uses_tighter_site_windows() -> None:
     assert cfg.sample.sequence_length >= max_window
 
 
+def test_densegen_demo_pins_merged_discovery_source() -> None:
+    config_path = Path(__file__).resolve().parents[2] / "workspaces" / "densegen_prep_three_tf" / "config.yaml"
+    cfg = load_config(config_path)
+
+    assert cfg.catalog.pwm_source == "matrix"
+    assert cfg.catalog.combine_sites is True
+    assert cfg.catalog.source_preference == ["demo_merged_meme_oops_three_tf"]
+    assert cfg.discover.source_id == "demo_merged_meme_oops_three_tf"
+    assert cfg.discover.tool == "meme"
+    assert cfg.discover.meme_mod == "oops"
+
+
 def test_demo_configs_use_tuned_gibbs_annealing_defaults() -> None:
     root = Path(__file__).resolve().parents[2] / "workspaces"
     expected = {

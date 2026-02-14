@@ -209,8 +209,17 @@ Plots (always generated when data is available):
 - `plots/plot__chain_trajectory_sweep.*` (optimizer scalar score over sweeps by chain, with `best_so_far|raw|all` modes and tune/cooling boundary markers when available; scalar semantics follow `sample.objective.combine` and optional soft-min shaping)
 - `plots/plot__elites_nn_distance.*` (elite diversity panel: y-axis is final optimizer scalar score, x-axis is full-sequence nearest-neighbor Hamming distance in bp to each elite's closest other selected elite, plus pairwise full-sequence distance matrix; core-distance context retained)
 - `plots/plot__elites_showcase.*` (baserender-backed elite panels with sense/antisense sequence rows, TF best-window placement, and per-window motif logos)
+  - motif-logo matrices are sourced from the locked optimization motif library (resolved by Cruncher during analysis) rather than inferred from elite strings.
+  - Cruncher passes only minimal rendering primitives (record-shaped rows + motif primitives); baserender does not require full run artifact trees.
+  - rendering uses baserender public API only (`dnadesign.baserender` package root), not internal `dnadesign.baserender.src.*` modules.
+  - panel title format is a short sentence premise, centered and terse: `Elite <rank> in <workspace> shows motif hits.` (hard capped to 40 chars).
 - `plots/plot__health_panel.*` (MH-only acceptance dynamics + move-mix over sweeps; `S` moves are excluded from acceptance rates)
 - `plots/plot__optimizer_vs_fimo.*` (optional via `analysis.fimo_compare.enabled=true`: descriptive QA scatter comparing Cruncher joint optimizer score vs FIMO weakest-TF sequence score; no-hit rows are retained at 0)
+
+Fail-fast plotting contract:
+
+- Required plots (`chain_trajectory_scatter`, `chain_trajectory_sweep`, `elites_nn_distance`, `elites_showcase`) fail analysis on plotting errors; they are not silently downgraded to skipped.
+- Intentional skips are only policy/data-driven cases (for example `health_panel` when trace is disabled, or `optimizer_vs_fimo` when `analysis.fimo_compare.enabled=false`).
 
 ## Diagnostics quick read
 

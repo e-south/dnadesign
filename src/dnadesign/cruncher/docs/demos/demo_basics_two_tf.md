@@ -43,7 +43,8 @@ rm -rf outputs
 rm -rf .cruncher/parse .cruncher/locks .cruncher/campaigns
 rm -f .cruncher/run_index.json
 pixi run cruncher -- fetch sites --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
-pixi run cruncher -- fetch sites --source regulondb --tf lexA --tf cpxR --update -c "$CONFIG"
+# Optional (network): adds curated RegulonDB sites
+# pixi run cruncher -- fetch sites --source regulondb --tf lexA --tf cpxR --update -c "$CONFIG"
 pixi run cruncher -- discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --source-id demo_merged_meme_oops -c "$CONFIG"
 pixi run cruncher -- lock -c "$CONFIG"
 pixi run cruncher -- parse --force-overwrite -c "$CONFIG"
@@ -84,13 +85,14 @@ rm -rf .cruncher/parse .cruncher/locks .cruncher/campaigns
 rm -f .cruncher/run_index.json
 ```
 
-## Cache Binding Sites (DAP-seq + RegulonDB)
+## Cache Binding Sites (local required, RegulonDB optional)
 
-Fetch binding sites from both sources so each TF has a larger merged site pool.
+Fetch local demo binding sites first. RegulonDB can be added when network access is available.
 
 ```bash
 cruncher fetch sites --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
-cruncher fetch sites --source regulondb      --tf lexA --tf cpxR --update -c "$CONFIG"
+# Optional (network)
+# cruncher fetch sites --source regulondb      --tf lexA --tf cpxR --update -c "$CONFIG"
 ```
 
 `catalog.combine_sites=true` in this demo, so discovery uses all cached site entries per TF (across both sources).

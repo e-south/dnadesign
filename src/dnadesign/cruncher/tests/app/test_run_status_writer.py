@@ -31,6 +31,12 @@ def test_run_status_writer_emits_live_metrics(tmp_path: Path) -> None:
     )
     writer.update(progress_pct=10.0, current_score=1.0, best_score=1.5)
     writer.finish(status="completed")
+    payload = json.loads(status_file.read_text())
+    assert payload["status"] == "completed"
+    assert payload["status_message"] == "completed"
+    assert "updated_at" in payload
+    assert "finished_at" in payload
+    assert payload["updated_at"] == payload["finished_at"]
 
     lines = metrics_path.read_text().strip().splitlines()
     assert len(lines) >= 3

@@ -28,3 +28,14 @@ def test_campaign_demo_reset_is_shell_safe_without_nomatch_globs() -> None:
     demo_doc = (_package_root() / "docs" / "demos" / "demo_campaigns_multi_tf.md").read_text()
     assert "rm -f campaign_*.yaml campaign_*.campaign_manifest.json" not in demo_doc
     assert "find . -maxdepth 1 -type f" in demo_doc
+
+
+def test_docs_define_baserender_public_api_boundary() -> None:
+    architecture = (_package_root() / "docs" / "reference" / "architecture.md").read_text()
+    assert "from dnadesign.baserender import" in architecture
+    disallowed_path_marker = "dnadesign.baserender" + ".src.*"
+    assert disallowed_path_marker in architecture
+
+    analysis_guide = (_package_root() / "docs" / "guides" / "sampling_and_analysis.md").read_text()
+    assert "minimal rendering primitives" in analysis_guide
+    assert "dnadesign.baserender" in analysis_guide

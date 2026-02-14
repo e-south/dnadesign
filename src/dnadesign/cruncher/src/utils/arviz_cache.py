@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 import os
 import tempfile
+import warnings
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -28,9 +29,19 @@ def _is_writable_dir(path: Path) -> bool:
         return False
 
 
+def _suppress_arviz_refactor_future_warning() -> None:
+    warnings.filterwarnings(
+        "ignore",
+        category=FutureWarning,
+        message=r"ArviZ is undergoing a major refactor.*",
+        module=r"^arviz(\..*)?$",
+    )
+
+
 def ensure_arviz_data_dir(catalog_root: Path) -> Path:
     """Ensure ArviZ can write its daily warning stamp before import."""
     catalog_root = Path(catalog_root).expanduser().resolve()
+    _suppress_arviz_refactor_future_warning()
     runtime_home = (catalog_root / ".runtime_home").resolve()
     home_warning_dir = Path.home() / "arviz_data"
     if not _is_writable_dir(home_warning_dir):

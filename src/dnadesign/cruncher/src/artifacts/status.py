@@ -76,9 +76,14 @@ class RunStatusWriter:
             self._append_metrics(event="update")
 
     def finish(self, status: str = "completed", **fields: Any) -> None:
+        status_message = fields.pop("status_message", None)
         self.payload.update(fields)
         self.payload["status"] = status
+        if status_message is None:
+            status_message = status
+        self.payload["status_message"] = status_message
         self.payload["finished_at"] = _utc_now()
+        self.payload["updated_at"] = self.payload["finished_at"]
         self.write()
         self._append_metrics(event="finish")
 

@@ -18,10 +18,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from dnadesign.baserender import Display, Effect, Feature, Record, Span, render_record_grid_figure
+from dnadesign.baserender import (
+    Display,
+    Effect,
+    Feature,
+    Record,
+    Span,
+    cruncher_showcase_style_overrides,
+    render_record_grid_figure,
+)
 from dnadesign.cruncher.analysis.plots._savefig import savefig
 
 _DNA_COMP = str.maketrans("ACGTacgtNn", "TGCAtgcaNn")
+_OVERLAY_MAX_CHARS = 40
 
 
 def _revcomp(seq: str) -> str:
@@ -59,29 +68,23 @@ def _hits_index(hits_df: pd.DataFrame) -> dict[tuple[str, str], pd.Series]:
     return rows
 
 
-def _overlay_text(elite_row: pd.Series, tf_names: list[str], overlap_by_id: Mapping[str, float]) -> str:
-    elite_id = str(elite_row.get("id"))
+def _overlay_text(
+    elite_row: pd.Series,
+    *,
+    max_chars: int = _OVERLAY_MAX_CHARS,
+) -> str:
+    if max_chars < 6:
+        raise ValueError("elites showcase title max_chars must be >= 6")
     rank_value = elite_row.get("rank")
-    score_cols = [f"score_{tf}" for tf in tf_names if f"score_{tf}" in elite_row.index]
-    weakest = None
-    if score_cols:
-        weakest = min(float(elite_row[col]) for col in score_cols if pd.notna(elite_row[col]))
-
-    joint = None
-    if "norm_sum" in elite_row.index and pd.notna(elite_row["norm_sum"]):
-        joint = float(elite_row["norm_sum"])
-
-    overlap_bp = overlap_by_id.get(elite_id)
-    parts = [f"id={elite_id}"]
+    subject = "Elite"
     if rank_value is not None and pd.notna(rank_value):
-        parts.append(f"rank={int(rank_value)}")
-    if joint is not None:
-        parts.append(f"joint={joint:.3f}")
-    if weakest is not None:
-        parts.append(f"weakest={weakest:.3f}")
-    if overlap_bp is not None:
-        parts.append(f"overlap_bp={float(overlap_bp):.1f}")
-    return "  ".join(parts)
+        rank_numeric = pd.to_numeric(rank_value, errors="coerce")
+        if pd.notna(rank_numeric):
+            subject = f"Elite #{int(rank_numeric)}"
+    return subject[:max_chars].rstrip()
+
+
+_SHOWCASE_STYLE_OVERRIDES: Mapping[str, object] = cruncher_showcase_style_overrides()
 
 
 def _matrix_from_pwm(pwm_obj) -> list[list[float]]:
@@ -98,7 +101,6 @@ def plot_elites_showcase(
     *,
     elites_df: pd.DataFrame,
     hits_df: pd.DataFrame,
-    elite_overlap_df: pd.DataFrame,
     tf_names: Iterable[str],
     pwms: Mapping[str, object],
     out_path: Path,
@@ -110,13 +112,10 @@ def plot_elites_showcase(
         raise ValueError("Elites table is required for elites_showcase.")
     if hits_df is None or hits_df.empty:
         raise ValueError("Hits table is required for elites_showcase.")
-    if elite_overlap_df is None or elite_overlap_df.empty:
-        raise ValueError("Elite overlap table is required for elites_showcase.")
     if not isinstance(max_panels, int) or max_panels < 1:
         raise ValueError("analysis.elites_showcase.max_panels must be >= 1")
 
     _required_columns(elites_df, ["id", "sequence"], context="elites_df")
-    _required_columns(elite_overlap_df, ["id", "overlap_total_bp"], context="elite_overlap_df")
 
     tf_list = [str(tf) for tf in tf_names]
     if not tf_list:
@@ -124,6 +123,7 @@ def plot_elites_showcase(
     missing_tf_pwms = sorted(tf for tf in tf_list if tf not in pwms)
     if missing_tf_pwms:
         raise ValueError(f"Missing PWM(s) for elites_showcase TFs: {missing_tf_pwms}")
+    pwm_matrix_by_tf = {tf_name: _matrix_from_pwm(pwms[tf_name]) for tf_name in tf_list}
 
     ordered = _ordered_elites(elites_df)
     if len(ordered) > max_panels:
@@ -133,12 +133,6 @@ def plot_elites_showcase(
         )
 
     hit_by_key = _hits_index(hits_df)
-    overlap_by_id = {
-        str(row["id"]): float(row["overlap_total_bp"])
-        for _, row in elite_overlap_df.iterrows()
-        if pd.notna(row.get("overlap_total_bp"))
-    }
-
     records: list[Record] = []
     for _, elite in ordered.iterrows():
         elite_id = str(elite["id"])
@@ -179,7 +173,7 @@ def plot_elites_showcase(
             label = segment if strand == "fwd" else _revcomp(segment)
             tag = f"tf:{tf_name}"
             feature_id = f"{elite_id}:best_window:{tf_name}:{tf_idx}"
-            matrix = _matrix_from_pwm(pwms[tf_name])
+            matrix = pwm_matrix_by_tf[tf_name]
             if len(matrix) != width:
                 raise ValueError(
                     f"PWM length mismatch for TF '{tf_name}': matrix rows={len(matrix)} "
@@ -215,7 +209,7 @@ def plot_elites_showcase(
                 features=tuple(features),
                 effects=tuple(effects),
                 display=Display(
-                    overlay_text=_overlay_text(elite, tf_list, overlap_by_id),
+                    overlay_text=_overlay_text(elite),
                     tag_labels=tag_labels,
                 ),
                 meta={"source": "cruncher_elites_showcase"},
@@ -226,7 +220,7 @@ def plot_elites_showcase(
     fig = render_record_grid_figure(
         records,
         ncols=ncols,
-        style_overrides={"legend": False},
+        style_overrides=_SHOWCASE_STYLE_OVERRIDES,
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)

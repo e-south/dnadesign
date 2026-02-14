@@ -90,6 +90,8 @@ Notes:
   entrypoint to `report.md`, and a detailed artifact manifest to
   `manifest.json` (all under each run directory, typically `outputs/analysis/`).
 - Motif overlap is a feature, not a failure; overlap plots are descriptive only.
+- The elites showcase plot is rendered via baserender's public API only (`dnadesign.baserender`).
+  Cruncher does not depend on baserender internal modules.
 
 ### More documentation
 

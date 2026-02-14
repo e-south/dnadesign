@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from dnadesign.cruncher.analysis.plots.elites_showcase import plot_elites_showcase
+from dnadesign.cruncher.analysis.plots.elites_showcase import _overlay_text, plot_elites_showcase
 from dnadesign.cruncher.core.pwm import PWM
 
 
@@ -23,13 +23,6 @@ def test_elites_showcase_plot_smoke(tmp_path) -> None:
             {"id": "elite-2", "rank": 2, "sequence": "CCCCAAAA"},
             {"id": "elite-3", "rank": 3, "sequence": "AACCGAAT"},
         ]
-    )
-    elite_overlap_df = pd.DataFrame(
-        {
-            "id": ["elite-1", "elite-2", "elite-3"],
-            "rank": [1, 2, 3],
-            "overlap_total_bp": [0, 2, 4],
-        }
     )
     hits_df = pd.DataFrame(
         [
@@ -72,7 +65,6 @@ def test_elites_showcase_plot_smoke(tmp_path) -> None:
     plot_elites_showcase(
         elites_df=elites_df,
         hits_df=hits_df,
-        elite_overlap_df=elite_overlap_df,
         tf_names=["tfA", "tfB"],
         pwms=pwms,
         out_path=panel_path,
@@ -90,7 +82,6 @@ def test_elites_showcase_fails_fast_when_panel_limit_exceeded(tmp_path) -> None:
             {"id": "elite-2", "rank": 2, "sequence": "CCCCAAAA"},
         ]
     )
-    elite_overlap_df = pd.DataFrame({"id": ["elite-1", "elite-2"], "overlap_total_bp": [7, 7]})
     hits_df = pd.DataFrame(
         [
             {"elite_id": "elite-1", "tf": "tfA", "best_start": 0, "pwm_width": 4, "best_strand": "+"},
@@ -104,7 +95,6 @@ def test_elites_showcase_fails_fast_when_panel_limit_exceeded(tmp_path) -> None:
         plot_elites_showcase(
             elites_df=elites_df,
             hits_df=hits_df,
-            elite_overlap_df=elite_overlap_df,
             tf_names=["tfA"],
             pwms=pwms,
             out_path=panel_path,
@@ -117,3 +107,17 @@ def test_elites_showcase_fails_fast_when_panel_limit_exceeded(tmp_path) -> None:
         raised = True
         assert "analysis.elites_showcase.max_panels" in str(exc)
     assert raised
+
+
+def test_elites_showcase_overlay_title_is_succinct_and_ranked() -> None:
+    row = pd.Series({"id": "elite_showcase_1234567890", "rank": 12})
+    text = _overlay_text(row, max_chars=40)
+    assert len(text) <= 40
+    assert text == "Elite #12"
+
+
+def test_elites_showcase_overlay_title_handles_missing_rank() -> None:
+    row = pd.Series({"id": "elite_showcase_1"})
+    text = _overlay_text(row, max_chars=40)
+    assert len(text) <= 40
+    assert text == "Elite"

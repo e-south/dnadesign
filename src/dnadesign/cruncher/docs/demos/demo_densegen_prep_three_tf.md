@@ -5,18 +5,22 @@
 - [Demo setup](#demo-setup)
 - [Reset demo](#reset-demo)
 - [Cache sites by source](#cache-sites-by-source)
+- [Discover merged motifs (MEME OOPS)](#discover-merged-motifs-meme-oops)
 - [Lock + parse](#lock--parse)
 - [Sample + analyze](#sample--analyze)
 - [Related docs](#related-docs)
 
 ## Overview
 
-This workspace prepares a three-TF run (`lexA`, `cpxR`, `baeR`) using site-derived PWMs.
-It is a practical prep flow for downstream densegen exports and validates that mixed site
-sources can be locked, parsed, sampled, and analyzed end-to-end. The bundled
-config uses Gibbs annealing with piecewise cooling, explicit proposal adaptation
-freeze in the cold tail, and Gibbs inertia for late-stage stability; sweep plots
-default to best-so-far (`analysis.trajectory_sweep_mode=best_so_far`).
+This workspace prepares a three-TF run (`lexA`, `cpxR`, `baeR`) using a strict
+two-stage contract:
+1. merge cached site sets per TF, then run MEME in OOPS mode;
+2. lock/sample/analyze against discovered motifs only.
+
+`catalog.source_preference` is pinned to the discovered source
+`demo_merged_meme_oops_three_tf`, so `lock` fails until discovery has been run.
+This prevents accidental fallback to raw source motifs/sites and keeps optimizer +
+analysis motif provenance explicit.
 
 ## Demo setup
 
@@ -41,12 +45,26 @@ rm -f .cruncher/run_index.json
 ## Cache sites by source
 
 This demo intentionally uses multiple sources:
-- `lexA`, `cpxR` from `demo_local_meme`
-- `baeR` from `baer_chip_exo`
+- `lexA`, `cpxR` from `demo_local_meme` + `regulondb`
+- `baeR` from `baer_chip_exo` (and optionally `regulondb` if present in your cache)
 
 ```bash
 cruncher fetch sites --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
+cruncher fetch sites --source regulondb      --tf lexA --tf cpxR --update -c "$CONFIG"
 cruncher fetch sites --source baer_chip_exo --tf baeR --update -c "$CONFIG"
+```
+
+Using the same lexA/cpxR source mix as the two-TF demo keeps discovered motif widths
+aligned across workspaces.
+
+## Discover merged motifs (MEME OOPS)
+
+`catalog.combine_sites=true` merges all cached site entries per TF before discovery.
+`discover motifs` writes discovered matrices to
+`demo_merged_meme_oops_three_tf`, which is the only source used by lock/sample/analyze.
+
+```bash
+cruncher discover motifs --set 1 --tool meme --meme-mod oops --source-id demo_merged_meme_oops_three_tf -c "$CONFIG"
 ```
 
 ## Lock + parse
@@ -57,6 +75,8 @@ cruncher parse -c "$CONFIG"
 ```
 
 If `.cruncher/parse` already exists from a prior run, re-run parse with `--force-overwrite`.
+If `lock` fails, re-run discovery first (this demo intentionally does not fall back
+to raw sources).
 
 ## Sample + analyze
 

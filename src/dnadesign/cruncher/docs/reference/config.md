@@ -335,7 +335,10 @@ Notes:
 - `analysis.trajectory_sweep_mode` controls sweep-plot narrative: `best_so_far` (default optimizer narrative), `raw`, or `all` (raw exploration + best-so-far envelope).
 - Trajectory plots are chain-centric: chains are rendered categorically, and lineage follows each chain across sweeps.
 - `analysis.trajectory_chain_overlay=true` overlays chain markers as a diagnostic layer.
+- Required analysis plots fail fast on plotting/data contract errors (`chain_trajectory_scatter`, `chain_trajectory_sweep`, `elites_nn_distance`, `elites_showcase`); only explicitly optional plots can be skipped by policy.
 - `analysis.elites_showcase.max_panels` sets a hard cap for the baserender-backed elites showcase panel count; analyze fails fast when elites exceed this cap.
+  - Cruncher-to-baserender handoff is contract-first: Cruncher emits `Record` primitives and baserender renders them.
+  - Integration must use baserender public API (`dnadesign.baserender`) only; internal `dnadesign.baserender.src.*` imports are non-contractual.
 - `analysis.fimo_compare.enabled=true` adds `plot__optimizer_vs_fimo.*`, a descriptive QA scatter:
   - x: Cruncher joint optimizer score (same scalar used during optimization)
   - y: FIMO weakest-TF score (`min_tf(-log10 p_seq_tf)`), where each TF score is based on the best FIMO hit p-value corrected to sequence-level.

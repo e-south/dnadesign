@@ -12,11 +12,11 @@ cruncher:
 
   catalog:
     root: .cruncher/densegen_prep_three_tf
-    source_preference: [meme_suite_meme, meme_suite_streme, baer_chip_exo, demo_local_meme, regulondb]
+    source_preference: [demo_merged_meme_oops_three_tf]
     allow_ambiguous: false
-    pwm_source: sites
+    pwm_source: matrix
     site_kinds: null
-    combine_sites: false
+    combine_sites: true
     dataset_preference: []
     dataset_map: {}
     site_window_lengths:
@@ -32,7 +32,7 @@ cruncher:
     tool: meme
     meme_mod: oops
     meme_prior: addone
-    source_id: meme_suite_meme
+    source_id: demo_merged_meme_oops_three_tf
     tool_path: ../../../../../.pixi/envs/default/bin
 
   ingest:

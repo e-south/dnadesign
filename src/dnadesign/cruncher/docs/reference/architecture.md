@@ -51,6 +51,7 @@ Core contract:
 #### `analysis/` (analysis + diagnostics)
 - plot registry, per-PWM summaries, and analysis helpers
 - plot implementations live under `analysis/plots/`
+- baserender-backed elites showcase lives in `analysis/plots/elites_showcase.py`
 
 #### `artifacts/` (run layout + manifests)
 - run directory layout + status helpers
@@ -71,6 +72,31 @@ Core contract:
 - Typer commands
 - argument parsing, output formatting
 - delegates work to app modules (no business logic)
+
+### Baserender integration boundary
+
+Cruncher integrates with baserender through the **public package root only**:
+
+- Allowed: `from dnadesign.baserender import ...`
+- Disallowed: `dnadesign.baserender.src.*` deep imports
+
+Current Cruncher handoff for `plot__elites_showcase.*`:
+
+1. Cruncher resolves run data into rendering primitives:
+   - sequence per elite
+   - best-window spans/strand per TF
+   - locked motif matrices for each TF
+2. Cruncher hands baserender only the minimal plotting contract:
+   - record-shaped rows (`id`, `sequence`, `features`, `effects`, `display`) and motif primitives
+   - or equivalent in-memory `Record` objects through baserender public APIs
+3. Baserender validates contracts, performs layout/rendering, and emits assets.
+
+The showcase renderer does not require overlap tables; overlap metrics remain separate analysis artifacts.
+
+This keeps responsibilities decoupled:
+- Cruncher owns analysis semantics and motif provenance.
+- Baserender owns rendering contracts, geometry, and output encoding.
+- Both sides fail fast on schema/contract violations.
 
 ---
 

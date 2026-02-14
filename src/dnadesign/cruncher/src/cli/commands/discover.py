@@ -437,6 +437,12 @@ def discover_motifs(
         if not sequences:
             console.print(f"Error: no site sequences available for {target.tf_name}.")
             raise typer.Exit(code=1)
+        source_labels = sorted({entry.source for entry in target.site_entries})
+        source_text = ", ".join(source_labels) if source_labels else "-"
+        console.print(
+            f"INFO {target.tf_name}: discovery input n_sites={len(sequences)} "
+            f"from {len(target.site_entries)} site set(s) across source(s): {source_text}."
+        )
         resolved_minw = minw if minw is not None else None
         resolved_maxw = maxw if maxw is not None else None
         if resolved_minw is not None and resolved_minw < 1:
@@ -545,6 +551,8 @@ def discover_motifs(
                 "discovery_tool_version": version or "unknown",
                 "discovery_run": run_dir.name,
                 "discovery_nsites": str(len(sequences)),
+                "discovery_site_sets": str(len(target.site_entries)),
+                "discovery_site_sources": source_text,
                 "discovery_minw": str(resolved_minw) if resolved_minw is not None else "tool_default",
                 "discovery_maxw": str(resolved_maxw) if resolved_maxw is not None else "tool_default",
                 "discovery_nmotifs": str(nmotifs),

@@ -99,8 +99,10 @@ Summary artifacts live under:
   analysis/campaign_summary.csv
   analysis/campaign_best.csv
   analysis/campaign_manifest.json
-  plots/plot__*.<plot_format>
+  plots/plot__*.png
 ```
+
+Campaign summary plots are currently always emitted as PNG (independent of `analysis.plot_format`).
 
 ## Related docs
 
