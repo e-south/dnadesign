@@ -1584,9 +1584,13 @@ class Dataset:
         *,
         include_deleted: bool = False,
     ) -> None:
-        """Export current table to CSV or JSONL."""
+        """Export current table to CSV, JSONL, or Parquet."""
+        fmt_norm = str(fmt or "").strip().lower()
+        if fmt_norm not in {"csv", "jsonl", "parquet"}:
+            raise SequencesError("Unsupported export format. Use csv|jsonl|parquet.")
+
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        if fmt == "csv":
+        if fmt_norm == "csv":
             first = True
             wrote = False
             for batch in self.scan(
@@ -1602,7 +1606,7 @@ class Dataset:
             if not wrote:
                 empty_cols = columns if columns else self.schema().names
                 pd.DataFrame(columns=list(empty_cols)).to_csv(out_path, index=False)
-        elif fmt == "jsonl":
+        elif fmt_norm == "jsonl":
             wrote = False
             with out_path.open("w", encoding="utf-8") as f:
                 for batch in self.scan(
@@ -1621,7 +1625,34 @@ class Dataset:
             if not wrote:
                 out_path.write_text("", encoding="utf-8")
         else:
-            raise SequencesError("Unsupported export format. Use csv|jsonl.")
+            writer: pq.ParquetWriter | None = None
+            try:
+                for batch in self.scan(
+                    columns=columns,
+                    include_overlays=True,
+                    include_deleted=include_deleted,
+                    batch_size=65536,
+                ):
+                    table = pa.Table.from_batches([batch], schema=batch.schema)
+                    if writer is None:
+                        writer = pq.ParquetWriter(out_path, schema=table.schema, compression=PARQUET_COMPRESSION)
+                    writer.write_table(table)
+            finally:
+                if writer is not None:
+                    writer.close()
+            if writer is None:
+                schema = self.schema()
+                if columns:
+                    fields = []
+                    for name in columns:
+                        idx = schema.get_field_index(str(name))
+                        if idx < 0:
+                            raise SchemaError(f"Unknown column '{name}' in export selection.")
+                        fields.append(schema.field(idx))
+                    schema = pa.schema(fields)
+                arrays = [pa.array([], type=field.type) for field in schema]
+                empty = pa.Table.from_arrays(arrays, schema=schema)
+                pq.write_table(empty, out_path, compression=PARQUET_COMPRESSION)
 
     def _write_reserved_overlay(
         self,

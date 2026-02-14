@@ -12,8 +12,11 @@ Module Author(s): Eric J. South
 from pathlib import Path
 
 import pandas as pd
+import pyarrow.parquet as pq
+import pytest
 
 from dnadesign.usr.src.dataset import Dataset
+from dnadesign.usr.src.errors import SequencesError
 from dnadesign.usr.tests.registry_helpers import ensure_registry
 
 
@@ -63,6 +66,23 @@ def test_export_columns(tmp_path: Path) -> None:
     ds.export("csv", out, columns=["id", "sequence"])
     data = pd.read_csv(out)
     assert list(data.columns) == ["id", "sequence"]
+
+
+def test_export_parquet_columns(tmp_path: Path) -> None:
+    ds = _make_dataset(tmp_path)
+    out = tmp_path / "out.parquet"
+    ds.export("parquet", out, columns=["id", "sequence"])
+    table = pq.read_table(out)
+    assert table.column_names == ["id", "sequence"]
+    assert table.num_rows == 2
+
+
+def test_export_rejects_invalid_format_without_creating_parent(tmp_path: Path) -> None:
+    ds = _make_dataset(tmp_path)
+    out = tmp_path / "nested" / "out.bad"
+    with pytest.raises(SequencesError, match="Unsupported export format"):
+        ds.export("badfmt", out)
+    assert not out.parent.exists()
 
 
 def test_grep_batch_size(tmp_path: Path) -> None:
