@@ -60,19 +60,7 @@ def resolve_webhook_config(
     mode = str(secret_source or "").strip().lower()
     if not mode:
         raise NotifyConfigError("secret_source must be a non-empty string")
-    if mode == "auto":
-        if secret_backend_available_fn("keychain"):
-            mode = "keychain"
-        elif secret_backend_available_fn("secretservice"):
-            mode = "secretservice"
-        elif secret_backend_available_fn("file"):
-            mode = "file"
-        else:
-            raise NotifyConfigError(
-                "secret_source=auto requires keychain, secretservice, or file backend availability. "
-                "Pass --secret-source env to opt into environment-variable webhook storage."
-            )
-    if mode not in {"env", "keychain", "secretservice", "file"}:
+    if mode not in {"auto", "env", "keychain", "secretservice", "file"}:
         raise NotifyConfigError("secret_source must be one of: auto, env, keychain, secretservice, file")
 
     if mode == "env":
@@ -81,10 +69,37 @@ def resolve_webhook_config(
             env_name = DEFAULT_WEBHOOK_ENV
         return {"source": "env", "ref": env_name}
 
-    if not secret_backend_available_fn(mode):
-        raise NotifyConfigError(f"secret backend '{mode}' is not available on this system")
-    secret_value = resolve_cli_optional_string(field="secret_ref", cli_value=secret_ref)
-    if secret_value is None:
+    provided_secret_ref = resolve_cli_optional_string(field="secret_ref", cli_value=secret_ref)
+    secret_refs: list[str]
+    if provided_secret_ref is not None:
+        secret_refs = [provided_secret_ref]
+    elif mode == "auto":
+        candidate_modes: list[str] = []
+        for candidate in ("keychain", "secretservice", "file"):
+            if secret_backend_available_fn(candidate):
+                candidate_modes.append(candidate)
+        if not candidate_modes:
+            raise NotifyConfigError(
+                "secret_source=auto requires keychain, secretservice, or file backend availability. "
+                "Pass --secret-source env to opt into environment-variable webhook storage."
+            )
+        xdg_config_home = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config")))
+        secret_refs = []
+        for candidate in candidate_modes:
+            if candidate == "file":
+                secret_path = (
+                    xdg_config_home.expanduser()
+                    / "dnadesign"
+                    / "notify"
+                    / "secrets"
+                    / f"{secret_name}.webhook"
+                ).resolve()
+                secret_refs.append(secret_path.as_uri())
+            else:
+                secret_refs.append(f"{candidate}://dnadesign.notify/{secret_name}")
+    else:
+        if not secret_backend_available_fn(mode):
+            raise NotifyConfigError(f"secret backend '{mode}' is not available on this system")
         if mode == "file":
             xdg_config_home = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config")))
             secret_path = (
@@ -94,25 +109,37 @@ def resolve_webhook_config(
                 / "secrets"
                 / f"{secret_name}.webhook"
             ).resolve()
-            secret_value = secret_path.as_uri()
+            secret_refs = [secret_path.as_uri()]
         else:
-            secret_value = f"{mode}://dnadesign.notify/{secret_name}"
-    webhook_config = {"source": "secret_ref", "ref": secret_value}
+            secret_refs = [f"{mode}://dnadesign.notify/{secret_name}"]
 
     if not store_webhook:
-        return webhook_config
+        return {"source": "secret_ref", "ref": secret_refs[0]}
 
     webhook_value = resolve_cli_optional_string(field="webhook_url", cli_value=webhook_url)
-    if webhook_value is None:
-        try:
-            _ = resolve_secret_ref_fn(secret_value)
-        except NotifyConfigError:
-            webhook_value = str(typer.prompt("Webhook URL", hide_input=True)).strip()
-    if webhook_value is not None:
+    last_error: NotifyConfigError | None = None
+    for secret_value in secret_refs:
+        webhook_config = {"source": "secret_ref", "ref": secret_value}
+        if webhook_value is None:
+            try:
+                _ = resolve_secret_ref_fn(secret_value)
+                return webhook_config
+            except NotifyConfigError:
+                webhook_value = str(typer.prompt("Webhook URL", hide_input=True)).strip()
         if not webhook_value:
             raise NotifyConfigError("webhook_url is required when --store-webhook is enabled")
-        store_secret_ref_fn(secret_value, webhook_value)
-    return webhook_config
+        try:
+            store_secret_ref_fn(secret_value, webhook_value)
+            return webhook_config
+        except NotifyConfigError as exc:
+            last_error = exc
+            if len(secret_refs) == 1:
+                raise
+            continue
+
+    if last_error is not None:
+        raise last_error
+    raise NotifyConfigError("failed to resolve webhook secret configuration")
 
 
 def resolve_setup_events(
