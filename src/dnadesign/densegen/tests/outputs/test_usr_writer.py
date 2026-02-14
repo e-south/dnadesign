@@ -179,8 +179,11 @@ def test_usr_writer_emits_densegen_health_events(tmp_path: Path, monkeypatch: py
     assert writer.add(record)
 
     health_events = _events_for_action(root / "demo" / ".events.log", "densegen_health")
-    assert len(health_events) == 1
-    event = health_events[0]
+    statuses = [str((event.get("args") or {}).get("status")) for event in health_events]
+    assert statuses[:2] == ["started", "running"]
+    running_events = [event for event in health_events if str((event.get("args") or {}).get("status")) == "running"]
+    assert len(running_events) == 1
+    event = running_events[0]
     assert event["metrics"]["rows_written_session"] == 1
     assert event["metrics"]["rows_incoming_session"] == 1
     assert event["metrics"]["run_quota"] == 10
@@ -224,7 +227,10 @@ def test_usr_writer_health_events_are_time_throttled(tmp_path: Path, monkeypatch
     assert writer.add(second)
 
     health_events = _events_for_action(root / "demo" / ".events.log", "densegen_health")
-    assert len(health_events) == 1
+    statuses = [str((event.get("args") or {}).get("status")) for event in health_events]
+    assert "started" in statuses
+    running_events = [event for event in health_events if str((event.get("args") or {}).get("status")) == "running"]
+    assert len(running_events) == 1
 
 
 def test_usr_writer_finalize_emits_completed_health_event(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

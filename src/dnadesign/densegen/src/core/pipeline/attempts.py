@@ -244,6 +244,44 @@ def _load_existing_library_index_by_plan(
     return max_by_plan
 
 
+def _load_existing_library_build_count_by_plan(
+    tables_root: Path,
+) -> dict[tuple[str, str], int]:
+    attempts_path = tables_root / "attempts.parquet"
+    paths: list[Path] = []
+    if attempts_path.exists():
+        paths.append(attempts_path)
+    paths.extend(sorted(tables_root.glob("attempts_part-*.parquet")))
+    if not paths:
+        return {}
+
+    counts_by_plan: dict[tuple[str, str], set[int]] = {}
+    for path in paths:
+        try:
+            df = pd.read_parquet(path, columns=["input_name", "plan_name", "sampling_library_index"])
+        except Exception:
+            continue
+        if df.empty:
+            continue
+        for _, row in df.iterrows():
+            input_name = str(row.get("input_name") or "")
+            plan_name = str(row.get("plan_name") or "")
+            if not input_name or not plan_name:
+                continue
+            idx = row.get("sampling_library_index")
+            try:
+                idx_val = int(idx) if idx is not None else 0
+            except Exception:
+                idx_val = 0
+            if idx_val <= 0:
+                continue
+            key = (input_name, plan_name)
+            values = counts_by_plan.setdefault(key, set())
+            values.add(idx_val)
+
+    return {key: int(len(values)) for key, values in counts_by_plan.items()}
+
+
 def _load_existing_attempt_index_by_plan(tables_root: Path) -> dict[tuple[str, str], int]:
     attempts_path = tables_root / "attempts.parquet"
     paths: list[Path] = []

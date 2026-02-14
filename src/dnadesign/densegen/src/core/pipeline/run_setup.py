@@ -53,10 +53,12 @@ def init_plan_stats(
     plan_items: Iterable[object],
     plan_pools: dict,
     existing_counts: dict[tuple[str, str], int] | None,
+    existing_library_build_counts: dict[tuple[str, str], int] | None = None,
 ) -> tuple[dict[tuple[str, str], dict[str, int]], list[tuple[str, str]]]:
     plan_stats: dict[tuple[str, str], dict[str, int]] = {}
     plan_order: list[tuple[str, str]] = []
     counts = existing_counts or {}
+    library_counts = existing_library_build_counts or {}
     for item in plan_items:
         spec = plan_pools[item.name]
         key = (spec.pool_name, item.name)
@@ -65,7 +67,7 @@ def init_plan_stats(
             "duplicates_skipped": 0,
             "failed_solutions": 0,
             "total_resamples": 0,
-            "libraries_built": 0,
+            "libraries_built": int(library_counts.get(key, 0)),
             "stall_events": 0,
             "failed_min_count_per_tf": 0,
             "failed_required_regulators": 0,
