@@ -7,6 +7,7 @@
 - [Cache sites by source](#cache-sites-by-source)
 - [Discover merged motifs (MEME OOPS)](#discover-merged-motifs-meme-oops)
 - [Lock + parse](#lock--parse)
+- [Export DenseGen Motifs](#export-densegen-motifs)
 - [Sample + analyze](#sample--analyze)
 - [Related docs](#related-docs)
 
@@ -46,12 +47,13 @@ rm -f .cruncher/run_index.json
 
 This demo intentionally uses multiple sources:
 - `lexA`, `cpxR` from `demo_local_meme` + `regulondb`
-- `baeR` from `baer_chip_exo` (and optionally `regulondb` if present in your cache)
+- `baeR` from `baer_chip_exo` + `regulondb`
 
 ```bash
 cruncher fetch sites --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
 cruncher fetch sites --source regulondb      --tf lexA --tf cpxR --update -c "$CONFIG"
 cruncher fetch sites --source baer_chip_exo --tf baeR --update -c "$CONFIG"
+cruncher fetch sites --source regulondb      --tf baeR --update -c "$CONFIG"
 ```
 
 Using the same lexA/cpxR source mix as the two-TF demo keeps discovered motif widths
@@ -77,6 +79,14 @@ cruncher parse -c "$CONFIG"
 If `.cruncher/parse` already exists from a prior run, re-run parse with `--force-overwrite`.
 If `lock` fails, re-run discovery first (this demo intentionally does not fall back
 to raw sources).
+
+## Export DenseGen Motifs
+
+Export the same discovered motifs used by optimization and analysis:
+
+```bash
+cruncher catalog export-densegen --set 1 --out outputs/densegen/pwms -c "$CONFIG"
+```
 
 ## Sample + analyze
 

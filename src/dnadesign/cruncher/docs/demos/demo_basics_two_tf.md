@@ -9,6 +9,7 @@
 - [Discover MEME OOPS Motifs](#discover-meme-oops-motifs)
 - [Lock + parse](#lock--parse)
 - [Render MEME Logos](#render-meme-logos)
+- [Export DenseGen Motifs](#export-densegen-motifs)
 - [Sample + analyze](#sample--analyze)
 - [Fast rerun after config edits](#fast-rerun-after-config-edits)
 - [Inspect results](#inspect-results)
@@ -43,15 +44,14 @@ rm -rf outputs
 rm -rf .cruncher/parse .cruncher/locks .cruncher/campaigns
 rm -f .cruncher/run_index.json
 pixi run cruncher -- fetch sites --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
-# Optional (network): adds curated RegulonDB sites
-# pixi run cruncher -- fetch sites --source regulondb --tf lexA --tf cpxR --update -c "$CONFIG"
+pixi run cruncher -- fetch sites --source regulondb      --tf lexA --tf cpxR --update -c "$CONFIG"
 pixi run cruncher -- discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --source-id demo_merged_meme_oops -c "$CONFIG"
 pixi run cruncher -- lock -c "$CONFIG"
 pixi run cruncher -- parse --force-overwrite -c "$CONFIG"
 pixi run cruncher -- sample --force-overwrite -c "$CONFIG"
 pixi run cruncher -- analyze --summary -c "$CONFIG"
 pixi run cruncher -- catalog logos --source demo_merged_meme_oops --tf lexA --tf cpxR -c "$CONFIG"
-find outputs -type f -name 'plot__*.*' | sort
+find outputs -type f -path '*/plots/*' | sort
 find outputs -type f -path '*/logos/*' -name '*.png' | sort
 ```
 
@@ -85,14 +85,13 @@ rm -rf .cruncher/parse .cruncher/locks .cruncher/campaigns
 rm -f .cruncher/run_index.json
 ```
 
-## Cache Binding Sites (local required, RegulonDB optional)
+## Cache Binding Sites (DAP-seq + RegulonDB)
 
-Fetch local demo binding sites first. RegulonDB can be added when network access is available.
+Fetch both sources before discovery so the TFBS pool is explicit and reproducible.
 
 ```bash
 cruncher fetch sites --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
-# Optional (network)
-# cruncher fetch sites --source regulondb      --tf lexA --tf cpxR --update -c "$CONFIG"
+cruncher fetch sites --source regulondb      --tf lexA --tf cpxR --update -c "$CONFIG"
 ```
 
 `catalog.combine_sites=true` in this demo, so discovery uses all cached site entries per TF (across both sources).
@@ -142,6 +141,16 @@ cruncher catalog logos --source demo_merged_meme_oops --tf lexA --tf cpxR -c "$C
 ```
 
 When you run `sample --force-overwrite`, generate logos after sampling so they are part of the final output snapshot.
+
+## Export DenseGen motifs
+
+Export the same discovered motifs used by lock/parse/sample/analyze:
+
+```bash
+cruncher catalog export-densegen --set 1 --out outputs/densegen/pwms -c "$CONFIG"
+```
+
+This keeps DenseGen exports on the same motif provenance path as optimization and showcase plotting.
 
 ## Sample + analyze
 
@@ -194,13 +203,13 @@ Run artifacts live under:
 
 Key files:
 
-- `analysis/summary.json`
-- `analysis/report.md`
-- `analysis/report.json`
+- `analysis/reports/summary.json`
+- `analysis/reports/report.md`
+- `analysis/reports/report.json`
 - motif logos under `logos/catalog/<run_name>/`
-- curated plots in `plots/`: `plot__chain_trajectory_scatter.*`,
-  `plot__chain_trajectory_sweep.*`, `plot__elites_nn_distance.*`, `plot__elites_showcase.*`
-  (and `plot__health_panel.*` if a trace is present)
+- curated plots in `plots/`: `chain_trajectory_scatter.*`,
+  `chain_trajectory_sweep.*`, `elites_nn_distance.*`, `elites_showcase.*`
+  (and `health_panel.*` if a trace is present)
 - analysis tables in `analysis/` use `table__*` filenames (for example
   `table__scores_summary.parquet` and `table__metrics_joint.parquet`)
 - elite hit metadata: `optimize/elites_hits.parquet`

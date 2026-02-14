@@ -35,6 +35,7 @@ cruncher workspaces list
 * **Render logos** → `catalog logos`
 * **Optimize** → `sample`
 * **Analyze** → `analyze`, `notebook`
+* **Export sequences** → `export sequences`
 * **Campaigns** → `campaign validate|generate|summarize|notebook`
 * **Run management** → `runs list/show/latest/best/watch/clean`
 * **Workspace health** → `status`
@@ -246,8 +247,8 @@ Examples:
 Outputs:
 
 * `analysis/campaign_summary.csv`, `analysis/campaign_best.csv`, `analysis/campaign_manifest.json`
-* plots under `plots/` (e.g., `plot__best_jointscore_bar.png`,
-  `plot__tf_coverage_heatmap.png`, `plot__joint_trend.png`, `plot__pareto_projection.png`)
+* plots under `plots/` (e.g., `best_jointscore_bar.png`,
+  `tf_coverage_heatmap.png`, `joint_trend.png`, `pareto_projection.png`)
 
 Notes:
 
@@ -320,7 +321,7 @@ Notes:
   If you add new motifs (e.g., via `discover motifs`) or change `catalog` preferences,
   re-run `cruncher lock <config>` to refresh what parse will use.
 * Parse requires overwrite intent when output already exists; use `--force-overwrite` to replace.
-* Parse artifacts live under `<workspace>/.cruncher/parse/input/` and are intentionally
+* Parse artifacts live under `<workspace>/.cruncher/parse/inputs/` and are intentionally
   separate from user-facing sample outputs in `workspace.out_dir`.
 * Use `cruncher catalog logos` to render PWM logos with provenance subtitles.
 
@@ -390,30 +391,66 @@ Preconditions:
 
 * provide runs via `analysis.runs`/`--run` or rely on the default latest run
 * trace-dependent plots require `optimize/trace.nc`
-* each sample run snapshots the lockfile under `input/lockfile.json`; analysis uses that snapshot to avoid mismatch if the workspace lockfile changes later
+* each sample run snapshots the lockfile under `inputs/lockfile.json`; analysis uses that snapshot to avoid mismatch if the workspace lockfile changes later
 * if `analysis` is omitted from config, analyze uses schema defaults (including `run_selector=latest`)
 * if `analysis.fimo_compare.enabled=true`, MEME Suite `fimo` must be resolvable via `discover.tool_path`, `MEME_BIN`, or `PATH`
 
 Outputs:
 
-* tables: `analysis/table__scores_summary.parquet`, `analysis/table__elites_topk.parquet`,
-  `analysis/table__metrics_joint.parquet`, `analysis/table__chain_trajectory_points.parquet`,
-  `analysis/table__chain_trajectory_lines.parquet`,
-  `analysis/table__diagnostics_summary.json`, `analysis/table__objective_components.json`,
-  `analysis/table__elites_mmr_summary.parquet`, `analysis/table__elites_nn_distance.parquet`,
-  `analysis/table__elites_mmr_sweep.parquet` (when `analysis.mmr_sweep.enabled=true`)
-* plots: `plots/plot__chain_trajectory_scatter.<plot_format>`,
-  `plots/plot__chain_trajectory_sweep.<plot_format>`,
-  `plots/plot__elites_nn_distance.<plot_format>`, `plots/plot__elites_showcase.<plot_format>`,
-  `plots/plot__health_panel.<plot_format>` (trace only)
-* reports: `analysis/report.json`, `analysis/report.md`
-* summaries: `analysis/summary.json`, `analysis/manifest.json`, `analysis/plot_manifest.json`, `analysis/table_manifest.json`
+* tables: `analysis/tables/table__scores_summary.parquet`, `analysis/tables/table__elites_topk.parquet`,
+  `analysis/tables/table__metrics_joint.parquet`, `analysis/tables/table__chain_trajectory_points.parquet`,
+  `analysis/tables/table__chain_trajectory_lines.parquet`,
+  `analysis/tables/table__diagnostics_summary.json`, `analysis/tables/table__objective_components.json`,
+  `analysis/tables/table__elites_mmr_summary.parquet`, `analysis/tables/table__elites_nn_distance.parquet`,
+  `analysis/tables/table__elites_mmr_sweep.parquet` (when `analysis.mmr_sweep.enabled=true`)
+* plots: `plots/chain_trajectory_scatter.<plot_format>`,
+  `plots/chain_trajectory_sweep.<plot_format>`,
+  `plots/elites_nn_distance.<plot_format>`, `plots/elites_showcase.<plot_format>`,
+  `plots/health_panel.<plot_format>` (trace only)
+* reports: `analysis/reports/report.json`, `analysis/reports/report.md`
+* summaries: `analysis/reports/summary.json`, `analysis/manifests/manifest.json`, `analysis/manifests/plot_manifest.json`, `analysis/manifests/table_manifest.json`
 
 Note:
 
 * Analyze rewrites the latest analysis outputs each run; set `analysis.archive=true` to keep prior reports.
-* Analyze uses `<run_dir>/.analysis_tmp` as a run-local lock. Stale temp locks from interrupted runs are auto-pruned; active locks still fail fast.
+* Analyze uses `<run_dir>/analysis/state/tmp` as a run-local lock. Stale temp locks from interrupted runs are auto-pruned; active locks still fail fast.
 * Use `cruncher analyze --summary` to print the highlights from `report.json`.
+
+---
+
+#### `cruncher export sequences`
+
+Exports sequence-centric run tables for downstream wrappers and operators.
+
+Inputs:
+
+* CONFIG (explicit or resolved)
+* exactly one run selector: `--run <run_name|run_dir>` (repeatable) or `--latest`
+* sample run artifacts: `optimize/tables/elites.parquet`, `optimize/tables/elites_hits.parquet`, `run/config_used.yaml`
+
+Network:
+
+* no (run artifacts only)
+
+Examples:
+
+* `cruncher export sequences --latest <config>`
+* `cruncher export sequences --run sample/run_001 <config>`
+* `cruncher export sequences --latest --table-format csv --max-combo-size 3 <config>`
+
+Outputs (under each run):
+
+* `export/sequences/table__consensus_sites.<parquet|csv>`
+* `export/sequences/table__elite_tf_windows.<parquet|csv>`
+* `export/sequences/table__elite_pairwise_windows.<parquet|csv>`
+* `export/sequences/table__elite_combinations.<parquet|csv>`
+* `export/sequences/export_manifest.json`
+
+Notes:
+
+* Fail-fast contract: duplicate `(elite_id, tf)` rows, out-of-bounds windows, non-numeric scores, or inconsistent motif widths terminate export with an explicit error.
+* Export appends artifact entries to `run/run_manifest.json` using stage `export`.
+* `--max-combo-size` must be `>=2`; omit to emit all combinations up to TF count.
 
 ---
 
@@ -437,15 +474,15 @@ Notes:
 
 * requires `marimo` to be installed (for example: `uv add --group notebooks marimo`)
 * useful when you want interactive slicing/filtering beyond static plots
-* strict artifact contract: requires `analysis/summary.json`, `analysis/plot_manifest.json`, and `analysis/table_manifest.json` to exist and parse, `analysis/summary.json` must include a non-empty `tf_names` list, and `analysis/table_manifest.json` must provide `scores_summary`, `metrics_joint`, and `elites_topk` entries with existing files
+* strict artifact contract: requires `analysis/reports/summary.json`, `analysis/manifests/plot_manifest.json`, and `analysis/manifests/table_manifest.json` to exist and parse, `analysis/reports/summary.json` must include a non-empty `tf_names` list, and `analysis/manifests/table_manifest.json` must provide `scores_summary`, `metrics_joint`, and `elites_topk` entries with existing files
 * plot output status is refreshed from disk so missing files are shown accurately
 * the Refresh button re-scans analysis entries and updates plot/table status without restarting marimo
 * the notebook infers `run_dir` from its location; keep it under `<run_dir>/` or regenerate it
-* plots are loaded from `analysis/plot_manifest.json`; the curated keys are `chain_trajectory_scatter`, `chain_trajectory_sweep`, `elites_nn_distance`, `elites_showcase`, plus optional `health_panel` and `optimizer_vs_fimo` entries when generated
+* plots are loaded from `analysis/manifests/plot_manifest.json`; the curated keys are `chain_trajectory_scatter`, `chain_trajectory_sweep`, `elites_nn_distance`, `elites_showcase`, plus optional `health_panel` and `optimizer_vs_fimo` entries when generated
 * the notebook includes:
   * Overview tab with run metadata and explicit warnings for missing/invalid analysis artifacts
-  * Tables tab with a Top-K slider and per-table previews from `analysis/table_manifest.json`
-  * Plots tab with inline previews and generated/skipped status from `analysis/plot_manifest.json`
+  * Tables tab with a Top-K slider and per-table previews from `analysis/manifests/table_manifest.json`
+  * Plots tab with inline previews and generated/skipped status from `analysis/manifests/plot_manifest.json`
 
 ---
 
@@ -497,7 +534,7 @@ Subcommands:
 * `catalog logos` — render PWM logos for selected TFs or motif refs
 
 Note: `catalog logos` is idempotent for identical inputs. If matching logos already exist
-under `outputs/logos/catalog/`, it reports the existing path instead of writing a new run.
+under `outputs/plots/logos/catalog/`, it reports the existing path instead of writing a new run.
 
 Examples:
 
@@ -759,7 +796,7 @@ Network:
 * `runs show <config> <run>` — show manifest + artifacts (run name or run dir)
 * `runs latest <config> --set-index 1` — print most recent run for a regulator set
 * `runs best <config> --set-index 1` — print best run by `best_score` for a regulator set
-* `runs watch <config> <run>` — live progress snapshot (run name or run dir; reads `run_status.json`, optionally `metrics.jsonl`)
+* `runs watch <config> <run>` — live progress snapshot (run name or run dir; reads `run/run_status.json`, optionally `optimize/state/metrics.jsonl`)
 * `runs rebuild-index <config>` — rebuild `<workspace>/.cruncher/run_index.json`
 * `runs repair-index <config>` — validate and optionally remove index entries missing run directories/manifests (`--apply`)
 * `runs clean <config> --stale` — mark stale `running` runs as `aborted` (use `--drop` to remove from the index)

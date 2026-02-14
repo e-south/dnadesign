@@ -3,6 +3,7 @@
 
 ## Contents
 - [Overview](#overview)
+- [Common provenance flow](#common-provenance-flow)
 - [Demos (end-to-end)](#demos-end-to-end)
 - [Guides (task-focused)](#guides-taskfocused)
 - [References (how things work)](#references-how-things-work)
@@ -20,6 +21,18 @@ Cruncher designs short, fixed-length DNA sequences that score highly across one 
 - **Mental model:** deterministic data prep (`fetch`/`lock`) + strict Gibbs annealing optimization (`sample`) + artifact-native analytics (`analyze`).
 
 Start with [Intent + lifecycle](guides/intent_and_lifecycle.md) if you're new to Cruncher.
+
+## Common provenance flow
+
+All curated demos follow this contract:
+
+1. fetch TFBS from configured sources per TF
+2. merge site sets per TF (`catalog.combine_sites=true`)
+3. discover motifs with MEME OOPS into a demo-specific discovered source
+4. lock/parse/sample/analyze against discovered motifs (`catalog.pwm_source=matrix`)
+5. export sequence tables for downstream wrappers (`cruncher export sequences`)
+
+This keeps optimizer, analysis, baserender showcase, and DenseGen exports on the same motif provenance path.
 
 ## Demos (end-to-end)
 

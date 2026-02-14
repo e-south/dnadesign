@@ -326,9 +326,9 @@ analysis:
 ```
 
 Notes:
-- `analysis.pairwise` selects the TF pair used for the trajectory scatter axes (`plot__chain_trajectory_scatter.*`).
+- `analysis.pairwise` selects the TF pair used for the trajectory scatter axes (`chain_trajectory_scatter.*`).
 - `analysis.trajectory_scatter_scale` controls whether scatter axes use per-TF raw LLR or normalized LLR.
-- `analysis.trajectory_sweep_y_column` controls the y-axis for `plot__chain_trajectory_sweep.*`:
+- `analysis.trajectory_sweep_y_column` controls the y-axis for `chain_trajectory_sweep.*`:
   - `objective_scalar`: optimizer scalar objective at each sweep (`min`/`sum` over TF best-window scores, with soft-min shaping when enabled).
   - `raw_llr_objective`: replay objective on raw-LLR per-TF scores.
   - `norm_llr_objective`: replay objective on normalized-LLR per-TF scores.
@@ -339,13 +339,13 @@ Notes:
 - `analysis.elites_showcase.max_panels` sets a hard cap for the baserender-backed elites showcase panel count; analyze fails fast when elites exceed this cap.
   - Cruncher-to-baserender handoff is contract-first: Cruncher emits `Record` primitives and baserender renders them.
   - Integration must use baserender public API (`dnadesign.baserender`) only; internal `dnadesign.baserender.src.*` imports are non-contractual.
-- `analysis.fimo_compare.enabled=true` adds `plot__optimizer_vs_fimo.*`, a descriptive QA scatter:
+- `analysis.fimo_compare.enabled=true` adds `optimizer_vs_fimo.*`, a descriptive QA scatter:
   - x: Cruncher joint optimizer score (same scalar used during optimization)
   - y: FIMO weakest-TF score (`min_tf(-log10 p_seq_tf)`), where each TF score is based on the best FIMO hit p-value corrected to sequence-level.
   - no-hit/poor-hit rows are retained with score `0` (not dropped), so the comparison shows full sampled coverage.
-- `analysis.mmr_sweep.enabled=true` writes `analysis/table__elites_mmr_sweep.*` by replaying MMR over pool-size and diversity grids.
-- `plot__health_panel.*` reports MH acceptance only (Gibbs `S` moves are excluded by design) and shows attempted move mix over sweeps.
-- `plot__elites_nn_distance.*` uses the final optimizer scalar score (`combined_score_final`) on the y-axis and summarizes full-sequence diversity as score-vs-distance plus a pairwise distance matrix, while retaining motif-core NN context.
+- `analysis.mmr_sweep.enabled=true` writes `analysis/tables/table__elites_mmr_sweep.*` by replaying MMR over pool-size and diversity grids.
+- `health_panel.*` reports MH acceptance only (Gibbs `S` moves are excluded by design) and shows attempted move mix over sweeps.
+- `elites_nn_distance.*` uses the final optimizer scalar score (`combined_score_final`) on the y-axis and summarizes full-sequence diversity as score-vs-distance plus a pairwise distance matrix, while retaining motif-core NN context.
   - In the score-vs-distance panel, x is nearest-neighbor full-sequence Hamming distance (bp) to the closest other selected elite (not average pairwise distance).
 - If the `analysis` block is omitted, analyze resolves this section from schema defaults.
 

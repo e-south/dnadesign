@@ -4,16 +4,26 @@
 - [Overview](#overview)
 - [Demo setup](#demo-setup)
 - [Reset demo](#reset-demo)
-- [Cache sites](#cache-sites)
+- [Cache merged TFBS sources](#cache-merged-tfbs-sources)
+- [Discover merged motifs (MEME OOPS)](#discover-merged-motifs-meme-oops)
 - [Run campaign directly](#run-campaign-directly)
+- [Export DenseGen motifs](#export-densegen-motifs)
 - [Optional: materialize expansion](#optional-materialize-expansion)
 - [Inspect campaign summary](#inspect-campaign-summary)
 - [Related docs](#related-docs)
 
 ## Overview
 
-Campaigns expand regulator categories into explicit regulator sets. This demo runs a campaign directly with `--campaign` (no derived config required), then summarizes results across runs.
-The demo config uses a ten-chain Gibbs annealing optimizer (`optimizer.kind=gibbs_anneal`, `optimizer.chains=10`) with a colder piecewise schedule (`cooling.kind=piecewise`, final `beta=18.0`) and linear move scheduling toward less Gibbs-dominant tail behavior. Adaptive move weights are disabled and proposal scaling remains explicit under `sample.moves.overrides.proposal_adapt`, with a cold-tail freeze (`freeze_after_beta=8.0`). Gibbs inertia is enabled (`gibbs_inertia.p_stay_end=0.70`) to damp late single-site jitter, and sweep plots default to best-so-far (`analysis.trajectory_sweep_mode=best_so_far`).
+This demo uses the same strict provenance contract as the two-TF and three-TF demos:
+
+1. cache TFBS sets from available sources
+2. merge TFBS sets per TF
+3. run MEME in OOPS mode on merged sites
+4. lock/parse/sample/analyze against discovered motifs only
+
+The config pins `catalog.source_preference` to `demo_merged_meme_oops_campaign`, so
+`lock` fails until discovery has been run. There is no silent fallback to raw local
+or RegulonDB motifs during optimization.
 
 ## Demo setup
 
@@ -36,20 +46,50 @@ rm -f .cruncher/run_index.json
 find . -maxdepth 1 -type f \( -name 'campaign_*.yaml' -o -name 'campaign_*.campaign_manifest.json' \) -delete
 ```
 
-## Cache sites
+## Cache merged TFBS sources
 
-The multi-TF demo is configured for site-derived PWMs (`catalog.pwm_source: sites`).
-For `demo_pair`, only `lexA` and `cpxR` are required:
+### Required for `demo_pair` (`lexA`, `cpxR`)
 
 ```bash
 cruncher fetch sites --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
+cruncher fetch sites --source regulondb      --tf lexA --tf cpxR --update -c "$CONFIG"
 ```
 
-Optional: prefetch additional TFs used by `demo_categories` / `demo_categories_best`:
+### Required when `baeR` is present in a campaign set
+
+```bash
+cruncher fetch sites --source baer_chip_exo --tf baeR --update -c "$CONFIG"
+cruncher fetch sites --source regulondb    --tf baeR --update -c "$CONFIG"
+```
+
+### Optional prefetch for `demo_categories` / `demo_categories_best`
+
+DAP-seq is available in this workspace for: `acrR`, `cpxR`, `lexA`, `lrp`, `rcdA`, `soxR`.
+For those TFs, cache both local DAP-seq and RegulonDB when available:
 
 ```bash
 cruncher fetch sites --source demo_local_meme --tf acrR --tf lrp --tf rcdA --tf soxR --update -c "$CONFIG"
-cruncher fetch sites --source regulondb --tf baeR --tf fnr --tf fur --tf soxS --update -c "$CONFIG"
+cruncher fetch sites --source regulondb      --tf acrR --tf lrp --tf rcdA --tf soxR --update -c "$CONFIG"
+```
+
+For TFs without local DAP-seq in this demo (`fnr`, `fur`, `soxS`), use RegulonDB:
+
+```bash
+cruncher fetch sites --source regulondb --tf fnr --tf fur --tf soxS --update -c "$CONFIG"
+```
+
+## Discover merged motifs (MEME OOPS)
+
+Discover motifs into the pinned campaign source:
+
+```bash
+cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --source-id demo_merged_meme_oops_campaign -c "$CONFIG"
+```
+
+For campaign sets that include additional TFs, include them in discovery too (example):
+
+```bash
+cruncher discover motifs --tf lexA --tf cpxR --tf baeR --tf acrR --tf lrp --tf rcdA --tf soxR --tf fnr --tf fur --tf soxS --tool meme --meme-mod oops --source-id demo_merged_meme_oops_campaign -c "$CONFIG"
 ```
 
 ## Run campaign directly
@@ -63,6 +103,14 @@ cruncher analyze --campaign demo_pair --summary -c "$CONFIG"
 
 If `.cruncher/parse` or `outputs/` already exist from a prior run, add
 `--force-overwrite` to `parse` and `sample`.
+
+## Export DenseGen motifs
+
+Export discovered motifs for the same campaign TF set:
+
+```bash
+cruncher catalog export-densegen --set 1 --out outputs/densegen/pwms -c "$CONFIG"
+```
 
 ## Optional: materialize expansion
 
@@ -99,7 +147,7 @@ Summary artifacts live under:
   analysis/campaign_summary.csv
   analysis/campaign_best.csv
   analysis/campaign_manifest.json
-  plots/plot__*.png
+  plots/*.png
 ```
 
 Campaign summary plots are currently always emitted as PNG (independent of `analysis.plot_format`).

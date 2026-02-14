@@ -18,7 +18,8 @@ This doc describes the Cruncher run lifecycle, module boundaries, and on-disk ar
 2. **lock** -> resolve TFs to exact cached artifacts (`<workspace>/.cruncher/locks/<config>.lock.json`)
 3. **parse** *(optional)* -> validate locked PWMs and refresh the parse cache in workspace state (no logo rendering)
 4. **sample** -> run MCMC and write sequences/trace + manifests
-5. **analyze** -> curated `plot__*`/`table__*` artifacts + report from sample artifacts (offline, written into the run directory)
+5. **analyze** -> curated `plots/*` and `tables/table__*` artifacts + report from sample artifacts (offline, written into the run directory)
+6. **export** -> sequence-centric contract tables for wrappers/operators (`cruncher export sequences`)
 
 ---
 
@@ -80,7 +81,7 @@ Cruncher integrates with baserender through the **public package root only**:
 - Allowed: `from dnadesign.baserender import ...`
 - Disallowed: `dnadesign.baserender.src.*` deep imports
 
-Current Cruncher handoff for `plot__elites_showcase.*`:
+Current Cruncher handoff for `elites_showcase.*`:
 
 1. Cruncher resolves run data into rendering primitives:
    - sequence per elite
@@ -142,7 +143,7 @@ discoveries/          # MEME/STREME discovery runs
 <workspace>/.cruncher/
 locks/<config>.lock.json
 run_index.json
-parse/input/{lockfile.json,parse_manifest.json,pwm_summary.json}
+parse/inputs/{lockfile.json,parse_manifest.json,pwm_summary.json}
 ```
 
 - `locks/<config>.lock.json` pins TF names -> exact cached artifacts + hashes.
@@ -165,13 +166,12 @@ Within each run directory, Cruncher uses a stable, stage-agnostic subdirectory l
 
 ```
 <run_dir>/
-  input/
+  run/
+  inputs/
   optimize/
   analysis/
   plots/
-  run_manifest.json
-  run_status.json
-  config_used.yaml
+  export/
 ```
 
 ---
@@ -180,15 +180,17 @@ Within each run directory, Cruncher uses a stable, stage-agnostic subdirectory l
 
 A typical **sample** run directory contains:
 
-- `run_manifest.json`, `run_status.json`, `config_used.yaml` - run metadata + status
-- `input/lockfile.json` - pinned input snapshot (reproducibility boundary)
-- `optimize/sequences.parquet`, `optimize/trace.nc`, `optimize/elites*`, `optimize/random_baseline*` - sampling outputs
-- `metrics.jsonl` - live sampling metrics (if enabled)
-- `analysis/summary.json` - canonical analysis summary
-- `analysis/report.json` + `analysis/report.md` - analysis report outputs from `cruncher analyze`
-- `analysis/plot_manifest.json` + `analysis/table_manifest.json` + `analysis/manifest.json` - analysis inventories
-- `plots/plot__*` - curated plot outputs
-- `analysis/table__*` - curated table outputs
+- `run/run_manifest.json`, `run/run_status.json`, `run/config_used.yaml` - run metadata + status
+- `inputs/lockfile.json` - pinned input snapshot (reproducibility boundary)
+- `optimize/tables/sequences.parquet`, `optimize/tables/elites*`, `optimize/tables/random_baseline*` - sampling tables
+- `optimize/state/trace.nc`, `optimize/state/metrics.jsonl`, `optimize/state/elites.{json,yaml}` - sampling metadata
+- `analysis/reports/summary.json` - canonical analysis summary
+- `analysis/reports/report.json` + `analysis/reports/report.md` - analysis report outputs from `cruncher analyze`
+- `analysis/manifests/plot_manifest.json` + `analysis/manifests/table_manifest.json` + `analysis/manifests/manifest.json` - analysis inventories
+- `export/sequences/table__*.{parquet|csv}` + `export/sequences/export_manifest.json` - sequence-export tables from `cruncher export sequences`
+- `analysis/plots/*` - curated analysis plots
+- `plots/logos/*` - catalog logo renders
+- `analysis/tables/table__*` - curated table outputs
 
 ---
 

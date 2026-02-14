@@ -3,6 +3,7 @@
 ## Contents
 - [Overview](#overview)
 - [End-to-end](#end-to-end)
+- [Sequence export layer](#sequence-export-layer)
 - [Fixed-length sampling model](#fixed-length-sampling-model)
 - [Fail-fast contracts](#fail-fast-contracts)
 - [Gibbs annealing optimization model](#gibbs-annealing-optimization-model)
@@ -29,13 +30,40 @@ cruncher lock
 cruncher sample
 cruncher analyze
 cruncher analyze --summary
+cruncher export sequences --latest
 ```
 
 Outputs are written under each run directory (typically `outputs/`). The canonical entrypoints are:
 
-- `analysis/summary.json`
-- `analysis/report.md`
-- `analysis/report.json`
+- `analysis/reports/summary.json`
+- `analysis/reports/report.md`
+- `analysis/reports/report.json`
+
+## Sequence export layer
+
+Use `cruncher export sequences` to emit stable, contract-first sequence tables for downstream wrappers.
+
+```bash
+cruncher export sequences --latest
+cruncher export sequences --run <run_name_or_path>
+cruncher export sequences --latest --table-format csv --max-combo-size 3
+```
+
+Outputs per run:
+
+- `export/sequences/table__consensus_sites.<parquet|csv>` (one consensus sequence per TF)
+- `export/sequences/table__elite_tf_windows.<parquet|csv>` (best window per elite x TF)
+- `export/sequences/table__elite_pairwise_windows.<parquet|csv>` (elite-level TF pairs)
+- `export/sequences/table__elite_combinations.<parquet|csv>` (elite-level TF combinations, size >=2)
+- `export/sequences/export_manifest.json`
+
+Fail-fast invariants:
+
+- no duplicate `(elite_id, tf)` best-hit rows
+- window spans stay within elite sequence bounds
+- score columns are numeric and finite
+- `best_window_seq` and `best_core_seq` lengths match exported widths
+- per-TF motif provenance (`pwm_ref`, `pwm_hash`, `pwm_width`) is internally consistent
 
 ## Fixed-length sampling model
 
@@ -59,7 +87,7 @@ Cruncher is intentionally strict and will error instead of silently degrading:
 - Elite constraints cannot be satisfied (after filtering/selection) -> error (no silent threshold relaxation).
 - Invalid `sample.optimizer.*` cooling settings -> error (no implicit schedule fallbacks).
 - `analyze` requires required artifacts and will not write partial reports on missing/invalid inputs.
-- `analyze` enforces an in-progress lock at `<run_dir>/.analysis_tmp`; active locks fail fast, stale interrupted locks are auto-pruned.
+- `analyze` enforces an in-progress lock at `<run_dir>/analysis/state/tmp`; active locks fail fast, stale interrupted locks are auto-pruned.
 - `analysis.fimo_compare.enabled=true` requires MEME Suite `fimo` to be resolvable (`discover.tool_path`, `MEME_BIN`, or `PATH`).
 
 ## Gibbs annealing optimization model
@@ -184,18 +212,18 @@ If Cruncher cannot produce `sample.elites.k` elites from the available candidate
 
 Analysis writes a curated, orthogonal suite of plots and tables (no plot booleans). Key artifacts include:
 
-- `analysis/table__scores_summary.parquet`
-- `analysis/table__elites_topk.parquet`
-- `analysis/table__metrics_joint.parquet`
-- `analysis/table__chain_trajectory_points.parquet`
-- `analysis/table__chain_trajectory_lines.parquet`
-- `analysis/table__overlap_pair_summary.parquet`
-- `analysis/table__overlap_per_elite.parquet`
-- `analysis/table__diagnostics_summary.json`
-- `analysis/table__objective_components.json`
-- `analysis/table__elites_mmr_summary.parquet`
-- `analysis/table__elites_mmr_sweep.parquet` (when `analysis.mmr_sweep.enabled=true`)
-- `analysis/table__elites_nn_distance.parquet`
+- `analysis/tables/table__scores_summary.parquet`
+- `analysis/tables/table__elites_topk.parquet`
+- `analysis/tables/table__metrics_joint.parquet`
+- `analysis/tables/table__chain_trajectory_points.parquet`
+- `analysis/tables/table__chain_trajectory_lines.parquet`
+- `analysis/tables/table__overlap_pair_summary.parquet`
+- `analysis/tables/table__overlap_per_elite.parquet`
+- `analysis/tables/table__diagnostics_summary.json`
+- `analysis/tables/table__objective_components.json`
+- `analysis/tables/table__elites_mmr_summary.parquet`
+- `analysis/tables/table__elites_mmr_sweep.parquet` (when `analysis.mmr_sweep.enabled=true`)
+- `analysis/tables/table__elites_nn_distance.parquet`
 
 Sampling artifacts consumed by analysis:
 
@@ -205,16 +233,17 @@ Sampling artifacts consumed by analysis:
 
 Plots (always generated when data is available):
 
-- `plots/plot__chain_trajectory_scatter.*` (random-baseline cloud + chain best-so-far lineage updates in TF score-space, with selected elites overlaid and consensus anchors)
-- `plots/plot__chain_trajectory_sweep.*` (optimizer scalar score over sweeps by chain, with `best_so_far|raw|all` modes and tune/cooling boundary markers when available; scalar semantics follow `sample.objective.combine` and optional soft-min shaping)
-- `plots/plot__elites_nn_distance.*` (elite diversity panel: y-axis is final optimizer scalar score, x-axis is full-sequence nearest-neighbor Hamming distance in bp to each elite's closest other selected elite, plus pairwise full-sequence distance matrix; core-distance context retained)
-- `plots/plot__elites_showcase.*` (baserender-backed elite panels with sense/antisense sequence rows, TF best-window placement, and per-window motif logos)
+- `plots/chain_trajectory_scatter.*` (random-baseline cloud + chain best-so-far lineage updates in TF score-space, with selected elites overlaid and consensus anchors)
+- `plots/chain_trajectory_sweep.*` (optimizer scalar score over sweeps by chain, with `best_so_far|raw|all` modes and tune/cooling boundary markers when available; scalar semantics follow `sample.objective.combine` and optional soft-min shaping)
+- `plots/elites_nn_distance.*` (elite diversity panel: y-axis is final optimizer scalar score, x-axis is full-sequence nearest-neighbor Hamming distance in bp to each elite's closest other selected elite, plus pairwise full-sequence distance matrix; core-distance context retained)
+- `plots/elites_showcase.*` (baserender-backed elite panels with sense/antisense sequence rows, TF best-window placement, and per-window motif logos)
   - motif-logo matrices are sourced from the locked optimization motif library (resolved by Cruncher during analysis) rather than inferred from elite strings.
   - Cruncher passes only minimal rendering primitives (record-shaped rows + motif primitives); baserender does not require full run artifact trees.
   - rendering uses baserender public API only (`dnadesign.baserender` package root), not internal `dnadesign.baserender.src.*` modules.
-  - panel title format is a short sentence premise, centered and terse: `Elite <rank> in <workspace> shows motif hits.` (hard capped to 40 chars).
-- `plots/plot__health_panel.*` (MH-only acceptance dynamics + move-mix over sweeps; `S` moves are excluded from acceptance rates)
-- `plots/plot__optimizer_vs_fimo.*` (optional via `analysis.fimo_compare.enabled=true`: descriptive QA scatter comparing Cruncher joint optimizer score vs FIMO weakest-TF sequence score; no-hit rows are retained at 0)
+  - panel title format is terse and rank-first: `Elite #<rank>` (fallback `Elite` when rank is unavailable, hard cap 40 chars).
+  - when multiple elite panels are rendered in one figure, Cruncher requests a single-row layout (left-to-right rank order).
+- `plots/health_panel.*` (MH-only acceptance dynamics + move-mix over sweeps; `S` moves are excluded from acceptance rates)
+- `plots/optimizer_vs_fimo.*` (optional via `analysis.fimo_compare.enabled=true`: descriptive QA scatter comparing Cruncher joint optimizer score vs FIMO weakest-TF sequence score; no-hit rows are retained at 0)
 
 Fail-fast plotting contract:
 
@@ -232,8 +261,8 @@ Key signals:
 - `optimizer.acceptance_tail_rugged` is the tail acceptance over rugged moves (`B`,`M`) and is more informative than all non-`S` acceptance when diagnosing warm tails.
 - `optimizer.downhill_accept_tail_rugged` isolates downhill rugged acceptance in the tail (cold-tail indicator).
 - `optimizer.gibbs_flip_rate_tail` and `optimizer.tail_step_hamming_mean` indicate whether late-chain motion is dominated by Gibbs micro-flips.
-- `plot__chain_trajectory_sweep.*` should be read as optimizer-scalar progress; `best_so_far` is the default narrative, while `all` overlays raw exploration.
-- `plot__elites_nn_distance.*` distinguishes motif-core collapse (`d_core ~ 0`) from full-sequence diversity (`d_full > 0`) so degenerate elite sets are visible.
+- `chain_trajectory_sweep.*` should be read as optimizer-scalar progress; `best_so_far` is the default narrative, while `all` overlays raw exploration.
+- `elites_nn_distance.*` distinguishes motif-core collapse (`d_core ~ 0`) from full-sequence diversity (`d_full > 0`) so degenerate elite sets are visible.
 - `objective_components.unique_fraction_canonical` is present only when canonicalization is enabled.
 - `elites_mmr_summary` and `elites_nn_distance` indicate diversity strength and collapse risk.
 
