@@ -165,6 +165,46 @@ Demo inputs in this repo:
 * Attachments: `src/dnadesign/usr/demo_material/demo_attachment_{one|two}.csv`
 * OPAL labels (SFXI vec8): `src/dnadesign/usr/demo_material/demo_y_sfxi.csv` (includes `intensity_log2_offset_delta`)
 
+### Minimal end-to-end sequence (copy/paste)
+
+Use this when you want one linear path from empty root -> materialized dataset -> portable export.
+
+```bash
+# Use a scratch datasets root so this walkthrough does not touch tracked demo data.
+ROOT="/tmp/usr_quickstart_$(date -u +%Y%m%d_%H%M%S)"
+DATASET="densegen/quickstart_demo"
+OUT_DIR="/tmp/usr_exports"
+mkdir -p "$ROOT" "$OUT_DIR"
+
+# 1) Register a namespace contract for derived columns (one-time per root).
+usr --root "$ROOT" namespace register quickstart \
+  --columns 'quickstart__X_value:list<float64>,quickstart__intensity_log2_offset_delta:float64'
+
+# 2) Create base dataset and import canonical sequence rows.
+usr --root "$ROOT" init "$DATASET" --source "readme quickstart"
+usr --root "$ROOT" import "$DATASET" --from csv \
+  --path src/dnadesign/usr/demo_material/demo_sequences.csv \
+  --bio-type dna --alphabet dna_4
+
+# 3) Attach derived overlays.
+usr --root "$ROOT" attach "$DATASET" \
+  --path src/dnadesign/usr/demo_material/demo_attachment_one.csv \
+  --namespace quickstart --key sequence --key-col sequence --columns X_value
+usr --root "$ROOT" attach "$DATASET" \
+  --path src/dnadesign/usr/demo_material/demo_y_sfxi.csv \
+  --namespace quickstart --key sequence --key-col sequence --columns intensity_log2_offset_delta --allow-missing
+
+# 4) Materialize overlays into records.parquet and keep a rollback snapshot.
+usr --root "$ROOT" materialize "$DATASET" --yes --snapshot-before
+
+# 5) Inspect canonical dataset path and export portable handoff files.
+usr --root "$ROOT" info "$DATASET"
+usr --root "$ROOT" export "$DATASET" --fmt parquet --out "$OUT_DIR"
+usr --root "$ROOT" export "$DATASET" --fmt csv --out "$OUT_DIR"
+```
+
+`usr materialize` rewrites canonical `records.parquet`; `usr export` is the handoff step for files you copy elsewhere.
+
 **macOS note:** Universal Sequence Record suppresses PyArrow `sysctlbyname` warnings by default. Set `USR_SHOW_PYARROW_SYSCTL=1` to force showing warnings. Backward-compatible flag `USR_SUPPRESS_PYARROW_SYSCTL` still works and takes precedence when explicitly set (`1` suppress, `0` show).
 
 **Demo dataset note:** `src/dnadesign/usr/datasets/demo` is tracked. If you want a scratch run, copy it first (or point `--root` to a scratch datasets folder) before running attach/materialize/snapshot.
@@ -337,8 +377,17 @@ usr export densegen/demo --fmt csv   --columns id,sequence --out src/dnadesign/u
 # Export newline-delimited JSON.
 usr export densegen/demo --fmt jsonl --out src/dnadesign/usr/demo_material/out.jsonl
 
+# Export parquet (preserves Arrow schema/types).
+usr export densegen/demo --fmt parquet --out src/dnadesign/usr/demo_material/out.parquet
+
+# Export into an existing directory (auto-name from dataset id + format).
+usr export densegen/demo --fmt parquet --out /tmp/usr_exports
+
 # Export including tombstoned rows.
 usr export densegen/demo --fmt csv --out src/dnadesign/usr/demo_material/out_with_deleted.csv --include-deleted
+
+# Dataset argument may be a dataset id or an absolute dataset directory path.
+usr export /abs/path/to/datasets/densegen/demo --fmt parquet --out /tmp/usr_exports
 
 # or if you're in the cwd of records.parquet
 usr export --fmt csv --out records.csv
