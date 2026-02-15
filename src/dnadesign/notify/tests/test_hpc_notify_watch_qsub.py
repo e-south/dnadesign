@@ -35,21 +35,21 @@ def _write_fake_uv(bin_dir: Path) -> Path:
             [
                 "#!/usr/bin/env bash",
                 "set -euo pipefail",
-                "echo \"$*\" >> \"$UV_CAPTURE\"",
-                "if [[ \"$1\" == \"run\" && \"$2\" == \"notify\" && \"$3\" == \"setup\" &&",
-                "      \"$4\" == \"resolve-events\" ]]; then",
-                "  if [[ \" $* \" == *\" --print-policy \"* ]]; then",
-                "    echo \"${FAKE_RESOLVED_POLICY:-densegen}\"",
+                'echo "$*" >> "$UV_CAPTURE"',
+                'if [[ "$1" == "run" && "$2" == "notify" && "$3" == "setup" &&',
+                '      "$4" == "resolve-events" ]]; then',
+                '  if [[ " $* " == *" --print-policy "* ]]; then',
+                '    echo "${FAKE_RESOLVED_POLICY:-densegen}"',
                 "    exit 0",
                 "  fi",
-                "  if [[ \" $* \" == *\" --json \"* ]]; then",
+                '  if [[ " $* " == *" --json "* ]]; then',
                 (
-                    "    echo \"{\\\"events\\\":\\\"$FAKE_EVENTS_PATH\\\","
-                    "\\\"policy\\\":\\\"${FAKE_RESOLVED_POLICY:-densegen}\\\"}\""
+                    '    echo "{\\"events\\":\\"$FAKE_EVENTS_PATH\\",'
+                    '\\"policy\\":\\"${FAKE_RESOLVED_POLICY:-densegen}\\"}"'
                 ),
                 "    exit 0",
                 "  fi",
-                "  echo \"$FAKE_EVENTS_PATH\"",
+                '  echo "$FAKE_EVENTS_PATH"',
                 "fi",
             ]
         )

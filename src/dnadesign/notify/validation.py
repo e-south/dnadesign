@@ -63,8 +63,7 @@ def resolve_tls_ca_bundle(*, webhook_url: str, tls_ca_bundle: Path | None) -> Pa
             candidate = Path(env_value)
     if candidate is None:
         raise NotifyConfigError(
-            "HTTPS webhook delivery requires an explicit CA bundle. "
-            "Pass --tls-ca-bundle or set SSL_CERT_FILE."
+            "HTTPS webhook delivery requires an explicit CA bundle. Pass --tls-ca-bundle or set SSL_CERT_FILE."
         )
 
     resolved = candidate.expanduser().resolve()
@@ -83,8 +82,6 @@ def validate_provider_webhook_url(*, provider: str, webhook_url: str) -> None:
         return
     if host not in _SLACK_WEBHOOK_HOSTS:
         allowed = ", ".join(sorted(_SLACK_WEBHOOK_HOSTS))
-        raise NotifyConfigError(
-            f"slack provider requires webhook host in {{{allowed}}}; found: {host or '<missing>'}"
-        )
+        raise NotifyConfigError(f"slack provider requires webhook host in {{{allowed}}}; found: {host or '<missing>'}")
     if not str(parsed.path or "").startswith("/services/"):
         raise NotifyConfigError("slack provider requires webhook path beginning with /services/")

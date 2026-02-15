@@ -203,7 +203,7 @@ uv run notify usr-events watch --tool densegen --config "$CONFIG" --follow --wai
 
 ## Slack setup onboarding (3 minutes)
 
-Use observer-only setup with DenseGen config resolution.  
+Use observer-only setup with DenseGen config resolution.
 `--config` below means your DenseGen `config.yaml` (not a notify file and not a Universal Sequence Record path).
 
 ```bash

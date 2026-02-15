@@ -77,6 +77,7 @@ app.add_typer(spool_app, name="spool")
 app.add_typer(profile_app, name="profile")
 app.add_typer(setup_app, name="setup")
 
+
 @lru_cache(maxsize=1)
 def _usr_event_version() -> int:
     module = importlib.import_module("dnadesign.usr.src.event_schema")
@@ -669,8 +670,8 @@ def _setup_webhook_impl(
         if name_value is None:
             name_value = "default"
         secret_name = "".join(char if char.isalnum() else "-" for char in str(name_value)).strip("-")
-        if not secret_name:
-            secret_name = "default"
+        if not secret_name:  # pragma: allowlist secret
+            secret_name = "default"  # pragma: allowlist secret
 
         webhook_config = _resolve_webhook_config(
             secret_source=secret_source,

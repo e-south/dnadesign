@@ -50,4 +50,3 @@ register_merge_policy("error", MergePolicy.ERROR)
 register_merge_policy("skip", MergePolicy.SKIP)
 register_merge_policy("prefer-src", MergePolicy.PREFER_SRC)
 register_merge_policy("prefer-dest", MergePolicy.PREFER_DEST)
-

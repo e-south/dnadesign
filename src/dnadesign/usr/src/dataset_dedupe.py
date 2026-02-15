@@ -102,8 +102,7 @@ def dedupe_dataset(
                     )
                     if keep == "keep-last":
                         conn.executemany(
-                            "INSERT INTO last (k, idx) VALUES (?, ?) "
-                            "ON CONFLICT(k) DO UPDATE SET idx = excluded.idx",
+                            "INSERT INTO last (k, idx) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET idx = excluded.idx",
                             [(k, row_idx + i) for i, k in enumerate(keys)],
                         )
                     row_idx += len(keys)

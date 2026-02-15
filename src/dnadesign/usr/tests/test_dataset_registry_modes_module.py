@@ -41,4 +41,3 @@ def test_register_registry_mode_rejects_duplicate_name() -> None:
             allowed_hashes=lambda dataset: set(),
             validate_with_registries=lambda dataset, validate: None,
         )
-

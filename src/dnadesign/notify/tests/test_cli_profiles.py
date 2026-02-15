@@ -350,9 +350,7 @@ def test_profile_wizard_defaults_to_namespaced_profile_and_runtime_paths(tmp_pat
     assert data["spool_dir"] == str((tmp_path / "outputs" / "notify" / "densegen" / "spool").resolve())
 
 
-def test_profile_wizard_requires_policy_or_profile_for_default_events_mode_profile(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_profile_wizard_requires_policy_or_profile_for_default_events_mode_profile(tmp_path: Path, monkeypatch) -> None:
     events = tmp_path / "events.log"
     _write_events(events, [_event()])
     monkeypatch.chdir(tmp_path)
@@ -1793,9 +1791,7 @@ def test_profile_doctor_allows_missing_events_when_profile_has_events_source(tmp
     assert "events file not created yet" in result.stdout
 
 
-def test_profile_doctor_json_reports_missing_events_as_pending_for_events_source(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_profile_doctor_json_reports_missing_events_as_pending_for_events_source(tmp_path: Path, monkeypatch) -> None:
     events = tmp_path / "future" / ".events.log"
     config_path = tmp_path / "densegen.config.yaml"
     profile = tmp_path / "notify.profile.json"

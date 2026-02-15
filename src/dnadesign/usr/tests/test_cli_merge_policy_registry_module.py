@@ -32,4 +32,3 @@ def test_register_merge_policy_rejects_duplicate_name() -> None:
     register_merge_policy("unit_custom_merge", MergePolicy.ERROR)
     with pytest.raises(SequencesError, match="duplicate policy name"):
         register_merge_policy("unit_custom_merge", MergePolicy.SKIP)
-

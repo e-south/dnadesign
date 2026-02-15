@@ -63,4 +63,3 @@ def test_validate_usr_event_rejects_unknown_version_without_flag() -> None:
     }
     with pytest.raises(NotifyConfigError, match="unknown event_version=2; expected 1"):
         validate_usr_event(event, expected_version=1, allow_unknown_version=False)
-

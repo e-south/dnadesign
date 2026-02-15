@@ -50,9 +50,7 @@ def validate_events_source_config(data: dict[str, Any]) -> None:
         raise NotifyConfigError("profile field 'events_source' must be an object")
     unknown = sorted(set(events_source.keys()) - {"tool", "config"})
     if unknown:
-        raise NotifyConfigError(
-            f"profile field 'events_source' contains unsupported keys: {', '.join(unknown)}"
-        )
+        raise NotifyConfigError(f"profile field 'events_source' contains unsupported keys: {', '.join(unknown)}")
     tool = events_source.get("tool")
     config = events_source.get("config")
     if not isinstance(tool, str) or not tool.strip():

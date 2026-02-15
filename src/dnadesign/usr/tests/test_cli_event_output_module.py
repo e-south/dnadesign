@@ -32,4 +32,3 @@ def test_register_event_output_format_rejects_duplicate_name() -> None:
     register_event_output_format("unit_custom_event", lambda line: line)
     with pytest.raises(SequencesError, match="format 'unit_custom_event' is already registered"):
         register_event_output_format("unit_custom_event", lambda line: line)
-

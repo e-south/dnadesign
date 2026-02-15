@@ -274,6 +274,7 @@ def test_run_pipeline_emits_terminal_failure_health_event_for_usr_sink(tmp_path:
     registry_dst = usr_root / "registry.yaml"
     registry_dst.parent.mkdir(parents=True, exist_ok=True)
     registry_dst.write_text(registry_src.read_text(encoding="utf-8"), encoding="utf-8")
+
     def _sink_factory(_cfg, _path):
         writer = USRWriter(
             dataset="demo",

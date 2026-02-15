@@ -67,4 +67,3 @@ def _emit_json(text: str) -> str:
 
 register_event_output_format("raw", _emit_raw)
 register_event_output_format("json", _emit_json)
-

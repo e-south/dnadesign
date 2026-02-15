@@ -101,4 +101,3 @@ def validate_usr_event(
     actor = event.get("actor")
     if actor is not None and not isinstance(actor, dict):
         raise NotifyConfigError("event field 'actor' must be an object when provided")
-

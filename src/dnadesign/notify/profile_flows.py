@@ -215,8 +215,7 @@ def resolve_profile_path_for_wizard(*, profile: Path, policy: str | None) -> Pat
     policy_namespace = resolve_workflow_policy(policy=policy)
     if policy_namespace is None:
         raise NotifyConfigError(
-            "default profile path is ambiguous in wizard mode; "
-            "pass --policy or --profile to select a profile namespace"
+            "default profile path is ambiguous in wizard mode; pass --policy or --profile to select a profile namespace"
         )
     return default_profile_path_for_tool(policy_namespace)
 
@@ -326,9 +325,7 @@ def create_wizard_profile(
         "webhook": webhook_config,
     }
     if tls_ca_bundle is not None:
-        payload["tls_ca_bundle"] = str(
-            resolve_existing_file_path(field="tls_ca_bundle", path_value=tls_ca_bundle)
-        )
+        payload["tls_ca_bundle"] = str(resolve_existing_file_path(field="tls_ca_bundle", path_value=tls_ca_bundle))
     if only_actions is not None:
         payload["only_actions"] = str(only_actions).strip()
     if only_tools is not None:

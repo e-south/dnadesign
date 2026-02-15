@@ -120,8 +120,7 @@ def run_usr_events_watch(
         auto_profile_path = (config_path.parent / default_profile_path_for_tool(tool_name)).resolve()
         if not auto_profile_path.exists():
             raise NotifyConfigError(
-                f"profile not found for tool '{tool_name}' at {auto_profile_path}. "
-                f"Run `{setup_hint}` once."
+                f"profile not found for tool '{tool_name}' at {auto_profile_path}. Run `{setup_hint}` once."
             )
         profile_path = auto_profile_path
         tool_value_for_events = None

@@ -66,9 +66,7 @@ def attach_dataset(
     if backend not in {"pyarrow", "duckdb"}:
         raise SchemaError(f"Unsupported backend '{backend}'.")
     if backend == "duckdb" and parse_json:
-        raise SchemaError(
-            "duckdb backend does not support JSON parsing. Use --no-parse-json or the pyarrow backend."
-        )
+        raise SchemaError("duckdb backend does not support JSON parsing. Use --no-parse-json or the pyarrow backend.")
     key = str(key).strip()
     if key not in {"id", "sequence", "sequence_norm", "sequence_ci"}:
         raise SchemaError(f"Unsupported join key '{key}'.")
@@ -385,8 +383,7 @@ def attach_duckdb_dataset(
         try:
             base_sql = str(dataset.records_path).replace("'", "''")
             con.execute(
-                "CREATE TEMP VIEW base AS SELECT id, sequence, alphabet, bio_type "
-                f"FROM read_parquet('{base_sql}')"
+                f"CREATE TEMP VIEW base AS SELECT id, sequence, alphabet, bio_type FROM read_parquet('{base_sql}')"
             )
 
             if key in {"sequence", "sequence_norm", "sequence_ci"}:
@@ -402,9 +399,7 @@ def attach_duckdb_dataset(
             con.execute(f"CREATE TEMP VIEW incoming AS SELECT {incoming_select} FROM read_parquet('{incoming_sql}')")
 
             missing_keys = int(
-                con.execute(
-                    f"SELECT COUNT(*) FROM incoming WHERE {key_q} IS NULL OR {key_q} = ''"
-                ).fetchone()[0]
+                con.execute(f"SELECT COUNT(*) FROM incoming WHERE {key_q} IS NULL OR {key_q} = ''").fetchone()[0]
             )
             if missing_keys:
                 raise SchemaError(f"{missing_keys} row(s) have missing key values in attachment input.")
@@ -425,8 +420,7 @@ def attach_duckdb_dataset(
                 base_key_expr = _key_expr("sequence")
                 dup_base = int(
                     con.execute(
-                        "SELECT COUNT(*) FROM "
-                        f"(SELECT {base_key_expr} AS k FROM base GROUP BY k HAVING COUNT(*) > 1)"
+                        f"SELECT COUNT(*) FROM (SELECT {base_key_expr} AS k FROM base GROUP BY k HAVING COUNT(*) > 1)"
                     ).fetchone()[0]
                 )
                 if dup_base:
@@ -473,8 +467,7 @@ def attach_duckdb_dataset(
                 existing_sql = str(out_path).replace("'", "''")
                 con.execute(f"CREATE TEMP VIEW existing_overlay AS SELECT * FROM read_parquet('{existing_sql}')")
                 dup_query = (
-                    "SELECT COUNT(*) FROM "
-                    f"(SELECT {key_q} FROM existing_overlay GROUP BY {key_q} HAVING COUNT(*) > 1)"
+                    f"SELECT COUNT(*) FROM (SELECT {key_q} FROM existing_overlay GROUP BY {key_q} HAVING COUNT(*) > 1)"
                 )
                 dup_existing = int(con.execute(dup_query).fetchone()[0])
                 if dup_existing:
@@ -486,9 +479,7 @@ def attach_duckdb_dataset(
                     raise NamespaceError(f"Columns already exist: {', '.join(overlap_cols)}. Use --allow-overwrite.")
 
                 ordered_cols = (
-                    [key]
-                    + [c for c in existing_cols if c != key]
-                    + [c for c in targets if c not in existing_set]
+                    [key] + [c for c in existing_cols if c != key] + [c for c in targets if c not in existing_set]
                 )
                 select_cols: List[str] = [f"COALESCE(e.{key_q}, n.{key_q}) AS {key_q}"]
                 for col in ordered_cols[1:]:
@@ -654,8 +645,7 @@ def write_overlay_part_dataset(
     dir_path = overlay_dir_path(dataset.dir, namespace)
     if file_path.exists():
         raise SchemaError(
-            f"Overlay file already exists for namespace '{namespace}'. "
-            "Remove it or compact it before writing parts."
+            f"Overlay file already exists for namespace '{namespace}'. Remove it or compact it before writing parts."
         )
 
     if isinstance(table_or_batches, pa.Table):
@@ -733,8 +723,7 @@ def write_overlay_part_dataset(
                 base_key_expr = _key_expr(f"b.{_sql_ident('sequence')}", key_name=key)
                 dup_base = int(
                     con.execute(
-                        "SELECT COUNT(*) FROM "
-                        f"(SELECT {base_key_expr} AS k FROM base b GROUP BY k HAVING COUNT(*) > 1)"
+                        f"SELECT COUNT(*) FROM (SELECT {base_key_expr} AS k FROM base b GROUP BY k HAVING COUNT(*) > 1)"
                     ).fetchone()[0]
                 )
                 if dup_base:

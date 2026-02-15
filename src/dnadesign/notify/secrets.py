@@ -53,9 +53,7 @@ def parse_secret_ref(secret_ref: str) -> SecretReference:
     backend = _normalize_backend(parsed.scheme)
     if backend == _BACKEND_FILE:
         if parsed.netloc and parsed.netloc not in {"", "localhost"}:
-            raise NotifyConfigError(
-                "file secret_ref must not include a host; expected file:///absolute/path/to/secret"
-            )
+            raise NotifyConfigError("file secret_ref must not include a host; expected file:///absolute/path/to/secret")
         path_value = str(parsed.path or "").strip()
         if not path_value:
             raise NotifyConfigError("file secret_ref must include an absolute path")

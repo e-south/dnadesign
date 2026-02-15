@@ -158,4 +158,3 @@ register_registry_mode(
     allowed_hashes=_allowed_hashes_either,
     validate_with_registries=_validate_with_either_registry,
 )
-

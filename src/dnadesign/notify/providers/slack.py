@@ -15,7 +15,6 @@ from typing import Any
 
 from .message import format_message
 
-
 _STATUS_EMOJI = {
     "started": ":large_blue_circle:",
     "running": ":large_blue_circle:",

@@ -189,4 +189,3 @@ register_tool_workspace_resolver(
     list_workspaces=lambda repo_root: _list_workspace_names(repo_root, Path("src/dnadesign/infer/workspaces")),
     aliases=("infer-evo2",),
 )
-

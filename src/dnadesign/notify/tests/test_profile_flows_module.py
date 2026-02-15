@@ -92,35 +92,27 @@ def test_resolve_setup_events_workspace_mode_resolves_config_before_events(tmp_p
 
 def test_resolve_webhook_config_file_mode_defaults_to_notify_package_secret_dir() -> None:
     webhook = resolve_webhook_config(
-        secret_source="file",
+        secret_source="file",  # pragma: allowlist secret
         url_env=None,
         secret_ref=None,
         webhook_url=None,
         store_webhook=False,
-        secret_name="densegen-shared",
+        secret_name="densegen-shared",  # pragma: allowlist secret
         secret_backend_available_fn=lambda backend: backend == "file",
     )
-    expected = (
-        Path(profile_flows_module.__file__).resolve().parent
-        / ".secrets"
-        / "densegen-shared.webhook"
-    ).resolve()
+    expected = (Path(profile_flows_module.__file__).resolve().parent / ".secrets" / "densegen-shared.webhook").resolve()
     assert webhook == {"source": "secret_ref", "ref": expected.as_uri()}
 
 
 def test_resolve_webhook_config_auto_file_mode_defaults_to_notify_package_secret_dir() -> None:
     webhook = resolve_webhook_config(
-        secret_source="auto",
+        secret_source="auto",  # pragma: allowlist secret
         url_env=None,
         secret_ref=None,
         webhook_url=None,
-        store_webhook=False,
-        secret_name="densegen-shared",
+        store_webhook=False,  # pragma: allowlist secret
+        secret_name="densegen-shared",  # pragma: allowlist secret
         secret_backend_available_fn=lambda backend: backend == "file",
     )
-    expected = (
-        Path(profile_flows_module.__file__).resolve().parent
-        / ".secrets"
-        / "densegen-shared.webhook"
-    ).resolve()
+    expected = (Path(profile_flows_module.__file__).resolve().parent / ".secrets" / "densegen-shared.webhook").resolve()
     assert webhook == {"source": "secret_ref", "ref": expected.as_uri()}

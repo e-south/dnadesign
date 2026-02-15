@@ -435,10 +435,7 @@ def register_run_commands(
             )
             if quota_floor_changes:
                 updates = ", ".join(f"{name}:{old}->{new}" for name, old, new in quota_floor_changes)
-                console.print(
-                    "[yellow]Resuming with prior effective quota floor[/]: "
-                    f"{updates}"
-                )
+                console.print(f"[yellow]Resuming with prior effective quota floor[/]: {updates}")
 
         if extend_quota is not None:
             extend_value = int(extend_quota)
@@ -455,9 +452,7 @@ def register_run_commands(
                 console.print(f"[bold red]{exc}[/]")
                 raise typer.Exit(code=1)
             updates = ", ".join(f"{name}:{old}->{new}" for name, old, new in quota_changes)
-            console.print(
-                f"[yellow]Extended total quota by {extend_value} rows for this run[/]: {updates}"
-            )
+            console.print(f"[yellow]Extended total quota by {extend_value} rows for this run[/]: {updates}")
 
         if fresh:
             build_stage_a = True

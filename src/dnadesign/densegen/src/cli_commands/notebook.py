@@ -323,8 +323,7 @@ def register_notebook_commands(app: typer.Typer, *, context: CliContext) -> None
         notebook_path = Path(path).expanduser().resolve() if path is not None else _default_notebook_path(run_root)
         if not notebook_path.exists():
             context.console.print(
-                "[bold red]No notebook found:[/] "
-                f"{context.display_path(notebook_path, run_root, absolute=absolute)}"
+                f"[bold red]No notebook found:[/] {context.display_path(notebook_path, run_root, absolute=absolute)}"
             )
             context.console.print("[bold]Next step[/]:")
             context.console.print(

@@ -1,6 +1,6 @@
 # DenseGen -> USR -> Notify Lifecycle Design
 
-Date: 2026-02-12  
+Date: 2026-02-12
 Status: Proposed (validated in brainstorming)
 
 ## Scope and outcomes
