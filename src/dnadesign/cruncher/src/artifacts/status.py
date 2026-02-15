@@ -15,6 +15,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
 
+from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json
+
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -41,7 +43,6 @@ DEFAULT_METRICS_FIELDS = (
     "best_chain",
     "best_draw",
     "acceptance_rate",
-    "swap_rate",
 )
 
 
@@ -75,15 +76,19 @@ class RunStatusWriter:
             self._append_metrics(event="update")
 
     def finish(self, status: str = "completed", **fields: Any) -> None:
+        status_message = fields.pop("status_message", None)
         self.payload.update(fields)
         self.payload["status"] = status
+        if status_message is None:
+            status_message = status
+        self.payload["status_message"] = status_message
         self.payload["finished_at"] = _utc_now()
+        self.payload["updated_at"] = self.payload["finished_at"]
         self.write()
         self._append_metrics(event="finish")
 
     def write(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(self.payload, indent=2))
+        atomic_write_json(self.path, self.payload)
 
     def _append_metrics(self, *, event: str) -> None:
         if self.metrics_path is None:
@@ -107,7 +112,6 @@ def _should_emit_metrics(fields: Dict[str, Any]) -> bool:
         "score_std",
         "best_score",
         "acceptance_rate",
-        "swap_rate",
         "status_message",
         "phase",
         "beta",

@@ -86,6 +86,14 @@ def _choose_tool(tool: str, *, nseq: int, streme_threshold: int) -> str:
     return tool
 
 
+def _format_discovery_width(value: int | None) -> str:
+    return str(value) if value is not None else "tool_default"
+
+
+def format_discovery_width_bounds(*, minw: int | None, maxw: int | None) -> str:
+    return f"minw={_format_discovery_width(minw)} maxw={_format_discovery_width(maxw)}"
+
+
 def _run_command(cmd: list[str], *, cwd: Path) -> None:
     result = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, check=False)
     if result.returncode != 0:
@@ -108,8 +116,8 @@ def build_meme_command(
     exe: Path,
     fasta_path: Path,
     run_dir: Path,
-    minw: int,
-    maxw: int,
+    minw: int | None,
+    maxw: int | None,
     nmotifs: int,
     meme_mod: str | None,
     meme_prior: str | None,
@@ -120,13 +128,13 @@ def build_meme_command(
         "-dna",
         "-oc",
         str(run_dir),
-        "-minw",
-        str(minw),
-        "-maxw",
-        str(maxw),
         "-nmotifs",
         str(nmotifs),
     ]
+    if minw is not None:
+        cmd.extend(["-minw", str(minw)])
+    if maxw is not None:
+        cmd.extend(["-maxw", str(maxw)])
     if meme_mod:
         cmd.extend(["-mod", str(meme_mod)])
     if meme_prior:
@@ -188,7 +196,7 @@ def check_tools(
     tool: str | None = typer.Option(
         None,
         "--tool",
-        help="Tool to check: auto, streme, or meme (defaults to motif_discovery.tool).",
+        help="Tool to check: auto, streme, or meme (defaults to discover.tool).",
     ),
     tool_path: Path | None = typer.Option(
         None,
@@ -206,9 +214,9 @@ def check_tools(
     if config_path is not None:
         cfg = load_config(config_path)
 
-    resolved_tool = (tool or (cfg.motif_discovery.tool if cfg else "auto")).lower()
+    resolved_tool = (tool or (cfg.discover.tool if cfg else "auto")).lower()
     resolved_path = resolve_tool_path(
-        tool_path or (cfg.motif_discovery.tool_path if cfg else None),
+        tool_path or (cfg.discover.tool_path if cfg else None),
         config_path=config_path,
     )
     if resolved_tool not in {"auto", "streme", "meme"}:
@@ -271,12 +279,12 @@ def discover_motifs(
     source_id: str | None = typer.Option(
         None,
         "--source-id",
-        help="Catalog source_id for discovered motifs (overrides motif_discovery.source_id).",
+        help="Catalog source_id for discovered motifs (overrides discover.source_id).",
     ),
     tool: str | None = typer.Option(
         None,
         "--tool",
-        help="Discovery tool: auto, streme, or meme (defaults to motif_discovery.tool).",
+        help="Discovery tool: auto, streme, or meme (defaults to discover.tool).",
     ),
     tool_path: Path | None = typer.Option(
         None,
@@ -286,7 +294,7 @@ def discover_motifs(
     window_sites: bool | None = typer.Option(
         None,
         "--window-sites/--no-window-sites",
-        help="Pre-window binding sites using motif_store.site_window_lengths before discovery.",
+        help="Pre-window binding sites using cruncher.catalog.site_window_lengths before discovery.",
     ),
     replace_existing: bool | None = typer.Option(
         None,
@@ -296,12 +304,12 @@ def discover_motifs(
     minw: int | None = typer.Option(
         None,
         "--minw",
-        help="Minimum motif width (defaults to config; auto from site lengths if unset).",
+        help="Minimum motif width (defaults to config; tool default if unset).",
     ),
     maxw: int | None = typer.Option(
         None,
         "--maxw",
-        help="Maximum motif width (defaults to config; auto from site lengths if unset).",
+        help="Maximum motif width (defaults to config; tool default if unset).",
     ),
     nmotifs: int | None = typer.Option(None, "--nmotifs", help="Number of motifs to report per TF."),
     meme_mod: str | None = typer.Option(
@@ -321,20 +329,23 @@ def discover_motifs(
         console.print(str(exc))
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
+    if not cfg.discover.enabled:
+        console.print("Error: discover.enabled=false; set discover.enabled=true to run motif discovery.")
+        raise typer.Exit(code=1)
 
-    tool = (tool or cfg.motif_discovery.tool).lower()
+    tool = (tool or cfg.discover.tool).lower()
     resolved_tool_path = resolve_tool_path(
-        tool_path or cfg.motif_discovery.tool_path,
+        tool_path or cfg.discover.tool_path,
         config_path=config_path,
     )
-    minw = minw if minw is not None else cfg.motif_discovery.minw
-    maxw = maxw if maxw is not None else cfg.motif_discovery.maxw
-    nmotifs = nmotifs or cfg.motif_discovery.nmotifs
-    meme_mod = meme_mod or cfg.motif_discovery.meme_mod
-    meme_prior = meme_prior or cfg.motif_discovery.meme_prior
-    streme_threshold = cfg.motif_discovery.min_sequences_for_streme
-    window_sites = cfg.motif_discovery.window_sites if window_sites is None else window_sites
-    replace_existing = cfg.motif_discovery.replace_existing if replace_existing is None else replace_existing
+    minw = minw if minw is not None else cfg.discover.minw
+    maxw = maxw if maxw is not None else cfg.discover.maxw
+    nmotifs = nmotifs or cfg.discover.nmotifs
+    meme_mod = meme_mod or cfg.discover.meme_mod
+    meme_prior = meme_prior or cfg.discover.meme_prior
+    streme_threshold = cfg.discover.min_sequences_for_streme
+    window_sites = cfg.discover.window_sites if window_sites is None else window_sites
+    replace_existing = cfg.discover.replace_existing if replace_existing is None else replace_existing
 
     if tool not in {"auto", "streme", "meme"}:
         raise typer.BadParameter("--tool must be auto, streme, or meme.")
@@ -355,10 +366,10 @@ def discover_motifs(
     if meme_prior is not None:
         meme_prior = meme_prior.lower()
 
-    resolved_source_id = source_id or cfg.motif_discovery.source_id
+    resolved_source_id = source_id or cfg.discover.source_id
     try:
         cfg_for_sites = cfg.model_copy(deep=True)
-        cfg_for_sites.motif_store.pwm_source = "sites"
+        cfg_for_sites.catalog.pwm_source = "sites"
         targets, _ = _resolve_targets(
             cfg=cfg_for_sites,
             config_path=config_path,
@@ -372,7 +383,7 @@ def discover_motifs(
         console.print("Hint: run cruncher fetch sites before discovery.")
         raise typer.Exit(code=1)
 
-    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     catalog_root.mkdir(parents=True, exist_ok=True)
     out_root = catalog_root / "discoveries"
     out_root.mkdir(parents=True, exist_ok=True)
@@ -382,7 +393,8 @@ def discover_motifs(
     table.add_column("TF")
     table.add_column("Tool")
     table.add_column("Motif ID")
-    table.add_column("Length")
+    table.add_column("Tool width")
+    table.add_column("Width bounds")
     table.add_column("Output")
 
     base = config_path.parent
@@ -396,7 +408,7 @@ def discover_motifs(
                 window_length = resolve_window_length(
                     tf_name=entry.tf_name,
                     dataset_id=entry.dataset_id,
-                    window_lengths=cfg.motif_store.site_window_lengths,
+                    window_lengths=cfg.catalog.site_window_lengths,
                 )
                 if window_length is None:
                     missing.append(f"{entry.source}:{entry.motif_id}")
@@ -405,44 +417,50 @@ def discover_motifs(
                     f"Error: window_sites is enabled but no site_window_lengths entry for TF '{target.tf_name}'."
                 )
                 console.print(
-                    "Hint: set motif_store.site_window_lengths for this TF (or dataset:<id>) "
+                    "Hint: set cruncher.catalog.site_window_lengths for this TF (or dataset:<id>) "
                     "or run with --no-window-sites."
                 )
                 raise typer.Exit(code=1)
         run_dir = out_root / build_run_name("discover", [target.tf_name])
         run_dir.mkdir(parents=True, exist_ok=True)
         fasta_path = run_dir / f"{_safe_id(target.tf_name)}_sites.fasta"
-        site_window_lengths = cfg.motif_store.site_window_lengths if window_sites else {}
+        site_window_lengths = cfg.catalog.site_window_lengths if window_sites else {}
         sequences = list(
             iter_site_sequences(
                 root=catalog_root,
                 entries=target.site_entries,
                 site_window_lengths=site_window_lengths,
-                site_window_center=cfg.motif_store.site_window_center,
+                site_window_center=cfg.catalog.site_window_center,
                 allow_variable_lengths=True,
             )
         )
         if not sequences:
             console.print(f"Error: no site sequences available for {target.tf_name}.")
             raise typer.Exit(code=1)
-        lengths = [len(seq) for seq in sequences]
-        min_len = min(lengths)
-        max_len = max(lengths)
-        resolved_minw = minw if minw is not None else min_len
-        resolved_maxw = maxw if maxw is not None else max_len
-        if resolved_minw < 1 or resolved_maxw < 1 or resolved_maxw < resolved_minw:
+        source_labels = sorted({entry.source for entry in target.site_entries})
+        source_text = ", ".join(source_labels) if source_labels else "-"
+        console.print(
+            f"INFO {target.tf_name}: discovery input n_sites={len(sequences)} "
+            f"from {len(target.site_entries)} site set(s) across source(s): {source_text}."
+        )
+        resolved_minw = minw if minw is not None else None
+        resolved_maxw = maxw if maxw is not None else None
+        if resolved_minw is not None and resolved_minw < 1:
+            console.print(f"Error: invalid motif width lower bound for {target.tf_name}: minw={resolved_minw}.")
+            raise typer.Exit(code=1)
+        if resolved_maxw is not None and resolved_maxw < 1:
+            console.print(f"Error: invalid motif width upper bound for {target.tf_name}: maxw={resolved_maxw}.")
+            raise typer.Exit(code=1)
+        if resolved_minw is not None and resolved_maxw is not None and resolved_maxw < resolved_minw:
             console.print(
                 f"Error: invalid motif width range for {target.tf_name}: minw={resolved_minw}, maxw={resolved_maxw}."
             )
             raise typer.Exit(code=1)
-        if minw is None or maxw is None:
-            console.print(
-                f"INFO {target.tf_name}: using site-length bounds for discovery "
-                f"(minw={resolved_minw}, maxw={resolved_maxw}, site lengths {min_len}-{max_len})."
-            )
+        chosen_tool = _choose_tool(tool, nseq=len(sequences), streme_threshold=streme_threshold)
+        if resolved_minw is None and resolved_maxw is None:
+            console.print(f"INFO {target.tf_name}: discovery width bounds unset; using {chosen_tool} defaults.")
         _write_fasta(fasta_path, sequences)
 
-        chosen_tool = _choose_tool(tool, nseq=len(sequences), streme_threshold=streme_threshold)
         try:
             exe = resolve_executable(chosen_tool, tool_path=resolved_tool_path)
         except FileNotFoundError as exc:
@@ -455,7 +473,7 @@ def discover_motifs(
             elif available:
                 hint = f"Available tools on PATH: {', '.join(available)}. Use --tool to select one."
             else:
-                hint = "Install MEME Suite and set MEME_BIN or motif_discovery.tool_path."
+                hint = "Install MEME Suite and set MEME_BIN or discover.tool_path."
             console.print(f"Error: {chosen_tool} not available. {hint} (Run `cruncher discover check`.)")
             raise typer.Exit(code=1)
 
@@ -467,13 +485,13 @@ def discover_motifs(
                 str(fasta_path),
                 "--oc",
                 str(run_dir),
-                "--minw",
-                str(resolved_minw),
-                "--maxw",
-                str(resolved_maxw),
                 "--nmotifs",
                 str(nmotifs),
             ]
+            if resolved_minw is not None:
+                cmd.extend(["--minw", str(resolved_minw)])
+            if resolved_maxw is not None:
+                cmd.extend(["--maxw", str(resolved_maxw)])
             output_path = run_dir / "streme.txt"
         else:
             cmd = build_meme_command(
@@ -533,8 +551,10 @@ def discover_motifs(
                 "discovery_tool_version": version or "unknown",
                 "discovery_run": run_dir.name,
                 "discovery_nsites": str(len(sequences)),
-                "discovery_minw": str(resolved_minw),
-                "discovery_maxw": str(resolved_maxw),
+                "discovery_site_sets": str(len(target.site_entries)),
+                "discovery_site_sources": source_text,
+                "discovery_minw": str(resolved_minw) if resolved_minw is not None else "tool_default",
+                "discovery_maxw": str(resolved_maxw) if resolved_maxw is not None else "tool_default",
                 "discovery_nmotifs": str(nmotifs),
             }
             record = build_motif_record(
@@ -559,8 +579,10 @@ def discover_motifs(
                 chosen_tool,
                 f"{resolved_source_id}:{motif_id}",
                 str(len(motif.prob_matrix)),
+                format_discovery_width_bounds(minw=resolved_minw, maxw=resolved_maxw),
                 render_path(output_path, base=base),
             )
 
     catalog.save(catalog_root)
     console.print(table)
+    console.print("Note: Tool width is discovery-time motif length before sample.motif_width constraints.")

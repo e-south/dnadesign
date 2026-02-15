@@ -3,7 +3,9 @@
 <cruncher project>
 src/dnadesign/cruncher/src/app/campaign_summary.py
 
-Author(s): Eric J. South
+Summarize campaign runs into aggregated tables and plots.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -12,6 +14,7 @@ from __future__ import annotations
 import glob
 import json
 import logging
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterable, Optional
@@ -22,6 +25,7 @@ from dnadesign.cruncher.analysis.layout import (
     load_summary,
     report_json_path,
     resolve_analysis_dir,
+    resolve_required_table_paths,
     summary_path,
 )
 from dnadesign.cruncher.analysis.parquet import read_parquet
@@ -31,10 +35,14 @@ from dnadesign.cruncher.app.campaign_service import (
     collect_campaign_metrics,
     expand_campaign,
 )
-from dnadesign.cruncher.app.run_service import list_runs
-from dnadesign.cruncher.artifacts.layout import sequences_path
+from dnadesign.cruncher.app.run_service import (
+    drop_run_index_entries,
+    find_invalid_run_index_entries,
+    list_runs,
+)
+from dnadesign.cruncher.artifacts.layout import campaign_stage_root, sequences_path
 from dnadesign.cruncher.artifacts.manifest import load_manifest
-from dnadesign.cruncher.config.schema_v2 import CampaignConfig, CruncherConfig
+from dnadesign.cruncher.config.schema_v3 import CampaignConfig, CruncherConfig
 from dnadesign.cruncher.utils.paths import resolve_catalog_root
 from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
 
@@ -76,6 +84,7 @@ def summarize_campaign(
     run_inputs: Optional[Iterable[str]] = None,
     analysis_id: Optional[str] = None,
     out_dir: Optional[Path] = None,
+    force_overwrite: bool = False,
     include_metrics: bool = True,
     skip_missing: bool = False,
     skip_non_campaign: bool = False,
@@ -84,7 +93,7 @@ def summarize_campaign(
     pd, _ = _load_pandas_numpy()
     if top_k < 1:
         raise ValueError("top_k must be >= 1")
-    ensure_mpl_cache(resolve_catalog_root(config_path, cfg.motif_store.catalog_root))
+    ensure_mpl_cache(resolve_catalog_root(config_path, cfg.catalog.catalog_root))
     expansion = expand_campaign(
         cfg=cfg,
         config_path=config_path,
@@ -138,8 +147,30 @@ def summarize_campaign(
 
     best_df = _best_rows(summary_df, top_k=top_k)
 
-    output_root = out_dir or (runs_root / "campaigns" / expansion.campaign_id)
+    if out_dir is None:
+        output_root = campaign_stage_root(
+            config_path=config_path,
+            out_dir=cfg.out_dir,
+            campaign_name=expansion.name,
+        )
+    else:
+        output_root = out_dir
+    if output_root.exists():
+        if not output_root.is_dir():
+            raise ValueError(f"Campaign output path exists and is not a directory: {output_root}")
+        has_entries = any(output_root.iterdir())
+        if has_entries:
+            if not force_overwrite:
+                raise ValueError(
+                    f"Campaign output directory already exists: {output_root}. "
+                    "Re-run with --force-overwrite to replace it."
+                )
+            shutil.rmtree(output_root)
     output_root.mkdir(parents=True, exist_ok=True)
+    output_data_root = output_root / "analysis"
+    output_plots_root = output_root / "plots"
+    output_data_root.mkdir(parents=True, exist_ok=True)
+    output_plots_root.mkdir(parents=True, exist_ok=True)
 
     manifest = build_campaign_manifest(expansion=expansion, config_path=config_path)
     if include_metrics and metrics:
@@ -156,20 +187,20 @@ def summarize_campaign(
             }
             for name, metric in metrics.items()
         }
-    manifest_path = output_root / "campaign_manifest.json"
+    manifest_path = output_data_root / "campaign_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2))
 
-    summary_path = output_root / "campaign_summary.csv"
-    best_path = output_root / "campaign_best.csv"
+    summary_path = output_data_root / "campaign_summary.csv"
+    best_path = output_data_root / "campaign_best.csv"
     summary_df.to_csv(summary_path, index=False)
     best_df.to_csv(best_path, index=False)
 
     plot_paths = [
-        _plot_best_jointscore(best_df, output_root / "plot__best_jointscore_bar.png"),
-        _plot_tf_coverage(expansion, output_root / "plot__tf_coverage_heatmap.png"),
-        _plot_pairgrid_overview(summary_df, output_root / "plot__pairgrid_overview.png"),
-        _plot_joint_trend(summary_df, output_root / "plot__joint_trend.png"),
-        _plot_pareto_projection(summary_df, output_root / "plot__pareto_projection.png"),
+        _plot_best_jointscore(best_df, output_plots_root / "best_jointscore_bar.png"),
+        _plot_tf_coverage(expansion, output_plots_root / "tf_coverage_heatmap.png"),
+        _plot_pairgrid_overview(summary_df, output_plots_root / "pairgrid_overview.png"),
+        _plot_joint_trend(summary_df, output_plots_root / "joint_trend.png"),
+        _plot_pareto_projection(summary_df, output_plots_root / "pareto_projection.png"),
     ]
 
     return CampaignSummaryResult(
@@ -217,6 +248,19 @@ def _resolve_run_dirs(
         if not expanded:
             raise FileNotFoundError("No runs matched the provided --runs inputs.")
         return expanded, False
+    stale_issues = find_invalid_run_index_entries(
+        config_path,
+        stage="sample",
+        catalog_root=cfg.catalog.catalog_root,
+    )
+    if stale_issues:
+        stale_names = sorted({issue.run_name for issue in stale_issues})
+        removed = drop_run_index_entries(config_path, stale_names, catalog_root=cfg.catalog.catalog_root)
+        logger.warning(
+            "Auto-repaired %d stale sample run index entr%s before campaign summarize.",
+            removed,
+            "y" if removed == 1 else "ies",
+        )
     runs = list_runs(cfg, config_path, stage="sample")
     run_dirs = [run.run_dir for run in runs]
     return run_dirs, True
@@ -272,7 +316,7 @@ def _summarize_run(
     reg = manifest.get("regulator_set") or {}
     tfs = reg.get("tfs") or []
     if not tfs:
-        raise ValueError(f"Run '{run_dir.name}' missing regulator_set.tfs in meta/run_manifest.json")
+        raise ValueError(f"Run '{run_dir.name}' missing regulator_set.tfs in run_manifest.json")
 
     set_key = _tf_key(tfs)
     set_index = set_index_map.get(set_key)
@@ -296,22 +340,18 @@ def _summarize_run(
                 f"Run '{run_dir.name}' analysis tf_names do not match regulator_set ({tf_names} vs {tfs})."
             )
 
-    analysis_cfg = summary.get("analysis_config") if isinstance(summary, dict) else {}
-    table_format = "parquet"
-    if isinstance(analysis_cfg, dict):
-        table_format = analysis_cfg.get("table_format") or table_format
-    score_summary_path = analysis_dir / f"score_summary.{table_format}"
-    joint_metrics_path = analysis_dir / f"joint_metrics.{table_format}"
-    if not score_summary_path.exists() or not joint_metrics_path.exists():
-        missing = []
-        if not score_summary_path.exists():
-            missing.append(str(score_summary_path))
-        if not joint_metrics_path.exists():
-            missing.append(str(joint_metrics_path))
-        message = f"Run '{run_dir.name}' missing required analysis tables: {', '.join(missing)}"
+    try:
+        table_paths = resolve_required_table_paths(
+            analysis_dir,
+            keys=("scores_summary", "metrics_joint"),
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        message = f"Run '{run_dir.name}' missing required analysis tables: {exc}"
         if skip_missing:
             return None, message
-        raise FileNotFoundError(message)
+        raise FileNotFoundError(message) from exc
+    score_summary_path = table_paths["scores_summary"]
+    joint_metrics_path = table_paths["metrics_joint"]
 
     if score_summary_path.suffix == ".parquet":
         score_df = read_parquet(score_summary_path)
@@ -361,7 +401,7 @@ def _load_counts(run_dir: Path) -> tuple[int, int]:
     seq_path = sequences_path(run_dir)
     elite_path = find_elites_parquet(run_dir)
     if not seq_path.exists():
-        raise FileNotFoundError(f"Missing artifacts/sequences.parquet for run '{run_dir.name}'.")
+        raise FileNotFoundError(f"Missing sequences.parquet for run '{run_dir.name}'.")
     seq_df = read_parquet(seq_path)
     if "phase" in seq_df.columns:
         seq_df = seq_df[seq_df["phase"] == "draw"].copy()

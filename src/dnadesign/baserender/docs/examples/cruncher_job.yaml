@@ -1,0 +1,46 @@
+version: 3
+input:
+  kind: parquet
+  path: data/cruncher_demo_elites.parquet
+  adapter:
+    kind: generic_features
+    columns:
+      sequence: sequence
+      features: features
+      effects: effects
+      display: display
+      id: id
+    policies: {}
+  alphabet: DNA
+render:
+  renderer: sequence_rows
+  style:
+    preset: presentation_default
+    overrides:
+      connectors: false
+      legend_font_size: 10
+      kmer:
+        box_height_cells: 1.12
+        fill_alpha: 0.94
+        text_y_nudge_cells: 0.0
+      motif_logo:
+        layout: stack
+        lane_mode: follow_feature_track
+        display_mode: information
+        height_bits: 2.0
+        bits_to_cells: 1.25
+        y_pad_cells: 0.20
+        letter_x_pad_frac: 0.06
+        alpha_other: 0.80
+        alpha_observed: 1.0
+        debug_bounds: false
+        scale_bar:
+          enabled: true
+          location: top_right
+outputs:
+  - kind: images
+    fmt: png
+run:
+  strict: false
+  fail_on_skips: false
+  emit_report: true

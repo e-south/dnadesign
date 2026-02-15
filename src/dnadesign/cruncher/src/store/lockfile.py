@@ -154,7 +154,7 @@ def verify_lockfile_hashes(
                 if not entries:
                     raise ValueError(
                         f"No cached site entries found for TF '{entry.tf_name}'. "
-                        "Fetch sites or adjust motif_store.site_kinds."
+                        "Fetch sites or adjust cruncher.catalog.site_kinds."
                     )
                 lines = []
                 for candidate in sorted(entries, key=lambda e: (e.source, e.motif_id)):

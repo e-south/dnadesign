@@ -45,11 +45,15 @@ def _select_targets(
     category: Optional[str],
     campaign: Optional[str],
 ) -> tuple:
+    def _with_regulator_sets(regulator_sets: list[list[str]]):
+        workspace = cfg.workspace.model_copy(update={"regulator_sets": regulator_sets})
+        return cfg.model_copy(update={"workspace": workspace})
+
     if category and campaign:
         raise ValueError("Use either --category or --campaign, not both.")
     if category:
         tfs = resolve_category_targets(cfg=cfg, category_name=category)
-        target_cfg = cfg.model_copy(update={"regulator_sets": [tfs]})
+        target_cfg = _with_regulator_sets([tfs])
         return target_cfg, f"Category targets: {category}", False
     if campaign:
         expansion = expand_campaign(
@@ -58,7 +62,7 @@ def _select_targets(
             campaign_name=campaign,
             include_metrics=False,
         )
-        target_cfg = cfg.model_copy(update={"regulator_sets": expansion.regulator_sets})
+        target_cfg = _with_regulator_sets(expansion.regulator_sets)
         return target_cfg, f"Campaign targets: {campaign}", False
     return cfg, "Configured targets", True
 
@@ -163,10 +167,10 @@ def targets_status(
         raise typer.Exit(code=1)
     if pwm_source is not None and pwm_source not in {"matrix", "sites"}:
         raise typer.BadParameter("--pwm-source must be 'matrix' or 'sites'.")
-    resolved_pwm_source = pwm_source or cfg.motif_store.pwm_source
+    resolved_pwm_source = pwm_source or cfg.catalog.pwm_source
     if site_kinds and resolved_pwm_source != "sites":
         raise typer.BadParameter(
-            "--site-kind requires pwm_source=sites (set motif_store.pwm_source or pass --pwm-source sites)."
+            "--site-kind requires pwm_source=sites (set cruncher.catalog.pwm_source or pass --pwm-source sites)."
         )
     statuses = target_statuses(
         cfg=target_cfg,
@@ -176,7 +180,7 @@ def targets_status(
         use_lockfile=use_lockfile,
     )
     site_label = "Sites (seq/total)"
-    if target_cfg.motif_store.combine_sites:
+    if target_cfg.catalog.combine_sites:
         site_label = "Sites (merged seq/total)"
     table = Table(title=title, header_style="bold")
     table.add_column("Set", style="dim", justify="right")

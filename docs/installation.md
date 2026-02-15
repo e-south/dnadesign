@@ -1,10 +1,14 @@
 ## Installation
 
-`dnadesign` is managed with [uv](https://docs.astral.sh/uv/):
 
-- `pyproject.toml` declares dependencies (runtime + optional extras)
-- `uv.lock` is the fully pinned dependency graph
-- `.venv/` is the project virtual environment (created automatically by uv)
+## Contents
+- [Installation](#installation)
+- [Install uv](#install-uv)
+- [Clone the repo](#clone-the-repo)
+- [Local install](#local-install)
+- [Dev tools (tests + lint)](#dev-tools-tests-lint)
+- [Running dnadesign CLIs](#running-dnadesign-clis)
+- [System dependencies (pixi)](#system-dependencies-pixi)
 
 ### Install uv
 

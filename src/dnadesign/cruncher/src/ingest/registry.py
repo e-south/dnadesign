@@ -3,7 +3,9 @@
 <cruncher project>
 src/dnadesign/cruncher/src/ingest/registry.py
 
-Author(s): Eric J. South
+Register and construct ingest source adapters.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -13,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Sequence
 
-from dnadesign.cruncher.config.schema_v2 import (
+from dnadesign.cruncher.config.schema_v3 import (
     IngestConfig,
     LocalMotifSourceConfig,
     LocalSiteSourceConfig,

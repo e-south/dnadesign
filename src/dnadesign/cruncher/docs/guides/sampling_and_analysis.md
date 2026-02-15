@@ -1,195 +1,272 @@
-## Sampling + analysis (auto‑optimize)
+# Sampling + analysis
 
-This guide shows the minimal end‑to‑end CLI flow for sampling and analysis, plus
-how auto‑opt picks a stable optimizer by default. For a one‑page happy path,
-see the top‑level cruncher README.
+## Contents
+- [Overview](#overview)
+- [End-to-end](#end-to-end)
+- [Sequence export layer](#sequence-export-layer)
+- [Fixed-length sampling model](#fixed-length-sampling-model)
+- [Fail-fast contracts](#fail-fast-contracts)
+- [Gibbs annealing optimization model](#gibbs-annealing-optimization-model)
+- [What The Optimizer Is Optimizing](#what-the-optimizer-is-optimizing)
+- [Interpreting Noisy Trajectories](#interpreting-noisy-trajectories)
+- [Elites: filter -> MMR select](#elites-filter--mmr-select)
+- [Analysis outputs](#analysis-outputs)
+- [Diagnostics quick read](#diagnostics-quick-read)
+- [Run selection + paths](#run-selection--paths)
+- [Related references](#related-references)
 
-### End‑to‑end (one regulator set)
+## Overview
+
+Cruncher designs fixed-length DNA sequences that jointly satisfy multiple PWMs. Sampling uses a Gibbs annealing optimizer and returns a diverse elite set via TFBS-core MMR. Analysis is offline and reads only run artifacts.
+
+**Important:** Cruncher is an **optimization engine**, not posterior inference. The "tune/draws/trace" terminology is used for optimizer mechanics + diagnostics; don't interpret outputs as posterior samples.
+
+## End-to-end
 
 From a workspace directory (so `config.yaml` is the default):
 
 ```bash
-# Reproducibility pinning (required before parse/sample)
 cruncher lock
-
-# Optimization (auto‑opt is on by default)
 cruncher sample
-# Optional: skip pilots (forces gibbs if optimizer.name=auto; set optimizer.name=gibbs|pt to choose)
-cruncher sample --no-auto-opt
-
-# Diagnostics + plots (writes analysis/report.json + analysis/report.md)
 cruncher analyze
-
-# Optional: print a concise summary to stdout
 cruncher analyze --summary
+cruncher export sequences --latest
 ```
 
-If you run via pixi, prefix each command with `pixi run cruncher --`.
+Outputs are written under each run directory (typically `outputs/`). The canonical entrypoints are:
 
-Outputs are recorded under each run’s `analysis/` folder. The canonical summary
-is `analysis/summary.json`, which links to plot/table manifests. The human‑readable
-entrypoint is `analysis/report.md` (machine‑readable `analysis/report.json`). A detailed
-inventory with “why” each artifact was generated is in `analysis/manifest.json`.
+- `analysis/reports/summary.json`
+- `analysis/reports/report.md`
+- `analysis/reports/report.json`
 
-### Numba cache (required for fast diagnostics)
+## Sequence export layer
 
-Cruncher uses ArviZ + Numba for trace diagnostics. If `NUMBA_CACHE_DIR` is not set, cruncher
-sets it to `<repo>/src/dnadesign/cruncher/.cruncher/numba_cache` (repo root discovered via
-`pyproject.toml` or `.git`; falls back to `<repo>/.cruncher/numba_cache` if the cruncher dir
-is missing) and requires it to be writable. To override:
+Use `cruncher export sequences` to emit stable, contract-first sequence tables for downstream wrappers.
 
 ```bash
-export NUMBA_CACHE_DIR=/path/to/writable/cache
+cruncher export sequences --latest
+cruncher export sequences --run <run_name_or_path>
+cruncher export sequences --latest --table-format csv --max-combo-size 3
 ```
 
-Logging defaults to concise progress. For verbose traces, use:
+Outputs per run:
 
-```bash
-cruncher sample --verbose
-cruncher --log-level DEBUG analyze --latest
+- `export/sequences/table__monospecific_consensus_sites.<parquet|csv>` (one consensus sequence per TF)
+- `export/sequences/table__monospecific_elite_windows.<parquet|csv>` (best window per elite x TF)
+- `export/sequences/table__bispecific_elite_windows.<parquet|csv>` (elite-level TF pairs; TF group size = 2)
+- `export/sequences/table__multispecific_elite_windows.<parquet|csv>` (elite-level TF groups; TF group size >=3)
+- `export/sequences/export_manifest.json`
+
+Fail-fast invariants:
+
+- no duplicate `(elite_id, tf)` best-hit rows
+- window spans stay within elite sequence bounds
+- score columns are numeric and finite
+- `best_window_seq` and `best_core_seq` lengths match exported widths
+- per-TF motif provenance (`pwm_ref`, `pwm_hash`, `pwm_width`) is internally consistent
+
+## Fixed-length sampling model
+
+Sampling is fixed-length and strict:
+
+- `sample.sequence_length` sets the designed DNA length.
+- `sample.budget.tune` and `sample.budget.draws` are explicit; no hidden budgets.
+- `sample.motif_width.maxw` optionally trims wide PWMs by max-information windowing during sampling.
+- `sample.sequence_length` must be at least the widest PWM after `sample.motif_width` constraints are applied.
+
+If the length invariant is violated, sampling fails fast with the per-TF widths.
+
+## Fail-fast contracts
+
+Cruncher is intentionally strict and will error instead of silently degrading:
+
+- Unknown config keys or missing required keys -> error (strict schema).
+- Missing lockfile for `parse`/`sample` -> error.
+- Existing `.cruncher/parse` or run `outputs/` directories -> error unless `--force-overwrite` is passed to `parse`/`sample`.
+- `sample.sequence_length < max_pwm_width` -> error with widths.
+- Elite constraints cannot be satisfied (after filtering/selection) -> error (no silent threshold relaxation).
+- Invalid `sample.optimizer.*` cooling settings -> error (no implicit schedule fallbacks).
+- `analyze` requires required artifacts and will not write partial reports on missing/invalid inputs.
+- `analyze` enforces an in-progress lock at `<run_dir>/analysis/state/tmp`; active locks fail fast, stale interrupted locks are auto-pruned.
+- `analysis.fimo_compare.enabled=true` requires MEME Suite `fimo` to be resolvable (`discover.tool_path`, `MEME_BIN`, or `PATH`).
+
+## Gibbs annealing optimization model
+
+Cruncher uses a hybrid Gibbs/MH optimizer with an explicit beta schedule
+(`sample.optimizer.cooling.*`). Replica exchange is disabled, so chains run
+independently while sharing the same objective and move policy.
+
+What "hybrid" means in practice:
+
+1. At each sweep, each chain samples one move kind from `sample.moves.*`.
+2. Default move mix is not `P(S)=1`: `S=0.85, B=0.07, M=0.04, I=0.04, L=0, W=0`.
+3. If move kind is `S`, Cruncher performs a single-site Gibbs update.
+4. If move kind is `B/M/L/W/I`, Cruncher performs a Metropolis-Hastings proposal with accept/reject.
+5. Optional adaptation can update move probabilities and proposal scales during tune (`sample.moves.overrides.*`).
+6. Chain identity is preserved across sweeps, so trajectory outputs are chain-lineage plots (not slot/particle swap traces).
+
+Terminology alignment:
+
+- `gibbs_anneal` = Metropolis-within-Gibbs sequence optimization.
+- With changing `beta_t` over sweeps, this is simulated annealing.
+- With fixed `beta`, it is fixed-temperature hybrid MCMC (not annealing).
+
+## What The Optimizer Is Optimizing
+
+Each chain maintains sequence state:
+
+```
+x in {A, C, G, T}^L
 ```
 
-### Auto‑optimize (default)
+with objective `f(x)` built from PWM best-window scores across TFs.
 
-Auto‑opt runs short **Gibbs** and **parallel tempering (PT)** pilots, evaluates objective‑aligned metrics from the draw phase (`combined_score_final`), and selects the best candidate using the top‑K median score (with a secondary max score tie‑breaker). Pilot diagnostics (R‑hat/ESS, acceptance summaries, diversity) are still recorded, but very short pilot budgets (<200 draws) suppress mixing warnings to avoid noise. Selection is **thresholdless** and driven by objective‑comparable metrics. Auto‑opt escalates through `budget_levels` (and the configured `replicates`) until a confidence‑separated winner emerges.
+Scoring mechanics:
 
-`auto_opt.policy.allow_warn: true` means auto‑opt will always pick a winner by the end of the configured budgets and record low‑confidence warnings if the separation is unclear. Set `allow_warn: false` to require a confidence‑separated winner; if none emerges at the maximum budgets/replicates, auto‑opt fails fast with guidance to increase `auto_opt.budget_levels` and/or `auto_opt.replicates`. Pilots disable trim/polish by default to preserve length fidelity; override with `auto_opt.allow_trim_polish_in_pilots: true` if needed.
-Auto‑opt pilot runs are stored under `outputs/auto_opt/`.
+- Scan windows per TF (optionally both strands via `objective.bidirectional=true`).
+- Select the best window per TF with deterministic tie-breaks.
+- Combine per-TF values using `objective.combine` (`min` or `sum`), optionally
+  shaped with soft-min:
 
-Disable auto‑opt when you want a single fixed optimizer (set `sample.optimizer.name`
-to `gibbs` or `pt` in your config):
-
-```bash
-cruncher sample --no-auto-opt
 ```
-If `optimizer.name=auto`, `--no-auto-opt` forces a Gibbs run and logs a warning; set
-`sample.optimizer.name` explicitly to choose the optimizer.
-
-Config knobs live under `sample.auto_opt` in `config.yaml` (see the config
-reference for full options). Auto‑opt also writes a pilot scorecard to
-`analysis/auto_opt_pilots.parquet` and a tradeoff plot to
-`analysis/plot__auto_opt_tradeoffs.<plot_format>` when available.
-
-If enabled, `sample.auto_opt.length` probes multiple sequence lengths and
-compares them using the same objective‑aligned top‑K median score; use
-`sample.auto_opt.length.prefer_shortest: true` to force the shortest winning length. Use
-`sample.rng.deterministic=true` to lock pilot RNG streams per config.
-
-Length bias warning: max-over-offset scoring makes longer sequences look better
-even under random background. If you sweep lengths, prefer normalized scales
-(`score_scale: normalized-llr|z|logp`) and/or set a length penalty:
-`objective.length_penalty_lambda > 0`.
-
-Cooling vs soft‑min: `optimizers.gibbs.beta_schedule` controls MCMC temperature,
-while `objective.softmin` controls the min‑approximation hardness. They are
-independent schedules; use soft‑min to smooth early exploration and a cooler
-beta to stabilize acceptance.
-
-### Length ladder (warm start)
-
-Ladder mode runs sequential lengths (L0..Lmax) with warm starts from the prior
-length's raw samples (`sequences.parquet`, elites as fallback). This avoids a
-biased "longer always wins" contest and makes length sweeps cheaper.
-
-```yaml
-sample:
-  auto_opt:
-    length:
-      enabled: true
-      mode: ladder
-      step: 1
-      min_length: null   # defaults to max PWM length
-      max_length: null   # defaults to sum of PWM lengths
-      warm_start: true
-      ladder_budget_scale: 0.5
-  objective:
-    length_penalty_lambda: 0.25
+softmin(v; beta) = -(1 / beta) * log(sum_i exp(-beta * v_i))
 ```
 
-Ladder runs write `analysis/length_ladder.csv` under the auto-opt pilot
-root with per‑length summary metrics.
+If using log-probability scoring (`score_scale=logp`), best-window p-values are
+adjusted to sequence-level p-values:
 
-### Elites: filter → rank → diversify
+```
+p_seq = 1 - (1 - p_win)^n_tests
+```
 
-Elite selection is explicitly aligned with the optimization objective:
+Move updates:
 
-1) **Filter (representativeness)** — gates candidates using normalized per‑TF
-   scores: `sample.elites.filters.min_per_tf_norm` (recommended) and optional
-   `pwm_sum_min` as a secondary threshold.
-2) **Rank (objective)** — sorts by the same combined score used by MCMC
-   (`combined_score_final`, soft‑min across TFs plus length penalty), then
-   `min_norm`, then `sum_norm`.
-3) **Diversify** — Hamming‑distance filter (`elites.min_hamming`), optionally
-   dsDNA‑aware via `elites.dsDNA_hamming=true`.
+- `S` (single-site Gibbs): sample from a conditional distribution over bases:
 
-`pwm_sum_min` is not the objective; it is a representativeness gate.
-`combined_score_final` respects `objective.combine` (default `min`, or `sum`
-for `score_scale=consensus-neglop-sum` unless you set `objective.combine=min`).
-When using `normalized-llr`, per‑TF scores are scaled by the PWM consensus LLR
-(`0.0` = background‑like, `1.0` = consensus‑like). A `min_per_tf_norm` of 0.05–0.2
-roughly corresponds to demanding 5–20% of consensus per TF; start with `null`
-and tune based on `normalized_min_median` in diagnostics.
+```
+P(base=b | rest) proportional to exp(beta_mcmc * f_b)
+```
 
-### Motif overlap metrics (feature, not a failure)
+  `S` is accepted by construction because Gibbs samples directly from a
+  conditional kernel. "Always accepted" does not mean "no beta effect":
+  `beta_mcmc` controls how sharp this distribution is.
+  - low `beta_mcmc`: flatter distribution (more exploratory)
+  - high `beta_mcmc`: concentrated on better bases (more greedy)
+- `B/M/L/W/I`: Metropolis acceptance:
 
-Overlap of TF motifs is expected and informative. Cruncher records overlap
-patterns from elites (best-hit windows per TF) and reports:
+```
+alpha = min(1, exp(beta_mcmc * (f(x') - f(x))))
+```
 
-- `analysis/overlap_summary.parquet` — TF-pair overlap rates, overlap bp stats,
-  strand-combo counts, and `overlap_bp_hist` (bins+counts).
-- `analysis/elite_overlap.parquet` — per-elite overlap totals and pair counts.
-- `analysis/plot__overlap_heatmap.<plot_format>` — heatmap of overlap rates.
-- `analysis/plot__overlap_bp_distribution.<plot_format>` — distribution of overlap bp.
-- Optional: `plot__overlap_strand_combos.png` + `plot__motif_offset_rug.png`.
+This is why analysis reports MH acceptance separately from `S`: including
+always-accepted Gibbs updates would hide whether MH proposals are calibrated.
+Trajectory stability is controlled by both cooling (`beta_mcmc`) and move
+proposal scale/mix.
 
-These are descriptive only; overlap is not penalized by default.
+## Interpreting Noisy Trajectories
 
-### Diagnostics quick read
+Raw chain traces can look jumpy even when optimization is healthy:
 
-Diagnostics are written to:
+- Gibbs single-site updates are always accepted.
+- The objective is rugged due to max-over-windows and cross-TF aggregation.
+- Finite tail temperature still allows some downhill MH transitions.
+- Adaptive proposal mechanics can change local behavior during a run.
 
-- `analysis/diagnostics.json`
-- `analysis/score_summary.parquet`
-- `analysis/joint_metrics.parquet`
-- `analysis/objective_components.json`
-- `analysis/plot__dashboard.<plot_format>`
-- `analysis/plot__worst_tf_trace.<plot_format>` / `plot__worst_tf_identity.<plot_format>`
+For optimization narrative, prioritize:
+
+- final/best elite quality and constraints
+- tail move diagnostics (`acceptance_tail_rugged`, `downhill_accept_tail_rugged`, `gibbs_flip_rate_tail`)
+- diversity tables (`elites_mmr_summary`, `elites_nn_distance`)
+- sweep plots with `analysis.trajectory_sweep_mode=best_so_far` (or `all` to overlay raw + best-so-far)
+
+Treat raw trajectory plots as exploration diagnostics, not monotone progress
+curves.
+
+## Elites: MMR select
+
+Elite selection is aligned with the optimization objective:
+
+1. Build the candidate pool from sampled draw states.
+2. Run MMR selection on that pool using `sample.elites.select.diversity` (`0..1`) as the primary quality-vs-diversity control.
+3. Return exactly `sample.elites.k` unique elites or fail fast if impossible.
+
+Current MMR behavior is:
+
+- For each sequence in the candidate pool, extract the best-hit window for each TF and orient each core to its PWM.
+- Compare candidates with a hybrid distance: full-sequence Hamming + motif-core weighted Hamming.
+- Use direct tradeoff weights from `sample.elites.select.diversity`: score weight `1 - diversity`, diversity weight `diversity`, plus minimum-distance constraints derived from the same knob.
+- We never compare LexA vs CpxR within the same sequence.
+
+`sample.elites.select.diversity=0.0` is an explicit score-only mode:
+- Selection policy switches to greedy top-k by final optimizer scalar score (`combined_score_final`).
+- No diversity constraints are derived or applied.
+- This gives a clear baseline for diversity-vs-score sweeps.
+
+"Tolerant" weights are hard-coded: low-information PWM positions are weighted more (weight = `1 - info_norm`). This preserves consensus-critical positions while encouraging diversity where the motif is flexible.
+
+When `objective.bidirectional=true`, canonicalization is automatic: reverse complements (including palindromes) count as the same identity for uniqueness and MMR dedupe.
+
+If Cruncher cannot produce `sample.elites.k` elites from the available candidate pool, the run fails fast.
+
+## Analysis outputs
+
+Analysis writes a curated, orthogonal suite of plots and tables (no plot booleans). Key artifacts include:
+
+- `analysis/tables/table__scores_summary.parquet`
+- `analysis/tables/table__elites_topk.parquet`
+- `analysis/tables/table__metrics_joint.parquet`
+- `analysis/tables/table__chain_trajectory_points.parquet`
+- `analysis/tables/table__chain_trajectory_lines.parquet`
+- `analysis/tables/table__overlap_pair_summary.parquet`
+- `analysis/tables/table__overlap_per_elite.parquet`
+- `analysis/tables/table__diagnostics_summary.json`
+- `analysis/tables/table__objective_components.json`
+- `analysis/tables/table__elites_mmr_summary.parquet`
+- `analysis/tables/table__elites_mmr_sweep.parquet` (when `analysis.mmr_sweep.enabled=true`)
+- `analysis/tables/table__elites_nn_distance.parquet`
+
+Sampling artifacts consumed by analysis:
+
+- `optimize/elites_hits.parquet` (per-elite, per-TF best-hit/core metadata)
+- `optimize/random_baseline.parquet` (baseline cloud for trajectory plots; includes seed, n_samples, length, score_scale, bidirectional, background model)
+- `optimize/random_baseline_hits.parquet` (baseline best-hit/core metadata for diversity context)
+
+Plots (always generated when data is available):
+
+- `plots/chain_trajectory_scatter.*` (random-baseline cloud + chain best-so-far lineage updates in TF score-space, with selected elites overlaid and consensus anchors)
+- `plots/chain_trajectory_sweep.*` (optimizer scalar score over sweeps by chain, with `best_so_far|raw|all` modes and tune/cooling boundary markers when available; scalar semantics follow `sample.objective.combine` and optional soft-min shaping)
+- `plots/elites_nn_distance.*` (elite diversity panel: y-axis is final optimizer scalar score, x-axis is full-sequence nearest-neighbor Hamming distance in bp to each elite's closest other selected elite, plus pairwise full-sequence distance matrix; core-distance context retained)
+- `plots/elites_showcase.*` (baserender-backed elite panels with sense/antisense sequence rows, TF best-window placement, and per-window motif logos)
+  - motif-logo matrices are sourced from the locked optimization motif library (resolved by Cruncher during analysis) rather than inferred from elite strings.
+  - Cruncher passes only minimal rendering primitives (record-shaped rows + motif primitives); baserender does not require full run artifact trees.
+  - rendering uses baserender public API only (`dnadesign.baserender` package root), not internal `dnadesign.baserender.src.*` modules.
+  - panel title format is terse and rank-first: `Elite #<rank>` (fallback `Elite` when rank is unavailable, hard cap 40 chars).
+  - when multiple elite panels are rendered in one figure, Cruncher requests a single-row layout (left-to-right rank order).
+- `plots/health_panel.*` (MH-only acceptance dynamics + move-mix over sweeps; `S` moves are excluded from acceptance rates)
+- `plots/optimizer_vs_fimo.*` (optional via `analysis.fimo_compare.enabled=true`: descriptive QA scatter comparing Cruncher joint optimizer score vs FIMO weakest-TF sequence score; no-hit rows are retained at 0)
+
+Fail-fast plotting contract:
+
+- Required plots (`chain_trajectory_scatter`, `chain_trajectory_sweep`, `elites_nn_distance`, `elites_showcase`) fail analysis on plotting errors; they are not silently downgraded to skipped.
+- Intentional skips are only policy/data-driven cases (for example `health_panel` when trace is disabled, or `optimizer_vs_fimo` when `analysis.fimo_compare.enabled=false`).
+
+## Diagnostics quick read
+
+Use `report.md` for a narrative view and `summary.json` for machine-readable links.
 
 Key signals:
 
-- `diagnostics.status` — `ok|warn|fail` summary.
-- `trace.rhat` ≲ 1.1 and `trace.ess_ratio` ≳ 0.10 usually indicate good mixing
-  for Gibbs runs. PT ladders report ESS from the cold chain only.
-- PT traces record **post‑swap** states (per temperature chain) for clarity.
-- `trace.nc` contains draw phase only; `sample.output.trace.include_tune`
-  controls whether tune samples appear in `sequences.parquet`.
-- When `sample.elites.dsDNA_canonicalize=true`, `sequences.parquet` includes a
-  `canonical_sequence` column and uniqueness metrics use that canonical form.
-- `sequences.parquet` includes `chain_1based` and `draw_in_phase` to make
-  plotting easier: `chain` remains 0‑based, `draw_idx` is the absolute sweep,
-  and `draw_in_phase` is 0‑based within the phase (tune/draw).
-- `sequences.unique_fraction` low values suggest chain collapse or lack of
-  diversity (use `elites.dsDNA_canonicalize=true` to treat reverse complements
-  as identical for uniqueness).
-- `objective_components.json` includes `unique_fraction_canonical` only when
-  `elites.dsDNA_canonicalize=true` is enabled.
-- `elites.balance_median` and `elites.diversity_hamming` summarize how well the
-  top‑K elites balance TF scores and remain diverse.
-- PT runs: `optimizer.swap_acceptance_rate` near 0.05–0.40 is typical; very low
-  values often mean a poor temperature ladder.
-- Acceptance metrics: Gibbs `S` moves are always accepted. Auto‑opt uses the
-  MH‑only aggregate rate (`optimizer.acceptance_rate_mh`) for scorecards; per‑move
-  `acceptance_rate.B/M` are still reported for debugging. Diagnostics also report
-  `optimizer.acceptance_rate_mh_tail` (MH acceptance over the tail window).
+- `diagnostics.status`: `ok|warn|fail` summary.
+- `trace.rhat` and `trace.ess_ratio` (if `trace.nc` exists) are directional indicators of sampling health across chains.
+- `optimizer.acceptance_tail_rugged` is the tail acceptance over rugged moves (`B`,`M`) and is more informative than all non-`S` acceptance when diagnosing warm tails.
+- `optimizer.downhill_accept_tail_rugged` isolates downhill rugged acceptance in the tail (cold-tail indicator).
+- `optimizer.gibbs_flip_rate_tail` and `optimizer.tail_step_hamming_mean` indicate whether late-chain motion is dominated by Gibbs micro-flips.
+- `chain_trajectory_sweep.*` should be read as optimizer-scalar progress; `best_so_far` is the default narrative, while `all` overlays raw exploration.
+- `elites_nn_distance.*` distinguishes motif-core collapse (`d_core ~ 0`) from full-sequence diversity (`d_full > 0`) so degenerate elite sets are visible.
+- `objective_components.unique_fraction_canonical` is present only when canonicalization is enabled.
+- `elites_mmr_summary` and `elites_nn_distance` indicate diversity strength and collapse risk.
 
-Plot defaults are intentionally lightweight (Tier‑0 only, including the dashboard).
-Enable additional plots by setting `analysis.extra_plots=true` or use
-`cruncher analyze --plots all`. Trace‑based diagnostics require
-`analysis.mcmc_diagnostics=true`.
-
-### Run selection + paths
-
-Use these helpers to choose the right run and reduce table truncation:
+## Run selection + paths
 
 ```bash
 COLUMNS=160 cruncher runs list
@@ -200,29 +277,12 @@ cruncher runs best --set-index 1
 Run artifacts live under:
 
 ```
-<workspace>/outputs/sample/<run_name>/
+<workspace>/outputs/
 ```
 
-`run_name` includes the TF slug; when multiple regulator sets are configured it is prefixed with `setN_`.
+## Related references
 
-If `cruncher analyze` reports `analysis/ contains artifacts but summary.json is missing`,
-remove the incomplete `analysis/` folder for that run before re-running analyze.
-
-### Tuning essentials (when diagnostics warn)
-
-If auto‑opt selects a run but diagnostics are weak, try:
-
-- Increase `sample.budget.draws` / `sample.budget.tune` (more iterations).
-- For Gibbs, increase `sample.budget.restarts`; for PT, adjust
-  `sample.optimizers.pt.beta_ladder`.
-- Adjust `sample.optimizers.gibbs.beta_schedule` (cooler schedules mix more stably).
-- Raise `sample.elites.filters.min_per_tf_norm` to enforce per‑TF satisfaction,
-  or use `pwm_sum_min` for a looser gate.
-- Tighten `sample.moves.overrides` ranges if swaps/moves are too disruptive.
-
-For full settings, see the config reference.
-
-Quick decision guide:
-- **Low unique_fraction** → increase draws/restarts or raise `elites.min_hamming`.
-- **Very low swap acceptance (PT)** → adjust `pt.beta_ladder` (gentler spacing).
-- **Weak worst‑TF trace** → increase `objective.softmin.beta_end` or normalize scores.
+- [Config reference](../reference/config.md)
+- [CLI reference](../reference/cli.md)
+- [Architecture and artifacts](../reference/architecture.md)
+- [Intent + lifecycle](intent_and_lifecycle.md)

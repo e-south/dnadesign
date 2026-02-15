@@ -49,7 +49,7 @@ def resolve_lock(
     def _combined_sites_checksum(tf_name: str, entries: List[CatalogEntry]) -> str:
         if not entries:
             raise ValueError(
-                f"No cached site entries found for TF '{tf_name}'. Fetch sites or adjust motif_store.site_kinds."
+                f"No cached site entries found for TF '{tf_name}'. Fetch sites or adjust cruncher.catalog.site_kinds."
             )
         lines: list[str] = []
         for entry in sorted(entries, key=lambda e: (e.source, e.motif_id)):

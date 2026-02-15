@@ -2,17 +2,20 @@
 
 # dnadesign
 
+
+## Contents
+- [Overview](#overview)
+- [Directory layout](#directory-layout)
+- [Documentation](#documentation)
+- [Available tools](#available-tools)
+
+## Overview
+
 `dnadesign` is a collection of modular bioinformatic pipelines and helper packages related to biological sequence design.
-
-### Contents
-
-1. [Directory layout](#directory-layout)
-2. [Documentation](#documentation)
-3. [Available tools](#available-tools)
 
 ---
 
-### Directory layout
+## Directory layout
 
 ```text
 dnadesign/
@@ -30,7 +33,7 @@ dnadesign/
 
 ---
 
-### Documentation
+## Documentation
 
 1. [Installation](docs/installation.md)
 2. [Maintaining dependencies](docs/dependencies.md)
@@ -44,7 +47,7 @@ dnadesign/
 
 ---
 
-### Available tools
+## Available tools
 
 1. [**usr**](src/dnadesign/usr) (Universal Sequence Record)
 
@@ -88,7 +91,7 @@ dnadesign/
 
 8. [**cruncher**](src/dnadesign/cruncher)
 
-      Pipeline that parses TF position-weight matrices (MEME, JASPAR, etc.) via plug-in parsers, and then runs a discrete Categorical Gibbs optimiser (or other plug-ins) to discover short DNA sequences that score highly on one or more TFs.
+      Pipeline that scores TF position-weight matrices and uses parallel tempering MCMC to design short DNA sequences that score highly across one or more TFs.
 
 9. [**tfkdanalysis**](src/dnadesign/tfkdanalysis)
 

@@ -1,139 +1,96 @@
-## baserender
+# baserender
 
-Minimal rendering of biological sequences with annotations.
+Contract-first sequence rendering with strict schemas and adapter-based integration.
 
-**Layout**:
-``` bash
-src/dnadesign/baserender/
-├─ src/       # package
-├─ jobs/      # YAML presets (call by name)
-├─ styles/    # YAML style presets
-└─ results/   # outputs per job
-```
+`baserender` exists to turn sequence-oriented records into visual assets with explicit invariants:
+- fail fast on invalid config/contract input
+- no silent fallback behavior
+- small stable public API at `dnadesign.baserender`
+- tool-agnostic render core (Cruncher/DenseGen integration via adapters and plugins)
 
-### Install
-`pyproject.toml`:
+## Table Of Contents
 
-```toml
-[project.scripts]
-baserender = "dnadesign.baserender.src.cli:app"
-```
+- [Quick Start](#quick-start)
+- [Public API](#public-api)
+- [CLI Surface](#cli-surface)
+- [Contract Inputs](#contract-inputs)
+- [Documentation Map](#documentation-map)
 
-### System dependencies
+## Quick Start
 
-* **FFmpeg** (required for video export). Confirm:
-
-  ```bash
-  which ffmpeg
-  ffmpeg -version
-  ```
-
-  - On macOS (Homebrew): `brew install ffmpeg`
-  - On Ubuntu/Debian: `sudo apt-get install -y ffmpeg`
-  - On Conda (any OS): `conda install -c conda-forge ffmpeg`
-
-**Compatibility:** Videos are encoded as **H.264** with **yuv420p** pixel format and `+faststart`, producing `.mp4` files that open in QuickTime Player and are drag‑and‑drop compatible with PowerPoint.
-
-### CLI quick start
-
-#### Help
+From repo root:
 
 ```bash
-baserender --help
+uv run baserender job validate --workspace demo_densegen_render --workspace-root src/dnadesign/baserender/workspaces
+uv run baserender job run --workspace demo_densegen_render --workspace-root src/dnadesign/baserender/workspaces
+
+uv run baserender job validate --workspace demo_cruncher_render --workspace-root src/dnadesign/baserender/workspaces
+uv run baserender job run --workspace demo_cruncher_render --workspace-root src/dnadesign/baserender/workspaces
 ```
 
-#### Run a Job (uses `jobs/` and writes into `results/`)
+`demo_cruncher_render` uses the fast normalized-record hotpath:
+- `inputs/elites_showcase_records.parquet`
+- `inputs/motif_library.json`
+
+## Public API
+
+Use package-root imports only:
+
+```python
+import dnadesign.baserender as br
+
+job = br.validate_job("job.yaml")
+report = br.run_job("job.yaml")
+fig = br.render(record_or_records)
+```
+
+Primary entrypoints:
+- `validate_job(path_or_dict, kind=..., caller_root=...)`
+- `run_job(path_or_dict, kind=..., strict=..., caller_root=...)`
+- `render(record_or_records, renderer=..., style=..., grid=...)`
+
+Grid behavior in `render(...)`:
+- single record: one panel
+- multiple records: default is one row (`ncols = number of records`)
+- override explicitly with `grid={"ncols": <int>}`
+
+Compatibility aliases are still exported:
+- `validate_cruncher_showcase_job`
+- `run_cruncher_showcase_job`
+
+Do not import from `dnadesign.baserender.src.*`.
+
+## CLI Surface
 
 ```bash
-baserender job run jobs/foo.yml
-# or by name (looked up in jobs/):
-baserender job run foo
+baserender job validate <job.yaml>
+baserender job run <job.yaml>
+baserender job normalize <job.yaml> --out <normalized.yaml>
+
+baserender job validate --workspace <name> [--workspace-root <dir>]
+baserender job run --workspace <name> [--workspace-root <dir>]
+baserender job normalize --workspace <name> --out <normalized.yaml> [--workspace-root <dir>]
+
+baserender workspace init <name> [--root <dir>]
+baserender workspace list [--root <dir>]
+
+baserender style list
+baserender style show <preset>
 ```
 
-#### Direct (dataset → images), with progress and plugin(s)
+## Contract Inputs
 
-```bash
-baserender render /path/to/records.parquet \
-  --out-dir ./out/images \
-  --plugin sigma70 \
-  --limit 500   # default; set 0 for all
-```
+Supported adapter contracts:
+- `densegen_tfbs`
+- `generic_features`
+- `cruncher_best_window`
+- `sequence_windows_v1`
 
-### Dataset contract
+Rule: adapters normalize source rows into `Record`; renderer remains contract-driven and tool-agnostic.
 
-* `sequence` (str)
-* `densegen__used_tfbs_detail` (list of dicts: `{"offset": int, "orientation": "fwd"|"rev", "tf": str, "tfbs": str}`)
-* optional `id` (str)
+## Documentation Map
 
-### Selection (CSV-driven)
-
-Jobs can optionally select specific records via a CSV:
-
-```yaml
-selection:
-  path: selections.csv
-  match_on: id              # id | sequence | row
-  column: id                # CSV column to read
-  overlay_column: details   # optional text overlay column (must exist if set)
-  keep_order: true
-  on_missing: warn          # skip | warn | error
-```
-
-Row selection uses **Parquet row index (0‑based)** from the dataset.
-
-### Style presets
-
-Style presets live in `styles/`. The default is `presentation_default.yml`.
-Use `baserender style list` to see available presets and `baserender style show` to inspect the effective mapping.
-
-### Output path resolution
-
-Output paths are resolved relative to `results_dir/<job_name>/`:
-
-* Absolute paths are used as‑is.
-* Relative paths resolve under `results_dir/<job_name>/...`.
-
-### Preset example
-
-`src/dnadesign/baserender/jobs/cpxR_LexA.yml`
-
-```yaml
-version: 2
-input:
-  # Relative paths resolve from the repo root when the job is under jobs/.
-  path: inputs/records.parquet
-  format: parquet
-  columns:
-    id: id
-    sequence: sequence
-    annotations: densegen__used_tfbs_detail
-  alphabet: DNA
-  # Limit how many sequences to process (default 500). Set 0 to process all.
-  limit: 500
-
-pipeline:
-  plugins:
-    - sigma70
-
-style:
-  preset: presentation_default
-  overrides: {}
-
-output:
-  video:
-    # If omitted, defaults to results/<job>/<job>.mp4
-    path: results/CpxR_LexA/cpxR_LexA.mp4
-    fmt: mp4
-    fps: 2
-    frames_per_record: 1
-    pauses: {}
-    width_px: 1400
-    height_px: null
-  images:
-    dir: results/CpxR_LexA/images
-    fmt: png
-```
-
----
-
-@e-south
+Keep docs compact and progressive:
+- Technical reference and architecture: `docs/reference.md`
+- Workspace/demo guide: `docs/demos/workspaces.md`
+- Executable job examples: `docs/examples/*.yaml`

@@ -1,7 +1,13 @@
 # Stage-A Summary Visual Redesign
 
-Date: 2026-01-28
-Status: accepted
+
+## Contents
+- [Context](#context)
+- [Goals](#goals)
+- [Non-goals](#non-goals)
+- [Decisions](#decisions)
+- [Implementation Notes](#implementation-notes)
+- [Testing Plan](#testing-plan)
 
 ## Context
 Stage-A summary plots are informative but suffer from overlapping titles/annotations,

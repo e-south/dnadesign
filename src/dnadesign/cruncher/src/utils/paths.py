@@ -39,14 +39,13 @@ def resolve_catalog_root(config_path: Path, catalog_root: Path | str) -> Path:
     cruncher_root = resolve_cruncher_root(config_path.parent)
     if cruncher_root is None:
         raise ValueError(
-            "Unable to resolve cruncher cache root from config location. "
-            "Set motif_store.catalog_root to an absolute path."
+            "Unable to resolve cruncher cache root from config location. Set cruncher.catalog.root to an absolute path."
         )
     resolved = (cruncher_root / root).resolve()
     try:
         resolved.relative_to(cruncher_root.resolve())
     except ValueError as exc:
-        raise ValueError("motif_store.catalog_root must stay within the cruncher root.") from exc
+        raise ValueError("cruncher.catalog.root must stay within the cruncher root.") from exc
     return resolved
 
 

@@ -1,8 +1,30 @@
 # dnadesign Monorepo Organization Audit
 
-Date: 2026-01-15
 
-Scope: Repository structure under `src/dnadesign`, top-level `pyproject.toml`, and `pixi.toml`. The audit is organizational only (no code changes).
+## Contents
+- [Executive summary](#executive-summary)
+- [Current structure (observed)](#current-structure-observed)
+- [Top-level](#top-level)
+- [Tool directories under `src/dnadesign/`](#tool-directories-under-srcdnadesign)
+- [Nested `src/` tool layout](#nested-src-tool-layout)
+- [CLI entry points (from `pyproject.toml`)](#cli-entry-points-from-pyprojecttoml)
+- [Dependency and environment management](#dependency-and-environment-management)
+- [Pragmatic programming principles: assessment and recommendations](#pragmatic-programming-principles-assessment-and-recommendations)
+- [1) Decoupled design](#1-decoupled-design)
+- [2) Easier to change](#2-easier-to-change)
+- [3) Assertive programming](#3-assertive-programming)
+- [4) Robustness](#4-robustness)
+- [5) Extendibility](#5-extendibility)
+- [Evaluating the current nested `src/` per tool](#evaluating-the-current-nested-src-per-tool)
+- [uv vs pixi for tool aliases and organization](#uv-vs-pixi-for-tool-aliases-and-organization)
+- [Recommendations by horizon](#recommendations-by-horizon)
+- [Low-risk, near-term](#low-risk-near-term)
+- [Medium-term](#medium-term)
+- [Long-term (optional)](#long-term-optional)
+- [Proposed standard tool layout (if keeping nested `src/`)](#proposed-standard-tool-layout-if-keeping-nested-src)
+- [Risks to track](#risks-to-track)
+- [Open questions](#open-questions)
+- [Suggested next steps](#suggested-next-steps)
 
 ## Executive summary
 

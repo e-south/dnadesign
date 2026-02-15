@@ -2848,27 +2848,23 @@ def _(active_record, dataset_path, inspect_view_mode_dropdown, mo):
     else:
         if view_mode == "BaseRender":
             try:
-                from dnadesign.baserender.src import api as _baserender_api
-                from dnadesign.baserender.src.io.parquet import (
-                    read_parquet_records_by_ids as _read_parquet_records_by_ids,
-                )
+                from dnadesign.baserender import render_parquet_record_figure as _render_parquet_record_figure
 
                 _active_id = active_record["id"][0] if "id" in active_record.columns else None
                 if _active_id is None:
                     raise ValueError("BaseRender requires a non-null id column.")
 
-                _records_iter = _read_parquet_records_by_ids(
-                    path=dataset_path,
-                    ids=[str(_active_id)],
-                    id_col="id",
-                    sequence_col="sequence",
-                    annotations_col="densegen__used_tfbs_detail",
+                _fig = _render_parquet_record_figure(
+                    dataset_path=dataset_path,
+                    record_id=str(_active_id),
+                    adapter_kind="densegen_tfbs",
+                    adapter_columns={
+                        "sequence": "sequence",
+                        "annotations": "densegen__used_tfbs_detail",
+                        "id": "id",
+                        "details": "details",
+                    },
                 )
-                _record = next(iter(_records_iter), None)
-                if _record is None:
-                    raise ValueError("Record not found in dataset for BaseRender.")
-
-                _fig = _baserender_api.render_image(_record, fmt="png")
                 _fig.patch.set_facecolor("white")
                 _fig.patch.set_alpha(1.0)
                 render_element = _fig
@@ -2958,29 +2954,24 @@ def _(
             save_pdf_status_md = mo.md("No output path provided.")
         else:
             try:
-                from dnadesign.baserender.src import api as _baserender_api
-                from dnadesign.baserender.src.io.parquet import (
-                    read_parquet_records_by_ids as _read_parquet_records_by_ids,
-                )
+                from dnadesign.baserender import render_parquet_record_figure as _render_parquet_record_figure
 
                 _active_id = active_record["id"][0] if "id" in active_record.columns else None
                 if _active_id is None:
                     raise ValueError("BaseRender requires a non-null id column.")
 
-                _records_iter = _read_parquet_records_by_ids(
-                    path=dataset_path,
-                    ids=[str(_active_id)],
-                    id_col="id",
-                    sequence_col="sequence",
-                    annotations_col="densegen__used_tfbs_detail",
+                _fig = _render_parquet_record_figure(
+                    dataset_path=dataset_path,
+                    record_id=str(_active_id),
+                    adapter_kind="densegen_tfbs",
+                    adapter_columns={
+                        "sequence": "sequence",
+                        "annotations": "densegen__used_tfbs_detail",
+                        "id": "id",
+                        "details": "details",
+                    },
                 )
-                _record = next(iter(_records_iter), None)
-                if _record is None:
-                    raise ValueError("Record not found in dataset for BaseRender.")
-
                 save_pdf_path.parent.mkdir(parents=True, exist_ok=True)
-
-                _fig = _baserender_api.render_image(_record, fmt="pdf")
                 _fig.patch.set_facecolor("white")
                 _fig.patch.set_alpha(1.0)
                 _fig.savefig(

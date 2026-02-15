@@ -98,7 +98,7 @@ def iter_site_sequences(
                     if not allow_variable_lengths and len(lengths) > 1:
                         raise ValueError(
                             f"Site lengths vary for TF '{site_entry.tf_name}'. "
-                            "Set motif_store.site_window_lengths to build a PWM."
+                            "Set cruncher.catalog.site_window_lengths to build a PWM."
                         )
                 else:
                     seq = window_sequence(seq, window_length, center=site_window_center)
@@ -117,6 +117,7 @@ class CatalogMotifStore(MotifStore):
         site_window_center: str = "midpoint",
         pwm_window_lengths: dict[str, int] | None = None,
         pwm_window_strategy: str = "max_info",
+        apply_pwm_window: bool = True,
         min_sites_for_pwm: int = 2,
         allow_low_sites: bool = False,
         pseudocounts: float = 0.5,
@@ -129,6 +130,7 @@ class CatalogMotifStore(MotifStore):
         self.site_window_center = site_window_center
         self.pwm_window_lengths = pwm_window_lengths or {}
         self.pwm_window_strategy = pwm_window_strategy
+        self.apply_pwm_window = bool(apply_pwm_window)
         self.min_sites_for_pwm = min_sites_for_pwm
         self.allow_low_sites = allow_low_sites
         self.pseudocounts = pseudocounts
@@ -207,6 +209,8 @@ class CatalogMotifStore(MotifStore):
         raise ValueError("pwm_source must be 'matrix' or 'sites'")
 
     def _apply_pwm_window(self, pwm: PWM, entry: CatalogEntry) -> PWM:
+        if not self.apply_pwm_window:
+            return pwm
         window_length = resolve_window_length(
             tf_name=entry.tf_name,
             dataset_id=entry.dataset_id,

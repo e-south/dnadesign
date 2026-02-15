@@ -38,7 +38,7 @@ def doctor(
     tool: str | None = typer.Option(
         None,
         "--tool",
-        help="Tool to check: auto, streme, or meme (defaults to motif_discovery.tool).",
+        help="Tool to check: auto, streme, or meme (defaults to discover.tool).",
     ),
     tool_path: Path | None = typer.Option(
         None,
@@ -66,9 +66,9 @@ def doctor(
     else:
         console.print("Config: - (not resolved)")
 
-    resolved_tool = (tool or (cfg.motif_discovery.tool if cfg else "auto")).lower()
+    resolved_tool = (tool or (cfg.discover.tool if cfg else "auto")).lower()
     resolved_path = resolve_tool_path(
-        tool_path or (cfg.motif_discovery.tool_path if cfg else None),
+        tool_path or (cfg.discover.tool_path if cfg else None),
         config_path=config_path,
     )
     try:
@@ -99,7 +99,7 @@ def doctor(
     if not ok:
         console.print(
             "Tip: if MEME Suite is installed via pixi, run `pixi run cruncher -- doctor -c <config>`, "
-            "or set motif_discovery.tool_path (or MEME_BIN) to the MEME bin directory "
+            "or set discover.tool_path (or MEME_BIN) to the MEME bin directory "
             "(see docs/guides/meme_suite.md)."
         )
         raise typer.Exit(code=1)

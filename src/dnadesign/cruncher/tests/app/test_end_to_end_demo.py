@@ -1,0 +1,386 @@
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/tests/app/test_end_to_end_demo.py
+
+Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import json
+import shutil
+from pathlib import Path
+
+import pandas as pd
+import pytest
+import yaml
+from typer.testing import CliRunner
+
+from dnadesign.cruncher.app.fetch_service import fetch_motifs, fetch_sites
+from dnadesign.cruncher.app.lock_service import resolve_lock
+from dnadesign.cruncher.app.parse_workflow import run_parse
+from dnadesign.cruncher.app.sample_workflow import run_sample
+from dnadesign.cruncher.artifacts.layout import (
+    config_used_path,
+    elites_path,
+    logos_root,
+    manifest_path,
+    out_root,
+    parse_manifest_path,
+    pwm_summary_path,
+    sequences_path,
+    trace_path,
+)
+from dnadesign.cruncher.cli.app import app
+from dnadesign.cruncher.config.load import load_config
+from dnadesign.cruncher.ingest.adapters.regulondb import RegulonDBAdapter, RegulonDBAdapterConfig
+from dnadesign.cruncher.tests.fixtures.regulondb_payloads import (
+    CPXR_ID,
+    HT_DATASETS,
+    HT_SOURCES,
+    HT_TF_BINDING,
+    LEXA_ID,
+    REGULON_DETAIL,
+    regulon_list_for_search,
+)
+from dnadesign.cruncher.utils.paths import resolve_lock_path
+
+
+def _sample_block() -> dict:
+    return {
+        "seed": 7,
+        "sequence_length": 12,
+        "budget": {"tune": 1, "draws": 2},
+        "optimizer": {
+            "kind": "gibbs_anneal",
+            "chains": 2,
+            "cooling": {"kind": "linear", "beta_start": 0.1, "beta_end": 1.0},
+        },
+        "objective": {"bidirectional": True, "score_scale": "normalized-llr", "combine": "min"},
+        "elites": {
+            "k": 1,
+            "select": {"diversity": 0.0, "pool_size": "auto"},
+        },
+        "moves": {
+            "profile": "balanced",
+            "overrides": {
+                "block_len_range": [2, 2],
+                "multi_k_range": [2, 2],
+                "slide_max_shift": 1,
+                "swap_len_range": [2, 2],
+                "move_probs": {"S": 0.8, "B": 0.1, "M": 0.1},
+            },
+        },
+        "output": {
+            "save_trace": False,
+            "save_sequences": True,
+            "include_tune_in_sequences": False,
+            "live_metrics": False,
+        },
+    }
+
+
+runner = CliRunner()
+
+
+def _fixture_transport(query: str, variables: dict) -> dict:
+    if "listAllHTSources" in query:
+        return HT_SOURCES
+    if "getDatasetsWithMetadata" in query:
+        source = variables.get("source")
+        return HT_DATASETS.get(source, {"getDatasetsWithMetadata": {"datasets": []}})
+    if "getAllTFBindingOfDataset" in query:
+        dataset_id = variables.get("datasetId")
+        page = variables.get("page", 0)
+        if page:
+            return {"getAllTFBindingOfDataset": []}
+        return HT_TF_BINDING.get(dataset_id, {"getAllTFBindingOfDataset": []})
+    if "regulatoryInteractions" in query:
+        search = (variables.get("search") or "").lower()
+        if search in {LEXA_ID.lower(), "lexa"}:
+            return REGULON_DETAIL[LEXA_ID]
+        if search in {CPXR_ID.lower(), "cpxr"}:
+            return REGULON_DETAIL[CPXR_ID]
+        return {"getRegulonBy": {"data": []}}
+    return regulon_list_for_search(variables.get("search"))
+
+
+def test_end_to_end_sites_pipeline(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    config = {
+        "cruncher": {
+            "schema_version": 3,
+            "workspace": {"out_dir": "results", "regulator_sets": [["lexA", "cpxR"]]},
+            "catalog": {
+                "root": str(catalog_root),
+                "source_preference": ["regulondb"],
+                "allow_ambiguous": False,
+                "pwm_source": "sites",
+                "min_sites_for_pwm": 2,
+                "allow_low_sites": False,
+            },
+            "ingest": {
+                "regulondb": {
+                    "base_url": "https://regulondb.ccg.unam.mx/graphql",
+                    "verify_ssl": True,
+                    "timeout_seconds": 30,
+                    "motif_matrix_source": "alignment",
+                    "alignment_matrix_semantics": "probabilities",
+                    "min_sites_for_pwm": 2,
+                    "allow_low_sites": False,
+                    "curated_sites": True,
+                    "ht_sites": False,
+                    "ht_dataset_sources": None,
+                    "ht_dataset_type": "TFBINDING",
+                    "uppercase_binding_site_only": True,
+                }
+            },
+            "sample": _sample_block(),
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    adapter = RegulonDBAdapter(
+        RegulonDBAdapterConfig(curated_sites=True, ht_sites=False),
+        transport=_fixture_transport,
+    )
+    fetch_sites(adapter, catalog_root, names=["lexA", "cpxR"])
+    fetch_motifs(adapter, catalog_root, names=["lexA", "cpxR"])
+
+    lock_path = resolve_lock_path(config_path)
+    resolve_lock(
+        names=["lexA", "cpxR"],
+        catalog_root=catalog_root,
+        pwm_source="sites",
+        lock_path=lock_path,
+    )
+
+    cfg = load_config(config_path)
+    run_parse(cfg, config_path)
+    run_sample(cfg, config_path)
+
+    sample_dir = tmp_path / "results"
+    assert sample_dir.exists()
+    assert manifest_path(sample_dir).exists()
+    sample_manifest_payload = json.loads(manifest_path(sample_dir).read_text())
+    assert sample_manifest_payload.get("chains") == config["cruncher"]["sample"]["optimizer"]["chains"]
+    optimizer_stats = sample_manifest_payload.get("optimizer_stats") or {}
+    assert "swap_acceptance_rate" not in optimizer_stats
+    assert sample_manifest_payload.get("parse_signature")
+    assert isinstance(sample_manifest_payload.get("parse_inputs"), dict)
+    assert not parse_manifest_path(sample_dir).exists()
+    assert not pwm_summary_path(sample_dir).exists()
+
+    result = runner.invoke(app, ["catalog", "logos", "--set", "1", "-c", str(config_path)])
+    assert result.exit_code == 0
+    elites_df = pd.read_parquet(elites_path(sample_dir), engine="fastparquet")
+    assert len(elites_df) <= config["cruncher"]["sample"]["elites"]["k"]
+    logo_root = logos_root(out_root(config_path, cfg.out_dir)) / "catalog"
+    logos = list(logo_root.glob("**/*_logo.png"))
+    assert any("lexA" in path.name for path in logos)
+    assert any("cpxR" in path.name for path in logos)
+    assert config_used_path(sample_dir).exists()
+    assert sequences_path(sample_dir).exists()
+    assert not trace_path(sample_dir).exists()
+
+
+def test_demo_workspace_cli_without_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    workspace = tmp_path / "regulondb_ecoli"
+    workspace.mkdir()
+    catalog_root = workspace / ".cruncher"
+    config = {
+        "cruncher": {
+            "schema_version": 3,
+            "workspace": {"out_dir": "runs", "regulator_sets": [["lexA", "cpxR"]]},
+            "catalog": {
+                "root": str(catalog_root),
+                "source_preference": ["regulondb"],
+                "allow_ambiguous": False,
+                "pwm_source": "sites",
+                "min_sites_for_pwm": 2,
+                "allow_low_sites": False,
+            },
+            "ingest": {
+                "regulondb": {
+                    "base_url": "https://regulondb.ccg.unam.mx/graphql",
+                    "verify_ssl": True,
+                    "timeout_seconds": 30,
+                    "motif_matrix_source": "alignment",
+                    "alignment_matrix_semantics": "probabilities",
+                    "min_sites_for_pwm": 2,
+                    "allow_low_sites": False,
+                    "curated_sites": True,
+                    "ht_sites": False,
+                    "ht_dataset_sources": None,
+                    "ht_dataset_type": "TFBINDING",
+                    "uppercase_binding_site_only": True,
+                }
+            },
+            "sample": _sample_block(),
+        }
+    }
+    config_path = workspace / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    adapter = RegulonDBAdapter(
+        RegulonDBAdapterConfig(curated_sites=True, ht_sites=False),
+        transport=_fixture_transport,
+    )
+    fetch_sites(adapter, catalog_root, names=["lexA", "cpxR"])
+    fetch_motifs(adapter, catalog_root, names=["lexA", "cpxR"])
+
+    lock_path = resolve_lock_path(config_path)
+    resolve_lock(
+        names=["lexA", "cpxR"],
+        catalog_root=catalog_root,
+        pwm_source="sites",
+        lock_path=lock_path,
+    )
+
+    monkeypatch.chdir(workspace)
+
+    result = runner.invoke(app, ["lock"])
+    assert result.exit_code == 0
+
+    result = runner.invoke(app, ["sample"])
+    assert result.exit_code == 0
+
+    result = runner.invoke(app, ["runs", "list"])
+    assert result.exit_code == 0
+
+
+def test_demo_campaign_pair_local_only_generates_plots(tmp_path: Path) -> None:
+    package_root = Path(__file__).resolve().parents[2]
+    demo_workspace = package_root / "workspaces" / "demo_campaigns_multi_tf"
+    workspace = tmp_path / "demo_campaigns_multi_tf"
+    shutil.copytree(demo_workspace, workspace)
+    shutil.rmtree(workspace / "outputs", ignore_errors=True)
+    shutil.rmtree(workspace / ".cruncher", ignore_errors=True)
+    (workspace / "outputs").mkdir(parents=True, exist_ok=True)
+
+    config_path = workspace / "config.yaml"
+    config_payload = yaml.safe_load(config_path.read_text())
+    cruncher_cfg = config_payload["cruncher"]
+    cruncher_cfg["workspace"]["regulator_sets"] = []
+    cruncher_cfg["catalog"]["root"] = str(workspace / ".cruncher" / "demo_campaigns_multi_tf")
+    # Keep this test local-only and MEME-independent.
+    cruncher_cfg["catalog"]["pwm_source"] = "sites"
+    cruncher_cfg["catalog"]["source_preference"] = ["demo_local_meme", "regulondb"]
+    cruncher_cfg["sample"]["budget"]["tune"] = 240
+    cruncher_cfg["sample"]["budget"]["draws"] = 480
+    cruncher_cfg["sample"]["elites"]["k"] = 3
+    cruncher_cfg["analysis"]["max_points"] = 1000
+    config_path.write_text(yaml.safe_dump(config_payload))
+
+    result = runner.invoke(
+        app,
+        [
+            "fetch",
+            "sites",
+            "--source",
+            "demo_local_meme",
+            "--tf",
+            "lexA",
+            "--tf",
+            "cpxR",
+            "--update",
+            "-c",
+            str(config_path),
+        ],
+    )
+    assert result.exit_code == 0
+
+    for command in (
+        ["lock", "--campaign", "demo_pair", "-c", str(config_path)],
+        ["parse", "--campaign", "demo_pair", "-c", str(config_path)],
+        ["sample", "--campaign", "demo_pair", "-c", str(config_path)],
+        ["analyze", "--campaign", "demo_pair", "--summary", "-c", str(config_path)],
+        ["campaign", "summarize", "--campaign", "demo_pair", "-c", str(config_path)],
+    ):
+        result = runner.invoke(app, command)
+        assert result.exit_code == 0
+
+    analysis_dir = workspace / "outputs"
+    assert analysis_dir.is_dir()
+    assert manifest_path(analysis_dir).exists()
+    analysis_plots_dir = analysis_dir / "analysis" / "plots"
+    plot_ext = str(cruncher_cfg["analysis"]["plot_format"])
+    assert (analysis_plots_dir / f"chain_trajectory_scatter.{plot_ext}").exists()
+    assert (analysis_plots_dir / f"chain_trajectory_sweep.{plot_ext}").exists()
+    assert (analysis_plots_dir / f"elites_nn_distance.{plot_ext}").exists()
+    assert (analysis_plots_dir / f"elites_showcase.{plot_ext}").exists()
+    assert (analysis_plots_dir / f"health_panel.{plot_ext}").exists()
+
+    campaign_dir = workspace / "outputs" / "campaign" / "demo_pair"
+    assert campaign_dir.is_dir()
+    assert (campaign_dir / "analysis" / "campaign_summary.csv").exists()
+    assert (campaign_dir / "analysis" / "campaign_best.csv").exists()
+    assert (campaign_dir / "analysis" / "campaign_manifest.json").exists()
+    campaign_plot = campaign_dir / "plots" / f"best_jointscore_bar.{plot_ext}"
+    if not campaign_plot.exists():
+        campaign_plot = campaign_dir / "plots" / "best_jointscore_bar.png"
+    assert campaign_plot.exists()
+    assert (campaign_dir / "plots" / "tf_coverage_heatmap.png").exists()
+    assert (campaign_dir / "plots" / "pairgrid_overview.png").exists()
+    assert (campaign_dir / "plots" / "joint_trend.png").exists()
+    assert (campaign_dir / "plots" / "pareto_projection.png").exists()
+
+
+def test_demo_basics_low_budget_analyze_survives_nonfinite_trajectory(tmp_path: Path) -> None:
+    package_root = Path(__file__).resolve().parents[2]
+    demo_workspace = package_root / "workspaces" / "demo_basics_two_tf"
+    workspace = tmp_path / "demo_basics_two_tf"
+    shutil.copytree(demo_workspace, workspace)
+    shutil.rmtree(workspace / "outputs", ignore_errors=True)
+    shutil.rmtree(workspace / ".cruncher", ignore_errors=True)
+    (workspace / "outputs").mkdir(parents=True, exist_ok=True)
+
+    config_path = workspace / "config.yaml"
+    config_payload = yaml.safe_load(config_path.read_text())
+    cruncher_cfg = config_payload["cruncher"]
+    cruncher_cfg["catalog"]["root"] = str(workspace / ".cruncher" / "demo_basics_two_tf")
+    cruncher_cfg["sample"]["budget"]["tune"] = 180
+    cruncher_cfg["sample"]["budget"]["draws"] = 360
+    cruncher_cfg["sample"]["elites"]["k"] = 3
+    cruncher_cfg["analysis"]["max_points"] = 1000
+    cruncher_cfg["analysis"]["fimo_compare"]["enabled"] = False
+    config_path.write_text(yaml.safe_dump(config_payload))
+
+    result = runner.invoke(
+        app,
+        [
+            "fetch",
+            "motifs",
+            "--source",
+            "demo_local_meme",
+            "--tf",
+            "lexA",
+            "--tf",
+            "cpxR",
+            "--update",
+            "-c",
+            str(config_path),
+        ],
+    )
+    assert result.exit_code == 0
+
+    for command in (
+        ["lock", "-c", str(config_path)],
+        ["parse", "-c", str(config_path)],
+        ["sample", "-c", str(config_path)],
+        ["analyze", "--summary", "-c", str(config_path)],
+    ):
+        result = runner.invoke(app, command)
+        assert result.exit_code == 0
+
+    summary_file = workspace / "outputs" / "analysis" / "reports" / "summary.json"
+    manifest_file = workspace / "outputs" / "analysis" / "manifests" / "plot_manifest.json"
+    assert summary_file.exists()
+    assert manifest_file.exists()
+
+    manifest_payload = json.loads(manifest_file.read_text())
+    plots = {entry["key"]: entry for entry in manifest_payload.get("plots", []) if isinstance(entry, dict)}
+    assert "chain_trajectory_sweep" in plots

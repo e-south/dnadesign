@@ -3,7 +3,9 @@
 <cruncher project>
 src/dnadesign/cruncher/src/app/target_service.py
 
-Author(s): Eric J. South
+Resolve target regulator sets and campaign expansions.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -14,7 +16,7 @@ from pathlib import Path
 from typing import Iterable, Optional, Tuple
 
 from dnadesign.cruncher.app.campaign_service import select_catalog_entry
-from dnadesign.cruncher.config.schema_v2 import CruncherConfig
+from dnadesign.cruncher.config.schema_v3 import CruncherConfig
 from dnadesign.cruncher.ingest.site_windows import resolve_window_length
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 from dnadesign.cruncher.store.lockfile import LockedMotif, read_lockfile
@@ -173,15 +175,15 @@ def target_statuses(
     site_window_lengths: Optional[dict[str, int]] = None,
     use_lockfile: bool = True,
 ) -> list[TargetStatus]:
-    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     lock_path = resolve_lock_path(config_path)
-    effective_pwm_source = pwm_source or cfg.motif_store.pwm_source
-    effective_site_kinds = site_kinds if site_kinds is not None else cfg.motif_store.site_kinds
-    effective_combine_sites = combine_sites if combine_sites is not None else cfg.motif_store.combine_sites
+    effective_pwm_source = pwm_source or cfg.catalog.pwm_source
+    effective_site_kinds = site_kinds if site_kinds is not None else cfg.catalog.site_kinds
+    effective_combine_sites = combine_sites if combine_sites is not None else cfg.catalog.combine_sites
     if site_window_lengths is not None:
         effective_window_lengths = site_window_lengths
     else:
-        effective_window_lengths = cfg.motif_store.site_window_lengths
+        effective_window_lengths = cfg.catalog.site_window_lengths
     lockmap: dict[str, LockedMotif] = {}
     lockfile_pwm = None
     lockfile_site_kinds: Optional[list[str]] = None
@@ -306,10 +308,10 @@ def target_statuses(
                     pwm_source=effective_pwm_source,
                     site_kinds=effective_site_kinds,
                     combine_sites=effective_combine_sites,
-                    source_preference=cfg.motif_store.source_preference,
-                    dataset_preference=cfg.motif_store.dataset_preference,
-                    dataset_map=cfg.motif_store.dataset_map,
-                    allow_ambiguous=cfg.motif_store.allow_ambiguous,
+                    source_preference=cfg.catalog.source_preference,
+                    dataset_preference=cfg.catalog.dataset_preference,
+                    dataset_map=cfg.catalog.dataset_map,
+                    allow_ambiguous=cfg.catalog.allow_ambiguous,
                 )
             except ValueError as exc:
                 statuses.append(
@@ -360,9 +362,13 @@ def target_statuses(
                 site_kind = None
                 dataset_id = None
             else:
-                if site_count < cfg.motif_store.min_sites_for_pwm:
-                    msg = f"Only {site_count} sites available (min_sites_for_pwm={cfg.motif_store.min_sites_for_pwm})."
-                    if cfg.motif_store.allow_low_sites:
+                if site_count < cfg.catalog.min_sites_for_pwm:
+                    msg = (
+                        "Only "
+                        f"{site_count} sites available (cruncher.catalog.min_sites_for_pwm="
+                        f"{cfg.catalog.min_sites_for_pwm})."
+                    )
+                    if cfg.catalog.allow_low_sites:
                         status = "warning"
                         message = msg
                     else:
@@ -375,8 +381,8 @@ def target_statuses(
             status, message = _status_for_entry(
                 entry=entry,
                 pwm_source=effective_pwm_source,
-                min_sites=cfg.motif_store.min_sites_for_pwm,
-                allow_low_sites=cfg.motif_store.allow_low_sites,
+                min_sites=cfg.catalog.min_sites_for_pwm,
+                allow_low_sites=cfg.catalog.allow_low_sites,
             )
 
         if effective_pwm_source == "sites" and status in {"ready", "warning"} and site_total > site_count:
@@ -408,7 +414,7 @@ def target_statuses(
                 elif _needs_window_length(entries=site_entries, window_lengths=effective_window_lengths):
                     status = "needs-window"
                     message = (
-                        "Site lengths vary across cached entries; set motif_store.site_window_lengths for this TF "
+                        "Site lengths vary across cached entries; set cruncher.catalog.site_window_lengths for this TF "
                         "or each dataset before building PWMs."
                     )
         statuses.append(
@@ -454,7 +460,7 @@ def has_blocking_target_errors(statuses: Iterable[TargetStatus]) -> bool:
 
 
 def target_candidates(*, cfg: CruncherConfig, config_path: Path) -> list[TargetCandidate]:
-    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     catalog = CatalogIndex.load(catalog_root)
     candidates: list[TargetCandidate] = []
     for set_index, tf in list_targets(cfg):
@@ -470,7 +476,7 @@ def target_candidates_fuzzy(
     min_score: float = 0.6,
     limit: int = 10,
 ) -> list[TargetCandidate]:
-    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     catalog = CatalogIndex.load(catalog_root)
     candidates: list[TargetCandidate] = []
     for set_index, tf in list_targets(cfg):
@@ -484,7 +490,7 @@ def target_stats(
     cfg: CruncherConfig,
     config_path: Path,
 ) -> list[TargetStats]:
-    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     catalog = CatalogIndex.load(catalog_root)
     stats: list[TargetStats] = []
     for set_index, tf in list_targets(cfg):

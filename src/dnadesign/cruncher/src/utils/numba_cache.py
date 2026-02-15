@@ -17,8 +17,6 @@ import tempfile
 from collections.abc import Iterator
 from pathlib import Path
 
-from dnadesign.cruncher.utils.paths import find_repo_root, resolve_cruncher_root
-
 logger = logging.getLogger(__name__)
 
 _NUMBA_CACHE_ENV = "NUMBA_CACHE_DIR"
@@ -68,29 +66,36 @@ def temporary_numba_cache_dir(*, env_var: str = _NUMBA_CACHE_ENV) -> Iterator[Pa
                 numba_config.CACHE_DIR = prior_cache_dir
 
 
-def ensure_numba_cache_dir(anchor: Path, *, env_var: str = _NUMBA_CACHE_ENV) -> Path:
+def ensure_numba_cache_dir(
+    anchor: Path,
+    *,
+    cache_dir: Path | None = None,
+    env_var: str = _NUMBA_CACHE_ENV,
+) -> Path:
     """Ensure Numba cache directory is set and writable.
 
-    If env_var is set, it must point to a writable directory (created if missing).
-    Otherwise, use <repo>/.cruncher/numba_cache, where repo is found by walking
-    up from anchor looking for pyproject.toml or .git. If no repo root is found,
-    raise an error instructing the user to set env_var explicitly.
+    If cache_dir is provided, use it (relative paths are resolved against anchor).
+    Otherwise, env_var must be set to a writable directory.
     """
     if anchor is None:
         raise ValueError("anchor is required")
     anchor = Path(anchor).expanduser().resolve()
+    if not anchor.is_dir():
+        raise ValueError(f"anchor must be a directory: {anchor}")
 
-    cache_dir = _env_path(env_var)
-    if cache_dir is None:
-        repo_root = find_repo_root(anchor)
-        if repo_root is None:
-            raise RuntimeError(
-                f"Numba cache dir not set and repo root not found from {anchor}. Set {env_var} to a writable path."
-            )
-        cache_root = resolve_cruncher_root(anchor) or repo_root
-        cache_dir = (cache_root / ".cruncher" / "numba_cache").resolve()
-        os.environ[env_var] = str(cache_dir)
-        logger.debug("NUMBA cache dir not set; using %s", cache_dir)
+    env_path = _env_path(env_var)
+    if cache_dir is not None:
+        cache_dir = Path(cache_dir).expanduser()
+        if not cache_dir.is_absolute():
+            cache_dir = anchor / cache_dir
+        cache_dir = cache_dir.resolve()
+        if env_path is not None and env_path != cache_dir:
+            logger.warning("%s is set to %s; overriding with cache_dir=%s.", env_var, env_path, cache_dir)
+    else:
+        if env_path is None:
+            raise RuntimeError(f"{env_var} must be set or cache_dir must be provided.")
+        cache_dir = env_path
+    os.environ[env_var] = str(cache_dir)
 
     try:
         cache_dir.mkdir(parents=True, exist_ok=True)

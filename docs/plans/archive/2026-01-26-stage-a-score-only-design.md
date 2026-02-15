@@ -1,11 +1,19 @@
 # Stage-A Score-Only PWM Sampling (FIMO Log-Odds)
 
-Date: 2026-01-26
-Status: accepted
 
-Note: This plan is historical. The current Stage-A implementation uses tier-target mining
-and MMR selection options, and removes oversample_factor entirely. See
-src/dnadesign/densegen/docs/guide/sampling.md for the current behavior.
+## Contents
+- [Context](#context)
+- [Goals](#goals)
+- [Non-goals](#non-goals)
+- [Proposed Changes](#proposed-changes)
+- [1) Score-only eligibility, tiering, retention](#1-score-only-eligibility-tiering-retention)
+- [2) FIMO invocation](#2-fimo-invocation)
+- [3) Config + CLI](#3-config-cli)
+- [4) Manifest + outputs](#4-manifest-outputs)
+- [5) Plotting](#5-plotting)
+- [Error Handling](#error-handling)
+- [Testing Plan](#testing-plan)
+- [Breaking Changes](#breaking-changes)
 
 ## Context
 Stage-A PWM sampling previously relied on p-value strata and retain depth for FIMO-based selection. This created

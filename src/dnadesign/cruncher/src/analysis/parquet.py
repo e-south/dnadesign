@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dnadesign.cruncher.artifacts.atomic_write import atomic_write_parquet
+
 
 def read_parquet(path: Path):
     import pandas as pd
@@ -19,4 +21,4 @@ def read_parquet(path: Path):
 
 
 def write_parquet(df, path: Path) -> None:
-    df.to_parquet(path, engine="pyarrow", index=False)
+    atomic_write_parquet(df, path, engine="pyarrow", index=False)

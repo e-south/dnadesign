@@ -1,0 +1,260 @@
+"""
+--------------------------------------------------------------------------------
+<cruncher project>
+src/dnadesign/cruncher/tests/core/test_mmr_selection.py
+
+Unit tests for MMR-based elite selection utilities.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import numpy as np
+import pytest
+
+from dnadesign.cruncher.core.pwm import PWM
+from dnadesign.cruncher.core.selection.mmr import (
+    MmrCandidate,
+    compute_core_distance,
+    compute_position_weights,
+    select_mmr_elites,
+    select_score_elites,
+    tfbs_cores_from_scorer,
+)
+
+
+def _pwm(name: str, rows: list[list[float]]) -> PWM:
+    return PWM(name=name, matrix=np.asarray(rows, dtype=float))
+
+
+def _candidate(seq: str, *, chain: int, draw: int, combined: float, min_norm: float) -> MmrCandidate:
+    mapping = {"A": 0, "C": 1, "G": 2, "T": 3}
+    arr = np.array([mapping[ch] for ch in seq], dtype=np.int8)
+    return MmrCandidate(
+        seq_arr=arr,
+        chain_id=chain,
+        draw_idx=draw,
+        combined_score=combined,
+        min_norm=min_norm,
+        sum_norm=min_norm,
+        per_tf_map={},
+        norm_map={},
+    )
+
+
+def test_position_weights_emphasize_low_info_positions() -> None:
+    pwm = _pwm("tf", [[0.99, 0.003, 0.003, 0.004], [0.25, 0.25, 0.25, 0.25]])
+    weights = compute_position_weights(pwm)
+    assert weights.shape == (2,)
+    assert weights[0] < weights[1]
+    assert np.all(weights >= 0.0)
+    assert np.all(weights <= 1.0)
+
+
+def test_core_distance_is_normalized() -> None:
+    weights = {"tf": np.array([1.0, 1.0, 1.0], dtype=float)}
+    cores_a = {"tf": np.array([0, 1, 2], dtype=np.int8)}
+    cores_b = {"tf": np.array([0, 1, 3], dtype=np.int8)}
+    dist = compute_core_distance(cores_a, cores_b, weights=weights, tf_names=["tf"])
+    assert dist == pytest.approx(1.0 / 3.0)
+    assert 0.0 <= dist <= 1.0
+    dist_symmetric = compute_core_distance(cores_b, cores_a, weights=weights, tf_names=["tf"])
+    assert dist_symmetric == pytest.approx(dist)
+    dist_identity = compute_core_distance(cores_a, cores_a, weights=weights, tf_names=["tf"])
+    assert dist_identity == pytest.approx(0.0)
+
+
+def test_mmr_selection_is_deterministic() -> None:
+    candidates = [
+        _candidate("AAAA", chain=0, draw=1, combined=0.9, min_norm=0.9),
+        _candidate("AAAT", chain=0, draw=2, combined=0.8, min_norm=0.8),
+        _candidate("AATT", chain=0, draw=3, combined=0.7, min_norm=0.7),
+    ]
+    selection_one = select_mmr_elites(
+        candidates,
+        k=2,
+        pool_size=3,
+        alpha=0.8,
+        relevance="min_tf_score",
+        dsdna=False,
+        tf_names=["tf"],
+        pwms={"tf": _pwm("tf", [[0.25, 0.25, 0.25, 0.25]] * 4)},
+        core_maps={f"{cand.chain_id}:{cand.draw_idx}": {"tf": cand.seq_arr} for cand in candidates},
+    )
+    selection_two = select_mmr_elites(
+        candidates,
+        k=2,
+        pool_size=3,
+        alpha=0.8,
+        relevance="min_tf_score",
+        dsdna=False,
+        tf_names=["tf"],
+        pwms={"tf": _pwm("tf", [[0.25, 0.25, 0.25, 0.25]] * 4)},
+        core_maps={f"{cand.chain_id}:{cand.draw_idx}": {"tf": cand.seq_arr} for cand in candidates},
+    )
+    ids_one = [row["candidate_id"] for row in selection_one.meta]
+    ids_two = [row["candidate_id"] for row in selection_two.meta]
+    assert ids_one == ids_two
+
+
+def test_score_selection_is_greedy_on_joint_score() -> None:
+    candidates = [
+        _candidate("AAAA", chain=0, draw=1, combined=0.90, min_norm=0.30),
+        _candidate("AAAT", chain=0, draw=2, combined=0.85, min_norm=0.95),
+        _candidate("AATT", chain=0, draw=3, combined=0.80, min_norm=0.99),
+    ]
+    result = select_score_elites(
+        candidates,
+        k=2,
+        pool_size=3,
+        dsdna=False,
+    )
+    assert [row["candidate_id"] for row in result.meta] == ["0:1", "0:2"]
+    assert result.alpha == pytest.approx(1.0)
+    assert result.constraint_policy == "disabled"
+
+
+def test_mmr_dedupes_reverse_complements() -> None:
+    candidates = [
+        _candidate("ACGA", chain=0, draw=1, combined=0.9, min_norm=0.9),
+        _candidate("TCGT", chain=0, draw=2, combined=0.85, min_norm=0.85),
+        _candidate("TTTT", chain=0, draw=3, combined=0.8, min_norm=0.8),
+    ]
+    result = select_mmr_elites(
+        candidates,
+        k=2,
+        pool_size=3,
+        alpha=0.7,
+        relevance="min_tf_score",
+        dsdna=True,
+        tf_names=["tf"],
+        pwms={"tf": _pwm("tf", [[0.25, 0.25, 0.25, 0.25]] * 4)},
+        core_maps={f"{cand.chain_id}:{cand.draw_idx}": {"tf": cand.seq_arr} for cand in candidates},
+    )
+    selected = [row["sequence"] for row in result.meta]
+    assert len(selected) == 2
+    assert len({row["canonical_sequence"] for row in result.meta}) == 2
+
+
+def test_mmr_tiebreak_prefers_full_sequence_diversity_when_core_distance_ties() -> None:
+    candidates = [
+        _candidate("AAAA", chain=0, draw=1, combined=0.90, min_norm=0.90),
+        _candidate("AAAT", chain=0, draw=2, combined=0.80, min_norm=0.80),
+        _candidate("TTTT", chain=0, draw=3, combined=0.80, min_norm=0.80),
+    ]
+    # Force a motif-core tie (all core signatures are identical) so tie-break behavior is exercised.
+    shared_core = np.array([0, 0, 0, 0], dtype=np.int8)
+    core_maps = {f"{cand.chain_id}:{cand.draw_idx}": {"tf": shared_core.copy()} for cand in candidates}
+    result = select_mmr_elites(
+        candidates,
+        k=2,
+        pool_size=3,
+        alpha=0.7,
+        relevance="min_tf_score",
+        dsdna=False,
+        tf_names=["tf"],
+        pwms={"tf": _pwm("tf", [[0.25, 0.25, 0.25, 0.25]] * 4)},
+        core_maps=core_maps,
+    )
+    selected_ids = [row["candidate_id"] for row in result.meta]
+    assert selected_ids[0] == "0:1"
+    assert selected_ids[1] == "0:3"
+
+
+def test_constrained_mmr_enforces_min_full_distance() -> None:
+    candidates = [
+        _candidate("AAAA", chain=0, draw=1, combined=0.90, min_norm=0.90),
+        _candidate("AAAT", chain=0, draw=2, combined=0.89, min_norm=0.89),
+        _candidate("TTTT", chain=0, draw=3, combined=0.88, min_norm=0.88),
+    ]
+    core_maps = {f"{cand.chain_id}:{cand.draw_idx}": {"tf": cand.seq_arr.copy()} for cand in candidates}
+    result = select_mmr_elites(
+        candidates,
+        k=2,
+        pool_size=3,
+        alpha=0.8,
+        relevance="min_tf_score",
+        dsdna=False,
+        tf_names=["tf"],
+        pwms={"tf": _pwm("tf", [[0.25, 0.25, 0.25, 0.25]] * 4)},
+        core_maps=core_maps,
+        min_hamming_bp=2,
+        min_core_hamming_bp=0,
+        distance_metric="hybrid",
+        constraint_policy="strict",
+    )
+    assert [row["candidate_id"] for row in result.meta] == ["0:1", "0:3"]
+    assert result.min_hamming_bp_final == 2
+    assert result.relax_steps_used == 0
+
+
+def test_constrained_mmr_relaxes_threshold_when_needed() -> None:
+    candidates = [
+        _candidate("AAAA", chain=0, draw=1, combined=0.90, min_norm=0.90),
+        _candidate("AAAT", chain=0, draw=2, combined=0.89, min_norm=0.89),
+        _candidate("AATT", chain=0, draw=3, combined=0.88, min_norm=0.88),
+    ]
+    core_maps = {f"{cand.chain_id}:{cand.draw_idx}": {"tf": cand.seq_arr.copy()} for cand in candidates}
+    result = select_mmr_elites(
+        candidates,
+        k=3,
+        pool_size=3,
+        alpha=0.8,
+        relevance="min_tf_score",
+        dsdna=False,
+        tf_names=["tf"],
+        pwms={"tf": _pwm("tf", [[0.25, 0.25, 0.25, 0.25]] * 4)},
+        core_maps=core_maps,
+        min_hamming_bp=3,
+        min_core_hamming_bp=0,
+        distance_metric="hybrid",
+        constraint_policy="relax",
+        relax_step_bp=1,
+        relax_min_bp=0,
+    )
+    assert len(result.selected) == 3
+    assert result.min_hamming_bp_requested == 3
+    assert result.min_hamming_bp_final < 3
+    assert result.relax_steps_used >= 1
+
+
+def test_constrained_mmr_strict_mode_fails_when_k_infeasible() -> None:
+    candidates = [
+        _candidate("AAAA", chain=0, draw=1, combined=0.90, min_norm=0.90),
+        _candidate("AAAT", chain=0, draw=2, combined=0.89, min_norm=0.89),
+    ]
+    core_maps = {f"{cand.chain_id}:{cand.draw_idx}": {"tf": cand.seq_arr.copy()} for cand in candidates}
+    with pytest.raises(ValueError, match="Strict constrained MMR could not select"):
+        select_mmr_elites(
+            candidates,
+            k=2,
+            pool_size=2,
+            alpha=0.8,
+            relevance="min_tf_score",
+            dsdna=False,
+            tf_names=["tf"],
+            pwms={"tf": _pwm("tf", [[0.25, 0.25, 0.25, 0.25]] * 4)},
+            core_maps=core_maps,
+            min_hamming_bp=2,
+            min_core_hamming_bp=4,
+            distance_metric="hybrid",
+            constraint_policy="strict",
+        )
+
+
+def test_tfbs_cores_from_scorer_clips_width_to_sequence_length() -> None:
+    class _StubScorer:
+        def best_llr(self, seq_arr: np.ndarray, tf: str) -> tuple[float, int, str]:
+            _ = tf
+            return 0.0, 0, "+"
+
+        def pwm_width(self, tf: str) -> int:
+            _ = tf
+            return 8
+
+    seq = np.array([0, 1, 2, 3], dtype=np.int8)
+    cores = tfbs_cores_from_scorer(seq, scorer=_StubScorer(), tf_names=["tf"])
+    assert "tf" in cores
+    assert cores["tf"].shape == (4,)

@@ -1,8 +1,11 @@
 ## Running marimo notebooks
 
-More in depth marimo guidance lives at `docs/marimo_reference.md`.
 
-There are two ways to use marimo in `dnadesign`:
+## Contents
+- [Running marimo notebooks](#running-marimo-notebooks)
+- [0) Campaign-tied notebooks (OPAL)](#0-campaign-tied-notebooks-opal)
+- [1) Install marimo into the project](#1-install-marimo-into-the-project)
+- [2) Sandboxed / self-contained marimo notebooks (inline dependencies)](#2-sandboxed-self-contained-marimo-notebooks-inline-dependencies)
 
 ### 0) Campaign-tied notebooks (OPAL)
 

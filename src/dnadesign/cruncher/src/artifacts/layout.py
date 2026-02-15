@@ -12,12 +12,30 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Iterable
 
-from dnadesign.cruncher.core.labels import build_run_name, format_regulator_slug
+from dnadesign.cruncher.core.labels import format_regulator_slug
 
-RUN_META_DIR = "meta"
+# Run-level IA:
+# - run/: run metadata/state files
+# - inputs/: resolved lock/parse inputs pinned for reproducibility
+# - optimize/: sampler outputs split into tables/ + state/
+# - analysis/: analysis outputs (managed by analysis/layout.py)
+# - export/: downstream contract exports
+RUN_META_DIR = "run"
 RUN_ARTIFACTS_DIR = "artifacts"
 RUN_LIVE_DIR = "live"
-LOGOS_ROOT_DIR = "logos"
+RUN_INPUT_DIR = "inputs"
+RUN_OPTIMIZE_DIR = "optimize"
+RUN_OPTIMIZE_TABLES_DIR = "tables"
+RUN_OPTIMIZE_META_DIR = "state"
+RUN_OUTPUT_DIR = "analysis"
+RUN_PLOTS_DIR = "plots"
+RUN_PLOTS_LOGOS_DIR = "logos"
+RUN_EXPORT_DIR = "export"
+RUN_EXPORT_SEQUENCES_DIR = "sequences"
+CAMPAIGN_ROOT_DIR = "campaign"
+# Backward-compatible token used by sample run cleanup logic.
+# Logos now live under `plots/logos/*`, so preserve the top-level `plots/`.
+LOGOS_ROOT_DIR = RUN_PLOTS_DIR
 
 
 def out_root(config_path: Path, out_dir: str | Path) -> Path:
@@ -25,7 +43,14 @@ def out_root(config_path: Path, out_dir: str | Path) -> Path:
 
 
 def stage_root(out_root_path: Path, stage: str) -> Path:
-    return out_root_path / stage
+    stage_name = str(stage).strip().lower()
+    if stage_name == "parse":
+        return out_root_path.parent / ".cruncher" / "parse"
+    return out_root_path
+
+
+def runs_root(out_root_path: Path) -> Path:
+    return out_root_path
 
 
 def run_group_label(
@@ -46,7 +71,7 @@ def run_group_dir(
     tfs: Iterable[str],
     set_index: int | None,
 ) -> Path:
-    return stage_root(out_root_path, stage)
+    return runs_root(stage_root(out_root_path, stage))
 
 
 def build_run_dir(
@@ -59,14 +84,10 @@ def build_run_dir(
     include_set_index: bool = False,
 ) -> Path:
     root = run_group_dir(out_root(config_path, out_dir), stage, tfs, set_index)
-    return root / build_run_name(
-        stage,
-        list(tfs),
-        set_index=set_index,
-        include_stage=False,
-        include_label=True,
-        include_set_index=include_set_index,
-    )
+    if include_set_index:
+        label = run_group_label(tfs, set_index, include_set_index=include_set_index)
+        return root / label
+    return root
 
 
 def ensure_run_dirs(
@@ -78,52 +99,157 @@ def ensure_run_dirs(
 ) -> None:
     run_dir.mkdir(parents=True, exist_ok=True)
     if meta:
-        (run_dir / RUN_META_DIR).mkdir(parents=True, exist_ok=True)
+        run_meta_dir(run_dir).mkdir(parents=True, exist_ok=True)
+    if meta or artifacts or live:
+        run_input_dir(run_dir).mkdir(parents=True, exist_ok=True)
+    if artifacts or live:
+        run_optimize_dir(run_dir).mkdir(parents=True, exist_ok=True)
+        run_optimize_tables_dir(run_dir).mkdir(parents=True, exist_ok=True)
+        run_optimize_meta_dir(run_dir).mkdir(parents=True, exist_ok=True)
     if artifacts:
-        (run_dir / RUN_ARTIFACTS_DIR).mkdir(parents=True, exist_ok=True)
-    if live:
-        (run_dir / RUN_LIVE_DIR).mkdir(parents=True, exist_ok=True)
+        run_output_dir(run_dir).mkdir(parents=True, exist_ok=True)
+        run_plots_dir(run_dir).mkdir(parents=True, exist_ok=True)
+        run_plots_logos_dir(run_dir).mkdir(parents=True, exist_ok=True)
+        run_export_dir(run_dir).mkdir(parents=True, exist_ok=True)
+        run_export_sequences_dir(run_dir).mkdir(parents=True, exist_ok=True)
+
+
+def run_meta_dir(run_dir: Path) -> Path:
+    return run_dir / RUN_META_DIR
+
+
+def run_input_dir(run_dir: Path) -> Path:
+    return run_dir / RUN_INPUT_DIR
+
+
+def run_optimize_dir(run_dir: Path) -> Path:
+    return run_dir / RUN_OPTIMIZE_DIR
+
+
+def run_optimize_tables_dir(run_dir: Path) -> Path:
+    return run_optimize_dir(run_dir) / RUN_OPTIMIZE_TABLES_DIR
+
+
+def run_optimize_meta_dir(run_dir: Path) -> Path:
+    return run_optimize_dir(run_dir) / RUN_OPTIMIZE_META_DIR
+
+
+def run_output_dir(run_dir: Path) -> Path:
+    return run_dir / RUN_OUTPUT_DIR
+
+
+def run_plots_dir(run_dir: Path) -> Path:
+    return run_dir / RUN_PLOTS_DIR
+
+
+def run_plots_logos_dir(run_dir: Path) -> Path:
+    return run_plots_dir(run_dir) / RUN_PLOTS_LOGOS_DIR
+
+
+def run_export_dir(run_dir: Path) -> Path:
+    return run_dir / RUN_EXPORT_DIR
+
+
+def run_export_sequences_dir(run_dir: Path) -> Path:
+    return run_export_dir(run_dir) / RUN_EXPORT_SEQUENCES_DIR
+
+
+def run_export_sequences_manifest_path(run_dir: Path) -> Path:
+    return run_export_sequences_dir(run_dir) / "export_manifest.json"
+
+
+def run_export_sequences_table_path(run_dir: Path, *, table_name: str, fmt: str) -> Path:
+    normalized_fmt = str(fmt).strip().lower()
+    if normalized_fmt not in {"parquet", "csv"}:
+        raise ValueError(f"Unsupported export table format: {fmt!r}")
+    if not table_name.strip():
+        raise ValueError("table_name must be non-empty")
+    return run_export_sequences_dir(run_dir) / f"table__{table_name}.{normalized_fmt}"
 
 
 def manifest_path(run_dir: Path) -> Path:
-    return run_dir / RUN_META_DIR / "run_manifest.json"
+    return run_meta_dir(run_dir) / "run_manifest.json"
 
 
 def status_path(run_dir: Path) -> Path:
-    return run_dir / RUN_META_DIR / "run_status.json"
+    return run_meta_dir(run_dir) / "run_status.json"
 
 
 def config_used_path(run_dir: Path) -> Path:
-    return run_dir / RUN_META_DIR / "config_used.yaml"
+    return run_meta_dir(run_dir) / "config_used.yaml"
 
 
 def live_metrics_path(run_dir: Path) -> Path:
-    return run_dir / RUN_LIVE_DIR / "metrics.jsonl"
+    return run_optimize_meta_dir(run_dir) / "metrics.jsonl"
 
 
 def trace_path(run_dir: Path) -> Path:
-    return run_dir / RUN_ARTIFACTS_DIR / "trace.nc"
+    return run_optimize_meta_dir(run_dir) / "trace.nc"
 
 
 def sequences_path(run_dir: Path) -> Path:
-    return run_dir / RUN_ARTIFACTS_DIR / "sequences.parquet"
+    return run_optimize_tables_dir(run_dir) / "sequences.parquet"
+
+
+def random_baseline_path(run_dir: Path) -> Path:
+    return run_optimize_tables_dir(run_dir) / "random_baseline.parquet"
+
+
+def random_baseline_hits_path(run_dir: Path) -> Path:
+    return run_optimize_tables_dir(run_dir) / "random_baseline_hits.parquet"
 
 
 def elites_path(run_dir: Path) -> Path:
-    return run_dir / RUN_ARTIFACTS_DIR / "elites.parquet"
+    return run_optimize_tables_dir(run_dir) / "elites.parquet"
+
+
+def elites_mmr_meta_path(run_dir: Path) -> Path:
+    return run_optimize_tables_dir(run_dir) / "elites_mmr_meta.parquet"
+
+
+def elites_hits_path(run_dir: Path) -> Path:
+    return run_optimize_tables_dir(run_dir) / "elites_hits.parquet"
 
 
 def elites_json_path(run_dir: Path) -> Path:
-    return run_dir / RUN_ARTIFACTS_DIR / "elites.json"
+    return run_optimize_meta_dir(run_dir) / "elites.json"
 
 
 def elites_yaml_path(run_dir: Path) -> Path:
-    return run_dir / RUN_ARTIFACTS_DIR / "elites.yaml"
+    return run_optimize_meta_dir(run_dir) / "elites.yaml"
+
+
+def lockfile_snapshot_path(run_dir: Path) -> Path:
+    return run_input_dir(run_dir) / "lockfile.json"
+
+
+def parse_manifest_path(run_dir: Path) -> Path:
+    return run_input_dir(run_dir) / "parse_manifest.json"
+
+
+def pwm_summary_path(run_dir: Path) -> Path:
+    return run_input_dir(run_dir) / "pwm_summary.json"
 
 
 def logos_root(out_root_path: Path) -> Path:
-    return out_root_path / LOGOS_ROOT_DIR
+    return out_root_path / RUN_PLOTS_DIR / RUN_PLOTS_LOGOS_DIR
 
 
 def logos_dir_for_run(out_root_path: Path, stage: str, run_name: str) -> Path:
-    return logos_root(out_root_path) / stage / run_name
+    stage_name = str(stage).strip().lower()
+    if not stage_name:
+        raise ValueError("stage is required for logo run layout")
+    return logos_root(out_root_path) / stage_name / run_name
+
+
+def campaign_name_slug(name: str) -> str:
+    return format_regulator_slug([name], max_len=80)
+
+
+def campaign_stage_root(
+    *,
+    config_path: Path,
+    out_dir: str | Path,
+    campaign_name: str,
+) -> Path:
+    return out_root(config_path, out_dir) / CAMPAIGN_ROOT_DIR / campaign_name_slug(campaign_name)

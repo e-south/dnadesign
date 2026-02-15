@@ -27,9 +27,11 @@ class SequenceState:
 
     Attributes:
       seq: 1-D numpy.ndarray of shape (L,), dtype=np.int8, with values in {0,1,2,3}.
+      particle_id: Optional persistent particle identity for chain lineage tracking.
     """
 
     seq: np.ndarray  # shape = (L,), dtype = np.int8
+    particle_id: int | None = None
 
     def __post_init__(self) -> None:
         arr = np.asarray(self.seq)
@@ -42,6 +44,11 @@ class SequenceState:
         if np.any((arr < 0) | (arr > 3)):
             raise ValueError("SequenceState.seq values must be in {0,1,2,3}")
         object.__setattr__(self, "seq", arr.astype(np.int8, copy=False))
+        if self.particle_id is not None:
+            if not isinstance(self.particle_id, int):
+                raise ValueError("SequenceState.particle_id must be an integer when provided.")
+            if self.particle_id < 0:
+                raise ValueError("SequenceState.particle_id must be >= 0 when provided.")
 
     @staticmethod
     def random(length: int, rng: np.random.Generator) -> "SequenceState":
@@ -110,7 +117,7 @@ class SequenceState:
         """
         Return a new SequenceState with a copied underlying numpy array.
         """
-        return SequenceState(self.seq.copy())
+        return SequenceState(self.seq.copy(), particle_id=self.particle_id)
 
     def __len__(self) -> int:
         """
@@ -119,20 +126,26 @@ class SequenceState:
         return int(self.seq.size)
 
 
-def make_seed(cfg_init: Any, pwms: Dict[str, PWM], rng: np.random.Generator) -> SequenceState:
+def make_seed(
+    cfg_init: Any,
+    pwms: Dict[str, PWM],
+    rng: np.random.Generator,
+    *,
+    sequence_length: int,
+) -> SequenceState:
     """
     Return an initial SequenceState based on cfg_init.kind. Three modes:
 
-      • “random”: uniform-random DNA sequence of length = cfg_init.length.
+      • “random”: uniform-random DNA sequence of length = sequence_length.
 
-      • “consensus”: embed one PWM's consensus (argmax) into background of length = cfg_init.length.
+      • “consensus”: embed one PWM's consensus (argmax) into background of length = sequence_length.
 
       • “consensus_mix”: randomly choose “random” or choose one PWM's consensus to embed.
     """
     kind = getattr(cfg_init, "kind", None)
-    length = int(getattr(cfg_init, "length", 0))
+    length = int(sequence_length)
     if length < 1:
-        raise ValueError(f"cfg_init.length must be ≥ 1, got {length}")
+        raise ValueError(f"sequence_length must be ≥ 1, got {length}")
 
     if kind == "random":
         return SequenceState.random(length, rng)

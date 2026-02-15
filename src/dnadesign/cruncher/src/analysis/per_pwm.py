@@ -3,21 +3,38 @@
 <cruncher project>
 src/dnadesign/cruncher/src/analysis/per_pwm.py
 
-Author(s): Eric J. South
+Compute per-TF score snapshots across draw sequences.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
 import logging
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from dnadesign.cruncher.analysis.parquet import read_parquet, write_parquet
-from dnadesign.cruncher.analysis.plots.scatter_utils import encode_sequence
 from dnadesign.cruncher.artifacts.layout import sequences_path
 from dnadesign.cruncher.core.scoring import Scorer
 
 logger = logging.getLogger(__name__)
+
+_SEQ_ALPHABET = {"A": 0, "C": 1, "G": 2, "T": 3}
+
+
+def encode_sequence(seq: str, *, context: str) -> np.ndarray:
+    """
+    Encode a DNA string into integer indices (A=0, C=1, G=2, T=3).
+    """
+    clean = seq.strip().upper()
+    if not clean:
+        raise ValueError(f"encode_sequence: empty sequence ({context})")
+    try:
+        return np.array([_SEQ_ALPHABET[base] for base in clean], dtype=np.int8)
+    except KeyError as exc:
+        raise ValueError(f"encode_sequence: invalid base in '{seq}' ({context})") from exc
 
 
 def gather_per_pwm_scores(
@@ -36,7 +53,7 @@ def gather_per_pwm_scores(
     Replace “first N + every_n” subsampling with “keep when per-PWM score changes by ≥ ε.”
 
     Steps:
-      1. Read artifacts/sequences.parquet (must have 'chain', 'draw', 'sequence').
+      1. Read sequences.parquet (must have 'chain', 'draw', 'sequence').
       2. Build a single Scorer(pwms, bidirectional, scale).
       3. For each chain (grouped & sorted by 'draw'):
          a. Always keep the very first draw (index 0).
@@ -50,7 +67,7 @@ def gather_per_pwm_scores(
     seq_path = sequences_path(run_dir)
     if sequences_df is None:
         if not seq_path.exists():
-            raise FileNotFoundError(f"[gather] artifacts/sequences.parquet not found in '{run_dir}'")
+            raise FileNotFoundError(f"[gather] sequences.parquet not found in '{run_dir}'")
     if change_threshold <= 0:
         raise ValueError("gather_per_pwm_scores: change_threshold must be > 0")
 

@@ -1,5 +1,13 @@
 # BaeR Site Source (FASTA) Design
 
+
+## Contents
+- [Goal](#goal)
+- [Scope](#scope)
+- [Schema](#schema)
+- [Data Flow](#data-flow)
+- [Tests](#tests)
+
 ## Goal
 
 Add a minimal local binding-site source that ingests the processed BaeR ChIP-exo FASTA
