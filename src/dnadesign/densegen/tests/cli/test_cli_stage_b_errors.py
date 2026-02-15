@@ -54,7 +54,7 @@ def _write_stage_b_config(
                   bio_type: dna
                   alphabet: dna_4
                 parquet:
-                  path: outputs/tables/dense_arrays.parquet
+                  path: outputs/tables/records.parquet
               generation:
                 sequence_length: 8
                 sampling:

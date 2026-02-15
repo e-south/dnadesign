@@ -201,3 +201,23 @@
   - Use `qsub` batch for long or interruption-sensitive workflows.
   - Use OnDemand for reconnectable human-interactive workflows.
   - If an interactive job is orphaned and unusable, explicitly clean with `qdel <job_id>` before requesting a replacement allocation.
+
+## 2026-02-15
+- Dependency contract update:
+  - Kept `marimo` as a core project dependency.
+  - Added `openai` as a core project dependency so notebook/API experiments do not require a separate dependency group.
+  - Regenerated `uv.lock` after dependency updates.
+- DenseGen output naming unification:
+  - Updated DenseGen local canonical parquet artifact naming from `outputs/tables/dense_arrays.parquet` to `outputs/tables/records.parquet`.
+  - Kept USR dataset canonical artifact naming as `.../records.parquet`; both sinks now use the same filename contract.
+  - Updated DenseGen code paths, workspace templates, tests, and DenseGen docs to reflect the unified filename.
+- Validation run (targeted):
+  - `uv run pytest -q src/dnadesign/densegen/tests/runtime/test_run_paths.py src/dnadesign/densegen/tests/runtime/test_run_metrics.py src/dnadesign/densegen/tests/runtime/test_run_diagnostics_plots.py src/dnadesign/densegen/tests/cli/test_cli_run_modes.py src/dnadesign/densegen/tests/cli/test_cli_workspace_init.py src/dnadesign/densegen/tests/reporting/test_reporting_library_summary_outputs.py src/dnadesign/densegen/tests/plotting/test_plot_manifest.py`
+- Dense notebook + BaseRender planning notes:
+  - Current BaseRender input contract is intentionally minimal (`sequence`, `densegen__used_tfbs_detail`, optional `id`).
+  - DenseGen currently does not expose a first-class workspace-scoped notebook command.
+  - Planned direction is a workspace-first Dense notebook flow with:
+    - run/workspace metadata header,
+    - summary stats block from run artifacts,
+    - plot gallery navigation,
+    - explicit use of `records.parquet` from local or USR sink.

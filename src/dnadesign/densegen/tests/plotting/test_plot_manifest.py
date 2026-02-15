@@ -149,7 +149,7 @@ def _write_config(path: Path, *, plots_default: list[str]) -> None:
                   bio_type: dna
                   alphabet: dna_4
                 parquet:
-                  path: outputs/tables/dense_arrays.parquet
+                  path: outputs/tables/records.parquet
               generation:
                 sequence_length: 10
                 plan:
@@ -501,7 +501,7 @@ def test_placement_map_uses_selected_output_source_for_solutions(
     monkeypatch.setattr(
         "dnadesign.densegen.src.viz.plotting._load_dense_arrays",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("placement_map must use selected output source rows, not dense_arrays.parquet")
+            AssertionError("placement_map must use selected output source rows, not records.parquet")
         ),
     )
     monkeypatch.setattr(

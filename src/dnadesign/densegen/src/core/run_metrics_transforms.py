@@ -134,13 +134,13 @@ def _placements_from_dense_arrays(df: pd.DataFrame) -> pd.DataFrame:
     }
     missing = required - set(df.columns)
     if missing:
-        raise ValueError(f"dense_arrays.parquet missing required columns: {sorted(missing)}")
+        raise ValueError(f"records.parquet missing required columns: {sorted(missing)}")
     rows: list[dict] = []
     for _, row in df.iterrows():
         input_name = str(row.get("densegen__input_name") or "")
         plan_name = str(row.get("densegen__plan") or "")
         if not input_name or not plan_name:
-            raise ValueError("dense_arrays.parquet missing input_name/plan_name metadata.")
+            raise ValueError("records.parquet missing input_name/plan_name metadata.")
         library_index = int(row.get("densegen__sampling_library_index") or 0)
         library_hash = str(row.get("densegen__sampling_library_hash") or "").strip()
         if not library_hash:

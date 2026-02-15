@@ -21,7 +21,8 @@ For end-to-end guided runs, use:
 - [`dense campaign-reset`](#dense-campaign-reset)
 - [`dense plot`](#dense-plot)
 - [`dense ls-plots`](#dense-ls-plots)
-- [`dense report`](#dense-report)
+- [`dense notebook generate`](#dense-notebook-generate)
+- [`dense notebook run`](#dense-notebook-run)
 
 ## How to inspect CLI surface quickly
 
@@ -212,23 +213,24 @@ Key options:
 
 Lists available plot names and descriptions.
 
-## `dense report`
+## `dense notebook generate`
 
-Generates run-scoped report artifacts under `outputs/report/`.
+Generates a workspace-scoped marimo notebook for the run.
 
 Key options:
-- `--run, -r PATH`
-- `--out TEXT` (default: `outputs/report`)
+- `--out PATH` (default: `<run_root>/outputs/notebooks/densegen_run_overview.py`)
+- `--force`
 - `--absolute`
-- `--plots none|include`
-- `--strict, --fail-on-missing`
-- `--format, -f json|md|html|all`
 - `-c, --config PATH`
 
-Report outputs:
-- `report.json`
-- `report.md`
-- `report.html`
+## `dense notebook run`
+
+Launches a DenseGen marimo notebook.
+
+Key options:
+- `--path PATH` (default: `<run_root>/outputs/notebooks/densegen_run_overview.py`)
+- `--absolute`
+- `-c, --config PATH`
 
 ---
 

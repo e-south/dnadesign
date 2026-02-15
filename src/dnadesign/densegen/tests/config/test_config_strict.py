@@ -34,7 +34,7 @@ MIN_CONFIG = {
             "targets": ["parquet"],
             "schema": {"bio_type": "dna", "alphabet": "dna_4"},
             "parquet": {
-                "path": "outputs/tables/dense_arrays.parquet",
+                "path": "outputs/tables/records.parquet",
                 "deduplicate": True,
                 "chunk_size": 128,
             },
@@ -243,7 +243,7 @@ def test_pad_mode_off_accepts_yaml_boolean(tmp_path: Path) -> None:
           bio_type: dna
           alphabet: dna_4
         parquet:
-          path: outputs/tables/dense_arrays.parquet
+          path: outputs/tables/records.parquet
           deduplicate: true
           chunk_size: 128
       generation:
@@ -359,7 +359,7 @@ def test_usr_health_event_interval_requires_positive_value(tmp_path: Path) -> No
 
 def test_output_paths_must_live_under_outputs(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
-    cfg["densegen"]["output"]["parquet"]["path"] = "dense_arrays.parquet"
+    cfg["densegen"]["output"]["parquet"]["path"] = "records.parquet"
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
     with pytest.raises(ConfigError, match="output.parquet.path must be within outputs"):
         load_config(cfg_path)

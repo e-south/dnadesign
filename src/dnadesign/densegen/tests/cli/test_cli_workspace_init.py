@@ -61,7 +61,7 @@ def _write_min_config(path: Path) -> None:
                   bio_type: dna
                   alphabet: dna_4
                 parquet:
-                  path: outputs/tables/dense_arrays.parquet
+                  path: outputs/tables/records.parquet
 
               generation:
                 sequence_length: 10
@@ -147,6 +147,7 @@ def test_workspace_init_supports_binding_sites_demo_workspace(tmp_path: Path) ->
     )
     assert result.exit_code == 0, result.output
     assert (tmp_path / "demo_run" / "config.yaml").exists()
+    assert not (tmp_path / "demo_run" / "outputs" / "report").exists()
 
 
 def test_workspace_init_rejects_archived_source_workspace(tmp_path: Path) -> None:
@@ -238,7 +239,7 @@ def test_workspace_init_output_mode_both_sets_both_targets(tmp_path: Path) -> No
     cfg = yaml.safe_load((tmp_path / "demo_run" / "config.yaml").read_text())
     output = cfg["densegen"]["output"]
     assert set(output["targets"]) == {"parquet", "usr"}
-    assert output["parquet"]["path"] == "outputs/tables/dense_arrays.parquet"
+    assert output["parquet"]["path"] == "outputs/tables/records.parquet"
     assert output["usr"]["root"] == "outputs/usr_datasets"
     assert (tmp_path / "demo_run" / "outputs" / "usr_datasets" / "registry.yaml").exists()
 

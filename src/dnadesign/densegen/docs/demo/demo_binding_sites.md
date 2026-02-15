@@ -66,7 +66,7 @@ uv run dense run --fresh --no-plot -c "$CONFIG"
 uv run dense inspect run --library --events -c "$CONFIG"
 
 # Confirm the main output table exists.
-ls -la outputs/tables/dense_arrays.parquet
+ls -la outputs/tables/records.parquet
 ```
 
 Expected behavior:

@@ -9,7 +9,7 @@ typed config and emits outputs that can be inspected or replayed.
 
 ```
 config -> Stage-A pools -> Stage-B libraries -> dense-arrays solver
-       -> postprocess -> outputs + plots + reports
+       -> postprocess -> outputs + plots + notebooks
 ```
 
 ---
@@ -22,7 +22,7 @@ config -> Stage-A pools -> Stage-B libraries -> dense-arrays solver
 - `adapters/optimizer/` - solver wrappers.
 - `core/pipeline.py` - orchestration + runtime guards.
 - `core/metadata*` + `adapters/outputs/*` - metadata + sinks.
-- `viz/*` - plots and reports.
+- `viz/*` - plots and notebook-facing visual artifacts.
 
 ---
 

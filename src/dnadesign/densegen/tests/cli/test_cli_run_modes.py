@@ -48,7 +48,7 @@ def _write_config(run_root: Path) -> Path:
               bio_type: dna
               alphabet: dna_4
             parquet:
-              path: outputs/tables/dense_arrays.parquet
+              path: outputs/tables/records.parquet
           generation:
             sequence_length: 10
             plan:
@@ -137,7 +137,7 @@ def _write_pwm_config(run_root: Path) -> Path:
               bio_type: dna
               alphabet: dna_4
             parquet:
-              path: outputs/tables/dense_arrays.parquet
+              path: outputs/tables/records.parquet
           generation:
             sequence_length: 10
             plan:
@@ -249,7 +249,7 @@ def test_run_auto_resumes_when_outputs_exist_and_pools_present(tmp_path: Path, m
     outputs_dir.mkdir(parents=True, exist_ok=True)
     tables_dir = outputs_dir / "tables"
     tables_dir.mkdir(parents=True, exist_ok=True)
-    (tables_dir / "dense_arrays.parquet").write_text("seed")
+    (tables_dir / "records.parquet").write_text("seed")
     _write_pool_manifest(run_root, cfg_path)
 
     captured: dict[str, bool] = {}
@@ -288,7 +288,7 @@ def test_run_reports_run_state_config_mismatch(tmp_path: Path, monkeypatch) -> N
     outputs_dir = run_root / "outputs"
     tables_dir = outputs_dir / "tables"
     tables_dir.mkdir(parents=True, exist_ok=True)
-    (tables_dir / "dense_arrays.parquet").write_text("seed")
+    (tables_dir / "records.parquet").write_text("seed")
 
     def _fake_run_pipeline(*_args, **_kwargs):
         raise RuntimeError(
@@ -317,7 +317,7 @@ def test_run_auto_builds_stage_a_when_pools_missing(tmp_path: Path, monkeypatch)
     outputs_dir.mkdir(parents=True, exist_ok=True)
     tables_dir = outputs_dir / "tables"
     tables_dir.mkdir(parents=True, exist_ok=True)
-    (tables_dir / "dense_arrays.parquet").write_text("seed")
+    (tables_dir / "records.parquet").write_text("seed")
 
     captured: dict[str, bool] = {}
 
@@ -345,7 +345,7 @@ def test_campaign_reset_removes_outputs(tmp_path: Path) -> None:
     (outputs_dir / "meta").mkdir(parents=True, exist_ok=True)
     (outputs_dir / "tables").mkdir(parents=True, exist_ok=True)
     (outputs_dir / "meta" / "run_state.json").write_text("{}")
-    (outputs_dir / "tables" / "dense_arrays.parquet").write_text("seed")
+    (outputs_dir / "tables" / "records.parquet").write_text("seed")
 
     runner = CliRunner()
     result = runner.invoke(app, ["campaign-reset", "-c", str(cfg_path)])
@@ -361,7 +361,7 @@ def test_run_fails_fast_for_screen_progress_without_interactive_terminal(tmp_pat
     _write_inputs(run_root)
     cfg_path = _write_screen_progress_config(run_root)
     outputs_dir = run_root / "outputs"
-    sentinel = outputs_dir / "tables" / "dense_arrays.parquet"
+    sentinel = outputs_dir / "tables" / "records.parquet"
     sentinel.parent.mkdir(parents=True, exist_ok=True)
     sentinel.write_text("seed")
 
@@ -503,7 +503,7 @@ def test_run_fresh_preserves_notify_profile_and_cursor(tmp_path: Path, monkeypat
     cursor_path.write_text("12345\n")
     stale_tables = run_root / "outputs" / "tables"
     stale_tables.mkdir(parents=True, exist_ok=True)
-    stale_marker = stale_tables / "dense_arrays.parquet"
+    stale_marker = stale_tables / "records.parquet"
     stale_marker.write_text("stale\n")
 
     def _fake_run_pipeline(_loaded, *, resume, build_stage_a, **_kwargs):
@@ -533,7 +533,7 @@ def test_run_auto_accepts_plan_quota_increase_on_resume(tmp_path: Path, monkeypa
     cfg_path.write_text(updated_text)
     outputs_dir = run_root / "outputs"
     (outputs_dir / "tables").mkdir(parents=True, exist_ok=True)
-    (outputs_dir / "tables" / "dense_arrays.parquet").write_text("seed")
+    (outputs_dir / "tables" / "records.parquet").write_text("seed")
     (outputs_dir / "meta").mkdir(parents=True, exist_ok=True)
     (outputs_dir / "meta" / "run_state.json").write_text(
         json.dumps(
@@ -591,7 +591,7 @@ def test_run_reports_quota_already_met_when_resume_has_no_work(tmp_path: Path, m
 
     outputs_dir = run_root / "outputs"
     (outputs_dir / "tables").mkdir(parents=True, exist_ok=True)
-    (outputs_dir / "tables" / "dense_arrays.parquet").write_text("seed")
+    (outputs_dir / "tables" / "records.parquet").write_text("seed")
     result = runner.invoke(app, ["run", "-c", str(cfg_path), "--resume", "--no-plot"])
     assert result.exit_code == 0, result.output
     assert "quota is already met" in result.output.lower()
@@ -639,7 +639,7 @@ def test_run_extend_quota_anchors_to_existing_generated_rows(tmp_path: Path, mon
     cfg_path = _write_config(run_root)
     outputs_dir = run_root / "outputs"
     (outputs_dir / "tables").mkdir(parents=True, exist_ok=True)
-    (outputs_dir / "tables" / "dense_arrays.parquet").write_text("seed")
+    (outputs_dir / "tables" / "records.parquet").write_text("seed")
     (outputs_dir / "meta").mkdir(parents=True, exist_ok=True)
     (outputs_dir / "meta" / "run_state.json").write_text(
         json.dumps(
@@ -677,7 +677,7 @@ def test_run_resume_reuses_effective_quota_target_after_interrupted_extend(tmp_p
 
     outputs_dir = run_root / "outputs"
     (outputs_dir / "tables").mkdir(parents=True, exist_ok=True)
-    (outputs_dir / "tables" / "dense_arrays.parquet").write_text("seed")
+    (outputs_dir / "tables" / "records.parquet").write_text("seed")
     (outputs_dir / "meta").mkdir(parents=True, exist_ok=True)
     (outputs_dir / "meta" / "run_state.json").write_text(
         json.dumps(

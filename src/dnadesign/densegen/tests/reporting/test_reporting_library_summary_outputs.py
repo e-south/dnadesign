@@ -18,7 +18,6 @@ import pandas as pd
 from dnadesign.densegen.src.adapters.outputs import OutputRecord, ParquetSink
 from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.core.reporting import collect_report_data
-from dnadesign.densegen.src.core.reporting_render import _render_report_md
 from dnadesign.densegen.tests.meta_fixtures import output_meta
 
 PLAN_POOL_LABEL = "plan_pool__demo_plan"
@@ -42,7 +41,7 @@ def _write_config(path: Path) -> None:
               bio_type: dna
               alphabet: dna_4
             parquet:
-              path: outputs/tables/dense_arrays.parquet
+              path: outputs/tables/records.parquet
           generation:
             sequence_length: 10
             plan:
@@ -107,7 +106,7 @@ def test_library_summary_outputs_filled(tmp_path: Path) -> None:
     cfg_path = run_root / "config.yaml"
     _write_config(cfg_path)
 
-    out_file = run_root / "outputs" / "tables" / "dense_arrays.parquet"
+    out_file = run_root / "outputs" / "tables" / "records.parquet"
     sink = ParquetSink(path=str(out_file), chunk_size=1)
     meta = output_meta(library_hash="abc123", library_index=1)
     rec = OutputRecord.from_sequence(
@@ -224,10 +223,7 @@ def test_report_outputs_section_uses_usr_records_path(tmp_path: Path, monkeypatc
     loaded = load_config(cfg_path)
     bundle = collect_report_data(loaded.root, cfg_path, include_combinatorics=False)
     assert bundle.run_report["outputs_path"] == "outputs/usr_datasets/densegen/demo_usr/records.parquet"
-
-    report_md = _render_report_md(bundle)
-    assert "- outputs/usr_datasets/densegen/demo_usr/records.parquet" in report_md
-    assert "- outputs/tables/dense_arrays.parquet" not in report_md
+    assert bundle.run_report["output_source"] == "usr:densegen/demo_usr"
 
 
 def test_collect_report_data_maps_used_rows_when_record_library_hash_missing(tmp_path: Path, monkeypatch) -> None:
@@ -293,7 +289,7 @@ def test_collect_report_data_maps_used_rows_when_record_library_hash_missing(tmp
     )
     monkeypatch.setattr(
         "dnadesign.densegen.src.core.reporting_data.load_records_from_config",
-        lambda *_args, **_kwargs: (records_df.copy(), "parquet:outputs/tables/dense_arrays.parquet"),
+        lambda *_args, **_kwargs: (records_df.copy(), "parquet:outputs/tables/records.parquet"),
     )
 
     loaded = load_config(cfg_path)

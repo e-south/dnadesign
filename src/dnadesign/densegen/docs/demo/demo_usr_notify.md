@@ -41,7 +41,7 @@ Subprocess boundary for this demo:
 Inside your DenseGen workspace:
 
 - DenseGen artifacts:
-  - `outputs/tables/dense_arrays.parquet`
+  - `outputs/tables/records.parquet`
   - `outputs/meta/events.jsonl` (DenseGen runtime telemetry)
 - USR dataset (written by DenseGen):
   - `outputs/usr_datasets/<dataset>/records.parquet`

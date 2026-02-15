@@ -48,7 +48,7 @@ def test_background_pool_requires_schema_29(tmp_path: Path) -> None:
               bio_type: dna
               alphabet: dna_4
             parquet:
-              path: outputs/tables/dense_arrays.parquet
+              path: outputs/tables/records.parquet
           generation:
             sequence_length: 20
             plan:

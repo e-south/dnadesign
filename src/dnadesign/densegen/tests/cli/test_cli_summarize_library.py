@@ -43,7 +43,7 @@ def _write_config(path: Path) -> None:
               bio_type: dna
               alphabet: dna_4
             parquet:
-              path: outputs/tables/dense_arrays.parquet
+              path: outputs/tables/records.parquet
           generation:
             sequence_length: 10
             plan:
@@ -70,7 +70,7 @@ def test_summarize_library_grouping(tmp_path: Path) -> None:
     _write_config(cfg_path)
 
     # outputs
-    out_file = run_root / "outputs" / "tables" / "dense_arrays.parquet"
+    out_file = run_root / "outputs" / "tables" / "records.parquet"
     sink = ParquetSink(path=str(out_file), chunk_size=1)
     meta = output_meta(library_hash="abc123", library_index=1)
     rec = OutputRecord.from_sequence(
@@ -185,7 +185,7 @@ def test_summarize_library_show_tfbs_flag(tmp_path: Path) -> None:
     cfg_path = run_root / "config.yaml"
     _write_config(cfg_path)
 
-    out_file = run_root / "outputs" / "tables" / "dense_arrays.parquet"
+    out_file = run_root / "outputs" / "tables" / "records.parquet"
     sink = ParquetSink(path=str(out_file), chunk_size=1)
     for lib_hash, lib_index in [("abc123", 1), ("def456", 2)]:
         meta = output_meta(library_hash=lib_hash, library_index=lib_index)

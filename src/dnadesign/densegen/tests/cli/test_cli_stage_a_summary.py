@@ -160,7 +160,7 @@ def _write_stage_a_config(tmp_path: Path) -> Path:
                   bio_type: dna
                   alphabet: dna_4
                 parquet:
-                  path: outputs/tables/dense_arrays.parquet
+                  path: outputs/tables/records.parquet
               generation:
                 sequence_length: 30
                 plan:
@@ -240,7 +240,7 @@ def _write_pwm_stage_a_config(tmp_path: Path) -> Path:
                   bio_type: dna
                   alphabet: dna_4
                 parquet:
-                  path: outputs/tables/dense_arrays.parquet
+                  path: outputs/tables/records.parquet
               generation:
                 sequence_length: 30
                 plan:

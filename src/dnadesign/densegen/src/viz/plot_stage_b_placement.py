@@ -778,11 +778,11 @@ def plot_placement_map(
     if composition_df is None or composition_df.empty:
         raise ValueError("placement_map requires composition.parquet with placements.")
     if dense_arrays_df is None or dense_arrays_df.empty:
-        raise ValueError("placement_map requires dense_arrays.parquet with final sequences.")
+        raise ValueError("placement_map requires records.parquet with final sequences.")
     _require_columns(
         dense_arrays_df,
         {"id", "sequence", "densegen__input_name", "densegen__plan"},
-        "dense_arrays.parquet",
+        "records.parquet",
     )
     _require_columns(
         composition_df,

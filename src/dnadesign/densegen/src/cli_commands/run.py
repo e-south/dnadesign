@@ -577,15 +577,15 @@ def register_run_commands(
             cfg_path=cfg_path,
             run_root=run_root,
         )
-        report_cmd = context.workspace_command(
-            "dense report",
+        notebook_cmd = context.workspace_command(
+            "dense notebook generate",
             cfg_path=cfg_path,
             run_root=run_root,
         )
         console.print(f"  - {inspect_cmd} (Stage-B library + solutions)")
         console.print(f"  - {stage_a_cmd} (Stage-A summary plots)")
         console.print(f"  - {placement_cmd} (Stage-B placement plots)")
-        console.print(f"  - {report_cmd} (render run report with tables + plot links)")
+        console.print(f"  - {notebook_cmd} (generate workspace-scoped marimo run notebook)")
 
         # Auto-plot if configured
         if not no_plot and root.plots:

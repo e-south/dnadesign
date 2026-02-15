@@ -61,7 +61,7 @@
 
 ## 2026-02-10
 - Audit scope: compared legacy USR dataset `60bp_dual_promoter_cpxR_LexA` against a fresh end-to-end DenseGen run (`/tmp/schema_audit_both_0210`) with `output.targets: [parquet, usr]`.
-- Confirmed sink consistency for a same-run output: local `outputs/tables/dense_arrays.parquet` and USR merged view share identical values/types for all shared densegen columns.
+- Confirmed sink consistency for a same-run output: local `outputs/tables/records.parquet` and USR merged view share identical values/types for all shared densegen columns.
 - Decision: keep a single curated DenseGen schema under the `densegen__` namespace; no split "compact vs full" schemas.
 - Decision: organize the one schema by hierarchical semantic prefixes (run/solver/input/stage_a/stage_b/placement/pad) while keeping `densegen__` as the USR namespace boundary.
 - Key gap found: Stage-A PWM fields (`densegen__input_pwm_*`) are registered but all-null for plan-pool runs; retention work should either populate these from pooled sources or replace them with non-redundant populated summaries.
@@ -73,7 +73,7 @@
 - Updated Parquet/USR schema contract for `densegen__used_tfbs_detail` to keep sink parity, including USR registry type updates.
 - Added tests for: Stage-A lineage in placement detail, retention/sparsity behavior by `input_mode`, and parity between Parquet and USR shared metadata columns.
 - Fresh e2e schema audit run (temp workspace): `/tmp/densegen_audit_demo_meme_three_tfs` with current `demo_meme_three_tfs` config.
-- Fresh run result: `dense_arrays.parquet` has 101 `densegen__*` columns (40 rows); 29 columns are all-null and 39 are run-constant in this run.
+- Fresh run result: `records.parquet` has 101 `densegen__*` columns (40 rows); 29 columns are all-null and 39 are run-constant in this run.
 - Confirmed expanded placement lineage now materializes in fresh outputs: `densegen__used_tfbs_detail` includes Stage-A fields; non-null placement counts in this run were `stage_a_* = 68/120` placements (core/id/offset fields remain 120/120).
 - Confirmed gap: `composition.parquet` currently stores placement identity/geometry (`tf`, `tfbs`, ids, offsets) but not `stage_a_*` fields, so Stage-A placement lineage is only present in nested `densegen__used_tfbs_detail`.
 - Retention triage direction (single `densegen__` schema): keep sequence/placement provenance inline; move repeated run constants to `outputs/meta/*`; keep library/pool-level attributes in `outputs/libraries/*` and `outputs/pools/*` with stable join keys (`sampling_library_hash`, `library_index`, `tfbs_id`, `motif_id`).
@@ -147,3 +147,18 @@
 - Added strict override consistency check for `pwm_artifact_set.overrides_by_motif_id`: collision mode must be identical across base + motif overrides.
 - Added regression coverage for warn-mode structured logging, error-mode rejection, and mixed-override-mode rejection; updated config/sampling/inputs docs with the new contract.
 - Event-schema boundary correction across DenseGen/USR/Notify: removed root-level `src/dnadesign/event_schema.py`; `USR_EVENT_VERSION` is owned by USR (`usr/src/event_schema.py`) and Notify resolves it lazily at runtime.
+
+## 2026-02-15
+- Output naming contract update:
+  - Unified local sink filename to `outputs/tables/records.parquet` (previously `dense_arrays.parquet`).
+  - USR sink already emits `<dataset>/records.parquet`; sink naming is now aligned across local + USR.
+  - Updated DenseGen code paths, workspace defaults, docs, and tests to use `records.parquet`.
+- Dependency contract note for notebook workflows:
+  - `marimo` remains a core dependency.
+  - `openai` is now a core dependency so DenseGen-adjacent notebooks can call model APIs without group-specific installs.
+- Validation:
+  - `uv run pytest -q src/dnadesign/densegen/tests/runtime/test_run_paths.py src/dnadesign/densegen/tests/runtime/test_run_metrics.py src/dnadesign/densegen/tests/runtime/test_run_diagnostics_plots.py src/dnadesign/densegen/tests/cli/test_cli_run_modes.py src/dnadesign/densegen/tests/cli/test_cli_workspace_init.py src/dnadesign/densegen/tests/reporting/test_reporting_library_summary_outputs.py src/dnadesign/densegen/tests/plotting/test_plot_manifest.py`
+- Notebook capability gap (recorded for follow-on work):
+  - DenseGen currently has no first-class workspace-scoped notebook CLI (`dense notebook ...`).
+  - Existing run artifacts are sufficient to generate one (`outputs/meta/run_manifest.json`, `outputs/meta/effective_config.json`, `outputs/tables/run_metrics.parquet`, `outputs/plots/plot_manifest.json`, `outputs/tables/records.parquet` or USR `records.parquet`).
+  - BaseRender contract already accepts DenseGen placement annotations via `densegen__used_tfbs_detail`; additional DenseGen metadata columns can be surfaced as notebook descriptors/hues without changing BaseRender’s required contract.

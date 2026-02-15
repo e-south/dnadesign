@@ -40,7 +40,7 @@ Notify reads USR `.events.log`, not DenseGen `outputs/meta/events.jsonl`.
 
 ### Parquet
 
-Parquet output is written as a single file (`outputs/tables/dense_arrays.parquet`) under the run root. Each row contains required fields (`id`, `sequence`, `bio_type`, `alphabet`, `source`) plus namespaced `densegen__*` metadata columns.
+Parquet output is written as a single file (`outputs/tables/records.parquet`) under the run root. Each row contains required fields (`id`, `sequence`, `bio_type`, `alphabet`, `source`) plus namespaced `densegen__*` metadata columns.
 
 Behavior:
 - If `deduplicate: true`, existing IDs in the dataset are loaded and skipped.
@@ -163,7 +163,7 @@ DenseGen participates in two distinct event streams when you enable the USR sink
 
 | Stream | Path | Producer | Primary purpose | Typical consumer |
 |---|---|---|---|---|
-| DenseGen runtime events | `outputs/meta/events.jsonl` | DenseGen | Run diagnostics (resamples, stalls, library rebuilds) | `dense inspect run --events`, plots, reports |
+| DenseGen runtime events | `outputs/meta/events.jsonl` | DenseGen | Run diagnostics (resamples, stalls, library rebuilds) | `dense inspect run --events`, plots, notebooks |
 | USR mutation events | `<usr_root>/<dataset>/.events.log` | USR | Audit plus integration boundary | `notify usr-events watch`, `usr events tail` |
 
 Important: Notify consumes USR `.events.log`, not DenseGen `outputs/meta/events.jsonl`.
@@ -193,27 +193,25 @@ DenseGen records solver library provenance in two places:
 
 DenseGen writes `outputs/tables/solutions.parquet` (append-only) with the canonical solution id, attempt id, and library hash. Join keys:
 
-- `solutions.solution_id` ↔ `dense_arrays.id`
+- `solutions.solution_id` ↔ `records.id`
 - `solutions.attempt_id` ↔ `attempts.attempt_id`
 - `solutions.solution_id` ↔ `composition.solution_id`
 
 ---
 
-### Audit reports
+### Notebook artifacts
 
-The `dense report` command writes a compact audit summary under `outputs/report/`:
+`dense notebook generate` writes a workspace-scoped marimo notebook:
 
-- `outputs/report/report.json`
-- `outputs/report/report.md`
-- `outputs/report/report.html` (basic HTML wrapper for quick sharing)
+- `<run_root>/outputs/notebooks/densegen_run_overview.py` (default path)
 
-These summarize run scope and link to the canonical outputs (`outputs/tables/dense_arrays.parquet` and `outputs/tables/attempts.parquet`). Reports do not generate plots; run `dense plot` to populate `outputs/plots/`, and use `dense report --plots include` to link the existing plot manifest. Use `dense report --format json|md|html|all` to control which files are emitted.
+The notebook reads run artifacts (`outputs/meta/*`, `outputs/tables/*`, `outputs/plots/plot_manifest.json`) and supports manual refresh for iterative sampling sessions.
 
 ---
 
 ### Plots
 
-`dense plot` writes plot images under `outputs/plots/` (format controlled by `plots.format`). `outputs/plots/plot_manifest.json` records the plot inventory and structured placement metadata for reports.
+`dense plot` writes plot images under `outputs/plots/` (format controlled by `plots.format`). `outputs/plots/plot_manifest.json` records the plot inventory and structured placement metadata for notebooks.
 
 Run diagnostics metrics are summarized in `outputs/tables/run_metrics.parquet` (aggregated from pools, libraries, attempts, and composition). Plots below are generated from canonical artifacts plus accepted-sequence records loaded from the configured plot source (`plots.source`: parquet or usr), not candidate/debug logs.
 
