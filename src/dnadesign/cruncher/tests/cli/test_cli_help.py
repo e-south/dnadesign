@@ -682,7 +682,7 @@ def test_analyze_latest_requires_complete_artifacts(tmp_path: Path) -> None:
 def test_analyze_rejects_run_and_latest_together() -> None:
     result = invoke_cli(["analyze", "--latest", "--run", "sample_123", str(CONFIG_PATH)])
     assert result.exit_code != 0
-    assert "Use either --run or --latest, not both." in result.output
+    assert "Use either --run or --latest, not both." in combined_output(result)
 
 
 def test_analyze_allows_missing_analysis_section(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

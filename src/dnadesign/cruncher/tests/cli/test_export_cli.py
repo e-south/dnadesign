@@ -24,9 +24,12 @@ runner = CliRunner()
 CONFIG_PATH = Path(__file__).resolve().parents[2] / "workspaces" / "demo_basics_two_tf" / "config.yaml"
 
 
+def invoke_cli(args: list[str]):
+    return runner.invoke(app, args, color=False)
+
+
 def test_export_sequences_rejects_run_and_latest() -> None:
-    result = runner.invoke(
-        app,
+    result = invoke_cli(
         [
             "export",
             "sequences",
@@ -41,8 +44,7 @@ def test_export_sequences_rejects_run_and_latest() -> None:
 
 
 def test_export_sequences_rejects_small_combo_size() -> None:
-    result = runner.invoke(
-        app,
+    result = invoke_cli(
         [
             "export",
             "sequences",
@@ -97,8 +99,7 @@ def test_export_sequences_passes_cli_options_to_service(tmp_path: Path, monkeypa
 
     monkeypatch.setattr(export_module, "run_export_sequences", _fake_run_export_sequences)
 
-    result = runner.invoke(
-        app,
+    result = invoke_cli(
         [
             "export",
             "sequences",
