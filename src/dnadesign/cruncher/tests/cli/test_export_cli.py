@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -22,10 +23,16 @@ from dnadesign.cruncher.cli.app import app
 
 runner = CliRunner()
 CONFIG_PATH = Path(__file__).resolve().parents[2] / "workspaces" / "demo_basics_two_tf" / "config.yaml"
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mK]")
 
 
 def invoke_cli(args: list[str]):
     return runner.invoke(app, args, color=False)
+
+
+def combined_output(result) -> str:
+    stderr = getattr(result, "stderr", "")
+    return ANSI_RE.sub("", f"{result.output}{stderr}")
 
 
 def test_export_sequences_rejects_run_and_latest() -> None:
@@ -40,7 +47,7 @@ def test_export_sequences_rejects_run_and_latest() -> None:
         ],
     )
     assert result.exit_code != 0
-    assert "Use either --run or --latest, not both." in result.output
+    assert "Use either --run or --latest, not both." in combined_output(result)
 
 
 def test_export_sequences_rejects_small_combo_size() -> None:
@@ -55,7 +62,7 @@ def test_export_sequences_rejects_small_combo_size() -> None:
         ],
     )
     assert result.exit_code != 0
-    assert "--max-combo-size must be >= 2." in result.output
+    assert "--max-combo-size must be >= 2." in combined_output(result)
 
 
 def test_export_sequences_passes_cli_options_to_service(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
