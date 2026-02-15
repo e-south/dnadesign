@@ -284,3 +284,80 @@ def test_export_sites_defaults_to_densegen_workspace(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     out_path = densegen_ws / "inputs" / "densegen_sites.parquet"
     assert out_path.exists()
+
+
+def test_export_densegen_relative_out_resolves_from_config_dir(tmp_path: Path, monkeypatch) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir(parents=True, exist_ok=True)
+    catalog_root = workspace / ".cruncher"
+    entry = CatalogEntry(
+        source="regulondb",
+        motif_id="RBM1",
+        tf_name="lexA",
+        kind="PFM",
+        has_matrix=True,
+        matrix_source="alignment",
+    )
+    CatalogIndex(entries={entry.key: entry}).save(catalog_root)
+    _write_prob_motif(
+        catalog_root / "normalized" / "motifs" / "regulondb" / "RBM1.json",
+        source="regulondb",
+        motif_id="RBM1",
+        tf_name="lexA",
+    )
+    config_path = _write_config(workspace)
+
+    invocation_dir = tmp_path / "invocation"
+    invocation_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.chdir(invocation_dir)
+
+    rel_out = Path("outputs") / "densegen" / "pwms"
+    result = runner.invoke(
+        app,
+        ["catalog", "export-densegen", "--tf", "lexA", "--out", str(rel_out), str(config_path)],
+        color=False,
+    )
+
+    assert result.exit_code == 0, result.output
+    workspace_out = workspace / rel_out
+    invocation_out = invocation_dir / rel_out
+    assert workspace_out.exists()
+    assert (workspace_out / "artifact_manifest.json").exists()
+    assert not invocation_out.exists()
+
+
+def test_export_sites_relative_out_resolves_from_config_dir(tmp_path: Path, monkeypatch) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir(parents=True, exist_ok=True)
+    catalog_root = workspace / ".cruncher"
+    entry = CatalogEntry(
+        source="regulondb",
+        motif_id="RBM1",
+        tf_name="lexA",
+        kind="sites",
+        has_matrix=False,
+        has_sites=True,
+        site_count=1,
+        site_total=1,
+        site_kind="curated",
+    )
+    CatalogIndex(entries={entry.key: entry}).save(catalog_root)
+    sites_path = catalog_root / "normalized" / "sites" / "regulondb" / "RBM1.jsonl"
+    sites_path.parent.mkdir(parents=True, exist_ok=True)
+    sites_path.write_text(json.dumps({"sequence": "ACGT", "site_id": "s1", "motif_ref": entry.key}) + "\n")
+    config_path = _write_config(workspace, pwm_source="matrix")
+
+    invocation_dir = tmp_path / "invocation"
+    invocation_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.chdir(invocation_dir)
+
+    rel_out = Path("outputs") / "densegen_sites.parquet"
+    result = runner.invoke(
+        app,
+        ["catalog", "export-sites", "--tf", "lexA", "--out", str(rel_out), str(config_path)],
+        color=False,
+    )
+
+    assert result.exit_code == 0, result.output
+    assert (workspace / rel_out).exists()
+    assert not (invocation_dir / rel_out).exists()

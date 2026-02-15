@@ -56,6 +56,8 @@ def test_demo_docs_encode_merged_meme_oops_provenance_pattern() -> None:
     assert "fetch sites --source baer_chip_exo --tf baeR" in campaign
     assert "fetch sites --source regulondb    --tf baeR" in campaign
     assert "--tool meme --meme-mod oops --source-id demo_merged_meme_oops_campaign" in campaign
+    assert "catalog export-densegen --set 1" not in campaign
+    assert "catalog export-densegen --tf lexA --tf cpxR" in campaign
 
     assert "fetch sites --source demo_local_meme --tf lexA --tf cpxR" in three_tf
     assert "fetch sites --source regulondb      --tf lexA --tf cpxR" in three_tf

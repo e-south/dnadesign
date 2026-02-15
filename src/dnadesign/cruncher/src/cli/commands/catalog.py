@@ -104,16 +104,21 @@ def _densegen_workspaces_root(config_path: Path) -> Path | None:
     return None
 
 
+def _resolve_user_path(path: Path, *, base_dir: Path) -> Path:
+    candidate = path.expanduser()
+    if candidate.is_absolute():
+        return candidate.resolve()
+    return (base_dir / candidate).resolve()
+
+
 def _resolve_densegen_workspace(selector: str, *, config_path: Path) -> Path:
     raw = str(selector or "").strip()
     if not raw:
         raise typer.BadParameter("--densegen-workspace must be a non-empty string.")
     candidate = Path(raw).expanduser()
     looks_like_path = candidate.is_absolute() or any(sep in raw for sep in (os.sep, os.altsep) if sep)
-    if looks_like_path or candidate.exists():
-        resolved = candidate
-        if not resolved.is_absolute():
-            resolved = (Path.cwd() / resolved).resolve()
+    if looks_like_path:
+        resolved = _resolve_user_path(candidate, base_dir=config_path.parent)
     else:
         root = _densegen_workspaces_root(config_path)
         if root is None:
@@ -135,8 +140,8 @@ def _resolve_densegen_workspace(selector: str, *, config_path: Path) -> Path:
     return resolved
 
 
-def _require_densegen_inputs_path(path: Path, *, inputs_root: Path, label: str) -> Path:
-    resolved = path.resolve()
+def _require_densegen_inputs_path(path: Path, *, inputs_root: Path, label: str, base_dir: Path) -> Path:
+    resolved = _resolve_user_path(path, base_dir=base_dir)
     try:
         resolved.relative_to(inputs_root.resolve())
     except ValueError as exc:
@@ -1093,6 +1098,7 @@ def export_densegen(
         raise typer.BadParameter("--background must be 'record', 'uniform', or 'matrix'.")
     if not producer.strip():
         raise typer.BadParameter("--producer must be a non-empty string.")
+    base_dir = config_path.parent
     densegen_root = None
     if densegen_workspace:
         densegen_root = _resolve_densegen_workspace(densegen_workspace, config_path=config_path)
@@ -1100,7 +1106,12 @@ def export_densegen(
         if out_dir is None:
             out_dir = inputs_root / "motif_artifacts"
         else:
-            out_dir = _require_densegen_inputs_path(out_dir, inputs_root=inputs_root, label="--out")
+            out_dir = _require_densegen_inputs_path(
+                out_dir,
+                inputs_root=inputs_root,
+                label="--out",
+                base_dir=base_dir,
+            )
     if out_dir is None:
         raise typer.BadParameter("--out is required when --densegen-workspace is not set.")
 
@@ -1119,7 +1130,7 @@ def export_densegen(
         raise typer.Exit(code=1)
 
     catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
-    out_dir = out_dir.resolve()
+    out_dir = _resolve_user_path(out_dir, base_dir=base_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if clean:
@@ -1230,6 +1241,7 @@ def export_sites(
         console.print(str(exc))
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
+    base_dir = config_path.parent
     densegen_root = None
     if densegen_workspace:
         densegen_root = _resolve_densegen_workspace(densegen_workspace, config_path=config_path)
@@ -1237,7 +1249,12 @@ def export_sites(
         if out_path is None:
             out_path = inputs_root / "densegen_sites.parquet"
         else:
-            out_path = _require_densegen_inputs_path(out_path, inputs_root=inputs_root, label="--out")
+            out_path = _require_densegen_inputs_path(
+                out_path,
+                inputs_root=inputs_root,
+                label="--out",
+                base_dir=base_dir,
+            )
     if out_path is None:
         raise typer.BadParameter("--out is required when --densegen-workspace is not set.")
 
@@ -1255,7 +1272,7 @@ def export_sites(
         console.print("Hint: run cruncher fetch sites --hydrate before export-sites.")
         raise typer.Exit(code=1)
 
-    out_path = out_path.resolve()
+    out_path = _resolve_user_path(out_path, base_dir=base_dir)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     if out_path.exists():
         if out_path.is_dir():
