@@ -23,11 +23,12 @@ From outside the campaign, pass `-c configs/campaign.yaml`.
 ### 1) Install marimo into the project
 
 ```bash
-uv sync --locked --group notebooks
+uv sync --locked
 uv run marimo edit notebooks/foo.py
 ```
 
 This runs marimo inside your project environment, so it can import `dnadesign` and anything in `uv.lock`.
+`openai` is available in the core environment for model API experiments inside notebooks.
 
 ### 2) Sandboxed / self-contained marimo notebooks (inline dependencies)
 

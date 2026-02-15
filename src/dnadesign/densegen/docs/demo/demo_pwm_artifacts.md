@@ -10,14 +10,14 @@ If you are new to DenseGen, run [demo_binding_sites.md](demo_binding_sites.md) f
 - how to stage a workspace from a packaged template
 - how to build Stage-A pools from motif artifacts
 - how to run generation to quota, then resume safely
-- how to inspect outputs, wire Notify, and render reports
+- how to inspect outputs, wire Notify, and render notebook summaries
 
 Subprocess map for this demo:
 
 1. Stage-A pool build from motif artifacts
 2. Stage-B library sampling per plan
 3. Solver loop to plan quotas
-4. Output materialization to Parquet/USR + plots/report
+4. Output materialization to Parquet/USR + plots/notebook
 
 ### Contents
 
@@ -30,7 +30,7 @@ Subprocess map for this demo:
 7. [Increase quota and resume](#6-increase-quota-and-resume)
 8. [Inspect outputs](#7-inspect-outputs)
 9. [Wire Notify to a real endpoint](#8-wire-notify-to-a-real-endpoint-deployed-pressure-test)
-10. [Plot and report](#9-plot-and-report)
+10. [Plot and notebook](#9-plot-and-notebook)
 11. [Reset workspace](#10-reset-workspace)
 12. [Troubleshooting](#11-troubleshooting)
 
@@ -245,7 +245,7 @@ uv run dense run --resume --no-plot -c "$CONFIG"
 
 Email note: use `--provider generic` with your email relay webhook endpoint.
 
-## 9) Plot and report
+## 9) Plot and notebook
 
 DenseGen uses a repo-local Matplotlib cache at `.cache/matplotlib/densegen`.
 Set `MPLCONFIGDIR` only if you need to override this path.
@@ -254,8 +254,9 @@ Set `MPLCONFIGDIR` only if you need to override this path.
 # Render core plots for this run.
 uv run dense plot --only stage_a_summary,placement_map -c "$CONFIG"
 
-# Build report files and include plot links.
-uv run dense report --plots include -c "$CONFIG"
+# Generate workspace notebook and launch it.
+uv run dense notebook generate -c "$CONFIG"
+uv run dense notebook run -c "$CONFIG"
 ```
 
 ## 10) Reset workspace

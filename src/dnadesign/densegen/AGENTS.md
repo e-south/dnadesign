@@ -6,7 +6,7 @@ Supplement to repo-root `AGENTS.md` with `densegen`-specific locations + run sha
 - README: `src/dnadesign/densegen/README.md`
 - Tool code: `src/dnadesign/densegen/src/` (entrypoint lives here)
 - Packaged demo template id: `demo_meme_two_tf`
-- Outputs: per-workspace `outputs/` (generated; run artifacts live in tables/plots/report)
+- Outputs: per-workspace `outputs/` (generated; run artifacts live in tables/plots)
 
 ### External deps (do not install unless asked)
 - MILP solver required (e.g., CBC or GUROBI).

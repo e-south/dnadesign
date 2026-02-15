@@ -100,7 +100,7 @@ def test_sequence_length_guard_shorter_than_motif(tmp_path: Path) -> None:
             "output": {
                 "targets": ["parquet"],
                 "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-                "parquet": {"path": "outputs/tables/dense_arrays.parquet"},
+                "parquet": {"path": "outputs/tables/records.parquet"},
             },
             "generation": {
                 "sequence_length": 4,
@@ -179,7 +179,7 @@ def test_sequence_length_guard_library_total_bp_too_small(tmp_path: Path) -> Non
             "output": {
                 "targets": ["parquet"],
                 "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-                "parquet": {"path": "outputs/tables/dense_arrays.parquet"},
+                "parquet": {"path": "outputs/tables/records.parquet"},
             },
             "generation": {
                 "sequence_length": 10,
@@ -257,7 +257,7 @@ def test_sequence_length_guard_required_regulators_min_length(tmp_path: Path) ->
             "output": {
                 "targets": ["parquet"],
                 "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-                "parquet": {"path": "outputs/tables/dense_arrays.parquet"},
+                "parquet": {"path": "outputs/tables/records.parquet"},
             },
             "generation": {
                 "sequence_length": 8,
@@ -336,7 +336,7 @@ def test_sequence_length_guard_promoter_constraints_min_length(tmp_path: Path) -
             "output": {
                 "targets": ["parquet"],
                 "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-                "parquet": {"path": "outputs/tables/dense_arrays.parquet"},
+                "parquet": {"path": "outputs/tables/records.parquet"},
             },
             "generation": {
                 "sequence_length": 8,

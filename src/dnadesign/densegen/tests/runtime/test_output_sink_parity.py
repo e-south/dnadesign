@@ -43,7 +43,7 @@ def _make_usr_writer(tmp_path: Path, *, deduplicate: bool = True) -> tuple[Path,
 
 def test_parquet_and_usr_sinks_keep_same_metadata_and_stage_a_lineage(tmp_path: Path) -> None:
     root, usr_writer = _make_usr_writer(tmp_path)
-    parquet_path = tmp_path / "dense_arrays.parquet"
+    parquet_path = tmp_path / "records.parquet"
     parquet_sink = ParquetSink(path=str(parquet_path), namespace="densegen", chunk_size=1)
     meta = output_meta(library_hash="demo_hash", library_index=1)
     meta["used_tfbs_detail"] = [

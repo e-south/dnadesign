@@ -44,7 +44,7 @@ def _write_config(path: Path, input_path: Path) -> None:
             "output": {
                 "targets": ["parquet"],
                 "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-                "parquet": {"path": "outputs/tables/dense_arrays.parquet"},
+                "parquet": {"path": "outputs/tables/records.parquet"},
             },
             "generation": {
                 "sequence_length": 3,

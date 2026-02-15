@@ -9,9 +9,8 @@ Each workspace should contain:
 - `config.yaml`
 - `inputs/`
 - `outputs/` (run artifacts)
-  - `tables/` (dense_arrays + attempts/solutions/composition)
+  - `tables/` (`records.parquet` + attempts/solutions/composition/run metrics)
   - `plots/` (plot images)
-  - `report/` (report.md/.json/.html + assets/)
   - `pools/` (Stage-A TFBS pools + optional candidates/)
   - `libraries/` (Stage-B library artifacts)
   - `logs/` (optional; defaults to outputs/logs)

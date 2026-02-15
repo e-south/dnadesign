@@ -72,7 +72,7 @@ def _apply_output_mode(output: dict, *, run_id: str, output_mode: str) -> dict:
         usr_cfg = {}
 
     if mode in {"local", "both"}:
-        parquet_cfg["path"] = "outputs/tables/dense_arrays.parquet"
+        parquet_cfg["path"] = "outputs/tables/records.parquet"
         out["parquet"] = parquet_cfg
 
     if mode in {"usr", "both"}:
@@ -229,7 +229,6 @@ def register_workspace_commands(
             (workspace_dir / "outputs" / "libraries").mkdir(parents=True, exist_ok=True)
             (workspace_dir / "outputs" / "tables").mkdir(parents=True, exist_ok=True)
             (workspace_dir / "outputs" / "plots").mkdir(parents=True, exist_ok=True)
-            (workspace_dir / "outputs" / "report").mkdir(parents=True, exist_ok=True)
 
             raw = yaml.safe_load(source_path.read_text())
             if not isinstance(raw, dict):

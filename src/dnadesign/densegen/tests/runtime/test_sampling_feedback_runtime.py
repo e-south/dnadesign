@@ -134,7 +134,7 @@ def test_runtime_iterative_sampling_uses_failure_feedback_across_libraries(tmp_p
             "output": {
                 "targets": ["parquet"],
                 "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-                "parquet": {"path": "outputs/tables/dense_arrays.parquet"},
+                "parquet": {"path": "outputs/tables/records.parquet"},
             },
             "generation": {
                 "sequence_length": 6,

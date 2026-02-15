@@ -44,7 +44,7 @@ def _write_config(tmp_path: Path) -> Path:
                   bio_type: dna
                   alphabet: dna_4
                 parquet:
-                  path: outputs/tables/dense_arrays.parquet
+                  path: outputs/tables/records.parquet
               generation:
                 sequence_length: 20
                 plan:
@@ -319,7 +319,7 @@ def _write_dense_arrays(tmp_path: Path) -> None:
             }
         ]
     )
-    rows.to_parquet(tables_dir / "dense_arrays.parquet", index=False)
+    rows.to_parquet(tables_dir / "records.parquet", index=False)
 
 
 def _write_sampling_pressure_events(tmp_path: Path) -> None:

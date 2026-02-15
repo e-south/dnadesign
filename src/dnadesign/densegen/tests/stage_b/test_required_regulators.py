@@ -101,7 +101,7 @@ def test_regulator_groups_filtering(tmp_path: Path) -> None:
             "output": {
                 "targets": ["parquet"],
                 "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-                "parquet": {"path": "outputs/tables/dense_arrays.parquet"},
+                "parquet": {"path": "outputs/tables/records.parquet"},
             },
             "generation": {
                 "sequence_length": 6,
@@ -233,7 +233,7 @@ def test_runtime_min_count_per_tf_rejection_then_acceptance(tmp_path: Path) -> N
             "output": {
                 "targets": ["parquet"],
                 "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-                "parquet": {"path": "outputs/tables/dense_arrays.parquet"},
+                "parquet": {"path": "outputs/tables/records.parquet"},
             },
             "generation": {
                 "sequence_length": 6,

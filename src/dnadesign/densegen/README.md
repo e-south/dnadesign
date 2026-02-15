@@ -10,7 +10,7 @@ run artifacts you can audit.
 
 - generating quota-bounded sequence libraries with explicit composition constraints
 - testing promoter/fixed-element constraints alongside TF placements
-- producing diagnostics (attempts, manifests, plots, reports)
+- producing diagnostics (attempts, manifests, plots, notebook summaries)
 
 ### What DenseGen is not for
 
@@ -49,7 +49,7 @@ DenseGen runtime is intentionally sequential:
 1. Stage-A: build or load input pools (`dense stage-a build-pool`, or auto-built by `dense run`)
 2. Stage-B: sample plan-scoped libraries from Stage-A pools (`dense stage-b build-libraries`, or auto-built by `dense run`)
 3. Solve: generate arrays under plan constraints to quota (`dense run`)
-4. Materialize diagnostics: write tables/manifests/events, then optional plots/report (`dense plot`, `dense report`)
+4. Materialize diagnostics: write tables/manifests/events, then optional plots/notebook (`dense plot`, `dense notebook generate`)
 
 If you keep this order in mind, most diagnostics become easy to interpret:
 
@@ -59,11 +59,11 @@ If you keep this order in mind, most diagnostics become easy to interpret:
 
 ### Output modes and handoff paths
 
-- `--output-mode local`: canonical run artifact is `outputs/tables/dense_arrays.parquet`.
+- `--output-mode local`: canonical run artifact is `outputs/tables/records.parquet`.
 - `--output-mode usr`: canonical run artifact is USR dataset `outputs/usr_datasets/<dataset>/records.parquet` plus overlays and `.events.log`.
 - `--output-mode both`: writes both sinks and enforces sink-alignment checks during the run.
 
-For `local`, copy `outputs/tables/dense_arrays.parquet`.  
+For `local`, copy `outputs/tables/records.parquet`.  
 For `usr`, resolve the dataset path from the run, then export:
 
 ```bash
@@ -102,8 +102,8 @@ Local-mode handoff output:
 
 ```bash
 # Canonical local parquet artifact for downstream copy/use.
-ls -lh outputs/tables/dense_arrays.parquet
-cp outputs/tables/dense_arrays.parquet /path/to/handoff/binding_sites_trial.parquet
+ls -lh outputs/tables/records.parquet
+cp outputs/tables/records.parquet /path/to/handoff/binding_sites_trial.parquet
 ```
 
 ### Quick start: canonical PWM path

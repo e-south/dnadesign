@@ -11,7 +11,7 @@ For full schema details, use [../reference/outputs.md](../reference/outputs.md).
 ```text
 outputs/
   tables/
-    dense_arrays.parquet
+    records.parquet
     attempts.parquet
     solutions.parquet
     composition.parquet
@@ -19,9 +19,15 @@ outputs/
   pools/
   libraries/
   plots/
-  report/
   meta/
   logs/
+```
+
+Workspace-level notebook artifact:
+
+```text
+notebooks/
+  densegen_run_overview.py
 ```
 
 ---
@@ -45,7 +51,7 @@ Read outputs by subprocess boundary:
    - `outputs/tables/attempts.parquet`
    - `outputs/tables/solutions.parquet`
    - `outputs/tables/composition.parquet`
-   - `outputs/tables/dense_arrays.parquet`
+   - `outputs/tables/records.parquet`
    - intent: what was attempted, what was accepted, and final sequence composition
 
 4. **Run metadata + diagnostics**
@@ -60,7 +66,7 @@ Read outputs by subprocess boundary:
 
 ### What each artifact means
 
-- `tables/dense_arrays.parquet`: final sequences (canonical run dataset)
+- `tables/records.parquet`: final sequences (canonical run dataset)
 - `tables/attempts.parquet`: solver attempts (ok/rejected/duplicate/failed)
 - `tables/solutions.parquet`: accepted solutions with stable join keys
 - `tables/composition.parquet`: per-placement TFBS rows for accepted solutions
@@ -74,7 +80,7 @@ Read outputs by subprocess boundary:
 
 ### Stable join keys
 
-- `dense_arrays.id` -> `solutions.solution_id`
+- `records.id` -> `solutions.solution_id`
 - `solutions.attempt_id` -> `attempts.attempt_id`
 - `solutions.solution_id` -> `composition.solution_id`
 - `attempts.library_index` -> `libraries/library_builds.parquet`
@@ -82,7 +88,7 @@ Read outputs by subprocess boundary:
 Stage-A joins use `tfbs_id` / `motif_id` where present.
 
 Interpretation rule:
-- `dense_arrays` is the final accepted surface.
+- `records` is the final accepted surface.
 - `solutions` and `composition` explain how each final row was assembled.
 - `attempts` explains why non-accepted work was rejected or failed.
 

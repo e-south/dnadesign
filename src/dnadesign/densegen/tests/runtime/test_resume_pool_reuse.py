@@ -95,7 +95,7 @@ def _write_config(path: Path, input_path: Path) -> None:
             "output": {
                 "targets": ["parquet"],
                 "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-                "parquet": {"path": "outputs/tables/dense_arrays.parquet"},
+                "parquet": {"path": "outputs/tables/records.parquet"},
             },
             "generation": {
                 "sequence_length": 3,
@@ -155,7 +155,7 @@ def test_resume_uses_existing_pool_without_inputs(tmp_path: Path) -> None:
     def _sink_factory(_cfg, _path):
         tables_root = tmp_path / "outputs" / "tables"
         tables_root.mkdir(parents=True, exist_ok=True)
-        out_file = tables_root / "dense_arrays.parquet"
+        out_file = tables_root / "records.parquet"
         return [ParquetSink(path=str(out_file), chunk_size=1)]
 
     deps = PipelineDeps(
@@ -182,7 +182,7 @@ def test_run_pipeline_fails_when_effective_config_write_fails(tmp_path: Path, mo
     def _sink_factory(_cfg, _path):
         tables_root = tmp_path / "outputs" / "tables"
         tables_root.mkdir(parents=True, exist_ok=True)
-        out_file = tables_root / "dense_arrays.parquet"
+        out_file = tables_root / "records.parquet"
         return [ParquetSink(path=str(out_file), chunk_size=1)]
 
     deps = PipelineDeps(
@@ -214,7 +214,7 @@ def test_run_pipeline_fails_when_stage_b_event_emit_fails(tmp_path: Path, monkey
     def _sink_factory(_cfg, _path):
         tables_root = tmp_path / "outputs" / "tables"
         tables_root.mkdir(parents=True, exist_ok=True)
-        out_file = tables_root / "dense_arrays.parquet"
+        out_file = tables_root / "records.parquet"
         return [ParquetSink(path=str(out_file), chunk_size=1)]
 
     deps = PipelineDeps(
@@ -373,7 +373,7 @@ def test_load_resume_state_uses_streaming_scan(monkeypatch, tmp_path: Path) -> N
         raise AssertionError("resume state should not use dataframe loading")
 
     def _scan_records_from_config(*_args, **_kwargs):
-        return iter(rows), "parquet:/tmp/dense_arrays.parquet"
+        return iter(rows), "parquet:/tmp/records.parquet"
 
     monkeypatch.setattr(
         resume_state_module,
@@ -437,7 +437,7 @@ def test_load_resume_state_rejects_stream_records_with_mismatched_run_id(monkeyp
                 "densegen__used_tfbs_detail": [],
             }
         ]
-        return iter(rows), "parquet:/tmp/dense_arrays.parquet"
+        return iter(rows), "parquet:/tmp/records.parquet"
 
     monkeypatch.setattr(
         resume_state_module,

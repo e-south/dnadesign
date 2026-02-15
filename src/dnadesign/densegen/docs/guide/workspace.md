@@ -11,6 +11,7 @@ Packaged demos use schema `2.9`, and `config.yaml` is the contract anchor for al
 workspace/
   config.yaml
   inputs/
+  notebooks/
   outputs/
     meta/
     logs/
@@ -18,7 +19,6 @@ workspace/
     libraries/
     tables/
     plots/
-    report/
 ```
 
 ### Why this layout matters

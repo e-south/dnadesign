@@ -190,10 +190,10 @@ def _load_effective_config(run_root: Path) -> dict:
 
 
 def _load_dense_arrays(run_root: Path) -> pd.DataFrame:
-    path = run_root / "outputs" / "tables" / "dense_arrays.parquet"
+    path = run_root / "outputs" / "tables" / "records.parquet"
     if path.exists():
         return pd.read_parquet(path)
-    raise ValueError(f"dense_arrays.parquet not found: {path}")
+    raise ValueError(f"records.parquet not found: {path}")
 
 
 _PLOT_FNS = {
@@ -408,7 +408,7 @@ def run_plots_from_config(
         if row_count == 0:
             row_count = len(dense_arrays_df)
             src_label = _format_source_label(
-                f"dense_arrays:{run_root / 'outputs' / 'tables' / 'dense_arrays.parquet'}", run_root, absolute
+                f"dense_arrays:{run_root / 'outputs' / 'tables' / 'records.parquet'}", run_root, absolute
             )
 
     out_label = _format_plot_path(out_dir, run_root, absolute)

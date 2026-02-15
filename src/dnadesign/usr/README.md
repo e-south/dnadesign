@@ -407,8 +407,8 @@ usr snapshot densegen/demo   # writes records-YYYYMMDDThhmmssffffff.parquet unde
 There is a marimo notebook for interactive exploration (filters + summaries):
 
 ```bash
-# Install notebook deps.
-uv sync --locked --group notebooks
+# Install project deps (includes marimo).
+uv sync --locked
 
 # Open marimo explorer notebook.
 uv run marimo edit --sandbox --watch src/dnadesign/usr/notebooks/usr_explorer.py

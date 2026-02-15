@@ -85,7 +85,7 @@ def build_run_metrics(*, cfg, run_root: Path) -> pd.DataFrame:
     composition_path = tables_root / "composition.parquet"
     composition_df = pd.read_parquet(composition_path) if composition_path.exists() else pd.DataFrame()
 
-    dense_arrays_path = tables_root / "dense_arrays.parquet"
+    dense_arrays_path = tables_root / "records.parquet"
     dense_arrays_df = pd.DataFrame()
     if composition_df.empty and dense_arrays_path.exists():
         dense_arrays_df = pd.read_parquet(

@@ -5,11 +5,11 @@ from pathlib import Path
 import pandas as pd
 
 from dnadesign.densegen.src.config import load_config
-from dnadesign.densegen.src.core.reporting import write_report
+from dnadesign.densegen.src.core.reporting import collect_report_data
 from dnadesign.densegen.tests.config_fixtures import write_minimal_config
 
 
-def test_report_does_not_write_assets_dir(tmp_path: Path) -> None:
+def test_collect_report_data_does_not_write_report_dir(tmp_path: Path) -> None:
     run_root = tmp_path / "run"
     run_root.mkdir(parents=True)
     cfg_path = run_root / "config.yaml"
@@ -36,7 +36,7 @@ def test_report_does_not_write_assets_dir(tmp_path: Path) -> None:
     ).to_parquet(tables_root / "composition.parquet", index=False)
 
     loaded = load_config(cfg_path)
-    write_report(loaded.root, cfg_path)
+    collect_report_data(loaded.root, cfg_path)
 
-    assets_root = run_root / "outputs" / "report" / "assets"
-    assert not assets_root.exists()
+    report_root = run_root / "outputs" / "report"
+    assert not report_root.exists()

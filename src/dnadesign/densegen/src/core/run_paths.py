@@ -22,7 +22,6 @@ RUN_POOLS_DIR = "pools"
 RUN_LIBRARIES_DIR = "libraries"
 RUN_TABLES_DIR = "tables"
 RUN_PLOTS_DIR = "plots"
-RUN_REPORT_DIR = "report"
 RUN_NOTIFY_DIR = "notify"
 CANDIDATES_DIR = "candidates"
 
@@ -32,7 +31,7 @@ RUN_STATE_NAME = "run_state.json"
 ID_INDEX_NAME = "_densegen_ids.sqlite"
 
 TABLE_FILES = {
-    "dense_arrays.parquet",
+    "records.parquet",
     "attempts.parquet",
     "solutions.parquet",
     "composition.parquet",
@@ -44,7 +43,6 @@ NON_BLOCKING_OUTPUT_DIRS = {
     RUN_POOLS_DIR,
     RUN_LIBRARIES_DIR,
     RUN_PLOTS_DIR,
-    RUN_REPORT_DIR,
     RUN_NOTIFY_DIR,
 }
 META_BLOCKING_FILES = {
@@ -81,10 +79,6 @@ def run_plots_root(run_root: Path) -> Path:
     return run_outputs_root(run_root) / RUN_PLOTS_DIR
 
 
-def run_report_root(run_root: Path) -> Path:
-    return run_outputs_root(run_root) / RUN_REPORT_DIR
-
-
 def ensure_run_meta_dir(run_root: Path) -> Path:
     meta = run_meta_root(run_root)
     meta.mkdir(parents=True, exist_ok=True)
@@ -108,7 +102,7 @@ def id_index_path(run_root: Path) -> Path:
 
 
 def dense_arrays_path(run_root: Path) -> Path:
-    return run_tables_root(run_root) / "dense_arrays.parquet"
+    return run_tables_root(run_root) / "records.parquet"
 
 
 def attempts_path(run_root: Path) -> Path:

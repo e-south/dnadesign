@@ -374,7 +374,7 @@ def cmd_notebook_run(
 
         if importlib.util.find_spec("marimo") is None:
             raise OpalError(
-                "marimo is not installed. Install with `uv sync --group notebooks` or `uv pip install marimo`.",
+                "marimo is not installed. Install with `uv sync --locked` or `uv pip install marimo`.",
                 ExitCodes.BAD_ARGS,
             )
 

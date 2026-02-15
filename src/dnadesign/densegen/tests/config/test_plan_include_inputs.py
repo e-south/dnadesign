@@ -40,7 +40,7 @@ def _write_config(tmp_path: Path, plan_block: str) -> Path:
               bio_type: dna
               alphabet: dna_4
             parquet:
-              path: outputs/tables/dense_arrays.parquet
+              path: outputs/tables/records.parquet
           generation:
             sequence_length: 20
             sampling:

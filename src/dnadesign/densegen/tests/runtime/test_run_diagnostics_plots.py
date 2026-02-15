@@ -581,7 +581,7 @@ def test_load_dense_arrays_requires_dense_arrays_table(tmp_path: Path) -> None:
         ]
     ).to_parquet(tables / "solutions.parquet", index=False)
 
-    with pytest.raises(ValueError, match="dense_arrays.parquet not found"):
+    with pytest.raises(ValueError, match="records.parquet not found"):
         _load_dense_arrays(tmp_path)
 
 

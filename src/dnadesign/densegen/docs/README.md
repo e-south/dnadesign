@@ -25,7 +25,7 @@ If you only need one answer:
 Use DenseGen when you need:
 - controlled library generation with explicit constraints
 - repeatable run state and resume behavior
-- diagnostics and report artifacts
+- diagnostics and notebook-ready artifacts
 
 Current config schema version: `2.9`.
 
@@ -54,13 +54,13 @@ DenseGen has four runtime subprocesses with clear boundaries:
 1. **Stage-A pool build**: sample/ingest candidate sites per input, score/filter, and write pool artifacts.
 2. **Stage-B library build**: create plan-scoped solver libraries from Stage-A pools.
 3. **Solve to quota**: generate accepted arrays under constraints and runtime limits.
-4. **Post-run rendering**: generate plots and reports from written tables/manifests.
+4. **Post-run rendering**: generate plots and workspace-scoped notebooks from written tables/manifests.
 
 Command mapping:
 - `dense stage-a build-pool`
 - `dense stage-b build-libraries`
 - `dense run`
-- `dense plot` and `dense report`
+- `dense plot` and `dense notebook generate`
 
 `dense run` orchestrates this pipeline end-to-end and auto-builds missing Stage-A/Stage-B artifacts.
 

@@ -50,7 +50,7 @@ def _write_config(path: Path, *, meme_path: Path) -> None:
               bio_type: dna
               alphabet: dna_4
             parquet:
-              path: outputs/tables/dense_arrays.parquet
+              path: outputs/tables/records.parquet
           generation:
             sequence_length: 10
             plan:

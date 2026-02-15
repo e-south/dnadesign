@@ -17,7 +17,7 @@ Commands:
   - run             : Execute generation pipeline; optionally auto-plot.
   - plot            : Generate plots from outputs using config YAML.
   - ls-plots         : List available plot names and descriptions.
-  - report          : Generate audit-grade report tables for a run.
+  - notebook        : Generate/run workspace-scoped marimo notebooks.
 
 Run:
   python -m dnadesign.densegen.src.cli --help
@@ -50,8 +50,8 @@ from rich.traceback import install as rich_traceback
 from .cli_commands.config import register_validate_command
 from .cli_commands.context import CliContext
 from .cli_commands.inspect import register_inspect_commands
+from .cli_commands.notebook import register_notebook_commands
 from .cli_commands.plots import register_plot_commands
-from .cli_commands.report import register_report_command
 from .cli_commands.run import register_run_commands
 from .cli_commands.stage_a import register_stage_a_commands
 from .cli_commands.stage_b import register_stage_b_commands
@@ -676,7 +676,7 @@ def _render_output_schema_hint(exc: Exception) -> bool:
     if "Existing Parquet schema does not match the current DenseGen schema" in msg:
         console.print(f"[bold red]Output schema mismatch:[/] {msg}")
         console.print("[bold]Next steps[/]:")
-        console.print("  - Remove outputs/tables/dense_arrays.parquet and outputs/meta/_densegen_ids.sqlite, or")
+        console.print("  - Remove outputs/tables/records.parquet and outputs/meta/_densegen_ids.sqlite, or")
         console.print("  - Stage a fresh workspace with `dense workspace init --copy-inputs` and re-run.")
         return True
     if "Output sinks are out of sync before run" in msg:
@@ -768,11 +768,13 @@ inspect_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Insp
 stage_a_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Stage-A helpers (input TFBS pools).")
 stage_b_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Stage-B helpers (library sampling).")
 workspace_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Workspace scaffolding.")
+notebook_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Workspace-scoped notebook workflows.")
 
 app.add_typer(inspect_app, name="inspect")
 app.add_typer(stage_a_app, name="stage-a")
 app.add_typer(stage_b_app, name="stage-b")
 app.add_typer(workspace_app, name="workspace")
+app.add_typer(notebook_app, name="notebook")
 
 cli_context = CliContext(
     console=console,
@@ -789,7 +791,6 @@ cli_context = CliContext(
     default_config_missing_message=DEFAULT_CONFIG_MISSING_MESSAGE,
 )
 register_inspect_commands(inspect_app, context=cli_context)
-register_report_command(app, context=cli_context)
 register_validate_command(
     app,
     context=cli_context,
@@ -813,6 +814,7 @@ register_stage_a_commands(
     stage_a_sampling_rows=_stage_a_sampling_rows,
 )
 register_stage_b_commands(stage_b_app, context=cli_context, short_hash=_short_hash)
+register_notebook_commands(notebook_app, context=cli_context)
 register_run_commands(
     app,
     context=cli_context,

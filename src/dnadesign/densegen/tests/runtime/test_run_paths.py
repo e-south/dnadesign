@@ -14,7 +14,6 @@ def test_existing_outputs_ignores_pre_run_dirs(tmp_path: Path) -> None:
     (outputs_root / "libraries").mkdir(parents=True)
     (outputs_root / "tables").mkdir(parents=True)
     (outputs_root / "plots").mkdir(parents=True)
-    (outputs_root / "report").mkdir(parents=True)
     assert not has_existing_run_outputs(run_root)
 
     (outputs_root / "pools" / "pool_manifest.json").write_text("{}")
@@ -22,12 +21,20 @@ def test_existing_outputs_ignores_pre_run_dirs(tmp_path: Path) -> None:
     assert not has_existing_run_outputs(run_root)
 
 
+def test_existing_outputs_detects_report_dir(tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    outputs_root = run_outputs_root(run_root)
+    (outputs_root / "report").mkdir(parents=True)
+
+    assert has_existing_run_outputs(run_root)
+
+
 def test_existing_outputs_detects_root_files(tmp_path: Path) -> None:
     run_root = tmp_path / "run"
     outputs_root = run_outputs_root(run_root)
     tables_root = outputs_root / "tables"
     tables_root.mkdir(parents=True)
-    (tables_root / "dense_arrays.parquet").write_text("stub")
+    (tables_root / "records.parquet").write_text("stub")
     assert has_existing_run_outputs(run_root)
 
 
