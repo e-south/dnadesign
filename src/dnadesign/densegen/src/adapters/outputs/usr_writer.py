@@ -70,6 +70,9 @@ class USRWriter:
     _flush_count: int = field(default=0, init=False, repr=False)
     _last_health_event_ts: Optional[float] = field(default=None, init=False, repr=False)
     _last_health_meta: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
+    _run_started_monotonic: float = field(default_factory=time.monotonic, init=False, repr=False)
+    _resume_detected: bool = field(default=False, init=False, repr=False)
+    _lifecycle_emitted: bool = field(default=False, init=False, repr=False)
 
     def __post_init__(self):
         if self.root is None:
@@ -88,6 +91,8 @@ class USRWriter:
             self.ds.init(source="densegen init")
         self._configure_npz()
         self._configure_id_index()
+        digest = self.alignment_digest()
+        self._resume_detected = bool(digest is not None and int(digest.id_count) > 0)
 
     def _configure_npz(self) -> None:
         fields = [str(f).strip() for f in self.npz_fields if str(f).strip()]
@@ -127,6 +132,16 @@ class USRWriter:
                 f"sink=({self.default_bio_type}, {self.default_alphabet})"
             )
         validate_metadata(record.meta)
+        if not self._lifecycle_emitted:
+            lifecycle_status = "resumed" if self._resume_detected else "started"
+            self._emit_densegen_health_event(
+                status=lifecycle_status,
+                record=record,
+                rows_incoming=0,
+                rows_written=0,
+                force=True,
+            )
+            self._lifecycle_emitted = True
         seq_id = record.id
         if self.deduplicate:
             if seq_id in self._seen_ids:
@@ -240,6 +255,17 @@ class USRWriter:
             force=True,
         )
 
+    def on_run_failure(self, exc: Exception) -> None:
+        self._emit_densegen_health_event(
+            status="failed",
+            record=None,
+            rows_incoming=0,
+            rows_written=0,
+            force=True,
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+        )
+
     def existing_ids(self) -> set:
         if self._id_index is None:
             return set(self._seen_ids)
@@ -351,6 +377,8 @@ class USRWriter:
         rows_incoming: int,
         rows_written: int,
         force: bool,
+        error_type: str | None = None,
+        error_message: str | None = None,
     ) -> None:
         now = time.monotonic()
         if (
@@ -369,6 +397,17 @@ class USRWriter:
         quota_progress_pct = None
         if quota and quota > 0:
             quota_progress_pct = float(self._rows_written_session) / float(quota) * 100.0
+        run_elapsed_seconds = max(0.0, float(now - self._run_started_monotonic))
+        used_tfbs_raw = meta.get("used_tfbs")
+        used_tfbs_unique_count = None
+        if isinstance(used_tfbs_raw, list):
+            used_tfbs_unique_count = len({str(item).strip() for item in used_tfbs_raw if str(item).strip()})
+        tfbs_total_library = self._to_int(meta.get("library_unique_tfbs_count"))
+        tfbs_coverage_pct = None
+        if tfbs_total_library is not None and tfbs_total_library > 0 and used_tfbs_unique_count is not None:
+            tfbs_coverage_pct = float(used_tfbs_unique_count) / float(tfbs_total_library) * 100.0
+        plans_attempted = int(self._rows_incoming_session)
+        plans_solved = int(self._rows_written_session)
 
         metrics: dict[str, Any] = {
             "rows_incoming_flush": int(rows_incoming),
@@ -384,6 +423,18 @@ class USRWriter:
             "library_unique_tf_count": self._to_int(meta.get("library_unique_tf_count")),
             "library_unique_tfbs_count": self._to_int(meta.get("library_unique_tfbs_count")),
             "solver_solve_time_s": self._to_float(meta.get("solver_solve_time_s")),
+            "run_elapsed_seconds": run_elapsed_seconds,
+            "densegen": {
+                "tfbs_total_library": tfbs_total_library,
+                "tfbs_unique_used": used_tfbs_unique_count,
+                "tfbs_coverage_pct": tfbs_coverage_pct,
+                "plans_attempted": plans_attempted,
+                "plans_solved": plans_solved,
+                "rows_written_session": int(self._rows_written_session),
+                "run_quota": quota,
+                "quota_progress_pct": quota_progress_pct,
+                "run_elapsed_seconds": run_elapsed_seconds,
+            },
         }
         args: dict[str, Any] = {
             "status": str(status),
@@ -395,6 +446,10 @@ class USRWriter:
             "sampling_library_hash": meta.get("sampling_library_hash"),
             "solver_status": meta.get("solver_status"),
         }
+        if error_type is not None:
+            args["error_type"] = str(error_type)
+        if error_message is not None:
+            args["error"] = str(error_message)
         self.ds.log_event(
             "densegen_health",
             args=args,
@@ -403,7 +458,8 @@ class USRWriter:
             target_path=self.ds.records_path,
             actor=self._densegen_actor(run_id),
         )
-        self._last_health_event_ts = now
+        if str(status).strip().lower() == "running":
+            self._last_health_event_ts = now
 
     @staticmethod
     def _to_int(value: Any) -> int | None:

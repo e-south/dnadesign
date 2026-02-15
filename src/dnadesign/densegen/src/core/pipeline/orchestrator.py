@@ -2046,6 +2046,13 @@ def run_pipeline(
             per_plan=per_plan,
             generated_this_run=max(0, int(total) - int(existing_total)),
         )
+    except Exception as exc:
+        for sink in sinks:
+            try:
+                sink.on_run_failure(exc)
+            except Exception:
+                log.debug("Failed to emit sink failure signal.", exc_info=True)
+        raise
     finally:
         if shared_dashboard is not None:
             shared_dashboard.close()

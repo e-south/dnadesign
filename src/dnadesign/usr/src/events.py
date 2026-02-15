@@ -94,6 +94,36 @@ def _redact_args(args: Optional[Mapping[str, Any]]) -> dict[str, Any]:
     return dict(_redact_arg_value(args, force_redact=False))
 
 
+def _default_actor() -> dict[str, Any]:
+    tool = str(os.getenv("USR_ACTOR_TOOL") or "usr").strip() or "usr"
+    run_id = str(os.getenv("USR_ACTOR_RUN_ID") or "").strip()
+    if not run_id:
+        run_id = f"usr-pid-{os.getpid()}"
+    return {
+        "tool": tool,
+        "run_id": run_id,
+        "host": socket.gethostname(),
+        "pid": os.getpid(),
+    }
+
+
+def _normalize_actor(actor: Mapping[str, Any] | None) -> dict[str, Any]:
+    if actor is None:
+        return _default_actor()
+    if not isinstance(actor, Mapping):
+        raise TypeError("actor must be a mapping when provided")
+    actor_payload = dict(actor)
+    tool = str(actor_payload.get("tool") or "").strip()
+    if not tool:
+        raise ValueError("actor.tool must be a non-empty string")
+    run_id = str(actor_payload.get("run_id") or "").strip()
+    if not run_id:
+        raise ValueError("actor.run_id must be a non-empty string")
+    actor_payload["tool"] = tool
+    actor_payload["run_id"] = run_id
+    return actor_payload
+
+
 def _sha256_file(path: Path, chunk: int = 1 << 16) -> str:
     h = hashlib.sha256()
     with Path(path).open("rb") as f:
@@ -142,15 +172,7 @@ def record_event(
     maintenance = dict(maintenance or {})
     if registry_hash is None and dataset_root is not None:
         registry_hash = _registry_hash(Path(dataset_root), required=False)
-    if actor is None:
-        tool = os.getenv("USR_ACTOR_TOOL") or "usr"
-        run_id = os.getenv("USR_ACTOR_RUN_ID")
-        actor = {
-            "tool": tool,
-            "run_id": run_id,
-            "host": socket.gethostname(),
-            "pid": os.getpid(),
-        }
+    actor_value = _normalize_actor(actor)
     payload = {
         "event_version": USR_EVENT_VERSION,
         "timestamp_utc": now_utc(),
@@ -165,7 +187,7 @@ def record_event(
         "maintenance": maintenance,
         "fingerprint": fingerprint_parquet(target_path).to_dict(),
         "registry_hash": registry_hash,
-        "actor": actor,
+        "actor": actor_value,
         "version": __version__,
     }
     event_path = Path(event_path)

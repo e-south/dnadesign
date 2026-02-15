@@ -8,16 +8,63 @@
 
 set -euo pipefail
 
-EVENTS_PATH="${EVENTS_PATH:-$PWD/outputs/usr_datasets/densegen/demo/.events.log}"
-CURSOR_PATH="${CURSOR_PATH:-$PWD/outputs/notify.cursor}"
-SPOOL_DIR="${SPOOL_DIR:-$PWD/outputs/notify_spool}"
-WEBHOOK_ENV="${WEBHOOK_ENV:-DENSEGEN_WEBHOOK}"
+NOTIFY_PROFILE="${NOTIFY_PROFILE:-}"
+EVENTS_PATH="${EVENTS_PATH:-}"
+NOTIFY_TOOL="${NOTIFY_TOOL:-}"
+NOTIFY_CONFIG="${NOTIFY_CONFIG:-}"
+NOTIFY_NAMESPACE="${NOTIFY_NAMESPACE:-}"
+CURSOR_PATH="${CURSOR_PATH:-}"
+SPOOL_DIR="${SPOOL_DIR:-}"
+WEBHOOK_ENV="${WEBHOOK_ENV:-NOTIFY_WEBHOOK}"
 NOTIFY_PROVIDER="${NOTIFY_PROVIDER:-slack}"
-NOTIFY_ACTIONS="${NOTIFY_ACTIONS:-densegen_health,densegen_flush_failed,materialize}"
+NOTIFY_POLICY="${NOTIFY_POLICY:-}"
+NOTIFY_ACTIONS="${NOTIFY_ACTIONS:-}"
+NOTIFY_TOOLS="${NOTIFY_TOOLS:-}"
+NOTIFY_IDLE_TIMEOUT_SECONDS="${NOTIFY_IDLE_TIMEOUT_SECONDS:-3600}"
+NOTIFY_POLL_INTERVAL_SECONDS="${NOTIFY_POLL_INTERVAL_SECONDS:-1.0}"
+NOTIFY_TLS_CA_BUNDLE="${NOTIFY_TLS_CA_BUNDLE:-${SSL_CERT_FILE:-}}"
 
-if [[ ! -f "$EVENTS_PATH" ]]; then
-  echo "Missing events log: $EVENTS_PATH" >&2
-  echo "Set EVENTS_PATH to a USR dataset .events.log path." >&2
+if [[ -n "$NOTIFY_PROFILE" ]]; then
+  if [[ ! -f "$NOTIFY_PROFILE" ]]; then
+    echo "Missing notify profile: $NOTIFY_PROFILE" >&2
+    echo "Set NOTIFY_PROFILE to an existing profile JSON path." >&2
+    exit 2
+  fi
+
+  PROFILE_WATCH_ARGS=(
+    --profile "$NOTIFY_PROFILE"
+    --wait-for-events
+    --idle-timeout "$NOTIFY_IDLE_TIMEOUT_SECONDS"
+    --poll-interval-seconds "$NOTIFY_POLL_INTERVAL_SECONDS"
+    --stop-on-terminal-status
+    --follow
+  )
+  if [[ -n "$NOTIFY_TLS_CA_BUNDLE" ]]; then
+    PROFILE_WATCH_ARGS+=(--tls-ca-bundle "$NOTIFY_TLS_CA_BUNDLE")
+  fi
+  uv run notify usr-events watch "${PROFILE_WATCH_ARGS[@]}"
+  exit 0
+fi
+
+if [[ -z "$EVENTS_PATH" ]]; then
+  if [[ -z "$NOTIFY_TOOL" || -z "$NOTIFY_CONFIG" ]]; then
+    echo "Missing events source." >&2
+    echo "Set NOTIFY_PROFILE, or set EVENTS_PATH, or set NOTIFY_TOOL with NOTIFY_CONFIG for auto-resolve." >&2
+    exit 2
+  fi
+  EVENTS_PATH="$(uv run notify setup resolve-events --tool "$NOTIFY_TOOL" --config "$NOTIFY_CONFIG")"
+  if [[ -z "$NOTIFY_POLICY" ]]; then
+    RESOLVED_POLICY="$(
+      uv run notify setup resolve-events --tool "$NOTIFY_TOOL" --config "$NOTIFY_CONFIG" --print-policy
+    )"
+    if [[ -n "$RESOLVED_POLICY" ]]; then
+      NOTIFY_POLICY="$RESOLVED_POLICY"
+    fi
+  fi
+fi
+
+if [[ -e "$EVENTS_PATH" && ! -f "$EVENTS_PATH" ]]; then
+  echo "Events path exists but is not a file: $EVENTS_PATH" >&2
   exit 2
 fi
 
@@ -27,11 +74,72 @@ if [[ -z "${!WEBHOOK_ENV:-}" ]]; then
   exit 2
 fi
 
-uv run notify usr-events watch \
-  --events "$EVENTS_PATH" \
-  --cursor "$CURSOR_PATH" \
-  --spool-dir "$SPOOL_DIR" \
-  --provider "$NOTIFY_PROVIDER" \
-  --url-env "$WEBHOOK_ENV" \
-  --only-actions "$NOTIFY_ACTIONS" \
+if [[ -z "$NOTIFY_POLICY" ]]; then
+  echo "Missing NOTIFY_POLICY." >&2
+  echo "Set NOTIFY_POLICY=densegen|infer_evo2|generic, or provide NOTIFY_TOOL with NOTIFY_CONFIG so policy can be resolved." >&2
+  exit 2
+fi
+
+if [[ -z "$NOTIFY_NAMESPACE" ]]; then
+  if [[ -n "$NOTIFY_TOOL" ]]; then
+    NOTIFY_NAMESPACE="$NOTIFY_TOOL"
+  else
+    echo "Missing NOTIFY_NAMESPACE." >&2
+    echo "Set NOTIFY_NAMESPACE for explicit EVENTS_PATH mode, or set NOTIFY_TOOL with NOTIFY_CONFIG so namespace can be derived." >&2
+    exit 2
+  fi
+fi
+if [[ -z "$CURSOR_PATH" ]]; then
+  CURSOR_PATH="$PWD/outputs/notify/$NOTIFY_NAMESPACE/cursor"
+fi
+if [[ -z "$SPOOL_DIR" ]]; then
+  SPOOL_DIR="$PWD/outputs/notify/$NOTIFY_NAMESPACE/spool"
+fi
+
+case "$NOTIFY_POLICY" in
+  densegen)
+    POLICY_ACTIONS="densegen_health,densegen_flush_failed,materialize"
+    POLICY_TOOLS="densegen"
+    ;;
+  infer_evo2)
+    POLICY_ACTIONS="attach,materialize"
+    POLICY_TOOLS="infer"
+    ;;
+  generic|"")
+    POLICY_ACTIONS=""
+    POLICY_TOOLS=""
+    ;;
+  *)
+    echo "Unsupported NOTIFY_POLICY: $NOTIFY_POLICY" >&2
+    echo "Supported policies: densegen | infer_evo2 | generic" >&2
+    exit 2
+    ;;
+esac
+
+NOTIFY_ACTIONS_EFFECTIVE="${NOTIFY_ACTIONS:-$POLICY_ACTIONS}"
+NOTIFY_TOOLS_EFFECTIVE="${NOTIFY_TOOLS:-$POLICY_TOOLS}"
+
+WATCH_ARGS=(
+  --events "$EVENTS_PATH"
+  --cursor "$CURSOR_PATH"
+  --spool-dir "$SPOOL_DIR"
+  --provider "$NOTIFY_PROVIDER"
+  --url-env "$WEBHOOK_ENV"
+  --wait-for-events
+  --idle-timeout "$NOTIFY_IDLE_TIMEOUT_SECONDS"
+  --poll-interval-seconds "$NOTIFY_POLL_INTERVAL_SECONDS"
+  --stop-on-terminal-status
   --follow
+)
+
+if [[ -n "$NOTIFY_ACTIONS_EFFECTIVE" ]]; then
+  WATCH_ARGS+=(--only-actions "$NOTIFY_ACTIONS_EFFECTIVE")
+fi
+if [[ -n "$NOTIFY_TOOLS_EFFECTIVE" ]]; then
+  WATCH_ARGS+=(--only-tools "$NOTIFY_TOOLS_EFFECTIVE")
+fi
+if [[ -n "$NOTIFY_TLS_CA_BUNDLE" ]]; then
+  WATCH_ARGS+=(--tls-ca-bundle "$NOTIFY_TLS_CA_BUNDLE")
+fi
+
+uv run notify usr-events watch "${WATCH_ARGS[@]}"

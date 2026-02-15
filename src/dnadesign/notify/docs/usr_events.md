@@ -1,4 +1,4 @@
-# Notify: consuming USR events
+# Notify: consuming Universal Sequence Record events
 
 This module-local page is a short index.
 For full operator procedures, use the canonical runbook:
@@ -12,23 +12,31 @@ For full operator procedures, use the canonical runbook:
 ## Fast path
 
 ```bash
+CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml
+RUN_ROOT="$(dirname "$CONFIG")"
+NOTIFY_DIR="$RUN_ROOT/outputs/notify/densegen"
+
 # Validate profile fields and secret wiring.
-uv run notify profile doctor --profile outputs/notify.profile.json
+uv run notify profile doctor --profile "$NOTIFY_DIR/profile.json"
 
 # Preview payloads first.
-uv run notify usr-events watch --profile outputs/notify.profile.json --dry-run
+uv run notify usr-events watch --profile "$NOTIFY_DIR/profile.json" --dry-run
 
 # Run live.
-uv run notify usr-events watch --profile outputs/notify.profile.json --follow
+uv run notify usr-events watch --profile "$NOTIFY_DIR/profile.json" --follow
+
+# Retry failed payloads from spool.
+uv run notify spool drain --profile "$NOTIFY_DIR/profile.json"
 ```
 
 ## Related stack docs
 
 - DenseGen local end-to-end demo: [../../densegen/docs/demo/demo_usr_notify.md](../../densegen/docs/demo/demo_usr_notify.md)
 - DenseGen event-boundary contract: [../../densegen/docs/reference/outputs.md#event-streams-and-consumers-densegen-vs-usr](../../densegen/docs/reference/outputs.md#event-streams-and-consumers-densegen-vs-usr)
-- USR event schema: [../../usr/README.md#event-log-schema](../../usr/README.md#event-log-schema)
+- Universal Sequence Record event schema: [../../usr/README.md#event-log-schema](../../usr/README.md#event-log-schema)
+- Setup command guide: [../../../../docs/notify/usr_events.md#command-anatomy-notify-setup-slack](../../../../docs/notify/usr_events.md#command-anatomy-notify-setup-slack)
 
 ## Boundary reminder
 
-Notify consumes USR `<dataset>/.events.log` only.
+Notify consumes Universal Sequence Record `<dataset>/.events.log` only.
 DenseGen `outputs/meta/events.jsonl` is runtime telemetry, not Notify input.

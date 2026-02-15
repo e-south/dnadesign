@@ -13,8 +13,6 @@ from __future__ import annotations
 
 import json
 import os
-import shlex
-import shutil
 import sys
 import time
 from collections import deque
@@ -28,9 +26,12 @@ import typer
 
 from .cli_commands import datasets as dataset_commands
 from .cli_commands import read as read_commands
+from .cli_commands import remotes as remotes_commands
 from .cli_commands import state as state_commands
 from .cli_commands import sync as sync_commands
 from .cli_commands import write as write_commands
+from .cli_event_output import emit_event_line as _emit_event_line_value
+from .cli_merge_policy import resolve_merge_policy
 from .cli_paths import (
     LEGACY_DATASET_PATH_ERROR as _LEGACY_DATASET_PATH_ERROR,
 )
@@ -49,25 +50,26 @@ from .cli_paths import (
 from .cli_paths import (
     resolve_path_anywhere as _resolve_path_anywhere_impl,
 )
-from .config import SSHRemoteConfig, get_remote, load_all, save_remote
 from .dataset import LEGACY_DATASET_PREFIX, Dataset
 from .errors import DuplicateIDError, SequencesError, UserAbort
 from .events import record_event
 from .io import read_parquet_head
 from .merge_datasets import (
     MergeColumnsMode,
-    MergePolicy,
     merge_usr_to_usr,
 )
 from .mock import MockSpec, add_demo_columns, create_mock_dataset
 from .overlays import list_overlays, overlay_metadata
 from .pretty import PrettyOpts, fmt_value
 from .registry import load_registry, parse_columns_spec, register_namespace
-from .remote import SSHRemote
 from .ui import (
     print_df_plain,
     render_table_rich,
 )
+
+# Compatibility exports kept for existing monkeypatch-based tests.
+shutil = remotes_commands.shutil
+SSHRemote = remotes_commands.SSHRemote
 
 
 # --------- small helpers for path-first UX (no-traceback, interactive pick) ---------
@@ -716,17 +718,9 @@ def cmd_overlay_compact(args) -> None:
 
 
 def _emit_event_line(line: str, fmt: str) -> None:
-    text = line.strip()
-    if not text:
-        return
-    if fmt == "raw":
-        print(text)
-        return
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError as e:
-        raise SequencesError(f"Invalid JSONL event line: {e}") from e
-    print(json.dumps(payload, separators=(",", ":")))
+    emitted = _emit_event_line_value(line, fmt)
+    if emitted is not None:
+        print(emitted)
 
 
 def cmd_events_tail(args) -> None:
@@ -743,8 +737,6 @@ def cmd_events_tail(args) -> None:
         raise SequencesError(f"Events log not found: {events_path}")
 
     fmt = str(getattr(args, "format", "json")).strip().lower()
-    if fmt not in {"json", "raw"}:
-        raise SequencesError("format must be 'json' or 'raw'.")
     n = int(getattr(args, "n", 0))
     follow = bool(getattr(args, "follow", False))
 
@@ -1010,22 +1002,13 @@ def cmd_add_demo(args):
 
 
 # ---------- MERGE DATASETS ----------
-def _policy_from_str(s: str) -> MergePolicy:
-    return {
-        "error": MergePolicy.ERROR,
-        "skip": MergePolicy.SKIP,
-        "prefer-src": MergePolicy.PREFER_SRC,
-        "prefer-dest": MergePolicy.PREFER_DEST,
-    }[s]
-
-
 def cmd_merge_datasets(args):
     columns = str(getattr(args, "columns", "") or "")
     cols_subset = [c.strip() for c in columns.split(",") if c.strip()] if columns else None
     require_same = bool(getattr(args, "require_same", False))
     mode = MergeColumnsMode.REQUIRE_SAME if require_same else MergeColumnsMode.UNION
     dup_policy = str(getattr(args, "dup_policy", "error") or "error")
-    policy = _policy_from_str(dup_policy)
+    policy = resolve_merge_policy(dup_policy)
     coerce_overlap = str(getattr(args, "coerce_overlap", "none") or "none")
     if coerce_overlap not in {"none", "to-dest"}:
         raise SequencesError("--coerce-overlap must be one of: none, to-dest")
@@ -1078,111 +1061,26 @@ def cmd_merge_datasets(args):
 
 
 # ---------- remotes commands ----------
-_BU_SCC_PRESET = "bu-scc"
-_BU_SCC_LOGIN_HOST = "scc1.bu.edu"
-_BU_SCC_TRANSFER_HOST = "scc-globus.bu.edu"
-
-
-def _render_ssh_config_snippet(*, alias: str, host: str, user: str) -> str:
-    return "\n".join(
-        [
-            f"Host {alias}",
-            f"  HostName {host}",
-            f"  User {user}",
-            "  IdentitiesOnly yes",
-            "  AddKeysToAgent yes",
-            "  ServerAliveInterval 60",
-            "  ServerAliveCountMax 2",
-            "  # If Duo prompts fail in your client, try:",
-            "  # PasswordAuthentication no",
-        ]
-    )
-
-
 def cmd_remotes_list(args):
-    remotes = load_all()
-    if not remotes:
-        print("(no remotes configured)")
-        return
-    for name, cfg in remotes.items():
-        print(f"{name:20s} ssh {cfg.user}@{cfg.host}  base_dir={cfg.base_dir}")
+    remotes_commands.cmd_remotes_list(args)
 
 
 def cmd_remotes_show(args):
-    cfg = get_remote(args.name)
-    print(f"name     : {cfg.name}")
-    print("type     : ssh")
-    print(f"ssh      : {cfg.user}@{cfg.host}")
-    print(f"base_dir : {cfg.base_dir}")
-    print(f"ssh_key  : {cfg.ssh_key_env or '(ssh-agent or default key)'}")
+    remotes_commands.cmd_remotes_show(args)
 
 
 def cmd_remotes_add(args):
-    if args.type != "ssh":
-        raise SystemExit("Only --type ssh is supported.")
-    cfg = SSHRemoteConfig(
-        name=args.name,
-        host=args.host,
-        user=args.user,
-        base_dir=args.base_dir,
-        ssh_key_env=args.ssh_key_env,
-    )
-    path = save_remote(cfg)
-    print(f"Saved remote '{cfg.name}' to {path}")
+    remotes_commands.cmd_remotes_add(args)
 
 
 def cmd_remotes_wizard(args):
-    preset = str(args.preset).strip().lower()
-    if preset != _BU_SCC_PRESET:
-        raise SystemExit(f"Unsupported preset '{args.preset}'. Supported presets: {_BU_SCC_PRESET}.")
-    host = (
-        args.host
-        if str(getattr(args, "host", "")).strip()
-        else (_BU_SCC_TRANSFER_HOST if bool(getattr(args, "transfer_node", False)) else _BU_SCC_LOGIN_HOST)
-    )
-    cfg = SSHRemoteConfig(
-        name=args.name,
-        host=host,
-        user=args.user,
-        base_dir=args.base_dir,
-        ssh_key_env=args.ssh_key_env,
-    )
-    path = save_remote(cfg)
-    print(f"Saved remote '{cfg.name}' to {path}")
-    print("\nSSH config snippet (copy into ~/.ssh/config):")
-    print(_render_ssh_config_snippet(alias=cfg.name, host=cfg.host, user=cfg.user))
+    remotes_commands.cmd_remotes_wizard(args)
 
 
 def cmd_remotes_doctor(args):
-    cfg = get_remote(args.remote)
-
-    if shutil.which("ssh") is None:
-        raise SystemExit("ssh not found on local PATH.")
-    if shutil.which("rsync") is None:
-        raise SystemExit("rsync not found on local PATH.")
-
-    remote = SSHRemote(cfg)
-    rc, _out, err = remote._ssh_run("echo USR_REMOTE_OK", check=False)
-    if rc != 0:
-        detail = err.strip() or "unknown ssh error"
-        raise SystemExit(f"SSH connectivity check failed for {cfg.ssh_target}: {detail}")
-
-    rc, _out, _err = remote._ssh_run("command -v rsync >/dev/null 2>&1", check=False)
-    if rc != 0:
-        raise SystemExit(f"Remote rsync is unavailable on {cfg.ssh_target}.")
-
-    if bool(getattr(args, "check_base_dir", True)):
-        base_dir = shlex.quote(cfg.base_dir)
-        rc, _out, _err = remote._ssh_run(f"test -d {base_dir}", check=False)
-        if rc != 0:
-            raise SystemExit(f"Remote base_dir does not exist: {cfg.base_dir}")
-
-    print(f"Remote: {cfg.name}")
-    print(f"SSH: {cfg.ssh_target} (ok)")
-    print("Remote rsync: ok")
-    if bool(getattr(args, "check_base_dir", True)):
-        print(f"base_dir: {cfg.base_dir} (ok)")
-    print("Doctor checks passed.")
+    remotes_commands.shutil = shutil
+    remotes_commands.SSHRemote = SSHRemote
+    remotes_commands.cmd_remotes_doctor(args)
 
 
 # ---------- namespace registry ----------

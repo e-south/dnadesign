@@ -25,7 +25,7 @@ def register_spool_drain_command(
     @spool_app.command("drain")
     def spool_drain(
         spool_dir: Path | None = typer.Option(None, "--spool-dir", help="Directory containing spooled payload files."),
-        provider: str | None = typer.Option(None, help="Provider: generic|slack|discord."),
+        provider: str | None = typer.Option(None, help="Override provider: generic|slack|discord."),
         url: str | None = typer.Option(None, help="Webhook URL."),
         url_env: str | None = typer.Option(None, help="Environment variable holding webhook URL."),
         secret_ref: str | None = typer.Option(
@@ -33,6 +33,7 @@ def register_spool_drain_command(
             "--secret-ref",
             help="Secret reference: keychain://service/account or secretservice://service/account.",
         ),
+        tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
         profile: Path | None = typer.Option(None, "--profile", help="Path to profile JSON file."),
         connect_timeout: float = typer.Option(5.0, help="HTTP connect timeout seconds."),
         read_timeout: float = typer.Option(10.0, help="HTTP read timeout seconds."),
@@ -46,6 +47,7 @@ def register_spool_drain_command(
             url=url,
             url_env=url_env,
             secret_ref=secret_ref,
+            tls_ca_bundle=tls_ca_bundle,
             profile=profile,
             connect_timeout=connect_timeout,
             read_timeout=read_timeout,

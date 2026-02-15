@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -19,8 +20,10 @@ import pandas as pd
 import pytest
 import yaml
 
+import dnadesign.usr as usr_pkg
 from dnadesign.densegen.src.adapters.optimizer import OptimizerRun
-from dnadesign.densegen.src.adapters.outputs import ParquetSink
+from dnadesign.densegen.src.adapters.outputs import ParquetSink, USRSink
+from dnadesign.densegen.src.adapters.outputs.usr_writer import USRWriter
 from dnadesign.densegen.src.adapters.sources import data_source_factory
 from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.core.pipeline import resume_state as resume_state_module
@@ -257,6 +260,58 @@ def test_run_pipeline_fails_when_stage_b_event_emit_fails(tmp_path: Path, monkey
 
     with pytest.raises(RuntimeError, match="RESAMPLE_TRIGGERED"):
         run_pipeline(loaded, deps=deps, resume=False, build_stage_a=True)
+
+
+def test_run_pipeline_emits_terminal_failure_health_event_for_usr_sink(tmp_path: Path, monkeypatch) -> None:
+    csv_path = tmp_path / "sites.csv"
+    csv_path.write_text("tf,tfbs\nTF1,AAA\n")
+    cfg_path = tmp_path / "config.yaml"
+    _write_config(cfg_path, csv_path)
+    loaded = load_config(cfg_path)
+
+    usr_root = tmp_path / "outputs" / "usr_datasets"
+    registry_src = Path(usr_pkg.__file__).resolve().parent / "datasets" / "registry.yaml"
+    registry_dst = usr_root / "registry.yaml"
+    registry_dst.parent.mkdir(parents=True, exist_ok=True)
+    registry_dst.write_text(registry_src.read_text(encoding="utf-8"), encoding="utf-8")
+
+    def _sink_factory(_cfg, _path):
+        writer = USRWriter(
+            dataset="demo",
+            root=usr_root,
+            namespace="densegen",
+            chunk_size=1,
+            allow_overwrite=False,
+        )
+        return [USRSink(writer)]
+
+    deps = PipelineDeps(
+        source_factory=data_source_factory,
+        sink_factory=_sink_factory,
+        optimizer=_DummyAdapter(),
+        pad=lambda *args, **kwargs: "",
+    )
+
+    def _raise_run_failure(**_kwargs):
+        raise RuntimeError("simulated run failure")
+
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.core.pipeline.orchestrator.run_plan_schedule",
+        _raise_run_failure,
+    )
+
+    with pytest.raises(RuntimeError, match="simulated run failure"):
+        run_pipeline(loaded, deps=deps, resume=False, build_stage_a=True)
+
+    events_path = usr_root / "demo" / ".events.log"
+    assert events_path.exists()
+    events = [json.loads(line) for line in events_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    terminal_failure = [
+        event
+        for event in events
+        if event.get("action") == "densegen_health" and str((event.get("args") or {}).get("status")) == "failed"
+    ]
+    assert terminal_failure
 
 
 def test_load_failure_counts_handles_numpy_arrays(tmp_path: Path) -> None:

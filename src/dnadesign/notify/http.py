@@ -12,10 +12,13 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import ssl
 import time
 import urllib.error
 import urllib.request
+from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from .errors import NotifyDeliveryError
 
@@ -27,6 +30,7 @@ def post_json(
     timeout: float = 10.0,
     retries: int = 0,
     user_agent: str = "dnadesign-notify",
+    tls_ca_bundle: Path | None = None,
 ) -> None:
     body = json.dumps(payload).encode("utf-8")
     headers = {
@@ -38,7 +42,17 @@ def post_json(
         attempt += 1
         req = urllib.request.Request(url, data=body, headers=headers, method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
+            scheme = urlparse(url).scheme.lower()
+            if scheme == "https":
+                if tls_ca_bundle is None:
+                    raise NotifyDeliveryError(
+                        "HTTPS webhook delivery requires a CA bundle. Pass --tls-ca-bundle or set SSL_CERT_FILE."
+                    )
+                context = ssl.create_default_context(cafile=str(tls_ca_bundle))
+                response = urllib.request.urlopen(req, timeout=timeout, context=context)
+            else:
+                response = urllib.request.urlopen(req, timeout=timeout)
+            with response as resp:
                 status = int(resp.getcode() or 0)
                 if status < 200 or status >= 300:
                     raise NotifyDeliveryError(f"Webhook returned status {status}")

@@ -1,0 +1,7 @@
+jobs:
+  - ingest:
+      source: usr
+      dataset: demo
+      root: /project/dunlop/esouth/dnadesign/.codex_tmp/audit_notify_autoload2/usr
+    io:
+      write_back: true

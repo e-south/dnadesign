@@ -275,6 +275,7 @@ meta.yaml
 
 # ADEs
 AGENTS.md
+!src/dnadesign/notify/AGENTS.md
 
 # Marimo
 **/__marimo__/cache/
