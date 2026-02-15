@@ -1,109 +1,67 @@
-## cruncher
+# Cruncher
 
-**cruncher** is a nucleic acid sequence design tool for generating short DNA sequences that jointly resemble multiple user-defined transcription factor motifs. Motifs can be represented as [position weight matrices (PWMs)](https://en.wikipedia.org/wiki/Position_weight_matrix).
+Cruncher designs short, fixed-length DNA sequences that jointly satisfy one or more TF motifs, then returns a diverse elite set.
 
-
-### Contents
+## Contents
 
 1. [Overview](#overview)
 2. [Quickstart](#quickstart)
-3. [More documentation](#more-documentation)
+3. [Documentation map](#documentation-map)
 
----
+## Overview
 
-### Overview
+Cruncher is an optimization tool with strict contracts:
 
-A typical workflow looks like:
+1. Cache TF binding sites per source.
+2. Merge sites per TF and discover motifs (typically MEME OOPS).
+3. Lock discovered motif artifacts for reproducible sampling.
+4. Parse, sample, and analyze from locked inputs.
 
-1. Fetch motif matrices and/or binding sites from a source (e.g., [RegulonDB](https://regulondb.ccg.unam.mx/), [JASPAR](https://jaspar.elixir.no/), or a local dataset).
-2. Lock TF names to exact cached artifacts (motif IDs + hashes) for reproducibility.
-3. Generate synthetic sequences (e.g., via [MCMC](https://en.wikipedia.org/wiki/Markov_chain_Monte_Carlo)) using the locked motifs.
-4. Analyze / visualize / report from run artifacts.
+Core properties:
+- fixed-length sequence optimization (`sample.sequence_length`)
+- best-hit PWM scoring per TF (optional bidirectional scan)
+- elite diversity via TFBS-core MMR
+- fail-fast behavior for invalid config/artifact states (no silent fallback)
 
-Scoring is **FIMO-like**: cruncher builds log-odds PWMs against a 0‑order
-background, scans each candidate sequence to find the best window per TF
-(optionally bidirectional), and can scale that best hit to a p‑value using a
-DP‑derived null distribution (`score_scale: logp`). For `logp`, the tail
-probability for the best window is converted to a sequence‑level p via
-`p_seq = 1 − (1 − p_win)^n_windows`. This is an internal implementation; cruncher
-does not call the FIMO binary.
+For the complete intent/lifecycle model, see `docs/guides/intent_and_lifecycle.md`.
 
----
-
-### Quickstart (happy path)
-
-**cruncher** uses **uv** for Python deps and **pixi** for system binaries (MEME Suite).
+## Quickstart
 
 ```bash
-# cd into a workspace
 cd src/dnadesign/cruncher/workspaces/demo_basics_two_tf
-
-# Optional: install system tools (MEME Suite) via pixi
-pixi install
-
-# Use pixi to keep MEME Suite on PATH; use uv for Python-only flows.
+CONFIG="$PWD/config.yaml"
 cruncher() { pixi run cruncher -- "$@"; }
-# cruncher() { uv run cruncher "$@"; }
 
-# Quick sanity check: list sources
-cruncher sources list
+# 1) Cache TFBS from both sources used by this demo.
+cruncher fetch sites --source demo_local_meme --tf lexA --tf cpxR --update -c "$CONFIG"
+cruncher fetch sites --source regulondb      --tf lexA --tf cpxR --update -c "$CONFIG"
 
-# Local demo cache (no network required)
-cruncher fetch motifs --source demo_local_meme --tf lexA --tf cpxR
-cruncher fetch sites --source demo_local_meme --tf lexA --tf cpxR
+# 2) Discover merged motifs (MEME OOPS).
+cruncher discover motifs --tf lexA --tf cpxR --tool meme --meme-mod oops --source-id demo_merged_meme_oops -c "$CONFIG"
 
-# Optional: fetch curated sites from RegulonDB (network)
-cruncher fetch sites --tf lexA --tf cpxR
-
-# Reproducibility pinning
-cruncher lock
-
-# Inspect cached PWMs / logos (optional)
-cruncher catalog pwms
-cruncher catalog logos --set 1
-
-# Optional: validate locked motifs
-cruncher parse
-
-# Optimization (auto-optimize is enabled by default)
-cruncher sample
-
-# Auto-opt can take minutes; for a quick demo run:
-# cruncher sample --no-auto-opt  # forces gibbs if optimizer.name=auto
-
-# Diagnostics + plots (defaults to latest run)
-cruncher analyze
-
-# Optional: print a concise summary to stdout
-cruncher analyze --summary
-
-# Optional: generate all plots
-# cruncher analyze --plots all
+# 3) Lock + parse + sample + analyze.
+cruncher lock -c "$CONFIG"
+cruncher parse --force-overwrite -c "$CONFIG"
+cruncher sample --force-overwrite -c "$CONFIG"
+cruncher analyze --summary -c "$CONFIG"
+cruncher export sequences --latest -c "$CONFIG"
 ```
 
----
-
 Notes:
-- Analysis writes a canonical summary to `analysis/summary.json`, a human‑readable
-  entrypoint to `analysis/report.md`, and a detailed artifact manifest to
-  `analysis/manifest.json`.
-- `trace.nc` contains draw phase only; `sample.output.trace.include_tune` controls
-  whether tune samples appear in `sequences.parquet`.
-- Motif overlap is a feature, not a failure; overlap plots are descriptive only.
+- Analysis entrypoints are `outputs/analysis/summary.json` and `outputs/analysis/report.md`.
+- Sequence-export entrypoints are under `outputs/export/sequences/`.
+- Elites showcase rendering goes through the baserender public API (`dnadesign.baserender`) only.
+- For demo-specific source mix and campaign flows, use the demo docs below.
 
-### More documentation
+## Documentation map
 
-1. [Documentation index](docs/index.md)
-2. [Two‑TF demo (end‑to‑end)](docs/demos/demo_basics_two_tf.md)
-3. [Campaign demo (multi‑TF)](docs/demos/demo_campaigns_multi_tf.md)
-4. [MEME Suite setup](docs/guides/meme_suite.md)
-5. [Sampling + analysis (auto‑optimize)](docs/guides/sampling_and_analysis.md)
-6. [Configure your project](docs/reference/config.md)
-7. [Ingesting and caching data](docs/guides/ingestion.md)
-8. [CLI reference](docs/reference/cli.md)
-9. [Architecture and artifacts](docs/reference/architecture.md)
-10. [Package spec (developers)](docs/internals/spec.md)
-
----
-
-@e-south
+1. [Docs index](docs/index.md)
+2. [Two-TF demo](docs/demos/demo_basics_two_tf.md)
+3. [Campaign demo (multi-TF)](docs/demos/demo_campaigns_multi_tf.md)
+4. [Three-TF DenseGen prep demo](docs/demos/demo_densegen_prep_three_tf.md)
+5. [Ingestion guide](docs/guides/ingestion.md)
+6. [MEME Suite guide](docs/guides/meme_suite.md)
+7. [Sampling and analysis](docs/guides/sampling_and_analysis.md)
+8. [Config reference](docs/reference/config.md)
+9. [CLI reference](docs/reference/cli.md)
+10. [Architecture reference](docs/reference/architecture.md)

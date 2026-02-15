@@ -17,8 +17,59 @@ import numpy as np
 
 from dnadesign.cruncher.core.pvalue import logodds_to_p_lookup
 from dnadesign.cruncher.core.pwm import PWM
+from dnadesign.cruncher.core.sequence import revcomp_int
+from dnadesign.cruncher.core.state import SequenceState
 
 logger = logging.getLogger(__name__)
+
+
+def _best_hit_from_llrs(
+    llrs_fwd: np.ndarray,
+    llrs_rev: np.ndarray | None,
+    *,
+    seq_len: int,
+    width: int,
+    prefer_strand: str = "+",
+    eps: float = 1.0e-12,
+) -> Tuple[float, int, str, str]:
+    if llrs_fwd.size == 0:
+        return float("-inf"), 0, prefer_strand, "empty"
+
+    fwd_max = float(np.max(llrs_fwd))
+    fwd_offsets = np.flatnonzero(np.abs(llrs_fwd - fwd_max) <= eps)
+    fwd_offset = int(np.min(fwd_offsets)) if fwd_offsets.size else int(np.argmax(llrs_fwd))
+    fwd_start = int(fwd_offset)
+    best_score = fwd_max
+    best_offset = fwd_offset
+    best_strand = "+"
+    best_start = fwd_start
+
+    if llrs_rev is None:
+        return best_score, best_offset, best_strand, "max_forward"
+
+    rev_max = float(np.max(llrs_rev))
+    rev_offsets = np.flatnonzero(np.abs(llrs_rev - rev_max) <= eps)
+    if rev_offsets.size:
+        rev_starts = seq_len - width - rev_offsets
+        best_rev_idx = int(np.argmin(rev_starts))
+        rev_offset = int(rev_offsets[best_rev_idx])
+        rev_start = int(rev_starts[best_rev_idx])
+    else:
+        rev_offset = int(np.argmax(llrs_rev))
+        rev_start = int(seq_len - width - rev_offset)
+
+    if rev_max > best_score + eps:
+        return rev_max, rev_offset, "-", "max_reverse"
+    if abs(rev_max - best_score) <= eps:
+        if rev_start < best_start:
+            return rev_max, rev_offset, "-", "tie_leftmost"
+        if rev_start == best_start and prefer_strand == "-":
+            return rev_max, rev_offset, "-", "tie_prefer_strand"
+    if abs(rev_max - best_score) <= eps and rev_start == best_start and prefer_strand == "+":
+        return best_score, best_offset, best_strand, "tie_prefer_strand"
+    if abs(rev_max - best_score) <= eps and rev_start > best_start:
+        return best_score, best_offset, best_strand, "tie_leftmost"
+    return best_score, best_offset, best_strand, "max_forward"
 
 
 @dataclass(slots=True)
@@ -149,18 +200,26 @@ class Scorer:
         idx = np.clip(idx, 0, info.tail_p.size - 1)
         return float(info.tail_p[idx])
 
+    @staticmethod
+    def _p_seq_from_p_win(p_win: float, n_offsets: int, *, bidirectional: bool) -> float:
+        n_offsets = max(1, int(n_offsets))
+        n_tests = n_offsets * (2 if bidirectional else 1)
+        log_term = np.log1p(-float(p_win))
+        return float(-np.expm1(float(n_tests) * log_term))
+
     def _per_pwm_neglogp(self, raw_llr: float, info: _PWMInfo, seq_length: int) -> float:
         """
         Compute −log10(p_seq) for a single PWM:
           p_win = P(X ≥ raw_llr) on one window,
           n_win = max(1, seq_length − width + 1),
-          p_seq = 1 − (1 − p_win)^n_win,
+          p_seq = 1 − (1 − p_win)^n_tests,
+          where n_tests = n_win (forward-only) or 2 * n_win (bidirectional).
           return −log10(p_seq).
         """
         w = info.width
         p_win = self._interp_tail_p(raw_llr, info)
         n_win = max(1, seq_length - w + 1)
-        p_seq = 1.0 - (1.0 - p_win) ** n_win
+        p_seq = self._p_seq_from_p_win(p_win, n_win, bidirectional=self.bidirectional)
         p_seq = max(p_seq, 1e-300)
         neglogp = -np.log10(p_seq)
         logger.debug(
@@ -178,29 +237,33 @@ class Scorer:
         info: _PWMInfo,
         *,
         rev: np.ndarray | None = None,
-    ) -> Tuple[float, int, str]:
+    ) -> Tuple[float, int, str, str]:
         """
         Scan a numeric‐encoded sequence to find the best raw LLR (and its offset & strand).
         """
         L, w = seq.size, info.width
         if L < w:
-            return float("-inf"), 0, "+"
+            return float("-inf"), 0, "+", "sequence_too_short"
 
-        def _scan(arr: np.ndarray, strand_label: str) -> Tuple[float, int, str]:
+        def _scan(arr: np.ndarray) -> np.ndarray:
             windows = np.lib.stride_tricks.sliding_window_view(arr, w)
             # windows shape: (L - w + 1, w)
-            llrs = info.lom[np.arange(w)[:, None], windows.T].sum(axis=0)
-            best_offset = int(np.argmax(llrs))
-            best_llr = float(llrs[best_offset])
-            return best_llr, best_offset, strand_label
+            return info.lom[np.arange(w)[:, None], windows.T].sum(axis=0)
 
-        best_llr, best_offset, best_strand = _scan(seq, "+")
+        llrs_fwd = _scan(seq)
+        llrs_rev = None
         if self.bidirectional:
             if rev is None:
                 rev = (3 - seq)[::-1]
-            rev_llr, rev_offset, rev_strand = _scan(rev, "-")
-            if rev_llr > best_llr:
-                best_llr, best_offset, best_strand = rev_llr, rev_offset, rev_strand
+            llrs_rev = _scan(rev)
+
+        best_llr, best_offset, best_strand, tiebreak = _best_hit_from_llrs(
+            llrs_fwd,
+            llrs_rev,
+            seq_len=L,
+            width=w,
+            prefer_strand="+",
+        )
 
         logger.debug(
             "    BEST_LLR: best_llr=%.3f at offset=%d, strand=%s",
@@ -208,7 +271,7 @@ class Scorer:
             best_offset,
             best_strand,
         )
-        return best_llr, best_offset, best_strand
+        return best_llr, best_offset, best_strand, tiebreak
 
     def _info(self, tf: str) -> _PWMInfo:
         info = self._cache.get(tf)
@@ -238,7 +301,35 @@ class Scorer:
 
     def best_llr(self, seq: np.ndarray, tf: str) -> Tuple[float, int, str]:
         info = self._info(tf)
-        return self._best_llr_and_location(seq, info)
+        raw_llr, offset, strand, _ = self._best_llr_and_location(seq, info)
+        return raw_llr, offset, strand
+
+    def best_hit(self, seq: np.ndarray, tf: str) -> Dict[str, object]:
+        info = self._info(tf)
+        rev = (3 - seq)[::-1] if self.bidirectional else None
+        raw_llr, offset, strand, tiebreak = self._best_llr_and_location(seq, info, rev=rev)
+        width = int(info.width)
+        if strand == "-":
+            start = int(seq.size - width - offset)
+        else:
+            start = int(offset)
+        window = np.asarray(seq, dtype=np.int8)[start : start + width]
+        if window.size != width:
+            raise ValueError(f"Best-hit window out of bounds for TF '{tf}'.")
+        if strand == "-":
+            core = revcomp_int(window)
+        else:
+            core = window
+        return {
+            "best_score_raw": float(raw_llr),
+            "offset": int(start),
+            "best_start": int(start),
+            "strand": str(strand),
+            "width": int(width),
+            "best_window_seq": SequenceState(window).to_string(),
+            "best_core_seq": SequenceState(core).to_string(),
+            "best_hit_tiebreak": str(tiebreak),
+        }
 
     def normalized_llr_map(self, seq: np.ndarray) -> Dict[str, float]:
         out: Dict[str, float] = {}
@@ -271,7 +362,7 @@ class Scorer:
         logger.debug("compute_all_per_pwm: seq_length=%d, scale=%s", seq_length, self.scale)
         rev = (3 - seq)[::-1] if self.bidirectional else None
         for tf, info in self._cache.items():
-            raw_llr, offset, strand = self._best_llr_and_location(seq, info, rev=rev)
+            raw_llr, offset, strand, _ = self._best_llr_and_location(seq, info, rev=rev)
 
             if self.scale == "llr":
                 out[tf] = float(raw_llr)

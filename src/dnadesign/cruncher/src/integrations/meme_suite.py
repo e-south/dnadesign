@@ -105,7 +105,7 @@ def check_meme_tools(*, tool: str, tool_path: Path | None) -> tuple[bool, list[M
                     status="missing",
                     path="-",
                     version="-",
-                    hint="Install MEME Suite and set MEME_BIN or motif_discovery.tool_path.",
+                    hint="Install MEME Suite and set MEME_BIN or discover.tool_path.",
                 )
             )
             continue

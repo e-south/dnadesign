@@ -16,7 +16,19 @@ from pathlib import Path
 
 import yaml
 
-from dnadesign.cruncher.analysis.layout import report_json_path, report_md_path
+from dnadesign.cruncher.analysis.layout import (
+    analysis_manifest_path,
+    analysis_plot_path,
+    analysis_table_filename,
+    analysis_table_path,
+    analysis_used_path,
+    plot_manifest_path,
+    report_json_path,
+    report_md_path,
+    summary_path,
+    table_manifest_path,
+)
+from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json, atomic_write_text
 
 
 def _load_json(path: Path) -> dict | None:
@@ -64,19 +76,18 @@ def _safe_int(value: object) -> int | None:
         return None
 
 
-def _path_if_exists(base: Path, rel: str) -> str | None:
-    path = base / rel
-    return rel if path.exists() else None
+def _relative_if_exists(base: Path, target: Path) -> str | None:
+    if not target.exists():
+        return None
+    return str(target.relative_to(base))
 
 
 def _table_path(base: Path, stem: str, fmt: str) -> str | None:
-    rel = f"{stem}.{fmt}"
-    return rel if (base / rel).exists() else None
+    return _relative_if_exists(base, analysis_table_path(base, stem, fmt))
 
 
 def _plot_path(base: Path, stem: str, fmt: str) -> str | None:
-    rel = f"{stem}.{fmt}"
-    return rel if (base / rel).exists() else None
+    return _relative_if_exists(base, analysis_plot_path(base, stem, fmt))
 
 
 def build_report_payload(
@@ -92,14 +103,21 @@ def build_report_payload(
     objective_components = objective_components or summary_payload.get("objective_components")
     overlap_summary = overlap_summary or summary_payload.get("overlap_summary")
 
+    def _first_non_none(*values: object) -> object | None:
+        for value in values:
+            if value is not None:
+                return value
+        return None
+
     analysis_cfg = {}
     if isinstance(analysis_used_payload, dict):
         analysis_cfg = analysis_used_payload.get("analysis") or analysis_used_payload.get("analysis_base") or {}
     table_format = "parquet"
-    plot_format = "png"
+    plot_format = "pdf"
     if isinstance(analysis_cfg, dict):
         table_format = str(analysis_cfg.get("table_format") or table_format)
         plot_format = str(analysis_cfg.get("plot_format") or plot_format)
+    start_here_key = "chain_trajectory_scatter"
 
     metrics = {}
     warnings = []
@@ -129,29 +147,52 @@ def build_report_payload(
         }
     highlights_diversity = {
         "unique_fraction": _safe_float(
-            (objective_components or {}).get("unique_fraction_canonical")
-            or (objective_components or {}).get("unique_fraction_raw")
-            or (seq_metrics or {}).get("unique_fraction")
+            _first_non_none(
+                (objective_components or {}).get("unique_fraction_canonical"),
+                (objective_components or {}).get("unique_fraction_raw"),
+                (seq_metrics or {}).get("unique_fraction"),
+            )
         ),
         "n_elites": _safe_int((elites_metrics or {}).get("n_elites")),
         "diversity_hamming": _safe_float((elites_metrics or {}).get("diversity_hamming")),
     }
     highlights_overlap = {
         "overlap_rate_median": _safe_float(
-            (overlap_summary or {}).get("overlap_rate_median") or (elites_metrics or {}).get("overlap_rate_median")
+            _first_non_none(
+                (overlap_summary or {}).get("overlap_rate_median"),
+                (elites_metrics or {}).get("overlap_rate_median"),
+            )
         ),
         "overlap_total_bp_median": _safe_float(
-            (overlap_summary or {}).get("overlap_total_bp_median")
-            or (objective_components or {}).get("overlap_total_bp_median")
+            _first_non_none(
+                (overlap_summary or {}).get("overlap_total_bp_median"),
+                (objective_components or {}).get("overlap_total_bp_median"),
+            )
         ),
     }
     highlights_sampling = {
         "rhat": _safe_float((trace_metrics or {}).get("rhat")),
         "ess": _safe_float((trace_metrics or {}).get("ess")),
         "ess_ratio": _safe_float((trace_metrics or {}).get("ess_ratio")),
-        "acceptance_rate_mh_tail": _safe_float((optimizer_metrics or {}).get("acceptance_rate_mh_tail")),
-        "swap_acceptance_rate": _safe_float((optimizer_metrics or {}).get("swap_acceptance_rate")),
+        "acceptance_rate_non_s_tail": _safe_float((optimizer_metrics or {}).get("acceptance_rate_non_s_tail")),
+        "acceptance_tail_rugged": _safe_float((optimizer_metrics or {}).get("acceptance_tail_rugged")),
+        "downhill_accept_tail_rugged": _safe_float((optimizer_metrics or {}).get("downhill_accept_tail_rugged")),
+        "gibbs_flip_rate_tail": _safe_float((optimizer_metrics or {}).get("gibbs_flip_rate_tail")),
     }
+    highlights_learning = {}
+    if isinstance(objective_components, dict):
+        learning_payload = objective_components.get("learning")
+        if isinstance(learning_payload, dict):
+            early_payload = learning_payload.get("early_stop") if isinstance(learning_payload, dict) else None
+            early_payload = early_payload if isinstance(early_payload, dict) else {}
+            highlights_learning = {
+                "best_score_draw": _safe_int(learning_payload.get("best_score_draw")),
+                "best_score_chain": _safe_int(learning_payload.get("best_score_chain")),
+                "last_improvement_draw": _safe_int(learning_payload.get("last_improvement_draw")),
+                "plateau_draws": _safe_int(learning_payload.get("plateau_draws")),
+                "early_stop_earliest_draw": _safe_int(early_payload.get("earliest_draw")),
+                "early_stop_stopped_chains": _safe_int(early_payload.get("stopped_chains")),
+            }
 
     autopicks = None
     if isinstance(analysis_used_payload, dict):
@@ -163,21 +204,36 @@ def build_report_payload(
         "created_at": datetime.now(timezone.utc).isoformat(),
         "tf_names": tf_names,
         "optimizer_kind": optimizer_metrics.get("kind") if isinstance(optimizer_metrics, dict) else None,
-        "chains": _safe_int(sample_metrics.get("chains")) if isinstance(sample_metrics, dict) else None,
-        "draws": _safe_int(sample_metrics.get("draws")) if isinstance(sample_metrics, dict) else None,
+        "chains": _safe_int(
+            _first_non_none(
+                sample_metrics.get("chains") if isinstance(sample_metrics, dict) else None,
+                trace_metrics.get("chains") if isinstance(trace_metrics, dict) else None,
+            )
+        ),
+        "draws": _safe_int(
+            _first_non_none(
+                sample_metrics.get("draws") if isinstance(sample_metrics, dict) else None,
+                trace_metrics.get("draws") if isinstance(trace_metrics, dict) else None,
+            )
+        ),
         "tune": _safe_int(sample_metrics.get("tune")) if isinstance(sample_metrics, dict) else None,
         "n_sequences": _safe_int(seq_metrics.get("n_sequences")) if isinstance(seq_metrics, dict) else None,
         "n_elites": _safe_int(elites_metrics.get("n_elites")) if isinstance(elites_metrics, dict) else None,
     }
 
     pointers = {
-        "start_here_plot": _plot_path(analysis_root, "plot__dashboard", plot_format),
-        "diagnostics": _path_if_exists(analysis_root, "diagnostics.json"),
-        "objective_components": _path_if_exists(analysis_root, "objective_components.json"),
-        "overlap_summary": _table_path(analysis_root, "overlap_summary", table_format),
-        "elite_topk": _table_path(analysis_root, "elite_topk", table_format),
-        "plot_manifest": _path_if_exists(analysis_root, "plot_manifest.json"),
-        "table_manifest": _path_if_exists(analysis_root, "table_manifest.json"),
+        "start_here_plot": _plot_path(analysis_root, start_here_key, plot_format),
+        "trajectory_plot": _plot_path(analysis_root, "chain_trajectory_scatter", plot_format),
+        "trajectory_sweep_plot": _plot_path(analysis_root, "chain_trajectory_sweep", plot_format),
+        "diagnostics": _table_path(analysis_root, "diagnostics_summary", "json"),
+        "objective_components": _table_path(analysis_root, "objective_components", "json"),
+        "elites_mmr_summary": _table_path(analysis_root, "elites_mmr_summary", table_format),
+        "elites_mmr_sweep": _table_path(analysis_root, "elites_mmr_sweep", table_format),
+        "overlap_summary": _table_path(analysis_root, "overlap_pair_summary", table_format),
+        "elite_topk": _table_path(analysis_root, "elites_topk", table_format),
+        "manifest": _relative_if_exists(analysis_root, analysis_manifest_path(analysis_root)),
+        "plot_manifest": _relative_if_exists(analysis_root, plot_manifest_path(analysis_root)),
+        "table_manifest": _relative_if_exists(analysis_root, table_manifest_path(analysis_root)),
     }
 
     payload: dict[str, object] = {
@@ -190,6 +246,7 @@ def build_report_payload(
             "diversity": highlights_diversity,
             "overlap": highlights_overlap,
             "sampling": highlights_sampling,
+            "learning": highlights_learning,
         },
         "autopicks": autopicks,
         "paths": pointers,
@@ -199,7 +256,7 @@ def build_report_payload(
 
 def write_report_json(report_path: Path, payload: dict[str, object]) -> None:
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(json.dumps(payload, indent=2, allow_nan=False))
+    atomic_write_json(report_path, payload, allow_nan=False)
 
 
 def write_report_md(
@@ -213,6 +270,7 @@ def write_report_md(
     diversity = highlights.get("diversity") or {}
     overlap = highlights.get("overlap") or {}
     sampling = highlights.get("sampling") or {}
+    learning = highlights.get("learning") or {}
     warnings = payload.get("warnings") or []
     status = payload.get("status") or "unknown"
     pointers = payload.get("paths") or {}
@@ -228,6 +286,12 @@ def write_report_md(
             return f"{value:.4f}"
         return str(value)
 
+    best_score_draw = _fmt(learning.get("best_score_draw"))
+    best_score_chain = _fmt(learning.get("best_score_chain"))
+    last_improvement_draw = _fmt(learning.get("last_improvement_draw"))
+    plateau_draws = _fmt(learning.get("plateau_draws"))
+    early_stop_earliest_draw = _fmt(learning.get("early_stop_earliest_draw"))
+    early_stop_stopped_chains = _fmt(learning.get("early_stop_stopped_chains"))
     lines = [
         "# Cruncher Analysis Report",
         "",
@@ -239,17 +303,52 @@ def write_report_md(
         f"- Elites: {_fmt(diversity.get('n_elites'))}",
         f"- Overlap rate median: {_fmt(overlap.get('overlap_rate_median'))}",
         f"- Overlap bp median: {_fmt(overlap.get('overlap_total_bp_median'))}",
-        f"- MH acceptance (tail): {_fmt(sampling.get('acceptance_rate_mh_tail'))}",
-        f"- PT swap acceptance: {_fmt(sampling.get('swap_acceptance_rate'))}",
-        "",
-        "## Start here",
-        "",
-        f"- {pointers.get('start_here_plot') or 'plot__dashboard.<ext>'}",
-        f"- {pointers.get('diagnostics') or 'diagnostics.json'}",
-        f"- {pointers.get('objective_components') or 'objective_components.json'}",
+        f"- Non-S acceptance (tail): {_fmt(sampling.get('acceptance_rate_non_s_tail'))}",
+        f"- Rugged acceptance (tail, B/M): {_fmt(sampling.get('acceptance_tail_rugged'))}",
+        f"- Rugged downhill acceptance (tail): {_fmt(sampling.get('downhill_accept_tail_rugged'))}",
+        f"- Gibbs flip rate (tail): {_fmt(sampling.get('gibbs_flip_rate_tail'))}",
+        "- Trace diagnostics: directional indicators only (not convergence proofs).",
     ]
-    overlap_path = pointers.get("overlap_summary") or f"overlap_summary.{table_format}"
-    elite_topk_path = pointers.get("elite_topk") or f"elite_topk.{table_format}"
+    if any(
+        learning.get(key) is not None
+        for key in (
+            "best_score_draw",
+            "best_score_chain",
+            "last_improvement_draw",
+            "plateau_draws",
+            "early_stop_earliest_draw",
+            "early_stop_stopped_chains",
+        )
+    ):
+        lines.extend(
+            [
+                f"- Best score draw: {best_score_draw} (chain {best_score_chain})",
+                f"- Last improvement draw: {last_improvement_draw}",
+                f"- Plateau draws: {plateau_draws}",
+                f"- Early-stop earliest draw: {early_stop_earliest_draw} (stopped chains: {early_stop_stopped_chains})",
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "## Start here",
+            "",
+            f"- {pointers.get('start_here_plot') or 'plots/chain_trajectory_scatter.<ext>'}",
+            f"- {pointers.get('trajectory_sweep_plot') or 'plots/chain_trajectory_sweep.<ext>'}",
+            f"- {pointers.get('diagnostics') or 'tables/table__diagnostics_summary.json'}",
+            f"- {pointers.get('objective_components') or 'tables/table__objective_components.json'}",
+        ]
+    )
+    elites_mmr_path = pointers.get("elites_mmr_summary")
+    if elites_mmr_path:
+        lines.append(f"- {elites_mmr_path}")
+    elites_mmr_sweep_path = pointers.get("elites_mmr_sweep")
+    if elites_mmr_sweep_path:
+        lines.append(f"- {elites_mmr_sweep_path}")
+    overlap_path = pointers.get("overlap_summary") or (
+        f"tables/{analysis_table_filename('overlap_pair_summary', table_format)}"
+    )
+    elite_topk_path = pointers.get("elite_topk") or f"tables/{analysis_table_filename('elites_topk', table_format)}"
     lines.extend([f"- {overlap_path}", f"- {elite_topk_path}"])
 
     autopicks = payload.get("autopicks")
@@ -263,24 +362,26 @@ def write_report_md(
         lines.extend([f"- {item}" for item in warnings])
 
     artifact_index = [
-        pointers.get("start_here_plot") or "plot__dashboard.<ext>",
-        pointers.get("diagnostics") or "diagnostics.json",
-        pointers.get("objective_components") or "objective_components.json",
+        pointers.get("start_here_plot") or "plots/chain_trajectory_scatter.<ext>",
+        pointers.get("trajectory_sweep_plot") or "plots/chain_trajectory_sweep.<ext>",
+        pointers.get("diagnostics") or "tables/table__diagnostics_summary.json",
+        pointers.get("objective_components") or "tables/table__objective_components.json",
+        pointers.get("elites_mmr_summary") or None,
+        pointers.get("elites_mmr_sweep") or None,
         overlap_path,
         elite_topk_path,
-        "plot_manifest.json",
-        "table_manifest.json",
+        pointers.get("manifest") or "manifests/manifest.json",
+        pointers.get("plot_manifest") or "manifests/plot_manifest.json",
+        pointers.get("table_manifest") or "manifests/table_manifest.json",
     ]
+    artifact_index = [item for item in artifact_index if item]
     move_summary = _table_path(analysis_root, "move_stats_summary", table_format)
     if move_summary:
         artifact_index.append(move_summary)
-    pt_swap = _table_path(analysis_root, "pt_swap_pairs", table_format)
-    if pt_swap:
-        artifact_index.append(pt_swap)
     lines.extend(["", "## Artifact index", ""] + [f"- {item}" for item in artifact_index])
 
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text("\n".join(lines))
+    atomic_write_text(report_path, "\n".join(lines))
 
 
 def ensure_report(
@@ -299,15 +400,18 @@ def ensure_report(
         return report_json, report_md
 
     if summary_payload is None:
-        summary_payload = _load_json(analysis_root / "summary.json") or {}
+        loaded_summary = _load_json(summary_path(analysis_root))
+        if loaded_summary is None:
+            raise FileNotFoundError(f"Missing analysis summary JSON: {summary_path(analysis_root)}")
+        summary_payload = loaded_summary
     if diagnostics_payload is None:
-        diagnostics_payload = _load_json(analysis_root / "diagnostics.json")
+        diagnostics_payload = _load_json(analysis_table_path(analysis_root, "diagnostics_summary", "json"))
     if objective_components is None:
-        objective_components = _load_json(analysis_root / "objective_components.json")
+        objective_components = _load_json(analysis_table_path(analysis_root, "objective_components", "json"))
     if overlap_summary is None:
         overlap_summary = summary_payload.get("overlap_summary") if isinstance(summary_payload, dict) else None
     if analysis_used_payload is None:
-        analysis_used_payload = _load_yaml(analysis_root / "analysis_used.yaml")
+        analysis_used_payload = _load_yaml(analysis_used_path(analysis_root))
     payload = build_report_payload(
         analysis_root=analysis_root,
         summary_payload=summary_payload,

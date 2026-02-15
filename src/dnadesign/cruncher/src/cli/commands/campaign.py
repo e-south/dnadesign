@@ -28,6 +28,7 @@ from dnadesign.cruncher.app.campaign_service import (
     validate_campaign,
 )
 from dnadesign.cruncher.app.campaign_summary import summarize_campaign
+from dnadesign.cruncher.artifacts.layout import campaign_name_slug, campaign_stage_root
 from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
     resolve_config_path,
@@ -57,10 +58,19 @@ def _rebase_path(value: str | None, *, src_dir: Path, dst_dir: Path) -> str | No
 def _rebase_config_paths(data: dict, *, src_dir: Path, dst_dir: Path) -> None:
     if src_dir == dst_dir:
         return
-    data["out_dir"] = _rebase_path(data.get("out_dir"), src_dir=src_dir, dst_dir=dst_dir)
-    motif_store = data.get("motif_store") or {}
-    motif_store["catalog_root"] = _rebase_path(
-        motif_store.get("catalog_root"),
+    workspace = data.get("workspace")
+    if not isinstance(workspace, dict):
+        raise ValueError("Derived config payload missing required workspace mapping.")
+    workspace["out_dir"] = _rebase_path(
+        workspace.get("out_dir"),
+        src_dir=src_dir,
+        dst_dir=dst_dir,
+    )
+    catalog = data.get("catalog")
+    if not isinstance(catalog, dict):
+        raise ValueError("Derived config payload missing required catalog mapping.")
+    catalog["root"] = _rebase_path(
+        catalog.get("root"),
         src_dir=src_dir,
         dst_dir=dst_dir,
     )
@@ -74,8 +84,22 @@ def _rebase_config_paths(data: dict, *, src_dir: Path, dst_dir: Path) -> None:
     for src in local_sources:
         src["root"] = _rebase_path(src.get("root"), src_dir=src_dir, dst_dir=dst_dir)
     ingest["local_sources"] = local_sources
-    data["motif_store"] = motif_store
+    data["workspace"] = workspace
+    data["catalog"] = catalog
     data["ingest"] = ingest
+
+
+def _resolve_workspace_path(path: Path, *, workspace_root: Path) -> Path:
+    if path.is_absolute():
+        return path.resolve()
+    return (workspace_root / path).resolve()
+
+
+def _ensure_under_workspace(path: Path, *, workspace_root: Path, flag: str) -> None:
+    try:
+        path.relative_to(workspace_root)
+    except ValueError as exc:
+        raise typer.BadParameter(f"{flag} must be inside the workspace ({workspace_root}).") from exc
 
 
 @app.command("generate", help="Expand a campaign into explicit regulator_sets.")
@@ -96,7 +120,7 @@ def generate(
         None,
         "--out",
         "-o",
-        help="Output path for derived config (default: <config_stem>.<campaign>.yaml).",
+        help="Output path for generated config (default: .cruncher/campaigns/<campaign>/generated.yaml).",
     ),
     manifest: Path | None = typer.Option(
         None,
@@ -127,29 +151,25 @@ def generate(
         raise typer.Exit(code=1)
 
     workspace_root = config_path.parent.resolve()
-    out_path = (out or config_path.with_name(f"{config_path.stem}.{campaign}.yaml")).expanduser()
-    if not out_path.is_absolute():
-        out_path = (workspace_root / out_path).resolve()
-    else:
-        out_path = out_path.resolve()
-    if out_path.parent != workspace_root:
-        raise typer.BadParameter(
-            f"--out must be inside the workspace ({workspace_root}). "
-            "Derived configs must live alongside config.yaml so out_dir remains workspace-relative."
-        )
-    manifest_path = (manifest or out_path.with_suffix(".campaign_manifest.json")).expanduser()
-    if not manifest_path.is_absolute():
-        manifest_path = (workspace_root / manifest_path).resolve()
-    else:
-        manifest_path = manifest_path.resolve()
-    if manifest_path.parent != workspace_root:
-        raise typer.BadParameter(
-            f"--manifest must be inside the workspace ({workspace_root}) to keep campaign artifacts collocated."
-        )
+    default_campaign_root = workspace_root / ".cruncher" / "campaigns" / campaign_name_slug(campaign)
+    out_path = _resolve_workspace_path(
+        (out or (default_campaign_root / "generated.yaml")).expanduser(),
+        workspace_root=workspace_root,
+    )
+    _ensure_under_workspace(out_path, workspace_root=workspace_root, flag="--out")
+    manifest_path = _resolve_workspace_path(
+        (manifest or out_path.with_suffix(".campaign_manifest.json")).expanduser(),
+        workspace_root=workspace_root,
+    )
+    _ensure_under_workspace(manifest_path, workspace_root=workspace_root, flag="--manifest")
     generated_at = datetime.now(timezone.utc).isoformat()
 
     data = cfg.model_dump(mode="json")
-    data["regulator_sets"] = expansion.regulator_sets
+    workspace = data.get("workspace")
+    if not isinstance(workspace, dict):
+        raise ValueError("Resolved config missing workspace settings.")
+    workspace["regulator_sets"] = expansion.regulator_sets
+    data["workspace"] = workspace
     manifest_value: Path | str
     try:
         manifest_value = manifest_path.relative_to(workspace_root)
@@ -206,6 +226,11 @@ def summarize(
         "-o",
         help="Output directory for campaign summary artifacts.",
     ),
+    force_overwrite: bool = typer.Option(
+        False,
+        "--force-overwrite",
+        help="Replace existing campaign summary directory before writing.",
+    ),
     include_metrics: bool = typer.Option(
         True,
         "--metrics/--no-metrics",
@@ -237,6 +262,7 @@ def summarize(
             run_inputs=runs or None,
             analysis_id=analysis_id,
             out_dir=out,
+            force_overwrite=force_overwrite,
             include_metrics=include_metrics,
             skip_missing=skip_missing,
             skip_non_campaign=skip_non_campaign,
@@ -347,7 +373,7 @@ def notebook(
         None,
         "--out",
         "-o",
-        help="Campaign summary directory (defaults to <out_dir>/campaigns/<campaign_id>).",
+        help="Campaign summary directory (defaults to <out_dir>/campaign/<campaign_name>).",
     ),
     force: bool = typer.Option(False, "--force", help="Overwrite the notebook if it already exists."),
     strict: bool = typer.Option(
@@ -373,8 +399,11 @@ def notebook(
         except ValueError as exc:
             console.print(f"Error: {exc}")
             raise typer.Exit(code=1)
-        runs_root = config_path.parent / cfg.out_dir
-        out_dir = runs_root / "campaigns" / expansion.campaign_id
+        out_dir = campaign_stage_root(
+            config_path=config_path,
+            out_dir=cfg.out_dir,
+            campaign_name=expansion.name,
+        )
     else:
         out_dir = out
     try:

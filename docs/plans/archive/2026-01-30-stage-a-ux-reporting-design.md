@@ -1,7 +1,17 @@
 # Stage-A Progress + Recap UX Simplification
 
-Date: 2026-01-30
-Status: accepted
+
+## Contents
+- [Context](#context)
+- [Goals](#goals)
+- [Non-goals](#non-goals)
+- [Decisions](#decisions)
+- [Live Table (Default)](#live-table-default)
+- [Recap Table (Default)](#recap-table-default)
+- [Data Contracts](#data-contracts)
+- [Logging Behavior](#logging-behavior)
+- [Testing Plan](#testing-plan)
+- [Docs Updates](#docs-updates)
 
 ## Context
 Stage-A live progress and recap tables are information-dense but confusing in practice.

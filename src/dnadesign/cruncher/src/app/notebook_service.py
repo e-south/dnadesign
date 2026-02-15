@@ -14,9 +14,12 @@ from pathlib import Path
 from typing import Optional
 
 from dnadesign.cruncher.analysis.layout import (
+    load_table_manifest,
     plot_manifest_path,
     resolve_analysis_dir,
+    resolve_required_table_paths,
     summary_path,
+    table_manifest_path,
 )
 from dnadesign.cruncher.app.run_service import update_run_index_from_manifest
 from dnadesign.cruncher.artifacts.entries import (
@@ -48,7 +51,8 @@ def _read_json(path: Path, label: str) -> object:
 def _validate_notebook_inputs(analysis_dir: Path) -> None:
     summary_file = summary_path(analysis_dir)
     plot_manifest_file = plot_manifest_path(analysis_dir)
-    missing = [path for path in (summary_file, plot_manifest_file) if not path.exists()]
+    table_manifest_file = table_manifest_path(analysis_dir)
+    missing = [path for path in (summary_file, plot_manifest_file, table_manifest_file) if not path.exists()]
     if missing:
         missing_blob = ", ".join(str(path) for path in missing)
         raise FileNotFoundError(
@@ -67,6 +71,11 @@ def _validate_notebook_inputs(analysis_dir: Path) -> None:
     plots = plot_manifest.get("plots")
     if not isinstance(plots, list):
         raise ValueError("plot_manifest.json must include a 'plots' list.")
+    load_table_manifest(table_manifest_file, required=True)
+    resolve_required_table_paths(
+        analysis_dir,
+        keys=("scores_summary", "metrics_joint", "elites_topk"),
+    )
 
 
 def _record_notebook_artifact(
@@ -104,7 +113,6 @@ def generate_notebook(
     analysis_id: Optional[str] = None,
     latest: bool = False,
     force: bool = False,
-    strict: bool = True,
 ) -> Path:
     if analysis_id is not None and not str(analysis_id).strip():
         raise ValueError("analysis_id must be a non-empty string.")
@@ -113,15 +121,8 @@ def generate_notebook(
     ensure_marimo()
     run_dir = run_dir.resolve()
     manifest = load_manifest(run_dir)
-    analysis_root = run_dir / "analysis"
-    try:
-        analysis_dir, resolved_id = resolve_analysis_dir(run_dir, analysis_id=analysis_id, latest=latest)
-    except (FileNotFoundError, ValueError):
-        if strict or analysis_id is not None or not analysis_root.exists():
-            raise
-        analysis_dir, resolved_id = analysis_root, None
-    if strict:
-        _validate_notebook_inputs(analysis_dir)
+    analysis_dir, resolved_id = resolve_analysis_dir(run_dir, analysis_id=analysis_id, latest=latest)
+    _validate_notebook_inputs(analysis_dir)
 
     notebook_path = analysis_dir / "notebook__run_overview.py"
     if notebook_path.exists() and not force:
@@ -133,7 +134,7 @@ def generate_notebook(
         )
         return notebook_path
 
-    template = _render_template(run_dir, analysis_root, resolved_id)
+    template = _render_template(resolved_id)
     notebook_path.write_text(template)
 
     _record_notebook_artifact(
@@ -145,7 +146,7 @@ def generate_notebook(
     return notebook_path
 
 
-def _render_template(run_dir: Path, analysis_root: Path, default_analysis_id: str | None) -> str:
+def _render_template(default_analysis_id: str | None) -> str:
     return f"""import marimo as mo
 
 app = mo.App(width="full")
@@ -165,21 +166,20 @@ def _(Path, json, mo, refresh_button):
     _ = refresh_button.value
     notebook_path = Path(__file__).resolve()
     analysis_dir = notebook_path.parent
-    analysis_root = analysis_dir
-    if analysis_root.name != "analysis":
-        if analysis_root.parent.name == "_archive" and analysis_root.parent.parent.name == "analysis":
-            analysis_root = analysis_root.parent.parent
+    if analysis_dir.name == "analysis":
+        run_dir = analysis_dir.parent
+    elif "_archive" in analysis_dir.parts:
+        parts = analysis_dir.parts
+        if "analysis" in parts:
+            analysis_idx = parts.index("analysis")
+            run_dir = Path(*parts[:analysis_idx])
         else:
-            mo.stop(
-                True,
-                mo.md(
-                    "Expected this notebook to live under `<run_dir>/analysis/` (or analysis/_archive).\n"
-                    f"Found: {{notebook_path}}"
-                ),
-            )
-    if not analysis_root.exists():
-        mo.stop(True, mo.md(f"Analysis directory not found: {{analysis_root}}"))
-    run_dir = analysis_root.parent
+            run_dir = analysis_dir
+    else:
+        run_dir = analysis_dir.parent
+    if not run_dir.exists():
+        mo.stop(True, mo.md(f"Run directory not found: {{run_dir}}"))
+    analysis_root = run_dir / "analysis"
     from dnadesign.cruncher.analysis.layout import list_analysis_entries_verbose
 
     analysis_entries = list_analysis_entries_verbose(run_dir)
@@ -256,34 +256,45 @@ def _(analysis_entries, analysis_picker, _load_json, Path):
 @app.cell
 def _(analysis_dir, _load_json, run_dir):
     from dnadesign.cruncher.analysis.layout import plot_manifest_path as analysis_plot_manifest_path
+    from dnadesign.cruncher.analysis.layout import resolve_required_table_paths as analysis_resolve_required_table_paths
+    from dnadesign.cruncher.analysis.layout import table_manifest_path as analysis_table_manifest_path
     from dnadesign.cruncher.artifacts.layout import manifest_path as run_manifest_path
 
     manifest_path = run_manifest_path(run_dir)
     manifest, manifest_error = _load_json(manifest_path, default={{}})
     plot_manifest_file = analysis_plot_manifest_path(analysis_dir)
     plot_manifest, plot_manifest_error = _load_json(plot_manifest_file, default={{"plots": []}})
-    return manifest, manifest_path, plot_manifest, plot_manifest_file, manifest_error, plot_manifest_error
+    # table_manifest.json defines table keys used by this notebook.
+    table_manifest_file = analysis_table_manifest_path(analysis_dir)
+    table_manifest, table_manifest_error = _load_json(table_manifest_file, default={{"tables": []}})
+    table_paths = {{}}
+    table_paths_error = None
+    try:
+        table_paths = analysis_resolve_required_table_paths(
+            analysis_dir,
+            keys=("scores_summary", "metrics_joint", "elites_topk"),
+        )
+    except Exception as exc:
+        table_paths_error = str(exc)
+    return (
+        manifest,
+        manifest_path,
+        plot_manifest,
+        plot_manifest_file,
+        table_manifest,
+        table_manifest_file,
+        table_paths,
+        manifest_error,
+        plot_manifest_error,
+        table_manifest_error,
+        table_paths_error,
+    )
 
 
 @app.cell
-def _(mo, tf_names):
-    if not tf_names:
-        tf_warning = mo.md("No TFs found in summary.json; scatter controls disabled.")
-        return None, None, tf_warning
-    default_x = tf_names[0] if len(tf_names) > 0 else None
-    default_y = tf_names[1] if len(tf_names) > 1 else default_x
-    tf_x = mo.ui.dropdown(options=tf_names, value=default_x, label="x_tf")
-    tf_y = mo.ui.dropdown(options=tf_names, value=default_y, label="y_tf")
-    tf_warning = None
-    return tf_x, tf_y, tf_warning
-
-
-@app.cell
-def _(analysis_dir, pd, summary):
-    analysis_cfg = summary.get("analysis_config") if isinstance(summary, dict) else {{}}
-    table_format = "parquet"
-    if isinstance(analysis_cfg, dict):
-        table_format = analysis_cfg.get("table_format") or table_format
+def _(analysis_dir, mo, pd, table_paths, table_paths_error):
+    if table_paths_error:
+        mo.stop(True, mo.md(f"Table contract error: {{table_paths_error}}"))
 
     def _read_table(path):
         if not path.exists():
@@ -292,94 +303,13 @@ def _(analysis_dir, pd, summary):
             return pd.read_parquet(path)
         return pd.read_csv(path)
 
-    per_pwm_path = analysis_dir / f"per_pwm_scores.{{table_format}}"
-    per_pwm_df = _read_table(per_pwm_path)
-    summary_table_path = analysis_dir / f"score_summary.{{table_format}}"
+    summary_table_path = table_paths["scores_summary"]
     summary_df = _read_table(summary_table_path)
-    joint_metrics_path = analysis_dir / f"joint_metrics.{{table_format}}"
+    joint_metrics_path = table_paths["metrics_joint"]
     joint_metrics_df = _read_table(joint_metrics_path)
-    topk_path = analysis_dir / f"elite_topk.{{table_format}}"
+    topk_path = table_paths["elites_topk"]
     topk_df = _read_table(topk_path)
-    return (
-        per_pwm_df,
-        per_pwm_path,
-        summary_df,
-        summary_table_path,
-        joint_metrics_df,
-        joint_metrics_path,
-        topk_df,
-        topk_path,
-    )
-
-
-@app.cell
-def _(mo, per_pwm_df):
-    if per_pwm_df.empty or "chain" not in per_pwm_df.columns or "draw" not in per_pwm_df.columns:
-        chain_picker = None
-        draw_slider = None
-        draw_limits = None
-        points_slider = None
-        return chain_picker, draw_slider, draw_limits, points_slider
-    chain_ids = sorted(per_pwm_df["chain"].unique().tolist())
-    chain_options = {{"all": None}}
-    for cid in chain_ids:
-        chain_options[f"chain {{cid}}"] = int(cid)
-    chain_picker = mo.ui.dropdown(options=chain_options, value=None, label="chain")
-    min_draw = int(per_pwm_df["draw"].min())
-    max_draw = int(per_pwm_df["draw"].max())
-    draw_slider = None
-    if min_draw != max_draw:
-        draw_slider = mo.ui.range_slider(
-            min_draw,
-            max_draw,
-            value=(min_draw, max_draw),
-            step=1,
-            label="draw range",
-        )
-    draw_limits = (min_draw, max_draw)
-    max_points = min(2000, len(per_pwm_df))
-    points_slider = None
-    if max_points > 0:
-        slider_min = 1 if max_points < 50 else 50
-        slider_step = 1 if max_points < 50 else 10
-        points_slider = mo.ui.slider(
-            slider_min,
-            max_points,
-            value=min(500, max_points),
-            step=slider_step,
-            label="max points",
-        )
-    return chain_picker, draw_slider, draw_limits, points_slider
-
-
-@app.cell
-def _(chain_picker, draw_slider, per_pwm_df, points_slider, draw_limits):
-    if per_pwm_df.empty:
-        filtered_pwm_df = per_pwm_df
-        scatter_info = "No per-PWM rows to plot."
-        return filtered_pwm_df, scatter_info
-    if draw_limits is None:
-        filtered_pwm_df = per_pwm_df
-        scatter_info = "Per-PWM table missing chain/draw columns."
-        return filtered_pwm_df, scatter_info
-    min_draw, max_draw = draw_limits
-    chain_value = None if chain_picker is None else chain_picker.value
-    if draw_slider is None:
-        draw_range = (min_draw, max_draw)
-    else:
-        draw_range = draw_slider.value
-    max_points = None if points_slider is None else int(points_slider.value)
-
-    filtered_pwm_df = per_pwm_df
-    if chain_value is not None:
-        filtered_pwm_df = filtered_pwm_df[filtered_pwm_df["chain"] == chain_value]
-    filtered_pwm_df = filtered_pwm_df[
-        (filtered_pwm_df["draw"] >= draw_range[0]) & (filtered_pwm_df["draw"] <= draw_range[1])
-    ]
-    if max_points is not None and len(filtered_pwm_df) > max_points:
-        filtered_pwm_df = filtered_pwm_df.sample(n=max_points, random_state=0)
-    scatter_info = f"Scatter points: {{len(filtered_pwm_df)}} / {{len(per_pwm_df)}}"
-    return filtered_pwm_df, scatter_info
+    return summary_df, summary_table_path, joint_metrics_df, joint_metrics_path, topk_df, topk_path
 
 
 @app.cell
@@ -401,22 +331,6 @@ def _(topk_df, topk_slider):
 
 
 @app.cell
-def _(filtered_pwm_df, plt, tf_x, tf_y):
-    fig = None
-    if not filtered_pwm_df.empty and tf_x is not None and tf_y is not None and tf_x.value and tf_y.value:
-        x_col = f"score_{{tf_x.value}}"
-        y_col = f"score_{{tf_y.value}}"
-        if x_col in filtered_pwm_df.columns and y_col in filtered_pwm_df.columns:
-            fig, ax = plt.subplots(figsize=(5, 5))
-            data = filtered_pwm_df[[x_col, y_col]].dropna()
-            ax.scatter(data[x_col].to_numpy(), data[y_col].to_numpy(), s=6, alpha=0.6)
-            ax.set_xlabel(x_col)
-            ax.set_ylabel(y_col)
-            ax.set_title("Per-PWM score scatter")
-    return fig
-
-
-@app.cell
 def _(analysis_dir, pd, plot_manifest):
     plot_entries = plot_manifest.get("plots", []) if isinstance(plot_manifest, dict) else []
     rows = []
@@ -431,16 +345,19 @@ def _(analysis_dir, pd, plot_manifest):
                     "exists": bool(full_path and full_path.exists()),
                 }}
             )
-        enabled = bool(entry.get("enabled"))
-        missing = [o["path"] for o in outputs if enabled and not o["exists"] and o.get("path")]
-        generated = bool(enabled and any(o["exists"] for o in outputs))
+        manifest_generated = bool(entry.get("generated"))
+        manifest_skipped = bool(entry.get("skipped"))
+        generated = bool(manifest_generated and any(o["exists"] for o in outputs))
+        missing = [o["path"] for o in outputs if manifest_generated and not o["exists"] and o.get("path")]
         rows.append(
             dict(
                 key=entry.get("key"),
                 label=entry.get("label"),
                 group=entry.get("group"),
-                enabled=entry.get("enabled"),
+                manifest_generated=manifest_generated,
+                skipped=manifest_skipped,
                 generated=generated,
+                skip_reason=entry.get("skip_reason"),
                 missing_outputs="; ".join(missing),
                 outputs="; ".join([o.get("path", "") for o in outputs if o.get("path")]),
             )
@@ -544,12 +461,22 @@ def _(
     summary,
     summary_error,
     summary_path,
+    table_manifest_error,
+    table_manifest_path,
+    table_paths_error,
     tf_names,
 ):
     motif_store = manifest.get("motif_store") or dict() if isinstance(manifest, dict) else dict()
     motif_count = len(manifest.get("motifs", [])) if isinstance(manifest, dict) else 0
     tf_blob = ", ".join(tf_names) if tf_names else "-"
-    warnings = [err for err in (summary_error, manifest_error, plot_manifest_error) if err]
+    warning_sources = (
+        summary_error,
+        manifest_error,
+        plot_manifest_error,
+        table_manifest_error,
+        table_paths_error,
+    )
+    warnings = [err for err in warning_sources if err]
     if entry_warnings:
         warnings.extend([str(warn) for warn in entry_warnings if warn])
     md = [
@@ -576,6 +503,7 @@ def _(
         f"- Config used: {{summary.get('config_used', '-') }}",
         f"- Analysis settings: {{summary.get('analysis_used', '-') }}",
         f"- Plot manifest: {{plot_manifest_path}}",
+        f"- Table manifest: {{table_manifest_path}}",
         f"- Summary JSON: {{summary_path}}",
         ]
     )
@@ -598,8 +526,6 @@ def _(
     joint_metrics_df,
     joint_metrics_path,
     mo,
-    per_pwm_df,
-    per_pwm_path,
     summary_df,
     summary_table_path,
     topk_path,
@@ -619,33 +545,16 @@ def _(
         blocks.append(topk_slider)
     if not topk_view.empty:
         blocks.append(mo.ui.dataframe(topk_view))
-    if per_pwm_df.empty:
-        blocks.append(mo.md("No per-PWM table found."))
-    else:
-        blocks.append(mo.ui.data_explorer(per_pwm_df))
     blocks.append(mo.md(f"Summary table: {{summary_table_path}}"))
     blocks.append(mo.md(f"Joint metrics table: {{joint_metrics_path}}"))
     blocks.append(mo.md(f"Top-K table: {{topk_path}}"))
-    blocks.append(mo.md(f"Per-PWM table: {{per_pwm_path}}"))
     tables_block = mo.vstack(blocks)
     return tables_block
 
 
 @app.cell
-def _(chain_picker, draw_slider, fig, mo, plot_df, plot_preview, points_slider, scatter_info, tf_warning, tf_x, tf_y):
+def _(mo, plot_df, plot_preview):
     blocks = []
-    tf_controls = [c for c in (tf_x, tf_y) if c is not None]
-    if tf_controls:
-        blocks.append(mo.hstack(tf_controls))
-    controls = [c for c in (chain_picker, draw_slider, points_slider) if c is not None]
-    if controls:
-        blocks.append(mo.hstack(controls))
-    if tf_warning is not None:
-        blocks.append(tf_warning)
-    if scatter_info:
-        blocks.append(mo.md(scatter_info))
-    if fig is not None:
-        blocks.append(fig)
     if not plot_df.empty:
         blocks.append(mo.ui.dataframe(plot_df))
     blocks.append(plot_preview)

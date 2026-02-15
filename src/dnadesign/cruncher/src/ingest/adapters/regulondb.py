@@ -961,7 +961,7 @@ class RegulonDBAdapter:
             except ValueError as exc:
                 raise ValueError(
                     f"Unable to build PWM from curated sites for {name}: {exc}. "
-                    "Use `cruncher fetch sites` and let motif_store.site_window_lengths "
+                    "Use `cruncher fetch sites` and let cruncher.catalog.site_window_lengths "
                     "window variable-length sites during parse/sample."
                 ) from exc
             matrix_source = "sites"

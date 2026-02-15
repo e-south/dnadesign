@@ -12,13 +12,23 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
-ANALYSIS_LAYOUT_VERSION = "v7"
+ANALYSIS_LAYOUT_VERSION = "v12"
 ANALYSIS_DIR_NAME = "analysis"
 ARCHIVE_DIR_NAME = "_archive"
+ANALYSIS_TABLES_DIR = "tables"
+ANALYSIS_PLOTS_DIR = "plots"
+ANALYSIS_REPORTS_DIR = "reports"
+ANALYSIS_MANIFESTS_DIR = "manifests"
+ANALYSIS_STATE_DIR = "state"
+# Plot files intentionally use plain semantic names (no synthetic prefix).
+PLOT_FILE_PREFIX = ""
+TABLE_FILE_PREFIX = "table__"
+PLOT_MANIFEST_FILE_NAME = "plot_manifest.json"
+TABLE_MANIFEST_FILE_NAME = "table_manifest.json"
 MANIFEST_FILE_NAME = "manifest.json"
 
 
@@ -26,36 +36,84 @@ def analysis_root(run_dir: Path) -> Path:
     return run_dir / ANALYSIS_DIR_NAME
 
 
-def analysis_meta_root(analysis_root: Path) -> Path:
-    return analysis_root
+def analysis_plots_root(analysis_root: Path) -> Path:
+    return analysis_root / ANALYSIS_PLOTS_DIR
+
+
+def analysis_tables_root(analysis_root: Path) -> Path:
+    return analysis_root / ANALYSIS_TABLES_DIR
+
+
+def analysis_reports_root(analysis_root: Path) -> Path:
+    return analysis_root / ANALYSIS_REPORTS_DIR
+
+
+def analysis_manifests_root(analysis_root: Path) -> Path:
+    return analysis_root / ANALYSIS_MANIFESTS_DIR
+
+
+def analysis_state_root(analysis_root: Path) -> Path:
+    return analysis_root / ANALYSIS_STATE_DIR
+
+
+def analysis_plot_filename(plot_key: str, plot_format: str) -> str:
+    key = str(plot_key).strip()
+    ext = str(plot_format).strip().lstrip(".")
+    if not key:
+        raise ValueError("plot key must be non-empty")
+    if not ext:
+        raise ValueError("plot format must be non-empty")
+    if "/" in key or "\\" in key:
+        raise ValueError(f"plot key must not contain path separators: {plot_key!r}")
+    return f"{PLOT_FILE_PREFIX}{key}.{ext}"
+
+
+def analysis_table_filename(table_key: str, table_format: str) -> str:
+    key = str(table_key).strip()
+    ext = str(table_format).strip().lstrip(".")
+    if not key:
+        raise ValueError("table key must be non-empty")
+    if not ext:
+        raise ValueError("table format must be non-empty")
+    if "/" in key or "\\" in key:
+        raise ValueError(f"table key must not contain path separators: {table_key!r}")
+    return f"{TABLE_FILE_PREFIX}{key}.{ext}"
+
+
+def analysis_plot_path(analysis_root: Path, plot_key: str, plot_format: str) -> Path:
+    return analysis_plots_root(analysis_root) / analysis_plot_filename(plot_key, plot_format)
+
+
+def analysis_table_path(analysis_root: Path, table_key: str, table_format: str) -> Path:
+    return analysis_tables_root(analysis_root) / analysis_table_filename(table_key, table_format)
 
 
 def summary_path(analysis_root: Path) -> Path:
-    return analysis_meta_root(analysis_root) / "summary.json"
+    return analysis_reports_root(analysis_root) / "summary.json"
 
 
 def report_json_path(analysis_root: Path) -> Path:
-    return analysis_meta_root(analysis_root) / "report.json"
+    return analysis_reports_root(analysis_root) / "report.json"
 
 
 def report_md_path(analysis_root: Path) -> Path:
-    return analysis_meta_root(analysis_root) / "report.md"
+    return analysis_reports_root(analysis_root) / "report.md"
 
 
 def analysis_used_path(analysis_root: Path) -> Path:
-    return analysis_meta_root(analysis_root) / "analysis_used.yaml"
+    return analysis_reports_root(analysis_root) / "analysis_used.yaml"
 
 
 def plot_manifest_path(analysis_root: Path) -> Path:
-    return analysis_meta_root(analysis_root) / "plot_manifest.json"
+    return analysis_manifests_root(analysis_root) / PLOT_MANIFEST_FILE_NAME
 
 
 def table_manifest_path(analysis_root: Path) -> Path:
-    return analysis_meta_root(analysis_root) / "table_manifest.json"
+    return analysis_manifests_root(analysis_root) / TABLE_MANIFEST_FILE_NAME
 
 
 def analysis_manifest_path(analysis_root: Path) -> Path:
-    return analysis_meta_root(analysis_root) / MANIFEST_FILE_NAME
+    return analysis_manifests_root(analysis_root) / MANIFEST_FILE_NAME
 
 
 def load_summary(path: Path, *, required: bool = False) -> Optional[dict]:
@@ -70,6 +128,84 @@ def load_summary(path: Path, *, required: bool = False) -> Optional[dict]:
     if not isinstance(payload, dict):
         raise ValueError(f"analysis summary must be a JSON object: {path}")
     return payload
+
+
+def load_table_manifest(path: Path, *, required: bool = False) -> Optional[dict]:
+    if not path.exists():
+        if required:
+            raise FileNotFoundError(f"Missing analysis table manifest: {path}")
+        return None
+    try:
+        payload = json.loads(path.read_text())
+    except Exception as exc:
+        raise ValueError(f"Invalid analysis table manifest JSON at {path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"analysis table manifest must be a JSON object: {path}")
+    tables = payload.get("tables")
+    if not isinstance(tables, list):
+        raise ValueError(f"analysis table manifest must include a 'tables' list: {path}")
+    return payload
+
+
+def table_paths_by_key(analysis_root: Path) -> dict[str, Path]:
+    manifest = load_table_manifest(table_manifest_path(analysis_root), required=True)
+    if manifest is None:
+        return {}
+    tables = manifest.get("tables")
+    if not isinstance(tables, list):
+        raise ValueError(f"analysis table manifest must include a 'tables' list: {table_manifest_path(analysis_root)}")
+    resolved: dict[str, Path] = {}
+    for idx, entry in enumerate(tables):
+        if not isinstance(entry, dict):
+            raise ValueError(
+                f"analysis table manifest contains a non-object table entry at index {idx}: "
+                f"{table_manifest_path(analysis_root)}"
+            )
+        key = entry.get("key")
+        rel_path = entry.get("path")
+        if not isinstance(key, str) or not key:
+            raise ValueError(
+                f"analysis table manifest table entry at index {idx} has invalid key: "
+                f"{table_manifest_path(analysis_root)}"
+            )
+        if not isinstance(rel_path, str) or not rel_path:
+            raise ValueError(
+                f"analysis table manifest table entry '{key}' has invalid path: {table_manifest_path(analysis_root)}"
+            )
+        rel_path_obj = Path(rel_path)
+        if rel_path_obj.name != rel_path or rel_path.startswith("."):
+            raise ValueError(
+                f"analysis table manifest table entry '{key}' must use a flat filename path: "
+                f"{table_manifest_path(analysis_root)}"
+            )
+        if not rel_path.startswith(TABLE_FILE_PREFIX):
+            raise ValueError(
+                f"analysis table manifest table entry '{key}' must start with '{TABLE_FILE_PREFIX}': "
+                f"{table_manifest_path(analysis_root)}"
+            )
+        if key in resolved:
+            raise ValueError(
+                f"analysis table manifest has duplicate table key '{key}': {table_manifest_path(analysis_root)}"
+            )
+        resolved[key] = analysis_tables_root(analysis_root) / rel_path
+    return resolved
+
+
+def resolve_required_table_paths(analysis_root: Path, *, keys: Sequence[str]) -> dict[str, Path]:
+    required_keys = [str(key) for key in keys]
+    paths_by_key = table_paths_by_key(analysis_root)
+    missing_keys = [key for key in required_keys if key not in paths_by_key]
+    if missing_keys:
+        raise FileNotFoundError(
+            "analysis table manifest missing required table keys: "
+            + ", ".join(sorted(missing_keys))
+            + f" ({table_manifest_path(analysis_root)})"
+        )
+    resolved = {key: paths_by_key[key] for key in required_keys}
+    missing_files = [f"{key}={path}" for key, path in resolved.items() if not path.exists()]
+    if missing_files:
+        raise FileNotFoundError("analysis table manifest references missing table files: " + ", ".join(missing_files))
+    return resolved
 
 
 def current_summary(run_dir: Path) -> Optional[dict]:
@@ -105,7 +241,7 @@ def list_analysis_entries(run_dir: Path) -> list[dict]:
         else:
             logger.warning("analysis summary missing analysis_id: %s", summary_path(root))
 
-    archive_root = root / ARCHIVE_DIR_NAME
+    archive_root = analysis_state_root(root) / ARCHIVE_DIR_NAME
     if archive_root.exists():
         for child in sorted(archive_root.iterdir()):
             if not child.is_dir():
@@ -117,8 +253,8 @@ def list_analysis_entries(run_dir: Path) -> list[dict]:
                 summary = None
             analysis_id = summary.get("analysis_id") if isinstance(summary, dict) else None
             if not isinstance(analysis_id, str) or not analysis_id:
-                analysis_id = child.name
-                logger.warning("archive summary missing analysis_id, using folder name: %s", child)
+                logger.warning("Skipping archive summary missing analysis_id: %s", child)
+                continue
             entries.append({"id": analysis_id, "path": child, "kind": "archive"})
 
     return entries
@@ -193,7 +329,7 @@ def list_analysis_entries_verbose(run_dir: Path) -> list[dict]:
             warnings=warnings,
         )
 
-    archive_root = root / ARCHIVE_DIR_NAME
+    archive_root = analysis_state_root(root) / ARCHIVE_DIR_NAME
     if archive_root.exists():
         for child in sorted(archive_root.iterdir()):
             if not child.is_dir():
@@ -205,8 +341,9 @@ def list_analysis_entries_verbose(run_dir: Path) -> list[dict]:
                 warnings.append(summary_error)
             analysis_id = summary.get("analysis_id") if isinstance(summary, dict) else None
             if not isinstance(analysis_id, str) or not analysis_id:
-                warnings.append(f"archive summary missing analysis_id; using folder name: {child}")
-                analysis_id = child.name
+                warnings.append(f"archive summary missing analysis_id: {child}")
+                logger.warning("Skipping archive summary missing analysis_id: %s", child)
+                continue
             _append_entry(
                 analysis_id=analysis_id,
                 path=child,

@@ -1,10 +1,18 @@
-## cruncher CLI
+# Cruncher CLI
 
-Most commands operate relative to a `config.yaml` file; some (notably `cruncher notebook`) operate on a run directory. You can pass `--config/-c` globally (before the command). With pixi (`pixi run cruncher -- ...`), place `-c/--config` after the subcommand because pixi inserts `--`. By default, paths render relative to the workspace root.
+## Contents
+- [Cruncher CLI](#cruncher-cli)
+- [Workspace discovery and config resolution](#workspace-discovery-and-config-resolution)
+- [Quick command map](#quick-command-map)
+- [Core lifecycle commands](#core-lifecycle-commands)
+- [Discovery and inspection](#discovery-and-inspection)
+- [Global options](#global-options)
 
-> Network access occurs in fetch and remote inventory commands (for example, `cruncher fetch ...`, `cruncher sources summary --scope remote`, `cruncher sources datasets`). Some workflows (such as site hydration via NCBI) also use the network depending on your config. Use `--offline` where supported to force cache‑only behavior.
+This reference summarizes the Cruncher CLI surface, grouped by lifecycle stage and workflow.
 
----
+> **Intent:** Cruncher is an optimization engine for **fixed-length** multi-TF PWM sequence design that returns a **diverse elite set** - not posterior inference.
+>
+> **When to use:** design under tight length constraints; explore motif compatibility tradeoffs; generate a small candidate set for assays; sweep many regulator sets via campaigns + summarize results.
 
 ### Workspace discovery and config resolution
 
@@ -27,6 +35,7 @@ cruncher workspaces list
 * **Render logos** → `catalog logos`
 * **Optimize** → `sample`
 * **Analyze** → `analyze`, `notebook`
+* **Export sequences** → `export sequences`
 * **Campaigns** → `campaign validate|generate|summarize|notebook`
 * **Run management** → `runs list/show/latest/best/watch/clean`
 * **Workspace health** → `status`
@@ -37,11 +46,11 @@ cruncher workspaces list
 
 #### `cruncher fetch motifs`
 
-Caches motif matrices into `<catalog_root>/normalized/motifs/...`.
+Caches motif matrices into `<catalog.root>/normalized/motifs/...`.
 
 Inputs:
 
-* CONFIG (explicit or resolved)
+* optional config path (`--config/-c`), otherwise resolved from workspace/CWD
 * at least one of `--tf`, `--motif-id`, or `--campaign`
 
 Network:
@@ -50,7 +59,7 @@ Network:
 
 When to use:
 
-* you want `cruncher.motif_store.pwm_source: matrix`
+* you want `cruncher.catalog.pwm_source: matrix`
 * you want to reuse alignment/matrix payloads across runs
 
 Examples:
@@ -77,16 +86,18 @@ Note:
 
 * `--campaign` applies campaign selectors by default; use `--no-selectors` to fetch raw category TFs when the
   local catalog is empty.
+* `--source` defaults to the first available entry in `catalog.source_preference` (skipping entries that are
+  not registered ingest sources); if the list is empty or none are available you must pass `--source` explicitly.
 
 ---
 
 #### `cruncher fetch sites`
 
-Caches binding-site instances into `<catalog_root>/normalized/sites/...`.
+Caches binding-site instances into `<catalog.root>/normalized/sites/...`.
 
 Inputs:
 
-* CONFIG (explicit or resolved)
+* optional config path (`--config/-c`), otherwise resolved from workspace/CWD
 * at least one of `--tf`, `--motif-id`, `--campaign`, or `--hydrate`
 
 Network:
@@ -95,7 +106,7 @@ Network:
 
 When to use:
 
-* you want `cruncher.motif_store.pwm_source: sites`
+* you want `cruncher.catalog.pwm_source: sites`
 * you want curated or HT site sets cached locally
 * you need hydration for coordinate-only peaks
 
@@ -109,7 +120,7 @@ Examples:
 
 Common options:
 
-* `--tf`, `--motif-id`, `--campaign`, `--dataset-id`, `--limit`
+* `--tf`, `--motif-id`, `--campaign`, `--dataset-id`, `--limit`, `--source`
 * `--apply-selectors/--no-selectors` (campaigns)
 * `--hydrate` (hydrates missing sequences)
 * `--offline`, `--update`
@@ -126,17 +137,22 @@ Note:
 * `--hydrate` with no `--tf/--motif-id` hydrates all cached site sets by default.
 * `--campaign` applies campaign selectors by default; use `--no-selectors` to fetch raw category TFs when the
   local catalog is empty.
+* `--source` defaults to the first available entry in `catalog.source_preference` (skipping entries that are
+  not registered ingest sources); if the list is empty or none are available you must pass `--source` explicitly.
 
 ---
 
 #### `cruncher lock`
 
-Resolves TF names in `cruncher.regulator_sets` to exact cached artifacts (IDs + hashes).
+Resolves TF names to exact cached artifacts (IDs + hashes) from either:
+- `workspace.regulator_sets` (direct mode), or
+- `--campaign <name>` expansion (campaign mode).
 Writes `<workspace>/.cruncher/locks/<config>.lock.json`.
 
 Inputs:
 
-* CONFIG (explicit or resolved)
+* optional config path (`--config/-c`), otherwise resolved from workspace/CWD
+* optional `--campaign <name>` (required when `workspace.regulator_sets: []`)
 * cached motifs/sites for the configured regulators
 
 Network:
@@ -151,12 +167,13 @@ When to use:
 Example:
 
 * `cruncher lock <config>`
+* `cruncher lock --campaign demo_pair <config>`
 
 ---
 
 #### `cruncher campaign generate`
 
-Expands a campaign into explicit `regulator_sets` and writes a derived config plus a manifest.
+Expands a campaign into explicit `regulator_sets` and writes a generated config plus a manifest.
 
 Inputs:
 
@@ -169,15 +186,16 @@ Network:
 
 Example:
 
-* `cruncher campaign generate --campaign regulators_v1 --out config.campaign.yaml <config>`
+* `cruncher campaign generate --campaign regulators_v1 <config>`
+* `cruncher campaign generate --campaign regulators_v1 --out .cruncher/campaigns/regulators_v1/custom.yaml <config>`
 
 Notes:
 
 * The base config must define `regulator_categories` and `campaigns`.
 * Selector filters require cached motifs/sites; fetch before generating if you use them.
-* The manifest is written alongside the output config by default.
-* `--out` must live alongside the workspace `config.yaml` so `out_dir` remains workspace-relative.
-  Relative `--out` paths are interpreted from the workspace root.
+* By default, files are written under `<workspace>/.cruncher/campaigns/<campaign>/`.
+* `--out`/`--manifest` must stay inside the workspace root.
+* `campaign generate` is optional; `lock`/`parse`/`sample`/`analyze` can run campaigns directly with `--campaign`.
 
 ---
 
@@ -228,22 +246,27 @@ Examples:
 
 Outputs:
 
-* `campaign_summary.csv`, `campaign_best.csv`
-* plots under the campaign output root (e.g., `plot__best_jointscore_bar.png`,
-  `plot__tf_coverage_heatmap.png`, `plot__joint_trend.png`, `plot__pareto_projection.png`)
+* `analysis/campaign_summary.csv`, `analysis/campaign_best.csv`, `analysis/campaign_manifest.json`
+* plots under `plots/` (e.g., `best_jointscore_bar.png`,
+  `tf_coverage_heatmap.png`, `joint_trend.png`, `pareto_projection.png`)
 
 Notes:
 
 * `--metrics` requires a local catalog; fetch motifs/sites first.
-* `--skip-missing` skips runs missing `analysis/joint_metrics.parquet` or `analysis/score_summary.parquet`.
-* With site-derived PWMs, `--metrics` also requires `motif_store.site_window_lengths`
+* Use `--force-overwrite` to replace an existing campaign summary directory.
+* When `--runs` is omitted, stale sample run-index entries are auto-repaired before summary.
+* `--skip-missing` skips runs missing required `table_manifest.json` entries/files for
+  `scores_summary` and `metrics_joint` (typically `table__scores_summary.parquet` and
+  `table__metrics_joint.parquet`).
+* With site-derived PWMs, `--metrics` also requires `catalog.site_window_lengths`
   for TFs with variable site lengths. Use `--no-metrics` if you haven't set them.
 
 ---
 
 #### `cruncher campaign notebook`
 
-Generates a marimo notebook for exploring `campaign_summary.csv` outputs.
+Generates a marimo notebook for exploring campaign summary outputs from
+`<campaign_latest>/analysis/` and `<campaign_latest>/plots/`.
 
 Inputs:
 
@@ -257,23 +280,26 @@ Network:
 Examples:
 
 * `cruncher campaign notebook --campaign regulators_v1 <config>`
-* `cruncher campaign notebook --campaign regulators_v1 --out outputs/campaigns/<id> <config>`
+* `cruncher campaign notebook --campaign regulators_v1 --out outputs/campaign/regulators_v1 <config>`
 
 Notes:
 
-* Requires `cruncher campaign summarize` to have been run first (summary CSVs + manifest present).
+* Requires `cruncher campaign summarize` to have been run first
+  (`analysis/campaign_summary.csv`, `analysis/campaign_best.csv`, `analysis/campaign_manifest.json`).
 * Install marimo with `uv sync --locked --group notebooks`.
 
 ---
 
 #### `cruncher parse`
 
-Validates cached PWMs (matrix- or site-derived) and writes a run manifest.
+Validates cached PWMs (matrix- or site-derived) and writes parse-cache artifacts in workspace state.
 
 Inputs:
 
 * CONFIG (explicit or resolved)
+* optional `--campaign <name>` (required when `workspace.regulator_sets: []`)
 * lockfile (from `cruncher lock`)
+* optional `--force-overwrite` to replace an existing run directory
 
 Network:
 
@@ -282,6 +308,7 @@ Network:
 Example:
 
 * `cruncher parse <config>`
+* `cruncher parse --campaign demo_pair <config>`
 
 Precondition:
 
@@ -289,12 +316,13 @@ Precondition:
 
 Notes:
 
-* Logos are rendered via `cruncher catalog logos`; its defaults come from `parse.plot.bits_mode` and `parse.plot.dpi`.
+* Logos are rendered via `cruncher catalog logos`; default logo settings are `--bits-mode information` and `--dpi 150`.
 * `cruncher parse` always uses the lockfile to pin exact motif IDs/hashes.
-  If you add new motifs (e.g., via `discover motifs`) or change `motif_store` preferences,
+  If you add new motifs (e.g., via `discover motifs`) or change `catalog` preferences,
   re-run `cruncher lock <config>` to refresh what parse will use.
-* Parse is idempotent for identical inputs; if matching outputs already exist, it reports
-  the existing run instead of creating a new one.
+* Parse requires overwrite intent when output already exists; use `--force-overwrite` to replace.
+* Parse artifacts live under `<workspace>/.cruncher/parse/inputs/` and are intentionally
+  separate from user-facing sample outputs in `workspace.out_dir`.
 * Use `cruncher catalog logos` to render PWM logos with provenance subtitles.
 
 ---
@@ -306,6 +334,7 @@ Runs MCMC optimization to design sequences scoring well across TFs.
 Inputs:
 
 * CONFIG (explicit or resolved)
+* optional `--campaign <name>` (required when `workspace.regulator_sets: []`)
 * lockfile (from `cruncher lock`)
 
 Network:
@@ -315,9 +344,9 @@ Network:
 Example:
 
 * `cruncher sample <config>`
-* `cruncher sample --no-auto-opt <config>`
 * `cruncher sample --verbose <config>`
 * `cruncher sample --debug <config>`
+* `cruncher sample --campaign demo_pair <config>`
 
 Precondition:
 
@@ -326,12 +355,11 @@ Precondition:
 Notes:
 
 * `sample.output.save_sequences: true` is required for later analysis.
-* `sample.output.trace.save: true` enables trace-based diagnostics.
-* Auto-opt is enabled by default: it runs short Gibbs + PT pilots, evaluates objective-aligned scores from draw-phase `combined_score_final` (top-K median), records diagnostics (warnings suppressed for very short pilots), then runs the best candidate. Selection is thresholdless and confidence-based; `auto_opt.policy.allow_warn: true` will always pick a winner at the max budget (logging low-confidence warnings). Use `--no-auto-opt` to disable.
-* `--no-auto-opt` overrides `optimizer.name=auto` to `gibbs` with a warning; set `sample.optimizer.name` explicitly to silence the fallback.
-* Auto-opt can take minutes; use `--no-auto-opt` when you need a quick smoke test.
+* `sample.output.save_trace: true` enables trace-based diagnostics.
+* `sample.output.save_trace: false` skips ArviZ trace construction and reduces sample runtime/memory overhead.
+* Sampling uses `sample.optimizer.*` (`kind: gibbs_anneal`) with chain count and cooling schedule under one explicit surface.
+* Replica exchange is disabled in `gibbs_anneal`; chains are tracked directly in trajectory outputs.
 * `--verbose` enables periodic progress logging; `--debug` enables very verbose debug logs.
-* Auto-opt selection details are recorded in each pilot's `meta/run_manifest.json`; `cruncher analyze` writes `analysis/auto_opt_pilots.parquet` for the latest run. The selected pilot is also recorded in `outputs/auto_opt/best_<run_group>.json` (run_group is the TF slug; it uses a `setN_` prefix only when multiple regulator sets are configured) and marked with a leading `*` in `cruncher runs list`.
 
 ---
 
@@ -342,9 +370,11 @@ Generates diagnostics and plots for one or more sample runs.
 Inputs:
 
 * CONFIG (explicit or resolved)
-* runs via `analysis.runs` or `--run` (defaults to latest sample run if empty)
-* run artifacts: `artifacts/sequences.parquet` (required) and `artifacts/trace.nc` for trace-based plots
-* pairwise plots auto-select a deterministic `tf_pair` when omitted (override with `--tf-pair`)
+* optional `--campaign <name>` (required when `workspace.regulator_sets: []`)
+* runs via `analysis.run_selector`/`analysis.runs` or `--run` (defaults to latest sample run if empty)
+* run artifacts: `optimize/sequences.parquet` (required), `optimize/elites.parquet` (required),
+  `optimize/elites_hits.parquet` (required), `optimize/random_baseline.parquet` (required),
+  and `optimize/trace.nc` for trace-based plots
 
 Network:
 
@@ -354,31 +384,73 @@ Examples:
 
 * `cruncher analyze --latest <config>`
 * `cruncher analyze --run <run_name|run_dir> <config>`
-* `cruncher analyze --tf-pair lexA,cpxR <config>`
-* `cruncher analyze --plots trace --plots score_hist <config>`
-* `cruncher analyze --scatter-background --scatter-background-samples 2000 <config>`
-* `cruncher analyze --list-plots`
+* `cruncher analyze --summary <config>`
+* `cruncher analyze --campaign demo_pair --summary <config>`
 
 Preconditions:
 
 * provide runs via `analysis.runs`/`--run` or rely on the default latest run
-* trace-dependent plots require `artifacts/trace.nc`
-* if `analysis/` exists without `analysis/summary.json`, remove the incomplete analysis folder before re-running `cruncher analyze`
-* each sample run snapshots the lockfile under `meta/lockfile.json`; analysis uses that snapshot to avoid mismatch if the workspace lockfile changes later
+* trace-dependent plots require `optimize/trace.nc`
+* each sample run snapshots the lockfile under `inputs/lockfile.json`; analysis uses that snapshot to avoid mismatch if the workspace lockfile changes later
+* if `analysis` is omitted from config, analyze uses schema defaults (including `run_selector=latest`)
+* if `analysis.fimo_compare.enabled=true`, MEME Suite `fimo` must be resolvable via `discover.tool_path`, `MEME_BIN`, or `PATH`
 
 Outputs:
 
-* tables: `analysis/score_summary.parquet`, `analysis/elite_topk.parquet`,
-  `analysis/joint_metrics.parquet`, `analysis/diagnostics.json`
-* plots: `analysis/plot__score__pairgrid.<plot_format>` (when `analysis.plots.pairgrid=true`)
-* reports: `analysis/report.json`, `analysis/report.md`
-* summaries: `analysis/summary.json`, `analysis/manifest.json`, `analysis/plot_manifest.json`, `analysis/table_manifest.json`
+* tables: `analysis/tables/table__scores_summary.parquet`, `analysis/tables/table__elites_topk.parquet`,
+  `analysis/tables/table__metrics_joint.parquet`, `analysis/tables/table__chain_trajectory_points.parquet`,
+  `analysis/tables/table__chain_trajectory_lines.parquet`,
+  `analysis/tables/table__diagnostics_summary.json`, `analysis/tables/table__objective_components.json`,
+  `analysis/tables/table__elites_mmr_summary.parquet`, `analysis/tables/table__elites_nn_distance.parquet`,
+  `analysis/tables/table__elites_mmr_sweep.parquet` (when `analysis.mmr_sweep.enabled=true`)
+* plots: `plots/chain_trajectory_scatter.<plot_format>`,
+  `plots/chain_trajectory_sweep.<plot_format>`,
+  `plots/elites_nn_distance.<plot_format>`, `plots/elites_showcase.<plot_format>`,
+  `plots/health_panel.<plot_format>` (trace only)
+* reports: `analysis/reports/report.json`, `analysis/reports/report.md`
+* summaries: `analysis/reports/summary.json`, `analysis/manifests/manifest.json`, `analysis/manifests/plot_manifest.json`, `analysis/manifests/table_manifest.json`
 
 Note:
 
-* Analyze is idempotent for identical inputs + analysis config; if the current summary signature matches,
-  it reports that analysis is already up to date and skips re-running plots/tables.
-* Use `cruncher analyze --summary` to print the highlights from `analysis/report.json`.
+* Analyze rewrites the latest analysis outputs each run; set `analysis.archive=true` to keep prior reports.
+* Analyze uses `<run_dir>/analysis/state/tmp` as a run-local lock. Stale temp locks from interrupted runs are auto-pruned; active locks still fail fast.
+* Use `cruncher analyze --summary` to print the highlights from `report.json`.
+
+---
+
+#### `cruncher export sequences`
+
+Exports sequence-centric run tables for downstream wrappers and operators.
+
+Inputs:
+
+* CONFIG (explicit or resolved)
+* exactly one run selector: `--run <run_name|run_dir>` (repeatable) or `--latest`
+* sample run artifacts: `optimize/tables/elites.parquet`, `optimize/tables/elites_hits.parquet`, `run/config_used.yaml`
+
+Network:
+
+* no (run artifacts only)
+
+Examples:
+
+* `cruncher export sequences --latest <config>`
+* `cruncher export sequences --run sample/run_001 <config>`
+* `cruncher export sequences --latest --table-format csv --max-combo-size 3 <config>`
+
+Outputs (under each run):
+
+* `export/sequences/table__monospecific_consensus_sites.<parquet|csv>`
+* `export/sequences/table__monospecific_elite_windows.<parquet|csv>`
+* `export/sequences/table__bispecific_elite_windows.<parquet|csv>`
+* `export/sequences/table__multispecific_elite_windows.<parquet|csv>`
+* `export/sequences/export_manifest.json`
+
+Notes:
+
+* Fail-fast contract: duplicate `(elite_id, tf)` rows, out-of-bounds windows, non-numeric scores, or inconsistent motif widths terminate export with an explicit error.
+* Export appends artifact entries to `run/run_manifest.json` using stage `export`.
+* `--max-combo-size` must be `>=2`; omit to emit all TF-group sizes up to TF count.
 
 ---
 
@@ -402,18 +474,15 @@ Notes:
 
 * requires `marimo` to be installed (for example: `uv add --group notebooks marimo`)
 * useful when you want interactive slicing/filtering beyond static plots
-* strict by default: requires `analysis/summary.json` + `analysis/plot_manifest.json` to exist and parse, and `analysis/summary.json` must include a non-empty `tf_names` list
-* pass `--lenient` to generate anyway (warnings appear in the Overview tab)
-* when `analysis/summary.json` is missing, lenient mode falls back to `analysis/` as an unindexed entry
+* strict artifact contract: requires `analysis/reports/summary.json`, `analysis/manifests/plot_manifest.json`, and `analysis/manifests/table_manifest.json` to exist and parse, `analysis/reports/summary.json` must include a non-empty `tf_names` list, and `analysis/manifests/table_manifest.json` must provide `scores_summary`, `metrics_joint`, and `elites_topk` entries with existing files
 * plot output status is refreshed from disk so missing files are shown accurately
 * the Refresh button re-scans analysis entries and updates plot/table status without restarting marimo
-* the notebook infers `run_dir` from its location; keep it under `<run_dir>/analysis/` or regenerate it
-* text outputs (for example, `diag__convergence.txt`) render inline in the Plots tab
-* if running in lenient mode and `analysis/summary.json` lacks `tf_names`, scatter controls are disabled with an inline warning
+* the notebook infers `run_dir` from its location; keep it under `<run_dir>/` or regenerate it
+* plots are loaded from `analysis/manifests/plot_manifest.json`; the curated keys are `chain_trajectory_scatter`, `chain_trajectory_sweep`, `elites_nn_distance`, `elites_showcase`, plus optional `health_panel` and `optimizer_vs_fimo` entries when generated
 * the notebook includes:
   * Overview tab with run metadata and explicit warnings for missing/invalid analysis artifacts
-  * Tables tab with a Top-K slider and a per-PWM data explorer
-  * Plots tab with TF dropdowns, chain/draw range controls, and inline plot previews
+  * Tables tab with a Top-K slider and per-table previews from `analysis/manifests/table_manifest.json`
+  * Plots tab with inline previews and generated/skipped status from `analysis/manifests/plot_manifest.json`
 
 ---
 
@@ -442,7 +511,7 @@ Example:
 Inspect cached motifs and site sets.
 
 Use `catalog pwms` to compute PWMs from cached matrices or binding sites and
-survey their lengths/bit scores (and any trimmed window), and `catalog logos` to render PNG logos for the
+survey their lengths/bit scores (without sampling-time motif-width trimming), and `catalog logos` to render PNG logos for the
 same selection criteria.
 
 Inputs:
@@ -465,7 +534,7 @@ Subcommands:
 * `catalog logos` — render PWM logos for selected TFs or motif refs
 
 Note: `catalog logos` is idempotent for identical inputs. If matching logos already exist
-under `outputs/logos/catalog/`, it reports the existing path instead of writing a new run.
+under `outputs/plots/logos/catalog/`, it reports the existing path instead of writing a new run.
 
 Examples:
 
@@ -521,18 +590,21 @@ Examples:
 Notes:
 * `tool=auto` selects STREME when there are enough sequences; use `--tool meme` if STREME is not installed.
 * Discovery reads cached binding sites (run `cruncher fetch sites` first).
-  Discovery always uses cached sites regardless of `motif_store.pwm_source`.
+  Discovery always uses cached sites regardless of `catalog.pwm_source`.
 * By default discovery uses raw cached site sequences. Use `--window-sites` (or
-  `motif_discovery.window_sites=true`) to pre-window with `motif_store.site_window_lengths`
+  `discover.window_sites=true`) to pre-window with `catalog.site_window_lengths`
   before running MEME/STREME.
   If enabled without window lengths for a TF, discovery exits with a helpful error.
-* If `--minw/--maxw` are omitted (and unset in config), Cruncher derives them from the min/max
-  site lengths per TF.
+* If `--minw/--maxw` are omitted (and unset in config), Cruncher passes no width flags and
+  MEME/STREME uses its own defaults.
+* `discover motifs` output `Tool width` is the discovery-time motif length from MEME/STREME;
+  `Width bounds` reports `minw/maxw` used for discovery (`tool_default` means unset).
+  Sampling-time constraints (`sample.motif_width`) are applied later during `sample`.
 * Use `cruncher targets stats` to set `--minw/--maxw` from site-length ranges.
-* If you plan to run both MEME and STREME, set distinct `motif_discovery.source_id` values between runs to avoid lock ambiguity.
+* If you plan to run both MEME and STREME, set distinct `discover.source_id` values between runs to avoid lock ambiguity.
   You can also pass `--source-id` per run to avoid editing config.
 * By default discovery replaces previous discovered motifs for the same TF/source
-  (`motif_discovery.replace_existing=true`). Pass `--keep-existing` to retain historical runs.
+  (`discover.replace_existing=true`). Pass `--keep-existing` to retain historical runs.
 * `--meme-mod` applies to MEME only; use it when each sequence is expected to contain one site.
 * `--meme-prior` applies to MEME only; `addone` is a good default for sparse site sets.
 * Use `--tool-path` or the `MEME_BIN` environment variable to point at a specific install.
@@ -681,6 +753,10 @@ Network:
 
 * `cache stats <config>` — counts of cached motifs and site sets
 * `cache verify <config>` — verify cache paths exist on disk
+* `cache clean <config>` — list generated `__pycache__` / `.pytest_cache` directories (dry-run by default; use `--apply` to delete)
+  * default scan scope is package root (`src/dnadesign/cruncher/`)
+  * use `--scope workspace|package|repo` to change scan scope
+  * use `--root <dir>` to scan an explicit directory (overrides `--scope`)
 
 ---
 
@@ -716,13 +792,17 @@ Network:
 
 * no (run artifacts only)
 
-* `runs list <config>` — list run folders (optionally filter by stage). Auto-opt pilots marked with a leading `*` indicate the selected candidate.
+* `runs list <config>` — list run folders (optionally filter by stage).
 * `runs show <config> <run>` — show manifest + artifacts (run name or run dir)
 * `runs latest <config> --set-index 1` — print most recent run for a regulator set
 * `runs best <config> --set-index 1` — print best run by `best_score` for a regulator set
-* `runs watch <config> <run>` — live progress snapshot (run name or run dir; reads `meta/run_status.json`, optionally `live/metrics.jsonl`)
+* `runs watch <config> <run>` — live progress snapshot (run name or run dir; reads `run/run_status.json`, optionally `optimize/state/metrics.jsonl`)
 * `runs rebuild-index <config>` — rebuild `<workspace>/.cruncher/run_index.json`
+* `runs repair-index <config>` — validate and optionally remove index entries missing run directories/manifests (`--apply`)
 * `runs clean <config> --stale` — mark stale `running` runs as `aborted` (use `--drop` to remove from the index)
+* `runs prune <config>` — archive old runs under `<out_dir>/_archive/<stage>/<YYYY-MM>/` with deterministic retention (`--keep-latest`, `--older-than-days`; dry-run unless `--apply`)
+  * use `--repair-index` to drop invalid run-index entries before pruning
+  * without `--repair-index`, prune requires a valid run index and exits with an actionable repair command
 
 Tip: inside a workspace you can drop the config argument entirely (for example,
 `cruncher runs show <run>` or `cruncher runs list`).
@@ -740,7 +820,7 @@ Summarize effective configuration settings.
 
 Inputs:
 
-* CONFIG (explicit or resolved)
+* optional config path (`--config/-c`), otherwise resolved from workspace/CWD
 
 Network:
 
@@ -748,8 +828,10 @@ Network:
 
 Examples:
 
-* `cruncher config <config>`
-* `cruncher config <config> summary`
+* `cruncher config`
+* `cruncher config summary`
+* `cruncher config summary <config>`
+* `cruncher config --config <config>`
 
 Note:
 
@@ -773,6 +855,10 @@ Network:
 Example:
 
 * `cruncher optimizers list`
+
+Note:
+
+* Cruncher defaults to `gibbs_anneal`; this list is informational for kernel development.
 
 ---
 

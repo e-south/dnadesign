@@ -104,16 +104,21 @@ def _densegen_workspaces_root(config_path: Path) -> Path | None:
     return None
 
 
+def _resolve_user_path(path: Path, *, base_dir: Path) -> Path:
+    candidate = path.expanduser()
+    if candidate.is_absolute():
+        return candidate.resolve()
+    return (base_dir / candidate).resolve()
+
+
 def _resolve_densegen_workspace(selector: str, *, config_path: Path) -> Path:
     raw = str(selector or "").strip()
     if not raw:
         raise typer.BadParameter("--densegen-workspace must be a non-empty string.")
     candidate = Path(raw).expanduser()
     looks_like_path = candidate.is_absolute() or any(sep in raw for sep in (os.sep, os.altsep) if sep)
-    if looks_like_path or candidate.exists():
-        resolved = candidate
-        if not resolved.is_absolute():
-            resolved = (Path.cwd() / resolved).resolve()
+    if looks_like_path:
+        resolved = _resolve_user_path(candidate, base_dir=config_path.parent)
     else:
         root = _densegen_workspaces_root(config_path)
         if root is None:
@@ -135,8 +140,8 @@ def _resolve_densegen_workspace(selector: str, *, config_path: Path) -> Path:
     return resolved
 
 
-def _require_densegen_inputs_path(path: Path, *, inputs_root: Path, label: str) -> Path:
-    resolved = path.resolve()
+def _require_densegen_inputs_path(path: Path, *, inputs_root: Path, label: str, base_dir: Path) -> Path:
+    resolved = _resolve_user_path(path, base_dir=base_dir)
     try:
         resolved.relative_to(inputs_root.resolve())
     except ValueError as exc:
@@ -227,20 +232,18 @@ def _build_logo_signature(
     dpi: int,
 ) -> tuple[str, dict]:
     pwm_config = {
-        "pwm_source": cfg.motif_store.pwm_source,
-        "pwm_window_lengths": cfg.motif_store.pwm_window_lengths,
-        "pwm_window_strategy": cfg.motif_store.pwm_window_strategy,
+        "pwm_source": cfg.catalog.pwm_source,
     }
-    if cfg.motif_store.pwm_source == "sites":
+    if cfg.catalog.pwm_source == "sites":
         pwm_config.update(
             {
-                "combine_sites": cfg.motif_store.combine_sites,
-                "site_kinds": cfg.motif_store.site_kinds,
-                "site_window_lengths": cfg.motif_store.site_window_lengths,
-                "site_window_center": cfg.motif_store.site_window_center,
-                "min_sites_for_pwm": cfg.motif_store.min_sites_for_pwm,
-                "allow_low_sites": cfg.motif_store.allow_low_sites,
-                "pseudocounts": cfg.motif_store.pseudocounts,
+                "combine_sites": cfg.catalog.combine_sites,
+                "site_kinds": cfg.catalog.site_kinds,
+                "site_window_lengths": cfg.catalog.site_window_lengths,
+                "site_window_center": cfg.catalog.site_window_center,
+                "min_sites_for_pwm": cfg.catalog.min_sites_for_pwm,
+                "allow_low_sites": cfg.catalog.allow_low_sites,
+                "pseudocounts": cfg.catalog.pseudocounts,
             }
         )
     target_payloads: list[dict[str, object]] = []
@@ -250,7 +253,7 @@ def _build_logo_signature(
             "ref": f"{target.entry.source}:{target.entry.motif_id}",
             "entry": _entry_signature(target.entry),
         }
-        if cfg.motif_store.pwm_source == "matrix":
+        if cfg.catalog.pwm_source == "matrix":
             payload["matrix_sha256"] = _matrix_checksum(catalog_root, target.entry)
         else:
             entries = target.site_entries
@@ -331,7 +334,7 @@ def _resolve_targets(
 ) -> tuple[list[ResolvedTarget], CatalogIndex]:
     if set_index is not None and (tfs or refs):
         raise typer.BadParameter("--set cannot be combined with --tf or --ref.")
-    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     catalog = CatalogIndex.load(catalog_root)
     tf_names = list(tfs)
     if set_index is not None:
@@ -357,18 +360,18 @@ def _resolve_targets(
             raise ValueError(f"No catalog entry found for {ref}.")
         _ensure_entry_matches_pwm_source(
             entry,
-            cfg.motif_store.pwm_source,
-            cfg.motif_store.site_kinds,
+            cfg.catalog.pwm_source,
+            cfg.catalog.site_kinds,
             tf_name=entry.tf_name,
             ref=ref,
         )
         site_entries = []
-        if cfg.motif_store.pwm_source == "sites":
+        if cfg.catalog.pwm_source == "sites":
             site_entries = site_entries_for_logo(
                 catalog=catalog,
                 entry=entry,
-                combine_sites=cfg.motif_store.combine_sites,
-                site_kinds=cfg.motif_store.site_kinds,
+                combine_sites=cfg.catalog.combine_sites,
+                site_kinds=cfg.catalog.site_kinds,
             )
         key = entry.key
         if key in seen_keys:
@@ -396,26 +399,26 @@ def _resolve_targets(
             entry = select_catalog_entry(
                 catalog=catalog_for_select,
                 tf_name=tf_name,
-                pwm_source=cfg.motif_store.pwm_source,
-                site_kinds=cfg.motif_store.site_kinds,
-                combine_sites=cfg.motif_store.combine_sites,
-                source_preference=cfg.motif_store.source_preference,
-                dataset_preference=cfg.motif_store.dataset_preference,
-                dataset_map=cfg.motif_store.dataset_map,
-                allow_ambiguous=cfg.motif_store.allow_ambiguous,
+                pwm_source=cfg.catalog.pwm_source,
+                site_kinds=cfg.catalog.site_kinds,
+                combine_sites=cfg.catalog.combine_sites,
+                source_preference=cfg.catalog.source_preference,
+                dataset_preference=cfg.catalog.dataset_preference,
+                dataset_map=cfg.catalog.dataset_map,
+                allow_ambiguous=cfg.catalog.allow_ambiguous,
             )
             site_entries = []
-            if cfg.motif_store.pwm_source == "sites":
+            if cfg.catalog.pwm_source == "sites":
                 site_entries = site_entries_for_logo(
                     catalog=catalog,
                     entry=entry,
-                    combine_sites=cfg.motif_store.combine_sites,
-                    site_kinds=cfg.motif_store.site_kinds,
+                    combine_sites=cfg.catalog.combine_sites,
+                    site_kinds=cfg.catalog.site_kinds,
                 )
                 if not site_entries:
                     raise ValueError(
                         f"No cached site entries available for '{tf_name}' "
-                        f"with site_kinds={cfg.motif_store.site_kinds}."
+                        f"with cruncher.catalog.site_kinds={cfg.catalog.site_kinds}."
                     )
             key = entry.key
             if key in seen_keys:
@@ -446,7 +449,7 @@ def _resolve_site_targets(
 ) -> tuple[list[ResolvedTarget], CatalogIndex]:
     if set_index is not None and (tfs or refs):
         raise typer.BadParameter("--set cannot be combined with --tf or --ref.")
-    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     catalog = CatalogIndex.load(catalog_root)
     tf_names = list(tfs)
     if set_index is not None:
@@ -473,19 +476,20 @@ def _resolve_site_targets(
         _ensure_entry_matches_pwm_source(
             entry,
             "sites",
-            cfg.motif_store.site_kinds,
+            cfg.catalog.site_kinds,
             tf_name=entry.tf_name,
             ref=ref,
         )
         site_entries = site_entries_for_logo(
             catalog=catalog,
             entry=entry,
-            combine_sites=cfg.motif_store.combine_sites,
-            site_kinds=cfg.motif_store.site_kinds,
+            combine_sites=cfg.catalog.combine_sites,
+            site_kinds=cfg.catalog.site_kinds,
         )
         if not site_entries:
             raise ValueError(
-                f"No cached site entries available for '{entry.tf_name}' with site_kinds={cfg.motif_store.site_kinds}."
+                "No cached site entries available for "
+                f"'{entry.tf_name}' with cruncher.catalog.site_kinds={cfg.catalog.site_kinds}."
             )
         key = entry.key
         if key in seen_keys:
@@ -514,22 +518,23 @@ def _resolve_site_targets(
                 catalog=catalog_for_select,
                 tf_name=tf_name,
                 pwm_source="sites",
-                site_kinds=cfg.motif_store.site_kinds,
-                combine_sites=cfg.motif_store.combine_sites,
-                source_preference=cfg.motif_store.source_preference,
-                dataset_preference=cfg.motif_store.dataset_preference,
-                dataset_map=cfg.motif_store.dataset_map,
-                allow_ambiguous=cfg.motif_store.allow_ambiguous,
+                site_kinds=cfg.catalog.site_kinds,
+                combine_sites=cfg.catalog.combine_sites,
+                source_preference=cfg.catalog.source_preference,
+                dataset_preference=cfg.catalog.dataset_preference,
+                dataset_map=cfg.catalog.dataset_map,
+                allow_ambiguous=cfg.catalog.allow_ambiguous,
             )
             site_entries = site_entries_for_logo(
                 catalog=catalog,
                 entry=entry,
-                combine_sites=cfg.motif_store.combine_sites,
-                site_kinds=cfg.motif_store.site_kinds,
+                combine_sites=cfg.catalog.combine_sites,
+                site_kinds=cfg.catalog.site_kinds,
             )
             if not site_entries:
                 raise ValueError(
-                    f"No cached site entries available for '{tf_name}' with site_kinds={cfg.motif_store.site_kinds}."
+                    "No cached site entries available for "
+                    f"'{tf_name}' with cruncher.catalog.site_kinds={cfg.catalog.site_kinds}."
                 )
             key = entry.key
             if key in seen_keys:
@@ -589,7 +594,7 @@ def list_entries(
         console.print(str(exc))
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
-    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     entries = list_catalog(
         catalog_root,
         tf_name=tf,
@@ -682,7 +687,7 @@ def search_entries(
         )
     if not (0.0 <= min_score <= 1.0):
         raise typer.BadParameter("--min-score must be between 0 and 1. Hint: try 0.6.")
-    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     entries = search_catalog(
         catalog_root,
         query=query,
@@ -767,7 +772,7 @@ def resolve_tf(
         console.print(str(exc))
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
-    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     entries = list_catalog(
         catalog_root,
         tf_name=tf,
@@ -848,7 +853,7 @@ def show(
             "Expected <source>:<motif_id> reference. Hint: cruncher catalog show regulondb:RBM000123"
         )
     source, motif_id = ref.split(":", 1)
-    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     entry = get_entry(catalog_root, source=source, motif_id=motif_id)
     if entry is None:
         console.print(f"No catalog entry found for {ref}")
@@ -940,19 +945,18 @@ def pwms(
             set_index=set_index,
             source_filter=source,
         )
-        catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+        catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
         store = CatalogMotifStore(
             catalog_root,
-            pwm_source=cfg.motif_store.pwm_source,
-            site_kinds=cfg.motif_store.site_kinds,
-            combine_sites=cfg.motif_store.combine_sites,
-            site_window_lengths=cfg.motif_store.site_window_lengths,
-            site_window_center=cfg.motif_store.site_window_center,
-            pwm_window_lengths=cfg.motif_store.pwm_window_lengths,
-            pwm_window_strategy=cfg.motif_store.pwm_window_strategy,
-            min_sites_for_pwm=cfg.motif_store.min_sites_for_pwm,
-            allow_low_sites=cfg.motif_store.allow_low_sites,
-            pseudocounts=cfg.motif_store.pseudocounts,
+            pwm_source=cfg.catalog.pwm_source,
+            site_kinds=cfg.catalog.site_kinds,
+            combine_sites=cfg.catalog.combine_sites,
+            site_window_lengths=cfg.catalog.site_window_lengths,
+            site_window_center=cfg.catalog.site_window_center,
+            apply_pwm_window=False,
+            min_sites_for_pwm=cfg.catalog.min_sites_for_pwm,
+            allow_low_sites=cfg.catalog.allow_low_sites,
+            pseudocounts=cfg.catalog.pseudocounts,
         )
         payloads: list[dict[str, object]] = []
         resolved: list[tuple[ResolvedTarget, object]] = []
@@ -972,7 +976,7 @@ def pwms(
             resolved.append((target, pwm))
             info_bits = pwm.information_bits()
             cached_sites = f"{target.entry.site_count}/{target.entry.site_total}" if target.entry.has_sites else "-"
-            site_sets = "-" if cfg.motif_store.pwm_source == "matrix" else str(len(target.site_entries))
+            site_sets = "-" if cfg.catalog.pwm_source == "matrix" else str(len(target.site_entries))
             window = "-"
             if pwm.source_length is not None and pwm.window_start is not None:
                 window = f"{pwm.window_start}:{pwm.window_start + pwm.length}/{pwm.source_length}"
@@ -980,7 +984,7 @@ def pwms(
                 target.tf_name,
                 target.entry.source,
                 target.entry.motif_id,
-                cfg.motif_store.pwm_source,
+                cfg.catalog.pwm_source,
                 str(pwm.length),
                 window,
                 f"{info_bits:.2f}",
@@ -992,7 +996,7 @@ def pwms(
                 "tf_name": target.tf_name,
                 "source": target.entry.source,
                 "motif_id": target.entry.motif_id,
-                "pwm_source": cfg.motif_store.pwm_source,
+                "pwm_source": cfg.catalog.pwm_source,
                 "length": pwm.length,
                 "window_start": pwm.window_start,
                 "source_length": pwm.source_length,
@@ -1002,7 +1006,7 @@ def pwms(
                 "nsites": pwm.nsites,
                 "sites_cached": target.entry.site_count if target.entry.has_sites else None,
                 "sites_cached_total": target.entry.site_total if target.entry.has_sites else None,
-                "site_sets": len(target.site_entries) if cfg.motif_store.pwm_source == "sites" else None,
+                "site_sets": len(target.site_entries) if cfg.catalog.pwm_source == "sites" else None,
             }
             if output_format == "json":
                 record["matrix"] = pwm.matrix.tolist()
@@ -1094,6 +1098,7 @@ def export_densegen(
         raise typer.BadParameter("--background must be 'record', 'uniform', or 'matrix'.")
     if not producer.strip():
         raise typer.BadParameter("--producer must be a non-empty string.")
+    base_dir = config_path.parent
     densegen_root = None
     if densegen_workspace:
         densegen_root = _resolve_densegen_workspace(densegen_workspace, config_path=config_path)
@@ -1101,7 +1106,12 @@ def export_densegen(
         if out_dir is None:
             out_dir = inputs_root / "motif_artifacts"
         else:
-            out_dir = _require_densegen_inputs_path(out_dir, inputs_root=inputs_root, label="--out")
+            out_dir = _require_densegen_inputs_path(
+                out_dir,
+                inputs_root=inputs_root,
+                label="--out",
+                base_dir=base_dir,
+            )
     if out_dir is None:
         raise typer.BadParameter("--out is required when --densegen-workspace is not set.")
 
@@ -1119,8 +1129,8 @@ def export_densegen(
         console.print("Hint: run cruncher fetch motifs/sites before catalog export-densegen.")
         raise typer.Exit(code=1)
 
-    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
-    out_dir = out_dir.resolve()
+    catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
+    out_dir = _resolve_user_path(out_dir, base_dir=base_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if clean:
@@ -1231,6 +1241,7 @@ def export_sites(
         console.print(str(exc))
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
+    base_dir = config_path.parent
     densegen_root = None
     if densegen_workspace:
         densegen_root = _resolve_densegen_workspace(densegen_workspace, config_path=config_path)
@@ -1238,7 +1249,12 @@ def export_sites(
         if out_path is None:
             out_path = inputs_root / "densegen_sites.parquet"
         else:
-            out_path = _require_densegen_inputs_path(out_path, inputs_root=inputs_root, label="--out")
+            out_path = _require_densegen_inputs_path(
+                out_path,
+                inputs_root=inputs_root,
+                label="--out",
+                base_dir=base_dir,
+            )
     if out_path is None:
         raise typer.BadParameter("--out is required when --densegen-workspace is not set.")
 
@@ -1256,7 +1272,7 @@ def export_sites(
         console.print("Hint: run cruncher fetch sites --hydrate before export-sites.")
         raise typer.Exit(code=1)
 
-    out_path = out_path.resolve()
+    out_path = _resolve_user_path(out_path, base_dir=base_dir)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     if out_path.exists():
         if out_path.is_dir():
@@ -1267,7 +1283,7 @@ def export_sites(
             raise typer.Exit(code=1)
 
     fmt = _resolve_export_format(out_path, fmt, label="--format")
-    catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+    catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
 
     rows: list[dict[str, object]] = []
     table = Table(title="DenseGen binding-site export", header_style="bold")
@@ -1360,12 +1376,12 @@ def logos(
     bits_mode: str | None = typer.Option(
         None,
         "--bits-mode",
-        help="Logo mode: information or probability (defaults to parse.plot.bits_mode).",
+        help="Logo mode: information or probability (default: information).",
     ),
     dpi: int | None = typer.Option(
         None,
         "--dpi",
-        help="DPI for logo output (defaults to parse.plot.dpi).",
+        help="DPI for logo output (default: 150).",
     ),
 ) -> None:
     try:
@@ -1375,7 +1391,7 @@ def logos(
         raise typer.Exit(code=1)
     cfg = load_config(config_path)
     try:
-        catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+        catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
         ensure_mpl_cache(catalog_root)
         targets, catalog = _resolve_targets(
             cfg=cfg,
@@ -1387,19 +1403,18 @@ def logos(
         )
         store = CatalogMotifStore(
             catalog_root,
-            pwm_source=cfg.motif_store.pwm_source,
-            site_kinds=cfg.motif_store.site_kinds,
-            combine_sites=cfg.motif_store.combine_sites,
-            site_window_lengths=cfg.motif_store.site_window_lengths,
-            site_window_center=cfg.motif_store.site_window_center,
-            pwm_window_lengths=cfg.motif_store.pwm_window_lengths,
-            pwm_window_strategy=cfg.motif_store.pwm_window_strategy,
-            min_sites_for_pwm=cfg.motif_store.min_sites_for_pwm,
-            allow_low_sites=cfg.motif_store.allow_low_sites,
-            pseudocounts=cfg.motif_store.pseudocounts,
+            pwm_source=cfg.catalog.pwm_source,
+            site_kinds=cfg.catalog.site_kinds,
+            combine_sites=cfg.catalog.combine_sites,
+            site_window_lengths=cfg.catalog.site_window_lengths,
+            site_window_center=cfg.catalog.site_window_center,
+            apply_pwm_window=False,
+            min_sites_for_pwm=cfg.catalog.min_sites_for_pwm,
+            allow_low_sites=cfg.catalog.allow_low_sites,
+            pseudocounts=cfg.catalog.pseudocounts,
         )
-        resolved_bits_mode = bits_mode or cfg.parse.plot.bits_mode
-        resolved_dpi = dpi or cfg.parse.plot.dpi
+        resolved_bits_mode = bits_mode or "information"
+        resolved_dpi = dpi or 150
         if resolved_bits_mode not in {"information", "probability"}:
             raise typer.BadParameter("--bits-mode must be 'information' or 'probability'.")
         signature, signature_payload = _build_logo_signature(
@@ -1450,11 +1465,11 @@ def logos(
             pwm = store.get_pwm(target.ref)
             info_bits = pwm.information_bits()
             subtitle = logo_subtitle(
-                pwm_source=cfg.motif_store.pwm_source,
+                pwm_source=cfg.catalog.pwm_source,
                 entry=target.entry,
                 catalog=catalog,
-                combine_sites=cfg.motif_store.combine_sites,
-                site_kinds=cfg.motif_store.site_kinds,
+                combine_sites=cfg.catalog.combine_sites,
+                site_kinds=cfg.catalog.site_kinds,
             )
             title = logo_title(
                 tf_name=target.tf_name,
@@ -1469,7 +1484,7 @@ def logos(
                 out=out_path,
                 title=title,
                 dpi=resolved_dpi,
-                subtitle=f"sites: {subtitle}" if cfg.motif_store.pwm_source == "sites" else subtitle,
+                subtitle=f"sites: {subtitle}" if cfg.catalog.pwm_source == "sites" else subtitle,
             )
             outputs.append(str(out_path))
             table.add_row(

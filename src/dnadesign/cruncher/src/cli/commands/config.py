@@ -3,7 +3,9 @@
 <cruncher project>
 src/dnadesign/cruncher/src/cli/commands/config.py
 
-Author(s): Eric J. South
+Render a concise summary of the resolved Cruncher config.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -34,11 +36,6 @@ console = Console()
 @app.callback(invoke_without_command=True)
 def config_main(
     ctx: typer.Context,
-    config: Path | None = typer.Argument(
-        None,
-        help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
-        metavar="CONFIG",
-    ),
     config_option: Path | None = typer.Option(
         None,
         "--config",
@@ -47,16 +44,16 @@ def config_main(
     ),
 ) -> None:
     if ctx.invoked_subcommand is not None:
-        if config_option is None and config is None:
+        if config_option is None:
             return
         try:
-            ctx.obj = {"config_path": resolve_config_path(config_option or config)}
+            ctx.obj = {"config_path": resolve_config_path(config_option)}
         except ConfigResolutionError as exc:
             console.print(str(exc))
             raise typer.Exit(code=1)
         return
     try:
-        config_path = resolve_config_path(config_option or config)
+        config_path = resolve_config_path(config_option)
     except ConfigResolutionError as exc:
         console.print(str(exc))
         raise typer.Exit(code=1)
@@ -88,7 +85,11 @@ def summary(
     except ConfigResolutionError as exc:
         console.print(str(exc))
         raise typer.Exit(code=1)
-    cfg = load_config(config_path)
+    try:
+        cfg = load_config(config_path)
+    except (ValueError, FileNotFoundError, OSError) as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1)
     summary = summarize_config(cfg)
 
     table = Table(title="Cruncher config summary", header_style="bold")
@@ -106,16 +107,23 @@ def summary(
         table.add_row("campaign.id", campaign_meta.get("campaign_id", "-"))
         table.add_row("campaign.manifest_path", campaign_meta.get("manifest_path", "-"))
     table.add_row("io.parsers.extra_modules", str(summary["io"]["parsers"]["extra_modules"]))
-    table.add_row("pwm_source", summary["motif_store"]["pwm_source"])
-    table.add_row("site_kinds", str(summary["motif_store"]["site_kinds"]))
-    table.add_row("combine_sites", str(summary["motif_store"]["combine_sites"]))
-    table.add_row("dataset_preference", str(summary["motif_store"]["dataset_preference"]))
-    table.add_row("dataset_map", str(summary["motif_store"]["dataset_map"]))
-    table.add_row("site_window_lengths", str(summary["motif_store"]["site_window_lengths"]))
-    table.add_row("site_window_center", summary["motif_store"]["site_window_center"])
-    table.add_row("min_sites_for_pwm", str(summary["motif_store"]["min_sites_for_pwm"]))
-    table.add_row("source_preference", str(summary["motif_store"]["source_preference"]))
-    table.add_row("allow_ambiguous", str(summary["motif_store"]["allow_ambiguous"]))
+    table.add_row("catalog.root", summary["catalog"]["root"])
+    table.add_row("catalog.pwm_source", summary["catalog"]["pwm_source"])
+    table.add_row("catalog.site_kinds", str(summary["catalog"]["site_kinds"]))
+    table.add_row("catalog.combine_sites", str(summary["catalog"]["combine_sites"]))
+    table.add_row("catalog.dataset_preference", str(summary["catalog"]["dataset_preference"]))
+    table.add_row("catalog.dataset_map", str(summary["catalog"]["dataset_map"]))
+    table.add_row("catalog.site_window_lengths", str(summary["catalog"]["site_window_lengths"]))
+    table.add_row("catalog.site_window_center", summary["catalog"]["site_window_center"])
+    table.add_row("catalog.min_sites_for_pwm", str(summary["catalog"]["min_sites_for_pwm"]))
+    table.add_row("catalog.source_preference", str(summary["catalog"]["source_preference"]))
+    table.add_row("catalog.allow_ambiguous", str(summary["catalog"]["allow_ambiguous"]))
+    table.add_row("discover.enabled", str(summary["discover"]["enabled"]))
+    table.add_row("discover.tool", summary["discover"]["tool"])
+    table.add_row("discover.source_id", summary["discover"]["source_id"])
+    table.add_row("discover.minw", str(summary["discover"]["minw"]))
+    table.add_row("discover.maxw", str(summary["discover"]["maxw"]))
+    table.add_row("discover.nmotifs", str(summary["discover"]["nmotifs"]))
     table.add_row("ingest.genome_source", summary["ingest"]["genome_source"])
     table.add_row("ingest.genome_fasta", summary["ingest"]["genome_fasta"] or "-")
     table.add_row("ingest.genome_cache", summary["ingest"]["genome_cache"])
@@ -160,42 +168,57 @@ def summary(
     if sample is None:
         table.add_row("sample", "None")
     else:
-        table.add_row("mode", sample["mode"])
-        table.add_row("rng.seed", str(sample["rng"]["seed"]))
-        table.add_row("rng.deterministic", str(sample["rng"]["deterministic"]))
-        table.add_row("budget.tune", str(sample["budget"]["tune"]))
-        table.add_row("budget.draws", str(sample["budget"]["draws"]))
-        table.add_row("budget.restarts", str(sample["budget"]["restarts"]))
-        table.add_row("init.kind", sample["init"]["kind"])
-        table.add_row("init.length", str(sample["init"]["length"]))
-        table.add_row("init.regulator", str(sample["init"].get("regulator")))
+        table.add_row("sample.seed", str(sample["seed"]))
+        table.add_row("sample.sequence_length", str(sample["sequence_length"]))
+        table.add_row("sample.budget.tune", str(sample["budget"]["tune"]))
+        table.add_row("sample.budget.draws", str(sample["budget"]["draws"]))
         table.add_row("objective.score_scale", sample["objective"]["score_scale"])
+        table.add_row("objective.combine", sample["objective"]["combine"])
         table.add_row("objective.bidirectional", str(sample["objective"]["bidirectional"]))
+        table.add_row("objective.softmin.enabled", str(sample["objective"]["softmin"]["enabled"]))
+        table.add_row("objective.softmin.schedule", sample["objective"]["softmin"]["schedule"])
+        table.add_row("optimizer.kind", str(sample["optimizer"]["kind"]))
+        table.add_row("optimizer.chains", str(sample["optimizer"]["chains"]))
+        cooling = sample["optimizer"]["cooling"]
+        table.add_row("optimizer.cooling.kind", str(cooling["kind"]))
+        if cooling["kind"] == "fixed":
+            table.add_row("optimizer.cooling.beta", str(cooling["beta"]))
+        elif cooling["kind"] == "linear":
+            table.add_row("optimizer.cooling.beta_start", str(cooling["beta_start"]))
+            table.add_row("optimizer.cooling.beta_end", str(cooling["beta_end"]))
+        else:
+            table.add_row("optimizer.cooling.stages", str(cooling["stages"]))
+        early_stop = sample["optimizer"]["early_stop"]
+        table.add_row("optimizer.early_stop.enabled", str(early_stop["enabled"]))
+        table.add_row("optimizer.early_stop.patience", str(early_stop["patience"]))
+        table.add_row("optimizer.early_stop.min_delta", str(early_stop["min_delta"]))
+        table.add_row("optimizer.early_stop.require_min_unique", str(early_stop["require_min_unique"]))
+        table.add_row("optimizer.early_stop.min_unique", str(early_stop["min_unique"]))
+        table.add_row(
+            "optimizer.early_stop.success_min_per_tf_norm",
+            str(early_stop["success_min_per_tf_norm"]),
+        )
         table.add_row("elites.k", str(sample["elites"]["k"]))
-        table.add_row("elites.min_hamming", str(sample["elites"]["min_hamming"]))
-        table.add_row("elites.filters.pwm_sum_min", str(sample["elites"]["filters"]["pwm_sum_min"]))
-        table.add_row("optimizer.name", sample["optimizer"]["name"])
-        table.add_row("optimizers.gibbs.beta_schedule", str(sample["optimizers"]["gibbs"]["beta_schedule"]))
-        table.add_row("optimizers.pt.beta_ladder", str(sample["optimizers"]["pt"]["beta_ladder"]))
-        table.add_row("optimizers.pt.swap_prob", str(sample["optimizers"]["pt"]["swap_prob"]))
-        table.add_row("output.trace.save", str(sample["output"]["trace"]["save"]))
+        table.add_row("elites.diversity", str(sample["elites"]["select"]["diversity"]))
+        table.add_row("elites.pool_size", str(sample["elites"]["select"]["pool_size"]))
         table.add_row("output.save_sequences", str(sample["output"]["save_sequences"]))
-        table.add_row("ui.progress_bar", str(sample["ui"]["progress_bar"]))
-        table.add_row("ui.progress_every", str(sample["ui"]["progress_every"]))
+        table.add_row("output.save_trace", str(sample["output"]["save_trace"]))
 
     analysis = summary.get("analysis")
     if analysis is None:
         table.add_row("analysis", "None")
     else:
+        table.add_row("analysis.enabled", str(analysis["enabled"]))
+        table.add_row("analysis.run_selector", analysis["run_selector"])
         table.add_row("analysis.runs", str(analysis["runs"]))
-        table.add_row("analysis.plots", str(analysis["plots"]))
-        table.add_row("analysis.scatter_scale", str(analysis["scatter_scale"]))
-        table.add_row("analysis.subsampling_epsilon", str(analysis["subsampling_epsilon"]))
-        table.add_row("analysis.scatter_style", str(analysis["scatter_style"]))
-        table.add_row("analysis.scatter_background", str(analysis["scatter_background"]))
-        table.add_row("analysis.scatter_background_samples", str(analysis["scatter_background_samples"]))
-        table.add_row("analysis.scatter_background_seed", str(analysis["scatter_background_seed"]))
-        table.add_row("analysis.tf_pair", str(analysis["tf_pair"]))
-        table.add_row("analysis.archive", str(analysis.get("archive")))
+        table.add_row("analysis.pairwise", str(analysis["pairwise"]))
+        table.add_row("analysis.plot_format", analysis["plot_format"])
+        table.add_row("analysis.plot_dpi", str(analysis["plot_dpi"]))
+        table.add_row("analysis.table_format", analysis["table_format"])
+        table.add_row("analysis.max_points", str(analysis["max_points"]))
+        table.add_row("analysis.archive", str(analysis["archive"]))
+        table.add_row("analysis.elites_showcase.max_panels", str(analysis["elites_showcase"]["max_panels"]))
+        table.add_row("analysis.mmr_sweep.enabled", str(analysis["mmr_sweep"]["enabled"]))
+        table.add_row("analysis.mmr_sweep.diversity_values", str(analysis["mmr_sweep"]["diversity_values"]))
 
     console.print(table)

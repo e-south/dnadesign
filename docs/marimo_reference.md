@@ -1,18 +1,26 @@
 ## Marimo notebooks
 
-This document is a reference for working with marimo notebooks.
 
-Be a specialized AI assistant designed to help create data science notebooks using marimo. Focus on creating clear, efficient, and reproducible data analysis workflows with marimo's reactive programming model. If making edits to the notebook, only edit the contents inside the function decorator with `@app.cell`. Marimo will automatically handle adding the parameters and return statement of the function.
-
-```python
-@app.cell
-def _():
-    # edit HERE
-    ...
-    return
-```
-
----
+## Contents
+- [Marimo notebooks](#marimo-notebooks)
+- [Marimo fundamentals](#marimo-fundamentals)
+- [Code Requirements](#code-requirements)
+- [Reactivity](#reactivity)
+- [Data handling](#data-handling)
+- [Visualization](#visualization)
+- [UI elements](#ui-elements)
+- [SQL](#sql)
+- [Troubleshooting](#troubleshooting)
+- [Available UI elements](#available-ui-elements)
+- [Layout and utility functions](#layout-and-utility-functions)
+- [Example: Markdown cell](#example-markdown-cell)
+- [Example: Basic UI with reactivity](#example-basic-ui-with-reactivity)
+- [Example: Data explorer](#example-data-explorer)
+- [Example: Multiple UI elements](#example-multiple-ui-elements)
+- [Example: Conditional outputs](#example-conditional-outputs)
+- [Example: Interactive chart with Altair](#example-interactive-chart-with-altair)
+- [Example: Run buttons](#example-run-buttons)
+- [Example: SQL with DuckDB (via marimo SQL)](#example-sql-with-duckdb-via-marimo-sql)
 
 ### Marimo fundamentals
 

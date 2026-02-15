@@ -1,5 +1,21 @@
 # DenseGen Stage-B Sampler Refactor Design
 
+
+## Contents
+- [Intent](#intent)
+- [Problem Statement](#problem-statement)
+- [Approaches Considered](#approaches-considered)
+- [Proposed Architecture (Option 2)](#proposed-architecture-option-2)
+- [Components](#components)
+- [Orchestrator Role](#orchestrator-role)
+- [Data Flow](#data-flow)
+- [Error Handling](#error-handling)
+- [Testing Strategy](#testing-strategy)
+- [Unit tests](#unit-tests)
+- [Integration tests](#integration-tests)
+- [Rollout](#rollout)
+- [Non-Goals](#non-goals)
+
 ## Intent
 
 Reduce Stage-B sampling coupling by splitting the monolithic orchestration logic into focused, testable components while preserving current behavior. The refactor must be assertive (fail fast), modular, and avoid fallbacks.

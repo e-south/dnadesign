@@ -16,7 +16,8 @@ import numpy as np
 import pandas as pd
 
 from dnadesign.cruncher.analysis.overlap import compute_overlap_tables
-from dnadesign.cruncher.core.sequence import canon_string
+from dnadesign.cruncher.core.optimizers.kinds import resolve_optimizer_kind
+from dnadesign.cruncher.core.sequence import identity_key
 
 
 def _safe_float(value: object) -> float | None:
@@ -49,7 +50,7 @@ def _trace_score_array(idata: Any) -> np.ndarray | None:
         return None
     try:
         return np.asarray(score)
-    except Exception:
+    except (TypeError, ValueError):
         return None
 
 
@@ -63,15 +64,6 @@ def _sequence_frame(draw_df: pd.DataFrame) -> pd.DataFrame:
     return draw_df
 
 
-def _revcomp_str(seq: str) -> str:
-    comp = {"A": "T", "C": "G", "G": "C", "T": "A"}
-    return "".join(comp[ch] for ch in reversed(seq))
-
-
-def _hamming_str(a: str, b: str) -> float:
-    return float(sum(c0 != c1 for c0, c1 in zip(a, b))) / float(len(a)) if a else 0.0
-
-
 def _acceptance_tail_from_move_stats(
     move_stats: list[dict[str, object]],
     *,
@@ -81,40 +73,141 @@ def _acceptance_tail_from_move_stats(
     min_window: int = 20,
     max_window: int = 200,
 ) -> tuple[float | None, int | None, int | None]:
+    tail_rows, window, total_sweeps = _tail_move_window_records(
+        move_stats,
+        phase=phase,
+        window_fraction=window_fraction,
+        min_window=min_window,
+        max_window=max_window,
+    )
+    if not tail_rows:
+        return None, window, total_sweeps
+    kinds = {"B", "M", "L", "W", "I"} if mh_only else None
+    rate, _ = _acceptance_rate(tail_rows, move_kinds=kinds)
+    return rate, window, total_sweeps
+
+
+def _tail_move_window_records(
+    move_stats: list[dict[str, object]],
+    *,
+    phase: str = "draw",
+    window_fraction: float = 0.2,
+    min_window: int = 20,
+    max_window: int = 200,
+) -> tuple[list[dict[str, object]], int | None, int | None]:
     if not move_stats:
-        return None, None, None
-    rows = []
+        return [], None, None
+    rows: list[dict[str, object]] = []
     for row in move_stats:
         if phase and row.get("phase") != phase:
-            continue
-        move_kind = row.get("move_kind")
-        if mh_only and move_kind == "S":
             continue
         sweep_idx = _safe_int(row.get("sweep_idx"))
         attempted = _safe_int(row.get("attempted"))
         accepted = _safe_int(row.get("accepted"))
-        if sweep_idx is None or attempted is None or accepted is None:
+        move_kind = row.get("move_kind")
+        if sweep_idx is None or attempted is None or accepted is None or not isinstance(move_kind, str):
             continue
-        rows.append((sweep_idx, attempted, accepted))
+        rows.append(
+            {
+                "sweep_idx": int(sweep_idx),
+                "attempted": int(attempted),
+                "accepted": int(accepted),
+                "move_kind": str(move_kind),
+                "delta": _safe_float(row.get("delta")),
+                "delta_hamming": _safe_float(row.get("delta_hamming")),
+                "gibbs_changed": row.get("gibbs_changed"),
+            }
+        )
     if not rows:
-        return None, None, None
-    sweeps = sorted({sweep for sweep, _, _ in rows})
+        return [], None, None
+    sweeps = sorted({int(row["sweep_idx"]) for row in rows})
     if not sweeps:
-        return None, None, None
+        return [], None, None
     total_sweeps = len(sweeps)
     window = int(round(window_fraction * total_sweeps))
     window = max(min_window, min(max_window, window))
     window = min(window, total_sweeps)
     cutoff = sweeps[-window]
+    tail_rows = [row for row in rows if int(row["sweep_idx"]) >= cutoff]
+    return tail_rows, window, total_sweeps
+
+
+def _acceptance_rate(
+    rows: list[dict[str, object]],
+    *,
+    move_kinds: set[str] | None = None,
+    downhill_only: bool = False,
+) -> tuple[float | None, int]:
     attempted_total = 0
     accepted_total = 0
-    for sweep_idx, attempted, accepted in rows:
-        if sweep_idx >= cutoff:
-            attempted_total += attempted
-            accepted_total += accepted
+    for row in rows:
+        move_kind = str(row.get("move_kind"))
+        if move_kinds is not None and move_kind not in move_kinds:
+            continue
+        delta = _safe_float(row.get("delta"))
+        if downhill_only and (delta is None or delta >= 0):
+            continue
+        attempted = _safe_int(row.get("attempted"))
+        accepted = _safe_int(row.get("accepted"))
+        if attempted is None or accepted is None:
+            continue
+        attempted_total += attempted
+        accepted_total += accepted
     if attempted_total <= 0:
-        return None, window, total_sweeps
-    return accepted_total / float(attempted_total), window, total_sweeps
+        return None, 0
+    return accepted_total / float(attempted_total), attempted_total
+
+
+def _delta_std(rows: list[dict[str, object]], *, move_kinds: set[str] | None = None) -> float | None:
+    deltas: list[float] = []
+    for row in rows:
+        move_kind = str(row.get("move_kind"))
+        if move_kinds is not None and move_kind not in move_kinds:
+            continue
+        delta = _safe_float(row.get("delta"))
+        if delta is None:
+            continue
+        deltas.append(delta)
+    if not deltas:
+        return None
+    return float(np.std(np.asarray(deltas, dtype=float)))
+
+
+def _gibbs_flip_rate(rows: list[dict[str, object]]) -> tuple[float | None, int]:
+    attempts = 0
+    changed = 0
+    for row in rows:
+        if str(row.get("move_kind")) != "S":
+            continue
+        attempted = _safe_int(row.get("attempted"))
+        if attempted is None or attempted <= 0:
+            continue
+        marker = row.get("gibbs_changed")
+        if marker is None:
+            hamming = _safe_float(row.get("delta_hamming"))
+            if hamming is None:
+                continue
+            is_changed = hamming > 0
+        else:
+            is_changed = bool(marker)
+        attempts += attempted
+        if is_changed:
+            changed += attempted
+    if attempts <= 0:
+        return None, 0
+    return changed / float(attempts), attempts
+
+
+def _tail_hamming_mean(rows: list[dict[str, object]]) -> tuple[float | None, int]:
+    values: list[float] = []
+    for row in rows:
+        val = _safe_float(row.get("delta_hamming"))
+        if val is None:
+            continue
+        values.append(val)
+    if not values:
+        return None, 0
+    return float(np.mean(np.asarray(values, dtype=float))), len(values)
 
 
 def summarize_sampling_diagnostics(
@@ -122,6 +215,7 @@ def summarize_sampling_diagnostics(
     trace_idata: Any | None,
     sequences_df: pd.DataFrame | None,
     elites_df: pd.DataFrame | None,
+    elites_hits_df: pd.DataFrame | None,
     tf_names: list[str],
     optimizer: dict[str, object] | None,
     optimizer_stats: dict[str, object] | None,
@@ -140,6 +234,10 @@ def summarize_sampling_diagnostics(
     """
     warnings: list[str] = []
     status = "ok"
+    if optimizer is not None and not isinstance(optimizer, dict):
+        raise ValueError("Sampling diagnostics field 'optimizer' must be an object when provided.")
+    if optimizer_stats is not None and not isinstance(optimizer_stats, dict):
+        raise ValueError("Sampling diagnostics field 'optimizer_stats' must be an object when provided.")
 
     thresholds = {
         "rhat_warn": 1.1,
@@ -148,13 +246,12 @@ def summarize_sampling_diagnostics(
         "ess_ratio_fail": 0.02,
         "acceptance_low": 0.05,
         "acceptance_high": 0.95,
-        "swap_low": 0.05,
-        "swap_high": 0.90,
+        "rugged_acceptance_low": 0.10,
+        "rugged_acceptance_high": 0.45,
+        "rugged_downhill_acceptance_high": 0.05,
         "unique_fraction_warn": 0.20,
         "balance_index_warn": 0.50,
     }
-    pilot_short = False
-    pilot_warn_draws_min = 200
 
     def _mark(level: str) -> None:
         nonlocal status
@@ -166,18 +263,29 @@ def summarize_sampling_diagnostics(
     metrics: dict[str, object] = {}
     if mode is None and sample_meta:
         mode = str(sample_meta.get("mode") or "")
-    if optimizer_kind is None and sample_meta:
-        optimizer_kind = sample_meta.get("optimizer_kind") or optimizer_kind
-    if optimizer_kind is None and isinstance(optimizer, dict):
-        optimizer_kind = optimizer.get("kind") if isinstance(optimizer.get("kind"), str) else optimizer_kind
-    optimizer_kind = str(optimizer_kind).lower() if optimizer_kind else None
-    dsdna_canonicalize = bool(sample_meta.get("dsdna_canonicalize")) if sample_meta else False
-    dsdna_hamming = bool(sample_meta.get("dsdna_hamming")) if sample_meta else False
+    raw_optimizer_kind = optimizer_kind
+    if raw_optimizer_kind is None and sample_meta:
+        raw_optimizer_kind = sample_meta.get("optimizer_kind") or raw_optimizer_kind
+    if raw_optimizer_kind is None and isinstance(optimizer, dict):
+        raw_optimizer_kind = optimizer.get("kind") if isinstance(optimizer.get("kind"), str) else raw_optimizer_kind
+    resolved_optimizer_kind = resolve_optimizer_kind(raw_optimizer_kind, context="Sampling diagnostics")
+    has_canonical = bool(sample_meta.get("dsdna_canonicalize")) if sample_meta else False
+
+    if isinstance(sample_meta, dict):
+        pvalue_cache = sample_meta.get("pvalue_cache")
+        if isinstance(pvalue_cache, dict):
+            cache_payload = {
+                "hits": _safe_int(pvalue_cache.get("hits")),
+                "misses": _safe_int(pvalue_cache.get("misses")),
+                "maxsize": _safe_int(pvalue_cache.get("maxsize")),
+                "currsize": _safe_int(pvalue_cache.get("currsize")),
+            }
+            if any(value is not None for value in cache_payload.values()):
+                metrics["pvalue_cache"] = cache_payload
 
     if mode:
         metrics["mode"] = mode
-    if optimizer_kind:
-        metrics["optimizer_kind"] = optimizer_kind
+    metrics["optimizer_kind"] = resolved_optimizer_kind
 
     # ---- trace diagnostics -------------------------------------------------
     trace_metrics: dict[str, object] = {}
@@ -239,81 +347,43 @@ def summarize_sampling_diagnostics(
                 n_chains, n_draws = int(score_arr.shape[0]), int(score_arr.shape[1])
                 trace_metrics["chains"] = n_chains
                 trace_metrics["draws"] = n_draws
-                if mode == "auto_opt" and n_draws < pilot_warn_draws_min:
-                    pilot_short = True
-                    trace_metrics["pilot_short"] = True
-                    trace_metrics["pilot_warn_draws_min"] = pilot_warn_draws_min
-                pt_mixing = optimizer_kind == "pt"
-                if pt_mixing:
-                    trace_metrics["mixing_note"] = "PT ladder: R-hat/ESS computed on cold chain only."
-                    if n_draws < 4:
-                        if not pilot_short:
-                            warnings.append(f"ESS requires ≥4 draws (got {n_draws}).")
-                            _mark("warn")
-                    else:
-                        try:
-                            import arviz as az
+                if n_chains < 2:
+                    warnings.append(f"R-hat requires ≥2 chains (got {n_chains}).")
+                    _mark("warn")
+                if n_draws < 4:
+                    warnings.append(f"ESS requires ≥4 draws (got {n_draws}).")
+                    _mark("warn")
+                if n_chains >= 2 and n_draws >= 4:
+                    try:
+                        import arviz as az
 
-                            cold_scores = score_arr[-1:, :]
-                            score_idata = az.from_dict(posterior={"score": cold_scores})
-                            score = score_idata.posterior["score"]
-                            ess = _safe_float(az.ess(score)["score"].item())
-                        except Exception as exc:
-                            warnings.append(f"Trace diagnostics failed: {exc}")
+                        score_idata = az.from_dict(posterior={"score": score_arr})
+                        score = score_idata.posterior["score"]
+                        rhat = _safe_float(az.rhat(score)["score"].item())
+                        ess = _safe_float(az.ess(score)["score"].item())
+                    except Exception as exc:
+                        raise ValueError(f"Trace diagnostics failed: {exc}") from exc
+                if rhat is not None:
+                    trace_metrics["rhat"] = rhat
+                    if mode == "sample":
+                        if rhat >= thresholds["rhat_fail"]:
+                            warnings.append(f"Directional R-hat={rhat:.3f} suggests failed mixing.")
+                            _mark("fail")
+                        elif rhat > thresholds["rhat_warn"]:
+                            warnings.append(f"Directional R-hat={rhat:.3f} indicates weak mixing.")
                             _mark("warn")
-                    if ess is not None:
-                        trace_metrics["ess"] = ess
-                        denom = max(1, n_draws)
-                        ess_ratio = float(ess) / float(denom)
-                        trace_metrics["ess_ratio"] = ess_ratio
-                        if mode == "sample":
-                            if ess_ratio <= thresholds["ess_ratio_fail"]:
-                                warnings.append(f"ESS ratio {ess_ratio:.3f} suggests failed mixing.")
-                                _mark("fail")
-                            elif ess_ratio < thresholds["ess_ratio_warn"]:
-                                warnings.append(f"ESS ratio {ess_ratio:.3f} is low; consider longer runs.")
-                                _mark("warn")
-                else:
-                    if n_chains < 2:
-                        if not pilot_short:
-                            warnings.append(f"R-hat requires ≥2 chains (got {n_chains}).")
+                if ess is not None:
+                    trace_metrics["ess"] = ess
+                    denom = max(1, n_chains * n_draws)
+                    ess_ratio = float(ess) / float(denom)
+                    trace_metrics["ess_ratio"] = ess_ratio
+                    if mode == "sample":
+                        if ess_ratio <= thresholds["ess_ratio_fail"]:
+                            warnings.append(f"Directional ESS ratio {ess_ratio:.3f} suggests failed mixing.")
+                            _mark("fail")
+                        elif ess_ratio < thresholds["ess_ratio_warn"]:
+                            warnings.append(f"Directional ESS ratio {ess_ratio:.3f} is low; consider longer runs.")
                             _mark("warn")
-                    if n_draws < 4:
-                        if not pilot_short:
-                            warnings.append(f"ESS requires ≥4 draws (got {n_draws}).")
-                            _mark("warn")
-                    if n_chains >= 2 and n_draws >= 4:
-                        try:
-                            import arviz as az
-
-                            score_idata = az.from_dict(posterior={"score": score_arr})
-                            score = score_idata.posterior["score"]
-                            rhat = _safe_float(az.rhat(score)["score"].item())
-                            ess = _safe_float(az.ess(score)["score"].item())
-                        except Exception as exc:
-                            warnings.append(f"Trace diagnostics failed: {exc}")
-                            _mark("warn")
-                    if rhat is not None:
-                        trace_metrics["rhat"] = rhat
-                        if mode == "sample":
-                            if rhat >= thresholds["rhat_fail"]:
-                                warnings.append(f"R-hat={rhat:.3f} suggests failed mixing.")
-                                _mark("fail")
-                            elif rhat > thresholds["rhat_warn"]:
-                                warnings.append(f"R-hat={rhat:.3f} indicates weak mixing.")
-                                _mark("warn")
-                    if ess is not None:
-                        trace_metrics["ess"] = ess
-                        denom = max(1, n_chains * n_draws)
-                        ess_ratio = float(ess) / float(denom)
-                        trace_metrics["ess_ratio"] = ess_ratio
-                        if mode == "sample":
-                            if ess_ratio <= thresholds["ess_ratio_fail"]:
-                                warnings.append(f"ESS ratio {ess_ratio:.3f} suggests failed mixing.")
-                                _mark("fail")
-                            elif ess_ratio < thresholds["ess_ratio_warn"]:
-                                warnings.append(f"ESS ratio {ess_ratio:.3f} is low; consider longer runs.")
-                                _mark("warn")
 
                 flat = score_arr.reshape(-1)
                 trace_metrics["score_mean"] = _safe_float(np.mean(flat))
@@ -328,16 +398,6 @@ def summarize_sampling_diagnostics(
                     trace_metrics["score_delta"] = _safe_float(delta)
                     denom = max(abs(start_mean), 1e-12)
                     trace_metrics["score_delta_pct"] = _safe_float(delta / denom)
-                best_so_far = np.maximum.accumulate(score_arr, axis=1)
-                bsf_start = _safe_float(np.mean(best_so_far[:, 0]))
-                bsf_end = _safe_float(np.mean(best_so_far[:, -1]))
-                if bsf_start is not None and bsf_end is not None:
-                    bsf_delta = bsf_end - bsf_start
-                    trace_metrics["best_so_far_start"] = bsf_start
-                    trace_metrics["best_so_far_end"] = bsf_end
-                    trace_metrics["best_so_far_delta"] = _safe_float(bsf_delta)
-                    denom = max(1, int(score_arr.shape[1]) - 1)
-                    trace_metrics["best_so_far_slope"] = _safe_float(bsf_delta / denom)
 
     metrics["trace"] = trace_metrics
 
@@ -347,13 +407,14 @@ def summarize_sampling_diagnostics(
         draw_df = _sequence_frame(sequences_df)
         total = int(len(draw_df))
         unique = None
-        if "canonical_sequence" in draw_df.columns:
-            unique = int(draw_df["canonical_sequence"].astype(str).nunique())
+        if has_canonical:
+            source = (
+                draw_df["canonical_sequence"] if "canonical_sequence" in draw_df.columns else draw_df["sequence"]
+            ).astype(str)
+            keys = source.map(lambda seq: identity_key(seq, bidirectional=True))
+            unique = int(keys.nunique())
             seq_metrics["unique_sequences_canonical"] = unique
             seq_metrics["unique_sequences_raw"] = int(draw_df["sequence"].astype(str).nunique())
-        elif dsdna_canonicalize:
-            canon = draw_df["sequence"].astype(str).map(canon_string)
-            unique = int(canon.nunique())
         else:
             unique = int(draw_df["sequence"].astype(str).nunique())
         seq_metrics["n_sequences"] = total
@@ -362,7 +423,7 @@ def summarize_sampling_diagnostics(
         if total > 0 and unique is not None:
             unique_fraction = unique / float(total)
             seq_metrics["unique_fraction"] = unique_fraction
-            if unique_fraction < thresholds["unique_fraction_warn"] and not pilot_short:
+            if unique_fraction < thresholds["unique_fraction_warn"]:
                 warnings.append(f"Unique sequence fraction {unique_fraction:.2f} is low; sampler may be stuck.")
                 _mark("warn")
     elif sequences_df is not None:
@@ -426,24 +487,12 @@ def summarize_sampling_diagnostics(
                 )
             elites_metrics["normalized_balance_median"] = _safe_float(np.nanmedian(norm_balance))
             elites_metrics["normalized_min_median"] = _safe_float(np.nanmedian(norm_min))
-        if "sequence" in subset.columns:
-            seqs = subset["sequence"].astype(str).tolist()
-            if len(seqs) >= 2:
-                total = 0.0
-                count = 0
-                for i in range(len(seqs)):
-                    for j in range(i + 1, len(seqs)):
-                        s0, s1 = seqs[i], seqs[j]
-                        if len(s0) != len(s1):
-                            continue
-                        if dsdna_hamming:
-                            dist = min(_hamming_str(s0, s1), _hamming_str(_revcomp_str(s0), s1))
-                        else:
-                            dist = _hamming_str(s0, s1)
-                        total += dist
-                        count += 1
-                if count:
-                    elites_metrics["diversity_hamming"] = _safe_float(total / count)
+        if has_canonical:
+            source = (
+                subset["canonical_sequence"] if "canonical_sequence" in subset.columns else subset["sequence"]
+            ).astype(str)
+            keys = source.map(lambda seq: identity_key(seq, bidirectional=True))
+            elites_metrics["unique_elites_canonical"] = int(keys.nunique())
         if overlap_summary is not None:
             overlap_rate_median = overlap_summary.get("overlap_rate_median")
             overlap_total_bp_median = overlap_summary.get("overlap_total_bp_median")
@@ -452,37 +501,38 @@ def summarize_sampling_diagnostics(
             if overlap_total_bp_median is not None:
                 elites_metrics["overlap_total_bp_median"] = _safe_float(overlap_total_bp_median)
         else:
-            try:
-                _, _, overlap_summary = compute_overlap_tables(elites_df, tf_names)
-                overlap_rate_median = overlap_summary.get("overlap_rate_median")
-                overlap_total_bp_median = overlap_summary.get("overlap_total_bp_median")
-                if overlap_rate_median is not None:
-                    elites_metrics["overlap_rate_median"] = _safe_float(overlap_rate_median)
-                if overlap_total_bp_median is not None:
-                    elites_metrics["overlap_total_bp_median"] = _safe_float(overlap_total_bp_median)
-            except Exception as exc:
-                warnings.append(f"Overlap metrics unavailable: {exc}")
-                _mark("warn")
+            if elites_hits_df is None:
+                raise ValueError("elites_hits.parquet is required for overlap metrics.")
+            _, _, overlap_summary = compute_overlap_tables(elites_df, elites_hits_df, tf_names)
+            overlap_rate_median = overlap_summary.get("overlap_rate_median")
+            overlap_total_bp_median = overlap_summary.get("overlap_total_bp_median")
+            if overlap_rate_median is not None:
+                elites_metrics["overlap_rate_median"] = _safe_float(overlap_rate_median)
+            if overlap_total_bp_median is not None:
+                elites_metrics["overlap_total_bp_median"] = _safe_float(overlap_total_bp_median)
     metrics["elites"] = elites_metrics
 
     # ---- optimizer stats --------------------------------------------------
     optimizer_metrics: dict[str, object] = {}
-    optimizer_kind = None
+    optimizer_kind_for_stats = resolved_optimizer_kind
     if optimizer:
-        optimizer_kind = optimizer.get("kind")
-        optimizer_metrics["kind"] = optimizer_kind
+        optimizer_kind_for_stats = resolve_optimizer_kind(
+            optimizer.get("kind"),
+            context="Sampling diagnostics field 'optimizer.kind'",
+        )
+    optimizer_metrics["kind"] = optimizer_kind_for_stats
     if optimizer_stats:
         acc = optimizer_stats.get("acceptance_rate") or {}
         acc_b = _safe_float(acc.get("B"))
         acc_m = _safe_float(acc.get("M"))
         if acc_b is not None:
             optimizer_metrics.setdefault("acceptance_rate", {})["B"] = acc_b
-            if (acc_b < thresholds["acceptance_low"] or acc_b > thresholds["acceptance_high"]) and not pilot_short:
+            if acc_b < thresholds["acceptance_low"] or acc_b > thresholds["acceptance_high"]:
                 warnings.append(f"Block-move acceptance {acc_b:.2f} is outside typical bounds.")
                 _mark("warn")
         if acc_m is not None:
             optimizer_metrics.setdefault("acceptance_rate", {})["M"] = acc_m
-            if (acc_m < thresholds["acceptance_low"] or acc_m > thresholds["acceptance_high"]) and not pilot_short:
+            if acc_m < thresholds["acceptance_low"] or acc_m > thresholds["acceptance_high"]:
                 warnings.append(f"Multi-site acceptance {acc_m:.2f} is outside typical bounds.")
                 _mark("warn")
         acc_mh = _safe_float(optimizer_stats.get("acceptance_rate_mh"))
@@ -493,24 +543,94 @@ def summarize_sampling_diagnostics(
             optimizer_metrics["acceptance_rate_all"] = acc_all
         move_stats = optimizer_stats.get("move_stats")
         if isinstance(move_stats, list):
-            tail_rate, tail_window, tail_total = _acceptance_tail_from_move_stats(move_stats)
-            if tail_rate is not None:
-                optimizer_metrics["acceptance_rate_mh_tail"] = tail_rate
-                optimizer_metrics["acceptance_rate_mh_tail_window"] = tail_window
-                optimizer_metrics["acceptance_rate_mh_tail_sweeps"] = tail_total
-                if (
-                    tail_rate < thresholds["acceptance_low"] or tail_rate > thresholds["acceptance_high"]
-                ) and not pilot_short:
+            tail_rows, tail_window, tail_total = _tail_move_window_records(move_stats)
+            if tail_window is not None:
+                optimizer_metrics["acceptance_rate_non_s_tail_window"] = tail_window
+            if tail_total is not None:
+                optimizer_metrics["acceptance_rate_non_s_tail_sweeps"] = tail_total
+
+            tail_non_s, tail_non_s_attempts = _acceptance_rate(tail_rows, move_kinds={"B", "M", "L", "W", "I"})
+            if tail_non_s is not None:
+                optimizer_metrics["acceptance_rate_non_s_tail"] = tail_non_s
+                optimizer_metrics["acceptance_rate_non_s_tail_attempts"] = tail_non_s_attempts
+                if tail_non_s < thresholds["acceptance_low"] or tail_non_s > thresholds["acceptance_high"]:
                     warnings.append(
-                        f"Tail MH acceptance {tail_rate:.2f} is outside typical bounds (window={tail_window})."
+                        f"Tail non-S acceptance {tail_non_s:.2f} is outside typical bounds (window={tail_window})."
                     )
                     _mark("warn")
-        swap_rate = _safe_float(optimizer_stats.get("swap_acceptance_rate"))
-        if swap_rate is not None:
-            optimizer_metrics["swap_acceptance_rate"] = swap_rate
-            if (swap_rate < thresholds["swap_low"] or swap_rate > thresholds["swap_high"]) and not pilot_short:
-                warnings.append(f"Swap acceptance {swap_rate:.2f} suggests poor PT mixing.")
-                _mark("warn")
+
+            for move_kind in ("B", "M", "L", "W", "I"):
+                rate, attempts = _acceptance_rate(tail_rows, move_kinds={move_kind})
+                if rate is None:
+                    continue
+                optimizer_metrics[f"acceptance_tail_{move_kind}"] = rate
+                optimizer_metrics[f"acceptance_tail_{move_kind}_attempts"] = attempts
+
+            tail_mh_all, attempts_mh_all = _acceptance_rate(tail_rows, move_kinds={"B", "M", "L", "W", "I"})
+            if tail_mh_all is not None:
+                optimizer_metrics["acceptance_tail_mh_all"] = tail_mh_all
+                optimizer_metrics["acceptance_tail_mh_all_attempts"] = attempts_mh_all
+
+            tail_rugged, attempts_rugged = _acceptance_rate(tail_rows, move_kinds={"B", "M"})
+            if tail_rugged is not None:
+                optimizer_metrics["acceptance_tail_rugged"] = tail_rugged
+                optimizer_metrics["acceptance_tail_rugged_attempts"] = attempts_rugged
+                if attempts_rugged >= 10 and (
+                    tail_rugged < thresholds["rugged_acceptance_low"]
+                    or tail_rugged > thresholds["rugged_acceptance_high"]
+                ):
+                    warnings.append(
+                        f"Tail rugged acceptance {tail_rugged:.2f} is outside target band "
+                        f"[{thresholds['rugged_acceptance_low']:.2f}, {thresholds['rugged_acceptance_high']:.2f}]."
+                    )
+                    _mark("warn")
+
+            downhill_rugged, attempts_downhill_rugged = _acceptance_rate(
+                tail_rows,
+                move_kinds={"B", "M"},
+                downhill_only=True,
+            )
+            if downhill_rugged is not None:
+                optimizer_metrics["downhill_accept_tail_rugged"] = downhill_rugged
+                optimizer_metrics["downhill_accept_tail_rugged_attempts"] = attempts_downhill_rugged
+                if attempts_downhill_rugged >= 10 and downhill_rugged > thresholds["rugged_downhill_acceptance_high"]:
+                    warnings.append(
+                        f"Tail rugged downhill acceptance {downhill_rugged:.2f} exceeds "
+                        f"{thresholds['rugged_downhill_acceptance_high']:.2f}."
+                    )
+                    _mark("warn")
+
+            gibbs_flip_rate, gibbs_flip_attempts = _gibbs_flip_rate(tail_rows)
+            if gibbs_flip_rate is not None:
+                optimizer_metrics["gibbs_flip_rate_tail"] = gibbs_flip_rate
+                optimizer_metrics["gibbs_flip_rate_tail_attempts"] = gibbs_flip_attempts
+
+            tail_hamming_mean, tail_hamming_n = _tail_hamming_mean(tail_rows)
+            if tail_hamming_mean is not None:
+                optimizer_metrics["tail_step_hamming_mean"] = tail_hamming_mean
+                optimizer_metrics["tail_step_hamming_n"] = tail_hamming_n
+
+            delta_std_tail = _delta_std(tail_rows)
+            if delta_std_tail is not None:
+                optimizer_metrics["score_delta_std_tail"] = delta_std_tail
+            delta_std_tail_mh = _delta_std(tail_rows, move_kinds={"B", "M", "L", "W", "I"})
+            if delta_std_tail_mh is not None:
+                optimizer_metrics["score_delta_std_tail_mh"] = delta_std_tail_mh
+            delta_std_tail_rugged = _delta_std(tail_rows, move_kinds={"B", "M"})
+            if delta_std_tail_rugged is not None:
+                optimizer_metrics["score_delta_std_tail_rugged"] = delta_std_tail_rugged
+        unique_successes = _safe_int(optimizer_stats.get("unique_successes"))
+        if unique_successes is not None:
+            optimizer_metrics["unique_successes"] = unique_successes
+            if sample_meta:
+                early_stop = sample_meta.get("early_stop") if isinstance(sample_meta, dict) else None
+                if isinstance(early_stop, dict) and early_stop.get("require_min_unique"):
+                    min_unique = _safe_int(early_stop.get("min_unique"))
+                    if min_unique is not None and unique_successes < min_unique:
+                        warnings.append(
+                            f"unique successes {unique_successes} below minimum {min_unique} required by early stop."
+                        )
+                        _mark("warn")
     else:
         warnings.append("Optimizer stats missing from run manifest; acceptance checks skipped.")
         _mark("warn")

@@ -1,0 +1,72 @@
+# styles/style_v1/presentation_default.yaml
+dpi: 180
+
+font_mono: DejaVu Sans Mono
+font_label: DejaVu Sans
+font_size_seq: 14
+font_size_label: 12
+
+padding_x: 24.0
+padding_y: 5.0
+
+track_spacing: 35.0
+baseline_spacing: 40.0
+show_reverse_complement: true
+layout:
+  outer_pad_cells: 0.35
+sequence:
+  strand_gap_cells: 0.55
+  to_kmer_gap_cells: 0.30
+
+legend: true
+legend_mode: bottom
+legend_inline_side: auto
+legend_inline_margin_cells: 0.35
+legend_height_px: 16.0
+legend_pad_px: 10.0
+legend_font_size: 11
+legend_patch_w: 18.0
+legend_patch_h: 12.0
+legend_gap_x: 14.0
+legend_gap_patch_text: 6.0
+legend_center: true
+
+connectors: true
+connector_alpha: 0.45
+connector_width: 0.6
+connector_dash: [1.0, 3.0]
+
+span_link_inner_margin_bp: 0.50
+
+kmer:
+  box_height_cells: 1.10
+  round_px: 5.0
+  pad_x_px: 1.025
+  fill_alpha: 0.88
+  edge_width: 0.0
+  text_color: "#ffffff"
+  text_y_nudge_cells: 0.0
+  to_logo_gap_cells: 0.18
+
+motif_logo:
+  layout: stack
+  lane_mode: follow_feature_track
+  display_mode: information
+  height_bits: 2.0
+  bits_to_cells: 1.05
+  y_pad_cells: 0.0
+  letter_x_pad_frac: 0.10
+  alpha_other: 0.65
+  alpha_observed: 1.0
+  debug_bounds: false
+  letter_coloring:
+    mode: classic
+    other_color: "#d1d5db"
+    observed_color_source: nucleotide_palette
+  scale_bar:
+    enabled: false
+    location: left_of_logo
+    font_size: 8
+
+# Palette is optional. Keep it empty by default.
+palette: {}

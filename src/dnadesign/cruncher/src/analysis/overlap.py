@@ -11,64 +11,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from collections import Counter
 from typing import Iterable
 
 import numpy as np
 import pandas as pd
-
-
-def _parse_per_tf(row: pd.Series) -> dict:
-    raw = row.get("per_tf_json") if isinstance(row, pd.Series) else None
-    if isinstance(raw, str):
-        try:
-            payload = json.loads(raw)
-            if isinstance(payload, dict):
-                return payload
-        except Exception:
-            return {}
-    if isinstance(raw, dict):
-        return raw
-    return {}
-
-
-def _parse_width(details: dict, pwm_widths: dict[str, int] | None, tf_name: str) -> int | None:
-    width = details.get("width")
-    if isinstance(width, (int, float)):
-        return int(width)
-    motif = details.get("motif_diagram")
-    if isinstance(motif, str):
-        match = re.search(r"_(\d+)$", motif)
-        if match:
-            return int(match.group(1))
-    if pwm_widths and tf_name in pwm_widths:
-        return int(pwm_widths[tf_name])
-    return None
-
-
-def _extract_hit(
-    per_tf: dict,
-    tf_name: str,
-    pwm_widths: dict[str, int] | None,
-) -> tuple[int, int, str | None] | None:
-    details = per_tf.get(tf_name)
-    if not isinstance(details, dict):
-        return None
-    offset = details.get("offset")
-    if offset is None:
-        return None
-    try:
-        start = int(offset)
-    except (TypeError, ValueError):
-        return None
-    width = _parse_width(details, pwm_widths, tf_name)
-    if width is None:
-        return None
-    end = start + int(width)
-    strand = details.get("strand")
-    strand_label = str(strand) if strand is not None else None
-    return start, end, strand_label
 
 
 def _resolve_hist_bins(hist_bins: list[int] | None, max_value: float) -> list[float]:
@@ -84,6 +31,7 @@ def _resolve_hist_bins(hist_bins: list[int] | None, max_value: float) -> list[fl
 
 def compute_overlap_tables(
     elites_df: pd.DataFrame,
+    hits_df: pd.DataFrame,
     tf_names: Iterable[str],
     pwm_widths: dict[str, int] | None = None,
     hist_bins: list[int] | None = None,
@@ -134,13 +82,39 @@ def compute_overlap_tables(
         elite_df = pd.DataFrame(columns=elite_cols)
         return pair_df, elite_df, {"overlap_rate_median": None, "overlap_total_bp_median": None}
 
-    for _, row in elites_df.iterrows():
-        per_tf = _parse_per_tf(row)
-        hits: dict[str, tuple[int, int, str | None]] = {}
-        for tf in tf_list:
-            hit = _extract_hit(per_tf, tf, pwm_widths)
-            if hit is not None:
-                hits[tf] = hit
+    if hits_df is None or hits_df.empty:
+        raise ValueError("elites_hits.parquet is required to compute overlap metrics.")
+
+    elite_info: dict[str, dict[str, object]] = {}
+    elite_cols = ["id"]
+    if "rank" in elites_df.columns:
+        elite_cols.append("rank")
+    if "sequence" in elites_df.columns:
+        elite_cols.append("sequence")
+    for values in elites_df[elite_cols].itertuples(index=False, name=None):
+        row = dict(zip(elite_cols, values, strict=False))
+        elite_id = str(row.get("id") or "")
+        if not elite_id:
+            raise ValueError("Elites parquet missing required 'id' column.")
+        elite_info[elite_id] = {
+            "rank": row.get("rank"),
+            "sequence": row.get("sequence"),
+        }
+
+    hits_by_elite: dict[str, dict[str, tuple[int, int, str | None]]] = {}
+    hit_cols = ["elite_id", "tf", "best_start", "pwm_width", "best_strand"]
+    for elite_id_raw, tf_name, start, width, strand in hits_df[hit_cols].itertuples(index=False, name=None):
+        elite_id = str(elite_id_raw or "")
+        if not elite_id or tf_name not in tf_list:
+            continue
+        if not isinstance(start, (int, float)) or not isinstance(width, (int, float)) or not isinstance(strand, str):
+            raise ValueError(f"Invalid hit metadata for elite '{elite_id}' TF '{tf_name}'.")
+        start_i = int(start)
+        end_i = start_i + int(width)
+        hits_by_elite.setdefault(elite_id, {})[str(tf_name)] = (start_i, end_i, strand)
+
+    for elite_id, hits in hits_by_elite.items():
+        elite_meta = elite_info.get(elite_id, {})
 
         overlap_total = 0
         overlap_pairs = 0
@@ -163,13 +137,13 @@ def compute_overlap_tables(
                 overlap_total += overlap_bp
                 overlap_pairs += 1
 
-        seq_val = row.get("sequence") if "sequence" in row else None
+        seq_val = elite_meta.get("sequence")
         seq_hash = None
         if isinstance(seq_val, str):
             seq_hash = hashlib.sha256(seq_val.encode("utf-8")).hexdigest()[:12]
         row_payload = {
-            "id": row.get("id") if "id" in row else None,
-            "rank": row.get("rank") if "rank" in row else None,
+            "id": elite_id,
+            "rank": elite_meta.get("rank"),
             "sequence_hash": seq_hash,
             "overlap_total_bp": overlap_total,
             "overlap_pair_count": overlap_pairs,
@@ -231,29 +205,26 @@ def compute_overlap_tables(
 
 
 def extract_elite_hits(
-    elites_df: pd.DataFrame,
+    hits_df: pd.DataFrame,
     tf_names: Iterable[str],
-    pwm_widths: dict[str, int] | None = None,
 ) -> pd.DataFrame:
     tf_list = list(tf_names)
+    if hits_df is None or hits_df.empty:
+        return pd.DataFrame(columns=["tf", "offset", "end", "strand", "elite_id"])
     rows: list[dict[str, object]] = []
-    if elites_df is None or elites_df.empty:
-        return pd.DataFrame(columns=["tf", "offset", "end", "strand", "rank", "sequence"])
-    for _, row in elites_df.iterrows():
-        per_tf = _parse_per_tf(row)
-        for tf in tf_list:
-            hit = _extract_hit(per_tf, tf, pwm_widths)
-            if hit is None:
-                continue
-            start, end, strand = hit
-            rows.append(
-                {
-                    "tf": tf,
-                    "offset": start,
-                    "end": end,
-                    "strand": strand,
-                    "rank": row.get("rank") if "rank" in row else None,
-                    "sequence": row.get("sequence") if "sequence" in row else None,
-                }
-            )
+    hit_cols = ["elite_id", "tf", "best_start", "pwm_width", "best_strand"]
+    for elite_id, tf_name, start, width, strand in hits_df[hit_cols].itertuples(index=False, name=None):
+        if tf_name not in tf_list:
+            continue
+        if not isinstance(start, (int, float)) or not isinstance(width, (int, float)) or not isinstance(strand, str):
+            continue
+        rows.append(
+            {
+                "tf": tf_name,
+                "offset": int(start),
+                "end": int(start) + int(width),
+                "strand": strand,
+                "elite_id": elite_id,
+            }
+        )
     return pd.DataFrame(rows)

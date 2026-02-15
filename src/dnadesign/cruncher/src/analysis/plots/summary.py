@@ -3,25 +3,21 @@
 <cruncher project>
 src/dnadesign/cruncher/src/analysis/plots/summary.py
 
-Author(s): Eric J. South
+Table helpers for the curated analysis suite.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import Iterable
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
 
 from dnadesign.cruncher.analysis.parquet import read_parquet, write_parquet
-from dnadesign.cruncher.analysis.plots._savefig import savefig
-
-logger = logging.getLogger(__name__)
 
 
 def _score_columns(tf_names: Iterable[str]) -> list[str]:
@@ -132,11 +128,6 @@ def write_joint_metrics(elites_df: pd.DataFrame, tf_names: list[str], out_path: 
         joint_hmean = scores.shape[1] / np.sum(1.0 / scores, axis=1)
     zero_mean = np.isfinite(joint_mean) & (joint_mean == 0)
     zero_mean_count = int(zero_mean.sum())
-    if zero_mean_count:
-        logger.debug(
-            "Balance index undefined for %d rows with joint_mean=0; writing NaN.",
-            zero_mean_count,
-        )
     balance_index = np.divide(
         joint_min,
         joint_mean,
@@ -163,166 +154,3 @@ def write_joint_metrics(elites_df: pd.DataFrame, tf_names: list[str], out_path: 
         write_parquet(df, out_path)
     else:
         df.to_csv(out_path, index=False)
-
-
-def plot_score_hist(
-    score_df: pd.DataFrame,
-    tf_names: list[str],
-    out_path: Path,
-    *,
-    dpi: int,
-    png_compress_level: int,
-) -> None:
-    sns.set_style("ticks", {"axes.grid": False})
-    n = len(tf_names)
-    ncols = 2 if n > 1 else 1
-    nrows = (n + ncols - 1) // ncols
-    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(6 * ncols, 3 * nrows))
-    axes_list = axes.flatten() if hasattr(axes, "flatten") else [axes]
-    for i, tf in enumerate(tf_names):
-        ax = axes_list[i]
-        sns.histplot(score_df[f"score_{tf}"], bins=30, kde=True, ax=ax)
-        ax.set_title(f"{tf} score distribution")
-        ax.set_xlabel("Score")
-        ax.set_ylabel("Count")
-    for j in range(i + 1, len(axes_list)):
-        axes_list[j].axis("off")
-    fig.tight_layout()
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
-    plt.close(fig)
-
-
-def plot_score_box(
-    score_df: pd.DataFrame,
-    tf_names: list[str],
-    out_path: Path,
-    *,
-    dpi: int,
-    png_compress_level: int,
-) -> None:
-    melted = score_df.melt(var_name="tf", value_name="score")
-    melted["tf"] = melted["tf"].str.replace("score_", "", regex=False)
-    sns.set_style("ticks", {"axes.grid": False})
-    fig, ax = plt.subplots(figsize=(max(6, len(tf_names) * 1.5), 4))
-    sns.boxplot(data=melted, x="tf", y="score", ax=ax)
-    ax.set_title("Per-TF score distribution")
-    ax.set_xlabel("TF")
-    ax.set_ylabel("Score")
-    fig.tight_layout()
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
-    plt.close(fig)
-
-
-def plot_correlation_heatmap(
-    score_df: pd.DataFrame,
-    tf_names: list[str],
-    out_path: Path,
-    *,
-    dpi: int,
-    png_compress_level: int,
-) -> None:
-    corr = score_df.corr()
-    corr.index = [name.replace("score_", "") for name in corr.index]
-    corr.columns = [name.replace("score_", "") for name in corr.columns]
-    sns.set_style("ticks", {"axes.grid": False})
-    fig, ax = plt.subplots(figsize=(6, 5))
-    sns.heatmap(corr, cmap="vlag", center=0.0, square=True, ax=ax)
-    ax.set_title("TF score correlation")
-    fig.tight_layout()
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
-    plt.close(fig)
-
-
-def plot_parallel_coords(
-    elites_df: pd.DataFrame,
-    tf_names: list[str],
-    out_path: Path,
-    *,
-    dpi: int,
-    png_compress_level: int,
-) -> None:
-    cols = _score_columns(tf_names)
-    missing = [col for col in cols if col not in elites_df.columns]
-    if missing:
-        raise ValueError(f"Missing score columns in elites parquet: {missing}")
-    df = elites_df.copy()
-    if "rank" in df.columns:
-        df = df.nsmallest(min(50, len(df)), "rank")
-    elif "norm_sum" in df.columns:
-        df = df.nlargest(min(50, len(df)), "norm_sum")
-    else:
-        df = df.head(min(50, len(df)))
-    scores = df[cols].copy()
-    scores = (scores - scores.min()) / (scores.max() - scores.min()).replace(0, 1)
-    sns.set_style("ticks", {"axes.grid": False})
-    fig, ax = plt.subplots(figsize=(max(6, len(tf_names) * 1.5), 4))
-    xs = list(range(len(cols)))
-    for _, row in scores.iterrows():
-        ax.plot(xs, row.values, color="steelblue", alpha=0.3, linewidth=1.0)
-    ax.set_xticks(xs)
-    ax.set_xticklabels([c.replace("score_", "") for c in cols], rotation=30, ha="right")
-    ax.set_ylabel("Scaled score (0-1)")
-    ax.set_title("Parallel coordinates (top elites)")
-    fig.tight_layout()
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
-    plt.close(fig)
-
-
-def plot_score_pairgrid(
-    score_df: pd.DataFrame,
-    tf_names: list[str],
-    out_path: Path,
-    *,
-    dpi: int,
-    png_compress_level: int,
-    max_points: int = 2000,
-) -> None:
-    if len(tf_names) < 2:
-        fig, ax = plt.subplots(figsize=(5, 3))
-        ax.text(
-            0.5,
-            0.5,
-            f"Pairgrid requires at least 2 TFs (found {len(tf_names)}).",
-            ha="center",
-            va="center",
-        )
-        ax.axis("off")
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
-        plt.close(fig)
-        return
-    if score_df.empty:
-        fig, ax = plt.subplots(figsize=(5, 3))
-        ax.text(
-            0.5,
-            0.5,
-            "No sequence scores available for pairgrid.",
-            ha="center",
-            va="center",
-        )
-        ax.axis("off")
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        savefig(fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
-        plt.close(fig)
-        return
-    cols = _score_columns(tf_names)
-    missing = [col for col in cols if col not in score_df.columns]
-    if missing:
-        raise ValueError(f"Missing score columns in sequences.parquet: {missing}")
-    df = score_df[cols].copy()
-    df.columns = list(tf_names)
-    if max_points > 0 and len(df) > max_points:
-        df = df.sample(n=max_points, random_state=0)
-    sns.set_style("ticks", {"axes.grid": False})
-    grid = sns.PairGrid(df, corner=True, diag_sharey=False, height=2.2)
-    grid.map_lower(sns.scatterplot, s=10, alpha=0.5, linewidth=0)
-    grid.map_diag(sns.histplot, bins=30)
-    grid.fig.suptitle("TF score pairgrid (pairwise projections)", y=1.02)
-    grid.fig.tight_layout()
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    savefig(grid.fig, out_path, dpi=dpi, png_compress_level=png_compress_level)
-    plt.close(grid.fig)

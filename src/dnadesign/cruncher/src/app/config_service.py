@@ -3,7 +3,9 @@
 <cruncher project>
 src/dnadesign/cruncher/src/app/config_service.py
 
-Author(s): Eric J. South
+Load and summarize resolved Cruncher configurations.
+
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -11,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from dnadesign.cruncher.config.schema_v2 import CruncherConfig
+from dnadesign.cruncher.config.schema_v3 import CruncherConfig
 
 
 def summarize_config(cfg: CruncherConfig) -> Dict[str, Any]:
@@ -66,31 +68,30 @@ def summarize_config(cfg: CruncherConfig) -> Dict[str, Any]:
         "campaign_names": campaign_names,
         "campaign": cfg.campaign.model_dump(mode="json") if cfg.campaign else None,
         "io": {"parsers": {"extra_modules": cfg.io.parsers.extra_modules}},
-        "motif_store": {
-            "catalog_root": str(cfg.motif_store.catalog_root),
-            "pwm_source": cfg.motif_store.pwm_source,
-            "site_kinds": cfg.motif_store.site_kinds,
-            "combine_sites": cfg.motif_store.combine_sites,
-            "pseudocounts": cfg.motif_store.pseudocounts,
-            "dataset_preference": cfg.motif_store.dataset_preference,
-            "dataset_map": cfg.motif_store.dataset_map,
-            "site_window_lengths": cfg.motif_store.site_window_lengths,
-            "site_window_center": cfg.motif_store.site_window_center,
-            "pwm_window_lengths": cfg.motif_store.pwm_window_lengths,
-            "pwm_window_strategy": cfg.motif_store.pwm_window_strategy,
-            "min_sites_for_pwm": cfg.motif_store.min_sites_for_pwm,
-            "allow_low_sites": cfg.motif_store.allow_low_sites,
-            "source_preference": cfg.motif_store.source_preference,
-            "allow_ambiguous": cfg.motif_store.allow_ambiguous,
+        "catalog": {
+            "root": str(cfg.catalog.root),
+            "pwm_source": cfg.catalog.pwm_source,
+            "site_kinds": cfg.catalog.site_kinds,
+            "combine_sites": cfg.catalog.combine_sites,
+            "pseudocounts": cfg.catalog.pseudocounts,
+            "dataset_preference": cfg.catalog.dataset_preference,
+            "dataset_map": cfg.catalog.dataset_map,
+            "site_window_lengths": cfg.catalog.site_window_lengths,
+            "site_window_center": cfg.catalog.site_window_center,
+            "min_sites_for_pwm": cfg.catalog.min_sites_for_pwm,
+            "allow_low_sites": cfg.catalog.allow_low_sites,
+            "source_preference": cfg.catalog.source_preference,
+            "allow_ambiguous": cfg.catalog.allow_ambiguous,
         },
-        "motif_discovery": {
-            "tool": cfg.motif_discovery.tool,
-            "tool_path": str(cfg.motif_discovery.tool_path) if cfg.motif_discovery.tool_path else None,
-            "minw": cfg.motif_discovery.minw,
-            "maxw": cfg.motif_discovery.maxw,
-            "nmotifs": cfg.motif_discovery.nmotifs,
-            "min_sequences_for_streme": cfg.motif_discovery.min_sequences_for_streme,
-            "source_id": cfg.motif_discovery.source_id,
+        "discover": {
+            "enabled": cfg.discover.enabled,
+            "tool": cfg.discover.tool,
+            "tool_path": str(cfg.discover.tool_path) if cfg.discover.tool_path else None,
+            "minw": cfg.discover.minw,
+            "maxw": cfg.discover.maxw,
+            "nmotifs": cfg.discover.nmotifs,
+            "min_sequences_for_streme": cfg.discover.min_sequences_for_streme,
+            "source_id": cfg.discover.source_id,
         },
         "ingest": {
             "genome_source": cfg.ingest.genome_source,
@@ -124,23 +125,6 @@ def summarize_config(cfg: CruncherConfig) -> Dict[str, Any]:
             "site_sources": site_sources,
         },
     }
-    if cfg.sample is None:
-        summary["sample"] = None
-    else:
-        summary["sample"] = cfg.sample.model_dump()
-    if cfg.analysis is None:
-        summary["analysis"] = None
-    else:
-        summary["analysis"] = {
-            "runs": cfg.analysis.runs,
-            "plots": cfg.analysis.plots.model_dump(),
-            "scatter_scale": cfg.analysis.scatter_scale,
-            "subsampling_epsilon": cfg.analysis.subsampling_epsilon,
-            "scatter_style": cfg.analysis.scatter_style,
-            "scatter_background": cfg.analysis.scatter_background,
-            "scatter_background_samples": cfg.analysis.scatter_background_samples,
-            "scatter_background_seed": cfg.analysis.scatter_background_seed,
-            "tf_pair": cfg.analysis.tf_pair,
-            "archive": cfg.analysis.archive,
-        }
+    summary["sample"] = cfg.sample.model_dump(mode="json") if cfg.sample else None
+    summary["analysis"] = cfg.analysis.model_dump(mode="json") if cfg.analysis else None
     return summary

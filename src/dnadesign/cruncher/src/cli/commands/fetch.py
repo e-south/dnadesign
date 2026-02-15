@@ -48,6 +48,40 @@ logger = logging.getLogger(__name__)
 console = Console()
 
 
+def _resolve_fetch_source(
+    source: str | None,
+    source_preference: list[str],
+    *,
+    available_sources: set[str],
+) -> str:
+    if source:
+        if source not in available_sources:
+            raise typer.BadParameter(f"Unknown source '{source}'. Run `cruncher sources list`.")
+        return source
+    if source_preference:
+        skipped: list[str] = []
+        for selected in source_preference:
+            if selected in available_sources:
+                if skipped:
+                    logger.info(
+                        "Using source '%s' from cruncher.catalog.source_preference (skipped unavailable: %s).",
+                        selected,
+                        ", ".join(skipped),
+                    )
+                else:
+                    logger.info("Using source '%s' from cruncher.catalog.source_preference.", selected)
+                return selected
+            skipped.append(selected)
+        raise typer.BadParameter(
+            "No cruncher.catalog.source_preference entries are available for fetching. "
+            "Pass --source from `cruncher sources list` or update cruncher.catalog.source_preference."
+        )
+    raise typer.BadParameter(
+        "--source is required when cruncher.catalog.source_preference is empty. "
+        "Set cruncher.catalog.source_preference or pass --source."
+    )
+
+
 def _unique_keys(paths: Iterable[Path]) -> List[Tuple[str, str]]:
     keys = {(path.parent.name, path.stem) for path in paths}
     return sorted(keys, key=lambda pair: (pair[0], pair[1]))
@@ -144,7 +178,11 @@ def motifs(
         "--apply-selectors/--no-selectors",
         help="Apply campaign selectors when resolving TFs (requires local catalog).",
     ),
-    source: str = typer.Option("regulondb", "--source", help="Source adapter to query."),
+    source: str | None = typer.Option(
+        None,
+        "--source",
+        help="Source adapter to query (defaults to cruncher.catalog.source_preference[0]).",
+    ),
     dry_run: bool = typer.Option(False, "--dry-run", help="List matching motifs without caching."),
     limit: Optional[int] = typer.Option(None, "--limit", help="Limit remote matches (dry-run only)."),
     all_matches: bool = typer.Option(False, "--all", help="Fetch all matching motifs for each TF name."),
@@ -191,8 +229,14 @@ def motifs(
             config_path=config_path,
             extra_parser_modules=cfg.io.parsers.extra_modules,
         )
+        available_sources = {spec.source_id for spec in registry.list_sources()}
+        source = _resolve_fetch_source(
+            source,
+            cfg.catalog.source_preference,
+            available_sources=available_sources,
+        )
         adapter = registry.create(source, cfg.ingest)
-        catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+        catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
         if dry_run:
             if not effective_tfs:
                 raise typer.BadParameter("--dry-run requires at least one --tf or --campaign.")
@@ -268,7 +312,11 @@ def sites(
         "--apply-selectors/--no-selectors",
         help="Apply campaign selectors when resolving TFs (requires local catalog).",
     ),
-    source: str = typer.Option("regulondb", "--source", help="Source adapter to query."),
+    source: str | None = typer.Option(
+        None,
+        "--source",
+        help="Source adapter to query (defaults to cruncher.catalog.source_preference[0]).",
+    ),
     limit: Optional[int] = typer.Option(None, "--limit", help="Optional limit on sites per TF."),
     dataset_id: Optional[str] = typer.Option(
         None,
@@ -336,13 +384,19 @@ def sites(
             config_path=config_path,
             extra_parser_modules=cfg.io.parsers.extra_modules,
         )
+        available_sources = {spec.source_id for spec in registry.list_sources()}
+        source = _resolve_fetch_source(
+            source,
+            cfg.catalog.source_preference,
+            available_sources=available_sources,
+        )
         ingest_cfg = cfg.ingest
         if dataset_id and source == "regulondb" and not cfg.ingest.regulondb.ht_sites:
             ingest_cfg = cfg.ingest.model_copy(deep=True)
             ingest_cfg.regulondb.ht_sites = True
             console.print("Note: enabling HT dataset access for this request (--dataset-id).")
         adapter = registry.create(source, ingest_cfg)
-        catalog_root = resolve_catalog_root(config_path, cfg.motif_store.catalog_root)
+        catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
         if dry_run:
             if not effective_tfs:
                 raise typer.BadParameter("--dry-run requires --tf or --campaign to resolve HT datasets.")

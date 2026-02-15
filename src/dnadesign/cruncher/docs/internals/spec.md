@@ -1,29 +1,24 @@
-## cruncher for developers
+# Cruncher for developers
 
-This document defines the end-to-end requirements and architecture for **cruncher**. It is intended as a build and review guide for engineers working on ingestion, optimization, and UX.
-
-### Contents
-
-1. [Goals](#goals)
-2. [Architecture](#architecture)
-3. [Registries](#registries)
-4. [Data model](#data-model)
-5. [Cache layout](#cache-layout)
-6. [Lockfiles](#lockfiles)
-7. [PWM creation strategy](#pwm-creation-strategy)
-8. [MCMC optimization spec](#mcmc-optimization-spec)
-9. [Outputs and reporting](#outputs-and-reporting)
-10. [CLI contract](#cli-contract)
-11. [Error handling](#error-handling)
-12. [Testing plan](#testing-plan)
-
----
+## Contents
+- [Cruncher for developers](#cruncher-for-developers)
+- [Goals](#goals)
+- [Architecture](#architecture)
+- [Data model](#data-model)
+- [Cache layout](#cache-layout)
+- [Lockfiles](#lockfiles)
+- [PWM creation strategy](#pwm-creation-strategy)
+- [MCMC optimization spec](#mcmc-optimization-spec)
+- [Outputs and reporting](#outputs-and-reporting)
+- [CLI contract](#cli-contract)
+- [Error handling](#error-handling)
+- [Testing plan](#testing-plan)
 
 ### Goals
 
 - Decoupled: core optimization is source-agnostic and runs offline.
 - Assertive: explicit errors for missing inputs, ambiguous TFs, invalid matrices.
-- Extendable: new sources and optimizers are adapters/registries.
+- Extendable: new sources and optimizers can be added via registries (v3 defaults to `gibbs_anneal`).
 - Reproducible: lockfiles + run manifests + deterministic seeds.
 - Operational UX: clear CLI commands, deterministic cache, readable reports, crisp docs.
 - No fallbacks: no implicit legacy modes, no silent fallbacks, no hidden network access.
@@ -76,7 +71,7 @@ This document defines the end-to-end requirements and architecture for **crunche
 ### Cache layout
 
 ```
-<catalog_root>/
+<catalog.root>/
   catalog.json
   normalized/
     motifs/<source>/<motif_id>.json
@@ -86,7 +81,7 @@ This document defines the end-to-end requirements and architecture for **crunche
 ```
 
 `catalog.json` is the single source of truth for “what we have in-house”. It tracks matrix availability, site counts, and provenance tags.
-`catalog_root` can be absolute or relative to the cruncher root (`src/dnadesign/cruncher`); relative paths must not include `..`.
+`catalog.root` can be absolute or relative to the cruncher root (`src/dnadesign/cruncher`); relative paths must not include `..`.
 By default the catalog cache is shared across workspaces (`src/dnadesign/cruncher/.cruncher`).
 
 Workspace state (per workspace `.cruncher/`):
@@ -100,9 +95,8 @@ Workspace state (per workspace `.cruncher/`):
 
 Tooling caches:
 
-- Matplotlib caches in `<catalog_root>/.mplcache/` unless `MPLCONFIGDIR` is set.
-- Numba JIT cache defaults to `<repo>/src/dnadesign/cruncher/.cruncher/numba_cache` (or `<repo>/.cruncher/numba_cache`)
-  unless `NUMBA_CACHE_DIR` is set.
+- Matplotlib caches in `<catalog.root>/.mplcache/` unless `MPLCONFIGDIR` is set.
+- Numba JIT cache defaults to `<workspace>/.cruncher/numba_cache` unless `NUMBA_CACHE_DIR` is set.
 
 ---
 
@@ -119,63 +113,59 @@ If a TF cannot be uniquely resolved, **cruncher** errors immediately. Analyze op
 
 ### PWM creation strategy
 
-- Default: use cached matrices (`motif_store.pwm_source=matrix`).
-- Optional: build PWM from cached sites (`motif_store.pwm_source=sites`).
-- Site-derived PWMs use Biopython with configurable pseudocounts (`motif_store.pseudocounts`).
-- `motif_store.site_kinds` can restrict which site sets are eligible (e.g., curated vs HT vs local).
-- `motif_store.combine_sites=true` concatenates site sets for a TF before PWM creation (explicit opt‑in).
+- Default: use cached matrices (`catalog.pwm_source=matrix`).
+- Optional: build PWM from cached sites (`catalog.pwm_source=sites`).
+- Site-derived PWMs use Biopython with configurable pseudocounts (`catalog.pseudocounts`).
+- `catalog.site_kinds` can restrict which site sets are eligible (e.g., curated vs HT vs local).
+- `catalog.combine_sites=true` concatenates site sets for a TF before PWM creation (explicit opt‑in).
 - When `combine_sites=true`, lockfiles hash the full set of site files used for that TF, so cache changes require re-locking.
-- HT site sets with variable lengths require per‑TF/per‑dataset window lengths via `motif_store.site_window_lengths`.
-- If optimization requires a shorter PWM, set `motif_store.pwm_window_lengths` to trim to the highest‑information sub-window.
+- HT site sets with variable lengths require per‑TF/per‑dataset window lengths via `catalog.site_window_lengths`.
+- If optimization requires a shorter PWM, set `sample.motif_width.maxw` to select the highest‑information window at sampling time.
 - Fail if fewer than `min_sites_for_pwm` binding sites are available (unless `allow_low_sites=true`).
 - All PWMs are validated (shape Lx4, rows sum to 1, non-negative).
 - De novo alignment/discovery is handled via MEME Suite (`cruncher discover motifs`) and stored as catalog matrices.
-  Tool resolution uses `motif_discovery.tool_path` (resolved relative to config), `MEME_BIN`, or PATH, and discovery
+  Tool resolution uses `discover.tool_path` (resolved relative to config), `MEME_BIN`, or PATH, and discovery
   writes a `discover_manifest.json` with tool/version metadata per run.
 
 ---
 
 ### MCMC optimization spec
 
-- Deterministic RNG via `sample.rng.seed` (and `sample.rng.deterministic=true` for stable pilot seeding).
-- Burn-in storage is optional via `sample.output.trace.include_tune` (default: false, affects sequences.parquet only).
-- Optimizer registry supports `gibbs` and `pt` out of the box.
-- Each optimizer reports:
-  - move tallies
-  - acceptance ratios for B/M moves
-  - PT swap acceptance rates
-- Cooling and soft-min schedules are independent; `optimizers.gibbs.apply_during` controls whether annealing happens during tune only or all sweeps.
-- `optimizers.gibbs.schedule_scope` selects per‑chain vs global cooling schedules (global spans all chains and requires `apply_during=all`).
-- Optional adaptive controllers tune Gibbs acceptance or PT ladder scale toward target bands.
-- Move policies support slide/swap/insertion moves plus optional “worst TF” targeting and move scheduling.
+- Deterministic RNG via `sample.seed` and run-level stable seeding.
+- Burn-in storage is optional via `sample.output.include_tune_in_sequences` (default: false, affects sequences.parquet only).
+- Fixed-length sampling: `sample.sequence_length` must be >= the widest PWM length.
+- `gibbs_anneal` kernel with configurable chain count and cooling schedule (`sample.optimizer.*`).
+- Each run reports move tallies and acceptance ratios; chain trajectories are persisted for analysis.
+- Optimizer cooling and objective softmin schedules are independent.
+- Move policies are selected via `sample.moves.profile` with optional overrides.
 
 ---
 
 ### Outputs and reporting
 
-Each run directory contains:
+Each run directory uses a stable subdir layout (stage-agnostic):
 
-- `meta/config_used.yaml` — resolved config + PWM summaries
-- `meta/run_manifest.json` — provenance, hashes, optimizer stats
-- `meta/run_status.json` — live progress updates (written during parse and sampling)
-- `artifacts/trace.nc` — canonical ArviZ trace
-- `artifacts/sequences.parquet` — per-draw sequences + per-TF scores
-- `artifacts/elites.parquet` — elite sequences (parquet)
-- `artifacts/elites.json` — elite sequences (JSON, human-readable)
-- `artifacts/elites.yaml` — elite metadata (YAML)
-- `analysis/` — latest analysis (plots/tables/report in one directory)
-- `analysis/summary.json` — analysis provenance and artifacts
-- `analysis/manifest.json` — artifact inventory with generation reasons
-- `analysis/analysis_used.yaml` — analysis settings used
-- `analysis/plot_manifest.json` — plot registry and generated outputs
-- `analysis/table_manifest.json` — table registry and generated outputs
-- `analysis/auto_opt_pilots.parquet` — pilot scorecard (when auto-opt runs)
-- `analysis/plot__auto_opt_tradeoffs.<plot_format>` — balance vs best-score tradeoffs (when auto-opt runs)
-- `analysis/_archive/<analysis_id>/` — optional archived analyses (when enabled)
-- `live/metrics.jsonl` — live sampling progress (when enabled)
-- `analysis/report.json` + `analysis/report.md` — summary (from `cruncher analyze`)
+```
+<run_dir>/
+  run/        # run_manifest.json, run_status.json, config_used.yaml
+  inputs/     # lockfile snapshot + input manifests
+  optimize/   # tables/ + state/ (trace, metrics, elite metadata)
+  analysis/   # reports/ + manifests/ + tables/ + plots/
+  plots/      # logos and non-analysis plot families
+  export/     # downstream exports (for example export/sequences/*)
+```
 
-`cruncher analyze` warns when required analysis artifacts are missing and still writes the report stubs.
+Key artifacts:
+
+- `run/run_manifest.json` / `run/run_status.json` / `run/config_used.yaml` — provenance + status + resolved config
+- `inputs/lockfile.json` — pinned input snapshot for reproducible analysis
+- `optimize/tables/sequences.parquet`, `optimize/tables/elites*`, `optimize/tables/random_baseline*` — sampling outputs
+- `optimize/state/trace.nc`, `optimize/state/metrics.jsonl`, `optimize/state/elites.{json,yaml}` — sampling metadata
+- `analysis/reports/summary.json`, `analysis/reports/report.json`, `analysis/reports/report.md` — analysis outputs
+- `analysis/manifests/plot_manifest.json`, `analysis/manifests/table_manifest.json`, `analysis/manifests/manifest.json` — inventories
+- `analysis/plots/*`, `analysis/tables/table__*` — curated analysis plots and tables
+
+`cruncher analyze` fails when required analysis artifacts are missing and does not write partial report outputs.
 
 ---
 
@@ -208,7 +198,7 @@ Defaults + automation:
 - `cruncher runs rebuild-index <config>`
 - `cruncher notebook [--analysis-id <id>|--latest] <run_dir>`
 
-Pairwise plots auto-pick a deterministic `tf_pair` when missing; explicit `analysis.tf_pair` overrides the selection.
+Pairwise plots auto-pick a deterministic TF pair when missing; `analysis.pairwise` can disable pairwise plots or pin a specific pair.
 
 Network access is explicit and opt-in. `cruncher fetch ...` and remote inventory commands (for example `cruncher sources summary --scope remote` or
 `cruncher sources datasets`) contact sources; other commands operate on local
@@ -233,7 +223,7 @@ Errors are explicit and actionable:
 
 - Missing lockfile → error (no implicit resolution)
 - Lockfile pwm_source mismatch → error (re-run lock)
-- Missing artifacts for analyze → warning + partial outputs
+- Missing artifacts for analyze → error (no partial outputs)
 - Invalid PWM / invalid sites → error
 - Ambiguous TF resolution → error
 - PWM-from-sites with low site count → error unless `allow_low_sites=true`

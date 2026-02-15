@@ -74,6 +74,24 @@ def canon_int(seq: np.ndarray) -> np.ndarray:
     return arr.copy() if seq_str <= rev_str else rev
 
 
+def identity_key(seq: str, *, bidirectional: bool) -> str:
+    """
+    Return the deterministic identity key for a DNA sequence.
+
+    When bidirectional is True, this is the canonical sequence (lexicographically
+    smaller of the sequence and its reverse complement). Otherwise it is the
+    cleaned uppercase sequence.
+    """
+    if not isinstance(seq, str):
+        raise TypeError("identity_key requires a DNA string")
+    clean = seq.strip().upper()
+    if not clean:
+        return ""
+    if bidirectional:
+        return canon_string(clean)
+    return clean
+
+
 def dsdna_hamming(a: np.ndarray, b: np.ndarray) -> int:
     """
     dsDNA-aware Hamming distance: minimum of forward and reverse-complement matches.

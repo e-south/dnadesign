@@ -74,7 +74,7 @@ def make_beta_scheduler(cooling_cfg: Dict[str, Any], total_sweeps: int):
 
 def make_beta_ladder(cooling_cfg: Dict[str, Any]) -> List[float]:
     """
-    For PT, build a “β-ladder” (a list of β values):
+    Build a beta ladder (a list of beta values):
       - If kind=="geometric": return copy of cooling_cfg["beta"] (list of floats)
       - If kind=="fixed": return [cooling_cfg["beta"]]
       - Otherwise: error
@@ -84,4 +84,4 @@ def make_beta_ladder(cooling_cfg: Dict[str, Any]) -> List[float]:
         return list(cooling_cfg["beta"])
     if kind == "fixed":
         return [cooling_cfg["beta"]]
-    raise ValueError("For PT, cooling.kind must be 'geometric' or 'fixed'")
+    raise ValueError("cooling.kind must be 'geometric' or 'fixed' when building a beta ladder")
