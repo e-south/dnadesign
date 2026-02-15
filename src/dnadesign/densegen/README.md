@@ -63,7 +63,7 @@ If you keep this order in mind, most diagnostics become easy to interpret:
 - `--output-mode usr`: canonical run artifact is USR dataset `outputs/usr_datasets/<dataset>/records.parquet` plus overlays and `.events.log`.
 - `--output-mode both`: writes both sinks and enforces sink-alignment checks during the run.
 
-For `local`, copy `outputs/tables/records.parquet`.  
+For `local`, copy `outputs/tables/records.parquet`.
 For `usr`, resolve the dataset path from the run, then export:
 
 ```bash

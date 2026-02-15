@@ -121,7 +121,7 @@ def test_secretservice_store_and_resolve_use_keyring_without_external_binary(mon
     monkeypatch.setattr("dnadesign.notify.secrets.shutil.which", lambda _cmd: None)
     monkeypatch.delenv("DBUS_SESSION_BUS_ADDRESS", raising=False)
 
-    secret_ref = "secretservice://dnadesign.notify/default"
+    secret_ref = "secretservice://dnadesign.notify/default"  # pragma: allowlist secret
     store_secret_ref(secret_ref, "https://example.invalid/webhook")
     assert resolve_secret_ref(secret_ref) == "https://example.invalid/webhook"
 

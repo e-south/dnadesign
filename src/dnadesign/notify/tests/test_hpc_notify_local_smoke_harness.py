@@ -59,8 +59,7 @@ def test_local_notify_smoke_harness_env_mode(tmp_path: Path) -> None:
     payloads = [json.loads(line) for line in capture_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     assert payloads
     assert any(
-        ("SUCCESS" in str(payload.get("text", "")))
-        or (str(payload.get("status", "")).lower() == "success")
+        ("SUCCESS" in str(payload.get("text", ""))) or (str(payload.get("status", "")).lower() == "success")
         for payload in payloads
     )
 

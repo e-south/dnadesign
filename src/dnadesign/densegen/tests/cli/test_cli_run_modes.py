@@ -499,7 +499,7 @@ def test_run_fresh_preserves_notify_profile_and_cursor(tmp_path: Path, monkeypat
     notify_dir.mkdir(parents=True, exist_ok=True)
     profile_path = notify_dir / "profile.json"
     cursor_path = notify_dir / "cursor"
-    profile_path.write_text("{\"provider\":\"slack\"}\n")
+    profile_path.write_text('{"provider":"slack"}\n')
     cursor_path.write_text("12345\n")
     stale_tables = run_root / "outputs" / "tables"
     stale_tables.mkdir(parents=True, exist_ok=True)
@@ -515,7 +515,7 @@ def test_run_fresh_preserves_notify_profile_and_cursor(tmp_path: Path, monkeypat
 
     assert result.exit_code == 0, result.output
     assert profile_path.exists()
-    assert profile_path.read_text() == "{\"provider\":\"slack\"}\n"
+    assert profile_path.read_text() == '{"provider":"slack"}\n'
     assert cursor_path.exists()
     assert cursor_path.read_text() == "12345\n"
     assert not stale_marker.exists()

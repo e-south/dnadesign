@@ -24,8 +24,8 @@ Do not use this skill for:
 
 1. Identify workload class first.
 2. Pick interactive or batch mode.
-3. Apply resource profile from `references/resource_profiles.md`.
-4. Use template command from `docs/hpc/agent_cheatsheet.md`.
+3. Apply resource profile from `references/resource-profiles.md`.
+4. Use template command from `../../../bu-scc/agent-cheatsheet.md`.
 5. Run preflight checks before expensive jobs.
 6. Submit and monitor with `qstat` + log tail.
 7. Keep interactive/OnDemand usage within BU policy limits for high-resource sessions.
@@ -61,8 +61,8 @@ Before relying on Notify:
 ## Command references
 
 Load only the needed references:
-- `docs/hpc/agent_cheatsheet.md` for copy/paste commands
+- `../../../bu-scc/agent-cheatsheet.md` for copy/paste commands
 - `docs/hpc/bu_scc_quickstart.md` for bootstrap flow
 - `docs/hpc/bu_scc_batch_notify.md` for runbook details
 - `docs/hpc/jobs/README.md` for template-specific submits
-- `references/resource_profiles.md` for workload-to-resource defaults
+- `references/resource-profiles.md` for workload-to-resource defaults
