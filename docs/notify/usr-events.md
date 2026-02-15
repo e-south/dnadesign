@@ -213,7 +213,7 @@ When prompted:
 - paste your Slack webhook address
 - press Enter (input stays hidden)
 
-For automation/agents, append `--json` to `setup slack`, `setup resolve-events`, and `profile doctor`
+For automation, append `--json` to `setup slack`, `setup resolve-events`, and `profile doctor`
 to emit structured output with `ok` and error fields.
 
 ```bash
@@ -232,7 +232,7 @@ uv run notify usr-events watch --tool densegen --config "$CONFIG" --follow --wai
 # 3) Run the watcher in Boston University Shared Computing Cluster batch mode (recommended)
 qsub -P <project> \
   -v NOTIFY_PROFILE="$(dirname "$CONFIG")/outputs/notify/densegen/profile.json" \
-  docs/hpc/jobs/bu_scc_notify_watch.qsub
+  docs/bu-scc/jobs/notify-watch.qsub
 ```
 
 If `--secret-source auto` fails (no keychain/secretservice backend), use env mode:
@@ -265,7 +265,7 @@ For Boston University Shared Computing Cluster batch mode with environment varia
 ```bash
 qsub -P <project> \
   -v NOTIFY_TOOL=densegen,NOTIFY_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,WEBHOOK_ENV=NOTIFY_WEBHOOK \
-  docs/hpc/jobs/bu_scc_notify_watch.qsub
+  docs/bu-scc/jobs/notify-watch.qsub
 ```
 
 If you run env mode with explicit `EVENTS_PATH` instead of resolver mode, set both

@@ -44,8 +44,8 @@ Do not use DenseGen for:
    - [DenseGen -> USR -> Notify demo](demo/demo_usr_notify.md)
    - [DenseGen -> USR -> Notify on HPC](workflows/usr_notify_hpc.md)
    - [DenseGen -> USR -> Notify on BU SCC](workflows/bu_scc_end_to_end.md)
-   - [docs/hpc/bu_scc_install.md](../../../../docs/hpc/bu_scc_install.md)
-   - [docs/hpc/bu_scc_batch_notify.md](../../../../docs/hpc/bu_scc_batch_notify.md)
+   - [docs/bu-scc/install.md](../../../../docs/bu-scc/install.md)
+   - [docs/bu-scc/batch-notify.md](../../../../docs/bu-scc/batch-notify.md)
 
 ## Runtime subprocess flow
 

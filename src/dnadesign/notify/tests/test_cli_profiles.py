@@ -223,7 +223,7 @@ def test_profile_wizard_writes_v2_profile_with_env_source(tmp_path: Path, monkey
     assert "--dry-run" in result.stdout
     assert "export DENSEGEN_WEBHOOK" in result.stdout
     assert "NOTIFY_PROFILE" in result.stdout
-    assert "docs/hpc/jobs/bu_scc_notify_watch.qsub" in result.stdout
+    assert "docs/bu-scc/jobs/notify-watch.qsub" in result.stdout
 
 
 def test_profile_wizard_env_uses_default_webhook_env_when_not_set(tmp_path: Path, monkeypatch) -> None:
@@ -416,7 +416,7 @@ def test_profile_wizard_stores_secret_ref_when_requested(tmp_path: Path, monkeyp
     assert "notify profile doctor --profile" in result.stdout
     assert "notify usr-events watch --profile" in result.stdout
     assert "NOTIFY_PROFILE" in result.stdout
-    assert "docs/hpc/jobs/bu_scc_notify_watch.qsub" in result.stdout
+    assert "docs/bu-scc/jobs/notify-watch.qsub" in result.stdout
     assert "export " not in result.stdout
 
 

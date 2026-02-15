@@ -63,7 +63,7 @@ def _write_fake_uv(bin_dir: Path) -> Path:
 @pytest.mark.skipif(shutil.which("bash") is None, reason="bash is required")
 def test_qsub_script_profile_mode_uses_profile_and_follow(tmp_path: Path) -> None:
     repo_root = _repo_root()
-    script_path = repo_root / "docs/hpc/jobs/bu_scc_notify_watch.qsub"
+    script_path = repo_root / "docs/bu-scc/jobs/notify-watch.qsub"
 
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir(parents=True, exist_ok=True)
@@ -102,7 +102,7 @@ def test_qsub_script_profile_mode_uses_profile_and_follow(tmp_path: Path) -> Non
 @pytest.mark.skipif(shutil.which("bash") is None, reason="bash is required")
 def test_qsub_script_can_resolve_events_from_tool_config(tmp_path: Path) -> None:
     repo_root = _repo_root()
-    script_path = repo_root / "docs/hpc/jobs/bu_scc_notify_watch.qsub"
+    script_path = repo_root / "docs/bu-scc/jobs/notify-watch.qsub"
 
     events_path = tmp_path / "dataset" / ".events.log"
     events_path.parent.mkdir(parents=True, exist_ok=True)
@@ -154,7 +154,7 @@ def test_qsub_script_can_resolve_events_from_tool_config(tmp_path: Path) -> None
 @pytest.mark.skipif(shutil.which("bash") is None, reason="bash is required")
 def test_qsub_script_accepts_missing_events_file_when_waiting(tmp_path: Path) -> None:
     repo_root = _repo_root()
-    script_path = repo_root / "docs/hpc/jobs/bu_scc_notify_watch.qsub"
+    script_path = repo_root / "docs/bu-scc/jobs/notify-watch.qsub"
 
     events_path = tmp_path / "dataset" / ".events.log"
     events_path.parent.mkdir(parents=True, exist_ok=True)
@@ -196,7 +196,7 @@ def test_qsub_script_accepts_missing_events_file_when_waiting(tmp_path: Path) ->
 @pytest.mark.skipif(shutil.which("bash") is None, reason="bash is required")
 def test_qsub_script_applies_infer_policy_filters(tmp_path: Path) -> None:
     repo_root = _repo_root()
-    script_path = repo_root / "docs/hpc/jobs/bu_scc_notify_watch.qsub"
+    script_path = repo_root / "docs/bu-scc/jobs/notify-watch.qsub"
 
     events_path = tmp_path / "dataset" / ".events.log"
     events_path.parent.mkdir(parents=True, exist_ok=True)
@@ -232,7 +232,7 @@ def test_qsub_script_applies_infer_policy_filters(tmp_path: Path) -> None:
 @pytest.mark.skipif(shutil.which("bash") is None, reason="bash is required")
 def test_qsub_script_requires_notify_policy_when_events_path_is_explicit(tmp_path: Path) -> None:
     repo_root = _repo_root()
-    script_path = repo_root / "docs/hpc/jobs/bu_scc_notify_watch.qsub"
+    script_path = repo_root / "docs/bu-scc/jobs/notify-watch.qsub"
 
     events_path = tmp_path / "dataset" / ".events.log"
     events_path.parent.mkdir(parents=True, exist_ok=True)
@@ -264,7 +264,7 @@ def test_qsub_script_requires_notify_policy_when_events_path_is_explicit(tmp_pat
 @pytest.mark.skipif(shutil.which("bash") is None, reason="bash is required")
 def test_qsub_script_requires_namespace_when_events_path_is_explicit_without_tool(tmp_path: Path) -> None:
     repo_root = _repo_root()
-    script_path = repo_root / "docs/hpc/jobs/bu_scc_notify_watch.qsub"
+    script_path = repo_root / "docs/bu-scc/jobs/notify-watch.qsub"
 
     events_path = tmp_path / "dataset" / ".events.log"
     events_path.parent.mkdir(parents=True, exist_ok=True)
@@ -298,7 +298,7 @@ def test_qsub_script_requires_namespace_when_events_path_is_explicit_without_too
 @pytest.mark.skipif(shutil.which("bash") is None, reason="bash is required")
 def test_qsub_script_uses_notify_webhook_default_env_name(tmp_path: Path) -> None:
     repo_root = _repo_root()
-    script_path = repo_root / "docs/hpc/jobs/bu_scc_notify_watch.qsub"
+    script_path = repo_root / "docs/bu-scc/jobs/notify-watch.qsub"
 
     events_path = tmp_path / "dataset" / ".events.log"
     events_path.parent.mkdir(parents=True, exist_ok=True)

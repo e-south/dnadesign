@@ -10,7 +10,7 @@
 - You want webhook monitoring from USR `.events.log`.
 
 **Not for:**
-- Deep dependency/debugging workflows (use [BU SCC Install bootstrap](bu_scc_install.md)).
+- Deep dependency/debugging workflows (use [BU SCC Install bootstrap](install.md)).
 - Non-BU clusters (use scheduler-specific docs for your platform).
 
 ## Contents
@@ -61,7 +61,7 @@ References:
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-Details: [BU SCC Install bootstrap: Install uv](bu_scc_install.md#1-install-uv-once)
+Details: [BU SCC Install bootstrap: Install uv](install.md#1-install-uv-once)
 
 ## 2) Clone repo
 
@@ -70,7 +70,7 @@ git clone https://github.com/e-south/dnadesign.git
 cd dnadesign
 ```
 
-Details: [BU SCC Install bootstrap: Clone the repository](bu_scc_install.md#2-clone-the-repository)
+Details: [BU SCC Install bootstrap: Clone the repository](install.md#2-clone-the-repository)
 
 ## 3) Set environment and caches
 
@@ -81,7 +81,7 @@ export UV_CACHE_DIR="${UV_CACHE_DIR:-$SCC_SCRATCH/uv-cache}"
 export HF_HOME="${HF_HOME:-/projectnb/<project>/$USER/huggingface}"
 ```
 
-Details: [BU SCC Install bootstrap: Configure environment location and caches](bu_scc_install.md#3-configure-environment-location-and-caches)
+Details: [BU SCC Install bootstrap: Configure environment location and caches](install.md#3-configure-environment-location-and-caches)
 
 ## 4) Load modules
 
@@ -93,7 +93,7 @@ module load cuda/<version>
 module load gcc/<version>
 ```
 
-Details: [BU SCC Install bootstrap: Load toolchain modules](bu_scc_install.md#4-load-toolchain-modules)
+Details: [BU SCC Install bootstrap: Load toolchain modules](install.md#4-load-toolchain-modules)
 
 ## 5) Sync dependencies
 
@@ -103,7 +103,7 @@ uv sync --locked
 uv sync --locked --extra infer-evo2
 ```
 
-Details: [BU SCC Install bootstrap: Sync dependencies](bu_scc_install.md#5-sync-dependencies)
+Details: [BU SCC Install bootstrap: Sync dependencies](install.md#5-sync-dependencies)
 
 ## 6) Smoke tests
 
@@ -116,7 +116,7 @@ PY
 ```
 
 For extended TE/FlashAttention/Evo2 checks:
-[BU SCC Install bootstrap: Smoke tests](bu_scc_install.md#6-smoke-tests)
+[BU SCC Install bootstrap: Smoke tests](install.md#6-smoke-tests)
 
 ## 7) Submit first jobs
 
@@ -125,7 +125,7 @@ For extended TE/FlashAttention/Evo2 checks:
 ```bash
 qsub -P <project> \
   -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml \
-  docs/hpc/jobs/bu_scc_densegen_cpu.qsub
+  docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
 ### 7.2 DenseGen + GUROBI (16-slot example)
@@ -138,7 +138,7 @@ qsub -P <project> \
   -l h_rt=08:00:00 \
   -l mem_per_core=8G \
   -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml \
-  docs/hpc/jobs/bu_scc_densegen_cpu.qsub
+  docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
 In config, keep `densegen.solver.threads <= 16`.
@@ -148,14 +148,14 @@ In config, keep `densegen.solver.threads <= 16`.
 ```bash
 qsub -P <project> \
   -v CUDA_MODULE=cuda/<version>,GCC_MODULE=gcc/<version> \
-  docs/hpc/jobs/bu_scc_evo2_gpu_infer.qsub
+  docs/bu-scc/jobs/evo2-gpu-infer.qsub
 ```
 
 Template details and overrides:
-[HPC job templates](jobs/README.md)
+[BU SCC job templates](jobs/README.md)
 
 Operational guidance:
-[BU SCC Batch + Notify runbook](bu_scc_batch_notify.md)
+[BU SCC Batch + Notify runbook](batch-notify.md)
 
 ## 8) Add Notify
 
@@ -184,7 +184,7 @@ Preferred mode (profile-driven, secure by default):
 ```bash
 qsub -P <project> \
   -v NOTIFY_PROFILE="$NOTIFY_DIR/profile.json" \
-  docs/hpc/jobs/bu_scc_notify_watch.qsub
+  docs/bu-scc/jobs/notify-watch.qsub
 ```
 
 Explicit env mode (no profile):
@@ -192,19 +192,19 @@ Explicit env mode (no profile):
 ```bash
 qsub -P <project> \
   -v NOTIFY_TOOL=densegen,NOTIFY_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,WEBHOOK_ENV=NOTIFY_WEBHOOK \
-  docs/hpc/jobs/bu_scc_notify_watch.qsub
+  docs/bu-scc/jobs/notify-watch.qsub
 ```
 
 Secure onboarding and wizard flow:
-[Notify USR events operator manual](../notify/usr_events.md)
+[Notify USR events operator manual](../notify/usr-events.md)
 
 Deployment patterns and transfer-node guidance:
-[BU SCC Batch + Notify runbook](bu_scc_batch_notify.md)
+[BU SCC Batch + Notify runbook](batch-notify.md)
 
 ---
 
-Back: [HPC index](README.md)
+Back: [BU SCC index](README.md)
 
-Next: [BU SCC Install bootstrap](bu_scc_install.md)
+Next: [BU SCC Install bootstrap](install.md)
 
-Next: [BU SCC Batch + Notify runbook](bu_scc_batch_notify.md)
+Next: [BU SCC Batch + Notify runbook](batch-notify.md)

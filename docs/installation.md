@@ -28,7 +28,7 @@ cd dnadesign
 
 ### Local install
 
-This is the default way to start working with most pipelines. For BU SCC CUDA/GPU setup and batch operations, see [BU SCC quickstart](hpc/bu_scc_quickstart.md), [BU SCC install bootstrap](hpc/bu_scc_install.md), and [BU SCC batch + Notify runbook](hpc/bu_scc_batch_notify.md).
+This is the default way to start working with most pipelines. For BU SCC CUDA/GPU setup and batch operations, see [BU SCC quickstart](bu-scc/quickstart.md), [BU SCC install bootstrap](bu-scc/install.md), and [BU SCC batch + Notify runbook](bu-scc/batch-notify.md).
 
 1) Ensure Python 3.12 is available:
 
@@ -51,9 +51,9 @@ uv run usr ls || true
 
 ### HPC (BU SCC)
 
-- [BU SCC quickstart](hpc/bu_scc_quickstart.md)
-- [BU SCC install bootstrap](hpc/bu_scc_install.md)
-- [BU SCC batch + Notify runbook](hpc/bu_scc_batch_notify.md)
+- [BU SCC quickstart](bu-scc/quickstart.md)
+- [BU SCC install bootstrap](bu-scc/install.md)
+- [BU SCC batch + Notify runbook](bu-scc/batch-notify.md)
 
 ### Dev tools (tests + lint)
 

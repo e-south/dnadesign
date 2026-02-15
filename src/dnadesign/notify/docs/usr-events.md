@@ -1,8 +1,8 @@
 # Notify: consuming Universal Sequence Record events
 
-This module-local page is a short index.
+This module-local page is a compact quick-operations guide.
 For full operator procedures, use the canonical runbook:
-- [docs/notify/usr_events.md](../../../../docs/notify/usr_events.md)
+- [docs/notify/usr-events.md](../../../../docs/notify/usr-events.md)
 
 ## Contents
 - [Fast path](#fast-path)
@@ -34,7 +34,7 @@ uv run notify spool drain --profile "$NOTIFY_DIR/profile.json"
 - DenseGen local end-to-end demo: [../../densegen/docs/demo/demo_usr_notify.md](../../densegen/docs/demo/demo_usr_notify.md)
 - DenseGen event-boundary contract: [../../densegen/docs/reference/outputs.md#event-streams-and-consumers-densegen-vs-usr](../../densegen/docs/reference/outputs.md#event-streams-and-consumers-densegen-vs-usr)
 - Universal Sequence Record event schema: [../../usr/README.md#event-log-schema](../../usr/README.md#event-log-schema)
-- Setup command guide: [../../../../docs/notify/usr_events.md#command-anatomy-notify-setup-slack](../../../../docs/notify/usr_events.md#command-anatomy-notify-setup-slack)
+- Setup command guide: [../../../../docs/notify/usr-events.md#command-anatomy-notify-setup-slack](../../../../docs/notify/usr-events.md#command-anatomy-notify-setup-slack)
 
 ## Boundary reminder
 

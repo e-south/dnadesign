@@ -194,8 +194,8 @@ Key files:
 ## 8) Wire Notify to a real endpoint (deployed pressure test)
 
 Notify setup details (profiles, secrets, spool/drain) are in:
-- [../../../../../docs/notify/usr_events.md](../../../../../docs/notify/usr_events.md)
-- [Command anatomy: `notify setup slack`](../../../../../docs/notify/usr_events.md#command-anatomy-notify-setup-slack)
+- [../../../../../docs/notify/usr-events.md](../../../../../docs/notify/usr-events.md)
+- [Command anatomy: `notify setup slack`](../../../../../docs/notify/usr-events.md#command-anatomy-notify-setup-slack)
 
 Slack-first flow:
 

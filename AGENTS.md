@@ -27,10 +27,11 @@ When you work inside a tool directory (e.g. `src/dnadesign/permuter/`), **also r
 
 When running on BU SCC, use these first:
 
-- `docs/hpc/skills/sge-hpc-ops/SKILL.md` (operational source of truth: resource matrix + commands + checks)
-- `docs/hpc/bu_scc_quickstart.md` (interactive/bootstrap path)
-- `docs/hpc/bu_scc_batch_notify.md` (batch + Notify runbook)
-- `docs/hpc/jobs/README.md` (submit-ready template scripts)
+- `docs/bu-scc/sge-hpc-ops/SKILL.md` (operational source of truth: resource matrix + commands + checks)
+- `docs/bu-scc/quickstart.md` (interactive/bootstrap path)
+- `docs/bu-scc/batch-notify.md` (batch + Notify runbook)
+- `docs/bu-scc/jobs/README.md` (submit-ready template scripts)
+- `docs/bu-scc/agent_cheatsheet.md` (copy/paste command paths + resource matrix)
 
 Within `src/dnadesign/`, many tools follow one of these patterns:
 
@@ -86,7 +87,7 @@ Setup (notebooks):
 uv sync --locked --group notebooks
 ```
 
-> GPU/HPC install notes: see docs/hpc/bu_scc_install.md. Don’t attempt CUDA-specific environment work unless asked.
+> GPU/HPC install notes: see docs/bu-scc/install.md. Don’t attempt CUDA-specific environment work unless asked.
 
 #### Commands
 
@@ -127,7 +128,7 @@ uv run baserender --help
 
 #### Notebooks (marimo)
 
-- Canonical marimo guidance lives at: `docs/marimo_reference.md`
+- Canonical marimo guidance lives at: `docs/marimo-reference.md`
 - Tool-specific notebook conventions may exist in `src/dnadesign/<tool>/notebooks/AGENTS.md`
 
 Preferred notebook workflows:
