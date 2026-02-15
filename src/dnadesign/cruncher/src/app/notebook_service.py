@@ -36,7 +36,7 @@ def ensure_marimo() -> None:
     except Exception as exc:  # pragma: no cover - optional dependency
         raise RuntimeError(
             "marimo is not installed. Install with:\n"
-            "  uv add --group notebooks marimo\n"
+            "  uv sync --locked\n"
             "Then re-run: cruncher notebook <run_dir>"
         ) from exc
 

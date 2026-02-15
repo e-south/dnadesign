@@ -284,9 +284,8 @@ Examples:
 
 Notes:
 
-* Requires `cruncher campaign summarize` to have been run first
-  (`analysis/campaign_summary.csv`, `analysis/campaign_best.csv`, `analysis/campaign_manifest.json`).
-* Install marimo with `uv sync --locked --group notebooks`.
+* Requires `cruncher campaign summarize` to have been run first (summary CSVs + manifest present).
+* Install marimo with `uv sync --locked`.
 
 ---
 
@@ -472,7 +471,7 @@ Example:
 
 Notes:
 
-* requires `marimo` to be installed (for example: `uv add --group notebooks marimo`)
+* requires `marimo` to be installed (for example: `uv sync --locked`)
 * useful when you want interactive slicing/filtering beyond static plots
 * strict artifact contract: requires `analysis/reports/summary.json`, `analysis/manifests/plot_manifest.json`, and `analysis/manifests/table_manifest.json` to exist and parse, `analysis/reports/summary.json` must include a non-empty `tf_names` list, and `analysis/manifests/table_manifest.json` must provide `scores_summary`, `metrics_joint`, and `elites_topk` entries with existing files
 * plot output status is refreshed from disk so missing files are shown accurately
