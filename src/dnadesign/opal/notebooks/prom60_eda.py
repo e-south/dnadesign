@@ -2848,13 +2848,13 @@ def _(active_record, dataset_path, inspect_view_mode_dropdown, mo):
     else:
         if view_mode == "BaseRender":
             try:
-                from dnadesign.baserender import render_parquet_record_figure
+                from dnadesign.baserender import render_parquet_record_figure as _render_parquet_record_figure
 
                 _active_id = active_record["id"][0] if "id" in active_record.columns else None
                 if _active_id is None:
                     raise ValueError("BaseRender requires a non-null id column.")
 
-                _fig = render_parquet_record_figure(
+                _fig = _render_parquet_record_figure(
                     dataset_path=dataset_path,
                     record_id=str(_active_id),
                     adapter_kind="densegen_tfbs",
@@ -2954,13 +2954,13 @@ def _(
             save_pdf_status_md = mo.md("No output path provided.")
         else:
             try:
-                from dnadesign.baserender import render_parquet_record_figure
+                from dnadesign.baserender import render_parquet_record_figure as _render_parquet_record_figure
 
                 _active_id = active_record["id"][0] if "id" in active_record.columns else None
                 if _active_id is None:
                     raise ValueError("BaseRender requires a non-null id column.")
 
-                _fig = render_parquet_record_figure(
+                _fig = _render_parquet_record_figure(
                     dataset_path=dataset_path,
                     record_id=str(_active_id),
                     adapter_kind="densegen_tfbs",

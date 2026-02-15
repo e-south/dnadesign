@@ -3,15 +3,14 @@ input:
   kind: parquet
   path: data/cruncher_demo_elites.parquet
   adapter:
-    kind: cruncher_best_window
+    kind: generic_features
     columns:
       sequence: sequence
+      features: features
+      effects: effects
+      display: display
       id: id
-      hits_path: data/cruncher_demo_elites_hits.parquet
-      config_path: data/cruncher_demo_config.yaml
-    policies:
-      on_missing_hit: error
-      on_missing_pwm: error
+    policies: {}
   alphabet: DNA
 render:
   renderer: sequence_rows

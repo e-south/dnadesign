@@ -114,6 +114,7 @@ temp.md
 *.joblib
 *.pkl
 *.pt
+!src/dnadesign/baserender/docs/examples/data/*.parquet
 
 # -----------------------------------------------------------------------------
 # Images: ignore by default; allow curated exceptions
