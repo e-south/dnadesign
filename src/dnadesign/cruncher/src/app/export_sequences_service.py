@@ -62,7 +62,7 @@ _WINDOW_COLUMNS = [
     "core_width",
 ]
 
-_PAIRWISE_COLUMNS = [
+_BISPECIFIC_COLUMNS = [
     "elite_id",
     "elite_rank",
     "elite_sequence",
@@ -89,7 +89,7 @@ _PAIRWISE_COLUMNS = [
     "pair_span_width",
 ]
 
-_COMBO_COLUMNS = [
+_MULTISPECIFIC_COLUMNS = [
     "elite_id",
     "elite_rank",
     "elite_sequence",
@@ -347,7 +347,7 @@ def _build_consensus_rows(window_df: pd.DataFrame, pwms: dict[str, object]) -> t
     return consensus_df, tf_names
 
 
-def _build_pairwise_rows(window_df: pd.DataFrame) -> pd.DataFrame:
+def _build_bispecific_rows(window_df: pd.DataFrame) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
     for (_, elite_id, elite_sequence), group in window_df.groupby(
         ["elite_rank", "elite_id", "elite_sequence"], sort=True
@@ -393,10 +393,10 @@ def _build_pairwise_rows(window_df: pd.DataFrame) -> pd.DataFrame:
                     "pair_span_width": int(span_end - span_start),
                 }
             )
-    pairwise_df = pd.DataFrame(rows, columns=_PAIRWISE_COLUMNS)
-    if not pairwise_df.empty:
-        pairwise_df = pairwise_df.sort_values(["elite_rank", "elite_id", "tf_a", "tf_b"]).reset_index(drop=True)
-    return pairwise_df
+    bispecific_df = pd.DataFrame(rows, columns=_BISPECIFIC_COLUMNS)
+    if not bispecific_df.empty:
+        bispecific_df = bispecific_df.sort_values(["elite_rank", "elite_id", "tf_a", "tf_b"]).reset_index(drop=True)
+    return bispecific_df
 
 
 def _resolve_max_combo_size(tf_count: int, max_combo_size: int | None) -> int:
@@ -409,7 +409,7 @@ def _resolve_max_combo_size(tf_count: int, max_combo_size: int | None) -> int:
     return min(max_combo_size, tf_count)
 
 
-def _build_combination_rows(window_df: pd.DataFrame, *, max_combo_size: int | None) -> tuple[pd.DataFrame, int]:
+def _build_multispecific_rows(window_df: pd.DataFrame, *, max_combo_size: int | None) -> tuple[pd.DataFrame, int]:
     rows: list[dict[str, object]] = []
     tf_count = int(window_df["tf"].nunique()) if not window_df.empty else 0
     max_combo = _resolve_max_combo_size(tf_count, max_combo_size)
@@ -418,7 +418,7 @@ def _build_combination_rows(window_df: pd.DataFrame, *, max_combo_size: int | No
     ):
         rank = int(group.iloc[0]["elite_rank"])
         ordered = group.sort_values("tf").to_dict(orient="records")
-        for combo_size in range(2, max_combo + 1):
+        for combo_size in range(3, max_combo + 1):
             for members in combinations(ordered, combo_size):
                 tf_members = [str(member["tf"]) for member in members]
                 starts = [int(member["best_start"]) for member in members]
@@ -466,12 +466,12 @@ def _build_combination_rows(window_df: pd.DataFrame, *, max_combo_size: int | No
                         "member_count": len(members),
                     }
                 )
-    combos_df = pd.DataFrame(rows, columns=_COMBO_COLUMNS)
-    if not combos_df.empty:
-        combos_df = combos_df.sort_values(["elite_rank", "elite_id", "combo_size", "tf_combo_key"]).reset_index(
-            drop=True
-        )
-    return combos_df, max_combo
+    multispecific_df = pd.DataFrame(rows, columns=_MULTISPECIFIC_COLUMNS)
+    if not multispecific_df.empty:
+        multispecific_df = multispecific_df.sort_values(
+            ["elite_rank", "elite_id", "combo_size", "tf_combo_key"]
+        ).reset_index(drop=True)
+    return multispecific_df, max_combo
 
 
 def _relative_to_run(path: Path, run_dir: Path) -> str:
@@ -490,31 +490,31 @@ def _append_export_artifacts(
     run_manifest = load_manifest(run_dir)
     artifact_rows = [
         artifact_entry(
-            files["consensus_sites"],
+            files["monospecific_consensus_sites"],
             run_dir,
             kind="table",
-            label="Sequence export: per-TF consensus sites",
+            label="Sequence export: monospecific consensus sites",
             stage="export",
         ),
         artifact_entry(
-            files["elite_tf_windows"],
+            files["monospecific_elite_windows"],
             run_dir,
             kind="table",
-            label="Sequence export: elite TF windows",
+            label="Sequence export: monospecific elite windows",
             stage="export",
         ),
         artifact_entry(
-            files["elite_pairwise_windows"],
+            files["bispecific_elite_windows"],
             run_dir,
             kind="table",
-            label="Sequence export: elite pairwise windows",
+            label="Sequence export: bispecific elite windows",
             stage="export",
         ),
         artifact_entry(
-            files["elite_combinations"],
+            files["multispecific_elite_windows"],
             run_dir,
             kind="table",
-            label="Sequence export: elite TF combinations",
+            label="Sequence export: multispecific elite windows",
             stage="export",
         ),
         artifact_entry(
@@ -561,52 +561,57 @@ def export_sequences_for_run(
     pwms, _ = load_pwms_from_config(run_dir)
     windows_df = _build_window_rows(elites_df, hits_df)
     consensus_df, tf_names = _build_consensus_rows(windows_df, pwms)
-    pairwise_df = _build_pairwise_rows(windows_df)
-    combinations_df, resolved_max_combo_size = _build_combination_rows(windows_df, max_combo_size=max_combo_size)
+    bispecific_df = _build_bispecific_rows(windows_df)
+    multispecific_df, resolved_max_combo_size = _build_multispecific_rows(windows_df, max_combo_size=max_combo_size)
 
     files = {
-        "consensus_sites": run_export_sequences_table_path(
-            run_dir, table_name="consensus_sites", fmt=normalized_format
+        "monospecific_consensus_sites": run_export_sequences_table_path(
+            run_dir, table_name="monospecific_consensus_sites", fmt=normalized_format
         ),
-        "elite_tf_windows": run_export_sequences_table_path(
-            run_dir, table_name="elite_tf_windows", fmt=normalized_format
+        "monospecific_elite_windows": run_export_sequences_table_path(
+            run_dir, table_name="monospecific_elite_windows", fmt=normalized_format
         ),
-        "elite_pairwise_windows": run_export_sequences_table_path(
-            run_dir, table_name="elite_pairwise_windows", fmt=normalized_format
+        "bispecific_elite_windows": run_export_sequences_table_path(
+            run_dir, table_name="bispecific_elite_windows", fmt=normalized_format
         ),
-        "elite_combinations": run_export_sequences_table_path(
-            run_dir, table_name="elite_combinations", fmt=normalized_format
+        "multispecific_elite_windows": run_export_sequences_table_path(
+            run_dir, table_name="multispecific_elite_windows", fmt=normalized_format
         ),
     }
     for key, path in files.items():
         path.parent.mkdir(parents=True, exist_ok=True)
-        if key == "consensus_sites":
+        if key == "monospecific_consensus_sites":
             _write_table(consensus_df, path, table_format=normalized_format)
-        elif key == "elite_tf_windows":
+        elif key == "monospecific_elite_windows":
             _write_table(windows_df.loc[:, _WINDOW_COLUMNS], path, table_format=normalized_format)
-        elif key == "elite_pairwise_windows":
-            _write_table(pairwise_df.loc[:, _PAIRWISE_COLUMNS], path, table_format=normalized_format)
+        elif key == "bispecific_elite_windows":
+            _write_table(bispecific_df.loc[:, _BISPECIFIC_COLUMNS], path, table_format=normalized_format)
         else:
-            _write_table(combinations_df.loc[:, _COMBO_COLUMNS], path, table_format=normalized_format)
+            _write_table(multispecific_df.loc[:, _MULTISPECIFIC_COLUMNS], path, table_format=normalized_format)
 
     row_counts = {
-        "consensus_sites": int(len(consensus_df)),
-        "elite_tf_windows": int(len(windows_df)),
-        "elite_pairwise_windows": int(len(pairwise_df)),
-        "elite_combinations": int(len(combinations_df)),
+        "monospecific_consensus_sites": int(len(consensus_df)),
+        "monospecific_elite_windows": int(len(windows_df)),
+        "bispecific_elite_windows": int(len(bispecific_df)),
+        "multispecific_elite_windows": int(len(multispecific_df)),
     }
     manifest_output = run_export_sequences_manifest_path(run_dir)
+    max_multispecific_group_size: int | None = int(resolved_max_combo_size) if resolved_max_combo_size >= 3 else None
     manifest_payload = {
-        "schema_version": 1,
-        "kind": "sequence_export_v1",
+        "schema_version": 2,
+        "kind": "sequence_export_v2",
         "created_at": _utc_now(),
         "run_name": run_name,
         "run_dir": str(run_dir.resolve()),
         "table_format": normalized_format,
         "tf_names": tf_names,
-        "combo": {
-            "min_size": 2,
-            "max_size": int(resolved_max_combo_size),
+        "specificity": {
+            "monospecific": {"group_size": 1},
+            "bispecific": {"group_size": 2},
+            "multispecific": {
+                "min_group_size": 3,
+                "max_group_size": max_multispecific_group_size,
+            },
         },
         "inputs": {
             "elites_path": _relative_to_run(elites_file, run_dir),

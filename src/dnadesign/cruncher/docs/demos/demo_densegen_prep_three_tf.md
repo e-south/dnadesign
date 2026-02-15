@@ -9,6 +9,8 @@
 - [Lock + parse](#lock--parse)
 - [Export DenseGen Motifs](#export-densegen-motifs)
 - [Sample + analyze](#sample--analyze)
+- [Export sequence tables](#export-sequence-tables)
+- [Inspect results](#inspect-results)
 - [Related docs](#related-docs)
 
 ## Overview
@@ -90,18 +92,41 @@ cruncher catalog export-densegen --set 1 --out outputs/densegen/pwms -c "$CONFIG
 
 ## Sample + analyze
 
+Intent:
+- `sample` optimizes sequences against the locked three-TF motif set.
+- `analyze` produces reports and plots from the generated sample artifacts.
+
 ```bash
-cruncher sample  -c "$CONFIG"
+cruncher sample -c "$CONFIG"
 cruncher analyze --summary -c "$CONFIG"
 ```
 
 If `outputs/` already exists from a prior run, re-run sample with `--force-overwrite`.
 
-Plots and tables are written under:
+## Export sequence tables
+
+Intent:
+- Emit stable downstream sequence contracts for wrappers/operators.
+
+```bash
+cruncher export sequences --latest -c "$CONFIG"
+```
+
+## Inspect results
+
+Outputs are written under:
 
 ```
 <workspace>/outputs/
 ```
+
+Key files:
+- `run/run_manifest.json`, `run/run_status.json`, `run/config_used.yaml`
+- `analysis/reports/summary.json`, `analysis/reports/report.md`
+- `analysis/plots/elites_showcase.pdf` (and other analysis plots)
+- `analysis/tables/table__scores_summary.parquet` (and other analysis tables)
+- `export/sequences/table__*.parquet`, `export/sequences/export_manifest.json`
+- `plots/logos/catalog/<run_name>/*.png`
 
 ## Related docs
 

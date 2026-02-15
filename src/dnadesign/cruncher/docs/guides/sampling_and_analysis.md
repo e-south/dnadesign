@@ -51,10 +51,10 @@ cruncher export sequences --latest --table-format csv --max-combo-size 3
 
 Outputs per run:
 
-- `export/sequences/table__consensus_sites.<parquet|csv>` (one consensus sequence per TF)
-- `export/sequences/table__elite_tf_windows.<parquet|csv>` (best window per elite x TF)
-- `export/sequences/table__elite_pairwise_windows.<parquet|csv>` (elite-level TF pairs)
-- `export/sequences/table__elite_combinations.<parquet|csv>` (elite-level TF combinations, size >=2)
+- `export/sequences/table__monospecific_consensus_sites.<parquet|csv>` (one consensus sequence per TF)
+- `export/sequences/table__monospecific_elite_windows.<parquet|csv>` (best window per elite x TF)
+- `export/sequences/table__bispecific_elite_windows.<parquet|csv>` (elite-level TF pairs; TF group size = 2)
+- `export/sequences/table__multispecific_elite_windows.<parquet|csv>` (elite-level TF groups; TF group size >=3)
 - `export/sequences/export_manifest.json`
 
 Fail-fast invariants:

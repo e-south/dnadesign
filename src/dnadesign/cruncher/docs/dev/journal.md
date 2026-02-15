@@ -2,10 +2,26 @@
 
 
 ## Contents
+- [2026-02-15](#2026-02-15)
 - [2026-02-04](#2026-02-04)
 - [2026-02-05](#2026-02-05)
 - [2026-02-06](#2026-02-06)
 - [2026-02-11](#2026-02-11)
+
+## 2026-02-15
+- Export contract semantics were hard-cut to specificity-first language: `monospecific`, `bispecific`, `multispecific`.
+- Export table names are now:
+  - `table__monospecific_consensus_sites`
+  - `table__monospecific_elite_windows`
+  - `table__bispecific_elite_windows`
+  - `table__multispecific_elite_windows`
+- Specificity is row-scoped by TF-group cardinality:
+  - monospecific: group size `1`
+  - bispecific: group size `2`
+  - multispecific: group size `>=3`
+- `multispecific` is no longer mixed with size-2 rows; size-2 rows live only in the bispecific table.
+- Export manifest schema advanced to v2 (`kind=sequence_export_v2`) and records specificity group bounds explicitly.
+- No compatibility aliases were retained for prior export table names or row-count keys.
 
 ## 2026-02-04
 - Start refactor to remove core I/O dependencies and progress UI from optimizers.

@@ -11,6 +11,7 @@
 - [Render MEME Logos](#render-meme-logos)
 - [Export DenseGen Motifs](#export-densegen-motifs)
 - [Sample + analyze](#sample--analyze)
+- [Export sequence tables](#export-sequence-tables)
 - [Fast rerun after config edits](#fast-rerun-after-config-edits)
 - [Inspect results](#inspect-results)
 - [Related docs](#related-docs)
@@ -50,9 +51,11 @@ pixi run cruncher -- lock -c "$CONFIG"
 pixi run cruncher -- parse --force-overwrite -c "$CONFIG"
 pixi run cruncher -- sample --force-overwrite -c "$CONFIG"
 pixi run cruncher -- analyze --summary -c "$CONFIG"
+pixi run cruncher -- export sequences --latest -c "$CONFIG"
 pixi run cruncher -- catalog logos --source demo_merged_meme_oops --tf lexA --tf cpxR -c "$CONFIG"
-find outputs -type f -path '*/plots/*' | sort
-find outputs -type f -path '*/logos/*' -name '*.png' | sort
+find outputs -type f -path '*/analysis/plots/*' | sort
+find outputs -type f -path '*/export/sequences/*' | sort
+find outputs -type f -path '*/plots/logos/*' -name '*.png' | sort
 ```
 
 If `sample` fails to produce enough elites, increase `sample.budget.draws`, set `sample.elites.select.pool_size: all`,
@@ -154,10 +157,15 @@ This keeps DenseGen exports on the same motif provenance path as optimization an
 
 ## Sample + analyze
 
+Intent:
+- `sample` generates optimization artifacts from locked motifs.
+- `analyze` converts those artifacts into curated plots/tables/reports.
+- `catalog logos` renders motif logos tied to the same discovered source.
+
 ```bash
-cruncher sample  -c "$CONFIG" && \
-cruncher analyze -c "$CONFIG" && \
-cruncher analyze --summary -c "$CONFIG" && \
+cruncher sample -c "$CONFIG"
+cruncher analyze -c "$CONFIG"
+cruncher analyze --summary -c "$CONFIG"
 cruncher catalog logos --source demo_merged_meme_oops --tf lexA --tf cpxR -c "$CONFIG"
 ```
 
@@ -167,6 +175,23 @@ so it is explicit when `sample.motif_width` changed widths versus leaving discov
 If `outputs/` already exists from a prior run, re-run sample with `--force-overwrite`.
 If sample fails with an elite-count message, increase `sample.budget.draws`, set
 `sample.elites.select.pool_size: all`, or lower `sample.elites.select.diversity`, then re-run sample.
+
+## Export sequence tables
+
+Intent:
+- Emit wrapper-friendly sequence contracts from the analyzed sample run.
+- Keep downstream integrations independent from internal optimize table shapes.
+
+```bash
+cruncher export sequences --latest -c "$CONFIG"
+```
+
+This writes:
+- `outputs/export/sequences/table__monospecific_consensus_sites.parquet`
+- `outputs/export/sequences/table__monospecific_elite_windows.parquet`
+- `outputs/export/sequences/table__bispecific_elite_windows.parquet`
+- `outputs/export/sequences/table__multispecific_elite_windows.parquet` (empty for 2-TF runs)
+- `outputs/export/sequences/export_manifest.json`
 
 ## Fast rerun after config edits
 
@@ -181,6 +206,7 @@ pixi run cruncher -- lock -c "$CONFIG"
 pixi run cruncher -- parse --force-overwrite -c "$CONFIG"
 pixi run cruncher -- sample --force-overwrite -c "$CONFIG"
 pixi run cruncher -- analyze --summary -c "$CONFIG"
+pixi run cruncher -- export sequences --latest -c "$CONFIG"
 pixi run cruncher -- catalog logos --source demo_merged_meme_oops --tf lexA --tf cpxR -c "$CONFIG"
 ```
 
@@ -203,18 +229,20 @@ Run artifacts live under:
 
 Key files:
 
-- `analysis/reports/summary.json`
-- `analysis/reports/report.md`
-- `analysis/reports/report.json`
-- motif logos under `logos/catalog/<run_name>/`
-- curated plots in `plots/`: `chain_trajectory_scatter.*`,
-  `chain_trajectory_sweep.*`, `elites_nn_distance.*`, `elites_showcase.*`
-  (and `health_panel.*` if a trace is present)
-- analysis tables in `analysis/` use `table__*` filenames (for example
-  `table__scores_summary.parquet` and `table__metrics_joint.parquet`)
-- elite hit metadata: `optimize/elites_hits.parquet`
-- random baseline cloud: `optimize/random_baseline.parquet`
-- random baseline hits: `optimize/random_baseline_hits.parquet`
+- run metadata: `run/run_manifest.json`, `run/run_status.json`, `run/config_used.yaml`
+- pinned inputs: `inputs/lockfile.json`, `inputs/parse_manifest.json`
+- optimizer tables: `optimize/tables/sequences.parquet`, `optimize/tables/elites.parquet`,
+  `optimize/tables/elites_hits.parquet`, `optimize/tables/random_baseline.parquet`,
+  `optimize/tables/random_baseline_hits.parquet`
+- optimizer state: `optimize/state/trace.nc`, `optimize/state/metrics.jsonl`, `optimize/state/elites.yaml`
+- analysis reports: `analysis/reports/summary.json`, `analysis/reports/report.json`, `analysis/reports/report.md`
+- analysis manifests: `analysis/manifests/manifest.json`, `analysis/manifests/plot_manifest.json`,
+  `analysis/manifests/table_manifest.json`
+- analysis plots: `analysis/plots/chain_trajectory_scatter.*`, `analysis/plots/chain_trajectory_sweep.*`,
+  `analysis/plots/elites_nn_distance.*`, `analysis/plots/elites_showcase.*` (and `analysis/plots/health_panel.*` when trace is present)
+- analysis tables: `analysis/tables/table__scores_summary.parquet`, `analysis/tables/table__metrics_joint.parquet`
+- sequence exports: `export/sequences/table__*.parquet`, `export/sequences/export_manifest.json`
+- motif logos: `plots/logos/catalog/<run_name>/*.png`
 
 ## Related docs
 

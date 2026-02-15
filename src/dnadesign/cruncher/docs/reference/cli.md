@@ -440,17 +440,17 @@ Examples:
 
 Outputs (under each run):
 
-* `export/sequences/table__consensus_sites.<parquet|csv>`
-* `export/sequences/table__elite_tf_windows.<parquet|csv>`
-* `export/sequences/table__elite_pairwise_windows.<parquet|csv>`
-* `export/sequences/table__elite_combinations.<parquet|csv>`
+* `export/sequences/table__monospecific_consensus_sites.<parquet|csv>`
+* `export/sequences/table__monospecific_elite_windows.<parquet|csv>`
+* `export/sequences/table__bispecific_elite_windows.<parquet|csv>`
+* `export/sequences/table__multispecific_elite_windows.<parquet|csv>`
 * `export/sequences/export_manifest.json`
 
 Notes:
 
 * Fail-fast contract: duplicate `(elite_id, tf)` rows, out-of-bounds windows, non-numeric scores, or inconsistent motif widths terminate export with an explicit error.
 * Export appends artifact entries to `run/run_manifest.json` using stage `export`.
-* `--max-combo-size` must be `>=2`; omit to emit all combinations up to TF count.
+* `--max-combo-size` must be `>=2`; omit to emit all TF-group sizes up to TF count.
 
 ---
 

@@ -81,16 +81,16 @@ def test_export_sequences_passes_cli_options_to_service(tmp_path: Path, monkeypa
                 output_dir=out_dir,
                 manifest_path=out_dir / "export_manifest.json",
                 files={
-                    "consensus_sites": out_dir / "table__consensus_sites.csv",
-                    "elite_tf_windows": out_dir / "table__elite_tf_windows.csv",
-                    "elite_pairwise_windows": out_dir / "table__elite_pairwise_windows.csv",
-                    "elite_combinations": out_dir / "table__elite_combinations.csv",
+                    "monospecific_consensus_sites": out_dir / "table__monospecific_consensus_sites.csv",
+                    "monospecific_elite_windows": out_dir / "table__monospecific_elite_windows.csv",
+                    "bispecific_elite_windows": out_dir / "table__bispecific_elite_windows.csv",
+                    "multispecific_elite_windows": out_dir / "table__multispecific_elite_windows.csv",
                 },
                 row_counts={
-                    "consensus_sites": 2,
-                    "elite_tf_windows": 2,
-                    "elite_pairwise_windows": 1,
-                    "elite_combinations": 1,
+                    "monospecific_consensus_sites": 2,
+                    "monospecific_elite_windows": 2,
+                    "bispecific_elite_windows": 1,
+                    "multispecific_elite_windows": 0,
                 },
             )
         ]
@@ -116,4 +116,4 @@ def test_export_sequences_passes_cli_options_to_service(tmp_path: Path, monkeypa
     assert captured.get("use_latest") is True
     assert captured.get("table_format") == "csv"
     assert captured.get("max_combo_size") == 3
-    assert "consensus_sites" in result.output
+    assert "monospecific_consensus_sites" in result.output

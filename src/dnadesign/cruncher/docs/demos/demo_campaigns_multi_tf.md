@@ -8,6 +8,7 @@
 - [Discover merged motifs (MEME OOPS)](#discover-merged-motifs-meme-oops)
 - [Run campaign directly](#run-campaign-directly)
 - [Export DenseGen motifs](#export-densegen-motifs)
+- [Export sequence tables](#export-sequence-tables)
 - [Optional: materialize expansion](#optional-materialize-expansion)
 - [Inspect campaign summary](#inspect-campaign-summary)
 - [Related docs](#related-docs)
@@ -94,6 +95,12 @@ cruncher discover motifs --tf lexA --tf cpxR --tf baeR --tf acrR --tf lrp --tf r
 
 ## Run campaign directly
 
+Intent:
+- `lock` pins discovered motifs for the campaign TF set.
+- `parse` validates pinned motifs and prepares parse artifacts.
+- `sample` runs optimization.
+- `analyze` renders reports/plots for the sampled run.
+
 ```bash
 cruncher lock    --campaign demo_pair -c "$CONFIG"
 cruncher parse   --campaign demo_pair -c "$CONFIG"
@@ -109,8 +116,31 @@ If `.cruncher/parse` or `outputs/` already exist from a prior run, add
 Export discovered motifs for the same campaign TF set:
 
 ```bash
-cruncher catalog export-densegen --set 1 --out outputs/densegen/pwms -c "$CONFIG"
+cruncher catalog export-densegen --tf lexA --tf cpxR --out outputs/densegen/pwms -c "$CONFIG"
 ```
+
+For larger campaign TF sets, pass the full TF list explicitly with repeated `--tf`.
+
+## Export sequence tables
+
+Export downstream sequence contracts from the latest sampled campaign run:
+
+```bash
+cruncher export sequences --latest -c "$CONFIG"
+```
+
+This writes run-level contract tables under:
+
+```
+<workspace>/outputs/export/sequences/
+```
+
+including:
+- `table__monospecific_consensus_sites.parquet`
+- `table__monospecific_elite_windows.parquet`
+- `table__bispecific_elite_windows.parquet`
+- `table__multispecific_elite_windows.parquet`
+- `export_manifest.json`
 
 ## Optional: materialize expansion
 

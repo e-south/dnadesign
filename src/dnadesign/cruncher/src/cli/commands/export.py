@@ -24,11 +24,14 @@ from dnadesign.cruncher.cli.config_resolver import (
 from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
 
-app = typer.Typer(no_args_is_help=True, help="Export sequence-focused artifacts from sample runs.")
+app = typer.Typer(no_args_is_help=True, help="Export sequence-specificity artifacts from sample runs.")
 console = Console()
 
 
-@app.command("sequences", help="Export per-TF consensus, elite windows, and TF combinations for sample runs.")
+@app.command(
+    "sequences",
+    help="Export monospecific, bispecific, and multispecific sequence tables for sample runs.",
+)
 def export_sequences_cmd(
     config: Path | None = typer.Argument(
         None,
