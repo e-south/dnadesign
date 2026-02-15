@@ -14,8 +14,10 @@ from __future__ import annotations
 import importlib
 import os
 import shutil
+import stat
 import subprocess
 from dataclasses import dataclass
+from pathlib import Path
 from types import ModuleType
 from urllib.parse import urlparse
 
@@ -23,14 +25,16 @@ from .errors import NotifyConfigError
 
 _BACKEND_KEYCHAIN = "keychain"
 _BACKEND_SECRET_SERVICE = "secretservice"  # pragma: allowlist secret
-_SUPPORTED_SECRET_BACKENDS = {_BACKEND_KEYCHAIN, _BACKEND_SECRET_SERVICE}
+_BACKEND_FILE = "file"
+_SUPPORTED_SECRET_BACKENDS = {_BACKEND_KEYCHAIN, _BACKEND_SECRET_SERVICE, _BACKEND_FILE}
 
 
 @dataclass(frozen=True)
 class SecretReference:
     backend: str
-    service: str
-    account: str
+    service: str | None = None
+    account: str | None = None
+    file_path: Path | None = None
 
 
 def _normalize_backend(value: str) -> str:
@@ -47,6 +51,18 @@ def parse_secret_ref(secret_ref: str) -> SecretReference:
         raise NotifyConfigError("secret_ref must be a non-empty string")
     parsed = urlparse(value)
     backend = _normalize_backend(parsed.scheme)
+    if backend == _BACKEND_FILE:
+        if parsed.netloc and parsed.netloc not in {"", "localhost"}:
+            raise NotifyConfigError(
+                "file secret_ref must not include a host; expected file:///absolute/path/to/secret"
+            )
+        path_value = str(parsed.path or "").strip()
+        if not path_value:
+            raise NotifyConfigError("file secret_ref must include an absolute path")
+        file_path = Path(path_value).expanduser()
+        if not file_path.is_absolute():
+            raise NotifyConfigError("file secret_ref must include an absolute path")
+        return SecretReference(backend=backend, file_path=file_path.resolve())
     service = str(parsed.netloc or "").strip()
     account = str(parsed.path or "").strip("/ ")
     if not service or not account:
@@ -60,6 +76,8 @@ def _backend_command(backend: str) -> str:
     normalized = _normalize_backend(backend)
     if normalized == _BACKEND_KEYCHAIN:
         return "security"
+    if normalized == _BACKEND_FILE:
+        return "filesystem"
     return "secret-tool"
 
 
@@ -115,6 +133,8 @@ def _probe_command(*, args: list[str], ok_codes: set[int], timeout_seconds: floa
 
 def is_secret_backend_available(backend: str) -> bool:
     normalized = _normalize_backend(backend)
+    if normalized == _BACKEND_FILE:
+        return True
     keyring_module = _keyring_client_for_backend(normalized)
     if keyring_module is not None:
         try:
@@ -174,8 +194,71 @@ def _run_command(args: list[str], *, input_text: str | None = None) -> str:
     return str(result.stdout or "").strip()
 
 
+def _ensure_private_secret_parent(path: Path) -> None:
+    parent = path.parent
+    try:
+        parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    except OSError as exc:
+        raise NotifyConfigError(f"failed to create secret directory: {parent}") from exc
+    if os.name == "nt":
+        return
+    try:
+        parent.chmod(0o700)
+    except OSError as exc:
+        raise NotifyConfigError(f"failed to set secure permissions on secret directory: {parent}") from exc
+    mode = stat.S_IMODE(parent.stat().st_mode)
+    if mode & 0o077:
+        raise NotifyConfigError(
+            f"secret directory must not be group/world-accessible (expected mode 700): {parent} (mode={oct(mode)})"
+        )
+
+
+def _assert_private_secret_file(path: Path) -> None:
+    if not path.exists():
+        raise NotifyConfigError(f"secret value not found for reference: {path.as_uri()}")
+    if not path.is_file():
+        raise NotifyConfigError(f"secret path is not a file: {path}")
+    if os.name == "nt":
+        return
+    mode = stat.S_IMODE(path.stat().st_mode)
+    if mode & 0o077:
+        raise NotifyConfigError(
+            f"secret file must not be group/world-accessible (expected mode 600): {path} (mode={oct(mode)})"
+        )
+
+
+def _read_file_secret(path: Path) -> str:
+    _assert_private_secret_file(path)
+    try:
+        value = path.read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        raise NotifyConfigError(f"failed to read secret file: {path}") from exc
+    if not value:
+        raise NotifyConfigError(f"secret value not found for reference: {path.as_uri()}")
+    return value
+
+
+def _write_file_secret(path: Path, value: str) -> None:
+    _ensure_private_secret_parent(path)
+    tmp_path = path.with_name(f".{path.name}.tmp")
+    try:
+        tmp_path.write_text(value, encoding="utf-8")
+        if os.name != "nt":
+            tmp_path.chmod(0o600)
+        tmp_path.replace(path)
+        if os.name != "nt":
+            path.chmod(0o600)
+    except OSError as exc:
+        raise NotifyConfigError(f"failed to write secret file: {path}") from exc
+    _assert_private_secret_file(path)
+
+
 def resolve_secret_ref(secret_ref: str) -> str:
     parsed = parse_secret_ref(secret_ref)
+    if parsed.backend == _BACKEND_FILE:
+        if parsed.file_path is None:
+            raise NotifyConfigError("file secret_ref must include an absolute path")
+        return _read_file_secret(parsed.file_path)
     keyring_module = _keyring_client_for_backend(parsed.backend)
     if keyring_module is not None:
         try:
@@ -211,6 +294,11 @@ def store_secret_ref(secret_ref: str, secret_value: str) -> None:
     value = str(secret_value or "").strip()
     if not value:
         raise NotifyConfigError("webhook URL value must be non-empty when storing in a secret backend")
+    if parsed.backend == _BACKEND_FILE:
+        if parsed.file_path is None:
+            raise NotifyConfigError("file secret_ref must include an absolute path")
+        _write_file_secret(parsed.file_path, value)
+        return
     keyring_module = _keyring_client_for_backend(parsed.backend)
     if keyring_module is not None:
         try:

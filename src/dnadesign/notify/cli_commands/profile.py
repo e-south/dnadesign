@@ -50,6 +50,16 @@ def register_profile_commands(
             "--include-raw-event/--no-include-raw-event",
             help="Whether to include the full USR event blob in payload meta.",
         ),
+        progress_step_pct: int | None = typer.Option(
+            None,
+            "--progress-step-pct",
+            help="DenseGen progress heartbeat threshold as percentage points (1-100).",
+        ),
+        progress_min_seconds: float | None = typer.Option(
+            None,
+            "--progress-min-seconds",
+            help="Minimum spacing between DenseGen progress heartbeats in seconds.",
+        ),
         tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
         policy: str | None = typer.Option(
             None,
@@ -70,6 +80,8 @@ def register_profile_commands(
             include_args=include_args,
             include_context=include_context,
             include_raw_event=include_raw_event,
+            progress_step_pct=progress_step_pct,
+            progress_min_seconds=progress_min_seconds,
             tls_ca_bundle=tls_ca_bundle,
             policy=policy,
             force=force,
@@ -104,6 +116,16 @@ def register_profile_commands(
             "--include-raw-event/--no-include-raw-event",
             help="Whether to include the full USR event blob in payload meta.",
         ),
+        progress_step_pct: int | None = typer.Option(
+            None,
+            "--progress-step-pct",
+            help="DenseGen progress heartbeat threshold as percentage points (1-100).",
+        ),
+        progress_min_seconds: float | None = typer.Option(
+            None,
+            "--progress-min-seconds",
+            help="Minimum spacing between DenseGen progress heartbeats in seconds.",
+        ),
         tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
         policy: str | None = typer.Option(
             None,
@@ -114,7 +136,7 @@ def register_profile_commands(
             "auto",
             "--secret-source",
             help=(
-                "Webhook source. auto requires keychain/secretservice; "
+                "Webhook source. auto prefers keychain/secretservice then file; "
                 "use env with --url-env for environment-based wiring."
             ),
         ),
@@ -127,8 +149,8 @@ def register_profile_commands(
             None,
             "--secret-ref",
             help=(
-                "Secret reference for keychain/secretservice mode: "
-                "keychain://service/account or secretservice://service/account."
+                "Secret reference for keychain/secretservice/file mode: "
+                "keychain://service/account, secretservice://service/account, or file:///path."
             ),
         ),
         webhook_url: str | None = typer.Option(
@@ -156,6 +178,8 @@ def register_profile_commands(
             include_args=include_args,
             include_context=include_context,
             include_raw_event=include_raw_event,
+            progress_step_pct=progress_step_pct,
+            progress_min_seconds=progress_min_seconds,
             tls_ca_bundle=tls_ca_bundle,
             policy=policy,
             secret_source=secret_source,

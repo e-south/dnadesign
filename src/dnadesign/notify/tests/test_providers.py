@@ -25,6 +25,10 @@ def test_format_payload_slack_minimum_fields() -> None:
     payload = build_payload(status="failure", tool="densegen", run_id="demo", message="oops")
     formatted = format_payload("slack", payload)
     assert "text" in formatted
+    assert "blocks" in formatted
+    assert isinstance(formatted["blocks"], list)
+    assert formatted["blocks"][0]["type"] == "section"
+    assert "*FAILURE*" in formatted["blocks"][0]["text"]["text"]
 
 
 def test_format_payload_discord_minimum_fields() -> None:

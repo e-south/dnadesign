@@ -490,6 +490,37 @@ def test_run_fresh_preserves_usr_registry(tmp_path: Path, monkeypatch) -> None:
     assert registry_path.read_text() == "namespaces: {}\n"
 
 
+def test_run_fresh_preserves_notify_profile_and_cursor(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_config(run_root)
+    notify_dir = run_root / "outputs" / "notify" / "densegen"
+    notify_dir.mkdir(parents=True, exist_ok=True)
+    profile_path = notify_dir / "profile.json"
+    cursor_path = notify_dir / "cursor"
+    profile_path.write_text("{\"provider\":\"slack\"}\n")
+    cursor_path.write_text("12345\n")
+    stale_tables = run_root / "outputs" / "tables"
+    stale_tables.mkdir(parents=True, exist_ok=True)
+    stale_marker = stale_tables / "dense_arrays.parquet"
+    stale_marker.write_text("stale\n")
+
+    def _fake_run_pipeline(_loaded, *, resume, build_stage_a, **_kwargs):
+        return None
+
+    runner = CliRunner()
+    monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
+    result = runner.invoke(app, ["run", "--fresh", "-c", str(cfg_path), "--no-plot"])
+
+    assert result.exit_code == 0, result.output
+    assert profile_path.exists()
+    assert profile_path.read_text() == "{\"provider\":\"slack\"}\n"
+    assert cursor_path.exists()
+    assert cursor_path.read_text() == "12345\n"
+    assert not stale_marker.exists()
+
+
 def test_run_auto_accepts_plan_quota_increase_on_resume(tmp_path: Path, monkeypatch) -> None:
     run_root = tmp_path / "run"
     run_root.mkdir(parents=True)
@@ -564,3 +595,124 @@ def test_run_reports_quota_already_met_when_resume_has_no_work(tmp_path: Path, m
     result = runner.invoke(app, ["run", "-c", str(cfg_path), "--resume", "--no-plot"])
     assert result.exit_code == 0, result.output
     assert "quota is already met" in result.output.lower()
+
+
+def test_run_extend_quota_increases_plan_target_before_pipeline(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_config(run_root)
+
+    captured: dict[str, int] = {}
+
+    def _fake_run_pipeline(loaded, **_kwargs):
+        captured["quota"] = int(loaded.root.densegen.generation.plan[0].quota)
+        return SimpleNamespace(total_generated=4, per_plan={("demo_input", "demo_plan"): 4}, generated_this_run=4)
+
+    monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
+    runner = CliRunner()
+    result = runner.invoke(app, ["run", "-c", str(cfg_path), "--extend-quota", "3", "--no-plot"])
+
+    assert result.exit_code == 0, result.output
+    assert captured["quota"] == 4
+    assert "Quota plan" in result.output
+    assert "demo_plan=4" in result.output
+
+
+def test_run_extend_quota_rejects_non_positive_values(tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_config(run_root)
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["run", "-c", str(cfg_path), "--extend-quota", "0", "--no-plot"])
+
+    assert result.exit_code == 1, result.output
+    assert "--extend-quota must be > 0" in result.output
+
+
+def test_run_extend_quota_anchors_to_existing_generated_rows(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_config(run_root)
+    outputs_dir = run_root / "outputs"
+    (outputs_dir / "tables").mkdir(parents=True, exist_ok=True)
+    (outputs_dir / "tables" / "dense_arrays.parquet").write_text("seed")
+    (outputs_dir / "meta").mkdir(parents=True, exist_ok=True)
+    (outputs_dir / "meta" / "run_state.json").write_text(
+        json.dumps(
+            {
+                "run_id": "demo",
+                "created_at": "2026-02-01T00:00:00Z",
+                "updated_at": "2026-02-01T00:00:00Z",
+                "schema_version": "2.9",
+                "config_sha256": hashlib.sha256(cfg_path.read_bytes()).hexdigest(),
+                "run_root": ".",
+                "items": [{"input_name": "demo_input", "plan_name": "demo_plan", "generated": 4}],
+            }
+        )
+    )
+
+    captured: dict[str, int] = {}
+
+    def _fake_run_pipeline(loaded, **_kwargs):
+        captured["quota"] = int(loaded.root.densegen.generation.plan[0].quota)
+        return SimpleNamespace(total_generated=7, per_plan={("demo_input", "demo_plan"): 7}, generated_this_run=3)
+
+    monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
+    runner = CliRunner()
+    result = runner.invoke(app, ["run", "-c", str(cfg_path), "--resume", "--extend-quota", "3", "--no-plot"])
+
+    assert result.exit_code == 0, result.output
+    assert captured["quota"] == 7
+
+
+def test_run_resume_reuses_effective_quota_target_after_interrupted_extend(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_config(run_root)
+
+    outputs_dir = run_root / "outputs"
+    (outputs_dir / "tables").mkdir(parents=True, exist_ok=True)
+    (outputs_dir / "tables" / "dense_arrays.parquet").write_text("seed")
+    (outputs_dir / "meta").mkdir(parents=True, exist_ok=True)
+    (outputs_dir / "meta" / "run_state.json").write_text(
+        json.dumps(
+            {
+                "run_id": "demo",
+                "created_at": "2026-02-01T00:00:00Z",
+                "updated_at": "2026-02-01T00:00:00Z",
+                "schema_version": "2.9",
+                "config_sha256": hashlib.sha256(cfg_path.read_bytes()).hexdigest(),
+                "run_root": ".",
+                "items": [{"input_name": "demo_input", "plan_name": "demo_plan", "generated": 2}],
+            }
+        )
+    )
+
+    previous_cfg = load_config(cfg_path).root.densegen.model_dump(by_alias=True, exclude_none=False)
+    previous_cfg["generation"]["plan"][0]["quota"] = 6
+    (outputs_dir / "meta" / "effective_config.json").write_text(
+        json.dumps(
+            {
+                "config": previous_cfg,
+                "run_id": "demo",
+            }
+        )
+    )
+
+    captured: dict[str, int] = {}
+
+    def _fake_run_pipeline(loaded, **_kwargs):
+        captured["quota"] = int(loaded.root.densegen.generation.plan[0].quota)
+        return SimpleNamespace(total_generated=6, per_plan={("demo_input", "demo_plan"): 6}, generated_this_run=4)
+
+    monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
+    runner = CliRunner()
+    result = runner.invoke(app, ["run", "-c", str(cfg_path), "--resume", "--no-plot"])
+
+    assert result.exit_code == 0, result.output
+    assert captured["quota"] == 6

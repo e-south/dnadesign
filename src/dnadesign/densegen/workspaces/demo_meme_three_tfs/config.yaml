@@ -115,14 +115,15 @@ densegen:
           forbid_kmers: [TTGACA, TATAAT]
 
   output:
-    targets: [parquet]
+    targets: [usr]
     schema:
       bio_type: dna
       alphabet: dna_4
-    parquet:
-      path: outputs/tables/dense_arrays.parquet
-      deduplicate: true
+    usr:
+      root: outputs/usr_datasets
+      dataset: densegen/demo_meme_three_tfs
       chunk_size: 64
+      health_event_interval_seconds: 60
 
   generation:
     sequence_length: 60
@@ -215,7 +216,7 @@ densegen:
     backend: GUROBI
     strategy: iterate
     time_limit_seconds: 5
-    threads: 16
+    threads: 8
 
   runtime:
     round_robin: true
@@ -262,7 +263,7 @@ densegen:
     progress_refresh_seconds: 1.0
 
 plots:
-  source: parquet
+  source: usr
   out_dir: outputs/plots
   format: pdf
   default: [stage_a_summary, placement_map, run_health, tfbs_usage]

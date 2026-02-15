@@ -45,32 +45,52 @@ Artifact placement default:
 ```bash
 WORKSPACE=<workspace>
 CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/$WORKSPACE/config.yaml
+PROFILE=<dnadesign_repo>/src/dnadesign/densegen/workspaces/$WORKSPACE/outputs/notify/densegen/profile.json
 
-# Discover available workspace names for your tool.
+# 1) Discover available workspace names for your tool.
 uv run notify setup list-workspaces --tool densegen
 
-# One-time setup by workspace shorthand (stores webhook securely and writes profile under <config-dir>/outputs/notify/<tool>/).
-uv run notify setup slack --tool densegen --workspace "$WORKSPACE" --secret-source auto
-# Explicit path fallback:
-# uv run notify setup slack --tool densegen --config "$CONFIG" --secret-source auto
+# 2) Configure webhook secret once (config-agnostic) and keep webhook ref.
+WEBHOOK_REF="$(uv run notify setup webhook --secret-source auto --name densegen-shared --json | python -c 'import json,sys; print(json.load(sys.stdin)[\"webhook\"][\"ref\"])')"
 
-# Validate the resolved profile.
-uv run notify profile doctor --profile "src/dnadesign/densegen/workspaces/$WORKSPACE/outputs/notify/densegen/profile.json"
+# 3) Create/update watcher profile (default path: outputs/notify/densegen/profile.json).
+uv run notify setup slack \
+  --tool densegen \
+  --workspace "$WORKSPACE" \
+  --secret-source auto \
+  --secret-ref "$WEBHOOK_REF" \
+  --policy densegen \
+  --progress-step-pct 25 \
+  --progress-min-seconds 60
 
-# Preview payloads without posting (autoload profile from --tool/--workspace).
-uv run notify usr-events watch --tool densegen --workspace "$WORKSPACE" --dry-run
+# 4) Validate profile wiring and secret resolution.
+uv run notify profile doctor --profile "$PROFILE"
 
-# Run live watcher (same autoload mode).
-uv run notify usr-events watch --tool densegen --workspace "$WORKSPACE" --follow
+# 5) Preview payload mapping without posting (cursor stays unchanged).
+uv run notify usr-events watch \
+  --tool densegen \
+  --workspace "$WORKSPACE" \
+  --dry-run \
+  --no-advance-cursor-on-dry-run
 
-# Retry failed payloads from spool.
-uv run notify spool drain --profile "src/dnadesign/densegen/workspaces/$WORKSPACE/outputs/notify/densegen/profile.json"
+# 6) Run live watcher (start before tool run if you want STARTED events).
+uv run notify usr-events watch \
+  --tool densegen \
+  --workspace "$WORKSPACE" \
+  --follow \
+  --wait-for-events \
+  --stop-on-terminal-status \
+  --idle-timeout 900
+
+# 7) Retry failed payloads from spool.
+uv run notify spool drain --profile "$PROFILE"
 ```
 
 ## Read order
 
 - Canonical operators runbook: [docs/notify/usr-events.md](../../../docs/notify/usr-events.md)
 - Module-local quick ops page: [docs/usr-events.md](docs/usr-events.md)
+- Command anatomy: [notify setup webhook flags and expectations](../../../docs/notify/usr-events.md#command-anatomy-notify-setup-webhook)
 - Command anatomy: [notify setup slack flags and expectations](../../../docs/notify/usr-events.md#command-anatomy-notify-setup-slack)
 - Setup onboarding: [Slack setup onboarding](../../../docs/notify/usr-events.md#slack-setup-onboarding-3-minutes)
 - End-to-end stack demo: [DenseGen -> Universal Sequence Record -> Notify demo](../densegen/docs/demo/demo_usr_notify.md)
@@ -120,6 +140,7 @@ Tool integration contract:
 - unsupported tools fail fast with explicit errors (no implicit tool fallback)
 
 Webhook contract:
-- secure mode `--secret-source auto|keychain|secretservice`
+- `notify setup webhook` configures webhook secret references without requiring tool/workspace/profile paths
+- secure mode `--secret-source auto|keychain|secretservice|file`
 - env mode supports `--url-env <ENV_VAR>` and defaults to `NOTIFY_WEBHOOK` when omitted
 - Python keyring support is included in the project lockfile; Notify uses it first and falls back to OS commands (`security`/`secret-tool`) when needed

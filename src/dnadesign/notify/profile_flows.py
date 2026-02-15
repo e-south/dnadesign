@@ -23,7 +23,7 @@ from .errors import NotifyConfigError
 from .events_source import normalize_tool_name, resolve_tool_events_path
 from .profile_ops import sanitize_profile_name, wizard_next_steps
 from .profile_schema import PROFILE_VERSION
-from .secrets import is_secret_backend_available, store_secret_ref
+from .secrets import is_secret_backend_available, resolve_secret_ref, store_secret_ref
 from .spool_ops import ensure_private_directory
 from .workflow_policy import (
     DEFAULT_PROFILE_PATH,
@@ -42,6 +42,111 @@ class SetupEventsResolution:
     policy: str | None
     tool_name: str | None
     events_require_exists: bool
+
+
+def _default_file_secret_path(secret_name: str) -> Path:
+    return (Path(__file__).resolve().parent / ".secrets" / f"{secret_name}.webhook").resolve()
+
+
+def _validate_progress_step_pct(value: int | None) -> int | None:
+    if value is None:
+        return None
+    step = int(value)
+    if step < 1 or step > 100:
+        raise NotifyConfigError("progress_step_pct must be an integer between 1 and 100")
+    return step
+
+
+def _validate_progress_min_seconds(value: float | None) -> float | None:
+    if value is None:
+        return None
+    minimum = float(value)
+    if minimum <= 0.0:
+        raise NotifyConfigError("progress_min_seconds must be a positive number")
+    return minimum
+
+
+def resolve_webhook_config(
+    *,
+    secret_source: str,
+    url_env: str | None,
+    secret_ref: str | None,
+    webhook_url: str | None,
+    store_webhook: bool,
+    secret_name: str,
+    secret_backend_available_fn: Callable[[str], bool] = is_secret_backend_available,
+    resolve_secret_ref_fn: Callable[[str], str] = resolve_secret_ref,
+    store_secret_ref_fn: Callable[[str, str], None] = store_secret_ref,
+) -> dict[str, str]:
+    mode = str(secret_source or "").strip().lower()
+    if not mode:
+        raise NotifyConfigError("secret_source must be a non-empty string")
+    if mode not in {"auto", "env", "keychain", "secretservice", "file"}:
+        raise NotifyConfigError("secret_source must be one of: auto, env, keychain, secretservice, file")
+
+    if mode == "env":
+        env_name = resolve_cli_optional_string(field="url_env", cli_value=url_env)
+        if env_name is None:
+            env_name = DEFAULT_WEBHOOK_ENV
+        return {"source": "env", "ref": env_name}
+
+    provided_secret_ref = resolve_cli_optional_string(field="secret_ref", cli_value=secret_ref)
+    secret_refs: list[str]
+    if provided_secret_ref is not None:
+        secret_refs = [provided_secret_ref]
+    elif mode == "auto":
+        candidate_modes: list[str] = []
+        for candidate in ("keychain", "secretservice", "file"):
+            if secret_backend_available_fn(candidate):
+                candidate_modes.append(candidate)
+        if not candidate_modes:
+            raise NotifyConfigError(
+                "secret_source=auto requires keychain, secretservice, or file backend availability. "
+                "Pass --secret-source env to opt into environment-variable webhook storage."
+            )
+        secret_refs = []
+        for candidate in candidate_modes:
+            if candidate == "file":
+                secret_path = _default_file_secret_path(secret_name)
+                secret_refs.append(secret_path.as_uri())
+            else:
+                secret_refs.append(f"{candidate}://dnadesign.notify/{secret_name}")
+    else:
+        if not secret_backend_available_fn(mode):
+            raise NotifyConfigError(f"secret backend '{mode}' is not available on this system")
+        if mode == "file":
+            secret_path = _default_file_secret_path(secret_name)
+            secret_refs = [secret_path.as_uri()]
+        else:
+            secret_refs = [f"{mode}://dnadesign.notify/{secret_name}"]
+
+    if not store_webhook:
+        return {"source": "secret_ref", "ref": secret_refs[0]}
+
+    webhook_value = resolve_cli_optional_string(field="webhook_url", cli_value=webhook_url)
+    last_error: NotifyConfigError | None = None
+    for secret_value in secret_refs:
+        webhook_config = {"source": "secret_ref", "ref": secret_value}
+        if webhook_value is None:
+            try:
+                _ = resolve_secret_ref_fn(secret_value)
+                return webhook_config
+            except NotifyConfigError:
+                webhook_value = str(typer.prompt("Webhook URL", hide_input=True)).strip()
+        if not webhook_value:
+            raise NotifyConfigError("webhook_url is required when --store-webhook is enabled")
+        try:
+            store_secret_ref_fn(secret_value, webhook_value)
+            return webhook_config
+        except NotifyConfigError as exc:
+            last_error = exc
+            if len(secret_refs) == 1:
+                raise
+            continue
+
+    if last_error is not None:
+        raise last_error
+    raise NotifyConfigError("failed to resolve webhook secret configuration")
 
 
 def resolve_setup_events(
@@ -151,6 +256,8 @@ def create_wizard_profile(
     include_args: bool,
     include_context: bool,
     include_raw_event: bool,
+    progress_step_pct: int | None,
+    progress_min_seconds: float | None,
     tls_ca_bundle: Path | None,
     policy: str | None,
     secret_source: str,
@@ -164,6 +271,7 @@ def create_wizard_profile(
     resolve_events_path: Callable[[Path, bool], Path],
     ensure_private_directory_fn: Callable[[Path, str], None] = ensure_private_directory,
     secret_backend_available_fn: Callable[[str], bool] = is_secret_backend_available,
+    resolve_secret_ref_fn: Callable[[str], str] = resolve_secret_ref,
     store_secret_ref_fn: Callable[[str, str], None] = store_secret_ref,
     write_profile_file_fn: Callable[[Path, dict[str, Any], bool], None] | None = None,
 ) -> dict[str, Any]:
@@ -177,43 +285,20 @@ def create_wizard_profile(
     if not provider_value:
         raise NotifyConfigError("provider must be a non-empty string")
     policy_name = resolve_workflow_policy(policy=policy)
+    progress_step_pct_value = _validate_progress_step_pct(progress_step_pct)
+    progress_min_seconds_value = _validate_progress_min_seconds(progress_min_seconds)
 
-    mode = str(secret_source or "").strip().lower()
-    if not mode:
-        raise NotifyConfigError("secret_source must be a non-empty string")
-    if mode == "auto":
-        if secret_backend_available_fn("keychain"):
-            mode = "keychain"
-        elif secret_backend_available_fn("secretservice"):
-            mode = "secretservice"
-        else:
-            raise NotifyConfigError(
-                "secret_source=auto requires keychain or secretservice on this system. "
-                "Pass --secret-source env to opt into environment-variable webhook storage."
-            )
-    if mode not in {"env", "keychain", "secretservice"}:
-        raise NotifyConfigError("secret_source must be one of: auto, env, keychain, secretservice")
-
-    webhook_config: dict[str, str]
-    if mode == "env":
-        env_name = resolve_cli_optional_string(field="url_env", cli_value=url_env)
-        if env_name is None:
-            env_name = DEFAULT_WEBHOOK_ENV
-        webhook_config = {"source": "env", "ref": env_name}
-    else:
-        if not secret_backend_available_fn(mode):
-            raise NotifyConfigError(f"secret backend '{mode}' is not available on this system")
-        secret_value = resolve_cli_optional_string(field="secret_ref", cli_value=secret_ref)
-        if secret_value is None:
-            secret_value = f"{mode}://dnadesign.notify/{sanitize_profile_name(profile_path)}"
-        webhook_config = {"source": "secret_ref", "ref": secret_value}
-        if store_webhook:
-            webhook_value = resolve_cli_optional_string(field="webhook_url", cli_value=webhook_url)
-            if webhook_value is None:
-                webhook_value = str(typer.prompt("Webhook URL", hide_input=True)).strip()
-            if not webhook_value:
-                raise NotifyConfigError("webhook_url is required when --store-webhook is enabled")
-            store_secret_ref_fn(secret_value, webhook_value)
+    webhook_config = resolve_webhook_config(
+        secret_source=secret_source,
+        url_env=url_env,
+        secret_ref=secret_ref,
+        webhook_url=webhook_url,
+        store_webhook=store_webhook,
+        secret_name=sanitize_profile_name(profile_path),
+        secret_backend_available_fn=secret_backend_available_fn,
+        resolve_secret_ref_fn=resolve_secret_ref_fn,
+        store_secret_ref_fn=store_secret_ref_fn,
+    )
 
     default_cursor = profile_path.parent / "cursor"
     default_spool = profile_path.parent / "spool"
@@ -251,6 +336,10 @@ def create_wizard_profile(
             payload.setdefault(key, value)
     if events_source is not None:
         payload["events_source"] = dict(events_source)
+    if progress_step_pct_value is not None:
+        payload["progress_step_pct"] = int(progress_step_pct_value)
+    if progress_min_seconds_value is not None:
+        payload["progress_min_seconds"] = float(progress_min_seconds_value)
 
     write_profile_file_fn(profile_path, payload, force)
     next_steps = wizard_next_steps(

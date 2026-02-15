@@ -128,9 +128,12 @@ uv run dense plot --only stage_a_summary -c "$CONFIG"
 ## 4) Run generation to quota
 
 ```bash
-# Run from a clean outputs state and skip auto-plotting for speed.
-uv run dense run --fresh --no-plot -c "$CONFIG"
+# Run using the Stage-A pools you just built and skip auto-plotting for speed.
+uv run dense run --no-plot -c "$CONFIG"
 ```
+
+`dense run --fresh` clears prior outputs (including Stage-A pool artifacts). Use `--fresh`
+only when you intentionally want a full rebuild.
 
 `demo_meme_three_tfs` uses `logging.progress_style: auto`, so progress output adapts to
 terminal capabilities automatically.

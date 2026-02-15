@@ -51,14 +51,15 @@ from .profile_flows import create_wizard_profile as _create_wizard_profile_flow
 from .profile_flows import resolve_profile_path_for_setup as _resolve_profile_path_for_setup
 from .profile_flows import resolve_profile_path_for_wizard as _resolve_profile_path_for_wizard
 from .profile_flows import resolve_setup_events as _resolve_setup_events
+from .profile_flows import resolve_webhook_config as _resolve_webhook_config
 from .profile_schema import PROFILE_VERSION
 from .profile_schema import read_profile as _read_profile
 from .profile_schema import resolve_profile_events_source as _resolve_profile_events_source
 from .profile_schema import resolve_profile_webhook_source as _resolve_profile_webhook_source
-from .secrets import is_secret_backend_available, store_secret_ref
+from .secrets import is_secret_backend_available, resolve_secret_ref, store_secret_ref
 from .spool_ops import ensure_private_directory as _ensure_private_directory
 from .usr_events_watch import watch_usr_events_loop
-from .validation import resolve_tls_ca_bundle, resolve_webhook_url
+from .validation import resolve_tls_ca_bundle, resolve_webhook_url, validate_provider_webhook_url
 from .workflow_policy import DEFAULT_PROFILE_PATH as _DEFAULT_PROFILE_PATH
 from .workflow_policy import default_profile_path_for_tool as _default_profile_path_for_tool
 from .workflow_policy import policy_defaults as _policy_defaults_for
@@ -197,6 +198,7 @@ def _send_impl(
 ) -> None:
     try:
         webhook_url = resolve_webhook_url(url=url, url_env=url_env, secret_ref=secret_ref)
+        validate_provider_webhook_url(provider=provider, webhook_url=webhook_url)
         tls_ca_bundle_value = resolve_tls_ca_bundle(webhook_url=webhook_url, tls_ca_bundle=tls_ca_bundle)
         meta_data = _load_meta(meta)
         payload = build_payload(
@@ -235,6 +237,16 @@ def _profile_init_impl(
     include_args: bool = typer.Option(False, "--include-args/--no-include-args"),
     include_context: bool = typer.Option(False, "--include-context/--no-include-context"),
     include_raw_event: bool = typer.Option(False, "--include-raw-event/--no-include-raw-event"),
+    progress_step_pct: int | None = typer.Option(
+        None,
+        "--progress-step-pct",
+        help="DenseGen progress heartbeat threshold as percentage points (1-100).",
+    ),
+    progress_min_seconds: float | None = typer.Option(
+        None,
+        "--progress-min-seconds",
+        help="Minimum spacing between DenseGen progress heartbeats in seconds.",
+    ),
     tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
     policy: str | None = typer.Option(
         None,
@@ -259,6 +271,16 @@ def _profile_init_impl(
             "include_raw_event": bool(include_raw_event),
             "webhook": {"source": "env", "ref": str(url_env).strip()},
         }
+        if progress_step_pct is not None:
+            progress_step_pct_value = int(progress_step_pct)
+            if progress_step_pct_value < 1 or progress_step_pct_value > 100:
+                raise NotifyConfigError("progress_step_pct must be an integer between 1 and 100")
+            payload["progress_step_pct"] = progress_step_pct_value
+        if progress_min_seconds is not None:
+            progress_min_seconds_value = float(progress_min_seconds)
+            if progress_min_seconds_value <= 0.0:
+                raise NotifyConfigError("progress_min_seconds must be a positive number")
+            payload["progress_min_seconds"] = progress_min_seconds_value
         if only_actions is not None:
             payload["only_actions"] = str(only_actions).strip()
         if only_tools is not None:
@@ -296,6 +318,16 @@ def _profile_wizard_impl(
     include_args: bool = typer.Option(False, "--include-args/--no-include-args"),
     include_context: bool = typer.Option(False, "--include-context/--no-include-context"),
     include_raw_event: bool = typer.Option(False, "--include-raw-event/--no-include-raw-event"),
+    progress_step_pct: int | None = typer.Option(
+        None,
+        "--progress-step-pct",
+        help="DenseGen progress heartbeat threshold as percentage points (1-100).",
+    ),
+    progress_min_seconds: float | None = typer.Option(
+        None,
+        "--progress-min-seconds",
+        help="Minimum spacing between DenseGen progress heartbeats in seconds.",
+    ),
     tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
     policy: str | None = typer.Option(
         None,
@@ -305,7 +337,7 @@ def _profile_wizard_impl(
     secret_source: str = typer.Option(
         "auto",
         "--secret-source",
-        help="Webhook source: auto|env|keychain|secretservice.",
+        help="Webhook source: auto|env|keychain|secretservice|file.",
     ),
     url_env: str | None = typer.Option(
         None,
@@ -315,7 +347,7 @@ def _profile_wizard_impl(
     secret_ref: str | None = typer.Option(
         None,
         "--secret-ref",
-        help="Secret reference: keychain://service/account or secretservice://service/account.",
+        help="Secret reference: keychain://service/account, secretservice://service/account, or file:///path.",
     ),
     webhook_url: str | None = typer.Option(None, "--webhook-url", help="Webhook URL to store in secure backend."),
     store_webhook: bool = typer.Option(
@@ -343,6 +375,8 @@ def _profile_wizard_impl(
             include_args=include_args,
             include_context=include_context,
             include_raw_event=include_raw_event,
+            progress_step_pct=progress_step_pct,
+            progress_min_seconds=progress_min_seconds,
             tls_ca_bundle=tls_ca_bundle,
             policy=policy,
             secret_source=secret_source,
@@ -356,6 +390,7 @@ def _profile_wizard_impl(
             resolve_events_path=lambda p, required: _resolve_usr_events_path(p, require_exists=required),
             ensure_private_directory_fn=_ensure_private_directory,
             secret_backend_available_fn=is_secret_backend_available,
+            resolve_secret_ref_fn=resolve_secret_ref,
             store_secret_ref_fn=store_secret_ref,
             write_profile_file_fn=lambda path, payload, overwrite: _write_profile_file(
                 path,
@@ -440,6 +475,7 @@ def _profile_doctor_impl(
             _probe_path_writable(spool_path)
 
         webhook_url = resolve_webhook_url(url=None, url_env=profile_url_env, secret_ref=profile_secret_ref)
+        validate_provider_webhook_url(provider=str(data.get("provider") or ""), webhook_url=webhook_url)
         profile_tls_ca_bundle = _resolve_optional_path_value(
             field="tls_ca_bundle",
             cli_value=None,
@@ -496,11 +532,21 @@ def _setup_slack_impl(
     include_args: bool = typer.Option(False, "--include-args/--no-include-args"),
     include_context: bool = typer.Option(False, "--include-context/--no-include-context"),
     include_raw_event: bool = typer.Option(False, "--include-raw-event/--no-include-raw-event"),
+    progress_step_pct: int | None = typer.Option(
+        None,
+        "--progress-step-pct",
+        help="DenseGen progress heartbeat threshold as percentage points (1-100).",
+    ),
+    progress_min_seconds: float | None = typer.Option(
+        None,
+        "--progress-min-seconds",
+        help="Minimum spacing between DenseGen progress heartbeats in seconds.",
+    ),
     tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
     secret_source: str = typer.Option(
         "auto",
         "--secret-source",
-        help="Webhook source: auto|env|keychain|secretservice.",
+        help="Webhook source: auto|env|keychain|secretservice|file.",
     ),
     url_env: str | None = typer.Option(
         None,
@@ -510,7 +556,7 @@ def _setup_slack_impl(
     secret_ref: str | None = typer.Option(
         None,
         "--secret-ref",
-        help="Secret reference: keychain://service/account or secretservice://service/account.",
+        help="Secret reference: keychain://service/account, secretservice://service/account, or file:///path.",
     ),
     webhook_url: str | None = typer.Option(None, "--webhook-url", help="Webhook URL to store in secure backend."),
     store_webhook: bool = typer.Option(
@@ -557,6 +603,8 @@ def _setup_slack_impl(
             include_args=include_args,
             include_context=include_context,
             include_raw_event=include_raw_event,
+            progress_step_pct=progress_step_pct,
+            progress_min_seconds=progress_min_seconds,
             tls_ca_bundle=tls_ca_bundle,
             policy=setup_resolution.policy,
             secret_source=secret_source,
@@ -570,6 +618,7 @@ def _setup_slack_impl(
             resolve_events_path=lambda p, required: _resolve_usr_events_path(p, require_exists=required),
             ensure_private_directory_fn=_ensure_private_directory,
             secret_backend_available_fn=is_secret_backend_available,
+            resolve_secret_ref_fn=resolve_secret_ref,
             store_secret_ref_fn=store_secret_ref,
             write_profile_file_fn=lambda path, payload, overwrite: _write_profile_file(
                 path,
@@ -583,6 +632,70 @@ def _setup_slack_impl(
         typer.echo(f"Profile written: {result['profile']}")
         for line in result["next_steps"]:
             typer.echo(line)
+    except NotifyError as exc:
+        if json_output:
+            typer.echo(json.dumps({"ok": False, "error": str(exc)}, sort_keys=True))
+        else:
+            typer.echo(f"Notification failed: {exc}")
+        raise typer.Exit(code=1)
+
+
+def _setup_webhook_impl(
+    name: str = typer.Option("default", "--name", help="Logical secret name used for default secure references."),
+    secret_source: str = typer.Option(
+        "auto",
+        "--secret-source",
+        help="Webhook source: auto|env|keychain|secretservice|file.",
+    ),
+    url_env: str | None = typer.Option(
+        None,
+        "--url-env",
+        help="Environment variable holding webhook URL (default: NOTIFY_WEBHOOK for --secret-source env).",
+    ),
+    secret_ref: str | None = typer.Option(
+        None,
+        "--secret-ref",
+        help="Secret reference: keychain://service/account, secretservice://service/account, or file:///path.",
+    ),
+    webhook_url: str | None = typer.Option(None, "--webhook-url", help="Webhook URL to store in secure backend."),
+    store_webhook: bool = typer.Option(
+        True,
+        "--store-webhook/--no-store-webhook",
+        help="Store webhook URL in the selected secure secret backend.",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON output."),
+) -> None:
+    try:
+        name_value = _resolve_cli_optional_string(field="name", cli_value=name)
+        if name_value is None:
+            name_value = "default"
+        secret_name = "".join(char if char.isalnum() else "-" for char in str(name_value)).strip("-")
+        if not secret_name:
+            secret_name = "default"
+
+        webhook_config = _resolve_webhook_config(
+            secret_source=secret_source,
+            url_env=url_env,
+            secret_ref=secret_ref,
+            webhook_url=webhook_url,
+            store_webhook=store_webhook,
+            secret_name=secret_name,
+            secret_backend_available_fn=is_secret_backend_available,
+            resolve_secret_ref_fn=resolve_secret_ref,
+            store_secret_ref_fn=store_secret_ref,
+        )
+
+        payload = {
+            "ok": True,
+            "name": secret_name,
+            "webhook": webhook_config,
+        }
+        if json_output:
+            typer.echo(json.dumps(payload, sort_keys=True))
+            return
+        typer.echo("Webhook reference configured.")
+        typer.echo(f"  source: {webhook_config['source']}")
+        typer.echo(f"  ref: {webhook_config['ref']}")
     except NotifyError as exc:
         if json_output:
             typer.echo(json.dumps({"ok": False, "error": str(exc)}, sort_keys=True))
@@ -683,7 +796,7 @@ def _usr_events_watch_impl(
     secret_ref: str | None = typer.Option(
         None,
         "--secret-ref",
-        help="Secret reference: keychain://service/account or secretservice://service/account.",
+        help="Secret reference: keychain://service/account, secretservice://service/account, or file:///path.",
     ),
     tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
     events: Path | None = typer.Option(None, "--events", help="USR .events.log JSONL path."),
@@ -736,6 +849,16 @@ def _usr_events_watch_impl(
     ),
     only_actions: str | None = typer.Option(None, "--only-actions", help="Comma-separated action filter."),
     only_tools: str | None = typer.Option(None, "--only-tools", help="Comma-separated actor tool filter."),
+    progress_step_pct: int | None = typer.Option(
+        None,
+        "--progress-step-pct",
+        help="DenseGen progress heartbeat threshold as percentage points (1-100).",
+    ),
+    progress_min_seconds: float | None = typer.Option(
+        None,
+        "--progress-min-seconds",
+        help="Minimum spacing between DenseGen progress heartbeats in seconds.",
+    ),
     on_invalid_event: str = typer.Option(
         "error",
         "--on-invalid-event",
@@ -791,6 +914,8 @@ def _usr_events_watch_impl(
             on_truncate=on_truncate,
             only_actions=only_actions,
             only_tools=only_tools,
+            progress_step_pct=progress_step_pct,
+            progress_min_seconds=progress_min_seconds,
             on_invalid_event=on_invalid_event,
             allow_unknown_version=allow_unknown_version,
             tool=tool,
@@ -822,6 +947,7 @@ def _usr_events_watch_impl(
             resolve_cli_optional_string=_resolve_cli_optional_string,
             resolve_webhook_url=resolve_webhook_url,
             resolve_tls_ca_bundle=resolve_tls_ca_bundle,
+            validate_provider_webhook_url=validate_provider_webhook_url,
             split_csv=_split_csv,
             watch_usr_events_loop=watch_usr_events_loop,
             validate_usr_event=_validate_usr_event,
@@ -843,7 +969,7 @@ def _spool_drain_impl(
     secret_ref: str | None = typer.Option(
         None,
         "--secret-ref",
-        help="Secret reference: keychain://service/account or secretservice://service/account.",
+        help="Secret reference: keychain://service/account, secretservice://service/account, or file:///path.",
     ),
     tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
     profile: Path | None = typer.Option(None, "--profile", help="Path to profile JSON file."),
@@ -874,6 +1000,7 @@ def _spool_drain_impl(
             resolve_optional_path_value=_resolve_optional_path_value,
             resolve_webhook_url=resolve_webhook_url,
             resolve_tls_ca_bundle=resolve_tls_ca_bundle,
+            validate_provider_webhook_url=validate_provider_webhook_url,
             format_for_provider=format_for_provider,
             post_with_backoff=_post_with_backoff,
         )
@@ -895,6 +1022,7 @@ register_profile_commands(
 register_setup_commands(
     setup_app,
     slack_handler=_setup_slack_impl,
+    webhook_handler=_setup_webhook_impl,
     resolve_events_handler=_setup_resolve_events_impl,
     list_workspaces_handler=_setup_list_workspaces_impl,
 )

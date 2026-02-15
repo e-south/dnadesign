@@ -20,6 +20,7 @@ from typer.testing import CliRunner
 
 from dnadesign.notify.cli import _ensure_private_directory, app
 from dnadesign.notify.errors import NotifyConfigError
+from dnadesign.notify.secrets import resolve_secret_ref
 
 
 def _event(action: str = "write_overlay_part") -> dict:
@@ -82,6 +83,38 @@ def test_profile_init_writes_densegen_policy_defaults(tmp_path: Path) -> None:
     assert data["only_tools"] == "densegen"
     assert "densegen_health" in data["only_actions"]
     assert "url_env" not in data
+
+
+def test_profile_init_persists_progress_tunables(tmp_path: Path) -> None:
+    events = tmp_path / "events.log"
+    profile = tmp_path / "notify.profile.json"
+    _write_events(events, [_event()])
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "profile",
+            "init",
+            "--profile",
+            str(profile),
+            "--provider",
+            "slack",
+            "--url-env",
+            "DENSEGEN_WEBHOOK",
+            "--events",
+            str(events),
+            "--progress-step-pct",
+            "20",
+            "--progress-min-seconds",
+            "90",
+        ],
+    )
+
+    assert result.exit_code == 0
+    data = json.loads(profile.read_text(encoding="utf-8"))
+    assert data["progress_step_pct"] == 20
+    assert data["progress_min_seconds"] == 90.0
 
 
 def test_profile_init_writes_infer_evo2_policy_defaults(tmp_path: Path) -> None:
@@ -224,6 +257,40 @@ def test_profile_wizard_writes_v2_profile_with_env_source(tmp_path: Path, monkey
     assert "export DENSEGEN_WEBHOOK" in result.stdout
     assert "NOTIFY_PROFILE" in result.stdout
     assert "docs/bu-scc/jobs/notify-watch.qsub" in result.stdout
+
+
+def test_profile_wizard_persists_progress_tunables(tmp_path: Path, monkeypatch) -> None:
+    events = tmp_path / "events.log"
+    profile = tmp_path / "notify.profile.json"
+    _write_events(events, [_event()])
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "profile",
+            "wizard",
+            "--profile",
+            str(profile),
+            "--provider",
+            "slack",
+            "--events",
+            str(events),
+            "--secret-source",
+            "env",
+            "--url-env",
+            "DENSEGEN_WEBHOOK",
+            "--progress-step-pct",
+            "12",
+            "--progress-min-seconds",
+            "75",
+        ],
+    )
+    assert result.exit_code == 0
+    data = json.loads(profile.read_text(encoding="utf-8"))
+    assert data["progress_step_pct"] == 12
+    assert data["progress_min_seconds"] == 75.0
 
 
 def test_profile_wizard_env_uses_default_webhook_env_when_not_set(tmp_path: Path, monkeypatch) -> None:
@@ -420,12 +487,12 @@ def test_profile_wizard_stores_secret_ref_when_requested(tmp_path: Path, monkeyp
     assert "export " not in result.stdout
 
 
-def test_profile_wizard_auto_requires_secure_backend_or_explicit_env(tmp_path: Path, monkeypatch) -> None:
+def test_profile_wizard_auto_falls_back_to_file_secret_ref(tmp_path: Path, monkeypatch) -> None:
     events = tmp_path / "events.log"
     profile = tmp_path / "notify.profile.json"
     _write_events(events, [_event()])
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
-    monkeypatch.setattr("dnadesign.notify.cli.is_secret_backend_available", lambda _backend: False)
+    monkeypatch.setattr("dnadesign.notify.cli.is_secret_backend_available", lambda backend: backend == "file")
 
     runner = CliRunner()
     result = runner.invoke(
@@ -439,10 +506,14 @@ def test_profile_wizard_auto_requires_secure_backend_or_explicit_env(tmp_path: P
             "slack",
             "--events",
             str(events),
+            "--webhook-url",
+            "https://example.invalid/webhook",
         ],
     )
-    assert result.exit_code == 1
-    assert "--secret-source env" in result.stdout
+    assert result.exit_code == 0
+    data = json.loads(profile.read_text(encoding="utf-8"))
+    assert data["webhook"]["source"] == "secret_ref"
+    assert data["webhook"]["ref"].startswith("file://")
 
 
 def test_profile_wizard_rejects_yaml_path_for_events(tmp_path: Path, monkeypatch) -> None:
@@ -802,6 +873,41 @@ def test_setup_slack_stores_tls_ca_bundle_path(tmp_path: Path, monkeypatch) -> N
     assert data["tls_ca_bundle"] == str(ca_bundle.resolve())
 
 
+def test_setup_slack_persists_progress_tunables(tmp_path: Path, monkeypatch) -> None:
+    config_path = tmp_path / "config.yaml"
+    resolved_events = tmp_path / "usr" / "demo" / ".events.log"
+    config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "dnadesign.notify.cli._resolve_tool_events_path",
+        lambda *, tool, config: (resolved_events, "densegen"),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "setup",
+            "slack",
+            "--tool",
+            "densegen",
+            "--config",
+            str(config_path),
+            "--secret-source",
+            "env",
+            "--progress-step-pct",
+            "18",
+            "--progress-min-seconds",
+            "120",
+        ],
+    )
+    assert result.exit_code == 0
+    profile = tmp_path / "outputs" / "notify" / "densegen" / "profile.json"
+    data = json.loads(profile.read_text(encoding="utf-8"))
+    assert data["progress_step_pct"] == 18
+    assert data["progress_min_seconds"] == 120.0
+
+
 def test_setup_resolve_events_emits_plain_events_path(tmp_path: Path, monkeypatch) -> None:
     config_path = tmp_path / "config.yaml"
     resolved_events = tmp_path / "usr" / "demo" / ".events.log"
@@ -952,6 +1058,131 @@ def test_setup_resolve_events_can_print_policy_only(tmp_path: Path, monkeypatch)
     assert result.stdout.strip() == "densegen"
 
 
+def test_setup_webhook_auto_falls_back_to_file_secret_ref(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str((tmp_path / "config_home").resolve()))
+    monkeypatch.setattr("dnadesign.notify.cli.is_secret_backend_available", lambda backend: backend == "file")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "setup",
+            "webhook",
+            "--secret-source",
+            "auto",
+            "--name",
+            "densegen-shared",
+            "--webhook-url",
+            "https://example.invalid/webhook",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is True
+    assert payload["webhook"]["source"] == "secret_ref"
+    secret_ref = str(payload["webhook"]["ref"])
+    assert secret_ref.startswith("file://")
+    assert resolve_secret_ref(secret_ref) == "https://example.invalid/webhook"
+
+
+def test_setup_webhook_auto_falls_back_to_file_when_secretservice_write_fails(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str((tmp_path / "config_home").resolve()))
+    monkeypatch.setattr(
+        "dnadesign.notify.cli.is_secret_backend_available",
+        lambda backend: backend in {"secretservice", "file"},
+    )
+
+    def _store(secret_ref: str, secret_value: str) -> None:
+        if secret_ref.startswith("secretservice://"):
+            raise NotifyConfigError("secret backend keyring write failed")
+        from dnadesign.notify.secrets import store_secret_ref as _store_secret_ref
+
+        _store_secret_ref(secret_ref, secret_value)
+
+    monkeypatch.setattr("dnadesign.notify.cli.store_secret_ref", _store)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "setup",
+            "webhook",
+            "--secret-source",
+            "auto",
+            "--name",
+            "densegen-shared",
+            "--webhook-url",
+            "https://example.invalid/webhook",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is True
+    assert payload["webhook"]["source"] == "secret_ref"
+    secret_ref = str(payload["webhook"]["ref"])
+    assert secret_ref.startswith("file://")
+    assert resolve_secret_ref(secret_ref) == "https://example.invalid/webhook"
+
+
+def test_setup_webhook_auto_reuses_existing_secret_without_prompt(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str((tmp_path / "config_home").resolve()))
+    monkeypatch.setattr("dnadesign.notify.cli.is_secret_backend_available", lambda backend: backend == "file")
+    runner = CliRunner()
+    first = runner.invoke(
+        app,
+        [
+            "setup",
+            "webhook",
+            "--secret-source",
+            "auto",
+            "--name",
+            "densegen-shared",
+            "--webhook-url",
+            "https://example.invalid/webhook",
+            "--json",
+        ],
+    )
+    assert first.exit_code == 0
+    monkeypatch.setattr(
+        "dnadesign.notify.profile_flows.typer.prompt",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("prompt should not be called")),
+    )
+    second = runner.invoke(
+        app,
+        [
+            "setup",
+            "webhook",
+            "--secret-source",
+            "auto",
+            "--name",
+            "densegen-shared",
+            "--json",
+        ],
+    )
+    assert second.exit_code == 0
+
+
+def test_setup_webhook_env_mode_uses_default_env_ref(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str((tmp_path / "config_home").resolve()))
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "setup",
+            "webhook",
+            "--secret-source",
+            "env",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is True
+    assert payload["webhook"] == {"source": "env", "ref": "NOTIFY_WEBHOOK"}
+
+
 def test_setup_slack_requires_events_or_tool_config(tmp_path: Path, monkeypatch) -> None:
     profile = tmp_path / "notify.profile.json"
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
@@ -1053,6 +1284,107 @@ def test_setup_slack_env_uses_default_webhook_env_when_not_set(tmp_path: Path, m
     assert result.exit_code == 0
     data = json.loads(profile.read_text(encoding="utf-8"))
     assert data["webhook"] == {"source": "env", "ref": "NOTIFY_WEBHOOK"}
+
+
+def test_setup_slack_auto_falls_back_to_file_secret_ref(tmp_path: Path, monkeypatch) -> None:
+    config_path = tmp_path / "config.yaml"
+    profile = tmp_path / "notify.profile.json"
+    config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    monkeypatch.setattr(
+        "dnadesign.notify.cli._resolve_tool_events_path",
+        lambda *, tool, config: (tmp_path / "usr" / "demo" / ".events.log", "densegen"),
+    )
+    monkeypatch.setattr("dnadesign.notify.cli.is_secret_backend_available", lambda backend: backend == "file")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "setup",
+            "slack",
+            "--profile",
+            str(profile),
+            "--tool",
+            "densegen",
+            "--config",
+            str(config_path),
+            "--secret-source",
+            "auto",
+            "--webhook-url",
+            "https://example.invalid/webhook",
+        ],
+    )
+    assert result.exit_code == 0
+    data = json.loads(profile.read_text(encoding="utf-8"))
+    assert data["webhook"]["source"] == "secret_ref"
+    assert data["webhook"]["ref"].startswith("file://")
+
+
+def test_setup_slack_auto_reuses_existing_secret_without_prompt(tmp_path: Path, monkeypatch) -> None:
+    config_path = tmp_path / "config.yaml"
+    profile = tmp_path / "notify.profile.json"
+    config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    monkeypatch.setattr(
+        "dnadesign.notify.cli._resolve_tool_events_path",
+        lambda *, tool, config: (tmp_path / "usr" / "demo" / ".events.log", "densegen"),
+    )
+    monkeypatch.setattr("dnadesign.notify.cli.is_secret_backend_available", lambda backend: backend == "file")
+    stored: dict[str, str] = {}
+
+    def _store(secret_ref: str, secret_value: str) -> None:
+        stored[secret_ref] = secret_value
+
+    def _resolve(secret_ref: str) -> str:
+        if secret_ref not in stored:
+            raise NotifyConfigError("missing secret")
+        return stored[secret_ref]
+
+    monkeypatch.setattr("dnadesign.notify.cli.store_secret_ref", _store)
+    monkeypatch.setattr("dnadesign.notify.cli.resolve_secret_ref", _resolve)
+    monkeypatch.setattr(
+        "dnadesign.notify.profile_flows.typer.prompt",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("prompt should not be called")),
+    )
+
+    runner = CliRunner()
+    first = runner.invoke(
+        app,
+        [
+            "setup",
+            "slack",
+            "--profile",
+            str(profile),
+            "--tool",
+            "densegen",
+            "--config",
+            str(config_path),
+            "--secret-source",
+            "auto",
+            "--webhook-url",
+            "https://example.invalid/webhook",
+        ],
+    )
+    assert first.exit_code == 0
+
+    second = runner.invoke(
+        app,
+        [
+            "setup",
+            "slack",
+            "--profile",
+            str(profile),
+            "--tool",
+            "densegen",
+            "--config",
+            str(config_path),
+            "--secret-source",
+            "auto",
+            "--force",
+        ],
+    )
+    assert second.exit_code == 0
 
 
 def test_setup_slack_rejects_unsupported_tool(tmp_path: Path, monkeypatch) -> None:
@@ -1200,7 +1532,7 @@ def test_profile_doctor_rejects_non_usr_events_file(tmp_path: Path, monkeypatch)
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://example.invalid/webhook")
+    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://hooks.slack.com/services/T000/B000/XXX")
 
     runner = CliRunner()
     result = runner.invoke(app, ["profile", "doctor", "--profile", str(profile)])
@@ -1249,7 +1581,7 @@ def test_profile_doctor_rejects_legacy_profile_version_1(tmp_path: Path, monkeyp
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://example.invalid/webhook")
+    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://hooks.slack.com/services/T000/B000/XXX")
 
     runner = CliRunner()
     result = runner.invoke(app, ["profile", "doctor", "--profile", str(profile)])
@@ -1273,7 +1605,7 @@ def test_profile_doctor_rejects_legacy_preset_field(tmp_path: Path, monkeypatch)
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://example.invalid/webhook")
+    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://hooks.slack.com/services/T000/B000/XXX")
 
     runner = CliRunner()
     result = runner.invoke(app, ["profile", "doctor", "--profile", str(profile)])
@@ -1297,7 +1629,7 @@ def test_profile_doctor_rejects_policy_without_explicit_filters(tmp_path: Path, 
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://example.invalid/webhook")
+    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://hooks.slack.com/services/T000/B000/XXX")
 
     runner = CliRunner()
     result = runner.invoke(app, ["profile", "doctor", "--profile", str(profile)])
@@ -1321,7 +1653,7 @@ def test_profile_doctor_passes_when_wiring_is_valid(tmp_path: Path, monkeypatch)
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://example.invalid/webhook")
+    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://hooks.slack.com/services/T000/B000/XXX")
     _set_ssl_cert_file(monkeypatch, tmp_path)
 
     runner = CliRunner()
@@ -1346,7 +1678,7 @@ def test_profile_doctor_can_emit_json_output(tmp_path: Path, monkeypatch) -> Non
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://example.invalid/webhook")
+    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://hooks.slack.com/services/T000/B000/XXX")
     _set_ssl_cert_file(monkeypatch, tmp_path)
 
     runner = CliRunner()
@@ -1382,6 +1714,30 @@ def test_profile_doctor_json_reports_structured_error(tmp_path: Path) -> None:
     assert "is not set or empty" in str(payload["error"])
 
 
+def test_profile_doctor_rejects_non_slack_webhook_for_slack_provider(tmp_path: Path, monkeypatch) -> None:
+    events = tmp_path / "events.log"
+    profile = tmp_path / "notify.profile.json"
+    _write_events(events, [_event()])
+    profile.write_text(
+        json.dumps(
+            {
+                "profile_version": 2,
+                "provider": "slack",
+                "events": str(events),
+                "webhook": {"source": "env", "ref": "DENSEGEN_WEBHOOK"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://example.invalid/webhook")
+    _set_ssl_cert_file(monkeypatch, tmp_path)
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["profile", "doctor", "--profile", str(profile)])
+    assert result.exit_code == 1
+    assert "slack provider requires webhook host" in result.stdout
+
+
 def test_profile_doctor_passes_with_secret_ref_profile(tmp_path: Path, monkeypatch) -> None:
     events = tmp_path / "events.log"
     profile = tmp_path / "notify.profile.json"
@@ -1399,7 +1755,7 @@ def test_profile_doctor_passes_with_secret_ref_profile(tmp_path: Path, monkeypat
         encoding="utf-8",
     )
     monkeypatch.setattr(
-        "dnadesign.notify.validation.resolve_secret_ref", lambda _ref: "https://example.invalid/webhook"
+        "dnadesign.notify.validation.resolve_secret_ref", lambda _ref: "https://hooks.slack.com/services/T000/B000/XXX"
     )
     _set_ssl_cert_file(monkeypatch, tmp_path)
 
@@ -1426,7 +1782,7 @@ def test_profile_doctor_allows_missing_events_when_profile_has_events_source(tmp
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://example.invalid/webhook")
+    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://hooks.slack.com/services/T000/B000/XXX")
     _set_ssl_cert_file(monkeypatch, tmp_path)
 
     runner = CliRunner()
@@ -1452,7 +1808,7 @@ def test_profile_doctor_json_reports_missing_events_as_pending_for_events_source
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://example.invalid/webhook")
+    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://hooks.slack.com/services/T000/B000/XXX")
     _set_ssl_cert_file(monkeypatch, tmp_path)
 
     runner = CliRunner()

@@ -15,11 +15,13 @@ from pathlib import Path
 
 import pytest
 
+import dnadesign.notify.profile_flows as profile_flows_module
 from dnadesign.notify.errors import NotifyConfigError
 from dnadesign.notify.profile_flows import (
     resolve_profile_path_for_setup,
     resolve_profile_path_for_wizard,
     resolve_setup_events,
+    resolve_webhook_config,
 )
 
 
@@ -86,3 +88,39 @@ def test_resolve_setup_events_workspace_mode_resolves_config_before_events(tmp_p
     assert result.policy == "densegen"
     assert result.tool_name == "densegen"
     assert result.events_require_exists is False
+
+
+def test_resolve_webhook_config_file_mode_defaults_to_notify_package_secret_dir() -> None:
+    webhook = resolve_webhook_config(
+        secret_source="file",
+        url_env=None,
+        secret_ref=None,
+        webhook_url=None,
+        store_webhook=False,
+        secret_name="densegen-shared",
+        secret_backend_available_fn=lambda backend: backend == "file",
+    )
+    expected = (
+        Path(profile_flows_module.__file__).resolve().parent
+        / ".secrets"
+        / "densegen-shared.webhook"
+    ).resolve()
+    assert webhook == {"source": "secret_ref", "ref": expected.as_uri()}
+
+
+def test_resolve_webhook_config_auto_file_mode_defaults_to_notify_package_secret_dir() -> None:
+    webhook = resolve_webhook_config(
+        secret_source="auto",
+        url_env=None,
+        secret_ref=None,
+        webhook_url=None,
+        store_webhook=False,
+        secret_name="densegen-shared",
+        secret_backend_available_fn=lambda backend: backend == "file",
+    )
+    expected = (
+        Path(profile_flows_module.__file__).resolve().parent
+        / ".secrets"
+        / "densegen-shared.webhook"
+    ).resolve()
+    assert webhook == {"source": "secret_ref", "ref": expected.as_uri()}
