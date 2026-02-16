@@ -167,6 +167,7 @@ Key options:
 
 Notes:
 - `--output-mode usr|both` seeds `outputs/usr_datasets/registry.yaml` when a seed file is available.
+- `--output-mode usr|both` sets `output.usr.dataset` to the workspace id so each initialized workspace writes to its own USR dataset path.
 
 ## `dense workspace where`
 

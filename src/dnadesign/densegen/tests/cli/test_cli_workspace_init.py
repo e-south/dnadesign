@@ -218,6 +218,30 @@ def test_workspace_init_output_mode_usr_sets_usr_target(tmp_path: Path) -> None:
     assert (tmp_path / "demo_run" / "outputs" / "usr_datasets" / "registry.yaml").exists()
 
 
+def test_workspace_init_output_mode_usr_rewrites_template_usr_dataset_to_workspace_id(tmp_path: Path) -> None:
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "sampling_run",
+            "--root",
+            str(tmp_path),
+            "--from-workspace",
+            "demo_sampling_baseline",
+            "--output-mode",
+            "usr",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    cfg = yaml.safe_load((tmp_path / "sampling_run" / "config.yaml").read_text())
+    output = cfg["densegen"]["output"]
+    assert output["targets"] == ["usr"]
+    assert output["usr"]["dataset"] == "sampling_run"
+
+
 def test_workspace_init_output_mode_both_sets_both_targets(tmp_path: Path) -> None:
     runner = CliRunner()
     result = runner.invoke(
@@ -242,6 +266,30 @@ def test_workspace_init_output_mode_both_sets_both_targets(tmp_path: Path) -> No
     assert output["parquet"]["path"] == "outputs/tables/records.parquet"
     assert output["usr"]["root"] == "outputs/usr_datasets"
     assert (tmp_path / "demo_run" / "outputs" / "usr_datasets" / "registry.yaml").exists()
+
+
+def test_workspace_init_output_mode_both_rewrites_template_usr_dataset_to_workspace_id(tmp_path: Path) -> None:
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "sampling_run",
+            "--root",
+            str(tmp_path),
+            "--from-workspace",
+            "demo_sampling_baseline",
+            "--output-mode",
+            "both",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    cfg = yaml.safe_load((tmp_path / "sampling_run" / "config.yaml").read_text())
+    output = cfg["densegen"]["output"]
+    assert set(output["targets"]) == {"parquet", "usr"}
+    assert output["usr"]["dataset"] == "sampling_run"
 
 
 def test_workspace_init_existing_workspace_dir_shows_actionable_error(tmp_path: Path) -> None:

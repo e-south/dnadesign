@@ -77,8 +77,7 @@ def _apply_output_mode(output: dict, *, run_id: str, output_mode: str) -> dict:
 
     if mode in {"usr", "both"}:
         usr_cfg["root"] = "outputs/usr_datasets"
-        if not str(usr_cfg.get("dataset", "")).strip():
-            usr_cfg["dataset"] = run_id
+        usr_cfg["dataset"] = run_id
         usr_cfg.setdefault("chunk_size", 128)
         usr_cfg.setdefault("allow_overwrite", False)
         out["usr"] = usr_cfg
