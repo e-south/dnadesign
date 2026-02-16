@@ -250,11 +250,11 @@ def test_run_pipeline_fails_when_stage_b_event_emit_fails(tmp_path: Path, monkey
         raise OSError("event stream unavailable")
 
     monkeypatch.setattr(
-        "dnadesign.densegen.src.core.pipeline.orchestrator.StageBSampler",
+        "dnadesign.densegen.src.core.pipeline.stage_b_runtime_runner.StageBSampler",
         _AlwaysResampleSampler,
     )
     monkeypatch.setattr(
-        "dnadesign.densegen.src.core.pipeline.orchestrator._emit_event",
+        "dnadesign.densegen.src.core.pipeline.stage_b_runtime_runner._emit_event",
         _raise_emit_error,
     )
 

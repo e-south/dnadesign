@@ -17,8 +17,8 @@ from types import SimpleNamespace
 import pytest
 from rich.console import Console
 
-from dnadesign.densegen.src.core.pipeline import orchestrator
-from dnadesign.densegen.src.core.pipeline.progress import PlanProgressReporter
+from dnadesign.densegen.src.core.pipeline.progress import PlanProgressReporter, _ScreenDashboard
+from dnadesign.densegen.src.core.pipeline.progress_runtime import _init_progress_settings
 from dnadesign.densegen.src.utils import logging_utils
 
 
@@ -54,7 +54,7 @@ def test_screen_progress_uses_live_dashboard_when_tty(monkeypatch) -> None:
     monkeypatch.setenv("TERM", "xterm-256color")
     monkeypatch.setattr(sys.stdout, "isatty", lambda: True, raising=False)
     monkeypatch.setattr(logging_utils, "_LOGGING_CONSOLE", None, raising=False)
-    settings = orchestrator._init_progress_settings(
+    settings = _init_progress_settings(
         log_cfg=_make_log_cfg(),
         source_label="demo",
         plan_name="demo",
@@ -74,7 +74,7 @@ def test_screen_progress_rejects_dumb_term_for_live_dashboard(monkeypatch) -> No
     monkeypatch.setattr(sys.stdout, "isatty", lambda: True, raising=False)
     monkeypatch.setattr(logging_utils, "_LOGGING_CONSOLE", None, raising=False)
     with pytest.raises(RuntimeError, match="TERM"):
-        orchestrator._init_progress_settings(
+        _init_progress_settings(
             log_cfg=_make_log_cfg(),
             source_label="demo",
             plan_name="demo",
@@ -90,7 +90,7 @@ def test_screen_progress_requires_tty(monkeypatch) -> None:
     monkeypatch.setattr(sys.stdout, "isatty", lambda: False, raising=False)
     monkeypatch.setattr(logging_utils, "_LOGGING_CONSOLE", None, raising=False)
     with pytest.raises(RuntimeError, match="interactive terminal"):
-        orchestrator._init_progress_settings(
+        _init_progress_settings(
             log_cfg=_make_log_cfg(),
             source_label="demo",
             plan_name="demo",
@@ -106,7 +106,7 @@ def test_auto_progress_uses_live_dashboard_when_interactive(monkeypatch) -> None
     monkeypatch.setenv("TERM", "xterm-256color")
     monkeypatch.setattr(sys.stdout, "isatty", lambda: True, raising=False)
     monkeypatch.setattr(logging_utils, "_LOGGING_CONSOLE", None, raising=False)
-    settings = orchestrator._init_progress_settings(
+    settings = _init_progress_settings(
         log_cfg=_make_log_cfg(progress_style="auto"),
         source_label="demo",
         plan_name="demo",
@@ -124,7 +124,7 @@ def test_auto_progress_uses_live_dashboard_when_interactive(monkeypatch) -> None
 def test_auto_progress_downgrades_to_summary_when_non_interactive(monkeypatch) -> None:
     monkeypatch.setattr(sys.stdout, "isatty", lambda: False, raising=False)
     monkeypatch.setattr(logging_utils, "_LOGGING_CONSOLE", None, raising=False)
-    settings = orchestrator._init_progress_settings(
+    settings = _init_progress_settings(
         log_cfg=_make_log_cfg(progress_style="auto", print_visual=False, visuals=None),
         source_label="demo",
         plan_name="demo",
@@ -142,7 +142,7 @@ def test_auto_progress_downgrades_to_stream_for_dumb_term(monkeypatch) -> None:
     monkeypatch.setenv("TERM", "dumb")
     monkeypatch.setattr(sys.stdout, "isatty", lambda: True, raising=False)
     monkeypatch.setattr(logging_utils, "_LOGGING_CONSOLE", None, raising=False)
-    settings = orchestrator._init_progress_settings(
+    settings = _init_progress_settings(
         log_cfg=_make_log_cfg(progress_style="auto", print_visual=False, visuals=None),
         source_label="demo",
         plan_name="demo",
@@ -214,8 +214,8 @@ def test_screen_progress_updates_per_solution_when_visual(monkeypatch) -> None:
 def test_screen_progress_reuses_shared_dashboard(monkeypatch) -> None:
     monkeypatch.setenv("TERM", "xterm-256color")
     monkeypatch.setattr(sys.stdout, "isatty", lambda: True, raising=False)
-    shared = orchestrator._ScreenDashboard(console=Console(), refresh_seconds=1.0)
-    settings_a = orchestrator._init_progress_settings(
+    shared = _ScreenDashboard(console=Console(), refresh_seconds=1.0)
+    settings_a = _init_progress_settings(
         log_cfg=_make_log_cfg(print_visual=False, visuals=None),
         source_label="demo",
         plan_name="plan-a",
@@ -226,7 +226,7 @@ def test_screen_progress_reuses_shared_dashboard(monkeypatch) -> None:
         extra_library_label=None,
         shared_dashboard=shared,
     )
-    settings_b = orchestrator._init_progress_settings(
+    settings_b = _init_progress_settings(
         log_cfg=_make_log_cfg(print_visual=False, visuals=None),
         source_label="demo",
         plan_name="plan-b",
