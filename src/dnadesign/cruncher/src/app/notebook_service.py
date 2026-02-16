@@ -145,9 +145,11 @@ def generate_notebook(
 
 
 def _render_template(default_analysis_id: str | None) -> str:
-    return f"""import marimo as mo
+    return f"""import marimo
 
-app = mo.App(width="full")
+__generated_with = "unknown"
+
+app = marimo.App(width="full")
 
 @app.cell
 def _():
@@ -163,18 +165,18 @@ def _():
 def _(Path, json, mo, refresh_button):
     _ = refresh_button.value
     notebook_path = Path(__file__).resolve()
-    analysis_dir = notebook_path.parent
-    if analysis_dir.name == "analysis":
-        run_dir = analysis_dir.parent
-    elif "_archive" in analysis_dir.parts:
-        parts = analysis_dir.parts
+    current_analysis_dir = notebook_path.parent
+    if current_analysis_dir.name == "analysis":
+        run_dir = current_analysis_dir.parent
+    elif "_archive" in current_analysis_dir.parts:
+        parts = current_analysis_dir.parts
         if "analysis" in parts:
             analysis_idx = parts.index("analysis")
             run_dir = Path(*parts[:analysis_idx])
         else:
-            run_dir = analysis_dir
+            run_dir = current_analysis_dir
     else:
-        run_dir = analysis_dir.parent
+        run_dir = current_analysis_dir.parent
     if not run_dir.exists():
         mo.stop(True, mo.md(f"Run directory not found: {{run_dir}}"))
     analysis_root = run_dir / "analysis"
@@ -186,9 +188,9 @@ def _(Path, json, mo, refresh_button):
     default_id_hint = {default_analysis_id!r}
     default_label = None
     if default_id_hint:
-        for entry in analysis_entries:
-            if entry.get("id") == default_id_hint:
-                default_label = entry.get("label")
+        for analysis_entry in analysis_entries:
+            if analysis_entry.get("id") == default_id_hint:
+                default_label = analysis_entry.get("label")
                 break
     if default_label is None:
         default_label = latest_label
@@ -230,9 +232,9 @@ def _(analysis_labels, default_label, mo):
 
 @app.cell
 def _(analysis_picker, mo, refresh_button):
-    if analysis_picker is None:
-        return None
-    analysis_controls = mo.hstack([analysis_picker, refresh_button])
+    analysis_controls = None
+    if analysis_picker is not None:
+        analysis_controls = mo.hstack([analysis_picker, refresh_button])
     return analysis_controls
 
 
@@ -240,11 +242,11 @@ def _(analysis_picker, mo, refresh_button):
 def _(analysis_entries, analysis_picker, _load_json, Path):
     from dnadesign.cruncher.analysis.layout import summary_path as analysis_summary_path
 
-    selected = analysis_picker.value or ""
-    entry = next((item for item in analysis_entries if item.get("label") == selected), None)
-    analysis_id = entry.get("id") if entry else ""
-    analysis_dir = Path(entry.get("path")) if entry else Path()
-    entry_warnings = entry.get("warnings", []) if entry else []
+    selected_label = analysis_picker.value or ""
+    selected_entry = next((item for item in analysis_entries if item.get("label") == selected_label), None)
+    analysis_id = selected_entry.get("id") if selected_entry else ""
+    analysis_dir = Path(selected_entry.get("path")) if selected_entry else Path()
+    entry_warnings = selected_entry.get("warnings", []) if selected_entry else []
     summary_file = analysis_summary_path(analysis_dir)
     summary, summary_error = _load_json(summary_file, default={{}})
     tf_names = summary.get("tf_names", []) if isinstance(summary, dict) else []
@@ -312,10 +314,10 @@ def _(analysis_dir, mo, pd, table_paths, table_paths_error):
 
 @app.cell
 def _(mo, topk_df):
-    if topk_df.empty:
-        return None
-    max_k = max(1, min(len(topk_df), 50))
-    topk_slider = mo.ui.slider(1, max_k, value=min(10, max_k), label="Top-K")
+    topk_slider = None
+    if not topk_df.empty:
+        max_k = max(1, min(len(topk_df), 50))
+        topk_slider = mo.ui.slider(1, max_k, value=min(10, max_k), label="Top-K")
     return topk_slider
 
 
@@ -332,37 +334,41 @@ def _(topk_df, topk_slider):
 def _(analysis_dir, pd, plot_manifest):
     plot_entries = plot_manifest.get("plots", []) if isinstance(plot_manifest, dict) else []
     rows = []
-    for entry in plot_entries:
-        outputs = []
-        for o in entry.get("outputs", []):
-            path = o.get("path", "") if isinstance(o, dict) else ""
-            full_path = analysis_dir / path if path else None
-            outputs.append(
+    for plot_entry in plot_entries:
+        _outputs = []
+        for raw_output in plot_entry.get("outputs", []):
+            _path = raw_output.get("path", "") if isinstance(raw_output, dict) else ""
+            _full_path = analysis_dir / _path if _path else None
+            _outputs.append(
                 {{
-                    "path": path,
-                    "exists": bool(full_path and full_path.exists()),
+                    "path": _path,
+                    "exists": bool(_full_path and _full_path.exists()),
                 }}
             )
-        manifest_generated = bool(entry.get("generated"))
-        manifest_skipped = bool(entry.get("skipped"))
-        generated = bool(manifest_generated and any(o["exists"] for o in outputs))
-        missing = [o["path"] for o in outputs if manifest_generated and not o["exists"] and o.get("path")]
+        manifest_generated = bool(plot_entry.get("generated"))
+        manifest_skipped = bool(plot_entry.get("skipped"))
+        generated = bool(manifest_generated and any(output["exists"] for output in _outputs))
+        _missing_outputs = [
+            output["path"]
+            for output in _outputs
+            if manifest_generated and not output["exists"] and output.get("path")
+        ]
         rows.append(
             dict(
-                key=entry.get("key"),
-                label=entry.get("label"),
-                group=entry.get("group"),
+                key=plot_entry.get("key"),
+                label=plot_entry.get("label"),
+                group=plot_entry.get("group"),
                 manifest_generated=manifest_generated,
                 skipped=manifest_skipped,
                 generated=generated,
-                skip_reason=entry.get("skip_reason"),
-                missing_outputs="; ".join(missing),
-                outputs="; ".join([o.get("path", "") for o in outputs if o.get("path")]),
+                skip_reason=plot_entry.get("skip_reason"),
+                missing_outputs="; ".join(_missing_outputs),
+                outputs="; ".join([output.get("path", "") for output in _outputs if output.get("path")]),
             )
         )
-        entry["outputs"] = outputs
-        entry["missing_outputs"] = missing
-        entry["generated"] = generated
+        plot_entry["outputs"] = _outputs
+        plot_entry["missing_outputs"] = _missing_outputs
+        plot_entry["generated"] = generated
     plot_df = pd.DataFrame(rows) if rows else pd.DataFrame()
     plot_options = (
         dict((f"{{e.get('label')}} ({{e.get('key')}})", e.get("key")) for e in plot_entries)
@@ -384,67 +390,72 @@ def _(default_key, mo, plot_options):
 @app.cell
 def _(analysis_dir, mo, plot_entries, plot_picker):
     plot_key = plot_picker.value if plot_picker else None
-    selected = next((p for p in plot_entries if p.get("key") == plot_key), None)
-    if not selected:
-        return None, mo.md("No plot metadata available.")
-    blocks = [
-        mo.md(
-            f"### {{selected.get('label')}} (`{{selected.get('key')}}`)\\n\\n"
-            f"{{selected.get('description', '')}}"
-        )
-    ]
-    requires = selected.get("requires", [])
-    if requires:
-        blocks.append(mo.md("Requires: " + ", ".join(requires)))
-    outputs = selected.get("outputs", [])
-    if outputs:
-        lines = []
-        for output in outputs:
-            path = output.get("path", "")
-            full_path = analysis_dir / path if path else None
-            exists = bool(full_path and full_path.exists())
-            lines.append(f"- {{path}} ({{'ok' if exists else 'missing'}})")
-        blocks.append(mo.md("Outputs:\\n" + "\\n".join(lines)))
-    missing = selected.get("missing_outputs", [])
-    if missing:
-        blocks.append(mo.md("Missing outputs: " + ", ".join(missing)))
+    selected_plot = next((plot_entry for plot_entry in plot_entries if plot_entry.get("key") == plot_key), None)
+    plot_preview = mo.md("No plot metadata available.")
+    if selected_plot:
+        _plot_blocks = [
+            mo.md(
+                f"### {{selected_plot.get('label')}} (`{{selected_plot.get('key')}}`)\\n\\n"
+                f"{{selected_plot.get('description', '')}}"
+            )
+        ]
+        requires = selected_plot.get("requires", [])
+        if requires:
+            _plot_blocks.append(mo.md("Requires: " + ", ".join(requires)))
+        _outputs = selected_plot.get("outputs", [])
+        if _outputs:
+            lines = []
+            for output in _outputs:
+                _path = output.get("path", "")
+                _full_path = analysis_dir / _path if _path else None
+                exists = bool(_full_path and _full_path.exists())
+                lines.append(f"- {{_path}} ({{'ok' if exists else 'missing'}})")
+            _plot_blocks.append(mo.md("Outputs:\\n" + "\\n".join(lines)))
+        _missing_outputs = selected_plot.get("missing_outputs", [])
+        if _missing_outputs:
+            _plot_blocks.append(mo.md("Missing outputs: " + ", ".join(_missing_outputs)))
 
-    for output in outputs:
-        path = output.get("path", "")
-        if not path:
-            continue
-        full_path = analysis_dir / path
-        if full_path.exists() and full_path.suffix.lower() in {".png", ".jpg", ".jpeg"}:
-            blocks.append(mo.image(full_path))
-            continue
-        if full_path.exists() and full_path.suffix.lower() in {".txt", ".log"}:
-            try:
-                text = full_path.read_text()
-            except Exception as exc:
-                blocks.append(mo.md(f"Failed to read {{path}}: {{exc}}"))
-            else:
-                max_chars = 4000
-                preview = text
-                truncated = False
-                if len(preview) > max_chars:
-                    preview = preview[:max_chars]
-                    truncated = True
-                blocks.append(mo.md(f"**Text output:** {{path}}"))
-                if truncated:
-                    blocks.append(mo.md("_preview truncated_"))
-                blocks.append(mo.md("```\\n" + preview + "\\n```"))
-    plot_preview = mo.vstack(blocks)
-    return selected, plot_preview
+        for output in _outputs:
+            _path = output.get("path", "")
+            if not _path:
+                continue
+            _full_path = analysis_dir / _path
+            if _full_path.exists() and _full_path.suffix.lower() in {".png", ".jpg", ".jpeg"}:
+                _plot_blocks.append(mo.image(_full_path))
+                continue
+            if _full_path.exists() and _full_path.suffix.lower() in {".txt", ".log"}:
+                try:
+                    text = _full_path.read_text()
+                except Exception as exc:
+                    _plot_blocks.append(mo.md(f"Failed to read {{_path}}: {{exc}}"))
+                else:
+                    max_chars = 4000
+                    preview = text
+                    truncated = False
+                    if len(preview) > max_chars:
+                        preview = preview[:max_chars]
+                        truncated = True
+                    _plot_blocks.append(mo.md(f"**Text output:** {{_path}}"))
+                    if truncated:
+                        _plot_blocks.append(mo.md("_preview truncated_"))
+                    _plot_blocks.append(mo.md("```\\n" + preview + "\\n```"))
+        plot_preview = mo.vstack(_plot_blocks)
+    return selected_plot, plot_preview
 
 
 @app.cell
 def _(analysis_dir, manifest, run_dir):
     artifacts = manifest.get("artifacts", []) if isinstance(manifest, dict) else []
+    filtered_artifacts = artifacts
     try:
         prefix = str(analysis_dir.relative_to(run_dir)).rstrip("/") + "/"
     except Exception:
-        return artifacts
-    return [a for a in artifacts if isinstance(a, dict) and str(a.get("path", "")).startswith(prefix)]
+        pass
+    else:
+        filtered_artifacts = [
+            a for a in artifacts if isinstance(a, dict) and str(a.get("path", "")).startswith(prefix)
+        ]
+    return filtered_artifacts
 
 
 @app.cell
@@ -511,11 +522,11 @@ def _(
 
 @app.cell
 def _(analysis_controls, mo, overview_md):
-    blocks = []
+    overview_blocks = []
     if analysis_controls is not None:
-        blocks.append(analysis_controls)
-    blocks.append(overview_md)
-    overview_block = mo.vstack(blocks)
+        overview_blocks.append(analysis_controls)
+    overview_blocks.append(overview_md)
+    overview_block = mo.vstack(overview_blocks)
     return overview_block
 
 
@@ -530,33 +541,33 @@ def _(
     topk_slider,
     topk_view,
 ):
-    blocks = []
+    tables_blocks = []
     if summary_df.empty:
-        blocks.append(mo.md("No summary table found."))
+        tables_blocks.append(mo.md("No summary table found."))
     else:
-        blocks.append(mo.ui.dataframe(summary_df))
+        tables_blocks.append(mo.ui.dataframe(summary_df))
     if joint_metrics_df.empty:
-        blocks.append(mo.md("No joint metrics table found."))
+        tables_blocks.append(mo.md("No joint metrics table found."))
     else:
-        blocks.append(mo.ui.dataframe(joint_metrics_df))
+        tables_blocks.append(mo.ui.dataframe(joint_metrics_df))
     if topk_slider is not None:
-        blocks.append(topk_slider)
+        tables_blocks.append(topk_slider)
     if not topk_view.empty:
-        blocks.append(mo.ui.dataframe(topk_view))
-    blocks.append(mo.md(f"Summary table: {{summary_table_path}}"))
-    blocks.append(mo.md(f"Joint metrics table: {{joint_metrics_path}}"))
-    blocks.append(mo.md(f"Top-K table: {{topk_path}}"))
-    tables_block = mo.vstack(blocks)
+        tables_blocks.append(mo.ui.dataframe(topk_view))
+    tables_blocks.append(mo.md(f"Summary table: {{summary_table_path}}"))
+    tables_blocks.append(mo.md(f"Joint metrics table: {{joint_metrics_path}}"))
+    tables_blocks.append(mo.md(f"Top-K table: {{topk_path}}"))
+    tables_block = mo.vstack(tables_blocks)
     return tables_block
 
 
 @app.cell
 def _(mo, plot_df, plot_preview):
-    blocks = []
+    plots_blocks = []
     if not plot_df.empty:
-        blocks.append(mo.ui.dataframe(plot_df))
-    blocks.append(plot_preview)
-    plots_block = mo.vstack(blocks)
+        plots_blocks.append(mo.ui.dataframe(plot_df))
+    plots_blocks.append(plot_preview)
+    plots_block = mo.vstack(plots_blocks)
     return plots_block
 
 
