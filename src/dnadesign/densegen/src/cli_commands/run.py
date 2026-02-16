@@ -505,6 +505,42 @@ def _handle_run_runtime_error(
             "no need to run `uv run dense stage-b build-libraries`"
         )
         raise typer.Exit(code=1)
+    if "Exceeded max_seconds_per_plan=" in message:
+        console.print(f"[bold red]{message}[/]")
+        console.print("[bold]Next steps[/]:")
+        inspect_cmd = context.workspace_command(
+            "dense inspect run --events --library",
+            cfg_path=cfg_path,
+            run_root=run_root,
+        )
+        console.print(f"  - {inspect_cmd}")
+        console.print("  - increase densegen.runtime.max_seconds_per_plan")
+        console.print("  - or reduce generation.plan[].quota / Stage-B complexity")
+        raise typer.Exit(code=1)
+    if "Exceeded max_consecutive_failures=" in message or "Exceeded max_failed_solutions=" in message:
+        console.print(f"[bold red]{message}[/]")
+        console.print("[bold]Next steps[/]:")
+        inspect_cmd = context.workspace_command(
+            "dense inspect run --events --library",
+            cfg_path=cfg_path,
+            run_root=run_root,
+        )
+        console.print(f"  - {inspect_cmd}")
+        console.print("  - increase densegen.runtime.max_consecutive_failures or max_failed_solutions")
+        console.print("  - or relax constraints / lower quota for the affected plan")
+        raise typer.Exit(code=1)
+    if "sequence validation failed and runtime.max_failed_solutions=0" in message:
+        console.print(f"[bold red]{message}[/]")
+        console.print("[bold]Next steps[/]:")
+        inspect_cmd = context.workspace_command(
+            "dense inspect run --events --library",
+            cfg_path=cfg_path,
+            run_root=run_root,
+        )
+        console.print(f"  - {inspect_cmd}")
+        console.print("  - keep strict behavior and adjust motif/placement constraints for feasibility")
+        console.print("  - or set densegen.runtime.max_failed_solutions > 0 to allow bounded retries")
+        raise typer.Exit(code=1)
     raise exc
 
 

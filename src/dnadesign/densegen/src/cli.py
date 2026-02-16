@@ -773,8 +773,12 @@ def _warn_full_pool_strategy(loaded) -> None:
         "max_sites_per_regulator",
         "relax_on_exhaustion",
     ]
+    explicitly_set = set(getattr(sampling, "model_fields_set", set()))
+    ignored_set = [name for name in ignored if name in explicitly_set]
+    if not ignored_set:
+        return
     console.print(
-        "[yellow]Warning:[/] pool_strategy=full uses the entire input library; " + ", ".join(ignored) + " are ignored."
+        "[yellow]Warning:[/] pool_strategy=full ignores explicitly set sampling keys: " + ", ".join(ignored_set) + "."
     )
 
 

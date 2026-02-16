@@ -16,6 +16,7 @@ import textwrap
 from contextlib import contextmanager
 from pathlib import Path
 
+import yaml
 from typer.testing import CliRunner
 
 from dnadesign.densegen.src.cli import app
@@ -76,6 +77,43 @@ def _write_min_config(path: Path) -> None:
         ).strip()
         + "\n"
     )
+
+
+def _write_full_pool_config(path: Path, *, explicit_ignored_keys: bool) -> None:
+    sampling_cfg = {
+        "pool_strategy": "full",
+    }
+    if explicit_ignored_keys:
+        sampling_cfg["library_size"] = 3
+        sampling_cfg["relax_on_exhaustion"] = False
+
+    payload = {
+        "densegen": {
+            "schema_version": "2.9",
+            "run": {"id": "demo", "root": "."},
+            "inputs": [{"name": "demo", "type": "binding_sites", "path": "inputs.csv"}],
+            "output": {
+                "targets": ["parquet"],
+                "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+                "parquet": {"path": "outputs/tables/records.parquet"},
+            },
+            "generation": {
+                "sequence_length": 10,
+                "sampling": sampling_cfg,
+                "plan": [
+                    {
+                        "name": "default",
+                        "quota": 1,
+                        "sampling": {"include_inputs": ["demo"]},
+                        "regulator_constraints": {"groups": []},
+                    }
+                ],
+            },
+            "solver": {"backend": "CBC", "strategy": "iterate"},
+            "logging": {"log_dir": "outputs/logs"},
+        }
+    }
+    path.write_text(yaml.safe_dump(payload, sort_keys=False))
 
 
 def test_validate_accepts_config_after_command(tmp_path: Path) -> None:
@@ -153,3 +191,25 @@ def test_validate_probe_solver_failure_reports_actionable_error(tmp_path: Path, 
     assert "Solver probe failed" in result.output
     assert "set densegen.solver.backend" in result.output
     assert "Traceback" not in result.output
+
+
+def test_validate_full_pool_without_explicit_ignored_keys_has_no_warning(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    _write_full_pool_config(cfg_path, explicit_ignored_keys=False)
+    runner = CliRunner()
+    result = runner.invoke(app, ["validate-config", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    assert "Config is valid" in result.output
+    assert "pool_strategy=full ignores explicitly set sampling keys" not in result.output
+
+
+def test_validate_full_pool_with_explicit_ignored_keys_warns(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    _write_full_pool_config(cfg_path, explicit_ignored_keys=True)
+    runner = CliRunner()
+    result = runner.invoke(app, ["validate-config", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    assert "Config is valid" in result.output
+    assert "pool_strategy=full ignores explicitly set sampling keys" in result.output
+    assert "library_size" in result.output
+    assert "relax_on_exhaustion" in result.output

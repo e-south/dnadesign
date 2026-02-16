@@ -24,10 +24,8 @@ densegen:
     sequence_length: 60
     sampling:
       pool_strategy: full
-      library_size: 3
       unique_binding_sites: true
       unique_binding_cores: true
-      relax_on_exhaustion: false
     plan:
       - name: baseline
         quota: 9

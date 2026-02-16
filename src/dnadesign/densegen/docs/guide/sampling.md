@@ -169,6 +169,9 @@ Key control is `densegen.generation.sampling.pool_strategy`:
 - `subsample`: build libraries of `library_size` from the pool and offer them to the solver.
 - `iterative_subsample`: repeatedly rebuild libraries within runtime caps (best for large pools).
 
+When `pool_strategy: full`, avoid setting `library_size`, `library_sampling_strategy`,
+`cover_all_regulators`, `max_sites_per_regulator`, or `relax_on_exhaustion`; they do not apply.
+
 Additional Stage-B controls that commonly affect "it fails vs it works":
 
 - **Uniqueness + exhaustion**
