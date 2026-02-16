@@ -2,6 +2,13 @@
 
 Selection plugins convert selected score/uncertainty channels into ranking decisions.
 
+## Strategy comparison
+
+| Strategy | Inputs | Behavior | Typical pairing |
+| --- | --- | --- | --- |
+| `top_n` | `score_ref` | Deterministic rank-by-score | RF + SFXI, GP + SFXI |
+| `expected_improvement` | `score_ref` + `uncertainty_ref` | Acquisition ranking (exploration/exploitation) | GP + SFXI |
+
 ## Runtime contract
 
 ```python

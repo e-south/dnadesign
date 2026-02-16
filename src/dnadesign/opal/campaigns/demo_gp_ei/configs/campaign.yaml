@@ -79,7 +79,4 @@ safety:
   write_back_requires_columns_present: true
   accept_x_mismatch: false
 
-metadata:
-  notes: "Campaign-scoped demo for GP + SFXI + expected_improvement."
-
 plot_config: plots.yaml

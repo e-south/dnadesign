@@ -85,11 +85,6 @@ class SafetyBlock:
 
 
 @dataclass
-class MetadataBlock:
-    notes: str = ""
-
-
-@dataclass
 class CampaignBlock:
     name: str
     slug: str
@@ -107,5 +102,4 @@ class RootConfig:
     ingest: IngestBlock
     scoring: ScoringBlock
     safety: SafetyBlock
-    metadata: MetadataBlock
     plot_config: Optional[str] = None

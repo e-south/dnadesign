@@ -1,239 +1,102 @@
 ## OPAL — Optimization with Active Learning
 
-**OPAL** is an [EVOLVEpro-style](https://www.science.org/doi/10.1126/science.adr6006) active-learning engine for biological sequence design.
+**OPAL** is an active-learning engine for biological sequence design.
 
-- **Train** a top-layer regressor on your chosen representation **X** and label **Y**.
-- **Predict** every candidate sample with **X** present.
-- **Evaluate** configured **objectives** into named score/uncertainty channels (for example `sfxi_v1/sfxi`).
-- **Select** top-k using explicit channel refs (`selection.params.score_ref`, optional `uncertainty_ref`).
-- **Append** runtime events to **ledger sinks** under **`outputs/`** (per-round predictions + run metadata).
-- **Persist** artifacts per round (model, selection CSV, round context, objective meta, logs) for auditability.
+It runs a strict, auditable round loop:
 
-The pipeline is plugin-driven: swap **data transforms** (X/Y), **models**, **objectives**, and **selection** strategies in `configs/campaign.yaml` without touching core code.
+1. ingest labels,
+2. train a model,
+3. evaluate objective channels,
+4. select candidates,
+5. persist artifacts + ledger events.
 
-> Using OPAL day-to-day? See the **[CLI Manual](./docs/reference/cli.md)**
+The pipeline is plugin-driven (`transforms_x`, `transforms_y`, `model`, `objectives`, `selection`) so behavior is configured in YAML rather than hardcoded.
 
----
-
-### Contents
-
-* [Quick start](#quick-start)
-* [What gets saved](#what-gets-saved)
-* [How OPAL is wired](#how-opal-is-wired)
-* [Campaign layout](#campaign-layout)
-* [Docs map](#docs-map)
-* [Demo campaign](#demo-campaign)
-
-
----
-
-### Quick start
-
-OPAL lives inside the `dnadesign` repo. The CLI entrypoint is defined in `pyproject.toml`:
-
-```toml
-[project.scripts]
-opal = "dnadesign.opal.src.cli:main"
-```
+## Quick start (5 commands)
 
 ```bash
-# 1) Initialize a campaign workspace (creates inputs/, outputs/, state.json, and .opal/config marker)
+# 1) Initialize campaign workspace
 uv run opal init -c path/to/configs/campaign.yaml
 
-# 2) Validate essentials + X + (if present) Y shape/values
+# 2) Validate config + records contracts
 uv run opal validate -c path/to/configs/campaign.yaml
 
-# 3) Ingest experimental labels (CSV/Parquet → Y), preview, then write new columns to X dataset
-uv run opal ingest-y -c path/to/configs/campaign.yaml --round 0 --csv path/to/my_labels.csv
+# 3) Ingest labels for observed round 0
+uv run opal ingest-y -c path/to/configs/campaign.yaml --round 0 --csv path/to/labels.csv --apply
 
-# 4) Train on labels with observed_round ≤ R, score the pool, select top-k, persist artifacts & events
+# 4) Train/score/select using labels with observed_round <= 0
 uv run opal run -c path/to/configs/campaign.yaml --round 0
 
-# 5) Inspect progress
+# 5) Inspect status and verify outputs
 uv run opal status -c path/to/configs/campaign.yaml
-uv run opal status -c path/to/configs/campaign.yaml --with-ledger
-uv run opal runs list -c path/to/configs/campaign.yaml
-uv run opal log -c path/to/configs/campaign.yaml --round latest
-uv run opal record-show -c path/to/configs/campaign.yaml --id <some_id>
-uv run opal explain -c path/to/configs/campaign.yaml --round 1
-uv run opal plot --list                                           # list available plot kinds
-uv run opal plot -c path/to/configs/campaign.yaml
-uv run opal plot -c path/to/configs/campaign.yaml --run-id <run_id>  # run-aware; resolves round, conflicts error
-uv run opal predict -c path/to/configs/campaign.yaml --out path/to/predictions.parquet
-uv run opal objective-meta -c path/to/configs/campaign.yaml --round latest
 uv run opal verify-outputs -c path/to/configs/campaign.yaml --round latest
-uv run opal notebook -c path/to/configs/campaign.yaml             # list notebooks / nudge next step
-uv run opal notebook generate -c path/to/configs/campaign.yaml --round latest
-uv run opal notebook generate -c path/to/configs/campaign.yaml --name my_analysis --no-validate
-uv run opal notebook run -c path/to/configs/campaign.yaml
-
-# (Optional) Start fresh: remove OPAL-derived columns from records.parquet
-uv run opal prune-source -c path/to/configs/campaign.yaml --scope campaign
 ```
 
-If you run commands from outside this repo checkout, use:
+Use `uv run opal --help` for command inventory.
 
-```bash
-uv run --project /path/to/dnadesign opal --help
-```
+## Demo flows
 
-**Round terminology**
+Use campaign-scoped demos for end-to-end workflows:
 
-- **observed_round**: the round stamp recorded when labels are ingested (`opal ingest-y`).
-- **labels-as-of**: the training cutoff used by `opal run`/`opal explain` (uses labels with `observed_round ≤ R`).
+| Flow | Campaign | Guide |
+| --- | --- | --- |
+| RF + SFXI + top_n | `src/dnadesign/opal/campaigns/demo_rf_sfxi_topn/` | [RF + SFXI + top_n](./docs/guides/demos/rf-sfxi-topn.md) |
+| GP + SFXI + top_n | `src/dnadesign/opal/campaigns/demo_gp_topn/` | [GP + SFXI + top_n](./docs/guides/demos/gp-sfxi-topn.md) |
+| GP + SFXI + expected_improvement | `src/dnadesign/opal/campaigns/demo_gp_ei/` | [GP + SFXI + expected_improvement](./docs/guides/demos/gp-sfxi-ei.md) |
 
-### What gets saved
+For the matrix runner and flow index, see [`docs/guides/demos/README.md`](./docs/guides/demos/README.md).
 
-* **Per-round**
-  - `outputs/rounds/round_<k>/`
-    - `model/`
-      - `model.joblib`
-      - `model_meta.json` *(includes training__y_ops when configured)*
-      - `feature_importance.csv`
-    - `selection/`
-      - `selection_top_k.csv`
-      - `selection_top_k__run_<run_id>.csv` *(immutable per-run copy)*
-    - `labels/`
-      - `labels_used.parquet`
-    - `metadata/`
-      - `round_ctx.json` *(runtime audit & fitted Y-ops)*
-      - `objective_meta.json` *(objective mode/params/keys)*
-    - `logs/`
-      - `round.log.jsonl`
+## Mental model
 
-* **Campaign-wide ledger (append-only)**
+- `transforms_y` is ingest-time only: table -> canonical `y` labels.
+- `transforms_x` is train/predict-time: stored X representation -> numeric model matrix.
+- Objectives emit **named score/uncertainty channels**.
+- Selection consumes explicit channel refs (`score_ref`, optional `uncertainty_ref`).
+- Ledger sinks under `outputs/ledger/` are append-only and run-aware.
 
-  * `outputs/ledger/runs.parquet`
-    - Plugin configs, counts, objective summaries, artifact hashes, versions.
-  * `outputs/ledger/predictions/`
-    - Ŷ vector, selected score/channel refs, optional selected uncertainty/channel ref, selection rank/flag, and row-level diagnostics.
-    - Channel payloads are persisted under `pred__score_channels` and `pred__uncertainty_channels`.
-    - `pred__y_hat_model` is in objective-space.
-  * `outputs/ledger/labels.parquet`
-    - 1 row per label event (observed round, id, y).
+## Artifacts and ledgers
 
-Schemas are **append-only**; uniqueness is enforced for: `run_id` (runs), `(run_id,id)` (predictions). Labels are event rows; exact duplicates are de‑duplicated, but distinct sources for the same `(observed_round,id)` are preserved.
+Per round (`outputs/rounds/round_<k>/`):
 
-**state.json** tracks campaign state per round, including `run_id` and `round_log_jsonl` paths for auditability.
+- `model/model.joblib`, `model/model_meta.json`
+- `selection/selection_top_k.csv`
+- `labels/labels_used.parquet`
+- `metadata/round_ctx.json`, `metadata/objective_meta.json`
+- `logs/round.log.jsonl`
 
----
+Campaign-wide ledgers (`outputs/ledger/`):
 
-## How OPAL is wired
+- `labels.parquet` (`label` events)
+- `predictions/` (`run_pred` events)
+- `runs.parquet` (`run_meta` events)
 
-At the top level, OPAL is a CLI (Typer) over an application layer with plugin registries.
+## Campaign layout
 
-### Code layout
-
-```
-src/dnadesign/opal/src/
-├─ cli/                     # CLI app + command registry
-│  ├─ app.py                # Typer entrypoint
-│  ├─ registry.py           # auto-discovers and mounts commands
-│  └─ commands/             # run, ingest_y, predict, explain, record_show, status, runs, log, validate, init, plot, prune_source
-├─ config/                  # YAML loader + plugin param schemas (Pydantic)
-├─ registries/              # transforms_x, transforms_y, models, objectives, selection, plots
-├─ transforms_x/            # X transforms (import = register)
-├─ transforms_y/            # Y ingests (import = register)
-├─ models/                  # model wrappers (e.g., RandomForest)
-├─ objectives/              # objective fns (Ŷ → named score/uncertainty channels + diagnostics)
-├─ selection/               # selection strategies (selected score/uncertainty channel → ranks/selected)
-├─ plots/                   # plot plugins
-├─ core/                    # RoundCtx, console helpers, core utils/errors
-├─ runtime/                 # run_round, ingest, predict, explain, preflight, round_plan
-├─ storage/                 # data_access, ledger, artifacts, writebacks, workspace, state, locks
-├─ reporting/               # status, summary, record_show
-├─ analysis/                # analysis utilities (dashboard modules under analysis/dashboard)
-└─ …
-```
-
-Dashboard notebooks (e.g., `prom60_eda.py`) now pull their shared logic from
-`src/dnadesign/opal/src/analysis/dashboard/` to keep data contracts explicit and reusable for future dashboards.
-
----
-
-### Campaign layout
-
-`opal init` scaffolds a campaign folder and ensures the label history column exists in `records.parquet`. Edit
-`configs/campaign.yaml` to define behavior.
-
-```
-<repo>/src/dnadesign/opal/campaigns/<my_campaign>/
-├─ configs/
-│  ├─ campaign.yaml
-│  └─ plots.yaml                  # optional plot config (recommended)
-├─ .opal/
-│  └─ config                     # auto-discovery marker (path to configs/campaign.yaml)
+```text
+src/dnadesign/opal/campaigns/<campaign>/
+├─ configs/campaign.yaml
 ├─ records.parquet
 ├─ state.json
-├─ inputs/                       # drop experimental label files here
 └─ outputs/
-   ├─ ledger/
-   │  ├─ predictions/            # append-only run_pred parts
-   │  ├─ runs.parquet            # run_meta (deduped)
-   │  └─ labels.parquet          # label events (ingest-only)
-   └─ rounds/
-      └─ round_<k>/
-         ├─ model/
-         │  ├─ model.joblib
-         │  └─ model_meta.json
-         ├─ selection/
-         │  └─ selection_top_k.csv
-         ├─ labels/
-         │  └─ labels_used.parquet
-         ├─ metadata/
-         │  ├─ round_ctx.json
-         │  └─ objective_meta.json
-         └─ logs/
-            └─ round.log.jsonl
 ```
 
-> **Note:** sequences may live in USR datasets under `src/dnadesign/usr/datasets/<dataset>/records.parquet` and are not copied into campaigns.
+## Documentation map
 
----
+Use [`docs/README.md`](./docs/README.md) as the docs hub.
 
-### Docs map
+- Concepts
+  - [Architecture](./docs/concepts/architecture.md)
+  - [RoundCtx](./docs/concepts/roundctx.md)
+  - [Strategy matrix](./docs/concepts/strategy-matrix.md)
+- References
+  - [Configuration](./docs/reference/configuration.md)
+  - [Data contracts](./docs/reference/data-contracts.md)
+  - [CLI](./docs/reference/cli.md)
+  - [Plots](./docs/reference/plots.md)
+  - [Plugin docs](./docs/reference/plugins/)
+- Objectives
+  - [SFXI objective math](./docs/objectives/sfxi.md)
 
-Core docs now live under `src/dnadesign/opal/docs/` with explicit concept/reference separation:
+## Config resolution
 
-* Docs hub: [`docs/README.md`](./docs/README.md)
-* Concepts:
-  * [`docs/concepts/architecture.md`](./docs/concepts/architecture.md)
-  * [`docs/concepts/roundctx.md`](./docs/concepts/roundctx.md)
-* Reference:
-  * [`docs/reference/configuration.md`](./docs/reference/configuration.md)
-  * [`docs/reference/data-contracts.md`](./docs/reference/data-contracts.md)
-  * [`docs/reference/cli.md`](./docs/reference/cli.md)
-  * [`docs/reference/plots.md`](./docs/reference/plots.md)
-  * [`docs/reference/plugins/models.md`](./docs/reference/plugins/models.md)
-  * [`docs/reference/plugins/selection.md`](./docs/reference/plugins/selection.md)
-  * [`docs/reference/plugins/transforms-x.md`](./docs/reference/plugins/transforms-x.md)
-  * [`docs/reference/plugins/transforms-y.md`](./docs/reference/plugins/transforms-y.md)
-* Objective math references:
-  * [`docs/objectives/sfxi.md`](./docs/objectives/sfxi.md)
-  * [`docs/objectives/spop.md`](./docs/objectives/spop.md)
-* Demo:
-  * [`docs/guides/demos/README.md`](./docs/guides/demos/README.md)
-  * [`docs/guides/demo-sfxi.md`](./docs/guides/demo-sfxi.md)
-* Internal notes:
-  * [`docs/internal/journal.md`](./docs/internal/journal.md)
-  * [`docs/internal/prom60_sfxi_diagnostics_plots.md`](./docs/internal/prom60_sfxi_diagnostics_plots.md)
-
----
-
-## More documentation
-
-Use the docs hub for task-oriented navigation: [`docs/README.md`](./docs/README.md).
-
-## Demo campaigns
-
-Campaign-scoped demo flows:
-
-- RF + SFXI + top_n: `src/dnadesign/opal/campaigns/demo_rf_sfxi_topn/`
-- GP + SFXI + top_n: `src/dnadesign/opal/campaigns/demo_gp_topn/`
-- GP + SFXI + expected_improvement: `src/dnadesign/opal/campaigns/demo_gp_ei/`
-
-Start from the **[Demo flow index](./docs/guides/demos/README.md)**, then follow the flow-specific guide with sequential commands.
-
----
-
-@e-south
+Pass `--config` explicitly, or set `OPAL_CONFIG` in your shell/CI environment.

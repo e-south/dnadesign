@@ -29,7 +29,6 @@ from .types import (
     IngestBlock,
     LocationLocal,
     LocationUSR,
-    MetadataBlock,
     ObjectivesBlock,
     PluginRef,
     RootConfig,
@@ -143,11 +142,6 @@ class PSafety(BaseModel):
     accept_x_mismatch: bool = False
 
 
-class PMetadata(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    notes: str = ""
-
-
 class PRoot(BaseModel):
     model_config = ConfigDict(extra="forbid")
     campaign: PCampaign
@@ -161,7 +155,6 @@ class PRoot(BaseModel):
     ingest: PIngest = Field(default_factory=PIngest)
     scoring: PScoring = Field(default_factory=PScoring)
     safety: PSafety = Field(default_factory=PSafety)
-    metadata: PMetadata = Field(default_factory=PMetadata)
     plot_config: Optional[str] = None
     plot_defaults: Dict[str, Any] = Field(default_factory=dict)
     plot_presets: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
@@ -173,7 +166,7 @@ def _require_registered_plugin(*, category: str, name: str, available: set[str])
     if name in available:
         return
     avail = ", ".join(sorted(available))
-    raise ConfigError(f"Unknown {category} plugin '{name}'. Available: [{avail}]")
+    raise ConfigError(f"Unknown {category} plugin '{name}'. Available plugins: {avail}")
 
 
 def _validate_registered_plugin_names(pyd: PRoot) -> None:
@@ -310,7 +303,6 @@ def load_config(path: Path | str) -> RootConfig:
         ingest=ingest_dc,
         scoring=scoring_dc,
         safety=safety_dc,
-        metadata=MetadataBlock(notes=pyd.metadata.notes),
         plot_config=(_abs(pyd.plot_config) if pyd.plot_config else None),
     )
     return root

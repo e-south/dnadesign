@@ -57,7 +57,7 @@ plots:
 
     # Opaque, plugin-specific params (required for plot knobs)
     params:
-      score_field: "score_sfxi"       # required by the starter plugin
+      score_field: "pred__score_selected"  # default selected score field from run_pred
       hue: null                       # or "round"
       highlight_selected: false
 
@@ -78,6 +78,7 @@ plots:
 
 **Notes:**
 - Plotting knobs must live under `params:`. Top‑level plotting keys are rejected.
+- `scatter_score_vs_rank` should use `pred__score_selected` unless you intentionally target another ledger metric.
 - Use `enabled: false` to keep a plot entry without running it.
 - Presets merge into each plot entry; entry values override preset values.
 - Inline `plots:` in campaign.yaml is still supported, but `plot_config` keeps runtime config lean.
@@ -103,6 +104,11 @@ These plots reuse shared SFXI math and are safe to run without retraining.
 Diagnostic plots always render the full dataset; sampling parameters are not supported.
 
 ### Plot kinds + params
+
+- **`feature_importance_bars`**: overlays per-round model feature importances from
+  `outputs/rounds/round_<k>/model/feature_importance.csv`.
+  - params: `order_policy` (`preserve|sort_index`), `alpha`, `figsize_in`
+  - requires feature importance artifacts (for example RF with `emit_feature_importance: true`)
 
 - **`sfxi_factorial_effects`**: factorial-effects map from predicted logic vectors.
   - params: `size_by` (default `obj__effect_scaled`), `include_labels`, `rasterize_at`

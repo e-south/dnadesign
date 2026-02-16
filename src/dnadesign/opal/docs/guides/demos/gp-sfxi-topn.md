@@ -2,46 +2,76 @@
 
 ### Intent
 
-Use this flow when you want Gaussian Process modeling but deterministic top-k selection:
+Use this flow when you want GP modeling with deterministic selection:
 
 - model: `gaussian_process`
 - objective: `sfxi_v1`
 - selection: `top_n`
 
-This isolates model-side uncertainty estimation while keeping selection behavior simple.
+Reference docs:
+
+- [Configuration](../../reference/configuration.md)
+- [Model plugins](../../reference/plugins/models.md)
+- [Selection plugins](../../reference/plugins/selection.md)
 
 ### Campaign
 
 - `src/dnadesign/opal/campaigns/demo_gp_topn/`
 
-### End-to-end commands
+### Guided runbook
+
+Generate a campaign-specific guided runbook before executing commands:
+
+```bash
+cd src/dnadesign/opal/campaigns/demo_gp_topn
+uv run opal guide -c configs/campaign.yaml --format markdown
+uv run opal guide next -c configs/campaign.yaml --labels-as-of 0
+```
+
+### End-to-end commands (round 0 + inspection)
 
 Run from repo root:
 
 ```bash
 cd src/dnadesign/opal/campaigns/demo_gp_topn
 
-# 1) Create campaign-local demo records so this flow is isolated
+# 1) Create campaign-local records for this flow
 cp ../demo/records.parquet ./records.parquet
 
-# 2) Initialize + validate
+# 2) Optional fresh rerun cleanup
+uv run opal campaign-reset -c configs/campaign.yaml --apply --no-backup
+
+# 3) Initialize + validate
 uv run opal init -c configs/campaign.yaml
 uv run opal validate -c configs/campaign.yaml
 
-# 3) Ingest round-0 labels
+# 4) Ingest round-0 labels
 uv run opal ingest-y -c configs/campaign.yaml --round 0 \
   --csv inputs/r0/vec8-b0.xlsx \
   --unknown-sequences drop \
   --if-exists replace \
-  --yes
+  --apply
 
-# 4) Train/score/select
+# 5) Train/score/select
 uv run opal run -c configs/campaign.yaml --round 0
 
-# 5) Verify and inspect
+# 6) Verify and inspect
 uv run opal verify-outputs -c configs/campaign.yaml --round latest
 uv run opal status -c configs/campaign.yaml
 uv run opal runs list -c configs/campaign.yaml
+
+# 7) Inspect runtime carriers and next-round plan
+uv run opal ctx audit -c configs/campaign.yaml --round latest
+uv run opal explain -c configs/campaign.yaml --round 1
+
+# 8) Inspect one selected record
+head -n 6 outputs/rounds/round_0/selection/selection_top_k.csv
+selected_id="$(tail -n +2 outputs/rounds/round_0/selection/selection_top_k.csv | head -n 1 | cut -d, -f1)"
+uv run opal record-show -c configs/campaign.yaml --id "${selected_id}" --run-id latest
+
+# 9) Ephemeral predictions and plots
+uv run opal predict -c configs/campaign.yaml --round latest --out outputs/predict_r0.parquet
+uv run opal plot -c configs/campaign.yaml --name score_vs_rank_latest --round latest
 ```
 
 ### Expected outcome
@@ -50,14 +80,21 @@ uv run opal runs list -c configs/campaign.yaml
 - latest run shows `selection=top_n`
 - GP fitting may emit sklearn `ConvergenceWarning` on demo data; contracts still pass
 
-### Round progression (r >= 1)
+### What to check after run
+
+- selection CSV: `outputs/rounds/round_0/selection/selection_top_k.csv`
+- run ledger: `outputs/ledger/runs.parquet`
+- prediction ledger: `outputs/ledger/predictions/`
+- round context: `outputs/rounds/round_0/metadata/round_ctx.json`
+
+### Round progression (round 1)
 
 ```bash
 uv run opal ingest-y -c configs/campaign.yaml --round 1 \
   --csv inputs/r0/vec8-b0.xlsx \
   --unknown-sequences drop \
   --if-exists replace \
-  --yes
+  --apply
 
 uv run opal run -c configs/campaign.yaml --round 1 --resume
 uv run opal verify-outputs -c configs/campaign.yaml --round latest

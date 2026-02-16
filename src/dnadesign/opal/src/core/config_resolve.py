@@ -1,4 +1,4 @@
-# ABOUTME: Resolve OPAL campaign config paths from CLI/env/markers.
+# ABOUTME: Resolve OPAL campaign config paths from explicit CLI/env inputs.
 # ABOUTME: Supports configs/ layout and campaign root discovery.
 """
 --------------------------------------------------------------------------------
@@ -57,7 +57,7 @@ def _find_campaign_yaml_in_dir(path: Path, *, names: Iterable[str]) -> Path:
 
 def resolve_campaign_config_path(opt: Optional[Path], *, allow_dir: bool = False) -> Path:
     """
-    Resolve a campaign YAML path from explicit args, env, marker files, or cwd.
+    Resolve a campaign YAML path from explicit args or OPAL_CONFIG.
     """
     names = _candidate_names()
     env = os.getenv("OPAL_CONFIG")
@@ -95,59 +95,7 @@ def resolve_campaign_config_path(opt: Optional[Path], *, allow_dir: bool = False
             raise OpalError(msg, ExitCodes.BAD_ARGS)
         return p
 
-    cur = Path.cwd()
-    # Prefer marker: .opal/config
-    for base in (cur, *cur.parents):
-        marker = base / ".opal" / "config"
-        if marker.exists():
-            txt = marker.read_text().strip()
-            if not txt:
-                raise OpalError(f"Marker file is empty: {marker}", ExitCodes.BAD_ARGS)
-            p = Path(txt)
-            if not p.is_absolute():
-                # Marker paths are defined relative to the campaign workdir
-                p = (marker.parent.parent / p).resolve()
-            if not p.exists():
-                raise OpalError(
-                    f"Marker points to missing config: {p} (from {marker}).",
-                    ExitCodes.BAD_ARGS,
-                )
-            if p.is_dir():
-                raise OpalError(
-                    f"Marker points to a directory (expected campaign YAML): {p}",
-                    ExitCodes.BAD_ARGS,
-                )
-            return p
-    # Otherwise look for common YAML names, nearest first
-    for base in (cur, *cur.parents):
-        for cand in _iter_candidate_paths(base, names=names):
-            if cand.exists():
-                return cand.resolve()
-
-    root = Path("src/dnadesign/opal/campaigns")
-    if root.exists():
-        found = []
-        for name in names:
-            found.extend(root.glob(f"*/{name}"))
-            found.extend(root.glob(f"*/configs/{name}"))
-        if len(found) == 1:
-            return found[0].resolve()
-
-    # Fallback: unique campaign under repo campaigns/ (resolve relative to this file)
-    try:
-        pkg_root = Path(__file__).resolve().parents[4]
-    except Exception:
-        pkg_root = Path.cwd()
-    root = pkg_root / "src" / "dnadesign" / "opal" / "campaigns"
-    if root.exists():
-        found = []
-        for name in names:
-            found.extend(root.glob(f"*/{name}"))
-            found.extend(root.glob(f"*/configs/{name}"))
-        if len(found) == 1:
-            return found[0].resolve()
-
     raise OpalError(
-        "No campaign config found. Use --config, set $OPAL_CONFIG, or run inside a campaign folder.",
+        "No config provided. Pass --config <campaign.yaml> or set $OPAL_CONFIG.",
         ExitCodes.BAD_ARGS,
     )

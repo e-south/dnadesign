@@ -1,11 +1,20 @@
 ## OPAL Models — Registry
 
+In OPAL docs, "optimizer choice" is the model + objective + selection trio. This page covers the model side.
+
 ### Inventory
 
 | name | X expected | Y expected | key behavior |
 | --- | --- | --- | --- |
 | `random_forest` | `X: (N, F)` | `Y: (N,)` or `(N,D)` | ensemble regressor with OOB diagnostics |
 | `gaussian_process` | `X: (N, F)` | `Y: (N,)` or `(N,D)` | GP regression with predictive std emitted to RoundCtx |
+
+## When to choose each model
+
+- `random_forest`: fast deterministic baseline; pairs naturally with `top_n`.
+- `gaussian_process`: uncertainty-aware modeling; can pair with `top_n` or `expected_improvement`.
+
+`expected_improvement` is not GP-only, but it requires an objective uncertainty channel referenced by `uncertainty_ref`.
 
 Quick check:
 

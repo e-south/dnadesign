@@ -204,5 +204,10 @@ selection:
 """.strip(),
     )
 
-    with pytest.raises(ConfigError, match="Unknown model plugin"):
+    with pytest.raises(ConfigError) as exc:
         _ = load_config(cfg_path)
+    msg = str(exc.value)
+    assert "Unknown model plugin" in msg
+    assert "Available plugins:" in msg
+    assert "gaussian_process" in msg
+    assert "random_forest" in msg

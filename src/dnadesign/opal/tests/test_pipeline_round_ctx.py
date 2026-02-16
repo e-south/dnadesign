@@ -21,7 +21,6 @@ from dnadesign.opal.src.config.types import (
     DataBlock,
     IngestBlock,
     LocationLocal,
-    MetadataBlock,
     ObjectivesBlock,
     PluginRef,
     RootConfig,
@@ -165,7 +164,6 @@ def test_run_round_writes_round_ctx_and_ledger(tmp_path):
             write_back_requires_columns_present=False,
             accept_x_mismatch=False,
         ),
-        metadata=MetadataBlock(notes=""),
     )
 
     # state.json must exist for run_round
@@ -317,7 +315,6 @@ def test_run_round_commits_stage_buffered_predict_summary(tmp_path):
             write_back_requires_columns_present=False,
             accept_x_mismatch=False,
         ),
-        metadata=MetadataBlock(notes=""),
     )
 
     st = CampaignState(

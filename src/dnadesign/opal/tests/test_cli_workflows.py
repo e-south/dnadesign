@@ -76,6 +76,23 @@ def test_validate_rejects_unknown_plugin_names(tmp_path: Path) -> None:
     assert "unknown transform_x plugin" in out
 
 
+def test_validate_unknown_model_error_lists_available_plugins_in_default_output(tmp_path: Path) -> None:
+    _, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+    app = _build()
+    runner = CliRunner()
+
+    raw = yaml.safe_load(campaign.read_text())
+    raw["model"]["name"] = "does_not_exist_model"
+    campaign.write_text(yaml.safe_dump(raw, sort_keys=False))
+
+    res = runner.invoke(app, ["validate", "-c", str(campaign)])
+    assert res.exit_code != 0
+    out = res.output.lower()
+    assert "unknown model plugin" in out
+    assert "gaussian_process" in out
+    assert "random_forest" in out
+
+
 def test_validate_requires_explicit_selection_contract_fields(tmp_path: Path) -> None:
     _, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
     app = _build()

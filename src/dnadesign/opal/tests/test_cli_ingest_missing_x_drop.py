@@ -77,7 +77,7 @@ def test_ingest_y_drops_unknown_missing_x_by_sequence(tmp_path: Path) -> None:
             str(csv_path),
             "--unknown-sequences",
             "create",
-            "--yes",
+            "--apply",
         ],
     )
     assert res.exit_code == 0, res.stdout

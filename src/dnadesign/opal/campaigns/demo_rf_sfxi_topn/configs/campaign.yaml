@@ -75,7 +75,4 @@ safety:
   write_back_requires_columns_present: true
   accept_x_mismatch: false
 
-metadata:
-  notes: "Campaign-scoped demo for RF + SFXI + top_n."
-
 plot_config: plots.yaml

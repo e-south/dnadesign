@@ -1,42 +1,53 @@
-# OPAL Docs
+# OPAL Docs Hub
 
-This directory is the canonical entrypoint for OPAL documentation.
+Use this page as the navigation entrypoint.
 
-## Learning paths
+## Start paths
 
-- First run: read [Getting started](../README.md#quick-start) then choose a flow in [Demo flows](./guides/demos/README.md).
-- Plugin authoring: read [RoundCtx and contract auditing](./concepts/roundctx.md), then plugin references under `reference/plugins/`.
-- Daily operations: use [CLI reference](./reference/cli.md) and [Plots reference](./reference/plots.md).
+### New user
 
-## Start Here
+1. Read the [Quick start](../README.md#quick-start-5-commands).
+2. Pick a flow from [Demo flows](./guides/demos/README.md).
+3. Keep [CLI reference](./reference/cli.md) open while running commands.
 
-- New to OPAL: [Getting started](../README.md#quick-start)
-- Running demo flows: [Demo flow index](./guides/demos/README.md)
-- Demo matrix at a glance: [Demo workflow matrix](./guides/demo-sfxi.md)
-- Command usage and flags: [CLI reference](./reference/cli.md)
+### Campaign operator
 
-## Concepts
+- Round planning: [`opal explain`](./reference/cli.md#explain)
+- Run execution: [`opal run`](./reference/cli.md#run)
+- Runtime audit: [`opal ctx`](./reference/cli.md#ctx)
+- Output validation: [`opal verify-outputs`](./reference/cli.md#verify-outputs)
 
-- [Architecture and data flow](./concepts/architecture.md)
-- [RoundCtx and contract auditing](./concepts/roundctx.md)
+### Plugin/config author
 
-## Reference
+- Runtime contracts: [RoundCtx](./concepts/roundctx.md)
+- Config schema: [Configuration](./reference/configuration.md)
+- Strategy wiring: [Strategy matrix](./concepts/strategy-matrix.md)
+- Plugin references: [`reference/plugins/`](./reference/plugins/)
 
-- [Configuration (`campaign.yaml`)](./reference/configuration.md)
-- [Data contracts and ledger schemas](./reference/data-contracts.md)
-- [CLI reference](./reference/cli.md)
-- [Plots reference](./reference/plots.md)
-- [Models plugin reference](./reference/plugins/models.md)
-- [Selection plugin reference](./reference/plugins/selection.md)
-- [X transforms plugin reference](./reference/plugins/transforms-x.md)
-- [Y transforms plugin reference](./reference/plugins/transforms-y.md)
+## Core references
 
-## Objectives
+- Concepts
+  - [Architecture and data flow](./concepts/architecture.md)
+  - [RoundCtx and contract auditing](./concepts/roundctx.md)
+  - [Model/selection strategy matrix](./concepts/strategy-matrix.md)
+- Reference
+  - [Configuration (`campaign.yaml`)](./reference/configuration.md)
+  - [Data contracts and ledger schemas](./reference/data-contracts.md)
+  - [CLI reference](./reference/cli.md)
+  - [Plots reference](./reference/plots.md)
+  - [Model plugins](./reference/plugins/models.md)
+  - [Selection plugins](./reference/plugins/selection.md)
+  - [X transforms](./reference/plugins/transforms-x.md)
+  - [Y transforms](./reference/plugins/transforms-y.md)
+- Objective math
+  - [SFXI objective](./objectives/sfxi.md)
 
-- [SFXI (`setpoint_fidelity_x_intensity`)](./objectives/sfxi.md)
-- [SPOP (`sponging_percent_of_positive`)](./objectives/spop.md)
+## Demo docs
 
-## Internal
+- [Demo flow index](./guides/demos/README.md)
+- [Demo matrix summary](./guides/demo-sfxi.md)
 
-- [Dev journal](./internal/journal.md)
-- [PROM60 SFXI diagnostics notes](./internal/prom60_sfxi_diagnostics_plots.md)
+## Maintainer notes
+
+- [Dev journal](./dev/journal.md)
+- [PROM60 diagnostics notes](./internal/prom60_sfxi_diagnostics_plots.md)

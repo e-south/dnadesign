@@ -23,6 +23,7 @@ from ...runtime.run_round import RunRoundRequest, run_round
 from ...storage.locks import CampaignLock
 from ...storage.state import CampaignState
 from ..formatting import render_run_summary_human
+from ..guidance_hints import maybe_print_hints
 from ..registry import cli_command
 from ..tui import progress_factory as tui_progress_factory
 from ._common import (
@@ -61,6 +62,7 @@ def cmd_run(
     ),
     score_batch_size: Optional[int] = typer.Option(None, "--score-batch-size", help="Override batch size."),
     verbose: bool = typer.Option(True, "--verbose/--quiet"),
+    no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in human output."),
     json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)"),
 ) -> None:
     try:
@@ -120,6 +122,13 @@ def cmd_run(
             json_out(summary)
         else:
             print_stdout(render_run_summary_human(summary))
+            maybe_print_hints(
+                command_name="run",
+                cfg_path=cfg_path,
+                no_hints=no_hints,
+                json_output=json,
+                labels_as_of=int(round),
+            )
     except OpalError as e:
         opal_error("run", e)
         raise typer.Exit(code=e.exit_code)

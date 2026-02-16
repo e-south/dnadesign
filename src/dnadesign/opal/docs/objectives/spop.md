@@ -1,5 +1,8 @@
 ## sponging_percent_of_positive `spop`
 
+> Archived note: `spop_v1` is not registered in the current OPAL objective registry.
+> Treat this file as historical design context, not an active plugin contract.
+
 **Intent.** IPTG increases expression of an msr/msd cassette with an extended hairpin. Constitutively expressed RT variants are tested for the ability to process these long hairpins to produce a mature retron. Mature retron DNA sponges TetR and derepresses the reporter, so RFP is a proxy for strand displacement and retron maturation. Our goal is to rank RT variants that deliver strong sponging, preferably at lower IPTG, without compromising growth.
 
 ---

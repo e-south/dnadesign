@@ -9,6 +9,7 @@ OPAL is assertive by default and fails fast on inconsistent inputs.
 - Labels in Y but missing from `label_hist` are rejected.
 - Ledger writes are strict: unknown columns are errors (override only with `OPAL_LEDGER_ALLOW_EXTRA=1`).
 - Duplicate handling on ingest is explicit via `ingest.duplicate_policy` (`error|keep_first|keep_last`).
+- `verify-outputs` is strict: selection IDs must be unique and must exist in the target run ledger predictions.
 
 ## Records schema
 
@@ -60,7 +61,7 @@ Prediction entries store objective channel metadata and selected metrics (`score
 - `event`: `"run_meta"`, plus `run_id`, `as_of_round`
 - Config snapshot: `model__*`, `x_transform__*`, `y_ingest__*`, `objective__*`, `selection__*`, `training__y_ops`
 - Objective declarations: `objective__defs_json`
-- Selection channel refs: `selection__score_ref`, `selection__uncertainty_ref`
+- Selection controls: `selection__score_ref`, `selection__uncertainty_ref`, `selection__objective` (`maximize|minimize`), `selection__tie_handling`
 - Counts + summaries: `stats__*`, `objective__summary_stats`, `objective__denom_*`
 - `stats__unc_mean_sd_targets` is the mean of the selected uncertainty channel for the run when uncertainty is emitted; otherwise null.
 - `selection__score_ref` is always required and non-empty; `selection__uncertainty_ref` is null or a non-empty channel ref.

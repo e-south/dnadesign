@@ -20,6 +20,11 @@ plots:
     output:
       save_data: true
 
+  - name: feature_importance_bars_latest
+    kind: feature_importance_bars
+    params:
+      order_policy: preserve
+
   - name: percent_high_activity
     kind: percent_high_activity_over_rounds
     params:

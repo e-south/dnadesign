@@ -16,6 +16,7 @@ import typer
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...runtime.explain import explain_round
 from ..formatting import render_explain_human
+from ..guidance_hints import maybe_print_hints
 from ..registry import cli_command
 from ._common import (
     internal_error,
@@ -43,6 +44,7 @@ def cmd_explain(
         "--json/--human",
         help="Output as JSON (default: human).",
     ),
+    no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in human output."),
 ):
     try:
         cfg_path = resolve_config_path(config)
@@ -55,6 +57,29 @@ def cmd_explain(
         else:
             print_config_context(cfg_path, cfg=cfg, records_path=store.records_path)
             print_stdout(render_explain_human(info))
+            preflight = dict(info.get("preflight") or {})
+            if preflight:
+                lines = ["Run preflight"]
+                lines.append(f"- observed_round: {preflight.get('observed_round_definition', '')}")
+                lines.append(f"- labels_as_of: {preflight.get('labels_as_of_definition', '')}")
+                if "sfxi_current_round_labels" in preflight:
+                    lines.append(
+                        "- sfxi current-round labels: "
+                        f"{int(preflight.get('sfxi_current_round_labels', 0))} "
+                        f"(min_n={int(preflight.get('sfxi_scaling_min_n', 0))})"
+                    )
+                if bool(preflight.get("sfxi_run_will_fail")):
+                    lines.append("- warning: this run will fail until current-round labels satisfy min_n.")
+                    lines.append(f"- fix: {preflight.get('sfxi_fix_command')}")
+                print_stdout("\n".join([""] + lines))
+            maybe_print_hints(
+                command_name="explain",
+                cfg_path=cfg_path,
+                no_hints=no_hints,
+                json_output=json,
+                labels_as_of=int(round),
+                explain_info=dict(info),
+            )
     except OpalError as e:
         opal_error("explain", e)
         raise typer.Exit(code=e.exit_code)

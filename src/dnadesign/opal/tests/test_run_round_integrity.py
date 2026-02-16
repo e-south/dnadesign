@@ -24,7 +24,6 @@ from dnadesign.opal.src.config.types import (
     DataBlock,
     IngestBlock,
     LocationLocal,
-    MetadataBlock,
     ObjectivesBlock,
     PluginRef,
     RootConfig,
@@ -265,7 +264,6 @@ def _make_config(
             write_back_requires_columns_present=False,
             accept_x_mismatch=False,
         ),
-        metadata=MetadataBlock(notes=""),
     )
 
 

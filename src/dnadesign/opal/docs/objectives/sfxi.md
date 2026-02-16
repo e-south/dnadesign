@@ -266,8 +266,9 @@ All outputs are written to **ledger sinks** under `outputs/ledger/`:
 - `objective__params` — includes setpoint, exponents, scaling config, log2 delta
 - `objective__summary_stats` — includes `denom_used`, `denom_percentile`, score min/median/max, clip fractions
 - `objective__denom_value`, `objective__denom_percentile` — convenience mirrors
-- `selection__score_ref = "pred__score_selected"` — selection ranks on this field
-- `selection__objective`, `selection__tie_handling`
+- `selection__score_ref` — selected score channel ref (for this demo: `"sfxi_v1/sfxi"`)
+- `selection__uncertainty_ref` — selected uncertainty channel ref (EI flows only)
+- `selection__objective` (stores objective mode: `maximize|minimize`), `selection__tie_handling`
 - `training__y_ops` — Y‑ops applied at fit time (inverted before objective)
 
 `round_ctx.json` also records:

@@ -82,7 +82,4 @@ safety:
   write_back_requires_columns_present: true
   accept_x_mismatch: false
 
-metadata:
-  notes: "Demo campaign for OPAL using SFXI (vec8) and Evo2 logits mean."
-
 plot_config: plots.yaml

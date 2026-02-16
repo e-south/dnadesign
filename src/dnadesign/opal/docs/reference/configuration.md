@@ -29,7 +29,7 @@ OPAL reads configuration from `configs/campaign.yaml`.
 - `tie_handling`: `competition_rank|dense_rank|ordinal`
 - `uncertainty_ref`: required when `selection.name: expected_improvement`; must reference a standard-deviation channel
 
-No schema defaults are applied for `top_k`, `objective_mode`, or `tie_handling`. Declare all required selection fields explicitly in YAML.
+Built-in schemas currently provide defaults for `top_k`, `objective_mode`, and `tie_handling`. For deterministic behavior and clearer reviews, declare all four keys explicitly in YAML.
 
 ## Defaults
 
@@ -42,7 +42,7 @@ If a block is omitted, OPAL supplies conservative defaults:
   conflict_policy_on_duplicate_ids=error, write_back_requires_columns_present=true, accept_x_mismatch=false
 
 Plugin `params` default to `{}`, but plugin names are required.
-Unknown plugin names fail during config load and therefore fail fast in CLI/API entrypoints (`init`, `validate`, `run`, etc.).
+Unknown plugin names fail at `opal validate` (registry resolution is strict).
 
 ## Semantic wiring (model → objective → selection)
 

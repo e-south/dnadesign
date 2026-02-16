@@ -37,16 +37,8 @@ class CampaignWorkspace:
         return self.workdir / "outputs"
 
     @property
-    def inputs_dir(self) -> Path:
-        return self.workdir / "inputs"
-
-    @property
     def state_path(self) -> Path:
         return self.workdir / "state.json"
-
-    @property
-    def marker_path(self) -> Path:
-        return self.workdir / ".opal" / "config"
 
     # --- Ledger sinks ---
     @property

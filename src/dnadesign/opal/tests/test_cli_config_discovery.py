@@ -1,5 +1,5 @@
-# ABOUTME: CLI config discovery tests for OPAL campaign workflows.
-# ABOUTME: Covers env var, marker, directory, and configs/ discovery cases.
+# ABOUTME: CLI config resolution tests for OPAL campaign workflows.
+# ABOUTME: Covers explicit --config and OPAL_CONFIG-only resolution behavior.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -42,7 +42,7 @@ def test_config_discovery_env_var(monkeypatch, tmp_path: Path) -> None:
     assert res.exit_code == 0, res.output
 
 
-def test_config_discovery_marker_relative_to_workdir(monkeypatch, tmp_path: Path) -> None:
+def test_config_discovery_marker_relative_to_workdir_is_ignored(monkeypatch, tmp_path: Path) -> None:
     workdir, _ = _setup_workspace(tmp_path)
     marker_dir = workdir / ".opal"
     marker_dir.mkdir(parents=True, exist_ok=True)
@@ -56,7 +56,8 @@ def test_config_discovery_marker_relative_to_workdir(monkeypatch, tmp_path: Path
     app = _build()
     runner = CliRunner()
     res = runner.invoke(app, ["--no-color", "validate"])
-    assert res.exit_code == 0, res.output
+    assert res.exit_code != 0
+    assert "No config provided" in res.output
 
 
 def test_config_discovery_env_invalid_errors(monkeypatch, tmp_path: Path) -> None:
@@ -83,22 +84,38 @@ def test_config_directory_rejected(tmp_path: Path) -> None:
     assert "Config path is a directory" in res.output
 
 
-def test_config_discovery_configs_subdir(monkeypatch, tmp_path: Path) -> None:
-    workdir = tmp_path / "campaign"
-    workdir.mkdir(parents=True, exist_ok=True)
-    records = workdir / "records.parquet"
-    write_records(records)
-
-    configs_dir = workdir / "configs"
-    configs_dir.mkdir(parents=True, exist_ok=True)
-    campaign = configs_dir / "campaign.yaml"
-    write_campaign_yaml(campaign, workdir=Path("."), records_path=Path("records.parquet"))
-
+def test_config_required_without_flag_or_env(monkeypatch, tmp_path: Path) -> None:
+    workdir, _ = _setup_workspace(tmp_path)
     monkeypatch.chdir(workdir)
 
     app = _build()
     runner = CliRunner()
     res = runner.invoke(app, ["--no-color", "validate"])
+    assert res.exit_code != 0
+    assert "No config provided" in res.output
+
+
+def test_config_required_ignores_marker(monkeypatch, tmp_path: Path) -> None:
+    workdir, campaign = _setup_workspace(tmp_path)
+    marker_dir = workdir / ".opal"
+    marker_dir.mkdir(parents=True, exist_ok=True)
+    (marker_dir / "config").write_text(str(campaign))
+    monkeypatch.chdir(workdir)
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(app, ["--no-color", "validate"])
+    assert res.exit_code != 0
+    assert "No config provided" in res.output
+
+
+def test_config_discovery_explicit_flag(monkeypatch, tmp_path: Path) -> None:
+    _, campaign = _setup_workspace(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(app, ["--no-color", "validate", "--config", str(campaign)])
     assert res.exit_code == 0, res.output
 
 

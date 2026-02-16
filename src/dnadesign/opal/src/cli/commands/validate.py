@@ -20,6 +20,7 @@ from ...registries.models import get_model
 from ...registries.objectives import get_objective_declared_channels
 from ...storage.data_access import ESSENTIAL_COLS
 from ..formatting import kv_block
+from ..guidance_hints import maybe_print_hints
 from ..registry import cli_command
 from ._common import (
     internal_error,
@@ -112,6 +113,7 @@ def _validate_selection_channel_refs(cfg) -> None:
 @cli_command("validate", help="End-to-end table checks (essentials present; X column present).")
 def cmd_validate(
     config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
+    no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in human output."),
 ):
     try:
         cfg_path = resolve_config_path(config)
@@ -259,6 +261,7 @@ def cmd_validate(
         except Exception:
             pass
         print_stdout(msg)
+        maybe_print_hints(command_name="validate", cfg_path=cfg_path, no_hints=no_hints, json_output=False)
 
     except OpalError as e:
         opal_error("validate", e)

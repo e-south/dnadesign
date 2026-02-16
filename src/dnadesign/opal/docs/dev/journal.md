@@ -1,8 +1,202 @@
-# OPAL Dev Journal
+## OPAL Dev Journal
 
 This journal tracks ongoing Elm_UQ analysis, refactor notes, and merge-readiness decisions for OPAL.
 
-## 2026-02-16 Run-Meta Contract Hardening (channel refs + denominator semantics)
+### 2026-02-16 Guided demo workflows (CLI + docs)
+
+What changed:
+- Added guided CLI surfaces:
+  - `opal guide` (config-driven runbook: text/markdown/json)
+  - `opal guide next` (state-aware next-command recommendation)
+  - `opal demo-matrix` (isolated pressure test runner across canonical demo flows)
+- Added default human-output next-step hints (opt-out with `--no-hints`) for:
+  - `init`, `validate`, `ingest-y`, `run`, `explain`, `verify-outputs`
+- Enhanced `explain` with a preflight block that explicitly states:
+  - observed-round vs labels-as-of semantics
+  - SFXI current-round label counts vs `scaling.min_n`
+  - run-fail warning + fix command when under threshold
+- Added tests:
+  - `test_cli_guide.py`
+  - `test_cli_guide_next.py`
+  - `test_cli_guidance_hints.py`
+  - `test_cli_demo_matrix.py`
+- Updated workflow and CLI docs to surface guided usage:
+  - `docs/workflows/{rf-sfxi-topn,gp-sfxi-topn,gp-sfxi-ei}.md`
+  - `docs/reference/cli.md`
+
+Why:
+- Convert demo docs from command lists into a guided operator flow with explicit lifecycle checkpoints.
+- Reduce round-semantic confusion and make “what to do next” available directly in CLI output.
+- Provide an agent/CI-oriented pressure-test command for the canonical workflow matrix.
+
+Validation:
+- `uv run pytest -q src/dnadesign/opal/tests/test_cli_guide.py src/dnadesign/opal/tests/test_cli_guide_next.py src/dnadesign/opal/tests/test_cli_guidance_hints.py src/dnadesign/opal/tests/test_cli_demo_matrix.py`
+- `uv run pytest -q src/dnadesign/opal/tests/test_cli_workflows.py src/dnadesign/opal/tests/test_workflow_matrix_cli.py src/dnadesign/opal/tests/test_verify_outputs.py src/dnadesign/opal/tests/test_cli_run_renderer.py src/dnadesign/opal/tests/test_cli_ingest_missing_x_drop.py src/dnadesign/opal/tests/test_cli_campaign_reset.py`
+- `uv run pytest -q src/dnadesign/opal/tests`
+- `uv run ruff check src/dnadesign/opal/src src/dnadesign/opal/tests src/dnadesign/opal/docs`
+
+### 2026-02-16 Plain-language docs pass (user-facing wording cleanup)
+
+What changed:
+- Replaced awkward or overloaded wording in user-facing docs with plain instructional language.
+- Updated terms such as:
+  - `switchboard` -> `main docs page` / `Documentation`
+  - `canonical` -> `primary` or `main` (where appropriate)
+  - `fail-fast` section labels -> `Error cases`
+  - `Intent` headings -> `Purpose`
+  - `deep pages` -> `detail pages`
+- Touched user-facing docs under:
+  - `src/dnadesign/opal/README.md`
+  - `src/dnadesign/opal/docs/index.md`
+  - `src/dnadesign/opal/docs/plugins/*.md`
+  - `src/dnadesign/opal/docs/reference/{cli.md,data-contracts.md,schema-to-runtime.md}`
+
+Why:
+- Improve readability and reduce jargon while keeping behavior and contract meaning unchanged.
+
+Validation:
+- Local markdown link target audit across `src/dnadesign/opal/**/*.md`.
+- `uv run ruff check src/dnadesign/opal/src src/dnadesign/opal/tests src/dnadesign/opal/docs`.
+
+### 2026-02-16 Plugin docs alignment pass (GP/EI deep pages + CLI reference tightening)
+
+What changed:
+- Added deep plugin behavior/math pages to match objective docs structure:
+  - `src/dnadesign/opal/docs/plugins/model-gaussian-process.md`
+  - `src/dnadesign/opal/docs/plugins/selection-expected-improvement.md`
+- Updated docs switchboard and workflow guides to link these pages directly:
+  - `src/dnadesign/opal/docs/index.md`
+  - `src/dnadesign/opal/docs/workflows/gp-sfxi-topn.md`
+  - `src/dnadesign/opal/docs/workflows/gp-sfxi-ei.md`
+  - `src/dnadesign/opal/docs/workflows/rf-sfxi-topn.md`
+- Kept registry-level pages focused on plugin contract/wiring and linked out to deep pages:
+  - `src/dnadesign/opal/docs/plugins/models.md`
+  - `src/dnadesign/opal/docs/plugins/selection.md`
+  - `src/dnadesign/opal/docs/plugins/objectives.md`
+- Tightened CLI reference scope to command contracts by removing tutorial-style workflow sections:
+  - `src/dnadesign/opal/docs/reference/cli.md`
+- Removed local docs `.DS_Store` cruft from working tree (these were untracked; ignore rule already exists in repo root `.gitignore`).
+
+Why:
+- Keep one consistent plugin-doc mental model:
+  - registry page at `docs/plugins/<type>.md`
+  - deep behavior/math pages at `docs/plugins/<type>-<plugin>.md`
+- Keep `reference/cli.md` as a contract lookup page; keep run sequencing in workflows.
+
+Validation:
+- Local markdown link target audit across `src/dnadesign/opal/**/*.md`.
+- `uv run ruff check src/dnadesign/opal/docs`.
+
+### 2026-02-16 Docs IA pass (single canonical index)
+
+What changed:
+- Removed nested docs entrypoints:
+  - `docs/workflows/index.md`
+  - `docs/plugins/index.md`
+  - `docs/reference/index.md`
+- Kept `docs/index.md` as the only documentation index.
+- Updated docs and README links to target `docs/index.md` anchors (`#workflows`, `#plugins`, `#reference`) and direct topic pages.
+
+Why:
+- Multiple nested index pages made navigation indirect and increased UX ambiguity.
+- One canonical index provides a single stable switchboard for all docs paths.
+
+Validation:
+- `find src/dnadesign/opal/docs -type f -name 'index.md'` now returns only `src/dnadesign/opal/docs/index.md`.
+- Grep checks found no markdown links to removed nested index pages.
+
+### 2026-02-16 Docs IA pass (workflows + unified plugins surface)
+
+What changed:
+- Renamed `docs/demos/` to `docs/workflows/` and updated cross-links from docs index, concepts, campaign readmes, and maintainer testing pages.
+- Removed nested plugin docs under `docs/reference/plugins/` and consolidated all plugin docs under `docs/plugins/`.
+- Moved objective math pages into plugins tree:
+  - `docs/plugins/objective-sfxi.md`
+  - `docs/plugins/objective-spop.md`
+- Added `docs/plugins/index.md` as the single plugin documentation entrypoint.
+- Updated docs switchboard and reference copy to use the new mental model:
+  - workflows = end-to-end run paths
+  - plugins = model/objective/selection/transform semantics
+  - reference = schema/CLI/data contracts/runtime crosswalk
+
+Why:
+- Remove ambiguity from `docs/reference/plugins/` nesting and objective docs being split away from plugin docs.
+- Give one canonical place to find GP, EI, SFXI, and plugin wiring semantics.
+
+Validation:
+- Local markdown link target audit across `src/dnadesign/opal/**/*.md` passed.
+- `uv run ruff check src/dnadesign/opal/src src/dnadesign/opal/tests src/dnadesign/opal/docs` passed.
+
+### 2026-02-16 Docs UX pass (CLI semantics + concept cross-links)
+
+What changed:
+- Updated `docs/reference/cli.md` usage blocks and workflow examples to prefer explicit semantic flags:
+  - `ingest-y --observed-round ... --in ...`
+  - `run/explain --labels-as-of ...`
+- Updated CLI mental-model section to clarify that `--round` is a shared alias and explicit flags are preferred by command surface.
+- Added concise `Next steps` cross-links to concept pages:
+  - `docs/concepts/architecture.md`
+  - `docs/concepts/roundctx.md`
+  - `docs/concepts/strategy-matrix.md`
+- Renamed docs switchboard heading from `Maintainer Notes` to `Maintainers` for consistency with `docs/index.md`.
+
+Why:
+- Remove residual flag ambiguity in reference examples.
+- Reduce navigation backtracking from concept pages.
+
+Validation:
+- Local markdown link target audit across `src/dnadesign/opal/**/*.md` passed with zero unresolved links.
+- `uv run ruff check src/dnadesign/opal/src src/dnadesign/opal/tests src/dnadesign/opal/docs` passed.
+
+### 2026-02-16 Docs UX pass (navigation + semantics alignment)
+
+What changed:
+- Fixed broken maintainer links in `docs/index.md` after maintainer path moves.
+- Added maintainer switchboard and moved demo pressure-test matrix script out of `docs/workflows/index.md`:
+  - `docs/index.md`
+  - `docs/maintainers/testing-matrix.md`
+- Added objective docs/navigation surfaces:
+  - `docs/plugins/index.md`
+  - `docs/plugins/objectives.md`
+- Added user-facing runtime guidance pages:
+  - `docs/reference/troubleshooting.md`
+  - `docs/reference/schema-to-runtime.md`
+- Updated demo guides to use explicit round/input flags:
+  - `ingest-y --observed-round ... --in ...`
+  - `run --labels-as-of ...`
+  - `explain --labels-as-of ...`
+- Updated SFXI doc with an operational contract header, parameterized percentile wording, and explicit distinction between objective channels and diagnostic columns.
+- Updated SPOP doc status text to draft/in-progress objective semantics.
+
+Why:
+- Remove onboarding clutter from demo entrypoints.
+- Reduce round-flag ambiguity in step-by-step docs.
+- Make channel ref wiring and config-to-runtime behavior easier to find without source dives.
+
+Validation:
+- Local markdown link target audit across `src/dnadesign/opal/**/*.md` passed with zero unresolved links.
+- `uv run ruff check src/dnadesign/opal/src src/dnadesign/opal/tests src/dnadesign/opal/docs` passed.
+
+### 2026-02-16 Docs IA Overhaul (no compatibility stubs)
+
+What changed:
+- Rebased OPAL docs navigation around explicit index pages:
+  - `docs/index.md` (primary docs switchboard)
+  - `docs/workflows/index.md` (demo switchboard)
+  - `docs/reference/index.md` (reference switchboard)
+- Removed redundant `docs/guides/` routing layer and promoted demo guides to `docs/workflows/`.
+- Simplified top-level `README.md` to an overview + switchboard only (removed duplicated navigation sections).
+- Updated all campaign README guide pointers to `docs/workflows/*.md`.
+- Updated concept references (`strategy-matrix.md`) to the new demo guide paths.
+
+Why:
+- Previous docs structure had redundant entry nodes (`Start here` + `Documentation map`) and a nested demos path that made discovery harder.
+- The new structure keeps one primary narrative path at each level and removes stale/duplicated routing pages.
+
+Validation:
+- Local markdown link + anchor audit across `src/dnadesign/opal/**/*.md` passed with zero unresolved targets.
+
+### 2026-02-16 Run-Meta Contract Hardening (channel refs + denominator semantics)
 
 What changed:
 - `build_run_meta_event` now enforces strict channel-ref invariants:
@@ -32,7 +226,7 @@ Validation:
 - `uv run pytest -q src/dnadesign/opal/tests`
 - `uv run ruff check src/dnadesign/opal/src src/dnadesign/opal/tests src/dnadesign/opal/docs`
 
-## 2026-02-16 Exception-Surface Hardening (no swallow paths)
+### 2026-02-16 Exception-Surface Hardening (no swallow paths)
 
 What changed:
 - Dashboard selection utilities now only catch expected coercion/reconstruction errors:
@@ -60,7 +254,7 @@ Validation:
 - `uv run pytest -q src/dnadesign/opal/tests`
 - `uv run ruff check src/dnadesign/opal/src src/dnadesign/opal/tests src/dnadesign/opal/docs`
 
-## 2026-02-16 Run-Pred API Cleanup + Reference Invariants
+### 2026-02-16 Run-Pred API Cleanup + Reference Invariants
 
 What changed:
 - Removed stale, unused writeback API kwargs from `build_run_pred_events`:
@@ -87,7 +281,7 @@ Validation:
 - `uv run pytest -q src/dnadesign/opal/tests`
 - `uv run ruff check src/dnadesign/opal/src src/dnadesign/opal/tests src/dnadesign/opal/docs`
 
-## 2026-02-16 Run-Pred Writeback Hardening (strict vector contracts)
+### 2026-02-16 Run-Pred Writeback Hardening (strict vector contracts)
 
 What was tightened:
 - `build_run_pred_events` now validates all row-vector inputs explicitly:
@@ -114,7 +308,7 @@ Validation:
 - `uv run pytest -q src/dnadesign/opal/tests`
 - `uv run ruff check src/dnadesign/opal/src src/dnadesign/opal/tests src/dnadesign/opal/docs`
 
-## 2026-02-16 Selection Contract Hardening (strict plugin output typing)
+### 2026-02-16 Selection Contract Hardening (strict plugin output typing)
 
 What was tightened:
 - Centralized selection reserved-key handling into shared contract utilities (`core/selection_contracts.py`) so runtime and registry cannot drift on which params are runtime-reserved vs plugin-specific.
@@ -147,7 +341,7 @@ Validation:
 - `uv run pytest -q src/dnadesign/opal/tests`
 - `uv run ruff check src/dnadesign/opal/src src/dnadesign/opal/tests src/dnadesign/opal/docs`
 
-## 2026-02-16 UQ Correctness Hardening (GP/EI/Y-ops/SFXI)
+### 2026-02-16 UQ Correctness Hardening (GP/EI/Y-ops/SFXI)
 
 What was broken:
 - `gaussian_process.predict(std=False)` unpacked `(y, sd)` unconditionally, which breaks scalar prediction calls.
@@ -188,7 +382,7 @@ Regression tests added:
   - all-OFF setpoint still reflects logic uncertainty
   - delta estimate matches Monte Carlo smoke tolerance
 
-## 2026-02-16 Independent Math Audit Follow-up
+### 2026-02-16 Independent Math Audit Follow-up
 
 Independent checks executed beyond the feature-targeted test suite:
 - Randomized EI equation checks against direct formula evaluation (including mixed `sigma=0` cases).
@@ -204,7 +398,7 @@ Findings:
   - `test_expected_improvement_allows_finite_negative_weighted_acquisition`.
 - SFXI uncertainty implementation is mathematically consistent with first-order delta method on the implemented score; observed Monte Carlo deviations are approximation error in nonlinear/clipped regions, not an implementation mismatch with the chosen method.
 
-## 2026-02-15 Baseline Audit
+### 2026-02-15 Baseline Audit
 
 - Branch: `Elm_UQ`
 - Compared against: `main`
@@ -222,17 +416,17 @@ Findings:
 - Use this file for chronological notes during the next change set.
 - Keep entries short, factual, and tied to specific files/commits.
 
-## 2026-02-15 Contract V2 Execution Plan
+### 2026-02-15 Contract V2 Execution Plan
 
-# Plan
+### Plan
 
 We are implementing a strict OPAL v2 contract that replaces ambiguous uncertainty semantics (`var`) with explicit channel-based abstractions for objective and selection. The approach is to define hard plugin/data contracts first, then refactor runtime and storage to consume those contracts, and finally lock behavior with tests and docs before merge.
 
-## Scope
+### Scope
 - In: `src/dnadesign/opal/src/**` objective plugin API, selection API, runtime round stages, config schemas, registry validation, ledger/writeback contracts, and OPAL docs/tests.
 - Out: Non-OPAL packages, backward-compatibility shims, and unrelated performance tuning.
 
-## Action items
+### Action items
 [ ] Define explicit uncertainty semantics and naming (`y_pred_std`, `y_pred_var`, `score_ref`, `uncertainty_ref`) and remove generic `var` usage from public contracts.
 [ ] Add a canonical typed objective result abstraction (v2) with named score/uncertainty channels and deterministic diagnostics fields.
 [ ] Enforce objective plugin signature exactly as `(*, y_pred, params, ctx, train_view, y_pred_std)` at registry load time with fail-fast validation errors.
@@ -246,12 +440,12 @@ We are implementing a strict OPAL v2 contract that replaces ambiguous uncertaint
 [ ] Run targeted OPAL tests, then full OPAL suite and CI; fix any failures at root cause before merge.
 [ ] Update OPAL reference docs (configuration, models/selection plugins, objective docs) so semantics, contracts, and examples match v2 exactly.
 
-## Open questions
+### Open questions
 - Should prediction ledger store channel outputs as wide typed columns (`pred__score__<channel>`) or as a typed map column with schema validation?
 - Should objective channel names be globally unique strings, or namespaced by objective id and exposed through aliases?
 - Should this land as one breaking PR (`Elm_UQ` -> `main`) or staged into two PRs (contracts first, runtime/storage second)?
 
-## 2026-02-15 Compatibility + Docs Guardrails (Elm_UQ)
+### 2026-02-15 Compatibility + Docs Guardrails (Elm_UQ)
 
 Context update:
 - Elm_UQ introduces uncertainty-aware model/objective/selection behavior (GP + EI + uncertainty emissions).
@@ -266,11 +460,11 @@ Compatibility policy for this branch:
 Documentation scope to update in lockstep:
 - `src/dnadesign/opal/README.md`
 - `src/dnadesign/opal/docs/reference/configuration.md`
-- `src/dnadesign/opal/docs/reference/plugins/models.md`
-- `src/dnadesign/opal/docs/reference/plugins/selection.md`
+- `src/dnadesign/opal/docs/plugins/models.md`
+- `src/dnadesign/opal/docs/plugins/selection.md`
 - `src/dnadesign/opal/docs/reference/data-contracts.md`
-- `src/dnadesign/opal/docs/guides/demo-sfxi.md`
-- (optional new guide) `src/dnadesign/opal/docs/guides/demo-uq-ei.md`
+- `src/dnadesign/opal/docs/workflows/index.md`
+- (optional new guide) `src/dnadesign/opal/docs/workflows/gp-sfxi-ei.md`
 
 Usage-path matrix (must pass before merge):
 - Path A (baseline): `random_forest` + `sfxi_v1` + `top_n` (no uncertainty path required).
@@ -285,7 +479,7 @@ Execution checkpoints:
 - [ ] Add/extend tests for all four usage paths above.
 - [ ] Run targeted OPAL suites and record pass/fail status by path in this journal.
 
-## 2026-02-15 Strict v2 Audit + Fix Pass (No Shim)
+### 2026-02-15 Strict v2 Audit + Fix Pass (No Shim)
 
 Decision update:
 - This branch now treats OPAL schema migration as intentionally breaking v2.
@@ -302,9 +496,9 @@ Completed actions:
   - `README.md`
   - `docs/reference/configuration.md`
   - `docs/reference/data-contracts.md`
-  - `docs/reference/plugins/models.md`
-  - `docs/reference/plugins/selection.md`
-  - `docs/guides/demo-sfxi.md`
+  - `docs/plugins/models.md`
+  - `docs/plugins/selection.md`
+  - `docs/workflows/rf-sfxi-topn.md`
 
 Path matrix results (targeted tests):
 - Path A: `random_forest + sfxi_v1 + top_n` -> PASS
@@ -326,7 +520,7 @@ Command set executed for this pass:
 - `uv run pytest -q src/dnadesign/opal/tests/test_pipeline_round_ctx.py`
 - `uv run ruff check <touched OPAL src/tests files>`
 
-## 2026-02-15 Full OPAL Validation (post-v2 cleanup)
+### 2026-02-15 Full OPAL Validation (post-v2 cleanup)
 
 - Fixed remaining v1-oriented test fixture assumptions by making `_cli_helpers.write_campaign_yaml` emit valid v2 selection params by default (`score_ref`, `objective_mode`, `tie_handling`, `uncertainty_ref` for EI).
 - Updated dashboard utility test expectations to strict v2 behavior (ignore deprecated `objective` key, rely on `objective_mode` only).
@@ -345,7 +539,7 @@ Verification:
 Notes:
 - GP workflow tests report sklearn `ConvergenceWarning` on noise-level lower bound; non-fatal and expected for current toy demo data.
 
-## 2026-02-15 Demo CLI Pressure Test Matrix
+### 2026-02-15 Demo CLI Pressure Test Matrix
 
 Ran end-to-end CLI command chains against isolated copies of `src/dnadesign/opal/campaigns/demo` for each workflow config.
 
@@ -371,7 +565,7 @@ Observed behavior checks:
   - GP EI path: `expected_improvement`
 - GP paths emitted sklearn `ConvergenceWarning` for kernel noise-level lower bound; run completed and contracts remained valid.
 
-## 2026-02-15 Round-1 CLI Pressure Test Matrix
+### 2026-02-15 Round-1 CLI Pressure Test Matrix
 
 Initial check:
 - `run --round 1` without `ingest-y --round 1` fails for SFXI flows by design because `sfxi_v1` scaling enforces `min_n` on the current-round label pool.
@@ -393,7 +587,7 @@ Observed behavior checks:
 - `verify-outputs` mismatch count remained `0` in all cases.
 - `status` reported `num_rounds: 2` and latest round `r=1` for all three workflows.
 
-## 2026-02-15 Campaign-Scoped Demo IA Reorganization
+### 2026-02-15 Campaign-Scoped Demo IA Reorganization
 
 Goal:
 - Move from one-config-many-flows to one-campaign-per-flow demos with clearer docs and command paths.
@@ -412,15 +606,15 @@ Implemented structure:
 
 Docs IA changes:
 - Added demos hub:
-  - `src/dnadesign/opal/docs/guides/demos/README.md`
+  - `src/dnadesign/opal/docs/workflows/index.md`
 - Added dedicated flow guides:
-  - `src/dnadesign/opal/docs/guides/demos/rf-sfxi-topn.md`
-  - `src/dnadesign/opal/docs/guides/demos/gp-sfxi-topn.md`
-  - `src/dnadesign/opal/docs/guides/demos/gp-sfxi-ei.md`
+  - `src/dnadesign/opal/docs/workflows/rf-sfxi-topn.md`
+  - `src/dnadesign/opal/docs/workflows/gp-sfxi-topn.md`
+  - `src/dnadesign/opal/docs/workflows/gp-sfxi-ei.md`
 - Repositioned matrix page to route to flow guides:
-  - `src/dnadesign/opal/docs/guides/demo-sfxi.md`
+  - `src/dnadesign/opal/docs/workflows/index.md`
 - Updated doc entrypoints:
-  - `src/dnadesign/opal/docs/README.md`
+  - `src/dnadesign/opal/docs/index.md`
   - `src/dnadesign/opal/README.md`
 
 File-organization guardrails:
@@ -432,7 +626,7 @@ Pressure-test result (new campaign-scoped flows):
 - For each flow, `init -> validate -> ingest-y -> run -> verify-outputs -> status -> runs list` passed.
 - `verify-outputs` mismatch count was `0` for all three flows.
 
-## 2026-02-15 UX/Schema/Registry Audit Follow-up
+### 2026-02-15 UX/Schema/Registry Audit Follow-up
 
 Audit-driven fixes applied:
 - Fixed a GP correctness/performance footgun in batched prediction uncertainty accumulation:
@@ -456,10 +650,10 @@ New regression coverage:
   - updated `test_resolve_objective_mode_aliases` to assert strict v2 behavior.
 
 Docs updates:
-- `docs/reference/plugins/selection.md` clarifies EI requires std-dev uncertainty channel.
+- `docs/plugins/selection.md` clarifies EI requires std-dev uncertainty channel.
 - `docs/reference/configuration.md` clarifies `uncertainty_ref` semantics.
-- `docs/reference/plugins/models.md` clarifies EI channel expectation.
-- `docs/objectives/sfxi.md` now documents `pred__uncertainty_selected`.
+- `docs/plugins/models.md` clarifies EI channel expectation.
+- `docs/plugins/objective-sfxi.md` now documents `pred__uncertainty_selected`.
 
 Validation for this pass:
 - `uv run pytest -q src/dnadesign/opal/tests/test_objective_contract_v2.py::test_expected_improvement_uses_uncertainty_as_std src/dnadesign/opal/tests/test_dashboard_utils.py::test_resolve_objective_mode_aliases src/dnadesign/opal/tests/test_run_round_integrity.py::test_run_round_matrix_gp_topn_handles_scalar_uncertainty_multibatch` -> PASS
@@ -470,7 +664,7 @@ Validation for this pass:
 Residual known warning:
 - sklearn GP `ConvergenceWarning` on demo data noise lower bound remains non-fatal.
 
-## 2026-02-15 Strict hardening pass: remove remaining selection/runtime fallbacks
+### 2026-02-15 Strict hardening pass: remove remaining selection/runtime fallbacks
 
 Goal:
 - Remove two remaining fallback-style behaviors identified in audit:
@@ -505,7 +699,7 @@ Result:
 - PASS on all OPAL tests and lint.
 - GP convergence warnings remain non-fatal on demo data.
 
-## 2026-02-15 Strictness follow-up: selection mode/tie and summary rendering alignment
+### 2026-02-15 Strictness follow-up: selection mode/tie and summary rendering alignment
 
 Goal:
 - Remove remaining implicit selection defaults in runtime-adjacent paths so v2 contracts are explicit even for programmatic config construction.
@@ -523,7 +717,7 @@ Implemented changes:
   - Updated plugin signature to require explicit `objective` and `tie_handling`.
 - `src/dnadesign/opal/src/cli/commands/run.py`
   - Removed summary-level defaults for `tie_handling` and `objective_mode`; summary now enforces required/valid values.
-- `src/dnadesign/opal/docs/reference/plugins/selection.md`
+- `src/dnadesign/opal/docs/plugins/selection.md`
   - Updated runtime signature docs to match strict required args (no default objective/tie values).
 
 TDD additions:
@@ -546,7 +740,7 @@ Validation:
 Notes:
 - GP `ConvergenceWarning` on demo toy data remains non-fatal and unchanged.
 
-## 2026-02-15 Renderer strictness cleanup (selection summary)
+### 2026-02-15 Renderer strictness cleanup (selection summary)
 
 Goal:
 - Remove remaining display-layer fallback defaults that could hide invalid selection summary payloads.
@@ -566,7 +760,7 @@ Validation:
 - `uv run pytest -q src/dnadesign/opal/tests` -> PASS
 - `uv run ruff check src/dnadesign/opal/src src/dnadesign/opal/tests src/dnadesign/opal/docs` -> PASS
 
-## 2026-02-16 Strict no-fallback sweep + demo pressure retest
+### 2026-02-16 Strict no-fallback sweep + demo pressure retest
 
 Goal:
 - Remove remaining implicit fallback behavior in objective/selection contracts and re-validate all documented demo flows end-to-end.
@@ -585,7 +779,7 @@ Implemented changes:
 - `src/dnadesign/opal/src/registries/selection.py`
   - Added strict objective-mode validation in `_stable_sort_indices`.
   - Added strict `tie_handling` validation in `_ranks_from_sorted_scores` (invalid values now error).
-- `src/dnadesign/opal/docs/guides/demos/README.md`
+- `src/dnadesign/opal/docs/workflows/index.md`
   - Added a quick pressure-test matrix with sequential commands for all three campaign-scoped demo flows.
 
 TDD updates:
@@ -610,7 +804,7 @@ Demo flow pressure retest (isolated copies, round 0 and round 1):
 - Data-sufficiency behavior check:
   - GP top_n vs GP EI selected IDs at round 1 diverged (`intersection=3`, `topn_only=2`, `ei_only=2`), confirming demo inputs support selector-behavior differentiation.
 
-## 2026-02-16 Maintainer hardening pass: verify integrity + mode strictness + profiling
+### 2026-02-16 Maintainer hardening pass: verify integrity + mode strictness + profiling
 
 Goal:
 - Remove remaining verification/runtime footguns and re-confirm demo ergonomics plus end-to-end behavior on current branch state.
@@ -627,7 +821,7 @@ Implemented changes:
   - Added strict unknown-ID rejection when selection IDs are absent from run ledger predictions.
 - `src/dnadesign/opal/src/runtime/round/stages.py`
   - Removed fallback mode propagation; score channel modes are now read directly from validated objective output.
-- `src/dnadesign/opal/docs/guides/demos/README.md`
+- `src/dnadesign/opal/docs/workflows/index.md`
   - Expanded pressure-test matrix to include round-1 continuation.
   - Added a compact GP top_n vs GP EI selected-ID comparison snippet to verify data sufficiency for selector differentiation.
 
@@ -662,7 +856,7 @@ Performance profiling (cProfile on GP+EI round-1 run path):
   - `storage/label_history.py:parse_hist_cell_strict`
 - Takeaway: dominant latency remains label-history normalization/parsing, not selection/EI path.
 
-## 2026-02-16 Documentation clarity and schema-semantics pass
+### 2026-02-16 Documentation clarity and schema-semantics pass
 
 Goal:
 - Make OPAL docs more didactic and less noisy while keeping strict semantic alignment with current code paths and schema behavior.
@@ -678,19 +872,19 @@ Implemented docs changes:
   - `src/dnadesign/opal/docs/concepts/strategy-matrix.md`
   - Covers model/objective/selection wiring, built-in flow choices, and EI uncertainty semantics.
 - Updated primary docs indexes and README maps:
-  - `src/dnadesign/opal/docs/README.md`
+  - `src/dnadesign/opal/docs/index.md`
   - `src/dnadesign/opal/README.md`
   - Removed `spop` from primary docs navigation (kept file but no longer presented as standard path).
 - Tightened config/reference semantics:
   - `src/dnadesign/opal/docs/reference/configuration.md`
   - Clarified explicit selection keys and model->objective->selection wiring.
 - Updated plugin references for selection/optimizer communication:
-  - `src/dnadesign/opal/docs/reference/plugins/models.md`
-  - `src/dnadesign/opal/docs/reference/plugins/selection.md`
+  - `src/dnadesign/opal/docs/plugins/models.md`
+  - `src/dnadesign/opal/docs/plugins/selection.md`
 - Updated data-contract reference to include strict verify behavior:
   - `src/dnadesign/opal/docs/reference/data-contracts.md`
 - Expanded demo matrix to include full round-1 continuation and selector-difference check snippet:
-  - `src/dnadesign/opal/docs/guides/demos/README.md`
+  - `src/dnadesign/opal/docs/workflows/index.md`
 
 Validation:
 - `uv run ruff check src/dnadesign/opal/src src/dnadesign/opal/tests src/dnadesign/opal/docs` -> PASS
@@ -705,7 +899,7 @@ Pressure test (real CLI flows in isolated temp workspace):
 - Selector differentiation check remained stable:
   - `intersection=3`, `topn_only=2`, `ei_only=2`
 
-## 2026-02-16 Doc semantics and demo command reproducibility pass
+### 2026-02-16 Doc semantics and demo command reproducibility pass
 
 Goal:
 - Remove doc footguns and ensure command snippets execute as written for all documented OPAL demo flows.
@@ -717,12 +911,12 @@ Findings fixed:
 - Data-contract and CLI reference pages needed explicit wording for `selection__objective` semantics and `verify-outputs --json` stdout behavior.
 
 Changes:
-- `src/dnadesign/opal/docs/guides/demos/README.md`
+- `src/dnadesign/opal/docs/workflows/index.md`
   - Updated pressure-test loop to write `verify_r0.json` / `verify_r1.json`.
   - Added `tmp_root` echo to support the follow-up selector comparison snippet.
 - `src/dnadesign/opal/docs/concepts/architecture.md`
   - Updated flow to explicit channel-driven v2 semantics (`score_ref`, `uncertainty_ref`).
-- `src/dnadesign/opal/docs/objectives/sfxi.md`
+- `src/dnadesign/opal/docs/plugins/objective-sfxi.md`
   - Corrected run_meta selection-field semantics.
 - `src/dnadesign/opal/docs/reference/data-contracts.md`
   - Clarified `selection__objective` stores objective mode.
@@ -743,7 +937,7 @@ Pressure test (live CLI demo matrix, round 0 + round 1 in isolated workspace):
   - `topn_only=2`
   - `ei_only=2`
 
-## 2026-02-16 Schema + demo UX hardening pass
+### 2026-02-16 Schema + demo UX hardening pass
 
 Goal:
 - Remove dead-end config surface, fail fast earlier for invalid plugin names, and align demo docs with full user-facing CLI flow.
@@ -760,11 +954,11 @@ Changes:
   - `src/dnadesign/opal/campaigns/demo/.opal/config` -> `configs/campaign.yaml`
   - removed stale marker file `src/dnadesign/opal/campaigns/prom60-etoh-cipro-andgate/.opal/config`
 - Demo information architecture + command narratives updated:
-  - `src/dnadesign/opal/docs/guides/demos/README.md`
-  - `src/dnadesign/opal/docs/guides/demos/rf-sfxi-topn.md`
-  - `src/dnadesign/opal/docs/guides/demos/gp-sfxi-topn.md`
-  - `src/dnadesign/opal/docs/guides/demos/gp-sfxi-ei.md`
-  - `src/dnadesign/opal/docs/guides/demo-sfxi.md`
+  - `src/dnadesign/opal/docs/workflows/index.md`
+  - `src/dnadesign/opal/docs/workflows/rf-sfxi-topn.md`
+  - `src/dnadesign/opal/docs/workflows/gp-sfxi-topn.md`
+  - `src/dnadesign/opal/docs/workflows/gp-sfxi-ei.md`
+  - `src/dnadesign/opal/docs/workflows/index.md`
   - now includes optional `campaign-reset`, then `init/validate/ingest/run/verify`, and in-sequence `ctx`, `explain`, `record-show`, `predict`, `plot`.
 - Added explicit RF demo coverage for `feature_importance_bars`:
   - `src/dnadesign/opal/campaigns/demo_rf_sfxi_topn/configs/plots.yaml`
@@ -789,7 +983,7 @@ Pressure-test matrix (updated command path) in isolated workspace:
 - GP selector differentiation still present on r1:
   - `intersection=3`, `topn_only=2`, `ei_only=2`
 
-## 2026-02-16 Demo doc simplification pass (no one-off flags, no Python snippets)
+### 2026-02-16 Demo doc simplification pass (no one-off flags, no Python snippets)
 
 Goal:
 - Keep demo guides on a strict, simple happy path with only standard CLI/shell commands.
@@ -804,17 +998,17 @@ Changes:
 - Removed the Python-based GP selector comparison block from demo index.
 
 Touched docs:
-- `src/dnadesign/opal/docs/guides/demos/README.md`
-- `src/dnadesign/opal/docs/guides/demos/rf-sfxi-topn.md`
-- `src/dnadesign/opal/docs/guides/demos/gp-sfxi-topn.md`
-- `src/dnadesign/opal/docs/guides/demos/gp-sfxi-ei.md`
-- `src/dnadesign/opal/docs/guides/demo-sfxi.md`
+- `src/dnadesign/opal/docs/workflows/index.md`
+- `src/dnadesign/opal/docs/workflows/rf-sfxi-topn.md`
+- `src/dnadesign/opal/docs/workflows/gp-sfxi-topn.md`
+- `src/dnadesign/opal/docs/workflows/gp-sfxi-ei.md`
+- `src/dnadesign/opal/docs/workflows/index.md`
 
 Validation:
-- `rg -n "allow-non-demo|uv run python|<<'PY'" src/dnadesign/opal/docs/guides/demos src/dnadesign/opal/docs/guides/demo-sfxi.md` -> no matches
+- `rg -n "allow-non-demo|uv run python|<<'PY'" src/dnadesign/opal/docs/workflows src/dnadesign/opal/docs/workflows/index.md` -> no matches
 - `uv run ruff check src/dnadesign/opal/docs` -> PASS
 
-## 2026-02-16 YAGNI config-resolution cleanup pass
+### 2026-02-16 YAGNI config-resolution cleanup pass
 
 Goal:
 - Remove implicit campaign marker/discovery behavior and keep campaign resolution explicit (`--config` or `$OPAL_CONFIG`).
@@ -846,7 +1040,7 @@ Validation:
 - `uv run pytest -q src/dnadesign/opal/tests/test_cli_config_discovery.py src/dnadesign/opal/tests/test_cli_workflows.py src/dnadesign/opal/tests/test_cli_campaign_reset.py` -> PASS
 - `uv run ruff check src/dnadesign/opal/src/cli/commands/campaign_reset.py src/dnadesign/opal/src/core/config_resolve.py src/dnadesign/opal/src/cli/commands/init.py src/dnadesign/opal/src/cli/formatting/renderers/init.py src/dnadesign/opal/src/storage/workspace.py src/dnadesign/opal/tests/test_cli_config_discovery.py src/dnadesign/opal/tests/test_cli_workflows.py src/dnadesign/opal/tests/test_cli_campaign_reset.py` -> PASS
 
-## 2026-02-16 YAGNI + correctness verification pass (post-cleanup)
+### 2026-02-16 YAGNI + correctness verification pass (post-cleanup)
 
 Goal:
 - Verify strict config-resolution changes under full OPAL coverage and real demo workflows, and remove notebook crash footgun when label history is empty.
@@ -866,21 +1060,21 @@ Validation:
 - Demo pressure matrix (RF+top_n, GP+top_n, GP+EI; rounds 0 and 1) -> PASS
   - `verify_r0.json` and `verify_r1.json` mismatch arrays were empty for all flows.
 
-## 2026-02-16 docs IA + UX footgun cleanup pass
+### 2026-02-16 docs IA + UX footgun cleanup pass
 
 Goal:
 - Remove remaining documentation UX footguns and ensure docs semantics match current v2 runtime behavior.
 
 Changes:
 - Fixed docs hub maintainer navigation:
-  - `src/dnadesign/opal/docs/README.md`
+  - `src/dnadesign/opal/docs/index.md`
   - `Dev journal` link now points to `docs/dev/journal.md` (was stale `docs/internal/journal.md`).
 - Corrected stale plot example field:
   - `src/dnadesign/opal/docs/reference/plots.md`
   - `scatter_score_vs_rank` example now uses `score_field: "pred__score_selected"` with explicit note on expected default usage.
 - Tightened demo terminology consistency:
-  - `src/dnadesign/opal/docs/guides/demos/gp-sfxi-topn.md`
-  - `src/dnadesign/opal/docs/guides/demos/gp-sfxi-ei.md`
+  - `src/dnadesign/opal/docs/workflows/gp-sfxi-topn.md`
+  - `src/dnadesign/opal/docs/workflows/gp-sfxi-ei.md`
   - Link label standardized to `Model plugins`.
 
 Validation:
@@ -897,7 +1091,7 @@ Validation:
   - flows passed: `demo_rf_sfxi_topn`, `demo_gp_topn`, `demo_gp_ei`
   - `verify-outputs` JSON mismatch count: `0` for all three flows.
 
-## 2026-02-16 strict selection-contract hardening + overlay refactor pass
+### 2026-02-16 strict selection-contract hardening + overlay refactor pass
 
 Goal:
 - Remove remaining implicit selection defaults across config validation and dashboard reconstruction, and tighten channel-selection helpers to explicit contracts.
@@ -939,7 +1133,7 @@ Validation:
 - Lint:
   - `uv run ruff check src/dnadesign/opal/src src/dnadesign/opal/tests` -> PASS
 
-## 2026-02-16 critical audit pass (UX footguns + strict history contracts)
+### 2026-02-16 critical audit pass (UX footguns + strict history contracts)
 
 Goal:
 - Run a full OPAL package audit with real CLI usage paths, then remove stale tracked campaign artifacts and harden label-history correctness on malformed existing cells.
@@ -967,7 +1161,7 @@ Validation:
   - temp run root: `/tmp/opal-demo-audit-m8EawP`.
   - `verify-outputs` JSON files written for r0/r1 in each temp flow and passed.
 
-## 2026-02-16 plugin-name fail-fast preflight in shared CLI config loader
+### 2026-02-16 plugin-name fail-fast preflight in shared CLI config loader
 
 Goal:
 - Eliminate fail-late unknown-plugin behavior where bad plugin names could pass `init` and only fail deep inside `run`.
@@ -995,7 +1189,7 @@ Validation:
 - Lint:
   - `uv run ruff check src/dnadesign/opal/src/cli/commands/_common.py src/dnadesign/opal/src/cli/commands/validate.py src/dnadesign/opal/tests/test_cli_config_discovery.py` -> PASS
 
-## 2026-02-16 strict UQ path hardening (no std-drop fallback + selection signature fail-fast)
+### 2026-02-16 strict UQ path hardening (no std-drop fallback + selection signature fail-fast)
 
 Goal:
 - Remove remaining fallback-style behavior in uncertainty and selection plugin contracts.
@@ -1011,7 +1205,7 @@ Changes:
   - `src/dnadesign/opal/src/objectives/sfxi_v1.py`
   - clip-fraction summary now computes directly and fails if diagnostics contract is broken.
 - Docs aligned to strict y-ops/std contract:
-  - `src/dnadesign/opal/docs/reference/plugins/models.md`
+  - `src/dnadesign/opal/docs/plugins/models.md`
   - `src/dnadesign/opal/docs/concepts/strategy-matrix.md`
 
 TDD:
@@ -1028,7 +1222,7 @@ Validation:
 - Lint:
   - `uv run ruff check src/dnadesign/opal/src src/dnadesign/opal/tests src/dnadesign/opal/docs` -> PASS
 
-## 2026-02-16 CLI/run + selection registry fail-fast hardening pass
+### 2026-02-16 CLI/run + selection registry fail-fast hardening pass
 
 Goal:
 - Remove additional fail-late/fallback behavior in the run guard and selection plugin wiring path.
@@ -1057,7 +1251,7 @@ Validation:
 - Lint:
   - `uv run ruff check src/dnadesign/opal/src src/dnadesign/opal/tests src/dnadesign/opal/docs` -> PASS
 
-## 2026-02-16 selection contract refactor + reserved-key hardening pass
+### 2026-02-16 selection contract refactor + reserved-key hardening pass
 
 Goal:
 - Implement shared selection contract parsing to remove duplicated mode/tie validators and tighten selection plugin parameter validation.
@@ -1091,7 +1285,7 @@ Validation:
 - Lint:
   - `uv run ruff check src/dnadesign/opal/src src/dnadesign/opal/tests src/dnadesign/opal/docs` -> PASS
 
-## 2026-02-16 config + selection registry strictness pass (no factory heuristics)
+### 2026-02-16 config + selection registry strictness pass (no factory heuristics)
 
 Goal:
 - Remove one remaining heuristic path in selection registration and enforce unknown-plugin rejection at config load for non-CLI API usage.
@@ -1126,7 +1320,7 @@ Validation:
 - Lint:
   - `uv run ruff check src/dnadesign/opal/src src/dnadesign/opal/tests src/dnadesign/opal/docs` -> PASS
 
-## 2026-02-16 strict y-op state + run-pred diagnostics hardening pass
+### 2026-02-16 strict y-op state + run-pred diagnostics hardening pass
 
 Goal:
 - Remove remaining fallback-style behavior in y-op state access and row diagnostics flattening; make run-level uncertainty summary reflect emitted uncertainty.
@@ -1160,7 +1354,7 @@ Validation:
 - Lint:
   - `uv run ruff check src/dnadesign/opal/src/transforms_y/intensity_median_iqr.py src/dnadesign/opal/src/storage/writebacks.py src/dnadesign/opal/src/runtime/round/writebacks.py src/dnadesign/opal/tests/test_intensity_median_iqr.py src/dnadesign/opal/tests/test_ledger_dataset_writes.py src/dnadesign/opal/tests/test_workflow_matrix_cli.py` -> PASS
 
-## 2026-02-16 strict summary-stats logging + selection ctx wrapper cleanup
+### 2026-02-16 strict summary-stats logging + selection ctx wrapper cleanup
 
 Goal:
 - Close the two remaining suggestions from the prior audit with fail-fast semantics preserved and no fallback behavior added.
@@ -1192,7 +1386,7 @@ Validation:
 - Lint:
   - `uv run ruff check src/dnadesign/opal/src src/dnadesign/opal/tests src/dnadesign/opal/docs` -> PASS
 
-## 2026-02-16 demo pressure-test pass + validate fail-fast hardening
+### 2026-02-16 demo pressure-test pass + validate fail-fast hardening
 
 Goal:
 - Pressure-test all documented OPAL demo flows for UX and numerical stability, then eliminate fail-late selection/UQ config paths.
@@ -1244,7 +1438,7 @@ Validation:
   - EI bad `uncertainty_ref` now fails at `opal validate` with declared-channel error.
   - RF + EI now fails at `opal validate` with model uncertainty contract error.
 
-## 2026-02-16 pass-2 pressure test: objective_mode fail-late closure
+### 2026-02-16 pass-2 pressure test: objective_mode fail-late closure
 
 Goal:
 - Re-run full demo matrix and adversarial configs; remove remaining fail-late selection semantic mismatch.
@@ -1276,7 +1470,7 @@ Validation:
 - Adversarial recheck:
   - objective mode mismatch now fails at `opal validate` with explicit mode mismatch error.
 
-## 2026-02-16 pass-3 pressure test: EI weight fail-late closure + demo matrix recheck
+### 2026-02-16 pass-3 pressure test: EI weight fail-late closure + demo matrix recheck
 
 Goal:
 - Re-run the full demo matrix as a real-user command path and probe additional adversarial EI config edges for fail-fast behavior.
@@ -1316,3 +1510,75 @@ Validation:
   - `uv run ruff check src/dnadesign/opal/src src/dnadesign/opal/tests src/dnadesign/opal/docs` -> PASS
 - Adversarial recheck:
   - demo GP+EI config with negative `alpha` now fails at `opal validate` (schema error) instead of run-time.
+
+### 2026-02-16 pass-4 adversarial UX hardening (demo reset path + plugin error clarity)
+
+Goal:
+- Pressure-test demo workflows again from user docs, then remove CLI UX footguns found during adversarial runs.
+
+Findings:
+- `opal campaign-reset` rejected demo campaign slugs used by current demo flows (`demo_gp_topn`, `demo_gp_ei`, `demo_rf_sfxi_topn`) unless `--allow-non-demo` was passed.
+- Unknown plugin validation errors used bracketed lists in the error message, which rendered poorly in default Rich output (available plugin names looked blank).
+
+Changes:
+- Expanded demo slug detection for `campaign-reset`:
+  - `src/dnadesign/opal/src/cli/commands/campaign_reset.py`
+  - Demo slugs now include `demo`, `demo_*`, and `demo-*`.
+  - Updated guard error message accordingly.
+- Updated unknown plugin message format to avoid Rich-markup ambiguity:
+  - `src/dnadesign/opal/src/config/loader.py`
+  - Message now uses `Available plugins: ...` (no bracketed list markup).
+- Updated demo docs to use a single semantic reset command instead of ad hoc `rm -rf` cleanup:
+  - `src/dnadesign/opal/docs/workflows/index.md`
+  - `src/dnadesign/opal/docs/workflows/rf-sfxi-topn.md`
+  - `src/dnadesign/opal/docs/workflows/gp-sfxi-topn.md`
+  - `src/dnadesign/opal/docs/workflows/gp-sfxi-ei.md`
+- Updated CLI reference for reset guard semantics:
+  - `src/dnadesign/opal/docs/reference/cli.md`
+
+TDD:
+- Added failing tests first:
+  - `src/dnadesign/opal/tests/test_cli_campaign_reset.py::test_campaign_reset_allows_demo_prefixed_slug_without_flag`
+  - `src/dnadesign/opal/tests/test_config_objectives_v2.py::test_load_config_rejects_unknown_model_plugin_name` (tightened assertion for explicit `Available plugins` text)
+  - `src/dnadesign/opal/tests/test_cli_workflows.py::test_validate_unknown_model_error_lists_available_plugins_in_default_output`
+- Confirmed red, implemented minimal fixes, re-ran to green.
+
+Validation:
+- Targeted tests:
+  - `uv run pytest -q src/dnadesign/opal/tests/test_cli_campaign_reset.py src/dnadesign/opal/tests/test_cli_workflows.py::test_validate_unknown_model_error_lists_available_plugins_in_default_output src/dnadesign/opal/tests/test_config_objectives_v2.py::test_load_config_rejects_unknown_model_plugin_name` -> PASS
+- Demo reset command check for all three demo campaigns:
+  - `uv run opal campaign-reset -c <demo_config> --apply --no-backup` -> PASS for `demo_rf_sfxi_topn`, `demo_gp_topn`, `demo_gp_ei`.
+- Full demo matrix re-run (reset-first path from docs, round-0 + round-1):
+  - RF + SFXI + top_n -> PASS
+  - GP + SFXI + top_n -> PASS
+  - GP + SFXI + expected_improvement -> PASS
+- Full OPAL gate:
+  - `uv run pytest -q src/dnadesign/opal/tests` -> PASS
+  - `uv run ruff check src/dnadesign/opal/src src/dnadesign/opal/tests src/dnadesign/opal/docs` -> PASS
+
+### 2026-02-16 pass-5 campaign-reset policy simplification (remove non-demo gate)
+
+Goal:
+- Remove unnecessary campaign-reset scope gating and simplify command semantics.
+
+Changes:
+- Removed `--allow-non-demo` from the command surface:
+  - `src/dnadesign/opal/src/cli/commands/campaign_reset.py`
+- Removed slug-based reset restriction; `campaign-reset` now supports any campaign when explicitly invoked with config + confirmation (`--apply` or slug typing in TTY).
+- Kept assertive destructive safeguards:
+  - explicit `--config`/`OPAL_CONFIG` resolution,
+  - preview output,
+  - interactive slug confirmation when `--apply` is not set.
+- Updated CLI docs:
+  - `src/dnadesign/opal/docs/reference/cli.md`
+- Updated tests:
+  - `src/dnadesign/opal/tests/test_cli_campaign_reset.py`
+    - non-demo reset without extra flags now passes,
+    - removed flag path now rejected as unknown option.
+
+Validation:
+- `uv run pytest -q src/dnadesign/opal/tests/test_cli_campaign_reset.py` -> PASS
+- `uv run pytest -q src/dnadesign/opal/tests` -> PASS
+- `uv run ruff check src/dnadesign/opal/src src/dnadesign/opal/tests src/dnadesign/opal/docs` -> PASS
+- Manual CLI check:
+  - non-demo slug (`alpha_campaign`) reset via `uv run opal campaign-reset -c <config> --apply --no-backup` -> PASS
