@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/objectives/sfxi_v1.py
 
-Module Author(s): Elm Markert, Eric J. South
+Module Author(s): Eric J. South, Elm Markert
 --------------------------------------------------------------------------------
 """
 

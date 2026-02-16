@@ -6,7 +6,7 @@ src/dnadesign/opal/src/selection/expected_improvement.py
 Ranks candidates with expected-improvement acquisition using explicit
 score/uncertainty channel inputs.
 
-Module Author(s): Elm Markert, Eric J. South
+Module Author(s): Elm Markert
 --------------------------------------------------------------------------------
 """
 

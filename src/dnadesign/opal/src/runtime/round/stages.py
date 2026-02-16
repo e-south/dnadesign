@@ -6,7 +6,7 @@ src/dnadesign/opal/src/runtime/round/stages.py
 Implements core round stages for OPAL execution (training, scoring, selection).
 Each stage returns a typed bundle for the next stage.
 
-Module Author(s): Elm Markert, Eric J. South
+Module Author(s): Eric J. South, Elm Markert
 --------------------------------------------------------------------------------
 """
 

@@ -6,7 +6,7 @@ src/dnadesign/opal/src/models/gaussian_process.py
 Implements the Gaussian Process model plugin and emits predictive uncertainty
 to RoundCtx for objective/selection consumption.
 
-Module Author(s): Elm Markert, Eric J. South
+Module Author(s): Elm Markert
 --------------------------------------------------------------------------------
 """
 

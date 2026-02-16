@@ -1,5 +1,3 @@
-# ABOUTME: Resolve OPAL campaign config paths from explicit CLI/env inputs.
-# ABOUTME: Supports configs/ layout and campaign root discovery.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

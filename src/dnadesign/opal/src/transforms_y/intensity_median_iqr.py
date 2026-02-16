@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/transforms_y/intensity_median_iqr.py
 
-Module Author(s): Elm Markert, Eric J. South
+Module Author(s): Eric J. South, Elm Markert
 --------------------------------------------------------------------------------
 """
 
