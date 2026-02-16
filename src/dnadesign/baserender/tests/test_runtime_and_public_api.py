@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 import pytest
 
 import dnadesign.baserender as baserender
-from dnadesign.baserender import render_parquet_record_figure
+from dnadesign.baserender import load_records_from_parquet, render_parquet_record_figure
 from dnadesign.baserender.src.core import ContractError, RenderingError
 from dnadesign.baserender.src.core.record import Display, Feature
 from dnadesign.baserender.src.core.registry import (
@@ -79,11 +79,70 @@ def test_public_parquet_render_helper_renders_record_figure(tmp_path) -> None:
             "sequence": "sequence",
             "annotations": "densegen__used_tfbs_detail",
             "id": "id",
-            "details": "details",
+            "overlay_text": "details",
         },
     )
     assert fig is not None
     plt.close(fig)
+
+
+def test_public_batch_parquet_record_loader_returns_requested_order(tmp_path) -> None:
+    parquet = write_parquet(
+        tmp_path / "input.parquet",
+        [
+            {
+                "id": "r1",
+                "sequence": "TTGACAAAAAAAAAAAAAAAATATAAT",
+                "densegen__used_tfbs_detail": [
+                    {"tf": "lexA", "orientation": "fwd", "tfbs": "TTGACA", "offset": 0},
+                ],
+            },
+            {
+                "id": "r2",
+                "sequence": "TTGACAAAAAAAAAAAAAAAATATAAT",
+                "densegen__used_tfbs_detail": [
+                    {"tf": "cpxR", "orientation": "fwd", "tfbs": "TATAAT", "offset": 23},
+                ],
+            },
+        ],
+    )
+    records = load_records_from_parquet(
+        dataset_path=parquet,
+        record_ids=["r2", "r1"],
+        adapter_kind="densegen_tfbs",
+        adapter_columns={
+            "sequence": "sequence",
+            "annotations": "densegen__used_tfbs_detail",
+            "id": "id",
+        },
+    )
+    assert [record.id for record in records] == ["r2", "r1"]
+
+
+def test_public_batch_parquet_record_loader_raises_on_missing_record_ids(tmp_path) -> None:
+    parquet = write_parquet(
+        tmp_path / "input.parquet",
+        [
+            {
+                "id": "r1",
+                "sequence": "TTGACAAAAAAAAAAAAAAAATATAAT",
+                "densegen__used_tfbs_detail": [
+                    {"tf": "lexA", "orientation": "fwd", "tfbs": "TTGACA", "offset": 0},
+                ],
+            }
+        ],
+    )
+    with pytest.raises(baserender.SchemaError, match="Records not found"):
+        load_records_from_parquet(
+            dataset_path=parquet,
+            record_ids=["r1", "missing"],
+            adapter_kind="densegen_tfbs",
+            adapter_columns={
+                "sequence": "sequence",
+                "annotations": "densegen__used_tfbs_detail",
+                "id": "id",
+            },
+        )
 
 
 def test_public_api_does_not_export_tool_specific_helpers() -> None:

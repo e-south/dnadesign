@@ -8,7 +8,6 @@ input:
       sequence: sequence
       annotations: densegen__used_tfbs_detail
       id: id
-      details: details
     policies: {}
   alphabet: DNA
 render:
@@ -17,8 +16,9 @@ render:
     preset: presentation_default
     overrides:
       palette:
-        tf:lexa: "#1f77b4"
-        tf:cpxr: "#2ca02c"
+        tf:tf_a: "#1f77b4"
+        tf:tf_b: "#2ca02c"
+        tf:tf_c: "#d62728"
       legend_font_size: 10
       connector_alpha: 0.35
 outputs:

@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
+import numpy as np
 import yaml
 
 from ..core import Record, SchemaError, SkipRecord, Span
@@ -24,6 +25,73 @@ _CRUNCHER_POLICY_DEFAULTS: dict[str, str] = {
     "on_missing_hit": "error",
     "on_missing_pwm": "error",
 }
+
+
+@dataclass(frozen=True)
+class _SamplingWindow:
+    sequence_length: int
+    maxw: int | None
+    strategy: str
+
+    @property
+    def max_allowed(self) -> int:
+        return self.sequence_length if self.maxw is None else min(self.maxw, self.sequence_length)
+
+
+def _resolve_sampling_window(cruncher_cfg: Mapping[str, Any]) -> _SamplingWindow | None:
+    sample_cfg = cruncher_cfg.get("sample")
+    if not isinstance(sample_cfg, Mapping):
+        return None
+
+    motif_width = sample_cfg.get("motif_width")
+    if motif_width is None:
+        return None
+    if not isinstance(motif_width, Mapping):
+        raise SchemaError("cruncher_best_window config_path sample.motif_width must be a mapping")
+
+    seq_len = sample_cfg.get("sequence_length")
+    if not isinstance(seq_len, int) or seq_len < 1:
+        raise SchemaError("cruncher_best_window config_path sample.sequence_length must be an integer >= 1")
+
+    maxw_raw = motif_width.get("maxw")
+    if maxw_raw is None:
+        maxw = None
+    else:
+        try:
+            maxw = int(maxw_raw)
+        except Exception as exc:
+            raise SchemaError(
+                "cruncher_best_window config_path sample.motif_width.maxw must be an integer >= 1"
+            ) from exc
+        if maxw < 1:
+            raise SchemaError("cruncher_best_window config_path sample.motif_width.maxw must be >= 1")
+
+    strategy = str(motif_width.get("strategy") or "max_info").strip()
+    if strategy != "max_info":
+        raise SchemaError("cruncher_best_window config_path sample.motif_width.strategy must be 'max_info'")
+    return _SamplingWindow(sequence_length=seq_len, maxw=maxw, strategy=strategy)
+
+
+def _select_max_info_window(matrix: list[list[float]], *, length: int) -> list[list[float]]:
+    if length < 1:
+        raise SchemaError("cruncher_best_window PWM window length must be >= 1")
+    if length > len(matrix):
+        raise SchemaError(f"cruncher_best_window PWM window length ({length}) exceeds matrix length ({len(matrix)})")
+    if length == len(matrix):
+        return matrix
+
+    arr = np.asarray(matrix, dtype=float)
+    best_start = 0
+    best_score = float("-inf")
+    last_start = arr.shape[0] - length
+    for start in range(last_start + 1):
+        window = arr[start : start + length]
+        p = window + 1e-9
+        score = float((2 + (p * np.log2(p)).sum(axis=1)).sum())
+        if score > best_score:
+            best_score = score
+            best_start = start
+    return [[float(x) for x in row] for row in arr[best_start : best_start + length].tolist()]
 
 
 @dataclass(frozen=True)
@@ -90,6 +158,7 @@ class CruncherBestWindowAdapter:
         pwms_info = cruncher.get("pwms_info")
         if not isinstance(pwms_info, Mapping):
             raise SchemaError("cruncher_best_window config_path missing 'cruncher.pwms_info'")
+        sampling_window = _resolve_sampling_window(cruncher)
 
         pwm_by_tf: dict[str, list[list[float]]] = {}
         for tf, info in pwms_info.items():
@@ -97,7 +166,10 @@ class CruncherBestWindowAdapter:
                 continue
             matrix = info.get("pwm_matrix")
             if isinstance(matrix, list) and matrix:
-                pwm_by_tf[str(tf)] = [[float(x) for x in row] for row in matrix]
+                parsed_matrix = [[float(x) for x in row] for row in matrix]
+                if sampling_window is not None and len(parsed_matrix) > sampling_window.max_allowed:
+                    parsed_matrix = _select_max_info_window(parsed_matrix, length=sampling_window.max_allowed)
+                pwm_by_tf[str(tf)] = parsed_matrix
 
         if not pwm_by_tf:
             raise SchemaError("cruncher_best_window could not load any PWM matrices from config_path")
@@ -186,6 +258,11 @@ class CruncherBestWindowAdapter:
                 if policy == "skip_effect":
                     continue
                 raise SchemaError(f"cruncher_best_window missing PWM matrix for tf='{tf}'")
+            if len(matrix) != len(window):
+                raise SchemaError(
+                    "cruncher_best_window PWM matrix length mismatch for tf="
+                    f"'{tf}': matrix={len(matrix)} hit_window={len(window)} elite_id={record_id}"
+                )
 
             effects.append(
                 Effect(

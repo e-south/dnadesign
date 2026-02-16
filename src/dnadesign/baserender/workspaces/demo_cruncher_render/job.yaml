@@ -12,10 +12,6 @@ input:
       id: id
     policies: {}
   alphabet: DNA
-pipeline:
-  plugins:
-    - attach_motifs_from_library:
-        library_path: inputs/motif_library.json
 render:
   renderer: sequence_rows
   style:

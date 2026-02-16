@@ -5,10 +5,11 @@ Single technical reference for operators and integrators.
 ## Documentation Policy (YAGNI + Kaizen)
 
 - Keep documentation compact and role-oriented:
-  - `README.md` for operator overview and quickstart
-  - `docs/reference.md` for contracts and architecture
+  - `README.md` for package overview and quickstart
+  - `docs/reference.md` for architecture and core contracts
+  - `docs/integrations/*.md` for tool-specific schema contracts
   - `docs/demos/workspaces.md` for workspace/demo operations
-- Add a new `.md` file only when a topic cannot stay clear in the existing three.
+- Keep tool-specific content out of `README.md`.
 - Prefer executable examples (`docs/examples/*.yaml`) over prose-heavy guides.
 - Update existing sections before adding parallel docs with overlapping scope.
 
@@ -108,7 +109,7 @@ Notable sequence-tone keys:
 - `style.sequence.non_consensus_color` defines the light endpoint
 - `style.sequence.tone_quantile_low` / `style.sequence.tone_quantile_high` control quantile min-max normalization
 
-For the concrete Cruncher demo mapping from style inputs to visual outputs, see `docs/demos/workspaces.md`.
+For tool-specific style interpretation, see `docs/integrations/cruncher.md`.
 
 ## Output and Report Semantics
 
@@ -133,6 +134,8 @@ Default `results_root`:
 Stable API surface:
 - `validate_job`, `run_job`, `render`
 - `validate_sequence_rows_job`, `run_sequence_rows_job`
+- `load_record_from_parquet`, `load_records_from_parquet`
+- `render_record_figure`, `render_record_grid_figure`, `render_parquet_record_figure`
 - `Record`, `Feature`, `Effect`, `Display`, `Span`
 - `SchemaError`, `ContractError`, `LayoutError`
 
@@ -148,6 +151,10 @@ Compatibility aliases:
 Boundary rule:
 - supported imports: `dnadesign.baserender`
 - unsupported/private imports: `dnadesign.baserender.src.*`
+
+Tool-specific wiring examples live in:
+- `docs/integrations/densegen.md`
+- `docs/integrations/cruncher.md`
 
 ## Runtime Flow
 

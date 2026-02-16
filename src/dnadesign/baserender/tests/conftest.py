@@ -46,7 +46,7 @@ def densegen_job_payload(
                     "sequence": "sequence",
                     "annotations": "densegen__used_tfbs_detail",
                     "id": "id",
-                    "details": "details",
+                    "overlay_text": "details",
                 },
                 "policies": {},
             },

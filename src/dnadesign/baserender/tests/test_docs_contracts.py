@@ -24,6 +24,9 @@ def test_docs_surface_stays_compact() -> None:
     assert docs_md == [
         "docs/demos/workspaces.md",
         "docs/dev/journal.md",
+        "docs/integrations/README.md",
+        "docs/integrations/cruncher.md",
+        "docs/integrations/densegen.md",
         "docs/reference.md",
     ]
 
@@ -32,7 +35,15 @@ def test_readme_points_to_single_reference_and_examples() -> None:
     readme = (_pkg_root() / "README.md").read_text()
     assert "docs/reference.md" in readme
     assert "docs/demos/workspaces.md" in readme
+    assert "docs/integrations/README.md" in readme
     assert "docs/examples/*.yaml" in readme
+
+
+def test_readme_stays_tool_agnostic() -> None:
+    readme = (_pkg_root() / "README.md").read_text()
+    assert "densegen_notebook_render_contract" not in readme
+    assert "demo_densegen_render" not in readme
+    assert "demo_cruncher_render" not in readme
 
 
 def test_workspace_demo_guide_matches_output_contract() -> None:

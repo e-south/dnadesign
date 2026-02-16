@@ -35,7 +35,7 @@ def test_densegen_adapter_yields_valid_record_and_renderer_works(tmp_path) -> No
             "sequence": "sequence",
             "annotations": "densegen__used_tfbs_detail",
             "id": "id",
-            "details": "details",
+            "overlay_text": "details",
         },
         policies={},
         alphabet="DNA",
@@ -44,7 +44,7 @@ def test_densegen_adapter_yields_valid_record_and_renderer_works(tmp_path) -> No
     record = adapter.apply(row, row_index=0)
     assert record.id == "row1"
     assert len(record.features) == 2
-    assert record.display.tag_labels.get("tf:lexa") == "lexa"
+    assert record.display.tag_labels.get("tf:lexA") == "lexA"
 
     style = resolve_style(preset=None, overrides={})
     palette = Palette(style.palette)
@@ -52,3 +52,51 @@ def test_densegen_adapter_yields_valid_record_and_renderer_works(tmp_path) -> No
     fig = render_record(record, renderer_name="sequence_rows", style=style, palette=palette)
     assert fig is not None
     plt.close(fig)
+
+
+def test_densegen_adapter_treats_zero_offset_as_explicit_coordinate() -> None:
+    row = {
+        "id": "row1",
+        "sequence": "AAAAAA",
+        "densegen__used_tfbs_detail": [
+            {"tf": "lexA", "orientation": "fwd", "tfbs": "AAA", "offset": 0},
+        ],
+    }
+    adapter = DensegenTfbsAdapter(
+        columns={
+            "sequence": "sequence",
+            "annotations": "densegen__used_tfbs_detail",
+            "id": "id",
+        },
+        policies={},
+        alphabet="DNA",
+    )
+
+    record = adapter.apply(row, row_index=0)
+    assert len(record.features) == 1
+    assert record.features[0].span.start == 0
+
+
+def test_densegen_adapter_preserves_tf_case_in_tags_and_attrs() -> None:
+    row = {
+        "id": "row1",
+        "sequence": "AAAAAA",
+        "densegen__used_tfbs_detail": [
+            {"tf": "LexA", "orientation": "fwd", "tfbs": "AAA", "offset": 0},
+        ],
+    }
+    adapter = DensegenTfbsAdapter(
+        columns={
+            "sequence": "sequence",
+            "annotations": "densegen__used_tfbs_detail",
+            "id": "id",
+        },
+        policies={},
+        alphabet="DNA",
+    )
+
+    record = adapter.apply(row, row_index=0)
+    assert len(record.features) == 1
+    assert record.features[0].tags == ("tf:LexA",)
+    assert record.features[0].attrs.get("tf") == "LexA"
+    assert record.display.tag_labels.get("tf:LexA") == "LexA"
