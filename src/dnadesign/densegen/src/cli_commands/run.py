@@ -505,6 +505,12 @@ def _handle_run_runtime_error(
             "no need to run `uv run dense stage-b build-libraries`"
         )
         raise typer.Exit(code=1)
+    if "USR registry not found at " in message:
+        console.print(f"[bold red]{message}[/]")
+        console.print("[bold]Next steps[/]:")
+        console.print("  - stage your run via `dense workspace init --output-mode usr|both` to seed registry.yaml")
+        console.print("  - or create `<output.usr.root>/registry.yaml` before running `dense run`")
+        raise typer.Exit(code=1)
     if "Exceeded max_seconds_per_plan=" in message:
         console.print(f"[bold red]{message}[/]")
         console.print("[bold]Next steps[/]:")

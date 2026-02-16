@@ -479,6 +479,33 @@ def test_run_handles_max_seconds_runtime_errors_with_actionable_next_steps(
     assert "Traceback" not in result.output
 
 
+def test_run_handles_missing_usr_registry_runtime_errors_with_actionable_next_steps(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_config(run_root)
+
+    def _fake_run_pipeline(*_args, **_kwargs):
+        raise RuntimeError(
+            "USR registry not found at /tmp/demo/outputs/usr_datasets/registry.yaml. "
+            "Create registry.yaml before writing USR outputs."
+        )
+
+    monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
+    runner = CliRunner()
+    result = runner.invoke(app, ["run", "-c", str(cfg_path)])
+
+    assert result.exit_code != 0, result.output
+    normalized = result.output.replace("\n", " ")
+    assert "USR registry not found" in normalized
+    assert "workspace init --output-mode usr|both" in normalized
+    assert "registry.yaml" in normalized
+    assert "Traceback" not in result.output
+
+
 def test_run_fresh_rebuilds_stage_a(tmp_path: Path, monkeypatch) -> None:
     run_root = tmp_path / "run"
     run_root.mkdir(parents=True)
