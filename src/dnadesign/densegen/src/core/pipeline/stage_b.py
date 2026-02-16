@@ -64,7 +64,16 @@ def _fixed_elements_dump(fixed_elements) -> dict:
 
     pcs_raw = dump.get("promoter_constraints") or []
     pcs = []
-    keys = ("name", "upstream", "downstream", "spacer_length", "upstream_pos", "downstream_pos")
+    keys = (
+        "name",
+        "upstream",
+        "downstream",
+        "upstream_variant_id",
+        "downstream_variant_id",
+        "spacer_length",
+        "upstream_pos",
+        "downstream_pos",
+    )
     for pc in pcs_raw:
         if hasattr(pc, "model_dump"):
             pc = pc.model_dump()
