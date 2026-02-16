@@ -30,7 +30,7 @@ def _write_pred_parts(pred_dir: Path) -> None:
             "run_id": ["run-a", "run-b"],
             "as_of_round": [1, 2],
             "id": ["a1", "b1"],
-            "pred__y_obj_scalar": [0.1, 0.2],
+            "pred__score_selected": [0.1, 0.2],
         }
     ).write_parquet(pred_dir / "part-0.parquet")
 

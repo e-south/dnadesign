@@ -91,6 +91,11 @@ class ScoreBundle:
     obj_name: str
     obj_params: Dict[str, Any]
     obj_mode: str
+    objective_defs: List[Dict[str, Any]]
+    score_channels: Dict[str, np.ndarray]
+    uncertainty_channels: Dict[str, np.ndarray]
+    score_ref: str
+    uncertainty_ref: Optional[str]
     sel_name: str
     sel_params: Dict[str, Any]
     tie_handling: str
@@ -100,6 +105,8 @@ class ScoreBundle:
     selected_effective: int
     top_k: int
     obj_sha: str
+    scores: np.ndarray
+    uq_scalar: Optional[np.ndarray]
 
 
 @dataclass(frozen=True)

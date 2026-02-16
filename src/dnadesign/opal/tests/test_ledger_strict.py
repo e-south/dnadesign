@@ -26,7 +26,7 @@ def test_ledger_rejects_unknown_columns(tmp_path):
             "id": ["x"],
             "pred__y_dim": [1],
             "pred__y_hat_model": [[0.1]],
-            "pred__y_obj_scalar": [0.2],
+            "pred__score_selected": [0.2],
             "sel__rank_competition": [1],
             "sel__is_selected": [True],
             "unexpected": [123],

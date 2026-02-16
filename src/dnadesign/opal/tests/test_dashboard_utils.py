@@ -336,7 +336,7 @@ def test_ensure_selection_columns() -> None:
         df,
         id_col="id",
         score_col="score",
-        selection_params={"top_k": 1, "objective_mode": "maximize"},
+        selection_params={"top_k": 1, "objective_mode": "maximize", "tie_handling": "competition_rank"},
         rank_col="rank",
         top_k_col="top_k",
     )
@@ -345,6 +345,24 @@ def test_ensure_selection_columns() -> None:
     assert "top_k" in df_out.columns
     assert len(df_out["rank"]) == 3
     assert warnings == []
+
+
+def test_ensure_selection_columns_does_not_swallow_unexpected_overlay_errors(monkeypatch) -> None:
+    df = pl.DataFrame({"id": ["a", "b"], "score": [0.3, 0.1]})
+    monkeypatch.setattr(
+        selection,
+        "compute_selection_overlay",
+        lambda **_: (_ for _ in ()).throw(RuntimeError("overlay failure")),
+    )
+    with pytest.raises(RuntimeError, match="overlay failure"):
+        selection.ensure_selection_columns(
+            df,
+            id_col="id",
+            score_col="score",
+            selection_params={"top_k": 1, "objective_mode": "maximize", "tie_handling": "competition_rank"},
+            rank_col="rank",
+            top_k_col="top_k",
+        )
 
 
 def test_build_umap_overlay_charts() -> None:
@@ -932,6 +950,12 @@ def test_selection_coercion() -> None:
     assert selection.coerce_selection_dataframe(df) is df
 
 
+def test_selection_coercion_does_not_swallow_unexpected_errors(monkeypatch) -> None:
+    monkeypatch.setattr(selection.pl, "from_pandas", lambda _: (_ for _ in ()).throw(RuntimeError("boom")))
+    with pytest.raises(RuntimeError, match="boom"):
+        selection.coerce_selection_dataframe({"a": [1]})
+
+
 def test_list_series_to_numpy() -> None:
     series = pl.Series("x", [[1.0, 2.0], [3.0, 4.0]])
     arr = util.list_series_to_numpy(series, expected_len=2)
@@ -945,16 +969,27 @@ def test_resolve_objective_mode_aliases() -> None:
     assert mode == "minimize"
     assert warnings == []
 
-    mode, warnings = selection.resolve_objective_mode({"objective": "minimize"})
-    assert mode == "minimize"
-    assert warnings
+    with pytest.raises(ValueError, match="objective_mode"):
+        selection.resolve_objective_mode({"objective": "minimize"})
 
-    mode, warnings = selection.resolve_objective_mode({"objective": "unknown"})
+    with pytest.raises(ValueError, match="objective_mode"):
+        selection.resolve_objective_mode({"objective": "unknown"})
+
+    mode, warnings = selection.resolve_objective_mode({"objective_mode": "maximize", "objective": "minimize"})
     assert mode == "maximize"
-    assert warnings
+    assert warnings == []
 
-    with pytest.raises(ValueError):
-        selection.resolve_objective_mode({"objective_mode": "maximize", "objective": "minimize"})
+
+def test_compute_selection_overlay_requires_explicit_tie_handling() -> None:
+    ids = np.asarray(["a", "b", "c"], dtype=str)
+    scores = np.asarray([0.5, 0.8, 0.2], dtype=float)
+
+    with pytest.raises(ValueError, match="tie_handling"):
+        selection.compute_selection_overlay(
+            ids=ids,
+            scores=scores,
+            selection_params={"top_k": 2, "objective_mode": "maximize"},
+        )
 
 
 def test_build_label_events_parsing_variants() -> None:

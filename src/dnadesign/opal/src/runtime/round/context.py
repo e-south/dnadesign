@@ -27,9 +27,10 @@ def build_round_ctx(
     n_train: int,
 ) -> Tuple[str, PluginRegistryView, RoundCtx]:
     run_id = f"r{int(as_of_round)}-{now_iso()}"
+    primary_objective = cfg.objectives.objectives[0].name
     reg = PluginRegistryView(
         model=cfg.model.name,
-        objective=cfg.objective.objective.name,
+        objective=primary_objective,
         selection=cfg.selection.selection.name,
         transform_x=cfg.data.transforms_x.name,
         transform_y=cfg.data.transforms_y.name,
@@ -43,6 +44,7 @@ def build_round_ctx(
             "core/plugins/transforms_x/name": reg.transform_x,
             "core/plugins/transforms_y/name": reg.transform_y,
             "core/plugins/model/name": reg.model,
+            "core/plugins/objectives/names": [o.name for o in cfg.objectives.objectives],
             "core/plugins/objective/name": reg.objective,
             "core/plugins/selection/name": reg.selection,
             "core/data/y_dim": int(y_dim),

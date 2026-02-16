@@ -93,7 +93,7 @@ def build_record_report(
         "id",
         "sequence",
         "pred__y_dim",
-        "pred__y_obj_scalar",
+        "pred__score_selected",
         "sel__rank_competition",
         "sel__is_selected",
     ]

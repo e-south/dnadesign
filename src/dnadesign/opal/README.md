@@ -4,8 +4,8 @@
 
 - **Train** a top-layer regressor on your chosen representation **X** and label **Y**.
 - **Predict** every candidate sample with **X** present.
-- **Reduce** each prediction Ŷ to a scalar **score** via your configured **objective** → `pred__y_obj_scalar`.
-- **Rank** candidates by that score and **select top-k**.
+- **Evaluate** configured **objectives** into named score/uncertainty channels (for example `sfxi_v1/sfxi`).
+- **Select** top-k using explicit channel refs (`selection.params.score_ref`, optional `uncertainty_ref`).
 - **Append** runtime events to **ledger sinks** under **`outputs/`** (per-round predictions + run metadata).
 - **Persist** artifacts per round (model, selection CSV, round context, objective meta, logs) for auditability.
 
@@ -106,7 +106,8 @@ uv run --project /path/to/dnadesign opal --help
   * `outputs/ledger/runs.parquet`
     - Plugin configs, counts, objective summaries, artifact hashes, versions.
   * `outputs/ledger/predictions/`
-    - Ŷ vector, scalar score, selection rank/flag, and row-level diagnostics (e.g., logic fidelity/effects).
+    - Ŷ vector, selected score/channel refs, optional selected uncertainty/channel ref, selection rank/flag, and row-level diagnostics.
+    - Channel payloads are persisted under `pred__score_channels` and `pred__uncertainty_channels`.
     - `pred__y_hat_model` is in objective-space.
   * `outputs/ledger/labels.parquet`
     - 1 row per label event (observed round, id, y).
@@ -134,8 +135,8 @@ src/dnadesign/opal/src/
 ├─ transforms_x/            # X transforms (import = register)
 ├─ transforms_y/            # Y ingests (import = register)
 ├─ models/                  # model wrappers (e.g., RandomForest)
-├─ objectives/              # objective fns (Ŷ → scalar score + diagnostics)
-├─ selection/               # selection strategies (scores → ranks/selected)
+├─ objectives/              # objective fns (Ŷ → named score/uncertainty channels + diagnostics)
+├─ selection/               # selection strategies (selected score/uncertainty channel → ranks/selected)
 ├─ plots/                   # plot plugins
 ├─ core/                    # RoundCtx, console helpers, core utils/errors
 ├─ runtime/                 # run_round, ingest, predict, explain, preflight, round_plan
@@ -211,6 +212,7 @@ Core docs now live under `src/dnadesign/opal/docs/` with explicit concept/refere
   * [`docs/objectives/sfxi.md`](./docs/objectives/sfxi.md)
   * [`docs/objectives/spop.md`](./docs/objectives/spop.md)
 * Demo:
+  * [`docs/guides/demos/README.md`](./docs/guides/demos/README.md)
   * [`docs/guides/demo-sfxi.md`](./docs/guides/demo-sfxi.md)
 * Internal notes:
   * [`docs/internal/journal.md`](./docs/internal/journal.md)
@@ -222,9 +224,15 @@ Core docs now live under `src/dnadesign/opal/docs/` with explicit concept/refere
 
 Use the docs hub for task-oriented navigation: [`docs/README.md`](./docs/README.md).
 
-## Demo campaign
+## Demo campaigns
 
-See the **[Demo Guide](./docs/guides/demo-sfxi.md)** for a runnable example using `sfxi_v1` (vec8) with a Random Forest model.
+Campaign-scoped demo flows:
+
+- RF + SFXI + top_n: `src/dnadesign/opal/campaigns/demo_rf_sfxi_topn/`
+- GP + SFXI + top_n: `src/dnadesign/opal/campaigns/demo_gp_topn/`
+- GP + SFXI + expected_improvement: `src/dnadesign/opal/campaigns/demo_gp_ei/`
+
+Start from the **[Demo flow index](./docs/guides/demos/README.md)**, then follow the flow-specific guide with sequential commands.
 
 ---
 

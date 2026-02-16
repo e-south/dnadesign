@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/transforms_y/intensity_median_iqr.py
 
-Module Author(s): Eric J. South
+Module Author(s): Elm Markert, Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -20,6 +20,41 @@ class _Params(BaseModel):
     center: str = Field(default="median", pattern="^(median)$")
     scale: str = Field(default="iqr", pattern="^(iqr)$")
     eps: float = 1e-8
+
+
+def _required_ctx_key(ctx, key: str):
+    if ctx is None:
+        raise ValueError("intensity_median_iqr requires ctx state.")
+    sentinel = object()
+    val = ctx.get(key, sentinel)
+    if val is sentinel:
+        raise ValueError(f"intensity_median_iqr missing required context key: {key}.")
+    return val
+
+
+def _required_center(ctx) -> np.ndarray:
+    center = np.asarray(_required_ctx_key(ctx, "yops/intensity_median_iqr/center"), dtype=float).reshape(-1)
+    if center.size != 4:
+        raise ValueError("intensity_median_iqr center must have length 4.")
+    if not np.all(np.isfinite(center)):
+        raise ValueError("intensity_median_iqr center must be finite.")
+    return center
+
+
+def _required_scale(ctx) -> np.ndarray:
+    scale = np.asarray(_required_ctx_key(ctx, "yops/intensity_median_iqr/scale"), dtype=float).reshape(-1)
+    if scale.size != 4:
+        raise ValueError("intensity_median_iqr scale must have length 4.")
+    if not np.all(np.isfinite(scale)) or np.any(scale <= 0.0):
+        raise ValueError("intensity_median_iqr scale must contain positive finite values.")
+    return scale
+
+
+def _required_eps(ctx) -> float:
+    eps = float(_required_ctx_key(ctx, "yops/intensity_median_iqr/eps"))
+    if not np.isfinite(eps) or eps <= 0.0:
+        raise ValueError("intensity_median_iqr eps must be positive finite.")
+    return eps
 
 
 def _fit(Y: np.ndarray, params: _Params, ctx=None) -> None:
@@ -53,35 +88,62 @@ def _fit(Y: np.ndarray, params: _Params, ctx=None) -> None:
 
 
 def _transform(Y: np.ndarray, params: _Params, ctx=None) -> np.ndarray:
+    del params
     Y = np.asarray(Y, dtype=float)
     if Y.ndim == 1:
         Y = Y.reshape(-1, 1)
-    if ctx is not None and not ctx.get("yops/intensity_median_iqr/enabled", True):
+    enabled = bool(_required_ctx_key(ctx, "yops/intensity_median_iqr/enabled"))
+    if not enabled:
         return Y
     if Y.shape[1] < 8:
         return Y
-    med = np.asarray((ctx.get("yops/intensity_median_iqr/center") or [0, 0, 0, 0]), dtype=float)
-    iqr = np.asarray((ctx.get("yops/intensity_median_iqr/scale") or [1, 1, 1, 1]), dtype=float)
-    eps = float(ctx.get("yops/intensity_median_iqr/eps") or params.eps)
+    med = _required_center(ctx)
+    iqr = _required_scale(ctx)
+    _ = _required_eps(ctx)
 
     out = Y.copy()
-    out[:, 4:8] = (out[:, 4:8] - med[None, :]) / np.maximum(iqr[None, :], eps)
+    out[:, 4:8] = (out[:, 4:8] - med[None, :]) / iqr[None, :]
     return out
 
 
 def _inverse(Y: np.ndarray, params: _Params, ctx=None) -> np.ndarray:
+    del params
     Y = np.asarray(Y, dtype=float)
     if Y.ndim == 1:
         Y = Y.reshape(-1, 1)
-    if ctx is not None and not ctx.get("yops/intensity_median_iqr/enabled", True):
+    enabled = bool(_required_ctx_key(ctx, "yops/intensity_median_iqr/enabled"))
+    if not enabled:
         return Y
     if Y.shape[1] < 8:
         return Y
-    med = np.asarray((ctx.get("yops/intensity_median_iqr/center") or [0, 0, 0, 0]), dtype=float)
-    iqr = np.asarray((ctx.get("yops/intensity_median_iqr/scale") or [1, 1, 1, 1]), dtype=float)
+    med = _required_center(ctx)
+    iqr = _required_scale(ctx)
+    _ = _required_eps(ctx)
 
     out = Y.copy()
     out[:, 4:8] = out[:, 4:8] * iqr[None, :] + med[None, :]
+    return out
+
+
+def _inverse_std(Y: np.ndarray, params: _Params, ctx=None, *, y_pred_transformed=None) -> np.ndarray:
+    del params, y_pred_transformed
+    Y = np.asarray(Y, dtype=float)
+    if Y.ndim == 1:
+        Y = Y.reshape(-1, 1)
+    if not np.all(np.isfinite(Y)):
+        raise ValueError("intensity_median_iqr inverse_std expects finite values.")
+    if np.any(Y < 0.0):
+        raise ValueError("intensity_median_iqr inverse_std expects non-negative standard deviations.")
+    enabled = bool(_required_ctx_key(ctx, "yops/intensity_median_iqr/enabled"))
+    if not enabled:
+        return Y
+    if Y.shape[1] < 8:
+        return Y
+    iqr = _required_scale(ctx)
+    _ = _required_eps(ctx)
+
+    out = Y.copy()
+    out[:, 4:8] = out[:, 4:8] * iqr[None, :]
     return out
 
 
@@ -95,4 +157,5 @@ def _inverse(Y: np.ndarray, params: _Params, ctx=None) -> np.ndarray:
     ],
 )
 def _entry():
+    setattr(_inverse, "inverse_std", _inverse_std)
     return _fit, _transform, _inverse, _Params

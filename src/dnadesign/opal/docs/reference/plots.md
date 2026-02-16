@@ -72,7 +72,7 @@ plots:
   - name: fold_change_numeric
     preset: fold_change_base
     params:
-      hue: pred__y_obj_scalar
+      hue: pred__score_selected
       cbar: true
 ```
 

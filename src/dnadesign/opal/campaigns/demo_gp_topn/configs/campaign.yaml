@@ -1,0 +1,82 @@
+# OPAL demo campaign configuration: GP + SFXI + top_n
+
+campaign:
+  name: "Demo GP + SFXI + top_n"
+  slug: "demo_gp_topn"
+  workdir: "."
+
+data:
+  location: { kind: local, path: "records.parquet" }
+  x_column_name: "infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean"
+  y_column_name: "sfxi_8_vector_y_label"
+  y_expected_length: 8
+
+ingest:
+  duplicate_policy: "error"
+
+training:
+  policy:
+    cumulative_training: true
+    label_cross_round_deduplication_policy: "latest_only"
+    allow_resuggesting_candidates_until_labeled: true
+  y_ops:
+    - name: intensity_median_iqr
+      params:
+        min_labels: 5
+        center: median
+        scale: iqr
+        eps: 1e-8
+
+transforms_x: { name: identity, params: {} }
+transforms_y:
+  name: sfxi_vec8_from_table_v1
+  params:
+    sequence_column: sequence
+    logic_columns: ["v00", "v10", "v01", "v11"]
+    intensity_columns: ["y00_star", "y10_star", "y01_star", "y11_star"]
+    enforce_log2_offset_match: true
+    expected_log2_offset_delta: 0.0
+
+model:
+  name: gaussian_process
+  params:
+    alpha: 1.0e-6
+    normalize_y: true
+    n_restarts_optimizer: 2
+    kernel:
+      name: matern
+      length_scale: 0.5
+      nu: 1.5
+      with_white_noise: true
+
+objectives:
+  - name: "sfxi_v1"
+    params:
+      setpoint_vector: [0, 0, 0, 1]
+      logic_exponent_beta: 1.0
+      intensity_exponent_gamma: 1.0
+      intensity_log2_offset_delta: 0.0
+      scaling: { percentile: 95, min_n: 5, eps: 1.0e-8 }
+
+selection:
+  name: "top_n"
+  params:
+    top_k: 5
+    score_ref: "sfxi_v1/sfxi"
+    tie_handling: "competition_rank"
+    objective_mode: "maximize"
+
+scoring:
+  score_batch_size: 1000
+
+safety:
+  fail_on_mixed_biotype_or_alphabet: true
+  require_biotype_and_alphabet_on_init: true
+  conflict_policy_on_duplicate_ids: "error"
+  write_back_requires_columns_present: true
+  accept_x_mismatch: false
+
+metadata:
+  notes: "Campaign-scoped demo for GP + SFXI + top_n."
+
+plot_config: plots.yaml

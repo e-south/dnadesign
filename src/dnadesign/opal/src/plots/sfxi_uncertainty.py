@@ -126,7 +126,7 @@ def render(context, params: dict) -> None:
     if records_path is None:
         raise OpalError("records path not available in PlotContext.", ExitCodes.BAD_ARGS)
 
-    need = {"id", "pred__y_obj_scalar", "obj__logic_fidelity"}
+    need = {"id", "pred__score_selected", "obj__logic_fidelity"}
     if y_axis:
         need.add(y_axis)
     if hue:

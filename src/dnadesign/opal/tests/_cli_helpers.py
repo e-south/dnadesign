@@ -65,7 +65,9 @@ def write_campaign_yaml(
     objective_name: str = "sfxi_v1",
     objective_params: Optional[Dict[str, Any]] = None,
     y_expected_length: int = 8,
+    model_name: str = "random_forest",
     model_params: Optional[Dict[str, Any]] = None,
+    selection_name: str = "top_n",
     selection_params: Optional[Dict[str, Any]] = None,
     safety: Optional[Dict[str, Any]] = None,
 ) -> None:
@@ -75,8 +77,20 @@ def write_campaign_yaml(
         objective_params = {"setpoint_vector": [0, 0, 0, 1]}
     if model_params is None:
         model_params = {"n_estimators": 5, "random_state": 0, "oob_score": False}
-    if selection_params is None:
-        selection_params = {"top_k": 1}
+    score_channel = "sfxi" if objective_name == "sfxi_v1" else "scalar"
+    default_selection_params: Dict[str, Any] = {
+        "top_k": 1,
+        "score_ref": f"{objective_name}/{score_channel}",
+        "objective_mode": "maximize",
+        "tie_handling": "competition_rank",
+    }
+    if selection_name == "expected_improvement":
+        default_selection_params["uncertainty_ref"] = default_selection_params["score_ref"]
+    merged_selection_params = dict(default_selection_params)
+    if selection_params is not None:
+        merged_selection_params.update(selection_params)
+    if selection_name == "expected_improvement" and "uncertainty_ref" not in merged_selection_params:
+        merged_selection_params["uncertainty_ref"] = str(merged_selection_params["score_ref"])
     cfg: Dict[str, Any] = {
         "campaign": {"name": "Demo", "slug": slug, "workdir": str(workdir)},
         "data": {
@@ -87,9 +101,9 @@ def write_campaign_yaml(
         },
         "transforms_x": {"name": "identity", "params": {}},
         "transforms_y": {"name": transforms_y_name, "params": transforms_y_params},
-        "model": {"name": "random_forest", "params": model_params},
-        "objective": {"name": objective_name, "params": objective_params},
-        "selection": {"name": "top_n", "params": selection_params},
+        "model": {"name": model_name, "params": model_params},
+        "objectives": [{"name": objective_name, "params": objective_params}],
+        "selection": {"name": selection_name, "params": merged_selection_params},
     }
     if plots is not None:
         cfg["plots"] = plots
@@ -177,10 +191,9 @@ def write_ledger(workdir: Path, *, run_id: str, round_index: int = 0) -> None:
         ids=["a", "b"],
         sequences=["AAA", "BBB"],
         y_hat_model=y_hat,
-        y_obj_scalar=y_obj,
+        selected_score=y_obj,
+        selected_score_ref="sfxi_v1/sfxi",
         y_dim=1,
-        y_hat_model_sd=None,
-        y_obj_scalar_sd=None,
         obj_diagnostics={"logic_fidelity": np.array([1.0, 0.5])},
         sel_emit=sel_emit,
     )
@@ -197,9 +210,11 @@ def write_ledger(workdir: Path, *, run_id: str, round_index: int = 0) -> None:
         y_ingest_transform_params={},
         objective_name="sfxi_v1",
         objective_params={"setpoint_vector": [0, 0, 0, 1]},
+        objective_defs=[{"name": "sfxi_v1", "score_channels": ["sfxi_v1/sfxi"], "uncertainty_channels": []}],
         selection_name="top_n",
-        selection_params={"top_k": 1},
-        selection_score_field="pred__y_obj_scalar",
+        selection_params={"top_k": 1, "score_ref": "sfxi_v1/sfxi"},
+        selection_score_ref="sfxi_v1/sfxi",
+        selection_uncertainty_ref=None,
         selection_objective_mode="maximize",
         sel_tie_handling="competition_rank",
         stats_n_train=2,

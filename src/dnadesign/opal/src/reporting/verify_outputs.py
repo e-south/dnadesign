@@ -31,9 +31,9 @@ def read_selection_table(path: Path) -> pd.DataFrame:
 
 
 def resolve_selection_score_column(df: pd.DataFrame) -> str:
-    if "pred__y_obj_scalar" in df.columns:
-        return "pred__y_obj_scalar"
-    raise OpalError("Selection data missing pred__y_obj_scalar.")
+    if "pred__score_selected" in df.columns:
+        return "pred__score_selected"
+    raise OpalError("Selection data missing pred__score_selected.")
 
 
 def _extract_artifact_path(val: Any) -> Path | None:
@@ -74,7 +74,7 @@ def compare_selection_to_ledger(
     *,
     eps: float = 1e-6,
     id_col: str = "id",
-    ledger_score_col: str = "pred__y_obj_scalar",
+    ledger_score_col: str = "pred__score_selected",
 ) -> tuple[dict, pd.DataFrame]:
     if id_col not in selection_df.columns:
         raise OpalError(f"Selection data missing '{id_col}' column.")
@@ -89,6 +89,21 @@ def compare_selection_to_ledger(
     led = ledger_df[[id_col, ledger_score_col]].copy()
     sel[id_col] = sel[id_col].astype(str)
     led[id_col] = led[id_col].astype(str)
+
+    dup_sel_mask = sel[id_col].duplicated(keep=False)
+    if bool(dup_sel_mask.any()):
+        dup_ids = sorted(sel.loc[dup_sel_mask, id_col].astype(str).unique().tolist())
+        preview = dup_ids[:10]
+        suffix = "..." if len(dup_ids) > len(preview) else ""
+        raise OpalError(f"Selection data contains duplicate IDs: {preview}{suffix}")
+
+    missing_sel_mask = ~sel[id_col].isin(set(led[id_col]))
+    if bool(missing_sel_mask.any()):
+        missing_ids = sorted(sel.loc[missing_sel_mask, id_col].astype(str).unique().tolist())
+        preview = missing_ids[:10]
+        suffix = "..." if len(missing_ids) > len(preview) else ""
+        raise OpalError(f"Selection IDs absent from ledger predictions: {preview}{suffix}")
+
     sel[selection_score_col] = pd.to_numeric(sel[selection_score_col], errors="coerce")
     led[ledger_score_col] = pd.to_numeric(led[ledger_score_col], errors="coerce")
 

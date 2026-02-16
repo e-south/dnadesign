@@ -169,7 +169,7 @@ opal run --config <yaml> --round <r> \
 **Events appended** to **ledger sinks** under `outputs/`
 
 * `run_pred` → `outputs/ledger/predictions/` (one row per candidate with **`pred__y_hat_model`** and
-  **`pred__y_obj_scalar`**, selection rank/flag, and diagnostics).
+  **`pred__score_selected`**, selection rank/flag, and diagnostics).
 * `run_meta` → `outputs/ledger/runs.parquet` (one row per run with model/config/selection snapshot
   and artifact checksums).
 
@@ -308,7 +308,7 @@ opal verify-outputs --config <yaml> [--round <k|latest> | --run-id <id>] \
 **Notes**
 
 * Resolves the selection artifact path from `outputs/ledger/runs.parquet` when possible.
-* Uses the ledger’s `pred__y_obj_scalar` as the canonical score source.
+* Uses the ledger’s `pred__score_selected` as the canonical score source.
 * `--selection-path` accepts `.csv` or `.parquet`.
 * `--round, -r`: Round selector (integer or `latest`).
 * If the selected round has multiple runs, pass `--run-id` to disambiguate.
@@ -552,7 +552,7 @@ plots:
   - name: score_vs_rank_latest
     kind: scatter_score_vs_rank         # plot plugin id
     params:
-      score_field: "pred__y_obj_scalar" # field from run_pred rows
+      score_field: "pred__score_selected" # field from run_pred rows
       hue: null                         # or "round"
       highlight_selected: false
     output:

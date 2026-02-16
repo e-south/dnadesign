@@ -107,7 +107,7 @@ We reward any observed sponging and, because the dose series is ascending, earli
 
 **Per‑variant (`kind="run_pred"`):**
 
-* `pred__y_obj_scalar`: $Score_g$
+* `pred__score_selected`: $Score_g$
 * `pred__y_per_dose`: $[y_{g,0},...,y_{g,J}]$
 * `qc__viability_per_dose`: $[v_{g,0},...,v_{g,J}]$
 * `qc__baselines`: $B_g$ and `$ \tilde Z_{pos,g} $
@@ -115,7 +115,7 @@ We reward any observed sponging and, because the dose series is ascending, earli
 **Per‑run (`kind="run_meta"`):**
 
 * `obj__name`: "spop_v1"
-* `sel__score_field`: "pred__y_obj_scalar"
+* `selection__score_ref`: "pred__score_selected"
 * `obj__lambda`: $\lambda$
 * `obj__eps_od`: $\epsilon_{od}$
 * `obj__eps_pos`: $\epsilon_{pos}$

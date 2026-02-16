@@ -82,7 +82,8 @@ def _ensure_objective_contracts() -> None:
             produces=["objective/<self>/foo"],
         )
         @register_objective("test_obj_contract")
-        def _obj(*, y_pred, params, ctx=None, train_view=None):
+        def _obj(*, y_pred, params, ctx=None, train_view=None, y_pred_std=None):
+            del y_pred_std
             if ctx is not None:
                 _ = ctx.get("core/labels_as_of_round")
                 ctx.set("objective/<self>/foo", {"ok": True})
@@ -96,7 +97,8 @@ def _ensure_objective_contracts() -> None:
             produces=["objective/<self>/bar"],
         )
         @register_objective("test_obj_no_produce")
-        def _obj_missing(*, y_pred, params, ctx=None, train_view=None):
+        def _obj_missing(*, y_pred, params, ctx=None, train_view=None, y_pred_std=None):
+            del y_pred_std
             # Intentionally do not set required key
             return _ObjResult(score=np.ones(len(y_pred)), diagnostics={})
 
@@ -149,7 +151,8 @@ def _ensure_selection_contracts() -> None:
 def _ensure_objective_stage_contract() -> None:
     if "test_obj_stage_contract" not in list_objectives():
 
-        def _obj(*, y_pred, params, ctx=None, train_view=None):
+        def _obj(*, y_pred, params, ctx=None, train_view=None, y_pred_std=None):
+            del y_pred_std
             if ctx is not None:
                 _ = ctx.get("core/labels_as_of_round")
                 ctx.set("objective/<self>/stage_key", True)
@@ -388,7 +391,7 @@ def test_objective_contract_requires_and_audit():
     obj = get_objective("test_obj_contract")
     rctx = _rctx({"core/labels_as_of_round": 0})
     octx = rctx.for_plugin(category="objective", name="test_obj_contract", plugin=obj)
-    obj(y_pred=np.zeros((2, 1)), params={}, ctx=octx, train_view=None)
+    obj(y_pred=np.zeros((2, 1)), params={}, ctx=octx, train_view=None, y_pred_std=None)
     snap = rctx.snapshot()
     produced = snap.get("core/contracts/objective/test_obj_contract/produced", [])
     assert "objective/test_obj_contract/foo" in produced
@@ -400,7 +403,7 @@ def test_objective_contract_missing_requires():
     rctx = _rctx({})
     octx = rctx.for_plugin(category="objective", name="test_obj_contract", plugin=obj)
     with pytest.raises(RoundCtxContractError):
-        obj(y_pred=np.zeros((1, 1)), params={}, ctx=octx, train_view=None)
+        obj(y_pred=np.zeros((1, 1)), params={}, ctx=octx, train_view=None, y_pred_std=None)
 
 
 def test_objective_contract_missing_produces():
@@ -409,7 +412,7 @@ def test_objective_contract_missing_produces():
     rctx = _rctx({"core/labels_as_of_round": 0})
     octx = rctx.for_plugin(category="objective", name="test_obj_no_produce", plugin=obj)
     with pytest.raises(RoundCtxContractError):
-        obj(y_pred=np.zeros((1, 1)), params={}, ctx=octx, train_view=None)
+        obj(y_pred=np.zeros((1, 1)), params={}, ctx=octx, train_view=None, y_pred_std=None)
 
 
 def test_selection_contract_requires_and_audit():
@@ -417,7 +420,14 @@ def test_selection_contract_requires_and_audit():
     sel = get_selection("test_sel_contract", {})
     rctx = _rctx({"core/data/n_scored": 2})
     sctx = rctx.for_plugin(category="selection", name="test_sel_contract", plugin=sel)
-    out = sel(ids=np.array(["a", "b"]), scores=np.array([1.0, 0.5]), top_k=1, ctx=sctx)
+    out = sel(
+        ids=np.array(["a", "b"]),
+        scores=np.array([1.0, 0.5]),
+        top_k=1,
+        objective="maximize",
+        tie_handling="competition_rank",
+        ctx=sctx,
+    )
     assert "order_idx" in out
     snap = rctx.snapshot()
     produced = snap.get("core/contracts/selection/test_sel_contract/produced", [])
@@ -430,7 +440,141 @@ def test_selection_contract_missing_produces():
     rctx = _rctx({"core/data/n_scored": 1})
     sctx = rctx.for_plugin(category="selection", name="test_sel_no_produce", plugin=sel)
     with pytest.raises(RoundCtxContractError):
-        sel(ids=np.array(["a"]), scores=np.array([1.0]), top_k=1, ctx=sctx)
+        sel(
+            ids=np.array(["a"]),
+            scores=np.array([1.0]),
+            top_k=1,
+            objective="maximize",
+            tie_handling="competition_rank",
+            ctx=sctx,
+        )
+
+
+def test_get_selection_does_not_mask_factory_typeerror():
+    name = "test_sel_factory_typeerror"
+    if name not in list_selections():
+
+        @register_selection(name, factory=True)
+        def _factory(_params: Dict[str, Any]):
+            raise TypeError("factory-construction-failed")
+
+    with pytest.raises(TypeError, match="factory-construction-failed"):
+        _ = get_selection(name, {})
+
+
+def test_get_selection_rejects_unmarked_factory() -> None:
+    name = "test_sel_factory_requires_explicit_flag"
+    if name not in list_selections():
+
+        @register_selection(name)
+        def _factory(_params: Dict[str, Any]):
+            def _sel(*, ids, scores, top_k, objective, tie_handling, ctx=None, **_):
+                _ = top_k, objective, tie_handling, ctx
+                return {"order_idx": np.arange(len(ids)), "score": np.asarray(scores, dtype=float)}
+
+            return _sel
+
+    with pytest.raises(TypeError, match="factory=True"):
+        _ = get_selection(name, {})
+
+
+def test_get_selection_rejects_incomplete_selection_callable_signature():
+    name = "test_sel_missing_required_selection_args"
+    if name not in list_selections():
+
+        @register_selection(name)
+        def _bad_sel(*, ids, scores, top_k, ctx=None, **_):
+            return {"order_idx": np.arange(len(ids))}
+
+    with pytest.raises(TypeError, match="invalid callable signature"):
+        _ = get_selection(name, {})
+
+
+def test_get_selection_rejects_unbound_required_parameters():
+    name = "test_sel_requires_unbound_kwarg"
+    if name not in list_selections():
+
+        @register_selection(name)
+        def _bad_sel(
+            *,
+            ids,
+            scores,
+            top_k,
+            objective,
+            tie_handling,
+            extra_required,
+            ctx=None,
+            **_,
+        ):
+            _ = objective, tie_handling, extra_required, ctx
+            return {"order_idx": np.arange(len(ids)), "score": np.asarray(scores, dtype=float)}
+
+    with pytest.raises(TypeError, match="required parameter"):
+        _ = get_selection(name, {})
+
+
+def test_get_selection_allows_required_parameters_bound_from_params():
+    name = "test_sel_requires_param_bound_from_params"
+    if name not in list_selections():
+
+        @register_selection(name)
+        def _sel(
+            *,
+            ids,
+            scores,
+            top_k,
+            objective,
+            tie_handling,
+            alpha,
+            ctx=None,
+            **_,
+        ):
+            _ = top_k, objective, tie_handling, ctx
+            return {"order_idx": np.arange(len(ids)), "score": np.asarray(scores, dtype=float) + float(alpha)}
+
+    sel = get_selection(name, {"alpha": 0.5})
+    out = sel(
+        ids=np.array(["a", "b"]),
+        scores=np.array([1.0, 2.0]),
+        top_k=1,
+        objective="maximize",
+        tie_handling="competition_rank",
+        alpha=0.5,
+        ctx=None,
+    )
+    assert np.allclose(np.asarray(out["score"], dtype=float), np.array([1.5, 2.5], dtype=float))
+
+
+def test_get_selection_rejects_required_param_if_only_reserved_key_is_present():
+    name = "test_sel_requires_score_ref_kwarg"
+    if name not in list_selections():
+
+        @register_selection(name)
+        def _sel(
+            *,
+            ids,
+            scores,
+            top_k,
+            objective,
+            tie_handling,
+            score_ref,
+            ctx=None,
+            **_,
+        ):
+            _ = top_k, objective, tie_handling, score_ref, ctx
+            return {"order_idx": np.arange(len(ids)), "score": np.asarray(scores, dtype=float)}
+
+    with pytest.raises(TypeError, match="required parameter"):
+        _ = get_selection(name, {"score_ref": "obj/channel"})
+
+
+def test_selection_call_requires_explicit_mode_and_tie() -> None:
+    _ensure_selection_contracts()
+    sel = get_selection("test_sel_contract", {})
+    rctx = _rctx({"core/data/n_scored": 2})
+    sctx = rctx.for_plugin(category="selection", name="test_sel_contract", plugin=sel)
+    with pytest.raises(TypeError, match="required keyword-only argument"):
+        sel(ids=np.array(["a", "b"]), scores=np.array([1.0, 0.5]), top_k=1, ctx=sctx)
 
 
 def test_yops_contract_requires_and_produces():
@@ -643,7 +787,7 @@ def test_objective_stage_contract_via_registry():
     rctx = _rctx({"core/labels_as_of_round": 0})
     octx = rctx.for_plugin(category="objective", name="test_obj_stage_contract", plugin=obj)
     try:
-        obj(y_pred=np.zeros((2, 1)), params={}, ctx=octx, train_view=None)
+        obj(y_pred=np.zeros((2, 1)), params={}, ctx=octx, train_view=None, y_pred_std=None)
     except RoundCtxContractError as exc:
         pytest.fail(f"objective stage contracts should pass: {exc}")
     assert rctx.get("objective/test_obj_stage_contract/stage_key") is True
@@ -655,7 +799,14 @@ def test_selection_stage_contract_via_registry():
     rctx = _rctx({"core/data/n_scored": 2})
     sctx = rctx.for_plugin(category="selection", name="test_sel_stage_contract", plugin=sel)
     try:
-        sel(ids=np.array(["a", "b"]), scores=np.array([1.0, 0.5]), top_k=1, ctx=sctx)
+        sel(
+            ids=np.array(["a", "b"]),
+            scores=np.array([1.0, 0.5]),
+            top_k=1,
+            objective="maximize",
+            tie_handling="competition_rank",
+            ctx=sctx,
+        )
     except RoundCtxContractError as exc:
         pytest.fail(f"selection stage contracts should pass: {exc}")
     assert rctx.get("selection/test_sel_stage_contract/stage_note") == "ok"

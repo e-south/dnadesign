@@ -79,7 +79,7 @@ def verify_outputs(
 
         selection_df = read_selection_table(Path(sel_path))
         ledger_df = reader.read_predictions(
-            columns=["id", "pred__y_obj_scalar"],
+            columns=["id", "pred__score_selected"],
             round_selector=as_of_round,
             run_id=run_id,
         )

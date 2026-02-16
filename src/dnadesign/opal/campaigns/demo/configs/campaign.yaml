@@ -55,19 +55,20 @@ model:
     n_jobs: -1
     emit_feature_importance: true
 
-objective:
-  name: "sfxi_v1"
-  params:
-    setpoint_vector: [0, 0, 0, 1]
-    logic_exponent_beta: 1.0
-    intensity_exponent_gamma: 1.0
-    intensity_log2_offset_delta: 0.0
-    scaling: { percentile: 95, min_n: 5, eps: 1.0e-8 }
+objectives:
+  - name: "sfxi_v1"
+    params:
+      setpoint_vector: [0, 0, 0, 1]
+      logic_exponent_beta: 1.0
+      intensity_exponent_gamma: 1.0
+      intensity_log2_offset_delta: 0.0
+      scaling: { percentile: 95, min_n: 5, eps: 1.0e-8 }
 
 selection:
   name: "top_n"
   params:
     top_k: 5
+    score_ref: "sfxi_v1/sfxi"
     tie_handling: "competition_rank"
     objective_mode: "maximize"   # minimize|maximize
 

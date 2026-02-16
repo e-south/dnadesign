@@ -133,7 +133,7 @@ def cmd_objective_meta(
         if profile:
             run_id = str(rsel["run_id"])
             # Candidate columns: objective row-level diagnostics plus commonly useful fields
-            extras = ["pred__y_obj_scalar", "sel__rank_competition", "sel__is_selected"]
+            extras = ["pred__score_selected", "sel__rank_competition", "sel__is_selected"]
             cand_cols = sorted(list(set(obj_diag_cols + [c for c in extras if c in pred_schema])))
             need = ["id"] + cand_cols + ["as_of_round", "run_id"]
 

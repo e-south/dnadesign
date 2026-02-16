@@ -100,3 +100,15 @@ def test_config_discovery_configs_subdir(monkeypatch, tmp_path: Path) -> None:
     runner = CliRunner()
     res = runner.invoke(app, ["--no-color", "validate"])
     assert res.exit_code == 0, res.output
+
+
+def test_init_rejects_unknown_model_plugin(tmp_path: Path) -> None:
+    _, campaign = _setup_workspace(tmp_path)
+    text = campaign.read_text()
+    campaign.write_text(text.replace("name: random_forest", "name: unknown_model_v99", 1))
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(app, ["--no-color", "init", "--config", str(campaign)])
+    assert res.exit_code != 0
+    assert "Unknown model plugin 'unknown_model_v99'" in res.output

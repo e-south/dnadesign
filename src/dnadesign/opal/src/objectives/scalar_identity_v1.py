@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/objectives/scalar_identity_v1.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
@@ -13,21 +13,9 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 
+from ..core.objective_result import ObjectiveResultV2
 from ..core.round_context import PluginCtx, roundctx_contract
 from ..registries.objectives import register_objective
-
-
-class ObjectiveResult:
-    def __init__(
-        self,
-        *,
-        score: np.ndarray,
-        scalar_uncertainty: Optional[np.ndarray],
-        diagnostics: Dict[str, Any],
-    ) -> None:
-        self.score = score
-        self.scalar_uncertainty = scalar_uncertainty
-        self.diagnostics = diagnostics
 
 
 @roundctx_contract(
@@ -40,9 +28,11 @@ def scalar_identity_v1(
     *,
     y_pred: np.ndarray,
     params: Dict[str, Any],
-    ctx: Optional[PluginCtx] = None,
-    train_view=None,
-) -> ObjectiveResult:
+    ctx: Optional[PluginCtx],
+    train_view,
+    y_pred_std,
+) -> ObjectiveResultV2:
+    del params, ctx, train_view, y_pred_std
     if not (isinstance(y_pred, np.ndarray) and y_pred.ndim == 2):
         raise ValueError(f"[scalar_identity_v1] Expected y_pred shape (n, 1); got {getattr(y_pred, 'shape', None)}.")
     if y_pred.shape[1] != 1:
@@ -56,4 +46,14 @@ def scalar_identity_v1(
             "score_max": float(np.nanmax(scores)) if scores.size else float("nan"),
         },
     }
-    return ObjectiveResult(score=scores, scalar_uncertainty=None, diagnostics=diagnostics)
+    return ObjectiveResultV2(
+        scores_by_name={"scalar": scores},
+        uncertainty_by_name={},
+        diagnostics=diagnostics,
+        modes_by_name={"scalar": "maximize"},
+    )
+
+
+scalar_identity_v1.__opal_score_channels__ = ("scalar",)
+scalar_identity_v1.__opal_uncertainty_channels__ = ()
+scalar_identity_v1.__opal_score_modes__ = {"scalar": "maximize"}

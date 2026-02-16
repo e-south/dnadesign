@@ -4,14 +4,15 @@ This directory is the canonical entrypoint for OPAL documentation.
 
 ## Learning paths
 
-- First run: read [Getting started](../README.md#quick-start) then run [Demo (SFXI)](./guides/demo-sfxi.md).
+- First run: read [Getting started](../README.md#quick-start) then choose a flow in [Demo flows](./guides/demos/README.md).
 - Plugin authoring: read [RoundCtx and contract auditing](./concepts/roundctx.md), then plugin references under `reference/plugins/`.
 - Daily operations: use [CLI reference](./reference/cli.md) and [Plots reference](./reference/plots.md).
 
 ## Start Here
 
 - New to OPAL: [Getting started](../README.md#quick-start)
-- Running the demo flow: [Demo (SFXI)](./guides/demo-sfxi.md)
+- Running demo flows: [Demo flow index](./guides/demos/README.md)
+- Demo matrix at a glance: [Demo workflow matrix](./guides/demo-sfxi.md)
 - Command usage and flags: [CLI reference](./reference/cli.md)
 
 ## Concepts

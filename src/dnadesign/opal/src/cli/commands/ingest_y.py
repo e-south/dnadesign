@@ -117,7 +117,8 @@ def cmd_ingest_y(
         if t_name == "sfxi_vec8_from_table_v1":
             t_params = dict(t_params or {})
             if "expected_log2_offset_delta" not in t_params:
-                obj_params = cfg.objective.objective.params or {}
+                sfxi_obj = next((o for o in cfg.objectives.objectives if o.name == "sfxi_v1"), None)
+                obj_params = (sfxi_obj.params if sfxi_obj is not None else {}) or {}
                 t_params["expected_log2_offset_delta"] = float(obj_params.get("intensity_log2_offset_delta", 0.0))
             if "enforce_log2_offset_match" not in t_params:
                 t_params["enforce_log2_offset_match"] = True
@@ -126,9 +127,10 @@ def cmd_ingest_y(
                 if candidate.exists():
                     t_params["sfxi_log_json"] = str(candidate)
 
+        primary_objective = cfg.objectives.objectives[0].name
         reg = PluginRegistryView(
             model=cfg.model.name,
-            objective=cfg.objective.objective.name,
+            objective=primary_objective,
             selection=cfg.selection.selection.name,
             transform_x=cfg.data.transforms_x.name,
             transform_y=t_name,

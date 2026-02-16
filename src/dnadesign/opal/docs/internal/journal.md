@@ -73,7 +73,7 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Round artifacts reorganized into subdirectories under each `outputs/rounds/round_<k>/`:
   `model/`, `selection/`, `labels/`, `metadata/`, `logs/` (no legacy flat layout).
 - Round log, round_ctx, objective_meta, and feature_importance now resolve from the new subdirs.
-- Selection outputs standardized to prefixed columns (removed `selection_score`; keep `pred__y_obj_scalar`).
+- Selection outputs standardized to prefixed columns (removed `selection_score`; keep `pred__score_selected`).
 - Dashboard exports now prefix canonical objective metrics (`obj__score`, `obj__logic_fidelity`, `obj__effect_scaled`,
   `obj__effect_raw`) to distinguish from overlay fields.
 - SFXI scatter now attaches `cluster__*` + `densegen__*` columns for hue selection; added util helper + test.

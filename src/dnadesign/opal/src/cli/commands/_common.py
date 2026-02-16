@@ -22,7 +22,7 @@ from typing import Optional
 
 import typer
 
-from ...core.utils import ExitCodes, OpalError, print_stderr, print_stdout
+from ...core.utils import ConfigError, ExitCodes, OpalError, print_stderr, print_stdout
 
 try:
     import numpy as _np
@@ -149,8 +149,11 @@ def load_cli_config(config_opt: Optional[Path]) -> RootConfig:
     try:
         from ...config import load_config as _load_config
 
-        return _load_config(cfg_path)
+        cfg = _load_config(cfg_path)
+        return cfg
     except Exception as e:
+        if isinstance(e, ConfigError):
+            raise OpalError(str(e), ExitCodes.BAD_ARGS)
         # Prefer a precise message if it's a Pydantic validation error
         try:
             from pydantic import ValidationError  # type: ignore

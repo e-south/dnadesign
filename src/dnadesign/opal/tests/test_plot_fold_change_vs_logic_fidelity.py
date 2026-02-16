@@ -36,7 +36,7 @@ def test_fold_change_plot_does_not_request_setpoint_column(tmp_path, monkeypatch
                 "id": ["a"],
                 "pred__y_hat_model": [list(np.linspace(0.0, 1.0, 8))],
                 "sel__is_selected": [True],
-                "pred__y_obj_scalar": [0.5],
+                "pred__score_selected": [0.5],
                 "obj__diag__setpoint": [[0.0, 0.0, 0.0, 1.0]],
             }
         )
@@ -74,7 +74,7 @@ def test_fold_change_plot_saves_namespaced_columns(tmp_path, monkeypatch):
                 "id": ["a"],
                 "pred__y_hat_model": [list(np.linspace(0.0, 1.0, 8))],
                 "sel__is_selected": [True],
-                "pred__y_obj_scalar": [0.5],
+                "pred__score_selected": [0.5],
                 "obj__effect_scaled": [0.9],
                 "obj__diag__setpoint": [[0.0, 0.0, 0.0, 1.0]],
             }

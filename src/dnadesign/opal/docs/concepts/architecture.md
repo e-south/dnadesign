@@ -14,7 +14,7 @@ my_experimental_data.csv -> transforms_y -> labels [id, y(list<float>)] -> appen
 records.parquet [X] -> transforms_x -> X (fixed width)
 
 # Train & score
-X + labels -> model.fit -> predict Y_hat -> objective -> pred__y_obj_scalar -> selection (top-k)
+X + labels -> model.fit -> predict Y_hat -> objective -> pred__score_selected -> selection (top-k)
 
 # Canonical ledger sinks
 outputs/ledger.*: { label | run_pred | run_meta }

@@ -45,10 +45,9 @@ def test_ledger_run_meta_writes_dataset_parts(tmp_path: Path) -> None:
         ids=["a", "b"],
         sequences=["AAA", "BBB"],
         y_hat_model=y_hat,
-        y_obj_scalar=y_obj,
+        selected_score=y_obj,
+        selected_score_ref="scalar_identity_v1/scalar",
         y_dim=1,
-        y_hat_model_sd=None,
-        y_obj_scalar_sd=None,
         obj_diagnostics={},
         sel_emit=sel_emit,
     )
@@ -64,9 +63,17 @@ def test_ledger_run_meta_writes_dataset_parts(tmp_path: Path) -> None:
         y_ingest_transform_params={},
         objective_name="scalar_identity_v1",
         objective_params={},
+        objective_defs=[
+            {
+                "name": "scalar_identity_v1",
+                "score_channels": ["scalar_identity_v1/scalar"],
+                "uncertainty_channels": [],
+            }
+        ],
         selection_name="top_n",
-        selection_params={"top_k": 1},
-        selection_score_field="pred__y_obj_scalar",
+        selection_params={"top_k": 1, "score_ref": "scalar_identity_v1/scalar"},
+        selection_score_ref="scalar_identity_v1/scalar",
+        selection_uncertainty_ref=None,
         selection_objective_mode="maximize",
         sel_tie_handling="competition_rank",
         stats_n_train=2,
@@ -89,6 +96,162 @@ def test_ledger_run_meta_writes_dataset_parts(tmp_path: Path) -> None:
     reader = LedgerReader(ws)
     runs_df = reader.read_runs()
     assert len(runs_df) == 1
+
+
+def test_build_run_meta_event_sets_denom_percentile_none_without_scaling() -> None:
+    y_hat = np.array([[0.1], [0.2]])
+    y_obj = np.array([0.1, 0.2])
+    sel_emit = SelectionEmit(
+        ranks_competition=np.array([1, 2]),
+        selected_bool=np.array([True, False]),
+    )
+    run_pred = build_run_pred_events(
+        run_id="run-0",
+        as_of_round=0,
+        ids=["a", "b"],
+        sequences=["AAA", "BBB"],
+        y_hat_model=y_hat,
+        selected_score=y_obj,
+        selected_score_ref="scalar_identity_v1/scalar",
+        y_dim=1,
+        obj_diagnostics={},
+        sel_emit=sel_emit,
+    )
+    run_meta = build_run_meta_event(
+        run_id="run-0",
+        as_of_round=0,
+        model_name="random_forest",
+        model_params={},
+        y_ops=[],
+        x_transform_name="identity",
+        x_transform_params={},
+        y_ingest_transform_name="scalar_from_table_v1",
+        y_ingest_transform_params={},
+        objective_name="scalar_identity_v1",
+        objective_params={},
+        objective_defs=[
+            {
+                "name": "scalar_identity_v1",
+                "score_channels": ["scalar_identity_v1/scalar"],
+                "uncertainty_channels": [],
+            }
+        ],
+        selection_name="top_n",
+        selection_params={"top_k": 1, "score_ref": "scalar_identity_v1/scalar"},
+        selection_score_ref="scalar_identity_v1/scalar",
+        selection_uncertainty_ref=None,
+        selection_objective_mode="maximize",
+        sel_tie_handling="competition_rank",
+        stats_n_train=2,
+        stats_n_scored=2,
+        unc_mean_sd=None,
+        pred_rows_df=run_pred,
+        artifact_paths_and_hashes={},
+        objective_summary_stats=None,
+    )
+    assert pd.isna(run_meta.loc[0, "objective__denom_percentile"])
+
+
+def test_build_run_meta_event_rejects_empty_selection_score_ref() -> None:
+    y_hat = np.array([[0.1], [0.2]])
+    y_obj = np.array([0.1, 0.2])
+    sel_emit = SelectionEmit(
+        ranks_competition=np.array([1, 2]),
+        selected_bool=np.array([True, False]),
+    )
+    run_pred = build_run_pred_events(
+        run_id="run-0",
+        as_of_round=0,
+        ids=["a", "b"],
+        sequences=["AAA", "BBB"],
+        y_hat_model=y_hat,
+        selected_score=y_obj,
+        selected_score_ref="scalar_identity_v1/scalar",
+        y_dim=1,
+        obj_diagnostics={},
+        sel_emit=sel_emit,
+    )
+    try:
+        build_run_meta_event(
+            run_id="run-0",
+            as_of_round=0,
+            model_name="random_forest",
+            model_params={},
+            y_ops=[],
+            x_transform_name="identity",
+            x_transform_params={},
+            y_ingest_transform_name="scalar_from_table_v1",
+            y_ingest_transform_params={},
+            objective_name="scalar_identity_v1",
+            objective_params={},
+            objective_defs=[],
+            selection_name="top_n",
+            selection_params={"top_k": 1, "score_ref": "scalar_identity_v1/scalar"},
+            selection_score_ref=" ",
+            selection_uncertainty_ref=None,
+            selection_objective_mode="maximize",
+            sel_tie_handling="competition_rank",
+            stats_n_train=2,
+            stats_n_scored=2,
+            unc_mean_sd=None,
+            pred_rows_df=run_pred,
+            artifact_paths_and_hashes={},
+            objective_summary_stats=None,
+        )
+        assert False, "Expected ValueError for empty selection_score_ref."
+    except ValueError as e:
+        assert "selection_score_ref" in str(e)
+
+
+def test_build_run_meta_event_rejects_blank_selection_uncertainty_ref() -> None:
+    y_hat = np.array([[0.1], [0.2]])
+    y_obj = np.array([0.1, 0.2])
+    sel_emit = SelectionEmit(
+        ranks_competition=np.array([1, 2]),
+        selected_bool=np.array([True, False]),
+    )
+    run_pred = build_run_pred_events(
+        run_id="run-0",
+        as_of_round=0,
+        ids=["a", "b"],
+        sequences=["AAA", "BBB"],
+        y_hat_model=y_hat,
+        selected_score=y_obj,
+        selected_score_ref="scalar_identity_v1/scalar",
+        y_dim=1,
+        obj_diagnostics={},
+        sel_emit=sel_emit,
+    )
+    try:
+        build_run_meta_event(
+            run_id="run-0",
+            as_of_round=0,
+            model_name="random_forest",
+            model_params={},
+            y_ops=[],
+            x_transform_name="identity",
+            x_transform_params={},
+            y_ingest_transform_name="scalar_from_table_v1",
+            y_ingest_transform_params={},
+            objective_name="scalar_identity_v1",
+            objective_params={},
+            objective_defs=[],
+            selection_name="top_n",
+            selection_params={"top_k": 1, "score_ref": "scalar_identity_v1/scalar"},
+            selection_score_ref="scalar_identity_v1/scalar",
+            selection_uncertainty_ref=" ",
+            selection_objective_mode="maximize",
+            sel_tie_handling="competition_rank",
+            stats_n_train=2,
+            stats_n_scored=2,
+            unc_mean_sd=None,
+            pred_rows_df=run_pred,
+            artifact_paths_and_hashes={},
+            objective_summary_stats=None,
+        )
+        assert False, "Expected ValueError for blank selection_uncertainty_ref."
+    except ValueError as e:
+        assert "selection_uncertainty_ref" in str(e)
 
 
 def test_ledger_labels_writes_dataset_parts(tmp_path: Path) -> None:
@@ -136,10 +299,9 @@ def test_run_pred_diagnostics_column_order_is_deterministic() -> None:
         ids=["a", "b"],
         sequences=["AAA", "BBB"],
         y_hat_model=y_hat,
-        y_obj_scalar=y_obj,
+        selected_score=y_obj,
+        selected_score_ref="scalar_identity_v1/scalar",
         y_dim=1,
-        y_hat_model_sd=None,
-        y_obj_scalar_sd=None,
         obj_diagnostics=diag,
         sel_emit=sel_emit,
     )
@@ -151,7 +313,13 @@ def test_run_pred_diagnostics_column_order_is_deterministic() -> None:
         "sequence",
         "pred__y_dim",
         "pred__y_hat_model",
-        "pred__y_obj_scalar",
+        "pred__score_selected",
+        "pred__score_ref",
+        "pred__selection_score",
+        "pred__uncertainty_selected",
+        "pred__uncertainty_ref",
+        "pred__score_channels",
+        "pred__uncertainty_channels",
         "sel__rank_competition",
         "sel__is_selected",
         "obj__logic_fidelity",
@@ -161,3 +329,187 @@ def test_run_pred_diagnostics_column_order_is_deterministic() -> None:
         "obj__clip_hi_mask",
     ]
     assert list(run_pred.columns) == expected
+
+
+def test_build_run_pred_events_rejects_selection_score_length_mismatch() -> None:
+    y_hat = np.array([[0.1], [0.2]])
+    y_obj = np.array([0.1, 0.2])
+    sel_emit = SelectionEmit(
+        ranks_competition=np.array([1, 2]),
+        selected_bool=np.array([True, False]),
+    )
+    try:
+        build_run_pred_events(
+            run_id="run-0",
+            as_of_round=0,
+            ids=["a", "b"],
+            sequences=["AAA", "BBB"],
+            y_hat_model=y_hat,
+            selected_score=y_obj,
+            selected_score_ref="scalar_identity_v1/scalar",
+            y_dim=1,
+            obj_diagnostics={},
+            sel_emit=sel_emit,
+            selection_score=np.array([0.5]),
+        )
+        assert False, "Expected ValueError for selection_score length mismatch."
+    except ValueError as e:
+        assert "selection_score length mismatch" in str(e)
+
+
+def test_build_run_pred_events_rejects_non_finite_selected_uncertainty() -> None:
+    y_hat = np.array([[0.1], [0.2]])
+    y_obj = np.array([0.1, 0.2])
+    sel_emit = SelectionEmit(
+        ranks_competition=np.array([1, 2]),
+        selected_bool=np.array([True, False]),
+    )
+    try:
+        build_run_pred_events(
+            run_id="run-0",
+            as_of_round=0,
+            ids=["a", "b"],
+            sequences=["AAA", "BBB"],
+            y_hat_model=y_hat,
+            selected_score=y_obj,
+            selected_score_ref="scalar_identity_v1/scalar",
+            y_dim=1,
+            obj_diagnostics={},
+            sel_emit=sel_emit,
+            selected_uncertainty=np.array([0.1, np.nan]),
+            selected_uncertainty_ref="sfxi_v1/sfxi",
+        )
+        assert False, "Expected ValueError for non-finite selected_uncertainty."
+    except ValueError as e:
+        assert "selected_uncertainty must be finite" in str(e)
+
+
+def test_build_run_pred_events_rejects_diagnostic_length_mismatch() -> None:
+    y_hat = np.array([[0.1], [0.2]])
+    y_obj = np.array([0.1, 0.2])
+    sel_emit = SelectionEmit(
+        ranks_competition=np.array([1, 2]),
+        selected_bool=np.array([True, False]),
+    )
+    try:
+        build_run_pred_events(
+            run_id="run-0",
+            as_of_round=0,
+            ids=["a", "b"],
+            sequences=["AAA", "BBB"],
+            y_hat_model=y_hat,
+            selected_score=y_obj,
+            selected_score_ref="scalar_identity_v1/scalar",
+            y_dim=1,
+            obj_diagnostics={"logic_fidelity": np.array([0.5])},
+            sel_emit=sel_emit,
+        )
+        assert False, "Expected ValueError for objective diagnostic length mismatch."
+    except ValueError as e:
+        assert "length mismatch" in str(e)
+
+
+def test_build_run_pred_events_rejects_empty_selected_score_ref() -> None:
+    y_hat = np.array([[0.1], [0.2]])
+    y_obj = np.array([0.1, 0.2])
+    sel_emit = SelectionEmit(
+        ranks_competition=np.array([1, 2]),
+        selected_bool=np.array([True, False]),
+    )
+    try:
+        build_run_pred_events(
+            run_id="run-0",
+            as_of_round=0,
+            ids=["a", "b"],
+            sequences=["AAA", "BBB"],
+            y_hat_model=y_hat,
+            selected_score=y_obj,
+            selected_score_ref=" ",
+            y_dim=1,
+            obj_diagnostics={},
+            sel_emit=sel_emit,
+        )
+        assert False, "Expected ValueError for empty selected_score_ref."
+    except ValueError as e:
+        assert "selected_score_ref" in str(e)
+
+
+def test_build_run_pred_events_rejects_uncertainty_without_ref() -> None:
+    y_hat = np.array([[0.1], [0.2]])
+    y_obj = np.array([0.1, 0.2])
+    sel_emit = SelectionEmit(
+        ranks_competition=np.array([1, 2]),
+        selected_bool=np.array([True, False]),
+    )
+    try:
+        build_run_pred_events(
+            run_id="run-0",
+            as_of_round=0,
+            ids=["a", "b"],
+            sequences=["AAA", "BBB"],
+            y_hat_model=y_hat,
+            selected_score=y_obj,
+            selected_score_ref="scalar_identity_v1/scalar",
+            y_dim=1,
+            obj_diagnostics={},
+            sel_emit=sel_emit,
+            selected_uncertainty=np.array([0.1, 0.2]),
+            selected_uncertainty_ref=None,
+        )
+        assert False, "Expected ValueError when selected_uncertainty_ref is missing."
+    except ValueError as e:
+        assert "selected_uncertainty_ref" in str(e)
+
+
+def test_build_run_pred_events_rejects_uncertainty_ref_without_values() -> None:
+    y_hat = np.array([[0.1], [0.2]])
+    y_obj = np.array([0.1, 0.2])
+    sel_emit = SelectionEmit(
+        ranks_competition=np.array([1, 2]),
+        selected_bool=np.array([True, False]),
+    )
+    try:
+        build_run_pred_events(
+            run_id="run-0",
+            as_of_round=0,
+            ids=["a", "b"],
+            sequences=["AAA", "BBB"],
+            y_hat_model=y_hat,
+            selected_score=y_obj,
+            selected_score_ref="scalar_identity_v1/scalar",
+            y_dim=1,
+            obj_diagnostics={},
+            sel_emit=sel_emit,
+            selected_uncertainty=None,
+            selected_uncertainty_ref="sfxi_v1/sfxi",
+        )
+        assert False, "Expected ValueError when selected_uncertainty values are missing."
+    except ValueError as e:
+        assert "selected_uncertainty" in str(e)
+
+
+def test_build_run_pred_events_rejects_removed_sd_kwargs() -> None:
+    y_hat = np.array([[0.1], [0.2]])
+    y_obj = np.array([0.1, 0.2])
+    sel_emit = SelectionEmit(
+        ranks_competition=np.array([1, 2]),
+        selected_bool=np.array([True, False]),
+    )
+    try:
+        build_run_pred_events(
+            run_id="run-0",
+            as_of_round=0,
+            ids=["a", "b"],
+            sequences=["AAA", "BBB"],
+            y_hat_model=y_hat,
+            selected_score=y_obj,
+            selected_score_ref="scalar_identity_v1/scalar",
+            y_dim=1,
+            y_hat_model_sd=None,
+            y_obj_scalar_sd=None,
+            obj_diagnostics={},
+            sel_emit=sel_emit,
+        )
+        assert False, "Expected TypeError for removed SD kwargs."
+    except TypeError as e:
+        assert "unexpected keyword argument" in str(e)

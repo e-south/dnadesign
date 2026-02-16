@@ -1,35 +1,22 @@
 ## OPAL Models — Registry
 
-### Contents
-
-1. [Inventory](#inventory)
-2. [Contracts](#contracts)
-4. [Extending](#extending)
-5. [Entries](#entries)
-    i. [random\_forest](#random_forest)
-
----
-
 ### Inventory
 
-Dashboard of current entries (see details below):
-
-| name            | X expected  | Y expected           | features (brief)                                        |
-| --------------- | ----------- | -------------------- | ------------------------------------------------------- |
-| `random_forest` | `X: (N, F)` | `Y: (N,)` or `(N,D)` | uncertainty: per-tree std · OOB |
+| name | X expected | Y expected | key behavior |
+| --- | --- | --- | --- |
+| `random_forest` | `X: (N, F)` | `Y: (N,)` or `(N,D)` | ensemble regressor with OOB diagnostics |
+| `gaussian_process` | `X: (N, F)` | `Y: (N,)` or `(N,D)` | GP regression with predictive std emitted to RoundCtx |
 
 Quick check:
 
 ```python
 from dnadesign.opal.src.registries.models import list_models
-print(list_models())  # e.g., ["random_forest", ...]
+print(list_models())
 ```
 
----
+### Contract
 
-### Contracts
-
-The **registry** maps a model name → factory. A factory must return an object that implements **at minimum**:
+A model plugin must implement:
 
 ```python
 class Model:
@@ -39,97 +26,46 @@ class Model:
     def load(path: str | Path) -> "Model": ...
 ```
 
-**Registry helpers**
+### Gaussian Process params (v2)
 
-* `register_model(name: str)` — decorator to register a factory under `name`
-* `get_model(name, params: dict)` — build by name (factory must accept a params dict)
-* `list_models() -> list[str]` — enumerate available entries
+`model.name: gaussian_process` accepts strict typed params:
 
-**Paths**
-Registry: `src/dnadesign/opal/src/registries/models.py`
-Implementations: `src/dnadesign/opal/src/models/`
+- `alpha`: positive scalar or list of positive values
+- `normalize_y`: bool
+- `random_state`: int or null
+- `n_restarts_optimizer`: int >= 0
+- `optimizer`: non-empty string or null
+- `copy_X_train`: bool
+- `kernel`: optional typed block
 
----
+Kernel block:
+
+- `name`: `rbf|matern|rational_quadratic|dot_product`
+- `length_scale`, `length_scale_bounds.lower`, `length_scale_bounds.upper`
+- `nu` (matern)
+- `alpha`, `alpha_bounds.*` (rational_quadratic)
+- `sigma_0`, `sigma_0_bounds.*` (dot_product)
+- `with_white_noise`, `noise_level`, `noise_level_bounds.*`
+
+### Runtime uncertainty carrier
+
+`gaussian_process` emits predictive standard deviation into:
+
+- `model/<self>/std_devs`
+
+Runtime forwards this to objectives as `y_pred_std`. Objectives can emit named uncertainty channels; selection consumes uncertainty only through explicit `uncertainty_ref`.
+For `expected_improvement`, that referenced uncertainty channel must be a standard deviation.
+
+When `training.y_ops` are configured, OPAL inverse-transforms both:
+
+- predictive means (`y_pred`), and
+- predictive standard deviations (`y_pred_std`)
+
+before objective evaluation, so `score_ref` and `uncertainty_ref` are always in the same objective units.
+If a model emits standard deviations and any configured y-op does not implement `inverse_std`, the run fails fast.
 
 ### Extending
 
-1. Implement a wrapper that satisfies the contract.
-2. Register a factory and import it in `models/__init__.py`.
-
-```python
-# src/dnadesign/opal/src/models/my_model.py
-from dnadesign.opal.src.registries.models import register_model
-
-@register_model("my_model")
-def _factory(params: dict, *args, **kwargs):
-    return MyModel(**params)
-```
-```python
-# src/dnadesign/opal/src/models/__init__.py
-from . import my_model  # noqa: F401
-```
-```yaml
-model:
-  name: "<model_name>"
-  params:
-    # model‑specific parameters go here
-```
-
----
-
-### Entries
-
-#### random\_forest
-
-**File:** `src/dnadesign/opal/src/models/random_forest.py`
-**Backend:** `sklearn.ensemble.RandomForestRegressor`
-
-**Implements (contract):** `fit`, `predict`, `save`, `load`
-**Also provides:** `iter_ensemble_predictions(...)`, `feature_importances()`, `get_params()`
-
-**Shapes**
-
-* `X: (N, F)`
-* `Y: (N,)` *or* `(N, D)` (multi‑output supported)
-
-**Features**
-
-* **Uncertainty:** `iter_ensemble_predictions` streams per-estimator predictions for
-  ensemble score std (heuristic spread; `ddof=0`).
-* **OOB diagnostics:** with `bootstrap: true` and `oob_score: true`, returns `FitMetrics(oob_r2, oob_mse)`.
-* **No target scaling inside the model:** apply any label scaling via **training `y_ops`** (e.g., `intensity_median_iqr`), which the runner fits/applies and inverts at prediction time.
-
-**Notes**
-
-* Scaling is a training‑time aid only; all reported predictions are in original units.
-* `std_vec` is tree dispersion (not calibrated probability).
-* `model_meta.json` now records `training__y_ops` so prediction can enforce Y‑ops inversion.
-
-#### Runtime carrier contracts
-
-Models may declare `@roundctx_contract(category="model", ...)` to enforce and audit
-runtime keys in `round_ctx.json`. If a contract is declared, OPAL enforces it on
-`fit` and `predict` when a `ctx` is provided.
-
-For stage-scoped model contracts (`produces_by_stage` / `requires_by_stage`):
-
-* `predict` is commonly batched, so a model may be called many times in one predict stage.
-* During an active stage, writes to keys declared in `produces_by_stage[stage]` are staged in-memory.
-* Stage-scoped staged writes use last-write-wins semantics within the stage and commit once at stage end.
-* `ctx.get(...)` is read-your-writes during the active stage and prefers staged values before persisted `RoundCtx`.
-* Writes outside the active stage mapping are immediate and keep strict immutable semantics (no differing overwrite).
-* For running summaries, use repeated `ctx.get(...)` + `ctx.set(...)` on a stage-scoped key.
-* Avoid storing unbounded per-batch payloads in `RoundCtx`; write per-batch/per-row data to ledgers or logs.
-
-Example pattern for batched accumulation in `predict`:
-
-```python
-prev = ctx.get("model/<self>/predict_summary", default={"n_batches": 0, "n_rows": 0})
-next_summary = {
-    "n_batches": int(prev["n_batches"]) + 1,
-    "n_rows": int(prev["n_rows"]) + int(X.shape[0]),
-}
-ctx.set("model/<self>/predict_summary", next_summary)
-```
-
-The key is staged for the active predict stage and committed once at stage end.
+1. Implement a model wrapper satisfying the contract.
+2. Register it with `@register_model("name")`.
+3. Import the module in `src/dnadesign/opal/src/models/__init__.py`.

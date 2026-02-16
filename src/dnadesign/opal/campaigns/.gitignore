@@ -1,0 +1,11 @@
+# OPAL run artifacts
+**/.opal/
+**/outputs/
+**/state.json
+
+# Local campaign-scoped data copies used for demo runs
+**/records.parquet
+
+# macOS metadata
+.DS_Store
+**/.DS_Store

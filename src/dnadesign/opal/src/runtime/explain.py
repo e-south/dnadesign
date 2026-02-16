@@ -47,10 +47,7 @@ def explain_round(store, df, cfg, round_k: int) -> Dict[str, Any]:
         "selection": {
             "strategy": cfg.selection.selection.name,
             "params": cfg.selection.selection.params,
-            "objective": {
-                "name": cfg.objective.objective.name,
-                "params": cfg.objective.objective.params,
-            },
+            "objectives": [{"name": o.name, "params": o.params} for o in cfg.objectives.objectives],
         },
         "number_of_training_examples_used_in_round": int(len(plan.training_df)),
         "number_of_candidates_scored_in_round": int(len(plan.candidate_df)),

@@ -93,7 +93,7 @@ def cmd_init(
             training_policy=cfg.training.policy,
             performance={
                 "score_batch_size": cfg.scoring.score_batch_size,
-                "objective": cfg.objective.objective.name,
+                "objectives": [o.name for o in cfg.objectives.objectives],
             },
             representation_vector_dimension=0,
             backlog={"number_of_selected_but_not_yet_labeled_candidates_total": 0},

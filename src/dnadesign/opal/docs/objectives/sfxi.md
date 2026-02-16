@@ -251,7 +251,8 @@ All outputs are written to **ledger sinks** under `outputs/ledger/`:
 
 **Per‑ID predictions (`run_pred` rows)**
 
-- `pred__y_obj_scalar: double` — the SFXI score used for ranking
+- `pred__score_selected: double` — the SFXI score used for ranking
+- `pred__uncertainty_selected: double` — selected uncertainty channel (SFXI score standard deviation when available)
 - `pred__y_hat_model: list<float>` — **objective‑space** vector (after Y‑ops inversion)
 - `obj__logic_fidelity: float ∈ [0,1]` — $F_{\text{logic}}$
 - `obj__effect_raw: float` — weighted intensity before scaling
@@ -263,9 +264,9 @@ All outputs are written to **ledger sinks** under `outputs/ledger/`:
 
 - `objective__name = "sfxi_v1"`
 - `objective__params` — includes setpoint, exponents, scaling config, log2 delta
-- `objective__summary_stats` — includes `denom_used`, score min/median/max, clip fractions
+- `objective__summary_stats` — includes `denom_used`, `denom_percentile`, score min/median/max, clip fractions
 - `objective__denom_value`, `objective__denom_percentile` — convenience mirrors
-- `selection__score_field = "pred__y_obj_scalar"` — selection ranks on this field
+- `selection__score_ref = "pred__score_selected"` — selection ranks on this field
 - `selection__objective`, `selection__tie_handling`
 - `training__y_ops` — Y‑ops applied at fit time (inverted before objective)
 
