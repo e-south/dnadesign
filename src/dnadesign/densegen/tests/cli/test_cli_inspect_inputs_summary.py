@@ -113,7 +113,8 @@ def test_inspect_inputs_uses_clear_labels(tmp_path: Path) -> None:
     assert "motifs" in result.output
     assert "lexA,cpxR" in result.output
     assert "stage-a pool" in result.output.lower()
-    assert str(tmp_path) not in result.output
+    assert "uv run dense stage-a build-pool --fresh -c " in result.output
+    assert " && " not in result.output
 
 
 def test_inspect_inputs_can_show_motif_ids(tmp_path: Path) -> None:

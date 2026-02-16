@@ -116,7 +116,7 @@ def _seed_usr_registry(*, run_dir: Path, output: dict, console, display_path: Ca
     if seed_path is None:
         console.print(
             "[yellow]USR output selected but no registry seed file was found.[/] "
-            "Create outputs/usr_datasets/registry.yaml before running `dense run`."
+            "Create outputs/usr_datasets/registry.yaml before running `uv run dense run`."
         )
         return
     shutil.copy2(seed_path, registry_path)
@@ -177,7 +177,7 @@ def register_workspace_commands(
         source_workspace: Optional[str] = typer.Option(
             None,
             "--from-workspace",
-            help="Packaged source workspace id (e.g., demo_binding_sites).",
+            help="Packaged source workspace id (e.g., demo_tfbs_baseline).",
         ),
         source_config: Optional[Path] = typer.Option(
             None,

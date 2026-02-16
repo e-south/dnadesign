@@ -256,8 +256,13 @@ def register_stage_b_commands(
                     console.print(f"[bold red]Stage-B sampling failed[/]: {exc}")
                     console.print(f"[bold]Context[/]: input={spec.pool_name} plan={plan_item.name}")
                     console.print("[bold]Next steps[/]:")
+                    inspect_cmd = context.workspace_command(
+                        "dense inspect inputs",
+                        cfg_path=cfg_path,
+                        run_root=run_root,
+                    )
                     console.print("  - ensure regulator_constraints group members match Stage-A regulator labels")
-                    console.print("  - inspect available regulators via dense inspect inputs")
+                    console.print(f"  - inspect available regulators via {inspect_cmd}")
                     console.print("    or outputs/pools/pool_manifest.json")
                     raise typer.Exit(code=1)
                 libraries_built = int(info.get("library_index", libraries_built))
@@ -450,8 +455,9 @@ def register_stage_b_commands(
 
         console.print("[bold]Stage-B libraries (solver inputs)[/]")
         console.print(summary_table)
+        run_cmd = context.workspace_command("dense run", cfg_path=cfg_path, run_root=run_root)
         console.print(
-            "Stage-B builds solver libraries from Stage-A pools (cached for `dense run`). "
+            f"Stage-B builds solver libraries from Stage-A pools (cached for `{run_cmd}`). "
             "Sites/TFs/bp totals summarize min/median/max across libraries."
         )
         console.print(f"libraries built now: {len(build_rows)}; libraries total: {libraries_total}")

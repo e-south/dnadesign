@@ -35,6 +35,7 @@ import logging
 import os
 import platform
 import re
+import shlex
 import shutil
 import sys
 import tempfile
@@ -211,8 +212,25 @@ def _apply_stage_a_overrides(
             inp.overrides_by_motif_id = new_overrides
 
 
+def _dense_command_launcher() -> str:
+    if os.environ.get("PIXI_PROJECT_MANIFEST"):
+        return "pixi run dense"
+    return "uv run dense"
+
+
+def _resolve_workspace_hint_command(command: str) -> str:
+    stripped = command.strip()
+    if stripped == "dense":
+        return _dense_command_launcher()
+    if stripped.startswith("dense "):
+        tail = stripped[len("dense ") :]
+        return f"{_dense_command_launcher()} {tail}"
+    return stripped
+
+
 def _workspace_command(command: str, *, cfg_path: Path | None = None, run_root: Path | None = None) -> str:
-    root = run_root or (cfg_path.parent if cfg_path is not None else None)
+    resolved_command = _resolve_workspace_hint_command(command)
+    root = run_root
     base = Path.cwd()
     if root is not None:
         try:
@@ -220,15 +238,15 @@ def _workspace_command(command: str, *, cfg_path: Path | None = None, run_root: 
         except Exception:
             root_resolved = root
         if root_resolved == base.resolve():
-            return command
+            return resolved_command
         candidate = root / DEFAULT_CONFIG_FILENAME
         if candidate.exists():
             root_label = display_path(root, base, absolute=False)
-            return f"cd {root_label} && {command}"
+            return f"cd {shlex.quote(root_label)} && {resolved_command}"
     if cfg_path is not None:
         cfg_label = display_path(cfg_path, base, absolute=False)
-        return f"{command} -c {cfg_label}"
-    return command
+        return f"{resolved_command} -c {shlex.quote(cfg_label)}"
+    return resolved_command
 
 
 # ----------------- schema & helpers -----------------
@@ -398,6 +416,186 @@ def _format_tier_fraction_label(fraction: float) -> str:
     return f"{float(fraction) * 100:.3f}%"
 
 
+def _stage_a_row_from_pwm_summary(*, summary: PWMSamplingSummary, pool_name: str) -> dict[str, object]:
+    input_name = summary.input_name or pool_name
+    if summary.generated is None:
+        raise ValueError("Stage-A summary missing generated count.")
+    if not summary.regulator:
+        raise ValueError("Stage-A summary missing regulator.")
+    regulator = summary.regulator
+    if summary.candidates_with_hit is None:
+        raise ValueError("Stage-A summary missing candidates_with_hit.")
+    if summary.eligible_raw is None:
+        raise ValueError("Stage-A summary missing eligible_raw.")
+    if summary.eligible_unique is None:
+        raise ValueError("Stage-A summary missing eligible_unique.")
+    if summary.retained is None:
+        raise ValueError("Stage-A summary missing retained count.")
+    if summary.eligible_tier_counts is None or summary.retained_tier_counts is None:
+        raise ValueError("Stage-A summary missing tier counts.")
+    if len(summary.eligible_tier_counts) != len(summary.retained_tier_counts):
+        raise ValueError("Stage-A summary tier counts length mismatch.")
+    if summary.tier_fractions is None:
+        raise ValueError("Stage-A summary missing tier fractions.")
+    tier_fractions = list(summary.tier_fractions)
+    if len(summary.retained_tier_counts) not in {len(tier_fractions), len(tier_fractions) + 1}:
+        raise ValueError("Stage-A summary tier fraction/count length mismatch.")
+    if summary.selection_policy is None:
+        raise ValueError("Stage-A summary missing selection policy.")
+    if summary.diversity is None:
+        raise ValueError("Stage-A diversity summary missing.")
+    candidates = _format_count(summary.generated)
+    has_hit = _format_ratio(summary.candidates_with_hit, summary.generated)
+    eligible_raw = _format_ratio(summary.eligible_raw, summary.generated)
+    eligible_unique = _format_ratio(summary.eligible_unique, summary.eligible_raw)
+    retained = _format_count(summary.retained)
+    tier_target = "-"
+    if summary.tier_target_fraction is not None:
+        frac = float(summary.tier_target_fraction)
+        frac_label = f"{frac:.3%}"
+        if summary.tier_target_met is True:
+            tier_target = f"{frac_label} met"
+        elif summary.tier_target_met is False:
+            tier_target = f"{frac_label} unmet"
+    selection_label = format_selection_label(
+        policy=str(summary.selection_policy),
+        alpha=summary.selection_alpha,
+        relevance_norm=summary.selection_relevance_norm or "minmax_raw_score",
+    )
+    tier_counts = _format_tier_counts(summary.eligible_tier_counts, summary.retained_tier_counts)
+    tier_fill = "-"
+    if summary.retained_tier_counts:
+        tier_labels = [_format_tier_fraction_label(frac) for frac in tier_fractions]
+        if len(summary.retained_tier_counts) == len(tier_fractions) + 1:
+            tier_labels.append("rest")
+        last_idx = None
+        for idx, val in enumerate(summary.retained_tier_counts):
+            if int(val) > 0:
+                last_idx = idx
+        if last_idx is not None:
+            tier_fill = tier_labels[last_idx]
+    length_label = _format_sampling_lengths(
+        min_len=summary.retained_len_min,
+        median_len=summary.retained_len_median,
+        mean_len=summary.retained_len_mean,
+        max_len=summary.retained_len_max,
+        count=summary.retained,
+    )
+    score_label = _format_score_stats(
+        min_score=summary.retained_score_min,
+        median_score=summary.retained_score_median,
+        mean_score=summary.retained_score_mean,
+        max_score=summary.retained_score_max,
+    )
+    diversity = summary.diversity
+    core_hamming = diversity.core_hamming
+    pairwise = core_hamming.pairwise
+    if pairwise is None:
+        raise ValueError("Stage-A diversity missing pairwise summary.")
+    top_pairwise = pairwise.top_candidates
+    diversified_pairwise = pairwise.diversified_candidates
+    if int(diversified_pairwise.n_pairs) <= 0 or int(top_pairwise.n_pairs) <= 0:
+        pairwise_top_label = "n/a"
+        pairwise_div_label = "n/a"
+    else:
+        pairwise_top_label = _format_diversity_value(top_pairwise.median)
+        pairwise_div_label = _format_diversity_value(diversified_pairwise.median)
+    score_block = diversity.score_quantiles
+    if score_block.top_candidates is None or score_block.diversified_candidates is None:
+        raise ValueError("Stage-A diversity missing top/diversified score quantiles.")
+    score_norm_top = _format_score_norm_triplet(diversity.score_norm_summary, label="top_candidates")
+    score_norm_div = _format_score_norm_triplet(diversity.score_norm_summary, label="diversified_candidates")
+    if diversity.set_overlap_fraction is None or diversity.set_overlap_swaps is None:
+        raise ValueError("Stage-A diversity missing overlap stats.")
+    diversity_overlap = f"{float(diversity.set_overlap_fraction) * 100:.1f}%"
+    diversity_swaps = str(int(diversity.set_overlap_swaps))
+    if diversity.candidate_pool_size is None:
+        raise ValueError("Stage-A diversity missing pool size.")
+    pool_label = str(int(diversity.candidate_pool_size))
+    pool_source = "-"
+    if summary.selection_pool_capped:
+        pool_label = f"{pool_label}*"
+        if summary.selection_pool_cap_value is not None:
+            pool_source = f"cap={int(summary.selection_pool_cap_value)}"
+    elif summary.selection_pool_rung_fraction_used is not None:
+        pool_source = f"rung={float(summary.selection_pool_rung_fraction_used) * 100:.3f}%"
+    diversity_pool = pool_label
+    return {
+        "input_name": str(input_name),
+        "regulator": str(regulator),
+        "generated": candidates,
+        "has_hit": has_hit,
+        "eligible_raw": eligible_raw,
+        "eligible_unique": eligible_unique,
+        "retained": retained,
+        "tier_fill": tier_fill,
+        "tier_counts": tier_counts,
+        "tier_target": tier_target,
+        "selection": selection_label,
+        "score": score_label,
+        "length": length_label,
+        "pairwise_top": pairwise_top_label,
+        "pairwise_div": pairwise_div_label,
+        "score_norm_top": score_norm_top,
+        "score_norm_div": score_norm_div,
+        "set_overlap": diversity_overlap,
+        "set_swaps": diversity_swaps,
+        "diversity_pool": diversity_pool,
+        "diversity_pool_source": pool_source,
+        "tier0_score": summary.tier0_score,
+        "tier1_score": summary.tier1_score,
+        "tier2_score": summary.tier2_score,
+    }
+
+
+def _stage_a_row_from_sequence_pool(*, pool: PoolData) -> dict[str, object]:
+    total = len(pool.sequences)
+    lengths = [len(seq) for seq in pool.sequences]
+    if lengths:
+        arr = np.asarray(lengths, dtype=float)
+        length_label = _format_sampling_lengths(
+            min_len=int(arr.min()),
+            median_len=float(np.median(arr)),
+            mean_len=float(arr.mean()),
+            max_len=int(arr.max()),
+            count=int(total),
+        )
+    else:
+        length_label = _format_sampling_lengths(
+            min_len=None,
+            median_len=None,
+            mean_len=None,
+            max_len=None,
+            count=int(total),
+        )
+    return {
+        "input_name": str(pool.name),
+        "regulator": "-",
+        "generated": _format_count(total),
+        "has_hit": _format_ratio(total, total),
+        "eligible_raw": _format_ratio(total, total),
+        "eligible_unique": _format_ratio(total, total),
+        "retained": _format_count(total),
+        "tier_fill": "-",
+        "tier_counts": "-",
+        "tier_target": "-",
+        "selection": "-",
+        "score": "-",
+        "length": length_label,
+        "pairwise_top": "-",
+        "pairwise_div": "-",
+        "score_norm_top": "-",
+        "score_norm_div": "-",
+        "set_overlap": "-",
+        "set_swaps": "-",
+        "diversity_pool": "-",
+        "diversity_pool_source": "-",
+        "tier0_score": None,
+        "tier1_score": None,
+        "tier2_score": None,
+    }
+
+
 def _stage_a_sampling_rows(
     pool_data: dict[str, PoolData],
 ) -> list[dict[str, object]]:
@@ -408,187 +606,9 @@ def _stage_a_sampling_rows(
             for summary in summaries:
                 if not isinstance(summary, PWMSamplingSummary):
                     continue
-                input_name = summary.input_name or pool.name
-                if summary.generated is None:
-                    raise ValueError("Stage-A summary missing generated count.")
-                if not summary.regulator:
-                    raise ValueError("Stage-A summary missing regulator.")
-                regulator = summary.regulator
-                if summary.candidates_with_hit is None:
-                    raise ValueError("Stage-A summary missing candidates_with_hit.")
-                if summary.eligible_raw is None:
-                    raise ValueError("Stage-A summary missing eligible_raw.")
-                if summary.eligible_unique is None:
-                    raise ValueError("Stage-A summary missing eligible_unique.")
-                if summary.retained is None:
-                    raise ValueError("Stage-A summary missing retained count.")
-                if summary.eligible_tier_counts is None or summary.retained_tier_counts is None:
-                    raise ValueError("Stage-A summary missing tier counts.")
-                if len(summary.eligible_tier_counts) != len(summary.retained_tier_counts):
-                    raise ValueError("Stage-A summary tier counts length mismatch.")
-                if summary.tier_fractions is None:
-                    raise ValueError("Stage-A summary missing tier fractions.")
-                tier_fractions = list(summary.tier_fractions)
-                if len(summary.retained_tier_counts) not in {len(tier_fractions), len(tier_fractions) + 1}:
-                    raise ValueError("Stage-A summary tier fraction/count length mismatch.")
-                if summary.selection_policy is None:
-                    raise ValueError("Stage-A summary missing selection policy.")
-                if summary.diversity is None:
-                    raise ValueError("Stage-A diversity summary missing.")
-                candidates = _format_count(summary.generated)
-                has_hit = _format_ratio(summary.candidates_with_hit, summary.generated)
-                eligible_raw = _format_ratio(summary.eligible_raw, summary.generated)
-                eligible_unique = _format_ratio(summary.eligible_unique, summary.eligible_raw)
-                retained = _format_count(summary.retained)
-                tier_target = "-"
-                if summary.tier_target_fraction is not None:
-                    frac = float(summary.tier_target_fraction)
-                    frac_label = f"{frac:.3%}"
-                    if summary.tier_target_met is True:
-                        tier_target = f"{frac_label} met"
-                    elif summary.tier_target_met is False:
-                        tier_target = f"{frac_label} unmet"
-                selection_label = format_selection_label(
-                    policy=str(summary.selection_policy),
-                    alpha=summary.selection_alpha,
-                    relevance_norm=summary.selection_relevance_norm or "minmax_raw_score",
-                )
-                tier_counts = _format_tier_counts(summary.eligible_tier_counts, summary.retained_tier_counts)
-                tier_fill = "-"
-                if summary.retained_tier_counts:
-                    tier_labels = [_format_tier_fraction_label(frac) for frac in tier_fractions]
-                    if len(summary.retained_tier_counts) == len(tier_fractions) + 1:
-                        tier_labels.append("rest")
-                    last_idx = None
-                    for idx, val in enumerate(summary.retained_tier_counts):
-                        if int(val) > 0:
-                            last_idx = idx
-                    if last_idx is not None:
-                        tier_fill = tier_labels[last_idx]
-                length_label = _format_sampling_lengths(
-                    min_len=summary.retained_len_min,
-                    median_len=summary.retained_len_median,
-                    mean_len=summary.retained_len_mean,
-                    max_len=summary.retained_len_max,
-                    count=summary.retained,
-                )
-                score_label = _format_score_stats(
-                    min_score=summary.retained_score_min,
-                    median_score=summary.retained_score_median,
-                    mean_score=summary.retained_score_mean,
-                    max_score=summary.retained_score_max,
-                )
-                diversity = summary.diversity
-                core_hamming = diversity.core_hamming
-                pairwise = core_hamming.pairwise
-                if pairwise is None:
-                    raise ValueError("Stage-A diversity missing pairwise summary.")
-                top_pairwise = pairwise.top_candidates
-                diversified_pairwise = pairwise.diversified_candidates
-                if int(diversified_pairwise.n_pairs) <= 0 or int(top_pairwise.n_pairs) <= 0:
-                    pairwise_top_label = "n/a"
-                    pairwise_div_label = "n/a"
-                else:
-                    pairwise_top_label = _format_diversity_value(top_pairwise.median)
-                    pairwise_div_label = _format_diversity_value(diversified_pairwise.median)
-                score_block = diversity.score_quantiles
-                if score_block.top_candidates is None or score_block.diversified_candidates is None:
-                    raise ValueError("Stage-A diversity missing top/diversified score quantiles.")
-                score_norm_top = _format_score_norm_triplet(diversity.score_norm_summary, label="top_candidates")
-                score_norm_div = _format_score_norm_triplet(
-                    diversity.score_norm_summary, label="diversified_candidates"
-                )
-                if diversity.set_overlap_fraction is None or diversity.set_overlap_swaps is None:
-                    raise ValueError("Stage-A diversity missing overlap stats.")
-                diversity_overlap = f"{float(diversity.set_overlap_fraction) * 100:.1f}%"
-                diversity_swaps = str(int(diversity.set_overlap_swaps))
-                if diversity.candidate_pool_size is None:
-                    raise ValueError("Stage-A diversity missing pool size.")
-                pool_label = str(int(diversity.candidate_pool_size))
-                pool_source = "-"
-                if summary.selection_pool_capped:
-                    pool_label = f"{pool_label}*"
-                    if summary.selection_pool_cap_value is not None:
-                        pool_source = f"cap={int(summary.selection_pool_cap_value)}"
-                elif summary.selection_pool_rung_fraction_used is not None:
-                    pool_source = f"rung={float(summary.selection_pool_rung_fraction_used) * 100:.3f}%"
-                diversity_pool = pool_label
-                rows.append(
-                    {
-                        "input_name": str(input_name),
-                        "regulator": str(regulator),
-                        "generated": candidates,
-                        "has_hit": has_hit,
-                        "eligible_raw": eligible_raw,
-                        "eligible_unique": eligible_unique,
-                        "retained": retained,
-                        "tier_fill": tier_fill,
-                        "tier_counts": tier_counts,
-                        "tier_target": tier_target,
-                        "selection": selection_label,
-                        "score": score_label,
-                        "length": length_label,
-                        "pairwise_top": pairwise_top_label,
-                        "pairwise_div": pairwise_div_label,
-                        "score_norm_top": score_norm_top,
-                        "score_norm_div": score_norm_div,
-                        "set_overlap": diversity_overlap,
-                        "set_swaps": diversity_swaps,
-                        "diversity_pool": diversity_pool,
-                        "diversity_pool_source": pool_source,
-                        "tier0_score": summary.tier0_score,
-                        "tier1_score": summary.tier1_score,
-                        "tier2_score": summary.tier2_score,
-                    }
-                )
+                rows.append(_stage_a_row_from_pwm_summary(summary=summary, pool_name=str(pool.name)))
             continue
-        total = len(pool.sequences)
-        lengths = [len(seq) for seq in pool.sequences]
-        if lengths:
-            arr = np.asarray(lengths, dtype=float)
-            length_label = _format_sampling_lengths(
-                min_len=int(arr.min()),
-                median_len=float(np.median(arr)),
-                mean_len=float(arr.mean()),
-                max_len=int(arr.max()),
-                count=int(total),
-            )
-        else:
-            length_label = _format_sampling_lengths(
-                min_len=None,
-                median_len=None,
-                mean_len=None,
-                max_len=None,
-                count=int(total),
-            )
-        rows.append(
-            {
-                "input_name": str(pool.name),
-                "regulator": "-",
-                "generated": _format_count(total),
-                "has_hit": _format_ratio(total, total),
-                "eligible_raw": _format_ratio(total, total),
-                "eligible_unique": _format_ratio(total, total),
-                "retained": _format_count(total),
-                "tier_fill": "-",
-                "tier_counts": "-",
-                "tier_target": "-",
-                "selection": "-",
-                "score": "-",
-                "length": length_label,
-                "pairwise_top": "-",
-                "pairwise_div": "-",
-                "score_norm_top": "-",
-                "score_norm_div": "-",
-                "set_overlap": "-",
-                "set_swaps": "-",
-                "diversity_pool": "-",
-                "diversity_pool_source": "-",
-                "tier0_score": None,
-                "tier1_score": None,
-                "tier2_score": None,
-            }
-        )
+        rows.append(_stage_a_row_from_sequence_pool(pool=pool))
     rows.sort(key=lambda row: (row["input_name"], row["regulator"]))
     return rows
 
@@ -662,9 +682,8 @@ def _render_missing_input_hint(cfg_path: Path, loaded, exc: Exception) -> None:
 
     hints = []
     if (cfg_path.parent / "inputs").exists():
-        hints.append(
-            "If this is a staged run dir, use `dense workspace init --copy-inputs` or copy files into run/inputs."
-        )
+        workspace_init_cmd = _resolve_workspace_hint_command("dense workspace init --copy-inputs")
+        hints.append(f"If this is a staged run dir, use `{workspace_init_cmd}` or copy files into run/inputs.")
     if hints:
         console.print("[bold]Next steps[/]:")
         for hint in hints:
@@ -674,10 +693,11 @@ def _render_missing_input_hint(cfg_path: Path, loaded, exc: Exception) -> None:
 def _render_output_schema_hint(exc: Exception) -> bool:
     msg = str(exc)
     if "Existing Parquet schema does not match the current DenseGen schema" in msg:
+        workspace_init_cmd = _resolve_workspace_hint_command("dense workspace init --copy-inputs")
         console.print(f"[bold red]Output schema mismatch:[/] {msg}")
         console.print("[bold]Next steps[/]:")
         console.print("  - Remove outputs/tables/records.parquet and outputs/meta/_densegen_ids.sqlite, or")
-        console.print("  - Stage a fresh workspace with `dense workspace init --copy-inputs` and re-run.")
+        console.print(f"  - Stage a fresh workspace with `{workspace_init_cmd}` and re-run.")
         return True
     if "Output sinks are out of sync before run" in msg:
         console.print(f"[bold red]Output sink mismatch:[/] {msg}")
@@ -763,12 +783,38 @@ app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
     help="DenseGen — Dense Array Generator (Typer/Rich CLI)",
+    pretty_exceptions_show_locals=False,
 )
-inspect_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Inspect configs, inputs, and runs.")
-stage_a_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Stage-A helpers (input TFBS pools).")
-stage_b_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Stage-B helpers (library sampling).")
-workspace_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Workspace scaffolding.")
-notebook_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Workspace-scoped notebook workflows.")
+inspect_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help="Inspect configs, inputs, and runs.",
+    pretty_exceptions_show_locals=False,
+)
+stage_a_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help="Stage-A helpers (input TFBS pools).",
+    pretty_exceptions_show_locals=False,
+)
+stage_b_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help="Stage-B helpers (library sampling).",
+    pretty_exceptions_show_locals=False,
+)
+workspace_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help="Workspace scaffolding.",
+    pretty_exceptions_show_locals=False,
+)
+notebook_app = typer.Typer(
+    add_completion=False,
+    no_args_is_help=True,
+    help="Workspace-scoped notebook workflows.",
+    pretty_exceptions_show_locals=False,
+)
 
 app.add_typer(inspect_app, name="inspect")
 app.add_typer(stage_a_app, name="stage-a")

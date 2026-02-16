@@ -134,7 +134,11 @@ def _print_inputs_summary(
     context.console.print(table)
     context.console.print("Legend: motifs = TF display names; source is workspace-relative.")
     context.console.print("Legend: stage-a pool reflects whether the pool matches the current config.")
-    context.console.print("Tip: run `dense stage-a build-pool --fresh` to rebuild pools.")
+    rebuild_cmd = context.workspace_command(
+        "dense stage-a build-pool --fresh",
+        cfg_path=loaded.path,
+    )
+    context.console.print(f"Tip: run `{rebuild_cmd}` to rebuild pools.")
 
 
 def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) -> None:
@@ -503,7 +507,8 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
             context.console.print(
                 f"[bold]Effective config[/]: {context.display_path(effective_path, run_root, absolute=absolute)}"
             )
-        context.console.print("See `dense inspect inputs` for resolved input sources.")
+        inspect_inputs_cmd = context.workspace_command("dense inspect inputs", cfg_path=cfg_path)
+        context.console.print(f"See `{inspect_inputs_cmd}` for resolved input sources.")
 
         plan_table = context.make_table(
             "name",

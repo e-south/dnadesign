@@ -308,7 +308,8 @@ def run_pipeline(
 
     if resume and pool_data is None:
         raise RuntimeError(
-            "resume=True requires existing Stage-A pools. Run dense stage-a build-pool first or rerun without resume."
+            "resume=True requires existing Stage-A pools. "
+            "Run `uv run dense stage-a build-pool` first or rerun without resume."
         )
     sampling_cfg = cfg.generation.sampling
     library_state = prepare_library_source(

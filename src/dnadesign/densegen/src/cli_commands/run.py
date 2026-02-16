@@ -253,6 +253,261 @@ def _clear_outputs_preserving_notify(*, outputs_root: Path) -> None:
             child.unlink()
 
 
+def _resolve_resume_mode(
+    *,
+    fresh: bool,
+    resume: bool,
+    existing_outputs: bool,
+    outputs_root: Path,
+    cfg,
+    cfg_path: Path,
+    run_root: Path,
+    context: CliContext,
+    console,
+) -> bool:
+    if fresh and resume:
+        console.print("[bold red]Choose either --fresh or --resume, not both.[/]")
+        raise typer.Exit(code=1)
+
+    if fresh:
+        registry_snapshots = _capture_usr_registry_snapshots(
+            cfg=cfg,
+            cfg_path=cfg_path,
+            run_root=run_root,
+            context=context,
+        )
+        if outputs_root.exists():
+            try:
+                _clear_outputs_preserving_notify(outputs_root=outputs_root)
+            except Exception as exc:
+                console.print(f"[bold red]Failed to clear outputs:[/] {exc}")
+                raise typer.Exit(code=1) from exc
+            if registry_snapshots:
+                _restore_usr_registry_snapshots(snapshots=registry_snapshots)
+            console.print(
+                ":broom: [bold yellow]Cleared outputs[/]: "
+                f"{context.display_path(outputs_root, run_root, absolute=False)}"
+            )
+        else:
+            console.print("[yellow]No outputs directory found; starting fresh.[/]")
+        return False
+
+    if resume:
+        if not existing_outputs:
+            console.print(
+                f"[bold red]--resume requested but no outputs were found under[/] "
+                f"{context.display_path(outputs_root, run_root, absolute=False)}. "
+                "Run without --resume or use --fresh to reset the workspace."
+            )
+            raise typer.Exit(code=1)
+        return True
+
+    if existing_outputs:
+        console.print(
+            f"[yellow]Existing outputs found under[/] "
+            f"{context.display_path(outputs_root, run_root, absolute=False)}. "
+            "Resuming from existing outputs."
+        )
+        return True
+    return False
+
+
+def _validate_existing_state_for_resume(
+    *,
+    fresh: bool,
+    state_path: Path,
+    cfg,
+    cfg_path: Path,
+    run_root: Path,
+    context: CliContext,
+    console,
+) -> bool:
+    allow_config_mismatch = False
+    if fresh or not state_path.exists():
+        return allow_config_mismatch
+
+    existing_state = load_run_state(state_path)
+    config_sha = hashlib.sha256(cfg_path.read_bytes()).hexdigest()
+    if existing_state.run_id and existing_state.run_id != str(cfg.run.id):
+        console.print(
+            "[bold red]Existing run_state.json was created with a different run_id. "
+            "Remove run_state.json or stage a new run root to start fresh.[/]"
+        )
+        console.print("[bold]Next steps[/]:")
+        fresh_cmd = context.workspace_command(
+            "dense run --fresh",
+            cfg_path=cfg_path,
+            run_root=run_root,
+        )
+        reset_cmd = context.workspace_command(
+            "dense campaign-reset",
+            cfg_path=cfg_path,
+            run_root=run_root,
+        )
+        console.print(f"  - {fresh_cmd}")
+        console.print(f"  - {reset_cmd}")
+        raise typer.Exit(code=1)
+
+    if existing_state.config_sha256 and existing_state.config_sha256 != config_sha:
+        try:
+            previous_cfg = _load_previous_densegen_config(run_root)
+            current_cfg = _model_to_dict(cfg)
+            _validate_quota_increase_only(previous_cfg=previous_cfg, current_cfg=current_cfg)
+        except ValueError as exc:
+            console.print(
+                "[bold red]Existing run_state.json was created with a different config "
+                "and changes are not quota-only.[/]"
+            )
+            console.print(f"[bold red]Quota validation failed:[/] {exc}")
+            console.print("[bold]Next steps[/]:")
+            fresh_cmd = context.workspace_command(
+                "dense run --fresh",
+                cfg_path=cfg_path,
+                run_root=run_root,
+            )
+            reset_cmd = context.workspace_command(
+                "dense campaign-reset",
+                cfg_path=cfg_path,
+                run_root=run_root,
+            )
+            console.print(f"  - {fresh_cmd}")
+            console.print(f"  - {reset_cmd}")
+            raise typer.Exit(code=1) from exc
+        allow_config_mismatch = True
+        console.print("[yellow]Quota-only config change detected; resuming with existing outputs.[/]")
+
+    if (
+        not has_existing_run_outputs(run_root)
+        and existing_state.items
+        and sum(item.generated for item in existing_state.items) > 0
+    ):
+        console.print(
+            "[bold red]run_state.json indicates prior progress, but no outputs were found. "
+            "Restore outputs or delete run_state.json before resuming.[/]"
+        )
+        console.print("[bold]Next steps[/]:")
+        reset_cmd = context.workspace_command(
+            "dense campaign-reset",
+            cfg_path=cfg_path,
+            run_root=run_root,
+        )
+        console.print(f"  - {reset_cmd}")
+        console.print("  - or restore outputs/ before resuming")
+        raise typer.Exit(code=1)
+    return allow_config_mismatch
+
+
+def _print_run_next_steps(*, cfg_path: Path, run_root: Path, context: CliContext, console) -> None:
+    console.print("[bold]Next steps[/]:")
+    inspect_cmd = context.workspace_command(
+        "dense inspect run --library",
+        cfg_path=cfg_path,
+        run_root=run_root,
+    )
+    stage_a_cmd = context.workspace_command(
+        "dense plot --only stage_a_summary",
+        cfg_path=cfg_path,
+        run_root=run_root,
+    )
+    placement_cmd = context.workspace_command(
+        "dense plot --only placement_map",
+        cfg_path=cfg_path,
+        run_root=run_root,
+    )
+    notebook_cmd = context.workspace_command(
+        "dense notebook generate",
+        cfg_path=cfg_path,
+        run_root=run_root,
+    )
+    console.print(f"  - {inspect_cmd} (Stage-B library + solutions)")
+    console.print(f"  - {stage_a_cmd} (Stage-A summary plots)")
+    console.print(f"  - {placement_cmd} (Stage-B placement plots)")
+    console.print(f"  - {notebook_cmd} (generate workspace-scoped marimo run notebook)")
+
+
+def _run_plots_if_configured(*, no_plot: bool, root, loaded, console) -> None:
+    if no_plot or root.plots is None:
+        return
+    try:
+        ensure_mpl_cache_dir()
+    except Exception as exc:
+        console.print(f"[bold red]Matplotlib cache setup failed:[/] {exc}")
+        console.print(
+            "[bold]Tip[/]: DenseGen defaults to a repo-local cache at .cache/matplotlib/densegen; "
+            "set MPLCONFIGDIR to override."
+        )
+        raise typer.Exit(code=1) from exc
+    install_native_stderr_filters(suppress_solver_messages=False)
+    from ..viz.plotting import run_plots_from_config
+
+    console.print("[bold]Generating plots...[/]")
+    run_plots_from_config(root, loaded.path, source="run")
+    console.print(":bar_chart: [bold green]Plots written.[/]")
+
+
+def _handle_run_runtime_error(
+    *,
+    exc: RuntimeError,
+    render_output_schema_hint: Callable[..., bool],
+    context: CliContext,
+    cfg_path: Path,
+    run_root: Path,
+    console,
+) -> None:
+    if render_output_schema_hint(exc):
+        raise typer.Exit(code=1)
+    message = str(exc)
+    if "progress_style=screen requires" in message:
+        console.print(f"[bold red]{message}[/]")
+        console.print("[bold]Next steps[/]:")
+        console.print("  - run in an interactive terminal with TERM=xterm-256color")
+        console.print("  - or set densegen.logging.progress_style: stream")
+        raise typer.Exit(code=1)
+    if "Existing run_state.json was created with a different" in message:
+        console.print(f"[bold red]{message}[/]")
+        console.print("[bold]Next steps[/]:")
+        fresh_cmd = context.workspace_command(
+            "dense run --fresh",
+            cfg_path=cfg_path,
+            run_root=run_root,
+        )
+        reset_cmd = context.workspace_command(
+            "dense campaign-reset",
+            cfg_path=cfg_path,
+            run_root=run_root,
+        )
+        console.print(f"  - {fresh_cmd}")
+        console.print(f"  - {reset_cmd}")
+        raise typer.Exit(code=1)
+    if "run_state.json indicates prior progress" in message:
+        console.print(f"[bold red]{message}[/]")
+        console.print("[bold]Next steps[/]:")
+        reset_cmd = context.workspace_command(
+            "dense campaign-reset",
+            cfg_path=cfg_path,
+            run_root=run_root,
+        )
+        console.print(f"  - {reset_cmd}")
+        console.print("  - or restore outputs/ before resuming")
+        raise typer.Exit(code=1)
+    if "Stage-A pools missing or stale" in message:
+        console.print(f"[bold red]{message}[/]")
+        console.print("[bold]Next steps[/]:")
+        rebuild_cmd = context.workspace_command(
+            "dense stage-a build-pool --fresh",
+            cfg_path=cfg_path,
+            run_root=run_root,
+        )
+        console.print(f"  - {rebuild_cmd}")
+        console.print("  - or rerun with --fresh to rebuild outputs and pools")
+        console.print(
+            "  - Stage-B libraries are built during `uv run dense run`; "
+            "no need to run `uv run dense stage-b build-libraries`"
+        )
+        raise typer.Exit(code=1)
+    raise exc
+
+
 def register_run_commands(
     app: typer.Typer,
     *,
@@ -305,127 +560,34 @@ def register_run_commands(
         if progress_reason is not None:
             console.print(f"[dim]logging.progress_style=auto -> {resolved_progress_style} ({progress_reason})[/]")
 
-        if fresh and resume:
-            console.print("[bold red]Choose either --fresh or --resume, not both.[/]")
-            raise typer.Exit(code=1)
         outputs_root = run_outputs_root(run_root)
         existing_outputs = has_existing_run_outputs(run_root)
-        registry_snapshots: dict[Path, str] = {}
-        allow_config_mismatch = False
-        if fresh:
-            registry_snapshots = _capture_usr_registry_snapshots(
-                cfg=cfg,
-                cfg_path=loaded.path,
-                run_root=run_root,
-                context=context,
-            )
-            if outputs_root.exists():
-                try:
-                    _clear_outputs_preserving_notify(outputs_root=outputs_root)
-                except Exception as exc:
-                    console.print(f"[bold red]Failed to clear outputs:[/] {exc}")
-                    raise typer.Exit(code=1)
-                if registry_snapshots:
-                    _restore_usr_registry_snapshots(snapshots=registry_snapshots)
-                console.print(
-                    ":broom: [bold yellow]Cleared outputs[/]: "
-                    f"{context.display_path(outputs_root, run_root, absolute=False)}"
-                )
-            else:
-                console.print("[yellow]No outputs directory found; starting fresh.[/]")
-            resume_run = False
-        elif resume:
-            if not existing_outputs:
-                console.print(
-                    f"[bold red]--resume requested but no outputs were found under[/] "
-                    f"{context.display_path(outputs_root, run_root, absolute=False)}. "
-                    "Run without --resume or use --fresh to reset the workspace."
-                )
-                raise typer.Exit(code=1)
-            resume_run = True
-        else:
-            if existing_outputs:
-                console.print(
-                    f"[yellow]Existing outputs found under[/] "
-                    f"{context.display_path(outputs_root, run_root, absolute=False)}. "
-                    "Resuming from existing outputs."
-                )
-                resume_run = True
-            else:
-                resume_run = False
+        resume_run = _resolve_resume_mode(
+            fresh=fresh,
+            resume=resume,
+            existing_outputs=existing_outputs,
+            outputs_root=outputs_root,
+            cfg=cfg,
+            cfg_path=loaded.path,
+            run_root=run_root,
+            context=context,
+            console=console,
+        )
 
         state_path = run_state_path(run_root)
         generated_by_plan: dict[str, int] = _load_generated_counts_by_plan(
             state_path=state_path,
             run_id=str(cfg.run.id),
         )
-        if not fresh and state_path.exists():
-            existing_state = load_run_state(state_path)
-            config_sha = hashlib.sha256(cfg_path.read_bytes()).hexdigest()
-            if existing_state.run_id and existing_state.run_id != str(cfg.run.id):
-                console.print(
-                    "[bold red]Existing run_state.json was created with a different run_id. "
-                    "Remove run_state.json or stage a new run root to start fresh.[/]"
-                )
-                console.print("[bold]Next steps[/]:")
-                fresh_cmd = context.workspace_command(
-                    "dense run --fresh",
-                    cfg_path=cfg_path,
-                    run_root=run_root,
-                )
-                reset_cmd = context.workspace_command(
-                    "dense campaign-reset",
-                    cfg_path=cfg_path,
-                    run_root=run_root,
-                )
-                console.print(f"  - {fresh_cmd}")
-                console.print(f"  - {reset_cmd}")
-                raise typer.Exit(code=1)
-            if existing_state.config_sha256 and existing_state.config_sha256 != config_sha:
-                try:
-                    previous_cfg = _load_previous_densegen_config(run_root)
-                    current_cfg = _model_to_dict(cfg)
-                    _validate_quota_increase_only(previous_cfg=previous_cfg, current_cfg=current_cfg)
-                except ValueError as exc:
-                    console.print(
-                        "[bold red]Existing run_state.json was created with a different config "
-                        "and changes are not quota-only.[/]"
-                    )
-                    console.print(f"[bold red]Quota validation failed:[/] {exc}")
-                    console.print("[bold]Next steps[/]:")
-                    fresh_cmd = context.workspace_command(
-                        "dense run --fresh",
-                        cfg_path=cfg_path,
-                        run_root=run_root,
-                    )
-                    reset_cmd = context.workspace_command(
-                        "dense campaign-reset",
-                        cfg_path=cfg_path,
-                        run_root=run_root,
-                    )
-                    console.print(f"  - {fresh_cmd}")
-                    console.print(f"  - {reset_cmd}")
-                    raise typer.Exit(code=1)
-                allow_config_mismatch = True
-                console.print("[yellow]Quota-only config change detected; resuming with existing outputs.[/]")
-            if (
-                not existing_outputs
-                and existing_state.items
-                and sum(item.generated for item in existing_state.items) > 0
-            ):
-                console.print(
-                    "[bold red]run_state.json indicates prior progress, but no outputs were found. "
-                    "Restore outputs or delete run_state.json before resuming.[/]"
-                )
-                console.print("[bold]Next steps[/]:")
-                reset_cmd = context.workspace_command(
-                    "dense campaign-reset",
-                    cfg_path=cfg_path,
-                    run_root=run_root,
-                )
-                console.print(f"  - {reset_cmd}")
-                console.print("  - or restore outputs/ before resuming")
-                raise typer.Exit(code=1)
+        allow_config_mismatch = _validate_existing_state_for_resume(
+            fresh=fresh,
+            state_path=state_path,
+            cfg=cfg,
+            cfg_path=cfg_path,
+            run_root=run_root,
+            context=context,
+            console=console,
+        )
 
         if resume_run:
             quota_floor_changes = _apply_resume_quota_floor(
@@ -500,107 +662,33 @@ def register_run_commands(
             render_missing_input_hint(cfg_path, loaded, exc)
             raise typer.Exit(code=1)
         except RuntimeError as exc:
-            if render_output_schema_hint(exc):
-                raise typer.Exit(code=1)
-            message = str(exc)
-            if "progress_style=screen requires" in message:
-                console.print(f"[bold red]{message}[/]")
-                console.print("[bold]Next steps[/]:")
-                console.print("  - run in an interactive terminal with TERM=xterm-256color")
-                console.print("  - or set densegen.logging.progress_style: stream")
-                raise typer.Exit(code=1)
-            if "Existing run_state.json was created with a different" in message:
-                console.print(f"[bold red]{message}[/]")
-                console.print("[bold]Next steps[/]:")
-                fresh_cmd = context.workspace_command(
-                    "dense run --fresh",
-                    cfg_path=cfg_path,
-                    run_root=run_root,
-                )
-                reset_cmd = context.workspace_command(
-                    "dense campaign-reset",
-                    cfg_path=cfg_path,
-                    run_root=run_root,
-                )
-                console.print(f"  - {fresh_cmd}")
-                console.print(f"  - {reset_cmd}")
-                raise typer.Exit(code=1)
-            if "run_state.json indicates prior progress" in message:
-                console.print(f"[bold red]{message}[/]")
-                console.print("[bold]Next steps[/]:")
-                reset_cmd = context.workspace_command(
-                    "dense campaign-reset",
-                    cfg_path=cfg_path,
-                    run_root=run_root,
-                )
-                console.print(f"  - {reset_cmd}")
-                console.print("  - or restore outputs/ before resuming")
-                raise typer.Exit(code=1)
-            if "Stage-A pools missing or stale" in message:
-                console.print(f"[bold red]{message}[/]")
-                console.print("[bold]Next steps[/]:")
-                rebuild_cmd = context.workspace_command(
-                    "dense stage-a build-pool --fresh",
-                    cfg_path=cfg_path,
-                    run_root=run_root,
-                )
-                console.print(f"  - {rebuild_cmd}")
-                console.print("  - or rerun with --fresh to rebuild outputs and pools")
-                console.print(
-                    "  - Stage-B libraries are built during dense run; no need to run dense stage-b build-libraries"
-                )
-                raise typer.Exit(code=1)
-            raise
+            _handle_run_runtime_error(
+                exc=exc,
+                render_output_schema_hint=render_output_schema_hint,
+                context=context,
+                cfg_path=cfg_path,
+                run_root=run_root,
+                console=console,
+            )
 
         if int(getattr(summary, "generated_this_run", 0)) == 0:
             console.print("[yellow]Quota is already met; no new sequences generated.[/]")
 
         console.print(":tada: [bold green]Run complete[/].")
-        console.print("[bold]Next steps[/]:")
-        inspect_cmd = context.workspace_command(
-            "dense inspect run --library",
+        _print_run_next_steps(
             cfg_path=cfg_path,
             run_root=run_root,
+            context=context,
+            console=console,
         )
-        stage_a_cmd = context.workspace_command(
-            "dense plot --only stage_a_summary",
-            cfg_path=cfg_path,
-            run_root=run_root,
+        _run_plots_if_configured(
+            no_plot=no_plot,
+            root=root,
+            loaded=loaded,
+            console=console,
         )
-        placement_cmd = context.workspace_command(
-            "dense plot --only placement_map",
-            cfg_path=cfg_path,
-            run_root=run_root,
-        )
-        notebook_cmd = context.workspace_command(
-            "dense notebook generate",
-            cfg_path=cfg_path,
-            run_root=run_root,
-        )
-        console.print(f"  - {inspect_cmd} (Stage-B library + solutions)")
-        console.print(f"  - {stage_a_cmd} (Stage-A summary plots)")
-        console.print(f"  - {placement_cmd} (Stage-B placement plots)")
-        console.print(f"  - {notebook_cmd} (generate workspace-scoped marimo run notebook)")
 
-        # Auto-plot if configured
-        if not no_plot and root.plots:
-            try:
-                ensure_mpl_cache_dir()
-            except Exception as exc:
-                console.print(f"[bold red]Matplotlib cache setup failed:[/] {exc}")
-                console.print(
-                    "[bold]Tip[/]: DenseGen defaults to a repo-local cache at .cache/matplotlib/densegen; "
-                    "set MPLCONFIGDIR to override."
-                )
-                raise typer.Exit(code=1)
-            install_native_stderr_filters(suppress_solver_messages=False)
-            from ..viz.plotting import run_plots_from_config
-
-            console.print("[bold]Generating plots...[/]")
-            run_plots_from_config(root, loaded.path, source="run")
-            console.print(":bar_chart: [bold green]Plots written.[/]")
-
-    @app.command("campaign-reset", hidden=True, help="Remove run outputs to reset a workspace.")
+    @app.command("campaign-reset", help="Remove run outputs to reset a workspace.")
     def campaign_reset(
         ctx: typer.Context,
         config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
