@@ -19,7 +19,7 @@ from dnadesign.densegen.src.core.input_types import PWM_INPUT_TYPES
 
 
 def _demo_config_path() -> Path:
-    return Path(__file__).resolve().parents[2] / "workspaces" / "demo_meme_three_tfs" / "config.yaml"
+    return Path(__file__).resolve().parents[2] / "workspaces" / "demo_sampling_baseline" / "config.yaml"
 
 
 def test_demo_config_declares_selection_policy() -> None:

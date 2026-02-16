@@ -82,10 +82,17 @@ META_FIELDS: list[MetaField] = [
     MetaField("library_unique_tf_count", (int,), "Unique TF count in the Stage-B sampled library."),
     MetaField("library_unique_tfbs_count", (int,), "Unique TFBS count in the Stage-B sampled library."),
     MetaField("promoter_constraint", (str,), "Primary promoter constraint name (if set).", allow_none=True),
+    MetaField("promoter_detail", (dict,), "Resolved promoter placements for fixed promoter constraints."),
+    MetaField(
+        "sequence_validation",
+        (dict,),
+        "Final-sequence validation summary ({validation_passed, violations}).",
+    ),
     MetaField("sampling_pool_strategy", (str,), "Stage-B sampling pool strategy (full|subsample|iterative_subsample)."),
     MetaField("sampling_library_size", (int,), "Stage-B configured library size for subsampling."),
     MetaField("sampling_library_strategy", (str,), "Stage-B library sampling strategy.", allow_none=True),
     MetaField("sampling_iterative_max_libraries", (int,), "Stage-B max libraries for iterative subsampling."),
+    MetaField("sampling_library_hash", (str,), "Stage-B stable hash for the sampled library."),
     MetaField("sampling_library_index", (int,), "Stage-B 1-based index of the sampled library."),
     MetaField("pad_used", (bool,), "Whether pad bases were applied."),
     MetaField("pad_bases", (int,), "Number of bases padded.", allow_none=True),
@@ -177,23 +184,61 @@ def _validate_list_fields(meta: Mapping[str, Any]) -> None:
 
 
 def _validate_struct_fields(meta: Mapping[str, Any]) -> None:
-    if "fixed_elements" not in meta:
-        return
-    fixed = meta["fixed_elements"]
-    if not isinstance(fixed, dict):
-        raise TypeError("fixed_elements must be a dict")
-    if "promoter_constraints" not in fixed or "side_biases" not in fixed:
-        raise ValueError("fixed_elements must include 'promoter_constraints' and 'side_biases'")
-    pcs = fixed.get("promoter_constraints")
-    if not isinstance(pcs, list):
-        raise TypeError("fixed_elements.promoter_constraints must be a list")
-    for pc in pcs:
-        if not isinstance(pc, dict):
-            raise TypeError("fixed_elements.promoter_constraints entries must be dicts")
-    sb = fixed.get("side_biases")
-    if not isinstance(sb, dict):
-        raise TypeError("fixed_elements.side_biases must be a dict")
-    for side in ("left", "right"):
-        vals = sb.get(side)
-        if not isinstance(vals, list):
-            raise TypeError(f"fixed_elements.side_biases.{side} must be a list")
+    sampling_library_hash = str(meta.get("sampling_library_hash") or "").strip()
+    if not sampling_library_hash:
+        raise ValueError("Metadata field 'sampling_library_hash' is required and cannot be empty")
+
+    if "fixed_elements" in meta:
+        fixed = meta["fixed_elements"]
+        if not isinstance(fixed, dict):
+            raise TypeError("fixed_elements must be a dict")
+        if "promoter_constraints" not in fixed or "side_biases" not in fixed:
+            raise ValueError("fixed_elements must include 'promoter_constraints' and 'side_biases'")
+        pcs = fixed.get("promoter_constraints")
+        if not isinstance(pcs, list):
+            raise TypeError("fixed_elements.promoter_constraints must be a list")
+        for pc in pcs:
+            if not isinstance(pc, dict):
+                raise TypeError("fixed_elements.promoter_constraints entries must be dicts")
+        sb = fixed.get("side_biases")
+        if not isinstance(sb, dict):
+            raise TypeError("fixed_elements.side_biases must be a dict")
+        for side in ("left", "right"):
+            vals = sb.get(side)
+            if not isinstance(vals, list):
+                raise TypeError(f"fixed_elements.side_biases.{side} must be a list")
+
+    if "promoter_detail" in meta:
+        detail = meta["promoter_detail"]
+        if not isinstance(detail, dict):
+            raise TypeError("promoter_detail must be a dict")
+        placements = detail.get("placements")
+        if not isinstance(placements, list):
+            raise TypeError("promoter_detail.placements must be a list")
+        for placement in placements:
+            if not isinstance(placement, dict):
+                raise TypeError("promoter_detail.placements entries must be dicts")
+            required = {
+                "upstream_seq",
+                "downstream_seq",
+                "upstream_start",
+                "downstream_start",
+                "spacer_length",
+                "variant_ids",
+            }
+            missing = [key for key in required if key not in placement]
+            if missing:
+                raise ValueError(f"promoter_detail placement missing required keys: {missing}")
+
+    if "sequence_validation" in meta:
+        block = meta["sequence_validation"]
+        if not isinstance(block, dict):
+            raise TypeError("sequence_validation must be a dict")
+        if not isinstance(block.get("validation_passed"), bool):
+            raise TypeError("sequence_validation.validation_passed must be a bool")
+        violations = block.get("violations")
+        if not isinstance(violations, list):
+            raise TypeError("sequence_validation.violations must be a list")
+        for violation in violations:
+            if not isinstance(violation, dict):
+                raise TypeError("sequence_validation.violations entries must be dicts")

@@ -27,7 +27,16 @@ def register_plot_commands(app: typer.Typer, *, context: CliContext) -> None:
     make_table = context.make_table
 
     @app.command("ls-plots", help="List available plot names and descriptions.")
-    def ls_plots():
+    def ls_plots(
+        ctx: typer.Context,
+        config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
+    ):
+        if config is not None:
+            cfg_path, is_default = context.resolve_config_path(ctx, config)
+            context.load_config_or_exit(
+                cfg_path,
+                missing_message=context.default_config_missing_message if is_default else None,
+            )
         from ..viz.plot_registry import PLOT_SPECS
 
         table = make_table("plot", "description")

@@ -52,9 +52,16 @@ def register_validate_command(
             from ..core.pipeline import select_solver
 
             solver_cfg = loaded.root.densegen.solver
-            select_solver(
-                solver_cfg.backend,
-                DenseArraysAdapter(),
-                strategy=str(solver_cfg.strategy),
-            )
+            try:
+                select_solver(
+                    solver_cfg.backend,
+                    DenseArraysAdapter(),
+                    strategy=str(solver_cfg.strategy),
+                )
+            except Exception as exc:
+                console.print(f"[bold red]Solver probe failed:[/] {exc}")
+                console.print("[bold]Next steps[/]:")
+                console.print("  - install/configure the requested solver backend")
+                console.print("  - or set densegen.solver.backend to an available backend (for example CBC)")
+                raise typer.Exit(code=1)
         console.print(":white_check_mark: [bold green]Config is valid.[/]")

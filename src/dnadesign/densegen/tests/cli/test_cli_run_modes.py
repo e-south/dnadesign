@@ -267,6 +267,13 @@ def test_run_auto_resumes_when_outputs_exist_and_pools_present(tmp_path: Path, m
     assert captured["build_stage_a"] is False
 
 
+def test_help_lists_campaign_reset_command() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["--help"])
+    assert result.exit_code == 0, result.output
+    assert "campaign-reset" in result.output
+
+
 def test_run_resume_requires_outputs(tmp_path: Path) -> None:
     run_root = tmp_path / "run"
     run_root.mkdir(parents=True)

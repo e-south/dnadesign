@@ -25,6 +25,8 @@ from dnadesign.cruncher.io.parsers.meme import parse_meme_file
 
 from ...config import BackgroundPoolSamplingConfig, resolve_relative_path
 from ...core.artifacts.ids import hash_label_motif, hash_tfbs_id
+from ...core.sequence_constraints.kmers import reverse_complement
+from ...core.sequence_constraints.sampler import ConstrainedSequenceError, generate_constrained_sequence
 from ...utils.sequence_utils import gc_fraction
 from .base import BaseDataSource
 from .pwm_artifact import load_artifact as load_pwm_artifact
@@ -160,6 +162,31 @@ def _filter_forbidden_kmers(sequences: Iterable[str], kmers: list[str]) -> list[
     return filtered
 
 
+def _expand_forbidden_kmers(
+    kmers: list[str],
+    *,
+    include_reverse_complements: bool,
+    strands: str,
+) -> list[str]:
+    if not kmers:
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for motif in kmers:
+        seq = str(motif).strip().upper()
+        if not seq:
+            continue
+        if seq not in seen:
+            seen.add(seq)
+            out.append(seq)
+        if include_reverse_complements or str(strands).strip().lower() == "both":
+            rc = reverse_complement(seq)
+            if rc not in seen:
+                seen.add(rc)
+                out.append(rc)
+    return out
+
+
 def _filter_gc(sequences: Iterable[str], *, gc_min: float | None, gc_max: float | None) -> list[str]:
     if gc_min is None and gc_max is None:
         return list(sequences)
@@ -281,6 +308,11 @@ class BackgroundPoolDataSource(BaseDataSource):
         gc_min = float(gc_cfg.min) if gc_cfg and gc_cfg.min is not None else None
         gc_max = float(gc_cfg.max) if gc_cfg and gc_cfg.max is not None else None
         forbid_kmers = list(filters.forbid_kmers or [])
+        forbid_kmers_expanded = _expand_forbidden_kmers(
+            forbid_kmers,
+            include_reverse_complements=bool(getattr(filters, "include_reverse_complements", False)),
+            strands=str(getattr(filters, "strands", "forward")),
+        )
 
         fimo_cfg = filters.fimo_exclude
         allow_zero_hit_only = False
@@ -335,22 +367,45 @@ class BackgroundPoolDataSource(BaseDataSource):
                 remaining = max_candidates - generated
                 batch = min(batch_size, remaining)
                 lengths = _resolve_lengths(rng, count=batch, length_cfg=length_cfg)
-                length_groups: dict[int, list[int]] = {}
-                for idx, length in enumerate(lengths):
-                    length_groups.setdefault(int(length), []).append(idx)
-                sequences = [""] * batch
-                for length, indices in length_groups.items():
-                    seqs = _sample_background_batch(rng, background_cdf, count=len(indices), length=length)
-                    for idx, seq in zip(indices, seqs):
-                        sequences[idx] = seq
-                generated += batch
+                if forbid_kmers_expanded:
+                    sequences: list[str] = []
+                    for length in lengths:
+                        try:
+                            seq = generate_constrained_sequence(
+                                length=int(length),
+                                gc_min=float(gc_min) if gc_min is not None else 0.0,
+                                gc_max=float(gc_max) if gc_max is not None else 1.0,
+                                forbid_kmers=forbid_kmers_expanded,
+                                left_context="",
+                                right_context="",
+                                rng=rng,
+                            )
+                        except ConstrainedSequenceError as exc:
+                            raise ValueError(
+                                "background_pool constrained sampling is infeasible for "
+                                f"length={int(length)}, gc_min={gc_min}, gc_max={gc_max}, "
+                                f"forbidden_kmers={len(forbid_kmers_expanded)}."
+                            ) from exc
+                        sequences.append(seq)
+                    generated += batch
+                    if len(_filter_forbidden_kmers(sequences, forbid_kmers_expanded)) != len(sequences):
+                        raise RuntimeError("background_pool constrained sampling produced forbidden kmer sequences.")
+                    if len(_filter_gc(sequences, gc_min=gc_min, gc_max=gc_max)) != len(sequences):
+                        raise RuntimeError("background_pool constrained sampling produced out-of-range GC sequences.")
+                else:
+                    length_groups: dict[int, list[int]] = {}
+                    for idx, length in enumerate(lengths):
+                        length_groups.setdefault(int(length), []).append(idx)
+                    sequences = [""] * batch
+                    for length, indices in length_groups.items():
+                        seqs = _sample_background_batch(rng, background_cdf, count=len(indices), length=length)
+                        for idx, seq in zip(indices, seqs):
+                            sequences[idx] = seq
+                    generated += batch
+                    before = len(sequences)
+                    sequences = _filter_gc(sequences, gc_min=gc_min, gc_max=gc_max)
+                    reject_gc += before - len(sequences)
 
-                before = len(sequences)
-                sequences = _filter_forbidden_kmers(sequences, forbid_kmers)
-                reject_kmer += before - len(sequences)
-                before = len(sequences)
-                sequences = _filter_gc(sequences, gc_min=gc_min, gc_max=gc_max)
-                reject_gc += before - len(sequences)
                 unique_sequences: list[str] = []
                 seen_batch: set[str] = set()
                 for seq in sequences:

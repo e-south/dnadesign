@@ -123,13 +123,10 @@ def display_path(path: Path, run_root: Path, *, absolute: bool) -> str:
     try:
         return str(path.relative_to(run_root))
     except ValueError:
-        relpath = os.path.relpath(path, run_root)
-        if path.is_absolute() and str(path) in relpath:
-            try:
-                return str(path.relative_to(path.anchor))
-            except ValueError:
-                return relpath
-        return relpath
+        try:
+            return os.path.relpath(path, run_root)
+        except ValueError:
+            return str(path)
 
 
 def has_existing_run_outputs(run_root: Path) -> bool:

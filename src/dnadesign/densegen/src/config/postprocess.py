@@ -11,8 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from typing import List, Optional
-
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing_extensions import Literal
 
@@ -85,47 +83,6 @@ class PadConfig(BaseModel):
         return v
 
 
-class FinalSequenceKmerFilterConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    kmers: List[str]
-
-    @field_validator("kmers")
-    @classmethod
-    def _kmers_ok(cls, v: List[str]):
-        if not v:
-            raise ValueError(
-                "postprocess.validate_final_sequence.forbid_kmers_outside_promoter_windows.kmers must be set"
-            )
-        cleaned: list[str] = []
-        for raw in v:
-            if not isinstance(raw, str):
-                raise ValueError(
-                    "postprocess.validate_final_sequence.forbid_kmers_outside_promoter_windows.kmers must be strings"
-                )
-            seq = raw.strip().upper()
-            if not seq:
-                raise ValueError(
-                    "postprocess.validate_final_sequence.forbid_kmers_outside_promoter_windows.kmers must be non-empty"
-                )
-            if any(ch not in {"A", "C", "G", "T"} for ch in seq):
-                raise ValueError(
-                    "postprocess.validate_final_sequence.forbid_kmers_outside_promoter_windows.kmers "
-                    "must contain only A/C/G/T"
-                )
-            cleaned.append(seq)
-        if len(set(cleaned)) != len(cleaned):
-            raise ValueError(
-                "postprocess.validate_final_sequence.forbid_kmers_outside_promoter_windows.kmers must be unique"
-            )
-        return cleaned
-
-
-class FinalSequenceValidationConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    forbid_kmers_outside_promoter_windows: Optional[FinalSequenceKmerFilterConfig] = None
-
-
 class PostprocessConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     pad: PadConfig = Field(default_factory=PadConfig)
-    validate_final_sequence: Optional[FinalSequenceValidationConfig] = None

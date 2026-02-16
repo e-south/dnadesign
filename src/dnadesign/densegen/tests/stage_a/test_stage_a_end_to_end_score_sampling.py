@@ -30,7 +30,7 @@ _FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
 
 def _artifact_paths() -> list[str]:
-    base = Path(__file__).resolve().parents[2] / "workspaces" / "demo_meme_three_tfs" / "inputs" / "motif_artifacts"
+    base = Path(__file__).resolve().parents[2] / "workspaces" / "demo_sampling_baseline" / "inputs" / "motif_artifacts"
     return [
         str(base / "lexA__meme_suite_meme__lexA_CTGTATAWAWWHACA.json"),
         str(base / "cpxR__meme_suite_meme__cpxR_MANWWHTTTAM.json"),

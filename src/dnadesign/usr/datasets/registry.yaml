@@ -72,7 +72,7 @@ namespaces:
     - name: densegen__sampling_fraction_pairs
       type: float64
     - name: densegen__fixed_elements
-      type: struct<promoter_constraints:list<struct<name:string,upstream:string,downstream:string,spacer_length:list<int64>,upstream_pos:list<int64>,downstream_pos:list<int64>>>,side_biases:struct<left:list<string>,right:list<string>>>
+      type: struct<promoter_constraints:list<struct<name:string,upstream:string,downstream:string,upstream_variant_id:string,downstream_variant_id:string,spacer_length:list<int64>,upstream_pos:list<int64>,downstream_pos:list<int64>>>,side_biases:struct<left:list<string>,right:list<string>>>
     - name: densegen__visual
       type: string
     - name: densegen__compression_ratio
@@ -85,6 +85,10 @@ namespaces:
       type: int64
     - name: densegen__promoter_constraint
       type: string
+    - name: densegen__promoter_detail
+      type: struct<placements:list<struct<name:string,upstream_seq:string,downstream_seq:string,upstream_start:int64,downstream_start:int64,spacer_length:int64,variant_ids:struct<up_id:string,down_id:string>>>>
+    - name: densegen__sequence_validation
+      type: struct<validation_passed:bool,violations:list<struct<constraint:string,pattern:string,strand:string,position:int64,matched_seq:string,context_window:string>>>
     - name: densegen__sampling_pool_strategy
       type: string
     - name: densegen__sampling_library_size
@@ -93,6 +97,8 @@ namespaces:
       type: string
     - name: densegen__sampling_iterative_max_libraries
       type: int64
+    - name: densegen__sampling_library_hash
+      type: string
     - name: densegen__sampling_library_index
       type: int64
     - name: densegen__pad_used

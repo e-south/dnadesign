@@ -129,6 +129,7 @@ def _placements_from_dense_arrays(df: pd.DataFrame) -> pd.DataFrame:
     required = {
         "densegen__used_tfbs_detail",
         "densegen__sampling_library_index",
+        "densegen__sampling_library_hash",
         "densegen__input_name",
         "densegen__plan",
     }
@@ -144,7 +145,10 @@ def _placements_from_dense_arrays(df: pd.DataFrame) -> pd.DataFrame:
         library_index = int(row.get("densegen__sampling_library_index") or 0)
         library_hash = str(row.get("densegen__sampling_library_hash") or "").strip()
         if not library_hash:
-            library_hash = f"{input_name}|{plan_name}|{library_index}"
+            raise ValueError(
+                "records.parquet missing densegen__sampling_library_hash metadata for "
+                f"{input_name}/{plan_name} library_index={library_index}."
+            )
         for item in _ensure_list_of_dicts(row.get("densegen__used_tfbs_detail")):
             tf = str(item.get("tf") or "").strip()
             tfbs = str(item.get("tfbs") or "").strip()

@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -39,6 +40,34 @@ class OutputUSRConfig(BaseModel):
     allow_overwrite: bool = False
     npz_fields: List[str] = Field(default_factory=list)
     npz_root: Optional[str] = None
+
+    @field_validator("dataset")
+    @classmethod
+    def _dataset_valid(cls, v: str):
+        value = str(v).strip().replace("\\", "/")
+        if not value:
+            raise ValueError("output.usr.dataset must be a non-empty string")
+        path = Path(value)
+        if path.is_absolute():
+            raise ValueError("output.usr.dataset must be a relative path")
+        if any(part in {".", ".."} for part in path.parts):
+            raise ValueError("output.usr.dataset must not contain '.' or '..'")
+        return Path(*path.parts).as_posix()
+
+    @field_validator("root")
+    @classmethod
+    def _root_nonempty(cls, v: str):
+        value = str(v).strip()
+        if not value:
+            raise ValueError("output.usr.root must be a non-empty string")
+        return value
+
+    @field_validator("chunk_size")
+    @classmethod
+    def _chunk_size_ok(cls, v: int):
+        if int(v) <= 0:
+            raise ValueError("output.usr.chunk_size must be > 0")
+        return int(v)
 
     @field_validator("npz_fields")
     @classmethod

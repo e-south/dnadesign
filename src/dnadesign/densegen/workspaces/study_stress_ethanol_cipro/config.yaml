@@ -1,8 +1,8 @@
-# DenseGen demo: Stage-A sampling baseline with stress-response TF artifacts.
+# DenseGen study workspace: larger stress-response library for ethanol and ciprofloxacin conditions.
 densegen:
   schema_version: "2.9"
   run:
-    id: demo_sampling_baseline
+    id: study_stress_ethanol_cipro
     root: "."
 
   motif_sets:
@@ -12,18 +12,17 @@ densegen:
       consensus: TATAAT
 
   inputs:
-    # LexA + CpxR + BaeR artifacts exported from the Cruncher handoff workflow.
     - name: lexA_pwm
       type: pwm_artifact
       path: inputs/motif_artifacts/lexA__meme_suite_meme__lexA_CTGTATAWAWWHACA.json
       sampling:
         strategy: stochastic
-        n_sites: 100
+        n_sites: 250
         mining:
-          batch_size: 2000
+          batch_size: 5000
           budget:
             mode: fixed_candidates
-            candidates: 150000
+            candidates: 1000000
             growth_factor: 1.25
           log_every_batches: 1
         length:
@@ -46,12 +45,12 @@ densegen:
       path: inputs/motif_artifacts/cpxR__meme_suite_meme__cpxR_MANWWHTTTAM.json
       sampling:
         strategy: stochastic
-        n_sites: 100
+        n_sites: 250
         mining:
-          batch_size: 2000
+          batch_size: 5000
           budget:
             mode: fixed_candidates
-            candidates: 150000
+            candidates: 1000000
             growth_factor: 1.25
           log_every_batches: 1
         length:
@@ -74,12 +73,12 @@ densegen:
       path: inputs/motif_artifacts/baeR__meme_suite_meme__baeR_WWDTYTCTSCMNNA.json
       sampling:
         strategy: stochastic
-        n_sites: 100
+        n_sites: 250
         mining:
-          batch_size: 2000
+          batch_size: 5000
           budget:
             mode: fixed_candidates
-            candidates: 150000
+            candidates: 1000000
             growth_factor: 1.25
           log_every_batches: 1
         length:
@@ -100,12 +99,12 @@ densegen:
     - name: background
       type: background_pool
       sampling:
-        n_sites: 200
+        n_sites: 500
         mining:
-          batch_size: 10000
+          batch_size: 20000
           budget:
             mode: fixed_candidates
-            candidates: 600000
+            candidates: 5000000
         length:
           policy: range
           range: [16, 20]
@@ -130,11 +129,11 @@ densegen:
     parquet:
       path: outputs/tables/records.parquet
       deduplicate: true
-      chunk_size: 64
+      chunk_size: 128
     usr:
       root: outputs/usr_datasets
-      dataset: densegen/demo_sampling_baseline
-      chunk_size: 64
+      dataset: densegen/study_stress_ethanol_cipro
+      chunk_size: 128
       health_event_interval_seconds: 60
 
   generation:
@@ -150,7 +149,7 @@ densegen:
 
     plan:
       - name: ethanol
-        quota: 6
+        quota: 60
         sampling:
           include_inputs: [cpxR_pwm, baeR_pwm, background]
         fixed_elements:
@@ -168,7 +167,7 @@ densegen:
                 - baeR_WWDTYTCTSCMNNA
               min_required: 1
       - name: ciprofloxacin
-        quota: 6
+        quota: 60
         sampling:
           include_inputs: [lexA_pwm, background]
         fixed_elements:
@@ -180,6 +179,28 @@ densegen:
               upstream_pos: [0, 60]
         regulator_constraints:
           groups:
+            - name: ciprofloxacin_response
+              members:
+                - lexA_CTGTATAWAWWHACA
+              min_required: 1
+      - name: ethanol_ciprofloxacin
+        quota: 80
+        sampling:
+          include_inputs: [lexA_pwm, cpxR_pwm, baeR_pwm, background]
+        fixed_elements:
+          promoter_constraints:
+            - name: sigma70_consensus
+              upstream: TTGACA
+              downstream: TATAAT
+              spacer_length: [16, 20]
+              upstream_pos: [0, 60]
+        regulator_constraints:
+          groups:
+            - name: ethanol_response
+              members:
+                - cpxR_MANWWHTTTAM
+                - baeR_WWDTYTCTSCMNNA
+              min_required: 1
             - name: ciprofloxacin_response
               members:
                 - lexA_CTGTATAWAWWHACA
@@ -213,7 +234,7 @@ densegen:
     stall_seconds_before_resample: 10
     stall_warning_every_seconds: 10
     max_consecutive_failures: 25
-    max_seconds_per_plan: 60
+    max_seconds_per_plan: 300
     max_failed_solutions: 0
     random_seed: 42
 
@@ -234,20 +255,10 @@ densegen:
     log_dir: outputs/logs
     level: INFO
     suppress_solver_stderr: true
-    print_visual: true
-    visuals:
-      tf_colors:
-        lexA: "#66C2A5"
-        cpxR: "#FC8D62"
-        baeR: "#8DA0CB"
-        background: "#B3B3B3"
-        sigma70_consensus: "#E78AC3"
     progress_style: auto
-    progress_every: 1
-    progress_refresh_seconds: 1.0
 
 plots:
   source: usr
   out_dir: outputs/plots
   format: pdf
-  default: [stage_a_summary, placement_map]
+  default: [stage_a_summary, placement_map, run_health, tfbs_usage]

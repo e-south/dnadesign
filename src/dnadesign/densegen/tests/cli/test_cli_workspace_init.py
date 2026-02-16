@@ -142,7 +142,7 @@ def test_workspace_init_supports_binding_sites_demo_workspace(tmp_path: Path) ->
             "--root",
             str(tmp_path),
             "--from-workspace",
-            "demo_binding_sites",
+            "demo_tfbs_baseline",
         ],
     )
     assert result.exit_code == 0, result.output
@@ -185,7 +185,7 @@ def test_workspace_init_uses_env_workspace_root_when_root_not_provided(
             "--id",
             "demo_run",
             "--from-workspace",
-            "demo_binding_sites",
+            "demo_tfbs_baseline",
         ],
     )
     assert result.exit_code == 0, result.output
@@ -204,7 +204,7 @@ def test_workspace_init_output_mode_usr_sets_usr_target(tmp_path: Path) -> None:
             "--root",
             str(tmp_path),
             "--from-workspace",
-            "demo_binding_sites",
+            "demo_tfbs_baseline",
             "--output-mode",
             "usr",
         ],
@@ -230,7 +230,7 @@ def test_workspace_init_output_mode_both_sets_both_targets(tmp_path: Path) -> No
             "--root",
             str(tmp_path),
             "--from-workspace",
-            "demo_binding_sites",
+            "demo_tfbs_baseline",
             "--output-mode",
             "both",
         ],
@@ -259,7 +259,7 @@ def test_workspace_init_existing_workspace_dir_shows_actionable_error(tmp_path: 
             "--root",
             str(tmp_path),
             "--from-workspace",
-            "demo_binding_sites",
+            "demo_tfbs_baseline",
         ],
     )
 

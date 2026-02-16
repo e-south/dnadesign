@@ -1,0 +1,214 @@
+# DenseGen study workspace: constitutive promoter library panel with multiple sigma fixed elements.
+densegen:
+  schema_version: "2.9"
+  run:
+    id: study_constitutive_sigma_panel
+    root: "."
+
+  motif_sets:
+    sigma70_upstream_35:
+      consensus: TTGACA
+      at_shift: TTTACA
+      gc_shift: TTGCCG
+    sigma70_downstream_10:
+      consensus: TATAAT
+      at_shift: TAAAAT
+      gc_shift: TATGCT
+    sigma32_upstream_35:
+      consensus: CTTGAA
+    sigma32_downstream_10:
+      consensus: CCCCAT
+    sigma38_upstream_35:
+      consensus: TTGACA
+    sigma38_downstream_10:
+      consensus: TATGAT
+    sigma54_upstream_35:
+      hexamerized: TGGCAC
+    sigma54_downstream_10:
+      hexamerized: TTGCAT
+
+  inputs:
+    - name: background
+      type: background_pool
+      sampling:
+        n_sites: 1200
+        mining:
+          batch_size: 20000
+          budget:
+            mode: fixed_candidates
+            candidates: 2000000
+        length:
+          policy: range
+          range: [20, 30]
+        uniqueness:
+          key: sequence
+        gc:
+          min: 0.40
+          max: 0.60
+        filters:
+          forbid_kmers:
+            - TTGACA
+            - TTTACA
+            - TTGCCG
+            - TATAAT
+            - TAAAAT
+            - TATGCT
+            - CTTGAA
+            - CCCCAT
+            - TATGAT
+            - TGGCAC
+            - TTGCAT
+          include_reverse_complements: true
+          strands: both
+
+  output:
+    targets: [parquet, usr]
+    schema:
+      bio_type: dna
+      alphabet: dna_4
+    parquet:
+      path: outputs/tables/records.parquet
+      deduplicate: true
+      chunk_size: 128
+    usr:
+      root: outputs/usr_datasets
+      dataset: densegen/study_constitutive_sigma_panel
+      chunk_size: 128
+      health_event_interval_seconds: 60
+
+  generation:
+    sequence_length: 90
+    plan_template_max_expanded_plans: 256
+    sampling:
+      pool_strategy: subsample
+      library_size: 16
+      library_sampling_strategy: tf_balanced
+      unique_binding_sites: true
+      unique_binding_cores: true
+      max_sites_per_regulator: null
+      relax_on_exhaustion: false
+
+    plan_templates:
+      - base_name: sigma70
+        quota_per_variant: 16
+        sampling:
+          include_inputs: [background]
+        fixed_elements:
+          promoter_matrix:
+            name: sigma70_core
+            upstream_from_set: sigma70_upstream_35
+            downstream_from_set: sigma70_downstream_10
+            pairing:
+              mode: zip
+            spacer_length: [16, 18]
+            upstream_pos: [0, 90]
+        regulator_constraints:
+          groups: []
+      - base_name: sigma32
+        quota_per_variant: 16
+        sampling:
+          include_inputs: [background]
+        fixed_elements:
+          promoter_matrix:
+            name: sigma32_core
+            upstream_from_set: sigma32_upstream_35
+            downstream_from_set: sigma32_downstream_10
+            pairing:
+              mode: zip
+            spacer_length: [13, 15]
+            upstream_pos: [0, 90]
+        regulator_constraints:
+          groups: []
+      - base_name: sigma38
+        quota_per_variant: 16
+        sampling:
+          include_inputs: [background]
+        fixed_elements:
+          promoter_matrix:
+            name: sigma38_core
+            upstream_from_set: sigma38_upstream_35
+            downstream_from_set: sigma38_downstream_10
+            pairing:
+              mode: zip
+            spacer_length: [15, 17]
+            upstream_pos: [0, 90]
+        regulator_constraints:
+          groups: []
+      - base_name: sigma54
+        quota_per_variant: 16
+        sampling:
+          include_inputs: [background]
+        fixed_elements:
+          promoter_matrix:
+            name: sigma54_core
+            upstream_from_set: sigma54_upstream_35
+            downstream_from_set: sigma54_downstream_10
+            pairing:
+              mode: zip
+            spacer_length: [10, 12]
+            upstream_pos: [0, 90]
+        regulator_constraints:
+          groups: []
+
+    sequence_constraints:
+      forbid_kmers:
+        - name: forbid_sigma_hexamers
+          patterns_from_motif_sets:
+            - sigma70_upstream_35
+            - sigma70_downstream_10
+            - sigma32_upstream_35
+            - sigma32_downstream_10
+            - sigma38_upstream_35
+            - sigma38_downstream_10
+            - sigma54_upstream_35
+            - sigma54_downstream_10
+          include_reverse_complements: true
+          scope: outside_allowed_placements
+          strands: both
+      allowlist:
+        - kind: fixed_element_instance
+          selector:
+            fixed_element: promoter
+            component: [upstream, downstream]
+          match_exact_coordinates: true
+
+  solver:
+    backend: CBC
+    strategy: iterate
+    time_limit_seconds: 5
+
+  runtime:
+    round_robin: true
+    arrays_generated_before_resample: 2
+    min_count_per_tf: 0
+    max_duplicate_solutions: 3
+    stall_seconds_before_resample: 10
+    stall_warning_every_seconds: 10
+    max_consecutive_failures: 25
+    max_seconds_per_plan: 120
+    max_failed_solutions: 0
+    random_seed: 42
+
+  postprocess:
+    pad:
+      mode: adaptive
+      end: 5prime
+      gc:
+        mode: range
+        min: 0.40
+        max: 0.60
+        target: 0.50
+        tolerance: 0.10
+        min_pad_length: 0
+      max_tries: 2000
+
+  logging:
+    log_dir: outputs/logs
+    level: INFO
+    progress_style: auto
+
+plots:
+  source: parquet
+  out_dir: outputs/plots
+  format: pdf
+  default: [placement_map, run_health]

@@ -205,6 +205,16 @@ def test_gap_fill_rejected(tmp_path: Path) -> None:
         load_config(cfg_path)
 
 
+def test_postprocess_validate_final_sequence_rejected(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["postprocess"] = {
+        "validate_final_sequence": {"forbid_kmers_outside_promoter_windows": {"kmers": ["TTGACA", "TATAAT"]}}
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="validate_final_sequence"):
+        load_config(cfg_path)
+
+
 def test_pad_config_accepts(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
     cfg["densegen"]["postprocess"] = {
@@ -354,6 +364,52 @@ def test_usr_health_event_interval_requires_positive_value(tmp_path: Path) -> No
     }
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
     with pytest.raises(ConfigError, match="health_event_interval_seconds"):
+        load_config(cfg_path)
+
+
+def test_usr_dataset_requires_non_empty_string(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["output"] = {
+        "targets": ["usr"],
+        "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+        "usr": {
+            "dataset": "   ",
+            "root": "outputs/usr_datasets",
+        },
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="output.usr.dataset must be a non-empty string"):
+        load_config(cfg_path)
+
+
+def test_usr_dataset_must_be_relative_path(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["output"] = {
+        "targets": ["usr"],
+        "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+        "usr": {
+            "dataset": "/absolute_dataset",
+            "root": "outputs/usr_datasets",
+        },
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="output.usr.dataset must be a relative path"):
+        load_config(cfg_path)
+
+
+def test_usr_chunk_size_requires_positive_value(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["output"] = {
+        "targets": ["usr"],
+        "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+        "usr": {
+            "dataset": "demo",
+            "root": "outputs/usr_datasets",
+            "chunk_size": 0,
+        },
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="output.usr.chunk_size must be > 0"):
         load_config(cfg_path)
 
 

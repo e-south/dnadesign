@@ -87,6 +87,15 @@ def test_validate_accepts_config_after_command(tmp_path: Path) -> None:
     assert "Config is valid" in result.output
 
 
+def test_ls_plots_accepts_config_after_command(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    _write_min_config(cfg_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["ls-plots", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    assert "placement_map" in result.output
+
+
 def test_validate_reports_invalid_config(tmp_path: Path) -> None:
     cfg_path = tmp_path / "config.yaml"
     cfg_path.write_text("densegen:\n  inputs: []\n")
@@ -126,3 +135,21 @@ def test_validate_missing_config_reports_error(tmp_path: Path) -> None:
         result = runner.invoke(app, ["validate-config"], env=env)
         assert result.exit_code != 0, result.output
         assert "No config file found" in result.output
+
+
+def test_validate_probe_solver_failure_reports_actionable_error(tmp_path: Path, monkeypatch) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    _write_min_config(cfg_path)
+
+    import dnadesign.densegen.src.core.pipeline as pipeline
+
+    def _fail_probe(*_args, **_kwargs):
+        raise RuntimeError("Requested solver 'GUROBI' failed during probe: missing backend")
+
+    monkeypatch.setattr(pipeline, "select_solver", _fail_probe)
+    runner = CliRunner()
+    result = runner.invoke(app, ["validate-config", "--probe-solver", "-c", str(cfg_path)])
+    assert result.exit_code == 1, result.output
+    assert "Solver probe failed" in result.output
+    assert "set densegen.solver.backend" in result.output
+    assert "Traceback" not in result.output

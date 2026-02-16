@@ -194,6 +194,8 @@ class BackgroundPoolFimoExcludeConfig(BaseModel):
 class BackgroundPoolFiltersConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     forbid_kmers: List[str] = Field(default_factory=list)
+    include_reverse_complements: bool = False
+    strands: Literal["forward", "both"] = "forward"
     fimo_exclude: Optional[BackgroundPoolFimoExcludeConfig] = None
 
     @field_validator("forbid_kmers")
