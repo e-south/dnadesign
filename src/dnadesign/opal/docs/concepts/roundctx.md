@@ -1,8 +1,6 @@
 ## RoundCtx and Contract Auditing
 
-`RoundCtx` is a runtime companion to `campaign.yaml`: YAML chooses plugin graph; `RoundCtx`
-tracks what each stage computes and what downstream components consume. Use this page to
-understand runtime carriers, contract enforcement, and audit keys.
+`RoundCtx` is a runtime companion to `campaign.yaml`: YAML chooses plugin graph. `RoundCtx`tracks what each stage computes and what downstream components consume. Use this page to understand runtime carriers, contract enforcement, and audit keys.
 
 The runner persists:
 
@@ -74,8 +72,3 @@ Inspect carriers via CLI:
 - `opal ctx show`
 - `opal ctx audit`
 - `opal ctx diff`
-
-### Next steps
-
-- [CLI reference](../reference/cli.md#ctx)
-- [Architecture and data flow](./architecture.md)

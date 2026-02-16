@@ -1,7 +1,6 @@
 ## OPAL Objective Plugins
 
-This page documents objective plugin wiring and channel reference rules.
-For detailed objective equations and behavior, use objective-specific pages.
+This page documents objective plugin wiring and channel reference rules. For detailed objective equations and behavior, use objective-specific pages.
 
 Source modules:
 
@@ -39,10 +38,6 @@ Use when the model output is already a single scalar objective.
 - Uncertainty channels:
   - none
 
-### Draft objective design notes
-
-- [SPOP objective draft](./objective-spop.md)
-
 ### Objective detail pages
 
 - [SFXI behavior and math](./objective-sfxi.md)
@@ -76,9 +71,3 @@ selection:
     alpha: 1.0
     beta: 1.0
 ```
-
-### See also
-
-- [SFXI behavior and math](./objective-sfxi.md)
-- [Selection plugins](./selection.md)
-- [Workflow guides](../index.md#workflows)

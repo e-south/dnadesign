@@ -1,7 +1,6 @@
 ## OPAL Documentation
 
-This documentation covers end-to-end workflows, plugin contracts and math, runtime concepts, and exact configuration and CLI references.
-Use the workflow guides for operational command order, then use plugin/concept/reference pages for deeper details.
+This documentation covers end-to-end workflows, plugin contracts and math, runtime concepts, and exact configuration and CLI references. Use the workflow guides for operational command order, then use plugin/concept/reference pages for deeper details.
 
 ### Workflows
 

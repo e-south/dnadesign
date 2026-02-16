@@ -49,9 +49,3 @@ OPAL is fail-fast by design:
 - unresolved score/uncertainty refs fail before selection
 - non-finite/invalid model/objective/selection outputs fail before writeback
 - ledger schema violations fail at write time
-
-### Next steps
-
-- [Workflow guides](../index.md#workflows)
-- [RoundCtx contracts](./roundctx.md)
-- [Configuration reference](../reference/configuration.md)

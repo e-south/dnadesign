@@ -1,7 +1,6 @@
 ## OPAL Models — Registry
 
-This page documents model plugin contracts, config surface, and runtime wiring.
-For equations and detailed behavior, use the model-specific pages.
+This page documents model plugin contracts, config surface, and runtime wiring. For equations and detailed behavior, use the model-specific pages.
 
 ### Inventory
 
@@ -10,8 +9,7 @@ For equations and detailed behavior, use the model-specific pages.
 | `random_forest` | `X: (N, F)` | `Y: (N,)` or `(N,D)` | ensemble regressor with OOB diagnostics |
 | `gaussian_process` | `X: (N, F)` | `Y: (N,)` or `(N,D)` | GP regression with predictive std emitted to RoundCtx |
 
-`expected_improvement` is not GP-only, but it requires an objective uncertainty channel referenced by
-`uncertainty_ref`.
+`expected_improvement` is not GP-only, but it requires an objective uncertainty channel referenced by `uncertainty_ref`.
 
 Source module:
 
@@ -67,16 +65,14 @@ Kernel block:
 
 - `model/<self>/std_devs`
 
-Runtime forwards this to objectives as `y_pred_std`. Objectives can emit named uncertainty channels; selection consumes uncertainty only through explicit `uncertainty_ref`.
-For `expected_improvement`, that referenced uncertainty channel must be a standard deviation.
+Runtime forwards this to objectives as `y_pred_std`. Objectives can emit named uncertainty channels; selection consumes uncertainty only through explicit `uncertainty_ref`. For `expected_improvement`, that referenced uncertainty channel must be a standard deviation.
 
 When `training.y_ops` are configured, OPAL inverse-transforms both:
 
 - predictive means (`y_pred`), and
 - predictive standard deviations (`y_pred_std`)
 
-before objective evaluation, so `score_ref` and `uncertainty_ref` are always in the same objective units.
-If a model emits standard deviations and any configured y-op does not implement `inverse_std`, the run stops with an error.
+before objective evaluation, so `score_ref` and `uncertainty_ref` are always in the same objective units. If a model emits standard deviations and any configured y-op does not implement `inverse_std`, the run stops with an error.
 
 ### Extending
 

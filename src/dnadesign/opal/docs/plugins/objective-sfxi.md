@@ -9,10 +9,12 @@ It explains how OPAL converts vec8 model outputs into selection-ready score and 
 - Input shape: `y_pred` vec8 = `[logic(4), log2_intensity(4)]` in state order `[00,10,01,11]`
 - Primary score channel: `sfxi` (maximize)
 - Additional score channels: `logic_fidelity`, `effect_scaled`
-- Uncertainty channel: `sfxi` (standard deviation of scalar score when uncertainty is available)
+- Uncertainty channel key (when available): `sfxi` (standard deviation of the scalar score)
 - Scaling source: denominator is computed from current-round observed labels and persisted in run metadata
 - Strictness: run fails if current-round labels are fewer than `scaling.min_n`
-- Selection wiring: `selection.params.score_ref = "sfxi_v1/sfxi"`
+- Selection wiring:
+  - Top-N: `selection.params.score_ref = "sfxi_v1/sfxi"`
+  - EI: `selection.params.score_ref = "sfxi_v1/sfxi"` and `selection.params.uncertainty_ref = "sfxi_v1/sfxi"`
 
 ---
 
@@ -318,5 +320,3 @@ To compute that, we keep 8 numbers per design:
 One cannot recover the ratio‑based logic (`v`) from YFP intensities alone. If you try to create a “logic pattern” by min–max scaling YFP across states, you keep state‑specific capacity shifts that the YFP/CFP ratio is designed to remove. Dropping to 4 intensities asks the model to infer information that isn’t in the data; it will compute a different score.
 
 ---
-
-@e-south

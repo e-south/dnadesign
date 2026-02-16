@@ -1,111 +1,182 @@
-## Workflow: GP + SFXI + expected_improvement
+## Uncertainty-aware OPAL rounds (GP + SFXI + EI)
 
-### Intent
+This demo involves a `gaussian_process` model that produces both predictions and predictive uncertainty, `sfxi_v1` turns those into a scalar score (and score uncertainty), and `expected_improvement` selects the next batch by balancing exploitation and exploration.
 
-Use this flow for uncertainty-aware acquisition:
+Campaign: `src/dnadesign/opal/campaigns/demo_gp_ei/`
 
-- model: `gaussian_process`
-- objective: `sfxi_v1` (score + uncertainty channels)
-- selection: `expected_improvement`
+**Reference docs:**
 
-Reference docs:
+* [Gaussian Process behavior and math](../plugins/model-gaussian-process.md)
+* [Expected Improvement behavior and math](../plugins/selection-expected-improvement.md)
+* [SFXI behavior and math](../plugins/objective-sfxi.md)
+* [Selection plugins](../plugins/selection.md)
+* [CLI reference](../reference/cli.md)
 
-- [Model plugins](../plugins/models.md)
-- [Gaussian Process behavior and math](../plugins/model-gaussian-process.md)
-- [Selection plugins](../plugins/selection.md)
-- [Expected Improvement behavior and math](../plugins/selection-expected-improvement.md)
-- [SFXI behavior and math](../plugins/objective-sfxi.md)
+**What this doc is meant to accomplish**
 
-### Campaign
+* Run a round where selection is driven by *both* predicted score and predicted uncertainty.
+* Make channel wiring explicit (`score_ref` + `uncertainty_ref`).
+* Show EI-specific failure modes (missing uncertainty, invalid sigma, all-zero sigma).
 
-- `src/dnadesign/opal/campaigns/demo_gp_ei/`
+---
 
-### Guided runbook
+### The EI wiring that matters in the config
 
-Generate a campaign-specific guided runbook before executing commands:
+The distinguishing feature of this workflow is the selection block. EI requires uncertainty.
 
-```bash
-cd src/dnadesign/opal/campaigns/demo_gp_ei
-uv run opal guide -c configs/campaign.yaml --format markdown
-uv run opal guide next -c configs/campaign.yaml --labels-as-of 0
+```yaml
+selection:                              # Uncertainty-aware acquisition strategy
+  name: expected_improvement            # EI balances exploitation and exploration
+  params:                               # Selection contract + EI weights
+    top_k: 5                            # Number of candidates to select
+    score_ref: sfxi_v1/sfxi             # Objective score channel for improvement term
+    uncertainty_ref: sfxi_v1/sfxi       # Objective uncertainty channel (std-dev) for exploration term
+    objective_mode: maximize            # Higher score is better
+    tie_handling: competition_rank      # Tie policy for ranking output
+    alpha: 1.0                          # Weight on exploitation component
+    beta: 1.0                           # Weight on exploration component
 ```
 
-### End-to-end commands (round 0 + inspection)
+Two important notes about refs:
 
-Run from repo root:
+1. `score_ref` always identifies a score channel key produced by the objective.
+2. `uncertainty_ref` identifies an uncertainty channel key. Some objectives publish uncertainty under the same key as the score (SFXI does this for `sfxi`), so it can be valid for `score_ref` and `uncertainty_ref` to be identical.
 
-Round flag semantics used below:
-- `ingest-y --observed-round` stamps when labels were observed.
-- `run/explain --labels-as-of` selects the training cutoff used for training and selection.
+EI contract reminder: OPAL fails fast if uncertainty is missing/invalid.
+
+---
+
+### Round 0 end-to-end
+
+#### 1. Prepare the workspace
 
 ```bash
+# Enter the GP+EI demo campaign directory.
 cd src/dnadesign/opal/campaigns/demo_gp_ei
-
-# 1) Create campaign-local records for this flow
+# Copy the shared demo design-space records into this campaign.
 cp ../demo/records.parquet ./records.parquet
 
-# 2) Optional fresh rerun cleanup
+# Reset generated outputs and state for a fresh demo run.
 uv run opal campaign-reset -c configs/campaign.yaml --apply --no-backup
-
-# 3) Initialize + validate
-uv run opal init -c configs/campaign.yaml
+# Initialize campaign state and workspace outputs.
+uv run opal init     -c configs/campaign.yaml
+# Validate config, plugin wiring, and core data contracts.
 uv run opal validate -c configs/campaign.yaml
+```
 
-# 4) Ingest round-0 labels
+#### 2. Ingest labels (observed round 0)
+
+```bash
+# Ingest measured labels and stamp them as observed in round 0.
 uv run opal ingest-y -c configs/campaign.yaml --observed-round 0 \
   --in inputs/r0/vec8-b0.xlsx \
   --unknown-sequences drop \
   --if-exists replace \
   --apply
-
-# 5) Train/score/select with EI
-uv run opal run -c configs/campaign.yaml --labels-as-of 0
-
-# 6) Verify and inspect
-uv run opal verify-outputs -c configs/campaign.yaml --round latest
-uv run opal status -c configs/campaign.yaml
-uv run opal runs list -c configs/campaign.yaml
-
-# 7) Inspect runtime carriers and next-round plan
-uv run opal ctx audit -c configs/campaign.yaml --round latest
-uv run opal explain -c configs/campaign.yaml --labels-as-of 1
-
-# 8) Inspect one selected record
-head -n 6 outputs/rounds/round_0/selection/selection_top_k.csv
-selected_id="$(tail -n +2 outputs/rounds/round_0/selection/selection_top_k.csv | head -n 1 | cut -d, -f1)"
-uv run opal record-show -c configs/campaign.yaml --id "${selected_id}" --run-id latest
-
-# 9) Ephemeral predictions and plots
-uv run opal predict -c configs/campaign.yaml --round latest --out outputs/predict_r0.parquet
-uv run opal plot -c configs/campaign.yaml --name score_vs_rank_latest --round latest
 ```
 
-### Expected outcome
-
-- `verify-outputs` reports `mismatches: 0`
-- latest run shows `selection=expected_improvement`
-- run metadata includes `selection__score_ref` and `selection__uncertainty_ref`
-
-### What to check after run
-
-- selection CSV: `outputs/rounds/round_0/selection/selection_top_k.csv`
-- run ledger: `outputs/ledger/runs.parquet`
-- prediction ledger: `outputs/ledger/predictions/`
-- round context: `outputs/rounds/round_0/metadata/round_ctx.json`
-
-### Strict EI behavior
-
-EI does not degrade to top_n when uncertainty is missing or invalid. It fails fast.
-
-### Round progression (round 1)
+#### 3. Run round 0 with Expected Improvement
 
 ```bash
+# Train, score, and select with Expected Improvement at labels-as-of round 0.
+uv run opal run -c configs/campaign.yaml --labels-as-of 0
+```
+> * `--observed-round R`: measurement stamp for ingest.
+> * `--labels-as-of R`: training/selection visibility cutoff for `opal run`.
+
+Checkpoint:
+
+* `outputs/rounds/round_0/selection/selection_top_k.csv`
+* `outputs/ledger/runs.parquet` (includes `selection__score_ref` and `selection__uncertainty_ref`)
+* `outputs/ledger/predictions/`
+
+#### 4. Verify + inspect
+
+```bash
+# Check selection and ledger consistency for the latest round.
+uv run opal verify-outputs -c configs/campaign.yaml --round latest
+# Print campaign status and latest round pointers.
+uv run opal status   -c configs/campaign.yaml
+# List recorded runs for this campaign.
+uv run opal runs list -c configs/campaign.yaml
+# Audit RoundCtx contract payloads for the latest round.
+uv run opal ctx audit -c configs/campaign.yaml --round latest
+```
+
+Expected result: `verify-outputs` reports `mismatches: 0`.
+
+Preview the selection:
+
+```bash
+# Preview selected candidates and ranking columns.
+head -n 6 outputs/rounds/round_0/selection/selection_top_k.csv
+```
+
+Optional: discover which “uncertainty / acquisition” columns exist in the CSV.
+
+```bash
+# Inspect uncertainty- or acquisition-related columns in selection output.
+python - <<'PY'
+import pandas as pd
+p="outputs/rounds/round_0/selection/selection_top_k.csv"
+df=pd.read_csv(p)
+cols=[c for c in df.columns if any(k in c.lower() for k in ["uncert", "sigma", "std", "acq", "ei"])]
+print("candidate columns:", cols)
+print(df[cols].head() if cols else "(no matching columns found)")
+PY
+```
+
+Inspect a selected record:
+
+```bash
+# Resolve the first selected candidate id from the selection CSV.
+selected_id="$(python - <<'PY'
+import pandas as pd
+p="outputs/rounds/round_0/selection/selection_top_k.csv"
+df=pd.read_csv(p)
+id_col="id" if "id" in df.columns else df.columns[0]
+print(df[id_col].iloc[0])
+PY
+)"
+# Show run-aware record details for that selected candidate.
+uv run opal record-show -c configs/campaign.yaml --id "${selected_id}" --run-id latest
+```
+
+#### 5. Optional read-only analysis and plots
+
+```bash
+# Export round-level predictions for downstream analysis.
+uv run opal predict -c configs/campaign.yaml --round latest --out outputs/predict_r0.parquet
+# Render the score-vs-rank plot for the latest round.
+uv run opal plot   -c configs/campaign.yaml --name score_vs_rank_latest --round latest
+```
+
+---
+
+### Continue to round 1, etc.
+
+```bash
+# Ingest the next batch and stamp labels as observed in round 1.
 uv run opal ingest-y -c configs/campaign.yaml --observed-round 1 \
   --in inputs/r0/vec8-b0.xlsx \
   --unknown-sequences drop \
   --if-exists replace \
   --apply
 
+# Re-run training/selection with labels visible through round 1.
 uv run opal run -c configs/campaign.yaml --labels-as-of 1 --resume
+# Re-check ledger and artifact consistency after the resume run.
 uv run opal verify-outputs -c configs/campaign.yaml --round latest
 ```
+
+---
+
+### If a step fails
+
+* Missing/invalid EI uncertainty:
+
+  * confirm `selection.params.uncertainty_ref` matches an uncertainty channel emitted by the objective
+  * confirm the model is producing non-negative predictive std
+  * confirm `training.y_ops` supports inverse-transforming standard deviation (units consistency)
+* All-zero uncertainty vector: EI errors (no exploration signal); confirm GP std is being emitted and propagated.
+* `SFXI min_n` failure: ingest enough labels for the same observed round you run as `--labels-as-of`.

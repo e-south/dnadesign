@@ -1,7 +1,6 @@
 ## OPAL Selection Strategies
 
 This page documents selection plugin contracts, required config fields, and runtime output expectations.
-For detailed acquisition equations and strategy behavior, use selection-specific pages.
 
 ### Built-in strategies
 

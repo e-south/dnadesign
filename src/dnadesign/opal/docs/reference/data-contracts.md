@@ -1,7 +1,6 @@
-## OPAL Data Contracts (v2)
+## OPAL Data Contracts
 
-This page documents the data and ledger contracts that OPAL reads and writes during ingest and round execution.
-Use it to validate schema expectations for `records.parquet`, label history, and append-only ledger sinks.
+This page documents the data and ledger contracts that OPAL reads and writes during ingest and round execution. Use it to validate schema expectations for `records.parquet`, label history, and append-only ledger sinks.
 
 ### Safety and validation
 

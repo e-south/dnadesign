@@ -1,7 +1,6 @@
 ## OPAL Y Transforms
 
-This page documents Y-transform and y-op contracts used during ingest and model-time Y processing.
-Use it when configuring `transforms_y` for ingest and `training.y_ops` for runtime inversion behavior.
+This page documents Y-transform and y-op contracts used during ingest and model-time Y processing. Use it when configuring `transforms_y` for ingest and `training.y_ops` for runtime inversion behavior.
 
 ### Contract
 
@@ -39,8 +38,3 @@ outputs under `yops/<name>/...` in `round_ctx.json`.
 
 * `sfxi_vec8_from_table_v1` — 8‑vector (logic + intensity) from tidy SFXI table.
 * `scalar_from_table_v1` — scalar Y from a single column (`y` by default).
-
-### See also
-
-- [Configuration reference](../reference/configuration.md)
-- [Workflow guides](../index.md#workflows)

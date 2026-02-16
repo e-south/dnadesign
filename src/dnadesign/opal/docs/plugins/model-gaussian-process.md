@@ -1,7 +1,6 @@
 ## Gaussian Process Plugin (`gaussian_process`)
 
-This page documents `gaussian_process` behavior, equations, and runtime invariants.
-For registry-level model contracts and model inventory, see [Models](./models.md).
+This page documents `gaussian_process` behavior, equations, and runtime invariants. For registry-level model contracts and model inventory, see [Models](./models.md).
 
 ### Purpose
 
@@ -59,9 +58,13 @@ If a model emits standard deviation and a configured y-op lacks `inverse_std`, O
 - shape mismatch between `y_pred` and `y_pred_std` in runtime path
 - invalid kernel/config shape resolved by strict schema/loader checks
 
-### See also
+### Used in workflow demos
 
-- [Selection plugins](./selection.md)
-- [Expected Improvement behavior and math](./selection-expected-improvement.md)
-- [GP + SFXI + top_n workflow](../workflows/gp-sfxi-topn.md)
-- [GP + SFXI + expected_improvement workflow](../workflows/gp-sfxi-ei.md)
+- [GP + SFXI + Top-N](../workflows/gp-sfxi-topn.md)
+- [GP + SFXI + Expected Improvement](../workflows/gp-sfxi-ei.md)
+
+To confirm uncertainty is present in a completed round:
+
+```bash
+uv run opal ctx audit -c configs/campaign.yaml --round latest
+```

@@ -1,7 +1,6 @@
 ## Expected Improvement Plugin (`expected_improvement`)
 
-This page documents `expected_improvement` acquisition behavior, equations, and failure conditions.
-For registry-level selection contracts and required fields, see [Selection](./selection.md).
+This page documents `expected_improvement` acquisition behavior, equations, and failure conditions. For registry-level selection contracts and required fields, see [Selection](./selection.md).
 
 ### Purpose
 
@@ -20,6 +19,31 @@ Configured in `selection.params`:
 - `top_k`, `tie_handling`, optional `alpha`, `beta`
 
 `uncertainty_ref` must resolve to standard deviation values in the same objective units as `score_ref`.
+
+### Wiring patterns (important)
+
+The `<objective>/<channel>` ref identifies a **channel key** within that objective. Score and uncertainty are separate surfaces:
+
+* `score_ref` pulls the **score values** for that channel key.
+* `uncertainty_ref` pulls the **standard deviation values** for that channel key.
+
+Some objectives publish uncertainty under the **same channel key** as the score (SFXI does this for `sfxi`). In that case it is valid for `score_ref` and `uncertainty_ref` to be identical.
+
+Minimal example (SFXI + EI):
+
+```yaml
+selection:
+  name: expected_improvement
+  params:
+    top_k: 5
+    score_ref: sfxi_v1/sfxi
+    uncertainty_ref: sfxi_v1/sfxi
+    objective_mode: maximize
+    alpha: 1.0
+    beta: 1.0
+```
+
+Common pitfall: setting `uncertainty_ref` to a channel key that **does not** publish uncertainty (or running EI with a model/objective path that produces no uncertainty). OPAL fails fast and does not fall back to `top_n`.
 
 ### Acquisition math
 
@@ -52,9 +76,7 @@ For per-candidate `sigma == 0`, OPAL uses the deterministic limit:
 
 - `A = alpha * max(I, 0)`
 
-This avoids `0/0` numerical failure in mixed-sigma batches.
-
-If all candidates have `sigma == 0`, OPAL raises an error (no exploration signal).
+This avoids `0/0` numerical failure in mixed-sigma batches. If all candidates have `sigma == 0`, OPAL raises an error (no exploration signal).
 
 ### Error cases
 
@@ -67,18 +89,3 @@ If all candidates have `sigma == 0`, OPAL raises an error (no exploration signal
 - non-finite acquisition outputs after computation
 
 There is no fallback to `top_n`.
-
-### Practical pairing in OPAL
-
-Most common path:
-
-- model: `gaussian_process`
-- objective: `sfxi_v1`
-- selection: `expected_improvement`
-
-### See also
-
-- [Selection plugins](./selection.md)
-- [Gaussian Process behavior and math](./model-gaussian-process.md)
-- [SFXI behavior and math](./objective-sfxi.md)
-- [GP + SFXI + expected_improvement workflow](../workflows/gp-sfxi-ei.md)

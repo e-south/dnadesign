@@ -1,7 +1,6 @@
 ## OPAL X Transforms
 
-This page documents X-transform plugin contracts and runtime expectations.
-Use it when configuring `transforms_x` in `campaign.yaml` or implementing a new X transform plugin.
+This page documents X-transform plugin contracts and runtime expectations. Use it when configuring `transforms_x` in `campaign.yaml` or implementing a new X transform plugin.
 
 **Contract**
 
@@ -25,8 +24,3 @@ Example: `identity` transforms scalars and vectors as‑is, coercing to `(N, F)`
 
 X transforms may declare `@roundctx_contract(category="transform_x", ...)` on the factory to
 enforce and audit their runtime keys in `round_ctx.json`.
-
-### See also
-
-- [Configuration reference](../reference/configuration.md)
-- [Workflow guides](../index.md#workflows)
