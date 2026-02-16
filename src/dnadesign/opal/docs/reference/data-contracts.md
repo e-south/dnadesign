@@ -1,17 +1,20 @@
-# OPAL Data Contracts (v2)
+## OPAL Data Contracts (v2)
 
-## Safety and validation
+This page documents the data and ledger contracts that OPAL reads and writes during ingest and round execution.
+Use it to validate schema expectations for `records.parquet`, label history, and append-only ledger sinks.
+
+### Safety and validation
 
 OPAL is assertive by default and fails fast on inconsistent inputs.
 
 - `opal validate` checks essentials + X presence; if Y exists it must be finite and expected length.
-- `label_hist` is required input for `run`/`explain` and the canonical dashboard source.
+- `label_hist` is required input for `run`/`explain` and the main dashboard source.
 - Labels in Y but missing from `label_hist` are rejected.
 - Ledger writes are strict: unknown columns are errors (override only with `OPAL_LEDGER_ALLOW_EXTRA=1`).
 - Duplicate handling on ingest is explicit via `ingest.duplicate_policy` (`error|keep_first|keep_last`).
 - `verify-outputs` is strict: selection IDs must be unique and must exist in the target run ledger predictions.
 
-## Records schema
+### Records schema
 
 Required columns in `records.parquet`:
 
@@ -27,24 +30,26 @@ X and Y representation:
 - X: Arrow `list<float>` or JSON array string; fixed length across used rows
 - Y: Arrow `list<float>`; label history stored in `opal__<campaign>__label_hist`
 
-## Records label history (OPAL-managed)
+### Records label history (OPAL-managed)
 
 | column | type | purpose |
 | --- | --- | --- |
 | `opal__<slug>__label_hist` | list<struct> | Append-only per-record history of observed labels and run-aware predictions. |
 
-Prediction entries store objective channel metadata and selected metrics (`score_ref`, `uncertainty_ref`) so readers can reconstruct selection semantics without implicit defaults.
+Prediction entries store objective channel metadata and selected metrics (`score_ref`, `uncertainty_ref`) so readers can reconstruct selection behavior without implicit defaults.
 
-## Ledger output schema (append-only)
+### Ledger output schema (append-only)
 
-### labels (`outputs/ledger/labels.parquet`)
+Append-only ledger datasets:
+
+`labels` (`outputs/ledger/labels.parquet`)
 
 - `event`: `"label"`
 - `observed_round`, `id`, `sequence` (if available)
 - `y_obs`: `list<float>`
 - `src`, `note`
 
-### run_pred (`outputs/ledger/predictions/`)
+`run_pred` (`outputs/ledger/predictions/`)
 
 - `event`: `"run_pred"`, plus `run_id`, `as_of_round`, `id`, `sequence`
 - `pred__y_dim`, `pred__y_hat_model`
@@ -56,7 +61,7 @@ Prediction entries store objective channel metadata and selected metrics (`score
 - Optional row diagnostics under `obj__*`
 - Contract checks are strict: all row-level vectors must match candidate count; score/uncertainty vectors and channel payload values must be finite; emitted uncertainty must be non-negative.
 
-### run_meta (`outputs/ledger/runs.parquet`)
+`run_meta` (`outputs/ledger/runs.parquet`)
 
 - `event`: `"run_meta"`, plus `run_id`, `as_of_round`
 - Config snapshot: `model__*`, `x_transform__*`, `y_ingest__*`, `objective__*`, `selection__*`, `training__y_ops`
@@ -68,14 +73,14 @@ Prediction entries store objective channel metadata and selected metrics (`score
 - `objective__denom_percentile` is populated only when the objective emits denominator-percentile metadata; otherwise null.
 - Provenance: `artifacts` (paths + hashes), `schema__version`, `opal__version`
 
-## Channel conventions
+### Channel conventions
 
 - Score channel refs: `<objective_name>/<score_channel_name>`
 - Uncertainty channel refs: `<objective_name>/<uncertainty_channel_name>`
 - `selection.params.score_ref` must resolve to an emitted score channel.
 - `selection.params.uncertainty_ref` is required for uncertainty-driven selection (for example `expected_improvement`).
 
-## Design notes
+### Design notes
 
 - Keep row-level diagnostics in `run_pred`, run-level summaries in `run_meta`.
 - Prefer explicit channels and references over implicit single-score columns.

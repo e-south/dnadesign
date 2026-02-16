@@ -1,8 +1,11 @@
-# OPAL Configuration (v2)
+## OPAL Configuration (v2)
 
-OPAL reads configuration from `configs/campaign.yaml`.
+This page documents the `campaign.yaml` configuration contract used by OPAL runtime and CLI commands.
+Use it as the source of truth for required keys, defaults, and model/objective/selection wiring.
 
-## Key blocks
+### Key blocks
+
+`configs/campaign.yaml` is organized into these top-level blocks:
 
 - `campaign`: `name`, `slug`, `workdir`
 - `data`: `location`, `x_column_name`, `y_column_name`, `y_expected_length`
@@ -19,7 +22,7 @@ OPAL reads configuration from `configs/campaign.yaml`.
 - `plot_config`: optional path to a separate plots YAML
 - `plot_defaults`, `plot_presets`, `plots`: optional plot-only keys when using inline plot config
 
-## Required v2 selection params
+### Required v2 selection params
 
 `selection.params` is explicit and channel-driven.
 
@@ -31,9 +34,9 @@ OPAL reads configuration from `configs/campaign.yaml`.
 
 Built-in schemas currently provide defaults for `top_k`, `objective_mode`, and `tie_handling`. For deterministic behavior and clearer reviews, declare all four keys explicitly in YAML.
 
-## Defaults
+### Defaults
 
-If a block is omitted, OPAL supplies conservative defaults:
+If an optional block is omitted, OPAL supplies conservative defaults:
 
 - `ingest.duplicate_policy`: `error`
 - `scoring.score_batch_size`: `10000`
@@ -44,7 +47,7 @@ If a block is omitted, OPAL supplies conservative defaults:
 Plugin `params` default to `{}`, but plugin names are required.
 Unknown plugin names fail at `opal validate` (registry resolution is strict).
 
-## Semantic wiring (model → objective → selection)
+### Semantic wiring (model → objective → selection)
 
 1. `model` predicts `y_hat` (and, for GP, predictive standard deviation).
 2. Each objective emits named score channels (and optional uncertainty channels).
@@ -52,7 +55,9 @@ Unknown plugin names fail at `opal validate` (registry resolution is strict).
 4. `selection.params.uncertainty_ref` (EI only) chooses the uncertainty standard deviation channel.
 5. `selection.params.objective_mode` must match the selected score channel mode.
 
-## Minimal baseline example (RF + top_n)
+### Minimal baseline example (RF + top_n)
+
+Use this example when your objective is already scalar and selection is deterministic.
 
 ```yaml
 campaign:
@@ -92,7 +97,9 @@ training:
     allow_resuggesting_candidates_until_labeled: true
 ```
 
-## UQ example (GP + expected_improvement)
+### UQ example (GP + expected_improvement)
+
+Use this example when selection must consume both score and uncertainty channels.
 
 ```yaml
 model:
@@ -125,13 +132,16 @@ selection:
     beta: 1.0
 ```
 
-## Precedence and wiring
+### Precedence and wiring
+
+Resolution and override rules:
 
 - `campaign.workdir` and `data.location.path` resolve relative to the campaign root (parent of `configs/`), unless absolute.
 - CLI flags override YAML for that invocation:
   `run --k` overrides `selection.params.top_k`, `run --score-batch-size` overrides `scoring.score_batch_size`,
   and `ingest-y --transform/--params` overrides `transforms_y`.
-- `--round` is the canonical flag; `--labels-as-of` and `--observed-round` are aliases.
+- `--round` is a shared alias across commands; prefer explicit flags in scripts:
+  `ingest-y --observed-round` for label stamping and `run/explain --labels-as-of` for training cutoff.
 - `transforms_y` is ingest-only; training/prediction uses `transforms_x` plus optional `training.y_ops`.
 - `state.json` records resolved config per round; ledger sinks are long-term audit.
 - `plot_config` paths resolve relative to the `configs/campaign.yaml` that declares them.

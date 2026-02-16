@@ -1,14 +1,15 @@
-# RoundCtx and Contract Auditing
+## RoundCtx and Contract Auditing
 
 `RoundCtx` is a runtime companion to `campaign.yaml`: YAML chooses plugin graph; `RoundCtx`
-tracks what each stage computes and what downstream components consume.
+tracks what each stage computes and what downstream components consume. Use this page to
+understand runtime carriers, contract enforcement, and audit keys.
 
 The runner persists:
 
 - `round.log.jsonl`: stage events and batch progress
 - `round_ctx.json`: full runtime carrier snapshot for audit
 
-## Plugin-scoped usage
+### Plugin-scoped usage
 
 The runner injects a plugin-scoped `ctx` that expands `"<self>"` to the plugin name and enforces contracts.
 
@@ -34,7 +35,7 @@ Audit fields in `round_ctx.json`:
 - `core/contracts/<category>/<plugin>/consumed`
 - `core/contracts/<category>/<plugin>/produced`
 
-## Batched predict stage behavior
+### Batched predict stage behavior
 
 For contracts using `produces_by_stage` (for example model `predict` summaries):
 
@@ -42,7 +43,7 @@ For contracts using `produces_by_stage` (for example model `predict` summaries):
 2. Writes to keys declared in `produces_by_stage["predict"]` are staged in memory.
 3. `ctx.get(...)` is read-your-writes for staged keys during the active stage.
 4. `ctx.postcheck_produces(stage="predict")` commits staged keys once (last write wins in-stage).
-5. Non-stage keys remain immediate and immutable (`allow_overwrite=False` semantics).
+5. Non-stage keys remain immediate and immutable (`allow_overwrite=False` behavior).
 
 This preserves persisted RoundCtx immutability while allowing batch-by-batch accumulation.
 
@@ -61,7 +62,7 @@ ctx.set("model/<self>/predict_summary", next_summary)
 
 Within the active predict stage, `ctx.get` reads staged values first. At stage end, OPAL commits the final staged value once.
 
-## Validation lifecycle
+### Validation lifecycle
 
 1. Runner builds `RoundCtx` with core keys and plugin names.
 2. Runner creates plugin-scoped contexts and checks `requires`.
@@ -73,3 +74,8 @@ Inspect carriers via CLI:
 - `opal ctx show`
 - `opal ctx audit`
 - `opal ctx diff`
+
+### Next steps
+
+- [CLI reference](../reference/cli.md#ctx)
+- [Architecture and data flow](./architecture.md)

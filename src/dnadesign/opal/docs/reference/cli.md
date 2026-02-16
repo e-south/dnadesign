@@ -255,6 +255,7 @@ opal record-show --config <yaml> \
 **Notes**
 
 * If reruns exist for a round, pass `--run-id` to avoid mixing predictions.
+* If the requested record does not exist, the command exits non-zero.
 
 ### `model-show`
 

@@ -1,15 +1,25 @@
 ## OPAL Selection Strategies
 
-Selection plugins convert selected score/uncertainty channels into ranking decisions.
+This page documents selection plugin contracts, required config fields, and runtime output expectations.
+For detailed acquisition equations and strategy behavior, use selection-specific pages.
 
-## Strategy comparison
+### Built-in strategies
 
 | Strategy | Inputs | Behavior | Typical pairing |
 | --- | --- | --- | --- |
 | `top_n` | `score_ref` | Deterministic rank-by-score | RF + SFXI, GP + SFXI |
 | `expected_improvement` | `score_ref` + `uncertainty_ref` | Acquisition ranking (exploration/exploitation) | GP + SFXI |
 
-## Runtime contract
+Source modules:
+
+- `src/dnadesign/opal/src/selection/top_n.py`
+- `src/dnadesign/opal/src/selection/expected_improvement.py`
+
+### Selection detail pages
+
+- [Expected Improvement behavior and math](./selection-expected-improvement.md)
+
+### Runtime contract
 
 ```python
 def selection_fn(
@@ -33,7 +43,7 @@ Required outputs:
 OPAL validates selection output types/shapes/finiteness before writeback.
 Tie expansion (`top_k` with `competition_rank` or `dense_rank`) is computed from the plugin-returned `score` vector.
 
-## Config contract (v2)
+### Config contract (v2)
 
 Every selection config must include:
 
@@ -47,7 +57,7 @@ Every selection config must include:
 - `uncertainty_ref`
 - The referenced uncertainty channel must be a standard deviation (not variance).
 
-## Built-ins
+### Built-ins
 
 ### `top_n`
 
@@ -59,36 +69,11 @@ Uncertainty-aware acquisition ranking.
 
 - consumes selected score channel (`score_ref`)
 - consumes uncertainty standard deviation channel (`uncertainty_ref`)
-- hard-fails on missing/non-finite/negative/all-zero uncertainty
+- raises an error on missing/non-finite/negative/all-zero uncertainty
 - does not degrade to score-only behavior
+- Acquisition details: [Expected Improvement behavior and math](./selection-expected-improvement.md)
 
-Acquisition math:
-
-- maximize mode: `I = s - s*` where `s* = max(scores)`
-- minimize mode: `I = s* - s` where `s* = min(scores)`
-- `Z = I / sigma`
-- `EI = I * Phi(Z) + sigma * phi(Z)`
-- OPAL selection score: `A = alpha * (I * Phi(Z)) + beta * (sigma * phi(Z))`
-
-Where:
-
-- `sigma` is the uncertainty standard deviation channel from `uncertainty_ref`
-- `Phi` is the standard normal CDF
-- `phi` is the standard normal PDF
-
-Zero-`sigma` handling:
-
-- Mixed per-candidate zero values are allowed.
-- For each candidate with `sigma == 0`, OPAL uses the deterministic EI limit:
-  - `A = alpha * max(I, 0)`
-- If all candidates have `sigma == 0`, OPAL fails fast because the acquisition has no exploration signal.
-
-Weighted-acquisition note:
-
-- With `alpha != beta`, `A` can be negative for some candidates.
-- This is valid and still rankable; OPAL only requires finite acquisition values.
-
-## Example configs
+### Example configs
 
 Top-N:
 
@@ -116,3 +101,10 @@ selection:
     alpha: 1.0
     beta: 1.0
 ```
+
+### See also
+
+- [Model plugins](./models.md)
+- [Gaussian Process behavior and math](./model-gaussian-process.md)
+- [Objective plugins](./objectives.md)
+- [GP + expected_improvement workflow](../workflows/gp-sfxi-ei.md)

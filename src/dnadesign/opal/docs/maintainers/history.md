@@ -1,8 +1,8 @@
-# OPAL Dev Journal
+## OPAL Internal Notes Archive
 
-Note: freeform working notes; prune/merge as they become cruft.
+Use `docs/dev/journal.md` for active development notes. This file is retained as historical archive.
 
-## 2026-02-12
+### 2026-02-12
 - Starting RoundCtx stage-buffer hardening for batched `model.predict` writes.
 - Goal: keep persisted `RoundCtx` immutable while allowing stage-local repeated updates to stage-scoped keys.
 - Implementing stage lifecycle state in `PluginCtx` with explicit mismatch errors and no silent fallbacks.
@@ -25,7 +25,7 @@ Note: freeform working notes; prune/merge as they become cruft.
 - README campaign tree updated to current nested round artifact layout (`model/`, `selection/`, `labels/`,
   `metadata/`, `logs/`) to remove stale flat-layout docs.
 
-## 2026-01-23
+### 2026-01-23
 - Starting from a clean baseline commit on `opal-dashboard-debug`.
 - New campaign layout uses `configs/` for `campaign.yaml` + `plots.yaml`.
 - Goal: anchor campaign IO to campaign root, add native XLSX ingest, and define a clean-slate demo reset.
@@ -69,7 +69,7 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Fold-change plot exports now namespace logic fidelity as obj__logic_fidelity.
 - prom60 explorer defaults updated to effect_scaled for the Y axis.
 
-## 2026-01-24
+### 2026-01-24
 - Round artifacts reorganized into subdirectories under each `outputs/rounds/round_<k>/`:
   `model/`, `selection/`, `labels/`, `metadata/`, `logs/` (no legacy flat layout).
 - Round log, round_ctx, objective_meta, and feature_importance now resolve from the new subdirs.
@@ -83,7 +83,7 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Dataset explorer hue registry now allows higher-cardinality categories (max_unique=100) for cluster labels.
 - SFXI hue registry now allows higher-cardinality categories so cluster labels appear in color-by options.
 
-## 2026-01-26
+### 2026-01-26
 - Starting prom60 SFXI diagnostics + uncertainty work on branch `opal-dashboard-extend`.
 - Decisions: setpoint sweep library uses 16 truth tables + current setpoint; factorial size uses `effect_scaled`.
 - Uncertainty contract will support both `score` and `y_hat` kinds (default `score`).
@@ -93,7 +93,7 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Derived metrics (nearest gate, dist-to-labeled logic/X, uncertainty) are attached to df_view for hue options.
 - UMAP explorer overlays labeled points; tests cover hue registry and chart layering.
 
-## 2026-01-27
+### 2026-01-27
 - prom60_eda headless marimo errors fixed (duplicate variable names, UI value access in creation cell).
 - Dashboard UMAP tooltips now typed to avoid empty-data Altair errors.
 - Demo plots config expanded to include all SFXI diagnostics; DEMO doc updated for setpoint plot + ingest-y replace.
@@ -134,7 +134,7 @@ Note: freeform working notes; prune/merge as they become cruft.
 - Refactored RF uncertainty to streaming ensemble score std (no `predict_per_tree`, no `y_hat` modes), added
   ensemble protocol under `analysis/sfxi`, and moved y-ops inverse helper out of dashboard.
 
-## 2026-01-28
+### 2026-01-28
 - Cached parquet loads for dashboards using a path+mtime key to avoid repeated reads.
 - Added column non-null count helper and threaded it through hue registries to reduce repeated scans.
 - Reduced redundant pred_y_hat vector conversion in prom60_eda diagnostics derivations.

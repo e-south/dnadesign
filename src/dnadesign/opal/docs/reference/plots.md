@@ -1,4 +1,4 @@
-# OPAL Plots
+## OPAL Plots
 
 This document covers **plot plugins** and the `PlotContext` helper. Plots are bespoke by design: each plugin owns its data loading, joins, and styling.
 
@@ -98,7 +98,7 @@ Ledger sinks always live under `context.workspace.outputs_dir` (e.g., `outputs/l
 
 ---
 
-## SFXI diagnostics plots
+### SFXI diagnostics plots
 
 These plots reuse shared SFXI math and are safe to run without retraining.
 Diagnostic plots always render the full dataset; sampling parameters are not supported.

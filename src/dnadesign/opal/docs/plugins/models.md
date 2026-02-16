@@ -1,6 +1,7 @@
 ## OPAL Models — Registry
 
-In OPAL docs, "optimizer choice" is the model + objective + selection trio. This page covers the model side.
+This page documents model plugin contracts, config surface, and runtime wiring.
+For equations and detailed behavior, use the model-specific pages.
 
 ### Inventory
 
@@ -9,12 +10,12 @@ In OPAL docs, "optimizer choice" is the model + objective + selection trio. This
 | `random_forest` | `X: (N, F)` | `Y: (N,)` or `(N,D)` | ensemble regressor with OOB diagnostics |
 | `gaussian_process` | `X: (N, F)` | `Y: (N,)` or `(N,D)` | GP regression with predictive std emitted to RoundCtx |
 
-## When to choose each model
+`expected_improvement` is not GP-only, but it requires an objective uncertainty channel referenced by
+`uncertainty_ref`.
 
-- `random_forest`: fast deterministic baseline; pairs naturally with `top_n`.
-- `gaussian_process`: uncertainty-aware modeling; can pair with `top_n` or `expected_improvement`.
+Source module:
 
-`expected_improvement` is not GP-only, but it requires an objective uncertainty channel referenced by `uncertainty_ref`.
+- `src/dnadesign/opal/src/models/gaussian_process.py`
 
 Quick check:
 
@@ -22,6 +23,10 @@ Quick check:
 from dnadesign.opal.src.registries.models import list_models
 print(list_models())
 ```
+
+### Model detail pages
+
+- [Gaussian Process behavior and math](./model-gaussian-process.md)
 
 ### Contract
 
@@ -37,7 +42,7 @@ class Model:
 
 ### Gaussian Process params (v2)
 
-`model.name: gaussian_process` accepts strict typed params:
+`model.name: gaussian_process` uses explicit typed params:
 
 - `alpha`: positive scalar or list of positive values
 - `normalize_y`: bool
@@ -71,10 +76,18 @@ When `training.y_ops` are configured, OPAL inverse-transforms both:
 - predictive standard deviations (`y_pred_std`)
 
 before objective evaluation, so `score_ref` and `uncertainty_ref` are always in the same objective units.
-If a model emits standard deviations and any configured y-op does not implement `inverse_std`, the run fails fast.
+If a model emits standard deviations and any configured y-op does not implement `inverse_std`, the run stops with an error.
 
 ### Extending
 
 1. Implement a model wrapper satisfying the contract.
 2. Register it with `@register_model("name")`.
 3. Import the module in `src/dnadesign/opal/src/models/__init__.py`.
+
+### See also
+
+- [Selection plugins](./selection.md)
+- [Expected Improvement behavior and math](./selection-expected-improvement.md)
+- [Objective plugins](./objectives.md)
+- [GP + top_n workflow](../workflows/gp-sfxi-topn.md)
+- [GP + expected_improvement workflow](../workflows/gp-sfxi-ei.md)

@@ -1,6 +1,7 @@
 ## OPAL X Transforms
 
-X‑transforms convert your stored representation column (**X**) into a fixed‑width numeric matrix for models.
+This page documents X-transform plugin contracts and runtime expectations.
+Use it when configuring `transforms_x` in `campaign.yaml` or implementing a new X transform plugin.
 
 **Contract**
 
@@ -20,7 +21,12 @@ The callable:
 
 Example: `identity` transforms scalars and vectors as‑is, coercing to `(N, F)` and enforcing finiteness.
 
-#### Runtime carrier contracts
+### Runtime carrier contracts
 
 X transforms may declare `@roundctx_contract(category="transform_x", ...)` on the factory to
 enforce and audit their runtime keys in `round_ctx.json`.
+
+### See also
+
+- [Configuration reference](../reference/configuration.md)
+- [Workflow guides](../index.md#workflows)
