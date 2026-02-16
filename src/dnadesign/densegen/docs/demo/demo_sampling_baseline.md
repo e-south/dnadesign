@@ -1,9 +1,10 @@
-## DenseGen Demo: Three-TF PWM Workflow
+## DenseGen Demo: Sampling Baseline (PWM Artifacts)
 
-This is the canonical DenseGen demo for PWM-driven generation.
-It uses three TFs (`lexA`, `cpxR`, `baeR`) and writes results to a local USR dataset.
+This is the canonical DenseGen sampling baseline for PWM-driven generation.
+It uses three TFs (`lexA`, `cpxR`, `baeR`) and writes results to local USR + parquet outputs.
+The packaged baseline includes two plans (`ethanol`, `ciprofloxacin`) for quick end-to-end cycles.
 
-If you are new to DenseGen, run [demo_binding_sites.md](demo_binding_sites.md) first.
+If you are new to DenseGen, run [demo_tfbs_baseline.md](demo_tfbs_baseline.md) first.
 
 ### What this demo teaches
 
@@ -58,23 +59,23 @@ pixi run fimo --version
 ## 1) Stage workspace
 
 ```bash
-# Create a new workspace from the packaged three-TF demo.
-uv run dense workspace init --id meme_three_tfs_trial --from-workspace demo_meme_three_tfs --copy-inputs --output-mode usr
+# Create a new workspace from the packaged sampling-baseline demo.
+uv run dense workspace init --id sampling_baseline_trial --from-workspace demo_sampling_baseline --copy-inputs --output-mode both
 
 # Move into the workspace.
-cd src/dnadesign/densegen/workspaces/meme_three_tfs_trial
+cd src/dnadesign/densegen/workspaces/sampling_baseline_trial
 
 # Store config path once for the rest of the demo.
 CONFIG="$PWD/config.yaml"
 ```
 
-If `meme_three_tfs_trial` already exists, choose a new `--id` or remove that workspace first.
+If `sampling_baseline_trial` already exists, choose a new `--id` or remove that workspace first.
 
-`workspace init --output-mode usr` also seeds `outputs/usr_datasets/registry.yaml`
+`workspace init --output-mode both` also seeds `outputs/usr_datasets/registry.yaml`
 when a repo registry seed file is available.
 
 If `fimo` is only available through pixi on your machine, run the same command flow with
-`pixi run dense -- ...` instead of `uv run dense ...`.
+`pixi run dense ...` instead of `uv run dense ...`.
 
 ## 2) Validate and inspect
 
@@ -92,9 +93,21 @@ uv run dense inspect plan -c "$CONFIG"
 uv run dense inspect config -c "$CONFIG"
 ```
 
+Packaged `demo_sampling_baseline` defaults to `solver.backend: CBC`.
+If you want GUROBI on your machine, update `config.yaml` before running:
+
+```yaml
+solver:
+  backend: GUROBI
+  strategy: iterate
+  time_limit_seconds: 5
+  # threads: 4
+```
+
 ## 3) Build Stage-A pools
 
-The workspace already includes motif artifact JSON files under `inputs/motif_artifacts/`.
+With `--copy-inputs`, this workspace stores motif artifact JSON files under `inputs/`.
+The config paths are rewritten to those copied files.
 
 If you need to regenerate those files from upstream data, follow:
 - [../workflows/cruncher_pwm_pipeline.md](../workflows/cruncher_pwm_pipeline.md)
@@ -108,9 +121,9 @@ uv run dense stage-a build-pool --fresh -c "$CONFIG"
 
 What this packaged demo does in Stage-A:
 
-- For each PWM input (`lexA`, `cpxR`, `baeR`), DenseGen mines **1,000,000** candidates and
-  retains **250** TFBS rows after scoring, dedupe, and MMR selection.
-- For the `background` input, DenseGen retains **500** rows.
+- For each PWM input (`lexA`, `cpxR`, `baeR`), DenseGen mines **150,000** candidates and
+  retains **100** TFBS rows after scoring, dedupe, and MMR selection.
+- For the `background` input, DenseGen mines **600,000** candidates and retains **200** rows.
 - In plain terms:
   - `mining.budget.candidates` = search effort
   - `n_sites` = final retained pool size
@@ -135,7 +148,7 @@ uv run dense run --no-plot -c "$CONFIG"
 `dense run --fresh` clears prior outputs (including Stage-A pool artifacts). Use `--fresh`
 only when you intentionally want a full rebuild.
 
-`demo_meme_three_tfs` uses `logging.progress_style: auto`, so progress output adapts to
+`demo_sampling_baseline` uses `logging.progress_style: auto`, so progress output adapts to
 terminal capabilities automatically.
 
 Useful debug variants:
@@ -162,7 +175,7 @@ uv run dense run --resume --no-plot -c "$CONFIG"
 To generate more sequences in the same workspace:
 
 1. edit `config.yaml`
-2. increase one or more `generation.plan[*].quota` values (for example 10 -> 13)
+2. increase one or more `generation.plan[*].quota` values (for example 6 -> 9)
 3. resume
 
 ```bash
@@ -189,10 +202,12 @@ Key files:
   - `outputs/meta/run_manifest.json`
   - `outputs/meta/events.jsonl`
   - `outputs/pools/pool_manifest.json`
+- Parquet records surface (used by notebook generation):
+  - `outputs/tables/records.parquet`
 - USR dataset artifacts:
-  - `outputs/usr_datasets/meme_three_tfs_trial/records.parquet`
-  - `outputs/usr_datasets/meme_three_tfs_trial/.events.log`
-  - `outputs/usr_datasets/meme_three_tfs_trial/_derived/densegen/part-*.parquet`
+  - `outputs/usr_datasets/densegen/demo_sampling_baseline/records.parquet`
+  - `outputs/usr_datasets/densegen/demo_sampling_baseline/.events.log`
+  - `outputs/usr_datasets/densegen/demo_sampling_baseline/_derived/densegen/part-*.parquet`
 
 ## 8) Wire Notify to a real endpoint (deployed pressure test)
 
@@ -257,6 +272,12 @@ uv run dense plot --only stage_a_summary,placement_map -c "$CONFIG"
 # Generate workspace notebook and launch it.
 uv run dense notebook generate -c "$CONFIG"
 uv run dense notebook run -c "$CONFIG"
+
+# Remote/non-GUI shell: launch without browser auto-open.
+uv run dense notebook run --headless -c "$CONFIG"
+
+# Optional: launch editable marimo cells instead of app mode.
+uv run dense notebook run --mode edit -c "$CONFIG"
 ```
 
 ## 10) Reset workspace
@@ -301,8 +322,18 @@ For non-interactive runs (CI, redirected logs), set `densegen.logging.progress_s
 ### USR registry missing
 
 DenseGen fails fast if `outputs/usr_datasets/registry.yaml` is missing or incompatible.
-`workspace init --output-mode usr` seeds this file. If you changed `output.usr.root`,
+`workspace init --output-mode usr|both` seeds this file. If you changed `output.usr.root`,
 ensure that new root has a valid `registry.yaml`.
+
+### Notebook records source resolution
+
+`dense notebook generate` reads one parquet records source selected by output wiring:
+
+- one sink in `output.targets` -> that sink (`parquet` or `usr`)
+- two sinks in `output.targets` -> `plots.source`
+
+This demo uses `--output-mode both` with `plots.source: usr`, so notebook previews read
+`outputs/usr_datasets/<dataset>/records.parquet`.
 
 ### Resume/config mismatch
 

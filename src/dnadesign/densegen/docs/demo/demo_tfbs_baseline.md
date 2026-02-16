@@ -19,29 +19,31 @@ Subprocess map for this demo:
 1. Stage workspace + validate config
 2. Run (`dense run --fresh`) which executes Stage-A ingest -> Stage-B sampling -> solve loop
 3. Inspect run diagnostics
-4. Iterate config changes and rerun
+4. Render plots + generate notebook
+5. Iterate config changes and rerun
 
 ### Contents
 1. [Stage a workspace](#1-stage-a-workspace)
 2. [Validate and inspect](#2-validate-and-inspect)
 3. [Run and inspect](#3-run-and-inspect)
 4. [Step-up examples: tune constraints in `config.yaml`](#4-step-up-examples-tune-constraints-in-configyaml)
-5. [Reset and rerun](#5-reset-and-rerun)
+5. [Plot and notebook](#5-plot-and-notebook)
+6. [Reset and rerun](#6-reset-and-rerun)
 
 ### 1) Stage a workspace
 
 ```bash
 # Create a fresh workspace from the packaged demo template.
-uv run dense workspace init --id binding_sites_trial --from-workspace demo_binding_sites --copy-inputs --output-mode local
+uv run dense workspace init --id tfbs_baseline_trial --from-workspace demo_tfbs_baseline --copy-inputs --output-mode local
 
 # Move into the new workspace.
-cd src/dnadesign/densegen/workspaces/binding_sites_trial
+cd src/dnadesign/densegen/workspaces/tfbs_baseline_trial
 
 # Reuse this path in the next commands.
 CONFIG="$PWD/config.yaml"
 ```
 
-If `binding_sites_trial` already exists, choose a new `--id` or remove the existing workspace directory first.
+If `tfbs_baseline_trial` already exists, choose a new `--id` or remove the existing workspace directory first.
 
 ### 2) Validate and inspect
 
@@ -125,7 +127,35 @@ uv run dense run --fresh --no-plot -c "$CONFIG"
 uv run dense inspect run --library --events -c "$CONFIG"
 ```
 
-### 5) Reset and rerun
+### 5) Plot and notebook
+
+```bash
+# Render the demo default plot set (placement map for this workspace).
+uv run dense plot -c "$CONFIG"
+
+# Generate a workspace-scoped marimo notebook.
+uv run dense notebook generate -c "$CONFIG"
+
+# Launch notebook in app mode for analysis.
+uv run dense notebook run -c "$CONFIG"
+
+# Remote/non-GUI shell: launch without browser auto-open.
+uv run dense notebook run --headless -c "$CONFIG"
+```
+
+What to expect:
+
+- plot files under `outputs/plots/`
+- notebook file at `outputs/notebooks/densegen_run_overview.py`
+- `dense notebook run` stays attached until you stop it (`Ctrl+C`)
+
+This demo uses local/parquet outputs by default, so notebook previews read
+`outputs/tables/records.parquet`. If you stage this same demo with `--output-mode usr`,
+the generated notebook resolves records from the USR dataset path instead.
+
+Use `uv run dense notebook run --mode edit -c "$CONFIG"` if you want editable marimo cells.
+
+### 6) Reset and rerun
 
 ```bash
 # Remove outputs only (keep config + inputs).
@@ -141,7 +171,7 @@ uv run dense plot -c "$CONFIG"
 `campaign-reset` removes `outputs/` and preserves `config.yaml` plus `inputs/`.
 
 Next step: move to the PWM demo at
-[demo_pwm_artifacts.md](demo_pwm_artifacts.md).
+[demo_sampling_baseline.md](demo_sampling_baseline.md).
 
 ---
 

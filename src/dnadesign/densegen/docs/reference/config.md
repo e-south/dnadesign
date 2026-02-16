@@ -19,6 +19,9 @@ If you want concepts first, read:
 - [`densegen.run`](#densegenrun) - run identifier and root.
 - [`densegen.output`](#densegenoutput) - output targets and schema.
 - [`densegen.generation`](#densegengeneration) - plan and fixed elements.
+- [`densegen.motif_sets`](#densegenmotif_sets) - reusable motif dictionaries.
+- [`densegen.generation.plan_templates`](#densegengenerationplan_templates) - matrix plan expansion.
+- [`densegen.generation.sequence_constraints`](#densegengenerationsequence_constraints) - global final-sequence motif rules.
 - [`densegen.generation.sampling`](#densegengenerationsampling-stage-b-sampling) - Stage-B library building controls.
 - [`densegen.solver`](#densegensolver) - backend and strategy.
 - [`densegen.runtime`](#densegenruntime) - retry and guard rails.
@@ -206,7 +209,8 @@ Outputs (tables), logs, and plots must resolve inside `outputs/` under `densegen
 - `sequence_length` should be >= the widest required motif (library TFBS or fixed elements); if it
   is shorter, Stage‑B records infeasibility and warns.
 - `sampling` (Stage‑B; see below)
-- `plan` (required, non-empty)
+- Exactly one of `plan` or `plan_templates` is required.
+  - `plan` (non-empty list)
   - Each item: `name` and `quota` (int > 0)
   - `sampling.include_inputs` (required) - input names that feed the plan‑scoped pool.
   - `fixed_elements.promoter_constraints[]` supports `name`, `upstream`, `downstream`,
@@ -225,6 +229,42 @@ Outputs (tables), logs, and plots must resolve inside `outputs/` under `densegen
     - `min_count_by_regulator` (dict, optional) - per-regulator minimum counts
       - Keys must match group members.
       - DenseGen uses the maximum of this value and `runtime.min_count_per_tf`.
+- `plan_templates` (non-empty list; mutually exclusive with `plan`)
+  - Use this for combinatorial promoter panels without duplicating YAML.
+  - Template keys:
+    - `base_name`
+    - one quota mode: `quota_per_variant` or `total_quota` (`distribution_policy: uniform` required with `total_quota`)
+    - `sampling`, `regulator_constraints`
+    - `fixed_elements.promoter_matrix`:
+      - `name`
+      - `upstream_from_set`, `downstream_from_set` (motif set names)
+      - `pairing.mode`: `zip | cross_product | explicit_pairs`
+      - `pairing.pairs` (required only when `mode=explicit_pairs`)
+      - `spacer_length`, `upstream_pos`, optional `downstream_pos`
+- `plan_template_max_expanded_plans` (int > 0; default 256)
+  - Hard cap on expansion fanout to prevent accidental config blow-ups.
+- `sequence_constraints` (optional)
+  - Use this for global final-sequence validation and constrained pad/gap fill.
+  - `forbid_kmers[]` rules:
+    - `name`
+    - `patterns_from_motif_sets` (non-empty list of motif set names)
+    - `include_reverse_complements` (bool)
+    - `scope`: `outside_allowed_placements`
+    - `strands`: `forward | both`
+  - `allowlist[]`:
+    - `kind`: `fixed_element_instance`
+    - `selector.fixed_element`: `promoter`
+    - `selector.component`: `upstream | downstream`
+    - `match_exact_coordinates` must be true
+
+---
+
+### `densegen.motif_sets`
+
+- Optional dictionary used by `generation.plan_templates` and `generation.sequence_constraints`.
+- Shape: `set_name -> { variant_id -> motif_sequence }`.
+- Motifs must be non-empty A/C/G/T strings.
+- Set names and variant IDs must be non-empty strings.
 
 ---
 
@@ -305,15 +345,6 @@ Notes:
   - `gc.min_pad_length` (int >= 0) — if the pad length is shorter than this value:
   - `strict` → error
   - `adaptive` → relax GC bounds to `[0, 1]` and record the relaxation
-
----
-
-### `densegen.postprocess.validate_final_sequence`
-
-- `forbid_kmers_outside_promoter_windows.kmers` (required list)
-  - Rejects solutions containing these kmers outside the fixed promoter windows
-    defined in `fixed_elements.promoter_constraints`.
-  - Requires promoter constraints; if none are present, the run fails fast.
 
 ---
 

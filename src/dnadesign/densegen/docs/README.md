@@ -12,6 +12,7 @@ If you only need one answer:
 - [Read order](#read-order)
 - [Runtime subprocess flow](#runtime-subprocess-flow)
 - [Event boundary](#event-boundary)
+- [Workspace templates](#workspace-templates)
 - [Demos](#demos)
 - [Guides](#guides)
 - [Reference](#reference)
@@ -36,9 +37,9 @@ Do not use DenseGen for:
 ## Read order
 
 1. Minimal run with low moving parts:
-   - [Binding-sites baseline demo](demo/demo_binding_sites.md)
-2. Canonical PWM path:
-   - [Three-TF PWM demo](demo/demo_pwm_artifacts.md)
+   - [Binding-sites baseline demo](demo/demo_tfbs_baseline.md)
+2. Canonical sampling path:
+   - [Sampling baseline demo](demo/demo_sampling_baseline.md)
    - [Cruncher PWM pipeline](workflows/cruncher_pwm_pipeline.md)
 3. Full stack integration:
    - [DenseGen -> USR -> Notify demo](demo/demo_usr_notify.md)
@@ -46,6 +47,11 @@ Do not use DenseGen for:
    - [DenseGen -> USR -> Notify on BU SCC](workflows/bu_scc_end_to_end.md)
    - [docs/bu-scc/install.md](../../../../docs/bu-scc/install.md)
    - [docs/bu-scc/batch-notify.md](../../../../docs/bu-scc/batch-notify.md)
+
+## Workspace templates
+
+Packaged workspace templates (both `demo_*` and `study_*`) are indexed here:
+- [Workspace templates catalog](guide/workspace-templates.md)
 
 ## Runtime subprocess flow
 
@@ -78,12 +84,13 @@ Canonical contract details:
 
 ## Demos
 - [Demo flows index](demo/README.md)
-- [Binding-sites baseline demo](demo/demo_binding_sites.md)
-- [Three-TF PWM demo](demo/demo_pwm_artifacts.md)
+- [Binding-sites baseline demo](demo/demo_tfbs_baseline.md)
+- [Sampling baseline demo](demo/demo_sampling_baseline.md)
 - [DenseGen -> USR -> Notify demo](demo/demo_usr_notify.md)
 
 ## Guides
 - [Workspace](guide/workspace.md)
+- [Workspace templates](guide/workspace-templates.md)
 - [Inputs](guide/inputs.md)
 - [Sampling](guide/sampling.md)
 - [Generation](guide/generation.md)

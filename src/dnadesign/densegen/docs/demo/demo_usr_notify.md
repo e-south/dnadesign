@@ -7,7 +7,7 @@ This walkthrough shows the full stack in one local workflow:
 - Notify reads USR `.events.log` and posts events to a webhook
 
 If this is your first DenseGen run, start with:
-- [demo_binding_sites.md](demo_binding_sites.md)
+- [demo_tfbs_baseline.md](demo_tfbs_baseline.md)
 
 ### What this demo teaches
 
@@ -63,7 +63,7 @@ You also need a solver backend (CBC or GUROBI, depending on your setup):
 
 ```bash
 # Validate demo config and probe solver availability.
-uv run dense validate-config --probe-solver -c src/dnadesign/densegen/workspaces/demo_binding_sites/config.yaml
+uv run dense validate-config --probe-solver -c src/dnadesign/densegen/workspaces/demo_tfbs_baseline/config.yaml
 ```
 
 ---
@@ -107,7 +107,7 @@ export DENSEGEN_WEBHOOK="http://127.0.0.1:8787/webhook"
 # Create a new workspace from the binding-sites demo template.
 uv run dense workspace init \
   --id usr_notify_trial \
-  --from-workspace demo_binding_sites \
+  --from-workspace demo_tfbs_baseline \
   --copy-inputs \
   --output-mode usr
 

@@ -129,14 +129,14 @@ Resolve missing sources before continuing.
 
 ```bash
 # Export DenseGen PWM artifact JSON files from catalog set 1.
-pixi run cruncher catalog export-densegen --set 1 --densegen-workspace demo_meme_three_tfs -c "$CONFIG"
+pixi run cruncher catalog export-densegen --set 1 --densegen-workspace demo_sampling_baseline -c "$CONFIG"
 
 # Export site tables (optional but useful for cross-checking).
-pixi run cruncher catalog export-sites --set 1 --densegen-workspace demo_meme_three_tfs --overwrite -c "$CONFIG"
+pixi run cruncher catalog export-sites --set 1 --densegen-workspace demo_sampling_baseline --overwrite -c "$CONFIG"
 ```
 
 These commands write motif JSON files under:
-`src/dnadesign/densegen/workspaces/demo_meme_three_tfs/inputs/motif_artifacts/`
+`src/dnadesign/densegen/workspaces/demo_sampling_baseline/inputs/motif_artifacts/`
 
 If you regenerate motifs, make sure DenseGen uses the newly exported IDs.
 `catalog export-densegen` cleans existing selected-TF artifact JSON files by default;
@@ -155,7 +155,7 @@ See:
 - [../reference/config.md](../reference/config.md)
 - [../reference/motif_artifacts.md](../reference/motif_artifacts.md)
 
-### Demo plan intent (`demo_meme_three_tfs`)
+### Demo plan intent (`demo_sampling_baseline`)
 
 The packaged DenseGen demo includes a `background_pool` input for neutral 16-20 bp parts.
 Plan-scoped pooling then builds four libraries:

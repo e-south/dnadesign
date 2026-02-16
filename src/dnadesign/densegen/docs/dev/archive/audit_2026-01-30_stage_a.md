@@ -1,8 +1,8 @@
 # DenseGen Stage-A audit (2026-01-30)
 
-- Scope: Stage-A PWM sampling behavior and diagnostics for demo_meme_three_tfs.
+- Scope: Stage-A PWM sampling behavior and diagnostics for demo_sampling_baseline.
 - Branch: densegen/cruncher-refine.
-- Workspace: src/dnadesign/densegen/workspaces/demo_meme_three_tfs.
+- Workspace: src/dnadesign/densegen/workspaces/demo_sampling_baseline.
 - Command: uv run dense stage-a build-pool --fresh (config auto-detected).
 - Inputs: pwm_artifact_set (LexA + CpxR).
 
@@ -13,7 +13,7 @@
 - Diagnostic tiers (0.1%, 1%, 9%, rest) and tier-targeted mining provide budget control and early warnings.
 - MMR selection trades score vs diversity on tfbs_core with PWM-tolerant weighted Hamming distance; shortlist pool built from a tier ladder for headroom.
 
-## Stage-A settings used in demo_meme_three_tfs
+## Stage-A settings used in demo_sampling_baseline
 - n_sites: 500 per motif.
 - mining: tier_target (target_tier_fraction=0.001), max_candidates=500000, max_seconds=300, batch_size=5000.
 - length: range [15, 20], core embedded in background flanks.

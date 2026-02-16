@@ -2,8 +2,8 @@
 
 Use this page when you need exact command behavior and flag names.
 For end-to-end guided runs, use:
-- [binding-sites baseline demo](../demo/demo_binding_sites.md)
-- [three-TF PWM demo](../demo/demo_pwm_artifacts.md)
+- [binding-sites baseline demo](../demo/demo_tfbs_baseline.md)
+- [sampling baseline demo](../demo/demo_sampling_baseline.md)
 
 ## Contents
 - [How to inspect CLI surface quickly](#how-to-inspect-cli-surface-quickly)
@@ -34,6 +34,7 @@ uv run dense --help
 uv run dense inspect run --help
 uv run dense stage-a build-pool --help
 uv run dense stage-b build-libraries --help
+uv run dense notebook run --help
 ```
 
 ## Config resolution
@@ -182,6 +183,7 @@ Key options:
 - `--no-plot`
 - `--fresh`
 - `--resume`
+- `--extend-quota INTEGER`
 - `--log-file PATH`
 - `--show-tfbs`
 - `--show-solutions`
@@ -194,7 +196,6 @@ Notes:
 
 ## `dense campaign-reset`
 
-Hidden command for demo/pressure-test workflows.
 Deletes run outputs while preserving config and inputs.
 
 Key options:
@@ -213,6 +214,9 @@ Key options:
 
 Lists available plot names and descriptions.
 
+Key options:
+- `-c, --config PATH` (optional config validation before listing)
+
 ## `dense notebook generate`
 
 Generates a workspace-scoped marimo notebook for the run.
@@ -223,14 +227,29 @@ Key options:
 - `--absolute`
 - `-c, --config PATH`
 
+Notes:
+- Uses one records source parquet file, selected by output wiring:
+  - if `output.targets` has one sink, use that sink (`parquet` or `usr`)
+  - if `output.targets` has both sinks, use `plots.source`
+- Source path resolution:
+  - `parquet` source -> `output.parquet.path`
+  - `usr` source -> `<output.usr.root>/<output.usr.dataset>/records.parquet`
+
 ## `dense notebook run`
 
 Launches a DenseGen marimo notebook.
 
 Key options:
 - `--path PATH` (default: `<run_root>/outputs/notebooks/densegen_run_overview.py`)
+- `--mode run|edit` (default: `run`)
+- `--headless` (run mode only)
 - `--absolute`
 - `-c, --config PATH`
+
+Notes:
+- `--mode run` launches a read-only notebook app for analysis.
+- `--mode edit` launches editable marimo cells.
+- `--headless` suppresses browser auto-open for remote/non-GUI shells.
 
 ---
 

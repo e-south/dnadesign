@@ -31,15 +31,15 @@ Notify consumes USR `.events.log` only.
 - [Pick your first run](#pick-your-first-run)
 - [Runtime subprocess flow](#runtime-subprocess-flow)
 - [Quick start: binding-sites baseline](#quick-start-binding-sites-baseline)
-- [Quick start: canonical PWM path](#quick-start-canonical-pwm-path)
+- [Quick start: sampling baseline](#quick-start-sampling-baseline)
 - [Docs map](#docs-map)
 
 ---
 
 ### Pick your first run
 
-- Fastest learning path: [docs/demo/demo_binding_sites.md](docs/demo/demo_binding_sites.md)
-- Canonical PWM workflow: [docs/demo/demo_pwm_artifacts.md](docs/demo/demo_pwm_artifacts.md)
+- Fastest learning path: [docs/demo/demo_tfbs_baseline.md](docs/demo/demo_tfbs_baseline.md)
+- Canonical sampling workflow: [docs/demo/demo_sampling_baseline.md](docs/demo/demo_sampling_baseline.md)
 - Full stack (DenseGen -> USR -> Notify): [docs/demo/demo_usr_notify.md](docs/demo/demo_usr_notify.md)
 
 ### Runtime subprocess flow
@@ -63,6 +63,10 @@ If you keep this order in mind, most diagnostics become easy to interpret:
 - `--output-mode usr`: canonical run artifact is USR dataset `outputs/usr_datasets/<dataset>/records.parquet` plus overlays and `.events.log`.
 - `--output-mode both`: writes both sinks and enforces sink-alignment checks during the run.
 
+`dense notebook generate` works in all three output modes. It resolves one records source:
+- single sink -> that sink (`parquet` or `usr`)
+- both sinks -> `plots.source`
+
 For `local`, copy `outputs/tables/records.parquet`.
 For `usr`, resolve the dataset path from the run, then export:
 
@@ -83,10 +87,10 @@ Run from repo root:
 uv sync --locked
 
 # Create a workspace from the binding-sites demo template.
-uv run dense workspace init --id binding_sites_trial --from-workspace demo_binding_sites --copy-inputs --output-mode local
+uv run dense workspace init --id tfbs_baseline_trial --from-workspace demo_tfbs_baseline --copy-inputs --output-mode local
 
 # Enter the workspace.
-cd src/dnadesign/densegen/workspaces/binding_sites_trial
+cd src/dnadesign/densegen/workspaces/tfbs_baseline_trial
 
 # Validate config + solver.
 uv run dense validate-config --probe-solver
@@ -103,10 +107,10 @@ Local-mode handoff output:
 ```bash
 # Canonical local parquet artifact for downstream copy/use.
 ls -lh outputs/tables/records.parquet
-cp outputs/tables/records.parquet /path/to/handoff/binding_sites_trial.parquet
+cp outputs/tables/records.parquet /path/to/handoff/tfbs_baseline_trial.parquet
 ```
 
-### Quick start: canonical PWM path
+### Quick start: sampling baseline
 
 This path needs MEME Suite (`fimo`) in addition to solver availability.
 
@@ -120,11 +124,11 @@ pixi install
 # Confirm FIMO is available.
 pixi run fimo --version
 
-# Create workspace from the packaged three-TF demo.
-uv run dense workspace init --id meme_three_tfs_trial --from-workspace demo_meme_three_tfs --copy-inputs --output-mode usr
+# Create workspace from the packaged sampling-baseline demo.
+uv run dense workspace init --id sampling_baseline_trial --from-workspace demo_sampling_baseline --copy-inputs --output-mode usr
 
 # Enter workspace.
-cd src/dnadesign/densegen/workspaces/meme_three_tfs_trial
+cd src/dnadesign/densegen/workspaces/sampling_baseline_trial
 
 # Validate config + solver.
 uv run dense validate-config --probe-solver
@@ -157,6 +161,7 @@ You can still edit plan quotas in `config.yaml`; runtime `--extend-quota` is for
 
 Guides:
 - [docs/guide/workspace.md](docs/guide/workspace.md)
+- [docs/guide/workspace-templates.md](docs/guide/workspace-templates.md)
 - [docs/guide/inputs.md](docs/guide/inputs.md)
 - [docs/guide/sampling.md](docs/guide/sampling.md)
 - [docs/guide/generation.md](docs/guide/generation.md)

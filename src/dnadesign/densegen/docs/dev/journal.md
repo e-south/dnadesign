@@ -18,7 +18,7 @@
 - Tests: `uv run pytest -q src/dnadesign/densegen/tests/runtime/test_round_robin_chunk_cap.py`.
 - Refactored `_process_plan_for_source` to delegate to `_run_stage_b_sampling`, separating plan setup, pool loading, and Stage-B execution.
 - Tests: `uv run pytest -q src/dnadesign/densegen/tests/runtime/test_round_robin_chunk_cap.py src/dnadesign/densegen/tests/runtime/test_source_cache.py`.
-- Profiling: Stage-A PWM build using `demo_meme_three_tfs` with `--max-seconds 2` (per-motif) wrote pools under `outputs/pools_profile`.
+- Profiling: Stage-A PWM build using `demo_sampling_baseline` with `--max-seconds 2` (per-motif) wrote pools under `outputs/pools_profile`.
   Hotspots: `stage_a_mining.mine_pwm_candidates`, `pwm_fimo.run_fimo` + `subprocess.run`, `_generate_batch`.
   Stage-B profiling blocked: `neutral_bg` pool missing; need background pool build to proceed.
 - Background pool negative selection now uses FIMO p-value threshold 1e-4 and scans both strands for hits.
@@ -72,7 +72,7 @@
 - Implemented Stage-A lineage propagation into `densegen__used_tfbs_detail` at record level: `stage_a_best_hit_score`, `stage_a_rank_within_regulator`, `stage_a_tier`, `stage_a_fimo_start`, `stage_a_fimo_stop`, `stage_a_fimo_strand`, `stage_a_selection_rank`, `stage_a_selection_score_norm`, and `stage_a_tfbs_core`.
 - Updated Parquet/USR schema contract for `densegen__used_tfbs_detail` to keep sink parity, including USR registry type updates.
 - Added tests for: Stage-A lineage in placement detail, retention/sparsity behavior by `input_mode`, and parity between Parquet and USR shared metadata columns.
-- Fresh e2e schema audit run (temp workspace): `/tmp/densegen_audit_demo_meme_three_tfs` with current `demo_meme_three_tfs` config.
+- Fresh e2e schema audit run (temp workspace): `/tmp/densegen_audit_demo_sampling_baseline` with current `demo_sampling_baseline` config.
 - Fresh run result: `records.parquet` has 101 `densegen__*` columns (40 rows); 29 columns are all-null and 39 are run-constant in this run.
 - Confirmed expanded placement lineage now materializes in fresh outputs: `densegen__used_tfbs_detail` includes Stage-A fields; non-null placement counts in this run were `stage_a_* = 68/120` placements (core/id/offset fields remain 120/120).
 - Confirmed gap: `composition.parquet` currently stores placement identity/geometry (`tf`, `tfbs`, ids, offsets) but not `stage_a_*` fields, so Stage-A placement lineage is only present in nested `densegen__used_tfbs_detail`.
@@ -107,18 +107,18 @@
 - Root-cause fix: `LIBRARY_BUILT` and `LIBRARY_SAMPLING_PRESSURE` events were incorrectly gated on optional `library_build_rows/library_member_rows` buffers. Event emission now works even when those table buffers are disabled.
 - Notify/USR decoupling pass (historical): `USR_EVENT_VERSION` was briefly moved to `src/dnadesign/event_schema.py`; ownership is now back in `src/dnadesign/usr/src/event_schema.py` and Notify resolves it lazily at runtime.
 - Added notify startup regression test `test_cli_import_decoupling.py` to enforce that importing `dnadesign.notify.cli` does not eagerly load heavy `dnadesign.usr.src.dataset` modules.
-- Maintainer pressure pass: reset and reran `demo_binding_sites` + `demo_meme_three_tfs`, generated full plot sets, and replayed the DenseGen -> USR -> Notify local flow (`usr_notify_trial`) with `notify usr-events watch --dry-run`.
+- Maintainer pressure pass: reset and reran `demo_tfbs_baseline` + `demo_sampling_baseline`, generated full plot sets, and replayed the DenseGen -> USR -> Notify local flow (`usr_notify_trial`) with `notify usr-events watch --dry-run`.
 - Root-cause fix: `dense inspect run --library` could report zero `used` counts when curated output rows omitted `densegen__sampling_library_hash`; report aggregation now backfills hash joins from attempts via `(input_name, plan, library_index)` when records use fallback hash keys.
 - Added regression coverage: `test_collect_report_data_maps_used_rows_when_record_library_hash_missing` in reporting tests.
 - Docs alignment: updated `docs/demo/demo_usr_notify.md` Step 5 dataset-path instructions to handle both default (`usr_notify_trial`) and namespaced (`densegen/usr_notify_trial`) dataset ids.
 - Plot polish pass: increased Stage-A pool-tier marker legend text in score-distribution subplots, reduced Stepwise sequence x-tick label size in yield-bias panels, moved the Stage-A diversity "Score vs max" right y-label closer to axis, and switched run-health failed-reason panel from stacked bars to lollipop markers.
 - Added plot regression tests for the above visual contracts in `tests/runtime/test_run_diagnostics_plots.py`.
 - Docs ergonomics audit across DenseGen/USR/Notify: added local TOCs and cross-links in DenseGen docs indices/demo guides, converted stale plain-text path references to clickable links, and fixed stale internal anchor targets discovered by a docs-wide link/anchor sweep.
-- Demo operator-footgun fix: standardized command examples in `docs/demo/demo_pwm_artifacts.md` and `docs/demo/README.md` to explicit `uv run dense ...` usage (with pixi note for FIMO-only environments) to avoid alias-dependent command failures.
-- Stage-A MMR pressure sweep pass: ran transient config grids over `selection.alpha`, `selection.pool.min_score_norm`, `sampling.n_sites`, `mining.budget.candidates`, and `selection.pool.max_candidates` on `demo_meme_three_tfs`; persisted summaries under `workspaces/demo_meme_three_tfs/outputs/pools_sweep*/`.
+- Demo operator-footgun fix: standardized command examples in `docs/demo/demo_sampling_baseline.md` and `docs/demo/README.md` to explicit `uv run dense ...` usage (with pixi note for FIMO-only environments) to avoid alias-dependent command failures.
+- Stage-A MMR pressure sweep pass: ran transient config grids over `selection.alpha`, `selection.pool.min_score_norm`, `sampling.n_sites`, `mining.budget.candidates`, and `selection.pool.max_candidates` on `demo_sampling_baseline`; persisted summaries under `workspaces/demo_sampling_baseline/outputs/pools_sweep*/`.
 - Root-cause fix: `selection.pool.min_score_norm` was validated/reported but not applied in MMR pool construction; now it actively filters by `score_norm = best_hit_score / pwm_theoretical_max_score`.
 - Root-cause fix: MMR diagnostics could crash for capped `rank_by=score_norm` pools due pool-membership mismatch in downstream diversity/objective diagnostics; `SelectionDiagnostics` now carries exact pool sequence membership and downstream selectors use it.
-- Updated Stage-A defaults in `workspaces/demo_meme_three_tfs/config.yaml` to `selection.alpha: 0.35` and `selection.pool.min_score_norm: 0.82` for full-retention runs with higher diversity than prior defaults.
+- Updated Stage-A defaults in `workspaces/demo_sampling_baseline/config.yaml` to `selection.alpha: 0.35` and `selection.pool.min_score_norm: 0.82` for full-retention runs with higher diversity than prior defaults.
 - Updated docs to remove stale "report-only" language for `selection.pool.min_score_norm` and to clarify cap semantics under `selection.rank_by`.
 - Additional Stage-A MMR pressure sweep (`n_sites` focus): ran `v00_n200`, `v01_n500`, `v02_n1000` with current defaults (`alpha=0.35`, `min_score_norm=0.82`) under `outputs/pools_sweep_nsites/`.
 - Finding: with current score gate, larger retain targets hit motif-specific ceilings (`lexA` max retained 393, `cpxR` max retained 243), causing Stage-A MMR degeneracy (`pool_size_final <= retained`) for `n_sites=500/1000`.
@@ -140,7 +140,7 @@
 - Validation: `uv run pytest -q src/dnadesign/densegen/tests/stage_a/test_stage_a_mmr_selection.py src/dnadesign/densegen/tests/pwm/test_pwm_sampling_mmr_tier_widening.py src/dnadesign/densegen/tests/pwm/test_pwm_artifact_source.py`; `uv run pytest -q src/dnadesign/densegen/tests/stage_a src/dnadesign/densegen/tests/pwm src/dnadesign/densegen/tests/plotting/test_plot_manifest.py src/dnadesign/densegen/tests/cli/test_cli_stage_a_summary.py src/dnadesign/densegen/tests/runtime/test_run_diagnostics_plots.py`; `uv run ruff check ...` on touched Stage-A files.
 - Stage-A MMR target-pool default tightened from `ceil(1.5 * n_sites)` to `ceil(2.0 * n_sites)` to increase deterministic diversity headroom while preserving bounded pool sizing and cap behavior.
 - Updated Stage-A MMR target-pool default from `ceil(2.0 * n_sites)` to `ceil(10.0 * n_sites)` and refreshed tests/docs/demo reruns accordingly.
-- Demo config update: `demo_meme_three_tfs` Stage-A PWM inputs now use `mining.budget.candidates=1_000_000` and `n_sites=250`; background pool now uses `n_sites=500`.
+- Demo config update: `demo_sampling_baseline` Stage-A PWM inputs now use `mining.budget.candidates=1_000_000` and `n_sites=250`; background pool now uses `n_sites=500`.
 - Docs clarity pass: clarified Stage-A "search effort vs retained size" language in sampling/docs and documented current packaged-demo Stage-A defaults in the three-TF PWM walkthrough.
 - Stage-A hardening pass: added run-global cross-regulator core-collision auditing for multi-motif PWM sources (`pwm_meme`, `pwm_meme_set`, `pwm_jaspar`, `pwm_artifact_set`).
 - Added explicit config control `pwm.sampling.uniqueness.cross_regulator_core_collisions` with modes `warn` (default), `error` (fail-fast), and `allow` (disabled).

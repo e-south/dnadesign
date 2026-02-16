@@ -26,7 +26,7 @@ outputs/
 Workspace-level notebook artifact:
 
 ```text
-notebooks/
+outputs/notebooks/
   densegen_run_overview.py
 ```
 

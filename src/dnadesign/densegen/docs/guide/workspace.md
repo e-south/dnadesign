@@ -11,8 +11,8 @@ Packaged demos use schema `2.9`, and `config.yaml` is the contract anchor for al
 workspace/
   config.yaml
   inputs/
-  notebooks/
   outputs/
+    notebooks/
     meta/
     logs/
     pools/
@@ -34,12 +34,13 @@ workspace/
 - Outputs live under `densegen.run.root` (typically `.`)
 - If outputs already exist, `dense run` resumes by default; use `dense run --fresh` for a clean run
 - `dense workspace init` defaults to `src/dnadesign/densegen/workspaces` (or `$DENSEGEN_WORKSPACE_ROOT`)
+- Packaged template catalog (`demo_*` and `study_*`): [workspace-templates.md](workspace-templates.md)
 
 ### Useful commands
 
 ```bash
 # Create a workspace from a packaged demo template.
-uv run dense workspace init --id my_run --from-workspace demo_binding_sites --copy-inputs --output-mode local
+uv run dense workspace init --id my_run --from-workspace demo_tfbs_baseline --copy-inputs --output-mode local
 
 # Show the effective workspace roots DenseGen will use.
 uv run dense workspace where --format json

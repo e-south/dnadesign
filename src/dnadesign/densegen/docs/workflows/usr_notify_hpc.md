@@ -30,7 +30,21 @@ References:
 
 ---
 
-## 2) Single-run submission (DenseGen)
+## 2) Create a workspace config for this runbook
+
+```bash
+uv run dense workspace init --id <workspace_id> --from-workspace demo_sampling_baseline --copy-inputs --output-mode usr
+```
+
+Use the generated config path:
+
+```bash
+CONFIG="<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace_id>/config.yaml"
+```
+
+---
+
+## 3) Single-run submission (DenseGen)
 
 Use the canonical template and pass per-run values at submit time:
 
@@ -39,19 +53,19 @@ qsub -P <project> \
   -pe omp 16 \
   -l h_rt=08:00:00 \
   -l mem_per_core=8G \
-  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/demo_hpc/config.yaml \
+  -v DENSEGEN_CONFIG="$CONFIG" \
   docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
 Before submission:
 
 ```bash
-uv run dense validate-config --probe-solver -c <dnadesign_repo>/src/dnadesign/densegen/workspaces/demo_hpc/config.yaml
+uv run dense validate-config --probe-solver -c "$CONFIG"
 ```
 
 ---
 
-## 3) Array submission pattern
+## 4) Array submission pattern
 
 If each task has a separate config, submit an array and consume `SGE_TASK_ID`:
 
@@ -81,25 +95,24 @@ qsub run_densegen_array.sh
 
 ---
 
-## 4) Resolve USR event path for Notify
+## 5) Resolve USR event path for Notify
 
 After DenseGen completes:
 
 ```bash
-uv run dense inspect run --usr-events-path -c <dnadesign_repo>/src/dnadesign/densegen/workspaces/demo_hpc/config.yaml
+uv run dense inspect run --usr-events-path -c "$CONFIG"
 ```
 
 Use this path in Notify. Do not use `outputs/meta/events.jsonl`.
 
 ---
 
-## 5) Create Notify profile from workspace config
+## 6) Create Notify profile from workspace config
 
 Use resolver mode to avoid manual event-path copying:
 
 ```bash
-CONFIG="<dnadesign_repo>/src/dnadesign/densegen/workspaces/demo_hpc/config.yaml"
-NOTIFY_DIR="<dnadesign_repo>/src/dnadesign/densegen/workspaces/demo_hpc/outputs/notify/densegen"
+NOTIFY_DIR="<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace_id>/outputs/notify/densegen"
 
 uv run notify setup slack \
   --tool densegen \
@@ -119,7 +132,7 @@ Flag expectations:
 
 ---
 
-## 6) Deploy Notify watcher
+## 7) Deploy Notify watcher
 
 Recommended: dedicated watcher batch job for durable delivery.
 
@@ -135,7 +148,7 @@ Env mode (if you intentionally do not use a profile):
 
 ```bash
 qsub -P <project> \
-  -v NOTIFY_TOOL=densegen,NOTIFY_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/demo_hpc/config.yaml,WEBHOOK_ENV=NOTIFY_WEBHOOK \
+  -v NOTIFY_TOOL=densegen,NOTIFY_CONFIG="$CONFIG",WEBHOOK_ENV=NOTIFY_WEBHOOK \
   docs/bu-scc/jobs/notify-watch.qsub
 ```
 
@@ -145,7 +158,7 @@ For setup checks, run `profile doctor` and watcher `--dry-run` before live follo
 
 ---
 
-## 7) Spool and drain recovery
+## 8) Spool and drain recovery
 
 If webhook delivery fails, keep spool enabled and drain later:
 

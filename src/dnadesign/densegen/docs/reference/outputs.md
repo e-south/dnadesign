@@ -123,6 +123,7 @@ Curated record fields:
 | `densegen__sampling_library_size` | artifact_candidate | Configured Stage-B library size. |
 | `densegen__sampling_library_strategy` | artifact_candidate | Stage-B library sampling strategy. |
 | `densegen__sampling_iterative_max_libraries` | artifact_candidate | Stage-B max libraries for iterative subsampling. |
+| `densegen__sampling_library_hash` | record_keep | Stage-B stable sampled-library hash. |
 | `densegen__sampling_library_index` | record_keep | Stage-B 1-based sampled library index. |
 | `densegen__pad_used` | record_keep | Whether pad bases were applied. |
 | `densegen__pad_bases` | record_conditional | Number of bases padded. |
@@ -185,7 +186,7 @@ Tier-based metrics (e.g., tier enrichment) are computed only for PWM-derived poo
 DenseGen records solver library provenance in two places:
 
 - `outputs/libraries/library_builds.parquet` + `library_members.parquet` (canonical library artifacts).
-- `outputs/tables/attempts.parquet` (attempt-level audit log with offered library lists). Each attempt row stores the full library offered to the solver (`library_tfbs`, `library_tfs`, `library_site_ids`, `library_sources`) along with the library hash/index and solver status. Attempts include `attempt_id` and `solution_id` (when successful) for stable joins. Output records carry `densegen__sampling_library_index`, and composition/solutions tables keep full library join keys.
+- `outputs/tables/attempts.parquet` (attempt-level audit log with offered library lists). Each attempt row stores the full library offered to the solver (`library_tfbs`, `library_tfs`, `library_site_ids`, `library_sources`) along with the library hash/index and solver status. Attempts include `attempt_id` and `solution_id` (when successful) for stable joins. Output records carry both `densegen__sampling_library_hash` and `densegen__sampling_library_index`, and composition/solutions tables keep full library join keys.
 
 ---
 
@@ -206,6 +207,24 @@ DenseGen writes `outputs/tables/solutions.parquet` (append-only) with the canoni
 - `<run_root>/outputs/notebooks/densegen_run_overview.py` (default path)
 
 The notebook reads run artifacts (`outputs/meta/*`, `outputs/tables/*`, `outputs/plots/plot_manifest.json`) and supports manual refresh for iterative sampling sessions.
+
+DenseGen -> BaseRender contract for the scaffolded notebook:
+
+- Contract source: `dnadesign.densegen.notebook_render_contract:densegen_notebook_render_contract`
+- Records source path: resolved from output sink selection:
+  - single sink in `output.targets` -> that sink (`parquet` or `usr`)
+  - multiple sinks in `output.targets` -> `plots.source`
+  - `parquet` source path: `densegen.output.parquet.path`
+  - `usr` source path: `<densegen.output.usr.root>/<densegen.output.usr.dataset>/records.parquet`
+- BaseRender API surface used by the notebook:
+  - `dnadesign.baserender.load_records_from_parquet(...)`
+  - `dnadesign.baserender.render_record_figure(...)`
+- Rendering style preset: `presentation_default` (fixed in the DenseGen contract)
+- Notebook record preview window limit: `500` rows
+- Required parquet columns for the default contract:
+  - `id`
+  - `sequence`
+  - `densegen__used_tfbs_detail`
 
 ---
 
@@ -228,7 +247,8 @@ Core diagnostics plots (canonical set):
 - `tfbs_usage` — TFBS usage diagnostics from accepted placements: specific TFBS rank-count curve
   plus cumulative share by regulator.
 
-The canonical `demo_meme_three_tfs` workspace defaults to all four plot families.
+The canonical `demo_sampling_baseline` workspace defaults to `stage_a_summary` and `placement_map`
+for faster iteration. `study_stress_ethanol_cipro` enables all four plot families.
 
 `stage_a_summary` consolidates PWM inputs into one image per plot type (one row per input),
 with outputs under `outputs/plots/stage_a/`:
