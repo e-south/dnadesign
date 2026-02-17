@@ -1,4 +1,4 @@
-## Motif artifact contract (JSON)
+## Motif artifact JSON contract
 
 DenseGen can consume one JSON file per motif.
 This keeps producer tooling and DenseGen decoupled:
@@ -10,24 +10,24 @@ Cruncher can emit these artifacts with `cruncher catalog export-densegen`.
 ### Contents
 
 This section covers contents.
-- [Context](#context) - why artifacts exist and where they fit.
-- [Core principles](#core-principles) - contract invariants.
+- [When to use this](#when-to-use-this) - where artifacts fit in DenseGen runs.
+- [Contract rules](#contract-rules) - invariants DenseGen validates.
 - [Required fields](#required-fields) - strict JSON keys.
-- [Scoring semantics](#scoring-semantics) - log‑odds + background.
+- [Scoring rules](#scoring-rules) - log‑odds + background.
 - [Example artifact](#example-artifact) - minimal JSON payload.
 - [Config usage](#config-usage) - Stage‑A sampling entry point.
 
 ---
 
-### Context
+### When to use this
 
 Artifact‑first PWM inputs are a decoupling contract: producers generate stable, versioned JSON, and DenseGen consumes them. This enables independent producers, reproducible ingestion, and clear provenance. DenseGen uses these artifacts in **Stage‑A sampling** to build TFBS pools from the PWM matrices.
 
 ---
 
-### Core principles
+### Contract rules
 
-This section covers core principles.
+This section lists the rules DenseGen enforces for artifact ingestion.
 
 - **One file per motif** (explicit paths; no directory scanning).
 - **JSON-first**, no sidecar schema files.
@@ -55,7 +55,7 @@ Optional keys (ignored by DenseGen but recommended for provenance):
 
 ---
 
-### Scoring semantics
+### Scoring rules
 
 DenseGen scores sampled candidates via **FIMO log-odds** using the PWM probabilities and
 background. The `log_odds` field is validated and stored for provenance, but scoring is
@@ -69,7 +69,7 @@ before emitting artifacts.
 
 ### Example artifact
 
-This section covers example artifact.
+This section shows a minimal valid motif artifact payload.
 
 ```json
 {
@@ -133,6 +133,4 @@ or caps/time terminate early.
 If `min` is below motif length, Stage‑A trims to a max-information window per candidate.
 When you use MMR, cores must have consistent length; set a fixed trimming window if needed.
 
----
-
-@e-south
+For end-to-end artifact handoff commands, use **[Cruncher to DenseGen PWM handoff](../howto/cruncher_pwm_pipeline.md)**.

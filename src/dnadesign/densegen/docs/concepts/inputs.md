@@ -1,8 +1,8 @@
-## Input concepts
+## Input model
 
 This concept page explains what DenseGen accepts as Stage-A inputs and how those inputs become retained candidate pools. Read it when you need to choose the right input type or diagnose Stage-A pool quality.
 
-### Stage-A mental model
+### How Stage-A builds input pools
 This section summarizes the input-to-pool lifecycle that all input types feed.
 
 1. Load or mine candidates from configured sources.
@@ -32,9 +32,10 @@ This section defines how DenseGen resolves input paths and why workspace-local c
 - `dense workspace init --copy-inputs` is the safest operator default because it decouples runs from mutable upstream files.
 - Absolute paths are accepted but reduce workspace portability.
 
-### Schema and artifact references
-This section points to contract-grade docs for exact key semantics and formats.
+### Related schema and artifact docs
+This section points to reference docs for exact key definitions and formats.
 
 - Use **[config reference](../reference/config.md)** for exact schema fields.
 - Use **[motif artifacts reference](../reference/motif_artifacts.md)** for PWM artifact JSON format.
 - Use **[sampling concepts](sampling.md)** for Stage-A selection and Stage-B weighting details.
+- Use **[Cruncher to DenseGen PWM handoff](../howto/cruncher_pwm_pipeline.md)** for end-to-end motif artifact handoff commands.

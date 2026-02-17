@@ -1,38 +1,39 @@
-## DenseGen output formats
+## DenseGen outputs reference
 
 This page defines what DenseGen writes, where it writes it, and which event stream each
 consumer should read.
 
 DenseGen can emit Parquet outputs locally and/or write through USR.
 
+For a compact run-and-artifact checklist, use **[DenseGen quick checklist](../concepts/quick-checklist.md)**.
+
 ### Contents
 
 This section covers contents.
-- [Canonical IDs](#canonical-ids) - deterministic sequence identifiers.
+- [Deterministic IDs](#deterministic-ids) - deterministic sequence identifiers.
 - [Parquet](#parquet) - dataset layout and deduplication.
 - [USR](#usr) - attach semantics and optional dependency.
-- [Metadata (common)](#metadata-common) - namespacing and core categories.
-- [Run-level manifests](#run-level-manifests) - run-level JSON summaries.
-- [Library provenance](#library-provenance-library-artifacts-attempts) - libraries offered to the solver.
-- [Source column](#source-column) - provenance string.
+- [Shared metadata fields](#shared-metadata-fields) - namespaced record fields and retention labels.
+- [Run manifests](#run-manifests) - run-level JSON summaries.
+- [Library provenance artifacts](#library-provenance-artifacts) - solver-offered libraries and attempts.
+- [Source column values](#source-column-values) - provenance string.
 - [Rejected solutions](#rejected-solutions) - constraint rejections audit.
 
 ---
 
-### Integration boundary
+### Event boundary paths
 
-DenseGen runtime diagnostics and USR mutation events are separate streams:
+This section records event artifact paths only; the boundary explanation lives in
+**[observability and events](../concepts/observability_and_events.md)**.
 
 - DenseGen runtime diagnostics: `outputs/meta/events.jsonl`
 - USR mutation events: `<usr_root>/<dataset>/.events.log`
 
-Notify reads USR `.events.log`, not DenseGen `outputs/meta/events.jsonl`.
-
 ---
 
-### Canonical IDs
+### Deterministic IDs
 
-This section covers canonical ids.
+This section covers deterministic ids.
 
 - Sequence IDs use USR's algorithm:
   - `normalize_sequence(sequence, bio_type, alphabet)`
@@ -78,7 +79,7 @@ does not (or IDs differ), DenseGen fails fast.
 
 ---
 
-### Metadata (common)
+### Shared metadata fields
 
 Keys are namespaced as `densegen__<key>`.
 
@@ -139,11 +140,11 @@ Curated record fields:
 | `densegen__npz_bytes` | record_conditional | NPZ payload size in bytes (USR sink only). |
 | `densegen__npz_fields` | record_conditional | Fields offloaded to NPZ (USR sink only). |
 
-For canonical types/validation logic, see `src/dnadesign/densegen/src/core/metadata_schema.py`.
+For type definitions and validation logic, see `src/dnadesign/densegen/src/core/metadata_schema.py`.
 
 ---
 
-### Run-level manifests
+### Run manifests
 
 DenseGen writes run-level JSON files under `outputs/meta/`:
 
@@ -156,25 +157,21 @@ These are produced alongside Parquet/USR outputs and provide a compact audit tra
 
 ---
 
-### Events log
+### DenseGen events log
 
 DenseGen writes `outputs/meta/events.jsonl` (JSON lines) with structured events for pool builds, library builds, sampling pressure, stalls, and resamples. This is a lightweight machine-readable trace of runtime control flow.
 
 ---
 
-### Event streams and consumers (DenseGen vs USR)
+### Related event docs
 
-DenseGen participates in two distinct event streams when you enable the USR sink:
+This section points to stream-boundary docs and keeps this file focused on artifact contracts.
 
-| Stream | Path | Producer | Primary purpose | Typical consumer |
-|---|---|---|---|---|
-| DenseGen runtime events | `outputs/meta/events.jsonl` | DenseGen | Run diagnostics (resamples, stalls, library rebuilds) | `dense inspect run --events`, plots, notebooks |
-| USR mutation events | `<usr_root>/<dataset>/.events.log` | USR | Audit plus integration boundary | `notify usr-events watch`, `usr events tail` |
-
-Important: Notify consumes USR `.events.log`, not DenseGen `outputs/meta/events.jsonl`.
 See also:
+- DenseGen boundary and mistakes: **[observability and events](../concepts/observability_and_events.md)**
 - USR event schema: `../../../usr/README.md#event-log-schema`
 - Notify operators doc: `../../../../../docs/notify/usr-events.md`
+- DenseGen watcher walkthrough: **[DenseGen to USR to Notify tutorial](../tutorials/demo_usr_notify.md)**
 
 ---
 
@@ -185,18 +182,18 @@ Tier-based metrics (e.g., tier enrichment) are computed only for PWM-derived poo
 
 ---
 
-### Library provenance (library artifacts + attempts)
+### Library provenance artifacts
 
 DenseGen records solver library provenance in two places:
 
-- `outputs/libraries/library_builds.parquet` + `library_members.parquet` (canonical library artifacts).
+- `outputs/libraries/library_builds.parquet` + `library_members.parquet` (primary library artifacts).
 - `outputs/tables/attempts.parquet` (attempt-level audit log with offered library lists). Each attempt row stores the full library offered to the solver (`library_tfbs`, `library_tfs`, `library_site_ids`, `library_sources`) along with the library hash/index and solver status. Attempts include `attempt_id` and `solution_id` (when successful) for stable joins. Output records carry both `densegen__sampling_library_hash` and `densegen__sampling_library_index`, and composition/solutions tables keep full library join keys.
 
 ---
 
 ### Solutions log
 
-DenseGen writes `outputs/tables/solutions.parquet` (append-only) with the canonical solution id, attempt id, and library hash. Join keys:
+DenseGen writes `outputs/tables/solutions.parquet` (append-only) with the solution id, attempt id, and library hash. Join keys:
 
 - `solutions.solution_id` ↔ `records.id`
 - `solutions.attempt_id` ↔ `attempts.attempt_id`
@@ -204,7 +201,7 @@ DenseGen writes `outputs/tables/solutions.parquet` (append-only) with the canoni
 
 ---
 
-### Notebook artifacts
+### Notebook output
 
 `dense notebook generate` writes a workspace-scoped marimo notebook:
 
@@ -232,13 +229,13 @@ DenseGen -> BaseRender contract for the scaffolded notebook:
 
 ---
 
-### Plots
+### Plot output
 
 `dense plot` writes plot images under `outputs/plots/` (format controlled by `plots.format`). `outputs/plots/plot_manifest.json` records the plot inventory and structured placement metadata for notebooks.
 
-Run diagnostics metrics are summarized in `outputs/tables/run_metrics.parquet` (aggregated from pools, libraries, attempts, and composition). Plots below are generated from canonical artifacts plus accepted-sequence records loaded from the configured plot source (`plots.source`: parquet or usr), not candidate/debug logs.
+Run diagnostics metrics are summarized in `outputs/tables/run_metrics.parquet` (aggregated from pools, libraries, attempts, and composition). Plots below are generated from run artifacts plus accepted-sequence records loaded from the configured plot source (`plots.source`: parquet or usr), not candidate/debug logs.
 
-Core diagnostics plots (canonical set):
+Core diagnostics plots:
 
 - `stage_a_summary` — Stage-A pool diagnostics (interpretation in the sampling guide).
 - `placement_map` — Stage-B fingerprint: per-position occupancy/event counts across the final
@@ -251,7 +248,7 @@ Core diagnostics plots (canonical set):
 - `tfbs_usage` — TFBS usage diagnostics from accepted placements: specific TFBS rank-count curve
   plus cumulative share by regulator.
 
-The canonical `demo_sampling_baseline` workspace defaults to `stage_a_summary` and `placement_map`
+The `demo_sampling_baseline` workspace defaults to `stage_a_summary` and `placement_map`
 for faster iteration. `study_stress_ethanol_cipro` enables all four plot families.
 
 `stage_a_summary` consolidates PWM inputs into one image per plot type (one row per input),
@@ -287,7 +284,7 @@ diversity metrics, rerun `dense stage-a build-pool --fresh` to regenerate it.
 
 ---
 
-#### `placement_map` overlays fixed elements
+#### How `placement_map` shows fixed elements
 
 `placement_map` visualizes 1-nt occupancy across binding-site types (regulators and fixed elements).
 
@@ -298,7 +295,7 @@ Fixed elements are shown in the legend as `<name> -35` and `<name> -10`.
 
 ---
 
-### Stage helper outputs (optional)
+### Optional stage helper outputs
 
 DenseGen can materialize Stage‑A/Stage‑B artifacts without running the solver:
 
@@ -338,7 +335,7 @@ or reset everything with `dense run --fresh`.
 
 ---
 
-### Source column
+### Source column values
 
 The `source` column is always present and encodes provenance as:
 
@@ -358,7 +355,7 @@ DenseGen records non-success solver attempts in `outputs/tables/attempts.parquet
 - `reason` (normalized reason-family label)
 - `reason_detail_json` (structured context for constraint audits)
 
-This is the canonical source for rejection audits and post-run failure triage.
+This is the primary source for rejection audits and post-run failure triage.
 
 ---
 
@@ -371,7 +368,3 @@ DenseGen writes `outputs/tables/attempts.parquet`, an append-only audit log of s
 - `attempt_index` — per-plan monotonic counter
 
 Each attempt also records the exact library TF/TFBS/site_id lists offered to the solver (subset attribution). If no attempts are logged, the file is absent. Attempts logs require `pyarrow`.
-
----
-
-@e-south

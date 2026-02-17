@@ -7,12 +7,14 @@ This section states the concrete behavior operators should expect from the packa
 
 The packaged `demo_sampling_baseline` workspace currently uses three PWM artifact inputs (`lexA`, `cpxR`, `baeR`) plus background and runs two plans (`ethanol`, `ciprofloxacin`). The larger `study_stress_ethanol_cipro` workspace is the path for three-plan campaign behavior including `ethanol_ciprofloxacin`.
 
-### Step 1: prepare PWM artifacts
+### Step 1: Prepare PWM artifacts
 This section clarifies what DenseGen expects from upstream Cruncher outputs.
 
 DenseGen consumes PWM artifacts as explicit per-input files. Do not assume a single aggregated set contract unless your workspace schema explicitly defines one.
 
-### Step 2: initialize a sampling workspace
+For exact JSON field requirements, use **[motif artifact JSON contract](../reference/motif_artifacts.md)**. For sampling behavior after ingest, use **[sampling model](../concepts/sampling.md)**.
+
+### Step 2: Initialize a sampling workspace
 This section creates a workspace from the packaged baseline and keeps inputs local for reproducibility.
 
 ```bash
@@ -22,17 +24,21 @@ uv sync --locked
 # Install pixi toolchain when FIMO is needed in Stage-A.
 pixi install
 
+# Resolve repo root and pin workspace root so paths are deterministic.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+WORKSPACE_ROOT="$REPO_ROOT/src/dnadesign/densegen/workspaces"
+
 # Initialize workspace from packaged sampling baseline.
-uv run dense workspace init --id sampling_baseline_trial --from-workspace demo_sampling_baseline --copy-inputs --output-mode both
+uv run dense workspace init --id sampling_baseline_trial --root "$WORKSPACE_ROOT" --from-workspace demo_sampling_baseline --copy-inputs --output-mode both
 
 # Enter the workspace.
-cd src/dnadesign/densegen/workspaces/sampling_baseline_trial
+cd "$WORKSPACE_ROOT/sampling_baseline_trial"
 
 # Validate config and solver availability.
 uv run dense validate-config --probe-solver
 ```
 
-### Step 3: build Stage-A pools
+### Step 3: Build Stage-A pools
 This section materializes pool artifacts before solve-to-quota starts.
 
 ```bash
@@ -40,7 +46,7 @@ This section materializes pool artifacts before solve-to-quota starts.
 uv run dense stage-a build-pool --fresh
 ```
 
-### Step 4: run DenseGen
+### Step 4: Run DenseGen
 This section executes Stage-B and solve-to-quota for the sampling baseline plans.
 
 ```bash
@@ -48,7 +54,7 @@ This section executes Stage-B and solve-to-quota for the sampling baseline plans
 uv run dense run --no-plot
 ```
 
-### Step 5: inspect and analyze
+### Step 5: Inspect and analyze
 This section verifies artifacts and generates analysis surfaces.
 
 ```bash
@@ -62,7 +68,7 @@ uv run dense plot
 uv run dense notebook generate
 ```
 
-### Step 6: optional Notify handoff
-This section points to canonical watcher docs instead of repeating full watcher setup.
+### Step 6: Optional Notify handoff
+This section points to watcher docs instead of repeating full watcher setup.
 
 Use **[DenseGen to USR to Notify tutorial](../tutorials/demo_usr_notify.md)** for end-to-end watcher setup and use **[Notify USR events guide](../../../../../docs/notify/usr-events.md)** for spool/drain operations.

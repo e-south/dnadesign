@@ -2,10 +2,15 @@
 
 This journal records cross-package engineering decisions, investigations, and validation notes for maintainers. Read it when you need historical rationale behind implementation changes.
 
-
-
 ### Contents
+This section lists dated entries so you can jump to a specific investigation window.
+
 - [2026-02-04](#2026-02-04)
+- [2026-02-05](#2026-02-05)
+- [2026-02-11](#2026-02-11)
+- [2026-02-12](#2026-02-12)
+- [2026-02-13](#2026-02-13)
+- [2026-02-15](#2026-02-15)
 - [2026-02-18](#2026-02-18)
 
 ### 2026-02-04

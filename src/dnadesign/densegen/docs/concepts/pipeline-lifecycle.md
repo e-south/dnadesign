@@ -1,4 +1,4 @@
-## DenseGen operator arc
+## DenseGen pipeline lifecycle
 
 This concept document explains the DenseGen lifecycle as an operator sequence from workspace initialization through run artifacts and reset. Read it when you need a stable mental model for debugging stage failures, resume behavior, and output placement.
 
@@ -13,7 +13,9 @@ This section gives the shortest reliable operator loop for most DenseGen workspa
 6. Render plots and notebook outputs.
 7. Resume or reset intentionally.
 
-### Stage model
+If you want copy/paste commands for this flow, use **[DenseGen quick checklist](quick-checklist.md)**.
+
+### Pipeline stages
 This section maps each runtime stage to its purpose and typical failure signature.
 
 | Stage | Purpose | Typical failure surface |
@@ -23,7 +25,7 @@ This section maps each runtime stage to its purpose and typical failure signatur
 | Solve | Place motifs/fixed elements to satisfy quotas. | Infeasible constraints, solver backend errors, strict runtime caps. |
 | Post-run | Materialize records, metadata, plots, and notebooks. | Sink/source mismatch, missing artifact source paths, notebook source confusion. |
 
-### Canonical artifact anchors
+### Key artifact paths
 This section lists the first files to check when validating run state.
 
 - `outputs/meta/events.jsonl` for DenseGen runtime diagnostics.
@@ -41,7 +43,7 @@ This section explains how sink mode affects plot and notebook record resolution.
 
 When both sinks are enabled, plots and notebooks resolve records from `plots.source`.
 
-### Resume and reset semantics
+### Resume and reset behavior
 This section clarifies which commands continue state and which commands clear it.
 
 - `dense run --resume` continues from existing run state.
@@ -49,11 +51,11 @@ This section clarifies which commands continue state and which commands clear it
 - `dense run --fresh` clears outputs and restarts from clean state.
 - `dense campaign-reset` clears outputs while preserving config and inputs.
 
-### Strand semantics by stage
+### Strand handling by stage
 This section summarizes strand handling differences so operators do not infer the wrong guarantees.
 
 - Stage-A scoring and filtering semantics depend on the configured input/scoring backend.
 - Solver strand model follows config-level generation constraints.
 - Final sequence acceptance is controlled by configured sequence constraints.
 
-For exact event-stream boundaries and consumer contracts, read **[observability and events](observability_and_events.md)**.
+For exact event-stream boundaries and consumer contracts, read **[observability and events](observability_and_events.md)**. For scheduler execution patterns, use **[DenseGen HPC runbook](../howto/hpc.md)**.

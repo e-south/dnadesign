@@ -5,10 +5,12 @@ For end-to-end guided runs, use:
 - [binding-sites baseline demo](../tutorials/demo_tfbs_baseline.md)
 - [sampling baseline demo](../tutorials/demo_sampling_baseline.md)
 
+For lifecycle context around these commands, use **[DenseGen pipeline lifecycle](../concepts/pipeline-lifecycle.md)**.
+
 ### Contents
 This section indexes the command surfaces covered in this reference.
 
-- [How to inspect CLI surface quickly](#how-to-inspect-cli-surface-quickly)
+- [Quick command discovery](#quick-command-discovery)
 - [Config resolution](#config-resolution)
 - [`dense validate-config`](#dense-validate-config)
 - [`dense inspect inputs`](#dense-inspect-inputs)
@@ -26,8 +28,8 @@ This section indexes the command surfaces covered in this reference.
 - [`dense notebook generate`](#dense-notebook-generate)
 - [`dense notebook run`](#dense-notebook-run)
 
-### How to inspect CLI surface quickly
-This section provides the fastest way to discover active command groups and flags.
+### Quick command discovery
+This section shows how to discover active command groups and flags.
 
 ```bash
 # Show top-level commands.
@@ -238,7 +240,7 @@ Notes:
   - if `output.targets` has both sinks, use `plots.source`
 - Source path resolution:
   - `parquet` source -> `output.parquet.path`
-  - `usr` source -> `<output.usr.root>/<output.usr.dataset>/records.parquet`
+  - `usr` source -> `<output.usr.root>/<output.usr.dataset>/records.parquet`, with notebook preview materialized to `outputs/notebooks/records_with_overlays.parquet` when overlay columns are required.
 
 ### `dense notebook run`
 
@@ -246,16 +248,20 @@ Launches a DenseGen marimo notebook.
 
 Key options:
 - `--path PATH` (default: `<run_root>/outputs/notebooks/densegen_run_overview.py`)
-- `--mode run|edit` (default: `run`)
+- `--mode run|edit` (default: `edit`)
 - `--headless` (run mode only)
+- `--open/--no-open` (default: `--open`; run mode only)
+- `--host TEXT` (default: `127.0.0.1`)
+- `--port INTEGER` (default: `2718`)
 - `--absolute`
 - `-c, --config PATH`
 
 Notes:
 - `--mode run` launches a read-only notebook app for analysis.
 - `--mode edit` launches editable marimo cells.
-- `--headless` suppresses browser auto-open for remote/non-GUI shells.
-
----
-
-@e-south
+- Default launch mode is `edit`; use `--mode run` for read-only serving.
+- `--headless` suppresses browser auto-open for remote/non-GUI shells when `--mode run` is used.
+- In run mode, `--no-open` maps to headless marimo launch.
+- In run mode with default `--open`, marimo handles browser auto-open and DenseGen prints `http://<host>:<port>`.
+- `--open/--no-open` is rejected when `--mode edit` is selected.
+- `--host` must be non-empty and `--port` must be within `1-65535`.

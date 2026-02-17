@@ -1,4 +1,4 @@
-## DenseGen Dev Journal
+## DenseGen development journal
 
 This journal records DenseGen implementation decisions, audit findings, and validation commands over time. Read it when you need historical context for why specific architecture or runtime changes were made.
 
@@ -129,7 +129,7 @@ This entry captures schema-retention audits, sink-parity checks, and Stage-A/Sta
 - Finding: with current score gate, larger retain targets hit motif-specific ceilings (`lexA` max retained 393, `cpxR` max retained 243), causing Stage-A MMR degeneracy (`pool_size_final <= retained`) for `n_sites=500/1000`.
 - Follow-up targeted sweep for larger pools: ran `v03_n500_a030_m078`, `v04_n500_a025_m075`, `v05_n1000_a030_m078`, `v06_n1000_a025_m075` via transient configs in `.tmp_stage_a_sweep_nsites_opt/`.
 - Tradeoff result: relaxing eligibility (`min_score_norm` 0.78/0.75) restores retain coverage (up to full 500 and near-full 1000) but reduces score retention materially (mean diversified median score_norm down to ~0.819 at `v04` and ~0.790 at `v06` vs 0.859 at `v00`).
-- Recommendation from this pass: keep defaults unchanged (`n_sites=200`, `alpha=0.35`, `min_score_norm=0.82`) for best score-quality/robustness; use relaxed variants only when higher per-motif pool cardinality is explicitly prioritized over score_norm.
+- Recommendation from this pass: keep defaults unchanged (`n_sites=200`, `alpha=0.35`, `min_score_norm=0.82`) for high score-quality/robustness; use relaxed variants only when higher per-motif pool cardinality is explicitly prioritized over score_norm.
 - Follow-up alpha/min-score sensitivity pass at fixed `n_sites=200`: compared `v082_a035` (control) vs `v080_a035`, `v080_a030`, `v080_a025` under `outputs/pools_alpha_eval/`.
 - Result for `.82 -> .80` at same alpha (`v080_a035`): small score-retention drop (mean diversified median score_norm `0.8592 -> 0.8568`) with a modest diversity lift (mean NND delta `0.3186 -> 0.3395`); main effect was enlarged `cpxR` MMR pool size (`243 -> 329`).
 - Lower-alpha result at `min_score_norm=0.80`: `alpha=0.30` and `0.25` increased diversity further but with larger score tradeoffs (`mean diversified median score_norm` `0.8537` and `0.8509`, respectively); `alpha=0.25` was the most aggressive.
