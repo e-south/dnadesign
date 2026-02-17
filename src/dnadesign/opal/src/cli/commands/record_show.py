@@ -102,6 +102,8 @@ def cmd_record_show(
             records_path=store.records_path,
             run_id=run_id,
         )
+        if "error" in report:
+            raise OpalError(str(report["error"]))
         if json:
             json_out(report)
         else:

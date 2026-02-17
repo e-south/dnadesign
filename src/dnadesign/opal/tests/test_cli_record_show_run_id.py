@@ -58,3 +58,17 @@ def test_record_show_accepts_latest_run_id_alias(tmp_path: Path) -> None:
     )
     assert res.exit_code == 0, res.stdout
     assert '"run_id": "r2"' in res.stdout
+
+
+def test_record_show_missing_id_fails_fast(tmp_path: Path) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path)
+    write_ledger(workdir, run_id="r0", round_index=0)
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        ["--no-color", "record-show", "-c", str(campaign), "--id", "missing-id", "--run-id", "latest", "--json"],
+    )
+    assert res.exit_code != 0
+    assert "record not found" in res.output.lower()
