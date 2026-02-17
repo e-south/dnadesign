@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 import typer
 
-from dnadesign.densegen.src import cli
+from dnadesign.densegen.src.cli import main as cli
 
 
 class _Ctx:

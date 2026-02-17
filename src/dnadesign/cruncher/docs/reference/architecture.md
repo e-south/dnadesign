@@ -167,7 +167,7 @@ Within each run directory, Cruncher uses a stable, stage-agnostic subdirectory l
 ```
 <run_dir>/
   run/
-  inputs/
+  provenance/
   optimize/
   analysis/
   plots/
@@ -181,14 +181,14 @@ Within each run directory, Cruncher uses a stable, stage-agnostic subdirectory l
 A typical **sample** run directory contains:
 
 - `run/run_manifest.json`, `run/run_status.json`, `run/config_used.yaml` - run metadata + status
-- `inputs/lockfile.json` - pinned input snapshot (reproducibility boundary)
+- `provenance/lockfile.json` - pinned input snapshot (reproducibility boundary)
 - `optimize/tables/sequences.parquet`, `optimize/tables/elites*`, `optimize/tables/random_baseline*` - sampling tables
 - `optimize/state/trace.nc`, `optimize/state/metrics.jsonl`, `optimize/state/elites.{json,yaml}` - sampling metadata
 - `analysis/reports/summary.json` - canonical analysis summary
 - `analysis/reports/report.json` + `analysis/reports/report.md` - analysis report outputs from `cruncher analyze`
 - `analysis/manifests/plot_manifest.json` + `analysis/manifests/table_manifest.json` + `analysis/manifests/manifest.json` - analysis inventories
 - `export/sequences/table__*.{parquet|csv}` + `export/sequences/export_manifest.json` - sequence-export tables from `cruncher export sequences`
-- `analysis/plots/*` - curated analysis plots
+- `plots/analysis/*` - curated analysis plots
 - `plots/logos/*` - catalog logo renders
 - `analysis/tables/table__*` - curated table outputs
 

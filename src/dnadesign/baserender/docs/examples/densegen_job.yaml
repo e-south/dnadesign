@@ -8,7 +8,6 @@ input:
       sequence: sequence
       annotations: densegen__used_tfbs_detail
       id: id
-      details: details
     policies: {}
   alphabet: DNA
 render:

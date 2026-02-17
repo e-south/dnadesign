@@ -1,74 +1,55 @@
 ## Running marimo notebooks
 
-More in depth marimo guidance lives at `docs/marimo-reference.md`.
+This document is a practical quickstart for running repository notebooks with marimo. Read it when you want to launch notebooks quickly; deeper notebook patterns and UI guidance are in `docs/marimo-reference.md`.
 
-## Contents
-- [Running marimo notebooks](#running-marimo-notebooks)
-- [0) Campaign-tied notebooks (OPAL)](#0-campaign-tied-notebooks-opal)
-- [1) Install marimo into the project](#1-install-marimo-into-the-project)
-- [2) Sandboxed / self-contained marimo notebooks (inline dependencies)](#2-sandboxed-self-contained-marimo-notebooks-inline-dependencies)
+### Contents
+This section lists the notebook execution modes used in this repository.
 
-### 0) Campaign-tied notebooks (OPAL)
+- [Campaign-tied notebooks (OPAL)](#campaign-tied-notebooks-opal)
+- [Project-environment notebooks](#project-environment-notebooks)
+- [Sandbox notebooks with inline dependencies](#sandbox-notebooks-with-inline-dependencies)
 
-If you are working inside an OPAL campaign directory, prefer the OPAL CLI:
+### Campaign-tied notebooks (OPAL)
+This section covers notebook flows generated and managed inside OPAL campaigns.
 
 ```bash
-uv run opal notebook              # list notebooks / nudge next step
-uv run opal notebook generate     # scaffold a notebook in <workdir>/notebooks
-uv run opal notebook run          # open the notebook (auto-select if only one exists)
+# List notebook status and next actions for the active campaign.
+uv run opal notebook
+
+# Generate a notebook scaffold in the campaign notebooks directory.
+uv run opal notebook generate
+
+# Run the campaign notebook.
+uv run opal notebook run
 ```
 
-From outside the campaign, pass `-c configs/campaign.yaml`.
-
-### 1) Install marimo into the project
+### Project-environment notebooks
+This section runs marimo directly inside the repository uv environment.
 
 ```bash
+# Sync project environment.
 uv sync --locked
+
+# Open a notebook in edit mode using project dependencies.
 uv run marimo edit notebooks/foo.py
 ```
 
-This runs marimo inside your project environment, so it can import `dnadesign` and anything in `uv.lock`.
-`openai` is available in the core environment for model API experiments inside notebooks.
+### Sandbox notebooks with inline dependencies
+This section uses marimo sandbox mode for self-contained notebook dependencies.
 
-### 2) Sandboxed / self-contained marimo notebooks (inline dependencies)
+```bash
+# Create or edit a sandbox notebook.
+uvx marimo edit --sandbox notebooks/sandbox_example.py
 
-Marimo can manage per-notebook sandbox environments using inline metadata. This is great for shareable notebooks.
+# Execute a sandbox notebook as a script.
+uv run notebooks/sandbox_example.py
 
-1) Create/edit a sandbox notebook (marimo installed temporarily via uvx).
+# Add local dnadesign checkout as an editable inline dependency.
+uv add --script notebooks/sandbox_example.py . --editable
 
-    ```bash
-    uvx marimo edit --sandbox notebooks/sandbox_example.py
-    ```
+# Add and remove notebook-local dependencies.
+uv add --script notebooks/sandbox_example.py numpy
+uv remove --script notebooks/sandbox_example.py numpy
+```
 
-2) Run a sandbox notebook as a script.
-
-    ```bash
-    uv run notebooks/sandbox_example.py
-    ```
-
-3) Make the sandbox notebook use your local `dnadesign` repo in editable mode.
-
-    From the repo root:
-
-    ```bash
-    uv add --script notebooks/sandbox_example.py . --editable
-    ```
-
-This writes inline metadata into the notebook so its sandbox can install dnadesign from your local checkout in editable mode.
-
-4) Add/remove sandbox dependencies (only affects the notebook file).
-
-    ```bash
-    uv add    --script notebooks/sandbox_example.py numpy
-    uv remove --script notebooks/sandbox_example.py numpy
-    ```
-
-    Note: If you use automated edits for a marimo notebook, launch with `--watch` so changes appear live:
-
-    ```bash
-    uv run marimo edit --watch notebook.py
-    ```
-
----
-
-@e-south
+For deeper notebook authoring and UI behavior guidance, read **[docs/marimo-reference.md](marimo-reference.md)**.

@@ -29,11 +29,11 @@ from dnadesign.cruncher.artifacts.layout import (
     pwm_summary_path,
     random_baseline_hits_path,
     random_baseline_path,
-    run_input_dir,
     run_meta_dir,
     run_optimize_dir,
     run_optimize_meta_dir,
     run_optimize_tables_dir,
+    run_provenance_dir,
     sequences_path,
     status_path,
     trace_path,
@@ -102,7 +102,7 @@ def test_run_artifacts_live_in_lifecycle_subdirs(tmp_path: Path) -> None:
     run_dir = tmp_path / "outputs"
 
     assert run_meta_dir(run_dir) == run_dir / "run"
-    assert run_input_dir(run_dir) == run_dir / "inputs"
+    assert run_provenance_dir(run_dir) == run_dir / "provenance"
     assert run_optimize_dir(run_dir) == run_dir / "optimize"
     assert run_optimize_tables_dir(run_dir) == run_dir / "optimize" / "tables"
     assert run_optimize_meta_dir(run_dir) == run_dir / "optimize" / "state"
@@ -110,9 +110,9 @@ def test_run_artifacts_live_in_lifecycle_subdirs(tmp_path: Path) -> None:
     assert manifest_path(run_dir) == run_dir / "run" / "run_manifest.json"
     assert status_path(run_dir) == run_dir / "run" / "run_status.json"
     assert config_used_path(run_dir) == run_dir / "run" / "config_used.yaml"
-    assert lockfile_snapshot_path(run_dir) == run_dir / "inputs" / "lockfile.json"
-    assert parse_manifest_path(run_dir) == run_dir / "inputs" / "parse_manifest.json"
-    assert pwm_summary_path(run_dir) == run_dir / "inputs" / "pwm_summary.json"
+    assert lockfile_snapshot_path(run_dir) == run_dir / "provenance" / "lockfile.json"
+    assert parse_manifest_path(run_dir) == run_dir / "provenance" / "parse_manifest.json"
+    assert pwm_summary_path(run_dir) == run_dir / "provenance" / "pwm_summary.json"
     assert live_metrics_path(run_dir) == run_dir / "optimize" / "state" / "metrics.jsonl"
     assert trace_path(run_dir) == run_dir / "optimize" / "state" / "trace.nc"
     assert sequences_path(run_dir) == run_dir / "optimize" / "tables" / "sequences.parquet"
@@ -137,7 +137,9 @@ def test_analysis_tables_and_plots_use_structured_semantic_filenames(tmp_path: P
     assert analysis_table_path(analysis_dir, "scores_summary", "parquet") == (
         analysis_dir / "tables" / "table__scores_summary.parquet"
     )
-    assert analysis_plot_path(analysis_dir, "opt_trajectory", "png") == (analysis_dir / "plots" / "opt_trajectory.png")
+    assert analysis_plot_path(analysis_dir, "opt_trajectory", "png") == (
+        run_dir / "plots" / "analysis" / "opt_trajectory.png"
+    )
     assert analysis_plot_path(analysis_dir, "opt_trajectory_sweep", "png") == (
-        analysis_dir / "plots" / "opt_trajectory_sweep.png"
+        run_dir / "plots" / "analysis" / "opt_trajectory_sweep.png"
     )

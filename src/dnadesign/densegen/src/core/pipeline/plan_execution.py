@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Callable, Iterable
 
@@ -45,7 +46,10 @@ def run_plan_schedule(
     plan_pool_sources: dict[str, PlanPoolSource],
     existing_counts: dict[PlanKey, int],
     round_robin: bool,
-    process_plan: Callable[[object, "ResolvedPlanItem", "PlanRunContext", "PlanExecutionState"], tuple[int, dict]],
+    process_plan: Callable[
+        [object, "ResolvedPlanItem", "PlanRunContext", "PlanExecutionState", float],
+        tuple[int, dict],
+    ],
     plan_context: "PlanRunContext",
     execution_state: "PlanExecutionState",
     accumulate_stats: Callable[[PlanKey, dict], None],
@@ -70,6 +74,7 @@ def run_plan_schedule(
         *,
         one_subsample_only: bool,
         already_generated: int,
+        plan_started_at: float,
     ) -> tuple[int, dict]:
         usage_counts = existing_usage_by_plan.get(entry.key) if existing_usage_by_plan else None
         entry_state = replace(
@@ -82,7 +87,8 @@ def run_plan_schedule(
             entry.source_cfg,
             entry.item,
             plan_context,
-            execution_state=entry_state,
+            entry_state,
+            plan_started_at,
             one_subsample_only=one_subsample_only,
             already_generated=already_generated,
         )
@@ -96,6 +102,7 @@ def run_plan_schedule(
                 entry,
                 one_subsample_only=False,
                 already_generated=int(existing_counts.get(entry.key, 0)),
+                plan_started_at=time.monotonic(),
             )
             per_plan[entry.key] = per_plan.get(entry.key, 0) + produced
             total += produced
@@ -106,6 +113,7 @@ def run_plan_schedule(
         return PlanExecutionResult(total=total, per_plan=per_plan, plan_leaderboards=plan_leaderboards)
 
     produced_counts: dict[PlanKey, int] = dict(existing_counts)
+    plan_started_at: dict[PlanKey, float] = {}
     done = False
     while not done:
         done = True
@@ -113,11 +121,16 @@ def run_plan_schedule(
             current = produced_counts.get(entry.key, 0)
             if current >= entry.quota:
                 continue
+            started_at = plan_started_at.get(entry.key)
+            if started_at is None:
+                started_at = time.monotonic()
+                plan_started_at[entry.key] = started_at
             done = False
             produced, stats = _process_entry(
                 entry,
                 one_subsample_only=True,
                 already_generated=current,
+                plan_started_at=started_at,
             )
             produced_counts[entry.key] = current + produced
             leaderboard_latest = stats.get("leaderboard_latest")

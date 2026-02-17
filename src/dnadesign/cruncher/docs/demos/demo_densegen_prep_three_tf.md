@@ -123,10 +123,10 @@ Outputs are written under:
 Key files:
 - `run/run_manifest.json`, `run/run_status.json`, `run/config_used.yaml`
 - `analysis/reports/summary.json`, `analysis/reports/report.md`
-- `analysis/plots/elites_showcase.pdf` (and other analysis plots)
+- `plots/analysis/elites_showcase.pdf` (and other analysis plots)
 - `analysis/tables/table__scores_summary.parquet` (and other analysis tables)
 - `export/sequences/table__*.parquet`, `export/sequences/export_manifest.json`
-- `plots/logos/catalog/<run_name>/*.png`
+- `plots/logos/*.png`
 
 ## Related docs
 

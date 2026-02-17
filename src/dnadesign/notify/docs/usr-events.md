@@ -31,7 +31,7 @@ uv run notify spool drain --profile "$NOTIFY_DIR/profile.json"
 
 ## Related stack docs
 
-- DenseGen local end-to-end demo: [../../densegen/docs/demo/demo_usr_notify.md](../../densegen/docs/demo/demo_usr_notify.md)
+- DenseGen local end-to-end demo: [../../densegen/docs/tutorials/demo_usr_notify.md](../../densegen/docs/tutorials/demo_usr_notify.md)
 - DenseGen event-boundary contract: [../../densegen/docs/reference/outputs.md#event-streams-and-consumers-densegen-vs-usr](../../densegen/docs/reference/outputs.md#event-streams-and-consumers-densegen-vs-usr)
 - Universal Sequence Record event schema: [../../usr/README.md#event-log-schema](../../usr/README.md#event-log-schema)
 - Setup command guide: [../../../../docs/notify/usr-events.md#command-anatomy-notify-setup-slack](../../../../docs/notify/usr-events.md#command-anatomy-notify-setup-slack)

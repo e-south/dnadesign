@@ -8,6 +8,8 @@ Author(s): Eric J. South
 """
 
 import json
+import subprocess
+import sys
 
 import pytest
 
@@ -51,15 +53,15 @@ def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
     content = notebook_path.read_text()
     assert f"default_id_hint = {analysis_id!r}" in content
     assert "Path(__file__).resolve()" in content
-    assert "analysis_dir = notebook_path.parent" in content
-    assert 'if "_archive" in analysis_dir.parts:' in content
-    assert "run_dir = analysis_dir.parent" in content
+    assert "current_analysis_dir = notebook_path.parent" in content
+    assert 'if "_archive" in current_analysis_dir.parts:' in content
+    assert "run_dir = current_analysis_dir.parent" in content
     assert 'analysis_root = run_dir / "analysis"' in content
     assert "Refresh analysis list" in content
     assert "plot_options" in content
     assert "table_manifest.json" in content
-    assert 'manifest_generated = bool(entry.get("generated"))' in content
-    assert 'manifest_skipped = bool(entry.get("skipped"))' in content
+    assert 'manifest_generated = bool(plot_entry.get("generated"))' in content
+    assert 'manifest_skipped = bool(plot_entry.get("skipped"))' in content
     assert 'enabled = bool(entry.get("enabled"))' not in content
     assert "scores_summary" in content
     assert "metrics_joint" in content
@@ -72,6 +74,48 @@ def test_generate_notebook_writes_template(tmp_path, monkeypatch) -> None:
     assert "Text output" in content
     assert "mo.ui.pyplot" not in content
     assert str(run_dir) not in content
+
+
+def test_generate_notebook_template_passes_marimo_check(tmp_path, monkeypatch) -> None:
+    pytest.importorskip("marimo")
+    run_dir = tmp_path / "run"
+    analysis_id = "20250101T000000Z_test"
+    analysis_dir = run_dir / "analysis"
+    (analysis_dir / "reports").mkdir(parents=True, exist_ok=True)
+    (analysis_dir / "manifests").mkdir(parents=True, exist_ok=True)
+    (analysis_dir / "tables").mkdir(parents=True, exist_ok=True)
+    manifest_file = manifest_path(run_dir)
+    manifest_file.parent.mkdir(parents=True, exist_ok=True)
+    manifest_file.write_text(json.dumps({"artifacts": [], "config_path": ""}))
+    (analysis_dir / "reports" / "summary.json").write_text(
+        json.dumps({"tf_names": ["LexA"], "analysis_id": analysis_id})
+    )
+    (analysis_dir / "manifests" / "plot_manifest.json").write_text(json.dumps({"plots": []}))
+    (analysis_dir / "manifests" / "table_manifest.json").write_text(
+        json.dumps(
+            {
+                "tables": [
+                    {"key": "scores_summary", "path": "table__scores_summary.parquet", "exists": True},
+                    {"key": "metrics_joint", "path": "table__metrics_joint.parquet", "exists": True},
+                    {"key": "elites_topk", "path": "table__elites_topk.parquet", "exists": True},
+                ]
+            }
+        )
+    )
+    (analysis_dir / "tables" / "table__scores_summary.parquet").write_text("placeholder")
+    (analysis_dir / "tables" / "table__metrics_joint.parquet").write_text("placeholder")
+    (analysis_dir / "tables" / "table__elites_topk.parquet").write_text("placeholder")
+
+    monkeypatch.setattr(notebook_service, "ensure_marimo", lambda: None)
+
+    notebook_path = notebook_service.generate_notebook(run_dir, latest=True)
+    check = subprocess.run(
+        [sys.executable, "-m", "marimo", "check", str(notebook_path)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert check.returncode == 0, check.stdout + check.stderr
 
 
 def test_generate_notebook_strict_requires_summary(tmp_path, monkeypatch) -> None:

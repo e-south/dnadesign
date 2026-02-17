@@ -20,7 +20,6 @@ from dnadesign.densegen.src.adapters.sources.background_pool import (
     BackgroundPoolDataSource,
     _run_fimo_exclusion,
 )
-from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_types import PWMMotif
 from dnadesign.densegen.src.config import (
     BackgroundPoolFiltersConfig,
     BackgroundPoolFimoExcludeConfig,
@@ -29,6 +28,7 @@ from dnadesign.densegen.src.config import (
     BackgroundPoolMiningConfig,
     BackgroundPoolSamplingConfig,
 )
+from dnadesign.densegen.src.core.stage_a.stage_a_types import PWMMotif
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
 
 _FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None

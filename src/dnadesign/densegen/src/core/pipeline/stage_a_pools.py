@@ -111,7 +111,7 @@ def prepare_stage_a_pools(
 
     if not pool_manifest.exists():
         raise RuntimeError(
-            "Stage-A pools missing or stale. Run `dense stage-a build-pool --fresh` to regenerate pools."
+            "Stage-A pools missing or stale. Run `uv run dense stage-a build-pool --fresh` to regenerate pools."
         )
     if not build_stage_a:
         statuses = pool_status_by_input(cfg, cfg_path, run_root)
@@ -120,7 +120,7 @@ def prepare_stage_a_pools(
             labels = ", ".join(sorted({status.name for status in stale}))
             raise RuntimeError(
                 "Stage-A pools missing or stale for: "
-                f"{labels}. Run `dense stage-a build-pool --fresh` to regenerate pools."
+                f"{labels}. Run `uv run dense stage-a build-pool --fresh` to regenerate pools."
             )
     try:
         _pool_artifact, pool_data = load_pool_data(pool_dir)

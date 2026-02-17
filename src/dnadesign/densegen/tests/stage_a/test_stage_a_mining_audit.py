@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 
-from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_metrics import _tail_unique_slope
+from dnadesign.densegen.src.core.stage_a.stage_a_metrics import _tail_unique_slope
 
 
 def test_tail_unique_slope_windowed_ratio() -> None:

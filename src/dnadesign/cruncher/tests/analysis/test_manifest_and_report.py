@@ -230,7 +230,7 @@ def test_report_payload_preserves_zero_highlights() -> None:
 
 
 def test_report_payload_paths_use_structured_output_and_plots_schema(tmp_path: Path) -> None:
-    analysis_dir = tmp_path / "run"
+    analysis_dir = tmp_path / "run" / "analysis"
     analysis_plot_path(analysis_dir, "chain_trajectory_scatter", "png").parent.mkdir(parents=True, exist_ok=True)
     analysis_plot_path(analysis_dir, "chain_trajectory_scatter", "png").write_text("png")
     analysis_plot_path(analysis_dir, "chain_trajectory_sweep", "png").write_text("png")
@@ -251,9 +251,9 @@ def test_report_payload_paths_use_structured_output_and_plots_schema(tmp_path: P
         analysis_used_payload={"analysis": {"table_format": "parquet", "plot_format": "png"}},
     )
     pointers = payload["paths"]
-    assert pointers["start_here_plot"] == "plots/chain_trajectory_scatter.png"
-    assert pointers["trajectory_plot"] == "plots/chain_trajectory_scatter.png"
-    assert pointers["trajectory_sweep_plot"] == "plots/chain_trajectory_sweep.png"
+    assert pointers["start_here_plot"] == "plots/analysis/chain_trajectory_scatter.png"
+    assert pointers["trajectory_plot"] == "plots/analysis/chain_trajectory_scatter.png"
+    assert pointers["trajectory_sweep_plot"] == "plots/analysis/chain_trajectory_sweep.png"
     assert pointers["diagnostics"] == "tables/table__diagnostics_summary.json"
     assert pointers["objective_components"] == "tables/table__objective_components.json"
     assert pointers["manifest"] == "manifests/manifest.json"

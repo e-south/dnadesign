@@ -17,7 +17,7 @@ import pandas as pd
 from typer.testing import CliRunner
 
 from dnadesign.densegen.src.adapters.outputs import OutputRecord, ParquetSink
-from dnadesign.densegen.src.cli import app
+from dnadesign.densegen.src.cli.main import app
 from dnadesign.densegen.src.core.run_manifest import PlanManifest, RunManifest
 from dnadesign.densegen.src.core.run_paths import ensure_run_meta_dir, run_manifest_path
 from dnadesign.densegen.tests.meta_fixtures import output_meta

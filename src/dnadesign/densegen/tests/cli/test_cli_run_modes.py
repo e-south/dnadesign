@@ -19,8 +19,8 @@ from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
-from dnadesign.densegen.src.cli import app
-from dnadesign.densegen.src.cli_commands import run as run_command
+from dnadesign.densegen.src.cli import run as run_command
+from dnadesign.densegen.src.cli.main import app
 from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.core.artifacts.pool import (
     POOL_SCHEMA_VERSION,
@@ -215,7 +215,6 @@ def _write_usr_config(run_root: Path) -> Path:
               root: outputs/usr_datasets
               dataset: demo
               chunk_size: 16
-              allow_overwrite: false
           generation:
             sequence_length: 10
             plan:
@@ -265,6 +264,13 @@ def test_run_auto_resumes_when_outputs_exist_and_pools_present(tmp_path: Path, m
     assert result.exit_code == 0, result.output
     assert captured["resume"] is True
     assert captured["build_stage_a"] is False
+
+
+def test_help_lists_campaign_reset_command() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["--help"])
+    assert result.exit_code == 0, result.output
+    assert "campaign-reset" in result.output
 
 
 def test_run_resume_requires_outputs(tmp_path: Path) -> None:
@@ -446,6 +452,57 @@ def test_run_handles_screen_progress_runtime_errors_with_actionable_next_steps(
     assert "interactive terminal" in result.output
     assert "Next steps" in result.output
     assert "progress_style: stream" in result.output
+
+
+def test_run_handles_max_seconds_runtime_errors_with_actionable_next_steps(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_config(run_root)
+
+    def _fake_run_pipeline(*_args, **_kwargs):
+        raise RuntimeError("[plan_pool__demo/demo_plan] Exceeded max_seconds_per_plan=120.")
+
+    monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
+    runner = CliRunner()
+    result = runner.invoke(app, ["run", "-c", str(cfg_path)])
+
+    assert result.exit_code != 0, result.output
+    normalized = result.output.replace("\n", " ")
+    assert "Exceeded max_seconds_per_plan=120" in normalized
+    assert "inspect run --events --library" in normalized
+    assert "increase densegen.runtime.max_seconds_per_plan" in normalized
+    assert "Traceback" not in result.output
+
+
+def test_run_handles_missing_usr_registry_runtime_errors_with_actionable_next_steps(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_config(run_root)
+
+    def _fake_run_pipeline(*_args, **_kwargs):
+        raise RuntimeError(
+            "USR registry not found at /tmp/demo/outputs/usr_datasets/registry.yaml. "
+            "Create registry.yaml before writing USR outputs."
+        )
+
+    monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
+    runner = CliRunner()
+    result = runner.invoke(app, ["run", "-c", str(cfg_path)])
+
+    assert result.exit_code != 0, result.output
+    normalized = result.output.replace("\n", " ")
+    assert "USR registry not found" in normalized
+    assert "workspace init --output-mode usr|both" in normalized
+    assert "registry.yaml" in normalized
+    assert "Traceback" not in result.output
 
 
 def test_run_fresh_rebuilds_stage_a(tmp_path: Path, monkeypatch) -> None:

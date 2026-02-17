@@ -13,12 +13,12 @@ from __future__ import annotations
 
 import pytest
 
-from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_pipeline import (
+from dnadesign.densegen.src.core.stage_a.stage_a_pipeline import (
     _evaluate_tier_target,
     _score_norm_by_tier,
     _score_norm_denominator_by_seq,
 )
-from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_sampling_utils import (
+from dnadesign.densegen.src.core.stage_a.stage_a_sampling_utils import (
     _pwm_theoretical_max_score,
     build_log_odds,
     select_pwm_window_by_length,

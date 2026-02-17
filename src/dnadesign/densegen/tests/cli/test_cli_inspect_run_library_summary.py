@@ -17,7 +17,7 @@ from pathlib import Path
 import pandas as pd
 from typer.testing import CliRunner
 
-from dnadesign.densegen.src.cli import app
+from dnadesign.densegen.src.cli.main import app
 from dnadesign.densegen.tests.config_fixtures import write_minimal_config
 
 PLAN_POOL_LABEL = "plan_pool__demo_plan"

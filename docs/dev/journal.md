@@ -1,20 +1,23 @@
-# Journal
+## Development journal
+
+This journal records cross-package engineering decisions, investigations, and validation notes for maintainers. Read it when you need historical rationale behind implementation changes.
 
 
-## Contents
+
+### Contents
 - [2026-02-04](#2026-02-04)
 
-## 2026-02-04
+### 2026-02-04
 - Investigated the reported stall in `test_round_robin_chunk_cap.py::test_stall_detected_with_no_solutions`.
 - Root cause: the test intentionally sleeps ~1.1s in the `_EmptyAdapter` generator to simulate a no-solution stall. `pytest --durations=10` shows this test as ~1.12s, matching the sleep.
 - No infinite hang observed after rerunning `uv run pytest -q src/dnadesign/densegen/tests --durations=10`.
 
-## 2026-02-05
+### 2026-02-05
 - Added a tool-agnostic notifier CLI (`notify`) with generic/Slack/Discord payloads and explicit URL validation.
 - Documented notifier usage in `docs/notify/README.md` and registered the CLI entry in `pyproject.toml`.
 - Expanded notifier docs with Slurm and BU SCC examples plus local testing guidance.
 
-## 2026-02-11
+### 2026-02-11
 - Prepared implementation plan for Notify ergonomics/UX across human operators and agentic automation.
 - Scope in: watcher lifecycle controls, multi-workflow policies (DenseGen + infer/Evo2), richer failure reporting, machine-friendly CLI outputs, secret backend robustness, spool/cursor correctness.
 - Scope out: scheduler-specific orchestration frameworks beyond current qsub templates.
@@ -146,7 +149,7 @@
     - explicit note that Notify stays decoupled from sink choices (parquet/USR), and always watches USR `.events.log`.
   - Updated workflow demos (`demo_usr_notify`, `demo_pwm_artifacts`) to use `notify setup slack` with workspace config resolution and run-local cursor/spool paths.
 
-## 2026-02-12
+### 2026-02-12
 - Continued pragmatic decoupling/extraction pass across Notify and USR with registry-oriented boundaries:
   - Notify: extracted command/runtime helpers and registry wiring to reduce tool coupling in command-line orchestration.
   - USR: extracted command-line and dataset hotspots into smaller operation modules to reduce monolith pressure and improve change isolation.
@@ -155,7 +158,7 @@
 - Completed a didactic clarity pass to expand dense acronym-heavy prose in operator guides while preserving executable command syntax and environment variable names.
 - Current branch state after the above: `dev/densegen-hpc-patching` remains the active working branch for this stream of changes.
 
-## 2026-02-13
+### 2026-02-13
 - Investigated rejoin behavior for BU SCC interactive sessions after client-side interruptions from the agent harness.
 - Prior state and evidence:
   - `qstat -u esouth` was empty at check time, so there was no active interactive job to rejoin.
@@ -202,7 +205,7 @@
   - Use OnDemand for reconnectable human-interactive workflows.
   - If an interactive job is orphaned and unusable, explicitly clean with `qdel <job_id>` before requesting a replacement allocation.
 
-## 2026-02-15
+### 2026-02-15
 - Dependency contract update:
   - Kept `marimo` as a core project dependency.
   - Added `openai` as a core project dependency so notebook/API experiments do not require a separate dependency group.

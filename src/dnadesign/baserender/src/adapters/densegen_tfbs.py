@@ -21,7 +21,7 @@ from ..core.record import Display, Feature, revcomp
 _DENSEGEN_POLICY_DEFAULTS: dict[str, object] = {
     "ambiguous": "error",
     "offset_mode": "auto",
-    "zero_as_unspecified": True,
+    "zero_as_unspecified": False,
     "on_missing_kmer": "error",
     "require_non_empty": False,
     "min_per_record": 0,
@@ -81,7 +81,7 @@ class DensegenTfbsAdapter:
                 raise SchemaError("DenseGen annotation entries must be dicts")
 
             tf_raw = item.get("tf")
-            tf = str(tf_raw or "").strip().lower()
+            tf = str(tf_raw or "").strip()
             if tf == "":
                 raise SchemaError("DenseGen annotation dict missing non-empty key: tf")
 
@@ -160,7 +160,7 @@ class DensegenTfbsAdapter:
         sequence_col = str(self.columns.get("sequence"))
         ann_col = str(self.columns.get("annotations"))
         id_col = self.columns.get("id")
-        details_col = self.columns.get("details")
+        overlay_text_col = self.columns.get("overlay_text")
 
         sequence_raw = row.get(sequence_col)
         if sequence_raw is None or str(sequence_raw).strip() == "":
@@ -212,10 +212,10 @@ class DensegenTfbsAdapter:
                     tag_labels[tag] = tag[3:]
 
         overlay_text = None
-        if details_col is not None:
-            details_raw = row.get(str(details_col))
-            if details_raw is not None and str(details_raw).strip() != "":
-                overlay_text = str(details_raw).strip()
+        if overlay_text_col is not None:
+            overlay_text_raw = row.get(str(overlay_text_col))
+            if overlay_text_raw is not None and str(overlay_text_raw).strip() != "":
+                overlay_text = str(overlay_text_raw).strip()
 
         record = Record(
             id=record_id,

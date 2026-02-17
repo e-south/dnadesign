@@ -20,7 +20,7 @@ from dnadesign.densegen.src.utils import logging_utils
 
 
 def _demo_config_path() -> Path:
-    return Path(__file__).resolve().parents[2] / "workspaces" / "demo_meme_three_tfs" / "config.yaml"
+    return Path(__file__).resolve().parents[2] / "workspaces" / "demo_sampling_baseline" / "config.yaml"
 
 
 def test_prepare_stage_a_pools_sets_progress_style(monkeypatch, tmp_path: Path) -> None:

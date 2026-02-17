@@ -35,7 +35,6 @@ def _make_writer(tmp_path: Path) -> tuple[Path, USRWriter]:
         root=root,
         namespace="densegen",
         chunk_size=1,
-        allow_overwrite=False,
         npz_fields=["used_tfbs_detail"],
     )
     return root, writer

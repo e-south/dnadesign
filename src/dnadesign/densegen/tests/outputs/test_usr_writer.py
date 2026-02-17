@@ -44,7 +44,6 @@ def test_usr_writer_writes_overlay_parts_with_typed_columns(tmp_path: Path) -> N
         root=root,
         namespace="densegen",
         chunk_size=1,
-        allow_overwrite=False,
     )
 
     meta = output_meta(library_hash="demo", library_index=1)
@@ -77,7 +76,6 @@ def test_usr_writer_offloads_npz_fields(tmp_path: Path) -> None:
         root=root,
         namespace="densegen",
         chunk_size=1,
-        allow_overwrite=False,
         npz_fields=["used_tfbs_detail"],
     )
 
@@ -123,7 +121,6 @@ def test_usr_writer_uses_atomic_npz_writer(tmp_path: Path, monkeypatch: pytest.M
         root=root,
         namespace="densegen",
         chunk_size=1,
-        allow_overwrite=False,
         npz_fields=["used_tfbs_detail"],
     )
 
@@ -163,7 +160,6 @@ def test_usr_writer_emits_densegen_health_events(tmp_path: Path, monkeypatch: py
         root=root,
         namespace="densegen",
         chunk_size=1,
-        allow_overwrite=False,
         health_event_interval_seconds=60.0,
         run_quota=10,
     )
@@ -204,7 +200,6 @@ def test_usr_writer_health_events_are_time_throttled(tmp_path: Path, monkeypatch
         root=root,
         namespace="densegen",
         chunk_size=1,
-        allow_overwrite=False,
         health_event_interval_seconds=60.0,
     )
 
@@ -246,7 +241,6 @@ def test_usr_writer_finalize_emits_completed_health_event(tmp_path: Path, monkey
         root=root,
         namespace="densegen",
         chunk_size=1,
-        allow_overwrite=False,
         health_event_interval_seconds=60.0,
     )
     record = OutputRecord.from_sequence(

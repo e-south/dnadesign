@@ -17,7 +17,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from dnadesign.densegen.src.cli import app
+from dnadesign.densegen.src.cli.main import app
 from dnadesign.densegen.tests.config_fixtures import write_minimal_config
 
 PLAN_POOL_LABEL = "plan_pool__demo_plan"
@@ -89,8 +89,11 @@ def test_inspect_config_missing_uses_relative_path(tmp_path: Path) -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["inspect", "config", "-c", str(cfg_path)])
     assert result.exit_code != 0
-    assert str(cfg_path) not in result.output
-    assert "Config file not found" in result.output
+    assert "Config file not found:" in result.output
+    shown_path = result.output.split("Config file not found:", 1)[1].replace("\n", "").strip()
+    assert shown_path
+    assert not Path(shown_path).is_absolute()
+    assert shown_path.endswith("missing_config.yaml")
 
 
 def test_inspect_run_usr_events_path_prints_absolute_path(tmp_path: Path) -> None:
@@ -116,7 +119,6 @@ def test_inspect_run_usr_events_path_prints_absolute_path(tmp_path: Path) -> Non
                   root: outputs/usr_datasets
                   dataset: densegen/demo
                   chunk_size: 16
-                  allow_overwrite: false
               generation:
                 sequence_length: 10
                 plan:

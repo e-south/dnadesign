@@ -18,8 +18,8 @@ from pathlib import Path
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.densegen.src.cli import app
-from dnadesign.densegen.src.cli_commands import workspace as workspace_commands
+from dnadesign.densegen.src.cli import workspace as workspace_commands
+from dnadesign.densegen.src.cli.main import app
 
 
 def _write_source_config(path: Path) -> None:
@@ -142,7 +142,7 @@ def test_workspace_init_supports_binding_sites_demo_workspace(tmp_path: Path) ->
             "--root",
             str(tmp_path),
             "--from-workspace",
-            "demo_binding_sites",
+            "demo_tfbs_baseline",
         ],
     )
     assert result.exit_code == 0, result.output
@@ -185,7 +185,7 @@ def test_workspace_init_uses_env_workspace_root_when_root_not_provided(
             "--id",
             "demo_run",
             "--from-workspace",
-            "demo_binding_sites",
+            "demo_tfbs_baseline",
         ],
     )
     assert result.exit_code == 0, result.output
@@ -204,7 +204,7 @@ def test_workspace_init_output_mode_usr_sets_usr_target(tmp_path: Path) -> None:
             "--root",
             str(tmp_path),
             "--from-workspace",
-            "demo_binding_sites",
+            "demo_tfbs_baseline",
             "--output-mode",
             "usr",
         ],
@@ -216,6 +216,30 @@ def test_workspace_init_output_mode_usr_sets_usr_target(tmp_path: Path) -> None:
     assert output["usr"]["root"] == "outputs/usr_datasets"
     assert output["usr"]["dataset"] == "demo_run"
     assert (tmp_path / "demo_run" / "outputs" / "usr_datasets" / "registry.yaml").exists()
+
+
+def test_workspace_init_output_mode_usr_rewrites_template_usr_dataset_to_workspace_id(tmp_path: Path) -> None:
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "sampling_run",
+            "--root",
+            str(tmp_path),
+            "--from-workspace",
+            "demo_sampling_baseline",
+            "--output-mode",
+            "usr",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    cfg = yaml.safe_load((tmp_path / "sampling_run" / "config.yaml").read_text())
+    output = cfg["densegen"]["output"]
+    assert output["targets"] == ["usr"]
+    assert output["usr"]["dataset"] == "sampling_run"
 
 
 def test_workspace_init_output_mode_both_sets_both_targets(tmp_path: Path) -> None:
@@ -230,7 +254,7 @@ def test_workspace_init_output_mode_both_sets_both_targets(tmp_path: Path) -> No
             "--root",
             str(tmp_path),
             "--from-workspace",
-            "demo_binding_sites",
+            "demo_tfbs_baseline",
             "--output-mode",
             "both",
         ],
@@ -242,6 +266,30 @@ def test_workspace_init_output_mode_both_sets_both_targets(tmp_path: Path) -> No
     assert output["parquet"]["path"] == "outputs/tables/records.parquet"
     assert output["usr"]["root"] == "outputs/usr_datasets"
     assert (tmp_path / "demo_run" / "outputs" / "usr_datasets" / "registry.yaml").exists()
+
+
+def test_workspace_init_output_mode_both_rewrites_template_usr_dataset_to_workspace_id(tmp_path: Path) -> None:
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "sampling_run",
+            "--root",
+            str(tmp_path),
+            "--from-workspace",
+            "demo_sampling_baseline",
+            "--output-mode",
+            "both",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    cfg = yaml.safe_load((tmp_path / "sampling_run" / "config.yaml").read_text())
+    output = cfg["densegen"]["output"]
+    assert set(output["targets"]) == {"parquet", "usr"}
+    assert output["usr"]["dataset"] == "sampling_run"
 
 
 def test_workspace_init_existing_workspace_dir_shows_actionable_error(tmp_path: Path) -> None:
@@ -259,7 +307,7 @@ def test_workspace_init_existing_workspace_dir_shows_actionable_error(tmp_path: 
             "--root",
             str(tmp_path),
             "--from-workspace",
-            "demo_binding_sites",
+            "demo_tfbs_baseline",
         ],
     )
 

@@ -17,6 +17,7 @@ import textwrap
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.core.run_metrics import build_run_metrics
@@ -322,6 +323,26 @@ def _write_dense_arrays(tmp_path: Path) -> None:
     rows.to_parquet(tables_dir / "records.parquet", index=False)
 
 
+def _write_dense_arrays_missing_hash(tmp_path: Path) -> None:
+    tables_dir = tmp_path / "outputs" / "tables"
+    tables_dir.mkdir(parents=True, exist_ok=True)
+    rows = pd.DataFrame(
+        [
+            {
+                "densegen__input_name": PLAN_POOL_LABEL,
+                "densegen__plan": "demo_plan",
+                "densegen__sampling_library_index": 1,
+                "densegen__used_tfbs_detail": [
+                    {"tf": "TF_A", "tfbs": "AAAA", "offset": 0},
+                    {"tf": "TF_B", "tfbs": "CCCCCC", "offset": 10},
+                ],
+                "length": 20,
+            }
+        ]
+    )
+    rows.to_parquet(tables_dir / "records.parquet", index=False)
+
+
 def _write_sampling_pressure_events(tmp_path: Path) -> None:
     meta_dir = tmp_path / "outputs" / "meta"
     meta_dir.mkdir(parents=True, exist_ok=True)
@@ -426,3 +447,15 @@ def test_build_run_metrics_traceability_dense_arrays(tmp_path: Path) -> None:
 
     tiers = metrics[metrics["metric_group"] == "tier_enrichment"]
     assert not tiers.empty
+
+
+def test_build_run_metrics_rejects_dense_arrays_without_library_hash(tmp_path: Path) -> None:
+    cfg_path = _write_config(tmp_path)
+    _write_pool_manifest(tmp_path)
+    _write_libraries(tmp_path)
+    _write_attempts(tmp_path)
+    _write_dense_arrays_missing_hash(tmp_path)
+
+    loaded = load_config(cfg_path)
+    with pytest.raises(ValueError, match="densegen__sampling_library_hash"):
+        build_run_metrics(cfg=loaded.root.densegen, run_root=tmp_path)

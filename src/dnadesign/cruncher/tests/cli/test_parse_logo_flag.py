@@ -19,7 +19,7 @@ from dnadesign.cruncher.app.parse_workflow import run_parse
 from dnadesign.cruncher.artifacts.layout import (
     build_run_dir,
     lockfile_snapshot_path,
-    logos_dir_for_run,
+    logos_root,
     out_root,
     parse_manifest_path,
     pwm_summary_path,
@@ -96,7 +96,7 @@ def test_parse_skips_logos_when_disabled(tmp_path: Path) -> None:
     assert not run_optimize_dir(parse_dir).exists()
     assert not run_output_dir(parse_dir).exists()
     assert not run_plots_dir(parse_dir).exists()
-    logo_dir = logos_dir_for_run(out_root(config_path, cfg.out_dir), "parse", parse_dir.name)
+    logo_dir = logos_root(out_root(config_path, cfg.out_dir))
     assert not logo_dir.exists() or not list(logo_dir.glob("*_logo.png"))
 
 

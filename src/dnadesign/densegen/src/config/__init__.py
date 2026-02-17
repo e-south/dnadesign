@@ -28,12 +28,21 @@ from .generation import (
     GenerationConfig,
     PlanItem,
     PlanSamplingConfig,
+    PlanTemplate,
     PromoterConstraint,
+    PromoterMatrix,
+    PromoterMatrixPairing,
     RegulatorConstraints,
     RegulatorGroup,
     ResolvedPlanItem,
     SamplingConfig,
+    SequenceConstraintAllowlistItem,
+    SequenceConstraintAllowSelector,
+    SequenceConstraintForbidKmers,
+    SequenceConstraintsConfig,
     SideBiases,
+    expand_plan_templates,
+    normalize_motif_sets,
 )
 from .inputs import (
     BackgroundPoolFiltersConfig,
@@ -68,13 +77,7 @@ from .inputs import (
 from .logging import LoggingConfig, LoggingVisualsConfig
 from .output import OutputConfig, OutputParquetConfig, OutputSchemaConfig, OutputUSRConfig
 from .plots import PlotConfig
-from .postprocess import (
-    FinalSequenceKmerFilterConfig,
-    FinalSequenceValidationConfig,
-    PadConfig,
-    PadGcConfig,
-    PostprocessConfig,
-)
+from .postprocess import PadConfig, PadGcConfig, PostprocessConfig
 from .root import DenseGenConfig, RootConfig, load_config
 from .runtime import RuntimeConfig
 from .solver import SolverConfig
@@ -93,8 +96,6 @@ __all__ = [
     "BindingSitesInput",
     "ConfigError",
     "DenseGenConfig",
-    "FinalSequenceKmerFilterConfig",
-    "FinalSequenceValidationConfig",
     "FixedElements",
     "GenerationConfig",
     "InputConfig",
@@ -124,8 +125,11 @@ __all__ = [
     "PadGcConfig",
     "PlanItem",
     "PlanSamplingConfig",
+    "PlanTemplate",
     "PlotConfig",
     "PostprocessConfig",
+    "PromoterMatrix",
+    "PromoterMatrixPairing",
     "PromoterConstraint",
     "RegulatorConstraints",
     "RegulatorGroup",
@@ -133,13 +137,19 @@ __all__ = [
     "RootConfig",
     "RunConfig",
     "RuntimeConfig",
+    "SequenceConstraintAllowSelector",
+    "SequenceConstraintAllowlistItem",
+    "SequenceConstraintForbidKmers",
+    "SequenceConstraintsConfig",
     "SamplingConfig",
     "SequenceLibraryInput",
     "SideBiases",
     "SolverConfig",
     "SUPPORTED_SCHEMA_VERSIONS",
     "USRSequencesInput",
+    "expand_plan_templates",
     "load_config",
+    "normalize_motif_sets",
     "resolve_outputs_scoped_path",
     "resolve_relative_path",
     "resolve_run_root",

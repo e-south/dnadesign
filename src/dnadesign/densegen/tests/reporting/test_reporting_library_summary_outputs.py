@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from dnadesign.densegen.src.adapters.outputs import OutputRecord, ParquetSink
 from dnadesign.densegen.src.config import load_config
@@ -226,7 +227,7 @@ def test_report_outputs_section_uses_usr_records_path(tmp_path: Path, monkeypatc
     assert bundle.run_report["output_source"] == "usr:densegen/demo_usr"
 
 
-def test_collect_report_data_maps_used_rows_when_record_library_hash_missing(tmp_path: Path, monkeypatch) -> None:
+def test_collect_report_data_rejects_missing_record_library_hash(tmp_path: Path, monkeypatch) -> None:
     run_root = tmp_path / "run"
     run_root.mkdir(parents=True)
     cfg_path = run_root / "config.yaml"
@@ -266,8 +267,6 @@ def test_collect_report_data_maps_used_rows_when_record_library_hash_missing(tmp
         ]
     ).to_parquet(attempts_path, index=False)
 
-    # Dense-array records may omit sampling_library_hash after schema curation;
-    # reporting still needs to map usage back to attempts by input/plan/library_index.
     records_df = pd.DataFrame(
         [
             {
@@ -293,11 +292,5 @@ def test_collect_report_data_maps_used_rows_when_record_library_hash_missing(tmp
     )
 
     loaded = load_config(cfg_path)
-    bundle = collect_report_data(loaded.root, cfg_path, include_combinatorics=False)
-    offered_vs_used_tf = bundle.tables["offered_vs_used_tf"]
-    assert not offered_vs_used_tf.empty
-
-    tf1 = offered_vs_used_tf[offered_vs_used_tf["tf"] == "TF1"].iloc[0]
-    tf2 = offered_vs_used_tf[offered_vs_used_tf["tf"] == "TF2"].iloc[0]
-    assert int(tf1["used_placements"]) == 1
-    assert int(tf2["used_placements"]) == 1
+    with pytest.raises(ValueError, match="missing densegen__sampling_library_hash"):
+        collect_report_data(loaded.root, cfg_path, include_combinatorics=False)

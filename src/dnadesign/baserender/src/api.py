@@ -76,6 +76,70 @@ def load_record_from_parquet(
     raise SchemaError(f"Record '{target_id}' not found in dataset by column '{key_col}'")
 
 
+def load_records_from_parquet(
+    dataset_path: str | Path,
+    *,
+    record_ids: Iterable[str],
+    adapter_kind: str,
+    adapter_columns: Mapping[str, object],
+    adapter_policies: Mapping[str, object] | None = None,
+    alphabet: str = "DNA",
+    match_column: str | None = None,
+) -> list[Record]:
+    initialize_runtime()
+    ensure(not isinstance(record_ids, (str, bytes)), "record_ids must be an iterable of ids", SchemaError)
+    requested_ids = [str(record_id) for record_id in record_ids]
+    ensure(len(requested_ids) > 0, "record_ids must contain at least one id", SchemaError)
+    ensure(
+        all(record_id.strip() != "" for record_id in requested_ids),
+        "record_ids cannot contain blank ids",
+        SchemaError,
+    )
+
+    cfg = AdapterCfg(
+        kind=str(adapter_kind),
+        columns=dict(adapter_columns),
+        policies={} if adapter_policies is None else dict(adapter_policies),
+    )
+    adapter = build_adapter(cfg, alphabet=alphabet)
+    source_columns = required_source_columns(cfg)
+
+    if match_column is None:
+        raw_match = cfg.columns.get("id")
+        ensure(
+            raw_match is not None,
+            "adapter columns must include 'id' when match_column is not provided",
+            SchemaError,
+        )
+        key_col = str(raw_match)
+    else:
+        key_col = str(match_column)
+        ensure(key_col.strip() != "", "match_column must be non-empty", SchemaError)
+        if key_col not in source_columns:
+            source_columns = [*source_columns, key_col]
+
+    remaining: set[str] = set()
+    for record_id in requested_ids:
+        if record_id not in remaining:
+            remaining.add(record_id)
+
+    found: dict[str, Record] = {}
+    for row_index, row in enumerate(iter_parquet_rows(dataset_path, columns=source_columns)):
+        row_id = str(row.get(key_col))
+        if row_id not in remaining:
+            continue
+        if row_id not in found:
+            found[row_id] = adapter.apply(row, row_index=row_index)
+        remaining.discard(row_id)
+        if not remaining:
+            break
+
+    if remaining:
+        raise SchemaError(f"Records not found in dataset by column '{key_col}': {sorted(remaining)}")
+
+    return [found[record_id] for record_id in requested_ids]
+
+
 def render_record_figure(
     record: Record,
     *,

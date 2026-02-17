@@ -160,7 +160,7 @@ Sampling writes (under `optimize/` unless noted):
 - `optimize/elites_hits.parquet` (per-elite x per-TF best-hit/core metadata)
 - `optimize/random_baseline.parquet` (baseline score cloud)
 - `optimize/random_baseline_hits.parquet` (baseline best-hit/core metadata)
-- `inputs/lockfile.json` (snapshot of the pinned lockfile for reproducibility)
+- `provenance/lockfile.json` (snapshot of the pinned lockfile for reproducibility)
 
 Analysis writes:
 
@@ -188,7 +188,7 @@ Crosswalk (behavior -> config -> modules -> artifacts):
 |---|---|---|---|
 | Fetch motifs/sites (cache) | `catalog.*`, `ingest.*`, `discover.*` | `ingest/`, `store/` | `<catalog.root>/normalized/...` + `catalog.json` |
 | Pin exact inputs (lock) | `workspace.regulator_sets` or `campaigns[]` + `--campaign`, `catalog.*` | `store/`, `app/` | `<workspace>/.cruncher/locks/<config>.lock.json` |
-| Validate locked PWMs (parse) | (lockfile-driven) | `app/` | `<workspace>/.cruncher/parse/inputs/` |
+| Validate locked PWMs (parse) | (lockfile-driven) | `app/` | `<workspace>/.cruncher/parse/provenance/` |
 | Gibbs annealing optimization (sample) | `sample.*` | `core/`, `app/` | `<run_dir>/optimize/` + manifest/status updates |
 | Elite filter + TFBS-core MMR | `sample.elites.*` | `core/`, `app/` | `optimize/elites*.parquet` |
 | Artifact-only reporting (analyze) | `analysis.*` | `analysis/`, `app/` | `<run_dir>/analysis/` + `<run_dir>/plots/` |

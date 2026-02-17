@@ -21,9 +21,9 @@ import pytest
 
 from dnadesign.densegen.src.adapters.sources import PWMArtifactSetDataSource
 from dnadesign.densegen.src.adapters.sources.pwm_sampling import build_log_odds
-from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_metadata import TFBSMeta
-from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_types import SelectionMeta
 from dnadesign.densegen.src.config import PWMSamplingConfig
+from dnadesign.densegen.src.core.stage_a.stage_a_metadata import TFBSMeta
+from dnadesign.densegen.src.core.stage_a.stage_a_types import SelectionMeta
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
 from dnadesign.densegen.tests.pwm_sampling_fixtures import (
     fixed_candidates_mining,

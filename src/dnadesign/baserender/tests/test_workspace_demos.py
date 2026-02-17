@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import re
 import shutil
 from pathlib import Path
 
@@ -55,9 +56,9 @@ def test_curated_workspace_demos_are_self_contained() -> None:
             assert cols["features"] == "features"
             assert cols["effects"] == "effects"
             assert cols["display"] == "display"
-            assert (ws / "inputs" / "motif_library.json").exists()
             plugins = [spec.name for spec in job.pipeline.plugins]
-            assert "attach_motifs_from_library" in plugins
+            assert plugins == []
+            assert not (ws / "inputs" / "motif_library.json").exists()
             import pyarrow.parquet as pq
 
             rows = pq.read_table(ws / "inputs" / "elites_showcase_records.parquet").to_pylist()
@@ -67,6 +68,35 @@ def test_curated_workspace_demos_are_self_contained() -> None:
                 assert isinstance(row["features"], list)
                 assert isinstance(row["effects"], list)
                 assert isinstance(row["display"], dict)
+                assert str(row["display"].get("overlay_text", "")).startswith("Elite #")
+                feature_ids = set()
+                for feature in row["features"]:
+                    feature_ids.add(str(feature["id"]))
+                    assert re.match(r".+:best_window:[^:]+:\d+$", str(feature["id"]))
+                    assert set((feature.get("attrs") or {}).keys()) == {"tf"}
+                    assert int(feature["span"]["end"]) > int(feature["span"]["start"])
+                    assert len(str(feature["label"])) == int(feature["span"]["end"]) - int(feature["span"]["start"])
+                for effect in row["effects"]:
+                    target = (effect.get("target") or {}).get("feature_id")
+                    assert target in feature_ids
+                    assert effect.get("kind") == "motif_logo"
+                    assert "matrix" in (effect.get("params") or {})
+
+        if name == "demo_densegen_render":
+            cols = job.input.adapter.columns
+            assert job.input.adapter.kind == "densegen_tfbs"
+            assert set(cols.keys()) == {"sequence", "annotations", "id"}
+            assert "overlay_text" not in cols
+            import pyarrow.parquet as pq
+
+            rows = pq.read_table(ws / "inputs" / "input.parquet").to_pylist()
+            assert len(rows) == 1
+            row = rows[0]
+            assert set(row.keys()) == {"id", "sequence", "densegen__used_tfbs_detail"}
+            ann = row["densegen__used_tfbs_detail"]
+            assert isinstance(ann, list) and ann
+            assert any(str(entry.get("orientation")) == "rev" for entry in ann)
+            assert any("motif_id" in entry for entry in ann)
 
 
 def test_docs_cruncher_example_uses_local_examples_data() -> None:
@@ -79,6 +109,28 @@ def test_docs_cruncher_example_uses_local_examples_data() -> None:
         cols = job.input.adapter.columns
         assert _is_under(Path(str(cols["hits_path"])), docs_data)
         assert _is_under(Path(str(cols["config_path"])), docs_data)
+
+
+def test_docs_densegen_example_matches_notebook_contract() -> None:
+    root = _pkg_root()
+    docs_data = root / "docs" / "examples" / "data"
+    job = load_cruncher_showcase_job(root / "docs" / "examples" / "densegen_job.yaml", caller_root=root)
+
+    cols = job.input.adapter.columns
+    assert job.input.adapter.kind == "densegen_tfbs"
+    assert set(cols.keys()) == {"sequence", "annotations", "id"}
+    assert "overlay_text" not in cols
+    assert _is_under(job.input.path, docs_data)
+
+    import pyarrow.parquet as pq
+
+    rows = pq.read_table(docs_data / "densegen_demo.parquet").to_pylist()
+    assert len(rows) >= 1
+    row = rows[0]
+    assert set(row.keys()) == {"id", "sequence", "densegen__used_tfbs_detail"}
+    ann = row["densegen__used_tfbs_detail"]
+    assert isinstance(ann, list) and ann
+    assert any("motif_id" in entry for entry in ann)
 
 
 def test_curated_workspace_demos_run_in_isolated_copy(tmp_path: Path) -> None:

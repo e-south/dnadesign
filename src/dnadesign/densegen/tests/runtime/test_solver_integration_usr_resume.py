@@ -34,7 +34,7 @@ def _write_config(path: Path) -> None:
             densegen:
               schema_version: "2.9"
               run:
-                id: demo_binding_sites
+                id: demo_tfbs_baseline
                 root: "."
 
               inputs:
@@ -55,7 +55,6 @@ def _write_config(path: Path) -> None:
                   dataset: demo_workspace
                   root: outputs/usr
                   chunk_size: 1
-                  allow_overwrite: false
 
               generation:
                 sequence_length: 3
@@ -114,7 +113,7 @@ def _write_config_usr_only(path: Path) -> None:
             densegen:
               schema_version: "2.9"
               run:
-                id: demo_binding_sites
+                id: demo_tfbs_baseline
                 root: "."
 
               inputs:
@@ -131,7 +130,6 @@ def _write_config_usr_only(path: Path) -> None:
                   dataset: demo_workspace
                   root: outputs/usr
                   chunk_size: 1
-                  allow_overwrite: false
 
               generation:
                 sequence_length: 3

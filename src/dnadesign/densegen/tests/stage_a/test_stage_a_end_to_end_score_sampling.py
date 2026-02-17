@@ -18,11 +18,11 @@ import pandas as pd
 import pytest
 import yaml
 
-from dnadesign.densegen.src.adapters.sources.stage_a import stage_a_selection
-from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_types import FimoCandidate
 from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.core.artifacts.pool import build_pool_artifact
 from dnadesign.densegen.src.core.pipeline import default_deps
+from dnadesign.densegen.src.core.stage_a import stage_a_selection
+from dnadesign.densegen.src.core.stage_a.stage_a_types import FimoCandidate
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
 from dnadesign.densegen.src.viz.plotting import plot_stage_a_summary
 
@@ -30,7 +30,7 @@ _FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
 
 def _artifact_paths() -> list[str]:
-    base = Path(__file__).resolve().parents[2] / "workspaces" / "demo_meme_three_tfs" / "inputs" / "motif_artifacts"
+    base = Path(__file__).resolve().parents[2] / "workspaces" / "demo_sampling_baseline" / "inputs" / "motif_artifacts"
     return [
         str(base / "lexA__meme_suite_meme__lexA_CTGTATAWAWWHACA.json"),
         str(base / "cpxR__meme_suite_meme__cpxR_MANWWHTTTAM.json"),

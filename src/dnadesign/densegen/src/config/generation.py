@@ -23,6 +23,8 @@ class PromoterConstraint(BaseModel):
     name: Optional[str] = None
     upstream: Optional[str] = None
     downstream: Optional[str] = None
+    upstream_variant_id: Optional[str] = None
+    downstream_variant_id: Optional[str] = None
     spacer_length: Optional[tuple[int, int]] = None
     upstream_pos: Optional[tuple[int, int]] = None
     downstream_pos: Optional[tuple[int, int]] = None
@@ -40,6 +42,16 @@ class PromoterConstraint(BaseModel):
         if any(ch not in {"A", "C", "G", "T"} for ch in s):
             raise ValueError(f"{info.field_name} must contain only A/C/G/T characters")
         return s
+
+    @field_validator("upstream_variant_id", "downstream_variant_id")
+    @classmethod
+    def _variant_id_ok(cls, v: Optional[str], info):
+        if v is None:
+            return v
+        text = str(v).strip()
+        if not text:
+            raise ValueError(f"{info.field_name} must be a non-empty string when set")
+        return text
 
     @field_validator("spacer_length", "upstream_pos", "downstream_pos")
     @classmethod
@@ -213,6 +225,185 @@ class PlanItem(BaseModel):
         return int(v)
 
 
+class PlanTemplatePair(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    up: str
+    down: str
+
+    @field_validator("up", "down")
+    @classmethod
+    def _name_ok(cls, v: str, info):
+        text = str(v).strip()
+        if not text:
+            raise ValueError(f"{info.field_name} must be a non-empty string")
+        return text
+
+
+class PromoterMatrixPairing(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    mode: Literal["zip", "cross_product", "explicit_pairs"] = "zip"
+    pairs: List[PlanTemplatePair] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _pairs_mode_rules(self):
+        if self.mode == "explicit_pairs":
+            if not self.pairs:
+                raise ValueError("promoter_matrix.pairing.pairs must be set when mode=explicit_pairs")
+        elif self.pairs:
+            raise ValueError("promoter_matrix.pairing.pairs is only valid when mode=explicit_pairs")
+        return self
+
+
+class PromoterMatrix(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    upstream_from_set: str
+    downstream_from_set: str
+    pairing: PromoterMatrixPairing = Field(default_factory=PromoterMatrixPairing)
+    spacer_length: tuple[int, int]
+    upstream_pos: tuple[int, int]
+    downstream_pos: Optional[tuple[int, int]] = None
+
+    @field_validator("name", "upstream_from_set", "downstream_from_set")
+    @classmethod
+    def _nonempty(cls, v: str, info):
+        text = str(v).strip()
+        if not text:
+            raise ValueError(f"{info.field_name} must be a non-empty string")
+        return text
+
+    @field_validator("spacer_length", "upstream_pos", "downstream_pos")
+    @classmethod
+    def _range_ok(cls, v: Optional[tuple[int, int]], info):
+        if v is None:
+            return v
+        if len(v) != 2:
+            raise ValueError(f"{info.field_name} must be a 2-tuple (min, max)")
+        lo, hi = int(v[0]), int(v[1])
+        if lo < 0 or hi < 0:
+            raise ValueError(f"{info.field_name} values must be >= 0")
+        if lo > hi:
+            raise ValueError(f"{info.field_name} must be min <= max")
+        return lo, hi
+
+
+class TemplateFixedElements(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    promoter_matrix: Optional[PromoterMatrix] = None
+    promoter_constraints: List[PromoterConstraint] = Field(default_factory=list)
+    side_biases: Optional[SideBiases] = None
+
+
+class PlanTemplate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    base_name: str
+    quota_per_variant: Optional[int] = None
+    total_quota: Optional[int] = None
+    distribution_policy: Optional[Literal["uniform"]] = None
+    sampling: PlanSamplingConfig
+    fixed_elements: TemplateFixedElements = Field(default_factory=TemplateFixedElements)
+    regulator_constraints: RegulatorConstraints
+
+    @field_validator("base_name")
+    @classmethod
+    def _base_name_ok(cls, v: str):
+        text = str(v).strip()
+        if not text:
+            raise ValueError("plan_templates[].base_name must be a non-empty string")
+        return text
+
+    @field_validator("quota_per_variant", "total_quota")
+    @classmethod
+    def _quota_positive(cls, v: Optional[int], info):
+        if v is None:
+            return v
+        value = int(v)
+        if value <= 0:
+            raise ValueError(f"plan_templates[].{info.field_name} must be > 0")
+        return value
+
+    @model_validator(mode="after")
+    def _quota_mode_rules(self):
+        has_per_variant = self.quota_per_variant is not None
+        has_total = self.total_quota is not None
+        if has_per_variant == has_total:
+            raise ValueError("plan_templates[] requires exactly one of quota_per_variant or total_quota")
+        if has_total and self.distribution_policy != "uniform":
+            raise ValueError("plan_templates[].distribution_policy must be 'uniform' when total_quota is set")
+        if has_per_variant and self.distribution_policy is not None:
+            raise ValueError("plan_templates[].distribution_policy is only valid when total_quota is set")
+        return self
+
+
+class SequenceConstraintForbidKmers(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    patterns_from_motif_sets: List[str]
+    include_reverse_complements: bool = False
+    strands: Literal["forward", "both"] = "both"
+
+    @field_validator("name")
+    @classmethod
+    def _name_ok(cls, v: str):
+        text = str(v).strip()
+        if not text:
+            raise ValueError("sequence_constraints.forbid_kmers[].name must be non-empty")
+        return text
+
+    @field_validator("patterns_from_motif_sets")
+    @classmethod
+    def _patterns_from_sets_ok(cls, v: List[str]):
+        if not v:
+            raise ValueError("sequence_constraints.forbid_kmers[].patterns_from_motif_sets must be non-empty")
+        cleaned: list[str] = []
+        for raw in v:
+            text = str(raw).strip()
+            if not text:
+                raise ValueError(
+                    "sequence_constraints.forbid_kmers[].patterns_from_motif_sets entries must be non-empty"
+                )
+            cleaned.append(text)
+        if len(set(cleaned)) != len(cleaned):
+            raise ValueError("sequence_constraints.forbid_kmers[].patterns_from_motif_sets must be unique")
+        return cleaned
+
+
+class SequenceConstraintAllowSelector(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    fixed_element: Literal["promoter"]
+    component: List[Literal["upstream", "downstream"]] = Field(default_factory=lambda: ["upstream", "downstream"])
+
+    @field_validator("component")
+    @classmethod
+    def _component_ok(cls, v: List[str]):
+        if not v:
+            raise ValueError("sequence_constraints.allowlist[].selector.component must be non-empty")
+        cleaned = [str(item).strip() for item in v]
+        if len(set(cleaned)) != len(cleaned):
+            raise ValueError("sequence_constraints.allowlist[].selector.component must be unique")
+        return cleaned
+
+
+class SequenceConstraintAllowlistItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["fixed_element_instance"]
+    selector: SequenceConstraintAllowSelector
+
+
+class SequenceConstraintsConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    forbid_kmers: List[SequenceConstraintForbidKmers] = Field(default_factory=list)
+    allowlist: List[SequenceConstraintAllowlistItem] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _rules_ok(self):
+        if not self.forbid_kmers:
+            return self
+        if not self.allowlist:
+            raise ValueError("sequence_constraints.allowlist must be set when sequence_constraints.forbid_kmers is set")
+        return self
+
+
 class SamplingConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     pool_strategy: Literal["full", "subsample", "iterative_subsample"] = "subsample"
@@ -293,7 +484,11 @@ class GenerationConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     sequence_length: int
     sampling: SamplingConfig = Field(default_factory=SamplingConfig)
-    plan: List[PlanItem]
+    plan: List[PlanItem] = Field(default_factory=list)
+    plan_templates: List[PlanTemplate] = Field(default_factory=list)
+    plan_template_max_expanded_plans: int = 256
+    plan_template_max_total_quota: int = 4096
+    sequence_constraints: Optional[SequenceConstraintsConfig] = None
 
     @field_validator("sequence_length")
     @classmethod
@@ -302,13 +497,31 @@ class GenerationConfig(BaseModel):
             raise ValueError("Value must be > 0")
         return v
 
+    @field_validator("plan_template_max_expanded_plans")
+    @classmethod
+    def _max_expanded_ok(cls, v: int):
+        if int(v) <= 0:
+            raise ValueError("generation.plan_template_max_expanded_plans must be > 0")
+        return int(v)
+
+    @field_validator("plan_template_max_total_quota")
+    @classmethod
+    def _max_total_quota_ok(cls, v: int):
+        if int(v) <= 0:
+            raise ValueError("generation.plan_template_max_total_quota must be > 0")
+        return int(v)
+
     @model_validator(mode="after")
     def _plan_mode(self):
-        if not self.plan:
-            raise ValueError("generation.plan must contain at least one item")
+        has_plan = bool(self.plan)
+        has_templates = bool(self.plan_templates)
+        if has_plan == has_templates:
+            raise ValueError("generation requires exactly one of plan or plan_templates")
         return self
 
     def resolve_plan(self) -> List["ResolvedPlanItem"]:
+        if not self.plan:
+            raise ValueError("generation.plan is empty; plan_templates must be expanded before runtime")
         return [
             ResolvedPlanItem(
                 name=p.name,
@@ -331,3 +544,208 @@ class ResolvedPlanItem:
     include_inputs: list[str]
     fixed_elements: FixedElements
     regulator_constraints: RegulatorConstraints
+
+
+def _spacer_min(spacer: tuple[int, int] | None) -> int:
+    if spacer is None:
+        return 0
+    return int(min(spacer))
+
+
+def _normalize_motif_set_values(values: Dict[str, str], *, set_name: str) -> Dict[str, str]:
+    cleaned: Dict[str, str] = {}
+    for raw_key, raw_seq in values.items():
+        key = str(raw_key).strip()
+        if not key:
+            raise ValueError(f"motif_sets.{set_name} contains an empty variant id")
+        seq = str(raw_seq).strip().upper()
+        if not seq:
+            raise ValueError(f"motif_sets.{set_name}.{key} must be a non-empty motif string")
+        if any(ch not in {"A", "C", "G", "T"} for ch in seq):
+            raise ValueError(f"motif_sets.{set_name}.{key} must contain only A/C/G/T characters")
+        cleaned[key] = seq
+    if not cleaned:
+        raise ValueError(f"motif_sets.{set_name} must contain at least one motif")
+    return cleaned
+
+
+def normalize_motif_sets(motif_sets: Dict[str, Dict[str, str]] | None) -> Dict[str, Dict[str, str]]:
+    if motif_sets is None:
+        return {}
+    cleaned: Dict[str, Dict[str, str]] = {}
+    for raw_set_name, raw_values in motif_sets.items():
+        set_name = str(raw_set_name).strip()
+        if not set_name:
+            raise ValueError("motif_sets keys must be non-empty strings")
+        if not isinstance(raw_values, dict):
+            raise ValueError(f"motif_sets.{set_name} must map variant ids to motif strings")
+        cleaned[set_name] = _normalize_motif_set_values(raw_values, set_name=set_name)
+    return cleaned
+
+
+def _validate_promoter_geometry(*, plan_name: str, sequence_length: int, constraint: PromoterConstraint) -> None:
+    if constraint.upstream is None or constraint.downstream is None:
+        return
+    spacer_min = _spacer_min(constraint.spacer_length)
+    required = len(constraint.upstream) + spacer_min + len(constraint.downstream)
+    pos = constraint.upstream_pos or (0, sequence_length - 1)
+    lo, hi = int(pos[0]), int(pos[1])
+    if lo > hi:
+        raise ValueError(
+            f"generation geometry invalid for plan '{plan_name}': upstream_pos has min > max ({lo} > {hi})."
+        )
+    if lo + required > int(sequence_length):
+        raise ValueError(
+            f"generation geometry invalid for plan '{plan_name}': "
+            f"upstream_pos.min={lo}, required_bp={required}, sequence_length={sequence_length}."
+        )
+
+
+def _expand_matrix_pairs(
+    *,
+    matrix: PromoterMatrix,
+    motif_sets: Dict[str, Dict[str, str]],
+) -> List[tuple[str, str, str, str]]:
+    if matrix.upstream_from_set not in motif_sets:
+        raise ValueError(f"plan_templates.promoter_matrix references unknown motif set: {matrix.upstream_from_set}")
+    if matrix.downstream_from_set not in motif_sets:
+        raise ValueError(f"plan_templates.promoter_matrix references unknown motif set: {matrix.downstream_from_set}")
+    up_set = motif_sets[matrix.upstream_from_set]
+    down_set = motif_sets[matrix.downstream_from_set]
+    pairing = matrix.pairing
+    if pairing.mode == "zip":
+        up_keys = sorted(up_set)
+        down_keys = sorted(down_set)
+        if set(up_keys) != set(down_keys):
+            raise ValueError(
+                "plan_templates.promoter_matrix pairing mode=zip requires matching keys between motif sets"
+            )
+        return [(key, up_set[key], key, down_set[key]) for key in sorted(set(up_keys))]
+    if pairing.mode == "cross_product":
+        return [
+            (up_key, up_set[up_key], down_key, down_set[down_key])
+            for up_key in sorted(up_set)
+            for down_key in sorted(down_set)
+        ]
+    pairs: List[tuple[str, str, str, str]] = []
+    for pair in pairing.pairs:
+        if pair.up not in up_set:
+            raise ValueError(f"plan_templates.promoter_matrix explicit pair references unknown upstream id: {pair.up}")
+        if pair.down not in down_set:
+            raise ValueError(
+                f"plan_templates.promoter_matrix explicit pair references unknown downstream id: {pair.down}"
+            )
+        pairs.append((pair.up, up_set[pair.up], pair.down, down_set[pair.down]))
+    return pairs
+
+
+def expand_plan_templates(
+    *,
+    plan_templates: List[PlanTemplate],
+    motif_sets: Dict[str, Dict[str, str]],
+    sequence_length: int,
+    max_expanded_plans: int,
+    max_total_quota: int,
+) -> List[PlanItem]:
+    expanded: List[PlanItem] = []
+    expanded_plan_count = 0
+    expanded_total_quota = 0
+    for template in plan_templates:
+        fixed = template.fixed_elements
+        matrix = fixed.promoter_matrix
+        if matrix is None:
+            quota = (
+                int(template.quota_per_variant) if template.quota_per_variant is not None else int(template.total_quota)
+            )
+            next_plan_count = expanded_plan_count + 1
+            if next_plan_count > int(max_expanded_plans):
+                raise ValueError(
+                    "plan_templates expansion exceeds generation.plan_template_max_expanded_plans "
+                    f"({next_plan_count} > {int(max_expanded_plans)})."
+                )
+            next_total_quota = expanded_total_quota + int(quota)
+            if next_total_quota > int(max_total_quota):
+                raise ValueError(
+                    "plan_templates expansion exceeds generation.plan_template_max_total_quota "
+                    f"({next_total_quota} > {int(max_total_quota)})."
+                )
+            plan = PlanItem(
+                name=str(template.base_name),
+                quota=quota,
+                sampling=template.sampling,
+                fixed_elements=FixedElements(
+                    promoter_constraints=list(fixed.promoter_constraints or []),
+                    side_biases=fixed.side_biases,
+                ),
+                regulator_constraints=template.regulator_constraints,
+            )
+            for constraint in plan.fixed_elements.promoter_constraints:
+                _validate_promoter_geometry(
+                    plan_name=plan.name,
+                    sequence_length=int(sequence_length),
+                    constraint=constraint,
+                )
+            expanded.append(plan)
+            expanded_plan_count = next_plan_count
+            expanded_total_quota = next_total_quota
+            continue
+
+        matrix_pairs = _expand_matrix_pairs(matrix=matrix, motif_sets=motif_sets)
+        next_plan_count = expanded_plan_count + len(matrix_pairs)
+        if next_plan_count > int(max_expanded_plans):
+            raise ValueError(
+                "plan_templates expansion exceeds generation.plan_template_max_expanded_plans "
+                f"({next_plan_count} > {int(max_expanded_plans)})."
+            )
+        if template.quota_per_variant is not None:
+            quotas = [int(template.quota_per_variant)] * len(matrix_pairs)
+        else:
+            total_quota = int(template.total_quota)
+            if total_quota % len(matrix_pairs) != 0:
+                raise ValueError(
+                    "plan_templates total_quota must divide evenly across expanded variants when "
+                    "distribution_policy=uniform"
+                )
+            quotas = [int(total_quota // len(matrix_pairs))] * len(matrix_pairs)
+
+        next_total_quota = expanded_total_quota + int(sum(quotas))
+        if next_total_quota > int(max_total_quota):
+            raise ValueError(
+                "plan_templates expansion exceeds generation.plan_template_max_total_quota "
+                f"({next_total_quota} > {int(max_total_quota)})."
+            )
+
+        for (up_id, up_seq, down_id, down_seq), quota in zip(matrix_pairs, quotas):
+            name = f"{template.base_name}__up={up_id}__down={down_id}"
+            matrix_constraint = PromoterConstraint(
+                name=matrix.name,
+                upstream=up_seq,
+                downstream=down_seq,
+                upstream_variant_id=up_id,
+                downstream_variant_id=down_id,
+                spacer_length=matrix.spacer_length,
+                upstream_pos=matrix.upstream_pos,
+                downstream_pos=matrix.downstream_pos,
+            )
+            constraints = [matrix_constraint, *list(fixed.promoter_constraints or [])]
+            fixed_elements = FixedElements(
+                promoter_constraints=constraints,
+                side_biases=fixed.side_biases,
+            )
+            plan = PlanItem(
+                name=name,
+                quota=int(quota),
+                sampling=template.sampling,
+                fixed_elements=fixed_elements,
+                regulator_constraints=template.regulator_constraints,
+            )
+            for constraint in plan.fixed_elements.promoter_constraints:
+                _validate_promoter_geometry(
+                    plan_name=plan.name,
+                    sequence_length=int(sequence_length),
+                    constraint=constraint,
+                )
+            expanded.append(plan)
+        expanded_plan_count = next_plan_count
+        expanded_total_quota = next_total_quota
+    return expanded

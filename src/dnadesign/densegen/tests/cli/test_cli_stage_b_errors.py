@@ -18,7 +18,7 @@ from pathlib import Path
 import pandas as pd
 from typer.testing import CliRunner
 
-from dnadesign.densegen.src.cli import app
+from dnadesign.densegen.src.cli.main import app
 
 
 def _write_stage_b_config(

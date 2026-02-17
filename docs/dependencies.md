@@ -1,86 +1,58 @@
-## Maintaining dependencies
+## Dependency maintenance
 
+This document is the canonical home for dependency management in this repository, including Python packages and pixi-managed system tools. Read it when adding, removing, or updating dependencies so lockfiles and runtime expectations stay aligned.
 
-## Contents
-- [Maintaining dependencies](#maintaining-dependencies)
-- [Non-Python system dependencies (pixi)](#non-python-system-dependencies-pixi)
-- Add a runtime dependency:
+### Contents
+This section lists the dependency surfaces maintained in this repo.
 
-    ```bash
-    uv add <package>
-    ```
+- [Python dependencies (uv)](#python-dependencies-uv)
+- [System dependencies (pixi)](#system-dependencies-pixi)
+- [Lockfile and commit checklist](#lockfile-and-commit-checklist)
 
-- Add to a dependency group:
-
-    ```bash
-    uv add --group dev <package>
-    ```
-
-- Remove a dependency:
-
-    ```bash
-    uv remove <package>
-    ```
-
-Then commit `pyproject.toml` + `uv.lock`.
-
-If you edit `pyproject.toml` by hand, regenerate the lockfile:
+### Python dependencies (uv)
+This section covers Python package lifecycle operations managed by `uv`.
 
 ```bash
+# Add a runtime dependency to the default dependency set.
+uv add <package>
+
+# Add a dependency to a named group (for example, dev tools).
+uv add --group dev <package>
+
+# Remove a dependency from pyproject and lockfile.
+uv remove <package>
+```
+
+If you edit `pyproject.toml` directly, regenerate the lockfile:
+
+```bash
+# Recompute uv.lock from pyproject constraints.
 uv lock
 ```
 
-New users should then run:
+### System dependencies (pixi)
+This section covers non-Python binaries pinned via `pixi.toml`.
+
+Use pixi for toolchains such as MEME Suite that are required by some workflows but are not Python packages.
 
 ```bash
-uv sync --locked
-```
-
----
-
-### Non-Python system dependencies (pixi)
-
-Some tools (e.g., MEME Suite for **cruncher**) are system-level binaries and are not installed via `uv`. We use [pixi](https://pixi.sh/) to pin and manage those dependencies in a reproducible way.
-
-This repo includes a minimal `pixi.toml` at the root with a `cruncher` task that wraps `uv run cruncher`.
-
-Typical commands:
-
-```bash
-# Install/resolve the toolchain defined in pixi.toml
+# Install or update the pinned pixi environment.
 pixi install
 
-# Run Cruncher with system tools on PATH (pixi env + uv Python env)
-# Note: pixi inserts `--` before task args, so put -c/--config after the subcommand.
-pixi run cruncher -- --help
+# Run a task that depends on pixi-managed binaries.
 pixi run cruncher -- doctor -c src/dnadesign/cruncher/workspaces/demo_basics_two_tf/config.yaml
 
-# Add or update a system dependency
+# Add or update a pixi-managed system package.
 pixi add bioconda::meme
 pixi update
 
-# Generate/update the lockfile
+# Regenerate pixi lockfile after dependency changes.
 pixi lock
 ```
 
-Optional: define a short runner in your shell (zsh doesn’t split multi-word variables):
+### Lockfile and commit checklist
+This section ensures dependency changes are reproducible for other operators.
 
-```bash
-cruncher() { pixi run cruncher -- "$@"; }
-# Example: cruncher doctor -c path/to/config.yaml
-```
-
-By default, pixi installs into `.pixi/`. If you prefer not to use `pixi run`, export an absolute `MEME_BIN` so Cruncher can find the MEME Suite binaries:
-
-```bash
-export DNADESIGN_ROOT="$(git rev-parse --show-toplevel)"
-export MEME_BIN="$DNADESIGN_ROOT/.pixi/envs/default/bin"
-```
-
-If you prefer `motif_discovery.tool_path`, use an absolute path (or a path relative to your `config.yaml` location).
-
-Commit `pixi.toml` and `pixi.lock` alongside any updates.
-
----
-
-@e-south
+- Commit `pyproject.toml` and `uv.lock` for Python dependency changes.
+- Commit `pixi.toml` and `pixi.lock` for system dependency changes.
+- Run `uv sync --locked` after pulling dependency updates.

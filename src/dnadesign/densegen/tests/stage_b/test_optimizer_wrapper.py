@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from dnadesign.densegen.src.adapters.optimizer import DenseArrayOptimizer
 from dnadesign.densegen.src.adapters.optimizer.dense_arrays import _apply_solver_controls
 
@@ -11,6 +13,44 @@ def test_promoter_constraint_name_is_ignored() -> None:
         fixed_elements={"promoter_constraints": [{"name": "sigma70", "upstream": "TTGACA", "downstream": "TATAAT"}]},
     )
     opt.get_optimizer_instance()
+
+
+def test_promoter_constraint_variant_ids_are_accepted() -> None:
+    opt = DenseArrayOptimizer(
+        library=["TTGACA", "TATAAT", "AT"],
+        sequence_length=60,
+        fixed_elements={
+            "promoter_constraints": [
+                {
+                    "name": "sigma70",
+                    "upstream": "TTGACA",
+                    "downstream": "TATAAT",
+                    "upstream_variant_id": "consensus",
+                    "downstream_variant_id": "consensus",
+                }
+            ]
+        },
+    )
+    opt.get_optimizer_instance()
+
+
+def test_promoter_constraint_variant_ids_must_be_non_empty_strings() -> None:
+    opt = DenseArrayOptimizer(
+        library=["TTGACA", "TATAAT", "AT"],
+        sequence_length=60,
+        fixed_elements={
+            "promoter_constraints": [
+                {
+                    "name": "sigma70",
+                    "upstream": "TTGACA",
+                    "downstream": "TATAAT",
+                    "upstream_variant_id": "",
+                }
+            ]
+        },
+    )
+    with pytest.raises(ValueError, match="upstream_variant_id must be a non-empty string"):
+        opt.get_optimizer_instance()
 
 
 def test_solver_time_limit_applies() -> None:

@@ -62,7 +62,7 @@ Before relying on Notify:
 
 Load only the needed references:
 - `../../../bu-scc/agent-cheatsheet.md` for copy/paste commands
-- `docs/hpc/bu_scc_quickstart.md` for bootstrap flow
-- `docs/hpc/bu_scc_batch_notify.md` for runbook details
-- `docs/hpc/jobs/README.md` for template-specific submits
+- `../../../bu-scc/quickstart.md` for bootstrap flow
+- `../../../bu-scc/batch-notify.md` for runbook details
+- `../../../bu-scc/jobs/README.md` for template-specific submits
 - `references/resource-profiles.md` for workload-to-resource defaults

@@ -53,7 +53,7 @@ pixi run cruncher -- sample --force-overwrite -c "$CONFIG"
 pixi run cruncher -- analyze --summary -c "$CONFIG"
 pixi run cruncher -- export sequences --latest -c "$CONFIG"
 pixi run cruncher -- catalog logos --source demo_merged_meme_oops --tf lexA --tf cpxR -c "$CONFIG"
-find outputs -type f -path '*/analysis/plots/*' | sort
+find outputs -type f -path '*/plots/analysis/*' | sort
 find outputs -type f -path '*/export/sequences/*' | sort
 find outputs -type f -path '*/plots/logos/*' -name '*.png' | sort
 ```
@@ -230,7 +230,7 @@ Run artifacts live under:
 Key files:
 
 - run metadata: `run/run_manifest.json`, `run/run_status.json`, `run/config_used.yaml`
-- pinned inputs: `inputs/lockfile.json`, `inputs/parse_manifest.json`
+- pinned inputs: `provenance/lockfile.json`, `provenance/parse_manifest.json`
 - optimizer tables: `optimize/tables/sequences.parquet`, `optimize/tables/elites.parquet`,
   `optimize/tables/elites_hits.parquet`, `optimize/tables/random_baseline.parquet`,
   `optimize/tables/random_baseline_hits.parquet`
@@ -238,11 +238,11 @@ Key files:
 - analysis reports: `analysis/reports/summary.json`, `analysis/reports/report.json`, `analysis/reports/report.md`
 - analysis manifests: `analysis/manifests/manifest.json`, `analysis/manifests/plot_manifest.json`,
   `analysis/manifests/table_manifest.json`
-- analysis plots: `analysis/plots/chain_trajectory_scatter.*`, `analysis/plots/chain_trajectory_sweep.*`,
-  `analysis/plots/elites_nn_distance.*`, `analysis/plots/elites_showcase.*` (and `analysis/plots/health_panel.*` when trace is present)
+- analysis plots: `plots/analysis/chain_trajectory_scatter.*`, `plots/analysis/chain_trajectory_sweep.*`,
+  `plots/analysis/elites_nn_distance.*`, `plots/analysis/elites_showcase.*` (and `plots/analysis/health_panel.*` when trace is present)
 - analysis tables: `analysis/tables/table__scores_summary.parquet`, `analysis/tables/table__metrics_joint.parquet`
 - sequence exports: `export/sequences/table__*.parquet`, `export/sequences/export_manifest.json`
-- motif logos: `plots/logos/catalog/<run_name>/*.png`
+- motif logos: `plots/logos/*.png`
 
 ## Related docs
 

@@ -89,6 +89,8 @@ def build_metadata(
     covers_required_regulators: bool,
     gc_total: float,
     gc_core: float,
+    promoter_detail: dict | None = None,
+    sequence_validation: dict | None = None,
     input_row_count: int,
     input_tf_count: int,
     input_tfbs_count: int,
@@ -105,6 +107,10 @@ def build_metadata(
 ) -> dict:
     tf_list = sorted(set(regulator_labels or []))
     library_unique_tfbs = len(set(library_for_opt)) if library_for_opt else 0
+    if promoter_detail is None:
+        promoter_detail = {"placements": []}
+    if sequence_validation is None:
+        sequence_validation = {"validation_passed": True, "violations": []}
     used_tf_counts_list = [
         {"tf": str(tf), "count": int(n)} for tf, n in sorted(used_tf_counts.items(), key=lambda kv: kv[0])
     ]
@@ -147,6 +153,7 @@ def build_metadata(
         "sampling_library_size": sampling_meta.get("library_size"),
         "sampling_library_strategy": sampling_meta.get("library_sampling_strategy"),
         "sampling_iterative_max_libraries": sampling_meta.get("iterative_max_libraries"),
+        "sampling_library_hash": str(sampling_library_hash),
         "sampling_library_index": int(sampling_library_index),
         "required_regulators": required_regulators,
         "min_count_by_regulator": min_count_by_regulator_list,
@@ -155,6 +162,8 @@ def build_metadata(
         "pad_end": pad_meta.get("end"),
         "gc_total": gc_total,
         "gc_core": gc_core,
+        "promoter_detail": promoter_detail,
+        "sequence_validation": sequence_validation,
     }
     _apply_retention_policy(meta)
     validate_metadata(meta)

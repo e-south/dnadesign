@@ -35,7 +35,6 @@ def _make_usr_writer(tmp_path: Path, *, deduplicate: bool = True) -> tuple[Path,
         root=root,
         namespace="densegen",
         chunk_size=1,
-        allow_overwrite=False,
         deduplicate=deduplicate,
     )
     return root, writer
@@ -124,7 +123,6 @@ def test_usr_writer_dedupes_without_full_parquet_id_preload(tmp_path: Path, monk
         root=root,
         namespace="densegen",
         chunk_size=1,
-        allow_overwrite=False,
     )
     rec = OutputRecord.from_sequence(
         sequence="ACGTACGTAA",

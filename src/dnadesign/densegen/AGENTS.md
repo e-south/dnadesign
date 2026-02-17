@@ -5,7 +5,11 @@ Supplement to repo-root `AGENTS.md` with `densegen`-specific locations + run sha
 ### Key paths
 - README: `src/dnadesign/densegen/README.md`
 - Tool code: `src/dnadesign/densegen/src/` (entrypoint lives here)
-- Packaged demo template id: `demo_meme_two_tf`
+- Packaged workspace ids:
+  - `demo_tfbs_baseline`
+  - `demo_sampling_baseline`
+  - `study_constitutive_sigma_panel`
+  - `study_stress_ethanol_cipro`
 - Outputs: per-workspace `outputs/` (generated; run artifacts live in tables/plots)
 
 ### External deps (do not install unless asked)
@@ -26,7 +30,7 @@ DenseGen CLI is exposed as `dense` in this repo:
 uv run dense --help
 
 # Workspace-first demo flow (no repo-root paths).
-uv run dense workspace init --id demo --template-id demo_meme_two_tf --copy-inputs
+uv run dense workspace init --id demo --from-workspace demo_tfbs_baseline --copy-inputs --output-mode local
 cd demo
 uv run dense validate-config --probe-solver
 uv run dense inspect inputs

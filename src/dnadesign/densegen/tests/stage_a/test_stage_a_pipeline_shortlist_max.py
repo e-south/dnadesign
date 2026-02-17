@@ -11,7 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dnadesign.densegen.src.adapters.sources.stage_a import stage_a_pipeline
+from dnadesign.densegen.src.core.stage_a import stage_a_pipeline
 
 
 def test_coerce_pool_cap_allows_none_for_mmr() -> None:

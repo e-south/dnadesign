@@ -2,6 +2,7 @@
 DenseGen input sources package.
 """
 
+from ...core.stage_a.stage_a_types import PWMMotif
 from .base import BaseDataSource, resolve_path
 from .binding_sites import BindingSitesDataSource
 from .factory import data_source_factory
@@ -12,7 +13,6 @@ from .pwm_matrix_csv import PWMMatrixCSVDataSource
 from .pwm_meme import PWMMemeDataSource
 from .pwm_meme_set import PWMMemeSetDataSource
 from .sequence_library import SequenceLibraryDataSource
-from .stage_a.stage_a_types import PWMMotif
 from .usr_sequences import USRSequencesDataSource
 
 __all__ = [

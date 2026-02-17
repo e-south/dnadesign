@@ -390,7 +390,7 @@ Preconditions:
 
 * provide runs via `analysis.runs`/`--run` or rely on the default latest run
 * trace-dependent plots require `optimize/trace.nc`
-* each sample run snapshots the lockfile under `inputs/lockfile.json`; analysis uses that snapshot to avoid mismatch if the workspace lockfile changes later
+* each sample run snapshots the lockfile under `provenance/lockfile.json`; analysis uses that snapshot to avoid mismatch if the workspace lockfile changes later
 * if `analysis` is omitted from config, analyze uses schema defaults (including `run_selector=latest`)
 * if `analysis.fimo_compare.enabled=true`, MEME Suite `fimo` must be resolvable via `discover.tool_path`, `MEME_BIN`, or `PATH`
 
@@ -402,10 +402,10 @@ Outputs:
   `analysis/tables/table__diagnostics_summary.json`, `analysis/tables/table__objective_components.json`,
   `analysis/tables/table__elites_mmr_summary.parquet`, `analysis/tables/table__elites_nn_distance.parquet`,
   `analysis/tables/table__elites_mmr_sweep.parquet` (when `analysis.mmr_sweep.enabled=true`)
-* plots: `plots/chain_trajectory_scatter.<plot_format>`,
-  `plots/chain_trajectory_sweep.<plot_format>`,
-  `plots/elites_nn_distance.<plot_format>`, `plots/elites_showcase.<plot_format>`,
-  `plots/health_panel.<plot_format>` (trace only)
+* plots: `plots/analysis/chain_trajectory_scatter.<plot_format>`,
+  `plots/analysis/chain_trajectory_sweep.<plot_format>`,
+  `plots/analysis/elites_nn_distance.<plot_format>`, `plots/analysis/elites_showcase.<plot_format>`,
+  `plots/analysis/health_panel.<plot_format>` (trace only)
 * reports: `analysis/reports/report.json`, `analysis/reports/report.md`
 * summaries: `analysis/reports/summary.json`, `analysis/manifests/manifest.json`, `analysis/manifests/plot_manifest.json`, `analysis/manifests/table_manifest.json`
 
@@ -533,7 +533,7 @@ Subcommands:
 * `catalog logos` — render PWM logos for selected TFs or motif refs
 
 Note: `catalog logos` is idempotent for identical inputs. If matching logos already exist
-under `outputs/plots/logos/catalog/`, it reports the existing path instead of writing a new run.
+under `outputs/plots/logos/`, it reports the existing path instead of writing new files.
 
 Examples:
 

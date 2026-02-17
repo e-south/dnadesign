@@ -327,12 +327,20 @@ class DenseArrayOptimizer:
                     "name",
                     "upstream",
                     "downstream",
+                    "upstream_variant_id",
+                    "downstream_variant_id",
                     "spacer_length",
                     "upstream_pos",
                     "downstream_pos",
                 }
                 if unknown:
                     raise ValueError(f"Unknown promoter constraint keys: {sorted(unknown)}")
+                for id_key in ("upstream_variant_id", "downstream_variant_id"):
+                    id_value = pc.get(id_key)
+                    if id_value is None:
+                        continue
+                    if not isinstance(id_value, str) or not id_value.strip():
+                        raise ValueError(f"{id_key} must be a non-empty string when provided")
                 # Ensure motifs in library
                 clean: dict[str, object] = {}
                 for mkey in ("upstream", "downstream"):

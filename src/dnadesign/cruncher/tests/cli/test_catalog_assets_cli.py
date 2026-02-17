@@ -145,7 +145,7 @@ def test_catalog_logos_writes_pngs(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "Rendered PWM logos" in result.output
     assert list(out_dir.glob("*_logo.png"))
-    manifest = out_dir / "run" / "logo_manifest.json"
+    manifest = out_dir / "logo_manifest.json"
     assert manifest.exists()
 
     repeat = runner.invoke(

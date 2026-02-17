@@ -111,6 +111,8 @@ def _meta_arrow_type(name: str, pa):
                     pa.field("name", pa.string()),
                     pa.field("upstream", pa.string()),
                     pa.field("downstream", pa.string()),
+                    pa.field("upstream_variant_id", pa.string()),
+                    pa.field("downstream_variant_id", pa.string()),
                     pa.field("spacer_length", pa.list_(pa.int64())),
                     pa.field("upstream_pos", pa.list_(pa.int64())),
                     pa.field("downstream_pos", pa.list_(pa.int64())),
@@ -124,6 +126,43 @@ def _meta_arrow_type(name: str, pa):
             ]
         )
         return pa.struct([pa.field("promoter_constraints", promoter), pa.field("side_biases", side_biases)])
+    if name == "promoter_detail":
+        placements = pa.list_(
+            pa.struct(
+                [
+                    pa.field("name", pa.string()),
+                    pa.field("upstream_seq", pa.string()),
+                    pa.field("downstream_seq", pa.string()),
+                    pa.field("upstream_start", pa.int64()),
+                    pa.field("downstream_start", pa.int64()),
+                    pa.field("spacer_length", pa.int64()),
+                    pa.field(
+                        "variant_ids",
+                        pa.struct(
+                            [
+                                pa.field("up_id", pa.string()),
+                                pa.field("down_id", pa.string()),
+                            ]
+                        ),
+                    ),
+                ]
+            )
+        )
+        return pa.struct([pa.field("placements", placements)])
+    if name == "sequence_validation":
+        violations = pa.list_(
+            pa.struct(
+                [
+                    pa.field("constraint", pa.string()),
+                    pa.field("pattern", pa.string()),
+                    pa.field("strand", pa.string()),
+                    pa.field("position", pa.int64()),
+                    pa.field("matched_seq", pa.string()),
+                    pa.field("context_window", pa.string()),
+                ]
+            )
+        )
+        return pa.struct([pa.field("validation_passed", pa.bool_()), pa.field("violations", violations)])
     if name in int_fields:
         return pa.int64()
     if name in float_fields:

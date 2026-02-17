@@ -1,145 +1,81 @@
 ## Installation
 
+This document covers initial repository setup for local development and CLI usage. Read it when bootstrapping a new environment; detailed dependency maintenance guidance lives in `docs/dependencies.md`.
 
-## Contents
-- [Installation](#installation)
+### Contents
+This section lists the setup steps in the order new users should follow.
+
 - [Install uv](#install-uv)
-- [Clone the repo](#clone-the-repo)
-- [Local install](#local-install)
-- [Dev tools (tests + lint)](#dev-tools-tests-lint)
-- [Running dnadesign CLIs](#running-dnadesign-clis)
-- [System dependencies (pixi)](#system-dependencies-pixi)
+- [Clone the repository](#clone-the-repository)
+- [Sync the project environment](#sync-the-project-environment)
+- [Optional dev-tool setup](#optional-dev-tool-setup)
+- [Run CLI entrypoints](#run-cli-entrypoints)
+- [BU SCC links](#bu-scc-links)
+- [System dependencies note](#system-dependencies-note)
 
 ### Install uv
-
-macOS/Linux (for other OSs see the uv docs):
+This section installs the package manager used by this monorepo.
 
 ```bash
+# Install uv on macOS/Linux.
 curl -LsSf https://astral.sh/uv/install.sh | sh
-# ensure your uv bin dir is on PATH
 ```
 
-### Clone the repo
+### Clone the repository
+This section checks out the project source locally.
 
 ```bash
+# Clone the repository and enter the project directory.
 git clone https://github.com/e-south/dnadesign.git
 cd dnadesign
 ```
 
-### Local install
-
-This is the default way to start working with most pipelines. For BU SCC CUDA/GPU setup and batch operations, see [BU SCC quickstart](bu-scc/quickstart.md), [BU SCC install bootstrap](bu-scc/install.md), and [BU SCC batch + Notify runbook](bu-scc/batch-notify.md).
-
-1) Ensure Python 3.12 is available:
+### Sync the project environment
+This section creates or updates the project virtual environment from the committed lockfile.
 
 ```bash
+# Ensure Python 3.12 is available to uv.
 uv python install 3.12
-```
 
-2) Create/sync the environment from the committed lockfile:
-
-```bash
+# Create or sync the project environment from uv.lock.
 uv sync --locked
-```
 
-3) Sanity checks:
-
-```bash
+# Run a basic import sanity check.
 uv run python -c "import dnadesign, pandas, pyarrow; print('ok')"
-uv run usr ls || true
 ```
 
-### HPC (BU SCC)
-
-- [BU SCC quickstart](bu-scc/quickstart.md)
-- [BU SCC install bootstrap](bu-scc/install.md)
-- [BU SCC batch + Notify runbook](bu-scc/batch-notify.md)
-
-### Dev tools (tests + lint)
-
-Dev tooling is opt-in via a dependency group:
+### Optional dev-tool setup
+This section installs lint/test tooling used during development.
 
 ```bash
+# Install optional dev dependencies.
 uv sync --locked --group dev
+
+# Confirm linter and test runner are available.
 uv run ruff --version
 uv run pytest -q
 ```
 
-### Running dnadesign CLIs
-
-This repo defines console scripts that can be run via:
-
-#### Option A: no `.venv` activation
+### Run CLI entrypoints
+This section shows the standard non-activated workflow for project CLIs.
 
 ```bash
+# Show help for key repository CLIs.
 uv run usr --help
-uv run usr ls
-
-uv run opal --help
 uv run dense --help
-uv run infer --help
-uv run cluster --help
-uv run permuter --help
+uv run notify --help
+uv run cruncher --help
 uv run baserender --help
 ```
 
-#### Option B: traditional `.venv` activation
+### BU SCC links
+This section points to the canonical BU SCC setup docs.
 
-```bash
-source .venv/bin/activate
-usr --help
-usr ls
-deactivate
-```
+- **[BU SCC quickstart](bu-scc/quickstart.md)**
+- **[BU SCC install bootstrap](bu-scc/install.md)**
+- **[BU SCC batch plus Notify runbook](bu-scc/batch-notify.md)**
 
-### System dependencies (pixi)
+### System dependencies note
+This section keeps installation concise and defers pixi specifics to the canonical dependency doc.
 
-Some subpackages rely on non-Python tools (e.g., MEME Suite for Cruncher). These are managed separately via `pixi`, using the repo-level `pixi.toml`.
-
-Division of labor:
-
-- **uv** is the source of truth for Python packages and the project virtualenv.
-- **pixi** pins system binaries (e.g., MEME Suite) that are not Python packages.
-- For MEME-dependent **cruncher** workflows, **use `pixi run cruncher -- <subcommand> ...`** so
-  system tools are on `PATH` while `uv` keeps Python deps synced under the hood. (Pixi inserts
-  `--` before task args, so put global options like `-c` after the subcommand.)
-
-Install pixi (one-time, system-level):
-
-```bash
-curl -fsSL https://pixi.sh/install.sh | sh
-```
-
-Install the pinned system toolchain (recommended when using **cruncher** + MEME Suite):
-
-```bash
-pixi install
-```
-
-Optional: define a short runner in your shell (zsh doesn’t split multi-word variables):
-
-```bash
-cruncher() { pixi run cruncher -- "$@"; }
-# Note: place -c/--config after the subcommand when using pixi:
-# cruncher doctor -c path/to/config.yaml
-```
-
-Run MEME-dependent workflows via pixi so system tools are on `PATH` while `uv`
-keeps Python deps synced:
-
-```bash
-pixi run cruncher -- --help
-pixi run cruncher -- doctor -c src/dnadesign/cruncher/workspaces/demo_basics_two_tf/config.yaml
-```
-
-If you update `pixi.toml`, regenerate the lock:
-
-```bash
-pixi lock
-```
-
-See `docs/dependencies.md` for more detail and maintenance commands.
-
----
-
-@e-south
+System dependencies managed with pixi are documented in **[docs/dependencies.md](dependencies.md)**.

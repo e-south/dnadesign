@@ -25,7 +25,7 @@ def test_required_source_columns_densegen_includes_optional_present_columns() ->
             "sequence": "sequence",
             "annotations": "densegen__used_tfbs_detail",
             "id": "id",
-            "details": "details",
+            "overlay_text": "details",
         },
         policies={},
     )
@@ -58,3 +58,17 @@ def test_required_source_columns_missing_required_key_is_schema_error() -> None:
     )
     with pytest.raises(SchemaError, match="missing required adapter column key"):
         required_source_columns(cfg)
+
+
+def test_required_source_columns_densegen_accepts_overlay_text_optional_key() -> None:
+    cfg = AdapterCfg(
+        kind="densegen_tfbs",
+        columns={
+            "sequence": "sequence",
+            "annotations": "densegen__used_tfbs_detail",
+            "id": "id",
+            "overlay_text": "details",
+        },
+        policies={},
+    )
+    assert required_source_columns(cfg) == ["sequence", "densegen__used_tfbs_detail", "id", "details"]

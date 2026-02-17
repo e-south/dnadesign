@@ -52,7 +52,6 @@ def build_sinks(cfg: DenseGenConfig, cfg_path: Path) -> Iterable[SinkBase]:
             namespace=DEFAULT_NAMESPACE,
             chunk_size=int(usr_cfg.chunk_size),
             health_event_interval_seconds=float(usr_cfg.health_event_interval_seconds),
-            allow_overwrite=bool(usr_cfg.allow_overwrite),
             default_bio_type=default_bio,
             default_alphabet=default_alpha,
             npz_fields=list(usr_cfg.npz_fields),

@@ -15,7 +15,7 @@ from __future__ import annotations
 import io
 import logging
 
-from dnadesign.densegen.src.adapters.sources.stage_a import stage_a_progress
+from dnadesign.densegen.src.core.stage_a import stage_a_progress
 from dnadesign.densegen.src.utils import logging_utils
 
 

@@ -12,7 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
@@ -27,7 +27,7 @@ from .base import (
     resolve_outputs_scoped_path,
     resolve_run_root,
 )
-from .generation import GenerationConfig
+from .generation import GenerationConfig, expand_plan_templates, normalize_motif_sets
 from .inputs import InputConfig
 from .logging import LoggingConfig
 from .output import OutputConfig
@@ -42,6 +42,7 @@ class DenseGenConfig(BaseModel):
     schema_version: str
     run: RunConfig
     inputs: List[InputConfig]
+    motif_sets: Dict[str, Dict[str, str]] = Field(default_factory=dict)
     output: OutputConfig
     generation: GenerationConfig
     solver: SolverConfig
@@ -67,6 +68,39 @@ class DenseGenConfig(BaseModel):
         names = [i.name for i in self.inputs]
         if len(set(names)) != len(names):
             raise ValueError("Input names must be unique")
+        return self
+
+    @model_validator(mode="after")
+    def _normalize_motif_sets(self):
+        self.motif_sets = normalize_motif_sets(self.motif_sets)
+        return self
+
+    @model_validator(mode="after")
+    def _expand_plan_templates(self):
+        if not self.generation.plan_templates:
+            return self
+        self.generation.plan = expand_plan_templates(
+            plan_templates=list(self.generation.plan_templates),
+            motif_sets=dict(self.motif_sets or {}),
+            sequence_length=int(self.generation.sequence_length),
+            max_expanded_plans=int(self.generation.plan_template_max_expanded_plans),
+            max_total_quota=int(self.generation.plan_template_max_total_quota),
+        )
+        return self
+
+    @model_validator(mode="after")
+    def _sequence_constraints_motif_sets(self):
+        constraints = self.generation.sequence_constraints
+        if constraints is None:
+            return self
+        known_sets = set(self.motif_sets)
+        for rule in list(constraints.forbid_kmers or []):
+            missing = [name for name in list(rule.patterns_from_motif_sets or []) if name not in known_sets]
+            if missing:
+                preview = ", ".join(missing[:10])
+                raise ValueError(
+                    f"generation.sequence_constraints.forbid_kmers references unknown motif_sets: {preview}."
+                )
         return self
 
     @model_validator(mode="after")
@@ -193,10 +227,24 @@ def _reject_removed_solver_options(raw: object) -> None:
         raise ConfigError("solver.allow_unknown_options has been removed.")
 
 
+def _reject_removed_postprocess_options(raw: object) -> None:
+    if not isinstance(raw, dict):
+        return
+    densegen = raw.get("densegen")
+    if not isinstance(densegen, dict):
+        return
+    postprocess = densegen.get("postprocess")
+    if not isinstance(postprocess, dict):
+        return
+    if "validate_final_sequence" in postprocess:
+        raise ConfigError("postprocess.validate_final_sequence has been removed. Use generation.sequence_constraints.")
+
+
 def load_config(path: Path | str) -> LoadedConfig:
     cfg_path = Path(path).resolve()
     raw = yaml.load(cfg_path.read_text(), Loader=_StrictLoader)
     _reject_removed_solver_options(raw)
+    _reject_removed_postprocess_options(raw)
     try:
         root = RootConfig.model_validate(raw)
     except ValidationError as e:

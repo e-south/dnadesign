@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from .src.api import (
     cruncher_showcase_style_overrides,
     load_record_from_parquet,
+    load_records_from_parquet,
     render,
     render_parquet_record_figure,
     render_record_figure,
@@ -44,6 +45,7 @@ __all__ = [
     "SchemaError",
     "ContractError",
     "LayoutError",
+    "load_records_from_parquet",
     "load_record_from_parquet",
     "render_record_figure",
     "render_record_grid_figure",

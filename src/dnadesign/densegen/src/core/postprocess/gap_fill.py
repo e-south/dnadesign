@@ -16,6 +16,7 @@ import math
 import random
 
 from ...utils.sequence_utils import gc_fraction
+from ..sequence_constraints.sampler import ConstrainedSequenceError, generate_constrained_sequence
 
 
 def generate_pad(
@@ -29,6 +30,9 @@ def generate_pad(
     gc_tolerance: float = 0.10,
     gc_min_pad_length: int = 0,
     max_tries: int = 2000,
+    forbid_kmers: list[str] | None = None,
+    left_context: str = "",
+    right_context: str = "",
     rng: random.Random | None = None,
 ) -> tuple[str, dict]:
     """
@@ -66,8 +70,27 @@ def generate_pad(
         }
 
     if gc_mode == "off":
-        bases = [rng.choice("ACGT") for _ in range(length)]
-        seq = "".join(bases)
+        if forbid_kmers:
+            try:
+                seq = generate_constrained_sequence(
+                    length=int(length),
+                    gc_min=0.0,
+                    gc_max=1.0,
+                    forbid_kmers=list(forbid_kmers),
+                    left_context=str(left_context or ""),
+                    right_context=str(right_context or ""),
+                    rng=rng,
+                    max_search_nodes=int(max_tries),
+                )
+            except ConstrainedSequenceError as exc:
+                raise ValueError(
+                    "Pad constraints are infeasible: "
+                    f"length={int(length)} gc_mode=off forbidden_kmers={len(list(forbid_kmers or []))} "
+                    f"left_context={left_context!r} right_context={right_context!r}"
+                ) from exc
+        else:
+            bases = [rng.choice("ACGT") for _ in range(length)]
+            seq = "".join(bases)
         return seq, {
             "attempts": 1,
             "gc_actual": gc_fraction(seq),
@@ -116,10 +139,30 @@ def generate_pad(
         final_min, final_max = 0.0, 1.0
         lo, hi = 0, length
 
-    gc_count = rng.randint(lo, hi) if lo <= hi else 0
-    bases = [rng.choice("GC") for _ in range(gc_count)] + [rng.choice("AT") for _ in range(length - gc_count)]
-    rng.shuffle(bases)
-    seq = "".join(bases)
+    if forbid_kmers:
+        try:
+            seq = generate_constrained_sequence(
+                length=int(length),
+                gc_min=float(final_min),
+                gc_max=float(final_max),
+                forbid_kmers=list(forbid_kmers),
+                left_context=str(left_context or ""),
+                right_context=str(right_context or ""),
+                rng=rng,
+                max_search_nodes=int(max_tries),
+            )
+        except ConstrainedSequenceError as exc:
+            raise ValueError(
+                "Pad constraints are infeasible: "
+                f"length={int(length)} gc_min={float(final_min):.4f} gc_max={float(final_max):.4f} "
+                f"forbidden_kmers={len(list(forbid_kmers or []))} "
+                f"left_context={left_context!r} right_context={right_context!r}"
+            ) from exc
+    else:
+        gc_count = rng.randint(lo, hi) if lo <= hi else 0
+        bases = [rng.choice("GC") for _ in range(gc_count)] + [rng.choice("AT") for _ in range(length - gc_count)]
+        rng.shuffle(bases)
+        seq = "".join(bases)
     return seq, {
         "attempts": 1,
         "gc_actual": gc_fraction(seq),

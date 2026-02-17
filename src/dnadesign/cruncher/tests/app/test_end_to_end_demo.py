@@ -178,7 +178,7 @@ def test_end_to_end_sites_pipeline(tmp_path: Path) -> None:
     assert result.exit_code == 0
     elites_df = pd.read_parquet(elites_path(sample_dir), engine="fastparquet")
     assert len(elites_df) <= config["cruncher"]["sample"]["elites"]["k"]
-    logo_root = logos_root(out_root(config_path, cfg.out_dir)) / "catalog"
+    logo_root = logos_root(out_root(config_path, cfg.out_dir))
     logos = list(logo_root.glob("**/*_logo.png"))
     assert any("lexA" in path.name for path in logos)
     assert any("cpxR" in path.name for path in logos)
@@ -306,7 +306,7 @@ def test_demo_campaign_pair_local_only_generates_plots(tmp_path: Path) -> None:
     analysis_dir = workspace / "outputs"
     assert analysis_dir.is_dir()
     assert manifest_path(analysis_dir).exists()
-    analysis_plots_dir = analysis_dir / "analysis" / "plots"
+    analysis_plots_dir = analysis_dir / "plots" / "analysis"
     plot_ext = str(cruncher_cfg["analysis"]["plot_format"])
     assert (analysis_plots_dir / f"chain_trajectory_scatter.{plot_ext}").exists()
     assert (analysis_plots_dir / f"chain_trajectory_sweep.{plot_ext}").exists()

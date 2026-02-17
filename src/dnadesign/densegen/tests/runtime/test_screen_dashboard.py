@@ -18,8 +18,9 @@ from types import SimpleNamespace
 import pytest
 from rich.console import Console
 
-from dnadesign.densegen.src.core.pipeline import orchestrator
 from dnadesign.densegen.src.core.pipeline.progress import _build_screen_dashboard, _ScreenDashboard
+from dnadesign.densegen.src.core.pipeline.progress_runtime import _build_shared_dashboard
+from dnadesign.densegen.src.core.pipeline.stage_b_runtime_types import _close_plan_dashboard
 from dnadesign.densegen.src.utils import logging_utils
 
 
@@ -83,7 +84,7 @@ def test_build_shared_dashboard_uses_logging_console(monkeypatch) -> None:
     console = Console(force_terminal=True, _environ={"TERM": "xterm-256color"})
     monkeypatch.setattr(logging_utils, "_LOGGING_CONSOLE", console, raising=False)
     cfg = SimpleNamespace(progress_style="screen", progress_refresh_seconds=1.0)
-    dashboard = orchestrator._build_shared_dashboard(cfg)
+    dashboard = _build_shared_dashboard(cfg)
     assert dashboard is not None
     assert dashboard._console is console
 
@@ -92,7 +93,7 @@ def test_build_shared_dashboard_uses_live_on_terminal_console(monkeypatch) -> No
     console = Console(force_terminal=True, _environ={"TERM": "xterm-256color"})
     monkeypatch.setattr(logging_utils, "_LOGGING_CONSOLE", console, raising=False)
     cfg = SimpleNamespace(progress_style="screen", progress_refresh_seconds=1.0)
-    dashboard = orchestrator._build_shared_dashboard(cfg)
+    dashboard = _build_shared_dashboard(cfg)
     assert dashboard is not None
     assert dashboard._append is False
     assert dashboard._live is not None
@@ -103,7 +104,7 @@ def test_build_shared_dashboard_rejects_dumb_terminal_console(monkeypatch) -> No
     monkeypatch.setattr(logging_utils, "_LOGGING_CONSOLE", console, raising=False)
     cfg = SimpleNamespace(progress_style="screen", progress_refresh_seconds=1.0)
     with pytest.raises(RuntimeError, match="TERM"):
-        orchestrator._build_shared_dashboard(cfg)
+        _build_shared_dashboard(cfg)
 
 
 def test_build_shared_dashboard_requires_terminal_console(monkeypatch) -> None:
@@ -111,7 +112,7 @@ def test_build_shared_dashboard_requires_terminal_console(monkeypatch) -> None:
     monkeypatch.setattr(logging_utils, "_LOGGING_CONSOLE", console, raising=False)
     cfg = SimpleNamespace(progress_style="screen", progress_refresh_seconds=1.0)
     with pytest.raises(RuntimeError, match="interactive terminal"):
-        orchestrator._build_shared_dashboard(cfg)
+        _build_shared_dashboard(cfg)
 
 
 class _CloseTracker:
@@ -124,14 +125,14 @@ class _CloseTracker:
 
 def test_close_plan_dashboard_skips_shared_dashboard() -> None:
     shared = _CloseTracker()
-    orchestrator._close_plan_dashboard(dashboard=shared, shared_dashboard=shared)
+    _close_plan_dashboard(dashboard=shared, shared_dashboard=shared)
     assert shared.closed == 0
 
 
 def test_close_plan_dashboard_closes_non_shared_dashboard() -> None:
     shared = _CloseTracker()
     local = _CloseTracker()
-    orchestrator._close_plan_dashboard(dashboard=local, shared_dashboard=shared)
+    _close_plan_dashboard(dashboard=local, shared_dashboard=shared)
     assert local.closed == 1
 
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -33,7 +34,7 @@ from dnadesign.cruncher.app.motif_artifacts import (
     build_manifest,
     load_motif_payload,
 )
-from dnadesign.cruncher.artifacts.layout import RUN_META_DIR, logos_dir_for_run, logos_root, out_root
+from dnadesign.cruncher.artifacts.layout import logos_root, out_root
 from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
     parse_config_and_value,
@@ -41,7 +42,6 @@ from dnadesign.cruncher.cli.config_resolver import (
 )
 from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.core.labels import build_run_name
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 from dnadesign.cruncher.store.catalog_store import CatalogMotifStore
 from dnadesign.cruncher.store.motif_store import MotifRef
@@ -166,7 +166,7 @@ def _remove_existing_artifacts(out_dir: Path, *, tf_names: Sequence[str]) -> int
 
 
 def _logo_manifest_path(out_dir: Path) -> Path:
-    return out_dir / RUN_META_DIR / LOGO_MANIFEST_NAME
+    return out_dir / LOGO_MANIFEST_NAME
 
 
 def _load_logo_manifest(out_dir: Path) -> dict | None:
@@ -271,16 +271,24 @@ def _build_logo_signature(
     return signature, signature_payload
 
 
-def _find_existing_logo_run(root_dir: Path, signature: str) -> Path | None:
-    if not root_dir.exists():
-        return None
-    for child in sorted(root_dir.iterdir()):
-        if not child.is_dir():
-            continue
-        manifest = _load_logo_manifest(child)
-        if manifest and manifest.get("signature") == signature:
-            return child
+def _matching_logo_dir(out_dir: Path, signature: str) -> Path | None:
+    manifest = _load_logo_manifest(out_dir)
+    if manifest and manifest.get("signature") == signature:
+        return out_dir
     return None
+
+
+def _clear_logo_outputs(out_dir: Path) -> None:
+    if not out_dir.exists():
+        return
+    for png in out_dir.glob("*_logo.png"):
+        png.unlink()
+    manifest_file = _logo_manifest_path(out_dir)
+    if manifest_file.exists():
+        manifest_file.unlink()
+    legacy_manifest_dir = out_dir / "run"
+    if legacy_manifest_dir.exists():
+        shutil.rmtree(legacy_manifest_dir)
 
 
 def _resolve_set_tfs(cfg, set_index: int | None) -> list[str]:
@@ -1371,7 +1379,7 @@ def logos(
     out_dir: Path | None = typer.Option(
         None,
         "--out-dir",
-        help="Directory to write logo PNGs (defaults to <out_dir>/logos/catalog/<run>).",
+        help="Directory to write logo PNGs (defaults to <out_dir>/plots/logos).",
     ),
     bits_mode: str | None = typer.Option(
         None,
@@ -1424,33 +1432,13 @@ def logos(
             bits_mode=resolved_bits_mode,
             dpi=resolved_dpi,
         )
-        out_base = out_dir
-        if out_base is None:
-            existing = _find_existing_logo_run(
-                logos_root(out_root(config_path, cfg.out_dir)) / "catalog",
-                signature,
-            )
-            if existing is not None:
-                console.print(f"Logos already rendered at {render_path(existing, base=config_path.parent)}")
-                return
-            name_set_index = set_index if len(cfg.regulator_sets) > 1 else None
-            run_name = build_run_name(
-                "catalog",
-                [t.tf_name for t in targets],
-                set_index=name_set_index,
-                include_stage=False,
-            )
-            out_base = logos_dir_for_run(
-                out_root(config_path, cfg.out_dir),
-                "catalog",
-                run_name,
-            )
-        else:
-            manifest = _load_logo_manifest(out_base)
-            if manifest and manifest.get("signature") == signature:
-                console.print(f"Logos already rendered at {render_path(out_base, base=config_path.parent)}")
-                return
+        out_base = out_dir or logos_root(out_root(config_path, cfg.out_dir))
+        existing = _matching_logo_dir(out_base, signature)
+        if existing is not None:
+            console.print(f"Logos already rendered at {render_path(existing, base=config_path.parent)}")
+            return
         out_base.mkdir(parents=True, exist_ok=True)
+        _clear_logo_outputs(out_base)
         from dnadesign.cruncher.viz.pwm import plot_pwm
 
         table = Table(title="Rendered PWM logos", header_style="bold")
