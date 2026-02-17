@@ -50,12 +50,12 @@ class DataBlock:
 
 @dataclass
 class SelectionBlock:
-    selection: PluginRef  # params must contain top_k, tie_handling; optional objective_mode override
+    selection: PluginRef  # params must contain top_k + score_ref; objective/tie controls are explicit
 
 
 @dataclass
-class ObjectiveBlock:
-    objective: PluginRef
+class ObjectivesBlock:
+    objectives: List[PluginRef]
 
 
 @dataclass
@@ -85,11 +85,6 @@ class SafetyBlock:
 
 
 @dataclass
-class MetadataBlock:
-    notes: str = ""
-
-
-@dataclass
 class CampaignBlock:
     name: str
     slug: str
@@ -102,10 +97,9 @@ class RootConfig:
     data: DataBlock
     model: PluginRef
     selection: SelectionBlock
-    objective: ObjectiveBlock
+    objectives: ObjectivesBlock
     training: TrainingBlock
     ingest: IngestBlock
     scoring: ScoringBlock
     safety: SafetyBlock
-    metadata: MetadataBlock
     plot_config: Optional[str] = None

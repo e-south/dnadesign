@@ -1,5 +1,3 @@
-# ABOUTME: Validates run_round wiring for round_ctx and ledger outputs.
-# ABOUTME: Exercises runtime with label history and SFXI objective metadata.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -21,8 +19,7 @@ from dnadesign.opal.src.config.types import (
     DataBlock,
     IngestBlock,
     LocationLocal,
-    MetadataBlock,
-    ObjectiveBlock,
+    ObjectivesBlock,
     PluginRef,
     RootConfig,
     SafetyBlock,
@@ -136,12 +133,24 @@ def test_run_round_writes_round_ctx_and_ledger(tmp_path):
             y_expected_length=8,
         ),
         model=PluginRef(name="random_forest", params={"n_estimators": 5, "random_state": 0}),
-        selection=SelectionBlock(selection=PluginRef(name="top_n", params={"top_k": 1})),
-        objective=ObjectiveBlock(
-            objective=PluginRef(
-                name="sfxi_v1",
-                params={"scaling": {"min_n": 1}},
+        selection=SelectionBlock(
+            selection=PluginRef(
+                name="top_n",
+                params={
+                    "top_k": 1,
+                    "score_ref": "sfxi_v1/sfxi",
+                    "objective_mode": "maximize",
+                    "tie_handling": "competition_rank",
+                },
             )
+        ),
+        objectives=ObjectivesBlock(
+            objectives=[
+                PluginRef(
+                    name="sfxi_v1",
+                    params={"scaling": {"min_n": 1}},
+                )
+            ]
         ),
         training=TrainingBlock(policy={"cumulative_training": True}),
         ingest=IngestBlock(duplicate_policy="error"),
@@ -153,7 +162,6 @@ def test_run_round_writes_round_ctx_and_ledger(tmp_path):
             write_back_requires_columns_present=False,
             accept_x_mismatch=False,
         ),
-        metadata=MetadataBlock(notes=""),
     )
 
     # state.json must exist for run_round
@@ -276,12 +284,24 @@ def test_run_round_commits_stage_buffered_predict_summary(tmp_path):
             y_expected_length=8,
         ),
         model=PluginRef(name="test_stage_buffer_model", params={}),
-        selection=SelectionBlock(selection=PluginRef(name="top_n", params={"top_k": 1})),
-        objective=ObjectiveBlock(
-            objective=PluginRef(
-                name="sfxi_v1",
-                params={"scaling": {"min_n": 1}},
+        selection=SelectionBlock(
+            selection=PluginRef(
+                name="top_n",
+                params={
+                    "top_k": 1,
+                    "score_ref": "sfxi_v1/sfxi",
+                    "objective_mode": "maximize",
+                    "tie_handling": "competition_rank",
+                },
             )
+        ),
+        objectives=ObjectivesBlock(
+            objectives=[
+                PluginRef(
+                    name="sfxi_v1",
+                    params={"scaling": {"min_n": 1}},
+                )
+            ]
         ),
         training=TrainingBlock(policy={"cumulative_training": True}),
         ingest=IngestBlock(duplicate_policy="error"),
@@ -293,7 +313,6 @@ def test_run_round_commits_stage_buffered_predict_summary(tmp_path):
             write_back_requires_columns_present=False,
             accept_x_mismatch=False,
         ),
-        metadata=MetadataBlock(notes=""),
     )
 
     st = CampaignState(

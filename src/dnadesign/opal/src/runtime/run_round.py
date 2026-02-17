@@ -85,7 +85,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
             cfg.data.transforms_x.name,
             cfg.data.transforms_y.name,
             cfg.model.name,
-            cfg.objective.objective.name,
+            [o.name for o in cfg.objectives.objectives],
             cfg.selection.selection.name,
             (yops_names or "(none)"),
         ),
@@ -116,10 +116,7 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
                     "params": cfg.data.transforms_y.params,
                 },
                 "model": {"name": cfg.model.name, "params": cfg.model.params},
-                "objective": {
-                    "name": cfg.objective.objective.name,
-                    "params": cfg.objective.objective.params,
-                },
+                "objectives": [{"name": o.name, "params": o.params} for o in cfg.objectives.objectives],
                 "selection": {
                     "name": cfg.selection.selection.name,
                     "params": cfg.selection.selection.params,
@@ -186,17 +183,45 @@ def run_round(store: RecordsStore, df: pd.DataFrame, req: RunRoundRequest) -> Ru
     )
 
     metrics_by_name: Dict[str, List[float]] = {"score": score.y_obj_scalar.astype(float).tolist()}
+    for ref, values in (score.score_channels or {}).items():
+        arr = np.asarray(values, dtype=float).ravel()
+        if arr.size == len(xbundle.id_order_pool):
+            metrics_by_name[f"score::{ref}"] = arr.tolist()
+    for ref, values in (score.uncertainty_channels or {}).items():
+        arr = np.asarray(values, dtype=float).ravel()
+        if arr.size == len(xbundle.id_order_pool):
+            metrics_by_name[f"uncertainty::{ref}"] = arr.tolist()
+    if score.uq_scalar is not None:
+        arr = np.asarray(score.uq_scalar, dtype=float).ravel()
+        if arr.size == len(xbundle.id_order_pool):
+            metrics_by_name["uncertainty_selected"] = arr.tolist()
     for key in ("logic_fidelity", "effect_scaled", "effect_raw"):
         if isinstance(score.diag, dict) and key in score.diag:
             arr = np.asarray(score.diag[key], dtype=float).ravel()
             if arr.size == len(xbundle.id_order_pool):
                 metrics_by_name[key] = arr.tolist()
 
+    objective_defs = []
+    for d in score.objective_defs:
+        row = {
+            "name": d.get("name"),
+            "score_channels": d.get("score_channels", []),
+            "uncertainty_channels": d.get("uncertainty_channels", []),
+        }
+        params = d.get("params")
+        if isinstance(params, dict) and params:
+            row["params"] = params
+        objective_defs.append(row)
+
     objective_meta = {
         "name": score.obj_name,
-        "params": score.obj_params,
         "mode": score.mode,
+        "score_ref": score.score_ref,
+        "uncertainty_ref": score.uncertainty_ref,
+        "objectives": objective_defs,
     }
+    if isinstance(score.obj_params, dict) and score.obj_params:
+        objective_meta["params"] = score.obj_params
     _ = write_prediction_label_hist(
         store=store,
         df=df,

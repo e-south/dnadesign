@@ -35,7 +35,7 @@ from ._param_utils import (
     meta=PlotMeta(
         summary="Scatter objective score vs rank; optional hue/size by diagnostics.",
         params={
-            "score_field": "Ledger field for y-axis (default pred__y_obj_scalar).",
+            "score_field": "Ledger field for y-axis (default pred__score_selected).",
             "rank_mode": "sequential|competition (default sequential).",
             "hue_field": "Optional obj__/pred__/sel__ field for color.",
             "size_by": "Optional obj__/pred__/sel__ field for size.",
@@ -44,7 +44,7 @@ from ._param_utils import (
         requires=[
             "as_of_round",
             "run_id",
-            "pred__y_obj_scalar",
+            "pred__score_selected",
             "sel__rank_competition",
             "sel__is_selected",
         ],
@@ -57,8 +57,8 @@ def render(context, params: dict) -> None:
 
     outputs_dir = resolve_outputs_dir(context)
 
-    score_field = get_str(params, ["score_field"], "pred__y_obj_scalar")
-    score_field = normalize_metric_field(score_field) or "pred__y_obj_scalar"
+    score_field = get_str(params, ["score_field"], "pred__score_selected")
+    score_field = normalize_metric_field(score_field) or "pred__score_selected"
     rank_mode = (get_str(params, ["rank_mode"], "sequential") or "sequential").lower()
     # "sequential" | "competition"
     alpha = get_float(params, ["alpha"], 0.45)

@@ -1,5 +1,3 @@
-# ABOUTME: Resolves round selectors from state and ledger metadata.
-# ABOUTME: Validates round selection inputs for OPAL commands.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

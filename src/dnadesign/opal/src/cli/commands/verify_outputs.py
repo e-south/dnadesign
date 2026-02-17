@@ -27,6 +27,7 @@ from ...reporting.verify_outputs import (
 )
 from ...storage.ledger import LedgerReader
 from ...storage.workspace import CampaignWorkspace
+from ..guidance_hints import maybe_print_hints
 from ..registry import cli_command
 from ._common import (
     internal_error,
@@ -52,6 +53,7 @@ def verify_outputs(
         help="Optional selection_top_k.csv path (defaults to run artifacts).",
     ),
     eps: float = typer.Option(1e-6, "--eps", help="Mismatch tolerance for numeric comparisons."),
+    no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in human output."),
     json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)."),
 ) -> None:
     try:
@@ -79,7 +81,7 @@ def verify_outputs(
 
         selection_df = read_selection_table(Path(sel_path))
         ledger_df = reader.read_predictions(
-            columns=["id", "pred__y_obj_scalar"],
+            columns=["id", "pred__score_selected"],
             round_selector=as_of_round,
             run_id=run_id,
         )
@@ -114,6 +116,12 @@ def verify_outputs(
             if summary["mismatch_count"] > 0:
                 print_stdout("- top mismatches:")
                 print_stdout(mismatches.head(10).to_string(index=False))
+            maybe_print_hints(
+                command_name="verify-outputs",
+                cfg_path=cfg_path,
+                no_hints=no_hints,
+                json_output=json,
+            )
     except OpalError as e:
         opal_error("verify-outputs", e)
         raise typer.Exit(code=e.exit_code)

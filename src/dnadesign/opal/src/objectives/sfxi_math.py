@@ -5,7 +5,7 @@ src/dnadesign/opal/src/objectives/sfxi_math.py
 
 Pure SFXI math helpers shared by objectives and diagnostics.
 
-Module Author(s): Eric J. South
+Module Author(s): Eric J. South, Elm Markert
 --------------------------------------------------------------------------------
 """
 

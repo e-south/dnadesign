@@ -35,7 +35,7 @@ from .sfxi_diag_data import labels_asof_round, resolve_run_id, resolve_single_ro
             "hue": "Metric for color (default effect_scaled).",
             "batch_size": "Batch size for distance computation (default 2048).",
         },
-        requires=["pred__y_hat_model", "pred__y_obj_scalar"],
+        requires=["pred__y_hat_model", "pred__score_selected"],
         notes=["Uses labels-as-of round for support distances."],
     ),
 )
@@ -50,7 +50,7 @@ def render(context, params: dict) -> None:
     batch_size = get_int(params, ["batch_size"], 2048)
     reject_params(params, ["sample_n", "sample", "n", "seed"], ctx="sfxi_support_diagnostics")
 
-    need = {"id", "pred__y_hat_model", "pred__y_obj_scalar"}
+    need = {"id", "pred__y_hat_model", "pred__score_selected"}
     if y_axis:
         need.add(y_axis)
     if hue:

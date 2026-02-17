@@ -40,7 +40,7 @@ from ._param_utils import event_columns_for, get_float, get_str, normalize_metri
             "as_of_round",
             "run_id",
             "pred__y_hat_model",
-            "pred__y_obj_scalar",
+            "pred__score_selected",
             "obj__diag__setpoint",
         ],
         notes=["Reads outputs/ledger/predictions + outputs/ledger/runs.parquet (setpoint join)."],
@@ -128,7 +128,7 @@ def render(context, params: dict) -> None:
         "id",
         "pred__y_hat_model",
         "sel__is_selected",
-        "pred__y_obj_scalar",
+        "pred__score_selected",
     }
     # If hue/size ask for objective/pred/sel columns, load them from predictions
     need |= event_columns_for(hue_field, size_by)
@@ -253,11 +253,11 @@ def render(context, params: dict) -> None:
         y_field_label = "Objective effect (scaled)"
         y_title_short = "Effect (scaled)"
         tidy_col = "obj__effect_scaled"
-    elif _ya in ("score", "pred__y_obj_scalar"):
-        y_plot = df["pred__y_obj_scalar"].astype(float).to_numpy()
+    elif _ya in ("score", "pred__score_selected"):
+        y_plot = df["pred__score_selected"].astype(float).to_numpy()
         y_field_label = "Objective score"
         y_title_short = "Score"
-        tidy_col = "pred__y_obj_scalar"
+        tidy_col = "pred__score_selected"
     else:
         raise ValueError(f"Unknown y_axis: {y_axis!r}")
 

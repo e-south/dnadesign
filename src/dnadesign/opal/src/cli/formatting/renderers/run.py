@@ -18,12 +18,22 @@ from ...tui import kv_table, tui_enabled
 from ..core import _b, _dim, kv_block
 
 
+def _required_summary_field(summary: dict, key: str) -> str:
+    raw = summary.get(key)
+    if raw is None:
+        raise ValueError(f"run summary missing required field: {key}")
+    val = str(raw).strip()
+    if not val:
+        raise ValueError(f"run summary field must be non-empty: {key}")
+    return val
+
+
 def render_run_summary_human(summary: dict) -> str:
     rid = summary.get("run_id", "")
     requested = summary.get("top_k_requested")
     effective = summary.get("top_k_effective")
-    tie_hint = summary.get("tie_handling") or "competition_rank"
-    obj_mode = summary.get("objective_mode") or "maximize"
+    tie_hint = _required_summary_field(summary, "tie_handling")
+    obj_mode = _required_summary_field(summary, "objective_mode")
     sel_line = (
         "selection: "
         f"objective={obj_mode} tie={tie_hint} | "

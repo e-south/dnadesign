@@ -1,5 +1,3 @@
-# ABOUTME: Exercises ledger compaction for run_meta datasets.
-# ABOUTME: Ensures duplicate run_id rows are deduplicated.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -68,7 +66,7 @@ def test_ledger_compact_runs_dedupes(tmp_path: Path) -> None:
             "-c",
             str(campaign),
             "--runs",
-            "--yes",
+            "--apply",
         ],
     )
     assert res.exit_code == 0, res.stdout

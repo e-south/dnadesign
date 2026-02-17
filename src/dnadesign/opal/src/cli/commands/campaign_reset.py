@@ -31,38 +31,16 @@ from ._common import (
     load_cli_config,
     opal_error,
     print_config_context,
-    prompt_confirm,
     resolve_config_path,
     store_from_cfg,
 )
 from .prune_source import _classify_columns
 
 
-def _resolve_default_demo_config_path() -> Path:
-    demo_paths = (
-        Path("src/dnadesign/opal/campaigns/demo/configs/campaign.yaml"),
-        Path("src/dnadesign/opal/campaigns/demo/campaign.yaml"),
-    )
-    for base in (Path.cwd(), *Path.cwd().parents):
-        for rel in demo_paths:
-            cand = (base / rel).resolve()
-            if cand.exists():
-                return cand
-    for base in Path(__file__).resolve().parents:
-        for rel in demo_paths:
-            cand = (base / rel).resolve()
-            if cand.exists():
-                return cand
-    raise OpalError(
-        "Default demo config not found. Pass --config to specify a campaign.",
-        ExitCodes.BAD_ARGS,
-    )
-
-
 def _prompt_slug_confirm(slug: str) -> bool:
     if not sys.stdin.isatty():
         raise OpalError(
-            "No TTY available. Re-run with --yes to confirm campaign-reset.",
+            "No TTY available. Re-run with --apply to confirm campaign-reset.",
             ExitCodes.BAD_ARGS,
         )
     resp = input(f"Type the campaign slug '{slug}' to confirm: ").strip()
@@ -76,12 +54,7 @@ def _prompt_slug_confirm(slug: str) -> bool:
 )
 def cmd_campaign_reset(
     config: Optional[Path] = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG", help="Path to campaign.yaml"),
-    allow_non_demo: bool = typer.Option(
-        False,
-        "--allow-non-demo",
-        help="Allow resetting a non-demo campaign (dangerous).",
-    ),
-    yes: bool = typer.Option(False, "--yes", "-y", help="Skip interactive confirmation."),
+    apply: bool = typer.Option(False, "--apply", help="Apply reset without interactive confirmation."),
     backup: bool = typer.Option(
         False,
         "--backup/--no-backup",
@@ -90,17 +63,11 @@ def cmd_campaign_reset(
     json: bool = typer.Option(False, "--json/--human", help="Output format."),
 ) -> None:
     try:
-        cfg_path = resolve_config_path(config) if config is not None else _resolve_default_demo_config_path()
+        cfg_path = resolve_config_path(config)
         cfg = load_cli_config(cfg_path)
         store = store_from_cfg(cfg)
         if not json:
             print_config_context(cfg_path, cfg=cfg, records_path=store.records_path)
-
-        if cfg.campaign.slug != "demo" and not allow_non_demo:
-            raise OpalError(
-                "campaign-reset is restricted to the demo campaign unless --allow-non-demo is set.",
-                ExitCodes.BAD_ARGS,
-            )
 
         rec_path = store.records_path
         if not rec_path.exists():
@@ -140,7 +107,7 @@ def cmd_campaign_reset(
 
         if json:
             json_out({"preview": preview, "to_delete": to_delete})
-            if not yes:
+            if not apply:
                 raise typer.Exit(code=ExitCodes.OK)
         else:
             head = kv_block("[Preview] campaign-reset", preview)
@@ -155,14 +122,8 @@ def cmd_campaign_reset(
             )
             print_stdout("\n".join([head, "", del_list, warning]))
 
-        if not yes and not json:
-            if cfg.campaign.slug == "demo":
-                confirmed = prompt_confirm(
-                    "Proceed with campaign-reset? This will remove outputs/ and state.json. (y/N): ",
-                    non_interactive_hint="No TTY available. Re-run with --yes to confirm campaign-reset.",
-                )
-            else:
-                confirmed = _prompt_slug_confirm(cfg.campaign.slug)
+        if not apply and not json:
+            confirmed = _prompt_slug_confirm(cfg.campaign.slug)
             if not confirmed:
                 print_stdout("Aborted.")
                 raise typer.Exit(code=ExitCodes.BAD_ARGS)

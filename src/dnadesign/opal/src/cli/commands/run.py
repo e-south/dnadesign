@@ -14,11 +14,16 @@ from typing import Optional
 
 import typer
 
+from ...core.selection_contracts import (
+    resolve_selection_objective_mode,
+    resolve_selection_tie_handling,
+)
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...runtime.run_round import RunRoundRequest, run_round
 from ...storage.locks import CampaignLock
 from ...storage.state import CampaignState
 from ..formatting import render_run_summary_human
+from ..guidance_hints import maybe_print_hints
 from ..registry import cli_command
 from ..tui import progress_factory as tui_progress_factory
 from ._common import (
@@ -31,6 +36,12 @@ from ._common import (
     resolve_config_path,
     store_from_cfg,
 )
+
+
+def _resolve_summary_selection_mode(sel_params: dict[str, object]) -> tuple[str, str]:
+    tie_handling = resolve_selection_tie_handling(sel_params, error_cls=OpalError)
+    objective_mode = resolve_selection_objective_mode(sel_params, error_cls=OpalError)
+    return tie_handling, objective_mode
 
 
 @cli_command("run", help="Train on labels ≤ round, score, select, append events.")
@@ -51,6 +62,7 @@ def cmd_run(
     ),
     score_batch_size: Optional[int] = typer.Option(None, "--score-batch-size", help="Override batch size."),
     verbose: bool = typer.Option(True, "--verbose/--quiet"),
+    no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in human output."),
     json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)"),
 ) -> None:
     try:
@@ -66,9 +78,9 @@ def cmd_run(
         if st_path.exists():
             try:
                 st = CampaignState.load(st_path)
-                exists = any(int(r.round_index) == int(round) for r in st.rounds)
-            except Exception:
-                exists = False
+            except Exception as e:
+                raise OpalError(f"Failed to load state.json at {st_path}: {e}", ExitCodes.BAD_ARGS) from e
+            exists = any(int(r.round_index) == int(round) for r in st.rounds)
             if exists and not resume:
                 if not prompt_confirm(
                     f"[guard] Round r={int(round)} already recorded in {st_path.name}. "
@@ -92,8 +104,7 @@ def cmd_run(
         with CampaignLock(Path(cfg.campaign.workdir)):
             res = run_round(store, df, req)
         sel_params = dict(cfg.selection.selection.params or {})
-        tie_handling = str(sel_params.get("tie_handling", "competition_rank"))
-        objective_mode = str((sel_params.get("objective_mode") or "maximize")).strip().lower()
+        tie_handling, objective_mode = _resolve_summary_selection_mode(sel_params)
         summary = {
             "ok": res.ok,
             "run_id": res.run_id,
@@ -111,6 +122,13 @@ def cmd_run(
             json_out(summary)
         else:
             print_stdout(render_run_summary_human(summary))
+            maybe_print_hints(
+                command_name="run",
+                cfg_path=cfg_path,
+                no_hints=no_hints,
+                json_output=json,
+                labels_as_of=int(round),
+            )
     except OpalError as e:
         opal_error("run", e)
         raise typer.Exit(code=e.exit_code)

@@ -99,7 +99,7 @@ def test_cli_pressure_unknown_sequences_create_rows(tmp_path: Path) -> None:
             "0",
             "--csv",
             str(labels),
-            "--yes",
+            "--apply",
         ],
     )
     assert res.exit_code == 0, res.stdout
@@ -163,7 +163,7 @@ def test_cli_pressure_unknown_sequences_drop_skips_rows(tmp_path: Path) -> None:
             "0",
             "--csv",
             str(labels),
-            "--yes",
+            "--apply",
             "--unknown-sequences",
             "drop",
         ],
@@ -213,7 +213,7 @@ def test_cli_pressure_unknown_sequences_missing_x_auto_drop(tmp_path: Path) -> N
             "0",
             "--csv",
             str(labels),
-            "--yes",
+            "--apply",
         ],
     )
     assert res.exit_code == 0, res.stdout
@@ -263,7 +263,7 @@ def test_cli_pressure_sequence_exists_with_new_id_errors(tmp_path: Path) -> None
             "0",
             "--csv",
             str(labels),
-            "--yes",
+            "--apply",
         ],
     )
     assert res.exit_code != 0
@@ -317,7 +317,7 @@ def test_cli_pressure_missing_required_defaults_prompt(tmp_path: Path) -> None:
             "0",
             "--csv",
             str(labels),
-            "--yes",
+            "--apply",
             "--infer-missing-required",
         ],
     )
@@ -378,7 +378,7 @@ def test_cli_pressure_duplicate_sequences_require_ids(tmp_path: Path) -> None:
             "0",
             "--csv",
             str(labels),
-            "--yes",
+            "--apply",
         ],
     )
     assert res.exit_code != 0
@@ -424,7 +424,7 @@ def test_cli_pressure_if_exists_skip_keeps_history(tmp_path: Path) -> None:
             "0",
             "--csv",
             str(labels0),
-            "--yes",
+            "--apply",
         ],
     )
     assert res.exit_code == 0, res.stdout
@@ -444,7 +444,7 @@ def test_cli_pressure_if_exists_skip_keeps_history(tmp_path: Path) -> None:
             str(labels_dup),
             "--if-exists",
             "skip",
-            "--yes",
+            "--apply",
         ],
     )
     assert res.exit_code == 0, res.stdout

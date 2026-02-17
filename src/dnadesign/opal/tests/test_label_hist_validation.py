@@ -1,5 +1,3 @@
-# ABOUTME: Validates label_history schema parsing and strictness for OPAL records.
-# ABOUTME: Ensures label/pred entries meet required contracts for auditability.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -171,3 +169,67 @@ def test_append_predictions_coerces_objective_params(tmp_path):
     cell = out[label_hist_col].iloc[0][0]
     params = cell["objective"]["params"]
     assert isinstance(params["setpoint_vector"], list)
+
+
+def test_append_predictions_rejects_malformed_existing_label_history(tmp_path):
+    store = _store(tmp_path)
+    label_hist_col = store.label_hist_col()
+    df = pd.DataFrame(
+        {
+            "id": ["a"],
+            "bio_type": ["dna"],
+            "sequence": ["AAA"],
+            "alphabet": ["dna_4"],
+            label_hist_col: [
+                [
+                    {
+                        "kind": "label",
+                        "y_obs": {"value": [0.1], "dtype": "vector"},
+                    }
+                ]
+            ],
+        }
+    )
+
+    with pytest.raises(OpalError, match="Malformed label history"):
+        store.append_predictions_from_arrays(
+            df,
+            ids=["a"],
+            y_hat=np.array([[0.1, 0.2]]),
+            as_of_round=0,
+            run_id="run-1",
+            objective={
+                "name": "sfxi_v1",
+                "mode": "maximize",
+                "params": {"setpoint_vector": np.array([0, 0, 0, 1])},
+            },
+            metrics_by_name={"score": [0.5]},
+            selection_rank=np.array([1]),
+            selection_top_k=np.array([True]),
+        )
+
+
+def test_append_labels_rejects_malformed_existing_label_history(tmp_path):
+    store = _store(tmp_path)
+    label_hist_col = store.label_hist_col()
+    df = pd.DataFrame(
+        {
+            "id": ["a"],
+            "bio_type": ["dna"],
+            "sequence": ["AAA"],
+            "alphabet": ["dna_4"],
+            "X": [[0.1, 0.2]],
+            label_hist_col: [
+                [
+                    {
+                        "kind": "label",
+                        "y_obs": {"value": [0.1], "dtype": "vector"},
+                    }
+                ]
+            ],
+        }
+    )
+    labels = pd.DataFrame({"id": ["a"], "y": [[0.4]]})
+
+    with pytest.raises(OpalError, match="Malformed label history"):
+        store.append_labels_from_df(df, labels, r=1, if_exists="replace")

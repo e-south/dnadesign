@@ -33,7 +33,7 @@ from ._param_utils import event_columns_for, get_str, normalize_metric_field
             "hue_field": "Optional obj__/pred__/sel__ field for swarm color.",
             "size_by": "Optional obj__/pred__/sel__ field for swarm size.",
         },
-        requires=["as_of_round", "pred__y_obj_scalar"],
+        requires=["as_of_round", "pred__score_selected"],
         notes=["Reads outputs/ledger/predictions."],
     ),
 )
@@ -74,7 +74,7 @@ def render(context, params: dict) -> None:
     size_max = float(params.get("size_max", 60.0))
     outputs_dir = resolve_outputs_dir(context)
     # Always read from typed sinks (predictions + runs).
-    need = {"as_of_round", "pred__y_obj_scalar"}
+    need = {"as_of_round", "pred__score_selected"}
     need |= event_columns_for(hue_field, size_by)
     df = load_events(outputs_dir, need, round_selector=context.rounds, run_id=context.run_id)
     if df.empty:
@@ -90,8 +90,8 @@ def render(context, params: dict) -> None:
         raise ValueError("No rows matched the requested round selector.")
 
     grp = df.groupby("as_of_round").agg(
-        total=("pred__y_obj_scalar", "size"),
-        high=("pred__y_obj_scalar", lambda s: (s >= threshold).sum()),
+        total=("pred__score_selected", "size"),
+        high=("pred__score_selected", lambda s: (s >= threshold).sum()),
     )
     grp["percent_high"] = (grp["high"] / grp["total"]) * 100.0
     grp = grp.reset_index().sort_values("as_of_round")
@@ -118,7 +118,7 @@ def render(context, params: dict) -> None:
     sizes = [] if size_by else None
     for r in rounds:
         sub = df.loc[df["as_of_round"] == r]
-        y_all = sub["pred__y_obj_scalar"].astype(float).to_numpy()
+        y_all = sub["pred__score_selected"].astype(float).to_numpy()
         mask = np.isfinite(y_all)
         y = y_all[mask]
         series.append(y)
@@ -142,7 +142,7 @@ def render(context, params: dict) -> None:
                 raise ValueError(f"Cannot draw violin: round {rr} has <3 finite points.")
             if float(np.nanmax(yy)) <= float(np.nanmin(yy)):
                 raise ValueError(
-                    f"Cannot draw violin: round {rr} has zero variance in 'pred__y_obj_scalar' after filtering."
+                    f"Cannot draw violin: round {rr} has zero variance in 'pred__score_selected' after filtering."
                 )
         parts = ax.violinplot(
             series,

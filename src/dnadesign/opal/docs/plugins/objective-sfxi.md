@@ -1,8 +1,20 @@
 ## setpoint_fidelity_x_intensity `sfxi`
 
-> **Scope.** This document describes the end‑to‑end selection scalar used by OPAL’s demo pipeline (logic fidelity × intensity). It spans ingest, Y‑ops, modeling, objective, and selection events.
+This page documents `sfxi_v1` objective behavior, equations, and emitted channels.
+It explains how OPAL converts vec8 model outputs into selection-ready score and uncertainty channels.
 
-**Objective intent:** Combine a model’s predicted **logic pattern** and **absolute fluorescent intensity** into a single score that rewards sequence designs that are both **right** (match the target setpoint) and **bright** (intense in the target conditions).
+### At a glance (plugin contract)
+
+- Objective plugin: `sfxi_v1`
+- Input shape: `y_pred` vec8 = `[logic(4), log2_intensity(4)]` in state order `[00,10,01,11]`
+- Primary score channel: `sfxi` (maximize)
+- Additional score channels: `logic_fidelity`, `effect_scaled`
+- Uncertainty channel key (when available): `sfxi` (standard deviation of the scalar score)
+- Scaling source: denominator is computed from current-round observed labels and persisted in run metadata
+- Strictness: run fails if current-round labels are fewer than `scaling.min_n`
+- Selection wiring:
+  - Top-N: `selection.params.score_ref = "sfxi_v1/sfxi"`
+  - EI: `selection.params.score_ref = "sfxi_v1/sfxi"` and `selection.params.uncertainty_ref = "sfxi_v1/sfxi"`
 
 ---
 
@@ -29,7 +41,7 @@ $$
 A_{\mathrm{experiment},i} := \mathrm{mean}\{\text{references' } Y^{\mathrm{RFU}}_i\}
 $$
 
-#### (a) Logic (fluorophore ratio → log2 → per-design min–max)
+### (a) Logic (fluorophore ratio → log2 → per-design min–max)
 
 Using a dual fluorescent reporter allows us to [separate intrinsic from extrinsic noise](https://pmc.ncbi.nlm.nih.gov/articles/PMC3141918/) in our experiments. The YFP/CFP ratio cancels cell size effects; log2 makes fold-changes symmetric; per-design min–max maps the four states onto a common $[0,1]$ scale so logic shapes are comparable across designs.
 
@@ -49,7 +61,7 @@ $$
 
 If $u_{\max}\approx u_{\min}$ (flat logic), set $v_i=\tfrac{1}{4}$ for all $i$ and **warn**. ($\varepsilon,\eta>0$ are small stabilizers and are recorded in metadata.)
 
-#### (b) Absolute fluorescent intensity (reference-normalized → log2)
+### (b) Absolute fluorescent intensity (reference-normalized → log2)
 
 Absolute intensity carries the **effect size** or **scale** signal but raw RFUs drift by experiment/time. Dividing by a per-experiment reference strain removes this drift while keeping a meaningful, unitless intensity. We store log2 to stabilize the regression and avoid dominance by possible ultra-bright samples; we invert back to linear when ranking samples.
 
@@ -169,7 +181,7 @@ If $P=0$ (an “all-OFF” setpoint), define $w=\mathbf{0}$ and set $E_{\mathrm{
 **Round-internal robust scaling.**
 We now map $E_{\mathrm{raw}}$ to $[0,1]$ using only **this round’s labeled designs**:
 
-* The denominator, **$\mathrm{denom}$**, is the **95th percentile** of $\{E_{\mathrm{raw}}\}$ recomputed over the round’s labels under the current setpoint $p$, with a small floor $\epsilon>0$:
+* The denominator, **$\mathrm{denom}$**, is the **`scaling.percentile`th percentile** (default 95) of $\{E_{\mathrm{raw}}\}$ recomputed over the round’s labels under the current setpoint $p$, with a small floor $\epsilon>0$:
 
   $$
   \mathrm{denom} \;=\; \max\!\Big(\text{95th percentile of } \{E^{\text{(round)}}_{\mathrm{raw}}\},\ \epsilon\Big)
@@ -210,7 +222,7 @@ $$
 
 ### 7. Concrete examples (state order $[00,10,01,11]$)
 
-#### (a) AND-like setpoint
+### (a) AND-like setpoint
 
 $p=[0,0,0,1]\Rightarrow w=[0,0,0,1]$.
 
@@ -218,7 +230,7 @@ $p=[0,0,0,1]\Rightarrow w=[0,0,0,1]$.
 * Candidate B: $\widehat{y}^{\mathrm{linear}}=[0.8,0.9,0.7,0.2]$ → $E_{\text{raw}}=0.2$ (intensity in the wrong conditions doesn’t help).
   If B’s $\widehat{v}$ is also far from $p$, $F_{\text{logic}}$ is small → score stays low.
 
-#### (b) Nuanced setpoint
+### (b) Nuanced setpoint
 
 $p=[0.3,0.4,0.7,0.2]\Rightarrow P=1.6,\; w\approx[0.1875,0.25,0.4375,0.125]$.
 
@@ -226,7 +238,7 @@ $p=[0.3,0.4,0.7,0.2]\Rightarrow P=1.6,\; w\approx[0.1875,0.25,0.4375,0.125]$.
 * Candidate D: $\widehat{y}^{\mathrm{linear}}=[0.1,0.5,1.1,0.4]$ → $E_{\text{raw}}\approx 0.675$.
   Similar total signal; D wins because it is intense in the **high-$p$** state (01).
 
-#### (c) “All-OFF” setpoint
+### (c) “All-OFF” setpoint
 
 $p=[0,0,0,0]\Rightarrow w=0\Rightarrow E_{\text{raw}}=0$.
 Only proximity of $\widehat{v}$ to $p$ (being OFF everywhere) is rewarded.
@@ -249,9 +261,15 @@ All outputs are written to **ledger sinks** under `outputs/ledger/`:
 - `outputs/ledger/runs.parquet` → per‑run `run_meta` row (one per run)
 - `outputs/ledger/labels.parquet` → per‑label `label` rows (one per ingest event)
 
+Selection channels and diagnostics are distinct:
+
+- channel refs (`score_ref`, `uncertainty_ref`) resolve only objective channels
+- `obj__*` columns are analysis diagnostics and are not selectable channel refs
+
 **Per‑ID predictions (`run_pred` rows)**
 
-- `pred__y_obj_scalar: double` — the SFXI score used for ranking
+- `pred__score_selected: double` — the SFXI score used for ranking
+- `pred__uncertainty_selected: double` — selected uncertainty channel (SFXI score standard deviation when available)
 - `pred__y_hat_model: list<float>` — **objective‑space** vector (after Y‑ops inversion)
 - `obj__logic_fidelity: float ∈ [0,1]` — $F_{\text{logic}}$
 - `obj__effect_raw: float` — weighted intensity before scaling
@@ -263,10 +281,11 @@ All outputs are written to **ledger sinks** under `outputs/ledger/`:
 
 - `objective__name = "sfxi_v1"`
 - `objective__params` — includes setpoint, exponents, scaling config, log2 delta
-- `objective__summary_stats` — includes `denom_used`, score min/median/max, clip fractions
+- `objective__summary_stats` — includes `denom_used`, `denom_percentile`, score min/median/max, clip fractions
 - `objective__denom_value`, `objective__denom_percentile` — convenience mirrors
-- `selection__score_field = "pred__y_obj_scalar"` — selection ranks on this field
-- `selection__objective`, `selection__tie_handling`
+- `selection__score_ref` — selected score channel ref (for this demo: `"sfxi_v1/sfxi"`)
+- `selection__uncertainty_ref` — selected uncertainty channel ref (EI flows only)
+- `selection__objective` (stores objective mode: `maximize|minimize`), `selection__tie_handling`
 - `training__y_ops` — Y‑ops applied at fit time (inverted before objective)
 
 `round_ctx.json` also records:
@@ -301,5 +320,3 @@ To compute that, we keep 8 numbers per design:
 One cannot recover the ratio‑based logic (`v`) from YFP intensities alone. If you try to create a “logic pattern” by min–max scaling YFP across states, you keep state‑specific capacity shifts that the YFP/CFP ratio is designed to remove. Dropping to 4 intensities asks the model to infer information that isn’t in the data; it will compute a different score.
 
 ---
-
-@e-south

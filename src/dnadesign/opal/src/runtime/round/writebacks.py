@@ -21,7 +21,7 @@ import pandas as pd
 
 from ...config.types import RootConfig
 from ...core.round_context import RoundCtx
-from ...core.utils import OpalError, ensure_dir, file_sha256, now_iso, print_stderr
+from ...core.utils import ensure_dir, file_sha256, now_iso, print_stderr
 from ...storage.artifacts import (
     ArtifactPaths,
     append_round_log_event,
@@ -121,7 +121,8 @@ def write_round_artifacts(
             "id": selected_ids,
             "sequence": [seq_map.get(i) for i in selected_ids],
             "sel__rank_competition": score.ranks_competition,
-            "pred__y_obj_scalar": score.y_obj_scalar,
+            "pred__score_selected": score.y_obj_scalar,
+            "pred__score_ref": [score.score_ref] * len(selected_ids),
             "sel__is_selected": score.selected_bool,
         }
     )
@@ -147,7 +148,8 @@ def write_round_artifacts(
             "id",
             "sequence",
             "sel__rank_competition",
-            "pred__y_obj_scalar",
+            "pred__score_selected",
+            "pred__score_ref",
         ]
     ]
     sel_sha = write_selection_csv(apaths.selection_csv, selected_df)
@@ -160,40 +162,37 @@ def write_round_artifacts(
     artifacts_paths_and_hashes: Dict[str, tuple[str, str]] = {}
 
     if hasattr(score.model, "model_artifacts") and callable(getattr(score.model, "model_artifacts")):
-        try:
-            m_arts = score.model.model_artifacts() or {}
-            if "feature_importance" in m_arts:
-                fi_df = m_arts["feature_importance"]
-                fi_path = apaths.feature_importance_csv
-                fi_sha = write_feature_importance_csv(fi_path, fi_df)
-                imp = fi_df["importance"].to_numpy(dtype=float)
-                xdim = int(imp.shape[0])
-                nonzero = int((imp > 0).sum())
-                hhi = float(np.sum((imp / max(imp.sum(), 1e-12)) ** 2))
-                top5 = fi_df.sort_values("importance", ascending=False).head(5).to_dict(orient="records")
-                _log(
-                    req.verbose,
-                    f"[model] feature_importance: x_dim={xdim} nonzero={nonzero} HHI={hhi:.4f}",
-                )
-                append_round_log_event(
-                    apaths.round_log_jsonl,
-                    {
-                        "ts": now_iso(),
-                        "stage": "model_feature_importance",
-                        "x_dim": xdim,
-                        "nonzero": nonzero,
-                        "hhi": hhi,
-                        "top5": top5,
-                        "artifact": "feature_importance.csv",
-                        "artifact_sha256": fi_sha,
-                    },
-                )
-                artifacts_paths_and_hashes["model/feature_importance.csv"] = (
-                    fi_sha,
-                    str(fi_path.resolve()),
-                )
-        except Exception as e:
-            raise OpalError(f"Failed to persist model artifacts: {e}")
+        m_arts = score.model.model_artifacts() or {}
+        if "feature_importance" in m_arts:
+            fi_df = m_arts["feature_importance"]
+            fi_path = apaths.feature_importance_csv
+            fi_sha = write_feature_importance_csv(fi_path, fi_df)
+            imp = fi_df["importance"].to_numpy(dtype=float)
+            xdim = int(imp.shape[0])
+            nonzero = int((imp > 0).sum())
+            hhi = float(np.sum((imp / max(imp.sum(), 1e-12)) ** 2))
+            top5 = fi_df.sort_values("importance", ascending=False).head(5).to_dict(orient="records")
+            _log(
+                req.verbose,
+                f"[model] feature_importance: x_dim={xdim} nonzero={nonzero} HHI={hhi:.4f}",
+            )
+            append_round_log_event(
+                apaths.round_log_jsonl,
+                {
+                    "ts": now_iso(),
+                    "stage": "model_feature_importance",
+                    "x_dim": xdim,
+                    "nonzero": nonzero,
+                    "hhi": hhi,
+                    "top5": top5,
+                    "artifact": "feature_importance.csv",
+                    "artifact_sha256": fi_sha,
+                },
+            )
+            artifacts_paths_and_hashes["model/feature_importance.csv"] = (
+                fi_sha,
+                str(fi_path.resolve()),
+            )
 
     _log(
         req.verbose,
@@ -254,9 +253,6 @@ def build_run_events(
     seq_map = build_sequence_map(inputs.df)
     sequences_list: List[Optional[str]] = [seq_map.get(i) for i in xbundle.id_order_pool]
 
-    y_hat_model_sd = None
-    y_obj_scalar_sd = None
-
     sel_emit = SelectionEmit(
         ranks_competition=score.ranks_competition,
         selected_bool=score.selected_bool,
@@ -269,12 +265,16 @@ def build_run_events(
         ids=list(map(str, xbundle.id_order_pool)),
         sequences=sequences_list,
         y_hat_model=score.Y_hat,
-        y_obj_scalar=score.y_obj_scalar,
+        selected_score=score.y_obj_scalar,
+        selected_score_ref=score.score_ref,
         y_dim=training.y_dim,
-        y_hat_model_sd=y_hat_model_sd,
-        y_obj_scalar_sd=y_obj_scalar_sd,
         obj_diagnostics=score.diag,
         sel_emit=sel_emit,
+        selected_uncertainty=score.uq_scalar,
+        selected_uncertainty_ref=score.uncertainty_ref,
+        selection_score=score.scores,
+        score_channels=score.score_channels,
+        uncertainty_channels=score.uncertainty_channels,
     )
 
     run_meta_event = build_run_meta_event(
@@ -289,14 +289,16 @@ def build_run_events(
         y_ingest_transform_params=dict(cfg.data.transforms_y.params),
         objective_name=score.obj_name,
         objective_params=score.obj_params,
+        objective_defs=score.objective_defs,
         selection_name=score.sel_name,
         selection_params=score.sel_params,
-        selection_score_field="pred__y_obj_scalar",
+        selection_score_ref=score.score_ref,
+        selection_uncertainty_ref=score.uncertainty_ref,
         selection_objective_mode=score.mode,
         sel_tie_handling=score.tie_handling,
         stats_n_train=len(xbundle.id_order_train),
         stats_n_scored=len(xbundle.id_order_pool),
-        unc_mean_sd=y_hat_model_sd,
+        unc_mean_sd=score.uq_scalar,
         pred_rows_df=run_pred_events,
         artifact_paths_and_hashes=artifacts.artifacts_paths_and_hashes,
         objective_summary_stats=score.obj_summary_stats,
@@ -372,10 +374,7 @@ def update_campaign_state(
 ) -> None:
     st = CampaignState.load(ws.state_path)
     if getattr(req, "allow_resume", False):
-        try:
-            st.rounds = [r for r in st.rounds if int(getattr(r, "round_index", -1)) != int(req.as_of_round)]
-        except Exception:
-            pass
+        st.rounds = [r for r in st.rounds if int(getattr(r, "round_index", -1)) != int(req.as_of_round)]
 
     st.campaign_slug = cfg.campaign.slug
     st.campaign_name = cfg.campaign.name

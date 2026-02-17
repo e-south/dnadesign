@@ -3,7 +3,7 @@
 <dnadesign project>
 src/dnadesign/opal/src/transforms_y/scalar_from_table_v1.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -1,5 +1,3 @@
-# ABOUTME: Tests the OPAL marimo notebook template rendering.
-# ABOUTME: Ensures generated notebooks include expected scaffolding choices.
 import ast
 from pathlib import Path
 

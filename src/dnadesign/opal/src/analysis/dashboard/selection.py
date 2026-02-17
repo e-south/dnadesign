@@ -16,39 +16,19 @@ from typing import Any, Mapping
 import numpy as np
 import polars as pl
 
+from ...core.selection_contracts import (
+    resolve_selection_objective_mode,
+    resolve_selection_tie_handling,
+)
 from ...registries.selection import normalize_selection_result
 from .util import is_altair_undefined
-
-_OBJECTIVE_MODES = {"maximize", "minimize"}
 
 
 def resolve_objective_mode(
     selection_params: Mapping[str, Any],
 ) -> tuple[str, list[str]]:
-    """
-    Resolve objective_mode with legacy alias support and warnings.
-    Returns (mode, warnings).
-    """
     warnings: list[str] = []
-    mode_raw = selection_params.get("objective_mode")
-    legacy_raw = selection_params.get("objective")
-    if mode_raw is not None and legacy_raw is not None:
-        mode_str = str(mode_raw).strip().lower()
-        legacy_str = str(legacy_raw).strip().lower()
-        if mode_str != legacy_str:
-            raise ValueError(
-                "selection.params has both 'objective_mode' and legacy 'objective' with conflicting values "
-                f"({mode_str!r} vs {legacy_str!r})"
-            )
-    if mode_raw is None and legacy_raw is not None:
-        warnings.append("selection.params.objective is deprecated; prefer selection.params.objective_mode.")
-        mode_raw = legacy_raw
-    if mode_raw is None:
-        mode_raw = "maximize"
-    mode = str(mode_raw).strip().lower()
-    if mode not in _OBJECTIVE_MODES:
-        warnings.append(f"Unknown objective mode {mode!r}; defaulting to 'maximize'.")
-        mode = "maximize"
+    mode = resolve_selection_objective_mode(selection_params, error_cls=ValueError)
     return mode, warnings
 
 
@@ -59,7 +39,7 @@ def coerce_selection_dataframe(selected_raw: object) -> pl.DataFrame | None:
         return selected_raw
     try:
         return pl.from_pandas(selected_raw)
-    except Exception:
+    except (TypeError, ValueError, pl.exceptions.PolarsError):
         return None
 
 
@@ -91,11 +71,12 @@ def compute_selection_overlay(
     selection_params: Mapping[str, Any],
 ) -> tuple[np.ndarray, np.ndarray, list[str]]:
     mode, warnings = resolve_objective_mode(selection_params)
-    try:
-        top_k = int(selection_params.get("top_k", 10))
-    except Exception:
-        top_k = 10
-    tie_handling = str(selection_params.get("tie_handling", "competition_rank"))
+    if "top_k" not in selection_params:
+        raise ValueError("selection.params.top_k is required.")
+    top_k = int(selection_params.get("top_k"))
+    if top_k <= 0:
+        raise ValueError("selection.params.top_k must be > 0.")
+    tie_handling = resolve_selection_tie_handling(selection_params, error_cls=ValueError)
     result = normalize_selection_result(
         {},
         ids=ids,
@@ -137,7 +118,7 @@ def ensure_selection_columns(
             scores=scores,
             selection_params=selection_params,
         )
-    except Exception as exc:
+    except (TypeError, ValueError) as exc:
         return df, [], f"Selection reconstruction failed: {exc}"
     df_out = df.with_columns(
         pl.Series(rank_col, ranks),

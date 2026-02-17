@@ -1,0 +1,94 @@
+plot_defaults:
+  output:
+    format: "png"
+    dpi: 600
+    save_data: false
+
+plots:
+  - name: score_vs_rank_latest
+    kind: scatter_score_vs_rank
+    params:
+      rank_mode: competition    # "sequential" | "competition"
+      hue: effect_scaled        # alias -> obj__effect_scaled
+      cmap: viridis
+      size_by: logic_fidelity   # alias -> obj__logic_fidelity
+      size_min: 12
+      size_max: 48
+      alpha: 0.45
+      rasterize_at: 20000
+      figsize_in: [9, 5]
+    output:
+      save_data: true
+
+  - name: feature_importance_bars_latest
+    kind: feature_importance_bars
+    params:
+      order_policy: preserve
+
+  - name: percent_high_activity
+    kind: percent_high_activity_over_rounds
+    params:
+      threshold: 0.85
+      mode: both                    # violin+swarm on left axis, % line on right axis
+      swarm: true
+      swarm_max_points: 2500
+      swarm_jitter: 0.07
+      swarm_alpha: 0.3
+      rasterize_at: 20000
+      figsize_in: [10, 5]
+
+  - name: sfxi_logic_closeness
+    kind: sfxi_logic_fidelity_closeness
+    tags: [diagnostic]
+    params:
+      figsize_in: [15, 10]     # overall figure size; both panels remain 1:1
+      top_percentile: 25      # optional: show closeness for top 25% nearest-to-setpoint
+      cbar_width_in: 0.25
+      cbar_pad_in: 0.05
+      gap_between_panels_in: 0.35
+      on_violin_invalid: line  # explicit: fallback to mean line when sample too small
+
+  - name: effect_scaled_vs_logic_fidelity
+    kind: fold_change_vs_logic_fidelity
+    tags: [analysis]
+    params:
+      intensity_log2_offset_delta: 0.0
+      y_axis: effect_scaled
+      hue: score
+      size_min: 10
+      size_max: 60
+      alpha: 0.4
+      rasterize_at: 20000
+      figsize_in: [10, 8]
+
+  - name: sfxi_factorial_effects
+    kind: sfxi_factorial_effects
+    tags: [diagnostic]
+    params:
+      size_by: obj__effect_scaled
+
+  - name: sfxi_setpoint_sweep
+    kind: sfxi_setpoint_sweep
+    tags: [diagnostic]
+    params: {}
+
+  - name: sfxi_support_diagnostics
+    kind: sfxi_support_diagnostics
+    tags: [diagnostic]
+    params:
+      y_axis: score
+      hue: effect_scaled
+
+  - name: sfxi_uncertainty
+    kind: sfxi_uncertainty
+    tags: [diagnostic]
+    params:
+      kind: score
+      y_axis: score
+      hue: logic_fidelity
+
+  - name: sfxi_intensity_scaling
+    kind: sfxi_intensity_scaling
+    tags: [diagnostic]
+    params:
+      include_pool: true

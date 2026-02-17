@@ -146,6 +146,88 @@ class _RFParams(BaseModel):
     n_jobs: int = -1
 
 
+class _KernelBounds(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    lower: float = 1e-5
+    upper: float = 1e5
+
+    @field_validator("upper")
+    @classmethod
+    def _bounds_valid(cls, v, info):
+        lower = float(info.data.get("lower", 1e-5))
+        upper = float(v)
+        if not np.isfinite(lower) or not np.isfinite(upper) or lower <= 0.0 or upper <= lower:
+            raise ValueError("kernel bounds must satisfy 0 < lower < upper.")
+        return upper
+
+
+class _GaussianProcessKernelParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: Literal["rbf", "matern", "rational_quadratic", "dot_product"] = "rbf"
+    length_scale: float = 1.0
+    length_scale_bounds: _KernelBounds = Field(default_factory=_KernelBounds)
+    nu: float = 1.5
+    alpha: float = 1.0
+    alpha_bounds: _KernelBounds = Field(default_factory=_KernelBounds)
+    sigma_0: float = 1.0
+    sigma_0_bounds: _KernelBounds = Field(default_factory=_KernelBounds)
+    with_white_noise: bool = False
+    noise_level: float = 1.0
+    noise_level_bounds: _KernelBounds = Field(default_factory=_KernelBounds)
+
+    @field_validator("length_scale", "nu", "alpha", "sigma_0", "noise_level")
+    @classmethod
+    def _positive_finite(cls, v: float) -> float:
+        vv = float(v)
+        if not np.isfinite(vv) or vv <= 0.0:
+            raise ValueError("kernel scalar parameters must be positive finite values.")
+        return vv
+
+
+@register_param_schema("model", "gaussian_process")
+class _GaussianProcessParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kernel: _GaussianProcessKernelParams | None = None
+    alpha: float | List[float] = 1e-10
+    normalize_y: bool = False
+    random_state: int | None = None
+    n_restarts_optimizer: int = 0
+    optimizer: str | None = "fmin_l_bfgs_b"
+    copy_X_train: bool = True
+
+    @field_validator("alpha")
+    @classmethod
+    def _alpha_valid(cls, v: float | List[float]) -> float | List[float]:
+        if isinstance(v, list):
+            if len(v) == 0:
+                raise ValueError("alpha list must be non-empty.")
+            vals = [float(x) for x in v]
+            if any((not np.isfinite(x) or x <= 0.0) for x in vals):
+                raise ValueError("alpha list entries must be positive finite values.")
+            return vals
+        vv = float(v)
+        if not np.isfinite(vv) or vv <= 0.0:
+            raise ValueError("alpha must be a positive finite value.")
+        return vv
+
+    @field_validator("n_restarts_optimizer")
+    @classmethod
+    def _restarts_non_negative(cls, v: int) -> int:
+        if int(v) < 0:
+            raise ValueError("n_restarts_optimizer must be >= 0.")
+        return int(v)
+
+    @field_validator("optimizer")
+    @classmethod
+    def _optimizer_valid(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        vv = str(v).strip()
+        if not vv:
+            raise ValueError("optimizer must be a non-empty string or null.")
+        return vv
+
+
 class _SFXIScaling(BaseModel):
     model_config = ConfigDict(extra="forbid")
     percentile: int = 95
@@ -201,9 +283,10 @@ class _ScalarIdentityParams(BaseModel):
 @register_param_schema("selection", "top_n")
 class _TopNParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    top_k: int = 12
-    tie_handling: Literal["competition_rank", "dense_rank", "ordinal"] = "competition_rank"
-    objective_mode: Optional[Literal["maximize", "minimize"]] = None
+    top_k: int
+    score_ref: str
+    tie_handling: Literal["competition_rank", "dense_rank", "ordinal"]
+    objective_mode: Literal["maximize", "minimize"]
     exclude_already_labeled: bool = True
 
     @field_validator("top_k")
@@ -212,3 +295,49 @@ class _TopNParams(BaseModel):
         if v <= 0:
             raise ValueError("top_k must be > 0")
         return v
+
+    @field_validator("score_ref")
+    @classmethod
+    def _score_ref_non_empty(cls, v: str) -> str:
+        vv = str(v).strip()
+        if not vv:
+            raise ValueError("score_ref must be a non-empty channel reference")
+        return vv
+
+
+@register_param_schema("selection", "expected_improvement")
+class _ExpectedImprovementParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    top_k: int
+    score_ref: str
+    uncertainty_ref: str
+    tie_handling: Literal["competition_rank", "dense_rank", "ordinal"]
+    objective_mode: Literal["maximize", "minimize"]
+    exclude_already_labeled: bool = True
+    alpha: float = 1.0
+    beta: float = 1.0
+
+    @field_validator("top_k")
+    @classmethod
+    def _positive(cls, v):
+        if v <= 0:
+            raise ValueError("top_k must be > 0")
+        return v
+
+    @field_validator("score_ref", "uncertainty_ref")
+    @classmethod
+    def _channel_ref_non_empty(cls, v: str) -> str:
+        vv = str(v).strip()
+        if not vv:
+            raise ValueError("channel references must be non-empty strings")
+        return vv
+
+    @field_validator("alpha", "beta")
+    @classmethod
+    def _non_negative_finite_weight(cls, v: float) -> float:
+        x = float(v)
+        if not np.isfinite(x):
+            raise ValueError("weights must be finite")
+        if x < 0.0:
+            raise ValueError("weights must be >= 0")
+        return x

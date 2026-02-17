@@ -1,11 +1,9 @@
-# ABOUTME: Validates predict handling for non-ndarray outputs and null sequences.
-# ABOUTME: Ensures predict output remains robust for custom model implementations.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/tests/test_predict_robustness.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

@@ -57,11 +57,11 @@ def test_scalar_from_table_rejects_non_finite() -> None:
 
 def test_scalar_identity_objective_scores() -> None:
     y_pred = np.array([[0.1], [0.2]])
-    res = scalar_identity_v1(y_pred=y_pred, params={})
-    assert res.score.tolist() == [0.1, 0.2]
+    res = scalar_identity_v1(y_pred=y_pred, params={}, ctx=None, train_view=None, y_pred_std=None)
+    assert res.scores_by_name["scalar"].tolist() == [0.1, 0.2]
     assert "summary_stats" in res.diagnostics
 
 
 def test_scalar_identity_objective_rejects_shape() -> None:
     with pytest.raises(ValueError):
-        scalar_identity_v1(y_pred=np.array([0.1, 0.2]), params={})
+        scalar_identity_v1(y_pred=np.array([0.1, 0.2]), params={}, ctx=None, train_view=None, y_pred_std=None)
