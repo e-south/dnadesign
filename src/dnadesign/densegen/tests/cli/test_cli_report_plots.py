@@ -317,3 +317,73 @@ def test_notebook_run_rejects_headless_edit_mode(tmp_path: Path, monkeypatch) ->
     run_result = runner.invoke(app, ["notebook", "run", "--mode", "edit", "--headless", "-c", str(cfg_path)])
     assert run_result.exit_code == 1
     assert "--headless is only supported with --mode run" in run_result.output
+
+
+def test_plot_missing_records_reports_actionable_error(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["plot", "-c", str(cfg_path)])
+
+    assert result.exit_code == 1
+    assert "Plot generation failed" in result.output
+    assert "Parquet output not found" in result.output
+    assert "dense run --fresh --no-plot" in result.output
+
+
+def test_plot_missing_records_with_dual_sinks_reports_plots_source_hint(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    cfg_path.write_text(
+        textwrap.dedent(
+            """
+            densegen:
+              schema_version: "2.9"
+              run:
+                id: demo
+                root: "."
+              inputs:
+                - name: demo_input
+                  type: binding_sites
+                  path: inputs.csv
+              output:
+                targets: [parquet, usr]
+                schema:
+                  bio_type: dna
+                  alphabet: dna_4
+                parquet:
+                  path: outputs/tables/records.parquet
+                usr:
+                  root: outputs/usr_datasets
+                  dataset: densegen/demo
+              generation:
+                sequence_length: 10
+                plan:
+                  - name: demo_plan
+                    quota: 1
+                    sampling:
+                      include_inputs: [demo_input]
+                    regulator_constraints:
+                      groups: []
+              solver:
+                backend: CBC
+                strategy: iterate
+              logging:
+                log_dir: outputs/logs
+            plots:
+              source: parquet
+              out_dir: outputs/plots
+              default: [placement_map]
+            """
+        ).strip()
+        + "\n"
+    )
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["plot", "-c", str(cfg_path)])
+
+    assert result.exit_code == 1
+    assert "Plot generation failed" in result.output
+    assert "plots.source" in result.output

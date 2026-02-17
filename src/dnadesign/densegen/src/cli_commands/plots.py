@@ -22,6 +22,16 @@ from ..utils.logging_utils import install_native_stderr_filters
 from ..utils.mpl_utils import ensure_mpl_cache_dir
 
 
+def _has_resumable_run_state(run_root: Path) -> bool:
+    candidates = (
+        run_root / "outputs" / "meta" / "run_state.json",
+        run_root / "outputs" / "meta" / "run_manifest.json",
+        run_root / "outputs" / "tables" / "attempts.parquet",
+        run_root / "outputs" / "tables" / "records.parquet",
+    )
+    return any(path.exists() for path in candidates)
+
+
 def register_plot_commands(app: typer.Typer, *, context: CliContext) -> None:
     console = context.console
     make_table = context.make_table
@@ -68,5 +78,23 @@ def register_plot_commands(app: typer.Typer, *, context: CliContext) -> None:
         install_native_stderr_filters(suppress_solver_messages=False)
         from ..viz.plotting import run_plots_from_config
 
-        run_plots_from_config(loaded.root, loaded.path, only=only, source="plot", absolute=absolute)
+        run_root = Path(context.run_root_for(loaded))
+        try:
+            run_plots_from_config(loaded.root, loaded.path, only=only, source="plot", absolute=absolute)
+        except Exception as exc:
+            message = str(exc)
+            console.print(f"[bold red]Plot generation failed:[/] {message}")
+            console.print("[bold]Next step[/]:")
+            if _has_resumable_run_state(run_root):
+                rerun = "dense run --resume --no-plot"
+            else:
+                rerun = "dense run --fresh --no-plot"
+            console.print(context.workspace_command(rerun, cfg_path=cfg_path, run_root=run_root))
+            if (
+                len(loaded.root.densegen.output.targets) > 1
+                and ("records not found" in message.lower() or "output not found" in message.lower())
+                and "plots.source" not in message
+            ):
+                console.print("[bold]Tip[/]: verify `plots.source` points to a sink with records (`parquet` or `usr`).")
+            raise typer.Exit(code=1) from exc
         console.print(":bar_chart: [bold green]Plots written.[/]")

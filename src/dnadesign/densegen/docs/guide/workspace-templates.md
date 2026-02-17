@@ -51,6 +51,18 @@ uv run dense plot -c "$CONFIG"
 uv run dense notebook generate -c "$CONFIG"
 ```
 
+`study_constitutive_sigma_panel` enforces strict final-sequence motif exclusions. If
+`dense run` stops with `Exceeded max_seconds_per_plan`, inspect run state and resume:
+
+```bash
+uv run dense inspect run --events --library -c "$CONFIG"
+uv run dense run --resume --no-plot -c "$CONFIG"
+```
+
+Then tune `densegen.runtime.max_seconds_per_plan` or lower plan quotas if needed.
+`dense plot` reads the sink selected by `plots.source`; if dual sinks are enabled,
+ensure that sink has records before plotting.
+
 If your template uses `pwm_artifact` inputs and `fimo` is not on `PATH`, use
 `pixi run dense ...`.
 
