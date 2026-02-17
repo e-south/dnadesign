@@ -148,22 +148,22 @@ Each run directory uses a stable subdir layout (stage-agnostic):
 ```
 <run_dir>/
   run/        # run_manifest.json, run_status.json, config_used.yaml
-  inputs/     # lockfile snapshot + input manifests
+  provenance/ # lockfile snapshot + input manifests
   optimize/   # tables/ + state/ (trace, metrics, elite metadata)
-  analysis/   # reports/ + manifests/ + tables/ + plots/
-  plots/      # logos and non-analysis plot families
+  analysis/   # reports/ + manifests/ + tables/
+  plots/      # analysis plots + logos
   export/     # downstream exports (for example export/sequences/*)
 ```
 
 Key artifacts:
 
 - `run/run_manifest.json` / `run/run_status.json` / `run/config_used.yaml` — provenance + status + resolved config
-- `inputs/lockfile.json` — pinned input snapshot for reproducible analysis
+- `provenance/lockfile.json` — pinned input snapshot for reproducible analysis
 - `optimize/tables/sequences.parquet`, `optimize/tables/elites*`, `optimize/tables/random_baseline*` — sampling outputs
 - `optimize/state/trace.nc`, `optimize/state/metrics.jsonl`, `optimize/state/elites.{json,yaml}` — sampling metadata
 - `analysis/reports/summary.json`, `analysis/reports/report.json`, `analysis/reports/report.md` — analysis outputs
 - `analysis/manifests/plot_manifest.json`, `analysis/manifests/table_manifest.json`, `analysis/manifests/manifest.json` — inventories
-- `analysis/plots/*`, `analysis/tables/table__*` — curated analysis plots and tables
+- `plots/analysis/*`, `analysis/tables/table__*` — curated analysis plots and tables
 
 `cruncher analyze` fails when required analysis artifacts are missing and does not write partial report outputs.
 
