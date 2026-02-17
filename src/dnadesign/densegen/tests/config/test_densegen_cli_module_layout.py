@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/densegen/tests/config/test_cli_module_layout.py
+src/dnadesign/densegen/tests/config/test_densegen_cli_module_layout.py
 
 Tests that CLI helper modules are organized under cli/ package.
 
