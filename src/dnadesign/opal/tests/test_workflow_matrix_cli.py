@@ -1,5 +1,3 @@
-# ABOUTME: End-to-end CLI workflow matrix for OPAL v2 selection/objective contracts.
-# ABOUTME: Validates RF+top_n, GP+top_n, and GP+EI flows using the same objective channel references.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

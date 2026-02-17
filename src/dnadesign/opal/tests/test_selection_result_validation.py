@@ -1,5 +1,3 @@
-# ABOUTME: Verifies strict selection output validation rejects coercive/non-numeric payloads.
-# ABOUTME: Ensures selection plugins fail fast on malformed order/score arrays.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

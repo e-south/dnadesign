@@ -239,7 +239,8 @@ Per-record history report (ground truth + per-round predictions/rank/selected).
 
 ```bash
 opal record-show --config <yaml> \
-  [<ID-or-SEQ> | --id <ID> | --sequence <SEQ>] \
+  [<ID-or-SEQ> | --id <ID> | --sequence <SEQ> | --selected-rank <n>] \
+  [--round <k|latest>] \
   [--run-id <id>] [--with-sequence|--no-sequence] [--json]
 ```
 
@@ -248,12 +249,15 @@ opal record-show --config <yaml> \
 * `--config, -c`: Path to `configs/campaign.yaml` (required unless `$OPAL_CONFIG` is set).
 * `<ID-or-SEQ>`: Positional id or sequence (use `--id/--sequence` to disambiguate).
 * `--id`, `--sequence`: Explicit lookup key (mutually exclusive).
+* `--selected-rank`: Resolve id from `selection_top_k.csv` by competition rank (1-based).
+* `--round`: Round selector used with `--selected-rank` (default: `latest`).
 * `--run-id`: Explicit run_id for ledger predictions (or `latest` to pick the latest ledger run by `(as_of_round, run_id)`).
 * `--with-sequence/--no-sequence`: Include the sequence in output (default: on).
 * `--json`: Output as JSON.
 
 **Notes**
 
+* `--selected-rank` cannot be combined with `<ID-or-SEQ>`, `--id`, or `--sequence`.
 * If reruns exist for a round, pass `--run-id` to avoid mixing predictions.
 * If the requested record does not exist, the command exits non-zero.
 

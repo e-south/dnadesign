@@ -1,5 +1,3 @@
-# ABOUTME: Ensures record_show reads ledger predictions from canonical paths.
-# ABOUTME: Verifies ledger-backed reporting for individual records.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

@@ -1,11 +1,9 @@
-# ABOUTME: Validates ingest preview counts for id/sequence presence.
-# ABOUTME: Ensures preview statistics reflect actual non-null counts.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/tests/test_ingest_preview_counts.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

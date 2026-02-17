@@ -46,6 +46,8 @@ def test_guide_json_includes_campaign_plugins_steps_and_doc_pointers(tmp_path: P
     assert out["workflow_key"] == "rf_sfxi_topn"
     assert any("opal run -c" in str(step["command"]) for step in out["steps"])
     assert "docs/plugins/objective-sfxi.md" in out["learn_more"]["docs"]
+    assert "src/dnadesign/opal/src/models/random_forest.py" in out["learn_more"]["source"]
+    assert "src/dnadesign/opal/src/runtime/round/stages.py" in out["learn_more"]["source"]
 
 
 def test_guide_markdown_contains_round_semantics_and_commands(tmp_path: Path) -> None:

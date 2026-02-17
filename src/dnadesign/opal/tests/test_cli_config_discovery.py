@@ -1,5 +1,3 @@
-# ABOUTME: CLI config resolution tests for OPAL campaign workflows.
-# ABOUTME: Covers explicit --config and OPAL_CONFIG-only resolution behavior.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

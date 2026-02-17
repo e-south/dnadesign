@@ -1,11 +1,9 @@
-# ABOUTME: Ensures registry auto-discovery fails loudly on bad built-in modules.
-# ABOUTME: Prevents silent plugin import failures from hiding root causes.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/tests/test_registry_strict_loading.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

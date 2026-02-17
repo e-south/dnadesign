@@ -1,5 +1,3 @@
-# ABOUTME: Tests run_id round resolution against ledger predictions.
-# ABOUTME: Verifies facade and ledger reader behavior for run_id selectors.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

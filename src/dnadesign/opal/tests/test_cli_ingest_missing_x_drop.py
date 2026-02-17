@@ -1,5 +1,3 @@
-# ABOUTME: Ensures ingest-y drops unknown sequences missing required X data.
-# ABOUTME: Verifies sequence-keyed matching when transforms reorder rows.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

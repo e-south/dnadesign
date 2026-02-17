@@ -1,5 +1,3 @@
-# ABOUTME: Validates label_history schema parsing and strictness for OPAL records.
-# ABOUTME: Ensures label/pred entries meet required contracts for auditability.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

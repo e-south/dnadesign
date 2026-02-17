@@ -1,5 +1,3 @@
-# ABOUTME: Verifies notebook directory only contains marimo notebooks.
-# ABOUTME: Prevents helper modules from breaking marimo check.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

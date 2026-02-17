@@ -1,5 +1,3 @@
-# ABOUTME: Tests predict CLI behavior for Y-ops inversion and round_ctx handling.
-# ABOUTME: Ensures predict reads model artifacts from round directories correctly.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

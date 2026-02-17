@@ -1,5 +1,3 @@
-# ABOUTME: Tests the campaign-reset CLI command for campaign cleanup.
-# ABOUTME: Ensures records pruning and output/state removal are enforced.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -121,4 +119,5 @@ def test_campaign_reset_rejects_removed_allow_non_demo_flag(tmp_path: Path) -> N
     runner = CliRunner()
     res = runner.invoke(app, ["--no-color", "campaign-reset", "-c", str(campaign), "--allow-non-demo"])
     assert res.exit_code != 0
-    assert "--allow-non-demo" in res.stdout or "--allow-non-demo" in res.stderr
+    text = f"{res.stdout}\n{res.stderr}".lower()
+    assert "no such option" in text or "--allow-non-demo" in text

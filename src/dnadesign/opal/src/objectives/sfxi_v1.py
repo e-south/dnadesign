@@ -47,7 +47,7 @@ def _compute_train_effect_pool(train_view, setpoint: np.ndarray, delta: float, *
         return float(raw[0])
 
     if not hasattr(train_view, "iter_labels_y_current_round"):
-        raise ValueError("[sfxi_v1] train_view must expose iter_labels_y_current_round() for round-calibrated scaling.")
+        raise ValueError("sfxi_v1: train_view must expose iter_labels_y_current_round() for round-calibrated scaling.")
 
     pool_cur: list[float] = []
     for y in train_view.iter_labels_y_current_round():
@@ -57,7 +57,7 @@ def _compute_train_effect_pool(train_view, setpoint: np.ndarray, delta: float, *
 
     if len(pool_cur) < int(min_n):
         raise ValueError(
-            f"[sfxi_v1] Need at least min_n={int(min_n)} labels in current round to scale intensity; "
+            f"sfxi_v1: need at least min_n={int(min_n)} labels in current round to scale intensity; "
             f"got {len(pool_cur)}. Add labels or lower scaling.min_n."
         )
     return pool_cur
@@ -67,22 +67,22 @@ def _parse_scaling_cfg(raw: Any) -> Tuple[int, int, float]:
     if raw is None:
         raw = {}
     if not isinstance(raw, dict):
-        raise ValueError("[sfxi_v1] scaling must be a mapping.")
+        raise ValueError("sfxi_v1: scaling must be a mapping.")
     allowed = {"percentile", "min_n", "eps"}
     extra = sorted(set(raw.keys()) - allowed)
     if extra:
-        raise ValueError(f"[sfxi_v1] Unknown scaling keys: {extra}. Allowed: {sorted(allowed)}")
+        raise ValueError(f"sfxi_v1: unknown scaling keys: {extra}. Allowed: {sorted(allowed)}")
 
     p = int(raw.get("percentile", 95))
     min_n = int(raw.get("min_n", 5))
     eps = float(raw.get("eps", 1e-8))
 
     if not (1 <= p <= 100):
-        raise ValueError(f"[sfxi_v1] scaling.percentile must be in [1, 100]; got {p}.")
+        raise ValueError(f"sfxi_v1: scaling.percentile must be in [1, 100]; got {p}.")
     if min_n <= 0:
-        raise ValueError(f"[sfxi_v1] scaling.min_n must be >= 1; got {min_n}.")
+        raise ValueError(f"sfxi_v1: scaling.min_n must be >= 1; got {min_n}.")
     if not np.isfinite(eps) or eps <= 0.0:
-        raise ValueError(f"[sfxi_v1] scaling.eps must be positive and finite; got {eps}.")
+        raise ValueError(f"sfxi_v1: scaling.eps must be positive and finite; got {eps}.")
     return p, min_n, eps
 
 
@@ -106,14 +106,14 @@ def sfxi_v1(
 ) -> ObjectiveResultV2:
     # assert y_pred dims
     if not (isinstance(y_pred, np.ndarray) and y_pred.ndim == 2 and y_pred.shape[1] >= 8):
-        raise ValueError(f"[sfxi_v1] Expected y_pred shape (n, 8+); got {getattr(y_pred, 'shape', None)}.")
+        raise ValueError(f"sfxi_v1: expected y_pred shape (n, 8+); got {getattr(y_pred, 'shape', None)}.")
     y_pred_std = np.asarray(y_pred_std, dtype=float) if y_pred_std is not None else None
     if y_pred_std is not None and y_pred_std.shape != y_pred.shape:
-        raise ValueError(f"[sfxi_v1] y_pred_std shape mismatch: expected {y_pred.shape}, got {y_pred_std.shape}.")
+        raise ValueError(f"sfxi_v1: y_pred_std shape mismatch: expected {y_pred.shape}, got {y_pred_std.shape}.")
     if y_pred_std is not None and not np.all(np.isfinite(y_pred_std)):
-        raise ValueError("[sfxi_v1] y_pred_std must be finite.")
+        raise ValueError("sfxi_v1: y_pred_std must be finite.")
     if y_pred_std is not None and np.any(y_pred_std < 0.0):
-        raise ValueError("[sfxi_v1] y_pred_std must be non-negative.")
+        raise ValueError("sfxi_v1: y_pred_std must be non-negative.")
     y_pred_var = (y_pred_std**2) if y_pred_std is not None else None
 
     v_hat = np.clip(y_pred[:, 0:4].astype(float), 0.0, 1.0)
@@ -128,11 +128,11 @@ def sfxi_v1(
     gamma = float(params.get("intensity_exponent_gamma", 1.0))
     delta = float(params.get("intensity_log2_offset_delta", 0.0))
     if not np.isfinite(beta) or beta < 0.0:
-        raise ValueError(f"[sfxi_v1] logic_exponent_beta must be >= 0; got {beta}.")
+        raise ValueError(f"sfxi_v1: logic_exponent_beta must be >= 0; got {beta}.")
     if not np.isfinite(gamma) or gamma < 0.0:
-        raise ValueError(f"[sfxi_v1] intensity_exponent_gamma must be >= 0; got {gamma}.")
+        raise ValueError(f"sfxi_v1: intensity_exponent_gamma must be >= 0; got {gamma}.")
     if not np.isfinite(delta) or delta < 0.0:
-        raise ValueError(f"[sfxi_v1] intensity_log2_offset_delta must be >= 0; got {delta}.")
+        raise ValueError(f"sfxi_v1: intensity_log2_offset_delta must be >= 0; got {delta}.")
 
     scaling_cfg = dict(params.get("scaling", {}) or {})
     p, min_n, eps = _parse_scaling_cfg(scaling_cfg)
@@ -143,13 +143,13 @@ def sfxi_v1(
         denom = 1.0
     else:
         if train_view is None:
-            raise ValueError("[sfxi_v1] train_view is required")
+            raise ValueError("sfxi_v1: train_view is required")
         effect_pool = _compute_train_effect_pool(train_view, setpoint=setpoint, delta=delta, min_n=min_n)
         denom = denom_from_pool(effect_pool, percentile=p, min_n=min_n, eps=eps)
 
     # persist into RoundCtx (strict: must be declared in produces)
     if ctx is None:
-        raise ValueError("[sfxi_v1] ctx (PluginCtx) is required")
+        raise ValueError("sfxi_v1: ctx (PluginCtx) is required")
     ctx.set("objective/<self>/denom_percentile", int(p))
     ctx.set("objective/<self>/denom_value", float(denom))
 
@@ -190,7 +190,7 @@ def sfxi_v1(
 
     uncertainty_method = str(params.get("uncertainty_method", "delta")).strip().lower()
     if uncertainty_method != "delta":
-        raise ValueError("[sfxi_v1] uncertainty_method must be 'delta'.")
+        raise ValueError("sfxi_v1: uncertainty_method must be 'delta'.")
 
     # ---- scalar uncertainty (delta method over implemented score function) ----
     if y_pred_var is not None:
@@ -233,11 +233,11 @@ def sfxi_v1(
 
         scalar_uncertainty_var = np.sum((grad**2) * y_pred_var, axis=1)
         if not np.all(np.isfinite(scalar_uncertainty_var)):
-            raise ValueError("[sfxi_v1] computed scalar uncertainty variance contains non-finite values.")
+            raise ValueError("sfxi_v1: computed scalar uncertainty variance contains non-finite values.")
         scalar_uncertainty_var = np.maximum(scalar_uncertainty_var, 0.0)
         scalar_uncertainty = np.sqrt(scalar_uncertainty_var)
         if not np.all(np.isfinite(scalar_uncertainty)):
-            raise ValueError("[sfxi_v1] computed scalar uncertainty contains non-finite values.")
+            raise ValueError("sfxi_v1: computed scalar uncertainty contains non-finite values.")
     else:
         scalar_uncertainty = None
     ctx.set(

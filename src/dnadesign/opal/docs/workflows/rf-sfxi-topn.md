@@ -43,7 +43,7 @@ After a successful round-0 run:
 
 ---
 
-### The knobs in tha config that this demo is exercising
+### The knobs in the config that this demo is exercising
 
 This demo is “config-driven on purpose”: changing these blocks changes behavior without changing runtime code.
 
@@ -186,17 +186,8 @@ head -n 6 outputs/rounds/round_0/selection/selection_top_k.csv
 Inspect a selected record:
 
 ```bash
-# Resolve the first selected candidate id from the selection CSV.
-selected_id="$(python - <<'PY'
-import pandas as pd
-p="outputs/rounds/round_0/selection/selection_top_k.csv"
-df=pd.read_csv(p)
-id_col="id" if "id" in df.columns else df.columns[0]
-print(df[id_col].iloc[0])
-PY
-)"
-# Show run-aware record details for that selected candidate.
-uv run opal record-show -c configs/campaign.yaml --id "${selected_id}" --run-id latest
+# Show the top selected record (competition rank 1) from the latest round.
+uv run opal record-show -c configs/campaign.yaml --selected-rank 1 --round latest --run-id latest
 ```
 
 #### 6. Optional read-only analysis and plots

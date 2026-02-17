@@ -1,5 +1,3 @@
-# ABOUTME: End-to-end CLI workflow tests for OPAL campaigns.
-# ABOUTME: Covers init/validate, ingest-y, and helper command behavior.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -230,6 +228,110 @@ def test_run_rejects_corrupt_state_json(tmp_path: Path) -> None:
     assert res.exit_code != 0
     out = res.output.lower()
     assert "failed to load state.json" in out
+
+
+def test_run_surfaces_sfxi_round_label_requirements_as_opal_error(tmp_path: Path) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path)
+    app = _build()
+    runner = CliRunner()
+
+    raw = yaml.safe_load(campaign.read_text())
+    raw["objectives"][0]["params"]["scaling"] = {"percentile": 95, "min_n": 1, "eps": 1.0e-8}
+    campaign.write_text(yaml.safe_dump(raw, sort_keys=False))
+
+    init_res = runner.invoke(app, ["--no-color", "init", "-c", str(campaign)])
+    assert init_res.exit_code == 0, init_res.stdout
+
+    csv_path = workdir / "labels.csv"
+    df = pd.DataFrame(
+        {
+            "sequence": ["AAA"],
+            "v00": [0.0],
+            "v10": [0.0],
+            "v01": [0.0],
+            "v11": [1.0],
+            "y00_star": [0.1],
+            "y10_star": [0.1],
+            "y01_star": [0.1],
+            "y11_star": [0.1],
+            "intensity_log2_offset_delta": [0.0],
+        }
+    )
+    df.to_csv(csv_path, index=False)
+
+    ingest_res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--csv",
+            str(csv_path),
+            "--apply",
+        ],
+    )
+    assert ingest_res.exit_code == 0, ingest_res.stdout
+
+    res = runner.invoke(app, ["--no-color", "run", "-c", str(campaign), "--round", "1"])
+    assert res.exit_code == 2, res.output
+    out = res.output.lower()
+    assert "objective plugin 'sfxi_v1' failed" in out
+    assert "min_n=1" in out
+    assert "current round" in out
+
+
+def test_run_reports_empty_candidate_pool_as_opal_error(tmp_path: Path) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path)
+    app = _build()
+    runner = CliRunner()
+
+    raw = yaml.safe_load(campaign.read_text())
+    raw["objectives"][0]["params"]["scaling"] = {"percentile": 95, "min_n": 1, "eps": 1.0e-8}
+    campaign.write_text(yaml.safe_dump(raw, sort_keys=False))
+
+    init_res = runner.invoke(app, ["--no-color", "init", "-c", str(campaign)])
+    assert init_res.exit_code == 0, init_res.stdout
+
+    csv_path = workdir / "labels.csv"
+    df = pd.DataFrame(
+        {
+            "sequence": ["AAA", "BBB"],
+            "v00": [0.0, 0.0],
+            "v10": [0.0, 0.0],
+            "v01": [0.0, 0.0],
+            "v11": [1.0, 0.5],
+            "y00_star": [0.1, 0.2],
+            "y10_star": [0.1, 0.2],
+            "y01_star": [0.1, 0.2],
+            "y11_star": [0.1, 0.2],
+            "intensity_log2_offset_delta": [0.0, 0.0],
+        }
+    )
+    df.to_csv(csv_path, index=False)
+
+    ingest_res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--csv",
+            str(csv_path),
+            "--apply",
+        ],
+    )
+    assert ingest_res.exit_code == 0, ingest_res.stdout
+
+    res = runner.invoke(app, ["--no-color", "run", "-c", str(campaign), "--round", "0"])
+    assert res.exit_code == 2, res.output
+    out = res.output.lower()
+    assert "candidate pool is empty after filtering" in out
 
 
 def test_label_hist_validate_and_repair(tmp_path: Path) -> None:

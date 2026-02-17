@@ -1,5 +1,3 @@
-# ABOUTME: Marimo notebook for promoter OPAL dashboard exploration.
-# ABOUTME: Provides interactive exploration of campaign datasets and scoring.
 import marimo
 
 __generated_with = "0.19.4"

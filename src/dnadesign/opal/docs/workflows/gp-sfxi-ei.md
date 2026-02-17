@@ -112,34 +112,18 @@ Preview the selection:
 head -n 6 outputs/rounds/round_0/selection/selection_top_k.csv
 ```
 
-Optional: discover which “uncertainty / acquisition” columns exist in the CSV.
+Optional: inspect objective channel metadata for the latest run.
 
 ```bash
-# Inspect uncertainty- or acquisition-related columns in selection output.
-python - <<'PY'
-import pandas as pd
-p="outputs/rounds/round_0/selection/selection_top_k.csv"
-df=pd.read_csv(p)
-cols=[c for c in df.columns if any(k in c.lower() for k in ["uncert", "sigma", "std", "acq", "ei"])]
-print("candidate columns:", cols)
-print(df[cols].head() if cols else "(no matching columns found)")
-PY
+# Show score/uncertainty channel refs and objective diagnostics for the latest round.
+uv run opal objective-meta -c configs/campaign.yaml --round latest
 ```
 
 Inspect a selected record:
 
 ```bash
-# Resolve the first selected candidate id from the selection CSV.
-selected_id="$(python - <<'PY'
-import pandas as pd
-p="outputs/rounds/round_0/selection/selection_top_k.csv"
-df=pd.read_csv(p)
-id_col="id" if "id" in df.columns else df.columns[0]
-print(df[id_col].iloc[0])
-PY
-)"
-# Show run-aware record details for that selected candidate.
-uv run opal record-show -c configs/campaign.yaml --id "${selected_id}" --run-id latest
+# Show the top selected record (competition rank 1) from the latest round.
+uv run opal record-show -c configs/campaign.yaml --selected-rank 1 --round latest --run-id latest
 ```
 
 #### 5. Optional read-only analysis and plots

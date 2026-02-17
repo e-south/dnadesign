@@ -1,5 +1,3 @@
-# ABOUTME: Validates run_round wiring for round_ctx and ledger outputs.
-# ABOUTME: Exercises runtime with label history and SFXI objective metadata.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

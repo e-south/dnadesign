@@ -1,5 +1,3 @@
-# ABOUTME: Verifies selection outputs against ledger predictions and run metadata.
-# ABOUTME: Covers integration paths for verify-outputs and end-to-end run flows.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

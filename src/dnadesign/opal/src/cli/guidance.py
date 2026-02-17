@@ -71,6 +71,7 @@ def detect_workflow_key(cfg: RootConfig) -> str:
 
 
 def _build_doc_pointers(cfg: RootConfig, workflow_key: str) -> dict[str, list[str]]:
+    src_root = "src/dnadesign/opal/src"
     docs: list[str] = [
         "docs/workflows",
         "docs/reference/configuration.md",
@@ -79,11 +80,11 @@ def _build_doc_pointers(cfg: RootConfig, workflow_key: str) -> dict[str, list[st
         "docs/concepts/roundctx.md",
     ]
     source: list[str] = [
-        "src/runtime/run_round.py",
-        "src/runtime/round/stages.py",
-        "src/registries/models.py",
-        "src/registries/objectives.py",
-        "src/registries/selection.py",
+        f"{src_root}/runtime/run_round.py",
+        f"{src_root}/runtime/round/stages.py",
+        f"{src_root}/registries/models.py",
+        f"{src_root}/registries/objectives.py",
+        f"{src_root}/registries/selection.py",
     ]
 
     model_name = str(cfg.model.name)
@@ -91,16 +92,16 @@ def _build_doc_pointers(cfg: RootConfig, workflow_key: str) -> dict[str, list[st
     objective_names = [str(o.name) for o in cfg.objectives.objectives]
     if model_name == "gaussian_process":
         docs.append("docs/plugins/model-gaussian-process.md")
-        source.append("src/models/gaussian_process.py")
+        source.append(f"{src_root}/models/gaussian_process.py")
     else:
         docs.append("docs/plugins/models.md")
-        source.append("src/models/random_forest.py")
+        source.append(f"{src_root}/models/random_forest.py")
     if "sfxi_v1" in objective_names:
         docs.append("docs/plugins/objective-sfxi.md")
-        source.append("src/objectives/sfxi_v1.py")
+        source.append(f"{src_root}/objectives/sfxi_v1.py")
     if selection_name == "expected_improvement":
         docs.append("docs/plugins/selection-expected-improvement.md")
-        source.append("src/selection/expected_improvement.py")
+        source.append(f"{src_root}/selection/expected_improvement.py")
     docs.append("docs/plugins/selection.md")
     if workflow_key == "rf_sfxi_topn":
         docs.append("docs/workflows/rf-sfxi-topn.md")

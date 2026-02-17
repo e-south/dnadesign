@@ -1,5 +1,3 @@
-# ABOUTME: Ensures prom60 EDA notebook auto-loads data without a manual button.
-# ABOUTME: Guards against reintroducing load-button gating that hides data by default.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

@@ -1,5 +1,3 @@
-# ABOUTME: Tests predict Y-ops guardrails for missing round context metadata.
-# ABOUTME: Ensures prediction fails fast when Y-ops inversion lacks round_ctx.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

@@ -1,5 +1,3 @@
-# ABOUTME: Tests campaign state loading compatibility for minimal state v1.
-# ABOUTME: Ensures status reporting handles missing run_id fields.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

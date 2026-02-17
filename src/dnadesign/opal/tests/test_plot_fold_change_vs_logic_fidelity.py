@@ -1,5 +1,3 @@
-# ABOUTME: Tests fold-change vs logic fidelity plot output contracts.
-# ABOUTME: Ensures saved plot data columns remain namespaced and consistent.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

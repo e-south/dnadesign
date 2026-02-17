@@ -1,5 +1,3 @@
-# ABOUTME: Exercises ledger compaction for run_meta datasets.
-# ABOUTME: Ensures duplicate run_id rows are deduplicated.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

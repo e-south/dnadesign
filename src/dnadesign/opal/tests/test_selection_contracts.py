@@ -1,5 +1,3 @@
-# ABOUTME: Verifies shared selection contract parsing for objective mode and tie handling.
-# ABOUTME: Ensures consistent fail-fast behavior across runtime, CLI, and dashboard callers.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

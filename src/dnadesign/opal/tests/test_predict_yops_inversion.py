@@ -1,5 +1,3 @@
-# ABOUTME: Verifies Y-ops inversion during prediction with round metadata.
-# ABOUTME: Ensures round_ctx-driven inversion modifies predictions as expected.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

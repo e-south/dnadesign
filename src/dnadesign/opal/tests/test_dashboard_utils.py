@@ -1,5 +1,3 @@
-# ABOUTME: Exercises dashboard utilities for parsing OPAL label history and plots.
-# ABOUTME: Covers parsing, filters, and SFXI overlays for dashboard workflows.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

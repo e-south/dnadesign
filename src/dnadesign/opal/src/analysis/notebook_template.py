@@ -31,8 +31,6 @@ def render_campaign_notebook(config_path: Path, *, round_selector: str) -> str:
 
     template = dedent(
         """
-        # ABOUTME: Marimo notebook for OPAL campaign analysis workflows.
-        # ABOUTME: Loads records, labels, and predictions for interactive inspection.
         import marimo
 
         __generated_with = "__GENERATED_WITH__"

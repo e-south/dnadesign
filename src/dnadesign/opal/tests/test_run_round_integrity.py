@@ -1,11 +1,9 @@
-# ABOUTME: Validates run_round correctness guards around objective outputs.
-# ABOUTME: Exercises run_round behavior that should fail fast on invalid scores.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/tests/test_run_round_integrity.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

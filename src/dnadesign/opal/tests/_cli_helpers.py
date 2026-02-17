@@ -1,5 +1,3 @@
-# ABOUTME: Test helpers for building OPAL campaign fixtures and ledgers.
-# ABOUTME: Provides small utilities for CLI workflow tests.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

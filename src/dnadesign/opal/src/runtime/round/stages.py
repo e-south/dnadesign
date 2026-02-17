@@ -231,6 +231,9 @@ def stage_x_matrices(
             f"(policy allow_resuggesting_candidates_until_labeled={plan.allow_resuggest})",
         )
 
+    if cand_df.shape[0] == 0:
+        raise OpalError("Candidate pool is empty after filtering; nothing to score.")
+
     X_pool, id_order_pool = store.transform_matrix(df, cand_df["id"], ctx=tctx)
     if X_pool.shape[0] == 0:
         raise OpalError("Candidate pool is empty after filtering; nothing to score.")
@@ -402,13 +405,18 @@ def stage_scoring(
         obj_params_i = dict(obj_ref.params)
         obj_fn = get_objective(obj_name_i)
         octx = rctx.for_plugin(category="objective", name=obj_name_i, plugin=obj_fn)
-        raw_obj = obj_fn(
-            y_pred=Y_hat,
-            params=obj_params_i,
-            ctx=octx,
-            train_view=tv,
-            y_pred_std=y_pred_std,
-        )
+        try:
+            raw_obj = obj_fn(
+                y_pred=Y_hat,
+                params=obj_params_i,
+                ctx=octx,
+                train_view=tv,
+                y_pred_std=y_pred_std,
+            )
+        except OpalError:
+            raise
+        except Exception as e:
+            raise OpalError(f"Objective plugin '{obj_name_i}' failed: {e}") from e
         obj_res = validate_objective_result_v2(
             result=raw_obj,
             objective_name=obj_name_i,
@@ -489,16 +497,21 @@ def stage_scoring(
     sel_fn = get_selection(sel_name, sel_params)
     sctx = rctx.for_plugin(category="selection", name=sel_name, plugin=sel_fn)
     selection_call_params = extract_selection_plugin_params(sel_params)
-    raw_sel = sel_fn(
-        ids=np.array(id_order_pool),
-        scores=y_obj_scalar,
-        top_k=top_k,
-        tie_handling=tie_handling,
-        objective=mode,
-        ctx=sctx,
-        scalar_uncertainty=sq,
-        **selection_call_params,
-    )
+    try:
+        raw_sel = sel_fn(
+            ids=np.array(id_order_pool),
+            scores=y_obj_scalar,
+            top_k=top_k,
+            tie_handling=tie_handling,
+            objective=mode,
+            ctx=sctx,
+            scalar_uncertainty=sq,
+            **selection_call_params,
+        )
+    except OpalError:
+        raise
+    except Exception as e:
+        raise OpalError(f"Selection plugin '{sel_name}' failed: {e}") from e
     validated_sel = validate_selection_result(raw_sel, plugin_name=sel_name, expected_len=len(id_order_pool))
     sel_norm = normalize_selection_result(
         {"order_idx": validated_sel.order_idx},

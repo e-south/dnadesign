@@ -9,11 +9,12 @@ Module Author(s): Eric J. South
 
 from pathlib import Path
 
+import pandas as pd
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
 
-from ._cli_helpers import write_campaign_yaml, write_ledger, write_records
+from ._cli_helpers import write_campaign_yaml, write_ledger, write_records, write_state
 
 
 def _setup_workspace(tmp_path: Path) -> tuple[Path, Path, Path]:
@@ -72,3 +73,75 @@ def test_record_show_missing_id_fails_fast(tmp_path: Path) -> None:
     )
     assert res.exit_code != 0
     assert "record not found" in res.output.lower()
+
+
+def test_record_show_selected_rank_resolves_id_from_selection_csv(tmp_path: Path) -> None:
+    workdir, campaign, records = _setup_workspace(tmp_path)
+    write_ledger(workdir, run_id="r0", round_index=0)
+    write_state(workdir, records_path=records, run_id="r0", round_index=0)
+    sel_dir = workdir / "outputs" / "rounds" / "round_0" / "selection"
+    sel_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "id": ["a", "b"],
+            "sel__rank_competition": [1, 2],
+            "pred__score_selected": [0.2, 0.1],
+        }
+    ).to_csv(sel_dir / "selection_top_k.csv", index=False)
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "record-show",
+            "-c",
+            str(campaign),
+            "--selected-rank",
+            "1",
+            "--round",
+            "0",
+            "--run-id",
+            "latest",
+            "--json",
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    assert '"id": "a"' in res.stdout
+
+
+def test_record_show_rejects_selected_rank_with_explicit_id(tmp_path: Path) -> None:
+    workdir, campaign, records = _setup_workspace(tmp_path)
+    write_ledger(workdir, run_id="r0", round_index=0)
+    write_state(workdir, records_path=records, run_id="r0", round_index=0)
+    sel_dir = workdir / "outputs" / "rounds" / "round_0" / "selection"
+    sel_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        {
+            "id": ["a"],
+            "sel__rank_competition": [1],
+            "pred__score_selected": [0.2],
+        }
+    ).to_csv(sel_dir / "selection_top_k.csv", index=False)
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "record-show",
+            "-c",
+            str(campaign),
+            "--id",
+            "a",
+            "--selected-rank",
+            "1",
+            "--round",
+            "0",
+            "--json",
+        ],
+    )
+    assert res.exit_code != 0
+    assert "cannot be combined" in res.output.lower()

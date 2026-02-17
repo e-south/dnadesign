@@ -1,11 +1,9 @@
-# ABOUTME: Ensures ledger run/label sinks write append-only dataset parts.
-# ABOUTME: Validates run/label ledger paths are directories with parquet parts.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/tests/test_ledger_dataset_writes.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

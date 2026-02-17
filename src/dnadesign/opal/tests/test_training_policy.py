@@ -1,5 +1,3 @@
-# ABOUTME: Tests training label extraction policies across rounds from label history.
-# ABOUTME: Ensures labels are deduped and pred entries are ignored during training.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

@@ -115,17 +115,8 @@ Expected result: `verify-outputs` reports `mismatches: 0`.
 Inspect a selected record and look for the selected score/uncertainty fields.
 
 ```bash
-# Resolve the first selected candidate id from the selection CSV.
-selected_id="$(python - <<'PY'
-import pandas as pd
-p="outputs/rounds/round_0/selection/selection_top_k.csv"
-df=pd.read_csv(p)
-id_col="id" if "id" in df.columns else df.columns[0]
-print(df[id_col].iloc[0])
-PY
-)"
-# Show run-aware record details for that selected candidate.
-uv run opal record-show -c configs/campaign.yaml --id "${selected_id}" --run-id latest
+# Show the top selected record (competition rank 1) from the latest round.
+uv run opal record-show -c configs/campaign.yaml --selected-rank 1 --round latest --run-id latest
 ```
 
 #### 6. Optional read-only analysis and plots

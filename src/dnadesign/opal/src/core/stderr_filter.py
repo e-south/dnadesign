@@ -74,6 +74,10 @@ def _install_stderr_filter(needles: Iterable[str]) -> None:
         if getattr(sys, "_opal_stderr_filter_cleaned", False):
             return
         setattr(sys, "_opal_stderr_filter_cleaned", True)
+        try:
+            sys.stderr.flush()
+        except Exception:
+            pass
         # Restore stderr to the original FD, which also closes the pipe writer.
         try:
             os.dup2(orig_fd, 2)
@@ -81,7 +85,7 @@ def _install_stderr_filter(needles: Iterable[str]) -> None:
             pass
         # Give the reader a brief chance to flush remaining buffered lines.
         try:
-            t.join(timeout=0.2)
+            t.join(timeout=5.0)
         except Exception:
             pass
         try:
