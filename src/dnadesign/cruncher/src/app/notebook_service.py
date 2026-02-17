@@ -331,7 +331,7 @@ def _(topk_df, topk_slider):
 
 
 @app.cell
-def _(analysis_dir, pd, plot_manifest):
+def _(analysis_dir, pd, plot_manifest, run_dir):
     plot_entries = plot_manifest.get("plots", []) if isinstance(plot_manifest, dict) else []
     rows = []
     for plot_entry in plot_entries:
@@ -339,6 +339,10 @@ def _(analysis_dir, pd, plot_manifest):
         for raw_output in plot_entry.get("outputs", []):
             _path = raw_output.get("path", "") if isinstance(raw_output, dict) else ""
             _full_path = analysis_dir / _path if _path else None
+            if _full_path is not None and not _full_path.exists():
+                _run_path = run_dir / _path
+                if _run_path.exists():
+                    _full_path = _run_path
             _outputs.append(
                 {{
                     "path": _path,
@@ -388,7 +392,7 @@ def _(default_key, mo, plot_options):
 
 
 @app.cell
-def _(analysis_dir, mo, plot_entries, plot_picker):
+def _(analysis_dir, mo, plot_entries, plot_picker, run_dir):
     plot_key = plot_picker.value if plot_picker else None
     selected_plot = next((plot_entry for plot_entry in plot_entries if plot_entry.get("key") == plot_key), None)
     plot_preview = mo.md("No plot metadata available.")
@@ -408,6 +412,10 @@ def _(analysis_dir, mo, plot_entries, plot_picker):
             for output in _outputs:
                 _path = output.get("path", "")
                 _full_path = analysis_dir / _path if _path else None
+                if _full_path is not None and not _full_path.exists():
+                    _run_path = run_dir / _path
+                    if _run_path.exists():
+                        _full_path = _run_path
                 exists = bool(_full_path and _full_path.exists())
                 lines.append(f"- {{_path}} ({{'ok' if exists else 'missing'}})")
             _plot_blocks.append(mo.md("Outputs:\\n" + "\\n".join(lines)))
@@ -420,6 +428,10 @@ def _(analysis_dir, mo, plot_entries, plot_picker):
             if not _path:
                 continue
             _full_path = analysis_dir / _path
+            if not _full_path.exists():
+                _run_path = run_dir / _path
+                if _run_path.exists():
+                    _full_path = _run_path
             if _full_path.exists() and _full_path.suffix.lower() in {".png", ".jpg", ".jpeg"}:
                 _plot_blocks.append(mo.image(_full_path))
                 continue

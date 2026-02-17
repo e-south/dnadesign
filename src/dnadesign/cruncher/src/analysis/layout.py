@@ -14,6 +14,8 @@ import logging
 from pathlib import Path
 from typing import Optional, Sequence
 
+from dnadesign.cruncher.artifacts.layout import run_plots_analysis_dir
+
 logger = logging.getLogger(__name__)
 
 ANALYSIS_LAYOUT_VERSION = "v12"
@@ -36,8 +38,16 @@ def analysis_root(run_dir: Path) -> Path:
     return run_dir / ANALYSIS_DIR_NAME
 
 
+def _run_dir_from_analysis_root(analysis_root: Path) -> Path:
+    if ANALYSIS_DIR_NAME in analysis_root.parts:
+        analysis_idx = analysis_root.parts.index(ANALYSIS_DIR_NAME)
+        if analysis_idx > 0:
+            return Path(*analysis_root.parts[:analysis_idx])
+    return analysis_root.parent
+
+
 def analysis_plots_root(analysis_root: Path) -> Path:
-    return analysis_root / ANALYSIS_PLOTS_DIR
+    return run_plots_analysis_dir(_run_dir_from_analysis_root(analysis_root))
 
 
 def analysis_tables_root(analysis_root: Path) -> Path:

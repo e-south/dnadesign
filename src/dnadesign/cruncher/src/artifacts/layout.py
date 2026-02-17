@@ -16,19 +16,21 @@ from dnadesign.cruncher.core.labels import format_regulator_slug
 
 # Run-level IA:
 # - run/: run metadata/state files
-# - inputs/: resolved lock/parse inputs pinned for reproducibility
+# - provenance/: resolved lock/parse inputs pinned for reproducibility
 # - optimize/: sampler outputs split into tables/ + state/
 # - analysis/: analysis outputs (managed by analysis/layout.py)
+# - plots/: plot outputs grouped by producer
 # - export/: downstream contract exports
 RUN_META_DIR = "run"
 RUN_ARTIFACTS_DIR = "artifacts"
 RUN_LIVE_DIR = "live"
-RUN_INPUT_DIR = "inputs"
+RUN_PROVENANCE_DIR = "provenance"
 RUN_OPTIMIZE_DIR = "optimize"
 RUN_OPTIMIZE_TABLES_DIR = "tables"
 RUN_OPTIMIZE_META_DIR = "state"
 RUN_OUTPUT_DIR = "analysis"
 RUN_PLOTS_DIR = "plots"
+RUN_PLOTS_ANALYSIS_DIR = "analysis"
 RUN_PLOTS_LOGOS_DIR = "logos"
 RUN_EXPORT_DIR = "export"
 RUN_EXPORT_SEQUENCES_DIR = "sequences"
@@ -101,7 +103,7 @@ def ensure_run_dirs(
     if meta:
         run_meta_dir(run_dir).mkdir(parents=True, exist_ok=True)
     if meta or artifacts or live:
-        run_input_dir(run_dir).mkdir(parents=True, exist_ok=True)
+        run_provenance_dir(run_dir).mkdir(parents=True, exist_ok=True)
     if artifacts or live:
         run_optimize_dir(run_dir).mkdir(parents=True, exist_ok=True)
         run_optimize_tables_dir(run_dir).mkdir(parents=True, exist_ok=True)
@@ -109,6 +111,7 @@ def ensure_run_dirs(
     if artifacts:
         run_output_dir(run_dir).mkdir(parents=True, exist_ok=True)
         run_plots_dir(run_dir).mkdir(parents=True, exist_ok=True)
+        run_plots_analysis_dir(run_dir).mkdir(parents=True, exist_ok=True)
         run_plots_logos_dir(run_dir).mkdir(parents=True, exist_ok=True)
         run_export_dir(run_dir).mkdir(parents=True, exist_ok=True)
         run_export_sequences_dir(run_dir).mkdir(parents=True, exist_ok=True)
@@ -118,8 +121,8 @@ def run_meta_dir(run_dir: Path) -> Path:
     return run_dir / RUN_META_DIR
 
 
-def run_input_dir(run_dir: Path) -> Path:
-    return run_dir / RUN_INPUT_DIR
+def run_provenance_dir(run_dir: Path) -> Path:
+    return run_dir / RUN_PROVENANCE_DIR
 
 
 def run_optimize_dir(run_dir: Path) -> Path:
@@ -140,6 +143,10 @@ def run_output_dir(run_dir: Path) -> Path:
 
 def run_plots_dir(run_dir: Path) -> Path:
     return run_dir / RUN_PLOTS_DIR
+
+
+def run_plots_analysis_dir(run_dir: Path) -> Path:
+    return run_plots_dir(run_dir) / RUN_PLOTS_ANALYSIS_DIR
 
 
 def run_plots_logos_dir(run_dir: Path) -> Path:
@@ -220,26 +227,19 @@ def elites_yaml_path(run_dir: Path) -> Path:
 
 
 def lockfile_snapshot_path(run_dir: Path) -> Path:
-    return run_input_dir(run_dir) / "lockfile.json"
+    return run_provenance_dir(run_dir) / "lockfile.json"
 
 
 def parse_manifest_path(run_dir: Path) -> Path:
-    return run_input_dir(run_dir) / "parse_manifest.json"
+    return run_provenance_dir(run_dir) / "parse_manifest.json"
 
 
 def pwm_summary_path(run_dir: Path) -> Path:
-    return run_input_dir(run_dir) / "pwm_summary.json"
+    return run_provenance_dir(run_dir) / "pwm_summary.json"
 
 
 def logos_root(out_root_path: Path) -> Path:
     return out_root_path / RUN_PLOTS_DIR / RUN_PLOTS_LOGOS_DIR
-
-
-def logos_dir_for_run(out_root_path: Path, stage: str, run_name: str) -> Path:
-    stage_name = str(stage).strip().lower()
-    if not stage_name:
-        raise ValueError("stage is required for logo run layout")
-    return logos_root(out_root_path) / stage_name / run_name
 
 
 def campaign_name_slug(name: str) -> str:

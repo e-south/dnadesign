@@ -79,7 +79,18 @@ def _safe_int(value: object) -> int | None:
 def _relative_if_exists(base: Path, target: Path) -> str | None:
     if not target.exists():
         return None
-    return str(target.relative_to(base))
+    roots: list[Path] = [base]
+    if "analysis" in base.parts:
+        analysis_idx = base.parts.index("analysis")
+        if analysis_idx > 0:
+            roots.append(Path(*base.parts[:analysis_idx]))
+    roots.append(base.parent)
+    for root in roots:
+        try:
+            return str(target.relative_to(root))
+        except ValueError:
+            continue
+    raise ValueError(f"{target} is not within expected analysis roots: {roots}")
 
 
 def _table_path(base: Path, stem: str, fmt: str) -> str | None:
@@ -88,6 +99,34 @@ def _table_path(base: Path, stem: str, fmt: str) -> str | None:
 
 def _plot_path(base: Path, stem: str, fmt: str) -> str | None:
     return _relative_if_exists(base, analysis_plot_path(base, stem, fmt))
+
+
+def _plot_path_from_manifest(base: Path, key: str) -> str | None:
+    payload = _load_json(plot_manifest_path(base))
+    if not isinstance(payload, dict):
+        return None
+    plots = payload.get("plots")
+    if not isinstance(plots, list):
+        return None
+    for entry in plots:
+        if not isinstance(entry, dict) or entry.get("key") != key:
+            continue
+        outputs = entry.get("outputs")
+        if not isinstance(outputs, list):
+            continue
+        for output in outputs:
+            if not isinstance(output, dict):
+                continue
+            rel_path = output.get("path")
+            if not isinstance(rel_path, str) or not rel_path:
+                continue
+            in_analysis = base / rel_path
+            if in_analysis.exists():
+                return rel_path
+            in_run = base.parent / rel_path
+            if in_run.exists():
+                return rel_path
+    return None
 
 
 def build_report_payload(
@@ -222,9 +261,12 @@ def build_report_payload(
     }
 
     pointers = {
-        "start_here_plot": _plot_path(analysis_root, start_here_key, plot_format),
-        "trajectory_plot": _plot_path(analysis_root, "chain_trajectory_scatter", plot_format),
-        "trajectory_sweep_plot": _plot_path(analysis_root, "chain_trajectory_sweep", plot_format),
+        "start_here_plot": _plot_path_from_manifest(analysis_root, start_here_key)
+        or _plot_path(analysis_root, start_here_key, plot_format),
+        "trajectory_plot": _plot_path_from_manifest(analysis_root, "chain_trajectory_scatter")
+        or _plot_path(analysis_root, "chain_trajectory_scatter", plot_format),
+        "trajectory_sweep_plot": _plot_path_from_manifest(analysis_root, "chain_trajectory_sweep")
+        or _plot_path(analysis_root, "chain_trajectory_sweep", plot_format),
         "diagnostics": _table_path(analysis_root, "diagnostics_summary", "json"),
         "objective_components": _table_path(analysis_root, "objective_components", "json"),
         "elites_mmr_summary": _table_path(analysis_root, "elites_mmr_summary", table_format),
@@ -333,8 +375,8 @@ def write_report_md(
             "",
             "## Start here",
             "",
-            f"- {pointers.get('start_here_plot') or 'plots/chain_trajectory_scatter.<ext>'}",
-            f"- {pointers.get('trajectory_sweep_plot') or 'plots/chain_trajectory_sweep.<ext>'}",
+            f"- {pointers.get('start_here_plot') or 'plots/analysis/chain_trajectory_scatter.<ext>'}",
+            f"- {pointers.get('trajectory_sweep_plot') or 'plots/analysis/chain_trajectory_sweep.<ext>'}",
             f"- {pointers.get('diagnostics') or 'tables/table__diagnostics_summary.json'}",
             f"- {pointers.get('objective_components') or 'tables/table__objective_components.json'}",
         ]
@@ -362,8 +404,8 @@ def write_report_md(
         lines.extend([f"- {item}" for item in warnings])
 
     artifact_index = [
-        pointers.get("start_here_plot") or "plots/chain_trajectory_scatter.<ext>",
-        pointers.get("trajectory_sweep_plot") or "plots/chain_trajectory_sweep.<ext>",
+        pointers.get("start_here_plot") or "plots/analysis/chain_trajectory_scatter.<ext>",
+        pointers.get("trajectory_sweep_plot") or "plots/analysis/chain_trajectory_sweep.<ext>",
         pointers.get("diagnostics") or "tables/table__diagnostics_summary.json",
         pointers.get("objective_components") or "tables/table__objective_components.json",
         pointers.get("elites_mmr_summary") or None,

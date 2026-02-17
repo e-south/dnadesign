@@ -77,6 +77,7 @@ from dnadesign.cruncher.artifacts.layout import (
     manifest_path,
     random_baseline_hits_path,
     random_baseline_path,
+    run_plots_analysis_dir,
     sequences_path,
     trace_path,
 )
@@ -896,6 +897,10 @@ def run_analyze(
         plot_format = analysis_cfg.plot_format
         plot_dpi = analysis_cfg.plot_dpi
         plot_kwargs = {"dpi": plot_dpi, "png_compress_level": 9}
+        analysis_plots_dir = run_plots_analysis_dir(run_dir)
+        if analysis_plots_dir.exists():
+            shutil.rmtree(analysis_plots_dir)
+        analysis_plots_dir.mkdir(parents=True, exist_ok=True)
 
         focus_pair = _select_tf_pair(tf_names, analysis_cfg.pairwise)
         trajectory_tf_pair = _resolve_trajectory_tf_pair(tf_names, analysis_cfg.pairwise)
@@ -937,8 +942,11 @@ def run_analyze(
 
         def _record_plot(spec_key: str, output: Path, generated: bool, skip_reason: str | None) -> None:
             spec = next(spec for spec in PLOT_SPECS if spec.key == spec_key)
-            rel_output = output.relative_to(tmp_root)
-            final_output = analysis_root_path / rel_output
+            try:
+                rel_output = output.relative_to(run_dir)
+            except ValueError as exc:
+                raise ValueError(f"analysis plot output must be inside run dir: {output}") from exc
+            final_output = output
             plot_entries.append(
                 {
                     "key": spec.key,
