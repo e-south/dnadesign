@@ -20,7 +20,10 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_metrics import (
+from dnadesign.densegen.src.cli.main import _format_tier_counts, _stage_a_sampling_rows, app
+from dnadesign.densegen.src.cli.render import stage_a_recap_tables
+from dnadesign.densegen.src.core.artifacts.pool import PoolData
+from dnadesign.densegen.src.core.stage_a.stage_a_metrics import (
     CoreHammingSummary,
     DiversitySummary,
     EntropyBlock,
@@ -34,10 +37,7 @@ from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_metrics import (
     ScoreSummary,
     ScoreSummaryBlock,
 )
-from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_summary import PWMSamplingSummary
-from dnadesign.densegen.src.cli import _format_tier_counts, _stage_a_sampling_rows, app
-from dnadesign.densegen.src.cli_render import stage_a_recap_tables
-from dnadesign.densegen.src.core.artifacts.pool import PoolData
+from dnadesign.densegen.src.core.stage_a.stage_a_summary import PWMSamplingSummary
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
 
 _FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None

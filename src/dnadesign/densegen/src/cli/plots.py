@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/densegen/cli_commands/plots.py
+dnadesign/densegen/cli/plots.py
 
 Plotting CLI command registration.
 
@@ -17,9 +17,9 @@ from typing import Optional
 
 import typer
 
-from ..cli_commands.context import CliContext
 from ..utils.logging_utils import install_native_stderr_filters
 from ..utils.mpl_utils import ensure_mpl_cache_dir
+from .context import CliContext
 
 
 def _has_resumable_run_state(run_root: Path) -> bool:

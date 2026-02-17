@@ -14,7 +14,7 @@ Module Author(s): Eric J. South
 # ABOUTME: Ensures progress output avoids non-monotonic percentage noise.
 from __future__ import annotations
 
-from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_progress import (
+from dnadesign.densegen.src.core.stage_a.stage_a_progress import (
     StageAProgressState,
     _format_pwm_progress_line,
     _stage_a_live_render,

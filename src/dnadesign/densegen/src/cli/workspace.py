@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/densegen/cli_commands/workspace.py
+dnadesign/densegen/cli/workspace.py
 
 Workspace scaffolding CLI command registration.
 
@@ -21,8 +21,8 @@ from typing import Callable, Optional
 import typer
 import yaml
 
-from ..cli_commands.context import CliContext
 from ..config import LATEST_SCHEMA_VERSION, resolve_relative_path
+from .context import CliContext
 
 
 def _repo_root_from(start: Path) -> Path | None:
@@ -79,7 +79,6 @@ def _apply_output_mode(output: dict, *, run_id: str, output_mode: str) -> dict:
         usr_cfg["root"] = "outputs/usr_datasets"
         usr_cfg["dataset"] = run_id
         usr_cfg.setdefault("chunk_size", 128)
-        usr_cfg.setdefault("allow_overwrite", False)
         out["usr"] = usr_cfg
 
     if mode == "local":

@@ -18,7 +18,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from dnadesign.densegen.src.cli import app
+from dnadesign.densegen.src.cli.main import app
 from dnadesign.densegen.tests.config_fixtures import write_minimal_config
 
 
@@ -43,7 +43,9 @@ def test_notebook_generate_writes_workspace_notebook(tmp_path: Path) -> None:
     assert "DenseGen Run Notebook" in content
     assert "from dnadesign.baserender import load_records_from_parquet" in content
     assert "from dnadesign.baserender import render_record_figure" in content
-    assert "from dnadesign.densegen.notebook_render_contract import densegen_notebook_render_contract" in content
+    assert (
+        "from dnadesign.densegen.src.integrations.baserender.notebook_contract import densegen_notebook_render_contract"
+    ) in content
     assert "records_path = Path(" in content
     assert "dense_arrays.parquet" not in content
     assert "record_window_limit = int(contract.record_window_limit)" in content
@@ -234,7 +236,7 @@ def test_notebook_run_uses_marimo_run_mode_by_default(tmp_path: Path, monkeypatc
     gen_result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
     assert gen_result.exit_code == 0, gen_result.output
 
-    import dnadesign.densegen.src.cli_commands.notebook as notebook_commands
+    import dnadesign.densegen.src.cli.notebook as notebook_commands
 
     monkeypatch.setattr(notebook_commands, "_ensure_marimo_installed", lambda: None)
     captured: dict[str, object] = {}
@@ -264,7 +266,7 @@ def test_notebook_run_edit_mode_failure_suggests_run_mode(tmp_path: Path, monkey
     gen_result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
     assert gen_result.exit_code == 0, gen_result.output
 
-    import dnadesign.densegen.src.cli_commands.notebook as notebook_commands
+    import dnadesign.densegen.src.cli.notebook as notebook_commands
 
     monkeypatch.setattr(notebook_commands, "_ensure_marimo_installed", lambda: None)
 
@@ -286,7 +288,7 @@ def test_notebook_run_headless_passes_flag_to_marimo(tmp_path: Path, monkeypatch
     gen_result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
     assert gen_result.exit_code == 0, gen_result.output
 
-    import dnadesign.densegen.src.cli_commands.notebook as notebook_commands
+    import dnadesign.densegen.src.cli.notebook as notebook_commands
 
     monkeypatch.setattr(notebook_commands, "_ensure_marimo_installed", lambda: None)
     captured: dict[str, object] = {}
@@ -311,7 +313,7 @@ def test_notebook_run_rejects_headless_edit_mode(tmp_path: Path, monkeypatch) ->
     gen_result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
     assert gen_result.exit_code == 0, gen_result.output
 
-    import dnadesign.densegen.src.cli_commands.notebook as notebook_commands
+    import dnadesign.densegen.src.cli.notebook as notebook_commands
 
     monkeypatch.setattr(notebook_commands, "_ensure_marimo_installed", lambda: None)
     run_result = runner.invoke(app, ["notebook", "run", "--mode", "edit", "--headless", "-c", str(cfg_path)])

@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/densegen/cli_commands/config.py
+dnadesign/densegen/cli/config.py
 
 Config validation CLI command registration.
 
@@ -18,7 +18,7 @@ from typing import Callable, Optional
 
 import typer
 
-from ..cli_commands.context import CliContext
+from .context import CliContext
 
 
 def register_validate_command(

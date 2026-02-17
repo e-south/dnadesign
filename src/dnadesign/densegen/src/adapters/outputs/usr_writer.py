@@ -51,7 +51,6 @@ class USRWriter:
     namespace: str = "densegen"
     chunk_size: int = 128
     health_event_interval_seconds: float = 60.0
-    allow_overwrite: bool = False
     default_bio_type: str = "dna"
     default_alphabet: str = "dna_4"
     deduplicate: bool = True
@@ -79,8 +78,6 @@ class USRWriter:
     def __post_init__(self):
         if self.root is None:
             raise ValueError("USRWriter requires an explicit root path.")
-        if self.allow_overwrite:
-            raise ValueError("USRWriter does not support allow_overwrite with overlay parts.")
         if float(self.health_event_interval_seconds) <= 0:
             raise ValueError("USRWriter.health_event_interval_seconds must be > 0.")
         if self.run_quota is not None and int(self.run_quota) <= 0:

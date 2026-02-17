@@ -340,7 +340,6 @@ class SequenceConstraintForbidKmers(BaseModel):
     name: str
     patterns_from_motif_sets: List[str]
     include_reverse_complements: bool = False
-    scope: Literal["outside_allowed_placements"] = "outside_allowed_placements"
     strands: Literal["forward", "both"] = "both"
 
     @field_validator("name")
@@ -389,13 +388,6 @@ class SequenceConstraintAllowlistItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kind: Literal["fixed_element_instance"]
     selector: SequenceConstraintAllowSelector
-    match_exact_coordinates: bool = True
-
-    @model_validator(mode="after")
-    def _strict_coordinate_match(self):
-        if not bool(self.match_exact_coordinates):
-            raise ValueError("sequence_constraints.allowlist[].match_exact_coordinates must be true")
-        return self
 
 
 class SequenceConstraintsConfig(BaseModel):

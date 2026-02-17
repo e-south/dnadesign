@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/densegen/cli_commands/notebook.py
+dnadesign/densegen/cli/notebook.py
 
 Workspace-scoped notebook commands for DenseGen.
 
@@ -115,7 +115,7 @@ def _():
 
     from dnadesign.baserender import load_records_from_parquet
     from dnadesign.baserender import render_record_figure
-    from dnadesign.densegen.notebook_render_contract import densegen_notebook_render_contract
+    from dnadesign.densegen.src.integrations.baserender.notebook_contract import densegen_notebook_render_contract
 
     return (
         Path,

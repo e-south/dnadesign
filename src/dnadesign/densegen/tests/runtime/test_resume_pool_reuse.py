@@ -281,7 +281,6 @@ def test_run_pipeline_emits_terminal_failure_health_event_for_usr_sink(tmp_path:
             root=usr_root,
             namespace="densegen",
             chunk_size=1,
-            allow_overwrite=False,
         )
         return [USRSink(writer)]
 

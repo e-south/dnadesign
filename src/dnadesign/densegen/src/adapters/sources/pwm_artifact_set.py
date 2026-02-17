@@ -20,6 +20,7 @@ from typing import List
 from ...config import PWMSamplingConfig
 from ...core.artifacts.ids import hash_pwm_motif, hash_tfbs_id
 from ...core.run_paths import candidates_root
+from ...core.stage_a.stage_a_progress import StageAProgressManager
 from .base import BaseDataSource, resolve_path
 from .pwm_artifact import load_artifact
 from .pwm_sampling import (
@@ -28,7 +29,6 @@ from .pwm_sampling import (
     sampling_kwargs_from_config,
     validate_mmr_core_length,
 )
-from .stage_a.stage_a_progress import StageAProgressManager
 
 
 @dataclass

@@ -23,11 +23,11 @@ from dnadesign.densegen.src.adapters.sources.pwm_fimo import (
     write_candidates_fasta,
     write_minimal_meme_motif,
 )
-from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_sampling_utils import (
+from dnadesign.densegen.src.core.stage_a.stage_a_sampling_utils import (
     _pwm_theoretical_max_score,
     build_log_odds,
 )
-from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_types import PWMMotif
+from dnadesign.densegen.src.core.stage_a.stage_a_types import PWMMotif
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
 
 

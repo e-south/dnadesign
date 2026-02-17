@@ -19,8 +19,8 @@ from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
-from dnadesign.densegen.src.cli import app
-from dnadesign.densegen.src.cli_commands import run as run_command
+from dnadesign.densegen.src.cli import run as run_command
+from dnadesign.densegen.src.cli.main import app
 from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.core.artifacts.pool import (
     POOL_SCHEMA_VERSION,
@@ -215,7 +215,6 @@ def _write_usr_config(run_root: Path) -> Path:
               root: outputs/usr_datasets
               dataset: demo
               chunk_size: 16
-              allow_overwrite: false
           generation:
             sequence_length: 10
             plan:

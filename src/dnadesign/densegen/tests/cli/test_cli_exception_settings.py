@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dnadesign.densegen.src import cli
+from dnadesign.densegen.src.cli import main as cli
 
 
 def test_typer_apps_disable_local_variable_tracebacks() -> None:

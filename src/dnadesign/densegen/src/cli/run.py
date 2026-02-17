@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/densegen/cli_commands/run.py
+dnadesign/densegen/cli/run.py
 
 Run execution CLI command registration.
 
@@ -23,7 +23,6 @@ from typing import Callable, Optional
 
 import typer
 
-from ..cli_commands.context import CliContext
 from ..core.artifacts.pool import pool_status_by_input
 from ..core.pipeline import resolve_plan, run_pipeline
 from ..core.run_paths import has_existing_run_outputs, run_outputs_root, run_state_path
@@ -31,6 +30,7 @@ from ..core.run_state import load_run_state
 from ..utils import logging_utils
 from ..utils.logging_utils import install_native_stderr_filters, setup_logging
 from ..utils.mpl_utils import ensure_mpl_cache_dir
+from .context import CliContext
 
 
 def _resolve_progress_style(log_cfg) -> tuple[str, str | None]:

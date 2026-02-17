@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from dnadesign.baserender import render_parquet_record_figure
-from dnadesign.densegen.notebook_render_contract import densegen_notebook_render_contract
+from dnadesign.densegen.src.integrations.baserender.notebook_contract import densegen_notebook_render_contract
 
 
 def test_notebook_render_contract_renders_without_optional_details_column(tmp_path: Path) -> None:

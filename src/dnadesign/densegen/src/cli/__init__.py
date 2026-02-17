@@ -1,17 +1,13 @@
 """
 --------------------------------------------------------------------------------
-dnadesign
-src/dnadesign/densegen/src/__main__.py
+<dnadesign project>
+dnadesign/densegen/cli/__init__.py
 
-DenseGen CLI entrypoint.
+CLI command groups for DenseGen.
 
 Module Author(s): Eric J. South
+Dunlop Lab
 --------------------------------------------------------------------------------
 """
 
 from __future__ import annotations
-
-from .cli.main import app
-
-if __name__ == "__main__":
-    app()

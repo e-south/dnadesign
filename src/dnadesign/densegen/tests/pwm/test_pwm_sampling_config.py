@@ -15,8 +15,8 @@ import numpy as np
 import pytest
 
 from dnadesign.densegen.src.adapters.sources.pwm_sampling import sample_pwm_sites, sampling_kwargs_from_config
-from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_types import PWMMotif
 from dnadesign.densegen.src.config import PWMMiningBudgetConfig, PWMMiningConfig, PWMSamplingConfig, PWMSelectionConfig
+from dnadesign.densegen.src.core.stage_a.stage_a_types import PWMMotif
 
 
 def test_sampling_kwargs_requires_config_object() -> None:

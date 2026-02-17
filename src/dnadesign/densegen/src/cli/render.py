@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/densegen/src/cli_render.py
+src/dnadesign/densegen/src/cli/render.py
 
 Shared Rich table builders for CLI output.
 
@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from .utils.rich_style import make_table
+from ..utils.rich_style import make_table
 
 
 def stage_a_plan_table(plan_rows: Iterable[dict[str, str]]):

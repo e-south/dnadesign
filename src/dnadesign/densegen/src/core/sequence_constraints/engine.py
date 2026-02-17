@@ -80,7 +80,6 @@ class ForbiddenRule:
     name: str
     patterns: tuple[str, ...]
     strands: str
-    scope: str
 
 
 @dataclass(frozen=True)
@@ -160,9 +159,6 @@ def compile_sequence_constraints(
         name = str(rule.get("name") or "").strip()
         if not name:
             raise ValueError("sequence_constraints.forbid_kmers[].name must be set.")
-        scope = str(rule.get("scope") or "").strip()
-        if scope != "outside_allowed_placements":
-            raise ValueError("sequence_constraints.forbid_kmers[].scope must be outside_allowed_placements.")
         strands = str(rule.get("strands") or "").strip().lower()
         if strands not in {"forward", "both"}:
             raise ValueError("sequence_constraints.forbid_kmers[].strands must be forward or both.")
@@ -182,7 +178,6 @@ def compile_sequence_constraints(
                 name=name,
                 patterns=unique_patterns,
                 strands=strands,
-                scope=scope,
             )
         )
         for pattern in unique_patterns:

@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/densegen/src/cli_sampling.py
+src/dnadesign/densegen/src/cli/sampling.py
 
 CLI helpers for describing Stage-A sampling configuration.
 
@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .core.motif_labels import input_motifs
+from ..core.motif_labels import input_motifs
 
 
 def format_selection_label(

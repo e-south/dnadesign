@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/densegen/cli_commands/stage_a.py
+dnadesign/densegen/cli/stage_a.py
 
 Stage-A CLI command registration for building TFBS pools.
 
@@ -20,9 +20,6 @@ from typing import Callable, Optional
 import numpy as np
 import typer
 
-from ..cli_commands.context import CliContext
-from ..cli_render import stage_a_plan_table, stage_a_recap_tables
-from ..cli_sampling import stage_a_plan_rows
 from ..core.artifacts.candidates import build_candidate_artifact, find_candidate_files, prepare_candidates_dir
 from ..core.artifacts.pool import build_pool_artifact
 from ..core.motif_labels import input_motifs
@@ -31,6 +28,9 @@ from ..core.run_paths import candidates_root
 from ..core.seeding import derive_seed_map
 from ..utils import logging_utils
 from ..utils.logging_utils import setup_logging
+from .context import CliContext
+from .render import stage_a_plan_table, stage_a_recap_tables
+from .sampling import stage_a_plan_rows
 
 
 def register_stage_a_commands(

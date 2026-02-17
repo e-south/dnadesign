@@ -19,7 +19,7 @@ from pathlib import Path
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.densegen.src.cli import app
+from dnadesign.densegen.src.cli.main import app
 
 
 @contextmanager

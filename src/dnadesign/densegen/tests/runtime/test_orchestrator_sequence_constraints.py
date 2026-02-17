@@ -22,7 +22,6 @@ def _constraint_block() -> dict:
                 "name": "sigma_core",
                 "patterns_from_motif_sets": ["sigma_hexamers"],
                 "include_reverse_complements": True,
-                "scope": "outside_allowed_placements",
                 "strands": "both",
             }
         ],
@@ -33,7 +32,6 @@ def _constraint_block() -> dict:
                     "fixed_element": "promoter",
                     "component": ["upstream", "downstream"],
                 },
-                "match_exact_coordinates": True,
             }
         ],
     }

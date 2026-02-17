@@ -17,7 +17,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from dnadesign.densegen.src.cli import app
+from dnadesign.densegen.src.cli.main import app
 from dnadesign.densegen.tests.config_fixtures import write_minimal_config
 
 PLAN_POOL_LABEL = "plan_pool__demo_plan"
@@ -116,7 +116,6 @@ def test_inspect_run_usr_events_path_prints_absolute_path(tmp_path: Path) -> Non
                   root: outputs/usr_datasets
                   dataset: densegen/demo
                   chunk_size: 16
-                  allow_overwrite: false
               generation:
                 sequence_length: 10
                 plan:

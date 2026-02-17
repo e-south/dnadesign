@@ -11,7 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_progress import _PwmSamplingProgress
+from dnadesign.densegen.src.core.stage_a.stage_a_progress import _PwmSamplingProgress
 from dnadesign.densegen.src.utils import logging_utils
 
 

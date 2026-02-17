@@ -18,8 +18,8 @@ from pathlib import Path
 import yaml
 from typer.testing import CliRunner
 
-from dnadesign.densegen.src.cli import app
-from dnadesign.densegen.src.cli_commands import workspace as workspace_commands
+from dnadesign.densegen.src.cli import workspace as workspace_commands
+from dnadesign.densegen.src.cli.main import app
 
 
 def _write_source_config(path: Path) -> None:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dnadesign.densegen.src.cli import _candidate_logging_enabled
+from dnadesign.densegen.src.cli.main import _candidate_logging_enabled
 from dnadesign.densegen.src.config import load_config
 
 

@@ -11,8 +11,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dnadesign.densegen.src.adapters.sources.stage_a import stage_a_summary
 from dnadesign.densegen.src.core import score_tiers
+from dnadesign.densegen.src.core.stage_a import stage_a_summary
 
 
 def test_score_tier_counts_partition() -> None:

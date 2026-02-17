@@ -336,7 +336,7 @@ def test_usr_output_requires_root(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
     cfg["densegen"]["output"] = {
         "targets": ["usr"],
-        "usr": {"dataset": "demo", "chunk_size": 10, "allow_overwrite": False},
+        "usr": {"dataset": "demo", "chunk_size": 10},
     }
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
     with pytest.raises(ConfigError):
@@ -410,6 +410,68 @@ def test_usr_chunk_size_requires_positive_value(tmp_path: Path) -> None:
     }
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
     with pytest.raises(ConfigError, match="output.usr.chunk_size must be > 0"):
+        load_config(cfg_path)
+
+
+def test_usr_allow_overwrite_removed(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["output"] = {
+        "targets": ["usr"],
+        "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+        "usr": {
+            "dataset": "demo",
+            "root": "outputs/usr_datasets",
+            "allow_overwrite": False,
+        },
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="allow_overwrite"):
+        load_config(cfg_path)
+
+
+def test_sequence_constraints_scope_removed(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["motif_sets"] = {"sigma": {"up": "TTGACA"}}
+    cfg["densegen"]["generation"]["sequence_constraints"] = {
+        "forbid_kmers": [
+            {
+                "name": "sigma_rule",
+                "patterns_from_motif_sets": ["sigma"],
+                "scope": "outside_allowed_placements",
+            }
+        ],
+        "allowlist": [
+            {
+                "kind": "fixed_element_instance",
+                "selector": {"fixed_element": "promoter", "component": ["upstream"]},
+            }
+        ],
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="scope"):
+        load_config(cfg_path)
+
+
+def test_sequence_constraints_match_exact_coordinates_removed(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["motif_sets"] = {"sigma": {"up": "TTGACA"}}
+    cfg["densegen"]["generation"]["sequence_constraints"] = {
+        "forbid_kmers": [
+            {
+                "name": "sigma_rule",
+                "patterns_from_motif_sets": ["sigma"],
+            }
+        ],
+        "allowlist": [
+            {
+                "kind": "fixed_element_instance",
+                "selector": {"fixed_element": "promoter", "component": ["upstream"]},
+                "match_exact_coordinates": True,
+            }
+        ],
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="match_exact_coordinates"):
         load_config(cfg_path)
 
 
@@ -689,7 +751,7 @@ def test_plots_source_required_for_multi_sink(tmp_path: Path) -> None:
     cfg["densegen"]["output"] = {
         "targets": ["usr", "parquet"],
         "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-        "usr": {"dataset": "demo", "root": "usr_root", "chunk_size": 10, "allow_overwrite": False},
+        "usr": {"dataset": "demo", "root": "usr_root", "chunk_size": 10},
         "parquet": {"path": "outputs/tables/demo_parquet.parquet", "deduplicate": True, "chunk_size": 128},
     }
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
@@ -702,7 +764,7 @@ def test_plots_source_must_be_target(tmp_path: Path) -> None:
     cfg["densegen"]["output"] = {
         "targets": ["usr", "parquet"],
         "schema": {"bio_type": "dna", "alphabet": "dna_4"},
-        "usr": {"dataset": "demo", "root": "usr_root", "chunk_size": 10, "allow_overwrite": False},
+        "usr": {"dataset": "demo", "root": "usr_root", "chunk_size": 10},
         "parquet": {"path": "outputs/tables/demo_parquet.parquet", "deduplicate": True, "chunk_size": 128},
     }
     cfg["plots"] = {"source": "csv", "out_dir": "plots"}

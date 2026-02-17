@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/densegen/cli.py
+dnadesign/densegen/src/cli/main.py
 
 Typer/Rich CLI entrypoint for DenseGen.
 
@@ -48,38 +48,38 @@ import typer
 from rich.console import Console
 from rich.traceback import install as rich_traceback
 
-from .cli_commands.config import register_validate_command
-from .cli_commands.context import CliContext
-from .cli_commands.inspect import register_inspect_commands
-from .cli_commands.notebook import register_notebook_commands
-from .cli_commands.plots import register_plot_commands
-from .cli_commands.run import register_run_commands
-from .cli_commands.stage_a import register_stage_a_commands
-from .cli_commands.stage_b import register_stage_b_commands
-from .cli_commands.workspace import register_workspace_commands
-from .cli_commands.workspace_sources import resolve_workspace_source as _resolve_workspace_source_impl
-from .cli_sampling import format_selection_label
-from .cli_setup import (
+from ..config import resolve_relative_path, resolve_run_root
+from ..core.artifacts.pool import PoolData
+from ..core.run_paths import display_path
+from ..core.stage_a.stage_a_summary import PWMSamplingSummary
+from ..utils.logging_utils import install_native_stderr_filters
+from ..utils.rich_style import make_table
+from .config import register_validate_command
+from .context import CliContext
+from .inspect import register_inspect_commands
+from .notebook import register_notebook_commands
+from .plots import register_plot_commands
+from .run import register_run_commands
+from .sampling import format_selection_label
+from .setup import (
     DEFAULT_CONFIG_FILENAME,
 )
-from .cli_setup import (
+from .setup import (
     ensure_fimo_available as _ensure_fimo_available_impl,
 )
-from .cli_setup import (
+from .setup import (
     load_config_or_exit as _load_config_or_exit_impl,
 )
-from .cli_setup import (
+from .setup import (
     resolve_config_path as _resolve_config_path_impl,
 )
-from .cli_setup import (
+from .setup import (
     resolve_outputs_path_or_exit as _resolve_outputs_path_or_exit_impl,
 )
-from .config import resolve_relative_path, resolve_run_root
-from .core.artifacts.pool import PoolData
-from .core.run_paths import display_path
-from .core.stage_a.stage_a_summary import PWMSamplingSummary
-from .utils.logging_utils import install_native_stderr_filters
-from .utils.rich_style import make_table
+from .stage_a import register_stage_a_commands
+from .stage_b import register_stage_b_commands
+from .workspace import register_workspace_commands
+from .workspace_sources import resolve_workspace_source as _resolve_workspace_source_impl
 
 
 def _build_console() -> Console:

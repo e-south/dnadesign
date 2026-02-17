@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/densegen/cli_commands/context.py
+dnadesign/densegen/cli/context.py
 
 Shared CLI wiring context for command registration.
 

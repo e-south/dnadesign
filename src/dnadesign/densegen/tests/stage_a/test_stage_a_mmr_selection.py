@@ -16,8 +16,8 @@ import logging
 
 import pytest
 
-from dnadesign.densegen.src.adapters.sources.stage_a import stage_a_selection
-from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_types import FimoCandidate
+from dnadesign.densegen.src.core.stage_a import stage_a_selection
+from dnadesign.densegen.src.core.stage_a.stage_a_types import FimoCandidate
 
 
 def _cand(seq: str, score: float) -> FimoCandidate:

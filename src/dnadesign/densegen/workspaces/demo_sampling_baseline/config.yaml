@@ -191,14 +191,12 @@ densegen:
             - sigma70_upstream_35
             - sigma70_downstream_10
           include_reverse_complements: true
-          scope: outside_allowed_placements
           strands: both
       allowlist:
         - kind: fixed_element_instance
           selector:
             fixed_element: promoter
             component: [upstream, downstream]
-          match_exact_coordinates: true
 
   solver:
     backend: CBC

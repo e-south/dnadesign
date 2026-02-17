@@ -20,9 +20,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Sequence
 
+from ...core.stage_a.stage_a_sampling_utils import normalize_background
+from ...core.stage_a.stage_a_types import PWMMotif
 from ...integrations.meme_suite import require_executable
-from .stage_a.stage_a_sampling_utils import normalize_background
-from .stage_a.stage_a_types import PWMMotif
 
 _HEADER_RE = re.compile(r"[\s\-]+")
 _SAFE_ID_RE = re.compile(r"[^A-Za-z0-9_.-]+")

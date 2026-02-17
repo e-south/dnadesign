@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/densegen/cli_commands/workspace_sources.py
+dnadesign/densegen/cli/workspace_sources.py
 
 Workspace source resolution helpers for the DenseGen CLI.
 

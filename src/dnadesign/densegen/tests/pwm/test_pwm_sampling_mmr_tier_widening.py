@@ -11,8 +11,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dnadesign.densegen.src.adapters.sources.stage_a import stage_a_selection
-from dnadesign.densegen.src.adapters.sources.stage_a.stage_a_types import FimoCandidate
+from dnadesign.densegen.src.core.stage_a import stage_a_selection
+from dnadesign.densegen.src.core.stage_a.stage_a_types import FimoCandidate
 
 
 def _motif_with_pwm() -> list[dict[str, float]]:

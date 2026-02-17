@@ -5,7 +5,7 @@ import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 
-from dnadesign.densegen.src.cli import DEFAULT_CONFIG_FILENAME, _workspace_command
+from dnadesign.densegen.src.cli.main import DEFAULT_CONFIG_FILENAME, _workspace_command
 
 
 @contextmanager

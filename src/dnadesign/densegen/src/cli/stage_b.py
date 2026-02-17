@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/densegen/cli_commands/stage_b.py
+dnadesign/densegen/cli/stage_b.py
 
 Stage-B CLI command registration for building library artifacts.
 
@@ -21,7 +21,6 @@ import numpy as np
 import pandas as pd
 import typer
 
-from ..cli_commands.context import CliContext
 from ..core.artifacts.library import load_library_artifact, write_library_artifact
 from ..core.artifacts.pool import _hash_file, load_pool_data
 from ..core.pipeline import resolve_plan
@@ -30,6 +29,7 @@ from ..core.pipeline.outputs import _emit_event
 from ..core.pipeline.plan_pools import PLAN_POOL_INPUT_TYPE, build_plan_pools
 from ..core.pipeline.stage_b import assess_library_feasibility, build_library_for_plan
 from ..core.seeding import derive_seed_map
+from .context import CliContext
 
 
 def register_stage_b_commands(

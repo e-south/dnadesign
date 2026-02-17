@@ -226,6 +226,9 @@ def test_packaged_workspace_configs_exclude_stale_legacy_namespaces() -> None:
         assert "demo_meme_three_tfs" not in raw
         assert "neutral_bg" not in raw
         assert "validate_final_sequence" not in raw
+        assert "allow_overwrite" not in raw
+        assert "match_exact_coordinates" not in raw
+        assert "outside_allowed_placements" not in raw
 
 
 def test_packaged_motif_artifact_manifests_are_workspace_local_and_current() -> None:

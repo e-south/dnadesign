@@ -27,6 +27,14 @@ from ...config import BackgroundPoolSamplingConfig, resolve_relative_path
 from ...core.artifacts.ids import hash_label_motif, hash_tfbs_id
 from ...core.sequence_constraints.kmers import reverse_complement
 from ...core.sequence_constraints.sampler import ConstrainedSequenceError, generate_constrained_sequence
+from ...core.stage_a.stage_a_progress import _BackgroundSamplingProgress
+from ...core.stage_a.stage_a_sampling_utils import (
+    _background_cdf,
+    _pwm_theoretical_max_score,
+    _sample_background_batch,
+    build_log_odds,
+)
+from ...core.stage_a.stage_a_types import PWMMotif
 from ...utils.sequence_utils import gc_fraction
 from .base import BaseDataSource
 from .pwm_artifact import load_artifact as load_pwm_artifact
@@ -39,14 +47,6 @@ from .pwm_fimo import (
 )
 from .pwm_jaspar import _parse_jaspar
 from .pwm_meme import _background_from_meta, _motif_to_pwm
-from .stage_a.stage_a_progress import _BackgroundSamplingProgress
-from .stage_a.stage_a_sampling_utils import (
-    _background_cdf,
-    _pwm_theoretical_max_score,
-    _sample_background_batch,
-    build_log_odds,
-)
-from .stage_a.stage_a_types import PWMMotif
 
 log = logging.getLogger(__name__)
 

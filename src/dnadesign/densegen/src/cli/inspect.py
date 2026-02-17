@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-dnadesign/densegen/cli_commands/inspect.py
+dnadesign/densegen/cli/inspect.py
 
 Inspect subcommands for the DenseGen CLI.
 
@@ -18,8 +18,6 @@ from typing import Optional
 import pandas as pd
 import typer
 
-from ..cli_render import stage_a_plan_table
-from ..cli_sampling import stage_a_plan_rows
 from ..config import load_config, resolve_outputs_scoped_path, resolve_relative_path, resolve_run_root
 from ..core.artifacts.pool import pool_status_by_input
 from ..core.event_log import load_events
@@ -30,6 +28,8 @@ from ..core.run_manifest import load_run_manifest
 from ..core.run_paths import run_manifest_path, run_state_path
 from ..core.run_state import load_run_state
 from .context import CliContext
+from .render import stage_a_plan_table
+from .sampling import stage_a_plan_rows
 
 
 def _input_kind_label(input_type: str) -> str:

@@ -16,7 +16,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from dnadesign.densegen.src.cli import app
+from dnadesign.densegen.src.cli.main import app
 
 
 def _write_config(path: Path, *, meme_path: Path) -> None:

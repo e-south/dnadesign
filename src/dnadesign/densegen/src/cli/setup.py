@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/densegen/src/cli_setup.py
+src/dnadesign/densegen/src/cli/setup.py
 
 CLI configuration resolution and environment checks.
 
@@ -18,8 +18,8 @@ from typing import Callable, Optional
 
 import typer
 
-from .config import ConfigError, load_config, resolve_outputs_scoped_path
-from .integrations.meme_suite import require_executable
+from ..config import ConfigError, load_config, resolve_outputs_scoped_path
+from ..integrations.meme_suite import require_executable
 
 DEFAULT_CONFIG_FILENAME = "config.yaml"
 

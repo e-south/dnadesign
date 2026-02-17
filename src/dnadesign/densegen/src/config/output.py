@@ -37,7 +37,6 @@ class OutputUSRConfig(BaseModel):
     root: str
     chunk_size: int = 128
     health_event_interval_seconds: float = 60.0
-    allow_overwrite: bool = False
     npz_fields: List[str] = Field(default_factory=list)
     npz_root: Optional[str] = None
 
