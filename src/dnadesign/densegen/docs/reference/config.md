@@ -242,7 +242,12 @@ Outputs (tables), logs, and plots must resolve inside `outputs/` under `densegen
       - `pairing.pairs` (required only when `mode=explicit_pairs`)
       - `spacer_length`, `upstream_pos`, optional `downstream_pos`
 - `plan_template_max_expanded_plans` (int > 0; default 256)
-  - Hard cap on expansion fanout to prevent accidental config blow-ups.
+  - Hard cap on total expanded plan count across all templates to prevent accidental config blow-ups.
+- `plan_template_max_total_quota` (int > 0; default 4096)
+  - Hard cap on total quota after template expansion to prevent accidental
+    `quota_per_variant x variants` run explosions.
+  - Prefer `total_quota` with `distribution_policy: uniform` for large
+    combinatorial templates when you want bounded library size.
 - `sequence_constraints` (optional)
   - Use this for global final-sequence validation and constrained pad/gap fill.
   - `forbid_kmers[]` rules:

@@ -78,7 +78,8 @@ densegen:
 
   generation:
     sequence_length: 90
-    plan_template_max_expanded_plans: 256
+    plan_template_max_expanded_plans: 32
+    plan_template_max_total_quota: 64
     sampling:
       pool_strategy: subsample
       library_size: 16
@@ -90,7 +91,8 @@ densegen:
 
     plan_templates:
       - base_name: sigma70
-        quota_per_variant: 16
+        total_quota: 24
+        distribution_policy: uniform
         sampling:
           include_inputs: [background]
         fixed_elements:
@@ -105,7 +107,8 @@ densegen:
         regulator_constraints:
           groups: []
       - base_name: sigma32
-        quota_per_variant: 16
+        total_quota: 8
+        distribution_policy: uniform
         sampling:
           include_inputs: [background]
         fixed_elements:
@@ -120,7 +123,8 @@ densegen:
         regulator_constraints:
           groups: []
       - base_name: sigma38
-        quota_per_variant: 16
+        total_quota: 8
+        distribution_policy: uniform
         sampling:
           include_inputs: [background]
         fixed_elements:
@@ -135,7 +139,8 @@ densegen:
         regulator_constraints:
           groups: []
       - base_name: sigma54
-        quota_per_variant: 16
+        total_quota: 8
+        distribution_policy: uniform
         sampling:
           include_inputs: [background]
         fixed_elements:

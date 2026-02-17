@@ -495,6 +495,7 @@ class GenerationConfig(BaseModel):
     plan: List[PlanItem] = Field(default_factory=list)
     plan_templates: List[PlanTemplate] = Field(default_factory=list)
     plan_template_max_expanded_plans: int = 256
+    plan_template_max_total_quota: int = 4096
     sequence_constraints: Optional[SequenceConstraintsConfig] = None
 
     @field_validator("sequence_length")
@@ -509,6 +510,13 @@ class GenerationConfig(BaseModel):
     def _max_expanded_ok(cls, v: int):
         if int(v) <= 0:
             raise ValueError("generation.plan_template_max_expanded_plans must be > 0")
+        return int(v)
+
+    @field_validator("plan_template_max_total_quota")
+    @classmethod
+    def _max_total_quota_ok(cls, v: int):
+        if int(v) <= 0:
+            raise ValueError("generation.plan_template_max_total_quota must be > 0")
         return int(v)
 
     @model_validator(mode="after")
@@ -645,8 +653,11 @@ def expand_plan_templates(
     motif_sets: Dict[str, Dict[str, str]],
     sequence_length: int,
     max_expanded_plans: int,
+    max_total_quota: int,
 ) -> List[PlanItem]:
     expanded: List[PlanItem] = []
+    expanded_plan_count = 0
+    expanded_total_quota = 0
     for template in plan_templates:
         fixed = template.fixed_elements
         matrix = fixed.promoter_matrix
@@ -654,6 +665,18 @@ def expand_plan_templates(
             quota = (
                 int(template.quota_per_variant) if template.quota_per_variant is not None else int(template.total_quota)
             )
+            next_plan_count = expanded_plan_count + 1
+            if next_plan_count > int(max_expanded_plans):
+                raise ValueError(
+                    "plan_templates expansion exceeds generation.plan_template_max_expanded_plans "
+                    f"({next_plan_count} > {int(max_expanded_plans)})."
+                )
+            next_total_quota = expanded_total_quota + int(quota)
+            if next_total_quota > int(max_total_quota):
+                raise ValueError(
+                    "plan_templates expansion exceeds generation.plan_template_max_total_quota "
+                    f"({next_total_quota} > {int(max_total_quota)})."
+                )
             plan = PlanItem(
                 name=str(template.base_name),
                 quota=quota,
@@ -671,13 +694,16 @@ def expand_plan_templates(
                     constraint=constraint,
                 )
             expanded.append(plan)
+            expanded_plan_count = next_plan_count
+            expanded_total_quota = next_total_quota
             continue
 
         matrix_pairs = _expand_matrix_pairs(matrix=matrix, motif_sets=motif_sets)
-        if len(matrix_pairs) > int(max_expanded_plans):
+        next_plan_count = expanded_plan_count + len(matrix_pairs)
+        if next_plan_count > int(max_expanded_plans):
             raise ValueError(
                 "plan_templates expansion exceeds generation.plan_template_max_expanded_plans "
-                f"({len(matrix_pairs)} > {int(max_expanded_plans)})."
+                f"({next_plan_count} > {int(max_expanded_plans)})."
             )
         if template.quota_per_variant is not None:
             quotas = [int(template.quota_per_variant)] * len(matrix_pairs)
@@ -689,6 +715,13 @@ def expand_plan_templates(
                     "distribution_policy=uniform"
                 )
             quotas = [int(total_quota // len(matrix_pairs))] * len(matrix_pairs)
+
+        next_total_quota = expanded_total_quota + int(sum(quotas))
+        if next_total_quota > int(max_total_quota):
+            raise ValueError(
+                "plan_templates expansion exceeds generation.plan_template_max_total_quota "
+                f"({next_total_quota} > {int(max_total_quota)})."
+            )
 
         for (up_id, up_seq, down_id, down_seq), quota in zip(matrix_pairs, quotas):
             name = f"{template.base_name}__up={up_id}__down={down_id}"
@@ -721,4 +754,6 @@ def expand_plan_templates(
                     constraint=constraint,
                 )
             expanded.append(plan)
+        expanded_plan_count = next_plan_count
+        expanded_total_quota = next_total_quota
     return expanded

@@ -84,6 +84,7 @@ class DenseGenConfig(BaseModel):
             motif_sets=dict(self.motif_sets or {}),
             sequence_length=int(self.generation.sequence_length),
             max_expanded_plans=int(self.generation.plan_template_max_expanded_plans),
+            max_total_quota=int(self.generation.plan_template_max_total_quota),
         )
         return self
 

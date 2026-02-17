@@ -137,3 +137,22 @@ def test_plan_templates_validate_geometry_at_load_time(tmp_path: Path) -> None:
     cfg_path = _write(cfg, tmp_path / "config.yaml")
     with pytest.raises(ConfigError, match="geometry"):
         load_config(cfg_path)
+
+
+def test_plan_templates_expansion_cap_applies_to_total_expanded_plan_count(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_TEMPLATE_CONFIG)
+    second_template = copy.deepcopy(cfg["densegen"]["generation"]["plan_templates"][0])
+    second_template["base_name"] = "sigma32"
+    cfg["densegen"]["generation"]["plan_templates"].append(second_template)
+    cfg["densegen"]["generation"]["plan_template_max_expanded_plans"] = 3
+    cfg_path = _write(cfg, tmp_path / "config.yaml")
+    with pytest.raises(ConfigError, match="max_expanded_plans"):
+        load_config(cfg_path)
+
+
+def test_plan_templates_default_total_quota_cap_blocks_astronomical_quota(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_TEMPLATE_CONFIG)
+    cfg["densegen"]["generation"]["plan_templates"][0]["quota_per_variant"] = 3000
+    cfg_path = _write(cfg, tmp_path / "config.yaml")
+    with pytest.raises(ConfigError, match="max_total_quota"):
+        load_config(cfg_path)

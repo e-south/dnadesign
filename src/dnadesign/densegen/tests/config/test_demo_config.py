@@ -281,6 +281,19 @@ def test_study_constitutive_sigma_panel_focuses_on_fixed_elements() -> None:
     assert len(promoter_pairs) >= 6
 
 
+def test_study_constitutive_sigma_panel_uses_bounded_total_quota_templates() -> None:
+    cfg = load_config(_demo_config_path("study_constitutive_sigma_panel"))
+    generation = cfg.root.densegen.generation
+    templates = list(cfg.root.densegen.generation.plan_templates or [])
+    assert templates
+    for template in templates:
+        assert template.quota_per_variant is None
+        assert template.total_quota is not None
+    assert generation.plan_template_max_expanded_plans <= 32
+    assert generation.plan_template_max_total_quota <= 64
+    assert generation.total_quota() <= generation.plan_template_max_total_quota
+
+
 def test_study_stress_ethanol_cipro_uses_pwm_artifact_sampling() -> None:
     cfg = load_config(_demo_config_path("study_stress_ethanol_cipro"))
     input_types = [inp.type for inp in cfg.root.densegen.inputs]

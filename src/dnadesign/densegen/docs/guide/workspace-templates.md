@@ -17,7 +17,7 @@ Study templates stay concise here.
 |---|---|---|---|
 | `demo_tfbs_baseline` | demo | Fast baseline run with mock TFBS + sigma70 variant | Solver only (`CBC`/`GUROBI`) |
 | `demo_sampling_baseline` | demo | Canonical motif-artifact sampling baseline (LexA/CpxR/BaeR) | Solver + MEME Suite (`fimo`) |
-| `study_constitutive_sigma_panel` | study | Constitutive promoter panel across six explicit -35/-10 hexamer pairs | Solver only (`CBC`/`GUROBI`) |
+| `study_constitutive_sigma_panel` | study | Constitutive promoter panel across six explicit -35/-10 hexamer pairs with bounded template total quotas | Solver only (`CBC`/`GUROBI`) |
 | `study_stress_ethanol_cipro` | study | Larger stress-response generation with legacy demo-3TF Stage-A sampling profile | Solver + MEME Suite (`fimo`) |
 
 ### Demo walkthroughs
