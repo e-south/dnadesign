@@ -1,11 +1,13 @@
-# DenseGen CLI reference
+## DenseGen CLI reference
 
 Use this page when you need exact command behavior and flag names.
 For end-to-end guided runs, use:
-- [binding-sites baseline demo](../demo/demo_tfbs_baseline.md)
-- [sampling baseline demo](../demo/demo_sampling_baseline.md)
+- [binding-sites baseline demo](../tutorials/demo_tfbs_baseline.md)
+- [sampling baseline demo](../tutorials/demo_sampling_baseline.md)
 
-## Contents
+### Contents
+This section indexes the command surfaces covered in this reference.
+
 - [How to inspect CLI surface quickly](#how-to-inspect-cli-surface-quickly)
 - [Config resolution](#config-resolution)
 - [`dense validate-config`](#dense-validate-config)
@@ -24,7 +26,8 @@ For end-to-end guided runs, use:
 - [`dense notebook generate`](#dense-notebook-generate)
 - [`dense notebook run`](#dense-notebook-run)
 
-## How to inspect CLI surface quickly
+### How to inspect CLI surface quickly
+This section provides the fastest way to discover active command groups and flags.
 
 ```bash
 # Show top-level commands.
@@ -37,7 +40,8 @@ uv run dense stage-b build-libraries --help
 uv run dense notebook run --help
 ```
 
-## Config resolution
+### Config resolution
+This section defines how DenseGen resolves config paths when `-c/--config` is present or omitted.
 
 - `-c, --config PATH` is supported globally and on command groups.
 - If `--config` is omitted, DenseGen resolves config in this order:
@@ -53,7 +57,7 @@ Operational guidance:
 - CI/HPC: pass `-c /abs/path/to/config.yaml`.
 - Local workspace shell: `./config.yaml` is usually enough.
 
-## `dense validate-config`
+### `dense validate-config`
 
 Validates schema and config sanity checks.
 
@@ -61,7 +65,7 @@ Key options:
 - `--probe-solver / --no-probe-solver`
 - `-c, --config PATH`
 
-## `dense inspect inputs`
+### `dense inspect inputs`
 
 Shows resolved input sources plus Stage-A pool status.
 
@@ -71,14 +75,14 @@ Key options:
 - `--show-motif-ids`
 - `-c, --config PATH`
 
-## `dense inspect plan`
+### `dense inspect plan`
 
 Shows resolved plan quotas by plan item.
 
 Key options:
 - `-c, --config PATH`
 
-## `dense inspect config`
+### `dense inspect config`
 
 Shows resolved output wiring, Stage-A/Stage-B sampling settings, and solver settings.
 
@@ -88,7 +92,7 @@ Key options:
 - `--absolute`
 - `-c, --config PATH`
 
-## `dense inspect run`
+### `dense inspect run`
 
 Summarizes a run manifest, or lists workspaces under a root.
 
@@ -110,7 +114,7 @@ Notes:
 - `--root` and `--usr-events-path` are mutually exclusive.
 - `--usr-events-path` requires a config that writes to USR outputs.
 
-## `dense stage-a build-pool`
+### `dense stage-a build-pool`
 
 Builds Stage-A TFBS pools and pool metadata.
 
@@ -130,7 +134,7 @@ Outputs:
 - `outputs/pools/<input>__pool.parquet`
 - candidate artifacts (when candidate logging is enabled)
 
-## `dense stage-b build-libraries`
+### `dense stage-b build-libraries`
 
 Builds Stage-B libraries from Stage-A pools.
 
@@ -153,7 +157,7 @@ Outputs:
 - `outputs/libraries/library_members.parquet`
 - `outputs/libraries/library_manifest.json`
 
-## `dense workspace init`
+### `dense workspace init`
 
 Creates a run workspace with `config.yaml`, `inputs/`, and `outputs/` subfolders.
 
@@ -169,14 +173,14 @@ Notes:
 - `--output-mode usr|both` seeds `outputs/usr_datasets/registry.yaml` when a seed file is available.
 - `--output-mode usr|both` sets `output.usr.dataset` to the workspace id so each initialized workspace writes to its own USR dataset path.
 
-## `dense workspace where`
+### `dense workspace where`
 
 Shows effective workspace roots that `workspace init` will use.
 
 Key options:
 - `--format text|json`
 
-## `dense run`
+### `dense run`
 
 Runs sampling, solving, output writing, and optional plotting.
 
@@ -195,14 +199,14 @@ Notes:
 - Missing/stale Stage-A pools are rebuilt automatically.
 - For FIMO-backed inputs, ensure `fimo` is available (for example via `pixi run ...`).
 
-## `dense campaign-reset`
+### `dense campaign-reset`
 
 Deletes run outputs while preserving config and inputs.
 
 Key options:
 - `-c, --config PATH`
 
-## `dense plot`
+### `dense plot`
 
 Generates plots from existing outputs.
 
@@ -211,14 +215,14 @@ Key options:
 - `--absolute`
 - `-c, --config PATH`
 
-## `dense ls-plots`
+### `dense ls-plots`
 
 Lists available plot names and descriptions.
 
 Key options:
 - `-c, --config PATH` (optional config validation before listing)
 
-## `dense notebook generate`
+### `dense notebook generate`
 
 Generates a workspace-scoped marimo notebook for the run.
 
@@ -236,7 +240,7 @@ Notes:
   - `parquet` source -> `output.parquet.path`
   - `usr` source -> `<output.usr.root>/<output.usr.dataset>/records.parquet`
 
-## `dense notebook run`
+### `dense notebook run`
 
 Launches a DenseGen marimo notebook.
 

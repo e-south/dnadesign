@@ -1,4 +1,4 @@
-# DenseGen output formats
+## DenseGen output formats
 
 This page defines what DenseGen writes, where it writes it, and which event stream each
 consumer should read.
@@ -6,6 +6,8 @@ consumer should read.
 DenseGen can emit Parquet outputs locally and/or write through USR.
 
 ### Contents
+
+This section covers contents.
 - [Canonical IDs](#canonical-ids) - deterministic sequence identifiers.
 - [Parquet](#parquet) - dataset layout and deduplication.
 - [USR](#usr) - attach semantics and optional dependency.
@@ -29,6 +31,8 @@ Notify reads USR `.events.log`, not DenseGen `outputs/meta/events.jsonl`.
 ---
 
 ### Canonical IDs
+
+This section covers canonical ids.
 
 - Sequence IDs use USR's algorithm:
   - `normalize_sequence(sequence, bio_type, alphabet)`
@@ -210,7 +214,7 @@ The notebook reads run artifacts (`outputs/meta/*`, `outputs/tables/*`, `outputs
 
 DenseGen -> BaseRender contract for the scaffolded notebook:
 
-- Contract source: `dnadesign.densegen.notebook_render_contract:densegen_notebook_render_contract`
+- Contract source: `dnadesign.densegen.src.integrations.baserender.notebook_contract:densegen_notebook_render_contract`
 - Records source path: resolved from output sink selection:
   - single sink in `output.targets` -> that sink (`parquet` or `usr`)
   - multiple sinks in `output.targets` -> `plots.source`
@@ -276,7 +280,7 @@ with outputs under `outputs/plots/stage_a/`:
 `outputs/meta/effective_config.json` (`generation.plan[].quota`).
 `summary.csv` is a compact numeric table with run-level totals and per-plan accepted/quota ratios.
 
-See `../guide/sampling.md` for plot interpretation context.
+See `../concepts/sampling.md` for plot interpretation context.
 
 `stage_a_summary` requires diversity metrics in `pool_manifest.json`. If your pool manifest predates
 diversity metrics, rerun `dense stage-a build-pool --fresh` to regenerate it.

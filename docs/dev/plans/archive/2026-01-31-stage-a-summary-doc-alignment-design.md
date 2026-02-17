@@ -31,7 +31,7 @@ Create a single authoritative "How to read `stage_a_summary`" section in `sampli
 - Adding new plots or annotations.
 
 ## Recommended Approach (A)
-Move the full interpretive narrative into `src/dnadesign/densegen/docs/guide/sampling.md` as a dedicated section and replace interpretive prose elsewhere with links to that section.
+Move the full interpretive narrative into `src/dnadesign/densegen/docs/concepts/sampling.md` as a dedicated section and replace interpretive prose elsewhere with links to that section.
 
 ## Proposed Changes
 ### 1) Canonical narrative in sampling.md
@@ -57,7 +57,7 @@ Add a short glossary for the inline metrics that appear in the plots:
 
 ### 2) Remove interpretive duplication elsewhere
 - `src/dnadesign/densegen/docs/reference/outputs.md`: keep plot inventory only; add a link to the sampling guide for interpretation.
-- `src/dnadesign/densegen/docs/demo/demo_pwm_artifacts.md`: replace interpretive text with a short link to the sampling guide section.
+- `src/dnadesign/densegen/docs/tutorials/demo_pwm_artifacts.md`: replace interpretive text with a short link to the sampling guide section.
 - `src/dnadesign/densegen/docs/dev/audit_2026-01-30_stage_a.md`: keep run notes but remove plot interpretation; link to the sampling guide section.
 
 ### 3) Drift prevention note

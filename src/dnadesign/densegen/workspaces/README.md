@@ -1,7 +1,7 @@
 DenseGen stores tracked packaged workspaces and local generated workspaces here.
 
 User-facing template guidance lives in:
-`src/dnadesign/densegen/docs/guide/workspace-templates.md`
+`src/dnadesign/densegen/docs/concepts/workspace-templates.md`
 
 - `demo_*` directories are fast baseline workspaces for guided onboarding and CI pressure tests.
 - `study_*` directories are larger template workspaces for real run planning.

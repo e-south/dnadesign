@@ -17,10 +17,6 @@ Notify consumes Universal Sequence Record mutation events from `.events.log` new
 - [Filtering (reduce noise first, then tighten)](#filtering-reduce-noise-first-then-tighten)
 - [Spool and drain (cluster-friendly)](#spool-and-drain-cluster-friendly)
 
-See also:
-- Universal Sequence Record event schema: [Universal Sequence Record README: event log schema](../../src/dnadesign/usr/README.md#event-log-schema)
-- DenseGen end-to-end demo: [DenseGen -> Universal Sequence Record -> Notify demo](../../src/dnadesign/densegen/docs/demo/demo_usr_notify.md)
-
 ---
 
 ## Minimal operator quickstart
@@ -590,3 +586,10 @@ uv run notify spool drain \
 
 Successful sends remove spool files. Failed sends are kept for retry.
 If `--provider` is omitted, drain uses the provider stored per spool file.
+
+---
+
+## See also
+
+- DenseGen documentation hub: [DenseGen docs index](../../src/dnadesign/densegen/docs/index.md)
+- DenseGen integration walkthrough: [DenseGen -> USR -> Notify tutorial](../../src/dnadesign/densegen/docs/tutorials/demo_usr_notify.md)

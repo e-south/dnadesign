@@ -1,4 +1,4 @@
-# DenseGen config reference
+## DenseGen config reference
 
 Use this page when you need exact YAML keys and constraints.
 Unknown keys are hard errors.
@@ -9,11 +9,13 @@ Sampling split:
 - Stage-B sampling keys live under `densegen.generation.sampling`
 
 If you want concepts first, read:
-- [inputs guide](../guide/inputs.md)
-- [sampling guide](../guide/sampling.md)
-- [generation guide](../guide/generation.md)
+- [inputs guide](../concepts/inputs.md)
+- [sampling guide](../concepts/sampling.md)
+- [generation guide](../concepts/generation.md)
 
 ### Contents
+
+This section covers contents.
 - [Top-level](#top-level) - required roots and plotting.
 - [`densegen.inputs[]`](#densegeninputs) - input sources and Stage‑A sampling.
 - [`densegen.run`](#densegenrun) - run identifier and root.
@@ -33,6 +35,8 @@ If you want concepts first, read:
 ---
 
 ### Top-level
+
+This section covers top-level.
 
 - `densegen` (required)
 - `densegen.schema_version` (required; supported: `2.9`)
@@ -145,7 +149,7 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
     - FIMO resolves `fimo` via `MEME_BIN` or PATH; pixi users should run `pixi run dense ...` so it is available.
     - Eligibility is `best_hit_score > 0` and requires a FIMO hit.
 - Algorithmic behavior (eligibility, tiering, tier-target mining math, and MMR diversity) is defined in:
-  - `../guide/sampling.md`
+  - `../concepts/sampling.md`
 - `type: pwm_meme_set`
   - `paths` - list of MEME PWM files (merged into a single TF pool)
   - `motif_ids` (optional list) - choose motifs by ID across files
@@ -181,6 +185,8 @@ Outputs (tables), logs, and plots must resolve inside `outputs/` under `densegen
 
 ### `densegen.run`
 
+This section covers densegen.run.
+
 - `id` - run identifier (string; required; must not contain path separators)
 - `root` - run root directory (required; must exist on disk)
 
@@ -188,11 +194,13 @@ Outputs (tables), logs, and plots must resolve inside `outputs/` under `densegen
 
 ### `densegen.output`
 
+This section covers densegen.output.
+
 - `schema`: shared output schema (`bio_type`, `alphabet`) used for IDs and validation (required).
 - `targets`: list of sinks to write (`usr`, `parquet`)
 - When multiple targets are set, outputs must be in sync before a run; mismatches are errors.
 - `usr` (required when `targets` includes `usr`)
-  - `dataset`, `root`, `chunk_size`, `health_event_interval_seconds`, `allow_overwrite`
+  - `dataset`, `root`, `chunk_size`, `health_event_interval_seconds`
   - `health_event_interval_seconds` (float > 0; default 60) controls cadence for `densegen_health` USR events
   - `npz_fields` (optional list of metadata keys to offload into NPZ artifacts; see outputs doc)
   - `npz_root` (optional path for NPZ artifacts; defaults to `<dataset>/_artifacts/densegen_npz`)
@@ -204,6 +212,8 @@ Outputs (tables), logs, and plots must resolve inside `outputs/` under `densegen
 ---
 
 ### `densegen.generation`
+
+This section covers densegen.generation.
 
 - `sequence_length` (int > 0)
 - `sequence_length` should be >= the widest required motif (library TFBS or fixed elements); if it
@@ -254,17 +264,17 @@ Outputs (tables), logs, and plots must resolve inside `outputs/` under `densegen
     - `name`
     - `patterns_from_motif_sets` (non-empty list of motif set names)
     - `include_reverse_complements` (bool)
-    - `scope`: `outside_allowed_placements`
     - `strands`: `forward | both`
   - `allowlist[]`:
     - `kind`: `fixed_element_instance`
     - `selector.fixed_element`: `promoter`
     - `selector.component`: `upstream | downstream`
-    - `match_exact_coordinates` must be true
 
 ---
 
 ### `densegen.motif_sets`
+
+This section covers densegen.motifsets.
 
 - Optional dictionary used by `generation.plan_templates` and `generation.sequence_constraints`.
 - Shape: `set_name -> { variant_id -> motif_sequence }`.
@@ -279,7 +289,7 @@ These controls apply to **Stage‑B sampling** (library construction) after Stag
 `library_size` does not change Stage‑A sampling counts. `library_size` also bounds the motif count
 offered to the solver for binding-site and PWM-sampled inputs.
 For conceptual behavior (what a library is, coverage/uniqueness enforcement, and resampling), see:
-- `../guide/sampling.md`
+- `../concepts/sampling.md`
 
 - `pool_strategy`: `full | subsample | iterative_subsample`
 - `library_source`: `build | artifact` (use `artifact` to replay prebuilt libraries)
@@ -309,6 +319,8 @@ Notes:
 
 ### `densegen.solver`
 
+This section covers densegen.solver.
+
 - `backend`: solver name string (required unless `strategy: approximate`).
   - Common values: `CBC`, `GUROBI` (depends on your dense-arrays install).
 - `strategy`: `iterate | diverse | optimal | approximate`
@@ -321,6 +333,8 @@ Notes:
 ---
 
 ### `densegen.runtime`
+
+This section covers densegen.runtime.
 
 - `round_robin` (bool) - interleave plan items across inputs (one subsample per plan per pass).
   Use this when you have multiple distinct constraint sets (e.g., different fixed sequences) and want
@@ -341,6 +355,8 @@ Notes:
 
 ### `densegen.postprocess.pad`
 
+This section covers densegen.postprocess.pad.
+
 - `mode`: `off | strict | adaptive`
 - `end`: `5prime | 3prime`
 - `max_tries` (int > 0)
@@ -354,6 +370,8 @@ Notes:
 ---
 
 ### `densegen.logging`
+
+This section covers densegen.logging.
 
 - `log_dir` (required) - directory for log files (relative to config path, must be inside
   `outputs/` under `densegen.run.root`).
@@ -401,6 +419,8 @@ densegen:
 
 ### `plots`
 
+This section covers plots.
+
 - `source`: `usr | parquet` (required if `output.targets` has multiple sinks)
 - `out_dir` (optional; default `outputs/plots`; must be inside `outputs/` under `densegen.run.root`)
 - `format` (optional; `png | pdf | svg`, default `pdf`)
@@ -413,6 +433,8 @@ densegen:
 ---
 
 ### Minimal example
+
+This section covers minimal example.
 
 ```yaml
 densegen:
