@@ -1,11 +1,9 @@
-# ABOUTME: Ensures stale campaign locks are detected with remediation guidance.
-# ABOUTME: Avoids silent lock failures by requiring explicit stale handling.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
 src/dnadesign/opal/tests/test_campaign_lock_stale.py
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

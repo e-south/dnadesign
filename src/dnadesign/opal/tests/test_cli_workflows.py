@@ -1,5 +1,3 @@
-# ABOUTME: End-to-end CLI workflow tests for OPAL campaigns.
-# ABOUTME: Covers init/validate, ingest-y, and helper command behavior.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -15,6 +13,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import yaml
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
@@ -40,11 +39,11 @@ def test_init_validate_explain_cli(tmp_path: Path) -> None:
     res = runner.invoke(app, ["--no-color", "init", "-c", str(campaign)])
     assert res.exit_code == 0, res.stdout
     assert (workdir / "state.json").exists()
-    assert (workdir / ".opal" / "config").exists()
+    assert not (workdir / ".opal" / "config").exists()
     assert (workdir / "outputs").exists()
     assert (workdir / "outputs" / "ledger").exists()
     assert (workdir / "outputs" / "rounds").exists()
-    assert (workdir / "inputs").exists()
+    assert not (workdir / "inputs").exists()
 
     res = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
     assert res.exit_code == 0, res.stdout
@@ -54,6 +53,285 @@ def test_init_validate_explain_cli(tmp_path: Path) -> None:
     assert res.exit_code == 0, res.stdout
     out = json.loads(res.stdout)
     assert out["round_index"] == 0
+
+
+def test_validate_rejects_unknown_plugin_names(tmp_path: Path) -> None:
+    _, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+    app = _build()
+    runner = CliRunner()
+
+    raw = yaml.safe_load(campaign.read_text())
+    raw["transforms_x"]["name"] = "does_not_exist_tx"
+    raw["transforms_y"]["name"] = "does_not_exist_ty"
+    raw["model"]["name"] = "does_not_exist_model"
+    raw["selection"]["name"] = "does_not_exist_selection"
+    raw["objectives"][0]["name"] = "does_not_exist_objective"
+    campaign.write_text(yaml.safe_dump(raw, sort_keys=False))
+
+    res = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
+    assert res.exit_code != 0
+    out = res.output.lower()
+    assert "unknown transform_x plugin" in out
+
+
+def test_validate_unknown_model_error_lists_available_plugins_in_default_output(tmp_path: Path) -> None:
+    _, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+    app = _build()
+    runner = CliRunner()
+
+    raw = yaml.safe_load(campaign.read_text())
+    raw["model"]["name"] = "does_not_exist_model"
+    campaign.write_text(yaml.safe_dump(raw, sort_keys=False))
+
+    res = runner.invoke(app, ["validate", "-c", str(campaign)])
+    assert res.exit_code != 0
+    out = res.output.lower()
+    assert "unknown model plugin" in out
+    assert "gaussian_process" in out
+    assert "random_forest" in out
+
+
+def test_validate_requires_explicit_selection_contract_fields(tmp_path: Path) -> None:
+    _, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+    app = _build()
+    runner = CliRunner()
+
+    raw = yaml.safe_load(campaign.read_text())
+    params = raw["selection"]["params"]
+    params.pop("top_k", None)
+    params.pop("tie_handling", None)
+    params.pop("objective_mode", None)
+    campaign.write_text(yaml.safe_dump(raw, sort_keys=False))
+
+    res = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
+    assert res.exit_code != 0
+    out = res.output.lower()
+    assert "top_k" in out
+    assert "tie_handling" in out
+    assert "objective_mode" in out
+
+
+def test_validate_rejects_unknown_selection_score_channel_for_declared_objective(tmp_path: Path) -> None:
+    _, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+    app = _build()
+    runner = CliRunner()
+
+    raw = yaml.safe_load(campaign.read_text())
+    raw["selection"]["params"]["score_ref"] = "sfxi_v1/missing_channel"
+    campaign.write_text(yaml.safe_dump(raw, sort_keys=False))
+
+    res = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
+    assert res.exit_code != 0
+    out = res.output.lower()
+    assert "score_ref channel" in out
+    assert "missing_channel" in out
+    assert "available" in out
+
+
+def test_validate_rejects_ei_channel_typo_before_runtime(tmp_path: Path) -> None:
+    _, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+    app = _build()
+    runner = CliRunner()
+
+    raw = yaml.safe_load(campaign.read_text())
+    raw["model"]["name"] = "gaussian_process"
+    raw["model"]["params"] = {
+        "alpha": 1.0e-6,
+        "normalize_y": True,
+        "kernel": {"name": "rbf", "length_scale": 1.0},
+    }
+    raw["selection"]["name"] = "expected_improvement"
+    raw["selection"]["params"]["uncertainty_ref"] = "sfxi_v1/missing_channel"
+    raw["selection"]["params"]["alpha"] = 1.0
+    raw["selection"]["params"]["beta"] = 1.0
+    campaign.write_text(yaml.safe_dump(raw, sort_keys=False))
+
+    res = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
+    assert res.exit_code != 0
+    out = res.output.lower()
+    assert "uncertainty_ref channel" in out
+    assert "missing_channel" in out
+    assert "available" in out
+
+
+def test_validate_rejects_ei_with_model_without_predictive_std(tmp_path: Path) -> None:
+    _, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+    app = _build()
+    runner = CliRunner()
+
+    raw = yaml.safe_load(campaign.read_text())
+    raw["selection"]["name"] = "expected_improvement"
+    raw["selection"]["params"]["uncertainty_ref"] = "sfxi_v1/sfxi"
+    raw["selection"]["params"]["alpha"] = 1.0
+    raw["selection"]["params"]["beta"] = 1.0
+    campaign.write_text(yaml.safe_dump(raw, sort_keys=False))
+
+    res = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
+    assert res.exit_code != 0
+    out = res.output.lower()
+    assert "expected_improvement" in out
+    assert "predictive std" in out
+
+
+def test_validate_rejects_objective_mode_mismatch_for_score_ref(tmp_path: Path) -> None:
+    _, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+    app = _build()
+    runner = CliRunner()
+
+    raw = yaml.safe_load(campaign.read_text())
+    raw["selection"]["params"]["objective_mode"] = "minimize"
+    campaign.write_text(yaml.safe_dump(raw, sort_keys=False))
+
+    res = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
+    assert res.exit_code != 0
+    out = res.output.lower()
+    assert "objective mode mismatch" in out
+    assert "sfxi_v1/sfxi" in out
+    assert "maximize" in out
+    assert "minimize" in out
+
+
+def test_validate_rejects_ei_negative_weights(tmp_path: Path) -> None:
+    _, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+    app = _build()
+    runner = CliRunner()
+
+    raw = yaml.safe_load(campaign.read_text())
+    raw["model"]["name"] = "gaussian_process"
+    raw["model"]["params"] = {
+        "alpha": 1.0e-6,
+        "normalize_y": True,
+        "kernel": {"name": "rbf", "length_scale": 1.0},
+    }
+    raw["selection"]["name"] = "expected_improvement"
+    raw["selection"]["params"]["uncertainty_ref"] = "sfxi_v1/sfxi"
+    raw["selection"]["params"]["alpha"] = -0.1
+    raw["selection"]["params"]["beta"] = -0.5
+    campaign.write_text(yaml.safe_dump(raw, sort_keys=False))
+
+    res = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
+    assert res.exit_code != 0
+    out = res.output.lower()
+    assert "alpha" in out
+    assert "beta" in out
+    assert ">= 0" in out
+
+
+def test_run_rejects_corrupt_state_json(tmp_path: Path) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+    app = _build()
+    runner = CliRunner()
+
+    (workdir / "state.json").write_text("{not-valid-json")
+
+    res = runner.invoke(app, ["--no-color", "run", "-c", str(campaign), "--round", "0", "--quiet"])
+    assert res.exit_code != 0
+    out = res.output.lower()
+    assert "failed to load state.json" in out
+
+
+def test_run_surfaces_sfxi_round_label_requirements_as_opal_error(tmp_path: Path) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path)
+    app = _build()
+    runner = CliRunner()
+
+    raw = yaml.safe_load(campaign.read_text())
+    raw["objectives"][0]["params"]["scaling"] = {"percentile": 95, "min_n": 1, "eps": 1.0e-8}
+    campaign.write_text(yaml.safe_dump(raw, sort_keys=False))
+
+    init_res = runner.invoke(app, ["--no-color", "init", "-c", str(campaign)])
+    assert init_res.exit_code == 0, init_res.stdout
+
+    csv_path = workdir / "labels.csv"
+    df = pd.DataFrame(
+        {
+            "sequence": ["AAA"],
+            "v00": [0.0],
+            "v10": [0.0],
+            "v01": [0.0],
+            "v11": [1.0],
+            "y00_star": [0.1],
+            "y10_star": [0.1],
+            "y01_star": [0.1],
+            "y11_star": [0.1],
+            "intensity_log2_offset_delta": [0.0],
+        }
+    )
+    df.to_csv(csv_path, index=False)
+
+    ingest_res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--csv",
+            str(csv_path),
+            "--apply",
+        ],
+    )
+    assert ingest_res.exit_code == 0, ingest_res.stdout
+
+    res = runner.invoke(app, ["--no-color", "run", "-c", str(campaign), "--round", "1"])
+    assert res.exit_code == 2, res.output
+    out = res.output.lower()
+    assert "objective plugin 'sfxi_v1' failed" in out
+    assert "min_n=1" in out
+    assert "current round" in out
+
+
+def test_run_reports_empty_candidate_pool_as_opal_error(tmp_path: Path) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path)
+    app = _build()
+    runner = CliRunner()
+
+    raw = yaml.safe_load(campaign.read_text())
+    raw["objectives"][0]["params"]["scaling"] = {"percentile": 95, "min_n": 1, "eps": 1.0e-8}
+    campaign.write_text(yaml.safe_dump(raw, sort_keys=False))
+
+    init_res = runner.invoke(app, ["--no-color", "init", "-c", str(campaign)])
+    assert init_res.exit_code == 0, init_res.stdout
+
+    csv_path = workdir / "labels.csv"
+    df = pd.DataFrame(
+        {
+            "sequence": ["AAA", "BBB"],
+            "v00": [0.0, 0.0],
+            "v10": [0.0, 0.0],
+            "v01": [0.0, 0.0],
+            "v11": [1.0, 0.5],
+            "y00_star": [0.1, 0.2],
+            "y10_star": [0.1, 0.2],
+            "y01_star": [0.1, 0.2],
+            "y11_star": [0.1, 0.2],
+            "intensity_log2_offset_delta": [0.0, 0.0],
+        }
+    )
+    df.to_csv(csv_path, index=False)
+
+    ingest_res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--csv",
+            str(csv_path),
+            "--apply",
+        ],
+    )
+    assert ingest_res.exit_code == 0, ingest_res.stdout
+
+    res = runner.invoke(app, ["--no-color", "run", "-c", str(campaign), "--round", "0"])
+    assert res.exit_code == 2, res.output
+    out = res.output.lower()
+    assert "candidate pool is empty after filtering" in out
 
 
 def test_label_hist_validate_and_repair(tmp_path: Path) -> None:
@@ -173,7 +451,63 @@ def test_ingest_y_cli(tmp_path: Path) -> None:
             "0",
             "--csv",
             str(csv_path),
+            "--apply",
+        ],
+    )
+    assert res.exit_code == 0, res.stdout
+    assert (workdir / "outputs" / "ledger" / "labels.parquet").exists()
+
+
+def test_ingest_y_uses_apply_flag(tmp_path: Path) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path)
+    app = _build()
+    runner = CliRunner()
+
+    csv_path = workdir / "labels.csv"
+    df = pd.DataFrame(
+        {
+            "sequence": ["AAA", "BBB"],
+            "v00": [0.0, 0.0],
+            "v10": [0.0, 0.0],
+            "v01": [0.0, 0.0],
+            "v11": [1.0, 0.5],
+            "y00_star": [0.1, 0.2],
+            "y10_star": [0.1, 0.2],
+            "y01_star": [0.1, 0.2],
+            "y11_star": [0.1, 0.2],
+            "intensity_log2_offset_delta": [0.0, 0.0],
+        }
+    )
+    df.to_csv(csv_path, index=False)
+
+    res_bad = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--csv",
+            str(csv_path),
             "--yes",
+        ],
+    )
+    assert res_bad.exit_code != 0
+
+    res = runner.invoke(
+        app,
+        [
+            "--no-color",
+            "ingest-y",
+            "-c",
+            str(campaign),
+            "--round",
+            "0",
+            "--csv",
+            str(csv_path),
+            "--apply",
         ],
     )
     assert res.exit_code == 0, res.stdout
@@ -213,7 +547,7 @@ def test_ingest_y_accepts_xlsx(tmp_path: Path) -> None:
             "0",
             "--csv",
             str(xlsx_path),
-            "--yes",
+            "--apply",
         ],
     )
     assert res.exit_code == 0, res.stdout
@@ -255,7 +589,7 @@ def test_ingest_y_drop_unknown_sequences_preview(tmp_path: Path) -> None:
             str(csv_path),
             "--unknown-sequences",
             "drop",
-            "--yes",
+            "--apply",
         ],
     )
     assert res.exit_code == 0, res.stdout
@@ -297,7 +631,7 @@ def test_ingest_y_rejects_unsupported_extension(tmp_path: Path) -> None:
             "0",
             "--csv",
             str(bad_path),
-            "--yes",
+            "--apply",
         ],
     )
     assert res.exit_code != 0, res.stdout
@@ -342,7 +676,7 @@ def test_ingest_y_rejects_params_non_json(tmp_path: Path) -> None:
             str(csv_path),
             "--params",
             str(bad_params),
-            "--yes",
+            "--apply",
         ],
     )
     assert res.exit_code != 0, res.stdout

@@ -34,6 +34,7 @@ from ..formatting import (
     render_ingest_commit_human,
     render_ingest_preview_human,
 )
+from ..guidance_hints import maybe_print_hints
 from ..registry import cli_command
 from ._common import (
     internal_error,
@@ -65,7 +66,7 @@ def cmd_ingest_y(
     csv: Path = typer.Option(..., "--csv", "--in", help="CSV/Parquet with raw reads"),
     transform: str = typer.Option(None, "--transform", help="Override YAML transform name"),
     params: Optional[Path] = typer.Option(None, "--params", help="JSON file (.json) with transform params"),
-    yes: bool = typer.Option(False, "--yes", "-y", help="Skip interactive prompt"),
+    apply: bool = typer.Option(False, "--apply", help="Apply ingest without interactive confirmation."),
     unknown_sequences: str = typer.Option(
         "create",
         "--unknown-sequences",
@@ -83,6 +84,7 @@ def cmd_ingest_y(
         help="Behavior if (id, round) already exists in label history: 'fail' (default), 'skip', or 'replace'.",
         case_sensitive=False,
     ),
+    no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in human output."),
     json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)"),
 ):
     try:
@@ -117,7 +119,8 @@ def cmd_ingest_y(
         if t_name == "sfxi_vec8_from_table_v1":
             t_params = dict(t_params or {})
             if "expected_log2_offset_delta" not in t_params:
-                obj_params = cfg.objective.objective.params or {}
+                sfxi_obj = next((o for o in cfg.objectives.objectives if o.name == "sfxi_v1"), None)
+                obj_params = (sfxi_obj.params if sfxi_obj is not None else {}) or {}
                 t_params["expected_log2_offset_delta"] = float(obj_params.get("intensity_log2_offset_delta", 0.0))
             if "enforce_log2_offset_match" not in t_params:
                 t_params["enforce_log2_offset_match"] = True
@@ -126,9 +129,10 @@ def cmd_ingest_y(
                 if candidate.exists():
                     t_params["sfxi_log_json"] = str(candidate)
 
+        primary_objective = cfg.objectives.objectives[0].name
         reg = PluginRegistryView(
             model=cfg.model.name,
-            objective=cfg.objective.objective.name,
+            objective=primary_objective,
             selection=cfg.selection.selection.name,
             transform_x=cfg.data.transforms_x.name,
             transform_y=t_name,
@@ -361,7 +365,7 @@ def cmd_ingest_y(
                         )
                     if infer_missing_required:
                         _apply_defaults(defaults)
-                    elif not yes:
+                    elif not apply:
                         prompt = (
                             "Input missing required metadata for new sequences: "
                             f"{', '.join(sorted(missing_set))}. "
@@ -370,7 +374,7 @@ def cmd_ingest_y(
                         if not prompt_confirm(
                             prompt,
                             non_interactive_hint=(
-                                "No TTY available. Re-run without --yes to confirm defaults or "
+                                "No TTY available. Re-run without --apply to confirm defaults or "
                                 "pass --infer-missing-required."
                             ),
                         ):
@@ -379,14 +383,14 @@ def cmd_ingest_y(
                         _apply_defaults(defaults)
                     else:
                         raise OpalError(
-                            "Missing required metadata for new sequences. Re-run without --yes to confirm defaults "
+                            "Missing required metadata for new sequences. Re-run without --apply to confirm defaults "
                             "or pass --infer-missing-required."
                         )
                     missing_required = [c for c in required_cols if c not in csv_df.columns]
                     missing_required_values = _missing_required_values_for_unknown()
                     missing_set = set(missing_required) | set(missing_required_values)
                 if missing_set:
-                    if not yes:
+                    if not apply:
                         prompt = (
                             "Input missing required columns/values for new sequences: "
                             f"{', '.join(sorted(missing_set))}. "
@@ -440,10 +444,10 @@ def cmd_ingest_y(
             if nudges:
                 print_stdout(bullet_list("Nudges", nudges))
 
-        if not yes:
+        if not apply:
             if not prompt_confirm(
                 f"Proceed to append {len(labels_df)} labels at observed_round={round}? (y/N): ",
-                non_interactive_hint="No TTY available. Re-run with --yes to confirm ingest-y.",
+                non_interactive_hint="No TTY available. Re-run with --apply to confirm ingest-y.",
             ):
                 print_stdout("Aborted.")
                 return
@@ -544,6 +548,13 @@ def cmd_ingest_y(
                     labels_skipped=out["labels_skipped"],
                     y_column_updated=out["y_column_updated"],
                 )
+            )
+            maybe_print_hints(
+                command_name="ingest",
+                cfg_path=cfg_path,
+                no_hints=no_hints,
+                json_output=json,
+                observed_round=int(round),
             )
     except OpalError as e:
         opal_error("ingest-y", e)

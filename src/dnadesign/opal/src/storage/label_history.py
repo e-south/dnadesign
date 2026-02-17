@@ -658,7 +658,11 @@ class LabelHistory:
 
         hist_map: Dict[str, List[Dict[str, Any]]] = {}
         for _id, hist_cell in out[["id", lh]].itertuples(index=False, name=None):
-            hist_map[str(_id)] = self.normalize_hist_cell(hist_cell)
+            _id_str = str(_id)
+            try:
+                hist_map[_id_str] = self.parse_hist_cell_strict(hist_cell)
+            except OpalError as exc:
+                raise OpalError(f"Malformed label history for id={_id_str}: {exc}") from exc
 
         new_ids = labels["id"].astype(str).tolist()
         new_ys = labels["y"].tolist()
@@ -719,15 +723,15 @@ class LabelHistory:
         recs: List[Tuple[str, List[float], int]] = []
         for _id, hist_cell in df[["id", lh]].itertuples(index=False, name=None):
             _id = str(_id)
-            hist = self.normalize_hist_cell(hist_cell)
+            try:
+                hist = self.parse_hist_cell_strict(hist_cell)
+            except OpalError as exc:
+                raise OpalError(f"Malformed label history for id={_id}: {exc}") from exc
             entries = []
             for e in hist:
-                try:
-                    if e.get("kind") != "label":
-                        continue
-                    rr = int(e.get("observed_round", 9_999_999))
-                except Exception:
+                if e.get("kind") != "label":
                     continue
+                rr = int(e.get("observed_round", 9_999_999))
                 if use_all:
                     if rr <= as_of_round:
                         entries.append(e)
@@ -740,26 +744,26 @@ class LabelHistory:
 
             if policy == "latest_only":
                 best = max(entries, key=lambda x: int(x.get("observed_round", -1)))
-                y_wrap = _normalize_value_wrapper(best.get("y_obs"), require_numeric=True)
-                if y_wrap is None:
+                y_wrap = _coerce_mapping(best.get("y_obs"))
+                if y_wrap is None or "value" not in y_wrap:
                     raise OpalError(f"Label history y_obs missing/invalid for id={_id}.")
-                y = [float(v) for v in (y_wrap.get("value") or [])]
+                y = [float(v) for v in y_wrap.get("value", [])]
                 recs.append((_id, y, int(best.get("observed_round", -1))))
             elif policy == "all_rounds":
                 for e in entries:
-                    y_wrap = _normalize_value_wrapper(e.get("y_obs"), require_numeric=True)
-                    if y_wrap is None:
+                    y_wrap = _coerce_mapping(e.get("y_obs"))
+                    if y_wrap is None or "value" not in y_wrap:
                         raise OpalError(f"Label history y_obs missing/invalid for id={_id}.")
-                    y = [float(v) for v in (y_wrap.get("value") or [])]
+                    y = [float(v) for v in y_wrap.get("value", [])]
                     recs.append((_id, y, int(e.get("observed_round", -1))))
             elif policy == "error_on_duplicate":
                 if len(entries) > 1:
                     raise OpalError(f"Duplicate labels for id={_id} at multiple rounds (policy=error_on_duplicate).")
                 e = entries[0]
-                y_wrap = _normalize_value_wrapper(e.get("y_obs"), require_numeric=True)
-                if y_wrap is None:
+                y_wrap = _coerce_mapping(e.get("y_obs"))
+                if y_wrap is None or "value" not in y_wrap:
                     raise OpalError(f"Label history y_obs missing/invalid for id={_id}.")
-                y = [float(v) for v in (y_wrap.get("value") or [])]
+                y = [float(v) for v in y_wrap.get("value", [])]
                 recs.append((_id, y, int(e.get("observed_round", -1))))
 
         out = pd.DataFrame(recs, columns=["id", "y", "r"])
@@ -833,7 +837,11 @@ class LabelHistory:
 
         hist_map: Dict[str, List[Dict[str, Any]]] = {}
         for _id, hist_cell in out[["id", lh]].itertuples(index=False, name=None):
-            hist_map[str(_id)] = self.normalize_hist_cell(hist_cell)
+            _id_str = str(_id)
+            try:
+                hist_map[_id_str] = self.parse_hist_cell_strict(hist_cell)
+            except OpalError as exc:
+                raise OpalError(f"Malformed label history for id={_id_str}: {exc}") from exc
 
         for i, _id in enumerate(ids):
             _id = str(_id)

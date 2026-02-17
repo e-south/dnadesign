@@ -97,7 +97,7 @@ def cmd_prune_source(
         "-k",
         help="Column name(s) to keep even if matched for deletion. May be passed multiple times.",
     ),
-    yes: bool = typer.Option(False, "--yes", "-y", help="Skip interactive prompt."),
+    apply: bool = typer.Option(False, "--apply", help="Apply prune without interactive confirmation."),
     backup: bool = typer.Option(
         True,
         "--backup/--no-backup",
@@ -108,7 +108,7 @@ def cmd_prune_source(
     """
     Typical use:
       opal prune-source -c path/to/campaign.yaml
-      opal prune-source -c . --scope any --yes
+      opal prune-source -c . --scope any --apply
       opal prune-source -c . --scope campaign --keep opal__othercampaign__label_hist
     """
     scope = (scope or "any").strip().lower()
@@ -166,8 +166,8 @@ def cmd_prune_source(
                     "to_delete": to_delete,
                 }
             )
-            if not yes:
-                # In JSON mode, do not mutate unless --yes was passed.
+            if not apply:
+                # In JSON mode, do not mutate unless --apply was passed.
                 raise typer.Exit(code=ExitCodes.OK)
         else:
             # Human preview & warning banner
@@ -190,10 +190,10 @@ def cmd_prune_source(
                 print_stdout("\nNothing to prune. Exiting.")
             raise typer.Exit(code=ExitCodes.OK)
 
-        if not yes and not json:
+        if not apply and not json:
             if not prompt_confirm(
                 "Proceed to DELETE the columns above and rewrite records.parquet? (y/N): ",
-                non_interactive_hint="No TTY available. Re-run with --yes to confirm prune-source.",
+                non_interactive_hint="No TTY available. Re-run with --apply to confirm prune-source.",
             ):
                 print_stdout("Aborted.")
                 raise typer.Exit(code=ExitCodes.BAD_ARGS)

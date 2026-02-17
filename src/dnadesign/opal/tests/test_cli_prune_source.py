@@ -38,7 +38,7 @@ def test_prune_source_preview_and_commit(tmp_path):
     assert any(c.startswith("opal__") for c in df_before.columns)
     assert "Y" in df_before.columns
 
-    res = runner.invoke(app, ["--no-color", "prune-source", "-c", str(campaign), "--yes", "--json"])
+    res = runner.invoke(app, ["--no-color", "prune-source", "-c", str(campaign), "--apply", "--json"])
     assert res.exit_code == 0, res.stdout
     decoder = json.JSONDecoder()
     idx = 0

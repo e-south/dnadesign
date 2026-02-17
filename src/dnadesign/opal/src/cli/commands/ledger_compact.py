@@ -41,7 +41,7 @@ from ._common import (
 def cmd_ledger_compact(
     config: Optional[Path] = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
     runs: bool = typer.Option(False, "--runs", help="Compact run_meta ledger (runs.parquet)."),
-    yes: bool = typer.Option(False, "--yes", "-y", help="Skip interactive confirmation."),
+    apply: bool = typer.Option(False, "--apply", help="Apply compaction without interactive confirmation."),
     json: bool = typer.Option(False, "--json/--human", help="Output format."),
 ) -> None:
     try:
@@ -56,10 +56,10 @@ def cmd_ledger_compact(
             print_config_context(cfg_path, cfg=cfg)
             print_stdout(kv_block("ledger-compact target", {"runs": str(ws.ledger_runs_path)}))
 
-        if not yes:
+        if not apply:
             if not prompt_confirm(
                 "Proceed with ledger-compact? This rewrites ledger datasets. (y/N): ",
-                non_interactive_hint="No TTY available. Re-run with --yes to confirm.",
+                non_interactive_hint="No TTY available. Re-run with --apply to confirm.",
             ):
                 print_stdout("Aborted.")
                 raise typer.Exit(code=ExitCodes.BAD_ARGS)

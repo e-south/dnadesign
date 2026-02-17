@@ -7,4 +7,5 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-from . import random_forest  # noqa: F401
+from . import gaussian_process as gaussian_process  # noqa: F401
+from . import random_forest as random_forest  # noqa: F401

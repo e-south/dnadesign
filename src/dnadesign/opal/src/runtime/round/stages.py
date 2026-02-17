@@ -6,7 +6,7 @@ src/dnadesign/opal/src/runtime/round/stages.py
 Implements core round stages for OPAL execution (training, scoring, selection).
 Each stage returns a typed bundle for the next stage.
 
-Module Author(s): Eric J. South
+Module Author(s): Eric J. South, Elm Markert
 --------------------------------------------------------------------------------
 """
 
@@ -17,13 +17,19 @@ from typing import Any, Dict, List
 
 import numpy as np
 
+from ...core.objective_result import validate_objective_result_v2
 from ...core.progress import NullProgress
-from ...core.round_context import RoundCtx
+from ...core.round_context import Contract, RoundCtx
+from ...core.selection_contracts import (
+    extract_selection_plugin_params,
+    resolve_selection_objective_mode,
+    resolve_selection_tie_handling,
+)
 from ...core.utils import OpalError, now_iso, print_stderr
 from ...registries.models import get_model
 from ...registries.objectives import get_objective
-from ...registries.selection import get_selection, normalize_selection_result
-from ...registries.transforms_y import run_y_ops_pipeline
+from ...registries.selection import get_selection, normalize_selection_result, validate_selection_result
+from ...registries.transforms_y import get_y_op, run_y_ops_pipeline
 from ...storage.artifacts import append_round_log_event, write_objective_meta
 from ..preflight import preflight_run
 from ..round_plan import plan_round
@@ -35,27 +41,103 @@ def _log(enabled: bool, msg: str) -> None:
         print_stderr(msg)
 
 
-def _resolve_selection_objective_mode(sel_params: Dict[str, Any], *, warn: bool = True) -> str:
-    mode_raw = sel_params.get("objective_mode")
-    legacy_raw = sel_params.get("objective")
-    if mode_raw is not None and legacy_raw is not None:
-        mode_str = str(mode_raw).strip().lower()
-        legacy_str = str(legacy_raw).strip().lower()
-        if mode_str != legacy_str:
-            raise OpalError(
-                "selection.params has both 'objective_mode' and legacy 'objective' with conflicting values "
-                f"({mode_str!r} vs {legacy_str!r})."
-            )
-    if mode_raw is None and legacy_raw is not None:
-        if warn:
-            print_stderr("[opal] selection.params.objective is deprecated; please use selection.params.objective_mode.")
-        mode_raw = legacy_raw
-    if mode_raw is None:
-        mode_raw = "maximize"
-    mode = str(mode_raw).strip().lower()
-    if mode not in {"maximize", "minimize"}:
-        raise OpalError(f"Invalid selection objective_mode: {mode!r} (expected 'maximize' or 'minimize').")
-    return mode
+def _resolve_channel_ref(ref: str, channels: Dict[str, np.ndarray], *, label: str) -> np.ndarray:
+    key = str(ref).strip()
+    if not key:
+        raise OpalError(f"{label} channel reference cannot be empty.")
+    if key not in channels:
+        raise OpalError(f"{label} channel '{key}' not found. Available: {sorted(channels.keys())}")
+    return np.asarray(channels[key], dtype=float).reshape(-1)
+
+
+def _format_summary_stats_for_log(summary_stats: Dict[str, Any]) -> List[str]:
+    kvs: List[str] = []
+    for k in sorted(summary_stats.keys()):
+        v = summary_stats[k]
+        if isinstance(v, (bool, np.bool_)):
+            kvs.append(f"{k}={v}")
+            continue
+        if isinstance(v, (int, float, np.integer, np.floating)):
+            kvs.append(f"{k}={float(v):.6g}")
+            continue
+        kvs.append(f"{k}={v}")
+    return kvs
+
+
+def _coalesce_uncertainty_chunks(std_payload: Any) -> np.ndarray:
+    if isinstance(std_payload, list):
+        if len(std_payload) == 0:
+            raise OpalError("model/<self>/std_devs payload is empty after prediction.")
+        chunks = [np.asarray(chunk, dtype=float) for chunk in std_payload]
+        dims = {arr.ndim for arr in chunks}
+        if dims == {1}:
+            return np.concatenate([arr.reshape(-1) for arr in chunks], axis=0)
+        if dims == {2}:
+            widths = {arr.shape[1] for arr in chunks}
+            if len(widths) != 1:
+                raise OpalError("model/<self>/std_devs chunks have inconsistent column widths.")
+            return np.vstack(chunks)
+        raise OpalError("model/<self>/std_devs chunks must be all 1D or all 2D arrays.")
+    arr = np.asarray(std_payload, dtype=float)
+    if arr.ndim in (1, 2):
+        return arr
+    raise OpalError("model/<self>/std_devs payload must be a 1D or 2D numeric array.")
+
+
+def _inverse_yops_outputs(
+    *,
+    rctx: RoundCtx,
+    y_ops_cfg: List[Any],
+    y_pred: np.ndarray,
+    y_pred_std: np.ndarray | None,
+) -> tuple[np.ndarray, np.ndarray | None]:
+    y_inv = np.asarray(y_pred, dtype=float)
+    std_inv = None if y_pred_std is None else np.asarray(y_pred_std, dtype=float)
+    if not y_ops_cfg:
+        return y_inv, std_inv
+
+    names = rctx.get("yops/pipeline/names", default=[])
+    params_used = rctx.get("yops/pipeline/params", default=[])
+    if len(names) != len(params_used):
+        raise OpalError("Malformed Y-ops pipeline: names/params length mismatch.")
+
+    for name, params in zip(reversed(names), reversed(params_used)):
+        spec = get_y_op(name)
+        ParamT = spec.ParamModel
+        params_obj = ParamT(**params) if ParamT is not None else params
+        inv_contract = Contract(
+            category="yops",
+            requires=spec.requires + spec.produces,
+            produces=tuple(),
+        )
+        inv_ctx = rctx.for_plugin(category="yops", name=name, contract=inv_contract)
+        inv_ctx.precheck_requires(stage="inverse")
+
+        y_before = y_inv
+        if std_inv is not None:
+            inverse_std_fn = getattr(spec.inverse_fn, "inverse_std", None)
+            if inverse_std_fn is None:
+                raise OpalError(
+                    "[round] y_ops are active but "
+                    f"{name} does not support inverse_std; uncertainty channels require objective-space units."
+                )
+            else:
+                std_inv = np.asarray(
+                    inverse_std_fn(std_inv, params_obj, ctx=inv_ctx, y_pred_transformed=y_before),
+                    dtype=float,
+                )
+                if std_inv.shape != y_before.shape:
+                    raise OpalError(
+                        f"Y-op inverse_std shape mismatch for {name}: expected {y_before.shape}, got {std_inv.shape}."
+                    )
+                if not np.all(np.isfinite(std_inv)):
+                    raise OpalError(f"Y-op inverse_std produced non-finite values for {name}.")
+                if np.any(std_inv < 0.0):
+                    raise OpalError(f"Y-op inverse_std produced negative standard deviations for {name}.")
+
+        y_inv = np.asarray(spec.inverse_fn(y_before, params_obj, ctx=inv_ctx), dtype=float)
+
+    return y_inv, std_inv
 
 
 def stage_training(inputs: RoundInputs) -> TrainingBundle:
@@ -148,6 +230,9 @@ def stage_x_matrices(
             f"[candidates] pool={plan.candidate_total_before_filter} → {len(cand_df)} after excluding already-labeled "
             f"(policy allow_resuggesting_candidates_until_labeled={plan.allow_resuggest})",
         )
+
+    if cand_df.shape[0] == 0:
+        raise OpalError("Candidate pool is empty after filtering; nothing to score.")
 
     X_pool, id_order_pool = store.transform_matrix(df, cand_df["id"], ctx=tctx)
     if X_pool.shape[0] == 0:
@@ -261,11 +346,21 @@ def stage_scoring(
         # Enforce predict-stage produces once after batching.
         mctx.postcheck_produces(stage="predict")
 
+    _missing = object()
+    std_payload = mctx.get("model/<self>/std_devs", _missing)
+    y_pred_std_fit = None if std_payload is _missing else _coalesce_uncertainty_chunks(std_payload)
+
     _log(
         req.verbose,
         f"[y-ops] inverting {len(yops_cfg)} op(s) for predictions: {([p.name for p in yops_cfg] or [])}",
     )
-    Y_hat = run_y_ops_pipeline(stage="inverse", y_ops=yops_cfg, Y=Y_hat_fit, ctx=rctx)
+    # UQ invariant: objectives consume mean and standard deviation in the same units.
+    Y_hat, y_pred_std = _inverse_yops_outputs(
+        rctx=rctx,
+        y_ops_cfg=yops_cfg,
+        y_pred=Y_hat_fit,
+        y_pred_std=y_pred_std_fit,
+    )
     append_round_log_event(
         rdir / "logs" / "round.log.jsonl",
         {
@@ -278,10 +373,6 @@ def stage_scoring(
         raise OpalError(f"Predicted Y dimension mismatch: expected {y_dim}, got {Y_hat.shape[1]}")
 
     rctx.set_core("core/labels_as_of_round", int(req.as_of_round))
-    obj_name = cfg.objective.objective.name
-    obj_params = dict(cfg.objective.objective.params)
-    obj_fn = get_objective(obj_name)
-    octx = rctx.for_plugin(category="objective", name=obj_name, plugin=obj_fn)
 
     class _TrainView:
         def __init__(self, Y: np.ndarray, R: np.ndarray, as_of_round: int) -> None:
@@ -302,109 +393,130 @@ def stage_scoring(
                 yield self._Y[i, :]
 
     tv = _TrainView(Y_train, R_train, int(req.as_of_round))
-    obj_res = obj_fn(y_pred=Y_hat, params=obj_params, ctx=octx, train_view=tv)
-    y_obj_scalar = np.asarray(obj_res.score, dtype=float).ravel()
-    if y_obj_scalar.size != len(id_order_pool):
-        raise OpalError(f"Objective produced {y_obj_scalar.size} scores for {len(id_order_pool)} candidates.")
-    non_finite_mask = ~np.isfinite(y_obj_scalar)
-    if non_finite_mask.any():
-        n = int(non_finite_mask.sum())
-        n_total = int(y_obj_scalar.size)
-        n_nan = int(np.isnan(y_obj_scalar).sum())
-        n_pinf = int(np.isposinf(y_obj_scalar).sum())
-        n_ninf = int(np.isneginf(y_obj_scalar).sum())
-        bad_ids = np.array(id_order_pool)[non_finite_mask]
-        preview_pairs = [f"{bad_ids[i]}={y_obj_scalar[non_finite_mask][i]:.6g}" for i in range(min(20, n))]
-        raise OpalError(
-            "Objective produced non-finite scores for {n}/{N} candidates "
-            "(NaN={na}, +Inf={pi}, -Inf={ni}). Sample: {pv}. "
-            "Ensure objective/Y-ops produce finite scalars.".format(
-                n=n,
-                N=n_total,
-                na=n_nan,
-                pi=n_pinf,
-                ni=n_ninf,
-                pv=", ".join(preview_pairs),
+
+    score_channels: Dict[str, np.ndarray] = {}
+    uncertainty_channels: Dict[str, np.ndarray] = {}
+    channel_modes: Dict[str, str] = {}
+    diagnostics_by_objective: Dict[str, Dict[str, Any]] = {}
+    objective_defs: List[Dict[str, Any]] = []
+
+    for obj_ref in cfg.objectives.objectives:
+        obj_name_i = obj_ref.name
+        obj_params_i = dict(obj_ref.params)
+        obj_fn = get_objective(obj_name_i)
+        octx = rctx.for_plugin(category="objective", name=obj_name_i, plugin=obj_fn)
+        try:
+            raw_obj = obj_fn(
+                y_pred=Y_hat,
+                params=obj_params_i,
+                ctx=octx,
+                train_view=tv,
+                y_pred_std=y_pred_std,
             )
+        except OpalError:
+            raise
+        except Exception as e:
+            raise OpalError(f"Objective plugin '{obj_name_i}' failed: {e}") from e
+        obj_res = validate_objective_result_v2(
+            result=raw_obj,
+            objective_name=obj_name_i,
+            n_rows=len(id_order_pool),
         )
-    diag = obj_res.diagnostics or {}
-    obj_mode = getattr(obj_res, "mode", "maximize")
-    obj_mode_norm = str(obj_mode).strip().lower()
-    if obj_mode_norm not in {"maximize", "minimize"}:
-        raise OpalError(
-            f"Objective returned invalid mode {obj_mode!r} (expected 'maximize' or 'minimize'). "
-            "Fix the objective plugin or configuration."
+        diagnostics_by_objective[obj_name_i] = dict(obj_res.diagnostics or {})
+
+        score_refs_for_obj: List[str] = []
+        for channel_name, arr in obj_res.scores_by_name.items():
+            ref = f"{obj_name_i}/{channel_name}"
+            if ref in score_channels:
+                raise OpalError(f"Duplicate score channel reference generated: {ref}")
+            score_channels[ref] = arr
+            channel_modes[ref] = obj_res.modes_by_name[channel_name]
+            score_refs_for_obj.append(ref)
+
+        uncertainty_refs_for_obj: List[str] = []
+        for channel_name, arr in obj_res.uncertainty_by_name.items():
+            ref = f"{obj_name_i}/{channel_name}"
+            if ref in uncertainty_channels:
+                raise OpalError(f"Duplicate uncertainty channel reference generated: {ref}")
+            uncertainty_channels[ref] = arr
+            uncertainty_refs_for_obj.append(ref)
+
+        objective_defs.append(
+            {
+                "name": obj_name_i,
+                "params": obj_params_i,
+                "score_channels": score_refs_for_obj,
+                "uncertainty_channels": uncertainty_refs_for_obj,
+                "diagnostics_summary_keys": list((obj_res.diagnostics or {}).keys()),
+            }
         )
 
-    obj_meta = {
-        "mode": obj_mode,
-        "params": obj_params,
-        "diagnostics_summary_keys": list(diag.keys()),
-    }
-    obj_sha = write_objective_meta(rdir / "metadata" / "objective_meta.json", obj_meta)
-
-    obj_summary_stats = diag.get("summary_stats") if isinstance(diag, dict) else None
-    if isinstance(obj_summary_stats, dict) and obj_summary_stats:
-        kvs: List[str] = []
-        for k in sorted(obj_summary_stats.keys()):
-            v = obj_summary_stats[k]
-            try:
-                kvs.append(f"{k}={float(v):.6g}")
-            except Exception:
-                kvs.append(f"{k}={v}")
-        _log(req.verbose, f"[objective:{obj_name}] " + " | ".join(kvs))
-    else:
-        stat_line = (
-            f"[objective:{obj_name}] scalar min/median/max = "
-            f"{np.nanmin(y_obj_scalar):.6g} / {np.nanmedian(y_obj_scalar):.6g} / {np.nanmax(y_obj_scalar):.6g}"
-        )
-        _log(
-            req.verbose,
-            stat_line,
-        )
-    append_round_log_event(
-        rdir / "logs" / "round.log.jsonl",
-        {
-            "ts": now_iso(),
-            "stage": "objective_done",
-            "objective": obj_name,
-            "score_min": float(np.nanmin(y_obj_scalar)) if y_obj_scalar.size else None,
-            "score_median": (float(np.nanmedian(y_obj_scalar)) if y_obj_scalar.size else None),
-            "score_max": float(np.nanmax(y_obj_scalar)) if y_obj_scalar.size else None,
-            "train_effect_pool_size": int(diag.get("train_effect_pool_size", 0)),
-            "denom_used": (float(diag.get("denom_used", float("nan"))) if "denom_used" in diag else None),
-        },
-    )
+        summary_stats = (obj_res.diagnostics or {}).get("summary_stats", {})
+        if isinstance(summary_stats, dict) and summary_stats:
+            kvs = _format_summary_stats_for_log(summary_stats)
+            _log(req.verbose, f"[objective:{obj_name_i}] " + " | ".join(kvs))
 
     sel_name = cfg.selection.selection.name
     sel_params = dict(cfg.selection.selection.params)
-    top_k = int(req.k_override or sel_params.get("top_k") or 0)
+    if req.k_override is not None:
+        top_k = int(req.k_override)
+    else:
+        if "top_k" not in sel_params:
+            raise OpalError("selection.params.top_k is required (or override with --k).")
+        top_k = int(sel_params.get("top_k"))
     if top_k <= 0:
         raise OpalError("selection.params.top_k must be > 0 (or override with --k).")
-    tie_handling = sel_params.get("tie_handling", "competition_rank")
-    mode = _resolve_selection_objective_mode(sel_params)
+    tie_handling = resolve_selection_tie_handling(sel_params, error_cls=OpalError)
+    sel_params["tie_handling"] = tie_handling
+    mode = resolve_selection_objective_mode(sel_params, error_cls=OpalError)
     sel_params["objective_mode"] = mode
-    if obj_mode_norm != mode:
+    score_ref = str(sel_params.get("score_ref", "")).strip()
+    if not score_ref:
+        raise OpalError("selection.params.score_ref is required and must reference an objective score channel.")
+    y_obj_scalar = _resolve_channel_ref(score_ref, score_channels, label="score_ref")
+    if score_ref not in channel_modes:
+        raise OpalError(f"score_ref channel '{score_ref}' is missing objective mode metadata.")
+    selected_mode = str(channel_modes[score_ref]).strip().lower()
+    if selected_mode != mode:
         raise OpalError(
-            "Objective mode mismatch: objective returned "
-            f"{obj_mode_norm!r} but selection objective_mode is {mode!r}. "
-            "Align objective and selection modes to avoid inverted ranking."
+            "Objective mode mismatch: selected score channel "
+            f"{score_ref!r} has mode {selected_mode!r} but selection objective_mode is {mode!r}."
         )
+
+    uncertainty_ref = sel_params.get("uncertainty_ref")
+    if uncertainty_ref is not None:
+        uncertainty_ref = str(uncertainty_ref).strip() or None
+    if sel_name == "expected_improvement" and not uncertainty_ref:
+        raise OpalError("selection.params.uncertainty_ref is required for expected_improvement.")
+    sq = (
+        _resolve_channel_ref(uncertainty_ref, uncertainty_channels, label="uncertainty_ref")
+        if uncertainty_ref
+        else None
+    )
 
     sel_fn = get_selection(sel_name, sel_params)
     sctx = rctx.for_plugin(category="selection", name=sel_name, plugin=sel_fn)
-    raw_sel = sel_fn(
-        ids=np.array(id_order_pool),
-        scores=y_obj_scalar,
-        top_k=top_k,
-        tie_handling=tie_handling,
-        objective=mode,
-        ctx=sctx,
-    )
+    selection_call_params = extract_selection_plugin_params(sel_params)
+    try:
+        raw_sel = sel_fn(
+            ids=np.array(id_order_pool),
+            scores=y_obj_scalar,
+            top_k=top_k,
+            tie_handling=tie_handling,
+            objective=mode,
+            ctx=sctx,
+            scalar_uncertainty=sq,
+            **selection_call_params,
+        )
+    except OpalError:
+        raise
+    except Exception as e:
+        raise OpalError(f"Selection plugin '{sel_name}' failed: {e}") from e
+    validated_sel = validate_selection_result(raw_sel, plugin_name=sel_name, expected_len=len(id_order_pool))
     sel_norm = normalize_selection_result(
-        raw_sel,
+        {"order_idx": validated_sel.order_idx},
         ids=np.array(id_order_pool),
-        scores=y_obj_scalar,
+        scores=validated_sel.score,
         top_k=top_k,
         tie_handling=tie_handling,
         objective=mode,
@@ -440,10 +552,25 @@ def stage_scoring(
         rdir / "logs" / "round.log.jsonl",
         {
             "ts": now_iso(),
+            "stage": "objective_done",
+            "score_ref": score_ref,
+            "uncertainty_ref": uncertainty_ref,
+            "objective_count": len(objective_defs),
+            "score_min": float(np.nanmin(y_obj_scalar)) if y_obj_scalar.size else None,
+            "score_median": (float(np.nanmedian(y_obj_scalar)) if y_obj_scalar.size else None),
+            "score_max": float(np.nanmax(y_obj_scalar)) if y_obj_scalar.size else None,
+        },
+    )
+    append_round_log_event(
+        rdir / "logs" / "round.log.jsonl",
+        {
+            "ts": now_iso(),
             "stage": "selection_done",
             "strategy": sel_name,
             "tie_handling": tie_handling,
             "objective_mode": mode,
+            "score_ref": score_ref,
+            "uncertainty_ref": uncertainty_ref,
             "requested_top_k": int(top_k),
             "effective_after_ties": int(selected_effective),
         },
@@ -452,6 +579,23 @@ def stage_scoring(
     rctx.set_core("core/selection/top_k_effective", int(selected_effective))
     rctx.set_core("core/selection/objective_mode", str(mode))
     rctx.set_core("core/selection/tie_handling", str(tie_handling))
+    rctx.set_core("core/selection/score_ref", str(score_ref))
+    rctx.set_core("core/selection/uncertainty_ref", uncertainty_ref)
+
+    selected_obj_name, _ = score_ref.split("/", 1)
+    selected_obj_params = next((d["params"] for d in objective_defs if d["name"] == selected_obj_name), {})
+    selected_diag = diagnostics_by_objective.get(selected_obj_name, {})
+    obj_summary_stats = selected_diag.get("summary_stats") if isinstance(selected_diag, dict) else None
+    obj_meta = {
+        "objectives": objective_defs,
+        "selection": {
+            "score_ref": score_ref,
+            "uncertainty_ref": uncertainty_ref,
+            "objective_mode": mode,
+            "tie_handling": tie_handling,
+        },
+    }
+    obj_sha = write_objective_meta(rdir / "metadata" / "objective_meta.json", obj_meta)
 
     return ScoreBundle(
         model=model,
@@ -459,11 +603,16 @@ def stage_scoring(
         fit_duration=fit_duration,
         Y_hat=Y_hat,
         y_obj_scalar=y_obj_scalar,
-        diag=diag,
+        diag=selected_diag,
         obj_summary_stats=obj_summary_stats if isinstance(obj_summary_stats, dict) else None,
-        obj_name=obj_name,
-        obj_params=obj_params,
-        obj_mode=obj_mode,
+        obj_name=selected_obj_name,
+        obj_params=selected_obj_params,
+        obj_mode=selected_mode,
+        objective_defs=objective_defs,
+        score_channels=score_channels,
+        uncertainty_channels=uncertainty_channels,
+        score_ref=score_ref,
+        uncertainty_ref=uncertainty_ref,
         sel_name=sel_name,
         sel_params=sel_params,
         tie_handling=tie_handling,
@@ -473,4 +622,6 @@ def stage_scoring(
         selected_effective=selected_effective,
         top_k=top_k,
         obj_sha=obj_sha,
+        scores=validated_sel.score,
+        uq_scalar=sq,
     )

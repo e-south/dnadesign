@@ -83,7 +83,7 @@ def print_stdout(s: object) -> None:
         # Rich console prints with markup if enabled
         c.print(s)
     else:
-        print(s)
+        print(s, flush=True)
 
 
 def print_stderr(s: object) -> None:
@@ -91,7 +91,7 @@ def print_stderr(s: object) -> None:
     if c is not None:
         c.print(s)
     else:
-        print(s, file=os.sys.stderr)
+        print(s, file=os.sys.stderr, flush=True)
 
 
 def read_json(path: str | Path):

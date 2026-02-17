@@ -19,6 +19,7 @@ import typer
 from ...core.utils import ExitCodes, OpalError, ensure_dir, file_sha256, print_stdout
 from ...storage.state import CampaignState
 from ..formatting import render_init_human
+from ..guidance_hints import maybe_print_hints
 from ..registry import cli_command
 from ._common import (
     internal_error,
@@ -34,6 +35,7 @@ from ._common import (
 @cli_command("init", help="Initialize/validate the campaign workspace; write state.json.")
 def cmd_init(
     config: Path = typer.Option(None, "--config", "-c", help="Path to campaign.yaml", envvar="OPAL_CONFIG"),
+    no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in human output."),
     json: bool = typer.Option(False, "--json/--human", help="Output format (default: human)"),
 ):
     try:
@@ -45,21 +47,6 @@ def cmd_init(
         outputs_dir = workdir / "outputs"
         ensure_dir(outputs_dir / "ledger")
         ensure_dir(outputs_dir / "rounds")
-        ensure_dir(workdir / "inputs")
-
-        # Write a workspace marker so future commands can resolve fast from any child
-        marker_dir = workdir / ".opal"
-        ensure_dir(marker_dir)
-        # store the path relative to the marker for portability
-        rel = cfg_path if cfg_path.is_absolute() else cfg_path.resolve()
-        try:
-            rel = rel.relative_to(marker_dir)
-        except Exception:
-            try:
-                rel = rel.relative_to(workdir)
-            except Exception:
-                pass
-        (marker_dir / "config").write_text(str(rel))
 
         store = store_from_cfg(cfg)
         df = store.load()
@@ -93,7 +80,7 @@ def cmd_init(
             training_policy=cfg.training.policy,
             performance={
                 "score_batch_size": cfg.scoring.score_batch_size,
-                "objective": cfg.objective.objective.name,
+                "objectives": [o.name for o in cfg.objectives.objectives],
             },
             representation_vector_dimension=0,
             backlog={"number_of_selected_but_not_yet_labeled_candidates_total": 0},
@@ -104,6 +91,7 @@ def cmd_init(
             json_out(out)
         else:
             print_stdout(render_init_human(workdir=Path(out["workdir"])))
+            maybe_print_hints(command_name="init", cfg_path=cfg_path, no_hints=no_hints, json_output=json)
     except OpalError as e:
         opal_error("init", e)
         raise typer.Exit(code=e.exit_code)

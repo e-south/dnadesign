@@ -18,6 +18,20 @@ from ...tui import kv_table, tui_enabled
 from ..core import _as_dict, _truncate, bullet_list, kv_block, short_array
 
 
+def _render_id_value(value: Any) -> str:
+    if value is None:
+        return "<unresolved>"
+    try:
+        if isinstance(value, float) and value != value:
+            return "<unresolved>"
+    except Exception:
+        pass
+    text = str(value).strip()
+    if not text or text.lower() in {"nan", "none", "nat"}:
+        return "<unresolved>"
+    return text
+
+
 def render_ingest_preview_human(
     preview: Any,
     sample_rows: Sequence[Mapping[str, Any]],
@@ -56,10 +70,10 @@ def render_ingest_preview_human(
             table.add_column("y")
             for r in sample_rows[:5]:
                 seq = _truncate(r.get("sequence", ""))
-                rid = r.get("id", "")
+                rid = _render_id_value(r.get("id", ""))
                 y = r.get("y", "")
                 y_str = short_array(y, maxlen=6) if isinstance(y, (list, tuple)) else _truncate(str(y), 64)
-                table.add_row(str(rid), str(seq), str(y_str))
+                table.add_row(rid, str(seq), str(y_str))
             blocks.append(table)
         return Group(*blocks)
 
@@ -87,7 +101,7 @@ def render_ingest_preview_human(
     lines: List[str] = []
     for r in sample_rows[:5]:
         seq = _truncate(r.get("sequence", ""))
-        rid = r.get("id", "")
+        rid = _render_id_value(r.get("id", ""))
         y = r.get("y", "")
         y_str = short_array(y, maxlen=6) if isinstance(y, (list, tuple)) else _truncate(str(y), 64)
         lines.append(f"id={rid}  sequence={seq}  y={y_str}")

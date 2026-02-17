@@ -1,5 +1,3 @@
-# ABOUTME: Ensures record_show reads ledger predictions from canonical paths.
-# ABOUTME: Verifies ledger-backed reporting for individual records.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -38,7 +36,7 @@ def test_record_show_reads_ledger_predictions_dir(tmp_path):
             "id": ["x"],
             "sequence": ["AC"],
             "pred__y_dim": [8],
-            "pred__y_obj_scalar": [0.5],
+            "pred__score_selected": [0.5],
             "sel__rank_competition": [1],
             "sel__is_selected": [True],
         }

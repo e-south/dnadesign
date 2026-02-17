@@ -24,8 +24,7 @@ def render_init_human(*, workdir: Path) -> str:
             "[ok] Initialized campaign workspace",
             {
                 "workdir": str(Path(workdir).resolve()),
-                "directories": "inputs/, outputs/",
-                "marker": ".opal/config",
+                "directories": "outputs/",
             },
         )
         if table is not None:
@@ -34,7 +33,6 @@ def render_init_human(*, workdir: Path) -> str:
         "[ok] Initialized campaign workspace",
         {
             "workdir": str(Path(workdir).resolve()),
-            "directories": "inputs/, outputs/",
-            "marker": ".opal/config",
+            "directories": "outputs/",
         },
     )

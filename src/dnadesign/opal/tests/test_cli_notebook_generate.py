@@ -1,7 +1,3 @@
-# ABOUTME: Validates the notebook CLI generation workflow and guardrails.
-# ABOUTME: Ensures notebooks are generated only when required artifacts exist.
-# ABOUTME: Exercises notebook CLI generation and selection behavior.
-# ABOUTME: Covers name overrides, run selection, and error nudges.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

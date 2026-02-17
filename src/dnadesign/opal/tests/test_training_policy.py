@@ -1,5 +1,3 @@
-# ABOUTME: Tests training label extraction policies across rounds from label history.
-# ABOUTME: Ensures labels are deduped and pred entries are ignored during training.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -105,4 +103,25 @@ def test_training_policy_error_on_duplicate(tmp_path):
             as_of_round=1,
             cumulative_training=True,
             dedup_policy="error_on_duplicate",
+        )
+
+
+def test_training_policy_rejects_malformed_label_history(tmp_path):
+    store = _store(tmp_path)
+    df = _df()
+    df["opal__demo__label_hist"] = [
+        [
+            {
+                "kind": "label",
+                "y_obs": {"value": [0.0], "dtype": "vector"},
+            }
+        ]
+    ]
+
+    with pytest.raises(OpalError, match="Malformed label history"):
+        store.training_labels_with_round(
+            df,
+            as_of_round=1,
+            cumulative_training=True,
+            dedup_policy="all_rounds",
         )

@@ -83,7 +83,7 @@ def test_cli_pressure_scalar_multi_round(tmp_path: Path) -> None:
             "0",
             "--csv",
             str(labels0),
-            "--yes",
+            "--apply",
         ],
     )
     assert res.exit_code == 0, res.stdout
@@ -105,7 +105,7 @@ def test_cli_pressure_scalar_multi_round(tmp_path: Path) -> None:
             "1",
             "--csv",
             str(labels1),
-            "--yes",
+            "--apply",
         ],
     )
     assert res.exit_code == 0, res.stdout

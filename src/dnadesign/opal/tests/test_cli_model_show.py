@@ -1,5 +1,3 @@
-# ABOUTME: Tests model-show CLI behavior for resolving round artifacts.
-# ABOUTME: Ensures model paths are discovered under round directories.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

@@ -6,7 +6,7 @@ src/dnadesign/opal/src/registries/loader.py
 Centralizes registry discovery for built-ins and entry-point plugins. Raises
 OpalError on import/load failures to enforce fail-fast behavior.
 
-Module Author(s): Eric J. South (extended by Codex)
+Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 

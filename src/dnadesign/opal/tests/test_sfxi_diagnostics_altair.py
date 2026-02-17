@@ -1,4 +1,3 @@
-# ABOUTME: Smoke tests for Altair-based SFXI diagnostics charts.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

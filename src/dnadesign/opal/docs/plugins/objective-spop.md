@@ -1,10 +1,11 @@
 ## sponging_percent_of_positive `spop`
 
-**Intent.** IPTG increases expression of an msr/msd cassette with an extended hairpin. Constitutively expressed RT variants are tested for the ability to process these long hairpins to produce a mature retron. Mature retron DNA sponges TetR and derepresses the reporter, so RFP is a proxy for strand displacement and retron maturation. Our goal is to rank RT variants that deliver strong sponging, preferably at lower IPTG, without compromising growth.
+This page documents the draft `spop` objective design and its proposed scoring equations.
+Status: draft objective note; it may not correspond to a built-in registered plugin yet.
 
 ---
 
-#### 1) Channels and data shape
+### 1) Channels and data shape
 
 **Per variant $g$, per dose $j\in{0..J}$ (ascending), with replicates $r$:**
 
@@ -27,7 +28,7 @@ If a variant’s aTc well is missing, use a plate‑level aTc median $\tilde Z_{
 
 ---
 
-#### 2) Per‑dose Y label
+### 2) Per‑dose Y label
 
 Percent of positive, growth‑normalized:
 
@@ -51,7 +52,7 @@ $$
 
 ---
 
-#### 3) Viability per dose (relative to zero IPTG)
+### 3) Viability per dose (relative to zero IPTG)
 
 We compare each induced condition to the variant’s own uninduced growth.
 
@@ -66,7 +67,7 @@ Interpretation: $v_{g,j}=1$ means “as viable as uninduced”; values below 1 i
 
 ---
 
-#### 4) Dose set used for scoring
+### 4) Dose set used for scoring
 
 Exclude zero IPTG by default to avoid rewarding leakiness:
 
@@ -75,7 +76,7 @@ $$S=\{j:\,dose_j>0\}$$
 
 ---
 
-#### 5) Potency and final score (cumulative aggregation)
+### 5) Potency and final score (cumulative aggregation)
 
 We reward any observed sponging and, because the dose series is ascending, earlier turn‑on naturally accumulates more credit.
 
@@ -103,11 +104,11 @@ We reward any observed sponging and, because the dose series is ascending, earli
 
 ---
 
-#### 6) Emissions
+### 6) Emissions
 
 **Per‑variant (`kind="run_pred"`):**
 
-* `pred__y_obj_scalar`: $Score_g$
+* `pred__score_selected`: $Score_g$
 * `pred__y_per_dose`: $[y_{g,0},...,y_{g,J}]$
 * `qc__viability_per_dose`: $[v_{g,0},...,v_{g,J}]$
 * `qc__baselines`: $B_g$ and `$ \tilde Z_{pos,g} $
@@ -115,7 +116,7 @@ We reward any observed sponging and, because the dose series is ascending, earli
 **Per‑run (`kind="run_meta"`):**
 
 * `obj__name`: "spop_v1"
-* `sel__score_field`: "pred__y_obj_scalar"
+* `selection__score_ref`: "pred__score_selected"
 * `obj__lambda`: $\lambda$
 * `obj__eps_od`: $\epsilon_{od}$
 * `obj__eps_pos`: $\epsilon_{pos}$
@@ -124,7 +125,7 @@ We reward any observed sponging and, because the dose series is ascending, earli
 
 ---
 
-#### 7) Defaults
+### 7) Defaults
 
 * $ \epsilon_{od}=10^{-8} $, $ \epsilon_{pos}=10^{-8} $
 * $ S=\{j:\,dose_j>0\} $ (exclude zero IPTG)
@@ -133,7 +134,7 @@ We reward any observed sponging and, because the dose series is ascending, earli
 
 ---
 
-#### 8) Edge cases and QC
+### 8) Edge cases and QC
 
 * Very small $ \tilde Z_{pos,g} $ can inflate ratios; rely on $ \epsilon_{pos} $ and flag for QC.
 * Near‑zero OD is guarded by $ \epsilon_{od}$ ($ v_{g,j} $ will be small, reducing the score when $ \lambda>0 $).
@@ -142,7 +143,7 @@ We reward any observed sponging and, because the dose series is ascending, earli
 
 ---
 
-#### 9) Pipeline summary
+### 9) Pipeline summary
 
 1. **Plate to vectors.** Compute $\tilde O_{g,j}$, $\tilde R_{g,j}$, $\tilde Z_{g,j}$, the variant’s $\tilde Z_{pos,g}$, and the baseline $B_g$. Then compute \(y_{g,j}\) and \(v_{g,j}\).
 2. **Vectors to scalar.** Choose $S$; compute \(P_g\), \(V_g\), and \(Score_g\).

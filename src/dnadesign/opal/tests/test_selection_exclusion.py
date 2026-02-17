@@ -1,5 +1,3 @@
-# ABOUTME: Validates selection exclusion logic against label history entries.
-# ABOUTME: Ensures labeled ids are filtered correctly by observed round.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>

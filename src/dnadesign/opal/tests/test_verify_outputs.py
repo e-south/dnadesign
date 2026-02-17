@@ -1,5 +1,3 @@
-# ABOUTME: Verifies selection outputs against ledger predictions and run metadata.
-# ABOUTME: Covers integration paths for verify-outputs and end-to-end run flows.
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
@@ -15,10 +13,12 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from dnadesign.opal.src.cli.commands.init import cmd_init
 from dnadesign.opal.src.cli.commands.run import cmd_run
 from dnadesign.opal.src.cli.commands.verify_outputs import verify_outputs
+from dnadesign.opal.src.core.utils import OpalError
 from dnadesign.opal.src.reporting.verify_outputs import compare_selection_to_ledger, read_selection_table
 from dnadesign.opal.src.storage.artifacts import write_selection_csv
 from dnadesign.opal.src.storage.ledger import LedgerReader, LedgerWriter
@@ -27,19 +27,40 @@ from dnadesign.opal.src.storage.writebacks import SelectionEmit, build_run_meta_
 
 
 def test_compare_selection_to_ledger_matches() -> None:
-    selection_df = pd.DataFrame({"id": ["a", "b"], "pred__y_obj_scalar": [1.0, 2.0]})
-    ledger_df = pd.DataFrame({"id": ["a", "b"], "pred__y_obj_scalar": [1.0, 2.0]})
+    selection_df = pd.DataFrame({"id": ["a", "b"], "pred__score_selected": [1.0, 2.0]})
+    ledger_df = pd.DataFrame({"id": ["a", "b"], "pred__score_selected": [1.0, 2.0]})
     summary, mismatches = compare_selection_to_ledger(selection_df, ledger_df, eps=1e-9)
     assert summary["mismatch_count"] == 0
     assert mismatches.empty
 
 
 def test_compare_selection_to_ledger_mismatch() -> None:
-    selection_df = pd.DataFrame({"id": ["a", "b"], "pred__y_obj_scalar": [1.0, 2.0]})
-    ledger_df = pd.DataFrame({"id": ["a", "b"], "pred__y_obj_scalar": [1.0, 2.5]})
+    selection_df = pd.DataFrame({"id": ["a", "b"], "pred__score_selected": [1.0, 2.0]})
+    ledger_df = pd.DataFrame({"id": ["a", "b"], "pred__score_selected": [1.0, 2.5]})
     summary, mismatches = compare_selection_to_ledger(selection_df, ledger_df, eps=1e-9)
     assert summary["mismatch_count"] == 1
     assert mismatches.shape[0] == 1
+
+
+def test_compare_selection_to_ledger_rejects_missing_v2_score_column() -> None:
+    selection_df = pd.DataFrame({"id": ["a", "b"], "pred__deprecated_score": [1.0, 2.0]})
+    ledger_df = pd.DataFrame({"id": ["a", "b"], "pred__score_selected": [1.0, 2.0]})
+    with pytest.raises(OpalError, match="pred__score_selected"):
+        _ = compare_selection_to_ledger(selection_df, ledger_df, eps=1e-9)
+
+
+def test_compare_selection_to_ledger_rejects_unknown_selection_ids() -> None:
+    selection_df = pd.DataFrame({"id": ["a", "missing"], "pred__score_selected": [1.0, 2.0]})
+    ledger_df = pd.DataFrame({"id": ["a", "b"], "pred__score_selected": [1.0, 2.0]})
+    with pytest.raises(OpalError, match="absent from ledger predictions"):
+        _ = compare_selection_to_ledger(selection_df, ledger_df, eps=1e-9)
+
+
+def test_compare_selection_to_ledger_rejects_duplicate_selection_ids() -> None:
+    selection_df = pd.DataFrame({"id": ["a", "a"], "pred__score_selected": [1.0, 1.0]})
+    ledger_df = pd.DataFrame({"id": ["a", "b"], "pred__score_selected": [1.0, 2.0]})
+    with pytest.raises(OpalError, match="duplicate IDs"):
+        _ = compare_selection_to_ledger(selection_df, ledger_df, eps=1e-9)
 
 
 def test_verify_outputs_integration(tmp_path: Path) -> None:
@@ -60,17 +81,16 @@ def test_verify_outputs_integration(tmp_path: Path) -> None:
         ids=ids,
         sequences=sequences,
         y_hat_model=y_hat,
-        y_obj_scalar=y_obj,
+        selected_score=y_obj,
+        selected_score_ref="scalar_identity_v1/scalar",
         y_dim=1,
-        y_hat_model_sd=None,
-        y_obj_scalar_sd=None,
         obj_diagnostics={},
         sel_emit=sel_emit,
     )
 
     rdir = ws.round_dir(as_of_round)
     rdir.mkdir(parents=True, exist_ok=True)
-    selection_df = pd.DataFrame({"id": ids, "pred__y_obj_scalar": y_obj})
+    selection_df = pd.DataFrame({"id": ids, "pred__score_selected": y_obj})
     selection_dir = rdir / "selection"
     selection_dir.mkdir(parents=True, exist_ok=True)
     selection_path = selection_dir / "selection_top_k.csv"
@@ -88,9 +108,11 @@ def test_verify_outputs_integration(tmp_path: Path) -> None:
         y_ingest_transform_params={},
         objective_name="dummy_obj",
         objective_params={},
+        objective_defs=[],
         selection_name="top_k",
-        selection_params={"top_k": 1, "objective_mode": "maximize"},
-        selection_score_field="pred__y_obj_scalar",
+        selection_params={"top_k": 1, "score_ref": "scalar_identity_v1/scalar", "objective_mode": "maximize"},
+        selection_score_ref="scalar_identity_v1/scalar",
+        selection_uncertainty_ref=None,
         selection_objective_mode="maximize",
         sel_tie_handling="competition_rank",
         stats_n_train=0,
@@ -107,7 +129,7 @@ def test_verify_outputs_integration(tmp_path: Path) -> None:
 
     reader = LedgerReader(ws)
     ledger_df = reader.read_predictions(
-        columns=["id", "pred__y_obj_scalar"],
+        columns=["id", "pred__score_selected"],
         round_selector=as_of_round,
         run_id=run_id,
     )
@@ -184,13 +206,16 @@ def test_end_to_end_run_and_verify_outputs(tmp_path: Path) -> None:
                 '  name: "random_forest"',
                 "  params: { n_estimators: 10, random_state: 7, oob_score: false }",
                 "",
-                "objective:",
-                '  name: "scalar_identity_v1"',
-                "  params: {}",
+                "objectives:",
+                '  - { name: "scalar_identity_v1", params: {} }',
                 "",
                 "selection:",
                 '  name: "top_n"',
-                "  params: { top_k: 2, objective_mode: maximize }",
+                "  params:",
+                "    top_k: 2",
+                '    score_ref: "scalar_identity_v1/scalar"',
+                "    objective_mode: maximize",
+                "    tie_handling: competition_rank",
                 "",
                 "training:",
                 "  policy:",

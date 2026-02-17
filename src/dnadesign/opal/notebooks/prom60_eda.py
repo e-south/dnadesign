@@ -1,5 +1,3 @@
-# ABOUTME: Marimo notebook for promoter OPAL dashboard exploration.
-# ABOUTME: Provides interactive exploration of campaign datasets and scoring.
 import marimo
 
 __generated_with = "0.19.4"
@@ -3086,6 +3084,7 @@ def _(
 ):
     df_sfxi = opal_labels_view_df.head(0)
     sfxi_meta_md = mo.md("")
+    sfxi_notice_md = mo.md("")
 
     readiness = resolve_sfxi_readiness(opal_campaign_info)
     if not readiness.ready:
@@ -3126,17 +3125,19 @@ def _(
         state_order=sfxi_math.STATE_ORDER,
     )
 
-    label_view = build_label_sfxi_view(
-        readiness=readiness,
-        selected_round=opal_selected_round,
-        labels_view_df=opal_labels_view_df,
-        labels_current_df=opal_labels_current_df,
-        params=sfxi_params,
-    )
-    df_sfxi = label_view.df
-    if not df_sfxi.is_empty():
-        sfxi_meta_md = mo.md("Label-level SFXI metrics are shown in the Labels table.")
-    sfxi_notice_md = mo.md("")
+    if opal_labels_view_df.is_empty():
+        sfxi_notice_md = mo.md("No label events available for the selected filters.")
+    else:
+        label_view = build_label_sfxi_view(
+            readiness=readiness,
+            selected_round=opal_selected_round,
+            labels_view_df=opal_labels_view_df,
+            labels_current_df=opal_labels_current_df,
+            params=sfxi_params,
+        )
+        df_sfxi = label_view.df
+        if not df_sfxi.is_empty():
+            sfxi_meta_md = mo.md("Label-level SFXI metrics are shown in the Labels table.")
     return df_sfxi, readiness, sfxi_meta_md, sfxi_notice_md, sfxi_params
 
 
