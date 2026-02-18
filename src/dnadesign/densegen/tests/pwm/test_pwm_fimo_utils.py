@@ -16,6 +16,8 @@ from dnadesign.densegen.src.adapters.sources.pwm_fimo import (
 from dnadesign.densegen.src.core.stage_a.stage_a_types import PWMMotif
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
 
+pytestmark = pytest.mark.fimo
+
 
 def test_write_minimal_meme_motif(tmp_path: Path) -> None:
     motif = PWMMotif(

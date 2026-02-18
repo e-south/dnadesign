@@ -1,0 +1,107 @@
+codecov:
+  require_ci_to_pass: true
+
+coverage:
+  precision: 2
+  round: down
+  range: "0...100"
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 0.5%
+        if_ci_failed: error
+        if_not_found: failure
+    patch:
+      default:
+        target: auto
+        threshold: 0.5%
+        if_ci_failed: error
+        if_not_found: failure
+
+flags:
+  core:
+    paths:
+      - src/dnadesign
+    carryforward: false
+  external_integration:
+    paths:
+      - src/dnadesign
+    carryforward: false
+
+component_management:
+  default_rules:
+    statuses:
+      - type: project
+        target: auto
+        threshold: 0.5%
+        if_ci_failed: error
+        if_not_found: failure
+  individual_components:
+    - component_id: usr
+      name: usr
+      paths:
+        - src/dnadesign/usr/**
+    - component_id: notify
+      name: notify
+      paths:
+        - src/dnadesign/notify/**
+    - component_id: densegen
+      name: densegen
+      paths:
+        - src/dnadesign/densegen/**
+    - component_id: infer
+      name: infer
+      paths:
+        - src/dnadesign/infer/**
+    - component_id: opal
+      name: opal
+      paths:
+        - src/dnadesign/opal/**
+    - component_id: cluster
+      name: cluster
+      paths:
+        - src/dnadesign/cluster/**
+    - component_id: billboard
+      name: billboard
+      paths:
+        - src/dnadesign/billboard/**
+    - component_id: libshuffle
+      name: libshuffle
+      paths:
+        - src/dnadesign/libshuffle/**
+    - component_id: nmf
+      name: nmf
+      paths:
+        - src/dnadesign/nmf/**
+    - component_id: latdna
+      name: latdna
+      paths:
+        - src/dnadesign/latdna/**
+    - component_id: cruncher
+      name: cruncher
+      paths:
+        - src/dnadesign/cruncher/**
+    - component_id: tfkdanalysis
+      name: tfkdanalysis
+      paths:
+        - src/dnadesign/tfkdanalysis/**
+    - component_id: aligner
+      name: aligner
+      paths:
+        - src/dnadesign/aligner/**
+    - component_id: baserender
+      name: baserender
+      paths:
+        - src/dnadesign/baserender/**
+    - component_id: permuter
+      name: permuter
+      paths:
+        - src/dnadesign/permuter/**
+
+comment:
+  require_changes: true
+  layout: "reach,diff,flags,components,files"
+
+github_checks:
+  annotations: true

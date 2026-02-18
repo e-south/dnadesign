@@ -36,3 +36,12 @@ def test_top_level_excludes_tool_commands() -> None:
     assert "namespace" in help_text
     assert "events" in help_text
     assert "state" in help_text
+
+
+def test_init_help_mentions_registry_precondition() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["init", "--help"])
+    assert result.exit_code == 0
+
+    normalized = " ".join(result.stdout.split())
+    assert "Requires registry.yaml under --root." in normalized

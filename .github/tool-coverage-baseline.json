@@ -1,0 +1,17 @@
+{
+  "aligner": 0.0,
+  "baserender": 80.0,
+  "billboard": 0.0,
+  "cluster": 0.0,
+  "cruncher": 74.0,
+  "densegen": 70.0,
+  "infer": 32.0,
+  "latdna": 0.0,
+  "libshuffle": 0.0,
+  "nmf": 0.0,
+  "notify": 80.0,
+  "opal": 64.0,
+  "permuter": 42.0,
+  "tfkdanalysis": 0.0,
+  "usr": 57.0
+}

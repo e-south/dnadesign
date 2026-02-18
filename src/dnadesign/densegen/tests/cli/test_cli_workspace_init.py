@@ -349,3 +349,11 @@ def test_workspace_where_requires_explicit_root_outside_repo(tmp_path: Path, mon
     assert result.exit_code == 1
     assert "Unable to determine workspace root" in result.output
     assert "DENSEGEN_WORKSPACE_ROOT" in result.output
+
+
+def test_workspace_init_help_states_required_source_options() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["workspace", "init", "--help"])
+    assert result.exit_code == 0, result.output
+    normalized = " ".join(result.output.split())
+    assert "Use exactly one of --from-workspace or --from-config." in normalized

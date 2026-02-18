@@ -1,0 +1,643 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/devtools/docs_checks.py
+
+Validates docs markdown naming and local relative links for CI checks.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import re
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse
+
+import yaml
+
+from .ci_changes import discover_repo_tools
+
+LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+README_TOOL_LINK_PATTERN = re.compile(r"\[\*\*(?P<tool>[a-z0-9_-]+)\*\*\]\((?P<link>[^)]+)\)")
+README_COVERAGE_LINK_PATTERN = re.compile(r"\[[^\]]+\]\((?P<link>[^)]+)\)")
+ROOT_MARKDOWN_FILES = (
+    "README.md",
+    "AGENTS.md",
+    "ARCHITECTURE.md",
+    "DESIGN.md",
+    "SECURITY.md",
+    "RELIABILITY.md",
+    "PLANS.md",
+    "QUALITY_SCORE.md",
+)
+SOR_MARKDOWN_FILES = (
+    "ARCHITECTURE.md",
+    "DESIGN.md",
+    "SECURITY.md",
+    "RELIABILITY.md",
+    "PLANS.md",
+    "QUALITY_SCORE.md",
+)
+INDEX_MARKDOWN_FILES = (
+    "docs/README.md",
+    "docs/architecture/README.md",
+    "docs/architecture/decisions/README.md",
+    "docs/security/README.md",
+    "docs/reliability/README.md",
+    "docs/quality/README.md",
+    "docs/exec-plans/README.md",
+    "docs/templates/README.md",
+    "docs/dev/README.md",
+    "docs/bu-scc/README.md",
+    "docs/notify/README.md",
+)
+RUNBOOK_MARKDOWN_FILES = (
+    "docs/installation.md",
+    "docs/dependencies.md",
+    "docs/notebooks.md",
+    "docs/marimo-reference.md",
+    "docs/bu-scc/quickstart.md",
+    "docs/bu-scc/install.md",
+    "docs/bu-scc/batch-notify.md",
+    "docs/notify/usr-events.md",
+)
+OWNER_PATTERN = re.compile(r"^\*\*Owner:\*\*\s*(.+?)\s*$", re.MULTILINE)
+LAST_VERIFIED_PATTERN = re.compile(r"^\*\*Last verified:\*\*\s*(.+?)\s*$", re.MULTILINE)
+TYPE_PATTERN = re.compile(r"^\*\*Type:\*\*\s*(.+?)\s*$", re.MULTILINE)
+STATUS_PATTERN = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)
+CREATED_PATTERN = re.compile(r"^\*\*Created:\*\*\s*(.+?)\s*$", re.MULTILINE)
+SECTION_HEADING_PATTERN = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+CHECKLIST_ITEM_PATTERN = re.compile(r"^\s*-\s*\[[ xX]\]\s+", re.MULTILINE)
+PROGRESS_ITEM_TIMESTAMP_PATTERN = re.compile(r"^\s*-\s*\[[ xX]\]\s+\(\d{4}-\d{2}-\d{2} \d{2}:\d{2}Z\)\s+.+$")
+_EXEC_PLAN_STATUSES = {"active", "paused", "completed"}
+_EXEC_PLAN_REQUIRED_SECTIONS = (
+    "Purpose / Big Picture",
+    "Progress",
+    "Surprises & Discoveries",
+    "Decision Log",
+    "Outcomes & Retrospective",
+    "Context and Orientation",
+    "Plan of Work",
+    "Concrete Steps",
+    "Validation and Acceptance",
+)
+
+
+def _collect_markdown_files(repo_root: Path) -> tuple[list[Path], list[Path]]:
+    docs_root = repo_root / "docs"
+    if not docs_root.exists():
+        raise FileNotFoundError("docs/ directory is missing")
+
+    docs_md_files = sorted(docs_root.rglob("*.md"))
+    all_md_files = list(docs_md_files)
+    for name in ROOT_MARKDOWN_FILES:
+        path = repo_root / name
+        if path.exists():
+            all_md_files.append(path)
+    return docs_md_files, all_md_files
+
+
+def _find_bad_doc_names(docs_md_files: list[Path]) -> list[Path]:
+    return [path for path in docs_md_files if "_" in path.name]
+
+
+def _find_broken_links(md_files: list[Path]) -> list[tuple[Path, str]]:
+    broken: list[tuple[Path, str]] = []
+    for src in md_files:
+        text = src.read_text(encoding="utf-8")
+        for raw in LINK_PATTERN.findall(text):
+            link = raw.strip().split()[0]
+            if link.startswith(("http://", "https://", "mailto:")):
+                continue
+            target_rel = link.split("#", 1)[0]
+            if not target_rel:
+                continue
+            target = (src.parent / target_rel).resolve()
+            if not target.exists():
+                broken.append((src, link))
+    return broken
+
+
+def _extract_level2_section_lines(text: str, heading: str) -> list[str]:
+    section_lines: list[str] = []
+    in_section = False
+    target = f"## {heading}"
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped == target:
+            in_section = True
+            continue
+        if in_section and stripped.startswith("## "):
+            break
+        if in_section:
+            section_lines.append(line)
+    return section_lines
+
+
+def _readme_tool_table_rows(text: str) -> list[list[str]]:
+    section_lines = _extract_level2_section_lines(text, "Available tools")
+    if not section_lines:
+        return []
+    rows: list[list[str]] = []
+    for line in section_lines:
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+        if not cells:
+            continue
+        if len(cells) >= 2 and cells[0].lower() == "tool" and cells[1].lower() == "description":
+            continue
+        if set(stripped.replace("|", "").replace("-", "").replace(" ", "")) == set():
+            continue
+        rows.append(cells)
+    return rows
+
+
+def _normalize_relative_markdown_path(value: str) -> str:
+    return str(Path(value).as_posix().lstrip("./"))
+
+
+def _is_valid_codecov_component_link(*, tool_name: str, link: str) -> bool:
+    parsed = urlparse(link)
+    if parsed.scheme != "https":
+        return False
+    if parsed.netloc not in {"codecov.io", "www.codecov.io", "app.codecov.io"}:
+        return False
+    if not parsed.path.startswith("/gh/"):
+        return False
+    component_values = parse_qs(parsed.query).get("component")
+    if component_values is None:
+        return False
+    return any(value.strip() == tool_name for value in component_values)
+
+
+def _find_readme_tool_catalog_issues(repo_root: Path) -> list[str]:
+    readme_path = repo_root / "README.md"
+    src_root = repo_root / "src" / "dnadesign"
+    if not readme_path.exists() or not src_root.exists():
+        return []
+
+    repo_tools = discover_repo_tools(repo_root=repo_root)
+    if not repo_tools:
+        return []
+
+    readme_text = readme_path.read_text(encoding="utf-8")
+    rows = _readme_tool_table_rows(readme_text)
+    if not rows:
+        return [f"{readme_path}: section '## Available tools' must include a markdown tool table."]
+
+    issues: list[str] = []
+    declared_tools: set[str] = set()
+    for row in rows:
+        if len(row) < 3:
+            issues.append(f"{readme_path}: tool table rows must include Tool, Description, and Coverage columns.")
+            continue
+
+        tool_cell = row[0]
+        coverage_cell = row[2]
+        match = README_TOOL_LINK_PATTERN.search(tool_cell)
+        if match is None:
+            issues.append(f"{readme_path}: tool cell must use [**tool**](src/dnadesign/tool) format ({tool_cell}).")
+            continue
+
+        tool_name = match.group("tool")
+        tool_link = match.group("link")
+        if tool_name in declared_tools:
+            issues.append(f"{readme_path}: duplicate tool row for '{tool_name}'.")
+            continue
+        declared_tools.add(tool_name)
+
+        expected_rel = Path("src") / "dnadesign" / tool_name
+        if _normalize_relative_markdown_path(tool_link) != expected_rel.as_posix():
+            issues.append(
+                f"{readme_path}: tool '{tool_name}' must link to '{expected_rel.as_posix()}' (found '{tool_link}')."
+            )
+
+        tool_dir = (repo_root / tool_link).resolve()
+        if not tool_dir.exists() or not tool_dir.is_dir():
+            issues.append(f"{readme_path}: tool '{tool_name}' link target does not exist: {tool_link}.")
+
+        coverage_match = README_COVERAGE_LINK_PATTERN.search(coverage_cell)
+        if coverage_match is None:
+            issues.append(
+                f"{readme_path}: coverage cell for '{tool_name}' must include a markdown link "
+                "to a Codecov component URL."
+            )
+            continue
+        coverage_link = coverage_match.group("link")
+        if not _is_valid_codecov_component_link(tool_name=tool_name, link=coverage_link):
+            issues.append(
+                f"{readme_path}: coverage link for '{tool_name}' must target Codecov with query "
+                f"'component={tool_name}' (found '{coverage_link}')."
+            )
+
+    missing_tools = sorted(repo_tools - declared_tools)
+    extra_tools = sorted(declared_tools - repo_tools)
+    if missing_tools:
+        issues.append(f"{readme_path}: missing tool rows for: {', '.join(missing_tools)}.")
+    if extra_tools:
+        issues.append(f"{readme_path}: unknown tool rows not found in src/dnadesign: {', '.join(extra_tools)}.")
+    return issues
+
+
+def _find_codecov_component_issues(repo_root: Path) -> list[str]:
+    src_root = repo_root / "src" / "dnadesign"
+    if not src_root.exists():
+        return []
+    repo_tools = discover_repo_tools(repo_root=repo_root)
+    if not repo_tools:
+        return []
+
+    codecov_path = repo_root / "codecov.yml"
+    if not codecov_path.exists():
+        return [f"{codecov_path}: missing Codecov configuration file."]
+
+    try:
+        config = yaml.safe_load(codecov_path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        return [f"{codecov_path}: unable to parse YAML ({exc})."]
+
+    if not isinstance(config, dict):
+        return [f"{codecov_path}: expected a top-level YAML mapping."]
+
+    component_management = config.get("component_management")
+    if not isinstance(component_management, dict):
+        return [f"{codecov_path}: missing 'component_management' mapping."]
+
+    default_rules = component_management.get("default_rules")
+    if not isinstance(default_rules, dict):
+        return [f"{codecov_path}: missing component_management.default_rules mapping."]
+    statuses = default_rules.get("statuses")
+    if not isinstance(statuses, list):
+        return [f"{codecov_path}: missing component_management.default_rules.statuses list."]
+
+    has_required_status = False
+    for status in statuses:
+        if not isinstance(status, dict):
+            continue
+        if (
+            status.get("type") == "project"
+            and status.get("target") == "auto"
+            and status.get("if_ci_failed") == "error"
+            and status.get("if_not_found") == "failure"
+        ):
+            has_required_status = True
+            break
+    if not has_required_status:
+        return [
+            f"{codecov_path}: component_management.default_rules.statuses must include a "
+            "project status with target=auto, if_ci_failed=error, if_not_found=failure."
+        ]
+
+    individual_components = component_management.get("individual_components")
+    if not isinstance(individual_components, list):
+        return [f"{codecov_path}: missing component_management.individual_components list."]
+
+    component_ids: set[str] = set()
+    issues: list[str] = []
+
+    for component in individual_components:
+        if not isinstance(component, dict):
+            issues.append(f"{codecov_path}: each individual component must be a mapping.")
+            continue
+
+        component_id = component.get("component_id")
+        if not isinstance(component_id, str) or not component_id:
+            issues.append(f"{codecov_path}: each component must define a non-empty component_id.")
+            continue
+        if component_id in component_ids:
+            issues.append(f"{codecov_path}: duplicate component_id '{component_id}'.")
+            continue
+        component_ids.add(component_id)
+
+        paths = component.get("paths")
+        if not isinstance(paths, list) or not all(isinstance(path, str) for path in paths):
+            issues.append(f"{codecov_path}: component '{component_id}' must define 'paths' as a list of strings.")
+            continue
+        expected_path = f"src/dnadesign/{component_id}/**"
+        if expected_path not in paths:
+            issues.append(f"{codecov_path}: component '{component_id}' must include path '{expected_path}'.")
+
+    missing_components = sorted(repo_tools - component_ids)
+    extra_components = sorted(component_ids - repo_tools)
+    if missing_components:
+        issues.append(f"{codecov_path}: missing component_id entries for: {', '.join(missing_components)}.")
+    if extra_components:
+        issues.append(
+            f"{codecov_path}: unknown component_id entries not found in src/dnadesign: {', '.join(extra_components)}."
+        )
+
+    return issues
+
+
+def _extract_metadata_field(text: str, pattern: re.Pattern[str]) -> str | None:
+    match = pattern.search(text)
+    if match is None:
+        return None
+    return match.group(1).strip()
+
+
+def _parse_iso_date(value: str, *, field_name: str, path: Path) -> dt.date:
+    try:
+        return dt.date.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError(f"{path}: {field_name} must use YYYY-MM-DD.") from exc
+
+
+def _find_sor_metadata_issues(repo_root: Path, *, max_age_days: int) -> list[str]:
+    today = dt.date.today()
+    issues: list[str] = []
+
+    for name in SOR_MARKDOWN_FILES:
+        path = repo_root / name
+        if not path.exists():
+            continue
+
+        text = path.read_text(encoding="utf-8")
+        doc_type = _extract_metadata_field(text, TYPE_PATTERN)
+        if doc_type is None:
+            issues.append(f"{path}: missing '**Type:**' metadata field.")
+            continue
+        if doc_type != "system-of-record":
+            issues.append(f"{path}: '**Type:**' must be exactly 'system-of-record'.")
+            continue
+
+        owner = _extract_metadata_field(text, OWNER_PATTERN)
+        if owner is None:
+            issues.append(f"{path}: missing '**Owner:**' metadata field.")
+            continue
+        if not owner:
+            issues.append(f"{path}: '**Owner:**' must not be empty.")
+
+        last_verified_raw = _extract_metadata_field(text, LAST_VERIFIED_PATTERN)
+        if last_verified_raw is None:
+            issues.append(f"{path}: missing '**Last verified:**' metadata field.")
+            continue
+        if not last_verified_raw:
+            issues.append(f"{path}: '**Last verified:**' must not be empty.")
+            continue
+
+        try:
+            last_verified = _parse_iso_date(last_verified_raw, field_name="Last verified", path=path)
+        except ValueError as exc:
+            issues.append(str(exc))
+            continue
+
+        if last_verified > today:
+            issues.append(f"{path}: Last verified date cannot be in the future ({last_verified.isoformat()}).")
+            continue
+
+        age_days = (today - last_verified).days
+        if age_days > max_age_days:
+            issues.append(f"{path}: Last verified date is stale by {age_days} days (max allowed {max_age_days}).")
+
+    return issues
+
+
+def _find_index_metadata_issues(repo_root: Path, *, max_age_days: int) -> list[str]:
+    return _find_owner_last_verified_metadata_issues(
+        repo_root,
+        relative_paths=INDEX_MARKDOWN_FILES,
+        max_age_days=max_age_days,
+    )
+
+
+def _find_runbook_metadata_issues(repo_root: Path, *, max_age_days: int) -> list[str]:
+    return _find_owner_last_verified_metadata_issues(
+        repo_root,
+        relative_paths=RUNBOOK_MARKDOWN_FILES,
+        max_age_days=max_age_days,
+    )
+
+
+def _find_owner_last_verified_metadata_issues(
+    repo_root: Path,
+    *,
+    relative_paths: tuple[str, ...],
+    max_age_days: int,
+) -> list[str]:
+    today = dt.date.today()
+    issues: list[str] = []
+
+    for relative_path in relative_paths:
+        path = repo_root / relative_path
+        if not path.exists():
+            continue
+
+        text = path.read_text(encoding="utf-8")
+        owner = _extract_metadata_field(text, OWNER_PATTERN)
+        if owner is None:
+            issues.append(f"{path}: missing '**Owner:**' metadata field.")
+            continue
+        if not owner:
+            issues.append(f"{path}: '**Owner:**' must not be empty.")
+
+        last_verified_raw = _extract_metadata_field(text, LAST_VERIFIED_PATTERN)
+        if last_verified_raw is None:
+            issues.append(f"{path}: missing '**Last verified:**' metadata field.")
+            continue
+        if not last_verified_raw:
+            issues.append(f"{path}: '**Last verified:**' must not be empty.")
+            continue
+
+        try:
+            last_verified = _parse_iso_date(last_verified_raw, field_name="Last verified", path=path)
+        except ValueError as exc:
+            issues.append(str(exc))
+            continue
+
+        if last_verified > today:
+            issues.append(f"{path}: Last verified date cannot be in the future ({last_verified.isoformat()}).")
+            continue
+
+        age_days = (today - last_verified).days
+        if age_days > max_age_days:
+            issues.append(f"{path}: Last verified date is stale by {age_days} days (max allowed {max_age_days}).")
+
+    return issues
+
+
+def _find_exec_plan_metadata_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    exec_root = repo_root / "docs" / "exec-plans"
+    if not exec_root.exists():
+        return issues
+
+    for lane_name in ("active", "completed"):
+        lane_root = exec_root / lane_name
+        if not lane_root.exists():
+            continue
+        for plan_path in sorted(lane_root.rglob("*.md")):
+            if plan_path.name == "README.md":
+                continue
+
+            text = plan_path.read_text(encoding="utf-8")
+            present_sections = {heading.strip() for heading in SECTION_HEADING_PATTERN.findall(text)}
+            section_bodies = _extract_section_bodies(text)
+
+            status = _extract_metadata_field(text, STATUS_PATTERN)
+            if status is None:
+                issues.append(f"{plan_path}: missing '**Status:**' metadata field.")
+                continue
+            if status not in _EXEC_PLAN_STATUSES:
+                allowed_statuses = ", ".join(sorted(_EXEC_PLAN_STATUSES))
+                issues.append(f"{plan_path}: invalid status '{status}' (expected one of: {allowed_statuses}).")
+                continue
+            if lane_name == "completed" and status != "completed":
+                issues.append(f"{plan_path}: plans under completed/ must set status to 'completed'.")
+            if lane_name == "active" and status == "completed":
+                issues.append(f"{plan_path}: plans under active/ cannot set status to 'completed'.")
+
+            owner = _extract_metadata_field(text, OWNER_PATTERN)
+            if owner is None:
+                issues.append(f"{plan_path}: missing '**Owner:**' metadata field.")
+            elif not owner:
+                issues.append(f"{plan_path}: '**Owner:**' must not be empty.")
+
+            created_raw = _extract_metadata_field(text, CREATED_PATTERN)
+            if created_raw is None:
+                issues.append(f"{plan_path}: missing '**Created:**' metadata field.")
+            elif not created_raw:
+                issues.append(f"{plan_path}: '**Created:**' must not be empty.")
+            else:
+                try:
+                    _parse_iso_date(created_raw, field_name="Created", path=plan_path)
+                except ValueError as exc:
+                    issues.append(str(exc))
+
+            if not LINK_PATTERN.search(text):
+                issues.append(f"{plan_path}: execution plans must include at least one markdown link for traceability.")
+
+            missing_sections = [name for name in _EXEC_PLAN_REQUIRED_SECTIONS if name not in present_sections]
+            if missing_sections:
+                missing_csv = ", ".join(missing_sections)
+                issues.append(f"{plan_path}: missing required execution-plan sections: {missing_csv}.")
+                continue
+
+            progress_body = section_bodies.get("Progress", "")
+            if not CHECKLIST_ITEM_PATTERN.search(progress_body):
+                issues.append(f"{plan_path}: '## Progress' must include checklist items (e.g., '- [ ] ...').")
+            progress_items = [line for line in progress_body.splitlines() if CHECKLIST_ITEM_PATTERN.match(line)]
+            for progress_item in progress_items:
+                if PROGRESS_ITEM_TIMESTAMP_PATTERN.match(progress_item):
+                    continue
+                issues.append(
+                    f"{plan_path}: progress checklist items must include a UTC timestamp "
+                    f"in '(YYYY-MM-DD HH:MMZ)' format."
+                )
+                break
+
+            for section_name, body in section_bodies.items():
+                if section_name == "Progress":
+                    continue
+                if CHECKLIST_ITEM_PATTERN.search(body):
+                    issues.append(
+                        f"{plan_path}: checklist items are only allowed under "
+                        f"'## Progress' (found in '## {section_name}')."
+                    )
+
+    return issues
+
+
+def _extract_section_bodies(text: str) -> dict[str, str]:
+    sections: dict[str, list[str]] = {}
+    current: str | None = None
+    for line in text.splitlines():
+        if line.startswith("## "):
+            current = line[3:].strip()
+            sections.setdefault(current, [])
+            continue
+        if current is not None:
+            sections[current].append(line)
+    return {name: "\n".join(lines) for name, lines in sections.items()}
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Check docs markdown naming and local links.")
+    parser.add_argument("--repo-root", type=Path, default=Path("."))
+    parser.add_argument(
+        "--max-sor-age-days",
+        type=int,
+        default=90,
+        help="Maximum allowed age in days for root system-of-record Last verified dates.",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _build_parser().parse_args(argv)
+    repo_root = args.repo_root
+
+    try:
+        docs_md_files, all_md_files = _collect_markdown_files(repo_root)
+    except FileNotFoundError as exc:
+        print(str(exc))
+        return 1
+
+    bad_names = _find_bad_doc_names(docs_md_files)
+    if bad_names:
+        print("Docs naming check failed: use kebab-case markdown filenames.")
+        for path in bad_names:
+            print(f" - {path}")
+        return 1
+
+    sor_metadata_issues = _find_sor_metadata_issues(repo_root, max_age_days=args.max_sor_age_days)
+    if sor_metadata_issues:
+        print("Root system-of-record metadata check failed:")
+        for issue in sor_metadata_issues:
+            print(f" - {issue}")
+        return 1
+
+    index_metadata_issues = _find_index_metadata_issues(repo_root, max_age_days=args.max_sor_age_days)
+    if index_metadata_issues:
+        print("Docs index metadata check failed:")
+        for issue in index_metadata_issues:
+            print(f" - {issue}")
+        return 1
+
+    runbook_metadata_issues = _find_runbook_metadata_issues(repo_root, max_age_days=args.max_sor_age_days)
+    if runbook_metadata_issues:
+        print("Docs runbook metadata check failed:")
+        for issue in runbook_metadata_issues:
+            print(f" - {issue}")
+        return 1
+
+    readme_tool_catalog_issues = _find_readme_tool_catalog_issues(repo_root)
+    if readme_tool_catalog_issues:
+        print("README tool catalog check failed:")
+        for issue in readme_tool_catalog_issues:
+            print(f" - {issue}")
+        return 1
+
+    codecov_component_issues = _find_codecov_component_issues(repo_root)
+    if codecov_component_issues:
+        print("Codecov component contract check failed:")
+        for issue in codecov_component_issues:
+            print(f" - {issue}")
+        return 1
+
+    exec_plan_issues = _find_exec_plan_metadata_issues(repo_root)
+    if exec_plan_issues:
+        print("Execution plan metadata check failed:")
+        for issue in exec_plan_issues:
+            print(f" - {issue}")
+        return 1
+
+    broken = _find_broken_links(all_md_files)
+    if broken:
+        print("Docs link check failed:")
+        for src, link in broken:
+            print(f" - {src}: {link}")
+        return 1
+
+    print(f"Docs checks passed ({len(all_md_files)} markdown files, including root system-of-record docs).")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -44,11 +44,14 @@ Each score uses a `0-4` rubric:
 | `docs-sor` | documentation fidelity | 3 | improving | enforced | `src/dnadesign/devtools/docs_checks.py`; `docs/exec-plans/README.md` | dnadesign-maintainers | 2026-02-18 | expand owner granularity to per-domain maintainers |
 
 ## Generated score inputs
-- Canonical score inputs are generated in CI from:
-  - fast-lane coverage artifact: `coverage-fast.json` (per-tool baseline gate input)
-  - fast/heavy Codecov uploads: `coverage-fast.xml`, `coverage-heavy.xml`
+- Canonical score inputs are generated in CI only for full-core scope (`run_full_core=true`) from:
+  - core-lane coverage artifact: `coverage-core.json` (per-tool baseline gate input)
+  - core-lane summary artifact: `quality-score-coverage-summary.json`
+  - generated quality input artifact: `quality-score-inputs.json`
+  - core/external integration Codecov uploads: `coverage-core.xml`, `coverage-external-integration.xml` (when coverage scope is active)
   - baseline contract: `.github/tool-coverage-baseline.json`
-  - workflow lane outcomes: detect/fast/heavy/ci-gate job results
+  - workflow lane outcomes: detect/core/external-integration/quality-score-inputs/ci-gate job results
+- On scoped PR runs (`run_full_core=false`), CI enforces per-tool coverage gates and uploads core-lane coverage, but skips canonical quality-score artifact generation by contract.
 - Published signal endpoints: `https://codecov.io/gh/e-south/dnadesign`, `codecov/project`, `codecov/patch`
 - Manual narrative in this doc explains interpretation and improvement priorities; baseline enforcement remains CI-executable in-repo.
 
@@ -56,9 +59,10 @@ Each score uses a `0-4` rubric:
 | Contract | Enforcement path | Status |
 | --- | --- | --- |
 | Docs naming/link integrity | `dnadesign.devtools.docs_checks` + CI | enforced |
-| Fast vs heavy test semantics | pytest markers + CI lanes | enforced |
-| Heavy-lane non-skipped execution (per in-scope heavy tool) | `dnadesign.devtools.pytest_gate` + JUnit XML in CI | enforced |
+| Core vs external integration test semantics | pytest markers + CI lanes | enforced |
+| External integration non-skipped execution (per in-scope external integration tool) | `dnadesign.devtools.pytest_gate` + JUnit XML in CI | enforced |
 | Per-tool coverage floors | `dnadesign.devtools.tool_coverage` + baseline JSON | enforced |
+| Quality score input generation | `dnadesign.devtools.coverage_summary` + `dnadesign.devtools.quality_score` in CI | enforced |
 | Tool-inventory alignment | `dnadesign.devtools.ci_changes` contracts | enforced |
 | Root README tool catalog integrity | `dnadesign.devtools.docs_checks` tool table + path checks | enforced |
 | Selected runbook metadata | `dnadesign.devtools.docs_checks` + CI | enforced |
@@ -71,7 +75,7 @@ Each score uses a `0-4` rubric:
 | Partial score ownership granularity | unclear accountability | this file | each score row has named owner role/team |
 
 ## Entropy control cadence
-- Per PR: CI enforces docs checks, fast tests, coverage gate, and heavy lane when in scope.
+- Per PR: CI enforces docs checks, core tests, coverage gate, and external integration lane when in scope.
 - Weekly: review scorecard trend and close one tracked gap.
 - Monthly: prune stale docs links and refresh `Last verified` timestamps.
 - Release cut: confirm scorecard evidence links still resolve and match shipped behavior.

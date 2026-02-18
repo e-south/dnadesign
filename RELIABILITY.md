@@ -26,9 +26,9 @@ It summarizes what must fail fast, what should be observable, and where recovery
 - Failures should include actionable context, not generic error wrappers.
 
 ## CI reliability lanes
-- Fast lane: lint/docs/format + fast marker test selection + per-tool coverage gate.
-- Heavy lane: real FIMO/integration tests with explicit MEME/FIMO setup and verification; JUnit gate fails if all heavy tests are skipped and if any in-scope heavy tool executes zero non-skipped tests.
-- CI gate lane: explicit merge gate that requires fast lane success and requires heavy lane success whenever heavy scope is active.
+- Core lane: lint/docs/format + standard-marker test selection + per-tool coverage gate; installs `ffmpeg` so baserender rendering tests run without environment skips.
+- External integration lane: real FIMO/integration tests with explicit MEME/FIMO setup and verification; JUnit gate fails if all external integration tests are skipped and if any in-scope external integration tool executes zero non-skipped tests.
+- CI gate lane: explicit merge gate that requires core lane success and requires external integration lane success whenever external integration scope is active.
 
 ## Operational runbook map
 - SCC quickstart and batch guidance: `docs/bu-scc/quickstart.md`, `docs/bu-scc/batch-notify.md`

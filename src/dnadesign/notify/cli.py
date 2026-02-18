@@ -199,7 +199,6 @@ def _send_impl(
     try:
         webhook_url = resolve_webhook_url(url=url, url_env=url_env, secret_ref=secret_ref)
         validate_provider_webhook_url(provider=provider, webhook_url=webhook_url)
-        tls_ca_bundle_value = resolve_tls_ca_bundle(webhook_url=webhook_url, tls_ca_bundle=tls_ca_bundle)
         meta_data = _load_meta(meta)
         payload = build_payload(
             status=status,
@@ -212,6 +211,7 @@ def _send_impl(
         if dry_run:
             typer.echo(json.dumps(formatted, indent=2, sort_keys=True))
             return
+        tls_ca_bundle_value = resolve_tls_ca_bundle(webhook_url=webhook_url, tls_ca_bundle=tls_ca_bundle)
         post_json(
             webhook_url,
             formatted,

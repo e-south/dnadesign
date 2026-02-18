@@ -250,7 +250,7 @@ This journal records cross-package engineering decisions, investigations, and va
   - `dnadesign.devtools.docs_checks` now enforces:
     - root SOR metadata presence/date freshness (`--max-sor-age-days`)
     - execution-plan metadata and traceability link requirements for non-README files under `docs/exec-plans/`.
-  - Added `dnadesign.devtools.architecture_boundaries` and wired it into fast CI to fail on undeclared cross-tool imports.
+  - Added `dnadesign.devtools.architecture_boundaries` and wired it into the core CI lane to fail on undeclared cross-tool imports.
   - Added `dnadesign.devtools.quality_score` to generate CI-backed quality score inputs from coverage summary, baseline, and lane outcomes.
   - Added `dnadesign.devtools.quality_entropy` and a scheduled/workflow-dispatch CI job that uploads an entropy report artifact and fails on stale SOR metadata or broken quality evidence links.
   - Updated `QUALITY_SCORE.md` to treat CI evidence links and Codecov status signal as canonical numeric source inputs, keeping narrative guidance separate.

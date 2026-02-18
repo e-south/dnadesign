@@ -31,6 +31,8 @@ from dnadesign.densegen.src.config import (
 from dnadesign.densegen.src.core.stage_a.stage_a_types import PWMMotif
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
 
+pytestmark = pytest.mark.fimo
+
 _FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
 

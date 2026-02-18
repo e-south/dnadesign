@@ -58,7 +58,6 @@ notify     = "dnadesign.notify.cli:app"
 infer      = "dnadesign.infer.cli:app"
 cluster    = "dnadesign.cluster.src.cli.app:main"
 permuter   = "dnadesign.permuter.src.cli.app:main"
-mb         = "dnadesign.molbench.src.cli.app:cli"
 baserender = "dnadesign.baserender.src.cli:app"
 cruncher   = "dnadesign.cruncher.cli.app:app"
 
@@ -106,11 +105,15 @@ where = ["src"]
 ]
 
 [tool.pytest.ini_options]
-addopts = "-ra -q"
+addopts = "-ra -q --strict-markers"
 testpaths = ["src/dnadesign"]
 pythonpath = ["src"]
 norecursedirs = ["*/archived/*", ".venv", "venv", "build", "dist", "*.egg-info"]
-markers = ["slow: sampling-heavy tests (>10 s)"]
+markers = [
+  "slow: sampling-heavy tests (>10 s)",
+  "fimo: tests requiring MEME/FIMO external tooling",
+  "integration: cross-component integration tests",
+]
 filterwarnings = [
   "ignore:ArviZ is undergoing a major refactor.*:FutureWarning",
   "ignore::FutureWarning:arviz.*",

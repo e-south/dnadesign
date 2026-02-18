@@ -30,11 +30,11 @@ This file is the architecture map: it names system boundaries, major flows, and 
 ## High-level data flows
 - DenseGen/other producers -> USR event stream (`.events.log`) -> Notify watcher/webhook sink.
 - Tool outputs -> dataset artifacts (for example Parquet tables) -> downstream analysis tools (cluster, billboard, nmf, latdna, cruncher, tfkdanalysis).
-- Developer workflow -> fast CI lane (lint/docs/fast tests + coverage gate) and heavy FIMO/integration lane when required.
+- Developer workflow -> core CI lane (lint/docs/standard tests + coverage gate) and external integration lane (FIMO/integration) when required.
 
 ## Architecture invariants
 - No silent fallbacks: missing required inputs/dependencies must fail fast with actionable errors.
-- Boundary contracts are explicit: CI scope, tool coverage baselines, and marker-based heavy tests are enforced in code.
+- Boundary contracts are explicit: CI scope, tool coverage baselines, and marker-based external integration tests are enforced in code.
 - Docs use progressive disclosure: root docs are maps; deep procedures stay in runbooks/reference docs.
 
 ## Where to go deeper
