@@ -40,24 +40,56 @@ def test_notebook_generate_writes_workspace_notebook(tmp_path: Path) -> None:
     notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
     assert notebook_path.exists()
     content = notebook_path.read_text()
-    assert "DenseGen Run Notebook" in content
-    assert "from dnadesign.baserender import load_records_from_parquet" in content
-    assert "from dnadesign.baserender import render_record_figure" in content
-    assert (
-        "from dnadesign.densegen.src.integrations.baserender.notebook_contract import densegen_notebook_render_contract"
-    ) in content
-    assert "records_path = Path(" in content
-    assert "dense_arrays.parquet" not in content
-    assert "record_window_limit = int(contract.record_window_limit)" in content
-    assert "ParquetFile(records_path)" in content
-    assert "pd.read_parquet(records_path)" not in content
-    assert "required = {" in content
-    assert 'contract.adapter_columns["id"]' in content
-    assert 'contract.adapter_columns["sequence"]' in content
-    assert 'contract.adapter_columns["annotations"]' in content
-    assert 'required = {"id", "sequence", "densegen__used_tfbs_detail"}' not in content
-    assert "duplicate_id_count = int(df_window[record_id_column].astype(str).duplicated().sum())" in content
-    assert "Duplicate ids detected in records preview window" in content
+    expected_literals = [
+        'app = marimo.App(width="medium")',
+        "workspace-scoped run dashboard for DenseGen outputs",
+        "from dnadesign.baserender import load_records_from_parquet",
+        "from dnadesign.baserender import render_record_figure",
+        "from dnadesign.densegen.src.viz.plot_registry import PLOT_SPECS",
+        (
+            "from dnadesign.densegen.src.integrations.baserender.notebook_contract import "
+            "densegen_notebook_render_contract"
+        ),
+        "record_window_limit = int(contract.record_window_limit)",
+        "Failed to parse `run_manifest.json`",
+        "Failed to parse `plot_manifest.json`",
+        'contract.adapter_columns["id"]',
+        'contract.adapter_columns["sequence"]',
+        'contract.adapter_columns["annotations"]',
+        "Duplicate record ids detected in the notebook preview window",
+        'record_plan_filter = mo.ui.dropdown(options=_plan_options, value=_plan_options[0], label="Record plan")',
+        "prev_record_button = mo.ui.button(",
+        "next_record_button = mo.ui.button(",
+        'export_format = mo.ui.dropdown(options=["parquet", "csv"], value="parquet", label="Export format")',
+        'export_path = mo.ui.text(value=str(default_export_path), label="Export path", full_width=True)',
+        'raise RuntimeError(f"Export failed while writing `{destination}`: {exc}")',
+        'plot_selector = mo.ui.dropdown(options=plot_options, value=plot_options[0], label="Plot")',
+        'selected_plot_plan = str(selected_record_plan or "all")',
+        '_allowed_plans = {selected_plot_plan, "unscoped", "stage_a"}',
+        'mo.pdf(_plot_path, width="100%", height=f"{int(plot_height_px.value)}px")',
+        'if _suffix == ".pdf":',
+        '_suffix in {".png", ".jpg", ".jpeg", ".svg", ".webp", ".gif"}',
+        'baserender_figure.patch.set_facecolor("white")',
+    ]
+    for literal in expected_literals:
+        assert literal in content
+
+    absent_literals = [
+        "__RUN_ROOT__",
+        "__CFG_PATH__",
+        "__RECORDS_PATH__",
+        "__OUTPUT_SOURCE__",
+        "__USR_ROOT__",
+        "__USR_DATASET__",
+        "Use **Refresh**",
+        'refresh = mo.ui.run_button(label="Refresh", kind="neutral")',
+        "mo.stop(",
+        "dense_arrays.parquet",
+        'status_message = ""',
+        'status_message = f"Export failed',
+    ]
+    for literal in absent_literals:
+        assert literal not in content
 
 
 def test_notebook_generate_uses_configured_parquet_path(tmp_path: Path) -> None:
@@ -125,7 +157,11 @@ def test_notebook_generate_supports_usr_output_target(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
     content = notebook_path.read_text()
-    assert "outputs/usr_datasets/demo/records.parquet" in content
+    assert "__OUTPUT_SOURCE__" not in content
+    assert "__USR_ROOT__" not in content
+    assert "__USR_DATASET__" not in content
+    assert 'output_source = "usr"' in content
+    assert '"records_with_overlays.parquet"' in content
 
 
 def test_notebook_generate_uses_plots_source_when_output_targets_are_both(tmp_path: Path) -> None:
@@ -180,7 +216,8 @@ def test_notebook_generate_uses_plots_source_when_output_targets_are_both(tmp_pa
     assert result.exit_code == 0, result.output
     notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
     content = notebook_path.read_text()
-    assert "outputs/usr_datasets/demo/records.parquet" in content
+    assert 'output_source = "usr"' in content
+    assert '"records_with_overlays.parquet"' in content
 
 
 def test_notebook_generate_custom_out_suggests_run_with_path(tmp_path: Path) -> None:
@@ -227,7 +264,7 @@ def test_notebook_generate_passes_marimo_check(tmp_path: Path) -> None:
     assert "warning[" not in check_result.stdout
 
 
-def test_notebook_run_uses_marimo_run_mode_by_default(tmp_path: Path, monkeypatch) -> None:
+def test_notebook_run_uses_marimo_edit_mode_by_default(tmp_path: Path, monkeypatch) -> None:
     cfg_path = tmp_path / "config.yaml"
     write_minimal_config(cfg_path)
     (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
@@ -250,11 +287,73 @@ def test_notebook_run_uses_marimo_run_mode_by_default(tmp_path: Path, monkeypatc
     monkeypatch.setattr(subprocess, "run", _fake_run)
     run_result = runner.invoke(app, ["notebook", "run", "-c", str(cfg_path)])
     assert run_result.exit_code == 0, run_result.output
-    assert captured["command"][:2] == ["marimo", "run"]
+    assert captured["command"][:2] == ["marimo", "edit"]
+    assert "--headless" not in captured["command"]
     assert captured["check"] is True
     env = captured["env"]
     assert isinstance(env, dict)
     assert env.get("MARIMO_SKIP_UPDATE_CHECK") == "1"
+    assert "BROWSER" not in env
+    assert "Notebook URL" not in run_result.output
+
+
+def test_notebook_run_explicit_open_keeps_marimo_auto_open_behavior(tmp_path: Path, monkeypatch) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    gen_result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert gen_result.exit_code == 0, gen_result.output
+
+    import dnadesign.densegen.src.cli.notebook as notebook_commands
+
+    monkeypatch.setattr(notebook_commands, "_ensure_marimo_installed", lambda: None)
+    captured: dict[str, object] = {}
+
+    def _fake_run(command, check, env):
+        captured["command"] = command
+        captured["env"] = env
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(subprocess, "run", _fake_run)
+    run_result = runner.invoke(app, ["notebook", "run", "--mode", "run", "--open", "-c", str(cfg_path)])
+
+    assert run_result.exit_code == 0, run_result.output
+    assert captured["command"][:2] == ["marimo", "run"]
+    assert "--headless" not in captured["command"]
+    assert "Notebook URL" in run_result.output
+
+
+def test_notebook_run_no_open_passes_headless_to_marimo(tmp_path: Path, monkeypatch) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    gen_result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert gen_result.exit_code == 0, gen_result.output
+
+    import dnadesign.densegen.src.cli.notebook as notebook_commands
+
+    monkeypatch.setattr(notebook_commands, "_ensure_marimo_installed", lambda: None)
+    captured: dict[str, object] = {}
+
+    def _fake_run(command, check, env):
+        captured["command"] = command
+        captured["env"] = env
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(subprocess, "run", _fake_run)
+    run_result = runner.invoke(app, ["notebook", "run", "--mode", "run", "--no-open", "-c", str(cfg_path)])
+
+    assert run_result.exit_code == 0, run_result.output
+    assert captured["command"][:2] == ["marimo", "run"]
+    assert "--headless" in captured["command"]
+    env = captured.get("env")
+    assert isinstance(env, dict)
+    assert "BROWSER" not in env
+    assert "Notebook URL" in run_result.output
 
 
 def test_notebook_run_edit_mode_failure_suggests_run_mode(tmp_path: Path, monkeypatch) -> None:
@@ -298,7 +397,7 @@ def test_notebook_run_headless_passes_flag_to_marimo(tmp_path: Path, monkeypatch
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(subprocess, "run", _fake_run)
-    run_result = runner.invoke(app, ["notebook", "run", "--headless", "-c", str(cfg_path)])
+    run_result = runner.invoke(app, ["notebook", "run", "--mode", "run", "--headless", "-c", str(cfg_path)])
     assert run_result.exit_code == 0, run_result.output
     assert captured["command"][:2] == ["marimo", "run"]
     assert "--headless" in captured["command"]
@@ -319,6 +418,86 @@ def test_notebook_run_rejects_headless_edit_mode(tmp_path: Path, monkeypatch) ->
     run_result = runner.invoke(app, ["notebook", "run", "--mode", "edit", "--headless", "-c", str(cfg_path)])
     assert run_result.exit_code == 1
     assert "--headless is only supported with --mode run" in run_result.output
+
+
+def test_notebook_run_rejects_no_open_edit_mode(tmp_path: Path, monkeypatch) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    gen_result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert gen_result.exit_code == 0, gen_result.output
+
+    import dnadesign.densegen.src.cli.notebook as notebook_commands
+
+    monkeypatch.setattr(notebook_commands, "_ensure_marimo_installed", lambda: None)
+    run_result = runner.invoke(app, ["notebook", "run", "--mode", "edit", "--no-open", "-c", str(cfg_path)])
+    assert run_result.exit_code == 1
+    assert "--open/--no-open is only supported with --mode run" in run_result.output
+
+
+def test_notebook_run_rejects_invalid_host(tmp_path: Path, monkeypatch) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    gen_result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert gen_result.exit_code == 0, gen_result.output
+
+    import dnadesign.densegen.src.cli.notebook as notebook_commands
+
+    monkeypatch.setattr(notebook_commands, "_ensure_marimo_installed", lambda: None)
+    run_result = runner.invoke(app, ["notebook", "run", "--host", "   ", "-c", str(cfg_path)])
+    assert run_result.exit_code == 1
+    assert "--host must be a non-empty value" in run_result.output
+
+
+def test_notebook_run_rejects_invalid_port(tmp_path: Path, monkeypatch) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    gen_result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert gen_result.exit_code == 0, gen_result.output
+
+    import dnadesign.densegen.src.cli.notebook as notebook_commands
+
+    monkeypatch.setattr(notebook_commands, "_ensure_marimo_installed", lambda: None)
+    run_result = runner.invoke(app, ["notebook", "run", "--port", "70000", "-c", str(cfg_path)])
+    assert run_result.exit_code == 1
+    assert "--port must be within 1-65535" in run_result.output
+
+
+def test_notebook_run_strips_host_before_launch(tmp_path: Path, monkeypatch) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    gen_result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert gen_result.exit_code == 0, gen_result.output
+
+    import dnadesign.densegen.src.cli.notebook as notebook_commands
+
+    monkeypatch.setattr(notebook_commands, "_ensure_marimo_installed", lambda: None)
+    captured: dict[str, object] = {}
+
+    def _fake_run(command, check, env):
+        captured["command"] = command
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(subprocess, "run", _fake_run)
+    run_result = runner.invoke(app, ["notebook", "run", "--host", " 127.0.0.1 ", "-c", str(cfg_path)])
+
+    assert run_result.exit_code == 0, run_result.output
+    assert captured["command"][:2] == ["marimo", "edit"]
+    assert "--host" in captured["command"]
+    host_index = captured["command"].index("--host")
+    assert captured["command"][host_index + 1] == "127.0.0.1"
+    assert "http://127.0.0.1:2718" not in run_result.output
 
 
 def test_plot_missing_records_reports_actionable_error(tmp_path: Path) -> None:

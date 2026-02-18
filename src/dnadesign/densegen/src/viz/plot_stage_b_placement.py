@@ -209,10 +209,35 @@ def _truncate_tfbs(seq: str, *, head: int = 8, tail: int = 6) -> str:
 
 
 def _placement_bounds(row: pd.Series, seq_len: int) -> tuple[int, int] | None:
-    start_val = row.get("offset")
-    if start_val is None or pd.isna(start_val):
-        raise ValueError("composition.parquet has placement row with missing offset.")
-    start = int(start_val)
+    offset_val = row.get("offset")
+    offset_raw_val = row.get("offset_raw")
+    pad_left_val = row.get("pad_left")
+
+    has_offset = offset_val is not None and not pd.isna(offset_val)
+    has_offset_raw = offset_raw_val is not None and not pd.isna(offset_raw_val)
+    has_pad_left = pad_left_val is not None and not pd.isna(pad_left_val)
+
+    if has_offset:
+        start = int(offset_val)
+        if has_offset_raw:
+            offset_raw = int(offset_raw_val)
+            if has_pad_left:
+                expected = offset_raw + int(pad_left_val)
+                if expected != start:
+                    raise ValueError(
+                        "composition.parquet offset metadata mismatch: "
+                        f"offset={start}, offset_raw={offset_raw}, pad_left={int(pad_left_val)}."
+                    )
+            elif offset_raw != start:
+                raise ValueError(
+                    "composition.parquet offset metadata mismatch: "
+                    f"offset={start}, offset_raw={offset_raw}, missing pad_left."
+                )
+    elif has_offset_raw:
+        start = int(offset_raw_val) + (int(pad_left_val) if has_pad_left else 0)
+    else:
+        raise ValueError("composition.parquet has placement row with missing offset/offset_raw.")
+
     length_val = row.get("length") if "length" in row else None
     if length_val is not None and not pd.isna(length_val):
         end = start + int(length_val)

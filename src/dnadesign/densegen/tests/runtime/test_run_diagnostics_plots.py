@@ -47,6 +47,7 @@ from dnadesign.densegen.src.viz.plot_stage_b_placement import (
     _allocation_summary_lines,
     _build_tfbs_count_records,
     _category_display_label,
+    _placement_bounds,
     _render_occupancy,
     _render_tfbs_allocation,
     _sanitize_fixed_label,
@@ -1496,6 +1497,17 @@ def test_placement_map_label_sanitizer() -> None:
     assert _sanitize_tf_label("cpxR") == "cpxR"
     assert _sanitize_fixed_label("fixed:sigma70_consensus:-35") == "sigma70_consensus -35"
     assert _sanitize_fixed_label("fixed:sigma70_consensus:-10") == "sigma70_consensus -10"
+
+
+def test_placement_bounds_uses_final_offset_when_present() -> None:
+    row = pd.Series({"offset": 6, "offset_raw": 0, "pad_left": 6, "length": 4})
+    assert _placement_bounds(row, seq_len=60) == (6, 10)
+
+
+def test_placement_bounds_rejects_inconsistent_offset_metadata() -> None:
+    row = pd.Series({"offset": 7, "offset_raw": 0, "pad_left": 6, "length": 4})
+    with pytest.raises(ValueError, match="offset metadata mismatch"):
+        _placement_bounds(row, seq_len=60)
 
 
 def test_plot_tfbs_usage(tmp_path: Path) -> None:
