@@ -156,13 +156,14 @@ def _parse_used_tfbs_detail(val) -> list[dict]:
                 val = json.loads(s)
             except Exception as exc:
                 raise ValueError(f"Failed to parse used_tfbs_detail JSON: {s[:120]}") from exc
-    if isinstance(val, (list, tuple, np.ndarray)):
-        out: list[dict] = []
-        for item in list(val):
-            if isinstance(item, dict):
-                out.append(item)
-        return out
-    return []
+    if not isinstance(val, (list, tuple, np.ndarray)):
+        raise ValueError("used_tfbs_detail must be a JSON list string or list-like of dict entries.")
+    out: list[dict] = []
+    for item in list(val):
+        if not isinstance(item, dict):
+            raise ValueError("used_tfbs_detail must contain dict entries.")
+        out.append(item)
+    return out
 
 
 def _update_usage_counts(

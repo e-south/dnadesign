@@ -184,19 +184,7 @@ def _evaluate_sequence_constraints(
             fixed_elements_dump=fixed_elements_dump,
         )
     except Exception as exc:
-        return SequenceConstraintEvaluation(
-            promoter_detail=promoter_detail,
-            sequence_validation=sequence_validation,
-            rejection_detail={"error": str(exc)},
-            rejection_event_payload={
-                "input_name": source_label,
-                "plan_name": plan_name,
-                "library_index": int(sampling_library_index),
-                "library_hash": str(sampling_library_hash),
-                "error": str(exc),
-            },
-            error=exc,
-        )
+        raise RuntimeError(f"[{source_label}/{plan_name}] sequence constraint evaluation failed: {exc}") from exc
     promoter_detail = dict(validation_result.promoter_detail or {"placements": []})
     sequence_validation = {
         "validation_passed": bool(validation_result.validation_passed),

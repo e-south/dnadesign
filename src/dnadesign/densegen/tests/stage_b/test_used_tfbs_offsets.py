@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+import pytest
+
 from dnadesign.densegen.src.core.pipeline.sequence_validation import _apply_pad_offsets
-from dnadesign.densegen.src.core.pipeline.usage_tracking import _compute_used_tf_info, _update_usage_summary
+from dnadesign.densegen.src.core.pipeline.usage_tracking import (
+    _compute_used_tf_info,
+    _parse_used_tfbs_detail,
+    _update_usage_summary,
+)
 
 
 class _DummySol:
@@ -91,3 +97,13 @@ def test_used_tfbs_detail_includes_stage_a_lineage_fields() -> None:
         assert entry["stage_a_selection_rank"] == 2
         assert entry["stage_a_selection_score_norm"] == 0.91
         assert entry["stage_a_tfbs_core"] == "TT"
+
+
+def test_parse_used_tfbs_detail_rejects_non_collection_values() -> None:
+    with pytest.raises(ValueError, match="must be a JSON list string or list-like"):
+        _parse_used_tfbs_detail(42)
+
+
+def test_parse_used_tfbs_detail_rejects_non_dict_items() -> None:
+    with pytest.raises(ValueError, match="must contain dict entries"):
+        _parse_used_tfbs_detail(["not-a-dict"])
