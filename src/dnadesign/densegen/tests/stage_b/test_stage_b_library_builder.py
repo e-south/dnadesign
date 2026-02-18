@@ -19,6 +19,7 @@ import pandas as pd
 import pytest
 
 import dnadesign.densegen.src.core.pipeline.stage_b as stage_b_module
+import dnadesign.densegen.src.core.pipeline.stage_b_library_builder as stage_b_library_builder_module
 from dnadesign.densegen.src.config.generation import (
     FixedElements,
     PromoterConstraint,
@@ -318,6 +319,232 @@ def test_library_builder_allows_long_motif_length() -> None:
 
     assert context.min_required_len == 0
     assert context.infeasible is False
+
+
+def test_library_builder_raises_when_library_selected_event_emit_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan_item = ResolvedPlanItem(
+        name="demo",
+        quota=1,
+        include_inputs=["demo"],
+        fixed_elements=FixedElements(),
+        regulator_constraints=RegulatorConstraints(groups=[]),
+    )
+    sampling_cfg = SamplingConfig(
+        pool_strategy="full",
+        library_source="artifact",
+        library_artifact_path="artifact",
+        library_size=1,
+        library_sampling_strategy="tf_balanced",
+    )
+    record = LibraryRecord(
+        input_name="demo",
+        plan_name="demo",
+        library_index=1,
+        library_hash="hash",
+        library_id="hash",
+        library_tfbs=["AAAA"],
+        library_tfs=["TF1"],
+        library_site_ids=[None],
+        library_sources=[None],
+        library_tfbs_ids=[None],
+        library_motif_ids=[None],
+        pool_strategy="full",
+        library_sampling_strategy="tf_balanced",
+        library_size=1,
+        achieved_length=None,
+        relaxed_cap=None,
+        final_cap=None,
+        iterative_max_libraries=None,
+        iterative_min_new_solutions=None,
+        required_regulators_selected=None,
+    )
+    pool = PoolData(
+        name="demo",
+        input_type="binding_sites",
+        pool_mode=POOL_MODE_TFBS,
+        df=None,
+        sequences=["AAAA"],
+        pool_path=Path("."),
+    )
+    builder = LibraryBuilder(
+        source_label="demo",
+        plan_item=plan_item,
+        pool=pool,
+        sampling_cfg=sampling_cfg,
+        seq_len=20,
+        min_count_per_tf=0,
+        usage_counts={},
+        failure_counts=None,
+        rng=random.Random(1),
+        np_rng=np.random.default_rng(2),
+        library_source_label="artifact",
+        library_records={("demo", "demo"): [record]},
+        library_cursor={},
+        events_path=tmp_path / "events.jsonl",
+        library_build_rows=[],
+        library_member_rows=[],
+    )
+
+    def _emit_event_fails(*_args, **_kwargs) -> None:
+        raise RuntimeError("emit failed")
+
+    monkeypatch.setattr(stage_b_library_builder_module, "_emit_event", _emit_event_fails)
+
+    with pytest.raises(RuntimeError, match="Failed to emit LIBRARY_SELECTED event."):
+        builder.build_next(library_index_start=0)
+
+
+def test_record_library_build_raises_when_library_built_event_emit_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan_item = ResolvedPlanItem(
+        name="demo",
+        quota=1,
+        include_inputs=["demo"],
+        fixed_elements=FixedElements(),
+        regulator_constraints=RegulatorConstraints(groups=[]),
+    )
+    sampling_cfg = SamplingConfig(
+        pool_strategy="subsample",
+        library_source="build",
+        library_size=1,
+        library_sampling_strategy="tf_balanced",
+    )
+    pool = PoolData(
+        name="demo",
+        input_type="binding_sites",
+        pool_mode=POOL_MODE_TFBS,
+        df=None,
+        sequences=["AAAA"],
+        pool_path=Path("."),
+    )
+    builder = LibraryBuilder(
+        source_label="demo",
+        plan_item=plan_item,
+        pool=pool,
+        sampling_cfg=sampling_cfg,
+        seq_len=20,
+        min_count_per_tf=0,
+        usage_counts={},
+        failure_counts=None,
+        rng=random.Random(1),
+        np_rng=np.random.default_rng(2),
+        library_source_label="build",
+        library_records=None,
+        library_cursor=None,
+        events_path=tmp_path / "events.jsonl",
+        library_build_rows=[],
+        library_member_rows=[],
+    )
+
+    def _emit_event_fails(*_args, **_kwargs) -> None:
+        raise RuntimeError("emit failed")
+
+    monkeypatch.setattr(stage_b_library_builder_module, "_emit_event", _emit_event_fails)
+
+    with pytest.raises(RuntimeError, match="Failed to emit LIBRARY_BUILT event."):
+        builder._record_library_build(
+            sampling_info={
+                "library_index": 1,
+                "library_hash": "hash",
+                "library_size": 1,
+                "pool_strategy": "subsample",
+                "library_sampling_strategy": "tf_balanced",
+            },
+            library_tfbs=["AAAA"],
+            library_tfs=["TF1"],
+            library_tfbs_ids=[None],
+            library_motif_ids=[None],
+            library_site_ids=[None],
+            library_sources=[None],
+            fixed_bp=0,
+            min_required_bp=0,
+            slack_bp=0,
+            infeasible=False,
+            sequence_length=20,
+        )
+
+
+def test_record_library_build_raises_when_sampling_pressure_event_emit_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan_item = ResolvedPlanItem(
+        name="demo",
+        quota=1,
+        include_inputs=["demo"],
+        fixed_elements=FixedElements(),
+        regulator_constraints=RegulatorConstraints(groups=[]),
+    )
+    sampling_cfg = SamplingConfig(
+        pool_strategy="subsample",
+        library_source="build",
+        library_size=1,
+        library_sampling_strategy="coverage_weighted",
+    )
+    pool = PoolData(
+        name="demo",
+        input_type="binding_sites",
+        pool_mode=POOL_MODE_TFBS,
+        df=None,
+        sequences=["AAAA"],
+        pool_path=Path("."),
+    )
+    builder = LibraryBuilder(
+        source_label="demo",
+        plan_item=plan_item,
+        pool=pool,
+        sampling_cfg=sampling_cfg,
+        seq_len=20,
+        min_count_per_tf=0,
+        usage_counts={},
+        failure_counts=None,
+        rng=random.Random(1),
+        np_rng=np.random.default_rng(2),
+        library_source_label="build",
+        library_records=None,
+        library_cursor=None,
+        events_path=tmp_path / "events.jsonl",
+        library_build_rows=[],
+        library_member_rows=[],
+    )
+
+    def _emit_event_conditional(_path: Path, *, event: str, payload: dict) -> None:
+        _ = payload
+        if event == "LIBRARY_SAMPLING_PRESSURE":
+            raise RuntimeError("emit failed")
+
+    monkeypatch.setattr(stage_b_library_builder_module, "_emit_event", _emit_event_conditional)
+
+    with pytest.raises(RuntimeError, match="Failed to emit LIBRARY_SAMPLING_PRESSURE event."):
+        builder._record_library_build(
+            sampling_info={
+                "library_index": 1,
+                "library_hash": "hash",
+                "library_size": 1,
+                "pool_strategy": "subsample",
+                "library_sampling_strategy": "coverage_weighted",
+                "sampling_weight_by_tf": {"TF1": 1.0},
+                "sampling_weight_fraction_by_tf": {"TF1": 1.0},
+                "sampling_usage_count_by_tf": {"TF1": 0},
+                "sampling_failure_count_by_tf": {"TF1": 0},
+            },
+            library_tfbs=["AAAA"],
+            library_tfs=["TF1"],
+            library_tfbs_ids=[None],
+            library_motif_ids=[None],
+            library_site_ids=[None],
+            library_sources=[None],
+            fixed_bp=0,
+            min_required_bp=0,
+            slack_bp=0,
+            infeasible=False,
+            sequence_length=20,
+        )
 
 
 def _coverage_weighted_test_context() -> tuple[ResolvedPlanItem, SamplingConfig, PoolData]:

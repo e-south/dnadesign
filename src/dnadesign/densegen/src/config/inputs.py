@@ -81,8 +81,8 @@ class BackgroundPoolMiningConfig(BaseModel):
 
 class BackgroundPoolLengthConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    policy: Literal["exact", "range"] = "exact"
-    range: Optional[tuple[int, int]] = None
+    policy: Literal["exact", "range"] = "range"
+    range: Optional[tuple[int, int]] = (16, 20)
     exact: Optional[int] = None
 
     @field_validator("range")
@@ -234,9 +234,11 @@ class BackgroundPoolSamplingConfig(BaseModel):
 
     @model_validator(mode="after")
     def _sampling_rules(self):
+        length_fields = set(getattr(self.length, "model_fields_set", set()))
         if self.length.policy == "exact":
-            if self.length.range is not None:
+            if "range" in length_fields and self.length.range is not None:
                 raise ValueError("background_pool.sampling.length.range is not allowed when policy=exact")
+            self.length.range = None
             if self.length.exact is None:
                 raise ValueError("background_pool.sampling.length.exact is required when policy=exact")
         if self.length.policy == "range":
@@ -323,8 +325,8 @@ class PWMMiningConfig(BaseModel):
 
 class PWMLengthConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    policy: Literal["exact", "range"] = "exact"
-    range: Optional[tuple[int, int]] = None
+    policy: Literal["exact", "range"] = "range"
+    range: Optional[tuple[int, int]] = (16, 20)
 
     @field_validator("range")
     @classmethod
@@ -454,10 +456,13 @@ class PWMSamplingConfig(BaseModel):
 
     @model_validator(mode="after")
     def _sampling_rules(self):
+        length_fields = set(getattr(self.length, "model_fields_set", set()))
         if self.strategy == "consensus" and int(self.n_sites) != 1:
             raise ValueError("pwm.sampling.strategy=consensus requires n_sites=1")
-        if self.length.policy == "exact" and self.length.range is not None:
-            raise ValueError("pwm.sampling.length.range is not allowed when policy=exact")
+        if self.length.policy == "exact":
+            if "range" in length_fields and self.length.range is not None:
+                raise ValueError("pwm.sampling.length.range is not allowed when policy=exact")
+            self.length.range = None
         if self.length.policy == "range" and self.length.range is None:
             raise ValueError("pwm.sampling.length.range is required when policy=range")
         if not self.include_matched_sequence:

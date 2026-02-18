@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Sequence, Tuple, Union
 
@@ -23,7 +24,12 @@ import numpy as np
 from ...config import PWMMiningConfig, PWMSamplingConfig, PWMSelectionConfig
 from ...core.score_tiers import resolve_tier_fractions
 from ...core.stage_a.stage_a_metadata import TFBSMeta
-from ...core.stage_a.stage_a_pipeline import run_stage_a_pipeline
+from ...core.stage_a.stage_a_pipeline import (
+    StageAMiningRequest,
+    StageASelectionRequest,
+    StageASummaryRequest,
+    run_stage_a_pipeline,
+)
 from ...core.stage_a.stage_a_progress import StageAProgressManager, _PwmSamplingProgress
 from ...core.stage_a.stage_a_sampling_utils import (
     _background_cdf,
@@ -54,10 +60,14 @@ def validate_mmr_core_length(
     length_range: Optional[Sequence[int]],
     trim_window_length: Optional[int],
 ) -> None:
-    policy = str(selection_policy or "top_score").lower()
+    if not isinstance(selection_policy, str) or not selection_policy.strip():
+        raise ValueError("pwm.sampling.selection.policy must be a non-empty string.")
+    policy = selection_policy.strip().lower()
     if policy != "mmr":
         return
-    length_policy_value = str(length_policy or "exact").lower()
+    if not isinstance(length_policy, str) or not length_policy.strip():
+        raise ValueError("pwm.sampling.length.policy must be a non-empty string.")
+    length_policy_value = length_policy.strip().lower()
     if length_policy_value != "range":
         return
     if length_range is None or len(length_range) != 2:
@@ -90,7 +100,9 @@ def enforce_cross_regulator_core_collisions(
     input_name: str,
     source_kind: str,
 ) -> None:
-    mode_value = str(mode or "warn").strip().lower()
+    if not isinstance(mode, str) or not mode.strip():
+        raise ValueError("pwm.sampling.uniqueness.cross_regulator_core_collisions must be a non-empty string.")
+    mode_value = mode.strip().lower()
     if mode_value not in {"allow", "warn", "error"}:
         raise ValueError("pwm.sampling.uniqueness.cross_regulator_core_collisions must be one of: allow, warn, error.")
     if mode_value == "allow":
@@ -158,6 +170,133 @@ def sampling_kwargs_from_config(sampling: PWMSamplingConfig) -> dict:
         "trim_window_length": trimming_cfg.window_length,
         "trim_window_strategy": str(trimming_cfg.window_strategy),
     }
+
+
+@dataclass(frozen=True)
+class StageARequestBundle:
+    mining_request: StageAMiningRequest
+    selection_request: StageASelectionRequest
+    summary_request: StageASummaryRequest
+
+
+def _build_stage_a_requests(
+    *,
+    matrix: list[dict[str, float]],
+    background_cdf: np.ndarray,
+    matrix_cdf: np.ndarray,
+    width: int,
+    strategy: str,
+    length_policy: str,
+    length_range: Optional[Sequence[int]],
+    mining_batch_size: int,
+    mining_log_every: int,
+    budget_mode: str,
+    budget_growth_factor: float,
+    budget_max_candidates: Optional[int],
+    budget_min_candidates: Optional[int],
+    budget_max_seconds: Optional[float],
+    budget_target_tier_fraction: Optional[float],
+    n_candidates: int,
+    requested: int,
+    n_sites: int,
+    bgfile: Optional[Path],
+    keep_all_candidates_debug: bool,
+    include_matched_sequence: bool,
+    debug_output_dir: Optional[Path],
+    debug_label: Optional[str],
+    motif_hash: Optional[str],
+    input_name: Optional[str],
+    run_id: Optional[str],
+    scoring_backend: str,
+    uniqueness_key: str,
+    progress: _PwmSamplingProgress | None,
+    selection_policy: str,
+    selection_rank_by: str,
+    selection_alpha: float,
+    selection_pool_min_score_norm: float | None,
+    selection_pool_max_candidates: int | None,
+    selection_relevance_norm: str | None,
+    tier_fractions: Sequence[float],
+    tier_fractions_source: str,
+    pwm_consensus: str,
+    pwm_consensus_iupac: str,
+    pwm_consensus_score: float | None,
+    pwm_theoretical_max_score: float | None,
+    length_label: str,
+    window_label: str,
+    trim_window_length: Optional[int],
+    trim_window_strategy: Optional[str],
+    trim_window_start: Optional[int],
+    trim_window_score: Optional[float],
+    score_label: str,
+    return_summary: bool,
+    provided_sequences: Optional[List[str]] = None,
+    intended_core_by_seq: Optional[dict[str, tuple[int, int]]] = None,
+    core_offset_by_seq: Optional[dict[str, int]] = None,
+) -> StageARequestBundle:
+    mining_request = StageAMiningRequest(
+        matrix=matrix,
+        background_cdf=background_cdf,
+        matrix_cdf=matrix_cdf,
+        width=int(width),
+        strategy=str(strategy),
+        length_policy=str(length_policy),
+        length_range=length_range,
+        mining_batch_size=int(mining_batch_size),
+        mining_log_every=int(mining_log_every),
+        budget_mode=str(budget_mode),
+        budget_growth_factor=float(budget_growth_factor),
+        budget_max_candidates=budget_max_candidates,
+        budget_min_candidates=budget_min_candidates,
+        budget_max_seconds=budget_max_seconds,
+        budget_target_tier_fraction=budget_target_tier_fraction,
+        n_candidates=int(n_candidates),
+        requested=int(requested),
+        n_sites=int(n_sites),
+        bgfile=bgfile,
+        keep_all_candidates_debug=bool(keep_all_candidates_debug),
+        include_matched_sequence=bool(include_matched_sequence),
+        debug_output_dir=debug_output_dir,
+        debug_label=debug_label,
+        motif_hash=motif_hash,
+        input_name=input_name,
+        run_id=run_id,
+        scoring_backend=str(scoring_backend),
+        uniqueness_key=str(uniqueness_key),
+        progress=progress,
+        provided_sequences=provided_sequences,
+        intended_core_by_seq=intended_core_by_seq,
+        core_offset_by_seq=core_offset_by_seq,
+    )
+    selection_request = StageASelectionRequest(
+        selection_policy=str(selection_policy),
+        selection_rank_by=str(selection_rank_by),
+        selection_alpha=float(selection_alpha),
+        selection_pool_min_score_norm=selection_pool_min_score_norm,
+        selection_pool_max_candidates=selection_pool_max_candidates,
+        selection_relevance_norm=selection_relevance_norm,
+        tier_fractions=tier_fractions,
+        tier_fractions_source=str(tier_fractions_source),
+    )
+    summary_request = StageASummaryRequest(
+        pwm_consensus=str(pwm_consensus),
+        pwm_consensus_iupac=str(pwm_consensus_iupac),
+        pwm_consensus_score=pwm_consensus_score,
+        pwm_theoretical_max_score=pwm_theoretical_max_score,
+        length_label=str(length_label),
+        window_label=str(window_label),
+        trim_window_length=trim_window_length,
+        trim_window_strategy=trim_window_strategy,
+        trim_window_start=trim_window_start,
+        trim_window_score=trim_window_score,
+        score_label=str(score_label),
+        return_summary=bool(return_summary),
+    )
+    return StageARequestBundle(
+        mining_request=mining_request,
+        selection_request=selection_request,
+        summary_request=summary_request,
+    )
 
 
 def sample_pwm_sites(
@@ -280,7 +419,7 @@ def sample_pwm_sites(
     if length_policy == "range" and length_range is not None and len(length_range) == 2:
         length_label = f"{length_policy}({length_range[0]}..{length_range[1]})"
 
-    selection_policy = str(selection.policy or "top_score").lower()
+    selection_policy = str(selection.policy).lower()
     if selection_policy not in {"top_score", "mmr"}:
         raise ValueError(f"Stage-A selection.policy must be 'top_score' or 'mmr', got '{selection_policy}'.")
     selection_alpha = float(selection.alpha)
@@ -292,7 +431,7 @@ def sample_pwm_sites(
         selection_pool_min_score_norm = selection_pool.min_score_norm
         selection_pool_max_candidates = selection_pool.max_candidates
         selection_relevance_norm = str(selection_pool.relevance_norm)
-    selection_rank_by = str(selection.rank_by or "score")
+    selection_rank_by = str(selection.rank_by)
     if selection_policy == "mmr":
         selection_alpha = float(selection_alpha)
         if selection_alpha <= 0.0 or selection_alpha > 1.0:
@@ -313,7 +452,7 @@ def sample_pwm_sites(
     tier_fractions_source = "sampling.tier_fractions" if tier_fractions else "default"
 
     budget = mining.budget
-    budget_mode = str(budget.mode or "fixed_candidates").lower()
+    budget_mode = str(budget.mode).lower()
     if budget_mode not in {"tier_target", "fixed_candidates"}:
         raise ValueError(
             f"pwm.sampling.mining.budget.mode must be 'tier_target' or 'fixed_candidates', got '{budget_mode}'."
@@ -423,9 +562,7 @@ def sample_pwm_sites(
         full_seq, left_len = _embed_with_background(seq, target_len)
         intended_start = int(left_len) + 1
         intended_stop = int(left_len) + int(width)
-        result = run_stage_a_pipeline(
-            rng=rng,
-            motif=motif,
+        request_bundle = _build_stage_a_requests(
             matrix=matrix,
             background_cdf=background_cdf,
             matrix_cdf=matrix_cdf,
@@ -479,6 +616,13 @@ def sample_pwm_sites(
             intended_core_by_seq={full_seq: (intended_start, intended_stop)},
             core_offset_by_seq={full_seq: int(left_len)},
         )
+        result = run_stage_a_pipeline(
+            rng=rng,
+            motif=motif,
+            mining_request=request_bundle.mining_request,
+            selection_request=request_bundle.selection_request,
+            summary_request=request_bundle.summary_request,
+        )
         selected = result.sequences
         meta = result.meta_by_seq
         summary = result.summary
@@ -520,9 +664,7 @@ def sample_pwm_sites(
         manager=progress_manager,
         target_fraction=progress_target_fraction,
     )
-    result = run_stage_a_pipeline(
-        rng=rng,
-        motif=motif,
+    request_bundle = _build_stage_a_requests(
         matrix=matrix,
         background_cdf=background_cdf,
         matrix_cdf=matrix_cdf,
@@ -572,6 +714,13 @@ def sample_pwm_sites(
         trim_window_score=trim_window_score,
         score_label=score_label,
         return_summary=return_summary,
+    )
+    result = run_stage_a_pipeline(
+        rng=rng,
+        motif=motif,
+        mining_request=request_bundle.mining_request,
+        selection_request=request_bundle.selection_request,
+        summary_request=request_bundle.summary_request,
     )
     selected = result.sequences
     meta = result.meta_by_seq

@@ -11,7 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import logging
 import random
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -28,8 +27,6 @@ from .stage_b import (
     assess_library_feasibility,
     build_library_for_plan,
 )
-
-log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -242,8 +239,8 @@ class LibraryBuilder:
                         "library_size": int(record.library_size),
                     },
                 )
-            except Exception:
-                log.debug("Failed to emit LIBRARY_SELECTED event.", exc_info=True)
+            except Exception as exc:
+                raise RuntimeError("Failed to emit LIBRARY_SELECTED event.") from exc
         return record.library_tfbs, tfbs_parts_local, record.library_tfs, record.sampling_info()
 
     def _record_library_build(
@@ -305,8 +302,8 @@ class LibraryBuilder:
                         "library_size": library_size,
                     },
                 )
-            except Exception:
-                log.debug("Failed to emit LIBRARY_BUILT event.", exc_info=True)
+            except Exception as exc:
+                raise RuntimeError("Failed to emit LIBRARY_BUILT event.") from exc
             if sampling_info.get("sampling_weight_by_tf"):
                 try:
                     _emit_event(
@@ -324,8 +321,8 @@ class LibraryBuilder:
                             "failure_count_by_tf": sampling_info.get("sampling_failure_count_by_tf"),
                         },
                     )
-                except Exception:
-                    log.debug("Failed to emit LIBRARY_SAMPLING_PRESSURE event.", exc_info=True)
+                except Exception as exc:
+                    raise RuntimeError("Failed to emit LIBRARY_SAMPLING_PRESSURE event.") from exc
         if self.library_member_rows is not None:
             for idx, tfbs in enumerate(library_tfbs):
                 self.library_member_rows.append(

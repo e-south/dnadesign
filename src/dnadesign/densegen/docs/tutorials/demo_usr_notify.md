@@ -1,6 +1,6 @@
 ## DenseGen to USR to Notify tutorial
 
-This tutorial shows the full event-driven operator path from DenseGen generation to USR mutation events to Notify webhook delivery. Read it when you need to verify real watcher behavior end-to-end and avoid mixing DenseGen diagnostics with USR event streams.
+This tutorial shows the full event-driven operator path from DenseGen generation to USR mutation events to Notify webhook delivery. Read it when you need to verify watcher behavior end-to-end and avoid mixing DenseGen diagnostics with USR event streams; for campaign-scale runs use the stress-study workspace and apply the same watcher flow.
 
 ### What this tutorial demonstrates
 This section defines the core workflow outcomes for this integration tutorial.
@@ -32,7 +32,7 @@ This section highlights the keys that determine where events are written and how
 
 - `densegen.output.targets`: Must include `usr` for Notify workflows.
 - `densegen.output.usr.root`: Defines dataset root under workspace outputs.
-- `densegen.output.usr.dataset`: Defines dataset id and output namespace.
+- `densegen.output.usr.dataset`: Defines dataset id and output namespace (`workspace init --output-mode usr` rewrites this to the workspace id).
 - `densegen.output.usr.health_event_interval_seconds`: Controls heartbeat event cadence.
 - `densegen.run.root`: Anchors workspace-relative output paths.
 - `plots.source`: Matters when notebook/plot source selection occurs in multi-sink runs.
@@ -67,11 +67,15 @@ PY
 This step stages a workspace that writes dataset mutation events for Notify to consume.
 
 ```bash
+# Resolve repo root and pin workspace root so paths are deterministic.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+WORKSPACE_ROOT="$REPO_ROOT/src/dnadesign/densegen/workspaces"
+
 # Create workspace from TFBS baseline in USR output mode.
-uv run dense workspace init --id usr_notify_trial --from-workspace demo_tfbs_baseline --copy-inputs --output-mode usr
+uv run dense workspace init --id usr_notify_trial --root "$WORKSPACE_ROOT" --from-workspace demo_tfbs_baseline --copy-inputs --output-mode usr
 
 # Enter the workspace.
-cd src/dnadesign/densegen/workspaces/usr_notify_trial
+cd "$WORKSPACE_ROOT/usr_notify_trial"
 
 # Cache config path for subsequent commands.
 CONFIG="$PWD/config.yaml"
@@ -87,7 +91,7 @@ uv run dense run --fresh --no-plot -c "$CONFIG"
 # Print DenseGen diagnostics path (for runtime debugging only).
 ls -la outputs/meta/events.jsonl
 
-# Print canonical USR events path used by Notify.
+# Print the USR events path used by Notify.
 uv run dense inspect run --usr-events-path -c "$CONFIG"
 ```
 
@@ -96,10 +100,10 @@ This step creates a profile without manual path guessing and binds it to your lo
 
 ```bash
 # Export local webhook URL for env-backed secret resolution.
-export DENSEGEN_WEBHOOK="http://127.0.0.1:8787/webhook"
+export NOTIFY_WEBHOOK="http://127.0.0.1:8787/webhook"
 
 # Create Notify profile using DenseGen config resolution.
-uv run notify setup slack --tool densegen --config "$CONFIG" --secret-source env --url-env DENSEGEN_WEBHOOK --policy densegen
+uv run notify setup slack --tool densegen --config "$CONFIG" --secret-source env --url-env NOTIFY_WEBHOOK --policy densegen
 
 # Cache profile path for doctor/watch commands.
 PROFILE="outputs/notify/densegen/profile.json"
@@ -139,7 +143,7 @@ This section lists the artifacts that confirm each boundary in the flow.
 ### Troubleshooting
 This section captures the common watcher integration footguns.
 
-- No webhook posts appear: confirm terminal A receiver is running and `DENSEGEN_WEBHOOK` is exported.
+- No webhook posts appear: confirm terminal A receiver is running and `NOTIFY_WEBHOOK` is exported.
 - `notify profile doctor` fails: recreate profile with `notify setup slack --force ...`.
 - Watcher sees no events: rerun `uv run dense inspect run --usr-events-path -c "$CONFIG"` and verify profile points to that file.
-- Confusing event sources: use **[observability and events](../concepts/observability_and_events.md)** as the canonical boundary definition.
+- Confusing event sources: use **[observability and events](../concepts/observability_and_events.md)** as the boundary definition.

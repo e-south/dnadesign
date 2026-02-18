@@ -41,7 +41,7 @@ import sys
 import tempfile
 from functools import partial
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Callable, Iterator, Optional, Sequence
 
 import numpy as np
 import typer
@@ -54,12 +54,7 @@ from ..core.run_paths import display_path
 from ..core.stage_a.stage_a_summary import PWMSamplingSummary
 from ..utils.logging_utils import install_native_stderr_filters
 from ..utils.rich_style import make_table
-from .config import register_validate_command
 from .context import CliContext
-from .inspect import register_inspect_commands
-from .notebook import register_notebook_commands
-from .plots import register_plot_commands
-from .run import register_run_commands
 from .sampling import format_selection_label
 from .setup import (
     DEFAULT_CONFIG_FILENAME,
@@ -76,10 +71,6 @@ from .setup import (
 from .setup import (
     resolve_outputs_path_or_exit as _resolve_outputs_path_or_exit_impl,
 )
-from .stage_a import register_stage_a_commands
-from .stage_b import register_stage_b_commands
-from .workspace import register_workspace_commands
-from .workspace_sources import resolve_workspace_source as _resolve_workspace_source_impl
 
 
 def _build_console() -> Console:
@@ -314,7 +305,9 @@ def _resolve_workspace_source(
     source_config: Optional[Path],
     source_workspace: Optional[str],
 ) -> Iterator[tuple[Path, Path]]:
-    return _resolve_workspace_source_impl(
+    from .workspace_sources import resolve_workspace_source
+
+    return resolve_workspace_source(
         source_config=source_config,
         source_workspace=source_workspace,
         console=console,
@@ -840,38 +833,186 @@ cli_context = CliContext(
     warn_full_pool_strategy=_warn_full_pool_strategy,
     default_config_missing_message=DEFAULT_CONFIG_MISSING_MESSAGE,
 )
-register_inspect_commands(inspect_app, context=cli_context)
-register_validate_command(
-    app,
-    context=cli_context,
-    warn_pwm_sampling_configs=_warn_pwm_sampling_configs,
-    ensure_fimo_available=_ensure_fimo_available,
-)
-register_plot_commands(app, context=cli_context)
-register_workspace_commands(
-    workspace_app,
-    context=cli_context,
-    resolve_workspace_source=_resolve_workspace_source,
-    sanitize_filename=_sanitize_filename,
-    collect_relative_input_paths_from_raw=_collect_relative_input_paths_from_raw,
-)
-register_stage_a_commands(
-    stage_a_app,
-    context=cli_context,
-    apply_stage_a_overrides=_apply_stage_a_overrides,
-    ensure_fimo_available=_ensure_fimo_available,
-    candidate_logging_enabled=_candidate_logging_enabled,
-    stage_a_sampling_rows=_stage_a_sampling_rows,
-)
-register_stage_b_commands(stage_b_app, context=cli_context, short_hash=_short_hash)
-register_notebook_commands(notebook_app, context=cli_context)
-register_run_commands(
-    app,
-    context=cli_context,
-    render_missing_input_hint=_render_missing_input_hint,
-    render_output_schema_hint=_render_output_schema_hint,
-    ensure_fimo_available=_ensure_fimo_available,
-)
+
+_REGISTERED_TARGETS: set[str] = set()
+_ALL_REGISTRATION_TARGETS: set[str] = {
+    "inspect",
+    "validate",
+    "plots",
+    "workspace",
+    "stage_a",
+    "stage_b",
+    "notebook",
+    "run",
+}
+_COMMAND_SCOPE_TARGETS: dict[str, set[str]] = {
+    "inspect": {"inspect"},
+    "validate-config": {"validate"},
+    "plot": {"plots"},
+    "ls-plots": {"plots"},
+    "workspace": {"workspace"},
+    "stage-a": {"stage_a"},
+    "stage-b": {"stage_b"},
+    "notebook": {"notebook"},
+    "run": {"run"},
+}
+
+
+def _command_scope_from_argv(argv: Sequence[str]) -> str | None:
+    idx = 0
+    while idx < len(argv):
+        token = str(argv[idx]).strip()
+        if not token:
+            idx += 1
+            continue
+        if token in {"-h", "--help"}:
+            return None
+        if token in {"-c", "--config"}:
+            idx += 2
+            continue
+        if token.startswith("--config="):
+            idx += 1
+            continue
+        if token.startswith("-"):
+            idx += 1
+            continue
+        return token
+    return None
+
+
+def _registration_targets_for_scope(scope: str | None) -> set[str]:
+    if scope is None:
+        return set(_ALL_REGISTRATION_TARGETS)
+    return set(_COMMAND_SCOPE_TARGETS.get(str(scope), _ALL_REGISTRATION_TARGETS))
+
+
+def _register_inspect_commands() -> None:
+    from .inspect import register_inspect_commands
+
+    register_inspect_commands(inspect_app, context=cli_context)
+
+
+def _register_validate_command() -> None:
+    from .config import register_validate_command
+
+    register_validate_command(
+        app,
+        context=cli_context,
+        warn_pwm_sampling_configs=_warn_pwm_sampling_configs,
+        ensure_fimo_available=_ensure_fimo_available,
+    )
+
+
+def _register_plot_commands() -> None:
+    from .plots import register_plot_commands
+
+    register_plot_commands(app, context=cli_context)
+
+
+def _register_workspace_commands() -> None:
+    from .workspace import register_workspace_commands
+
+    register_workspace_commands(
+        workspace_app,
+        context=cli_context,
+        resolve_workspace_source=_resolve_workspace_source,
+        sanitize_filename=_sanitize_filename,
+        collect_relative_input_paths_from_raw=_collect_relative_input_paths_from_raw,
+    )
+
+
+def _register_stage_a_commands() -> None:
+    from .stage_a import register_stage_a_commands
+
+    register_stage_a_commands(
+        stage_a_app,
+        context=cli_context,
+        apply_stage_a_overrides=_apply_stage_a_overrides,
+        ensure_fimo_available=_ensure_fimo_available,
+        candidate_logging_enabled=_candidate_logging_enabled,
+        stage_a_sampling_rows=_stage_a_sampling_rows,
+    )
+
+
+def _register_stage_b_commands() -> None:
+    from .stage_b import register_stage_b_commands
+
+    register_stage_b_commands(stage_b_app, context=cli_context, short_hash=_short_hash)
+
+
+def _register_notebook_commands() -> None:
+    from .notebook import register_notebook_commands
+
+    register_notebook_commands(notebook_app, context=cli_context)
+
+
+def _register_run_commands() -> None:
+    from .run import register_run_commands
+
+    register_run_commands(
+        app,
+        context=cli_context,
+        render_missing_input_hint=_render_missing_input_hint,
+        render_output_schema_hint=_render_output_schema_hint,
+        ensure_fimo_available=_ensure_fimo_available,
+    )
+
+
+_REGISTER_TARGET_TO_CALLABLE: dict[str, Callable[[], None]] = {
+    "inspect": _register_inspect_commands,
+    "validate": _register_validate_command,
+    "plots": _register_plot_commands,
+    "workspace": _register_workspace_commands,
+    "stage_a": _register_stage_a_commands,
+    "stage_b": _register_stage_b_commands,
+    "notebook": _register_notebook_commands,
+    "run": _register_run_commands,
+}
+
+
+def _ensure_commands_registered(scope: str | None) -> None:
+    targets = sorted(_registration_targets_for_scope(scope))
+    for target in targets:
+        if target in _REGISTERED_TARGETS:
+            continue
+        register = _REGISTER_TARGET_TO_CALLABLE.get(target)
+        if register is None:
+            raise RuntimeError(f"Unknown DenseGen CLI registration target: {target}")
+        register()
+        _REGISTERED_TARGETS.add(target)
+
+
+def _patch_typer_testing_get_command(
+    patched_get_command: Callable,
+    *,
+    typer_testing_module=None,
+) -> None:
+    testing = typer_testing_module
+    if testing is None:
+        import typer.testing as testing
+    if not hasattr(testing, "_get_command"):
+        raise RuntimeError("typer.testing._get_command hook is unavailable.")
+    testing._get_command = patched_get_command
+
+
+def _patch_typer_get_command_for_lazy_registration() -> None:
+    patch_flag = "__densegen_lazy_patch__"
+    original = typer.main.get_command
+    if getattr(original, patch_flag, False):
+        return
+
+    def _patched_get_command(typer_instance):
+        if typer_instance is app:
+            scope = _command_scope_from_argv(sys.argv[1:])
+            _ensure_commands_registered(scope=scope)
+        return original(typer_instance)
+
+    setattr(_patched_get_command, patch_flag, True)
+    typer.main.get_command = _patched_get_command
+    _patch_typer_testing_get_command(_patched_get_command)
+
+
+_patch_typer_get_command_for_lazy_registration()
 
 
 @app.callback()

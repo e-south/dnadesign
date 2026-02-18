@@ -2,8 +2,10 @@
 
 Resource defaults derived from:
 - `docs/bu-scc/quickstart.md`
+- `docs/bu-scc/install.md`
 - `docs/bu-scc/batch-notify.md`
-- `docs/bu-scc/jobs/*.qsub`
+- `docs/bu-scc/jobs/README.md`
+- `docs/bu-scc/agent-cheatsheet.md`
 
 Tune from these baselines after measuring runtime, memory, and queue wait.
 When feasible, keep walltime requests at or below 12 hours for better shared-cluster scheduling access.

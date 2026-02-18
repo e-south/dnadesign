@@ -33,6 +33,10 @@ class ResumeState:
     library_build_counts: dict[tuple[str, str], int]
 
 
+class ResumeStateLoadError(RuntimeError):
+    pass
+
+
 def load_resume_state(
     *,
     resume: bool,
@@ -59,10 +63,9 @@ def load_resume_state(
     attempt_counters = _load_existing_attempt_index_by_plan(tables_root)
     library_build_counts = _load_existing_library_build_count_by_plan(tables_root)
     if loaded.root.densegen.output.targets:
-        scan_ok = False
         run_ids: set[str] = set()
         try:
-            rows, _ = scan_records_from_config(
+            rows, source_label = scan_records_from_config(
                 loaded.root,
                 loaded.path,
                 columns=[
@@ -72,6 +75,9 @@ def load_resume_state(
                     "densegen__used_tfbs_detail",
                 ],
             )
+        except Exception as exc:
+            raise ResumeStateLoadError("Failed to scan existing output records while preparing resume state.") from exc
+        try:
             for row in rows:
                 run_id = row.get("densegen__run_id")
                 if run_id is not None:
@@ -89,10 +95,11 @@ def load_resume_state(
                 counts = existing_usage_by_plan.setdefault(key, {})
                 used = _parse_used_tfbs_detail(row.get("densegen__used_tfbs_detail"))
                 _update_usage_counts(counts, used)
-            scan_ok = True
-        except Exception:
-            scan_ok = False
-        if scan_ok and run_ids and any(val != loaded.root.densegen.run.id for val in run_ids):
+        except Exception as exc:
+            raise ResumeStateLoadError(
+                f"Failed to parse scanned output records from `{source_label}` while preparing resume state."
+            ) from exc
+        if run_ids and any(val != loaded.root.densegen.run.id for val in run_ids):
             raise RuntimeError(
                 "Existing outputs were produced with a different run_id. "
                 "Remove outputs/tables (and outputs/meta if present) "

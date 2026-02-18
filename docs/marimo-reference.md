@@ -6,6 +6,8 @@
 This reference captures practical marimo patterns used across this repository, including reactivity rules, UI usage, and notebook code conventions. Read it when authoring or reviewing marimo notebooks and you need concrete examples plus guardrails.
 
 ### Contents
+This section maps the notebook conventions in this guide so you can jump directly to the area you need.
+
 - [Marimo notebooks](#marimo-notebooks)
 - [Marimo fundamentals](#marimo-fundamentals)
 - [Code Requirements](#code-requirements)

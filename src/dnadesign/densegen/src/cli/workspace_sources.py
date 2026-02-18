@@ -19,17 +19,29 @@ from typing import Callable, Iterator, Optional
 
 import typer
 
+PACKAGED_WORKSPACE_IDS: tuple[str, ...] = (
+    "demo_tfbs_baseline",
+    "demo_sampling_baseline",
+    "study_constitutive_sigma_panel",
+    "study_stress_ethanol_cipro",
+)
+
 
 def list_packaged_workspace_ids() -> list[str]:
     package_root = resources.files("dnadesign.densegen")
     workspaces_dir = package_root.joinpath("workspaces")
     with resources.as_file(workspaces_dir) as resolved_root:
-        ids = [
-            child.name
-            for child in Path(resolved_root).iterdir()
-            if child.is_dir() and not child.name.startswith("_") and child.name not in {"runs", "archived"}
-        ]
-    return sorted(ids)
+        missing: list[str] = []
+        available: list[str] = []
+        for workspace_id in PACKAGED_WORKSPACE_IDS:
+            cfg_path = Path(resolved_root) / workspace_id / "config.yaml"
+            if not cfg_path.is_file():
+                missing.append(str(workspace_id))
+                continue
+            available.append(str(workspace_id))
+    if missing:
+        raise RuntimeError("Packaged workspaces are missing config.yaml: " + ", ".join(missing))
+    return available
 
 
 @contextlib.contextmanager
@@ -46,7 +58,11 @@ def resolve_workspace_source(
         raise typer.Exit(code=1)
 
     if source_workspace:
-        available_ids = list_packaged_workspace_ids()
+        try:
+            available_ids = list_packaged_workspace_ids()
+        except RuntimeError as exc:
+            console.print(f"[bold red]{exc}[/]")
+            raise typer.Exit(code=1) from exc
         if source_workspace not in set(available_ids):
             available = ", ".join(available_ids) or "-"
             console.print(f"[bold red]Unknown source workspace:[/] {source_workspace}")

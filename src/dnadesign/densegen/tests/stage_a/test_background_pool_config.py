@@ -15,7 +15,12 @@ from pathlib import Path
 
 import pytest
 
-from dnadesign.densegen.src.config import load_config
+from dnadesign.densegen.src.config import (
+    BackgroundPoolMiningBudgetConfig,
+    BackgroundPoolMiningConfig,
+    BackgroundPoolSamplingConfig,
+    load_config,
+)
 
 
 def test_background_pool_requires_schema_29(tmp_path: Path) -> None:
@@ -68,3 +73,42 @@ def test_background_pool_requires_schema_29(tmp_path: Path) -> None:
     )
     with pytest.raises(Exception, match="schema_version"):
         load_config(cfg_path)
+
+
+def test_background_pool_length_defaults_to_range_16_20() -> None:
+    sampling = BackgroundPoolSamplingConfig(
+        n_sites=8,
+        mining=BackgroundPoolMiningConfig(
+            batch_size=100,
+            budget=BackgroundPoolMiningBudgetConfig(mode="fixed_candidates", candidates=2000),
+        ),
+    )
+    assert sampling.length.policy == "range"
+    assert sampling.length.range == (16, 20)
+    assert sampling.length.exact is None
+
+
+def test_background_pool_length_exact_allows_implicit_default_range() -> None:
+    sampling = BackgroundPoolSamplingConfig(
+        n_sites=8,
+        mining=BackgroundPoolMiningConfig(
+            batch_size=100,
+            budget=BackgroundPoolMiningBudgetConfig(mode="fixed_candidates", candidates=2000),
+        ),
+        length={"policy": "exact", "exact": 18},
+    )
+    assert sampling.length.policy == "exact"
+    assert sampling.length.exact == 18
+    assert sampling.length.range is None
+
+
+def test_background_pool_length_exact_rejects_explicit_range() -> None:
+    with pytest.raises(ValueError, match="background_pool.sampling.length.range is not allowed when policy=exact"):
+        BackgroundPoolSamplingConfig(
+            n_sites=8,
+            mining=BackgroundPoolMiningConfig(
+                batch_size=100,
+                budget=BackgroundPoolMiningBudgetConfig(mode="fixed_candidates", candidates=2000),
+            ),
+            length={"policy": "exact", "exact": 18, "range": [16, 20]},
+        )

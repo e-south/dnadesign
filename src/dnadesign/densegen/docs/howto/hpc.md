@@ -3,9 +3,11 @@
 This how-to guide provides scheduler-safe DenseGen execution patterns for batch environments. Read it when you need predictable preflight checks, resume behavior, and artifact generation on shared clusters.
 
 ### When to use this runbook
-This section clarifies scope so operators can quickly choose the right guide.
+This section clarifies scope so operators can choose the right guide.
 
-Use this runbook for generic scheduler workflows; use **[BU SCC delta](bu-scc.md)** for BU-specific flags and policy details.
+Use this runbook for generic scheduler workflows; use **[DenseGen on BU SCC](bu-scc.md)** for BU-specific flags and policy details.
+
+For expected artifact paths while debugging batch runs, use **[DenseGen outputs reference](../reference/outputs.md)**.
 
 ### Preflight checks
 This section runs the minimum assertions before submitting long jobs.
@@ -50,7 +52,7 @@ uv run dense run --resume --no-plot -c "$CONFIG"
 uv run dense run --resume --extend-quota 8 --no-plot -c "$CONFIG"
 ```
 
-### Notify wiring
-This section points to the canonical event-boundary docs instead of duplicating event semantics.
+### Notify event wiring
+This section points to the event-boundary docs instead of duplicating event semantics.
 
 Notify must consume USR `.events.log` rather than DenseGen diagnostics. Use **[observability and events](../concepts/observability_and_events.md)** plus the **[DenseGen to USR to Notify tutorial](../tutorials/demo_usr_notify.md)** for wiring and validation.

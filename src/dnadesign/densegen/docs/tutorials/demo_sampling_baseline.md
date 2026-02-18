@@ -1,6 +1,6 @@
 ## DenseGen sampling baseline tutorial
 
-This tutorial is the canonical DenseGen walkthrough for PWM artifact-driven sampling with Stage-A mining and Stage-B library selection. Read it when you want a realistic end-to-end flow that still runs quickly in normal development settings.
+This tutorial is the DenseGen walkthrough for PWM artifact-driven sampling with Stage-A mining and Stage-B library selection. Read it when you want an end-to-end flow that runs in normal development settings; for the three-plan campaign variant use the **[stress ethanol and ciprofloxacin study tutorial](study_stress_ethanol_cipro.md)**.
 
 ### What this tutorial demonstrates
 This section defines the practical skills you should gain by the end of the run.
@@ -33,6 +33,8 @@ uv run dense validate-config --probe-solver -c src/dnadesign/densegen/workspaces
 ### Key config knobs
 This section highlights the keys in `src/dnadesign/densegen/workspaces/demo_sampling_baseline/config.yaml` that most affect behavior.
 
+For conceptual tuning guidance, use **[sampling model](../concepts/sampling.md)**.
+
 - `densegen.inputs[*].type`: Uses three `pwm_artifact` inputs and one `background_pool` input.
 - `densegen.inputs[*].sampling.n_sites`: Sets retained Stage-A pool size per input.
 - `densegen.inputs[*].sampling.mining.budget.candidates`: Sets Stage-A mining effort per input.
@@ -41,6 +43,7 @@ This section highlights the keys in `src/dnadesign/densegen/workspaces/demo_samp
 - `densegen.generation.plan[*].fixed_elements.promoter_constraints`: Enforces sigma70 promoter geometry.
 - `densegen.generation.sequence_constraints`: Enforces global motif exclusion with explicit allowlist.
 - `densegen.output.targets`: Enables dual sink output (`parquet`, `usr`).
+- `densegen.output.usr.dataset`: Packaged template uses a namespaced dataset id, but `workspace init --output-mode both` rewrites it to the new workspace id.
 - `plots.source`: Chooses the records source used by plotting and notebook flows when dual sinks are enabled.
 - `densegen.runtime.max_failed_solutions`: Preserves fail-fast contract with no silent fallback.
 
@@ -51,11 +54,15 @@ This section follows the same operator sequence you should use in real workspace
 This step creates an isolated workspace from the packaged sampling demo and preserves local copies of inputs.
 
 ```bash
+# Resolve repo root and pin workspace root so paths are deterministic.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+WORKSPACE_ROOT="$REPO_ROOT/src/dnadesign/densegen/workspaces"
+
 # Initialize workspace from packaged sampling baseline and enable both output sinks.
-uv run dense workspace init --id sampling_baseline_trial --from-workspace demo_sampling_baseline --copy-inputs --output-mode both
+uv run dense workspace init --id sampling_baseline_trial --root "$WORKSPACE_ROOT" --from-workspace demo_sampling_baseline --copy-inputs --output-mode both
 
 # Enter the workspace so relative output paths resolve correctly.
-cd src/dnadesign/densegen/workspaces/sampling_baseline_trial
+cd "$WORKSPACE_ROOT/sampling_baseline_trial"
 
 # Cache config path for all remaining commands.
 CONFIG="$PWD/config.yaml"
@@ -126,7 +133,7 @@ uv run dense inspect run --usr-events-path -c "$CONFIG"
 This step creates presentation artifacts for review and downstream analysis.
 
 ```bash
-# Render default plot set.
+# Render all registered plot types for this workspace.
 uv run dense plot -c "$CONFIG"
 
 # Generate marimo notebook from resolved records source.
@@ -143,8 +150,12 @@ This section lists the key files that confirm the sampling baseline ran correctl
 - `outputs/libraries/`
 - `outputs/meta/events.jsonl`
 - `outputs/tables/records.parquet`
-- `outputs/usr_datasets/densegen/demo_sampling_baseline/records.parquet`
-- `outputs/usr_datasets/densegen/demo_sampling_baseline/.events.log`
+- `outputs/usr_datasets/sampling_baseline_trial/records.parquet`
+- `outputs/usr_datasets/sampling_baseline_trial/.events.log`
+- `outputs/plots/stage_a/*.pdf`
+- `outputs/plots/stage_b/<plan>/occupancy.pdf`
+- `outputs/plots/stage_b/<plan>/tfbs_usage.pdf`
+- `outputs/plots/run_health/*.pdf`
 - `outputs/notebooks/densegen_run_overview.py`
 
 ### Troubleshooting

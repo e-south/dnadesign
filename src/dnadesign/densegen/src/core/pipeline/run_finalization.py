@@ -97,9 +97,8 @@ def finalize_run_outputs(
         if composition_path.exists():
             try:
                 existing_rows = pd.read_parquet(composition_path).to_dict("records")
-            except Exception:
-                log.warning("Failed to read existing composition.parquet; overwriting.", exc_info=True)
-                existing_rows = []
+            except Exception as exc:
+                raise RuntimeError(f"Failed to read existing composition.parquet at {composition_path}: {exc}") from exc
         existing_keys = {
             (str(row.get("solution_id") or ""), int(row.get("placement_index") or 0)) for row in existing_rows
         }
@@ -154,6 +153,7 @@ def finalize_run_outputs(
         items=manifest_items,
     )
     manifest_path = run_manifest_path(run_root)
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest.write_json(manifest_path)
 
     if inputs_manifest_entries:
@@ -172,6 +172,7 @@ def finalize_run_outputs(
             "library_sampling": cfg.generation.sampling.model_dump(),
         }
         inputs_manifest = inputs_manifest_path(run_root)
+        inputs_manifest.parent.mkdir(parents=True, exist_ok=True)
         inputs_manifest.write_text(json.dumps(payload, indent=2, sort_keys=True))
         log.info(
             "Inputs manifest written: %s",

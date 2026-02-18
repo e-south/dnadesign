@@ -27,7 +27,10 @@ from dnadesign.densegen.src.adapters.outputs.usr_writer import USRWriter
 from dnadesign.densegen.src.adapters.sources import data_source_factory
 from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.core.pipeline import resume_state as resume_state_module
-from dnadesign.densegen.src.core.pipeline.attempts import _load_failure_counts_from_attempts
+from dnadesign.densegen.src.core.pipeline.attempts import (
+    _load_existing_library_index,
+    _load_failure_counts_from_attempts,
+)
 from dnadesign.densegen.src.core.pipeline.deps import PipelineDeps
 from dnadesign.densegen.src.core.pipeline.orchestrator import run_pipeline
 from dnadesign.densegen.src.core.pipeline.resume_state import load_resume_state
@@ -462,3 +465,63 @@ def test_load_resume_state_rejects_stream_records_with_mismatched_run_id(monkeyp
             config_sha="abc123",
             allowed_config_sha256=None,
         )
+
+
+def test_load_resume_state_fails_fast_when_record_scan_errors(monkeypatch, tmp_path: Path) -> None:
+    loaded = SimpleNamespace(
+        root=SimpleNamespace(
+            densegen=SimpleNamespace(
+                run=SimpleNamespace(id="run-1"),
+                output=SimpleNamespace(targets=["parquet"]),
+            )
+        ),
+        path=tmp_path / "config.yaml",
+    )
+
+    def _scan_records_from_config(*_args, **_kwargs):
+        raise FileNotFoundError("records missing")
+
+    monkeypatch.setattr(
+        resume_state_module,
+        "_load_failure_counts_from_attempts",
+        lambda _tables_root: {},
+    )
+    monkeypatch.setattr(
+        resume_state_module,
+        "_load_existing_attempt_index_by_plan",
+        lambda _tables_root: {},
+    )
+    monkeypatch.setattr(
+        resume_state_module,
+        "scan_records_from_config",
+        _scan_records_from_config,
+    )
+
+    with pytest.raises(RuntimeError, match="Failed to scan existing output records"):
+        load_resume_state(
+            resume=True,
+            loaded=loaded,
+            tables_root=tmp_path / "outputs" / "tables",
+            config_sha="abc123",
+            allowed_config_sha256=None,
+        )
+
+
+def test_load_failure_counts_fails_fast_on_corrupt_attempts_artifact(tmp_path: Path) -> None:
+    outputs_root = tmp_path / "outputs"
+    tables_root = outputs_root / "tables"
+    tables_root.mkdir(parents=True, exist_ok=True)
+    (tables_root / "attempts.parquet").write_text("not a parquet file")
+
+    with pytest.raises(RuntimeError, match="Failed to read attempts artifact"):
+        _load_failure_counts_from_attempts(outputs_root)
+
+
+def test_load_existing_library_index_fails_fast_on_corrupt_attempts_part(tmp_path: Path) -> None:
+    tables_root = tmp_path / "outputs" / "tables"
+    tables_root.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame([{"sampling_library_index": 3}]).to_parquet(tables_root / "attempts.parquet", index=False)
+    (tables_root / "attempts_part-bad.parquet").write_text("broken parquet stream")
+
+    with pytest.raises(RuntimeError, match="Failed to read attempts artifact"):
+        _load_existing_library_index(tables_root)

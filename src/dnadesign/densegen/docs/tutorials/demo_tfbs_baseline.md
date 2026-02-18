@@ -1,6 +1,8 @@
 ## DenseGen TFBS baseline tutorial
 
-This tutorial is the shortest end-to-end DenseGen walkthrough and is the best first run for a new operator. Read it when you want to learn the DenseGen lifecycle without PWM mining complexity, and finish with a runnable workspace, plots, and notebook outputs.
+This tutorial is the smallest end-to-end DenseGen walkthrough. Read it when you want to learn the DenseGen lifecycle without PWM mining complexity, and finish with a runnable workspace, plots, and notebook outputs.
+
+For the stage-by-stage model behind these commands, use **[DenseGen pipeline lifecycle](../concepts/pipeline-lifecycle.md)**.
 
 ### What this tutorial demonstrates
 This section states the learning outcomes so you can decide whether this is the right starting point.
@@ -34,7 +36,7 @@ This section highlights the highest-signal keys in `src/dnadesign/densegen/works
 - `densegen.solver.backend`: Selects solver backend (`CBC` by default).
 - `densegen.runtime.max_failed_solutions`: Enforces fail-fast behavior at `0`.
 - `densegen.postprocess.pad.mode`: Uses adaptive pad behavior.
-- `densegen.output.parquet.path`: Writes canonical records to `outputs/tables/records.parquet`.
+- `densegen.output.parquet.path`: Writes records to `outputs/tables/records.parquet`.
 
 ### Walkthrough
 This section executes the lifecycle in the same order DenseGen runs internally.
@@ -43,11 +45,15 @@ This section executes the lifecycle in the same order DenseGen runs internally.
 This step creates an isolated workspace so you can run and reset safely without modifying the packaged template.
 
 ```bash
+# Resolve repo root and pin workspace root so paths are deterministic.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+WORKSPACE_ROOT="$REPO_ROOT/src/dnadesign/densegen/workspaces"
+
 # Create a new workspace from the packaged TFBS baseline template.
-uv run dense workspace init --id tfbs_baseline_trial --from-workspace demo_tfbs_baseline --copy-inputs --output-mode local
+uv run dense workspace init --id tfbs_baseline_trial --root "$WORKSPACE_ROOT" --from-workspace demo_tfbs_baseline --copy-inputs --output-mode local
 
 # Change into the workspace so all relative output paths resolve locally.
-cd src/dnadesign/densegen/workspaces/tfbs_baseline_trial
+cd "$WORKSPACE_ROOT/tfbs_baseline_trial"
 
 # Store the config path once for the rest of the tutorial.
 CONFIG="$PWD/config.yaml"
@@ -82,7 +88,7 @@ This step verifies run health and confirms the records table was materialized.
 # Print event and library summaries to understand run outcomes.
 uv run dense inspect run --events --library -c "$CONFIG"
 
-# Verify the canonical records table exists.
+# Verify the records table exists.
 ls -la outputs/tables/records.parquet
 ```
 
@@ -90,7 +96,7 @@ ls -la outputs/tables/records.parquet
 This step produces the default visual outputs and a marimo notebook for interactive review.
 
 ```bash
-# Render default plots for this workspace.
+# Render all registered plot types; stage_a_summary will be skipped because this workspace has no Stage-A pool artifacts.
 uv run dense plot -c "$CONFIG"
 
 # Generate the notebook file from run outputs.
@@ -114,7 +120,9 @@ This section lists the key artifacts you should confirm after a successful run.
 - `outputs/tables/records.parquet`
 - `outputs/meta/events.jsonl`
 - `outputs/meta/run_manifest.json`
-- `outputs/plots/placement_map.pdf`
+- `outputs/plots/stage_b/<plan>/occupancy.pdf`
+- `outputs/plots/stage_b/<plan>/tfbs_usage.pdf`
+- `outputs/plots/run_health/*.pdf`
 - `outputs/notebooks/densegen_run_overview.py`
 
 ### Troubleshooting

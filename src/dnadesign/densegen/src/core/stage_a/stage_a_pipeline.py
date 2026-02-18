@@ -66,6 +66,70 @@ class StageAPipelineResult:
     summary: Optional[PWMSamplingSummary]
 
 
+@dataclass(frozen=True)
+class StageAMiningRequest:
+    matrix: list[dict[str, float]]
+    background_cdf: np.ndarray
+    matrix_cdf: np.ndarray
+    width: int
+    strategy: str
+    length_policy: str
+    length_range: Optional[Sequence[int]]
+    mining_batch_size: int
+    mining_log_every: int
+    budget_mode: str
+    budget_growth_factor: float
+    budget_max_candidates: Optional[int]
+    budget_min_candidates: Optional[int]
+    budget_max_seconds: Optional[float]
+    budget_target_tier_fraction: Optional[float]
+    n_candidates: int
+    requested: int
+    n_sites: int
+    bgfile: Optional[Path]
+    keep_all_candidates_debug: bool
+    include_matched_sequence: bool
+    debug_output_dir: Optional[Path]
+    debug_label: Optional[str]
+    motif_hash: Optional[str]
+    input_name: Optional[str]
+    run_id: Optional[str]
+    scoring_backend: str
+    uniqueness_key: str
+    progress: _PwmSamplingProgress | None
+    provided_sequences: Optional[List[str]] = None
+    intended_core_by_seq: Optional[dict[str, tuple[int, int]]] = None
+    core_offset_by_seq: Optional[dict[str, int]] = None
+
+
+@dataclass(frozen=True)
+class StageASelectionRequest:
+    selection_policy: str
+    selection_rank_by: str
+    selection_alpha: float
+    selection_pool_min_score_norm: float | None
+    selection_pool_max_candidates: int | None
+    selection_relevance_norm: str | None
+    tier_fractions: Sequence[float]
+    tier_fractions_source: str
+
+
+@dataclass(frozen=True)
+class StageASummaryRequest:
+    pwm_consensus: str
+    pwm_consensus_iupac: str
+    pwm_consensus_score: float | None
+    pwm_theoretical_max_score: float | None
+    length_label: str
+    window_label: str
+    trim_window_length: Optional[int]
+    trim_window_strategy: Optional[str]
+    trim_window_start: Optional[int]
+    trim_window_score: Optional[float]
+    score_label: str
+    return_summary: bool
+
+
 def _evaluate_tier_target(*, n_sites: int, target_tier_fraction: float, eligible_unique: int) -> tuple[int, bool]:
     return evaluate_tier_target(
         n_sites=n_sites,
@@ -267,59 +331,65 @@ def run_stage_a_pipeline(
     *,
     rng: np.random.Generator,
     motif: PWMMotif,
-    matrix: list[dict[str, float]],
-    background_cdf: np.ndarray,
-    matrix_cdf: np.ndarray,
-    width: int,
-    strategy: str,
-    length_policy: str,
-    length_range: Optional[Sequence[int]],
-    mining_batch_size: int,
-    mining_log_every: int,
-    budget_mode: str,
-    budget_growth_factor: float,
-    budget_max_candidates: Optional[int],
-    budget_min_candidates: Optional[int],
-    budget_max_seconds: Optional[float],
-    budget_target_tier_fraction: Optional[float],
-    n_candidates: int,
-    requested: int,
-    n_sites: int,
-    bgfile: Optional[Path],
-    keep_all_candidates_debug: bool,
-    include_matched_sequence: bool,
-    debug_output_dir: Optional[Path],
-    debug_label: Optional[str],
-    motif_hash: Optional[str],
-    input_name: Optional[str],
-    run_id: Optional[str],
-    scoring_backend: str,
-    uniqueness_key: str,
-    progress: _PwmSamplingProgress | None,
-    selection_policy: str,
-    selection_rank_by: str,
-    selection_alpha: float,
-    selection_pool_min_score_norm: float | None,
-    selection_pool_max_candidates: int | None,
-    selection_relevance_norm: str | None,
-    tier_fractions: Sequence[float],
-    tier_fractions_source: str,
-    pwm_consensus: str,
-    pwm_consensus_iupac: str,
-    pwm_consensus_score: float | None,
-    pwm_theoretical_max_score: float | None,
-    length_label: str,
-    window_label: str,
-    trim_window_length: Optional[int],
-    trim_window_strategy: Optional[str],
-    trim_window_start: Optional[int],
-    trim_window_score: Optional[float],
-    score_label: str,
-    return_summary: bool,
-    provided_sequences: Optional[List[str]] = None,
-    intended_core_by_seq: Optional[dict[str, tuple[int, int]]] = None,
-    core_offset_by_seq: Optional[dict[str, int]] = None,
+    mining_request: StageAMiningRequest,
+    selection_request: StageASelectionRequest,
+    summary_request: StageASummaryRequest,
 ) -> StageAPipelineResult:
+    matrix = mining_request.matrix
+    background_cdf = mining_request.background_cdf
+    matrix_cdf = mining_request.matrix_cdf
+    width = int(mining_request.width)
+    strategy = str(mining_request.strategy)
+    length_policy = str(mining_request.length_policy)
+    length_range = mining_request.length_range
+    mining_batch_size = int(mining_request.mining_batch_size)
+    mining_log_every = int(mining_request.mining_log_every)
+    budget_mode = str(mining_request.budget_mode)
+    budget_growth_factor = float(mining_request.budget_growth_factor)
+    budget_max_candidates = mining_request.budget_max_candidates
+    budget_min_candidates = mining_request.budget_min_candidates
+    budget_max_seconds = mining_request.budget_max_seconds
+    budget_target_tier_fraction = mining_request.budget_target_tier_fraction
+    n_candidates = int(mining_request.n_candidates)
+    requested = int(mining_request.requested)
+    n_sites = int(mining_request.n_sites)
+    bgfile = mining_request.bgfile
+    keep_all_candidates_debug = bool(mining_request.keep_all_candidates_debug)
+    include_matched_sequence = bool(mining_request.include_matched_sequence)
+    debug_output_dir = mining_request.debug_output_dir
+    debug_label = mining_request.debug_label
+    motif_hash = mining_request.motif_hash
+    input_name = mining_request.input_name
+    run_id = mining_request.run_id
+    scoring_backend = str(mining_request.scoring_backend)
+    uniqueness_key = str(mining_request.uniqueness_key)
+    progress = mining_request.progress
+    provided_sequences = mining_request.provided_sequences
+    intended_core_by_seq = mining_request.intended_core_by_seq
+    core_offset_by_seq = mining_request.core_offset_by_seq
+
+    selection_policy = str(selection_request.selection_policy)
+    selection_rank_by = str(selection_request.selection_rank_by)
+    selection_alpha = float(selection_request.selection_alpha)
+    selection_pool_min_score_norm = selection_request.selection_pool_min_score_norm
+    selection_pool_max_candidates = selection_request.selection_pool_max_candidates
+    selection_relevance_norm = selection_request.selection_relevance_norm
+    tier_fractions = selection_request.tier_fractions
+    tier_fractions_source = str(selection_request.tier_fractions_source)
+
+    pwm_consensus = str(summary_request.pwm_consensus)
+    pwm_consensus_iupac = str(summary_request.pwm_consensus_iupac)
+    pwm_consensus_score = summary_request.pwm_consensus_score
+    pwm_theoretical_max_score = summary_request.pwm_theoretical_max_score
+    length_label = str(summary_request.length_label)
+    window_label = str(summary_request.window_label)
+    trim_window_length = summary_request.trim_window_length
+    trim_window_strategy = summary_request.trim_window_strategy
+    trim_window_start = summary_request.trim_window_start
+    trim_window_score = summary_request.trim_window_score
+    score_label = str(summary_request.score_label)
+    return_summary = bool(summary_request.return_summary)
+
     mining_result = mine_pwm_candidates(
         rng=rng,
         motif=motif,
