@@ -1,13 +1,9 @@
 ## Running marimo notebooks
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-18
+
 This document is a practical quickstart for running repository notebooks with marimo. Read it when you want to launch notebooks quickly; deeper notebook patterns and UI guidance are in `docs/marimo-reference.md`.
-
-### Contents
-This section lists the notebook execution modes used in this repository.
-
-- [Campaign-tied notebooks (OPAL)](#campaign-tied-notebooks-opal)
-- [Project-environment notebooks](#project-environment-notebooks)
-- [Sandbox notebooks with inline dependencies](#sandbox-notebooks-with-inline-dependencies)
 
 ### Campaign-tied notebooks (OPAL)
 This section covers notebook flows generated and managed inside OPAL campaigns.

@@ -6,6 +6,7 @@ This journal records cross-package engineering decisions, investigations, and va
 
 ### Contents
 - [2026-02-04](#2026-02-04)
+- [2026-02-18](#2026-02-18)
 
 ### 2026-02-04
 - Investigated the reported stall in `test_round_robin_chunk_cap.py::test_stall_detected_with_no_solutions`.
@@ -224,3 +225,32 @@ This journal records cross-package engineering decisions, investigations, and va
     - summary stats block from run artifacts,
     - plot gallery navigation,
     - explicit use of `records.parquet` from local or USR sink.
+
+### 2026-02-18
+- Documentation system-of-record scaffold introduced at repo root:
+  - `ARCHITECTURE.md`, `DESIGN.md`, `SECURITY.md`, `RELIABILITY.md`, `PLANS.md`, `QUALITY_SCORE.md`.
+- `AGENTS.md` was reduced to a map-style entrypoint and now links to canonical policy/runbook docs instead of carrying full prose copies.
+- Added docs knowledge-base indexes:
+  - `docs/architecture/README.md`
+  - `docs/architecture/decisions/README.md`
+  - `docs/security/README.md`
+  - `docs/reliability/README.md`
+  - `docs/quality/README.md`
+  - `docs/exec-plans/README.md`
+  - `docs/templates/README.md`
+- Added reusable templates:
+  - `docs/templates/system-of-record.md`
+  - `docs/templates/runbook.md`
+  - `docs/templates/adr.md`
+  - `docs/templates/exec-plan.md`
+- Added explicit ADR policy: numbered ADRs are required for new decisions going forward; historical backfill is optional.
+- Extended docs check contract to validate relative links from root system-of-record docs, not only `docs/` plus root `README.md`.
+- SOR hardening pass implemented with CI/devtool enforcement:
+  - Root SOR docs now include required metadata (`Type`, `Owner`, `Last verified`).
+  - `dnadesign.devtools.docs_checks` now enforces:
+    - root SOR metadata presence/date freshness (`--max-sor-age-days`)
+    - execution-plan metadata and traceability link requirements for non-README files under `docs/exec-plans/`.
+  - Added `dnadesign.devtools.architecture_boundaries` and wired it into fast CI to fail on undeclared cross-tool imports.
+  - Added `dnadesign.devtools.quality_score` to generate CI-backed quality score inputs from coverage summary, baseline, and lane outcomes.
+  - Added `dnadesign.devtools.quality_entropy` and a scheduled/workflow-dispatch CI job that uploads an entropy report artifact and fails on stale SOR metadata or broken quality evidence links.
+  - Updated `QUALITY_SCORE.md` to treat CI evidence links and Codecov status signal as canonical numeric source inputs, keeping narrative guidance separate.

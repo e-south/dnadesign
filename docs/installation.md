@@ -1,17 +1,9 @@
 ## Installation
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-18
+
 This document covers initial repository setup for local development and CLI usage. Read it when bootstrapping a new environment; detailed dependency maintenance guidance lives in `docs/dependencies.md`.
-
-### Contents
-This section lists the setup steps in the order new users should follow.
-
-- [Install uv](#install-uv)
-- [Clone the repository](#clone-the-repository)
-- [Sync the project environment](#sync-the-project-environment)
-- [Optional dev-tool setup](#optional-dev-tool-setup)
-- [Run CLI entrypoints](#run-cli-entrypoints)
-- [BU SCC links](#bu-scc-links)
-- [System dependencies note](#system-dependencies-note)
 
 ### Install uv
 This section installs the package manager used by this monorepo.

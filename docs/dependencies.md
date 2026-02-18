@@ -1,13 +1,9 @@
 ## Dependency maintenance
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-18
+
 This document is the canonical home for dependency management in this repository, including Python packages and pixi-managed system tools. Read it when adding, removing, or updating dependencies so lockfiles and runtime expectations stay aligned.
-
-### Contents
-This section lists the dependency surfaces maintained in this repo.
-
-- [Python dependencies (uv)](#python-dependencies-uv)
-- [System dependencies (pixi)](#system-dependencies-pixi)
-- [Lockfile and commit checklist](#lockfile-and-commit-checklist)
 
 ### Python dependencies (uv)
 This section covers Python package lifecycle operations managed by `uv`.
