@@ -26,6 +26,8 @@ from dnadesign.densegen.src.core.stage_a.stage_a_types import FimoCandidate
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
 from dnadesign.densegen.src.viz.plotting import plot_stage_a_summary
 
+pytestmark = pytest.mark.fimo
+
 _FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
 

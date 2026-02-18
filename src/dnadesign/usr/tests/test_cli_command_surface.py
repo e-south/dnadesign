@@ -11,9 +11,17 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import re
+
 from typer.testing import CliRunner
 
 from dnadesign.usr.src.cli import app
+
+_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+
+
+def _normalized_help(text: str) -> str:
+    return " ".join(_ANSI_ESCAPE_RE.sub("", text).split())
 
 
 def test_top_level_excludes_tool_commands() -> None:
@@ -36,3 +44,12 @@ def test_top_level_excludes_tool_commands() -> None:
     assert "namespace" in help_text
     assert "events" in help_text
     assert "state" in help_text
+
+
+def test_init_help_mentions_registry_precondition() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["init", "--help"])
+    assert result.exit_code == 0
+
+    normalized = _normalized_help(result.stdout)
+    assert "Requires registry.yaml under --root." in normalized

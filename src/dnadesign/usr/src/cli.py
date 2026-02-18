@@ -1245,7 +1245,7 @@ def cli_ls(
     cmd_ls(_ctx_args(ctx, format=format))
 
 
-@app.command("init")
+@app.command("init", help="Initialize dataset metadata. Requires registry.yaml under --root.")
 def cli_init(
     ctx: typer.Context,
     dataset: str = typer.Argument(...),

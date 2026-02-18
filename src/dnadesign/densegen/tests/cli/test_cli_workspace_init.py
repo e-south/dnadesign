@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import re
 import textwrap
 from pathlib import Path
 
@@ -20,6 +21,12 @@ from typer.testing import CliRunner
 
 from dnadesign.densegen.src.cli import workspace as workspace_commands
 from dnadesign.densegen.src.cli.main import app
+
+_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+
+
+def _normalized_output(text: str) -> str:
+    return " ".join(_ANSI_ESCAPE_RE.sub("", text).split())
 
 
 def _write_source_config(path: Path) -> None:
@@ -126,7 +133,7 @@ def test_stage_b_reports_missing_pool_manifest(tmp_path: Path) -> None:
     )
     assert result.exit_code != 0, result.output
     assert "Pool manifest not found" in result.output
-    normalized = " ".join(result.output.split())
+    normalized = _normalized_output(result.output)
     assert "dense stage-a build-pool" in normalized
 
 
@@ -349,3 +356,11 @@ def test_workspace_where_requires_explicit_root_outside_repo(tmp_path: Path, mon
     assert result.exit_code == 1
     assert "Unable to determine workspace root" in result.output
     assert "DENSEGEN_WORKSPACE_ROOT" in result.output
+
+
+def test_workspace_init_help_states_required_source_options() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["workspace", "init", "--help"])
+    assert result.exit_code == 0, result.output
+    normalized = _normalized_output(result.output)
+    assert "Use exactly one of --from-workspace or --from-config." in normalized

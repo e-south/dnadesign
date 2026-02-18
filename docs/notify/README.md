@@ -1,5 +1,8 @@
 # Notify Operations
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-18
+
 `dnadesign` includes a tool-agnostic notifier CLI for webhook delivery from local and batch workflows.
 
 ## Choose a workflow
@@ -26,6 +29,8 @@ Supported providers:
 - `discord` (text payload)
 
 Exactly one of `--url`, `--url-env`, or `--secret-ref` is required.
+Live HTTPS delivery requires trust roots via `--tls-ca-bundle` or `SSL_CERT_FILE` and fails fast when neither is provided.
+`--dry-run` does not post to the webhook and does not require a CA bundle.
 
 ## Metadata payloads
 

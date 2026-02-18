@@ -1,5 +1,8 @@
 # BU SCC Install: `dnadesign` Interactive Bootstrap (CPU + Evo2 GPU)
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-18
+
 ## At a glance
 
 **Intent:** One-time environment bootstrap for running `dnadesign` on BU SCC for CPU workflows (for example DenseGen with CBC/Gurobi) and Linux GPU workflows (Evo2 inference stack).

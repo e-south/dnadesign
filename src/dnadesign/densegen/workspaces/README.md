@@ -6,6 +6,7 @@ User-facing template guidance lives in:
 - `demo_*` directories are fast baseline workspaces for guided onboarding and CI pressure tests.
 - `study_*` directories are larger template workspaces for real run planning.
 - New workspaces created by `dense workspace init` default to this same root.
+- `dense workspace init` requires exactly one source option: `--from-workspace` or `--from-config`.
 - `archived/` stores historical local artifacts that are not part of active work.
 
 Each workspace should contain:

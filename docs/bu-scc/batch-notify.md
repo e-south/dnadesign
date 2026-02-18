@@ -1,5 +1,8 @@
 # BU SCC Batch + Notify Runbook (`dnadesign` platform workflows)
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-18
+
 ## At a glance
 
 **Intent:** Run `dnadesign` workflows as SGE batch jobs on BU SCC with restart-safe logs and optional Notify webhooks.

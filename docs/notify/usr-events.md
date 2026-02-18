@@ -1,5 +1,8 @@
 # Notify: consuming Universal Sequence Record events
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-18
+
 Notify consumes Universal Sequence Record mutation events from `.events.log` newline-delimited JSON files and sends selected events to webhook providers. The integration contract is Universal Sequence Record `.events.log` only; DenseGen runtime diagnostics (`outputs/meta/events.jsonl`) are out of scope for Notify.
 
 ## Contents

@@ -1,5 +1,8 @@
 # BU SCC Quickstart: dnadesign (Interactive -> Batch -> Notify)
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-18
+
 ## At a glance
 
 **Intent:** Provide one copy/paste path from SCC login through first batch submissions and Notify setup.

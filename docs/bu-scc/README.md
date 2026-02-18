@@ -1,5 +1,8 @@
 # BU SCC Operations
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-18
+
 This directory is the canonical source for BU SCC platform policy, submission vocabulary, and job templates for `dnadesign`.
 
 ## Choose by task

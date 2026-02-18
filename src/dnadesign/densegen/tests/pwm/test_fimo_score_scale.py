@@ -30,6 +30,8 @@ from dnadesign.densegen.src.core.stage_a.stage_a_sampling_utils import (
 from dnadesign.densegen.src.core.stage_a.stage_a_types import PWMMotif
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
 
+pytestmark = pytest.mark.fimo
+
 
 def _consensus(matrix: list[dict[str, float]]) -> str:
     return "".join(max(row.items(), key=lambda kv: kv[1])[0] for row in matrix)

@@ -4,10 +4,102 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: "15 07 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  lint-test-build:
+  detect-ci-scope:
+    name: Detect CI scope
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run-external-integration: ${{ steps.scope.outputs.run_external_integration }}
+      run-full-core: ${{ steps.scope.outputs.run_full_core }}
+      run-coverage-gate: ${{ steps.scope.outputs.run_coverage_gate }}
+      affected-tools-csv: ${{ steps.scope.outputs.affected_tools_csv }}
+      external-integration-tools-csv: ${{ steps.scope.outputs.external_integration_tools_csv }}
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+
+      - name: Collect changed files for scope detection
+        run: |
+          PYTHONPATH=src python3 -m dnadesign.devtools.ci_changed_files \
+            --event-name "${{ github.event_name }}" \
+            --repo-root . \
+            --base-ref "${{ github.base_ref }}" \
+            --head-sha "${{ github.sha }}" \
+            --output-file .ci_changed_files.txt
+
+      - name: Compute CI scope
+        id: scope
+        run: |
+          PYTHONPATH=src python3 -m dnadesign.devtools.ci_changes \
+            --event-name "${{ github.event_name }}" \
+            --repo-root . \
+            --baseline-json .github/tool-coverage-baseline.json \
+            --changed-files-file .ci_changed_files.txt \
+            --github-output "$GITHUB_OUTPUT"
+
+  quality-entropy:
+    name: Quality entropy report
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+
+      - name: Build quality entropy report
+        id: entropy
+        continue-on-error: true
+        run: |
+          PYTHONPATH=src python3 -m dnadesign.devtools.quality_entropy \
+            --repo-root . \
+            --max-sor-age-days 90 \
+            --report-file quality-entropy-report.md
+
+      - name: Upload quality entropy artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-entropy-report
+          path: quality-entropy-report.md
+
+      - name: Enforce quality entropy checks
+        if: steps.entropy.outcome == 'failure'
+        run: exit 1
+
+  core-lint-test-build:
+    name: Core lint/test/build lane
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    needs: detect-ci-scope
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      MPLCONFIGDIR: ${{ github.workspace }}/.tmp/matplotlib
 
     steps:
       - uses: actions/checkout@v5
@@ -22,71 +114,32 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Install pixi
-        run: |
-          curl -fsSL https://pixi.sh/install.sh | sh
-          echo "$HOME/.pixi/bin" >> $GITHUB_PATH
-
-      - name: Install system deps (pixi)
-        run: pixi install --locked
-
-      - name: Export MEME_BIN
-        run: echo "MEME_BIN=${{ github.workspace }}/.pixi/envs/default/bin" >> $GITHUB_ENV
-
       - name: Install dependencies (locked)
         run: uv sync --locked --dev
 
-      - name: Docs checks (links + naming)
+      - name: Install FFmpeg
         run: |
-          python - <<'PY'
-          import re
-          from pathlib import Path
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
 
-          docs_root = Path("docs")
-          if not docs_root.exists():
-            raise SystemExit("docs/ directory is missing")
+      - name: Docs checks (links + naming)
+        run: uv run python -m dnadesign.devtools.docs_checks
 
-          docs_md_files = sorted(docs_root.rglob("*.md"))
-          bad_names = [p for p in docs_md_files if "_" in p.name]
-          if bad_names:
-            print("Docs naming check failed: use kebab-case markdown filenames.")
-            for path in bad_names:
-              print(f" - {path}")
-            raise SystemExit(1)
-
-          md_files = list(docs_md_files)
-          root_readme = Path("README.md")
-          if root_readme.exists():
-            md_files.append(root_readme)
-
-          link_pattern = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
-          broken = []
-          for src in md_files:
-            text = src.read_text(encoding="utf-8")
-            for raw in link_pattern.findall(text):
-              link = raw.strip().split()[0]
-              if link.startswith(("http://", "https://", "mailto:")):
-                continue
-              target_rel = link.split("#", 1)[0]
-              if not target_rel:
-                continue
-              target = (src.parent / target_rel).resolve()
-              if not target.exists():
-                broken.append((src, link))
-
-          if broken:
-            print("Docs link check failed:")
-            for src, link in broken:
-              print(f" - {src}: {link}")
-            raise SystemExit(1)
-
-          print(f"Docs checks passed ({len(md_files)} markdown files, including root README if present).")
-          PY
+      - name: Architecture boundary checks
+        run: uv run python -m dnadesign.devtools.architecture_boundaries
 
       - name: Pre-commit (non-Ruff hooks)
         env:
           SKIP: ruff-check,ruff-format
-        run: uv run pre-commit run --all-files
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            uv run pre-commit run --all-files
+            exit 0
+          fi
+
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          uv run pre-commit run --from-ref "origin/${{ github.base_ref }}" --to-ref "${{ github.sha }}"
 
       - name: Lint
         run: uv run ruff check .
@@ -94,15 +147,126 @@ jobs:
       - name: Format check
         run: uv run ruff format --check .
 
-      - name: Tests
-        run: uv run pytest -q
+      - name: Tests (core lane) + coverage report
+        shell: bash
+        run: |
+          marker_expr="not fimo and not integration"
+          run_coverage_gate="${{ needs.detect-ci-scope.outputs.run-coverage-gate }}"
+          smoke_targets=(
+            src/dnadesign/devtools/tests/test_docs_checks.py
+            src/dnadesign/usr/tests/test_cli_command_surface.py
+          )
+
+          if [ "${{ needs.detect-ci-scope.outputs.run-full-core }}" = "true" ]; then
+            uv run pytest -q -m "$marker_expr" \
+              --cov=src/dnadesign \
+              --cov-report=json:coverage-core.json \
+              --cov-report=xml:coverage-core.xml
+            exit 0
+          fi
+
+          affected_csv="${{ needs.detect-ci-scope.outputs.affected-tools-csv }}"
+          if [ -z "$affected_csv" ]; then
+            if [ "$run_coverage_gate" = "true" ]; then
+              echo "Invariant violation: coverage gate requested with empty affected tool scope."
+              exit 1
+            fi
+            echo "No affected tools in PR scope; running core-lane smoke tests without coverage upload."
+            uv run pytest -q "${smoke_targets[@]}"
+            exit 0
+          fi
+
+          mapfile -t targets < <(
+            PYTHONPATH=src python3 -m dnadesign.devtools.ci_test_targets \
+              --repo-root . \
+              --affected-tools-csv "$affected_csv"
+          )
+
+          if [ "${#targets[@]}" -eq 0 ]; then
+            echo "No test directories found for affected tools: $affected_csv; running core-lane smoke tests."
+            uv run pytest -q "${smoke_targets[@]}" \
+              --cov=src/dnadesign \
+              --cov-report=json:coverage-core.json \
+              --cov-report=xml:coverage-core.xml
+            exit 0
+          fi
+
+          uv run pytest -q -m "$marker_expr" "${targets[@]}" \
+            --cov=src/dnadesign \
+            --cov-report=json:coverage-core.json \
+            --cov-report=xml:coverage-core.xml
+
+      - name: Coverage gate (per tool)
+        if: needs.detect-ci-scope.outputs.run-coverage-gate == 'true'
+        shell: bash
+        run: |
+          cmd=(
+            uv run python -m dnadesign.devtools.tool_coverage
+            --coverage-json coverage-core.json
+            --baseline-json .github/tool-coverage-baseline.json
+          )
+          if [ "${{ needs.detect-ci-scope.outputs.run-full-core }}" != "true" ]; then
+            cmd+=(--only-tools "${{ needs.detect-ci-scope.outputs.affected-tools-csv }}")
+          fi
+          "${cmd[@]}"
+
+      - name: Coverage summary (quality score input)
+        if: needs.detect-ci-scope.outputs.run-full-core == 'true'
+        shell: bash
+        run: |
+          uv run python -m dnadesign.devtools.coverage_summary \
+            --coverage-json coverage-core.json \
+            --baseline-json .github/tool-coverage-baseline.json \
+            --output-json quality-score-coverage-summary.json
+
+      - name: Upload quality-score coverage summary artifact
+        if: needs.detect-ci-scope.outputs.run-full-core == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-score-coverage-summary
+          path: quality-score-coverage-summary.json
+
+      - name: Upload core-lane coverage to Codecov
+        if: needs.detect-ci-scope.outputs.run-coverage-gate == 'true'
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage-core.xml
+          flags: core
+          use_oidc: true
+          fail_ci_if_error: true
+          verbose: true
 
       - name: Build (sdist + wheel)
         run: uv build
 
-  densegen-fimo:
-    name: DenseGen FIMO Lane
+  lint-test-build:
+    name: lint-test-build
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: core-lint-test-build
+    if: always()
+    steps:
+      - name: Mirror core lane result
+        shell: bash
+        run: |
+          result="${{ needs.core-lint-test-build.result }}"
+          if [ "$result" != "success" ]; then
+            echo "core-lint-test-build result: $result"
+            exit 1
+          fi
+          echo "core-lint-test-build result: $result"
+
+  external-integration:
+    name: External integration lane (FIMO/MEME)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: detect-ci-scope
+    if: needs.detect-ci-scope.outputs.run-external-integration == 'true'
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      MPLCONFIGDIR: ${{ github.workspace }}/.tmp/matplotlib
 
     steps:
       - uses: actions/checkout@v5
@@ -117,40 +281,162 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Install pixi
-        run: |
-          curl -fsSL https://pixi.sh/install.sh | sh
-          echo "$HOME/.pixi/bin" >> $GITHUB_PATH
+      - name: Set up pixi (cached)
+        uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          cache: true
+          cache-write: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
       - name: Install system deps (pixi)
         run: pixi install --locked
 
-      - name: Export MEME_BIN
-        run: echo "MEME_BIN=${{ github.workspace }}/.pixi/envs/default/bin" >> $GITHUB_ENV
+      - name: Resolve MEME_BIN and PATH
+        run: |
+          PYTHONPATH=src python3 -m dnadesign.devtools.meme_env \
+            --repo-root . \
+            --github-env "$GITHUB_ENV" \
+            --github-path "$GITHUB_PATH"
 
       - name: Install dependencies (locked)
         run: uv sync --locked --dev
 
       - name: Verify FIMO availability
-        run: pixi run fimo --version
+        run: fimo --version
 
-      - name: DenseGen FIMO tests
+      - name: External integration tests (fimo/integration)
+        shell: bash
         run: |
-          pixi run pytest \
-            src/dnadesign/densegen/tests/cli/test_cli_stage_a_summary.py \
-            src/dnadesign/densegen/tests/pwm/test_fimo_score_scale.py \
-            src/dnadesign/densegen/tests/pwm/test_pwm_artifact_set_source.py \
-            src/dnadesign/densegen/tests/pwm/test_pwm_artifact_source.py \
-            src/dnadesign/densegen/tests/pwm/test_pwm_fimo_utils.py \
-            src/dnadesign/densegen/tests/pwm/test_pwm_log_odds_smoothing.py \
-            src/dnadesign/densegen/tests/pwm/test_pwm_meme_set_source.py \
-            src/dnadesign/densegen/tests/pwm/test_pwm_meme_source.py \
-            src/dnadesign/densegen/tests/pwm/test_pwm_other_sources.py \
-            src/dnadesign/densegen/tests/pwm/test_pwm_sampling_mining.py \
-            src/dnadesign/densegen/tests/pwm/test_pwm_sampling_relaxed_selection.py \
-            src/dnadesign/densegen/tests/pwm/test_pwm_sampling_stratification.py \
-            src/dnadesign/densegen/tests/pwm/test_pwm_sampling_time_limit.py \
-            src/dnadesign/densegen/tests/pwm/test_pwm_sampling_trim.py \
-            src/dnadesign/densegen/tests/stage_a/test_background_pool_source.py \
-            src/dnadesign/densegen/tests/stage_a/test_stage_a_end_to_end_score_sampling.py \
-            src/dnadesign/densegen/tests/stage_a/test_stage_a_padding_audit.py
+          marker_expr="fimo or integration"
+          report_path="external-integration-junit.xml"
+
+          if [ "${{ needs.detect-ci-scope.outputs.run-full-core }}" = "true" ]; then
+            uv run pytest -q -m "$marker_expr" \
+              --junitxml "$report_path" \
+              --cov=src/dnadesign \
+              --cov-report=xml:coverage-external-integration.xml
+          else
+            affected_csv="${{ needs.detect-ci-scope.outputs.affected-tools-csv }}"
+            if [ -z "$affected_csv" ]; then
+              echo "Invariant violation: external integration lane requested without affected tools."
+              exit 1
+            fi
+
+            mapfile -t targets < <(
+              PYTHONPATH=src python3 -m dnadesign.devtools.ci_test_targets \
+                --repo-root . \
+                --affected-tools-csv "$affected_csv"
+            )
+
+            if [ "${#targets[@]}" -eq 0 ]; then
+              echo "No test directories found for affected tools: $affected_csv"
+              exit 1
+            fi
+
+            uv run pytest -q -m "$marker_expr" "${targets[@]}" \
+              --junitxml "$report_path" \
+              --cov=src/dnadesign \
+              --cov-report=xml:coverage-external-integration.xml
+          fi
+
+          uv run python -m dnadesign.devtools.pytest_gate \
+            --junit-xml "$report_path" \
+            --lane-name external-integration \
+            --required-tools-csv "${{ needs.detect-ci-scope.outputs.external-integration-tools-csv }}"
+
+      - name: Upload external-integration coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage-external-integration.xml
+          flags: external_integration
+          use_oidc: true
+          fail_ci_if_error: true
+          verbose: true
+
+  quality-score-inputs:
+    name: Quality score inputs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [detect-ci-scope, core-lint-test-build, external-integration]
+    if: >
+      always() &&
+      needs.detect-ci-scope.outputs.run-full-core == 'true' &&
+      needs.core-lint-test-build.result == 'success' &&
+      (needs.external-integration.result == 'success' || needs.external-integration.result == 'skipped')
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+
+      - name: Download quality-score coverage summary artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: quality-score-coverage-summary
+          path: .
+
+      - name: Build quality score inputs
+        run: |
+          PYTHONPATH=src python3 -m dnadesign.devtools.quality_score \
+            --coverage-summary-json quality-score-coverage-summary.json \
+            --baseline-json .github/tool-coverage-baseline.json \
+            --core-lane-result "${{ needs.core-lint-test-build.result }}" \
+            --external-integration-lane-result "${{ needs.external-integration.result }}" \
+            --publish-lane-result skipped \
+            --output-json quality-score-inputs.json
+
+      - name: Upload quality score inputs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-score-inputs
+          path: quality-score-inputs.json
+
+  ci-gate:
+    name: CI gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [detect-ci-scope, core-lint-test-build, external-integration, quality-score-inputs]
+    if: always()
+
+    steps:
+      - name: Enforce lane outcomes
+        shell: bash
+        run: |
+          core_result="${{ needs.core-lint-test-build.result }}"
+          external_integration_result="${{ needs.external-integration.result }}"
+          quality_result="${{ needs.quality-score-inputs.result }}"
+          run_external_integration="${{ needs.detect-ci-scope.outputs.run-external-integration }}"
+          run_full_core="${{ needs.detect-ci-scope.outputs.run-full-core }}"
+
+          if [ "$core_result" != "success" ]; then
+            echo "Core lane failed: $core_result"
+            exit 1
+          fi
+
+          if [ "$run_external_integration" = "true" ]; then
+            if [ "$external_integration_result" != "success" ]; then
+              echo "External integration lane required but result was: $external_integration_result"
+              exit 1
+            fi
+          else
+            if [ "$external_integration_result" != "skipped" ] && [ "$external_integration_result" != "success" ]; then
+              echo "External integration lane not required, but result was unexpected: $external_integration_result"
+              exit 1
+            fi
+          fi
+
+          if [ "$run_full_core" = "true" ]; then
+            if [ "$quality_result" != "success" ]; then
+              echo "Quality score input generation required for full-core scope but result was: $quality_result"
+              exit 1
+            fi
+          else
+            if [ "$quality_result" != "skipped" ] && [ "$quality_result" != "success" ]; then
+              echo "Quality score inputs not required for scoped core runs, but result was unexpected: $quality_result"
+              exit 1
+            fi
+          fi
+
+          echo "CI gate passed."

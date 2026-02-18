@@ -22,6 +22,8 @@ from dnadesign.densegen.src.adapters.sources import PWMJasparDataSource, PWMMatr
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
 from dnadesign.densegen.tests.pwm_sampling_fixtures import fixed_candidates_mining, sampling_config
 
+pytestmark = pytest.mark.fimo
+
 _FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
 JASPAR_TEXT = """>M1

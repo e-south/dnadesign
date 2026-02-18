@@ -23,7 +23,6 @@ from rich.table import Table
 from rich.traceback import install as rich_traceback
 
 from ..algo.leiden import run as leiden_run
-from ..algo.sweep import leiden_sweep
 from ..io.detect import detect_context
 from ..io.read import extract_X, load_table, peek_columns
 from ..io.write import attach_usr, drop_usr_columns, write_generic
@@ -49,8 +48,6 @@ from ..runs.store import (
     write_umap_coords,
     write_umap_meta,
 )
-from ..umap.compute import compute as umap_compute
-from ..umap.plot import scatter as umap_scatter
 from ..util.checks import (
     ClusterError,
     assert_id_sequence_bijection,
@@ -986,6 +983,9 @@ def cmd_umap(
     inplace: bool = typer.Option(False),
     out: Optional[str] = typer.Option(None),
 ):
+    from ..umap.compute import compute as umap_compute
+    from ..umap.plot import scatter as umap_scatter
+
     # Job params (flags win)
     jp = _apply_job_params(job, expected_command="umap")
     jp_plot = _apply_job_plot(job, expected_command="umap")
@@ -1494,6 +1494,8 @@ def cmd_sweep(
     seeds: str = typer.Option("1,2,3,4,5"),
     out_dir: str = typer.Option(...),
 ):
+    from ..algo.sweep import leiden_sweep
+
     _, df = _context_and_df(dataset, file, usr_root)
     df = assert_no_duplicate_ids(df, key_col=key_col, policy="error")
     X = extract_X(

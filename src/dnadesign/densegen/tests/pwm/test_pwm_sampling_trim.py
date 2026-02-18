@@ -13,6 +13,8 @@ from dnadesign.densegen.tests.pwm_sampling_fixtures import (
     selection_top_score,
 )
 
+pytestmark = pytest.mark.fimo
+
 _FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
 

@@ -164,7 +164,13 @@ def register_workspace_commands(
         console.print(f"workspace_source_root: {payload['workspace_source_root']}")
         console.print("Tip: set DENSEGEN_WORKSPACE_ROOT to choose a custom workspace root directory.")
 
-    @app.command("init", help="Stage a new workspace with config.yaml and standard subfolders.")
+    @app.command(
+        "init",
+        help=(
+            "Stage a new workspace with config.yaml and standard subfolders. "
+            "Use exactly one of --from-workspace or --from-config."
+        ),
+    )
     def workspace_init(
         workspace_id: str = typer.Option(..., "--id", "-i", help="Workspace identifier (directory name)."),
         root: Optional[Path] = typer.Option(
@@ -175,12 +181,12 @@ def register_workspace_commands(
         source_workspace: Optional[str] = typer.Option(
             None,
             "--from-workspace",
-            help="Packaged source workspace id (e.g., demo_tfbs_baseline).",
+            help="Packaged source workspace id (e.g., demo_tfbs_baseline). Required unless --from-config is set.",
         ),
         source_config: Optional[Path] = typer.Option(
             None,
             "--from-config",
-            help="Source workspace config YAML to copy.",
+            help="Source workspace config YAML to copy. Required unless --from-workspace is set.",
         ),
         copy_inputs: bool = typer.Option(False, help="Copy file-based inputs into workspace/inputs and rewrite paths."),
         output_mode: str = typer.Option(

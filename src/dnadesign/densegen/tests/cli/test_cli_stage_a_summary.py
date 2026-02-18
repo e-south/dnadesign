@@ -40,6 +40,8 @@ from dnadesign.densegen.src.core.stage_a.stage_a_metrics import (
 from dnadesign.densegen.src.core.stage_a.stage_a_summary import PWMSamplingSummary
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
 
+pytestmark = pytest.mark.fimo
+
 _FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 
 
