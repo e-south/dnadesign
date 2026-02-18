@@ -20,6 +20,7 @@ import numpy as np
 import pytest
 
 from dnadesign.densegen.src.adapters.sources import PWMArtifactSetDataSource
+from dnadesign.densegen.src.adapters.sources import pwm_artifact_set as pwm_artifact_set_module
 from dnadesign.densegen.src.adapters.sources.pwm_sampling import build_log_odds
 from dnadesign.densegen.src.config import PWMSamplingConfig
 from dnadesign.densegen.src.core.stage_a.stage_a_metadata import TFBSMeta
@@ -229,6 +230,45 @@ def test_pwm_artifact_set_rejects_mixed_cross_regulator_collision_modes(tmp_path
 
     with pytest.raises(ValueError, match="cross_regulator_core_collisions consistent"):
         ds.load_data(rng=np.random.default_rng(10))
+
+
+def test_pwm_artifact_set_requires_explicit_collision_mode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    a_path = tmp_path / "m1.json"
+    _write_artifact(a_path, "M1")
+
+    original_sampling_kwargs = pwm_artifact_set_module.sampling_kwargs_from_config
+
+    def _sampling_kwargs_missing_collision_mode(sampling):
+        kwargs = original_sampling_kwargs(sampling)
+        kwargs.pop("cross_regulator_core_collisions", None)
+        return kwargs
+
+    def _should_not_run(*_args, **_kwargs):
+        raise RuntimeError("sample_pwm_sites should not run when collision mode is missing")
+
+    monkeypatch.setattr(
+        pwm_artifact_set_module,
+        "sampling_kwargs_from_config",
+        _sampling_kwargs_missing_collision_mode,
+    )
+    monkeypatch.setattr(pwm_artifact_set_module, "sample_pwm_sites", _should_not_run)
+
+    ds = PWMArtifactSetDataSource(
+        paths=[str(a_path)],
+        cfg_path=tmp_path / "config.yaml",
+        sampling=sampling_config(
+            n_sites=1,
+            strategy="stochastic",
+            mining=fixed_candidates_mining(batch_size=10, candidates=20),
+            length_policy="exact",
+        ),
+    )
+
+    with pytest.raises(ValueError, match="cross_regulator_core_collisions"):
+        ds.load_data(rng=np.random.default_rng(13))
 
 
 def test_pwm_artifact_set_warns_on_cross_regulator_core_collisions(

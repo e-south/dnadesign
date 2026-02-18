@@ -135,20 +135,64 @@ def _coerce_attempt_list(value: object, *, field: str, input_name: str, plan_nam
     )
 
 
+def _attempts_artifact_paths(tables_root: Path) -> list[Path]:
+    candidate_dirs = [tables_root]
+    nested_tables_dir = tables_root / "tables"
+    if nested_tables_dir.exists():
+        candidate_dirs.append(nested_tables_dir)
+    paths: list[Path] = []
+    seen: set[str] = set()
+    for directory in candidate_dirs:
+        if not directory.exists():
+            continue
+        candidates = [directory / "attempts.parquet", *sorted(directory.glob("attempts_part-*.parquet"))]
+        for candidate in candidates:
+            if not candidate.exists():
+                continue
+            resolved = str(candidate.resolve())
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            paths.append(candidate)
+    return paths
+
+
+def _load_attempts_snapshot(
+    tables_root: Path,
+    *,
+    columns: list[str] | None = None,
+) -> pd.DataFrame:
+    paths = _attempts_artifact_paths(tables_root)
+    if not paths:
+        if columns is None:
+            return pd.DataFrame()
+        return pd.DataFrame(columns=columns)
+    frames: list[pd.DataFrame] = []
+    for path in paths:
+        try:
+            if columns is None:
+                frame = pd.read_parquet(path)
+            else:
+                frame = pd.read_parquet(path, columns=columns)
+        except Exception as exc:
+            raise RuntimeError(f"Failed to read attempts artifact `{path}`: {exc}") from exc
+        frames.append(frame)
+    if not frames:
+        if columns is None:
+            return pd.DataFrame()
+        return pd.DataFrame(columns=columns)
+    if len(frames) == 1:
+        return frames[0]
+    return pd.concat(frames, ignore_index=True)
+
+
 def _load_failure_counts_from_attempts(
     tables_root: Path,
 ) -> dict[tuple[str, str, str, str, str | None], dict[str, int]]:
-    attempts_path = tables_root / "attempts.parquet"
-    if not attempts_path.exists():
-        alt_path = tables_root / "tables" / "attempts.parquet"
-        if alt_path.exists():
-            attempts_path = alt_path
-    if not attempts_path.exists():
-        return {}
-    try:
-        df = pd.read_parquet(attempts_path)
-    except Exception:
-        return {}
+    df = _load_attempts_snapshot(
+        tables_root,
+        columns=["status", "reason", "input_name", "plan_name", "library_tfbs", "library_tfs", "library_site_ids"],
+    )
     if df.empty:
         return {}
     counts: dict[tuple[str, str, str, str, str | None], dict[str, int]] = {}
@@ -190,128 +234,110 @@ def _load_failure_counts_from_attempts(
 
 
 def _load_existing_library_index(tables_root: Path) -> int:
-    attempts_path = tables_root / "attempts.parquet"
-    paths: list[Path] = []
-    if attempts_path.exists():
-        paths.append(attempts_path)
-    paths.extend(sorted(tables_root.glob("attempts_part-*.parquet")))
-    if not paths:
+    df = _load_attempts_snapshot(tables_root, columns=["sampling_library_index"])
+    if df.empty:
         return 0
-    max_idx = 0
-    for path in paths:
-        try:
-            df = pd.read_parquet(path, columns=["sampling_library_index"])
-        except Exception:
-            continue
-        if df.empty or "sampling_library_index" not in df.columns:
-            continue
-        try:
-            current = int(pd.to_numeric(df["sampling_library_index"], errors="coerce").dropna().max() or 0)
-        except Exception:
-            continue
-        max_idx = max(max_idx, current)
-    return max_idx
+    numeric = pd.to_numeric(df["sampling_library_index"], errors="coerce")
+    invalid = df["sampling_library_index"].notna() & numeric.isna()
+    if bool(invalid.any()):
+        bad_values = df.loc[invalid, "sampling_library_index"].head(5).tolist()
+        raise RuntimeError(
+            "attempts artifacts contain non-numeric sampling_library_index values: "
+            + ", ".join(repr(value) for value in bad_values)
+        )
+    return int(numeric.dropna().max() or 0)
 
 
 def _load_existing_library_index_by_plan(
     tables_root: Path,
 ) -> dict[tuple[str, str], int]:
-    attempts_path = tables_root / "attempts.parquet"
-    paths: list[Path] = []
-    if attempts_path.exists():
-        paths.append(attempts_path)
-    paths.extend(sorted(tables_root.glob("attempts_part-*.parquet")))
-    if not paths:
+    df = _load_attempts_snapshot(
+        tables_root,
+        columns=["input_name", "plan_name", "sampling_library_index"],
+    )
+    if df.empty:
         return {}
+    numeric = pd.to_numeric(df["sampling_library_index"], errors="coerce")
+    invalid = df["sampling_library_index"].notna() & numeric.isna()
+    if bool(invalid.any()):
+        bad_values = df.loc[invalid, "sampling_library_index"].head(5).tolist()
+        raise RuntimeError(
+            "attempts artifacts contain non-numeric sampling_library_index values: "
+            + ", ".join(repr(value) for value in bad_values)
+        )
     max_by_plan: dict[tuple[str, str], int] = {}
-    for path in paths:
-        try:
-            df = pd.read_parquet(path, columns=["input_name", "plan_name", "sampling_library_index"])
-        except Exception:
-            continue
-        if df.empty:
-            continue
-        for _, row in df.iterrows():
-            input_name = str(row.get("input_name") or "")
-            plan_name = str(row.get("plan_name") or "")
-            idx = row.get("sampling_library_index")
-            try:
-                idx_val = int(idx) if idx is not None else 0
-            except Exception:
-                idx_val = 0
-            key = (input_name, plan_name)
-            max_by_plan[key] = max(max_by_plan.get(key, 0), idx_val)
+    for _, row in df.iterrows():
+        input_name = str(row.get("input_name") or "")
+        plan_name = str(row.get("plan_name") or "")
+        idx = row.get("sampling_library_index")
+        idx_val = int(idx) if idx is not None and not pd.isna(idx) else 0
+        key = (input_name, plan_name)
+        max_by_plan[key] = max(max_by_plan.get(key, 0), idx_val)
     return max_by_plan
 
 
 def _load_existing_library_build_count_by_plan(
     tables_root: Path,
 ) -> dict[tuple[str, str], int]:
-    attempts_path = tables_root / "attempts.parquet"
-    paths: list[Path] = []
-    if attempts_path.exists():
-        paths.append(attempts_path)
-    paths.extend(sorted(tables_root.glob("attempts_part-*.parquet")))
-    if not paths:
+    df = _load_attempts_snapshot(
+        tables_root,
+        columns=["input_name", "plan_name", "sampling_library_index"],
+    )
+    if df.empty:
         return {}
+    numeric = pd.to_numeric(df["sampling_library_index"], errors="coerce")
+    invalid = df["sampling_library_index"].notna() & numeric.isna()
+    if bool(invalid.any()):
+        bad_values = df.loc[invalid, "sampling_library_index"].head(5).tolist()
+        raise RuntimeError(
+            "attempts artifacts contain non-numeric sampling_library_index values: "
+            + ", ".join(repr(value) for value in bad_values)
+        )
+    df = df.copy()
+    df["sampling_library_index"] = numeric
 
     counts_by_plan: dict[tuple[str, str], set[int]] = {}
-    for path in paths:
-        try:
-            df = pd.read_parquet(path, columns=["input_name", "plan_name", "sampling_library_index"])
-        except Exception:
+    for _, row in df.iterrows():
+        input_name = str(row.get("input_name") or "")
+        plan_name = str(row.get("plan_name") or "")
+        if not input_name or not plan_name:
             continue
-        if df.empty:
+        idx = row.get("sampling_library_index")
+        idx_val = int(idx) if idx is not None and not pd.isna(idx) else 0
+        if idx_val <= 0:
             continue
-        for _, row in df.iterrows():
-            input_name = str(row.get("input_name") or "")
-            plan_name = str(row.get("plan_name") or "")
-            if not input_name or not plan_name:
-                continue
-            idx = row.get("sampling_library_index")
-            try:
-                idx_val = int(idx) if idx is not None else 0
-            except Exception:
-                idx_val = 0
-            if idx_val <= 0:
-                continue
-            key = (input_name, plan_name)
-            values = counts_by_plan.setdefault(key, set())
-            values.add(idx_val)
+        key = (input_name, plan_name)
+        values = counts_by_plan.setdefault(key, set())
+        values.add(idx_val)
 
     return {key: int(len(values)) for key, values in counts_by_plan.items()}
 
 
 def _load_existing_attempt_index_by_plan(tables_root: Path) -> dict[tuple[str, str], int]:
-    attempts_path = tables_root / "attempts.parquet"
-    paths: list[Path] = []
-    if attempts_path.exists():
-        paths.append(attempts_path)
-    paths.extend(sorted(tables_root.glob("attempts_part-*.parquet")))
-    if not paths:
+    df = _load_attempts_snapshot(
+        tables_root,
+        columns=["input_name", "plan_name", "attempt_index"],
+    )
+    if df.empty:
         return {}
+    numeric = pd.to_numeric(df["attempt_index"], errors="coerce")
+    invalid = df["attempt_index"].notna() & numeric.isna()
+    if bool(invalid.any()):
+        bad_values = df.loc[invalid, "attempt_index"].head(5).tolist()
+        raise RuntimeError(
+            "attempts artifacts contain non-numeric attempt_index values: "
+            + ", ".join(repr(value) for value in bad_values)
+        )
+    df = df.copy()
+    df["attempt_index"] = numeric
     max_by_plan: dict[tuple[str, str], int] = {}
-    for path in paths:
-        try:
-            df = pd.read_parquet(path)
-        except Exception:
-            continue
-        if df.empty:
-            continue
-        if "attempt_index" not in df.columns:
-            raise RuntimeError(
-                f"attempts file missing attempt_index column: {path}. "
-                "Regenerate outputs with the current DenseGen version."
-            )
-        for _, row in df.iterrows():
-            input_name = str(row.get("input_name") or "")
-            plan_name = str(row.get("plan_name") or "")
-            key = (input_name, plan_name)
-            try:
-                idx_val = int(row.get("attempt_index") or 0)
-            except Exception:
-                idx_val = 0
-            max_by_plan[key] = max(max_by_plan.get(key, 0), idx_val)
+    for _, row in df.iterrows():
+        input_name = str(row.get("input_name") or "")
+        plan_name = str(row.get("plan_name") or "")
+        key = (input_name, plan_name)
+        idx = row.get("attempt_index")
+        idx_val = int(idx) if idx is not None and not pd.isna(idx) else 0
+        max_by_plan[key] = max(max_by_plan.get(key, 0), idx_val)
     return max_by_plan
 
 

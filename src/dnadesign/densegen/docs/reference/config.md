@@ -16,14 +16,14 @@ If you want concepts first, read:
 ### Contents
 
 This section covers contents.
-- [Top-level](#top-level) - required roots and plotting.
+- [Top-level keys](#top-level-keys) - required roots and plotting.
 - [`densegen.inputs[]`](#densegeninputs) - input sources and Stage‑A sampling.
 - [`densegen.run`](#densegenrun) - run identifier and root.
 - [`densegen.output`](#densegenoutput) - output targets and schema.
 - [`densegen.generation`](#densegengeneration) - plan and fixed elements.
-- [`densegen.motif_sets`](#densegenmotif_sets) - reusable motif dictionaries.
-- [`densegen.generation.plan_templates`](#densegengenerationplan_templates) - matrix plan expansion.
-- [`densegen.generation.sequence_constraints`](#densegengenerationsequence_constraints) - global final-sequence motif rules.
+- [`densegen.motif_sets`](#densegenmotifsets) - reusable motif dictionaries.
+- [`densegen.generation.plan_templates`](#densegengenerationplantemplates) - matrix plan expansion.
+- [`densegen.generation.sequence_constraints`](#densegengenerationsequenceconstraints) - global final-sequence motif rules.
 - [`densegen.generation.sampling`](#densegengenerationsampling-stage-b-sampling) - Stage-B library building controls.
 - [`densegen.solver`](#densegensolver) - backend and strategy.
 - [`densegen.runtime`](#densegenruntime) - retry and guard rails.
@@ -34,7 +34,7 @@ This section covers contents.
 
 ---
 
-### Top-level
+### Top-level keys
 
 This section covers top-level.
 
@@ -80,7 +80,8 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
       - `budget.candidates` (int > 0; fixed candidate count)
     - `length`
       - `policy`: `exact | range` (default: `range`)
-      - `range` or `exact` (required by policy)
+      - `range` or `exact` (required by policy; default range is `[16, 20]`)
+      - When `policy=exact`, set `exact` and omit `range` (explicit `range` is rejected)
     - `uniqueness.key`: `sequence` (only option)
     - `gc` (optional): `min`, `max` in [0, 1]
     - `filters`
@@ -98,7 +99,7 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
     - `strategy`: `consensus | stochastic | background`
     - `n_sites` (int > 0)
     - `mining` - batch controls for FIMO mining:
-      - `batch_size` (int > 0; default 100000) - candidates per FIMO batch
+      - `batch_size` (int > 0; required) - candidates per FIMO batch
       - `budget` (required)
         - `mode`: `tier_target | fixed_candidates`
         - `target_tier_fraction` (float in (0, 1]; required when `mode=tier_target`)
@@ -120,9 +121,10 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
     - `tier_fractions` (optional list of three floats in (0, 1], non‑decreasing, sum ≤ 1.0; default
       `[0.001, 0.01, 0.09]`). Used for diagnostic tiers and the cumulative rung ladder for MMR pool selection.
     - `length`
-      - `policy`: `exact | range` (default: `exact`)
-      - `range`: `[min, max]` (required when `policy=range`; `min` can be below motif length,
+      - `policy`: `exact | range` (default: `range`)
+      - `range`: `[min, max]` (required when `policy=range`; default range is `[16, 20]`; `min` can be below motif length,
         in which case Stage‑A trims to the max‑information window per candidate)
+      - When `policy=exact`, omit `range` (explicit `range` is rejected)
     - `trimming`
       - `window_length` (optional int > 0; trims PWM to a max‑information window before Stage‑A sampling)
       - `window_strategy`: `max_info` (window selection strategy)
@@ -230,7 +232,7 @@ This section covers densegen.generation.
     - `left`: list of motifs biased toward the 5prime side
     - `right`: list of motifs biased toward the 3prime side
     - Motifs must be A/C/G/T and must exist in the sampled library
-  - `regulator_constraints` (required)
+- `regulator_constraints` (required)
     - `groups` (list) - regulator groups that must appear in each solution.
       - Each group: `name`, `members`, `min_required`.
       - Group members must match Stage‑A pool `tf` labels (for PWM inputs, this is the motif ID).
@@ -239,6 +241,12 @@ This section covers densegen.generation.
     - `min_count_by_regulator` (dict, optional) - per-regulator minimum counts
       - Keys must match group members.
       - DenseGen uses the maximum of this value and `runtime.min_count_per_tf`.
+
+#### `densegen.generation.plan_templates`
+This section describes template-driven plan expansion for combinatorial studies.
+
+For a worked example, use **[constitutive sigma panel study tutorial](../tutorials/study_constitutive_sigma_panel.md)**.
+
 - `plan_templates` (non-empty list; mutually exclusive with `plan`)
   - Use this for combinatorial promoter panels without duplicating YAML.
   - Template keys:
@@ -258,6 +266,12 @@ This section covers densegen.generation.
     `quota_per_variant x variants` run explosions.
   - Prefer `total_quota` with `distribution_policy: uniform` for large
     combinatorial templates when you want bounded library size.
+
+#### `densegen.generation.sequence_constraints`
+This section describes global final-sequence checks applied after layout assembly.
+
+For conceptual behavior and troubleshooting, use **[generation model](../concepts/generation.md)**.
+
 - `sequence_constraints` (optional)
   - Use this for global final-sequence validation and constrained pad/gap fill.
   - `forbid_kmers[]` rules:
@@ -424,7 +438,7 @@ This section covers plots.
 - `source`: `usr | parquet` (required if `output.targets` has multiple sinks)
 - `out_dir` (optional; default `outputs/plots`; must be inside `outputs/` under `densegen.run.root`)
 - `format` (optional; `png | pdf | svg`, default `pdf`)
-- `default`: list of plot names to run when `dense plot` is invoked (defaults to all)
+- `default`: list of plot names to run when `dense plot` is invoked (defaults to `stage_a_summary` and `placement_map`)
 - `options`: dict keyed by plot name (strict; unknown options error)
 - `style`: global style dict applied to every plot (can be overridden per plot). Common keys:
   - `seaborn_style` (bool; default `true`) — set to `false` if seaborn styles are unavailable.
@@ -505,7 +519,3 @@ densegen:
     suppress_solver_stderr: true
     print_visual: false
 ```
-
----
-
-@e-south

@@ -175,17 +175,25 @@ class PWMArtifactDataSource(BaseDataSource):
 
         sampling_kwargs = sampling_kwargs_from_config(self.sampling)
         selection_cfg = sampling_kwargs.get("selection")
-        selection_policy = str(getattr(selection_cfg, "policy", None) or "top_score")
+        if selection_cfg is None or not hasattr(selection_cfg, "policy"):
+            raise ValueError("pwm.sampling.selection is required.")
+        selection_policy = str(selection_cfg.policy).strip()
+        if not selection_policy:
+            raise ValueError("pwm.sampling.selection.policy must be a non-empty string.")
+        length_policy_raw = sampling_kwargs.get("length_policy")
+        if not isinstance(length_policy_raw, str) or not length_policy_raw.strip():
+            raise ValueError("pwm.sampling.length.policy is required.")
+        length_policy = length_policy_raw.strip()
         validate_mmr_core_length(
             motif_id=motif.motif_id,
             motif_width=len(motif.matrix),
             selection_policy=selection_policy,
-            length_policy=str(sampling_kwargs.get("length_policy") or "exact"),
-            length_range=sampling_kwargs.get("length_range"),
-            trim_window_length=sampling_kwargs.get("trim_window_length"),
+            length_policy=length_policy,
+            length_range=sampling_kwargs["length_range"],
+            trim_window_length=sampling_kwargs["trim_window_length"],
         )
-        bgfile = sampling_kwargs.get("bgfile")
-        keep_all_candidates_debug = bool(sampling_kwargs.get("keep_all_candidates_debug", False))
+        bgfile = sampling_kwargs["bgfile"]
+        keep_all_candidates_debug = bool(sampling_kwargs["keep_all_candidates_debug"])
         bgfile_path: Path | None = None
         if bgfile is not None:
             bgfile_path = resolve_path(self.cfg_path, str(bgfile))

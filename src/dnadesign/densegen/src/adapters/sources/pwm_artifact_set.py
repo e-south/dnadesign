@@ -67,16 +67,27 @@ class PWMArtifactSetDataSource(BaseDataSource):
         for motif in motifs:
             sampling_cfg = overrides.get(motif.motif_id, sampling)
             sampling_kwargs = sampling_kwargs_from_config(sampling_cfg)
-            collision_modes.add(str(sampling_kwargs.get("cross_regulator_core_collisions") or "warn"))
+            collision_mode_raw = sampling_kwargs.get("cross_regulator_core_collisions")
+            if not isinstance(collision_mode_raw, str) or not collision_mode_raw.strip():
+                raise ValueError("pwm.sampling.uniqueness.cross_regulator_core_collisions is required.")
+            collision_modes.add(collision_mode_raw.strip())
             selection_cfg = sampling_kwargs.get("selection")
-            selection_policy = str(getattr(selection_cfg, "policy", None) or "top_score")
+            if selection_cfg is None or not hasattr(selection_cfg, "policy"):
+                raise ValueError("pwm.sampling.selection is required.")
+            selection_policy = str(selection_cfg.policy).strip()
+            if not selection_policy:
+                raise ValueError("pwm.sampling.selection.policy must be a non-empty string.")
+            length_policy_raw = sampling_kwargs.get("length_policy")
+            if not isinstance(length_policy_raw, str) or not length_policy_raw.strip():
+                raise ValueError("pwm.sampling.length.policy is required.")
+            length_policy = length_policy_raw.strip()
             validate_mmr_core_length(
                 motif_id=motif.motif_id,
                 motif_width=len(motif.matrix),
                 selection_policy=selection_policy,
-                length_policy=str(sampling_kwargs.get("length_policy") or "exact"),
-                length_range=sampling_kwargs.get("length_range"),
-                trim_window_length=sampling_kwargs.get("trim_window_length"),
+                length_policy=length_policy,
+                length_range=sampling_kwargs["length_range"],
+                trim_window_length=sampling_kwargs["trim_window_length"],
             )
             sampling_kwargs_by_motif[motif.motif_id] = sampling_kwargs
         if len(collision_modes) != 1:
@@ -84,7 +95,9 @@ class PWMArtifactSetDataSource(BaseDataSource):
                 "pwm_artifact_set.overrides_by_motif_id must keep "
                 "pwm.sampling.uniqueness.cross_regulator_core_collisions consistent across motifs."
             )
-        collision_mode = next(iter(collision_modes)) if collision_modes else "warn"
+        if not collision_modes:
+            raise ValueError("pwm_artifact_set resolved no sampling policies across motifs.")
+        collision_mode = next(iter(collision_modes))
 
         progress_manager = StageAProgressManager(stream=sys.stdout)
         entries = []
@@ -98,8 +111,8 @@ class PWMArtifactSetDataSource(BaseDataSource):
                 source_kind="pwm_artifact_set",
             )
             sampling_kwargs = sampling_kwargs_by_motif[motif.motif_id]
-            bgfile = sampling_kwargs.get("bgfile")
-            keep_all_candidates_debug = bool(sampling_kwargs.get("keep_all_candidates_debug", False))
+            bgfile = sampling_kwargs["bgfile"]
+            keep_all_candidates_debug = bool(sampling_kwargs["keep_all_candidates_debug"])
             bgfile_path: Path | None = None
             if bgfile is not None:
                 bgfile_path = resolve_path(self.cfg_path, str(bgfile))
