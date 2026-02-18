@@ -41,8 +41,6 @@ dnadesign/
 - [Planning map](PLANS.md): proposals, execution plans, ADRs, and journal workflow.
 - [Quality score scaffold](QUALITY_SCORE.md): test/CI/docs quality dimensions and improvement path.
 - [Developer documentation](docs/dev/README.md): maintainer notes, plans, and CI/test details.
-- [CI workflow](.github/workflows/ci.yaml): authoritative pipeline definition.
-- [Agent map](AGENTS.md): task-oriented operational entrypoints for contributors and agents.
 
 ---
 
