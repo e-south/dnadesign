@@ -15,7 +15,7 @@ This section lists the four canonical packaged templates and their primary inten
 | --- | --- | --- | --- |
 | `demo_tfbs_baseline` | demo | Minimal lifecycle walkthrough with binding-sites input | Solver backend |
 | `demo_sampling_baseline` | demo | PWM artifact sampling walkthrough with two plans | Solver backend plus FIMO |
-| `study_constitutive_sigma_panel` | study | Constitutive promoter panel using plan-template expansion | Solver backend |
+| `study_constitutive_sigma_panel` | study | Sigma70 constitutive promoter panel with fixed-element combinatorics | Solver backend |
 | `study_stress_ethanol_cipro` | study | Larger stress-response campaign with three plans | Solver backend plus FIMO |
 
 ### Tutorial mapping

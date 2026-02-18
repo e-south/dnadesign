@@ -85,4 +85,4 @@ plots:
   source: parquet
   out_dir: outputs/plots
   format: pdf
-  default: [placement_map]
+  default: [stage_a_summary, placement_map, run_health, tfbs_usage]

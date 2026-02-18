@@ -14,12 +14,15 @@ from __future__ import annotations
 import json
 import re
 import textwrap
+from contextlib import contextmanager
 from pathlib import Path
 
+import pytest
 import yaml
 from typer.testing import CliRunner
 
 from dnadesign.densegen.src.cli import workspace as workspace_commands
+from dnadesign.densegen.src.cli import workspace_sources
 from dnadesign.densegen.src.cli.main import app
 
 _ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
@@ -356,6 +359,58 @@ def test_workspace_where_requires_explicit_root_outside_repo(tmp_path: Path, mon
     assert result.exit_code == 1
     assert "Unable to determine workspace root" in result.output
     assert "DENSEGEN_WORKSPACE_ROOT" in result.output
+
+
+def test_list_packaged_workspace_ids_returns_only_declared_templates(tmp_path: Path, monkeypatch) -> None:
+    package_root = tmp_path / "package_root"
+    workspaces_root = package_root / "workspaces"
+    workspaces_root.mkdir(parents=True, exist_ok=True)
+
+    declared = ("demo_tfbs_baseline", "study_constitutive_sigma_panel")
+    for workspace_id in declared:
+        (workspaces_root / workspace_id).mkdir(parents=True, exist_ok=True)
+        (workspaces_root / workspace_id / "config.yaml").write_text("densegen: {}\n")
+
+    # Local ad-hoc directories can exist during editable development and should
+    # not leak into the packaged template list.
+    (workspaces_root / "scratch_run").mkdir(parents=True, exist_ok=True)
+    (workspaces_root / "scratch_run" / "config.yaml").write_text("densegen: {}\n")
+
+    monkeypatch.setattr(workspace_sources.resources, "files", lambda _name: package_root)
+    monkeypatch.setattr(workspace_sources, "PACKAGED_WORKSPACE_IDS", declared)
+
+    @contextmanager
+    def _as_file(path):
+        yield Path(path)
+
+    monkeypatch.setattr(workspace_sources.resources, "as_file", _as_file)
+
+    ids = workspace_sources.list_packaged_workspace_ids()
+    assert ids == list(declared)
+
+
+def test_list_packaged_workspace_ids_fails_when_declared_template_missing_config(tmp_path: Path, monkeypatch) -> None:
+    package_root = tmp_path / "package_root"
+    workspaces_root = package_root / "workspaces"
+    workspaces_root.mkdir(parents=True, exist_ok=True)
+
+    declared = ("demo_tfbs_baseline", "study_constitutive_sigma_panel")
+    (workspaces_root / "demo_tfbs_baseline").mkdir(parents=True, exist_ok=True)
+    (workspaces_root / "demo_tfbs_baseline" / "config.yaml").write_text("densegen: {}\n")
+    (workspaces_root / "study_constitutive_sigma_panel").mkdir(parents=True, exist_ok=True)
+    # Missing config.yaml on purpose for the second declared template.
+
+    monkeypatch.setattr(workspace_sources.resources, "files", lambda _name: package_root)
+    monkeypatch.setattr(workspace_sources, "PACKAGED_WORKSPACE_IDS", declared)
+
+    @contextmanager
+    def _as_file(path):
+        yield Path(path)
+
+    monkeypatch.setattr(workspace_sources.resources, "as_file", _as_file)
+
+    with pytest.raises(RuntimeError, match="missing config.yaml"):
+        workspace_sources.list_packaged_workspace_ids()
 
 
 def test_workspace_init_help_states_required_source_options() -> None:

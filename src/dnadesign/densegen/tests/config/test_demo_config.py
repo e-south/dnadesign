@@ -48,12 +48,12 @@ def test_demo_artifacts_present() -> None:
     assert not missing, f"Missing demo artifacts: {missing}"
 
 
-def test_demo_sampling_baseline_default_plots_are_minimal() -> None:
+def test_demo_sampling_baseline_default_plots_cover_core_diagnostics() -> None:
     cfg_path = _demo_config_path("demo_sampling_baseline")
     cfg = load_config(cfg_path)
     plots = cfg.root.plots
     assert plots is not None
-    assert list(plots.default or []) == ["stage_a_summary", "placement_map"]
+    assert list(plots.default or []) == ["stage_a_summary", "placement_map", "run_health", "tfbs_usage"]
 
 
 def test_demo_sampling_baseline_uses_background_and_plan_specific_sigma70_spacers() -> None:
@@ -269,10 +269,11 @@ def test_study_constitutive_sigma_panel_focuses_on_fixed_elements() -> None:
     input_types = {inp.type for inp in cfg.root.densegen.inputs}
     assert input_types == {"background_pool"}
     plan = list(cfg.root.densegen.generation.plan or [])
-    assert len(plan) >= 6
+    assert len(plan) == 50
 
     promoter_pairs: set[tuple[str, str]] = set()
     for item in plan:
+        assert item.name.startswith("sigma70_")
         pcs = list(item.fixed_elements.promoter_constraints or [])
         assert len(pcs) == 1
         pc = pcs[0]
@@ -281,7 +282,7 @@ def test_study_constitutive_sigma_panel_focuses_on_fixed_elements() -> None:
         promoter_pairs.add((pc.upstream, pc.downstream))
         assert list(item.regulator_constraints.groups or []) == []
 
-    assert len(promoter_pairs) >= 6
+    assert len(promoter_pairs) == 48
 
 
 def test_study_constitutive_sigma_panel_uses_bounded_total_quota_templates() -> None:
@@ -292,13 +293,53 @@ def test_study_constitutive_sigma_panel_uses_bounded_total_quota_templates() -> 
     for template in templates:
         assert template.quota_per_variant is None
         assert template.total_quota is not None
-    assert generation.plan_template_max_expanded_plans <= 32
-    assert generation.plan_template_max_total_quota <= 64
-    assert generation.total_quota() <= generation.plan_template_max_total_quota
+    assert generation.plan_template_max_expanded_plans == 64
+    assert generation.plan_template_max_total_quota == 500
+    assert generation.total_quota() == 500
+
+
+def test_study_constitutive_sigma_panel_expansion_uses_uniform_quota_units() -> None:
+    cfg = load_config(_demo_config_path("study_constitutive_sigma_panel"))
+    plans = list(cfg.root.densegen.generation.plan or [])
+    assert plans
+    assert all(int(item.quota) == 10 for item in plans)
+
+    panel_plans = [item for item in plans if item.name.startswith("sigma70_panel__")]
+    topup_plans = [item for item in plans if item.name.startswith("sigma70_topup__")]
+    assert len(panel_plans) == 48
+    assert len(topup_plans) == 2
+
+
+def test_study_constitutive_sigma_panel_runtime_allows_bounded_retries() -> None:
+    cfg = load_config(_demo_config_path("study_constitutive_sigma_panel"))
+    runtime = cfg.root.densegen.runtime
+    assert runtime.max_failed_solutions >= 1
+    assert runtime.max_seconds_per_plan >= 300
+
+
+def test_packaged_workspace_plot_defaults_cover_primary_runtime_diagnostics() -> None:
+    expected_defaults = {
+        "demo_tfbs_baseline": {"stage_a_summary", "placement_map", "run_health", "tfbs_usage"},
+        "demo_sampling_baseline": {"stage_a_summary", "placement_map", "run_health", "tfbs_usage"},
+        "study_constitutive_sigma_panel": {"stage_a_summary", "placement_map", "run_health", "tfbs_usage"},
+        "study_stress_ethanol_cipro": {"stage_a_summary", "placement_map", "run_health", "tfbs_usage"},
+    }
+    for workspace_id, expected in expected_defaults.items():
+        cfg = load_config(_demo_config_path(workspace_id))
+        plots = cfg.root.plots
+        assert plots is not None
+        assert set(plots.default) == expected
 
 
 def test_study_stress_ethanol_cipro_uses_pwm_artifact_sampling() -> None:
     cfg = load_config(_demo_config_path("study_stress_ethanol_cipro"))
+    output = cfg.root.densegen.output
+    assert output.targets == ["parquet", "usr"]
+    assert output.usr is not None
+    assert output.usr.dataset == "densegen/study_stress_ethanol_cipro"
+    assert output.usr.root == "outputs/usr_datasets"
+    assert float(output.usr.health_event_interval_seconds) > 0
+
     input_types = [inp.type for inp in cfg.root.densegen.inputs]
     assert input_types.count("pwm_artifact") == 3
     assert input_types.count("background_pool") == 1
@@ -318,8 +359,33 @@ def test_study_stress_ethanol_cipro_uses_pwm_artifact_sampling() -> None:
     assert background.sampling.mining.batch_size == 20000
     assert background.sampling.mining.budget.mode == "fixed_candidates"
     assert background.sampling.mining.budget.candidates == 5_000_000
-
     sampling = cfg.root.densegen.generation.sampling
     assert sampling.library_size == 10
     assert cfg.root.densegen.generation.sequence_constraints is not None
     assert "validate_final_sequence" not in cfg.root.densegen.postprocess.model_dump(exclude_none=False)
+
+
+def test_packaged_workspace_stage_a_length_policy_is_range_16_20() -> None:
+    workspace_ids = (
+        "demo_sampling_baseline",
+        "study_constitutive_sigma_panel",
+        "study_stress_ethanol_cipro",
+    )
+    stage_a_sampling_input_types = {
+        "background_pool",
+        "pwm_meme",
+        "pwm_meme_set",
+        "pwm_jaspar",
+        "pwm_matrix_csv",
+        "pwm_artifact",
+        "pwm_artifact_set",
+    }
+
+    for workspace_id in workspace_ids:
+        cfg = load_config(_demo_config_path(workspace_id))
+        for inp in cfg.root.densegen.inputs:
+            if inp.type not in stage_a_sampling_input_types:
+                continue
+            length = inp.sampling.length
+            assert length.policy == "range"
+            assert tuple(length.range or ()) == (16, 20)

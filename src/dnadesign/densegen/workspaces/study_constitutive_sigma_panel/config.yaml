@@ -1,4 +1,4 @@
-# DenseGen study workspace: constitutive promoter library panel with multiple sigma fixed elements.
+# DenseGen study workspace: constitutive sigma70 promoter core combinatorics panel.
 densegen:
   schema_version: "2.9"
   run:
@@ -7,25 +7,21 @@ densegen:
 
   motif_sets:
     sigma70_upstream_35:
-      consensus: TTGACA
-      at_shift: TTTACA
-      gc_shift: TTGCCG
+      a: CCCGGG
+      b: CTGACA
+      c: TTGTGA
+      d: TTTACA
+      e: TAGACA
+      f: TTGACA
     sigma70_downstream_10:
-      consensus: TATAAT
-      at_shift: TAAAAT
-      gc_shift: TATGCT
-    sigma32_upstream_35:
-      consensus: CTTGAA
-    sigma32_downstream_10:
-      consensus: CCCCAT
-    sigma38_upstream_35:
-      consensus: TTGACA
-    sigma38_downstream_10:
-      consensus: TATGAT
-    sigma54_upstream_35:
-      hexamerized: TGGCAC
-    sigma54_downstream_10:
-      hexamerized: TTGCAT
+      A: CCAGTC
+      B: TATGTT
+      C: TACTGT
+      D: TAAATT
+      E: GATACT
+      F: GATAAT
+      G: TATAGT
+      H: TATAAT
 
   inputs:
     - name: background
@@ -39,7 +35,7 @@ densegen:
             candidates: 2000000
         length:
           policy: range
-          range: [20, 30]
+          range: [16, 20]
         uniqueness:
           key: sequence
         gc:
@@ -47,17 +43,20 @@ densegen:
           max: 0.60
         filters:
           forbid_kmers:
-            - TTGACA
+            - CCCGGG
+            - CTGACA
+            - TTGTGA
             - TTTACA
-            - TTGCCG
+            - TAGACA
+            - TTGACA
+            - CCAGTC
+            - TATGTT
+            - TACTGT
+            - TAAATT
+            - GATACT
+            - GATAAT
+            - TATAGT
             - TATAAT
-            - TAAAAT
-            - TATGCT
-            - CTTGAA
-            - CCCCAT
-            - TATGAT
-            - TGGCAC
-            - TTGCAT
           include_reverse_complements: true
           strands: both
 
@@ -78,8 +77,8 @@ densegen:
 
   generation:
     sequence_length: 90
-    plan_template_max_expanded_plans: 32
-    plan_template_max_total_quota: 64
+    plan_template_max_expanded_plans: 64
+    plan_template_max_total_quota: 500
     sampling:
       pool_strategy: subsample
       library_size: 16
@@ -90,8 +89,8 @@ densegen:
       relax_on_exhaustion: false
 
     plan_templates:
-      - base_name: sigma70
-        total_quota: 24
+      - base_name: sigma70_panel
+        total_quota: 480
         distribution_policy: uniform
         sampling:
           include_inputs: [background]
@@ -101,56 +100,29 @@ densegen:
             upstream_from_set: sigma70_upstream_35
             downstream_from_set: sigma70_downstream_10
             pairing:
-              mode: zip
+              mode: cross_product
             spacer_length: [16, 18]
             upstream_pos: [0, 90]
         regulator_constraints:
           groups: []
-      - base_name: sigma32
-        total_quota: 8
+      - base_name: sigma70_topup
+        total_quota: 20
         distribution_policy: uniform
         sampling:
           include_inputs: [background]
         fixed_elements:
           promoter_matrix:
-            name: sigma32_core
-            upstream_from_set: sigma32_upstream_35
-            downstream_from_set: sigma32_downstream_10
+            name: sigma70_core
+            upstream_from_set: sigma70_upstream_35
+            downstream_from_set: sigma70_downstream_10
             pairing:
-              mode: zip
-            spacer_length: [13, 15]
-            upstream_pos: [0, 90]
-        regulator_constraints:
-          groups: []
-      - base_name: sigma38
-        total_quota: 8
-        distribution_policy: uniform
-        sampling:
-          include_inputs: [background]
-        fixed_elements:
-          promoter_matrix:
-            name: sigma38_core
-            upstream_from_set: sigma38_upstream_35
-            downstream_from_set: sigma38_downstream_10
-            pairing:
-              mode: zip
-            spacer_length: [15, 17]
-            upstream_pos: [0, 90]
-        regulator_constraints:
-          groups: []
-      - base_name: sigma54
-        total_quota: 8
-        distribution_policy: uniform
-        sampling:
-          include_inputs: [background]
-        fixed_elements:
-          promoter_matrix:
-            name: sigma54_core
-            upstream_from_set: sigma54_upstream_35
-            downstream_from_set: sigma54_downstream_10
-            pairing:
-              mode: zip
-            spacer_length: [10, 12]
+              mode: explicit_pairs
+              pairs:
+                - up: a
+                  down: A
+                - up: f
+                  down: H
+            spacer_length: [16, 18]
             upstream_pos: [0, 90]
         regulator_constraints:
           groups: []
@@ -161,12 +133,6 @@ densegen:
           patterns_from_motif_sets:
             - sigma70_upstream_35
             - sigma70_downstream_10
-            - sigma32_upstream_35
-            - sigma32_downstream_10
-            - sigma38_upstream_35
-            - sigma38_downstream_10
-            - sigma54_upstream_35
-            - sigma54_downstream_10
           include_reverse_complements: true
           strands: both
       allowlist:
@@ -188,8 +154,8 @@ densegen:
     stall_seconds_before_resample: 10
     stall_warning_every_seconds: 10
     max_consecutive_failures: 25
-    max_seconds_per_plan: 120
-    max_failed_solutions: 0
+    max_seconds_per_plan: 1800
+    max_failed_solutions: 256
     random_seed: 42
 
   postprocess:
@@ -214,4 +180,4 @@ plots:
   source: parquet
   out_dir: outputs/plots
   format: pdf
-  default: [placement_map, run_health]
+  default: [stage_a_summary, placement_map, run_health, tfbs_usage]

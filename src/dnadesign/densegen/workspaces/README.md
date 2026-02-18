@@ -1,7 +1,16 @@
-DenseGen stores tracked packaged workspaces and local generated workspaces here.
+## DenseGen workspaces directory
 
-User-facing template guidance lives in:
-`src/dnadesign/densegen/docs/concepts/workspace-templates.md`
+This file explains what belongs under `src/dnadesign/densegen/workspaces/` and where to find template docs. Read it when organizing workspace folders or checking what should be committed.
+
+### Core docs
+Use these pages as the source of truth for workspace behavior and template intent:
+
+- **[Workspace templates](../docs/concepts/workspace-templates.md)**
+- **[Workspace model](../docs/concepts/workspace.md)**
+- **[DenseGen documentation index](../docs/index.md)**
+
+### Quick rules
+This section provides fast checks for what belongs in this directory and how it is used.
 
 - `demo_*` directories are fast baseline workspaces for guided onboarding and CI pressure tests.
 - `study_*` directories are larger template workspaces for real run planning.
@@ -9,34 +18,44 @@ User-facing template guidance lives in:
 - `dense workspace init` requires exactly one source option: `--from-workspace` or `--from-config`.
 - `archived/` stores historical local artifacts that are not part of active work.
 
+### What belongs here
+This directory contains:
+
+- Packaged templates tracked in git (`demo_*`, `study_*`).
+- Local workspaces created by `dense workspace init`.
+- Historical snapshots under `archived/` when intentionally preserved.
+
+### Packaged workspace flows
+This section maps each tracked packaged workspace to runtime intent and its primary didactic tutorial.
+
+| Workspace | Primary flow | High-signal schema keys | Tutorial |
+| --- | --- | --- | --- |
+| `demo_tfbs_baseline` | Binding-site only smoke run | `densegen.inputs[].type=binding_sites`, `densegen.generation.plan`, `densegen.output.targets=[parquet]` | **[TFBS baseline tutorial](../docs/tutorials/demo_tfbs_baseline.md)** |
+| `demo_sampling_baseline` | PWM Stage-A sampling + Stage-B subsampling | `densegen.inputs[].sampling`, `densegen.generation.sampling.pool_strategy=subsample`, `densegen.output.targets=[parquet,usr]` | **[Sampling baseline tutorial](../docs/tutorials/demo_sampling_baseline.md)** |
+| `study_constitutive_sigma_panel` | Plan-template expansion with promoter matrices | `densegen.motif_sets`, `densegen.generation.plan_templates`, `densegen.generation.sequence_constraints` | **[Constitutive sigma panel study tutorial](../docs/tutorials/study_constitutive_sigma_panel.md)** |
+| `study_stress_ethanol_cipro` | Multi-plan stress study with dual sink outputs | `densegen.generation.plan` (three plans), `densegen.inputs[].sampling.filters.fimo_exclude`, `densegen.output.targets=[parquet,usr]` | **[Stress ethanol and ciprofloxacin study tutorial](../docs/tutorials/study_stress_ethanol_cipro.md)** |
+
+### Notify readiness
+This section clarifies which packaged workspaces are intended for USR-event watcher operations.
+
+`study_stress_ethanol_cipro` is the packaged campaign workspace for Notify-bound operations because it writes USR events by default (`output.targets=[parquet,usr]`). For watcher setup and delivery verification, pair the stress tutorial with the **[DenseGen to USR to Notify tutorial](../docs/tutorials/demo_usr_notify.md)**.
+
+### Expected workspace shape
 Each workspace should contain:
 
 - `config.yaml`
 - `inputs/`
-- `outputs/` (run artifacts)
-  - `tables/` (`records.parquet` + attempts/solutions/composition/run metrics)
-  - `plots/` (plot images)
-  - `pools/` (Stage-A TFBS pools + optional candidates/)
-  - `libraries/` (Stage-B library artifacts)
-  - `logs/` (optional; defaults to outputs/logs)
-  - `meta/` (run manifests + run state + id index)
+- `outputs/` with stage artifacts (`pools/`, `libraries/`, `tables/`, `meta/`, `plots/`, `notebooks/`, optional `logs/`)
 
-Keep real production outputs out of version control. Generated workspaces under
-`workspaces/` are ignored by default unless explicitly whitelisted.
+For exact artifact contracts and file semantics, use **[DenseGen outputs reference](../docs/reference/outputs.md)**.
 
-Packaged workspace naming convention:
+### Git hygiene
+Keep production run outputs out of version control. Generated workspaces under `workspaces/` are ignored by default unless explicitly whitelisted.
 
-- `demo_<intent>`: didactic baseline with low runtime cost.
-- `study_<intent>`: extended template for non-demo workloads.
+### Inspect all workspaces
+Use this command to inspect runs under this root:
 
-Packaged workspaces:
-
-- `demo_tfbs_baseline/` is the unconstrained baseline demo for didactic run/solver behavior.
-- `demo_sampling_baseline/` is the canonical Cruncher PWM handoff demo with LexA/CpxR/BaeR artifacts.
-- `study_constitutive_sigma_panel/` templates constitutive promoter generation via motif-set and plan-template matrix expansion (six baseline -35/-10 pairs).
-- `study_stress_ethanol_cipro/` templates larger stress-response generation for ethanol/ciprofloxacin with high-budget Stage-A sampling and global final-sequence motif constraints.
-
-The sampling-baseline workspace stores DenseGen motif artifacts in
-`demo_sampling_baseline/inputs/motif_artifacts/` and the stress-study workspace carries the
-same curated artifact set under its own `inputs/motif_artifacts/` directory.
-Use `dense inspect run --root src/dnadesign/densegen/workspaces` to inspect local workspaces.
+```bash
+# Inspect all DenseGen workspaces under the default root.
+uv run dense inspect run --root src/dnadesign/densegen/workspaces
+```

@@ -1,11 +1,12 @@
 ## DenseGen documentation
 
-DenseGen generates constraint-driven TFBS libraries and produces audit-grade artifacts for solver diagnostics, plotting, notebooks, and downstream event workflows. Read this index when you need a complete map of DenseGen docs and a clear path from first run to advanced operations.
+DenseGen generates constraint-driven TFBS libraries and audit-grade artifacts for debugging and downstream analysis. Use this index to choose the right document for your task, from first-run tutorials to detailed reference docs.
 
 ### Contents
 This table of contents lets you jump by doc type instead of scanning folders.
 
 - [Doc type definitions](#doc-type-definitions)
+- [End-to-end guidance](#end-to-end-guidance)
 - [Tutorials](#tutorials)
 - [How-to guides](#how-to-guides)
 - [Concepts](#concepts)
@@ -15,52 +16,59 @@ This table of contents lets you jump by doc type instead of scanning folders.
 ### Doc type definitions
 This section prevents terminology drift by defining each documentation type in one place.
 
-- **Tutorials** are progressive, end-to-end walkthroughs for learning by doing.
-- **How-to guides** are task-oriented runbooks for operators who already know the basics.
-- **Concepts** explain lifecycle semantics, architecture boundaries, and mental models.
-- **Reference** documents are contract-grade definitions for CLI, schema, and artifacts.
+- **Tutorials**: progressive, end-to-end walkthroughs.
+- **How-to guides**: task-focused runbooks for known goals.
+- **Concepts**: mental models and lifecycle explanations.
+- **Reference**: authoritative contracts for commands, schema, and artifacts.
+
+### End-to-end guidance
+This section gives a practical run order so new users can move from smallest demo to campaign-scale flows without guessing.
+
+- Start with **[TFBS baseline tutorial](tutorials/demo_tfbs_baseline.md)**, then move to **[sampling baseline](tutorials/demo_sampling_baseline.md)**.
+- For template expansion behavior, run **[constitutive sigma panel study](tutorials/study_constitutive_sigma_panel.md)** after the baselines.
+- For Notify-ready campaign flow, run **[stress ethanol and ciprofloxacin study](tutorials/study_stress_ethanol_cipro.md)** and then **[DenseGen to USR to Notify](tutorials/demo_usr_notify.md)**.
 
 ### Tutorials
-Tutorials are the fastest way to get productive with DenseGen because they show complete command flows and expected outputs.
+Tutorials are the most direct way to start with DenseGen because they show complete command flows and expected outputs.
 
-- Read the **[TFBS baseline tutorial](tutorials/demo_tfbs_baseline.md)** to run the smallest DenseGen workflow and inspect core artifacts.
-- Read the **[sampling baseline tutorial](tutorials/demo_sampling_baseline.md)** to run Stage-A mining, Stage-B sampling, and dual-sink outputs.
-- Read the **[DenseGen to USR to Notify tutorial](tutorials/demo_usr_notify.md)** to wire USR events into Notify and verify webhook delivery.
-- Read the **[constitutive sigma panel study tutorial](tutorials/study_constitutive_sigma_panel.md)** to exercise promoter-matrix templates and sequence constraints.
+- **[TFBS baseline tutorial](tutorials/demo_tfbs_baseline.md)** - `demo_tfbs_baseline`: minimal end-to-end run and core artifacts.
+- **[Sampling baseline tutorial](tutorials/demo_sampling_baseline.md)** - `demo_sampling_baseline`: Stage-A mining, Stage-B sampling, dual sinks.
+- **[Constitutive sigma panel study tutorial](tutorials/study_constitutive_sigma_panel.md)** - `study_constitutive_sigma_panel`: sigma70 fixed-element combinatorics and sequence constraints.
+- **[Stress ethanol and ciprofloxacin study tutorial](tutorials/study_stress_ethanol_cipro.md)** - `study_stress_ethanol_cipro`: three-plan stress campaign with Notify-ready outputs.
+- **[DenseGen to USR to Notify tutorial](tutorials/demo_usr_notify.md)** - Event pipeline and watcher validation.
 
 ### How-to guides
 How-to guides are for specific operator tasks where you need focused instructions rather than a full tutorial arc.
 
-- Use the **[Cruncher to DenseGen PWM handoff guide](howto/cruncher_pwm_pipeline.md)** to align motif artifacts with DenseGen Stage-A inputs.
-- Use the **[HPC runbook](howto/hpc.md)** for batch-safe preflight, run, resume, and notebook generation patterns.
-- Use the **[BU SCC delta guide](howto/bu-scc.md)** for BU-specific scheduler details layered on top of the base HPC runbook.
-- Use the **[HPC and Notify legacy redirect](howto/usr_notify_hpc.md)** only when following an older link; it points to current runbooks.
-- Use the **[BU SCC end-to-end legacy redirect](howto/bu_scc_end_to_end.md)** only when following an older link; it points to current runbooks.
+- **[Cruncher to DenseGen PWM handoff](howto/cruncher_pwm_pipeline.md)** - Prepare motif artifacts for Stage-A.
+- **[HPC runbook](howto/hpc.md)** - Preflight, run, resume, and post-run analysis on clusters.
+- **[DenseGen on BU SCC guide](howto/bu-scc.md)** - BU-specific scheduler and environment differences.
+- **[BU SCC quickstart](../../../../docs/bu-scc/quickstart.md)** - Repo-level onboarding and submit patterns.
 
 ### Concepts
 Concepts explain DenseGen behavior so operators can reason about failures, config choices, and output contracts without trial-and-error.
 
-- Read **[observability and events](concepts/observability_and_events.md)** to understand DenseGen diagnostics, USR mutation events, and Notify boundaries.
-- Read **[operator arc](concepts/operator-arc.md)** for the Stage-A to Stage-B to solve lifecycle and run-state behavior.
-- Read **[workspace layout](concepts/workspace.md)** to understand workspace structure, reset semantics, and path expectations.
-- Read **[workspace templates](concepts/workspace-templates.md)** to understand how packaged demos and studies are intended to scale.
-- Read **[inputs](concepts/inputs.md)** to understand Stage-A input types and path resolution.
-- Read **[sampling](concepts/sampling.md)** to understand Stage-A candidate selection and Stage-B weighting behavior.
-- Read **[generation](concepts/generation.md)** to understand plan constraints, fixed elements, and solver interactions.
-- Read **[outputs and metadata](concepts/outputs-metadata.md)** to understand sink layout and join keys.
-- Read **[postprocess](concepts/postprocess.md)** to understand pad-mode behavior and GC constraints.
-- Read **[quick contracts](concepts/quick-contracts.md)** for a short command-and-artifact checklist.
+- **[Observability and events](concepts/observability_and_events.md)** - DenseGen diagnostics vs USR events vs Notify.
+- **[Pipeline lifecycle](concepts/pipeline-lifecycle.md)** - Stage lifecycle and run-state behavior.
+- **[Workspace layout](concepts/workspace.md)** - Directory model, reset, and resume semantics.
+- **[Workspace templates](concepts/workspace-templates.md)** - Demo and study template intent.
+- **[Inputs](concepts/inputs.md)** - Stage-A input types and path resolution.
+- **[Sampling](concepts/sampling.md)** - Stage-A candidate selection and Stage-B weighting.
+- **[Generation](concepts/generation.md)** - Plans, fixed elements, and solver interactions.
+- **[Outputs and metadata](concepts/outputs-and-metadata.md)** - Sink layout and join keys.
+- **[Postprocess](concepts/postprocess.md)** - Pad behavior and GC constraints.
+- **[Quick checklist](concepts/quick-checklist.md)** - Minimal command and artifact checklist.
 
 ### Reference
 Reference documents are the authoritative contracts for command surfaces, schema keys, and file formats.
 
-- Use the **[CLI reference](reference/cli.md)** to look up exact commands, flags, and behavior.
-- Use the **[config reference](reference/config.md)** to look up schema fields and strict validation rules.
-- Use the **[outputs reference](reference/outputs.md)** to look up artifact paths, event streams, and notebook/plot surfaces.
-- Use the **[motif artifacts reference](reference/motif_artifacts.md)** to look up PWM artifact JSON requirements.
+- **[CLI reference](reference/cli.md)** - Commands, flags, and behavior.
+- **[Config reference](reference/config.md)** - Schema fields and strict validation.
+- **[Outputs reference](reference/outputs.md)** - Artifact paths and output contracts.
+- **[Motif artifacts reference](reference/motif_artifacts.md)** - PWM artifact JSON contract.
 
 ### Developer notes
 Developer notes are maintainer-facing documents for code architecture and implementation history.
 
-- Read **[architecture notes](dev/architecture.md)** when tracing pipeline boundaries across CLI, config, runtime, and output modules.
-- Read **[development journal](dev/journal.md)** when you need historical rationale for prior implementation decisions.
+- **[Architecture notes](dev/architecture.md)** - Pipeline boundaries and key code surfaces.
+- **[Development journal](dev/journal.md)** - Historical decisions and validation notes.
