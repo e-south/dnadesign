@@ -819,6 +819,8 @@ def test_run_round_matrix_gp_ei_path(tmp_path: Path) -> None:
     assert pred_entries
     metrics = pred_entries[-1]["metrics"]
     assert "score" in metrics
+    assert np.isfinite(float(metrics["score"]))
+    assert 0.0 <= float(metrics["score"]) <= 1.0
     assert f"score::{objective_name}/scalar" in metrics
     assert f"uncertainty::{objective_name}/scalar_var" in metrics
 

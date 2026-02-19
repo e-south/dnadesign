@@ -256,7 +256,7 @@ Only proximity of $\widehat{v}$ to $p$ (being OFF everywhere) is rewarded.
 * **Non-finite:** reject at ingestion.
 * **Too few labels in round:** objective errors; lower `scaling.min_n` or add labels.
 * **Analytical uncertainty constraints:** if `uncertainty_method=analytical`, OPAL fails fast unless `logic_exponent_beta=1` and `intensity_exponent_gamma=1`.
-* **Analytical scope:** analytical uncertainty follows the restored `bf3cde3` path and is treated as a closed-form approximation to scalar score uncertainty, not a clipping-aware re-derivation of every nonlinear branch.
+* **Analytical scope:** analytical uncertainty follows the restored `bf3cde3` closed-form path, with clip-alignment guards for clipped effect and out-of-bounds logic regimes; it remains a closed-form approximation rather than a full re-derivation of every nonlinear branch.
 
 ---
 
