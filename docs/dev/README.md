@@ -1,7 +1,7 @@
 # Developer Documentation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-18
+**Last verified:** 2026-02-19
 
 This directory contains developer-facing planning and maintenance notes.
 
@@ -27,9 +27,11 @@ This directory contains developer-facing planning and maintenance notes.
 - External integration marker discovery inspects `tests/test_*.py` and `tests/conftest.py` for `pytestmark` assignments and mark decorators (`pytest.mark.<name>`, aliased `pytest`, and `from pytest import mark as ...`).
 - MEME/FIMO path resolution for the external integration lane is centralized in `dnadesign.devtools.meme_env` (fails fast if `.pixi` FIMO is missing).
 - CI changed-file collection is centralized in `dnadesign.devtools.ci_changed_files`.
-- `ci_changes` enforces a strict tool inventory contract: `.github/tool-coverage-baseline.json` must match repository tool directories under `src/dnadesign/` (excluding `devtools`).
+- `ci_changed_files` diffs against an existing `<remote>/<base-ref>` tracking ref when present and fetches only when that ref is missing.
+- `ci_changes` enforces a strict tool inventory contract: `.github/tool-coverage-baseline.json` must match repository tool directories under `src/dnadesign/` (excluding `devtools`, `archived`, and `prototypes`).
 - Affected tool test-directory resolution is centralized in `dnadesign.devtools.ci_test_targets`.
 - Architecture boundary enforcement is centralized in `dnadesign.devtools.architecture_boundaries` and runs in the core lane.
+- Architecture boundary checks target production tool packages and exclude `devtools`, `archived`, and `prototypes`.
 - Docs checks enforce root SOR metadata, knowledge-base/operator index metadata (`Owner`, `Last verified`), and exec-plan metadata/link traceability through `dnadesign.devtools.docs_checks`.
 - Docs checks also enforce metadata (`Owner`, `Last verified`) for selected operational runbooks: installation/dependencies/notebooks/marimo and BU SCC + Notify event operator runbooks.
 - Docs checks enforce the root README tool catalog contract: table rows must match repo tool inventory and each tool link must target `src/dnadesign/<tool>`.
@@ -50,12 +52,12 @@ This directory contains developer-facing planning and maintenance notes.
   - `gate`: `pass` when `actual >= baseline`, otherwise `fail`.
 - `tool_coverage` prints per-tool actual/baseline rows directly in CI logs.
 - CI generates `quality-score-coverage-summary.json` and `quality-score-inputs.json` artifacts only on full-core scope (`run_full_core=true`).
+- `dnadesign.devtools.quality_score` enforces exact tool-set parity between coverage summary input and `.github/tool-coverage-baseline.json`; partial summaries fail fast by contract.
 - Published dashboard: `https://codecov.io/gh/e-south/dnadesign`
 - Codecov status checks (`codecov/project`, `codecov/patch`) provide PR/project coverage signal; per-tool floors remain enforced by `dnadesign.devtools.tool_coverage`.
 - Codecov per-tool components are configured in `codecov.yml` under `component_management.individual_components` and exposed in the root README tool table coverage column.
 - Per-tool badge images in the root README can remain `unknown` until Codecov has processed at least one successful default-branch upload with component-aware configuration.
-- `ci-gate` is the required aggregate workflow check and enforces conditional external integration lane requirements for merge safety.
-- `lint-test-build` mirrors `core-lint-test-build` result so branch protection can require a stable core-lane check name.
+- `CI gate` is the required aggregate workflow check and enforces conditional external integration lane requirements for merge safety.
 - Scheduled entropy reporting is handled by `dnadesign.devtools.quality_entropy` and uploads a quality-entropy report artifact.
 
 Local parity commands:

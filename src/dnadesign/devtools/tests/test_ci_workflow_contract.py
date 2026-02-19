@@ -35,11 +35,18 @@ def test_core_lane_installs_ffmpeg() -> None:
     assert any(step.get("name") == "Install FFmpeg" for step in steps)
 
 
-def test_lint_test_build_check_mirrors_core_lane_result() -> None:
+def test_ci_gate_is_the_required_aggregate_check() -> None:
     workflow = _workflow()
-    lint_job = workflow["jobs"]["lint-test-build"]
-    assert lint_job["needs"] == "core-lint-test-build"
-    assert lint_job["if"] == "always()"
+    jobs = workflow["jobs"]
+    assert "lint-test-build" not in jobs
+    gate_job = jobs["ci-gate"]
+    assert gate_job["if"] == "always()"
+    assert gate_job["needs"] == [
+        "detect-ci-scope",
+        "core-lint-test-build",
+        "external-integration",
+        "quality-score-inputs",
+    ]
 
 
 def test_scope_outputs_expose_core_external_integration_keys() -> None:
@@ -48,3 +55,15 @@ def test_scope_outputs_expose_core_external_integration_keys() -> None:
     assert "run-external-integration" in outputs
     assert "run-full-core" in outputs
     assert "external-integration-tools-csv" in outputs
+
+
+def test_quality_entropy_job_uses_locked_uv_environment() -> None:
+    workflow = _workflow()
+    steps = workflow["jobs"]["quality-entropy"]["steps"]
+    step_names = {step.get("name") for step in steps}
+    assert "Install uv" in step_names
+    assert "Install dependencies (locked)" in step_names
+
+    entropy_step = next(step for step in steps if step.get("name") == "Build quality entropy report")
+    run_script = str(entropy_step.get("run", ""))
+    assert "uv run python -m dnadesign.devtools.quality_entropy" in run_script

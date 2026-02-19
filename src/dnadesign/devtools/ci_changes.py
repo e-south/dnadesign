@@ -34,7 +34,7 @@ _FULL_CORE_EXACT_FILES = {
     "uv.lock",
     ".github/tool-coverage-baseline.json",
 }
-_NON_TOOL_DIRS = {"devtools", "__pycache__"}
+_NON_TOOL_DIRS = {"devtools", "__pycache__", "archived", "prototypes"}
 
 
 @dataclass(frozen=True)

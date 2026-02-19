@@ -32,6 +32,17 @@ def _run_git(*, repo_root: Path, args: list[str], context: str) -> str:
     return completed.stdout
 
 
+def _git_ref_exists(*, repo_root: Path, ref_name: str) -> bool:
+    completed = subprocess.run(
+        ["git", "rev-parse", "--verify", "--quiet", ref_name],
+        cwd=repo_root,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+    return completed.returncode == 0
+
+
 def collect_changed_files(
     *, event_name: str, repo_root: Path, base_ref: str | None, head_sha: str | None, remote: str = "origin"
 ) -> list[str]:
@@ -43,14 +54,16 @@ def collect_changed_files(
     if not remote.strip():
         raise ValueError("--remote must not be empty.")
 
-    _run_git(
-        repo_root=repo_root,
-        args=["fetch", "--no-tags", "--depth=1", remote, base_ref],
-        context="git fetch failed",
-    )
+    tracking_ref = f"{remote}/{base_ref}"
+    if not _git_ref_exists(repo_root=repo_root, ref_name=tracking_ref):
+        _run_git(
+            repo_root=repo_root,
+            args=["fetch", "--no-tags", "--depth=1", remote, base_ref],
+            context="git fetch failed",
+        )
     diff_output = _run_git(
         repo_root=repo_root,
-        args=["diff", "--name-only", f"{remote}/{base_ref}...{head_sha}"],
+        args=["diff", "--name-only", f"{tracking_ref}...{head_sha}"],
         context="git diff failed",
     )
     return [line.strip() for line in diff_output.splitlines() if line.strip()]
