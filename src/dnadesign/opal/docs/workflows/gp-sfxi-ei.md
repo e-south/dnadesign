@@ -160,7 +160,7 @@ uv run opal verify-outputs -c configs/campaign.yaml --round latest
 * Missing/invalid EI uncertainty:
 
   * confirm `selection.params.uncertainty_ref` matches an uncertainty channel emitted by the objective
-  * confirm the model is producing non-negative predictive std
+  * confirm the selected uncertainty channel is strictly positive per candidate at selection time
   * confirm `training.y_ops` supports inverse-transforming standard deviation (units consistency)
 * Any non-positive uncertainty value: EI errors; confirm GP std is being emitted and propagated.
 * `SFXI min_n` failure: ingest enough labels for the same observed round you run as `--labels-as-of`.

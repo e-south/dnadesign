@@ -27,6 +27,21 @@ from .sfxi_math import (
     worst_corner_distance,
 )
 
+_MAX_LOG2_FOR_SCORE = float(np.log2(np.finfo(float).max)) - 1.0
+_MAX_LOG2_FOR_UNCERTAINTY = float(np.log2(np.sqrt(np.finfo(float).max) / np.log(2.0))) - 1.0
+
+
+def _validate_intensity_log2_range(y_star: np.ndarray, *, upper: float, context: str) -> None:
+    vals = np.asarray(y_star, dtype=float)
+    if vals.ndim == 1:
+        vals = vals.reshape(1, -1)
+    if np.any(vals > float(upper)):
+        observed = float(np.max(vals))
+        raise ValueError(
+            f"sfxi_v1: y_pred intensity log2 values exceed stable {context} range "
+            f"(max allowed {float(upper):.1f}, observed {observed:.1f})."
+        )
+
 
 def _compute_train_effect_pool(train_view, setpoint: np.ndarray, delta: float, *, min_n: int) -> Sequence[float]:
     """
@@ -167,34 +182,51 @@ def _scalar_uncertainty_analytical(
     *,
     y_pred: np.ndarray,
     y_pred_var: np.ndarray,
+    v_hat: np.ndarray,
+    logic_clip_mask: np.ndarray,
+    effect_clip_mask: np.ndarray,
+    effect_scaled_vals: np.ndarray,
     w: np.ndarray,
     setpoint: np.ndarray,
+    delta: float,
     intensity_disabled: bool,
 ) -> np.ndarray:
     # Analytical uncertainty formula follows the bf3cde3 implementation.
+    logic_mean = np.asarray(v_hat, dtype=float)
+    logic_var = np.asarray(y_pred_var[:, 0:4], dtype=float) * np.asarray(logic_clip_mask, dtype=float)
     if intensity_disabled:
         effect_var = np.zeros(y_pred.shape[0], dtype=float)
         effect_exp = np.ones(y_pred.shape[0], dtype=float)
     else:
-        placeholder = (np.exp2(y_pred[:, 4:8]) * np.log(2.0)) ** 2
-        ind_var = placeholder * y_pred_var[:, 4:8]
+        exp2_intensity = np.exp2(y_pred[:, 4:8])
+        y_lin = np.maximum(0.0, exp2_intensity - float(delta))
+        positive_intensity = y_lin > 0.0
+        placeholder = (exp2_intensity * np.log(2.0)) ** 2
+        ind_var = placeholder * y_pred_var[:, 4:8] * positive_intensity
         wt_var = ind_var * w[None, :]
         effect_var = np.sum(wt_var, axis=1)
-        effect_exp = np.sum(w[None, :] * np.exp2(y_pred[:, 4:8]), axis=1)
+        effect_exp = np.sum(w[None, :] * y_lin, axis=1)
+        clip_mask = np.asarray(effect_clip_mask, dtype=bool).reshape(-1)
+        if clip_mask.size != y_pred.shape[0]:
+            raise ValueError("sfxi_v1: effect_clip_mask shape mismatch for analytical uncertainty.")
+        logic_out_of_bounds = np.any(np.asarray(logic_clip_mask, dtype=float) < 1.0, axis=1)
+        clip_guard_mask = clip_mask & logic_out_of_bounds
+        effect_var = np.where(clip_guard_mask, 0.0, effect_var)
+        effect_exp = np.where(clip_guard_mask, np.asarray(effect_scaled_vals, dtype=float).reshape(-1), effect_exp)
 
     D = float(worst_corner_distance(setpoint))
     if not np.isfinite(D) or D <= 0.0:
         raise ValueError("sfxi_v1: invalid setpoint distance for analytical uncertainty.")
     c = 1.0 / (D**2)
     ph2 = (
-        4.0 * (y_pred[:, 0:4] ** 2) * y_pred_var[:, 0:4]
-        + 4.0 * (setpoint[None, :] ** 2) * y_pred_var[:, 0:4]
-        + 2.0 * (y_pred_var[:, 0:4] ** 2)
-        - 8.0 * y_pred[:, 0:4] * setpoint[None, :] * y_pred_var[:, 0:4]
+        4.0 * (logic_mean**2) * logic_var
+        + 4.0 * (setpoint[None, :] ** 2) * logic_var
+        + 2.0 * (logic_var**2)
+        - 8.0 * logic_mean * setpoint[None, :] * logic_var
     )
     lf_var = c * np.sum(ph2, axis=1)
     lf_exp = c * np.sum(
-        y_pred[:, 0:4] ** 2 + y_pred_var[:, 0:4] - (2.0 * y_pred[:, 0:4] * setpoint[None, :]) + setpoint[None, :] ** 2,
+        logic_mean**2 + logic_var - (2.0 * logic_mean * setpoint[None, :]) + setpoint[None, :] ** 2,
         axis=1,
     )
 
@@ -229,6 +261,8 @@ def sfxi_v1(
     # assert y_pred dims
     if not (isinstance(y_pred, np.ndarray) and y_pred.ndim == 2 and y_pred.shape[1] >= 8):
         raise ValueError(f"sfxi_v1: expected y_pred shape (n, 8+); got {getattr(y_pred, 'shape', None)}.")
+    if not np.all(np.isfinite(y_pred)):
+        raise ValueError("sfxi_v1: y_pred must be finite.")
     y_pred_std = np.asarray(y_pred_std, dtype=float) if y_pred_std is not None else None
     if y_pred_std is not None and y_pred_std.shape != y_pred.shape:
         raise ValueError(f"sfxi_v1: y_pred_std shape mismatch: expected {y_pred.shape}, got {y_pred_std.shape}.")
@@ -240,6 +274,9 @@ def sfxi_v1(
 
     v_hat = np.clip(y_pred[:, 0:4].astype(float), 0.0, 1.0)
     y_star = y_pred[:, 4:8].astype(float)
+    _validate_intensity_log2_range(y_star, upper=_MAX_LOG2_FOR_SCORE, context="score")
+    if y_pred_var is not None:
+        _validate_intensity_log2_range(y_star, upper=_MAX_LOG2_FOR_UNCERTAINTY, context="uncertainty")
 
     setpoint = parse_setpoint_vector(params)
     sum_setpoint = float(np.sum(setpoint))
@@ -291,6 +328,8 @@ def sfxi_v1(
         )
         E_scaled = effect_scaled(E_raw, float(denom))
         score = np.power(F_logic, beta) * np.power(E_scaled, gamma)
+    logic_clip_mask = ((y_pred[:, 0:4] >= 0.0) & (y_pred[:, 0:4] <= 1.0)).astype(float)
+    effect_clip_mask = (E_scaled <= 0.0 + 1e-12) | (E_scaled >= 1.0 - 1e-12)
 
     diagnostics: Dict[str, Any] = {
         "logic_fidelity": F_logic,
@@ -299,6 +338,7 @@ def sfxi_v1(
         "denom_used": float(denom),
         "clip_lo_mask": E_scaled <= 0.0 + 1e-12,
         "clip_hi_mask": E_scaled >= 1.0 - 1e-12,
+        "logic_clip_mask": logic_clip_mask,
         "weights": w,
         "setpoint": setpoint,
         "beta": beta,
@@ -310,10 +350,11 @@ def sfxi_v1(
         "all_off_setpoint": bool(intensity_disabled),
     }
 
-    uncertainty_method = _resolve_uncertainty_method(params.get("uncertainty_method", None), beta=beta, gamma=gamma)
+    uncertainty_method: Optional[str] = None
 
     # ---- scalar uncertainty (selected method over implemented score function) ----
     if y_pred_var is not None:
+        uncertainty_method = _resolve_uncertainty_method(params.get("uncertainty_method", None), beta=beta, gamma=gamma)
         if uncertainty_method == "delta":
             scalar_uncertainty = _scalar_uncertainty_delta(
                 y_pred=y_pred,
@@ -335,8 +376,13 @@ def sfxi_v1(
             scalar_uncertainty = _scalar_uncertainty_analytical(
                 y_pred=y_pred,
                 y_pred_var=y_pred_var,
+                v_hat=v_hat,
+                logic_clip_mask=logic_clip_mask,
+                effect_clip_mask=effect_clip_mask,
+                effect_scaled_vals=E_scaled,
                 w=w,
                 setpoint=setpoint,
+                delta=delta,
                 intensity_disabled=bool(intensity_disabled),
             )
     else:
@@ -349,7 +395,7 @@ def sfxi_v1(
     # Emit optional, named summary stats so the runner can log them generically
     clip_hi_frac = float(np.mean(np.asarray(diagnostics["clip_hi_mask"], dtype=bool)))
     clip_lo_frac = float(np.mean(np.asarray(diagnostics["clip_lo_mask"], dtype=bool)))
-    diagnostics["summary_stats"] = {
+    summary_stats: Dict[str, Any] = {
         "score_min": float(np.nanmin(score)),
         "score_median": float(np.nanmedian(score)),
         "score_max": float(np.nanmax(score)),
@@ -358,8 +404,10 @@ def sfxi_v1(
         "train_effect_pool_size": int(len(effect_pool)),
         "denom_used": float(denom),
         "denom_percentile": int(p),
-        "uncertainty_method": uncertainty_method,
     }
+    if uncertainty_method is not None:
+        summary_stats["uncertainty_method"] = uncertainty_method
+    diagnostics["summary_stats"] = summary_stats
 
     score_arr = np.asarray(score, dtype=float).ravel()
     return ObjectiveResultV2(

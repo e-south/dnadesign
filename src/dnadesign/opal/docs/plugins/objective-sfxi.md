@@ -113,10 +113,10 @@ $$
 
 ### 2. Inputs to the objective (selection time)
 
-* **Predictions:** $\widehat{v}\in[0,1]^4$ and $\widehat{y}^{\mathrm{linear}}\in\mathbb{R}_{\ge 0}^4$.
+* **Predictions:** $\widehat{v}\in[0,1]^4$ and $\widehat{y}^{\star}\in\mathbb{R}^{4}$ (log2 intensity block from the vec8 model output).
 * **Setpoint** (i.e., preference): $p\in[0,1]^4$. This can be binary setpoints (e.g., AND: $[0,0,0,1]$) or nuanced continuous ones (e.g., $[0.3,0.4,0.7,0.2]$).
 
-Each candidate is scored with $p$, $\widehat{v}$, and $\widehat{y}^{\mathrm{linear}}$.
+Each candidate is scored with $p$, $\widehat{v}$, and $\widehat{y}^{\star}$; OPAL converts $\widehat{y}^{\star}$ to linear intensity internally before computing effect terms.
 
 ---
 
