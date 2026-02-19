@@ -85,6 +85,28 @@ def _register_scalar_uq_objective() -> str:
     return name
 
 
+def _register_scalar_non_positive_uq_objective() -> str:
+    name = "test_scalar_non_positive_uq_v1"
+    if name in list_objectives():
+        return name
+
+    @register_objective(name)
+    def _scalar_non_positive_uq_objective(
+        *, y_pred, params: Dict[str, Any], ctx=None, train_view=None, y_pred_std=None
+    ) -> ObjectiveResultV2:
+        del params, ctx, train_view, y_pred_std
+        yp = np.asarray(y_pred, dtype=float).reshape(-1)
+        sigma = np.zeros_like(yp)
+        return ObjectiveResultV2(
+            scores_by_name={"scalar": yp},
+            uncertainty_by_name={"scalar_var": sigma},
+            diagnostics={},
+            modes_by_name={"scalar": "maximize"},
+        )
+
+    return name
+
+
 def _register_non_tie_scalar_objective() -> str:
     name = "test_non_tie_scalar_v1"
     if name in list_objectives():
@@ -799,6 +821,55 @@ def test_run_round_matrix_gp_ei_path(tmp_path: Path) -> None:
     assert "score" in metrics
     assert f"score::{objective_name}/scalar" in metrics
     assert f"uncertainty::{objective_name}/scalar_var" in metrics
+
+
+def test_run_round_ei_fails_on_non_positive_uncertainty_channel(tmp_path: Path) -> None:
+    objective_name = _register_scalar_non_positive_uq_objective()
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+
+    records_path = tmp_path / "records.parquet"
+    _write_records(records_path)
+    cfg = _make_config(
+        workdir=workdir,
+        records_path=records_path,
+        objective_name=objective_name,
+        model_name="random_forest",
+        model_params={"n_estimators": 5, "random_state": 0},
+        selection_name="expected_improvement",
+        selection_params={
+            "top_k": 1,
+            "score_ref": f"{objective_name}/scalar",
+            "uncertainty_ref": f"{objective_name}/scalar_var",
+            "objective_mode": "maximize",
+            "alpha": 1.0,
+            "beta": 1.0,
+        },
+    )
+    _write_state(workdir, cfg, records_path)
+    (workdir / "campaign.yaml").write_text("campaign: {}")
+
+    store = RecordsStore(
+        kind="local",
+        records_path=records_path,
+        campaign_slug=cfg.campaign.slug,
+        x_col=cfg.data.x_column_name,
+        y_col=cfg.data.y_column_name,
+        x_transform_name=cfg.data.transforms_x.name,
+        x_transform_params={},
+    )
+
+    with pytest.raises(OpalError, match="must be > 0"):
+        run_round(
+            store,
+            store.load(),
+            RunRoundRequest(
+                cfg=cfg,
+                as_of_round=0,
+                config_path=workdir / "campaign.yaml",
+                verbose=False,
+            ),
+        )
 
 
 def test_run_round_rejects_ei_when_yops_lacks_inverse_std(tmp_path: Path) -> None:

@@ -86,6 +86,128 @@ def _parse_scaling_cfg(raw: Any) -> Tuple[int, int, float]:
     return p, min_n, eps
 
 
+def _resolve_uncertainty_method(raw: Any, *, beta: float, gamma: float) -> str:
+    method = None if raw is None else str(raw).strip().lower()
+    if method is None:
+        method = "analytical" if (beta == 1.0 and gamma == 1.0) else "delta"
+    if method not in {"delta", "analytical"}:
+        raise ValueError("sfxi_v1: uncertainty_method must be 'delta' or 'analytical'.")
+    if method == "analytical" and not (beta == 1.0 and gamma == 1.0):
+        raise ValueError(
+            "sfxi_v1: analytical uncertainty requires logic_exponent_beta == 1 and intensity_exponent_gamma == 1."
+        )
+    return method
+
+
+def _scalar_uncertainty_delta(
+    *,
+    y_pred: np.ndarray,
+    y_pred_var: np.ndarray,
+    v_hat: np.ndarray,
+    y_star: np.ndarray,
+    setpoint: np.ndarray,
+    w: np.ndarray,
+    beta: float,
+    gamma: float,
+    delta: float,
+    denom: float,
+    F_logic: np.ndarray,
+    E_raw: np.ndarray,
+    E_scaled: np.ndarray,
+    intensity_disabled: bool,
+) -> np.ndarray:
+    n_rows = int(y_pred.shape[0])
+    grad = np.zeros((n_rows, y_pred.shape[1]), dtype=float)
+
+    logic_raw = y_pred[:, 0:4].astype(float)
+    logic_clip_mask = ((logic_raw >= 0.0) & (logic_raw <= 1.0)).astype(float)
+    dist = np.linalg.norm(v_hat - setpoint[None, :], axis=1)
+    dist_safe = np.maximum(dist, 1e-12)
+    D = float(worst_corner_distance(setpoint))
+    dF_dv = np.zeros_like(v_hat, dtype=float)
+    if np.isfinite(D) and D > 0.0:
+        active_logic = (dist > 1e-12) & (F_logic > 0.0)
+        dF_dv[active_logic, :] = -(v_hat[active_logic, :] - setpoint[None, :]) / (D * dist_safe[active_logic, None])
+
+    logic_prefactor = np.zeros_like(F_logic, dtype=float)
+    if beta > 0.0:
+        logic_active = F_logic > 0.0
+        logic_prefactor[logic_active] = beta * np.power(F_logic[logic_active], beta - 1.0)
+    if intensity_disabled:
+        logic_scale = logic_prefactor
+    else:
+        logic_scale = logic_prefactor * np.power(E_scaled, gamma)
+    grad[:, 0:4] = logic_scale[:, None] * dF_dv * logic_clip_mask
+
+    if not intensity_disabled:
+        y_lin = np.power(2.0, y_star) - delta
+        positive_intensity = y_lin > 0.0
+        e_unclipped = E_raw / float(denom)
+        e_active = (e_unclipped > 0.0) & (e_unclipped < 1.0)
+        dEraw_dy = np.log(2.0) * np.power(2.0, y_star) * positive_intensity * w[None, :]
+        dEscaled_dy = (dEraw_dy / float(denom)) * e_active[:, None]
+
+        intensity_prefactor = np.zeros_like(E_scaled, dtype=float)
+        if gamma > 0.0:
+            active = e_active & (E_scaled > 0.0)
+            intensity_prefactor[active] = gamma * np.power(E_scaled[active], gamma - 1.0)
+        grad[:, 4:8] = (np.power(F_logic, beta) * intensity_prefactor)[:, None] * dEscaled_dy
+
+    scalar_uncertainty_var = np.sum((grad**2) * y_pred_var, axis=1)
+    if not np.all(np.isfinite(scalar_uncertainty_var)):
+        raise ValueError("sfxi_v1: computed scalar uncertainty variance contains non-finite values.")
+    scalar_uncertainty_var = np.maximum(scalar_uncertainty_var, 0.0)
+    scalar_uncertainty = np.sqrt(scalar_uncertainty_var)
+    if not np.all(np.isfinite(scalar_uncertainty)):
+        raise ValueError("sfxi_v1: computed scalar uncertainty contains non-finite values.")
+    return scalar_uncertainty
+
+
+def _scalar_uncertainty_analytical(
+    *,
+    y_pred: np.ndarray,
+    y_pred_var: np.ndarray,
+    w: np.ndarray,
+    setpoint: np.ndarray,
+    intensity_disabled: bool,
+) -> np.ndarray:
+    # Analytical uncertainty formula follows the bf3cde3 implementation.
+    if intensity_disabled:
+        effect_var = np.zeros(y_pred.shape[0], dtype=float)
+        effect_exp = np.ones(y_pred.shape[0], dtype=float)
+    else:
+        placeholder = (np.exp2(y_pred[:, 4:8]) * np.log(2.0)) ** 2
+        ind_var = placeholder * y_pred_var[:, 4:8]
+        wt_var = ind_var * w[None, :]
+        effect_var = np.sum(wt_var, axis=1)
+        effect_exp = np.sum(w[None, :] * np.exp2(y_pred[:, 4:8]), axis=1)
+
+    D = float(worst_corner_distance(setpoint))
+    if not np.isfinite(D) or D <= 0.0:
+        raise ValueError("sfxi_v1: invalid setpoint distance for analytical uncertainty.")
+    c = 1.0 / (D**2)
+    ph2 = (
+        4.0 * (y_pred[:, 0:4] ** 2) * y_pred_var[:, 0:4]
+        + 4.0 * (setpoint[None, :] ** 2) * y_pred_var[:, 0:4]
+        + 2.0 * (y_pred_var[:, 0:4] ** 2)
+        - 8.0 * y_pred[:, 0:4] * setpoint[None, :] * y_pred_var[:, 0:4]
+    )
+    lf_var = c * np.sum(ph2, axis=1)
+    lf_exp = c * np.sum(
+        y_pred[:, 0:4] ** 2 + y_pred_var[:, 0:4] - (2.0 * y_pred[:, 0:4] * setpoint[None, :]) + setpoint[None, :] ** 2,
+        axis=1,
+    )
+
+    scalar_uncertainty_var = effect_var * lf_var + effect_var * (lf_exp**2) + lf_var * (effect_exp**2)
+    if not np.all(np.isfinite(scalar_uncertainty_var)):
+        raise ValueError("sfxi_v1: computed scalar uncertainty variance contains non-finite values.")
+    scalar_uncertainty_var = np.maximum(scalar_uncertainty_var, 0.0)
+    scalar_uncertainty = np.sqrt(scalar_uncertainty_var)
+    if not np.all(np.isfinite(scalar_uncertainty)):
+        raise ValueError("sfxi_v1: computed scalar uncertainty contains non-finite values.")
+    return scalar_uncertainty
+
+
 @roundctx_contract(
     category="objective",
     requires=["core/labels_as_of_round"],
@@ -188,56 +310,35 @@ def sfxi_v1(
         "all_off_setpoint": bool(intensity_disabled),
     }
 
-    uncertainty_method = str(params.get("uncertainty_method", "delta")).strip().lower()
-    if uncertainty_method != "delta":
-        raise ValueError("sfxi_v1: uncertainty_method must be 'delta'.")
+    uncertainty_method = _resolve_uncertainty_method(params.get("uncertainty_method", None), beta=beta, gamma=gamma)
 
-    # ---- scalar uncertainty (delta method over implemented score function) ----
+    # ---- scalar uncertainty (selected method over implemented score function) ----
     if y_pred_var is not None:
-        n_rows = int(y_pred.shape[0])
-        grad = np.zeros((n_rows, y_pred.shape[1]), dtype=float)
-
-        logic_raw = y_pred[:, 0:4].astype(float)
-        logic_clip_mask = ((logic_raw >= 0.0) & (logic_raw <= 1.0)).astype(float)
-        dist = np.linalg.norm(v_hat - setpoint[None, :], axis=1)
-        dist_safe = np.maximum(dist, 1e-12)
-        D = float(worst_corner_distance(setpoint))
-        dF_dv = np.zeros_like(v_hat, dtype=float)
-        if np.isfinite(D) and D > 0.0:
-            active_logic = (dist > 1e-12) & (F_logic > 0.0)
-            dF_dv[active_logic, :] = -(v_hat[active_logic, :] - setpoint[None, :]) / (D * dist_safe[active_logic, None])
-
-        logic_prefactor = np.zeros_like(F_logic, dtype=float)
-        if beta > 0.0:
-            logic_active = F_logic > 0.0
-            logic_prefactor[logic_active] = beta * np.power(F_logic[logic_active], beta - 1.0)
-        if intensity_disabled:
-            logic_scale = logic_prefactor
+        if uncertainty_method == "delta":
+            scalar_uncertainty = _scalar_uncertainty_delta(
+                y_pred=y_pred,
+                y_pred_var=y_pred_var,
+                v_hat=v_hat,
+                y_star=y_star,
+                setpoint=setpoint,
+                w=w,
+                beta=beta,
+                gamma=gamma,
+                delta=delta,
+                denom=float(denom),
+                F_logic=F_logic,
+                E_raw=E_raw,
+                E_scaled=E_scaled,
+                intensity_disabled=bool(intensity_disabled),
+            )
         else:
-            logic_scale = logic_prefactor * np.power(E_scaled, gamma)
-        grad[:, 0:4] = logic_scale[:, None] * dF_dv * logic_clip_mask
-
-        if not intensity_disabled:
-            y_lin = np.power(2.0, y_star) - delta
-            positive_intensity = y_lin > 0.0
-            e_unclipped = E_raw / float(denom)
-            e_active = (e_unclipped > 0.0) & (e_unclipped < 1.0)
-            dEraw_dy = np.log(2.0) * np.power(2.0, y_star) * positive_intensity * w[None, :]
-            dEscaled_dy = (dEraw_dy / float(denom)) * e_active[:, None]
-
-            intensity_prefactor = np.zeros_like(E_scaled, dtype=float)
-            if gamma > 0.0:
-                active = e_active & (E_scaled > 0.0)
-                intensity_prefactor[active] = gamma * np.power(E_scaled[active], gamma - 1.0)
-            grad[:, 4:8] = (np.power(F_logic, beta) * intensity_prefactor)[:, None] * dEscaled_dy
-
-        scalar_uncertainty_var = np.sum((grad**2) * y_pred_var, axis=1)
-        if not np.all(np.isfinite(scalar_uncertainty_var)):
-            raise ValueError("sfxi_v1: computed scalar uncertainty variance contains non-finite values.")
-        scalar_uncertainty_var = np.maximum(scalar_uncertainty_var, 0.0)
-        scalar_uncertainty = np.sqrt(scalar_uncertainty_var)
-        if not np.all(np.isfinite(scalar_uncertainty)):
-            raise ValueError("sfxi_v1: computed scalar uncertainty contains non-finite values.")
+            scalar_uncertainty = _scalar_uncertainty_analytical(
+                y_pred=y_pred,
+                y_pred_var=y_pred_var,
+                w=w,
+                setpoint=setpoint,
+                intensity_disabled=bool(intensity_disabled),
+            )
     else:
         scalar_uncertainty = None
     ctx.set(

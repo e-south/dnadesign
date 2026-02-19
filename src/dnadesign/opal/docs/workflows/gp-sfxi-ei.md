@@ -16,7 +16,7 @@ Campaign: `src/dnadesign/opal/campaigns/demo_gp_ei/`
 
 * Run a round where selection is driven by *both* predicted score and predicted uncertainty.
 * Make channel wiring explicit (`score_ref` + `uncertainty_ref`).
-* Show EI-specific failure modes (missing uncertainty, invalid sigma, all-zero sigma).
+* Show EI-specific failure modes (missing uncertainty, invalid sigma, non-positive sigma).
 
 ---
 
@@ -162,5 +162,5 @@ uv run opal verify-outputs -c configs/campaign.yaml --round latest
   * confirm `selection.params.uncertainty_ref` matches an uncertainty channel emitted by the objective
   * confirm the model is producing non-negative predictive std
   * confirm `training.y_ops` supports inverse-transforming standard deviation (units consistency)
-* All-zero uncertainty vector: EI errors (no exploration signal); confirm GP std is being emitted and propagated.
+* Any non-positive uncertainty value: EI errors; confirm GP std is being emitted and propagated.
 * `SFXI min_n` failure: ingest enough labels for the same observed round you run as `--labels-as-of`.

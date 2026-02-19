@@ -10,6 +10,11 @@ It explains how OPAL converts vec8 model outputs into selection-ready score and 
 - Primary score channel: `sfxi` (maximize)
 - Additional score channels: `logic_fidelity`, `effect_scaled`
 - Uncertainty channel key (when available): `sfxi` (standard deviation of the scalar score)
+- Uncertainty methods: `delta` (gradient delta-method) and `analytical` (restored analytical variance path)
+- Uncertainty method parameter values: only `delta` or `analytical` are accepted
+- Uncertainty method gating: `analytical` is valid only when `logic_exponent_beta == 1` and `intensity_exponent_gamma == 1` (exact equality)
+- Uncertainty method default: if `uncertainty_method` is omitted or null, OPAL uses `analytical` when `beta=gamma=1`, otherwise `delta`
+- Uncertainty with missing model std: when `y_pred_std` is absent, no uncertainty channel is emitted and method selection does not affect score computation
 - Scaling source: denominator is computed from current-round observed labels and persisted in run metadata
 - Strictness: run fails if current-round labels are fewer than `scaling.min_n`
 - Selection wiring:
@@ -250,6 +255,8 @@ Only proximity of $\widehat{v}$ to $p$ (being OFF everywhere) is rewarded.
 * **Flat logic:** if $u_{\max}\approx u_{\min}$, set $v=\tfrac{1}{4}\mathbf{1}$.
 * **Non-finite:** reject at ingestion.
 * **Too few labels in round:** objective errors; lower `scaling.min_n` or add labels.
+* **Analytical uncertainty constraints:** if `uncertainty_method=analytical`, OPAL fails fast unless `logic_exponent_beta=1` and `intensity_exponent_gamma=1`.
+* **Analytical scope:** analytical uncertainty follows the restored `bf3cde3` path and is treated as a closed-form approximation to scalar score uncertainty, not a clipping-aware re-derivation of every nonlinear branch.
 
 ---
 

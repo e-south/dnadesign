@@ -263,6 +263,7 @@ class _SFXIParams(BaseModel):
     logic_exponent_beta: float = 1.0
     intensity_exponent_gamma: float = 1.0
     intensity_log2_offset_delta: float = 0.0
+    uncertainty_method: Optional[Literal["delta", "analytical"]] = None
     scaling: _SFXIScaling = Field(default_factory=_SFXIScaling)
 
     @field_validator("setpoint_vector")

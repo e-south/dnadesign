@@ -85,7 +85,10 @@ def test_expected_improvement_uses_uncertainty_as_std() -> None:
     incumbent = float(np.max(scores))
     improvement = scores - incumbent
     z = improvement / std
-    expected = (improvement * norm.cdf(z)) + (std * norm.pdf(z))
+    expected_raw = (improvement * norm.cdf(z)) + (std * norm.pdf(z))
+    expected = (expected_raw - float(np.min(expected_raw))) / (
+        float(np.max(expected_raw)) - float(np.min(expected_raw))
+    )
     np.testing.assert_allclose(np.asarray(out["score"], dtype=float), expected, rtol=1e-9, atol=1e-12)
 
 

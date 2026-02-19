@@ -70,13 +70,24 @@ OPAL weighted acquisition:
 
 - `A = alpha * (I * Phi(Z)) + beta * (sigma * phi(Z))`
 
-### Zero-sigma behavior
+Normalization:
 
-For per-candidate `sigma == 0`, OPAL uses the deterministic limit:
+- OPAL min-max normalizes weighted acquisition to `[0,1]` before returning `score`.
+- `A_norm = (A - min(A)) / (max(A) - min(A))`
+- if `max(A) == min(A)`, OPAL returns all zeros.
 
-- `A = alpha * max(I, 0)`
+Ranking source:
 
-This avoids `0/0` numerical failure in mixed-sigma batches. If all candidates have `sigma == 0`, OPAL raises an error (no exploration signal).
+- OPAL ranks by `A_norm` (descending).
+- In the degenerate case (`max(A) == min(A)`), all scores tie at zero and ranking is resolved deterministically by candidate `id`.
+
+### Sigma contract
+
+EI requires strict positive standard deviation for every candidate:
+
+- `sigma > 0` for all candidates
+
+Any non-positive value (`sigma <= 0`) is an error; there is no epsilon-tolerance override.
 
 ### Error cases
 
@@ -84,8 +95,7 @@ This avoids `0/0` numerical failure in mixed-sigma batches. If all candidates ha
 
 - missing `uncertainty_ref`
 - non-finite uncertainty values
-- negative uncertainty values
-- all-zero uncertainty vector
+- non-positive uncertainty values
 - non-finite acquisition outputs after computation
 
 There is no fallback to `top_n`.
