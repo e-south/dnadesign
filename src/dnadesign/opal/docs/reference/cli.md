@@ -472,6 +472,7 @@ opal validate --config <yaml>
 
 **Notes**
 
+* Config parsing is strict: malformed YAML or duplicate keys fail as bad-args config errors.
 * Verifies **USR essentials** exist in `records.parquet`.
 * Verifies the configured **X** column exists.
 * If Y is present, validates vector length & numeric/finite cells.

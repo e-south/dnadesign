@@ -74,6 +74,45 @@ def test_validate_rejects_unknown_plugin_names(tmp_path: Path) -> None:
     assert "unknown transform_x plugin" in out
 
 
+def test_validate_rejects_duplicate_yaml_keys_as_bad_args(tmp_path: Path) -> None:
+    _, campaign, records = _setup_workspace(tmp_path, include_opal_cols=True)
+    app = _build()
+    runner = CliRunner()
+
+    campaign.write_text(
+        f"""
+campaign:
+  name: "Demo"
+  slug: "demo"
+  workdir: "."
+data:
+  location: {{ kind: local, path: "{records}" }}
+  x_column_name: "X"
+  y_column_name: "Y"
+transforms_x: {{ name: identity, params: {{}} }}
+transforms_y: {{ name: scalar_from_table_v1, params: {{}} }}
+model: {{ name: random_forest, params: {{ n_estimators: 5, random_state: 0 }} }}
+objectives:
+  - {{ name: scalar_identity_v1, params: {{}} }}
+selection:
+  name: top_n
+  params:
+    top_k: 2
+    score_ref: "scalar_identity_v1/scalar"
+    objective_mode: maximize
+    tie_handling: competition_rank
+objectives:
+  - {{ name: scalar_identity_v1, params: {{}} }}
+""".strip()
+    )
+
+    res = runner.invoke(app, ["--no-color", "validate", "-c", str(campaign)])
+    assert res.exit_code == 2
+    out = res.output.lower()
+    assert "duplicate key in yaml" in out
+    assert "internal error during validate" not in out
+
+
 def test_validate_unknown_model_error_lists_available_plugins_in_default_output(tmp_path: Path) -> None:
     _, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
     app = _build()

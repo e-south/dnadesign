@@ -259,6 +259,7 @@ Only proximity of $\widehat{v}$ to $p$ (being OFF everywhere) is rewarded.
 * **Non-finite:** reject at ingestion.
 * **Too few labels in round:** objective errors; lower `scaling.min_n` or add labels.
 * **Analytical uncertainty constraints:** if `uncertainty_method=analytical`, OPAL fails fast unless `logic_exponent_beta=1` and `intensity_exponent_gamma=1`.
+  Config parsing also rejects this invalid combination before runs start.
 * **Uncertainty positivity:** if required model std entries are non-positive, or computed scalar uncertainty is non-positive, OPAL fails fast with a clear error.
 * **Fractional-exponent derivatives:** for `0 < logic_exponent_beta < 1` or `0 < intensity_exponent_gamma < 1`, delta-method derivatives are singular at base `0`; OPAL fails fast if `F_logic <= 0` (beta case) or `E_scaled <= 0` (gamma case).
 * **Analytical scope:** analytical uncertainty follows the `c5666a7` closed-form direction with log2-space moment correction (`ln(2)` scaling in the intensity moments), modeling `X = 2^Y` moments in log2 space. It remains a closed-form approximation and does not fully re-derive all nonlinear score branches (`max(0, 2^y - delta)` and clipping).

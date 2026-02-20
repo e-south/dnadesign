@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Literal, Optional, Type
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # Registry: category -> name -> Pydantic model class
 _SCHEMAS: Dict[str, Dict[str, Type[BaseModel]]] = {
@@ -274,6 +274,18 @@ class _SFXIParams(BaseModel):
         if any((x < 0.0 or x > 1.0) for x in v):
             raise ValueError("objective.params.setpoint_vector entries must be in [0, 1]")
         return v
+
+    @model_validator(mode="after")
+    def _analytical_requires_unit_exponents(self):
+        method = self.uncertainty_method
+        if method == "analytical" and not (
+            float(self.logic_exponent_beta) == 1.0 and float(self.intensity_exponent_gamma) == 1.0
+        ):
+            raise ValueError(
+                "objective.params.uncertainty_method=analytical requires "
+                "logic_exponent_beta=1 and intensity_exponent_gamma=1"
+            )
+        return self
 
 
 @register_param_schema("objective", "scalar_identity_v1")
