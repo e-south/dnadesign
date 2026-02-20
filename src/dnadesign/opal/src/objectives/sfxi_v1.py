@@ -268,15 +268,17 @@ def _scalar_uncertainty_analytical(
         effect_var = np.zeros(y_pred.shape[0], dtype=float)
         effect_exp = np.ones(y_pred.shape[0], dtype=float)
     else:
-        effect_var_unwt = (np.exp2(y_pred_var[:, 4:8]) - 1) * np.exp2(
-            y_pred_var[:, 4:8] + 2 * y_pred[:, 4:8]
-        )
+        ln2 = np.log(2.0)
+        var_ln = (ln2**2) * y_pred_var[:, 4:8]
+        mean_ln = ln2 * y_pred[:, 4:8]
+
+        effect_var_unwt = (np.exp(var_ln) - 1.0) * np.exp(2.0 * mean_ln + var_ln)
         effect_var_unsc = np.sum(np.multiply(effect_var_unwt, w**2), axis=1)
         effect_var = effect_var_unsc / (denom**2)
         effect_exp = (
             np.sum(
                 np.multiply(
-                    np.exp2(y_pred[:, 4:8] + y_pred_var[:, 4:8] / 2),
+                    np.exp(mean_ln + (var_ln / 2.0)),
                     w,
                 ),
                 axis=1,
@@ -458,7 +460,7 @@ def sfxi_v1(
                 y_pred_var=y_pred_var,
                 v_hat=v_hat,
                 w=w,
-                denom = denom,
+                denom=denom,
                 setpoint=setpoint,
                 delta=delta,
                 intensity_disabled=bool(intensity_disabled),

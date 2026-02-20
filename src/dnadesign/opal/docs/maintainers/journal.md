@@ -2,6 +2,22 @@
 
 This journal tracks ongoing Elm_UQ analysis, refactor notes, and merge-readiness decisions for OPAL.
 
+### 2026-02-20 SFXI uncertainty canon alignment plan
+
+Decision points captured from active issue triage:
+- Analytical canon reference is `c5666a7`.
+- Analytical effect moments must use log2-consistent `ln(2)` scaling with `np.exp` forms (not `np.exp2` on variance terms).
+- Keep analytical default for `beta=gamma=1`, with explicit approximation notes.
+- Treat #23 as partially superseded by #27, and resolve both in one coherent PR narrative.
+
+Execution plan used for this pass:
+- Add deterministic tests first for analytical log2-moment correctness and regression baselines.
+- Remove Monte Carlo-based uncertainty smoke checks to reduce CI flakiness.
+- Patch `sfxi_v1` analytical intensity moments to log2-consistent closed forms.
+- Preserve #27 strictness invariants (required std `>0`, emitted sigma `>0`, no clip-mask variance gating).
+- Update objective docs and PR #26 body to the same canon wording and issue relationship.
+- Include pending formatting diffs and end with a clean working tree.
+
 ### 2026-02-16 Guided demo workflows (CLI + docs)
 
 What changed:

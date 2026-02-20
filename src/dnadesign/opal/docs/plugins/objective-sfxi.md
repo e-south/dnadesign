@@ -260,7 +260,7 @@ Only proximity of $\widehat{v}$ to $p$ (being OFF everywhere) is rewarded.
 * **Too few labels in round:** objective errors; lower `scaling.min_n` or add labels.
 * **Analytical uncertainty constraints:** if `uncertainty_method=analytical`, OPAL fails fast unless `logic_exponent_beta=1` and `intensity_exponent_gamma=1`.
 * **Uncertainty positivity:** if required model std entries are non-positive, or computed scalar uncertainty is non-positive, OPAL fails fast with a clear error.
-* **Analytical scope:** analytical uncertainty follows the restored `bf3cde3` closed-form path; it remains a closed-form approximation rather than a full re-derivation of every nonlinear branch.
+* **Analytical scope:** analytical uncertainty follows the `c5666a7` closed-form direction with log2-space moment correction (`ln(2)` scaling in the intensity moments). It remains a closed-form approximation rather than a full re-derivation of every nonlinear branch.
 
 ---
 

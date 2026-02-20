@@ -13,14 +13,8 @@ import numpy as np
 import pytest
 
 from dnadesign.opal.src.core.round_context import PluginRegistryView, RoundCtx
-from dnadesign.opal.src.objectives.sfxi_math import (
-    STATE_ORDER,
-    effect_raw_from_y_star,
-    effect_scaled,
-    logic_fidelity,
-    parse_setpoint_vector,
-)
-from dnadesign.opal.src.objectives.sfxi_v1 import sfxi_v1
+from dnadesign.opal.src.objectives.sfxi_math import worst_corner_distance
+from dnadesign.opal.src.objectives.sfxi_v1 import _scalar_uncertainty_analytical, sfxi_v1
 
 
 class _TrainView:
@@ -252,7 +246,7 @@ def test_sfxi_v1_uncertainty_rejects_zero_std_for_weighted_intensity_state():
         )
 
 
-def test_sfxi_v1_uncertainty_delta_matches_monte_carlo_smoke():
+def test_sfxi_v1_uncertainty_delta_regression_fixture():
     y_pred = np.array([[0.1, 0.2, 0.15, 0.85, 0.3, 0.5, 0.2, 0.6]], dtype=float)
     y_pred_std = np.array([[0.02, 0.03, 0.02, 0.02, 0.05, 0.04, 0.05, 0.03]], dtype=float)
     params = {
@@ -272,23 +266,8 @@ def test_sfxi_v1_uncertainty_delta_matches_monte_carlo_smoke():
     res = sfxi_v1(y_pred=y_pred, params=params, ctx=octx, train_view=tv, y_pred_std=y_pred_std)
     est_std = float(np.asarray(res.uncertainty_by_name["sfxi"], dtype=float)[0])
 
-    denom = float(res.diagnostics["denom_used"])
-    setpoint = parse_setpoint_vector(params)
-    beta = float(params["logic_exponent_beta"])
-    gamma = float(params["intensity_exponent_gamma"])
-    delta = float(params["intensity_log2_offset_delta"])
-    rng = np.random.default_rng(7)
-    draws = 2000
-    samples = rng.normal(loc=y_pred[0], scale=y_pred_std[0], size=(draws, y_pred.shape[1]))
-    v_hat = np.clip(samples[:, 0:4], 0.0, 1.0)
-    y_star = samples[:, 4:8]
-    logic = logic_fidelity(v_hat, setpoint)
-    effect_raw, _ = effect_raw_from_y_star(y_star, setpoint, delta=delta, eps=1e-12, state_order=STATE_ORDER)
-    effect = effect_scaled(effect_raw, denom)
-    scores = np.power(logic, beta) * np.power(effect, gamma)
-    mc_std = float(np.std(scores, ddof=1))
-    rel_err = abs(est_std - mc_std) / max(mc_std, 1e-12)
-    assert rel_err < 0.30
+    expected = 0.01871242242800085
+    assert est_std == pytest.approx(expected, rel=1e-10, abs=1e-12)
 
 
 def test_sfxi_v1_uncertainty_analytical_requires_beta_gamma_one():
@@ -312,43 +291,50 @@ def test_sfxi_v1_uncertainty_analytical_requires_beta_gamma_one():
         sfxi_v1(y_pred=y_pred, params=params, ctx=octx, train_view=tv, y_pred_std=y_pred_std)
 
 
-def test_sfxi_v1_uncertainty_analytical_matches_monte_carlo_smoke():
-    y_pred = np.array([[0.1, 0.2, 0.15, 0.85, 0.3, 0.5, 0.2, 0.9]], dtype=float)
-    y_pred_std = np.array([[0.02, 0.03, 0.02, 0.02, 0.05, 0.04, 0.05, 0.03]], dtype=float)
-    params = {
-        "setpoint_vector": [0, 0, 0, 1],
-        "logic_exponent_beta": 1.0,
-        "intensity_exponent_gamma": 1.0,
-        "intensity_log2_offset_delta": 0.0,
-        "uncertainty_method": "analytical",
-        "scaling": {"percentile": 95, "min_n": 1, "eps": 1e-8},
-    }
-    train_Y = np.array([[0.0, 0.0, 0.0, 1.0, 0.2, 0.3, 0.1, 0.8]], dtype=float)
-    train_R = np.array([0], dtype=int)
-    tv = _TrainView(train_Y, train_R, as_of_round=0)
+def test_sfxi_v1_uncertainty_analytical_uses_log2_normal_moments():
+    setpoint = np.array([0.3, 0.4, 0.7, 0.2], dtype=float)
+    w = setpoint / float(np.sum(setpoint))
+    y_pred = np.array([[0.2, 0.3, 0.4, 0.5, 0.9, 0.8, 1.1, 0.7]], dtype=float)
+    y_pred_var = np.array([[0.03, 0.02, 0.04, 0.01, 0.36, 0.16, 0.25, 0.09]], dtype=float)
+    denom = 1.25
 
-    rctx = _ctx(as_of_round=0)
-    octx = rctx.for_plugin(category="objective", name="sfxi_v1", plugin=sfxi_v1)
-    res = sfxi_v1(y_pred=y_pred, params=params, ctx=octx, train_view=tv, y_pred_std=y_pred_std)
-    est_std = float(np.asarray(res.uncertainty_by_name["sfxi"], dtype=float)[0])
+    sigma = _scalar_uncertainty_analytical(
+        y_pred=y_pred,
+        y_pred_var=y_pred_var,
+        v_hat=y_pred[:, 0:4],
+        w=w,
+        denom=denom,
+        setpoint=setpoint,
+        delta=0.0,
+        intensity_disabled=False,
+    )
 
-    denom = float(res.diagnostics["denom_used"])
-    setpoint = parse_setpoint_vector(params)
-    beta = float(params["logic_exponent_beta"])
-    gamma = float(params["intensity_exponent_gamma"])
-    delta = float(params["intensity_log2_offset_delta"])
-    rng = np.random.default_rng(7)
-    draws = 2000
-    samples = rng.normal(loc=y_pred[0], scale=y_pred_std[0], size=(draws, y_pred.shape[1]))
-    v_hat = np.clip(samples[:, 0:4], 0.0, 1.0)
-    y_star = samples[:, 4:8]
-    logic = logic_fidelity(v_hat, setpoint)
-    effect_raw, _ = effect_raw_from_y_star(y_star, setpoint, delta=delta, eps=1e-12, state_order=STATE_ORDER)
-    effect = effect_scaled(effect_raw, denom)
-    scores = np.power(logic, beta) * np.power(effect, gamma)
-    mc_std = float(np.std(scores, ddof=1))
-    rel_err = abs(est_std - mc_std) / max(mc_std, 1e-12)
-    assert rel_err < 0.50
+    logic_mean = y_pred[:, 0:4]
+    logic_var = y_pred_var[:, 0:4]
+    D = float(worst_corner_distance(setpoint))
+    c = 1.0 / (D**2)
+    lf_var_unsc = (
+        4.0 * (logic_mean**2) * logic_var
+        + 4.0 * (setpoint[None, :] ** 2) * logic_var
+        + 2.0 * (logic_var**2)
+        - 8.0 * logic_mean * setpoint[None, :] * logic_var
+    )
+    lf_var = c * np.sum(lf_var_unsc, axis=1)
+    lf_exp = c * np.sum(
+        logic_mean**2 + logic_var - (2.0 * logic_mean * setpoint[None, :]) + setpoint[None, :] ** 2,
+        axis=1,
+    )
+
+    ln2 = np.log(2.0)
+    effect_var_unwt = (np.exp((ln2**2) * y_pred_var[:, 4:8]) - 1.0) * np.exp(
+        2.0 * ln2 * y_pred[:, 4:8] + (ln2**2) * y_pred_var[:, 4:8]
+    )
+    effect_var = np.sum(effect_var_unwt * (w**2), axis=1) / (denom**2)
+    effect_exp = np.sum(np.exp(ln2 * y_pred[:, 4:8] + 0.5 * (ln2**2) * y_pred_var[:, 4:8]) * w, axis=1) / denom
+
+    expected_var = effect_var * lf_var + effect_var * (lf_exp**2) + lf_var * (effect_exp**2)
+    expected_sigma = np.sqrt(expected_var)
+    np.testing.assert_allclose(sigma, expected_sigma, rtol=1e-10, atol=1e-12)
 
 
 def test_sfxi_v1_uncertainty_auto_defaults_to_analytical_when_beta_gamma_one():
@@ -528,7 +514,7 @@ def test_sfxi_v1_uncertainty_is_empty_without_std_input():
     assert res.uncertainty_by_name == {}
 
 
-def test_sfxi_v1_uncertainty_analytical_matches_bf3cde3_regression_fixture():
+def test_sfxi_v1_uncertainty_analytical_c5666a7_regression_fixture():
     y_pred = np.array(
         [
             [0.1, 0.2, 0.15, 0.85, 0.3, 0.5, 0.2, 0.9],
@@ -559,8 +545,8 @@ def test_sfxi_v1_uncertainty_analytical_matches_bf3cde3_regression_fixture():
     octx = rctx.for_plugin(category="objective", name="sfxi_v1", plugin=sfxi_v1)
     res = sfxi_v1(y_pred=y_pred, params=params, ctx=octx, train_view=tv, y_pred_std=y_pred_std)
     unc = np.asarray(res.uncertainty_by_name["sfxi"], dtype=float)
-    expected = np.array([0.014324431764661054, 0.025163760663451593], dtype=float)
-    np.testing.assert_allclose(unc, expected, rtol=1e-12, atol=1e-12)
+    expected = np.array([0.008229008782537631, 0.014461619845017327], dtype=float)
+    np.testing.assert_allclose(unc, expected, rtol=1e-10, atol=1e-12)
 
 
 def test_sfxi_v1_skips_uncertainty_method_validation_when_std_missing():
