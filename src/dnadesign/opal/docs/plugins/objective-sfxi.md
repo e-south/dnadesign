@@ -15,6 +15,9 @@ It explains how OPAL converts vec8 model outputs into selection-ready score and 
 - Uncertainty method gating: `analytical` is valid only when `logic_exponent_beta == 1` and `intensity_exponent_gamma == 1` (exact equality)
 - Uncertainty method default: if `uncertainty_method` is omitted or null, OPAL uses `analytical` when `beta=gamma=1`, otherwise `delta`
 - Uncertainty with missing model std: when `y_pred_std` is absent, no uncertainty channel is emitted and method selection does not affect score computation
+- Uncertainty with model std: required `y_pred_std` entries must be strictly `> 0`; non-positive required entries fail fast
+- Uncertainty output contract: emitted scalar uncertainty is finite and strictly `> 0`, otherwise OPAL fails fast
+- Std semantics: `y_pred_std` is interpreted as a standard deviation in objective units and may exceed `1`
 - Scaling source: denominator is computed from current-round observed labels and persisted in run metadata
 - Strictness: run fails if current-round labels are fewer than `scaling.min_n`
 - Selection wiring:
@@ -256,7 +259,8 @@ Only proximity of $\widehat{v}$ to $p$ (being OFF everywhere) is rewarded.
 * **Non-finite:** reject at ingestion.
 * **Too few labels in round:** objective errors; lower `scaling.min_n` or add labels.
 * **Analytical uncertainty constraints:** if `uncertainty_method=analytical`, OPAL fails fast unless `logic_exponent_beta=1` and `intensity_exponent_gamma=1`.
-* **Analytical scope:** analytical uncertainty follows the restored `bf3cde3` closed-form path, with clip-alignment guards for clipped effect and out-of-bounds logic regimes; it remains a closed-form approximation rather than a full re-derivation of every nonlinear branch.
+* **Uncertainty positivity:** if required model std entries are non-positive, or computed scalar uncertainty is non-positive, OPAL fails fast with a clear error.
+* **Analytical scope:** analytical uncertainty follows the restored `bf3cde3` closed-form path; it remains a closed-form approximation rather than a full re-derivation of every nonlinear branch.
 
 ---
 
