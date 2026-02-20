@@ -241,6 +241,18 @@ def _scalar_uncertainty_delta(
     scalar_uncertainty_var = np.sum((grad**2) * y_pred_var, axis=1)
     if not np.all(np.isfinite(scalar_uncertainty_var)):
         raise ValueError("sfxi_v1: computed scalar uncertainty variance contains non-finite values.")
+    zero_or_negative_var = scalar_uncertainty_var <= 0.0
+    if beta > 0.0 and np.any(zero_or_negative_var):
+        cusp_mask = dist <= 1e-12
+        cusp_rows = zero_or_negative_var & cusp_mask
+        if np.any(cusp_rows):
+            count = int(np.sum(cusp_rows))
+            sample_rows = [int(i) for i in np.where(cusp_rows)[0][:5].tolist()]
+            raise ValueError(
+                "sfxi_v1: delta uncertainty is undefined at exact logic setpoint "
+                "(dist=0) because the logic-fidelity branch is non-differentiable; "
+                f"found {count} candidates; sample_rows={sample_rows}."
+            )
     with np.errstate(invalid="ignore"):
         scalar_uncertainty = np.sqrt(scalar_uncertainty_var)
     _validate_scalar_uncertainty_strictly_positive(

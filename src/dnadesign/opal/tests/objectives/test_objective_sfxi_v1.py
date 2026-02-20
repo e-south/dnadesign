@@ -650,6 +650,26 @@ def test_sfxi_v1_uncertainty_analytical_clipped_regime_matches_delta():
     assert sigma_analytical > 0.0
 
 
+def test_sfxi_v1_uncertainty_delta_exact_logic_setpoint_fails_with_clear_error():
+    y_pred = np.array([[0.0, 0.0, 0.0, 0.0, 2.0, 2.0, 2.0, 2.0]], dtype=float)
+    y_pred_std = np.array([[0.05, 0.05, 0.05, 0.05, 0.0, 0.0, 0.0, 0.0]], dtype=float)
+    params = {
+        "setpoint_vector": [0, 0, 0, 0],
+        "logic_exponent_beta": 1.0,
+        "intensity_exponent_gamma": 1.0,
+        "uncertainty_method": "delta",
+        "scaling": {"percentile": 95, "min_n": 1, "eps": 1e-8},
+    }
+    train_Y = np.empty((0, 8), dtype=float)
+    train_R = np.empty((0,), dtype=int)
+    tv = _TrainView(train_Y, train_R, as_of_round=0)
+
+    rctx = _ctx(as_of_round=0)
+    octx = rctx.for_plugin(category="objective", name="sfxi_v1", plugin=sfxi_v1)
+    with pytest.raises(ValueError, match="delta uncertainty is undefined at exact logic setpoint"):
+        sfxi_v1(y_pred=y_pred, params=params, ctx=octx, train_view=tv, y_pred_std=y_pred_std)
+
+
 def test_sfxi_v1_rejects_unstable_score_intensity_log2_range():
     y_pred = np.array([[0.1, 0.2, 0.15, 0.85, 2000.0, 2000.0, 2000.0, 2000.0]], dtype=float)
     params = {

@@ -18,6 +18,28 @@ Execution plan used for this pass:
 - Update objective docs and PR #26 body to the same canon wording and issue relationship.
 - Include pending formatting diffs and end with a clean working tree.
 
+### 2026-02-20 Audit follow-up: delta exact-setpoint uncertainty clarity
+
+What changed:
+- Added a new objective regression test for the delta-method cusp case:
+  - `src/dnadesign/opal/tests/objectives/test_objective_sfxi_v1.py`
+  - `test_sfxi_v1_uncertainty_delta_exact_logic_setpoint_fails_with_clear_error`
+- Hardened `sfxi_v1` delta uncertainty path with a targeted fail-fast error when candidates land exactly on the logic setpoint (`dist=0`) and computed variance would otherwise collapse to zero due non-differentiability:
+  - `src/dnadesign/opal/src/objectives/sfxi_v1.py`
+- Updated SFXI docs to document this delta-method edge case explicitly:
+  - `src/dnadesign/opal/docs/plugins/objective-sfxi.md`
+
+Why:
+- During adversarial audit of issue-aligned uncertainty behavior, this remained a UX footgun: users could receive a generic strict-positivity error instead of a precise root-cause message for a non-differentiable delta branch corner.
+- The new message is explicit and actionable, while preserving existing strict uncertainty contracts.
+
+Validation:
+- `uv run pytest -q src/dnadesign/opal/tests/objectives/test_objective_sfxi_v1.py -k exact_logic_setpoint` (fails before code change, passes after)
+- `uv run ruff check src/dnadesign/opal/src/objectives/sfxi_v1.py src/dnadesign/opal/tests/objectives/test_objective_sfxi_v1.py`
+- `uv run pytest -q src/dnadesign/opal/tests`
+- `uv run opal demo-matrix --rounds 0 --json`
+- `uv run python -m dnadesign.devtools.docs_checks`
+
 ### 2026-02-16 Guided demo workflows (CLI + docs)
 
 What changed:
