@@ -1598,3 +1598,41 @@ Validation:
 - `uv run ruff check src/dnadesign/opal/src src/dnadesign/opal/tests src/dnadesign/opal/docs` -> PASS
 - Manual CLI check:
   - non-demo slug (`alpha_campaign`) reset via `uv run opal campaign-reset -c <config> --apply --no-backup` -> PASS
+
+### 2026-02-20 SFXI/EI hardening follow-up: config parse + CLI error stream UX
+
+Goal:
+- Close remaining user-facing footguns found during adversarial OPAL workflow testing while preserving current #22/#23/#27/#28 direction.
+
+Findings:
+- Duplicate YAML keys (for example duplicate `objectives:`) surfaced as internal error (`exit 3`) in `opal validate` instead of a config bad-args failure.
+- Non-debug `OpalError` messages were mirrored to both stderr and stdout, creating duplicate error lines in non-interactive usage.
+
+Changes:
+- Config loader now converts strict-YAML parse failures (including duplicate-key `KeyError`) into `ConfigError`:
+  - `src/dnadesign/opal/src/config/loader.py`
+- CLI OpalError handling now writes non-debug errors to stderr only:
+  - `src/dnadesign/opal/src/cli/commands/_common.py`
+- Added regression tests:
+  - `src/dnadesign/opal/tests/test_cli_common.py::test_opal_error_default_mode_writes_only_stderr`
+  - `src/dnadesign/opal/tests/test_config_objectives_v2.py::test_load_config_rejects_duplicate_yaml_keys`
+  - `src/dnadesign/opal/tests/test_cli_workflows.py::test_validate_rejects_duplicate_yaml_keys_as_bad_args`
+- Updated user docs for strict parse behavior:
+  - `src/dnadesign/opal/docs/reference/configuration.md`
+  - `src/dnadesign/opal/docs/reference/cli.md`
+
+Validation:
+- Red-first targeted tests (confirmed failing before fixes), then green:
+  - `uv run pytest -q src/dnadesign/opal/tests/test_cli_common.py src/dnadesign/opal/tests/test_config_objectives_v2.py::test_load_config_rejects_duplicate_yaml_keys src/dnadesign/opal/tests/test_cli_workflows.py::test_validate_rejects_duplicate_yaml_keys_as_bad_args` -> PASS
+- Broader OPAL regression:
+  - `uv run pytest -q src/dnadesign/opal/tests/test_cli_common.py src/dnadesign/opal/tests/test_config_objectives_v2.py src/dnadesign/opal/tests/test_cli_workflows.py src/dnadesign/opal/tests/test_cli_demo_matrix.py src/dnadesign/opal/tests/test_objective_sfxi_v1.py src/dnadesign/opal/tests/test_expected_improvement_edge_cases.py` -> PASS
+  - `uv run pytest -q src/dnadesign/opal/tests` -> PASS
+- Lint/docs checks:
+  - `uv run ruff check src/dnadesign/opal/src/config/loader.py src/dnadesign/opal/src/cli/commands/_common.py src/dnadesign/opal/tests/test_cli_common.py src/dnadesign/opal/tests/test_cli_workflows.py src/dnadesign/opal/tests/test_config_objectives_v2.py` -> PASS
+  - `uv run python -m dnadesign.devtools.docs_checks` -> PASS
+- End-to-end CLI pressure checks:
+  - `uv run opal demo-matrix --rounds 0,1 --json` -> PASS
+  - `uv run opal demo-matrix --rounds 0 --json` -> PASS
+  - Adversarial:
+    - `uv run opal demo-matrix --rounds a --json` -> exits 2, stderr-only message
+    - `uv run opal validate -c <dup-key-yaml>` -> exits 2 with `Invalid campaign.yaml: "Duplicate key in YAML: 'objectives'"`
