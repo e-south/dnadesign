@@ -29,6 +29,7 @@ from ._common import (
     opal_error,
     resolve_config_path,
     resolve_json_path,
+    resolve_recorded_model_artifact_path,
     resolve_table_path,
     store_from_cfg,
 )
@@ -116,10 +117,7 @@ def cmd_predict(
             entry = next((r for r in rounds if int(r.round_index) == int(round_sel)), None)
             if entry is None:
                 raise OpalError(f"Round {round} not found in {st_path}")
-            mp = Path(entry.model.get("artifact_path", "")) if entry.model else None
-            if not mp or not mp.exists():
-                mp = Path(entry.round_dir) / "model" / "model.joblib"
-            model_path = mp
+            model_path = resolve_recorded_model_artifact_path(entry, state_path=st_path)
         if model_path is None or not Path(model_path).exists():
             raise OpalError(f"Resolved model path not found: {model_path}")
         if Path(model_path).is_dir():

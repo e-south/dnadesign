@@ -32,6 +32,7 @@ from ._common import (
     print_config_context,
     resolve_config_path,
     resolve_json_path,
+    resolve_recorded_model_artifact_path,
 )
 
 
@@ -77,11 +78,7 @@ def cmd_model_show(
             entry = next((r for r in rounds if int(r.round_index) == int(round_sel)), None)
             if entry is None:
                 raise OpalError(f"Round {round_sel} not found in {st_path}")
-            # Prefer recorded artifact path; fallback to conventional path
-            mp = Path(entry.model.get("artifact_path", "")) if entry.model else None
-            if not mp or not mp.exists():
-                mp = Path(entry.round_dir) / "model" / "model.joblib"
-            model_path = mp
+            model_path = resolve_recorded_model_artifact_path(entry, state_path=st_path)
         params_obj = None
         if model_params:
             model_params = resolve_json_path(model_params, label="--model-params", must_exist=True)

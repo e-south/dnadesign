@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_cli_predict_yops_inversion.py
+src/dnadesign/opal/tests/cli/test_cli_predict_yops_inversion.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -104,6 +104,35 @@ def test_predict_accepts_latest_round_selector(tmp_path: Path) -> None:
     res = runner.invoke(app, ["--no-color", "predict", "-c", str(campaign), "--round", "latest"])
     assert res.exit_code == 0, res.output
     assert "y_pred_vec" in res.output
+
+
+def test_predict_rejects_missing_recorded_artifact_path(tmp_path: Path) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(campaign, workdir=workdir, records_path=records)
+
+    round_dir = workdir / "outputs" / "rounds" / "round_0"
+    model_dir = round_dir / "model"
+    model_dir.mkdir(parents=True, exist_ok=True)
+    model_path = model_dir / "model.joblib"
+    meta = _train_model(model_path)
+    (model_dir / "model_meta.json").write_text(json.dumps(meta))
+
+    write_state(workdir, records_path=records, run_id="run-0", round_index=0)
+
+    state_path = workdir / "state.json"
+    state_obj = json.loads(state_path.read_text())
+    state_obj["rounds"][0]["model"].pop("artifact_path", None)
+    state_path.write_text(json.dumps(state_obj))
+
+    app = _build()
+    runner = CliRunner()
+    res = runner.invoke(app, ["--no-color", "predict", "-c", str(campaign), "--round", "latest"])
+    assert res.exit_code != 0
+    assert "model.artifact_path" in res.output
 
 
 def test_predict_rejects_round_and_model_path(tmp_path: Path) -> None:

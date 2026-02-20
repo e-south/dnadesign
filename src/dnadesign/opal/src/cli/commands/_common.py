@@ -185,6 +185,31 @@ def print_config_context(cfg_path: Path, *, cfg: RootConfig | None = None, recor
     print_stdout(" | ".join(parts))
 
 
+def resolve_recorded_model_artifact_path(entry, *, state_path: Path) -> Path:
+    """
+    Resolve a round model artifact path from state.json with strict contracts.
+    """
+    round_index = getattr(entry, "round_index", "?")
+    model_meta = getattr(entry, "model", None)
+    if not isinstance(model_meta, dict):
+        raise OpalError(f"state.json round {round_index} missing model metadata: {state_path}")
+
+    raw_path = str(model_meta.get("artifact_path", "")).strip()
+    if not raw_path:
+        raise OpalError(f"state.json round {round_index} missing model.artifact_path: {state_path}")
+
+    artifact_path = Path(raw_path)
+    if not artifact_path.is_absolute():
+        raise OpalError(
+            f"state.json round {round_index} has non-absolute model.artifact_path: {artifact_path} ({state_path})"
+        )
+    if not artifact_path.exists():
+        raise OpalError(f"state.json round {round_index} model.artifact_path not found: {artifact_path}")
+    if artifact_path.is_dir():
+        raise OpalError(f"state.json round {round_index} model.artifact_path must be a file: {artifact_path}")
+    return artifact_path
+
+
 def _json_default(o):
     if _dc.is_dataclass(o):
         return _dc.asdict(o)
