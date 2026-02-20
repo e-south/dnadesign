@@ -1636,3 +1636,30 @@ Validation:
   - Adversarial:
     - `uv run opal demo-matrix --rounds a --json` -> exits 2, stderr-only message
     - `uv run opal validate -c <dup-key-yaml>` -> exits 2 with `Invalid campaign.yaml: "Duplicate key in YAML: 'objectives'"`
+
+### 2026-02-20 OPAL tests layout organization (domain-first)
+
+Goal:
+- Reduce maintenance friction from a flat OPAL test directory by grouping tests by ownership domain.
+
+Changes:
+- Reorganized `src/dnadesign/opal/tests/` into domain folders:
+  - `analysis/`, `cli/`, `config/`, `ingest/`, `models/`, `notebooks/`, `objectives/`,
+    `platform/`, `plots/`, `predict/`, `runtime/`, `selection/`, `storage/`, `transforms/`
+- Moved all `test_*.py` files from root into the above folders with no behavior changes.
+- Standardized shared helper imports to absolute path:
+  - `from dnadesign.opal.tests._cli_helpers import ...`
+- Added `src/dnadesign/opal/tests/README.md` with category map and placement rules for new tests.
+
+Validation:
+- Collection:
+  - `uv run pytest --collect-only -q src/dnadesign/opal/tests` -> PASS
+- Lint:
+  - `uv run ruff check --fix src/dnadesign/opal/tests`
+  - `uv run ruff check src/dnadesign/opal/tests` -> PASS
+- Full OPAL tests:
+  - `uv run pytest -q src/dnadesign/opal/tests` -> PASS
+- Focused regression:
+  - `uv run pytest -q src/dnadesign/opal/tests/cli/test_cli_workflow* src/dnadesign/opal/tests/cli/test_verify_outputs.py src/dnadesign/opal/tests/config/test_config_objectives_v2.py src/dnadesign/opal/tests/runtime/test_run_round_integrity.py` -> PASS
+- Workflow smoke:
+  - `uv run opal demo-matrix --rounds 0 --json` -> PASS
