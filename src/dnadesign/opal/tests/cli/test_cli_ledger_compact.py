@@ -18,8 +18,7 @@ from dnadesign.opal.src import LEDGER_SCHEMA_VERSION
 from dnadesign.opal.src import __version__ as OPAL_VERSION
 from dnadesign.opal.src.cli.app import _build
 from dnadesign.opal.src.storage.parquet_io import write_parquet_df
-
-from ._cli_helpers import write_campaign_yaml, write_records
+from dnadesign.opal.tests._cli_helpers import write_campaign_yaml, write_records
 
 
 def test_ledger_compact_runs_dedupes(tmp_path: Path) -> None:

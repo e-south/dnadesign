@@ -16,8 +16,7 @@ from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
 from dnadesign.opal.src.registries.transforms_y import register_transform_y
-
-from ._cli_helpers import write_campaign_yaml, write_records
+from dnadesign.opal.tests._cli_helpers import write_campaign_yaml, write_records
 
 
 @register_transform_y("test_reorder_reset")

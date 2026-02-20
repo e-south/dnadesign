@@ -25,8 +25,7 @@ from dnadesign.opal.src.storage.writebacks import (
     build_run_meta_event,
     build_run_pred_events,
 )
-
-from ._cli_helpers import write_campaign_yaml, write_records
+from dnadesign.opal.tests._cli_helpers import write_campaign_yaml, write_records
 
 
 def test_load_predictions_with_setpoint_requires_setpoint(tmp_path: Path) -> None:

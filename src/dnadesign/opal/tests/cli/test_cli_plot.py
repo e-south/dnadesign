@@ -14,8 +14,7 @@ from typer.testing import CliRunner
 from dnadesign.opal.src.cli.app import _build
 from dnadesign.opal.src.plots._context import PlotContext
 from dnadesign.opal.src.registries.plots import register_plot
-
-from ._cli_helpers import write_campaign_yaml, write_records
+from dnadesign.opal.tests._cli_helpers import write_campaign_yaml, write_records
 
 
 @register_plot("test_plot_cli_minimal")
@@ -143,7 +142,7 @@ def test_plot_cli_rejects_run_id_round_mismatch(tmp_path):
         records_path=records,
         plots=[{"name": "mini", "kind": "test_plot_cli_minimal", "params": {"tag": "demo"}}],
     )
-    from ._cli_helpers import write_ledger
+    from dnadesign.opal.tests._cli_helpers import write_ledger
 
     write_ledger(workdir, run_id="r0", round_index=0)
     write_ledger(workdir, run_id="r1", round_index=1)
@@ -169,7 +168,7 @@ def test_plot_cli_rejects_bad_round_selector(tmp_path):
         records_path=records,
         plots=[{"name": "mini", "kind": "test_plot_cli_minimal", "params": {"tag": "demo"}}],
     )
-    from ._cli_helpers import write_ledger
+    from dnadesign.opal.tests._cli_helpers import write_ledger
 
     write_ledger(workdir, run_id="r0", round_index=0)
 

@@ -16,8 +16,7 @@ from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
 from dnadesign.opal.src.storage.data_access import RecordsStore
-
-from ._cli_helpers import write_campaign_yaml
+from dnadesign.opal.tests._cli_helpers import write_campaign_yaml
 
 
 def _write_records(path: Path) -> None:

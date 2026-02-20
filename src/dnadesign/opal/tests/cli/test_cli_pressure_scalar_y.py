@@ -16,8 +16,7 @@ import pandas as pd
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
-
-from ._cli_helpers import write_campaign_yaml
+from dnadesign.opal.tests._cli_helpers import write_campaign_yaml
 
 
 def _write_records(path: Path) -> None:

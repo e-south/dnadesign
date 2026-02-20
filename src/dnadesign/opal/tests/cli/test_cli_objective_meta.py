@@ -12,8 +12,7 @@ import json
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
-
-from ._cli_helpers import write_campaign_yaml, write_ledger, write_records
+from dnadesign.opal.tests._cli_helpers import write_campaign_yaml, write_ledger, write_records
 
 
 def test_objective_meta_json_contains_diagnostics(tmp_path):

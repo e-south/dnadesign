@@ -17,8 +17,7 @@ import yaml
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
-
-from ._cli_helpers import write_campaign_yaml, write_records
+from dnadesign.opal.tests._cli_helpers import write_campaign_yaml, write_records
 
 
 def _setup_workspace(tmp_path: Path, *, include_opal_cols: bool = False) -> tuple[Path, Path, Path]:

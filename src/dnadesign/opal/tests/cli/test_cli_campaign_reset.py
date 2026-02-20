@@ -15,8 +15,7 @@ import pandas as pd
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
-
-from ._cli_helpers import write_campaign_yaml, write_records
+from dnadesign.opal.tests._cli_helpers import write_campaign_yaml, write_records
 
 
 def test_campaign_reset_requires_config_or_env(monkeypatch, tmp_path: Path) -> None:

@@ -18,8 +18,7 @@ from dnadesign.opal.src.cli.commands.init import cmd_init
 from dnadesign.opal.src.cli.commands.run import cmd_run
 from dnadesign.opal.src.storage.ledger import LedgerReader
 from dnadesign.opal.src.storage.workspace import CampaignWorkspace
-
-from ._cli_helpers import write_campaign_yaml
+from dnadesign.opal.tests._cli_helpers import write_campaign_yaml
 
 
 def _write_records_vec8(records_path: Path, *, slug: str = "demo") -> None:

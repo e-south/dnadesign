@@ -17,8 +17,7 @@ from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
 from dnadesign.opal.src.models.random_forest import RandomForestModel
-
-from ._cli_helpers import write_campaign_yaml, write_records, write_state
+from dnadesign.opal.tests._cli_helpers import write_campaign_yaml, write_records, write_state
 
 
 def _train_model(model_path: Path) -> dict:
