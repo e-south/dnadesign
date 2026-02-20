@@ -291,6 +291,46 @@ def test_sfxi_v1_uncertainty_analytical_requires_beta_gamma_one():
         sfxi_v1(y_pred=y_pred, params=params, ctx=octx, train_view=tv, y_pred_std=y_pred_std)
 
 
+def test_sfxi_v1_delta_rejects_fractional_beta_with_zero_logic_base():
+    y_pred = np.array([[1.0, 1.0, 1.0, 0.0, 0.3, 0.4, 0.2, 0.8]], dtype=float)
+    y_pred_std = np.full_like(y_pred, 0.05, dtype=float)
+    params = {
+        "setpoint_vector": [0, 0, 0, 1],
+        "logic_exponent_beta": 0.5,
+        "intensity_exponent_gamma": 1.0,
+        "intensity_log2_offset_delta": 0.0,
+        "scaling": {"percentile": 95, "min_n": 1, "eps": 1e-8},
+    }
+    train_Y = np.array([[0.0, 0.0, 0.0, 1.0, 0.2, 0.3, 0.1, 0.8]], dtype=float)
+    train_R = np.array([0], dtype=int)
+    tv = _TrainView(train_Y, train_R, as_of_round=0)
+
+    rctx = _ctx(as_of_round=0)
+    octx = rctx.for_plugin(category="objective", name="sfxi_v1", plugin=sfxi_v1)
+    with pytest.raises(ValueError, match="logic_exponent_beta.*requires positive base"):
+        sfxi_v1(y_pred=y_pred, params=params, ctx=octx, train_view=tv, y_pred_std=y_pred_std)
+
+
+def test_sfxi_v1_delta_rejects_fractional_gamma_with_zero_effect_base():
+    y_pred = np.array([[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0]], dtype=float)
+    y_pred_std = np.full_like(y_pred, 0.05, dtype=float)
+    params = {
+        "setpoint_vector": [0, 0, 0, 1],
+        "logic_exponent_beta": 1.0,
+        "intensity_exponent_gamma": 0.5,
+        "intensity_log2_offset_delta": 1.0,
+        "scaling": {"percentile": 95, "min_n": 1, "eps": 1e-8},
+    }
+    train_Y = np.array([[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 2.0]], dtype=float)
+    train_R = np.array([0], dtype=int)
+    tv = _TrainView(train_Y, train_R, as_of_round=0)
+
+    rctx = _ctx(as_of_round=0)
+    octx = rctx.for_plugin(category="objective", name="sfxi_v1", plugin=sfxi_v1)
+    with pytest.raises(ValueError, match="intensity_exponent_gamma.*requires positive base"):
+        sfxi_v1(y_pred=y_pred, params=params, ctx=octx, train_view=tv, y_pred_std=y_pred_std)
+
+
 def test_sfxi_v1_uncertainty_analytical_uses_log2_normal_moments():
     setpoint = np.array([0.3, 0.4, 0.7, 0.2], dtype=float)
     w = setpoint / float(np.sum(setpoint))
