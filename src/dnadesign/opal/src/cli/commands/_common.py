@@ -223,10 +223,4 @@ def opal_error(ctx: str, e: OpalError) -> None:
 
         print_stderr(f"[bold red]OpalError during [white]{ctx}[/]:[/] {e}\n[dim]{_tb.format_exc()}[/]")
     else:
-        msg = str(e)
-        print_stderr(msg)
-        try:
-            if not sys.stderr.isatty():
-                print_stdout(msg)
-        except Exception:
-            pass
+        print_stderr(str(e))
