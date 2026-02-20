@@ -187,49 +187,39 @@ def _scalar_uncertainty_analytical(
     effect_clip_mask: np.ndarray,
     effect_scaled_vals: np.ndarray,
     w: np.ndarray,
+    denom: float,
     setpoint: np.ndarray,
     delta: float,
     intensity_disabled: bool,
 ) -> np.ndarray:
-    # Analytical uncertainty formula follows the bf3cde3 implementation.
+    # Analytical uncertainty formula updated to reflect lognormal distribution usage
     logic_mean = np.asarray(v_hat, dtype=float)
-    logic_var = np.asarray(y_pred_var[:, 0:4], dtype=float) * np.asarray(logic_clip_mask, dtype=float)
+    logic_var = np.asarray(y_pred_var[:, 0:4], dtype=float)
     if intensity_disabled:
         effect_var = np.zeros(y_pred.shape[0], dtype=float)
         effect_exp = np.ones(y_pred.shape[0], dtype=float)
     else:
-        exp2_intensity = np.exp2(y_pred[:, 4:8])
-        y_lin = np.maximum(0.0, exp2_intensity - float(delta))
-        positive_intensity = y_lin > 0.0
-        placeholder = (exp2_intensity * np.log(2.0)) ** 2
-        ind_var = placeholder * y_pred_var[:, 4:8] * positive_intensity
-        wt_var = ind_var * w[None, :]
-        effect_var = np.sum(wt_var, axis=1)
-        effect_exp = np.sum(w[None, :] * y_lin, axis=1)
-        clip_mask = np.asarray(effect_clip_mask, dtype=bool).reshape(-1)
-        if clip_mask.size != y_pred.shape[0]:
-            raise ValueError("sfxi_v1: effect_clip_mask shape mismatch for analytical uncertainty.")
-        logic_out_of_bounds = np.any(np.asarray(logic_clip_mask, dtype=float) < 1.0, axis=1)
-        clip_guard_mask = clip_mask & logic_out_of_bounds
-        effect_var = np.where(clip_guard_mask, 0.0, effect_var)
-        effect_exp = np.where(clip_guard_mask, np.asarray(effect_scaled_vals, dtype=float).reshape(-1), effect_exp)
+        effect_var_unwt = (np.exp2(y_pred_var[:, 4:8]) - 1)*np.exp2(y_pred_var[:, 4:8]+2*y_pred[:, 4:8])
+        effect_var_unsc = np.sum(np.multiply(effect_var_unwt, w**2), axis=1)
+        effect_var = effect_var_unsc / (denom**2)
+        effect_exp = np.sum(np.multiply(np.exp2(y_pred[:, 4:8] + y_pred_var[:, 4:8]/2), w), axis=1) / denom
+        
 
     D = float(worst_corner_distance(setpoint))
     if not np.isfinite(D) or D <= 0.0:
         raise ValueError("sfxi_v1: invalid setpoint distance for analytical uncertainty.")
     c = 1.0 / (D**2)
-    ph2 = (
+    lf_var_unsc = (
         4.0 * (logic_mean**2) * logic_var
         + 4.0 * (setpoint[None, :] ** 2) * logic_var
         + 2.0 * (logic_var**2)
         - 8.0 * logic_mean * setpoint[None, :] * logic_var
     )
-    lf_var = c * np.sum(ph2, axis=1)
+    lf_var = c * np.sum(lf_var_unsc, axis=1)
     lf_exp = c * np.sum(
         logic_mean**2 + logic_var - (2.0 * logic_mean * setpoint[None, :]) + setpoint[None, :] ** 2,
         axis=1,
     )
-
     scalar_uncertainty_var = effect_var * lf_var + effect_var * (lf_exp**2) + lf_var * (effect_exp**2)
     if not np.all(np.isfinite(scalar_uncertainty_var)):
         raise ValueError("sfxi_v1: computed scalar uncertainty variance contains non-finite values.")
@@ -381,6 +371,7 @@ def sfxi_v1(
                 effect_clip_mask=effect_clip_mask,
                 effect_scaled_vals=E_scaled,
                 w=w,
+                denom = denom,
                 setpoint=setpoint,
                 delta=delta,
                 intensity_disabled=bool(intensity_disabled),
