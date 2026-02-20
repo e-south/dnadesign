@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_state_v1_compat.py
+src/dnadesign/opal/tests/runtime/test_state_v1_compat.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

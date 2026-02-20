@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_cli_common.py
+src/dnadesign/opal/tests/cli/test_cli_common.py
 
 Tests shared CLI command helpers for error-report stream behavior.
 

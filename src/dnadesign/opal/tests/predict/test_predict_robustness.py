@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_predict_robustness.py
+src/dnadesign/opal/tests/predict/test_predict_robustness.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

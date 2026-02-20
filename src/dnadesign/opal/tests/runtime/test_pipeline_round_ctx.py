@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_pipeline_round_ctx.py
+src/dnadesign/opal/tests/runtime/test_pipeline_round_ctx.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_cli_pressure_sfxi_roundtrip.py
+src/dnadesign/opal/tests/cli/test_cli_pressure_sfxi_roundtrip.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

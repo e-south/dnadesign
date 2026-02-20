@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_training_policy.py
+src/dnadesign/opal/tests/runtime/test_training_policy.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

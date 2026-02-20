@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_ingest_duplicate_policy.py
+src/dnadesign/opal/tests/ingest/test_ingest_duplicate_policy.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

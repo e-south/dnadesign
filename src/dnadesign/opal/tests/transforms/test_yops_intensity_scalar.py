@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_yops_intensity_scalar.py
+src/dnadesign/opal/tests/transforms/test_yops_intensity_scalar.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

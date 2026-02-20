@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_selection_exclusion.py
+src/dnadesign/opal/tests/selection/test_selection_exclusion.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

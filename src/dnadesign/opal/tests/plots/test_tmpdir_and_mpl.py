@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_tmpdir_and_mpl.py
+src/dnadesign/opal/tests/plots/test_tmpdir_and_mpl.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

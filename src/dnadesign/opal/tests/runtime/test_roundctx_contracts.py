@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_roundctx_contracts.py
+src/dnadesign/opal/tests/runtime/test_roundctx_contracts.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

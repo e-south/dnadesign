@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_cli_guide.py
+src/dnadesign/opal/tests/cli/test_cli_guide.py
 
 CLI tests for guided workflow runbook generation.
 

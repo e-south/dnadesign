@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_cli_guidance_hints.py
+src/dnadesign/opal/tests/cli/test_cli_guidance_hints.py
 
 CLI tests for next-step hint output controls.
 

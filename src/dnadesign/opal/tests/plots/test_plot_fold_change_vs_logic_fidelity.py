@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_plot_fold_change_vs_logic_fidelity.py
+src/dnadesign/opal/tests/plots/test_plot_fold_change_vs_logic_fidelity.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_transform_matrix.py
+src/dnadesign/opal/tests/transforms/test_transform_matrix.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

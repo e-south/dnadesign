@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_transform_sfxi_vec8_from_table_v1.py
+src/dnadesign/opal/tests/transforms/test_transform_sfxi_vec8_from_table_v1.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

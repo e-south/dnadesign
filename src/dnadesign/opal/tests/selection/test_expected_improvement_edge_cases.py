@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_expected_improvement_edge_cases.py
+src/dnadesign/opal/tests/selection/test_expected_improvement_edge_cases.py
 
 Edge-case regression tests for expected-improvement acquisition behavior.
 

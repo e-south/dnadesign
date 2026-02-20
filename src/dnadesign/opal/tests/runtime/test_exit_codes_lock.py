@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_exit_codes_lock.py
+src/dnadesign/opal/tests/runtime/test_exit_codes_lock.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

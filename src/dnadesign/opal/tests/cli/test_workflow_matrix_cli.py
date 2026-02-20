@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_workflow_matrix_cli.py
+src/dnadesign/opal/tests/cli/test_workflow_matrix_cli.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

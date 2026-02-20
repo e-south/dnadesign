@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_sfxi_diagnostics_guidance.py
+src/dnadesign/opal/tests/analysis/test_sfxi_diagnostics_guidance.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

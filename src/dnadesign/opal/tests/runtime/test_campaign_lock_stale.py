@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_campaign_lock_stale.py
+src/dnadesign/opal/tests/runtime/test_campaign_lock_stale.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

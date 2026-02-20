@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_predict_output_format.py
+src/dnadesign/opal/tests/predict/test_predict_output_format.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

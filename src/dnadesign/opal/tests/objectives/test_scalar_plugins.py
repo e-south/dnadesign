@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_scalar_plugins.py
+src/dnadesign/opal/tests/objectives/test_scalar_plugins.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

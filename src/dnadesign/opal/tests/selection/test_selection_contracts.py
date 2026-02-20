@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_selection_contracts.py
+src/dnadesign/opal/tests/selection/test_selection_contracts.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

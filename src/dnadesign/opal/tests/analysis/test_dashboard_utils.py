@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_dashboard_utils.py
+src/dnadesign/opal/tests/analysis/test_dashboard_utils.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

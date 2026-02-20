@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_round_log_summary.py
+src/dnadesign/opal/tests/runtime/test_round_log_summary.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

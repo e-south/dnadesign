@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_cli_plot.py
+src/dnadesign/opal/tests/cli/test_cli_plot.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

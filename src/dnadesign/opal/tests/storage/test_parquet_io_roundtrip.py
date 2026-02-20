@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_parquet_io_roundtrip.py
+src/dnadesign/opal/tests/storage/test_parquet_io_roundtrip.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

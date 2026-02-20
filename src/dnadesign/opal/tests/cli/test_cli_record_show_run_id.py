@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_cli_record_show_run_id.py
+src/dnadesign/opal/tests/cli/test_cli_record_show_run_id.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

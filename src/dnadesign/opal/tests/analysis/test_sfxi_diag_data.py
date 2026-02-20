@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_sfxi_diag_data.py
+src/dnadesign/opal/tests/analysis/test_sfxi_diag_data.py
 
 Tests for SFXI diagnostic plot helpers.
 

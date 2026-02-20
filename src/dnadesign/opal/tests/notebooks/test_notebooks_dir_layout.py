@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_notebooks_dir_layout.py
+src/dnadesign/opal/tests/notebooks/test_notebooks_dir_layout.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

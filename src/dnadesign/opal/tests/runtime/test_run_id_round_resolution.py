@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_run_id_round_resolution.py
+src/dnadesign/opal/tests/runtime/test_run_id_round_resolution.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

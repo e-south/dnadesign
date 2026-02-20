@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_prom60_eda_autoload.py
+src/dnadesign/opal/tests/notebooks/test_prom60_eda_autoload.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

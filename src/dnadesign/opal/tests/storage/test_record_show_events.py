@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_record_show_events.py
+src/dnadesign/opal/tests/storage/test_record_show_events.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

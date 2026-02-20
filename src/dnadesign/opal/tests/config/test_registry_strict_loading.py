@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_registry_strict_loading.py
+src/dnadesign/opal/tests/config/test_registry_strict_loading.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

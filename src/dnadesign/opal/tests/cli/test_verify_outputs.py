@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_verify_outputs.py
+src/dnadesign/opal/tests/cli/test_verify_outputs.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

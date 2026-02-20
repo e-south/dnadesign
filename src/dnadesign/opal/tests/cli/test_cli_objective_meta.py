@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_cli_objective_meta.py
+src/dnadesign/opal/tests/cli/test_cli_objective_meta.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_cli_campaign_reset.py
+src/dnadesign/opal/tests/cli/test_cli_campaign_reset.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_sfxi_diagnostics_charts.py
+src/dnadesign/opal/tests/analysis/test_sfxi_diagnostics_charts.py
 
 Smoke tests for SFXI diagnostic chart builders.
 

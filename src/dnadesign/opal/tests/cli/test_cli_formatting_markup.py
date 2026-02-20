@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_cli_formatting_markup.py
+src/dnadesign/opal/tests/cli/test_cli_formatting_markup.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

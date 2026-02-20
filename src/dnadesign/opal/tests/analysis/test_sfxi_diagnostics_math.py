@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_sfxi_diagnostics_math.py
+src/dnadesign/opal/tests/analysis/test_sfxi_diagnostics_math.py
 
 Tests core SFXI diagnostics math utilities (factorial effects, gates, support,
 and intensity scaling).

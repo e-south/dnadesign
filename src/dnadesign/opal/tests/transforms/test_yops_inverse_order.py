@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_yops_inverse_order.py
+src/dnadesign/opal/tests/transforms/test_yops_inverse_order.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_objective_contract_v2.py
+src/dnadesign/opal/tests/objectives/test_objective_contract_v2.py
 
 Validates strict v2 objective and selection uncertainty contracts.
 

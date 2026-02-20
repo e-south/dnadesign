@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_ledger_dataset_writes.py
+src/dnadesign/opal/tests/storage/test_ledger_dataset_writes.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

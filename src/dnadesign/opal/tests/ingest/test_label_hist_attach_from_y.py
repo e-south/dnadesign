@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_label_hist_attach_from_y.py
+src/dnadesign/opal/tests/ingest/test_label_hist_attach_from_y.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

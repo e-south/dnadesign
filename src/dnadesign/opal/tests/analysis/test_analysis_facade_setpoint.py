@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_analysis_facade_setpoint.py
+src/dnadesign/opal/tests/analysis/test_analysis_facade_setpoint.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

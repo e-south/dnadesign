@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_pyarrow_sysctl_filter.py
+src/dnadesign/opal/tests/platform/test_pyarrow_sysctl_filter.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

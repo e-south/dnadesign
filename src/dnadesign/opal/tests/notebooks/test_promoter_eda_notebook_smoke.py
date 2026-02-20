@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 <dnadesign project>
-src/dnadesign/opal/tests/test_promoter_eda_notebook_smoke.py
+src/dnadesign/opal/tests/notebooks/test_promoter_eda_notebook_smoke.py
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
