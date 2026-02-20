@@ -1663,3 +1663,43 @@ Validation:
   - `uv run pytest -q src/dnadesign/opal/tests/cli/test_cli_workflow* src/dnadesign/opal/tests/cli/test_verify_outputs.py src/dnadesign/opal/tests/config/test_config_objectives_v2.py src/dnadesign/opal/tests/runtime/test_run_round_integrity.py` -> PASS
 - Workflow smoke:
   - `uv run opal demo-matrix --rounds 0 --json` -> PASS
+
+### 2026-02-20 CLI model artifact contract hardening (remove path fallback)
+
+Goal:
+- Remove hidden model-path fallback logic in CLI model resolution and enforce explicit state contracts.
+
+Findings:
+- `model-show` and `predict` previously fell back to `round_dir/model/model.joblib` when `state.json` model metadata was missing or stale.
+- This hid state corruption and coupled behavior to conventional filesystem layout.
+
+Changes:
+- Added strict resolver:
+  - `src/dnadesign/opal/src/cli/commands/_common.py::resolve_recorded_model_artifact_path`
+  - Requires `state.json` round entry to include `model.artifact_path`.
+  - Requires path to be absolute, exist, and be a file.
+- Updated commands to use strict resolver (no fallback):
+  - `src/dnadesign/opal/src/cli/commands/model_show.py`
+  - `src/dnadesign/opal/src/cli/commands/predict.py`
+- Added regression tests:
+  - `src/dnadesign/opal/tests/cli/test_cli_model_show.py::test_model_show_rejects_missing_recorded_artifact_path`
+  - `src/dnadesign/opal/tests/cli/test_cli_predict_yops_inversion.py::test_predict_rejects_missing_recorded_artifact_path`
+- Updated CLI docs:
+  - `src/dnadesign/opal/docs/reference/cli.md` (`predict` and `model-show` notes now document strict `model.artifact_path` requirement)
+
+Related maintainability cleanup:
+- Fixed stale per-file header path comments after test-tree move by aligning each moved test file header to its new path.
+
+Validation:
+- Red/green TDD:
+  - New missing-artifact-path tests fail before code changes and pass after.
+- Lint:
+  - `uv run ruff check src/dnadesign/opal/src/cli/commands/_common.py src/dnadesign/opal/src/cli/commands/model_show.py src/dnadesign/opal/src/cli/commands/predict.py src/dnadesign/opal/tests/cli/test_cli_model_show.py src/dnadesign/opal/tests/cli/test_cli_predict_yops_inversion.py src/dnadesign/opal/tests` -> PASS
+- Targeted tests:
+  - `uv run pytest -q src/dnadesign/opal/tests/cli/test_cli_model_show.py src/dnadesign/opal/tests/cli/test_cli_predict_yops_inversion.py` -> PASS
+- Full OPAL:
+  - `uv run pytest -q src/dnadesign/opal/tests` -> PASS
+- Docs checks:
+  - `uv run python -m dnadesign.devtools.docs_checks` -> PASS
+- Workflow smoke:
+  - `uv run opal demo-matrix --rounds 0 --json` -> PASS
