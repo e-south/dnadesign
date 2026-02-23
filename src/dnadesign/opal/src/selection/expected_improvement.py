@@ -97,5 +97,6 @@ def ei(
     acquisition_norm = _minmax_01(acquisition)
 
     primary = np.where(np.isfinite(acquisition_norm), -acquisition_norm, np.inf)
-    order_idx = np.lexsort((ids, primary)).astype(int)
+    secondary = -preds if mode == "maximize" else preds
+    order_idx = np.lexsort((ids, secondary, primary)).astype(int)
     return {"order_idx": order_idx, "score": acquisition_norm}

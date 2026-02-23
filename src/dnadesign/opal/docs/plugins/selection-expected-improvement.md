@@ -85,7 +85,10 @@ Normalization:
 Ranking source:
 
 - OPAL ranks by `A_norm` (descending).
-- In the degenerate case (`max(A) == min(A)`), all scores tie at zero and ranking is resolved deterministically by candidate `id`.
+- If `A_norm` ties, OPAL breaks ties by predicted score:
+  - `maximize`: higher predicted score first
+  - `minimize`: lower predicted score first
+- If both `A_norm` and predicted score tie, ranking is resolved deterministically by candidate `id`.
 
 ### Sigma contract
 

@@ -158,7 +158,7 @@ def test_expected_improvement_rejects_non_finite_scores() -> None:
         )
 
 
-def test_expected_improvement_degenerate_normalization_orders_by_id() -> None:
+def test_expected_improvement_degenerate_normalization_orders_by_id_when_predictions_tie() -> None:
     out = ei(
         ids=np.array(["b", "a", "c"], dtype=str),
         scores=np.array([1.0, 1.0, 1.0], dtype=float),
@@ -172,6 +172,38 @@ def test_expected_improvement_degenerate_normalization_orders_by_id() -> None:
     acq = np.asarray(out["score"], dtype=float).reshape(-1)
     assert np.allclose(acq, np.zeros(3, dtype=float))
     np.testing.assert_array_equal(np.asarray(out["order_idx"], dtype=int), np.array([1, 0, 2], dtype=int))
+
+
+def test_expected_improvement_ties_break_by_predicted_score_then_id_for_maximize() -> None:
+    out = ei(
+        ids=np.array(["d", "a", "c", "b"], dtype=str),
+        scores=np.array([0.2, 0.9, 0.9, 0.1], dtype=float),
+        scalar_uncertainty=np.array([0.2, 0.2, 0.2, 0.2], dtype=float),
+        top_k=2,
+        objective="maximize",
+        tie_handling="competition_rank",
+        alpha=0.0,
+        beta=0.0,
+    )
+    acq = np.asarray(out["score"], dtype=float).reshape(-1)
+    assert np.allclose(acq, np.zeros(4, dtype=float))
+    np.testing.assert_array_equal(np.asarray(out["order_idx"], dtype=int), np.array([1, 2, 0, 3], dtype=int))
+
+
+def test_expected_improvement_ties_break_by_predicted_score_then_id_for_minimize() -> None:
+    out = ei(
+        ids=np.array(["d", "a", "c", "b"], dtype=str),
+        scores=np.array([0.2, 0.9, 0.9, 0.1], dtype=float),
+        scalar_uncertainty=np.array([0.2, 0.2, 0.2, 0.2], dtype=float),
+        top_k=2,
+        objective="minimize",
+        tie_handling="competition_rank",
+        alpha=0.0,
+        beta=0.0,
+    )
+    acq = np.asarray(out["score"], dtype=float).reshape(-1)
+    assert np.allclose(acq, np.zeros(4, dtype=float))
+    np.testing.assert_array_equal(np.asarray(out["order_idx"], dtype=int), np.array([3, 0, 1, 2], dtype=int))
 
 
 def test_expected_improvement_minimize_scores_normalize_and_rank_consistently() -> None:
@@ -202,7 +234,8 @@ def test_expected_improvement_minimize_scores_normalize_and_rank_consistently() 
     )
     np.testing.assert_allclose(acq_norm, expected_scores)
     primary = -expected_scores
-    expected_order = np.lexsort((ids, primary)).astype(int)
+    secondary = scores
+    expected_order = np.lexsort((ids, secondary, primary)).astype(int)
     np.testing.assert_array_equal(np.asarray(out["order_idx"], dtype=int), expected_order)
 
 
@@ -231,7 +264,7 @@ def test_expected_improvement_normalization_preserves_order_monotonicity() -> No
         normalize_sigma_for_z=False,
     )
     np.testing.assert_allclose(np.asarray(out["score"], dtype=float), expected_scores)
-    expected_order = np.lexsort((ids, -expected_scores)).astype(int)
+    expected_order = np.lexsort((ids, -scores, -expected_scores)).astype(int)
     np.testing.assert_array_equal(np.asarray(out["order_idx"], dtype=int), expected_order)
 
 

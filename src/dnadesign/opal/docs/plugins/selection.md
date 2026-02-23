@@ -68,6 +68,7 @@ Uncertainty-aware acquisition ranking.
 
 - consumes selected score channel (`score_ref`)
 - consumes uncertainty standard deviation channel (`uncertainty_ref`)
+- ranks by EI score first, then predicted score (objective-aware), then `id`
 - raises an error on missing/non-finite/non-positive uncertainty
 - does not degrade to score-only behavior
 - Acquisition details: [Expected Improvement behavior and math](./selection-expected-improvement.md)

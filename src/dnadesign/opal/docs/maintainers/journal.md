@@ -2,6 +2,31 @@
 
 This journal tracks ongoing Elm_UQ analysis, refactor notes, and merge-readiness decisions for OPAL.
 
+### 2026-02-23 EI tie-break ordering by predicted score
+
+What changed:
+- Updated EI selection ordering to preserve acquisition as primary rank while adding objective-aware predicted-score tie-breaks before `id`:
+  - `src/dnadesign/opal/src/selection/expected_improvement.py`
+- Added regression coverage for tied EI ordering in both objective modes:
+  - `src/dnadesign/opal/tests/selection/test_expected_improvement_edge_cases.py`
+  - `test_expected_improvement_ties_break_by_predicted_score_then_id_for_maximize`
+  - `test_expected_improvement_ties_break_by_predicted_score_then_id_for_minimize`
+- Updated docs to describe EI tie-break semantics explicitly:
+  - `src/dnadesign/opal/docs/plugins/selection-expected-improvement.md`
+  - `src/dnadesign/opal/docs/plugins/selection.md`
+  - `src/dnadesign/opal/docs/workflows/gp-sfxi-ei.md`
+
+Why:
+- PR #26 review follow-up requested deterministic tie behavior that prefers better predicted outcomes within equal EI scores:
+  - `maximize`: higher predicted score first
+  - `minimize`: lower predicted score first
+- This closes the edge case where tied EI values were previously broken only by sequence `id`.
+
+Validation:
+- `uv run pytest -q src/dnadesign/opal/tests/selection/test_expected_improvement_edge_cases.py`
+- `uv run pytest -q src/dnadesign/opal/tests/objectives/test_objective_contract_v2.py src/dnadesign/opal/tests/runtime/test_run_round_integrity.py::test_run_round_uses_selection_score_for_tie_expansion`
+- `uv run python -m dnadesign.devtools.docs_checks`
+
 ### 2026-02-20 SFXI uncertainty canon alignment plan
 
 Decision points captured from active issue triage:

@@ -41,6 +41,7 @@ Two important notes about refs:
 
 1. `score_ref` always identifies a score channel key produced by the objective.
 2. `uncertainty_ref` identifies an uncertainty channel key. Some objectives publish uncertainty under the same key as the score (SFXI does this for `sfxi`), so it can be valid for `score_ref` and `uncertainty_ref` to be identical.
+3. EI ranking uses normalized acquisition as the primary key; ties are broken by predicted score (higher in `maximize`, lower in `minimize`), then by `id`.
 
 EI contract reminder: OPAL fails fast if uncertainty is missing/invalid.
 
