@@ -64,6 +64,12 @@ uv run opal init     -c configs/campaign.yaml
 uv run opal validate -c configs/campaign.yaml
 ```
 
+If you run the campaign from a copied directory outside the repo tree, invoke OPAL through the project root:
+
+```bash
+uv run --project /path/to/dnadesign opal <command> ...
+```
+
 #### 2. Ingest labels (observed round 0)
 
 ```bash
@@ -157,6 +163,7 @@ uv run opal verify-outputs -c configs/campaign.yaml --round latest
 
 ### If a step fails
 
+* sklearn GP `ConvergenceWarning`: common on small demo data; treat as informational if `validate` and `verify-outputs` pass.
 * Missing/invalid EI uncertainty:
 
   * confirm `selection.params.uncertainty_ref` matches an uncertainty channel emitted by the objective
