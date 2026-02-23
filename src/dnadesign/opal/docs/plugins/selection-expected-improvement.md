@@ -68,7 +68,13 @@ Standard EI:
 
 OPAL weighted acquisition:
 
-- `A = alpha * (I * Phi(Z)) + beta * (sigma * phi(Z))`
+- `sigma_norm = (sigma - min(sigma)) / (max(sigma) - min(sigma))` (clipped to `[0,1]`; all-equal sigma yields zeros)
+- `A = alpha * (I * Phi(Z)) + beta * (sigma_norm * phi(Z))`
+
+Important:
+
+- raw `sigma` is used in `Z = I / sigma` (no sigma normalization in z-score denominator)
+- only the exploration multiplier uses `sigma_norm`
 
 Normalization:
 

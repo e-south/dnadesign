@@ -89,7 +89,8 @@ def ei(
 
     z = improvement / uncertainty_std
     exploit = improvement * norm.cdf(z)
-    explore = uncertainty_std * norm.pdf(z)
+    uncertainty_std_explore = _minmax_01(uncertainty_std)
+    explore = uncertainty_std_explore * norm.pdf(z)
     acquisition = alpha * exploit + beta * explore
     if not np.all(np.isfinite(acquisition)):
         raise ValueError("[expected_improvement] non-finite acquisition; check scores/uncertainty.")
