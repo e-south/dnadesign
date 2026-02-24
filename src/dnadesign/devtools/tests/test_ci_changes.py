@@ -201,6 +201,8 @@ def test_discover_repo_tools_excludes_devtools_and_dunder_dirs(tmp_path: Path) -
     (src_root / "densegen").mkdir(parents=True, exist_ok=True)
     (src_root / "devtools").mkdir(parents=True, exist_ok=True)
     (src_root / "__pycache__").mkdir(parents=True, exist_ok=True)
+    (src_root / "archived").mkdir(parents=True, exist_ok=True)
+    (src_root / "prototypes").mkdir(parents=True, exist_ok=True)
 
     tool_names = discover_repo_tools(repo_root=tmp_path)
     assert tool_names == {"densegen", "usr"}

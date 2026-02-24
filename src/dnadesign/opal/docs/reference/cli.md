@@ -226,6 +226,8 @@ opal predict --config <yaml> \
 **Notes**
 
 * `--model-path` and `--round` are mutually exclusive; passing both is an error.
+* When resolving from `state.json`, OPAL requires a recorded `model.artifact_path` for the selected round.
+* OPAL fails fast if `model.artifact_path` is missing, relative, missing on disk, or points to a directory.
 * Defaults to `records.parquet` when `--in` is omitted.
 * Writes CSV to stdout by default; use `--out` for CSV/Parquet files (Parquet keeps vectors as list<float>).
 
@@ -282,6 +284,11 @@ opal model-show \
 * `--model-name` / `--model-params`: Required if `model_meta.json` is missing. `--model-params` must be a `.json`.
 * `--out-dir`: Write `feature_importance_full.csv` and print top-20 in JSON.
 * `--json`: Output as machine-readable JSON (default output is plain text).
+
+**Notes**
+
+* When resolving from `state.json`, OPAL requires a recorded `model.artifact_path` for the selected round.
+* OPAL fails fast if `model.artifact_path` is missing, relative, missing on disk, or points to a directory.
 
 ### `objective-meta`
 
@@ -472,6 +479,7 @@ opal validate --config <yaml>
 
 **Notes**
 
+* Config parsing is strict: malformed YAML or duplicate keys fail as bad-args config errors.
 * Verifies **USR essentials** exist in `records.parquet`.
 * Verifies the configured **X** column exists.
 * If Y is present, validates vector length & numeric/finite cells.

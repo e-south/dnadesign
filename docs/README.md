@@ -1,7 +1,7 @@
 # Documentation Index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-18
+**Last verified:** 2026-02-19
 
 This is the canonical docs entrypoint. Keep curated navigation here.
 

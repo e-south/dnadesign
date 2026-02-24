@@ -10,6 +10,14 @@ It explains how OPAL converts vec8 model outputs into selection-ready score and 
 - Primary score channel: `sfxi` (maximize)
 - Additional score channels: `logic_fidelity`, `effect_scaled`
 - Uncertainty channel key (when available): `sfxi` (standard deviation of the scalar score)
+- Uncertainty methods: `delta` (gradient delta-method) and `analytical` (restored analytical variance path)
+- Uncertainty method parameter values: only `delta` or `analytical` are accepted
+- Uncertainty method gating: `analytical` is valid only when `logic_exponent_beta == 1` and `intensity_exponent_gamma == 1` (exact equality)
+- Uncertainty method default: if `uncertainty_method` is omitted or null, OPAL uses `analytical` when `beta=gamma=1`, otherwise `delta`
+- Uncertainty with missing model std: when `y_pred_std` is absent, no uncertainty channel is emitted and method selection does not affect score computation
+- Uncertainty with model std: required `y_pred_std` entries must be strictly `> 0`; non-positive required entries fail fast
+- Uncertainty output contract: emitted scalar uncertainty is finite and strictly `> 0`, otherwise OPAL fails fast
+- Std semantics: `y_pred_std` is interpreted as a standard deviation in objective units and may exceed `1`
 - Scaling source: denominator is computed from current-round observed labels and persisted in run metadata
 - Strictness: run fails if current-round labels are fewer than `scaling.min_n`
 - Selection wiring:
@@ -108,10 +116,10 @@ $$
 
 ### 2. Inputs to the objective (selection time)
 
-* **Predictions:** $\widehat{v}\in[0,1]^4$ and $\widehat{y}^{\mathrm{linear}}\in\mathbb{R}_{\ge 0}^4$.
+* **Predictions:** $\widehat{v}\in[0,1]^4$ and $\widehat{y}^{\star}\in\mathbb{R}^{4}$ (log2 intensity block from the vec8 model output).
 * **Setpoint** (i.e., preference): $p\in[0,1]^4$. This can be binary setpoints (e.g., AND: $[0,0,0,1]$) or nuanced continuous ones (e.g., $[0.3,0.4,0.7,0.2]$).
 
-Each candidate is scored with $p$, $\widehat{v}$, and $\widehat{y}^{\mathrm{linear}}$.
+Each candidate is scored with $p$, $\widehat{v}$, and $\widehat{y}^{\star}$; OPAL converts $\widehat{y}^{\star}$ to linear intensity internally before computing effect terms.
 
 ---
 
@@ -250,6 +258,12 @@ Only proximity of $\widehat{v}$ to $p$ (being OFF everywhere) is rewarded.
 * **Flat logic:** if $u_{\max}\approx u_{\min}$, set $v=\tfrac{1}{4}\mathbf{1}$.
 * **Non-finite:** reject at ingestion.
 * **Too few labels in round:** objective errors; lower `scaling.min_n` or add labels.
+* **Analytical uncertainty constraints:** if `uncertainty_method=analytical`, OPAL fails fast unless `logic_exponent_beta=1` and `intensity_exponent_gamma=1`.
+  Config parsing also rejects this invalid combination before runs start.
+* **Uncertainty positivity:** if required model std entries are non-positive, or computed scalar uncertainty is non-positive, OPAL fails fast with a clear error.
+* **Delta exact-setpoint cusp:** delta-method uncertainty fails fast when candidates land exactly on the logic setpoint (`dist=0`) and this would otherwise produce zero uncertainty from a non-differentiable logic branch.
+* **Fractional-exponent derivatives:** for `0 < logic_exponent_beta < 1` or `0 < intensity_exponent_gamma < 1`, delta-method derivatives are singular at base `0`; OPAL fails fast if `F_logic <= 0` (beta case) or `E_scaled <= 0` (gamma case).
+* **Analytical scope:** analytical uncertainty follows the `c5666a7` closed-form direction with log2-space moment correction (`ln(2)` scaling in the intensity moments), modeling `X = 2^Y` moments in log2 space. It remains a closed-form approximation and does not fully re-derive all nonlinear score branches (`max(0, 2^y - delta)` and clipping).
 
 ---
 

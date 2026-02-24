@@ -70,11 +70,19 @@ jobs:
         with:
           python-version-file: ".python-version"
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies (locked)
+        run: uv sync --locked --dev
+
       - name: Build quality entropy report
         id: entropy
         continue-on-error: true
         run: |
-          PYTHONPATH=src python3 -m dnadesign.devtools.quality_entropy \
+          uv run python -m dnadesign.devtools.quality_entropy \
             --repo-root . \
             --max-sor-age-days 90 \
             --report-file quality-entropy-report.md
@@ -238,23 +246,6 @@ jobs:
 
       - name: Build (sdist + wheel)
         run: uv build
-
-  lint-test-build:
-    name: lint-test-build
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs: core-lint-test-build
-    if: always()
-    steps:
-      - name: Mirror core lane result
-        shell: bash
-        run: |
-          result="${{ needs.core-lint-test-build.result }}"
-          if [ "$result" != "success" ]; then
-            echo "core-lint-test-build result: $result"
-            exit 1
-          fi
-          echo "core-lint-test-build result: $result"
 
   external-integration:
     name: External integration lane (FIMO/MEME)

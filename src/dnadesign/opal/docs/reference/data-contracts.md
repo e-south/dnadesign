@@ -58,7 +58,7 @@ Append-only ledger datasets:
 - `pred__score_channels`, `pred__uncertainty_channels` (row-level channel payloads)
 - `sel__rank_competition`, `sel__is_selected`
 - Optional row diagnostics under `obj__*`
-- Contract checks are strict: all row-level vectors must match candidate count; score/uncertainty vectors and channel payload values must be finite; emitted uncertainty must be non-negative.
+- Contract checks are strict: all row-level vectors must match candidate count; score/uncertainty vectors and channel payload values must be finite; emitted uncertainty must be non-negative (some objective+selection paths enforce strict positivity, for example `sfxi_v1` uncertainty consumed by `expected_improvement`).
 
 `run_meta` (`outputs/ledger/runs.parquet`)
 

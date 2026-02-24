@@ -46,6 +46,8 @@ If an optional block is omitted, OPAL supplies conservative defaults:
 
 Plugin `params` default to `{}`, but plugin names are required.
 Unknown plugin names fail at `opal validate` (registry resolution is strict).
+Duplicate YAML keys fail fast during config parsing (for example, two `objectives:` blocks).
+Analytical `sfxi_v1` uncertainty requires `logic_exponent_beta=1` and `intensity_exponent_gamma=1`; invalid combinations are rejected at config load.
 
 ### Semantic wiring (model → objective → selection)
 

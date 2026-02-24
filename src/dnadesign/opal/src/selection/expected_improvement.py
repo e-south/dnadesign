@@ -19,6 +19,18 @@ from ..core.round_context import roundctx_contract
 from ..registries.selection import register_selection
 
 
+def _minmax_01(x: np.ndarray) -> np.ndarray:
+    arr = np.asarray(x, dtype=float).reshape(-1)
+    lo = float(np.min(arr))
+    hi = float(np.max(arr))
+    if not np.isfinite(lo) or not np.isfinite(hi):
+        raise ValueError("[expected_improvement] non-finite acquisition; check scores/uncertainty.")
+    if hi <= lo:
+        return np.zeros_like(arr)
+    out = (arr - lo) / (hi - lo)
+    return np.clip(out, 0.0, 1.0)
+
+
 def _validate_uncertainty_std(ids: np.ndarray, scores: np.ndarray, scalar_uncertainty) -> np.ndarray:
     if scalar_uncertainty is None:
         raise ValueError("[expected_improvement] scalar_uncertainty is required.")
@@ -29,10 +41,8 @@ def _validate_uncertainty_std(ids: np.ndarray, scores: np.ndarray, scalar_uncert
         )
     if not np.all(np.isfinite(unc_std)):
         raise ValueError("[expected_improvement] uncertainty must be finite.")
-    if np.any(unc_std < 0.0):
-        raise ValueError("[expected_improvement] uncertainty must be non-negative.")
-    if not np.any(unc_std > 0.0):
-        raise ValueError("[expected_improvement] uncertainty cannot be all zeros.")
+    if np.any(unc_std <= 0.0):
+        raise ValueError("[expected_improvement] uncertainty must be > 0 for all candidates.")
     if not np.all(np.isfinite(scores)):
         raise ValueError("[expected_improvement] scores must be finite.")
     return unc_std
@@ -77,22 +87,16 @@ def ei(
         incumbent = float(np.min(preds))
         improvement = incumbent - preds
 
-    with np.errstate(divide="ignore", invalid="ignore"):
-        z = np.divide(
-            improvement,
-            uncertainty_std,
-            out=np.zeros_like(improvement, dtype=float),
-            where=uncertainty_std > 0.0,
-        )
+    z = improvement / uncertainty_std
     exploit = improvement * norm.cdf(z)
-    explore = uncertainty_std * norm.pdf(z)
-    acquisition_pos = alpha * exploit + beta * explore
-    # Deterministic EI limit: sigma -> 0 gives max(improvement, 0), scaled by alpha.
-    acquisition_zero = alpha * np.maximum(improvement, 0.0)
-    acquisition = np.where(uncertainty_std > 0.0, acquisition_pos, acquisition_zero)
+    uncertainty_std_explore = _minmax_01(uncertainty_std)
+    explore = uncertainty_std_explore * norm.pdf(z)
+    acquisition = alpha * exploit + beta * explore
     if not np.all(np.isfinite(acquisition)):
         raise ValueError("[expected_improvement] non-finite acquisition; check scores/uncertainty.")
+    acquisition_norm = _minmax_01(acquisition)
 
-    primary = np.where(np.isfinite(acquisition), -acquisition, np.inf)
-    order_idx = np.lexsort((ids, primary)).astype(int)
-    return {"order_idx": order_idx, "score": acquisition}
+    primary = np.where(np.isfinite(acquisition_norm), -acquisition_norm, np.inf)
+    secondary = -preds if mode == "maximize" else preds
+    order_idx = np.lexsort((ids, secondary, primary)).astype(int)
+    return {"order_idx": order_idx, "score": acquisition_norm}

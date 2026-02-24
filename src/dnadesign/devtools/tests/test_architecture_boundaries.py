@@ -113,6 +113,26 @@ def test_find_undeclared_cross_tool_imports_ignores_test_files(tmp_path: Path) -
     assert violations == []
 
 
+def test_find_undeclared_cross_tool_imports_ignores_archived_and_prototypes(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "dnadesign" / "foo" / "api.py", "def run():\n    return 1\n")
+    _write(tmp_path / "src" / "dnadesign" / "bar" / "api.py", "def run():\n    return 1\n")
+    _write(
+        tmp_path / "src" / "dnadesign" / "archived" / "legacy.py",
+        "from dnadesign.bar.api import run\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "prototypes" / "draft.py",
+        "from dnadesign.foo.api import run\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(
+        repo_root=tmp_path,
+        allowed_edges=set(),
+    )
+
+    assert violations == []
+
+
 def test_main_fails_on_syntax_error_in_checked_file(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "dnadesign" / "foo" / "api.py", "def broken(:\n")
     _write(tmp_path / "src" / "dnadesign" / "bar" / "api.py", "def run():\n    return 1\n")

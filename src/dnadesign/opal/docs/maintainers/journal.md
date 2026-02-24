@@ -2,6 +2,69 @@
 
 This journal tracks ongoing Elm_UQ analysis, refactor notes, and merge-readiness decisions for OPAL.
 
+### 2026-02-23 EI tie-break ordering by predicted score
+
+What changed:
+- Updated EI selection ordering to preserve acquisition as primary rank while adding objective-aware predicted-score tie-breaks before `id`:
+  - `src/dnadesign/opal/src/selection/expected_improvement.py`
+- Added regression coverage for tied EI ordering in both objective modes:
+  - `src/dnadesign/opal/tests/selection/test_expected_improvement_edge_cases.py`
+  - `test_expected_improvement_ties_break_by_predicted_score_then_id_for_maximize`
+  - `test_expected_improvement_ties_break_by_predicted_score_then_id_for_minimize`
+- Updated docs to describe EI tie-break semantics explicitly:
+  - `src/dnadesign/opal/docs/plugins/selection-expected-improvement.md`
+  - `src/dnadesign/opal/docs/plugins/selection.md`
+  - `src/dnadesign/opal/docs/workflows/gp-sfxi-ei.md`
+
+Why:
+- PR #26 review follow-up requested deterministic tie behavior that prefers better predicted outcomes within equal EI scores:
+  - `maximize`: higher predicted score first
+  - `minimize`: lower predicted score first
+- This closes the edge case where tied EI values were previously broken only by sequence `id`.
+
+Validation:
+- `uv run pytest -q src/dnadesign/opal/tests/selection/test_expected_improvement_edge_cases.py`
+- `uv run pytest -q src/dnadesign/opal/tests/objectives/test_objective_contract_v2.py src/dnadesign/opal/tests/runtime/test_run_round_integrity.py::test_run_round_uses_selection_score_for_tie_expansion`
+- `uv run python -m dnadesign.devtools.docs_checks`
+
+### 2026-02-20 SFXI uncertainty canon alignment plan
+
+Decision points captured from active issue triage:
+- Analytical canon reference is `c5666a7`.
+- Analytical effect moments must use log2-consistent `ln(2)` scaling with `np.exp` forms (not `np.exp2` on variance terms).
+- Keep analytical default for `beta=gamma=1`, with explicit approximation notes.
+- Treat #23 as partially superseded by #27, and resolve both in one coherent PR narrative.
+
+Execution plan used for this pass:
+- Add deterministic tests first for analytical log2-moment correctness and regression baselines.
+- Remove Monte Carlo-based uncertainty smoke checks to reduce CI flakiness.
+- Patch `sfxi_v1` analytical intensity moments to log2-consistent closed forms.
+- Preserve #27 strictness invariants (required std `>0`, emitted sigma `>0`, no clip-mask variance gating).
+- Update objective docs and PR #26 body to the same canon wording and issue relationship.
+- Include pending formatting diffs and end with a clean working tree.
+
+### 2026-02-20 Audit follow-up: delta exact-setpoint uncertainty clarity
+
+What changed:
+- Added a new objective regression test for the delta-method cusp case:
+  - `src/dnadesign/opal/tests/objectives/test_objective_sfxi_v1.py`
+  - `test_sfxi_v1_uncertainty_delta_exact_logic_setpoint_fails_with_clear_error`
+- Hardened `sfxi_v1` delta uncertainty path with a targeted fail-fast error when candidates land exactly on the logic setpoint (`dist=0`) and computed variance would otherwise collapse to zero due non-differentiability:
+  - `src/dnadesign/opal/src/objectives/sfxi_v1.py`
+- Updated SFXI docs to document this delta-method edge case explicitly:
+  - `src/dnadesign/opal/docs/plugins/objective-sfxi.md`
+
+Why:
+- During adversarial audit of issue-aligned uncertainty behavior, this remained a UX footgun: users could receive a generic strict-positivity error instead of a precise root-cause message for a non-differentiable delta branch corner.
+- The new message is explicit and actionable, while preserving existing strict uncertainty contracts.
+
+Validation:
+- `uv run pytest -q src/dnadesign/opal/tests/objectives/test_objective_sfxi_v1.py -k exact_logic_setpoint` (fails before code change, passes after)
+- `uv run ruff check src/dnadesign/opal/src/objectives/sfxi_v1.py src/dnadesign/opal/tests/objectives/test_objective_sfxi_v1.py`
+- `uv run pytest -q src/dnadesign/opal/tests`
+- `uv run opal demo-matrix --rounds 0 --json`
+- `uv run python -m dnadesign.devtools.docs_checks`
+
 ### 2026-02-16 Guided demo workflows (CLI + docs)
 
 What changed:
@@ -1582,3 +1645,108 @@ Validation:
 - `uv run ruff check src/dnadesign/opal/src src/dnadesign/opal/tests src/dnadesign/opal/docs` -> PASS
 - Manual CLI check:
   - non-demo slug (`alpha_campaign`) reset via `uv run opal campaign-reset -c <config> --apply --no-backup` -> PASS
+
+### 2026-02-20 SFXI/EI hardening follow-up: config parse + CLI error stream UX
+
+Goal:
+- Close remaining user-facing footguns found during adversarial OPAL workflow testing while preserving current #22/#23/#27/#28 direction.
+
+Findings:
+- Duplicate YAML keys (for example duplicate `objectives:`) surfaced as internal error (`exit 3`) in `opal validate` instead of a config bad-args failure.
+- Non-debug `OpalError` messages were mirrored to both stderr and stdout, creating duplicate error lines in non-interactive usage.
+
+Changes:
+- Config loader now converts strict-YAML parse failures (including duplicate-key `KeyError`) into `ConfigError`:
+  - `src/dnadesign/opal/src/config/loader.py`
+- CLI OpalError handling now writes non-debug errors to stderr only:
+  - `src/dnadesign/opal/src/cli/commands/_common.py`
+- Added regression tests:
+  - `src/dnadesign/opal/tests/test_cli_common.py::test_opal_error_default_mode_writes_only_stderr`
+  - `src/dnadesign/opal/tests/test_config_objectives_v2.py::test_load_config_rejects_duplicate_yaml_keys`
+  - `src/dnadesign/opal/tests/test_cli_workflows.py::test_validate_rejects_duplicate_yaml_keys_as_bad_args`
+- Updated user docs for strict parse behavior:
+  - `src/dnadesign/opal/docs/reference/configuration.md`
+  - `src/dnadesign/opal/docs/reference/cli.md`
+
+Validation:
+- Red-first targeted tests (confirmed failing before fixes), then green:
+  - `uv run pytest -q src/dnadesign/opal/tests/test_cli_common.py src/dnadesign/opal/tests/test_config_objectives_v2.py::test_load_config_rejects_duplicate_yaml_keys src/dnadesign/opal/tests/test_cli_workflows.py::test_validate_rejects_duplicate_yaml_keys_as_bad_args` -> PASS
+- Broader OPAL regression:
+  - `uv run pytest -q src/dnadesign/opal/tests/test_cli_common.py src/dnadesign/opal/tests/test_config_objectives_v2.py src/dnadesign/opal/tests/test_cli_workflows.py src/dnadesign/opal/tests/test_cli_demo_matrix.py src/dnadesign/opal/tests/test_objective_sfxi_v1.py src/dnadesign/opal/tests/test_expected_improvement_edge_cases.py` -> PASS
+  - `uv run pytest -q src/dnadesign/opal/tests` -> PASS
+- Lint/docs checks:
+  - `uv run ruff check src/dnadesign/opal/src/config/loader.py src/dnadesign/opal/src/cli/commands/_common.py src/dnadesign/opal/tests/test_cli_common.py src/dnadesign/opal/tests/test_cli_workflows.py src/dnadesign/opal/tests/test_config_objectives_v2.py` -> PASS
+  - `uv run python -m dnadesign.devtools.docs_checks` -> PASS
+- End-to-end CLI pressure checks:
+  - `uv run opal demo-matrix --rounds 0,1 --json` -> PASS
+  - `uv run opal demo-matrix --rounds 0 --json` -> PASS
+  - Adversarial:
+    - `uv run opal demo-matrix --rounds a --json` -> exits 2, stderr-only message
+    - `uv run opal validate -c <dup-key-yaml>` -> exits 2 with `Invalid campaign.yaml: "Duplicate key in YAML: 'objectives'"`
+
+### 2026-02-20 OPAL tests layout organization (domain-first)
+
+Goal:
+- Reduce maintenance friction from a flat OPAL test directory by grouping tests by ownership domain.
+
+Changes:
+- Reorganized `src/dnadesign/opal/tests/` into domain folders:
+  - `analysis/`, `cli/`, `config/`, `ingest/`, `models/`, `notebooks/`, `objectives/`,
+    `platform/`, `plots/`, `predict/`, `runtime/`, `selection/`, `storage/`, `transforms/`
+- Moved all `test_*.py` files from root into the above folders with no behavior changes.
+- Standardized shared helper imports to absolute path:
+  - `from dnadesign.opal.tests._cli_helpers import ...`
+- Added `src/dnadesign/opal/tests/README.md` with category map and placement rules for new tests.
+
+Validation:
+- Collection:
+  - `uv run pytest --collect-only -q src/dnadesign/opal/tests` -> PASS
+- Lint:
+  - `uv run ruff check --fix src/dnadesign/opal/tests`
+  - `uv run ruff check src/dnadesign/opal/tests` -> PASS
+- Full OPAL tests:
+  - `uv run pytest -q src/dnadesign/opal/tests` -> PASS
+- Focused regression:
+  - `uv run pytest -q src/dnadesign/opal/tests/cli/test_cli_workflow* src/dnadesign/opal/tests/cli/test_verify_outputs.py src/dnadesign/opal/tests/config/test_config_objectives_v2.py src/dnadesign/opal/tests/runtime/test_run_round_integrity.py` -> PASS
+- Workflow smoke:
+  - `uv run opal demo-matrix --rounds 0 --json` -> PASS
+
+### 2026-02-20 CLI model artifact contract hardening (remove path fallback)
+
+Goal:
+- Remove hidden model-path fallback logic in CLI model resolution and enforce explicit state contracts.
+
+Findings:
+- `model-show` and `predict` previously fell back to `round_dir/model/model.joblib` when `state.json` model metadata was missing or stale.
+- This hid state corruption and coupled behavior to conventional filesystem layout.
+
+Changes:
+- Added strict resolver:
+  - `src/dnadesign/opal/src/cli/commands/_common.py::resolve_recorded_model_artifact_path`
+  - Requires `state.json` round entry to include `model.artifact_path`.
+  - Requires path to be absolute, exist, and be a file.
+- Updated commands to use strict resolver (no fallback):
+  - `src/dnadesign/opal/src/cli/commands/model_show.py`
+  - `src/dnadesign/opal/src/cli/commands/predict.py`
+- Added regression tests:
+  - `src/dnadesign/opal/tests/cli/test_cli_model_show.py::test_model_show_rejects_missing_recorded_artifact_path`
+  - `src/dnadesign/opal/tests/cli/test_cli_predict_yops_inversion.py::test_predict_rejects_missing_recorded_artifact_path`
+- Updated CLI docs:
+  - `src/dnadesign/opal/docs/reference/cli.md` (`predict` and `model-show` notes now document strict `model.artifact_path` requirement)
+
+Related maintainability cleanup:
+- Fixed stale per-file header path comments after test-tree move by aligning each moved test file header to its new path.
+
+Validation:
+- Red/green TDD:
+  - New missing-artifact-path tests fail before code changes and pass after.
+- Lint:
+  - `uv run ruff check src/dnadesign/opal/src/cli/commands/_common.py src/dnadesign/opal/src/cli/commands/model_show.py src/dnadesign/opal/src/cli/commands/predict.py src/dnadesign/opal/tests/cli/test_cli_model_show.py src/dnadesign/opal/tests/cli/test_cli_predict_yops_inversion.py src/dnadesign/opal/tests` -> PASS
+- Targeted tests:
+  - `uv run pytest -q src/dnadesign/opal/tests/cli/test_cli_model_show.py src/dnadesign/opal/tests/cli/test_cli_predict_yops_inversion.py` -> PASS
+- Full OPAL:
+  - `uv run pytest -q src/dnadesign/opal/tests` -> PASS
+- Docs checks:
+  - `uv run python -m dnadesign.devtools.docs_checks` -> PASS
+- Workflow smoke:
+  - `uv run opal demo-matrix --rounds 0 --json` -> PASS
