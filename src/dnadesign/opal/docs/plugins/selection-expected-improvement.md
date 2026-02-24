@@ -68,15 +68,35 @@ Standard EI:
 
 OPAL weighted acquisition:
 
-- `A = alpha * (I * Phi(Z)) + beta * (sigma * phi(Z))`
+- `sigma_norm = (sigma - min(sigma)) / (max(sigma) - min(sigma))` (clipped to `[0,1]`; all-equal sigma yields zeros)
+- `A = alpha * (I * Phi(Z)) + beta * (sigma_norm * phi(Z))`
 
-### Zero-sigma behavior
+Important:
 
-For per-candidate `sigma == 0`, OPAL uses the deterministic limit:
+- raw `sigma` is used in `Z = I / sigma` (no sigma normalization in z-score denominator)
+- only the exploration multiplier uses `sigma_norm`
 
-- `A = alpha * max(I, 0)`
+Normalization:
 
-This avoids `0/0` numerical failure in mixed-sigma batches. If all candidates have `sigma == 0`, OPAL raises an error (no exploration signal).
+- OPAL min-max normalizes weighted acquisition to `[0,1]` before returning `score`.
+- `A_norm = (A - min(A)) / (max(A) - min(A))`
+- if `max(A) == min(A)`, OPAL returns all zeros.
+
+Ranking source:
+
+- OPAL ranks by `A_norm` (descending).
+- If `A_norm` ties, OPAL breaks ties by predicted score:
+  - `maximize`: higher predicted score first
+  - `minimize`: lower predicted score first
+- If both `A_norm` and predicted score tie, ranking is resolved deterministically by candidate `id`.
+
+### Sigma contract
+
+EI requires strict positive standard deviation for every candidate:
+
+- `sigma > 0` for all candidates
+
+Any non-positive value (`sigma <= 0`) is an error; there is no epsilon-tolerance override.
 
 ### Error cases
 
@@ -84,8 +104,7 @@ This avoids `0/0` numerical failure in mixed-sigma batches. If all candidates ha
 
 - missing `uncertainty_ref`
 - non-finite uncertainty values
-- negative uncertainty values
-- all-zero uncertainty vector
+- non-positive uncertainty values
 - non-finite acquisition outputs after computation
 
 There is no fallback to `top_n`.

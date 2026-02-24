@@ -200,7 +200,7 @@ def build_guidance_report(cfg_path: Path, cfg: RootConfig, *, labels_as_of: int 
         steps=_build_steps(cfg_path, int(labels_as_of)),
         common_errors=[
             "SFXI min_n failures occur when current-round observed labels are missing for labels-as-of round.",
-            "EI requires uncertainty_ref resolving to a finite, non-negative standard-deviation channel.",
+            "EI requires uncertainty_ref resolving to a finite, strictly positive standard-deviation channel.",
             "score_ref and uncertainty_ref must be '<objective>/<channel>' and resolve against configured objectives.",
         ],
         learn_more=_build_doc_pointers(cfg, workflow_key),

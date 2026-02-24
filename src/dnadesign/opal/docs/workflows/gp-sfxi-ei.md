@@ -16,7 +16,7 @@ Campaign: `src/dnadesign/opal/campaigns/demo_gp_ei/`
 
 * Run a round where selection is driven by *both* predicted score and predicted uncertainty.
 * Make channel wiring explicit (`score_ref` + `uncertainty_ref`).
-* Show EI-specific failure modes (missing uncertainty, invalid sigma, all-zero sigma).
+* Show EI-specific failure modes (missing uncertainty, invalid sigma, non-positive sigma).
 
 ---
 
@@ -41,6 +41,7 @@ Two important notes about refs:
 
 1. `score_ref` always identifies a score channel key produced by the objective.
 2. `uncertainty_ref` identifies an uncertainty channel key. Some objectives publish uncertainty under the same key as the score (SFXI does this for `sfxi`), so it can be valid for `score_ref` and `uncertainty_ref` to be identical.
+3. EI ranking uses normalized acquisition as the primary key; ties are broken by predicted score (higher in `maximize`, lower in `minimize`), then by `id`.
 
 EI contract reminder: OPAL fails fast if uncertainty is missing/invalid.
 
@@ -62,6 +63,12 @@ uv run opal campaign-reset -c configs/campaign.yaml --apply --no-backup
 uv run opal init     -c configs/campaign.yaml
 # Validate config, plugin wiring, and core data contracts.
 uv run opal validate -c configs/campaign.yaml
+```
+
+If you run the campaign from a copied directory outside the repo tree, invoke OPAL through the project root:
+
+```bash
+uv run --project /path/to/dnadesign opal <command> ...
 ```
 
 #### 2. Ingest labels (observed round 0)
@@ -157,10 +164,11 @@ uv run opal verify-outputs -c configs/campaign.yaml --round latest
 
 ### If a step fails
 
+* sklearn GP `ConvergenceWarning`: common on small demo data; treat as informational if `validate` and `verify-outputs` pass.
 * Missing/invalid EI uncertainty:
 
   * confirm `selection.params.uncertainty_ref` matches an uncertainty channel emitted by the objective
-  * confirm the model is producing non-negative predictive std
+  * confirm the selected uncertainty channel is strictly positive per candidate at selection time
   * confirm `training.y_ops` supports inverse-transforming standard deviation (units consistency)
-* All-zero uncertainty vector: EI errors (no exploration signal); confirm GP std is being emitted and propagated.
+* Any non-positive uncertainty value: EI errors; confirm GP std is being emitted and propagated.
 * `SFXI min_n` failure: ingest enough labels for the same observed round you run as `--labels-as-of`.

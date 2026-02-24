@@ -76,6 +76,22 @@ def test_collect_changed_files_returns_pr_diff(tmp_path: Path) -> None:
     assert files == ["README.md"]
 
 
+def test_collect_changed_files_uses_existing_tracking_ref_without_fetch(tmp_path: Path) -> None:
+    repo_root, head_sha = _create_repo_with_feature_change(tmp_path)
+    main_sha = _run_git(repo_root, "rev-parse", "main")
+    _run_git(repo_root, "update-ref", "refs/remotes/broken/main", main_sha)
+
+    files = collect_changed_files(
+        event_name="pull_request",
+        repo_root=repo_root,
+        base_ref="main",
+        head_sha=head_sha,
+        remote="broken",
+    )
+
+    assert files == ["README.md"]
+
+
 def test_main_fails_when_pr_args_missing(tmp_path: Path) -> None:
     repo_root, _ = _create_repo_with_feature_change(tmp_path)
     output_file = tmp_path / "changed.txt"

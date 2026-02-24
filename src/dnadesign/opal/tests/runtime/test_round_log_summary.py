@@ -1,0 +1,38 @@
+"""
+--------------------------------------------------------------------------------
+<dnadesign project>
+src/dnadesign/opal/tests/runtime/test_round_log_summary.py
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from dnadesign.opal.src.reporting.summary import summarize_round_log
+
+
+def test_round_log_summary_counts():
+    events = [
+        {"ts": "2025-01-01T00:00:00+00:00", "stage": "start"},
+        {"ts": "2025-01-01T00:00:05+00:00", "stage": "fit_start"},
+        {"ts": "2025-01-01T00:00:06+00:00", "stage": "fit"},
+        {"ts": "2025-01-01T00:00:07+00:00", "stage": "predict_batch", "rows": 2},
+        {"ts": "2025-01-01T00:00:08+00:00", "stage": "done"},
+    ]
+    summary = summarize_round_log(events)
+    assert summary["events"] == 5
+    assert summary["stage_counts"]["predict_batch"] == 1
+    assert summary["predict_rows"] == 2
+
+
+def test_round_log_summary_latest_run_window():
+    events = [
+        {"ts": "2025-01-01T00:00:00+00:00", "stage": "start"},
+        {"ts": "2025-01-01T00:00:10+00:00", "stage": "done"},
+        {"ts": "2025-01-01T00:01:00+00:00", "stage": "start"},
+        {"ts": "2025-01-01T00:01:05+00:00", "stage": "done"},
+    ]
+    summary = summarize_round_log(events)
+    assert summary["run_count"] == 2
+    assert summary["events_total"] == 4
+    assert summary["events"] == 2
+    assert summary["duration_sec_total"] == 5.0

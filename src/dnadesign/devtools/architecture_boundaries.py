@@ -16,7 +16,7 @@ import ast
 from dataclasses import dataclass
 from pathlib import Path
 
-_NON_TOOL_DIRS = {"devtools", "__pycache__"}
+_NON_TOOL_DIRS = {"devtools", "__pycache__", "archived", "prototypes"}
 _SKIPPED_PATH_SEGMENTS = {
     "tests",
     "notebooks",

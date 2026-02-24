@@ -217,7 +217,10 @@ def _validate_registered_plugin_names(pyd: PRoot) -> None:
 def load_config(path: Path | str) -> RootConfig:
     cfg_path = Path(path).resolve()
     campaign_root = resolve_campaign_root(cfg_path)
-    raw = yaml.load(cfg_path.read_text(), Loader=_StrictLoader)
+    try:
+        raw = yaml.load(cfg_path.read_text(), Loader=_StrictLoader)
+    except (yaml.YAMLError, KeyError) as e:
+        raise ConfigError(f"Invalid campaign.yaml: {e}") from e
 
     try:
         pyd = PRoot.model_validate(raw)
