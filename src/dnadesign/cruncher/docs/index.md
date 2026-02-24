@@ -1,62 +1,92 @@
-# Cruncher docs
+## Cruncher docs
 
+**Last updated by:** cruncher-maintainers on 2026-02-23
 
-## Contents
+### Contents
 - [Overview](#overview)
-- [Common provenance flow](#common-provenance-flow)
-- [Demos (end-to-end)](#demos-end-to-end)
-- [Guides (task-focused)](#guides-taskfocused)
-- [References (how things work)](#references-how-things-work)
-- [For developers](#for-developers)
+- [Choose your path](#choose-your-path)
+- [Docs map](#docs-map)
+- [Demos](#demos)
+- [Guides](#guides)
+- [References](#references)
+- [Internals and dev notes](#internals-and-dev-notes)
 
-## Overview
+### Overview
+This index is the maintainers’ entrypoint for Cruncher docs. Start with [`README.md`](README.md) for the short operational map, then route into task-specific docs.
 
-Cruncher designs short, fixed-length DNA sequences that score highly across one or more TF PWMs, using Gibbs annealing and TFBS-core MMR to select a diverse elite set. Use the demos for end-to-end workflows and the references for precise schema/CLI behavior.
+### Choose your path
+- Run a demo end-to-end: [`demos/demo_pairwise.md`](demos/demo_pairwise.md)
+- Ingest or discovery changes: [`guides/ingestion.md`](guides/ingestion.md)
+- Analyze outputs and plots: [`guides/sampling_and_analysis.md`](guides/sampling_and_analysis.md)
+- Run sweeps/studies: [`guides/studies.md`](guides/studies.md)
+- Aggregate a portfolio: [`guides/portfolio_aggregation.md`](guides/portfolio_aggregation.md)
+- Debug failures quickly: [`guides/troubleshooting.md`](guides/troubleshooting.md)
 
-**Intent (at a glance)**
+### Docs map
+<!-- docs:map:start -->
+#### Run End-to-End Workflows
+- [Pairwise Demo](demos/demo_pairwise.md)
+- [MultiTF Demo](demos/demo_multitf.md)
+- [Project Workspace Demo](demos/project_all_tfs.md)
 
-- **What it is:** an optimization engine for designing **short, fixed-length DNA** sequences that jointly satisfy one or more TF PWMs, then returning a **diverse elite set**.
-- **When to use:** multi-TF promoter/operator design under tight length constraints; motif-compatibility tradeoff exploration; producing a small, diverse candidate set for assays; campaign sweeps across many regulator sets + aggregate comparison.
-- **What it is not:** a posterior-inference engine (don't interpret traces as posterior samples); a variable-length designer; a motif discovery tool (use MEME/STREME for discovery, then ingest/lock).
-- **Mental model:** deterministic data prep (`fetch`/`lock`) + strict Gibbs annealing optimization (`sample`) + artifact-native analytics (`analyze`).
+#### Ingest and Prepare Inputs
+- [Ingestion](guides/ingestion.md)
+- [MEME Suite](guides/meme_suite.md)
+- [Troubleshooting](guides/troubleshooting.md)
 
-Start with [Intent + lifecycle](guides/intent_and_lifecycle.md) if you're new to Cruncher.
+#### Optimize and Analyze Outputs
+- [Intent and Lifecycle](guides/intent_and_lifecycle.md)
+- [Sampling and Analysis](guides/sampling_and_analysis.md)
+- [Artifacts Reference](reference/artifacts.md)
 
-## Common provenance flow
+#### Run Studies and Portfolio Aggregation
+- [Studies](guides/studies.md)
+- [Study Length vs Score](guides/study_length_vs_score.md)
+- [Study Diversity vs Score](guides/study_diversity_vs_score.md)
+- [Portfolio Aggregation](guides/portfolio_aggregation.md)
 
-All curated demos follow this contract:
+#### Reference Contracts
+- [Config Reference](reference/config.md)
+- [CLI Reference](reference/cli.md)
+- [Architecture](reference/architecture.md)
+- [Glossary](reference/glossary.md)
+- [Runbook Step Reference](reference/runbook_steps.md)
+- [Doc Conventions](reference/doc_conventions.md)
 
-1. fetch TFBS from configured sources per TF
-2. merge site sets per TF (`catalog.combine_sites=true`)
-3. discover motifs with MEME OOPS into a demo-specific discovered source
-4. lock/parse/sample/analyze against discovered motifs (`catalog.pwm_source=matrix`)
-5. export sequence tables for downstream wrappers (`cruncher export sequences`)
+#### Maintainer Internals
+- [Cruncher Internals Spec](internals/spec.md)
+- [Optimizer Improvements Plan](internals/optimizer_improvements_plan.md)
+- [Dev Journal](dev/journal.md)
+- [Docs Style Guide](meta/style_guide.md)
+<!-- docs:map:end -->
 
-This keeps optimizer, analysis, baserender showcase, and DenseGen exports on the same motif provenance path.
+### Demos
+- [`demos/demo_pairwise.md`](demos/demo_pairwise.md)
+- [`demos/demo_multitf.md`](demos/demo_multitf.md)
+- [`demos/project_all_tfs.md`](demos/project_all_tfs.md)
 
-## Demos (end-to-end)
+### Guides
+- [`guides/intent_and_lifecycle.md`](guides/intent_and_lifecycle.md)
+- [`guides/ingestion.md`](guides/ingestion.md)
+- [`guides/meme_suite.md`](guides/meme_suite.md)
+- [`guides/sampling_and_analysis.md`](guides/sampling_and_analysis.md)
+- [`guides/studies.md`](guides/studies.md)
+- [`guides/study_length_vs_score.md`](guides/study_length_vs_score.md)
+- [`guides/study_diversity_vs_score.md`](guides/study_diversity_vs_score.md)
+- [`guides/portfolio_aggregation.md`](guides/portfolio_aggregation.md)
+- [`guides/troubleshooting.md`](guides/troubleshooting.md)
 
-Each demo maps to a workspace: `demo_basics_two_tf`, `demo_campaigns_multi_tf`,
-`densegen_prep_three_tf`.
+### References
+- [`reference/config.md`](reference/config.md)
+- [`reference/cli.md`](reference/cli.md)
+- [`reference/architecture.md`](reference/architecture.md)
+- [`reference/artifacts.md`](reference/artifacts.md)
+- [`reference/glossary.md`](reference/glossary.md)
+- [`reference/doc_conventions.md`](reference/doc_conventions.md)
+- [`reference/runbook_steps.md`](reference/runbook_steps.md)
 
-- [Two-TF demo (end-to-end)](demos/demo_basics_two_tf.md)
-- [Campaign demo (multi-TF)](demos/demo_campaigns_multi_tf.md)
-- [Densegen prep demo (three-TF)](demos/demo_densegen_prep_three_tf.md)
-
-## Guides (task-focused)
-
-- [Ingesting and caching data](guides/ingestion.md)
-- [MEME Suite setup](guides/meme_suite.md)
-- [Intent + lifecycle](guides/intent_and_lifecycle.md)
-- [Sampling + analysis](guides/sampling_and_analysis.md)
-
-## References (how things work)
-
-- [CLI reference](reference/cli.md)
-- [Config reference](reference/config.md)
-- [Architecture and artifacts](reference/architecture.md)
-
-## For developers
-
-- [Package spec](internals/spec.md)
-- [Optimizer improvements plan](internals/optimizer_improvements_plan.md)
+### Internals and dev notes
+- [`internals/spec.md`](internals/spec.md)
+- [`internals/optimizer_improvements_plan.md`](internals/optimizer_improvements_plan.md)
+- [`dev/journal.md`](dev/journal.md)
+- [`meta/style_guide.md`](meta/style_guide.md)
