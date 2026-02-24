@@ -36,7 +36,7 @@ Use pixi for toolchains such as MEME Suite that are required by some workflows b
 pixi install
 
 # Run a task that depends on pixi-managed binaries.
-pixi run cruncher -- doctor -c src/dnadesign/cruncher/workspaces/demo_basics_two_tf/config.yaml
+pixi run cruncher -- doctor -c src/dnadesign/cruncher/workspaces/demo_pairwise/configs/config.yaml
 
 # Add or update a pixi-managed system package.
 pixi add bioconda::meme
