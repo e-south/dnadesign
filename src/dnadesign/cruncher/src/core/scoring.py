@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Dict, Sequence, Tuple
 
 import numpy as np
@@ -21,6 +22,7 @@ from dnadesign.cruncher.core.sequence import revcomp_int
 from dnadesign.cruncher.core.state import SequenceState
 
 logger = logging.getLogger(__name__)
+_PWM_STATS_CACHE_MAXSIZE = 512
 
 
 def _best_hit_from_llrs(
@@ -97,6 +99,43 @@ class _PWMInfo:
     null_std: float = 1.0
 
 
+def _bg_key(background: np.ndarray) -> tuple[float, float, float, float]:
+    arr = np.asarray(background, dtype=float)
+    if arr.shape != (4,):
+        raise ValueError("background must be a length-4 probability vector")
+    return tuple(float(x) for x in arr)
+
+
+@lru_cache(maxsize=_PWM_STATS_CACHE_MAXSIZE)
+def _pwm_stats_cached(
+    lom_bytes: bytes,
+    shape: tuple[int, int],
+    bg_tuple: tuple[float, float, float, float],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, float, float, float]:
+    lom = np.frombuffer(lom_bytes, dtype=np.float64).reshape(shape)
+    null_scores, tail_p = logodds_to_p_lookup(lom, np.asarray(bg_tuple, dtype=float))
+    consensus_llr = float(np.max(lom, axis=1).sum())
+
+    pmf = np.empty_like(tail_p)
+    if tail_p.size > 1:
+        pmf[:-1] = tail_p[:-1] - tail_p[1:]
+    pmf[-1] = tail_p[-1]
+    pmf = np.clip(pmf, 0.0, 1.0)
+
+    mean_null = float((null_scores * pmf).sum())
+    var_null = float(((null_scores - mean_null) ** 2 * pmf).sum())
+    std_null = float(np.sqrt(var_null)) if var_null > 0 else 1.0
+    return lom, null_scores, tail_p, consensus_llr, mean_null, std_null
+
+
+def pwm_stats_cache_info():  # pragma: no cover - thin wrapper
+    return _pwm_stats_cached.cache_info()
+
+
+def clear_pwm_stats_cache() -> None:  # pragma: no cover - thin wrapper
+    _pwm_stats_cached.cache_clear()
+
+
 class Scorer:
     """
     Multi‐PWM scorer with supported scales:
@@ -141,38 +180,34 @@ class Scorer:
             self.bidirectional,
         )
 
-        # Build per‐PWM info (lom, null_scores, tail_p, width, plus compute null mean/std).
+        # Build per-PWM info (lom, null lookup, and cached null moments).
         self._cache: Dict[str, _PWMInfo] = {}
+        bg_tuple = _bg_key(self.bg)
         for name, pwm in pwms.items():
             logger.debug("  Precomputing PWM info for %s", name)
-            info = self._build_one_pwm_info(
-                pwm,
-                self.bg,
-                pseudocounts=self.pseudocounts,
-                log_odds_clip=self.log_odds_clip,
+            lom = np.asarray(
+                pwm.log_odds(
+                    self.bg,
+                    pseudocounts=self.pseudocounts,
+                    log_odds_clip=self.log_odds_clip,
+                ),
+                dtype=np.float64,
             )
-
-            # Precompute consensus_llr for each PWM (sum of column‐maxes).
-            info.consensus_llr = float(np.max(info.lom, axis=1).sum())
-
-            # Compute null distribution's PMF, mean, and variance for single-window LLRs.
-            # null_scores[i] is sorted list of unique LLR values.
-            # tail_p[i] = P(LLR >= null_scores[i]).
-            # Then P(LLR = null_scores[i]) = tail_p[i] - tail_p[i+1], with tail_p[last+1] = 0.
-            scores = info.null_scores
-            tails = info.tail_p
-            # Append a zero at the end for tail_p[last+1]
-            tails_extended = np.concatenate([tails, [0.0]])
-            pmf = tails_extended[:-1] - tails_extended[1:]
-            pmf = np.clip(pmf, 0.0, 1.0)  # numerical safeguards
-
-            mean_null = float((scores * pmf).sum())
-            var_null = float(((scores - mean_null) ** 2 * pmf).sum())
-            std_null = float(np.sqrt(var_null)) if var_null > 0 else 1.0
-
+            lom_contig = np.ascontiguousarray(lom)
+            cached_lom, null_scores, tail_p, consensus_llr, mean_null, std_null = _pwm_stats_cached(
+                lom_contig.tobytes(),
+                lom_contig.shape,
+                bg_tuple,
+            )
+            info = _PWMInfo(
+                lom=cached_lom,
+                null_scores=null_scores,
+                tail_p=tail_p,
+                width=cached_lom.shape[0],
+            )
+            info.consensus_llr = consensus_llr
             info.null_mean = mean_null
             info.null_std = std_null
-
             self._cache[name] = info
 
         logger.debug("Finished building cache with %d PWMs", len(self._cache))
@@ -308,6 +343,27 @@ class Scorer:
         info = self._info(tf)
         rev = (3 - seq)[::-1] if self.bidirectional else None
         raw_llr, offset, strand, tiebreak = self._best_llr_and_location(seq, info, rev=rev)
+        return self._hit_from_scan(
+            seq,
+            info,
+            tf=tf,
+            raw_llr=raw_llr,
+            offset=offset,
+            strand=strand,
+            tiebreak=tiebreak,
+        )
+
+    def _hit_from_scan(
+        self,
+        seq: np.ndarray,
+        info: _PWMInfo,
+        *,
+        tf: str,
+        raw_llr: float,
+        offset: int,
+        strand: str,
+        tiebreak: str,
+    ) -> Dict[str, object]:
         width = int(info.width)
         if strand == "-":
             start = int(seq.size - width - offset)
@@ -330,6 +386,31 @@ class Scorer:
             "best_core_seq": SequenceState(core).to_string(),
             "best_hit_tiebreak": str(tiebreak),
         }
+
+    def compute_all_per_pwm_and_hits(
+        self,
+        seq: np.ndarray,
+        seq_length: int,
+    ) -> tuple[Dict[str, float], Dict[str, Dict[str, object]]]:
+        """
+        Compute per-TF scaled values plus best-hit metadata in one pass.
+        """
+        per_tf: Dict[str, float] = {}
+        hits: Dict[str, Dict[str, object]] = {}
+        rev = (3 - seq)[::-1] if self.bidirectional else None
+        for tf, info in self._cache.items():
+            raw_llr, offset, strand, tiebreak = self._best_llr_and_location(seq, info, rev=rev)
+            per_tf[tf] = self._scaled_value_from_raw_llr(tf, raw_llr, seq_length)
+            hits[tf] = self._hit_from_scan(
+                seq,
+                info,
+                tf=tf,
+                raw_llr=raw_llr,
+                offset=offset,
+                strand=strand,
+                tiebreak=tiebreak,
+            )
+        return per_tf, hits
 
     def normalized_llr_map(self, seq: np.ndarray) -> Dict[str, float]:
         out: Dict[str, float] = {}
@@ -409,6 +490,37 @@ class Scorer:
         logger.debug("  Per-TF scaled map: %s", out)
         return out
 
+    def _scaled_value_from_raw_llr(self, tf: str, raw_llr: float, seq_length: int) -> float:
+        info = self._info(tf)
+        if self.scale == "llr":
+            return float(raw_llr)
+        if self.scale == "z":
+            return float((raw_llr - info.null_mean) / info.null_std)
+        if self.scale == "normalized-llr":
+            num, denom = raw_llr - info.null_mean, info.consensus_llr - info.null_mean
+            frac = 0.0 if denom <= 0 else max(0.0, num / denom)
+            return float(frac)
+        neglogp_seq = self._per_pwm_neglogp(raw_llr, info, seq_length)
+        if self.scale == "logp":
+            return float(neglogp_seq)
+        neglogp_cons = info.consensus_neglogp_by_len.get(seq_length)
+        if neglogp_cons is None:
+            cons_llr = info.consensus_llr
+            neglogp_cons = self._per_pwm_neglogp(cons_llr, info, seq_length)
+            info.consensus_neglogp_by_len[seq_length] = neglogp_cons
+        if neglogp_cons > 0.0:
+            return float(neglogp_seq / neglogp_cons)
+        return 0.0
+
+    def scaled_values_from_raw_llr(self, raw_llr_by_tf: Dict[str, float], seq_length: int) -> list[float]:
+        """
+        Compute scaled values from precomputed raw LLRs without allocating a per-TF dict.
+        """
+        values: list[float] = []
+        for tf, raw_llr in raw_llr_by_tf.items():
+            values.append(self._scaled_value_from_raw_llr(tf, raw_llr, seq_length))
+        return values
+
     def scaled_from_raw_llr(self, raw_llr_by_tf: Dict[str, float], seq_length: int) -> Dict[str, float]:
         """
         Compute per-TF scaled values given precomputed raw LLRs.
@@ -416,32 +528,7 @@ class Scorer:
         """
         out: Dict[str, float] = {}
         for tf, raw_llr in raw_llr_by_tf.items():
-            info = self._info(tf)
-            if self.scale == "llr":
-                out[tf] = float(raw_llr)
-                continue
-            if self.scale == "z":
-                z_val = (raw_llr - info.null_mean) / info.null_std
-                out[tf] = float(z_val)
-                continue
-            if self.scale == "normalized-llr":
-                num, denom = raw_llr - info.null_mean, info.consensus_llr - info.null_mean
-                frac = 0.0 if denom <= 0 else max(0.0, num / denom)
-                out[tf] = float(frac)
-                continue
-            neglogp_seq = self._per_pwm_neglogp(raw_llr, info, seq_length)
-            if self.scale == "logp":
-                out[tf] = float(neglogp_seq)
-                continue
-            neglogp_cons = info.consensus_neglogp_by_len.get(seq_length)
-            if neglogp_cons is None:
-                cons_llr = info.consensus_llr
-                neglogp_cons = self._per_pwm_neglogp(cons_llr, info, seq_length)
-                info.consensus_neglogp_by_len[seq_length] = neglogp_cons
-            if neglogp_cons > 0.0:
-                out[tf] = float(neglogp_seq / neglogp_cons)
-            else:
-                out[tf] = 0.0
+            out[tf] = self._scaled_value_from_raw_llr(tf, raw_llr, seq_length)
         return out
 
     def make_local_cache(self, seq: np.ndarray) -> "LocalScanCache":
@@ -503,6 +590,52 @@ class LocalScanCache:
             max_val = max(max_val, float(np.max(scores[end + 1 :])))
         return max_val
 
+    @staticmethod
+    def _max_in_forward(
+        *,
+        entry: _ScanCacheEntry,
+        pos: int,
+        old_base_int: int,
+        start: int,
+        end: int,
+    ) -> np.ndarray:
+        max_in = np.full(4, float("-inf"), dtype=float)
+        for offset in range(start, end + 1):
+            j = pos - offset
+            row = entry.info.lom[j]
+            base_score = float(entry.fwd_scores[offset])
+            old_val = float(row[old_base_int])
+            for b in range(4):
+                candidate = base_score + float(row[b] - old_val)
+                if candidate > max_in[b]:
+                    max_in[b] = candidate
+        return max_in
+
+    @staticmethod
+    def _max_in_reverse(
+        *,
+        entry: _ScanCacheEntry,
+        rev_pos: int,
+        old_base_int: int,
+        start: int,
+        end: int,
+    ) -> np.ndarray:
+        if entry.rev_scores is None:
+            return np.full(4, float("-inf"), dtype=float)
+        max_in = np.full(4, float("-inf"), dtype=float)
+        old_comp = 3 - old_base_int
+        for offset in range(start, end + 1):
+            j = rev_pos - offset
+            row = entry.info.lom[j]
+            base_score = float(entry.rev_scores[offset])
+            old_val = float(row[old_comp])
+            for b in range(4):
+                new_comp = 3 - b
+                candidate = base_score + float(row[new_comp] - old_val)
+                if candidate > max_in[b]:
+                    max_in[b] = candidate
+        return max_in
+
     def candidate_raw_llr_maps(self, pos: int, old_base: int) -> list[Dict[str, float]]:
         """
         Return per-base raw LLR maps for a single position change.
@@ -518,45 +651,37 @@ class LocalScanCache:
                 for b in range(4):
                     maps[b][tf] = float("-inf")
                 continue
+
             start = max(0, pos - w + 1)
             end = min(pos, nwin - 1)
             max_out_fwd = self._max_outside(entry.fwd_scores, start, end)
+            max_in_fwd = self._max_in_forward(
+                entry=entry,
+                pos=pos,
+                old_base_int=old_base_int,
+                start=start,
+                end=end,
+            )
+            best_fwd = np.maximum(max_out_fwd, max_in_fwd)
 
             if self.bidirectional and entry.rev_scores is not None:
-                r = L - 1 - pos
-                start_r = max(0, r - w + 1)
-                end_r = min(r, nwin - 1)
+                rev_pos = L - 1 - pos
+                start_r = max(0, rev_pos - w + 1)
+                end_r = min(rev_pos, nwin - 1)
                 max_out_rev = self._max_outside(entry.rev_scores, start_r, end_r)
+                max_in_rev = self._max_in_reverse(
+                    entry=entry,
+                    rev_pos=rev_pos,
+                    old_base_int=old_base_int,
+                    start=start_r,
+                    end=end_r,
+                )
+                best_raw = np.maximum(best_fwd, np.maximum(max_out_rev, max_in_rev))
             else:
-                r = None
-                start_r = end_r = 0
-                max_out_rev = float("-inf")
+                best_raw = best_fwd
 
             for b in range(4):
-                max_in_fwd = float("-inf")
-                for o in range(start, end + 1):
-                    j = pos - o
-                    delta = info.lom[j, b] - info.lom[j, old_base_int]
-                    val = entry.fwd_scores[o] + delta
-                    if val > max_in_fwd:
-                        max_in_fwd = float(val)
-                best_fwd = max(max_out_fwd, max_in_fwd)
-
-                if r is not None and entry.rev_scores is not None:
-                    new_c = 3 - b
-                    old_c = 3 - old_base_int
-                    max_in_rev = float("-inf")
-                    for o in range(start_r, end_r + 1):
-                        j = r - o
-                        delta = info.lom[j, new_c] - info.lom[j, old_c]
-                        val = entry.rev_scores[o] + delta
-                        if val > max_in_rev:
-                            max_in_rev = float(val)
-                    best_rev = max(max_out_rev, max_in_rev)
-                    best_raw = max(best_fwd, best_rev)
-                else:
-                    best_raw = best_fwd
-                maps[b][tf] = float(best_raw)
+                maps[b][tf] = float(best_raw[b])
         return maps
 
     def apply_base_change(self, pos: int, old_base: int, new_base: int) -> None:

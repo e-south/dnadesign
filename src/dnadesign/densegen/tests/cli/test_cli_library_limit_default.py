@@ -49,10 +49,12 @@ def test_inspect_run_library_summary_is_aggregated(tmp_path: Path) -> None:
         "solver_strands": "double",
         "dense_arrays_version": None,
         "dense_arrays_version_source": "unknown",
+        "total_quota": 1,
         "items": [
             {
                 "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
+                "quota": 1,
                 "generated": 0,
                 "duplicates_skipped": 0,
                 "failed_solutions": 0,
@@ -88,7 +90,7 @@ def test_inspect_run_library_summary_is_aggregated(tmp_path: Path) -> None:
     pd.DataFrame(attempts_rows).to_parquet(tables_root / "attempts.parquet", index=False)
 
     runner = CliRunner()
-    result = runner.invoke(app, ["inspect", "run", "--library", "-c", str(cfg_path)])
+    result = runner.invoke(app, ["inspect", "run", "--library", "--allow-partial", "-c", str(cfg_path)])
     assert result.exit_code == 0
     assert "TF usage summary" in result.output
     assert "Library build summary" not in result.output

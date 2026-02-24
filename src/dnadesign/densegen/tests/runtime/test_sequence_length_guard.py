@@ -13,12 +13,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import yaml
 
 from dnadesign.densegen.src.adapters.optimizer import OptimizerRun
 from dnadesign.densegen.src.adapters.outputs.base import SinkBase
 from dnadesign.densegen.src.adapters.sources import data_source_factory
-from dnadesign.densegen.src.config import load_config
+from dnadesign.densegen.src.config import ConfigError, load_config
 from dnadesign.densegen.src.core.pipeline import PipelineDeps, run_pipeline
 
 
@@ -116,7 +117,7 @@ def test_sequence_length_guard_shorter_than_motif(tmp_path: Path) -> None:
                 "plan": [
                     {
                         "name": "default",
-                        "quota": 1,
+                        "sequences": 1,
                         "sampling": {"include_inputs": ["demo"]},
                         "regulator_constraints": {
                             "groups": [
@@ -195,7 +196,7 @@ def test_sequence_length_guard_library_total_bp_too_small(tmp_path: Path) -> Non
                 "plan": [
                     {
                         "name": "default",
-                        "quota": 1,
+                        "sequences": 1,
                         "sampling": {"include_inputs": ["demo"]},
                         "regulator_constraints": {
                             "groups": [
@@ -273,7 +274,7 @@ def test_sequence_length_guard_required_regulators_min_length(tmp_path: Path) ->
                 "plan": [
                     {
                         "name": "default",
-                        "quota": 1,
+                        "sequences": 1,
                         "sampling": {"include_inputs": ["demo"]},
                         "regulator_constraints": {
                             "groups": [
@@ -352,7 +353,7 @@ def test_sequence_length_guard_promoter_constraints_min_length(tmp_path: Path) -
                 "plan": [
                     {
                         "name": "default",
-                        "quota": 1,
+                        "sequences": 1,
                         "sampling": {"include_inputs": ["demo"]},
                         "regulator_constraints": {
                             "groups": [
@@ -394,13 +395,5 @@ def test_sequence_length_guard_promoter_constraints_min_length(tmp_path: Path) -
     }
     cfg_path = tmp_path / "cfg.yaml"
     cfg_path.write_text(yaml.safe_dump(cfg))
-    loaded = load_config(cfg_path)
-    sink = _DummySink()
-    deps = PipelineDeps(
-        source_factory=data_source_factory,
-        sink_factory=lambda _cfg, _path: [sink],
-        optimizer=_DummyAdapter(),
-        pad=lambda *args, **kwargs: "",
-    )
-    run_pipeline(loaded, deps=deps, resume=False, build_stage_a=True)
-    assert sink.records
+    with pytest.raises(ConfigError, match="geometry"):
+        load_config(cfg_path)

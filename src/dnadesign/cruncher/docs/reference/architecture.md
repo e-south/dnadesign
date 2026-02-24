@@ -1,18 +1,22 @@
-# Cruncher architecture
+## Cruncher architecture
 
-## Contents
+**Last updated by:** cruncher-maintainers on 2026-02-23
+
+### Contents
 - [Cruncher architecture](#cruncher-architecture)
 - [Run lifecycle](#run-lifecycle)
 - [Layers and responsibilities](#layers-and-responsibilities)
 - [On-disk layout](#on-disk-layout)
 - [Run artifacts](#run-artifacts)
+- [Study artifacts](#study-artifacts)
+- [Portfolio artifacts](#portfolio-artifacts)
 - [Reproducibility boundaries](#reproducibility-boundaries)
 - [Extensibility points](#extensibility-points)
 - [Related docs](#related-docs)
 
 This doc describes the Cruncher run lifecycle, module boundaries, and on-disk artifacts.
 
-### Run lifecycle
+#### Run lifecycle
 
 1. **fetch** -> cache motifs/sites and update `catalog.json`
 2. **lock** -> resolve TFs to exact cached artifacts (`<workspace>/.cruncher/locks/<config>.lock.json`)
@@ -23,7 +27,7 @@ This doc describes the Cruncher run lifecycle, module boundaries, and on-disk ar
 
 ---
 
-### Layers and responsibilities
+#### Layers and responsibilities
 
 Core contract:
 
@@ -67,6 +71,8 @@ Core contract:
 
 #### `app/` (orchestration)
 - fetch / lock / parse / sample / analyze coordination
+- study coordination (`study run|summarize|show`)
+- portfolio coordination (`portfolio run|show`)
 - translates CLI intent + config into concrete runs and artifacts
 
 #### `cli/` (UX only)
@@ -74,7 +80,7 @@ Core contract:
 - argument parsing, output formatting
 - delegates work to app modules (no business logic)
 
-### Baserender integration boundary
+#### Baserender integration boundary
 
 Cruncher integrates with baserender through the **public package root only**:
 
@@ -101,24 +107,28 @@ This keeps responsibilities decoupled:
 
 ---
 
-### On-disk layout
+#### On-disk layout
 
-**cruncher** uses **project-local state** (relative to the config file). Data artifacts live in the workspace;
+**cruncher** uses **project-local state** (relative to the workspace root resolved from config). Data artifacts live in the workspace;
 tooling caches stay within the repo/workspace unless you override their environment variables.
 
 Recommended workspace layout:
 
 ```
 <workspace>/
-config.yaml
+configs/
+  config.yaml
+  studies/               # optional study specs
+  portfolios/            # optional portfolio specs
 .cruncher/
 outputs/
 ```
 
 In this repo, the bundled demo workspaces live at:
 
-- `src/dnadesign/cruncher/workspaces/demo_basics_two_tf/`
-- `src/dnadesign/cruncher/workspaces/demo_campaigns_multi_tf/`
+- `src/dnadesign/cruncher/workspaces/demo_pairwise/`
+- `src/dnadesign/cruncher/workspaces/demo_multitf/`
+- `src/dnadesign/cruncher/workspaces/project_tfs_lexa_cpxr_baer_rcda_lrp_fur_fnr_acrr_soxr_soxs/`
 
 #### Catalog root (`catalog.root`, default: `.cruncher/`)
 
@@ -130,12 +140,11 @@ motifs/<source>/<motif_id>.json
 sites/<source>/<motif_id>.jsonl
 genomes/              # if genome hydration is enabled
 discoveries/          # MEME/STREME discovery runs
-.mplcache/            # Matplotlib cache (MPLCONFIGDIR)
 ```
 
 - `catalog.json` is the "what do we have cached?" index.
-- `catalog.root` can be absolute or relative to the cruncher root (`src/dnadesign/cruncher`); relative paths must not include `..`.
-- By default the catalog cache is shared across workspaces (`src/dnadesign/cruncher/.cruncher`); locks/run_index live in each workspace's `.cruncher/`.
+- `catalog.root` can be absolute or relative to the workspace root; relative paths must not include `..`.
+- By default the catalog cache is workspace-local (`<workspace>/.cruncher`); locks/run_index also live in each workspace's `.cruncher/`.
 
 #### Workspace state (per workspace `.cruncher/`)
 
@@ -152,7 +161,7 @@ parse/inputs/{lockfile.json,parse_manifest.json,pwm_summary.json}
 
 #### Tooling caches
 
-- Matplotlib writes its cache under `<catalog.root>/.mplcache/` unless `MPLCONFIGDIR` is set.
+- Matplotlib writes its cache under `.cache/matplotlib/cruncher` unless `MPLCONFIGDIR` is set.
 - Numba JIT cache defaults to `<workspace>/.cruncher/numba_cache` unless `NUMBA_CACHE_DIR` is set.
 
 #### Run outputs (`out_dir`, e.g. `outputs/`)
@@ -166,7 +175,7 @@ Within each run directory, Cruncher uses a stable, stage-agnostic subdirectory l
 
 ```
 <run_dir>/
-  run/
+  meta/
   provenance/
   optimize/
   analysis/
@@ -176,25 +185,88 @@ Within each run directory, Cruncher uses a stable, stage-agnostic subdirectory l
 
 ---
 
-### Run artifacts
+#### Run artifacts
 
 A typical **sample** run directory contains:
 
-- `run/run_manifest.json`, `run/run_status.json`, `run/config_used.yaml` - run metadata + status
+- `meta/run_manifest.json`, `meta/run_status.json`, `meta/config_used.yaml` - run metadata + status
 - `provenance/lockfile.json` - pinned input snapshot (reproducibility boundary)
-- `optimize/tables/sequences.parquet`, `optimize/tables/elites*`, `optimize/tables/random_baseline*` - sampling tables
+- `optimize/tables/sequences.parquet`, `optimize/tables/elites*`, `optimize/tables/random_baseline*` - sampling tables (`random_baseline*` defaults on with `sample.output.save_random_baseline=true`, `sample.output.random_baseline_n=10000`)
 - `optimize/state/trace.nc`, `optimize/state/metrics.jsonl`, `optimize/state/elites.{json,yaml}` - sampling metadata
 - `analysis/reports/summary.json` - canonical analysis summary
 - `analysis/reports/report.json` + `analysis/reports/report.md` - analysis report outputs from `cruncher analyze`
 - `analysis/manifests/plot_manifest.json` + `analysis/manifests/table_manifest.json` + `analysis/manifests/manifest.json` - analysis inventories
-- `export/sequences/table__*.{parquet|csv}` + `export/sequences/export_manifest.json` - sequence-export tables from `cruncher export sequences`
-- `plots/analysis/*` - curated analysis plots
-- `plots/logos/*` - catalog logo renders
+- `export/table__elites.csv` + `export/table__*.{parquet|csv}` + `export/export_manifest.json` - sequence-export tables from `cruncher export sequences`
+- `plots/*` - curated analysis plots and catalog logo renders
 - `analysis/tables/table__*` - curated table outputs
 
 ---
 
-### Reproducibility boundaries
+#### Study artifacts
+
+Study runs are aggregate sweep workflows that keep deterministic workspace config separate from sweep intent.
+
+Study specs live under:
+
+```
+<workspace>/configs/studies/<name>.study.yaml
+```
+
+Study outputs live under:
+
+```
+<workspace>/outputs/studies/<study.name>/<study_id>/
+  study/
+  trials/
+  tables/
+  manifests/
+```
+
+Key points:
+
+- `study_id` is deterministic from frozen spec + base config hash + target descriptor.
+- Study specs support both explicit trial lists and cartesian grid expansion (`trial_grids`).
+- Trial outputs are nested under `trials/<trial_id>/seed_<seed>/`.
+- `tables/` stores aggregate sweep tables (`table__trial_metrics*`, optional `table__mmr_tradeoff_agg`).
+- Aggregate study plots are workspace-flat under `outputs/plots/` as namespaced files
+  (`study__<study_name>__<study_id>__plot__*`).
+- Study trial sampling does **not** write to workspace `run_index.json`.
+- Replay sweeps reuse saved run artifacts instead of re-sampling where possible (MMR selection replay).
+
+---
+
+#### Portfolio artifacts
+
+Portfolio runs aggregate selected source runs across workspaces into one handoff package.
+
+Portfolio specs live under:
+
+```
+<portfolio_workspace>/configs/<name>.portfolio.yaml
+```
+
+Portfolio outputs live under:
+
+```
+<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/
+  portfolio/
+  tables/
+  manifests/
+```
+
+Key points:
+
+- `portfolio_id` is deterministic from the frozen Portfolio spec payload.
+- Source run selection is explicit in spec (`workspace`, `run_dir` per source).
+- Source elite count is contract-driven from source run manifest `top_k` and `elites.parquet`.
+- Portfolio plots are workspace-flat under `outputs/plots/` as namespaced files
+  (`portfolio__<portfolio_name>__<portfolio_id>__plot__*`).
+- No implicit latest-run fallback is used during portfolio aggregation.
+- Handoff tables are source-provenance-first (`table__handoff_windows_long`, `table__handoff_elites_summary`, `table__source_summary`).
+
+---
+
+#### Reproducibility boundaries
 
 - **Lockfiles are mandatory** for `parse` and `sample`.
 - If you change inputs that affect TF resolution (e.g., PWM source, site filters, dataset selection),
@@ -203,7 +275,7 @@ A typical **sample** run directory contains:
 
 ---
 
-### Extensibility points
+#### Extensibility points
 
 - **Sources:** add a new adapter under `ingest/adapters/` and register it in the source registry.
 - **Local sources:** configure `ingest.local_sources` for local motif directories (no new code required).
@@ -213,9 +285,10 @@ A typical **sample** run directory contains:
 
 ---
 
-### Related docs
+#### Related docs
 
 - [Intent + lifecycle](../guides/intent_and_lifecycle.md)
+- [Portfolio aggregation](../guides/portfolio_aggregation.md)
 - [Config reference](config.md)
 
 @e-south

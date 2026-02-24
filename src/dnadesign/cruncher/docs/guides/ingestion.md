@@ -1,6 +1,8 @@
-# Ingestion
+## Ingestion
 
-## Contents
+**Last updated by:** cruncher-maintainers on 2026-02-23
+
+### Contents
 - [Ingestion](#ingestion)
 - [How ingestion works](#how-ingestion-works)
 - [Cache layout](#cache-layout)
@@ -17,7 +19,7 @@
 
 This guide describes how Cruncher ingests, normalizes, and caches motif and site data.
 
-### How ingestion works
+#### How ingestion works
 
 1. **Fetch** raw payloads from a source adapter (for example RegulonDB).
 2. **Normalize** into `MotifRecord` and `SiteInstance`.
@@ -26,7 +28,7 @@ This guide describes how Cruncher ingests, normalizes, and caches motif and site
 
 ---
 
-### Cache layout
+#### Cache layout
 
 ```
 <catalog.root>/
@@ -35,7 +37,6 @@ This guide describes how Cruncher ingests, normalizes, and caches motif and site
     motifs/<source>/<motif_id>.json
     sites/<source>/<motif_id>.jsonl
   discoveries/      # MEME/STREME discovery runs (optional)
-  .mplcache/         # Matplotlib cache (auto-managed)
 ```
 
 Workspace state (per workspace `.cruncher/`):
@@ -48,12 +49,13 @@ Workspace state (per workspace `.cruncher/`):
 ```
 
 `catalog.json` is the local source of truth for cached motifs and sites. `discoveries/` is created only when you run
-`cruncher discover motifs`. By default, the catalog cache is shared across workspaces (`src/dnadesign/cruncher/.cruncher`).
+`cruncher discover motifs`. By default, the catalog cache is workspace-local (`<workspace>/.cruncher`).
+Matplotlib cache is shared at `.cache/matplotlib/cruncher` unless `MPLCONFIGDIR` is set.
 `run_index.json` tracks known runs for the workspace.
 
 ---
 
-### General normalization rules
+#### General normalization rules
 
 - **Sequences** must be A/C/G/T only (invalid sequences are rejected).
 - **Coordinates** are stored as 0-based, half-open intervals.
@@ -63,7 +65,7 @@ Workspace state (per workspace `.cruncher/`):
 
 ---
 
-### RegulonDB
+#### RegulonDB
 
 **cruncher** queries the RegulonDB Datamarts GraphQL endpoint:
 
@@ -75,7 +77,7 @@ Notes: **cruncher** uses the default trust store plus a bundled RegulonDB interm
 
 ---
 
-### Local motif directories
+#### Local motif directories
 
 Local motif sources let you register on‑disk datasets as first‑class sources. Each file becomes a cached motif entry, with TF names derived from the filename stem by default. MEME files can also expose MEME BLOCKS sites.
 
@@ -85,7 +87,7 @@ Key behaviors:
 - **Explicit parsing**: you must provide `format_map` and/or `default_format`.
 - **TF naming**: default is file stem (preserves case), configurable via `tf_name_strategy`.
 - **Provenance**: dataset metadata (DOI, comments) lives in config tags/citation, not code.
-- **Path resolution**: relative roots are resolved from the config file location.
+- **Path resolution**: relative roots are resolved from the workspace root.
 - **Sites opt-in**: set `extract_sites=true` to parse MEME BLOCKS sites (training-set occurrences).
 - **Motif selection**: use `meme_motif_selector` to disambiguate multi-motif MEME files.
 
@@ -126,7 +128,7 @@ Use `source_url` plus `tags` to keep provenance, and swap in your own on‑disk 
 
 ---
 
-### Local binding-site FASTA sources
+#### Local binding-site FASTA sources
 
 Local site sources register binding-site sequences from a FASTA file as a first‑class source. Each header line
 should start with a TF name, followed by `|`‑separated metadata. The sequence lines are used directly.
@@ -150,13 +152,13 @@ ingest:
 
 ---
 
-### Curated TF binding sites
+#### Curated TF binding sites
 
 Curated binding sites are fetched from the regulon datamart and cached as `SiteInstance` records. If you set `ingest.regulondb.motif_matrix_source: alignment`, **cruncher** uses the alignment payload when present; otherwise it fails fast.
 
 ---
 
-### High-throughput datasets
+#### High-throughput datasets
 
 HT datasets (ChIP‑seq, ChIP‑exo, DAP‑seq, gSELEX) are discovered and fetched via dataset queries:
 
@@ -173,9 +175,18 @@ Lockfiles record the chosen dataset ID for reproducibility.
 `ingest.regulondb.ht_dataset_type` is validated against the remote
 `listAllDatasetTypes` response and fails fast if the value is unknown.
 
+HT contracts are strict (no curated fallback):
+- if `ingest.regulondb.ht_sites: true`, discovery/fetch failures raise errors
+- if HT returns zero records for the selected mode, fetch raises errors
+- `sources datasets --dataset-source <X>` applies a row-level source filter after remote fetch to guard against mixed-source payloads
+
+If you enable both `curated_sites` and `ht_sites`, avoid mixed-mode limits:
+- `fetch sites --limit <N>` without `--dataset-id` is rejected because curated rows can consume the limit before HT rows.
+- Use one explicit mode per request: pin `--dataset-id`, disable one source class, or omit `--limit`.
+
 ---
 
-### Hydration
+#### Hydration
 
 Some HT datasets return coordinates without sequences. **cruncher** hydrates those coordinates using a reference genome.
 
@@ -200,13 +211,15 @@ those sites (for example via `cruncher fetch sites --hydrate <config>`).
 
 ---
 
-### Fetching data
+#### Fetching data
 
 - `cruncher fetch motifs --tf <TF> <config>` -> caches matrices.
 - `cruncher fetch sites --tf <TF> <config>` -> caches site sets.
 - `cruncher fetch sites --hydrate <config>` -> hydrate missing sequences only (all cached site sets by default).
 - `cruncher fetch sites --dataset-id <id> <config>` -> pin a specific HT dataset
   (also enables HT access for this request).
+- If HT `tfbinding` returns no rows for a known dataset, set `ingest.regulondb.ht_binding_mode: peaks`
+  and provide FASTA hydration (`ingest.genome_fasta` or `--genome-fasta`) when sequences are not returned.
 - `--source` defaults to the first available entry in `catalog.source_preference` (skipping entries that are
   not registered ingest sources); if the list is empty or none are available you must pass `--source` explicitly.
 - `--offline` validates cache without network.
@@ -214,7 +227,7 @@ those sites (for example via `cruncher fetch sites --hydrate <config>`).
 
 ---
 
-### PWM creation strategy
+#### PWM creation strategy
 
 - `catalog.pwm_source=matrix` uses cached matrices (default).
 - `catalog.pwm_source=sites` builds PWMs from cached binding sites.
@@ -222,7 +235,7 @@ those sites (for example via `cruncher fetch sites --hydrate <config>`).
 
 ---
 
-### Common issues
+#### Common issues
 
 - Missing lockfile: run `cruncher lock <config>` before parse/sample.
 - Target readiness: `cruncher targets status <config>`.

@@ -13,15 +13,16 @@ from pathlib import Path
 from typing import Iterable
 
 from dnadesign.cruncher.core.labels import format_regulator_slug
+from dnadesign.cruncher.utils.paths import resolve_workspace_root
 
 # Run-level IA:
-# - run/: run metadata/state files
+# - meta/: run metadata/state files
 # - provenance/: resolved lock/parse inputs pinned for reproducibility
 # - optimize/: sampler outputs split into tables/ + state/
 # - analysis/: analysis outputs (managed by analysis/layout.py)
-# - plots/: plot outputs grouped by producer
+# - plots/: all plot outputs (flat filenames)
 # - export/: downstream contract exports
-RUN_META_DIR = "run"
+RUN_META_DIR = "meta"
 RUN_ARTIFACTS_DIR = "artifacts"
 RUN_LIVE_DIR = "live"
 RUN_PROVENANCE_DIR = "provenance"
@@ -30,18 +31,13 @@ RUN_OPTIMIZE_TABLES_DIR = "tables"
 RUN_OPTIMIZE_META_DIR = "state"
 RUN_OUTPUT_DIR = "analysis"
 RUN_PLOTS_DIR = "plots"
-RUN_PLOTS_ANALYSIS_DIR = "analysis"
-RUN_PLOTS_LOGOS_DIR = "logos"
 RUN_EXPORT_DIR = "export"
-RUN_EXPORT_SEQUENCES_DIR = "sequences"
-CAMPAIGN_ROOT_DIR = "campaign"
-# Backward-compatible token used by sample run cleanup logic.
-# Logos now live under `plots/logos/*`, so preserve the top-level `plots/`.
+# Logos now live under `plots/*`, so preserve the top-level `plots/`.
 LOGOS_ROOT_DIR = RUN_PLOTS_DIR
 
 
 def out_root(config_path: Path, out_dir: str | Path) -> Path:
-    return config_path.parent / Path(out_dir)
+    return resolve_workspace_root(config_path) / Path(out_dir)
 
 
 def stage_root(out_root_path: Path, stage: str) -> Path:
@@ -111,10 +107,7 @@ def ensure_run_dirs(
     if artifacts:
         run_output_dir(run_dir).mkdir(parents=True, exist_ok=True)
         run_plots_dir(run_dir).mkdir(parents=True, exist_ok=True)
-        run_plots_analysis_dir(run_dir).mkdir(parents=True, exist_ok=True)
-        run_plots_logos_dir(run_dir).mkdir(parents=True, exist_ok=True)
         run_export_dir(run_dir).mkdir(parents=True, exist_ok=True)
-        run_export_sequences_dir(run_dir).mkdir(parents=True, exist_ok=True)
 
 
 def run_meta_dir(run_dir: Path) -> Path:
@@ -146,11 +139,11 @@ def run_plots_dir(run_dir: Path) -> Path:
 
 
 def run_plots_analysis_dir(run_dir: Path) -> Path:
-    return run_plots_dir(run_dir) / RUN_PLOTS_ANALYSIS_DIR
+    return run_plots_dir(run_dir)
 
 
 def run_plots_logos_dir(run_dir: Path) -> Path:
-    return run_plots_dir(run_dir) / RUN_PLOTS_LOGOS_DIR
+    return run_plots_dir(run_dir)
 
 
 def run_export_dir(run_dir: Path) -> Path:
@@ -158,7 +151,7 @@ def run_export_dir(run_dir: Path) -> Path:
 
 
 def run_export_sequences_dir(run_dir: Path) -> Path:
-    return run_export_dir(run_dir) / RUN_EXPORT_SEQUENCES_DIR
+    return run_export_dir(run_dir)
 
 
 def run_export_sequences_manifest_path(run_dir: Path) -> Path:
@@ -172,6 +165,15 @@ def run_export_sequences_table_path(run_dir: Path, *, table_name: str, fmt: str)
     if not table_name.strip():
         raise ValueError("table_name must be non-empty")
     return run_export_sequences_dir(run_dir) / f"table__{table_name}.{normalized_fmt}"
+
+
+def run_export_table_path(run_dir: Path, *, table_name: str, fmt: str) -> Path:
+    normalized_fmt = str(fmt).strip().lower()
+    if normalized_fmt not in {"parquet", "csv"}:
+        raise ValueError(f"Unsupported export table format: {fmt!r}")
+    if not table_name.strip():
+        raise ValueError("table_name must be non-empty")
+    return run_export_dir(run_dir) / f"table__{table_name}.{normalized_fmt}"
 
 
 def manifest_path(run_dir: Path) -> Path:
@@ -239,17 +241,4 @@ def pwm_summary_path(run_dir: Path) -> Path:
 
 
 def logos_root(out_root_path: Path) -> Path:
-    return out_root_path / RUN_PLOTS_DIR / RUN_PLOTS_LOGOS_DIR
-
-
-def campaign_name_slug(name: str) -> str:
-    return format_regulator_slug([name], max_len=80)
-
-
-def campaign_stage_root(
-    *,
-    config_path: Path,
-    out_dir: str | Path,
-    campaign_name: str,
-) -> Path:
-    return out_root(config_path, out_dir) / CAMPAIGN_ROOT_DIR / campaign_name_slug(campaign_name)
+    return out_root_path / RUN_PLOTS_DIR

@@ -16,13 +16,10 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from dnadesign.cruncher.app.campaign_service import (
-    expand_campaign,
-    resolve_category_targets,
-)
 from dnadesign.cruncher.app.target_service import (
     has_blocking_target_errors,
     list_targets,
+    resolve_category_targets,
     target_candidates,
     target_candidates_fuzzy,
     target_stats,
@@ -38,32 +35,27 @@ app = typer.Typer(no_args_is_help=True, help="Check target readiness and catalog
 console = Console()
 
 
+def _load_config_or_exit(config_path: Path):
+    try:
+        return load_config(config_path)
+    except (ValueError, FileNotFoundError) as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1) from exc
+
+
 def _select_targets(
     *,
     cfg,
-    config_path: Path,
     category: Optional[str],
-    campaign: Optional[str],
 ) -> tuple:
     def _with_regulator_sets(regulator_sets: list[list[str]]):
         workspace = cfg.workspace.model_copy(update={"regulator_sets": regulator_sets})
         return cfg.model_copy(update={"workspace": workspace})
 
-    if category and campaign:
-        raise ValueError("Use either --category or --campaign, not both.")
     if category:
         tfs = resolve_category_targets(cfg=cfg, category_name=category)
         target_cfg = _with_regulator_sets([tfs])
         return target_cfg, f"Category targets: {category}", False
-    if campaign:
-        expansion = expand_campaign(
-            cfg=cfg,
-            config_path=config_path,
-            campaign_name=campaign,
-            include_metrics=False,
-        )
-        target_cfg = _with_regulator_sets(expansion.regulator_sets)
-        return target_cfg, f"Campaign targets: {campaign}", False
     return cfg, "Configured targets", True
 
 
@@ -85,24 +77,17 @@ def list_config_targets(
         "--category",
         help="List targets from a named regulator category.",
     ),
-    campaign: Optional[str] = typer.Option(
-        None,
-        "--campaign",
-        help="List targets from a named campaign (expanded regulator_sets).",
-    ),
 ) -> None:
     try:
         config_path = resolve_config_path(config_option or config)
     except ConfigResolutionError as exc:
         console.print(str(exc))
         raise typer.Exit(code=1)
-    cfg = load_config(config_path)
+    cfg = _load_config_or_exit(config_path)
     try:
         target_cfg, title, _ = _select_targets(
             cfg=cfg,
-            config_path=config_path,
             category=category,
-            campaign=campaign,
         )
     except ValueError as exc:
         console.print(f"Error: {exc}")
@@ -143,24 +128,17 @@ def targets_status(
         "--category",
         help="Report status for targets in a named regulator category.",
     ),
-    campaign: Optional[str] = typer.Option(
-        None,
-        "--campaign",
-        help="Report status for targets in a named campaign (expanded regulator_sets).",
-    ),
 ) -> None:
     try:
         config_path = resolve_config_path(config_option or config)
     except ConfigResolutionError as exc:
         console.print(str(exc))
         raise typer.Exit(code=1)
-    cfg = load_config(config_path)
+    cfg = _load_config_or_exit(config_path)
     try:
         target_cfg, title, use_lockfile = _select_targets(
             cfg=cfg,
-            config_path=config_path,
             category=category,
-            campaign=campaign,
         )
     except ValueError as exc:
         console.print(f"Error: {exc}")
@@ -255,24 +233,17 @@ def targets_candidates(
         "--category",
         help="Show candidates for targets in a named regulator category.",
     ),
-    campaign: Optional[str] = typer.Option(
-        None,
-        "--campaign",
-        help="Show candidates for targets in a named campaign (expanded regulator_sets).",
-    ),
 ) -> None:
     try:
         config_path = resolve_config_path(config_option or config)
     except ConfigResolutionError as exc:
         console.print(str(exc))
         raise typer.Exit(code=1)
-    cfg = load_config(config_path)
+    cfg = _load_config_or_exit(config_path)
     try:
         target_cfg, title, _ = _select_targets(
             cfg=cfg,
-            config_path=config_path,
             category=category,
-            campaign=campaign,
         )
     except ValueError as exc:
         console.print(f"Error: {exc}")
@@ -319,24 +290,17 @@ def targets_stats(
         "--category",
         help="Show stats for targets in a named regulator category.",
     ),
-    campaign: Optional[str] = typer.Option(
-        None,
-        "--campaign",
-        help="Show stats for targets in a named campaign (expanded regulator_sets).",
-    ),
 ) -> None:
     try:
         config_path = resolve_config_path(config_option or config)
     except ConfigResolutionError as exc:
         console.print(str(exc))
         raise typer.Exit(code=1)
-    cfg = load_config(config_path)
+    cfg = _load_config_or_exit(config_path)
     try:
         target_cfg, title, _ = _select_targets(
             cfg=cfg,
-            config_path=config_path,
             category=category,
-            campaign=campaign,
         )
     except ValueError as exc:
         console.print(f"Error: {exc}")

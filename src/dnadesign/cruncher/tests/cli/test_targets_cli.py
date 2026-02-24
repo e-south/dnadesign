@@ -29,14 +29,6 @@ def _write_config(tmp_path: Path) -> Path:
                     "CatB": ["Fur", "Lrp"],
                 },
             },
-            "campaigns": [
-                {
-                    "name": "demo",
-                    "categories": ["CatA", "CatB"],
-                    "within_category": {"sizes": [2]},
-                    "across_categories": {"sizes": [2], "max_per_category": 1},
-                }
-            ],
         }
     }
     config_path = tmp_path / "config.yaml"
@@ -52,20 +44,8 @@ def test_targets_list_category(tmp_path: Path) -> None:
     assert "CpxR" in result.output
 
 
-def test_targets_list_campaign(tmp_path: Path) -> None:
+def test_targets_list_rejects_unknown_category(tmp_path: Path) -> None:
     config_path = _write_config(tmp_path)
-    result = runner.invoke(app, ["targets", "list", "--campaign", "demo", str(config_path)], color=False)
-    assert result.exit_code == 0
-    assert "LexA" in result.output
-    assert "Fur" in result.output
-
-
-def test_targets_list_rejects_category_and_campaign(tmp_path: Path) -> None:
-    config_path = _write_config(tmp_path)
-    result = runner.invoke(
-        app,
-        ["targets", "list", "--category", "CatA", "--campaign", "demo", str(config_path)],
-        color=False,
-    )
+    result = runner.invoke(app, ["targets", "list", "--category", "NotARealCategory", str(config_path)], color=False)
     assert result.exit_code != 0
-    assert "Use either --category or --campaign" in result.output
+    assert "not found" in result.output

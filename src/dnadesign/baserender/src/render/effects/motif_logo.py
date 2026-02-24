@@ -75,6 +75,15 @@ def reverse_complement_matrix(matrix: Sequence[Sequence[float]]) -> list[list[fl
     return rc
 
 
+def reverse_matrix_rows(matrix: Sequence[Sequence[float]]) -> list[list[float]]:
+    out: list[list[float]] = []
+    for row in reversed(matrix):
+        if len(row) < 4:
+            raise RenderingError("motif_logo matrix rows must contain at least 4 probabilities [A,C,G,T]")
+        out.append([float(row[0]), float(row[1]), float(row[2]), float(row[3])])
+    return out
+
+
 def _effect_index(record: Record, effect: Effect) -> int:
     for idx, candidate in enumerate(record.effects):
         if candidate is effect:
@@ -171,7 +180,7 @@ def compute_motif_logo_geometry(
 
     observed = feature.label.upper()
     if feature.span.strand == "rev":
-        matrix_rows = reverse_complement_matrix(matrix_rows)
+        matrix_rows = reverse_matrix_rows(matrix_rows)
         observed = observed[::-1]
 
     row_count = len(matrix_rows)

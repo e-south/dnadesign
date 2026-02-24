@@ -46,6 +46,17 @@ def _resolve_progress_style(log_cfg) -> tuple[str, str | None]:
     return effective, reason
 
 
+def _active_stage_a_inputs(plan_items: list) -> set[str]:
+    names: set[str] = set()
+    for item in plan_items:
+        include_inputs = list(getattr(item, "include_inputs", []) or [])
+        for input_name in include_inputs:
+            value = str(input_name).strip()
+            if value:
+                names.add(value)
+    return names
+
+
 def _model_to_dict(value) -> dict:
     if hasattr(value, "model_dump"):
         return value.model_dump(by_alias=True, exclude_none=False)
@@ -73,12 +84,12 @@ def _extract_quota_profile(cfg: dict) -> tuple[list[str], dict[str, int], int]:
             raise ValueError("generation.plan item is missing name.")
         if "fraction" in item and item.get("fraction") is not None:
             raise ValueError("generation.plan fractions are not supported.")
-        quota_raw = item.get("quota")
+        quota_raw = item.get("sequences")
         if quota_raw is None:
-            raise ValueError("generation.plan items must define quota.")
+            raise ValueError("generation.plan items must define sequences.")
         quota_val = int(quota_raw)
         if quota_val <= 0:
-            raise ValueError("Plan quotas must be positive.")
+            raise ValueError("generation.plan[].sequences must be positive.")
         names.append(name)
         quotas[name] = quota_val
     total = sum(quotas.values())
@@ -97,7 +108,7 @@ def _strip_quota_fields(cfg: dict) -> dict:
         for item in plan:
             if not isinstance(item, dict):
                 continue
-            item.pop("quota", None)
+            item.pop("sequences", None)
     return _canonicalize_structure(normalized)
 
 
@@ -170,11 +181,11 @@ def _apply_extend_quota(
 ) -> list[tuple[str, int, int]]:
     plan_items = list(cfg.generation.plan or [])
     existing = generated_by_plan or {}
-    anchor_quotas = [max(int(item.quota), int(existing.get(str(item.name), 0))) for item in plan_items]
+    anchor_quotas = [max(int(item.sequences), int(existing.get(str(item.name), 0))) for item in plan_items]
     updated = _distribute_quota_extension(quotas=anchor_quotas, extension_rows=extension_rows)
     changes: list[tuple[str, int, int]] = []
     for item, old_quota, new_quota in zip(plan_items, anchor_quotas, updated):
-        item.quota = int(new_quota)
+        item.sequences = int(new_quota)
         changes.append((str(item.name), int(old_quota), int(new_quota)))
     return changes
 
@@ -207,14 +218,14 @@ def _apply_resume_quota_floor(
     changes: list[tuple[str, int, int]] = []
     for item in list(cfg.generation.plan or []):
         name = str(item.name)
-        old_quota = int(item.quota)
+        old_quota = int(item.sequences)
         floor_quota = max(
             old_quota,
             int(previous_quotas.get(name, 0)),
             int(generated_by_plan.get(name, 0)),
         )
         if floor_quota != old_quota:
-            item.quota = int(floor_quota)
+            item.sequences = int(floor_quota)
             changes.append((name, old_quota, floor_quota))
     return changes
 
@@ -404,8 +415,13 @@ def _print_run_next_steps(*, cfg_path: Path, run_root: Path, context: CliContext
         cfg_path=cfg_path,
         run_root=run_root,
     )
-    stage_a_cmd = context.workspace_command(
-        "dense plot --only stage_a_summary",
+    list_plots_cmd = context.workspace_command(
+        "dense ls-plots",
+        cfg_path=cfg_path,
+        run_root=run_root,
+    )
+    plot_cmd = context.workspace_command(
+        "dense plot",
         cfg_path=cfg_path,
         run_root=run_root,
     )
@@ -420,7 +436,8 @@ def _print_run_next_steps(*, cfg_path: Path, run_root: Path, context: CliContext
         run_root=run_root,
     )
     console.print(f"  - {inspect_cmd} (Stage-B library + solutions)")
-    console.print(f"  - {stage_a_cmd} (Stage-A summary plots)")
+    console.print(f"  - {list_plots_cmd} (list available plot ids for this workspace)")
+    console.print(f"  - {plot_cmd} (render configured plot set)")
     console.print(f"  - {placement_cmd} (Stage-B placement plots)")
     console.print(f"  - {notebook_cmd} (generate workspace-scoped marimo run notebook)")
 
@@ -521,7 +538,7 @@ def _handle_run_runtime_error(
         )
         console.print(f"  - {inspect_cmd}")
         console.print("  - increase densegen.runtime.max_seconds_per_plan")
-        console.print("  - or reduce generation.plan[].quota / Stage-B complexity")
+        console.print("  - or reduce generation.plan[].sequences / Stage-B complexity")
         raise typer.Exit(code=1)
     if "Exceeded max_consecutive_failures=" in message or "Exceeded max_failed_solutions=" in message:
         console.print(f"[bold red]{message}[/]")
@@ -532,20 +549,11 @@ def _handle_run_runtime_error(
             run_root=run_root,
         )
         console.print(f"  - {inspect_cmd}")
-        console.print("  - increase densegen.runtime.max_consecutive_failures or max_failed_solutions")
-        console.print("  - or relax constraints / lower quota for the affected plan")
-        raise typer.Exit(code=1)
-    if "sequence validation failed and runtime.max_failed_solutions=0" in message:
-        console.print(f"[bold red]{message}[/]")
-        console.print("[bold]Next steps[/]:")
-        inspect_cmd = context.workspace_command(
-            "dense inspect run --events --library",
-            cfg_path=cfg_path,
-            run_root=run_root,
+        console.print(
+            "  - increase densegen.runtime.max_consecutive_failures, "
+            "max_failed_solutions_per_target, or max_failed_solutions"
         )
-        console.print(f"  - {inspect_cmd}")
-        console.print("  - keep strict behavior and adjust motif/placement constraints for feasibility")
-        console.print("  - or set densegen.runtime.max_failed_solutions > 0 to allow bounded retries")
+        console.print("  - or relax constraints / lower quota for the affected plan")
         raise typer.Exit(code=1)
     raise exc
 
@@ -658,11 +666,20 @@ def register_run_commands(
             updates = ", ".join(f"{name}:{old}->{new}" for name, old, new in quota_changes)
             console.print(f"[yellow]Extended total quota by {extend_value} rows for this run[/]: {updates}")
 
+        pl = resolve_plan(loaded)
+        active_inputs = _active_stage_a_inputs(pl)
         if fresh:
             build_stage_a = True
         else:
             statuses = pool_status_by_input(cfg, cfg_path, run_root)
-            rebuild_needed = any(status.state != "present" for status in statuses.values())
+            rebuild_needed = any(
+                status.state != "present" for name, status in statuses.items() if name in active_inputs
+            )
+            stale_unused = sorted(
+                name for name, status in statuses.items() if name not in active_inputs and status.state != "present"
+            )
+            if stale_unused:
+                console.print(f"[yellow]Ignoring stale Stage-A pools for unused inputs: {', '.join(stale_unused)}[/]")
             if rebuild_needed:
                 console.print("[yellow]Stage-A pools missing or stale; rebuilding before run.[/]")
             build_stage_a = rebuild_needed
@@ -689,7 +706,6 @@ def register_run_commands(
         )
 
         # Plan & solver
-        pl = resolve_plan(loaded)
         console.print("[bold]Quota plan[/]: " + ", ".join(f"{p.name}={p.quota}" for p in pl))
         try:
             summary = run_pipeline(

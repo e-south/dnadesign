@@ -102,22 +102,26 @@ def compute_consensus_anchors(
         log_odds_clip=log_odds_clip,
     )
 
-    anchors: list[dict[str, object]] = []
-    for tf_name in tf_names:
+    ordered_tf_names = [str(tf_name) for tf_name in tf_names]
+    if not ordered_tf_names:
+        raise ValueError("Cannot compute consensus anchors without TF names.")
+    for tf_name in ordered_tf_names:
         if tf_name not in pwms:
             raise ValueError(f"Cannot compute consensus anchor; missing PWM for TF '{tf_name}'.")
-        consensus = pwm_consensus(pwms[tf_name])
-        seq = _embed_consensus(consensus, int(sequence_length))
-        seq_arr = _encode_sequence(seq)
-        per_tf = scorer.compute_all_per_pwm(seq_arr, int(sequence_length))
-        x, y = _project_from_per_tf(per_tf, x_metric=x_metric, y_metric=y_metric)
+    anchors: list[dict[str, object]] = []
+    for tf_name in ordered_tf_names:
+        consensus_sequence = scorer.consensus_sequence(tf_name)
+        embedded_sequence = _embed_consensus(consensus_sequence, int(sequence_length))
+        seq_arr = _encode_sequence(embedded_sequence)
+        per_tf_scores = scorer.compute_all_per_pwm(seq_arr, int(seq_arr.size))
+        x, y = _project_from_per_tf(per_tf_scores, x_metric=x_metric, y_metric=y_metric)
         anchors.append(
             {
-                "tf": str(tf_name),
-                "label": f"{tf_name} consensus (max)",
+                "tf": tf_name,
+                "label": f"{tf_name} consensus",
                 "x": float(x),
                 "y": float(y),
-                "sequence": seq,
+                "sequence": embedded_sequence,
             }
         )
     return anchors

@@ -70,6 +70,14 @@ def test_compute_config_loads(tmp_path: Path) -> None:
     assert cfg.sample.optimizer.cooling.beta_end == pytest.approx(4.0)
 
 
+def test_sample_optimizer_kind_is_required_when_optimizer_block_is_set(tmp_path: Path) -> None:
+    payload = _base_config()
+    payload["cruncher"]["sample"]["optimizer"] = {"chains": 2}
+    config_path = _write_config(tmp_path, payload)
+    with pytest.raises(ValidationError, match="sample.optimizer.kind"):
+        load_config(config_path)
+
+
 def test_balanced_move_defaults_are_stability_oriented(tmp_path: Path) -> None:
     config_path = _write_config(tmp_path, _base_config())
     cfg = load_config(config_path)
@@ -109,6 +117,7 @@ def test_analysis_particle_trajectory_fields_load(tmp_path: Path) -> None:
         "run_selector": "latest",
         "trajectory_stride": 5,
         "trajectory_scatter_scale": "llr",
+        "trajectory_scatter_retain_elites": True,
         "trajectory_sweep_y_column": "objective_scalar",
         "trajectory_sweep_mode": "all",
         "trajectory_particle_alpha_min": 0.2,
@@ -120,6 +129,7 @@ def test_analysis_particle_trajectory_fields_load(tmp_path: Path) -> None:
     assert cfg.analysis is not None
     assert cfg.analysis.trajectory_stride == 5
     assert cfg.analysis.trajectory_scatter_scale == "llr"
+    assert cfg.analysis.trajectory_scatter_retain_elites is True
     assert cfg.analysis.trajectory_sweep_y_column == "objective_scalar"
     assert cfg.analysis.trajectory_sweep_mode == "all"
 
@@ -133,11 +143,39 @@ def test_analysis_legacy_trajectory_slot_overlay_is_rejected(tmp_path: Path) -> 
     assert any(err.get("type") == "extra_forbidden" for err in exc.value.errors())
 
 
-def test_sample_output_save_sequences_false_is_rejected(tmp_path: Path) -> None:
+def test_sample_output_save_sequences_false_is_allowed(tmp_path: Path) -> None:
     payload = _base_config()
     payload["cruncher"]["sample"]["output"]["save_sequences"] = False
     config_path = _write_config(tmp_path, payload)
-    with pytest.raises(ValidationError, match="sample.output.save_sequences must be true"):
+    cfg = load_config(config_path)
+    assert cfg.sample is not None
+    assert cfg.sample.output.save_sequences is False
+
+
+def test_sample_output_random_baseline_n_loads(tmp_path: Path) -> None:
+    payload = _base_config()
+    payload["cruncher"]["sample"]["output"]["random_baseline_n"] = 64
+    config_path = _write_config(tmp_path, payload)
+    cfg = load_config(config_path)
+    assert cfg.sample is not None
+    assert cfg.sample.output.random_baseline_n == 64
+
+
+def test_sample_output_random_baseline_is_enabled_by_default(tmp_path: Path) -> None:
+    payload = _base_config()
+    config_path = _write_config(tmp_path, payload)
+    cfg = load_config(config_path)
+    assert cfg.sample is not None
+    assert cfg.sample.output.save_random_baseline is True
+    assert cfg.sample.output.random_baseline_n == 10_000
+
+
+@pytest.mark.parametrize("value", [0, -1])
+def test_sample_output_random_baseline_n_requires_positive(tmp_path: Path, value: int) -> None:
+    payload = _base_config()
+    payload["cruncher"]["sample"]["output"]["random_baseline_n"] = value
+    config_path = _write_config(tmp_path, payload)
+    with pytest.raises(ValidationError, match="sample.output.random_baseline_n"):
         load_config(config_path)
 
 
@@ -149,12 +187,43 @@ def test_analysis_trajectory_defaults_prefer_best_so_far_and_dense_lineage(tmp_p
 
     assert cfg.analysis is not None
     assert cfg.analysis.trajectory_scatter_scale == "llr"
+    assert cfg.analysis.trajectory_scatter_retain_elites is True
     assert cfg.analysis.trajectory_stride == 5
     assert cfg.analysis.trajectory_sweep_y_column == "objective_scalar"
     assert cfg.analysis.trajectory_sweep_mode == "best_so_far"
+    assert cfg.analysis.trajectory_summary_overlay is False
     assert cfg.analysis.trajectory_particle_alpha_max == pytest.approx(0.45)
     assert cfg.analysis.mmr_sweep.enabled is False
     assert cfg.analysis.fimo_compare.enabled is False
+
+
+@pytest.mark.parametrize(
+    "stale_key, stale_value",
+    [
+        ("trajectory_scatter_mode", "best_progression"),
+        ("trajectory_scatter_elite_context_radius", 12),
+        ("trajectory_scatter_objective_column", "objective_scalar"),
+        ("trajectory_scatter_elite_collision_strategy", "none_or_count"),
+        ("trajectory_scatter_elite_link_mode", "exact_only"),
+    ],
+)
+def test_analysis_stale_scatter_keys_are_rejected(tmp_path: Path, stale_key: str, stale_value: object) -> None:
+    payload = _base_config()
+    payload["cruncher"]["analysis"] = {stale_key: stale_value}
+    config_path = _write_config(tmp_path, payload)
+    with pytest.raises(ValidationError) as exc:
+        load_config(config_path)
+    assert any(err.get("type") == "extra_forbidden" for err in exc.value.errors())
+
+
+def test_analysis_trajectory_summary_overlay_toggle_loads(tmp_path: Path) -> None:
+    payload = _base_config()
+    payload["cruncher"]["analysis"] = {"enabled": True, "trajectory_summary_overlay": False}
+    config_path = _write_config(tmp_path, payload)
+    cfg = load_config(config_path)
+
+    assert cfg.analysis is not None
+    assert cfg.analysis.trajectory_summary_overlay is False
 
 
 def test_analysis_fimo_compare_toggle_loads(tmp_path: Path) -> None:

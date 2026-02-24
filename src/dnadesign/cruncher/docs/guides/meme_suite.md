@@ -1,6 +1,8 @@
-# MEME Suite
+## MEME Suite
 
-## Contents
+**Last updated by:** cruncher-maintainers on 2026-02-23
+
+### Contents
 - [MEME Suite](#meme-suite)
 - [Install with pixi (recommended)](#install-with-pixi-recommended)
 - [Choose MEME vs STREME](#choose-meme-vs-streme)
@@ -10,7 +12,7 @@
 
 This guide explains how to install MEME Suite and choose between MEME and STREME for motif discovery.
 
-### Install with pixi (recommended)
+#### Install with pixi (recommended)
 
 This repo ships a minimal `pixi.toml` plus a `cruncher` task that wraps `uv run cruncher`.
 
@@ -21,7 +23,7 @@ pixi run cruncher -- doctor
 
 Note: the pixi `meme` package provides both `meme` and `streme`. When using pixi tasks, place `-c/--config` after the subcommand (pixi inserts `--`).
 
-### Choose MEME vs STREME
+#### Choose MEME vs STREME
 
 - **MEME**: best when each sequence is one site; use `--meme-mod oops` (or `zoops` if noisy).
 - **STREME**: good default for larger sets or when you want speed.
@@ -32,7 +34,7 @@ cruncher discover motifs --tool meme --meme-mod oops <config>
 cruncher discover motifs --tool streme <config>
 ```
 
-### Compare outputs (optional)
+#### Compare outputs (optional)
 
 Run both tools into separate sources so `lock` can disambiguate, then render both logos:
 
@@ -46,7 +48,7 @@ cruncher catalog logos --source meme_suite_meme <config>
 After choosing, set `catalog.source_preference` and re‑run `cruncher lock`.
 Note: MEME/STREME matrices are rounded in their text output. **cruncher** renormalizes near‑1.0 rows to avoid false validation errors.
 
-### If you don't use pixi
+#### If you don't use pixi
 
 Point **cruncher** at a MEME Suite bin directory:
 
@@ -58,7 +60,7 @@ export MEME_BIN="$DNADESIGN_ROOT/.pixi/envs/default/bin"
 #   tool_path: /abs/path/to/meme/bin
 ```
 
-### Alternative: official MEME Suite installer
+#### Alternative: official MEME Suite installer
 
 Install MEME Suite with the official installer, ensure `meme` and `streme` are on PATH,
 then verify:

@@ -1,6 +1,8 @@
-# Cruncher config
+## Cruncher config
 
-## Contents
+**Last updated by:** cruncher-maintainers on 2026-02-23
+
+### Contents
 - [Overview](#overview)
 - [Root](#root)
 - [Workspace](#workspace)
@@ -10,11 +12,10 @@
 - [ingest](#ingest)
 - [sample](#sample)
 - [analysis](#analysis)
-- [campaigns](#campaigns)
 - [Inspect resolved config](#inspect-resolved-config)
 - [Related docs](#related-docs)
 
-## Overview
+### Overview
 
 Cruncher uses a single root key and strict validation. Unknown keys and missing required keys are errors.
 
@@ -26,7 +27,7 @@ Use this doc as a *schema map*. If you only change a few knobs, start with:
 `workspace.regulator_sets`, `catalog.pwm_source`, `sample.sequence_length`,
 `sample.budget.*`, and `sample.elites.*`.
 
-## Root
+### Root
 
 ```yaml
 cruncher:
@@ -38,33 +39,27 @@ cruncher:
   ingest: { ... }
   sample: { ... }            # optional unless running `cruncher sample`
   analysis: { ... }          # optional; analyze uses schema defaults when omitted
-  campaigns: []
-  campaign: null
 ```
 
 Notes:
-- `campaigns` are optional helpers for expanding regulator sets.
-- `campaign` metadata is optional runtime metadata (for generated or campaign-driven runs).
 - `sample` is required for `cruncher sample`, but analyze/reporting consume run artifacts and do not require `sample` in the current config.
 - `analysis` is optional; when omitted, analyze uses default settings (`run_selector=latest`, `pairwise=auto`, `plot_format=pdf`, `table_format=parquet`).
 
-## Workspace
+### Workspace
 
 ```yaml
 workspace:
   out_dir: outputs/
   regulator_sets:
     - [lexA, cpxR]
-  regulator_categories: {}
 ```
 
 Notes:
 - `out_dir` is resolved relative to the config file and must be a relative path.
 - `regulator_sets` defines direct run targets (each set becomes a run).
-- `regulator_sets` may be empty when you run commands with `--campaign <name>`.
-- `regulator_categories` are used by campaigns.
+- `regulator_sets` must be non-empty.
 
-## io
+### io
 
 ```yaml
 io:
@@ -76,7 +71,7 @@ Notes:
 - `extra_modules` is a list of importable Python modules that register parsers via
   `@register("FMT")` decorators in `dnadesign.cruncher.io.parsers.backend`.
 
-## catalog
+### catalog
 
 Controls how the local catalog is queried and how PWMs are prepared.
 
@@ -98,11 +93,13 @@ catalog:
 ```
 
 Notes:
+- `catalog.root` accepts absolute paths or workspace-relative paths (relative paths are resolved from the config workspace root and cannot include `..`).
 - `pwm_source=matrix` uses cached motif matrices (default).
 - `pwm_source=sites` builds PWMs from cached binding-site sequences at runtime.
+- `source_preference` is strict when set: lock resolution fails if no candidate matches the preferred source list.
 - If site lengths vary, set `site_window_lengths` per TF or dataset.
 
-## discover
+### discover
 
 Motif discovery/alignment via MEME Suite.
 
@@ -126,7 +123,7 @@ Notes:
 - Discovery requires cached binding sites and MEME Suite binaries.
 - `tool=auto` chooses STREME above `min_sequences_for_streme`, MEME otherwise.
 
-## ingest
+### ingest
 
 Controls source adapters, genome hydration, and HTTP retries.
 
@@ -167,7 +164,13 @@ ingest:
   site_sources: []
 ```
 
-## sample
+Notes:
+- `ht_sites: true` is strict. HT discovery/fetch failures are not downgraded to curated-only results.
+- `ht_binding_mode: tfbinding` may return zero rows for some datasets; use `peaks` for peak-only datasets.
+- `dataset_source` filtering is applied to each returned dataset row (not only request parameters).
+- With `curated_sites: true` and `ht_sites: true`, `fetch sites --limit` requires explicit mode (`--dataset-id` or one source class disabled).
+
+### sample
 
 Fixed-length sampling with gibbs annealing optimization and MMR elite selection.
 
@@ -293,7 +296,7 @@ Notes:
   - `all`: use every candidate draw
   - integer: clamp to available candidates
 
-## analysis
+### analysis
 
 Curated plot + table suite with explicit contracts (no per-plot enable toggles).
 
@@ -302,7 +305,7 @@ analysis:
   enabled: true
   run_selector: latest      # latest | explicit
   runs: []                  # used only if run_selector=explicit
-  pairwise: auto            # off | auto | [tf1, tf2]
+  pairwise: auto            # off | auto | all_pairs_grid | [tf1, tf2]
   plot_format: pdf          # pdf | png
   plot_dpi: 300
   table_format: parquet     # parquet | csv
@@ -310,11 +313,13 @@ analysis:
   max_points: 5000
   trajectory_stride: 5
   trajectory_scatter_scale: llr   # normalized-llr | llr
+  trajectory_scatter_retain_elites: true
   trajectory_sweep_y_column: objective_scalar  # objective_scalar | raw_llr_objective | norm_llr_objective
   trajectory_sweep_mode: best_so_far  # best_so_far | raw | all
   trajectory_particle_alpha_min: 0.25
   trajectory_particle_alpha_max: 0.45
   trajectory_chain_overlay: false
+  trajectory_summary_overlay: false
   elites_showcase:
     max_panels: 12
   fimo_compare:
@@ -326,16 +331,29 @@ analysis:
 ```
 
 Notes:
-- `analysis.pairwise` selects the TF pair used for the trajectory scatter axes (`chain_trajectory_scatter.*`).
-- `analysis.trajectory_scatter_scale` controls whether scatter axes use per-TF raw LLR or normalized LLR.
+- `analysis.pairwise` controls elite score-space projection:
+  - `auto`: explicit TF pair for 2-TF runs; for 3+ TF runs, selects TF-specific axes from elite worst/second-worst rankings and renders those TF raw-LLR axes.
+  - `all_pairs_grid`: render all TF pair projections in one figure (edge-only axis labels in the grid).
+  - `[tf1, tf2]`: explicit TF pair projection.
+- In `elite_score_space_context`, consensus markers are per-TF consensus anchors for the active axes (`<tf> consensus`), not theoretical maxima bounds.
+- `analysis.trajectory_scatter_scale` controls elite-context axis scale for explicit TF-pair projection; `analysis.pairwise=auto` with 3+ TFs requires `llr`.
+- In `analysis.pairwise=all_pairs_grid`, shared limits are automatic only for `analysis.trajectory_scatter_scale=normalized-llr`.
+- `analysis.trajectory_scatter_retain_elites` keeps exact-mapped elite provenance in metadata.
 - `analysis.trajectory_sweep_y_column` controls the y-axis for `chain_trajectory_sweep.*`:
   - `objective_scalar`: optimizer scalar objective at each sweep (`min`/`sum` over TF best-window scores, with soft-min shaping when enabled).
   - `raw_llr_objective`: replay objective on raw-LLR per-TF scores.
   - `norm_llr_objective`: replay objective on normalized-LLR per-TF scores.
 - `analysis.trajectory_sweep_mode` controls sweep-plot narrative: `best_so_far` (default optimizer narrative), `raw`, or `all` (raw exploration + best-so-far envelope).
-- Trajectory plots are chain-centric: chains are rendered categorically, and lineage follows each chain across sweeps.
-- `analysis.trajectory_chain_overlay=true` overlays chain markers as a diagnostic layer.
-- Required analysis plots fail fast on plotting/data contract errors (`chain_trajectory_scatter`, `chain_trajectory_sweep`, `elites_nn_distance`, `elites_showcase`); only explicitly optional plots can be skipped by policy.
+- `analysis.trajectory_stride` applies deterministic point decimation for `chain_trajectory_sweep.*`.
+  - Scatter always retains first/last sweeps, best-update sweeps, and exact-mapped elite sweeps (when enabled).
+  - Sweep `best_so_far|all` always retains improvement sweeps in addition to stride points.
+- `analysis.trajectory_summary_overlay=true` adds a median-across-chains line and IQR band in `chain_trajectory_sweep.*`, computed from real per-sweep values (no fitted smoothing).
+  - `trajectory_sweep_mode=raw` summarizes raw chain values.
+  - `trajectory_sweep_mode=best_so_far|all` summarizes best-so-far chain values.
+  - Overlay renders only when at least two chains are present; default is disabled.
+- Trajectory plots are chain-centric: scatter backbones follow visited states; best markers highlight record updates without replacing the backbone.
+- `analysis.trajectory_chain_overlay=true` adds diagnostic chain markers (scatter: sampled points, sweep: start/end markers).
+- Required analysis plots fail fast on plotting/data contract errors (`elite_score_space_context`, `chain_trajectory_sweep`, `elites_nn_distance`, `elites_showcase`); only explicitly optional plots can be skipped by policy.
 - `analysis.elites_showcase.max_panels` sets a hard cap for the baserender-backed elites showcase panel count; analyze fails fast when elites exceed this cap.
   - Cruncher-to-baserender handoff is contract-first: Cruncher emits `Record` primitives and baserender renders them.
   - Integration must use baserender public API (`dnadesign.baserender`) only; internal `dnadesign.baserender.src.*` imports are non-contractual.
@@ -349,42 +367,13 @@ Notes:
   - In the score-vs-distance panel, x is nearest-neighbor full-sequence Hamming distance (bp) to the closest other selected elite (not average pairwise distance).
 - If the `analysis` block is omitted, analyze resolves this section from schema defaults.
 
-## campaigns
-
-Campaigns expand regulator categories into explicit regulator sets.
-
-```yaml
-campaigns:
-  - name: regulators_v1
-    categories: [Category1, Category2]
-    within_category:
-      sizes: [2, 3]
-    across_categories:
-      sizes: [2, 3]
-      max_per_category: 2
-    allow_overlap: true
-    distinct_across_categories: true
-    dedupe_sets: true
-    selectors:
-      min_info_bits: 8.0
-      min_site_count: 10
-    tags:
-      organism: ecoli
-      purpose: multi_tf_sweep
-```
-
-Notes:
-- Campaigns execute directly via `--campaign` on `lock`, `parse`, `sample`, and `analyze`.
-- `cruncher campaign generate` is optional and writes export snapshots under
-  `<workspace>/.cruncher/campaigns/<campaign>/` by default.
-
-## Inspect resolved config
+### Inspect resolved config
 
 ```bash
-cruncher config summary -c path/to/config.yaml
+cruncher config summary -c path/to/workspace/configs/config.yaml
 ```
 
-## Related docs
+### Related docs
 
 - [Sampling + analysis](../guides/sampling_and_analysis.md)
 - [Intent + lifecycle](../guides/intent_and_lifecycle.md)

@@ -97,25 +97,23 @@ def drop_usr_columns(usr_root: Path, dataset: str, columns: list[str]) -> None:
     # Resolve dataset paths deterministically
     ds_dir = (usr_root / dataset).resolve()
     records = ds_dir / "records.parquet"
-    snapshots = ds_dir / "_snapshots"
     events = ds_dir / ".events.log"
     if not records.exists():
         raise FileNotFoundError(f"USR dataset not found: {records}")
 
-    # Use USR I/O primitives so we inherit atomic write + snapshot + metadata preservation.
+    # Use public USR API and pyarrow for deterministic in-place rewrite.
     try:
-        from dnadesign.usr.src.io import (  # type: ignore
-            append_event,
-            read_parquet,
-            write_parquet_atomic,
-        )
+        from dnadesign.usr import Dataset
     except Exception as e:
         raise RuntimeError(
-            "dnadesign.usr.src.io is required to modify USR datasets. "
-            "Please ensure the dnadesign.usr package is installed and up to date."
+            "dnadesign.usr is required to modify USR datasets. "
+            "Please ensure the dnadesign package is installed and up to date."
         ) from e
 
-    tbl = read_parquet(records)
+    import pyarrow.parquet as pq
+
+    ds = Dataset(usr_root, dataset)
+    tbl = pq.read_table(records)
     names = set(tbl.schema.names)  # top‑level Arrow names
     drop_now = [c for c in columns if c in names]
     if not drop_now:
@@ -124,12 +122,20 @@ def drop_usr_columns(usr_root: Path, dataset: str, columns: list[str]) -> None:
     # Build new table by selection (pyarrow Table.select keeps metadata on preserved columns)
     new_tbl = tbl.select(keep)
 
-    # Persist atomically and snapshot
-    write_parquet_atomic(new_tbl, records, snapshots, preserve_metadata_from=tbl)
+    # Persist atomically and snapshot using public dataset lifecycle hooks.
+    ds.snapshot()
+    tmp_path = records.with_suffix(records.suffix + ".tmp")
+    try:
+        pq.write_table(new_tbl, tmp_path)
+        tmp_path.replace(records)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
 
     # Append a concise event
     try:
-        append_event(events, {"action": "cluster_delete", "columns": drop_now})
+        with events.open("a", encoding="utf-8") as f:
+            f.write(json.dumps({"action": "cluster_delete", "columns": drop_now}) + "\n")
     except Exception:
         pass
 

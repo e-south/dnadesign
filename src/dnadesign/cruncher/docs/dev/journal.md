@@ -1,14 +1,132 @@
-# cruncher dev journal
+## cruncher dev journal
 
+**Last updated by:** cruncher-maintainers on 2026-02-23
 
-## Contents
+### Contents
+- [2026-02-20](#2026-02-20)
+- [2026-02-18](#2026-02-18)
 - [2026-02-15](#2026-02-15)
 - [2026-02-04](#2026-02-04)
 - [2026-02-05](#2026-02-05)
 - [2026-02-06](#2026-02-06)
 - [2026-02-11](#2026-02-11)
 
-## 2026-02-15
+### 2026-02-20
+- Confirmed direction for a strict, breaking workspace/schema modernization focused on decoupling and fail-fast behavior.
+- Locked decisions:
+  - workspace operational specs move under `configs/`:
+    - `configs/config.yaml`
+    - `configs/runbook.yaml` (machine-executable)
+    - `configs/studies/*.study.yaml`
+    - `configs/*.portfolio.yaml`
+  - `runbook.md` remains narrative only.
+  - portfolio source inclusion remains explicit-only via `portfolio.sources[]` (no auto-discovery fallback).
+  - portfolio orchestration mode will be schema-driven (`aggregate_only` vs `prepare_then_aggregate`), not an ad hoc CLI flag.
+  - machine runbook execution will use typed Cruncher steps only (no arbitrary shell).
+  - portfolio outputs/manifests should use portable relative provenance fields (not absolute machine paths).
+- Audit findings used to scope first implementation slices:
+  - `fetch sites --dry-run` currently behaves as HT-dataset discovery only; this is ambiguous for curated/local users.
+  - `study run` failures can emit Matplotlib cache warnings before failing fast on spec-level errors.
+  - portfolio outputs currently include absolute workspace/run paths and absolute spec path in manifest.
+  - workspace discovery and docs/tests currently assume root-level `config.yaml` and root-level `*.study.yaml`.
+- Execution slices to implement:
+  1. Add failing tests for new `configs/` workspace contract and strict path resolution.
+  2. Refactor config/workspace/study/portfolio loaders to `configs/` layout with no root fallback.
+  3. Add machine runbook schema + CLI execution surface under `workspaces`.
+  4. Extend portfolio schema/workflow with explicit preparation mode and declared prep graph.
+  5. Make portfolio manifest/tables portable and path-agnostic.
+  6. Migrate workspace assets/docs and update contract tests + runbook docs.
+- Implementation progress:
+  - Added strict layout tests (`tests/cli/test_workspace_configs_layout.py`) and updated resolver/CLI tests to enforce `configs/config.yaml`.
+  - Migrated all Cruncher workspace configs/specs to `configs/` (`configs/config.yaml`, `configs/studies/`, `configs/*.portfolio.yaml`).
+  - Hardened workspace-root semantics in CLI/runtime path handling (`resolve_workspace_root` adoption in status/sample/analyze/runs/cache/catalog/discover/doctor/catalog_utils) to prevent accidental `configs/`-scoped outputs.
+  - Updated runbooks and docs to the new path contract (workspace README, demo docs, study/portfolio guides, CLI/config/architecture references).
+  - Validation: `uv run ruff check src/dnadesign/cruncher/src src/dnadesign/cruncher/tests` and `uv run pytest -q src/dnadesign/cruncher/tests -q` (pass; one expected MEME/FIMO skip).
+  - Added a strict machine runbook contract under `configs/runbook.yaml`:
+    - new module `src/workspaces/runbook.py` with schema validation + fail-fast step execution
+    - new CLI entrypoint `cruncher workspaces run` with optional `--workspace`, `--runbook`, and `--step` filters
+    - runbooks execute typed Cruncher CLI steps only (`run: [<subcommand>, ...]`), no shell fallback.
+  - Generated `configs/runbook.yaml` for all active Cruncher workspaces and updated runbook docs to include the canonical machine-runbook happy path.
+  - Extended portfolio schema to v2:
+    - `portfolio.execution.mode` (`aggregate_only` | `prepare_then_aggregate`)
+    - source-scoped `prepare.runbook` + `prepare.step_ids`
+    - explicit prepare execution before aggregation in portfolio workflow.
+  - Hardened portfolio preparation semantics:
+    - in `prepare_then_aggregate`, source `run_dir` may be created by prepare steps and is validated after preparation
+    - fail-fast error if required source run artifacts are still missing post-prepare.
+  - Updated portfolio workspace template/spec/docs/tests to use schema v2 prepare mode and source runbook step orchestration.
+  - Validation:
+    - `uv run pytest -q src/dnadesign/cruncher/tests/workspaces/test_runbook_execution.py ...` (targeted CLI/portfolio/docs suites pass)
+    - `uv run pytest -q src/dnadesign/cruncher/tests` (pass; one expected MEME/FIMO skip)
+    - `uv run cruncher workspaces run --runbook ... --dry-run` (demo + portfolio runbooks validate)
+    - `uv run cruncher portfolio run --spec ...` now fails fast at prepare-time when source runs are missing (`No sample runs found for analysis`), matching strict contracts.
+  - Added master orchestration plan and implementation for whole-workspace reproducibility:
+    - canonicalized per-workspace study contracts via `configs/studies/length_vs_score.study.yaml` and `configs/studies/diversity_vs_score.study.yaml` for all non-portfolio workspaces.
+    - canonicalized runbook study step ids `study_run_length_vs_score` and `study_run_diversity_vs_score` across all non-portfolio workspace machine runbooks.
+    - added source-scoped `study_spec` contract in portfolio schema v2 and strict loader resolution (workspace-contained path, must exist).
+    - added shared Study identity helpers in `src/study/identity.py` so deterministic Study run directory resolution is reusable outside `study_workflow`.
+    - extended portfolio aggregation outputs with optional `table__study_summary` when `study_spec` is declared per source.
+    - added master portfolio spec `workspaces/portfolios/configs/master_all_workspaces.portfolio.yaml` with explicit source list, explicit prepare graph, and no discovery fallback.
+    - updated portfolio workspace runbook machine steps to include `portfolio_run_master_all_workspaces`.
+    - updated workspace/docs narrative to include canonical study + master portfolio flow.
+  - Contract coverage added:
+    - `tests/docs/test_master_orchestration_contracts.py` enforces per-workspace study spec presence, runbook step wiring, and master portfolio source coverage.
+    - `tests/portfolio/test_portfolio_run_smoke.py` adds coverage for `table__study_summary` generation from deterministic Study outputs.
+    - `tests/portfolio/test_portfolio_load_and_layout.py` and `test_portfolio_spec_strict_validation.py` cover `study_spec` schema/load contracts.
+  - Validation:
+    - `uv run ruff check` on changed study/portfolio modules + tests (pass).
+    - `uv run pytest -q src/dnadesign/cruncher/tests` (pass; one expected MEME/FIMO skip).
+    - CLI pressure checks:
+      - `uv run cruncher study list --workspace pairwise_cpxr_baer` (shows `length_vs_score` and `diversity_vs_score` specs)
+      - `uv run cruncher workspaces run --workspace pairwise_cpxr_baer --step study_run_length_vs_score --dry-run` (pass)
+      - `uv run cruncher workspaces run --runbook .../portfolio/configs/runbook.yaml --step portfolio_run_master_all_workspaces --dry-run` (pass)
+  - Implementation tracker (master orchestration + study/portfolio reproducibility):
+    - [x] Strict workspace layout migration to `configs/` for config, study, portfolio, and machine runbook assets.
+    - [x] Machine runbook execution path (`workspaces run`) with typed CLI subcommand steps and fail-fast contracts.
+    - [x] Portfolio schema v2 orchestration modes (`aggregate_only`, `prepare_then_aggregate`) with explicit source prepare graph.
+    - [x] Canonical per-workspace study specs (`configs/studies/length_vs_score.study.yaml`, `configs/studies/diversity_vs_score.study.yaml`) across non-portfolio workspaces.
+    - [x] Canonical runbook study steps (`study_run_length_vs_score`, `study_run_diversity_vs_score`) across non-portfolio workspace runbooks.
+    - [x] Deterministic study identity shared utility (`src/study/identity.py`) and portfolio `study_spec` integration.
+    - [x] Master portfolio spec (`master_all_workspaces.portfolio.yaml`) wired for explicit source set and reproducible prep+aggregate flow.
+    - [x] Study summary aggregation output (`table__study_summary`) and associated schema/load/run contract tests.
+    - [x] Docs/runbooks updated for canonical end-to-end narrative flow (workspace -> study -> portfolio).
+    - [x] Added canonical workspace reset command (`workspaces reset`) and migrated machine runbooks/docs away from ad hoc shell cleanup.
+    - [x] `workspaces run` now resolves from runbook-only workspace roots (for example portfolio workspace) without requiring `configs/config.yaml`.
+    - [x] `workspaces list` now reports runbook-only workspaces as first-class entries (`kind=runbook-only`).
+    - [ ] Remaining follow-up: run full master portfolio end-to-end on populated source workspaces to record real artifact examples and runtime envelope.
+
+### 2026-02-18
+- Ran a kernel sweep study for `demo_pairwise` (`kernel_tuning_score_diversity`) over cooling tail, adaptation freeze point, and Gibbs inertia at fixed diversity (`0.15`) with 3 seeds.
+- Kernel sweep aggregate metrics were close across candidates; lower-half elite score favored the colder-tail family (`COLD_TAIL_24` / `COLD_TAIL_26`) over baseline.
+- Ran a calibrated direct-sampling diversity sweep study (`mmr_diversity_kernel_calibration`) at fixed `COLD_TAIL_24` kernel across diversity values `[0.05, 0.08, 0.10, 0.12, 0.15, 0.18, 0.22]` with 4 seeds.
+- Measured tradeoff (direct sample outputs): `diversity=0.05` delivered the strongest score lift while preserving non-collapsed diversity (`median_nn_full_bp=6.375`, `min_pairwise_full_bp=4.75`), and materially improved lower-half elite scores versus `0.15`.
+- Promoted tuned defaults into `demo_pairwise/configs/config.yaml`:
+  - `sample.elites.select.diversity: 0.05`
+  - `sample.moves.overrides.proposal_adapt.freeze_after_beta: 5.0`
+  - `sample.moves.overrides.gibbs_inertia.p_stay_end: 0.90`
+  - cooling tail stages set to `138000@6.0`, `146000@12.0`, `150000@24.0`.
+- Ran a new two-TF study (`chains_vs_seeds_score_bullish`) to measure score/diversity gains vs `sample.optimizer.chains` under multiple RNG seeds.
+  - Spec path: `workspaces/demo_pairwise/configs/studies/chains_vs_seeds_score_bullish.study.yaml`
+  - Sweep: chains `{2,4,6,8,10}` x seeds `{101..106}` with fixed score-leaning selection (`diversity=0.04`) and fixed budget (`tune=3000`, `draws=12000`).
+  - Study run path: `workspaces/demo_pairwise/outputs/studies/chains_vs_seeds_score_bullish/ddb95559af2b`.
+  - Derived summary table: `tables/table__chains_seed_tradeoff_summary.csv`.
+  - Derived plots: `plots/plot__chains_vs_score_diversity_tradeoff.pdf`, `plots/plot__seed_count_stability_by_chains.pdf`.
+- Chains sweep findings (means across 6 seeds):
+  - `median_score`: `C2=0.5530`, `C4=0.5524`, `C6=0.5709`, `C8=0.5963`, `C10=0.6045`.
+  - `best_score` remained flat (`0.7122`) across all chain counts; gains were in lower-half elite quality, not top-1.
+  - lower-half mean elite score peaked at `C8=0.5615` (vs `C10=0.5554`), indicating `C10` slightly regressed tail quality despite higher median.
+  - diversity metrics favored `C8` over `C10` (`min_pairwise_full_bp: 6.0 vs 5.17`, `median_nn_full_bp: 6.83 vs 6.17`).
+- Runtime cost scaled near-linearly with chains:
+  - mean duration per run: `C2=16.48s`, `C4=25.70s`, `C6=31.60s`, `C8=37.62s`, `C10=44.19s`.
+  - `C10` delivered only `+0.0082` median-score over `C8` for `+6.58s` extra runtime and lower diversity/tail quality.
+- Seed-count findings:
+  - At fixed chains, cumulative means stabilized by ~`4-6` seeds; `median_score_sem` at 6 seeds was already small (`~0.005-0.010`).
+  - Additional seeds beyond 4 reduced uncertainty more than they changed central tendency in most chain settings.
+- Recommendation from this sweep:
+  - For score-favoring two-TF runs without unnecessary quality/diversity regression, `chains=8` is the best practical setting from tested values.
+  - Keep `6` as a faster option; avoid `10` unless additional runtime is acceptable for marginal median-score gain.
+
+### 2026-02-15
 - Export contract semantics were hard-cut to specificity-first language: `monospecific`, `bispecific`, `multispecific`.
 - Export table names are now:
   - `table__monospecific_consensus_sites`
@@ -23,7 +141,7 @@
 - Export manifest schema advanced to v2 (`kind=sequence_export_v2`) and records specificity group bounds explicitly.
 - No compatibility aliases were retained for prior export table names or row-count keys.
 
-## 2026-02-04
+### 2026-02-04
 - Start refactor to remove core I/O dependencies and progress UI from optimizers.
 - Enforce strict no-fallback behaviors (numba cache location, auto-opt override).
 - Split sample/analyze workflows into focused modules while keeping public entrypoints.
@@ -37,20 +155,20 @@
 - Analyze now errors if trace.nc is missing when trace-based diagnostics are requested.
 - Updated docs to reflect strict analyze artifacts and warm-start requirements.
 - Reorganized tests into analysis/app/cli/core/ingest/store subfolders and fixed path-based tests.
-- Profiled demo_basics_two_tf with a reduced budget; font-cache build dominated the first run, with scoring/pvalue setup next.
+- Profiled demo_pairwise with a reduced budget; font-cache build dominated the first run, with scoring/pvalue setup next.
 - Added analysis plan + manifest helpers to trim analyze_workflow and keep manifest writing cohesive.
 - Made fetch CLI default its source from motif_store.source_preference and documented the requirement.
 - Tightened auto-opt candidate validation: warn candidates now require allow_warn, and quality=fail is rejected.
 - Added a core import contract test to keep core free of artifacts/cli/filesystem dependencies.
-- Profiled `cruncher analyze --summary` (demo_basics_two_tf); runtime dominated by import overhead (~3s total).
-- Audited demo_basics_two_tf outputs: auto_opt candidates=40 (20 specs x 2 budgets), 35 fail (ESS<10), 5 warn; winner selected via allow_warn. auto_opt outputs ~145M vs sample ~7.7M.
+- Profiled `cruncher analyze --summary` (demo_pairwise); runtime dominated by import overhead (~3s total).
+- Audited demo_pairwise outputs: auto_opt candidates=40 (20 specs x 2 budgets), 35 fail (ESS<10), 5 warn; winner selected via allow_warn. auto_opt outputs ~145M vs sample ~7.7M.
 - Added learning metrics to analysis objective components + report (best score draw, plateau, early-stop simulation).
 - Enforced early_stop.min_delta <= 0.1 for normalized-llr configs and added tests.
 - Enabled early_stop and analysis.extra_tables in demo config; demo now emits auto_opt_pilots table.
 - Updated docs (config, sampling guide, demo) to reflect learning metrics + early-stop guidance.
 - Auto-opt quality grading now uses trace draw counts + ESS ratio; short pilots are marked warn and ESS ratio only warns (no hard-fail).
 - Auto-opt candidate payload now records ess_ratio + trace_draws/expected to make pilot diagnostics scale-aware in auto_opt_pilots tables.
-- Reran demo_basics_two_tf with full default config; auto-opt selected PT with warnings and produced sample run lexA-cpxR_20260204_140346_cb1935.
+- Reran demo_pairwise with full default config; auto-opt selected PT with warnings and produced sample run lexA-cpxR_20260204_140346_cb1935.
 - Latest demo analysis warns only on low elite count (n_elites=1) and shows early-stop per-chain around draw 1500-1633.
 - Auto-opt pilot summary: PT swap_prob=0.15 + aggressive/boosted cooling yields top top_k_median; ESS ratios remain very low (~0.001) across grid.
 - Added `min_norm` to sequences.parquet for fast per-draw consensus filtering.
@@ -58,10 +176,10 @@
 - Updated CLI docs to describe the MMR scorecard as the default auto-opt selector.
 - Allow NUMBA_CACHE_DIR overrides when an explicit cache_dir is provided (warn + overwrite) to keep CLI runs deterministic in workspaces.
 - Reordered MMR selection to run after final candidate pool assembly so final elites preserve diversity (MMR meta now matches elites).
-- Reran demo_basics_two_tf after the MMR ordering change: latest run lexA-cpxR_20260204_174159_fdeee2 produced 10 elites with 10 unique canonical sequences and unique_successes=24.
+- Reran demo_pairwise after the MMR ordering change: latest run lexA-cpxR_20260204_174159_fdeee2 produced 10 elites with 10 unique canonical sequences and unique_successes=24.
 - Design Section 4 plan of action: (1) audit + prune config schema to essential knobs (enforce init.length >= max PWM width; canonicalize MMR when bidirectional), (2) behavior cleanup (PT-only, no auto-disable paths), (3) refactor cohesion (split auto_opt and run_set by responsibility), (4) tests (CLI smoke test, fixed-length vs max PWM), (5) docs alignment (sampling/config docs; MMR TFBS-core behavior), (6) performance sanity (note scorer DP caching; no core kernel changes now).
 
-## 2026-02-05
+### 2026-02-05
 - Brainstorming: Intent + Plan of Action (200-300 words). Cruncher's intent is to generate short, fixed-length DNA sequences that jointly satisfy multiple PWMs while returning a diverse elite set, with diversity defined across sequences rather than within a sequence's motif windows. The MCMC kernel should remain unchanged; selection, scoring, and stopping should be assertive and predictable. The hard-break simplification focuses on keeping only essential knobs so users can reason about outcomes with minimal configuration. Plan of action: first, prune config schema to essential knobs and enforce sample.init.length >= max PWM width with canonical MMR under bidirectional scoring. Second, behavior cleanup removes auto-disable or warm-start paths and keeps the optimizer PT-only. Third, improve cohesion by splitting app/sample/auto_opt.py into candidate generation, scoring/selection, and orchestration, and splitting app/sample/run_set.py into run layout, candidate pool creation, MMR selection/metadata, and manifest writing. Fourth, add tests that assert fixed-length constraints and include a CLI smoke test using the two-TF demo. Fifth, align docs (sampling + config) to state fixed length, TFBS-core MMR behavior, and canonicalization under bidirectional scoring. Sixth, add lightweight profiling to identify hot paths, with an eye toward reusing scorer caches across pilots without touching the kernel.
 - Fixed a recursion bug in `_assert_init_length_fits_pwms` and centralized the max-PWM length check.
 - Removed warm-start seed injection in PT; chains now always start from a shared seed plus small perturbations.
@@ -72,9 +190,9 @@
 - Tightened analysis fixtures to include explicit MMR selection policy and fixed demo config indentation.
 - Added `min_per_tf_norm` to sequences.parquet and asserted it in the CLI smoke test.
 - Gated early-stop reporting on unique-success requirements and surfaced a diagnostics warning when unique_successes < min_unique.
-- Lowered demo `min_per_tf_norm` / `success_min_per_tf_norm` to 0.40 and reran demo_basics_two_tf; elites now populate (n=10) and early-stop triggers cleanly.
+- Lowered demo `min_per_tf_norm` / `success_min_per_tf_norm` to 0.40 and reran demo_pairwise; elites now populate (n=10) and early-stop triggers cleanly.
 - Ran the demo end-to-end (fetch motifs/sites -> lock -> parse -> sample -> analyze) using the workspace config.
-- Profiled `cruncher sample` on demo_basics_two_tf; dominant cost is PWM log-odds -> p-value lookup construction (`core/pvalue.py`), with scorer init next (candidate for cross-pilot cache reuse).
+- Profiled `cruncher sample` on demo_pairwise; dominant cost is PWM log-odds -> p-value lookup construction (`core/pvalue.py`), with scorer init next (candidate for cross-pilot cache reuse).
 - Updated docs (demo, sampling guide, config reference, architecture) to reflect PT-only language, TFBS-core MMR behavior, and sequences column naming.
 - Removed sample.budget.restarts from schema/config/code to eliminate PT-only fallback overrides; updated tests, docs, and demo configs accordingly.
 - Added an in-memory LRU cache for PWM log-odds -> p-value lookup tables (core/pvalue.py) to reuse DP results across auto-opt pilots; added a minimal cache-hit test.
@@ -92,7 +210,7 @@
 - Added a v3 single-path schema design: `sequence_length`, `compute.total_sweeps`, and `compute.adapt_sweep_frac` with explicit numeric elite gates (`min_per_tf_norm`, `mmr_alpha`), removing pilot grids and inference-style tune/draws.
 - Removed auto-opt orchestration modules and CLI/report wiring; updated demos/workspaces and sampling docs to the fixed-length compute schema with no pilot references.
 
-## 2026-02-06
+### 2026-02-06
 - Continued v3 work: updated schema_v3 to be self-contained (removed schema_v2 imports) and aligned CLI config/analyze commands with the v3 surface.
 - Simplified analysis CLI to v3 behavior (run selection + summary only) and removed plot/tf-pair override flags.
 - Updated v3 docs (config reference, sampling/analysis guide, demos, ingestion/meme suite guides, architecture, internals spec) to match the curated analysis suite and v3 schema terminology.
@@ -104,7 +222,7 @@
 - Updated analysis tests and docs to match the new plot suite and baseline artifacts.
 - Added an intent + lifecycle guide and linked it from docs index, demo, config, and architecture references.
 
-## 2026-02-11
+### 2026-02-11
 - Refactored the analysis plot suite to improve optimizer narrative and diagnostics while preserving existing output filenames.
 - Added shared plot styling utilities (`analysis/plots/_style.py`) and applied them across trajectory, diversity, overlap, and health plots.
 - Upgraded trajectory scatter to show best-so-far lineage updates with selected elite overlays and objective-caption footnotes.
@@ -122,7 +240,7 @@
 - Ran a two-TF alpha spot-check (`0.55` vs `0.85`) and observed identical elite set/metrics under fixed seed+kernel, so the existing `alpha=0.85` remains unchanged there.
 - Fixed analyze crash in overlap plotting by replacing unsupported colormap `mako` with matplotlib-native `viridis`.
 - Updated the elite diversity panel to show full-sequence Hamming distances in base pairs (bp) on both the score-vs-diversity axis and distance-matrix colorbar, so effective elite diversity is directly interpretable without normalization.
-- Revalidated `demo_basics_two_tf` canonical outputs after rerun: elites remain `8/8` unique sequences, with full-sequence pairwise Hamming distance `min/median/max = 1/13/14 bp` (sequence length 16 bp), confirming no exact duplicates while exposing remaining near-duplicate tails.
+- Revalidated `demo_pairwise` canonical outputs after rerun: elites remain `8/8` unique sequences, with full-sequence pairwise Hamming distance `min/median/max = 1/13/14 bp` (sequence length 16 bp), confirming no exact duplicates while exposing remaining near-duplicate tails.
 - Clarified optimizer score semantics in plots: sweep y-axis now labels optimizer scalar meaning explicitly (`min` vs `sum`, soft-min on/off, and score scale), and elite diversity y-axis labels final optimizer scalar source.
 - Hardened elite score fallback reconstruction to respect objective combine mode (`sum` no longer falls back to `min`), with regression coverage in `test_nn_distance_identity`.
 - Tightened score-axis wording to reduce label verbosity while preserving semantics; y-labels now use compact forms like `Opt scalar (...)` and `Replay objective (...)` with explicit combine/scale context.
@@ -143,7 +261,7 @@
 - Updated demo workspace configs to use the diversity macro (`sample.elites.select.diversity`) and updated reference/sampling docs plus optimizer-surface tests to match.
 - Audited `schema_v3` surface against runtime usage and removed-key regression tests: no new stale/no-op keys found in active Cruncher v3 paths; existing removed keys remain enforced by `tests/config/test_removed_config_keys.py`.
 - Fixed `analysis.mmr_sweep` parquet serialization failure when `pool_size_input` mixes `'auto'` and integers by normalizing `pool_size_input` to string before table write; added regression test `test_run_mmr_sweep_table_is_parquet_writable_with_mixed_pool_size_inputs`.
-- Generated demo variant matrix (`score_focus`, `balanced`, `diversity_focus`, `strict_probe`) for `demo_basics_two_tf`, `demo_campaigns_multi_tf`, and `densegen_prep_three_tf` under `workspaces/*/variants/`.
+- Generated demo variant matrix (`score_focus`, `balanced`, `diversity_focus`, `strict_probe`) for `demo_pairwise`, `demo_multitf`, and `densegen_prep_three_tf` under `workspaces/*/variants/`.
 - Ran bounded offline MMR diversity sweeps (`alpha=0.85`, `pool_size in {auto,1600,4000}`, `diversity in {0,0.25,0.5,0.75,0.9}`) for all three demos and updated balanced variants with measured settings:
   - `two_tf`: balanced -> `diversity=0.25` (higher values relaxed to zero constraints with no added full-sequence separation).
   - `campaign`: balanced -> `diversity=0.5`, `pool_size=4000` (non-zero diversity pressure with strong score retention).
@@ -161,3 +279,62 @@
 - Two-TF score vs diversity table (full-sequence Hamming in bp): `0.00 -> median_score 0.7122, median_nn 1.0, min_pairwise 1.0`; `0.05 -> 0.6749, 5.5, 3.0`; `0.10 -> 0.6540, 5.5, 4.0`; `0.15 -> 0.6426, 6.5, 5.0`; `0.20 -> 0.6366, 6.0, 4.0`; `0.25 -> 0.6306, 7.0, 6.0`; `0.35 -> 0.5949, 7.0, 5.0`; `0.40 -> 0.5929, 7.0, 5.0`; `0.60 -> 0.5563, 8.0, 5.0`; `0.80 -> 0.5069, 8.0, 6.0`; `1.00 -> 0.2785, 7.5, 7.0`.
 - Interpretation: `diversity=0.00` now correctly maps to score-only selection and collapses (`NN=1 bp`). Practical knee for two-TF is `0.10..0.25`; chose `0.15` as score-favoring default with non-collapsed elites.
 - Plot candidate to add in analysis: `plot__elites_diversity_tradeoff_curve` from `analysis.mmr_sweep` table, with x=`diversity`, left y=`median_score_selected`, right y=`median_nn_full_bp` and `min_pairwise_full_bp`, plus a marked knee/default point. This would make default selection evidence visible from a single run artifact.
+
+### 2026-02-20
+- Hardened portfolio schema v2 with explicit `studies.ensure_specs` and global `studies.sequence_length_table` (`study_spec`, `top_n_lengths`) plus strict validation that the sequence-length study is declared in ensure specs.
+- Portfolio loader now validates every declared ensure study path per source workspace (inside-workspace, exists, file) before execution.
+- Portfolio workflow now auto-runs/resumes required studies when missing/incomplete (fail-fast on corrupted study metadata), and writes a separate aggregate table `table__handoff_sequence_length.{parquet,csv}` keyed by `sequence_length`.
+- Added contract tests for new schema/workflow behavior (`tests/portfolio/test_portfolio_spec_strict_validation.py`, `tests/portfolio/test_portfolio_run_smoke.py`).
+- Standardized non-portfolio workspace studies around two canonical specs (`length_vs_score`, `diversity_vs_score`) and added runbook machine steps `study_run_length_vs_score` and `study_run_diversity_vs_score`.
+- Added config/docs contract tests to keep study specs aligned with workspace minimum sequence lengths and no-drift diversity study behavior (`tests/config/test_workspace_study_specs_contracts.py`, updated `test_workspace_sequence_length_bounds.py`, `test_docs_path_contracts.py`, and master orchestration/docs contracts).
+- Updated portfolio/workspace docs and runbooks to reflect the new study orchestration and sequence-length handoff table surface.
+- Pressure-tested CLI flow on a synthetic workspace tree: `cruncher portfolio run --spec ...` produced `table__handoff_sequence_length` with expected rows and manifest entries.
+- Added doc hardening pass for demo narratives: each demo now explicitly includes machine-runbook execution plus canonical study invocation (`length_vs_score`, `diversity_vs_score`) and study output locations.
+- Added runbook readability contract: machine study steps now require non-empty `description` fields; updated all optimization workspace machine runbooks accordingly.
+- Fixed end-to-end test brittleness in `test_end_to_end_demo.py` by deriving `sample.motif_width.maxw` from `sample.sequence_length` instead of a stale hardcoded value.
+- Fixed `docs/guides/studies.md` canonical sequence mismatch: guide now shows separate length/diversity study runs and corresponding plot paths, with explicit note that sequence-length tradeoff plot is emitted only when length varies.
+- Switched Cruncher Matplotlib cache default to a repo-shared path (`.cache/matplotlib/cruncher`) instead of per-catalog `.mplcache`; kept explicit `MPLCONFIGDIR` override precedence.
+- Added fail-fast cache-dir contracts (repo root resolvable, writable cache dir) in `viz/mpl.py` and regression coverage in `tests/viz/test_mpl_cache.py`.
+- Updated architecture/ingestion/spec docs and docs contract tests to reflect the shared Matplotlib cache contract.
+- Audited root `.gitignore` for fresh-user Cruncher ergonomics and removed over-broad runtime globs that hid legitimate docs files (`elites.*`, `report.json`, `report.md` under `src/dnadesign/cruncher/**`).
+- Removed stale `**/.mplcache/` ignore rule to align with shared Matplotlib cache contract.
+- Added explicit Cruncher docs media allowlist (`!src/dnadesign/cruncher/docs/**/*.{png,jpg,jpeg,gif}`) and added regression coverage in `tests/docs/test_root_gitignore_contracts.py`.
+- Normalized runbook/demo UX wording to plain English: each workspace runbook now starts with “Run this single command to do everything below,” and demo docs now state “Run this single command to do everything in this demo” followed by “Or run the same flow step by step with context below.”
+- Added docs contracts to enforce this single-command + step-by-step structure in `tests/docs/test_workspace_runbook_contracts.py` and `tests/docs/test_docs_path_contracts.py`.
+
+### 2026-02-21
+- Removed portfolio source-level `top_k` from schema/specs and made source elite selection manifest-driven (`run_manifest.top_k` + `elites.parquet`), with fail-fast mismatch checks.
+- Hardened portfolio aggregation outputs into two explicit handoff tables:
+  - `table__handoff_windows_long.{parquet,csv}` (tidy long window rows)
+  - `table__handoff_elites_summary.{parquet,csv}` (minimal elite summary rows)
+- Added deterministic hash IDs to portfolio outputs (`elite_hash_id`, `window_hash_id`) and collision checks.
+- Updated portfolio source manifest entries to record `source_top_k` (from source run manifest) instead of spec-supplied top-k.
+- Added schema registry entrypoints (`study/schema.py`, `portfolio/schema.py`) and wired study/portfolio loaders through registry-based parsing rather than direct version-coupled module assumptions.
+- Added elite showcase overlay hash token rendering (deterministic from `id|sequence` when no explicit `hash_id` is present) and test coverage.
+- Updated portfolio workspace specs/docs/runbooks/contracts to remove stale `top_k` keys and document the new handoff table names and manifest-driven elite-count contract.
+- Validation run:
+  - `uv run ruff check` on touched Cruncher src/tests files
+  - `uv run pytest -q src/dnadesign/cruncher/tests/portfolio`
+  - `uv run pytest -q src/dnadesign/cruncher/tests/docs/test_portfolio_docs_contracts.py src/dnadesign/cruncher/tests/docs/test_master_orchestration_contracts.py`
+  - `uv run pytest -q src/dnadesign/cruncher/tests/analysis/test_overlap_plots.py src/dnadesign/cruncher/tests/study/test_study_spec_strict_validation.py src/dnadesign/cruncher/tests/study/test_study_run_smoke.py src/dnadesign/cruncher/tests/cli/test_portfolio_cli.py`
+
+### 2026-02-23
+- Added elite postprocessing in sampling with strict hit-window invariants:
+  - Iterative single-owner nucleotide polishing across all eligible positions.
+  - Global edge trimming only for uncovered contiguous prefix/suffix offsets.
+  - Postprocess dedup that may reduce elite count below requested `k`.
+- Enforced acceptance contract for both polish and trim using only hit-window validity (start/width/strand continuity), including bidirectional scoring paths.
+- Added regression coverage in `tests/app/test_elite_selection.py` for:
+  - deterministic polish updates,
+  - edge-trim behavior,
+  - dedup count reduction,
+  - mixed-strand bidirectional robustness.
+- Fixed postprocess regression where recomputed `per_tf_hits` dropped `best_score_scaled`/`best_score_norm`, which serialized `score_*`/`norm_*` elite columns as null and caused `cruncher analyze --summary` to fail hard in `elites_showcase`.
+- Added regression assertion that postprocessed hit payloads always include numeric `best_score_scaled` and `best_score_norm`.
+- Pressure-tested `demo_pairwise` with real CLI flows:
+  - runbook smoke path (reset/config/fetch/discover/lock/parse/sample/analyze/export/logos),
+  - `diversity_vs_score` study replay sweep (21 diversity values),
+  - validated trial hits include both `+` and `-` strands and all hit windows remain in bounds.
+- Validation run:
+  - `uv run ruff check src/dnadesign/cruncher/src/app/sample/elites_stage.py src/dnadesign/cruncher/tests/app/test_elite_selection.py`
+  - `uv run pytest -q src/dnadesign/cruncher/tests/app/test_elite_selection.py src/dnadesign/cruncher/tests/app/test_empty_elites_fail.py`

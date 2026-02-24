@@ -82,7 +82,7 @@ def _lockmap_for(cfg: CruncherConfig, config_path: Path) -> dict[str, object]:
     catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     lock_path = resolve_lock_path(config_path)
     if not lock_path.exists():
-        raise ValueError(f"Lockfile is required: {lock_path}. Run `cruncher lock {config_path.name}`.")
+        raise ValueError(f"Lockfile is required: {lock_path}. Run `cruncher lock -c {config_path.name}`.")
     lockfile = read_lockfile(lock_path)
     required = {tf for group in cfg.regulator_sets for tf in group}
     validate_lockfile(

@@ -116,7 +116,7 @@ def test_regulator_groups_filtering(tmp_path: Path) -> None:
                 "plan": [
                     {
                         "name": "default",
-                        "quota": 1,
+                        "sequences": 1,
                         "sampling": {"include_inputs": ["demo"]},
                         "regulator_constraints": {
                             "groups": [
@@ -248,7 +248,7 @@ def test_runtime_min_count_per_tf_rejection_then_acceptance(tmp_path: Path) -> N
                 "plan": [
                     {
                         "name": "default",
-                        "quota": 1,
+                        "sequences": 1,
                         "sampling": {"include_inputs": ["demo"]},
                         "regulator_constraints": {"groups": []},
                     }

@@ -172,3 +172,108 @@ def test_gibbs_block_move_uses_precomputed_scores() -> None:
     )
     after = evaluator.call_count
     assert after == before
+
+
+class _ScanCacheEvaluator:
+    def __init__(self) -> None:
+        self.scaled_map_calls = 0
+        self.combined_scores_calls = 0
+        self.combined_raw_calls = 0
+        self.scorer = self
+
+    def __call__(self, state: SequenceState) -> dict[str, float]:
+        return {"tf": float(state.seq.sum())}
+
+    def scaled_from_raw_llr(self, raw_llr_by_tf: dict[str, float], seq_length: int) -> dict[str, float]:
+        self.scaled_map_calls += 1
+        return {"tf": float(raw_llr_by_tf["tf"])}
+
+    def combined_from_scores(
+        self,
+        per_tf_scores: dict[str, float],
+        beta: float | None = None,
+        *,
+        length: int | None = None,
+    ) -> float:
+        self.combined_scores_calls += 1
+        return float(per_tf_scores["tf"])
+
+    def combined_from_raw_llr(
+        self,
+        raw_llr_by_tf: dict[str, float],
+        beta: float | None = None,
+        *,
+        length: int | None = None,
+    ) -> float:
+        self.combined_raw_calls += 1
+        return float(raw_llr_by_tf["tf"])
+
+
+class _StubScanCache:
+    def __init__(self) -> None:
+        self.apply_calls = 0
+
+    def candidate_raw_llr_maps(self, pos: int, old_base: int) -> list[dict[str, float]]:
+        return [
+            {"tf": 0.0},
+            {"tf": 1.0},
+            {"tf": 2.0},
+            {"tf": 3.0},
+        ]
+
+    def apply_base_change(self, pos: int, old_base: int, new_base: int) -> None:
+        self.apply_calls += 1
+
+
+def test_gibbs_single_base_scan_cache_uses_one_scaled_map_for_selected_base() -> None:
+    rng = np.random.default_rng(0)
+    evaluator = _ScanCacheEvaluator()
+    cache = _StubScanCache()
+    cfg = {
+        "draws": 1,
+        "tune": 1,
+        "chains": 1,
+        "min_dist": 0,
+        "top_k": 1,
+        "sequence_length": 4,
+        "swap_prob": 0.0,
+        "record_tune": False,
+        "progress_bar": False,
+        "progress_every": 0,
+        "early_stop": {},
+        "block_len_range": (1, 1),
+        "multi_k_range": (1, 1),
+        "slide_max_shift": 1,
+        "swap_len_range": (1, 1),
+        "move_probs": {"S": 1.0, "B": 0.0, "M": 0.0, "L": 0.0, "W": 0.0, "I": 0.0},
+        "kind": "fixed",
+        "beta": 1.0,
+        "softmin": {"enabled": False},
+    }
+    init_cfg = SimpleNamespace(kind="random", length=4, pad_with="background", regulator=None)
+    optimizer = GibbsAnnealOptimizer(
+        evaluator=evaluator,
+        cfg=cfg,
+        rng=rng,
+        pwms={},
+        init_cfg=init_cfg,
+    )
+    seq = np.array([0, 1, 2, 3], dtype=np.int8)
+    state = SequenceState(seq)
+    optimizer._single_chain_move(
+        seq,
+        current_combined=0.0,
+        β=1.0,
+        beta_softmin=None,
+        evaluator=evaluator,
+        rng=rng,
+        move_probs=np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+        state=state,
+        scan_cache=cache,
+        per_tf={"tf": 0.0},
+        sweep_idx=0,
+    )
+    assert evaluator.combined_raw_calls == 4
+    assert evaluator.scaled_map_calls == 1
+    assert evaluator.combined_scores_calls == 0
+    assert cache.apply_calls == 1

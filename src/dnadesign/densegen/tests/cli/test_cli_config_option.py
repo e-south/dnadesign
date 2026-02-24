@@ -58,7 +58,7 @@ def _write_min_config(path: Path) -> None:
                 sequence_length: 10
                 plan:
                   - name: default
-                    quota: 1
+                    sequences: 1
                     sampling:
                       include_inputs: [demo]
                     regulator_constraints:
@@ -103,7 +103,7 @@ def _write_full_pool_config(path: Path, *, explicit_ignored_keys: bool) -> None:
                 "plan": [
                     {
                         "name": "default",
-                        "quota": 1,
+                        "sequences": 1,
                         "sampling": {"include_inputs": ["demo"]},
                         "regulator_constraints": {"groups": []},
                     }

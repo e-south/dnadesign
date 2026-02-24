@@ -82,10 +82,12 @@ def test_inspect_run_library_summary_hides_tfbs_sequences(tmp_path: Path) -> Non
         "solver_strands": "double",
         "dense_arrays_version": None,
         "dense_arrays_version_source": "unknown",
+        "total_quota": 1,
         "items": [
             {
                 "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
+                "quota": 1,
                 "generated": 1,
                 "duplicates_skipped": 0,
                 "failed_solutions": 0,
@@ -98,8 +100,77 @@ def test_inspect_run_library_summary_hides_tfbs_sequences(tmp_path: Path) -> Non
     (meta_root / "run_manifest.json").write_text(json.dumps(run_manifest))
 
     runner = CliRunner()
-    result = runner.invoke(app, ["inspect", "run", "--library", "-c", str(cfg_path)])
+    result = runner.invoke(app, ["inspect", "run", "--library", "--allow-partial", "-c", str(cfg_path)])
     assert result.exit_code == 0, result.output
     assert "TF usage summary" in result.output
     assert "TFBS usage summary" in result.output
     assert "AAA" not in result.output
+
+
+def test_inspect_run_library_summary_fails_closed_without_allow_partial(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\nTF1,AAA\n")
+    meta_root = tmp_path / "outputs" / "meta"
+    meta_root.mkdir(parents=True, exist_ok=True)
+    run_manifest = {
+        "run_id": "demo",
+        "created_at": "2026-01-14T00:00:00+00:00",
+        "schema_version": "2.9",
+        "config_sha256": "dummy",
+        "run_root": str(tmp_path),
+        "random_seed": 0,
+        "seed_stage_a": 0,
+        "seed_stage_b": 0,
+        "seed_solver": 0,
+        "solver_backend": "CBC",
+        "solver_strategy": "iterate",
+        "solver_time_limit_seconds": None,
+        "solver_threads": None,
+        "solver_strands": "double",
+        "dense_arrays_version": None,
+        "dense_arrays_version_source": "unknown",
+        "total_quota": 0,
+        "items": [],
+    }
+    (meta_root / "run_manifest.json").write_text(json.dumps(run_manifest))
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["inspect", "run", "--library", "-c", str(cfg_path)])
+    assert result.exit_code == 1
+    assert "Failed to build library summaries" in result.output
+    assert "--allow-partial" in result.output
+
+
+def test_inspect_run_library_summary_allow_partial_opt_in(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\nTF1,AAA\n")
+    meta_root = tmp_path / "outputs" / "meta"
+    meta_root.mkdir(parents=True, exist_ok=True)
+    run_manifest = {
+        "run_id": "demo",
+        "created_at": "2026-01-14T00:00:00+00:00",
+        "schema_version": "2.9",
+        "config_sha256": "dummy",
+        "run_root": str(tmp_path),
+        "random_seed": 0,
+        "seed_stage_a": 0,
+        "seed_stage_b": 0,
+        "seed_solver": 0,
+        "solver_backend": "CBC",
+        "solver_strategy": "iterate",
+        "solver_time_limit_seconds": None,
+        "solver_threads": None,
+        "solver_strands": "double",
+        "dense_arrays_version": None,
+        "dense_arrays_version_source": "unknown",
+        "total_quota": 0,
+        "items": [],
+    }
+    (meta_root / "run_manifest.json").write_text(json.dumps(run_manifest))
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["inspect", "run", "--library", "--allow-partial", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    assert "No library usage summaries found" in result.output

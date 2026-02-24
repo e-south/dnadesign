@@ -20,7 +20,7 @@ from rich.console import Console
 from rich.table import Table
 
 from dnadesign.cruncher.app.fetch_service import write_motif_record
-from dnadesign.cruncher.cli.commands.catalog import _resolve_targets
+from dnadesign.cruncher.cli.catalog_targets import _resolve_targets
 from dnadesign.cruncher.cli.config_resolver import ConfigResolutionError, resolve_config_path
 from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
@@ -37,7 +37,7 @@ from dnadesign.cruncher.integrations.meme_suite import (
 from dnadesign.cruncher.io.parsers.meme import parse_meme_file
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
 from dnadesign.cruncher.store.catalog_store import iter_site_sequences
-from dnadesign.cruncher.utils.paths import resolve_catalog_root
+from dnadesign.cruncher.utils.paths import resolve_catalog_root, resolve_workspace_root
 
 app = typer.Typer(no_args_is_help=True, help="Discover motifs from cached binding sites.")
 console = Console()
@@ -212,7 +212,11 @@ def check_tools(
         console.print(str(exc))
         raise typer.Exit(code=1)
     if config_path is not None:
-        cfg = load_config(config_path)
+        try:
+            cfg = load_config(config_path)
+        except (ValueError, FileNotFoundError) as exc:
+            console.print(f"Error: {exc}")
+            raise typer.Exit(code=1)
 
     resolved_tool = (tool or (cfg.discover.tool if cfg else "auto")).lower()
     resolved_path = resolve_tool_path(
@@ -234,7 +238,7 @@ def check_tools(
     table.add_column("Version")
     table.add_column("Hint")
 
-    base = config_path.parent if config_path is not None else None
+    base = resolve_workspace_root(config_path) if config_path is not None else None
     for status in statuses:
         path_val = status.path
         rendered_path = "-" if path_val in {None, "-"} else render_path(path_val, base=base)
@@ -328,7 +332,11 @@ def discover_motifs(
     except ConfigResolutionError as exc:
         console.print(str(exc))
         raise typer.Exit(code=1)
-    cfg = load_config(config_path)
+    try:
+        cfg = load_config(config_path)
+    except (ValueError, FileNotFoundError) as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1)
     if not cfg.discover.enabled:
         console.print("Error: discover.enabled=false; set discover.enabled=true to run motif discovery.")
         raise typer.Exit(code=1)
@@ -397,7 +405,7 @@ def discover_motifs(
     table.add_column("Width bounds")
     table.add_column("Output")
 
-    base = config_path.parent
+    base = resolve_workspace_root(config_path)
     for target in targets:
         if not target.site_entries:
             console.print(f"Error: no cached site entries for {target.tf_name}.")

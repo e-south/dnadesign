@@ -49,6 +49,35 @@ from .run_paths import (
 
 log = logging.getLogger(__name__)
 
+_ATTEMPTS_REPORT_COLUMNS = [
+    "status",
+    "sampling_library_hash",
+    "sampling_library_index",
+    "input_name",
+    "plan_name",
+    "library_tfbs",
+    "library_tfs",
+    "library_site_ids",
+    "library_sources",
+]
+_SOLUTIONS_REPORT_COLUMNS = [
+    "solution_id",
+    "attempt_id",
+    "input_name",
+    "plan_name",
+    "sampling_library_index",
+    "sampling_library_hash",
+    "sequence",
+]
+_COMPOSITION_REPORT_COLUMNS = [
+    "solution_id",
+    "input_name",
+    "plan_name",
+    "tf",
+    "tfbs",
+    "length",
+]
+
 
 def _resolve_output_records_path(root_cfg: RootConfig, cfg_path: Path, run_root: Path, source_label: str) -> str | None:
     out_cfg = root_cfg.densegen.output
@@ -143,7 +172,14 @@ def collect_report_data(
         warnings.append(message)
         attempts_df = pd.DataFrame()
     else:
-        attempts_df = pd.read_parquet(attempts_path)
+        try:
+            attempts_df = pd.read_parquet(attempts_path, columns=_ATTEMPTS_REPORT_COLUMNS)
+        except Exception as exc:
+            message = f"Failed to load attempts.parquet; library utilization summaries will be incomplete. ({exc})"
+            if strict:
+                raise ValueError(message) from exc
+            warnings.append(message)
+            attempts_df = pd.DataFrame()
     library_df = _explode_library_from_attempts(attempts_df)
 
     solutions_path = tables_root / "solutions.parquet"
@@ -157,7 +193,7 @@ def collect_report_data(
         solutions_df = pd.DataFrame()
     else:
         try:
-            solutions_df = pd.read_parquet(solutions_path)
+            solutions_df = pd.read_parquet(solutions_path, columns=_SOLUTIONS_REPORT_COLUMNS)
         except Exception as exc:
             message = f"Failed to load solutions.parquet; skipping solution tables. ({exc})"
             if strict:
@@ -526,14 +562,16 @@ def collect_report_data(
     composition_path = tables_root / "composition.parquet"
     if composition_path.exists():
         try:
-            composition = pd.read_parquet(composition_path)
+            composition = pd.read_parquet(composition_path, columns=_COMPOSITION_REPORT_COLUMNS)
             if not composition.empty and "tf" in composition.columns and "input_name" in composition.columns:
                 composition["tf"] = composition.apply(
                     lambda row: _display_tf_label(str(row.get("input_name") or ""), str(row.get("tf") or "")),
                     axis=1,
                 )
             tables["composition"] = composition
-        except Exception:
+        except Exception as exc:
+            if strict:
+                raise ValueError(f"Failed to load composition.parquet for report tables. ({exc})") from exc
             log.warning("Failed to load composition.parquet for report tables.", exc_info=True)
 
     library_hashes = used_df["library_hash"].dropna().unique().tolist() if "library_hash" in used_df.columns else []

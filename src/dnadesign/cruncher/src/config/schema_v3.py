@@ -17,373 +17,20 @@ from typing import Annotated, Dict, List, Literal, Optional, Tuple, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .source_schema import (
+    HttpRetryConfig,
+    IOConfig,
+    LocalMotifSourceConfig,
+    LocalSiteSourceConfig,
+    RegulonDBConfig,
+)
+
 
 class StrictBaseModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
 logger = logging.getLogger(__name__)
-
-
-class ParserConfig(StrictBaseModel):
-    extra_modules: List[str] = Field(
-        default_factory=list,
-        description="Additional modules to import for parser registration.",
-    )
-
-    @field_validator("extra_modules")
-    @classmethod
-    def _check_extra_modules(cls, v: List[str]) -> List[str]:
-        cleaned = []
-        for mod in v:
-            name = str(mod).strip()
-            if not name:
-                raise ValueError("io.parsers.extra_modules entries must be non-empty strings")
-            cleaned.append(name)
-        return cleaned
-
-
-class IOConfig(StrictBaseModel):
-    parsers: ParserConfig = ParserConfig()
-
-
-class OrganismConfig(StrictBaseModel):
-    taxon: Optional[int] = None
-    name: Optional[str] = None
-    strain: Optional[str] = None
-    assembly: Optional[str] = None
-
-
-class CampaignSelectorsConfig(StrictBaseModel):
-    min_info_bits: Optional[float] = None
-    min_site_count: Optional[int] = None
-    min_pwm_length: Optional[int] = None
-    max_pwm_length: Optional[int] = None
-    source_preference: List[str] = Field(default_factory=list)
-    dataset_preference: List[str] = Field(default_factory=list)
-
-    @field_validator("min_info_bits")
-    @classmethod
-    def _check_min_info_bits(cls, v: Optional[float]) -> Optional[float]:
-        if v is None:
-            return None
-        if not isinstance(v, (int, float)) or v < 0:
-            raise ValueError("selectors.min_info_bits must be a non-negative number")
-        return float(v)
-
-    @field_validator("min_site_count", "min_pwm_length", "max_pwm_length")
-    @classmethod
-    def _check_non_negative_ints(cls, v: Optional[int], info) -> Optional[int]:
-        if v is None:
-            return None
-        if not isinstance(v, int) or v < 0:
-            raise ValueError(f"selectors.{info.field_name} must be a non-negative integer")
-        return v
-
-    @field_validator("source_preference", "dataset_preference")
-    @classmethod
-    def _check_text_list(cls, v: List[str], info) -> List[str]:
-        cleaned: list[str] = []
-        for item in v:
-            name = str(item).strip()
-            if not name:
-                raise ValueError(f"selectors.{info.field_name} entries must be non-empty strings")
-            cleaned.append(name)
-        return cleaned
-
-    @model_validator(mode="after")
-    def _check_pwm_length_bounds(self) -> "CampaignSelectorsConfig":
-        if self.min_pwm_length is not None and self.max_pwm_length is not None:
-            if self.max_pwm_length < self.min_pwm_length:
-                raise ValueError("selectors.max_pwm_length must be >= selectors.min_pwm_length")
-        return self
-
-    def requires_catalog(self) -> bool:
-        return any(
-            [
-                self.min_info_bits is not None,
-                self.min_site_count is not None,
-                self.min_pwm_length is not None,
-                self.max_pwm_length is not None,
-                bool(self.source_preference),
-                bool(self.dataset_preference),
-            ]
-        )
-
-
-class CampaignWithinCategoryConfig(StrictBaseModel):
-    sizes: List[int] = Field(default_factory=list)
-
-    @field_validator("sizes")
-    @classmethod
-    def _check_sizes(cls, v: List[int]) -> List[int]:
-        if not v:
-            raise ValueError("within_category.sizes must be a non-empty list")
-        cleaned: list[int] = []
-        for size in v:
-            if not isinstance(size, int) or size < 1:
-                raise ValueError("within_category.sizes must be positive integers")
-            cleaned.append(size)
-        return sorted(set(cleaned))
-
-
-class CampaignAcrossCategoriesConfig(StrictBaseModel):
-    sizes: List[int] = Field(default_factory=list)
-    max_per_category: Optional[int] = None
-
-    @field_validator("sizes")
-    @classmethod
-    def _check_sizes(cls, v: List[int]) -> List[int]:
-        if not v:
-            raise ValueError("across_categories.sizes must be a non-empty list")
-        cleaned: list[int] = []
-        for size in v:
-            if not isinstance(size, int) or size < 2:
-                raise ValueError("across_categories.sizes must be integers >= 2")
-            cleaned.append(size)
-        return sorted(set(cleaned))
-
-    @field_validator("max_per_category")
-    @classmethod
-    def _check_max_per_category(cls, v: Optional[int]) -> Optional[int]:
-        if v is None:
-            return None
-        if not isinstance(v, int) or v < 1:
-            raise ValueError("across_categories.max_per_category must be a positive integer")
-        return v
-
-
-class CampaignConfig(StrictBaseModel):
-    name: str
-    categories: List[str]
-    within_category: Optional[CampaignWithinCategoryConfig] = None
-    across_categories: Optional[CampaignAcrossCategoriesConfig] = None
-    allow_overlap: bool = True
-    distinct_across_categories: bool = True
-    dedupe_sets: bool = True
-    selectors: CampaignSelectorsConfig = CampaignSelectorsConfig()
-    tags: Dict[str, str] = Field(default_factory=dict)
-
-    @field_validator("name")
-    @classmethod
-    def _check_name(cls, v: str) -> str:
-        name = str(v).strip()
-        if not name:
-            raise ValueError("campaign.name must be a non-empty string")
-        return name
-
-    @field_validator("categories")
-    @classmethod
-    def _check_categories(cls, v: List[str]) -> List[str]:
-        if not v:
-            raise ValueError("campaign.categories must be a non-empty list")
-        cleaned: list[str] = []
-        for item in v:
-            name = str(item).strip()
-            if not name:
-                raise ValueError("campaign.categories entries must be non-empty strings")
-            cleaned.append(name)
-        if len(set(cleaned)) != len(cleaned):
-            raise ValueError("campaign.categories must be unique")
-        return cleaned
-
-    @field_validator("tags")
-    @classmethod
-    def _check_tags(cls, v: Dict[str, str]) -> Dict[str, str]:
-        cleaned: dict[str, str] = {}
-        for key, value in v.items():
-            key_clean = str(key).strip()
-            if not key_clean:
-                raise ValueError("campaign.tags keys must be non-empty strings")
-            cleaned[key_clean] = str(value)
-        return cleaned
-
-    @model_validator(mode="after")
-    def _check_rules(self) -> "CampaignConfig":
-        if self.within_category is None and self.across_categories is None:
-            raise ValueError("campaign must define within_category or across_categories rules")
-        return self
-
-
-class CampaignMetadataConfig(StrictBaseModel):
-    name: str
-    campaign_id: str
-    manifest_path: Optional[Path] = None
-    generated_at: Optional[str] = None
-
-    @field_validator("name", "campaign_id")
-    @classmethod
-    def _check_required_text(cls, v: str, info) -> str:
-        text = str(v).strip()
-        if not text:
-            raise ValueError(f"campaign.{info.field_name} must be a non-empty string")
-        return text
-
-
-class LocalMotifSourceConfig(StrictBaseModel):
-    source_id: str = Field(..., description="Unique identifier for the local motif source.")
-    description: Optional[str] = Field(None, description="Human-readable description for the source list.")
-    root: Path = Field(..., description="Root directory containing motif files.")
-    patterns: List[str] = Field(
-        default_factory=lambda: ["*.txt"],
-        description="Glob patterns to select motif files under root.",
-    )
-    recursive: bool = Field(False, description="Recursively search subdirectories when true.")
-    format_map: Dict[str, str] = Field(
-        default_factory=dict,
-        description="Mapping from file extension to parser format (e.g., .txt -> MEME).",
-    )
-    default_format: Optional[str] = Field(
-        None,
-        description="Default parser format when an extension is not listed in format_map.",
-    )
-    tf_name_strategy: Literal["stem", "filename"] = Field(
-        "stem",
-        description="Strategy for deriving TF names from files.",
-    )
-    matrix_semantics: Literal["probabilities", "weights"] = Field(
-        "probabilities",
-        description="Matrix semantics to store in the catalog.",
-    )
-    organism: Optional[OrganismConfig] = None
-    citation: Optional[str] = None
-    license: Optional[str] = None
-    source_url: Optional[str] = None
-    source_version: Optional[str] = None
-    tags: Dict[str, str] = Field(default_factory=dict)
-    extract_sites: bool = Field(
-        False,
-        description="Enable binding-site extraction from MEME BLOCKS sections.",
-    )
-    meme_motif_selector: Optional[Union[str, int]] = Field(
-        None,
-        description="Select a motif from multi-motif MEME files (name_match, MEME-1, index, or label).",
-    )
-
-    @field_validator("source_id")
-    @classmethod
-    def _check_source_id(cls, v: str) -> str:
-        source_id = str(v).strip()
-        if not source_id:
-            raise ValueError("local source_id must be a non-empty string")
-        return source_id
-
-    @field_validator("patterns")
-    @classmethod
-    def _check_patterns(cls, v: List[str]) -> List[str]:
-        if not v:
-            raise ValueError("local source patterns must be a non-empty list")
-        cleaned = []
-        for pat in v:
-            pat = str(pat).strip()
-            if not pat:
-                raise ValueError("local source patterns must be non-empty strings")
-            cleaned.append(pat)
-        return cleaned
-
-    @model_validator(mode="after")
-    def _check_format_config(self) -> "LocalMotifSourceConfig":
-        if not self.format_map and not self.default_format:
-            raise ValueError("local source must set format_map or default_format")
-        return self
-
-
-class LocalSiteSourceConfig(StrictBaseModel):
-    source_id: str = Field(..., description="Unique identifier for the local site source.")
-    description: Optional[str] = Field(None, description="Human-readable description for the source list.")
-    path: Path = Field(..., description="Path to a FASTA file containing binding sites.")
-    tf_name: Optional[str] = Field(
-        None,
-        description="Optional TF name override (defaults to the FASTA header prefix).",
-    )
-    record_kind: Optional[str] = Field(
-        None,
-        description="Optional site-kind label stored in provenance tags (e.g., chip_exo).",
-    )
-    organism: Optional[OrganismConfig] = None
-    citation: Optional[str] = None
-    license: Optional[str] = None
-    source_url: Optional[str] = None
-    source_version: Optional[str] = None
-    tags: Dict[str, str] = Field(default_factory=dict)
-
-    @field_validator("source_id")
-    @classmethod
-    def _check_source_id(cls, v: str) -> str:
-        source_id = str(v).strip()
-        if not source_id:
-            raise ValueError("site source_id must be a non-empty string")
-        return source_id
-
-    @field_validator("tf_name", "record_kind")
-    @classmethod
-    def _check_optional_text(cls, v: Optional[str], info) -> Optional[str]:
-        if v is None:
-            return None
-        value = str(v).strip()
-        if not value:
-            raise ValueError(f"{info.field_name} must be a non-empty string")
-        return value
-
-
-class RegulonDBConfig(StrictBaseModel):
-    base_url: str = "https://regulondb.ccg.unam.mx/graphql"
-    verify_ssl: bool = True
-    ca_bundle: Optional[Path] = None
-    timeout_seconds: int = 30
-    motif_matrix_source: Literal["alignment", "sites"] = "alignment"
-    alignment_matrix_semantics: Literal["probabilities", "counts"] = "probabilities"
-    min_sites_for_pwm: int = 2
-    pseudocounts: float = Field(
-        0.5,
-        description="Pseudocounts for PWM construction from curated sites (Biopython).",
-    )
-    allow_low_sites: bool = False
-    curated_sites: bool = True
-    ht_sites: bool = False
-    ht_dataset_sources: Optional[List[str]] = None
-    ht_dataset_type: Literal["TFBINDING"] = "TFBINDING"
-    ht_binding_mode: Literal["tfbinding", "peaks"] = "tfbinding"
-    uppercase_binding_site_only: bool = True
-
-    @field_validator("min_sites_for_pwm")
-    @classmethod
-    def _check_min_sites(cls, v: int) -> int:
-        if v < 1:
-            raise ValueError("min_sites_for_pwm must be >= 1")
-        return v
-
-    @field_validator("pseudocounts")
-    @classmethod
-    def _check_pseudocounts(cls, v: float) -> float:
-        if v < 0:
-            raise ValueError("pseudocounts must be >= 0")
-        return float(v)
-
-
-class HttpRetryConfig(StrictBaseModel):
-    retries: int = Field(3, description="Number of retry attempts for transient network failures.")
-    backoff_seconds: float = Field(0.5, description="Base backoff (seconds) between retries.")
-    max_backoff_seconds: float = Field(8.0, description="Maximum backoff between retries.")
-    retry_statuses: List[int] = Field(
-        default_factory=lambda: [429, 500, 502, 503, 504],
-        description="HTTP status codes that trigger retry.",
-    )
-    respect_retry_after: bool = Field(True, description="Respect Retry-After header when provided.")
-
-    @field_validator("retries")
-    @classmethod
-    def _check_retries(cls, v: int) -> int:
-        if v < 0:
-            raise ValueError("retries must be >= 0")
-        return v
-
-    @field_validator("backoff_seconds", "max_backoff_seconds")
-    @classmethod
-    def _check_backoff(cls, v: float) -> float:
-        if v < 0:
-            raise ValueError("backoff_seconds must be >= 0")
-        return float(v)
 
 
 class WorkspaceConfig(StrictBaseModel):
@@ -476,7 +123,7 @@ class CatalogConfig(StrictBaseModel):
         if not str(normalized).strip():
             raise ValueError("catalog.root must be a non-empty path")
         if not normalized.is_absolute() and any(part == ".." for part in normalized.parts):
-            raise ValueError("catalog.root must not traverse outside the cruncher root")
+            raise ValueError("catalog.root must not traverse outside the workspace root")
         return normalized
 
     @field_validator("site_window_lengths")
@@ -1053,7 +700,7 @@ class SampleOptimizerEarlyStopConfig(StrictBaseModel):
 
 
 class SampleOptimizerConfig(StrictBaseModel):
-    kind: Literal["gibbs_anneal"] = "gibbs_anneal"
+    kind: Literal["gibbs_anneal"]
     chains: int = 1
     cooling: SampleOptimizerCoolingConfig = Field(default_factory=SampleOptimizerCoolingLinearConfig)
     early_stop: SampleOptimizerEarlyStopConfig = SampleOptimizerEarlyStopConfig()
@@ -1160,14 +807,18 @@ class AnalysisElitesShowcaseConfig(StrictBaseModel):
 class SampleOutputConfig(StrictBaseModel):
     save_sequences: bool = True
     save_trace: bool = True
+    save_random_baseline: bool = True
+    random_baseline_n: int = 10_000
+    save_optimizer_move_stats: bool = True
     include_tune_in_sequences: bool = False
     live_metrics: bool = True
 
-    @model_validator(mode="after")
-    def _check_sequences_required(self) -> "SampleOutputConfig":
-        if not self.save_sequences:
-            raise ValueError("sample.output.save_sequences must be true because analyze requires sequences.parquet")
-        return self
+    @field_validator("random_baseline_n")
+    @classmethod
+    def _check_random_baseline_n(cls, value: int) -> int:
+        if not isinstance(value, int) or value < 1:
+            raise ValueError("sample.output.random_baseline_n must be >= 1")
+        return int(value)
 
 
 class SampleMotifWidthConfig(StrictBaseModel):
@@ -1197,7 +848,7 @@ class SampleConfig(StrictBaseModel):
     budget: SampleBudgetConfig
     objective: SampleObjectiveConfig = SampleObjectiveConfig()
     moves: SampleMovesConfig = SampleMovesConfig()
-    optimizer: SampleOptimizerConfig = SampleOptimizerConfig()
+    optimizer: SampleOptimizerConfig = Field(default_factory=lambda: SampleOptimizerConfig(kind="gibbs_anneal"))
     elites: SampleElitesConfig = SampleElitesConfig()
     output: SampleOutputConfig = SampleOutputConfig()
     motif_width: SampleMotifWidthConfig = SampleMotifWidthConfig()
@@ -1231,7 +882,7 @@ class AnalysisConfig(StrictBaseModel):
     enabled: bool = True
     run_selector: Literal["latest", "explicit"] = "latest"
     runs: List[str] = Field(default_factory=list)
-    pairwise: Union[Literal["off", "auto"], List[str]] = "auto"
+    pairwise: Union[Literal["off", "auto", "all_pairs_grid"], List[str]] = "auto"
     plot_format: Literal["png", "pdf"] = "pdf"
     plot_dpi: int = 300
     table_format: Literal["parquet", "csv"] = "parquet"
@@ -1239,6 +890,7 @@ class AnalysisConfig(StrictBaseModel):
     max_points: int = 5000
     trajectory_stride: int = 5
     trajectory_scatter_scale: Literal["normalized-llr", "llr"] = "llr"
+    trajectory_scatter_retain_elites: bool = True
     trajectory_sweep_y_column: Literal["raw_llr_objective", "objective_scalar", "norm_llr_objective"] = (
         "objective_scalar"
     )
@@ -1246,6 +898,7 @@ class AnalysisConfig(StrictBaseModel):
     trajectory_particle_alpha_min: float = 0.25
     trajectory_particle_alpha_max: float = 0.45
     trajectory_chain_overlay: bool = False
+    trajectory_summary_overlay: bool = False
     elites_showcase: AnalysisElitesShowcaseConfig = AnalysisElitesShowcaseConfig()
     mmr_sweep: AnalysisMmrSweepConfig = AnalysisMmrSweepConfig()
     fimo_compare: AnalysisFimoCompareConfig = AnalysisFimoCompareConfig()
@@ -1285,17 +938,17 @@ class AnalysisConfig(StrictBaseModel):
     @field_validator("pairwise")
     @classmethod
     def _check_pairwise(cls, v):
-        if v in ("off", "auto"):
+        if v in ("off", "auto", "all_pairs_grid"):
             return v
         if isinstance(v, list):
             if len(v) != 2:
-                raise ValueError("analysis.pairwise must be 'off', 'auto', or a list of two TF names")
+                raise ValueError("analysis.pairwise must be 'off', 'auto', 'all_pairs_grid', or a list of two TF names")
             tf_a = str(v[0]).strip()
             tf_b = str(v[1]).strip()
             if not tf_a or not tf_b:
                 raise ValueError("analysis.pairwise TF names must be non-empty")
             return [tf_a, tf_b]
-        raise ValueError("analysis.pairwise must be 'off', 'auto', or a list of two TF names")
+        raise ValueError("analysis.pairwise must be 'off', 'auto', 'all_pairs_grid', or a list of two TF names")
 
     @model_validator(mode="after")
     def _check_particle_alpha_order(self) -> "AnalysisConfig":
@@ -1313,15 +966,13 @@ class CruncherConfig(StrictBaseModel):
     ingest: IngestConfig = IngestConfig()
     sample: Optional[SampleConfig] = None
     analysis: Optional[AnalysisConfig] = None
-    campaigns: List[CampaignConfig] = Field(default_factory=list)
-    campaign: Optional[CampaignMetadataConfig] = None
 
     @model_validator(mode="after")
     def _check_schema_version(self) -> "CruncherConfig":
         if self.schema_version != 3:
             raise ValueError("Config schema v3 required (schema_version: 3)")
-        if not self.workspace.regulator_sets and not self.campaigns:
-            raise ValueError("Config must define workspace.regulator_sets or campaigns.")
+        if not self.workspace.regulator_sets:
+            raise ValueError("Config must define workspace.regulator_sets.")
         return self
 
     @property

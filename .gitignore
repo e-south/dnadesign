@@ -92,6 +92,7 @@ yarn-error.log*
 *.orig
 *.rej
 temp.md
+tmp/
 
 # -----------------------------------------------------------------------------
 # Archives
@@ -129,6 +130,12 @@ temp.md
 !src/dnadesign/nmf/images/*.png
 !src/dnadesign/libshuffle/images/*.png
 !images/*.png
+# allow Cruncher docs media
+!src/dnadesign/cruncher/docs/**/*.png
+!src/dnadesign/cruncher/docs/**/*.jpg
+!src/dnadesign/cruncher/docs/**/*.jpeg
+!src/dnadesign/cruncher/docs/**/*.gif
+!src/dnadesign/cruncher/images/*.png
 
 # -----------------------------------------------------------------------------
 # Project-specific
@@ -136,7 +143,6 @@ temp.md
 # Cruncher: local cache + run outputs + experiment artifacts (keep demos/templates)
 .cruncher/
 **/.cruncher/
-**/.mplcache/
 src/dnadesign/cruncher/.cruncher/
 src/dnadesign/cruncher/results/
 src/dnadesign/cruncher/experiments/
@@ -152,12 +158,9 @@ src/dnadesign/cruncher/**/run_status.json
 src/dnadesign/cruncher/**/config_used.yaml
 src/dnadesign/cruncher/**/sequences.csv
 src/dnadesign/cruncher/**/sequences.parquet
-src/dnadesign/cruncher/**/elites.*
 !src/dnadesign/cruncher/src/utils/elites.py
 !src/dnadesign/cruncher/src/analysis/elites.py
 src/dnadesign/cruncher/**/trace.nc
-src/dnadesign/cruncher/**/report.json
-src/dnadesign/cruncher/**/report.md
 src/dnadesign/cruncher/**/gathered_per_pwm_*.csv
 src/dnadesign/cruncher/workspaces/archived/
 projects/**/projects/
@@ -209,17 +212,24 @@ src/dnadesign/densegen/workspaces/**
 !src/dnadesign/densegen/workspaces/README.md
 !src/dnadesign/densegen/workspaces/demo_tfbs_baseline/
 !src/dnadesign/densegen/workspaces/demo_tfbs_baseline/config.yaml
+!src/dnadesign/densegen/workspaces/demo_tfbs_baseline/runbook.md
 !src/dnadesign/densegen/workspaces/demo_tfbs_baseline/inputs/
 !src/dnadesign/densegen/workspaces/demo_tfbs_baseline/inputs/*.csv
 !src/dnadesign/densegen/workspaces/demo_sampling_baseline/
 !src/dnadesign/densegen/workspaces/demo_sampling_baseline/config.yaml
+!src/dnadesign/densegen/workspaces/demo_sampling_baseline/runbook.md
 !src/dnadesign/densegen/workspaces/demo_sampling_baseline/inputs/
 !src/dnadesign/densegen/workspaces/demo_sampling_baseline/inputs/motif_artifacts/
 !src/dnadesign/densegen/workspaces/demo_sampling_baseline/inputs/motif_artifacts/*.json
 !src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/
 !src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/config.yaml
+!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/runbook.md
+!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/inputs/
+!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/inputs/motif_artifacts/
+!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/inputs/motif_artifacts/*.json
 !src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/
 !src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/config.yaml
+!src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/runbook.md
 !src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/inputs/
 !src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/inputs/motif_artifacts/
 !src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/inputs/motif_artifacts/*.json

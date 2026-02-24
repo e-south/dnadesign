@@ -62,7 +62,9 @@ def test_ensure_arviz_data_dir_suppresses_arviz_refactor_future_warning(tmp_path
         warnings.simplefilter("always")
         ensure_arviz_data_dir(tmp_path / "catalog")
         warnings.warn_explicit(
-            "ArviZ is undergoing a major refactor to improve flexibility.",
+            "\nArviZ is undergoing a major refactor to improve flexibility and extensibility while maintaining a "
+            "user-friendly interface.\nSome upcoming changes may be backward incompatible.\nFor details and "
+            "migration guidance, visit: https://python.arviz.org/en/latest/user_guide/migration_guide.html",
             FutureWarning,
             filename="arviz/__init__.py",
             lineno=1,

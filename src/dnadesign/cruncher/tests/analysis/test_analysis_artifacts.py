@@ -30,7 +30,7 @@ from dnadesign.cruncher.analysis.layout import (
     summary_path,
     table_manifest_path,
 )
-from dnadesign.cruncher.app import analyze_workflow
+from dnadesign.cruncher.app import analyze_score_space
 from dnadesign.cruncher.app.analyze_workflow import _load_elites_meta, run_analyze
 from dnadesign.cruncher.app.run_service import save_run_index
 from dnadesign.cruncher.artifacts.layout import (
@@ -56,7 +56,7 @@ def _sample_block(*, save_trace: bool, top_k: int, draws: int = 2, tune: int = 1
         "sequence_length": 12,
         "budget": {"tune": tune, "draws": draws},
         "elites": {"k": top_k},
-        "output": {"save_sequences": True, "save_trace": save_trace},
+        "output": {"save_sequences": True, "save_trace": save_trace, "save_random_baseline": True},
     }
 
 
@@ -198,6 +198,7 @@ def _write_basic_run_artifacts(
     baseline_hits_df.to_parquet(baseline_hits_path, engine="fastparquet")
 
     elite_scores = {f"score_{tf}": [1.0 + 0.05 * idx] for idx, tf in enumerate(tf_names)}
+    elite_norm_scores = {f"norm_{tf}": [1.0] for tf in tf_names}
     elites_df = pd.DataFrame(
         {
             "id": ["elite-1"],
@@ -205,6 +206,7 @@ def _write_basic_run_artifacts(
             "rank": [1],
             "norm_sum": [float(len(tf_names))],
             **elite_scores,
+            **elite_norm_scores,
         }
     )
     elites_path(run_dir).parent.mkdir(parents=True, exist_ok=True)
@@ -273,6 +275,7 @@ def _write_basic_run_artifacts(
   "adapt_sweeps": {tune},
   "top_k": {top_k},
   "objective": {{"bidirectional": true, "score_scale": "normalized-llr"}},
+  "optimizer": {{"kind": "gibbs_anneal"}},
   "optimizer_stats": {{"beta_ladder_final": [1.0]}},
   "artifacts": []
 }}"""
@@ -701,7 +704,7 @@ def test_analyze_restores_previous_analysis_when_generation_fails(
     def _boom(*_args, **_kwargs):
         raise RuntimeError("synthetic failure in analyze")
 
-    monkeypatch.setattr(analyze_workflow, "build_trajectory_points", _boom)
+    monkeypatch.setattr(analyze_score_space, "build_trajectory_points", _boom)
     cfg = load_config(config_path)
 
     with pytest.raises(RuntimeError, match="synthetic failure in analyze"):
@@ -1028,7 +1031,7 @@ def test_analyze_opt_trajectory_multi_tf(tmp_path: Path) -> None:
     assert analysis_runs
 
     analysis_dir = analysis_runs[0]
-    assert analysis_plot_path(analysis_dir, "chain_trajectory_scatter", "png").exists()
+    assert analysis_plot_path(analysis_dir, "elite_score_space_context", "png").exists()
     assert analysis_plot_path(analysis_dir, "chain_trajectory_sweep", "png").exists()
 
 
@@ -1077,7 +1080,7 @@ def test_analyze_opt_trajectory_single_tf(tmp_path: Path) -> None:
     assert analysis_runs
 
     analysis_dir = analysis_runs[0]
-    assert analysis_plot_path(analysis_dir, "chain_trajectory_scatter", "png").exists()
+    assert analysis_plot_path(analysis_dir, "elite_score_space_context", "png").exists()
     assert analysis_plot_path(analysis_dir, "chain_trajectory_sweep", "png").exists()
 
 
@@ -1391,14 +1394,14 @@ def test_analyze_plot_manifest_single_tf_showcase_and_trace_skip(tmp_path: Path)
     plot_manifest = json.loads(plot_manifest_path(analysis_dir).read_text())
     plots_by_key = {entry.get("key"): entry for entry in plot_manifest.get("plots", [])}
     assert set(plots_by_key) == {
-        "chain_trajectory_scatter",
+        "elite_score_space_context",
         "chain_trajectory_sweep",
         "elites_nn_distance",
         "elites_showcase",
         "health_panel",
         "optimizer_vs_fimo",
     }
-    assert plots_by_key["chain_trajectory_scatter"]["generated"] is True
+    assert plots_by_key["elite_score_space_context"]["generated"] is True
     assert plots_by_key["chain_trajectory_sweep"]["generated"] is True
     assert plots_by_key["elites_nn_distance"]["generated"] is True
     assert plots_by_key["elites_showcase"]["generated"] is True
@@ -1457,6 +1460,8 @@ def test_analyze_showcase_fails_when_elites_count_exceeds_max_panels(tmp_path: P
                 "norm_sum": 2.0,
                 "score_lexA": 1.0,
                 "score_cpxR": 1.1,
+                "norm_lexA": 1.0,
+                "norm_cpxR": 1.0,
             },
             {
                 "id": "elite-2",
@@ -1465,6 +1470,8 @@ def test_analyze_showcase_fails_when_elites_count_exceeds_max_panels(tmp_path: P
                 "norm_sum": 1.8,
                 "score_lexA": 0.9,
                 "score_cpxR": 0.9,
+                "norm_lexA": 0.9,
+                "norm_cpxR": 0.9,
             },
         ]
     )
@@ -1682,7 +1689,7 @@ def test_analyze_fails_when_required_plot_generation_raises(tmp_path: Path, monk
     def _explode(*args, **kwargs) -> None:
         raise RuntimeError("intentional opt trajectory error")
 
-    monkeypatch.setattr("dnadesign.cruncher.analysis.plots.opt_trajectory.plot_chain_trajectory_scatter", _explode)
+    monkeypatch.setattr("dnadesign.cruncher.analysis.plots.opt_trajectory.plot_elite_score_space_context", _explode)
 
     cfg = load_config(config_path)
     with pytest.raises(RuntimeError, match="opt trajectory error"):
@@ -1731,7 +1738,7 @@ def test_analyze_fails_fast_on_trajectory_value_error(tmp_path: Path, monkeypatc
         raise ValueError("intentional trajectory value error")
 
     monkeypatch.setattr(
-        "dnadesign.cruncher.analysis.plots.opt_trajectory.plot_chain_trajectory_scatter",
+        "dnadesign.cruncher.analysis.plots.opt_trajectory.plot_elite_score_space_context",
         _explode_value,
     )
 

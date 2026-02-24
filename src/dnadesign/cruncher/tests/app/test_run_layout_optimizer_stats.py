@@ -79,3 +79,26 @@ def test_materialize_optimizer_stats_skips_sidecar_without_move_stats(tmp_path: 
     assert manifest_stats == raw_stats
     assert artifact_entries == []
     assert stats_path is None
+
+
+def test_materialize_optimizer_stats_can_drop_move_stats_payload(tmp_path: Path) -> None:
+    run_dir = tmp_path / "runs" / "sample" / "run_d"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    move_stats = [{"sweep_idx": 0, "attempted": 10, "accepted": 5, "phase": "draw"}]
+    raw_stats = {
+        "acceptance_rate_all": 0.5,
+        "move_stats": move_stats,
+    }
+
+    manifest_stats, artifact_entries, stats_path = _materialize_optimizer_stats(
+        run_dir,
+        raw_stats,
+        stage="sample",
+        include_move_stats=False,
+    )
+
+    assert "move_stats" not in manifest_stats
+    assert "move_stats_path" not in manifest_stats
+    assert manifest_stats["move_stats_rows"] == 1
+    assert artifact_entries == []
+    assert stats_path is None

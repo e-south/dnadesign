@@ -1,6 +1,8 @@
-# Cruncher for developers
+## Cruncher for developers
 
-## Contents
+**Last updated by:** cruncher-maintainers on 2026-02-23
+
+### Contents
 - [Cruncher for developers](#cruncher-for-developers)
 - [Goals](#goals)
 - [Architecture](#architecture)
@@ -14,7 +16,7 @@
 - [Error handling](#error-handling)
 - [Testing plan](#testing-plan)
 
-### Goals
+#### Goals
 
 - Decoupled: core optimization is source-agnostic and runs offline.
 - Assertive: explicit errors for missing inputs, ambiguous TFs, invalid matrices.
@@ -25,7 +27,7 @@
 
 ---
 
-### Architecture
+#### Architecture
 
 #### Layers (ports & adapters)
 
@@ -47,7 +49,7 @@
 
 ---
 
-### Data model
+#### Data model
 
 #### MotifRecord (normalized)
 
@@ -68,7 +70,7 @@
 
 ---
 
-### Cache layout
+#### Cache layout
 
 ```
 <catalog.root>/
@@ -77,12 +79,11 @@
     motifs/<source>/<motif_id>.json
     sites/<source>/<motif_id>.jsonl
   discoveries/
-  .mplcache/
 ```
 
 `catalog.json` is the single source of truth for “what we have in-house”. It tracks matrix availability, site counts, and provenance tags.
-`catalog.root` can be absolute or relative to the cruncher root (`src/dnadesign/cruncher`); relative paths must not include `..`.
-By default the catalog cache is shared across workspaces (`src/dnadesign/cruncher/.cruncher`).
+`catalog.root` can be absolute or relative to the workspace root; relative paths must not include `..`.
+By default the catalog cache is workspace-local (`<workspace>/.cruncher`).
 
 Workspace state (per workspace `.cruncher/`):
 
@@ -95,12 +96,12 @@ Workspace state (per workspace `.cruncher/`):
 
 Tooling caches:
 
-- Matplotlib caches in `<catalog.root>/.mplcache/` unless `MPLCONFIGDIR` is set.
+- Matplotlib caches in `.cache/matplotlib/cruncher` unless `MPLCONFIGDIR` is set.
 - Numba JIT cache defaults to `<workspace>/.cruncher/numba_cache` unless `NUMBA_CACHE_DIR` is set.
 
 ---
 
-### Lockfiles
+#### Lockfiles
 
 Lockfiles pin TF names to exact source IDs and checksums. Lockfiles are **required** for:
 
@@ -111,7 +112,7 @@ If a TF cannot be uniquely resolved, **cruncher** errors immediately. Analyze op
 
 ---
 
-### PWM creation strategy
+#### PWM creation strategy
 
 - Default: use cached matrices (`catalog.pwm_source=matrix`).
 - Optional: build PWM from cached sites (`catalog.pwm_source=sites`).
@@ -129,7 +130,7 @@ If a TF cannot be uniquely resolved, **cruncher** errors immediately. Analyze op
 
 ---
 
-### MCMC optimization spec
+#### MCMC optimization spec
 
 - Deterministic RNG via `sample.seed` and run-level stable seeding.
 - Burn-in storage is optional via `sample.output.include_tune_in_sequences` (default: false, affects sequences.parquet only).
@@ -141,37 +142,37 @@ If a TF cannot be uniquely resolved, **cruncher** errors immediately. Analyze op
 
 ---
 
-### Outputs and reporting
+#### Outputs and reporting
 
 Each run directory uses a stable subdir layout (stage-agnostic):
 
 ```
 <run_dir>/
-  run/        # run_manifest.json, run_status.json, config_used.yaml
+  meta/       # run_manifest.json, run_status.json, config_used.yaml
   provenance/ # lockfile snapshot + input manifests
   optimize/   # tables/ + state/ (trace, metrics, elite metadata)
   analysis/   # reports/ + manifests/ + tables/
   plots/      # analysis plots + logos
-  export/     # downstream exports (for example export/sequences/*)
+  export/     # downstream exports (for example export/*)
 ```
 
 Key artifacts:
 
-- `run/run_manifest.json` / `run/run_status.json` / `run/config_used.yaml` — provenance + status + resolved config
+- `meta/run_manifest.json` / `meta/run_status.json` / `meta/config_used.yaml` — provenance + status + resolved config
 - `provenance/lockfile.json` — pinned input snapshot for reproducible analysis
 - `optimize/tables/sequences.parquet`, `optimize/tables/elites*`, `optimize/tables/random_baseline*` — sampling outputs
 - `optimize/state/trace.nc`, `optimize/state/metrics.jsonl`, `optimize/state/elites.{json,yaml}` — sampling metadata
 - `analysis/reports/summary.json`, `analysis/reports/report.json`, `analysis/reports/report.md` — analysis outputs
 - `analysis/manifests/plot_manifest.json`, `analysis/manifests/table_manifest.json`, `analysis/manifests/manifest.json` — inventories
-- `plots/analysis/*`, `analysis/tables/table__*` — curated analysis plots and tables
+- `plots/*`, `analysis/tables/table__*` — curated analysis plots and tables
 
 `cruncher analyze` fails when required analysis artifacts are missing and does not write partial report outputs.
 
 ---
 
-### CLI contract
+#### CLI contract
 
-Most commands accept an explicit config `--config`. If omitted, **cruncher** resolves a config from `--workspace`/`CRUNCHER_WORKSPACE`, then from `config.yaml` in the current directory (or parent directories), and finally from discoverable workspaces. When multiple workspaces are discovered, Cruncher prompts in interactive shells.
+Most commands accept an explicit config `--config`. If omitted, **cruncher** resolves a config from `--workspace`/`CRUNCHER_WORKSPACE`, then from `<workspace>/configs/config.yaml` in the current directory (or parent directories; or `config.yaml` when CWD is already `<workspace>/configs`), and finally from discoverable workspaces. When multiple workspaces are discovered, Cruncher prompts in interactive shells.
 
 Defaults + automation:
 
@@ -217,7 +218,7 @@ Inspection:
 
 ---
 
-### Error handling
+#### Error handling
 
 Errors are explicit and actionable:
 
@@ -230,7 +231,7 @@ Errors are explicit and actionable:
 
 ---
 
-### Testing plan
+#### Testing plan
 
 Unit tests:
 

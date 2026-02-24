@@ -80,7 +80,7 @@ app.add_typer(setup_app, name="setup")
 
 @lru_cache(maxsize=1)
 def _usr_event_version() -> int:
-    module = importlib.import_module("dnadesign.usr.src.event_schema")
+    module = importlib.import_module("dnadesign.usr.event_schema")
     version = getattr(module, "USR_EVENT_VERSION", None)
     if not isinstance(version, int):
         raise NotifyConfigError("USR event schema is invalid: USR_EVENT_VERSION must be an integer")

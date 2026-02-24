@@ -14,6 +14,8 @@ from __future__ import annotations
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import pytest
+from matplotlib.font_manager import FontProperties
+from matplotlib.textpath import TextPath
 
 from dnadesign.baserender.src.config import resolve_style
 from dnadesign.baserender.src.core import Record, Span
@@ -27,6 +29,63 @@ from dnadesign.baserender.src.runtime import initialize_runtime
 
 def _motif_matrix(length: int) -> list[list[float]]:
     return [[0.70, 0.10, 0.10, 0.10] for _ in range(length)]
+
+
+def test_reverse_strand_geometry_aligns_logo_columns_to_antisense_row() -> None:
+    initialize_runtime()
+    sequence = "ATACAGTT"
+    segment = sequence[0:6]
+    complement = segment.translate(str.maketrans("ACGT", "TGCA"))
+    label = segment.translate(str.maketrans("ACGT", "TGCA"))[::-1]
+    matrix = [
+        [0.90, 0.05, 0.03, 0.02],
+        [0.05, 0.60, 0.30, 0.05],
+        [0.20, 0.10, 0.10, 0.60],
+        [0.05, 0.20, 0.70, 0.05],
+        [0.65, 0.10, 0.20, 0.05],
+        [0.10, 0.75, 0.10, 0.05],
+    ]
+    record = Record(
+        id="reverse_orientation",
+        alphabet="DNA",
+        sequence=sequence,
+        features=(
+            Feature(
+                id="k1",
+                kind="kmer",
+                span=Span(start=0, end=6, strand="rev"),
+                label=label,
+                tags=("tf:lexA",),
+                attrs={},
+                render={},
+            ),
+        ),
+        effects=(
+            Effect(
+                kind="motif_logo",
+                target={"feature_id": "k1"},
+                params={"matrix": matrix},
+                render={},
+            ),
+        ),
+        display=Display(),
+        meta={},
+    )
+    style = resolve_style(
+        preset=None,
+        overrides={
+            "motif_logo": {
+                "letter_coloring": {
+                    "mode": "match_window_seq",
+                },
+                "lane_mode": "follow_feature_track",
+            }
+        },
+    )
+    layout = compute_layout(record, style)
+    geometry = compute_motif_logo_geometry(record=record, effect_index=0, layout=layout, style=style)
+    assert geometry.observed == complement
+    assert geometry.matrix == tuple(tuple(float(v) for v in row) for row in matrix[::-1])
 
 
 def test_match_window_seq_coloring_uses_feature_fill_color() -> None:
@@ -309,6 +368,84 @@ def test_inline_legend_labels_are_tag_colored_and_track_aligned() -> None:
     x, y = label.get_position()
     assert y == pytest.approx(placement.y)
     assert x > (placement.x + placement.w)
+
+    plt.close(fig)
+
+
+def test_inline_legend_labels_do_not_overlap_neighbor_kmer_boxes() -> None:
+    initialize_runtime()
+    record = Record(
+        id="inline_legend_no_overlap",
+        alphabet="DNA",
+        sequence="ACTGCATATATTTACAACTGCA",
+        features=(
+            Feature(
+                id="k1",
+                kind="regulator_window",
+                span=Span(start=0, end=6, strand="fwd"),
+                label="ACTGCA",
+                tags=("tf:lexA",),
+                attrs={},
+                render={},
+            ),
+            Feature(
+                id="k2",
+                kind="regulator_window",
+                span=Span(start=7, end=13, strand="fwd"),
+                label="TATATT",
+                tags=("tf:cpxR",),
+                attrs={},
+                render={},
+            ),
+        ),
+        effects=(),
+        display=Display(tag_labels={"tf:lexA": "lexA", "tf:cpxR": "cpxR"}),
+        meta={},
+    )
+    style = resolve_style(
+        preset=None,
+        overrides={
+            "connectors": False,
+            "palette": {"tf:lexA": "#B45309", "tf:cpxR": "#0F766E"},
+            "legend": True,
+            "legend_mode": "inline",
+            "legend_inline_side": "right",
+            "legend_inline_margin_cells": 0.05,
+        },
+    )
+    layout = compute_layout(record, style)
+    fig = render_record(record, renderer_name="sequence_rows", style=style, palette=Palette(style.palette))
+    ax = fig.axes[0]
+
+    labels = [t for t in ax.texts if t.get_text() in {"LexA", "CpxR"}]
+    assert len(labels) == 2
+
+    feature_for_label = {"LexA": "k1", "CpxR": "k2"}
+    prop = FontProperties(family=style.font_label, size=style.legend_font_size)
+    px_per_pt = style.dpi / 72.0
+    for text_artist in labels:
+        label = str(text_artist.get_text())
+        own_feature_id = feature_for_label[label]
+        text_width = TextPath((0, 0), label, prop=prop).get_extents().width * px_per_pt
+        x_anchor, y_anchor = text_artist.get_position()
+        ha = str(text_artist.get_ha()).lower()
+        if ha == "left":
+            text_x0 = float(x_anchor)
+            text_x1 = float(x_anchor) + float(text_width)
+        elif ha == "right":
+            text_x0 = float(x_anchor) - float(text_width)
+            text_x1 = float(x_anchor)
+        else:
+            half = float(text_width) * 0.5
+            text_x0 = float(x_anchor) - half
+            text_x1 = float(x_anchor) + half
+        for feature_id, (bx0, by0, bx1, by1) in layout.feature_boxes.items():
+            if feature_id == own_feature_id:
+                continue
+            if not (float(by0) <= float(y_anchor) <= float(by1)):
+                continue
+            overlaps = max(float(text_x0), float(bx0)) < min(float(text_x1), float(bx1))
+            assert not overlaps, (label, (text_x0, text_x1), (bx0, bx1))
 
     plt.close(fig)
 

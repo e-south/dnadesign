@@ -7,14 +7,18 @@ densegen:
 
   motif_sets:
     sigma70_upstream_35:
-      consensus: TTGACA
+      f: TTGACA
+      b: CTGACA
+      e: TAGACA
+      d: TTTACA
+      c: TTGTGA
     sigma70_downstream_10:
       consensus: TATAAT
 
   inputs:
     - name: lexA_pwm
       type: pwm_artifact
-      path: inputs/motif_artifacts/lexA__meme_suite_meme__lexA_CTGTATAWAWWHACA.json
+      path: inputs/motif_artifacts/lexA__demo_merged_meme_oops_multitf__lexA_CTGTATAWAWWHACA.json
       sampling:
         strategy: stochastic
         n_sites: 250
@@ -42,7 +46,7 @@ densegen:
         tier_fractions: [0.001, 0.01, 0.09]
     - name: cpxR_pwm
       type: pwm_artifact
-      path: inputs/motif_artifacts/cpxR__meme_suite_meme__cpxR_MANWWHTTTAM.json
+      path: inputs/motif_artifacts/cpxR__demo_merged_meme_oops_multitf__cpxR_MANWWHTTTAM.json
       sampling:
         strategy: stochastic
         n_sites: 250
@@ -70,7 +74,7 @@ densegen:
         tier_fractions: [0.001, 0.01, 0.09]
     - name: baeR_pwm
       type: pwm_artifact
-      path: inputs/motif_artifacts/baeR__meme_suite_meme__baeR_WWDTYTCTSCMNNA.json
+      path: inputs/motif_artifacts/baeR__demo_merged_meme_oops_multitf__baeR_TTTCTSCVHNA.json
       sampling:
         strategy: stochastic
         n_sites: 250
@@ -117,9 +121,12 @@ densegen:
           fimo_exclude:
             pwms_input: [lexA_pwm, cpxR_pwm, baeR_pwm]
             allow_zero_hit_only: true
-          forbid_kmers: [TTGACA, TATAAT]
-          include_reverse_complements: true
-          strands: both
+          forbid_kmers:
+            - patterns_from_motif_sets:
+                - sigma70_upstream_35
+                - sigma70_downstream_10
+              include_reverse_complements: true
+              strands: both
 
   output:
     targets: [parquet, usr]
@@ -138,6 +145,8 @@ densegen:
 
   generation:
     sequence_length: 60
+    expansion:
+      max_plans: 64
     sampling:
       pool_strategy: subsample
       library_size: 10
@@ -149,34 +158,44 @@ densegen:
 
     plan:
       - name: ethanol
-        quota: 60
+        sequences: 60
+        expanded_name_template: "{base}__sig35={up}"
         sampling:
           include_inputs: [cpxR_pwm, baeR_pwm, background]
         fixed_elements:
-          promoter_constraints:
-            - name: sigma70_consensus
-              upstream: TTGACA
-              downstream: TATAAT
-              spacer_length: [16, 20]
-              upstream_pos: [0, 60]
+          fixed_element_matrix:
+            name: sigma70_core
+            upstream_from_set: sigma70_upstream_35
+            upstream_variant_ids: [f, b, e, d, c]
+            downstream_from_set: sigma70_downstream_10
+            downstream_variant_ids: [consensus]
+            pairing:
+              mode: cross_product
+            spacer_length: [16, 20]
+            upstream_pos: [0, 60]
         regulator_constraints:
           groups:
             - name: ethanol_response
               members:
                 - cpxR_MANWWHTTTAM
-                - baeR_WWDTYTCTSCMNNA
+                - baeR_TTTCTSCVHNA
               min_required: 1
       - name: ciprofloxacin
-        quota: 60
+        sequences: 60
+        expanded_name_template: "{base}__sig35={up}"
         sampling:
           include_inputs: [lexA_pwm, background]
         fixed_elements:
-          promoter_constraints:
-            - name: sigma70_consensus
-              upstream: TTGACA
-              downstream: TATAAT
-              spacer_length: [16, 18]
-              upstream_pos: [0, 60]
+          fixed_element_matrix:
+            name: sigma70_core
+            upstream_from_set: sigma70_upstream_35
+            upstream_variant_ids: [f, b, e, d, c]
+            downstream_from_set: sigma70_downstream_10
+            downstream_variant_ids: [consensus]
+            pairing:
+              mode: cross_product
+            spacer_length: [16, 18]
+            upstream_pos: [0, 60]
         regulator_constraints:
           groups:
             - name: ciprofloxacin_response
@@ -184,22 +203,27 @@ densegen:
                 - lexA_CTGTATAWAWWHACA
               min_required: 1
       - name: ethanol_ciprofloxacin
-        quota: 80
+        sequences: 80
+        expanded_name_template: "{base}__sig35={up}"
         sampling:
           include_inputs: [lexA_pwm, cpxR_pwm, baeR_pwm, background]
         fixed_elements:
-          promoter_constraints:
-            - name: sigma70_consensus
-              upstream: TTGACA
-              downstream: TATAAT
-              spacer_length: [16, 20]
-              upstream_pos: [0, 60]
+          fixed_element_matrix:
+            name: sigma70_core
+            upstream_from_set: sigma70_upstream_35
+            upstream_variant_ids: [f, b, e, d, c]
+            downstream_from_set: sigma70_downstream_10
+            downstream_variant_ids: [consensus]
+            pairing:
+              mode: cross_product
+            spacer_length: [16, 20]
+            upstream_pos: [0, 60]
         regulator_constraints:
           groups:
             - name: ethanol_response
               members:
                 - cpxR_MANWWHTTTAM
-                - baeR_WWDTYTCTSCMNNA
+                - baeR_TTTCTSCVHNA
               min_required: 1
             - name: ciprofloxacin_response
               members:
@@ -233,7 +257,8 @@ densegen:
     stall_warning_every_seconds: 10
     max_consecutive_failures: 25
     max_seconds_per_plan: 300
-    max_failed_solutions: 0
+    max_failed_solutions: 100000
+    max_failed_solutions_per_target: 2.0
     random_seed: 42
 
   postprocess:
@@ -260,3 +285,10 @@ plots:
   out_dir: outputs/plots
   format: pdf
   default: [stage_a_summary, placement_map, run_health, tfbs_usage]
+  options:
+    placement_map:
+      scope: auto
+      max_plans: 12
+    tfbs_usage:
+      scope: auto
+      max_plans: 12

@@ -671,6 +671,8 @@ class RegulonDBAdapter:
                 collection = dataset.get("collectionData") or {}
                 dataset_type = collection.get("type") or dataset.get("datasetType")
                 dataset_source = collection.get("source") or source
+                if query.dataset_source and dataset_source != query.dataset_source:
+                    continue
                 objects = dataset.get("objectsTested") or []
                 tf_names = tuple(sorted({name for obj in objects for name in self._collect_tf_candidates(obj)}))
                 if query.dataset_type and dataset_type != query.dataset_type:
@@ -988,8 +990,12 @@ class RegulonDBAdapter:
     def list_sites(self, query: SiteQuery) -> Iterable[SiteInstance]:
         if not query.tf_name and not query.motif_id:
             raise ValueError("site queries require tf_name or motif_id")
+        if self._config.curated_sites and self._config.ht_sites and query.limit is not None and not query.dataset_id:
+            raise ValueError(
+                "site limit with curated+HT retrieval requires explicit source mode: "
+                "pin --dataset-id, disable curated_sites, or omit --limit."
+            )
         remaining = query.limit
-        curated_yielded = 0
         if self._config.curated_sites and not query.dataset_id:
             search = query.motif_id or query.tf_name
             item = self._get_regulon(search, exact=True)
@@ -1005,7 +1011,6 @@ class RegulonDBAdapter:
                     continue
                 if site_obj is None:
                     continue
-                curated_yielded += 1
                 yield site_obj
                 if remaining is not None:
                     remaining -= 1
@@ -1020,26 +1025,8 @@ class RegulonDBAdapter:
             if query.dataset_id:
                 dataset_ids = [query.dataset_id]
             else:
-                try:
-                    dataset_ids = self._find_ht_datasets_for_tf(tf_name)
-                except RuntimeError as exc:
-                    if curated_yielded:
-                        logger.warning(
-                            "HT dataset discovery failed for TF %s (%s); using curated sites only.",
-                            tf_name,
-                            exc,
-                        )
-                        return
-                    raise
+                dataset_ids = self._find_ht_datasets_for_tf(tf_name)
             if not dataset_ids:
-                if query.dataset_id:
-                    raise ValueError(f"No HT datasets found for TF {tf_name}")
-                if curated_yielded:
-                    logger.warning(
-                        "No HT datasets found for TF %s; using curated sites only.",
-                        tf_name,
-                    )
-                    return
                 raise ValueError(f"No HT datasets found for TF {tf_name}")
             yielded = 0
             for dataset_id in dataset_ids:
@@ -1065,24 +1052,15 @@ class RegulonDBAdapter:
                         raise ValueError(
                             f"No HT TFBinding records returned for dataset {query.dataset_id} (TF {tf_name})"
                         )
-                    if curated_yielded:
-                        logger.warning(
-                            "No HT binding-site records returned for TF %s; using curated sites only.",
-                            tf_name,
-                        )
-                    else:
-                        raise ValueError(f"No HT binding-site records returned for TF {tf_name}")
+                    raise ValueError(
+                        f"No HT binding-site records returned for TF {tf_name}. "
+                        "If datasets expose peaks only, set ingest.regulondb.ht_binding_mode=peaks."
+                    )
             if self._config.ht_binding_mode == "peaks":
                 if yielded == 0:
                     if query.dataset_id:
                         raise ValueError(f"No HT peak records returned for dataset {query.dataset_id} (TF {tf_name})")
-                    if curated_yielded:
-                        logger.warning(
-                            "No HT peak records returned for TF %s; using curated sites only.",
-                            tf_name,
-                        )
-                    else:
-                        raise ValueError(f"No HT peak records returned for TF {tf_name}")
+                    raise ValueError(f"No HT peak records returned for TF {tf_name}")
         elif query.dataset_id:
             raise ValueError("HT dataset_id requires ht_sites=true in config.")
 

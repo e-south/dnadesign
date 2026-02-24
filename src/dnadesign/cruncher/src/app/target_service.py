@@ -3,7 +3,7 @@
 <cruncher project>
 src/dnadesign/cruncher/src/app/target_service.py
 
-Resolve target regulator sets and campaign expansions.
+Resolve target regulator sets and catalog readiness.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Optional, Tuple
 
-from dnadesign.cruncher.app.campaign_service import select_catalog_entry
+from dnadesign.cruncher.app.cache_readiness import cache_refresh_hint
 from dnadesign.cruncher.config.schema_v3 import CruncherConfig
 from dnadesign.cruncher.ingest.site_windows import resolve_window_length
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
@@ -68,6 +68,16 @@ class TargetStats:
     dataset_id: Optional[str]
     dataset_method: Optional[str]
     reference_genome: Optional[str]
+
+
+def resolve_category_targets(*, cfg: CruncherConfig, category_name: str) -> list[str]:
+    tfs = cfg.regulator_categories.get(category_name)
+    if tfs is None:
+        available = ", ".join(sorted(cfg.regulator_categories.keys()))
+        raise ValueError(f"category '{category_name}' not found. Available categories: {available or 'none'}")
+    if not tfs:
+        raise ValueError(f"category '{category_name}' is empty.")
+    return list(tfs)
 
 
 def _merge_text(values: Iterable[Optional[str]]) -> Optional[str]:
@@ -163,6 +173,60 @@ def _status_for_entry(
             return "insufficient-sites", msg
         return "ready", None
     raise ValueError("pwm_source must be 'matrix' or 'sites'")
+
+
+def select_catalog_entry(
+    *,
+    catalog: CatalogIndex,
+    tf_name: str,
+    pwm_source: str,
+    site_kinds: Optional[list[str]],
+    combine_sites: bool,
+    source_preference: list[str],
+    dataset_preference: list[str],
+    dataset_map: dict[str, str],
+    allow_ambiguous: bool,
+) -> CatalogEntry:
+    candidates = catalog.list(tf_name=tf_name, include_synonyms=True)
+    if not candidates:
+        if pwm_source == "sites":
+            raise ValueError(f"No cached sites found for '{tf_name}'. {cache_refresh_hint(pwm_source='sites')}")
+        raise ValueError(f"No cached motifs found for '{tf_name}'. {cache_refresh_hint(pwm_source='matrix')}")
+    if pwm_source == "matrix":
+        candidates = [c for c in candidates if c.has_matrix]
+    elif pwm_source == "sites":
+        candidates = [c for c in candidates if c.has_sites]
+        if site_kinds:
+            candidates = [c for c in candidates if c.site_kind in site_kinds]
+    else:
+        raise ValueError("pwm_source must be 'matrix' or 'sites'")
+    if not candidates:
+        raise ValueError(
+            f"No cached data for '{tf_name}' compatible with pwm_source='{pwm_source}'. "
+            "Fetch motifs/sites or change pwm_source."
+        )
+    candidates = sorted(candidates, key=lambda c: (c.source, c.motif_id))
+    if dataset_map and tf_name in dataset_map:
+        dataset_id = dataset_map[tf_name]
+        candidates = [c for c in candidates if c.dataset_id == dataset_id]
+        if not candidates:
+            raise ValueError(f"Dataset '{dataset_id}' not found for TF '{tf_name}'.")
+        return candidates[0]
+    if dataset_preference:
+        by_dataset = {c.dataset_id: c for c in candidates if c.dataset_id}
+        for pref in dataset_preference:
+            if pref in by_dataset:
+                return by_dataset[pref]
+    if source_preference:
+        by_source = {c.source: c for c in candidates}
+        for pref in source_preference:
+            if pref in by_source:
+                return by_source[pref]
+    allow_ambiguous_effective = allow_ambiguous or (combine_sites and pwm_source == "sites")
+    if len(candidates) == 1 or allow_ambiguous_effective:
+        return candidates[0]
+    options = ", ".join(f"{c.source}:{c.motif_id}" for c in candidates)
+    raise ValueError(f"Ambiguous motif for '{tf_name}'. Candidates: {options}")
 
 
 def target_statuses(
@@ -296,7 +360,7 @@ def target_statuses(
                     matrix_source=None,
                     pwm_source=effective_pwm_source,
                     status="missing-lock",
-                    message=f"Missing lock entry for '{tf}'. Run `cruncher lock {config_path.name}`.",
+                    message=f"Missing lock entry for '{tf}'. Run `cruncher lock -c {config_path.name}`.",
                 )
             )
             continue

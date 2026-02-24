@@ -137,7 +137,7 @@ def test_runtime_uses_non_iterate_solver_strategy(
                 "plan": [
                     {
                         "name": "default",
-                        "quota": 1,
+                        "sequences": 1,
                         "sampling": {"include_inputs": ["demo"]},
                         "regulator_constraints": {"groups": []},
                     }

@@ -34,8 +34,8 @@ def _dense_arrays_version_from_uv_lock(root: Path) -> str | None:
         return None
     try:
         data = tomllib.loads(lock_path.read_text())
-    except Exception:
-        return None
+    except Exception as exc:
+        raise ValueError(f"Failed to parse uv.lock at {lock_path}: {exc}") from exc
     packages = data.get("package", [])
     for pkg in packages:
         name = str(pkg.get("name", "")).lower()
@@ -60,8 +60,8 @@ def _dense_arrays_version_from_pyproject(root: Path) -> str | None:
         return None
     try:
         data = tomllib.loads(pyproject_path.read_text())
-    except Exception:
-        return None
+    except Exception as exc:
+        raise ValueError(f"Failed to parse pyproject.toml at {pyproject_path}: {exc}") from exc
     deps = data.get("project", {}).get("dependencies", [])
     for dep in deps:
         dep_str = str(dep).strip()
@@ -84,16 +84,24 @@ def _resolve_dense_arrays_version(cfg_path: Path) -> tuple[str | None, str]:
         version = getattr(da, "__version__", None)
         if isinstance(version, str) and version:
             return version, "installed"
-    except Exception:
+    except ModuleNotFoundError:
         pass
+    except Exception as exc:
+        raise RuntimeError("Failed to import dense-arrays while resolving package version.") from exc
+    metadata_error: Exception | None = None
     for pkg_name in ("dense-arrays", "dense_arrays"):
         try:
             version = importlib.metadata.version(pkg_name)
             return version, "installed"
         except importlib.metadata.PackageNotFoundError:
             continue
-        except Exception:
+        except Exception as exc:
+            metadata_error = exc
             break
+    if metadata_error is not None:
+        raise RuntimeError(
+            "Failed to resolve dense-arrays version from installed package metadata."
+        ) from metadata_error
     root = _find_project_root(cfg_path)
     if root is None:
         root = _find_project_root(Path(__file__).resolve())
@@ -104,4 +112,7 @@ def _resolve_dense_arrays_version(cfg_path: Path) -> tuple[str | None, str]:
         version = _dense_arrays_version_from_pyproject(root)
         if version:
             return version, "pyproject"
-    return None, "unknown"
+    raise RuntimeError(
+        "Unable to resolve dense-arrays version. "
+        "Ensure dense-arrays is installed or declared in uv.lock/pyproject.toml."
+    )

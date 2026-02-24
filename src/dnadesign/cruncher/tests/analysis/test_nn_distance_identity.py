@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from dnadesign.cruncher.analysis.diversity import (
     compute_elite_distance_matrix,
@@ -125,6 +126,34 @@ def test_full_sequence_nn_table_reports_bp_metrics() -> None:
     assert summary["min_pairwise_full_distance"] == 0.25
 
 
+def test_full_sequence_nn_table_supports_mixed_sequence_lengths() -> None:
+    elites_df = pd.DataFrame(
+        {
+            "id": ["e1", "e2", "e3"],
+            "sequence": ["AAAA", "AAA", "TTTT"],
+            "rank": [1, 2, 3],
+        }
+    )
+    table, summary = compute_elites_full_sequence_nn_table(
+        elites_df,
+        identity_mode="canonical",
+        identity_by_elite_id={"e1": "canon1", "e2": "canon2", "e3": "canon3"},
+        rank_by_elite_id={"e1": 1, "e2": 2, "e3": 3},
+    )
+    row_e1 = table[table["elite_id"] == "e1"].iloc[0]
+    row_e2 = table[table["elite_id"] == "e2"].iloc[0]
+    row_e3 = table[table["elite_id"] == "e3"].iloc[0]
+    assert float(row_e1["nn_full_bp"]) == 1.0
+    assert float(row_e2["nn_full_bp"]) == 1.0
+    assert float(row_e3["nn_full_bp"]) == 4.0
+    assert float(row_e1["nn_full_dist"]) == 0.25
+    assert float(row_e2["nn_full_dist"]) == 0.25
+    assert float(row_e3["nn_full_dist"]) == 1.0
+    assert summary["sequence_length_bp"] is None
+    assert summary["min_pairwise_full_bp"] == 1.0
+    assert summary["min_pairwise_full_distance"] == 0.25
+
+
 def test_resolve_joint_score_fallback_respects_sum_combine() -> None:
     elites_df = pd.DataFrame(
         {
@@ -144,3 +173,17 @@ def test_full_sequence_nn_axis_label_mentions_closest_selected_elite() -> None:
     label = _full_nn_xlabel()
     assert "closest selected elite" in label
     assert "Hamming" in label
+
+
+def test_compute_elite_distance_matrix_rejects_core_width_mismatch() -> None:
+    hits_df = pd.DataFrame(
+        {
+            "elite_id": ["e1", "e2"],
+            "tf": ["tf1", "tf1"],
+            "best_core_seq": ["AAAA", "AAA"],
+        }
+    )
+    pwms = {"tf1": _pwm("tf1", length=4)}
+
+    with pytest.raises(ValueError, match="core width mismatch"):
+        compute_elite_distance_matrix(hits_df, ["tf1"], pwms)

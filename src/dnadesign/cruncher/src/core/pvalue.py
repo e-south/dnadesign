@@ -16,26 +16,35 @@ _LOGODDS_SCALE = 1000.0 / np.log(2.0)
 _LOGODDS_CACHE_MAXSIZE = 256
 
 
-@njit
-def _dp_convolve(lom_int: np.ndarray, bg: np.ndarray, offset: int, length: int) -> np.ndarray:
+@njit(cache=True)
+def _dp_convolve_shifted(lom_shifted: np.ndarray, bg: np.ndarray, length: int) -> np.ndarray:
     """
-    Build the null distribution by dynamic-programming convolution, fully in Numba.
+    Build the null distribution by dynamic-programming convolution on per-column
+    shifted integer scores. Each column in `lom_shifted` must have minimum 0.
     """
-    w = lom_int.shape[0]
-    # default zeros() dtype is float64 under Numba
-    probs = np.zeros(length)
+    w = lom_shifted.shape[0]
+    probs = np.zeros(length, dtype=np.float64)
     probs[0] = 1.0
+    max_idx = 0
 
     for i in range(w):
-        col = lom_int[i]
-        new = np.zeros(length)
-        # each base in this column
+        col = lom_shifted[i]
+        new = np.zeros(length, dtype=np.float64)
+        next_max_idx = 0
         for b in range(col.shape[0]):
-            shift = col[b] + offset
-            # accumulate old probs into new shifted by 'shift'
-            for j in range(length - shift):
+            shift = int(col[b])
+            if shift >= length:
+                continue
+            candidate_max = max_idx + shift
+            if candidate_max > next_max_idx:
+                next_max_idx = candidate_max
+            for j in range(max_idx + 1):
                 new[j + shift] += probs[j] * bg[b]
         probs = new
+        if next_max_idx >= length:
+            max_idx = length - 1
+        else:
+            max_idx = next_max_idx
     return probs
 
 
@@ -58,10 +67,10 @@ def _logodds_lookup_cached(
     total_min = int(min_per_col.sum())
     total_max = int(max_per_col.sum())
 
-    offset = -int(min_per_col.min())
     length = total_max - total_min + 1
+    lom_shifted = lom_int - min_per_col.reshape(-1, 1)
 
-    probs = _dp_convolve(lom_int, np.asarray(bg_tuple, dtype=float), offset, length)
+    probs = _dp_convolve_shifted(lom_shifted, np.asarray(bg_tuple, dtype=np.float64), length)
     tail_p = probs[::-1].cumsum()[::-1]
     scores = np.arange(total_min, total_max + 1) / _LOGODDS_SCALE
     return scores, tail_p

@@ -37,6 +37,17 @@ class StageAPoolState:
     source_cache: dict[str, PoolData]
 
 
+def _active_input_names(plan_items: list) -> set[str]:
+    names: set[str] = set()
+    for item in plan_items:
+        include_inputs = list(getattr(item, "include_inputs", []) or [])
+        for input_name in include_inputs:
+            value = str(input_name).strip()
+            if value:
+                names.add(value)
+    return names
+
+
 def prepare_stage_a_pools(
     *,
     cfg: DenseGenConfig,
@@ -63,6 +74,9 @@ def prepare_stage_a_pools(
     pool_dir = outputs_root / "pools"
     pool_manifest = pool_dir / "pool_manifest.json"
     pool_data: dict[str, PoolData] | None = None
+    active_inputs = _active_input_names(plan_items)
+    if not active_inputs:
+        raise RuntimeError("No active Stage-A inputs resolved from generation plan.")
 
     if build_stage_a:
         if candidate_logging:
@@ -87,6 +101,7 @@ def prepare_stage_a_pools(
                 outputs_root=outputs_root,
                 out_dir=pool_dir,
                 overwrite=True,
+                selected_inputs=active_inputs,
             )
         except Exception as exc:
             raise RuntimeError(f"Failed to build Stage-A TFBS pools: {exc}") from exc
@@ -115,13 +130,18 @@ def prepare_stage_a_pools(
         )
     if not build_stage_a:
         statuses = pool_status_by_input(cfg, cfg_path, run_root)
-        stale = [status for status in statuses.values() if status.state != "present"]
+        stale = [status for name, status in statuses.items() if name in active_inputs and status.state != "present"]
         if stale:
             labels = ", ".join(sorted({status.name for status in stale}))
             raise RuntimeError(
                 "Stage-A pools missing or stale for: "
                 f"{labels}. Run `uv run dense stage-a build-pool --fresh` to regenerate pools."
             )
+        stale_unused = sorted(
+            name for name, status in statuses.items() if name not in active_inputs and status.state != "present"
+        )
+        if stale_unused:
+            log.info("Ignoring stale Stage-A pools for unused inputs: %s", ", ".join(stale_unused))
     try:
         _pool_artifact, pool_data = load_pool_data(pool_dir)
     except Exception as exc:

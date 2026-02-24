@@ -29,7 +29,7 @@ from dnadesign.cruncher.cli.config_resolver import (
 from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.ingest.registry import default_registry
-from dnadesign.cruncher.utils.paths import resolve_catalog_root, resolve_lock_path
+from dnadesign.cruncher.utils.paths import resolve_catalog_root, resolve_lock_path, resolve_workspace_root
 
 console = Console()
 
@@ -55,7 +55,12 @@ def status(
     except ConfigResolutionError as exc:
         console.print(str(exc))
         raise typer.Exit(code=1)
-    cfg = load_config(config_path)
+    try:
+        cfg = load_config(config_path)
+    except (ValueError, FileNotFoundError) as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1)
+    workspace_root = resolve_workspace_root(config_path)
     catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     lock_path = resolve_lock_path(config_path)
     sources = default_registry(
@@ -68,9 +73,9 @@ def status(
     config_table = Table(title="Configuration", header_style="bold")
     config_table.add_column("Setting")
     config_table.add_column("Value")
-    config_table.add_row("config", render_path(config_path, base=config_path.parent))
-    config_table.add_row("catalog_root", render_path(catalog_root, base=config_path.parent))
-    config_table.add_row("out_dir", render_path(config_path.parent / cfg.out_dir, base=config_path.parent))
+    config_table.add_row("config", render_path(config_path, base=workspace_root))
+    config_table.add_row("catalog_root", render_path(catalog_root, base=workspace_root))
+    config_table.add_row("out_dir", render_path(workspace_root / cfg.out_dir, base=workspace_root))
     config_table.add_row("pwm_source", cfg.catalog.pwm_source)
     config_table.add_row("sources", source_ids)
     config_table.add_row("lockfile", "present" if lock_path.exists() else "missing")

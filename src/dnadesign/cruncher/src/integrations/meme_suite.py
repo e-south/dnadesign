@@ -15,6 +15,8 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from dnadesign.cruncher.utils.paths import resolve_workspace_root
+
 
 @dataclass(frozen=True)
 class MemeToolStatus:
@@ -31,12 +33,16 @@ def resolve_tool_path(tool_path: Path | None, *, config_path: Path | None) -> Pa
     resolved = tool_path.expanduser()
     if resolved.is_absolute() or config_path is None:
         return resolved
-    return (config_path.parent / resolved).resolve()
+    return (resolve_workspace_root(config_path) / resolved).resolve()
 
 
 def resolve_executable(tool: str, *, tool_path: Path | None) -> Path | None:
     if tool_path is not None:
         resolved = tool_path.expanduser()
+        if not resolved.exists():
+            raise FileNotFoundError(
+                f"Configured tool_path does not exist: {resolved}. Provide a MEME bin directory or executable path."
+            )
         if resolved.is_dir():
             candidate = resolved / tool
         else:

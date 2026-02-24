@@ -41,6 +41,14 @@ app = typer.Typer(no_args_is_help=True, help="List available ingestion sources a
 console = Console()
 
 
+def _load_config_or_exit(config_path: Path):
+    try:
+        return load_config(config_path)
+    except (ValueError, FileNotFoundError) as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1) from exc
+
+
 @app.command("list", help="List registered ingestion sources.")
 def list_sources(
     config: Path | None = typer.Argument(
@@ -73,7 +81,7 @@ def list_sources(
         console.print(str(exc))
         raise typer.Exit(code=1)
     if config_path is not None:
-        cfg = load_config(config_path)
+        cfg = _load_config_or_exit(config_path)
         registry = default_registry(
             cfg.ingest,
             config_path=config_path,
@@ -111,7 +119,7 @@ def info(
     except ConfigResolutionError as exc:
         console.print(str(exc))
         raise typer.Exit(code=1)
-    cfg = load_config(config_path)
+    cfg = _load_config_or_exit(config_path)
     registry = default_registry(
         cfg.ingest,
         config_path=config_path,
@@ -158,7 +166,7 @@ def datasets(
     except ConfigResolutionError as exc:
         console.print(str(exc))
         raise typer.Exit(code=1)
-    cfg = load_config(config_path)
+    cfg = _load_config_or_exit(config_path)
     registry = default_registry(
         cfg.ingest,
         config_path=config_path,
@@ -282,7 +290,7 @@ def summary(
     except ConfigResolutionError as exc:
         console.print(str(exc))
         raise typer.Exit(code=1)
-    cfg = load_config(config_path)
+    cfg = _load_config_or_exit(config_path)
     registry = default_registry(
         cfg.ingest,
         config_path=config_path,

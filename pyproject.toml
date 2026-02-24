@@ -51,14 +51,14 @@ dependencies = [
 ]
 
 [project.scripts]
-usr        = "dnadesign.usr.src.cli:main"
-opal       = "dnadesign.opal.src.cli:main"
-dense      = "dnadesign.densegen.src.cli.main:app"
+usr        = "dnadesign.usr.cli:main"
+opal       = "dnadesign.opal.cli:main"
+dense      = "dnadesign.densegen:app"
 notify     = "dnadesign.notify.cli:app"
 infer      = "dnadesign.infer.cli:app"
-cluster    = "dnadesign.cluster.src.cli.app:main"
-permuter   = "dnadesign.permuter.src.cli.app:main"
-baserender = "dnadesign.baserender.src.cli:app"
+cluster    = "dnadesign.cluster.cli:main"
+permuter   = "dnadesign.permuter.cli:main"
+baserender = "dnadesign.baserender.cli:app"
 cruncher   = "dnadesign.cruncher.cli.app:app"
 
 [project.optional-dependencies]

@@ -20,6 +20,12 @@ import numpy as np
 
 from dnadesign.cruncher.core.optimizers.base import Optimizer
 from dnadesign.cruncher.core.optimizers.cooling import make_beta_scheduler
+from dnadesign.cruncher.core.optimizers.gibbs_summary import (
+    build_objective_schedule_summary,
+    build_stats,
+    final_mcmc_beta,
+    final_softmin_beta,
+)
 from dnadesign.cruncher.core.optimizers.helpers import _replace_block, slide_window, swap_block
 from dnadesign.cruncher.core.optimizers.policies import (
     MOVE_KINDS,
@@ -665,13 +671,12 @@ class GibbsAnnealOptimizer(Optimizer):
             old = int(seq[i])
             lods = np.empty(4, float)
             combined_vals = np.empty(4, float)
+            raw_candidates: list[Dict[str, float]] | None = None
             per_tf_candidates: list[Dict[str, float]] = []
             if scan_cache is not None:
                 raw_candidates = scan_cache.candidate_raw_llr_maps(i, old)
                 for b in range(4):
-                    per_tf_b = evaluator.scorer.scaled_from_raw_llr(raw_candidates[b], L)
-                    per_tf_candidates.append(per_tf_b)
-                    comb_b = evaluator.combined_from_scores(per_tf_b, beta=beta_softmin, length=L)
+                    comb_b = evaluator.combined_from_raw_llr(raw_candidates[b], beta=beta_softmin, length=L)
                     combined_vals[b] = comb_b
                     lods[b] = β * comb_b
             else:
@@ -695,13 +700,17 @@ class GibbsAnnealOptimizer(Optimizer):
             seq[i] = new_base
             if scan_cache is not None:
                 scan_cache.apply_base_change(i, old, int(new_base))
+                assert raw_candidates is not None
+                selected_per_tf = evaluator.scorer.scaled_from_raw_llr(raw_candidates[int(new_base)], L)
+            else:
+                selected_per_tf = per_tf_candidates[int(new_base)]
             self.accept_tally[move_kind] += 1
             accepted = True
             gibbs_changed = int(new_base) != int(old)
             return (
                 move_kind,
                 accepted,
-                per_tf_candidates[int(new_base)],
+                selected_per_tf,
                 float(combined_vals[new_base]),
                 _gibbs_detail(float(combined_vals[new_base]), gibbs_changed=gibbs_changed),
             )
@@ -940,80 +949,13 @@ class GibbsAnnealOptimizer(Optimizer):
         )
 
     def stats(self) -> Dict[str, object]:
-        totals = dict(self.move_tally)
-        accepted = dict(self.accept_tally)
-        acceptance_rate = {k: (accepted.get(k, 0) / totals[k]) if totals.get(k, 0) else 0.0 for k in totals}
-        mh_kinds = [k for k in totals if k != "S"]
-        mh_total = sum(totals.get(k, 0) for k in mh_kinds)
-        mh_accept = sum(accepted.get(k, 0) for k in mh_kinds)
-        acceptance_rate_mh = (mh_accept / mh_total) if mh_total else 0.0
-        all_total = sum(totals.values())
-        all_accept = sum(accepted.values())
-        acceptance_rate_all = (all_accept / all_total) if all_total else 0.0
-        eps = 1.0e-12
-        mh_deltas = [
-            abs(float(ms.get("delta", 0.0)))
-            for ms in self.move_stats
-            if ms.get("move_kind") in mh_kinds and ms.get("delta") is not None
-        ]
-        if mh_deltas:
-            delta_abs_median_mh = float(np.median(mh_deltas))
-            delta_frac_zero_mh = float(np.mean([d <= eps for d in mh_deltas]))
-            score_change_rate_mh = float(np.mean([d > eps for d in mh_deltas]))
-        else:
-            delta_abs_median_mh = None
-            delta_frac_zero_mh = None
-            score_change_rate_mh = None
-        beta_min = float(self.beta_ladder_base[0]) if self.beta_ladder_base else None
-        beta_max_base = float(self.beta_ladder_base[-1]) if self.beta_ladder_base else None
-        beta_max_final = float(max(self.beta_ladder)) if self.beta_ladder else None
-        return {
-            "moves": totals,
-            "accepted": accepted,
-            "acceptance_rate": acceptance_rate,
-            "acceptance_rate_mh": acceptance_rate_mh,
-            "acceptance_rate_all": acceptance_rate_all,
-            "delta_abs_median_mh": delta_abs_median_mh,
-            "delta_frac_zero_mh": delta_frac_zero_mh,
-            "score_change_rate_mh": score_change_rate_mh,
-            "beta_ladder_base": list(self.beta_ladder_base),
-            "beta_ladder_final": list(self.beta_ladder),
-            "beta_min": beta_min,
-            "beta_max_base": beta_max_base,
-            "beta_max_final": beta_max_final,
-            "adaptive_moves_enabled": bool(self.move_controller.enabled),
-            "proposal_adapt_enabled": bool(self.proposal_controller.enabled),
-            "proposal_block_len_range_final": list(self.move_cfg["block_len_range"]),
-            "proposal_multi_k_range_final": list(self.move_cfg["multi_k_range"]),
-            "adaptive_weights_freeze_after_sweep": self.move_adapt_freeze_after_sweep,
-            "adaptive_weights_freeze_after_beta": self.move_adapt_freeze_after_beta,
-            "proposal_adapt_freeze_after_sweep": self.proposal_adapt_freeze_after_sweep,
-            "proposal_adapt_freeze_after_beta": self.proposal_adapt_freeze_after_beta,
-            "gibbs_inertia_enabled": bool(self.gibbs_inertia_enabled),
-            "gibbs_inertia_kind": self.gibbs_inertia_kind,
-            "gibbs_inertia_p_stay_start": self.gibbs_inertia_p_stay_start,
-            "gibbs_inertia_p_stay_end": self.gibbs_inertia_p_stay_end,
-            "unique_successes": self.unique_successes,
-            "move_stats": self.move_stats,
-            "mcmc_cooling": dict(self.mcmc_cooling_summary),
-            "final_softmin_beta": self.final_softmin_beta(),
-            "final_mcmc_beta": self.final_mcmc_beta(),
-        }
+        return build_stats(self)
 
     def final_softmin_beta(self) -> float | None:
-        if self.softmin_of is None:
-            return None
-        return float(self.softmin_of(self.total_sweeps - 1))
+        return final_softmin_beta(self)
 
     def final_mcmc_beta(self) -> float | None:
-        if self.total_sweeps < 1:
-            return None
-        return float(self.mcmc_beta_of(self.total_sweeps - 1))
+        return final_mcmc_beta(self)
 
     def objective_schedule_summary(self) -> Dict[str, object]:
-        return {
-            "total_sweeps": self.total_sweeps,
-            "beta_ladder_base": list(self.beta_ladder_base),
-            "beta_ladder_final": list(self.beta_ladder),
-            "mcmc_cooling": dict(self.mcmc_cooling_summary),
-        }
+        return build_objective_schedule_summary(self)

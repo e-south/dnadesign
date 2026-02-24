@@ -52,7 +52,22 @@ def _style(style: Optional[dict]) -> dict:
     s.setdefault("tick_direction", "out")
     s.setdefault("tick_length", 3.5)
     s.setdefault("tick_width", 0.8)
+    s.setdefault("save_pad_inches", 0.08)
+    s.setdefault("save_dpi", 300)
     return s
+
+
+def _save_figure(fig: plt.Figure, path: Path, *, style: Optional[dict] = None) -> None:
+    s = _style(style)
+    try:
+        pad_inches = max(0.0, float(s.get("save_pad_inches", 0.08)))
+    except Exception:
+        pad_inches = 0.08
+    try:
+        save_dpi = max(72.0, float(s.get("save_dpi", 300)))
+    except Exception:
+        save_dpi = 300.0
+    fig.savefig(path, bbox_inches="tight", pad_inches=pad_inches, facecolor="white", dpi=save_dpi)
 
 
 def _format_plot_path(path: Path, run_root: Path, absolute: bool) -> str:
@@ -156,6 +171,13 @@ def _fig_ax(style: dict):
 def _safe_filename(text: str) -> str:
     cleaned = _SAFE_FILENAME_RE.sub("_", str(text).strip())
     return cleaned or "densegen"
+
+
+def plan_group_from_name(plan_name: str) -> str:
+    name = str(plan_name or "").strip()
+    if not name:
+        return name
+    return name.split("__", 1)[0]
 
 
 def _stage_b_plan_output_dir(out_path: Path, *, plan_name: str, input_name: str) -> Path:

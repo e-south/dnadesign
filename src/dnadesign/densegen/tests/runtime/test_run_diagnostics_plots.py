@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import copy
 import json
+import warnings
 from pathlib import Path
 
 import matplotlib
@@ -45,9 +46,11 @@ from dnadesign.densegen.src.viz.plot_stage_a_strata import _build_stage_a_strata
 from dnadesign.densegen.src.viz.plot_stage_a_yield import _build_stage_a_yield_bias_figure
 from dnadesign.densegen.src.viz.plot_stage_b_placement import (
     _allocation_summary_lines,
+    _build_occupancy,
     _build_tfbs_count_records,
     _category_display_label,
     _placement_bounds,
+    _promoter_constraints,
     _render_occupancy,
     _render_tfbs_allocation,
     _sanitize_fixed_label,
@@ -559,7 +562,13 @@ def _background_pool_manifest(tmp_path: Path) -> TFBSPoolArtifact:
 
 def test_plot_required_columns_for_new_plots() -> None:
     cols = _plot_required_columns(["placement_map", "tfbs_usage", "run_health"], {})
-    assert cols == []
+    assert set(cols) == {
+        "densegen__compression_ratio",
+        "densegen__input_name",
+        "densegen__plan",
+        "id",
+        "sequence",
+    }
 
 
 def test_load_dense_arrays_requires_dense_arrays_table(tmp_path: Path) -> None:
@@ -598,16 +607,18 @@ def test_plot_run_health(tmp_path: Path) -> None:
         cfg={"config": {"generation": {"plan": [{"name": "demo_plan", "quota": 12}]}}},
         style={},
     )
-    assert len(paths) == 4
+    assert len(paths) == 5
     rel_paths = {str(Path(path).relative_to(tmp_path)) for path in paths}
     assert "run_health/outcomes_over_time.png" in rel_paths
     assert "run_health/run_health.png" in rel_paths
     assert "run_health/compression_ratio_distribution.png" in rel_paths
     assert "run_health/tfbs_length_by_regulator.png" in rel_paths
+    assert "run_health/summary_table.png" in rel_paths
     assert (tmp_path / "run_health" / "outcomes_over_time.png").exists()
     assert (tmp_path / "run_health" / "run_health.png").exists()
     assert (tmp_path / "run_health" / "compression_ratio_distribution.png").exists()
     assert (tmp_path / "run_health" / "tfbs_length_by_regulator.png").exists()
+    assert (tmp_path / "run_health" / "summary_table.png").exists()
     assert not (tmp_path / "run_health" / "run_health_detail.png").exists()
     assert (tmp_path / "run_health" / "summary.csv").exists()
 
@@ -635,6 +646,50 @@ def test_run_health_compression_ratio_distribution_uses_plan_hue() -> None:
         assert any("plan_b" in label for label in labels)
         assert not ax.spines["top"].get_visible()
         assert not ax.spines["right"].get_visible()
+    finally:
+        fig.clf()
+
+
+def test_run_health_compression_ratio_distribution_avoids_tight_layout_warning_with_many_plans() -> None:
+    rows: list[dict[str, object]] = []
+    for idx in range(50):
+        plan = f"plan_{idx:02d}"
+        rows.append({"densegen__plan": plan, "densegen__compression_ratio": 0.40 + (idx % 7) * 0.03})
+        rows.append({"densegen__plan": plan, "densegen__compression_ratio": 0.45 + (idx % 7) * 0.03})
+    dense_arrays = pd.DataFrame(rows)
+    with warnings.catch_warnings(record=True) as captured:
+        warnings.simplefilter("always")
+        fig, _axes = _build_run_health_compression_ratio_figure(dense_arrays, style={})
+    try:
+        assert not any("tight layout not applied" in str(item.message).lower() for item in captured)
+        assert not any("constrained_layout not applied" in str(item.message).lower() for item in captured)
+    finally:
+        fig.clf()
+
+
+def test_run_health_compression_ratio_distribution_groups_expanded_plan_names() -> None:
+    dense_arrays = pd.DataFrame(
+        [
+            {"densegen__plan": "ethanol__sig35=f", "densegen__compression_ratio": 0.42},
+            {"densegen__plan": "ethanol__sig35=b", "densegen__compression_ratio": 0.51},
+            {"densegen__plan": "ethanol__sig35=e", "densegen__compression_ratio": 0.56},
+            {"densegen__plan": "ciprofloxacin__sig35=f", "densegen__compression_ratio": 0.63},
+            {"densegen__plan": "ciprofloxacin__sig35=b", "densegen__compression_ratio": 0.67},
+            {"densegen__plan": "ciprofloxacin__sig35=e", "densegen__compression_ratio": 0.71},
+        ]
+    )
+    fig, axes = _build_run_health_compression_ratio_figure(
+        dense_arrays,
+        style={"run_health_compression_legend_max": 2},
+    )
+    try:
+        ax = axes["compression"]
+        assert ax.get_title() == "Compression ratio distribution by plan group"
+        legend = ax.get_legend()
+        assert legend is not None
+        labels = [text.get_text() for text in legend.get_texts()]
+        assert any("ethanol" in label for label in labels)
+        assert any("ciprofloxacin" in label for label in labels)
     finally:
         fig.clf()
 
@@ -888,6 +943,41 @@ def test_run_health_outcomes_xticks_use_regular_spacing() -> None:
         fig.clf()
 
 
+def test_run_health_outcomes_auto_groups_expanded_plans() -> None:
+    matplotlib.use("Agg", force=True)
+    attempts_rows = []
+    quotas: dict[str, int] = {}
+    for idx in range(20):
+        if idx < 10:
+            plan_name = f"sigma70_panel__sig35={idx % 5}__sig10={idx % 2}"
+        else:
+            plan_name = f"sigma70_topup__sig35={idx % 5}__sig10={idx % 2}"
+        attempts_rows.append(
+            {
+                "attempt_index": idx + 1,
+                "created_at": f"2026-01-26T00:00:{idx:02d}+00:00",
+                "status": "ok",
+                "reason": "ok",
+                "plan_name": plan_name,
+                "sampling_library_index": idx + 1,
+            }
+        )
+        quotas[plan_name] = 1
+    attempts = pd.DataFrame(attempts_rows)
+    fig, axes = _build_run_health_outcomes_figure(
+        attempts,
+        events_df=None,
+        style={},
+        plan_quotas=quotas,
+    )
+    try:
+        labels = [tick.get_text() for tick in axes["outcome"].get_yticklabels()]
+        assert len(labels) == 2
+        assert set(labels) == {"sigma70_panel", "sigma70_topup"}
+    finally:
+        fig.clf()
+
+
 def test_run_health_detail_plot_has_square_panels_without_subtitles() -> None:
     matplotlib.use("Agg", force=True)
     attempts = _attempts_df().copy()
@@ -949,6 +1039,47 @@ def test_run_health_detail_plot_has_square_panels_without_subtitles() -> None:
         )
         assert (1.0 - fail_title_bbox.y1) >= 0.05
         assert (1.0 - plan_title_bbox.y1) >= 0.05
+    finally:
+        fig.clf()
+
+
+def test_run_health_detail_legend_wraps_for_many_plans() -> None:
+    matplotlib.use("Agg", force=True)
+    attempts_rows = []
+    quotas: dict[str, int] = {}
+    for idx in range(12):
+        plan_name = f"plan_{idx:02d}"
+        attempts_rows.append(
+            {
+                "attempt_index": idx * 2 + 1,
+                "created_at": f"2026-01-26T00:00:{idx:02d}+00:00",
+                "status": "ok",
+                "reason": "ok",
+                "plan_name": plan_name,
+                "sampling_library_index": idx + 1,
+            }
+        )
+        attempts_rows.append(
+            {
+                "attempt_index": idx * 2 + 2,
+                "created_at": f"2026-01-26T00:01:{idx:02d}+00:00",
+                "status": "failed",
+                "reason": "no_solution",
+                "plan_name": plan_name,
+                "sampling_library_index": idx + 1,
+            }
+        )
+        quotas[plan_name] = 2
+    attempts = pd.DataFrame(attempts_rows)
+    fig, _axes = _build_run_health_detail_figure(
+        attempts,
+        events_df=None,
+        style={"run_health_plan_scope": "per_plan"},
+        plan_quotas=quotas,
+    )
+    try:
+        assert fig.legends
+        assert fig.legends[0]._ncols <= 4
     finally:
         fig.clf()
 
@@ -1525,6 +1656,92 @@ def test_plot_tfbs_usage(tmp_path: Path) -> None:
     assert str(path.relative_to(tmp_path)) == "stage_b/demo_plan/tfbs_usage.png"
 
 
+def test_plot_tfbs_usage_saves_with_tight_bbox(monkeypatch, tmp_path: Path) -> None:
+    import dnadesign.densegen.src.viz.plot_run_panels as plot_run_panels_module
+
+    class _FakeFigure:
+        def __init__(self) -> None:
+            self.calls: list[tuple[Path, dict[str, object]]] = []
+
+        def savefig(self, path: Path, **kwargs) -> None:
+            self.calls.append((Path(path), dict(kwargs)))
+
+    fake_fig = _FakeFigure()
+    monkeypatch.setattr(
+        plot_run_panels_module,
+        "_build_tfbs_usage_breakdown_figure",
+        lambda *_args, **_kwargs: (fake_fig, {}),
+    )
+    monkeypatch.setattr(plot_run_panels_module.plt, "close", lambda *_args, **_kwargs: None)
+
+    paths = plot_run_panels_module.plot_tfbs_usage(
+        pd.DataFrame(),
+        tmp_path / "tfbs_usage.png",
+        composition_df=_composition_df(),
+        style={},
+    )
+    assert len(paths) == 1
+    assert len(fake_fig.calls) == 1
+    _path, kwargs = fake_fig.calls[0]
+    assert kwargs.get("bbox_inches") == "tight"
+    assert float(kwargs.get("pad_inches", 0.0)) > 0.0
+    assert kwargs.get("facecolor") == "white"
+
+
+def test_plot_run_health_saves_with_tight_bbox(monkeypatch, tmp_path: Path) -> None:
+    import dnadesign.densegen.src.viz.plot_run as plot_run_module
+
+    class _FakeFigure:
+        def __init__(self) -> None:
+            self.calls: list[tuple[Path, dict[str, object]]] = []
+
+        def savefig(self, path: Path, **kwargs) -> None:
+            self.calls.append((Path(path), dict(kwargs)))
+
+    fake_outcomes = _FakeFigure()
+    fake_detail = _FakeFigure()
+    fake_compression = _FakeFigure()
+    fake_tfbs = _FakeFigure()
+    monkeypatch.setattr(
+        plot_run_module,
+        "_build_run_health_outcomes_figure",
+        lambda *_args, **_kwargs: (fake_outcomes, {}),
+    )
+    monkeypatch.setattr(
+        plot_run_module,
+        "_build_run_health_detail_figure",
+        lambda *_args, **_kwargs: (fake_detail, {}),
+    )
+    monkeypatch.setattr(
+        plot_run_module,
+        "_build_run_health_compression_ratio_figure",
+        lambda *_args, **_kwargs: (fake_compression, {}),
+    )
+    monkeypatch.setattr(
+        plot_run_module,
+        "_build_run_health_tfbs_length_by_regulator_figure",
+        lambda *_args, **_kwargs: (fake_tfbs, {}),
+    )
+    monkeypatch.setattr(plot_run_module.plt, "close", lambda *_args, **_kwargs: None)
+
+    paths = plot_run_module.plot_run_health(
+        _dense_arrays_df(),
+        tmp_path / "run_health.png",
+        attempts_df=_attempts_df(),
+        composition_df=_composition_df(),
+        events_df=_events_df(),
+        cfg={"config": {"generation": {"plan": [{"name": "demo_plan", "quota": 12}]}}},
+        style={},
+    )
+    assert len(paths) == 5
+    for fake_figure in (fake_outcomes, fake_detail, fake_compression, fake_tfbs):
+        assert len(fake_figure.calls) == 1
+        _path, kwargs = fake_figure.calls[0]
+        assert kwargs.get("bbox_inches") == "tight"
+        assert float(kwargs.get("pad_inches", 0.0)) > 0.0
+        assert kwargs.get("facecolor") == "white"
+
+
 def test_tfbs_usage_breakdown_figure_has_category_curves() -> None:
     matplotlib.use("Agg", force=True)
     composition = _composition_df().copy()
@@ -1587,6 +1804,67 @@ def test_placement_allocation_includes_fixed_constraint_records() -> None:
     labels = set(records["category_label"].astype(str).tolist())
     assert "TF_A" in labels
     assert any(label.startswith("fixed:sigma70") for label in labels)
+
+
+def test_grouped_plan_occupancy_keeps_fixed_components() -> None:
+    composition = _composition_df().copy()
+    dense_arrays = _dense_arrays_df().copy()
+    composition["plan_name"] = "demo_plan"
+    dense_arrays["densegen__plan"] = "demo_plan"
+    cfg_effective = {
+        "config": {
+            "generation": {
+                "sequence_length": 20,
+                "plan": [
+                    {
+                        "name": "demo_plan__sig35=f__sig10=H",
+                        "fixed_elements": {
+                            "promoter_constraints": [
+                                {
+                                    "name": "sigma70_core",
+                                    "upstream_pos": [0, 6],
+                                    "downstream_pos": [10, 16],
+                                    "upstream": "TTGACA",
+                                    "downstream": "TATAAT",
+                                    "spacer_length": [4, 4],
+                                }
+                            ]
+                        },
+                    },
+                    {
+                        "name": "demo_plan__sig35=b__sig10=H",
+                        "fixed_elements": {
+                            "promoter_constraints": [
+                                {
+                                    "name": "sigma70_core",
+                                    "upstream_pos": [0, 6],
+                                    "downstream_pos": [10, 16],
+                                    "upstream": "CTGACA",
+                                    "downstream": "TATAAT",
+                                    "spacer_length": [4, 4],
+                                }
+                            ]
+                        },
+                    },
+                ],
+            }
+        }
+    }
+    constraints, aggregate_fixed_components = _promoter_constraints(cfg_effective, "demo_plan")
+    assert aggregate_fixed_components is True
+    occupancy, categories, missing_counts = _build_occupancy(
+        composition,
+        solutions=dense_arrays,
+        seq_len=20,
+        constraints=constraints,
+        max_categories=12,
+        aggregate_fixed_components=aggregate_fixed_components,
+    )
+    assert set(missing_counts.keys()).issubset({"promoter"})
+    assert "fixed:promoter:-35" in categories
+    assert "fixed:promoter:-10" in categories
+    assert float(occupancy["fixed:promoter:-35"].sum()) > 0.0
+    assert float(occupancy["fixed:promoter:-10"].sum()) > 0.0
 
 
 def test_allocation_summary_lines_define_denominators() -> None:

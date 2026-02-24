@@ -139,3 +139,43 @@ def test_resolve_lock_combines_site_hashes(tmp_path: Path) -> None:
 
     lockfile = read_lockfile(lock_path)
     verify_lockfile_hashes(lockfile=lockfile, catalog_root=catalog_root, expected_pwm_source="sites")
+
+
+def test_resolve_lock_enforces_source_preference_for_single_candidate(tmp_path: Path) -> None:
+    catalog_root = tmp_path
+    entry = CatalogEntry(
+        source="regulondb",
+        motif_id="RBM1",
+        tf_name="lexA",
+        kind="PFM",
+        has_matrix=True,
+    )
+    CatalogIndex(entries={entry.key: entry}).save(catalog_root)
+    motif_path = catalog_root / "normalized" / "motifs" / "regulondb" / "RBM1.json"
+    _write_motif(motif_path, source="regulondb", motif_id="RBM1", tf_name="lexA")
+
+    with pytest.raises(ValueError, match="no matching source_preference"):
+        resolve_lock(
+            names=["lexA"],
+            catalog_root=catalog_root,
+            source_preference=["demo_merged_meme_oops"],
+            pwm_source="matrix",
+            lock_path=catalog_root / "locks" / "config.lock.json",
+        )
+
+
+def test_resolve_lock_missing_matrix_hint_mentions_discovery_flow(tmp_path: Path) -> None:
+    catalog_root = tmp_path
+    CatalogIndex(entries={}).save(catalog_root)
+
+    with pytest.raises(ValueError) as exc:
+        resolve_lock(
+            names=["lexA"],
+            catalog_root=catalog_root,
+            pwm_source="matrix",
+            lock_path=catalog_root / "locks" / "config.lock.json",
+        )
+
+    message = str(exc.value)
+    assert "fetch motifs" in message
+    assert "discover motifs" in message

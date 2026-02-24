@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from dnadesign.cruncher.analysis.move_stats import move_stats_frame
 from dnadesign.cruncher.analysis.plots._savefig import savefig
 from dnadesign.cruncher.analysis.plots._style import apply_axes_style
 
@@ -60,38 +61,10 @@ def _cooling_markers(optimizer_stats: dict[str, object] | None) -> list[int]:
 
 def _move_frame(optimizer_stats: dict[str, object] | None) -> pd.DataFrame:
     stats = optimizer_stats.get("move_stats") if isinstance(optimizer_stats, dict) else None
-    if not isinstance(stats, list) or not stats:
+    frame = move_stats_frame(stats, phase=None)
+    if frame.empty:
         return pd.DataFrame(columns=["sweep_idx", "chain", "move_kind", "attempted", "accepted"])
-    rows: list[dict[str, object]] = []
-    for row in stats:
-        if not isinstance(row, dict):
-            continue
-        sweep = row.get("sweep_idx")
-        attempted = row.get("attempted")
-        accepted = row.get("accepted")
-        move_kind = row.get("move_kind")
-        if not isinstance(sweep, (int, float)):
-            continue
-        if not isinstance(attempted, (int, float)) or int(attempted) < 0:
-            continue
-        if not isinstance(accepted, (int, float)) or int(accepted) < 0:
-            continue
-        if not isinstance(move_kind, str) or not move_kind:
-            continue
-        chain_raw = row.get("chain")
-        chain = int(chain_raw) if isinstance(chain_raw, (int, float)) else 0
-        rows.append(
-            {
-                "sweep_idx": int(sweep),
-                "chain": int(chain),
-                "move_kind": str(move_kind),
-                "attempted": int(attempted),
-                "accepted": int(accepted),
-            }
-        )
-    if not rows:
-        return pd.DataFrame(columns=["sweep_idx", "chain", "move_kind", "attempted", "accepted"])
-    return pd.DataFrame(rows)
+    return frame.loc[:, ["sweep_idx", "chain", "move_kind", "attempted", "accepted"]].reset_index(drop=True)
 
 
 def _with_bins(move_df: pd.DataFrame) -> tuple[pd.DataFrame, int]:

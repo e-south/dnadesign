@@ -72,11 +72,17 @@ def _save_config(
             rounded_row = [round(float(p), 6) for p in row]
             pwm_probs_rounded.append(rounded_row)
 
-        pwms_info[tf] = {
+        info: dict[str, object] = {
             "alphabet": ["A", "C", "G", "T"],
             "pwm_matrix": pwm_probs_rounded,
             "consensus": consensus,
         }
+        if pwm.log_odds_matrix is not None:
+            log_odds_rounded: list[list[float]] = []
+            for row in np.asarray(pwm.log_odds_matrix, dtype=float):
+                log_odds_rounded.append([round(float(v), 6) for v in row])
+            info["log_odds_matrix"] = log_odds_rounded
+        pwms_info[tf] = info
 
     data["pwms_info"] = pwms_info
     data["active_regulator_set"] = {"index": set_index, "tfs": tfs}

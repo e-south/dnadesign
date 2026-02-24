@@ -470,7 +470,51 @@ def test_layout_sequence_half_height_covers_rendered_sequence_glyph_extents() ->
     assert (y_max - layout.y_forward) <= (layout.sequence_extent_up + 1e-3)
     assert (layout.y_forward - y_min) <= (layout.sequence_extent_down + 1e-3)
 
-    plt.close(fig)
+
+def test_multiline_overlay_text_reserves_additional_title_space() -> None:
+    sequence = "TTGACAAAAAAAAAAAAAAAATATAAT"
+    base_feature = Feature(
+        id="k1",
+        kind="kmer",
+        span=Span(start=0, end=6, strand="fwd"),
+        label="TTGACA",
+        tags=("tf:lexA",),
+        attrs={},
+        render={},
+    )
+    base_effect = Effect(
+        kind="motif_logo",
+        target={"feature_id": "k1"},
+        params={"matrix": _logo_matrix(6)},
+        render={},
+    )
+    single = Record(
+        id="single_line_overlay",
+        alphabet="DNA",
+        sequence=sequence,
+        features=(base_feature,),
+        effects=(base_effect,),
+        display=Display(overlay_text="Source\nElite"),
+        meta={},
+    )
+    multiline = Record(
+        id="multi_line_overlay",
+        alphabet="DNA",
+        sequence=sequence,
+        features=(base_feature,),
+        effects=(base_effect,),
+        display=Display(overlay_text="Source\nElite\nlexA=0.91 cpxR=0.87"),
+        meta={},
+    )
+    style = resolve_style(
+        preset=None,
+        overrides={"motif_logo": {"layout": "stack", "lane_mode": "follow_feature_track"}},
+    )
+    single_layout = compute_layout(single, style)
+    multiline_layout = compute_layout(multiline, style)
+
+    one_line_px = max((style.font_size_label / 72.0 * style.dpi) * 1.05, single_layout.ch * 0.5)
+    assert (multiline_layout.height - single_layout.height) >= (one_line_px * 0.9)
 
 
 def test_style_accepts_new_logo_coloring_and_scale_bar_location() -> None:

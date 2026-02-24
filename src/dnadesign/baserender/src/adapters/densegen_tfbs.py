@@ -156,6 +156,102 @@ class DensegenTfbsAdapter:
 
         return features
 
+    def _parse_promoter_detail(
+        self,
+        obj: Any,
+        *,
+        sequence: str,
+        record_id: str,
+    ) -> tuple[list[Feature], dict[str, str]]:
+        if obj is None:
+            return ([], {})
+        if isinstance(obj, str):
+            try:
+                obj = json.loads(obj)
+            except Exception as exc:
+                raise SchemaError("DenseGen promoter detail column is a string but not valid JSON") from exc
+        if not isinstance(obj, dict):
+            raise SchemaError("DenseGen promoter detail column must be a dict")
+
+        placements = obj.get("placements", [])
+        if hasattr(placements, "tolist"):
+            placements = placements.tolist()
+        if not isinstance(placements, (list, tuple)):
+            raise SchemaError("DenseGen promoter detail placements must be a list")
+
+        seq_u = sequence.upper()
+        promoter_features: list[Feature] = []
+        promoter_labels: dict[str, str] = {}
+
+        for placement_index, placement in enumerate(placements):
+            if not isinstance(placement, dict):
+                raise SchemaError("DenseGen promoter detail placements must contain dicts")
+
+            name = str(placement.get("name") or "promoter").strip() or "promoter"
+            upstream_seq = str(placement.get("upstream_seq") or "").strip().upper()
+            downstream_seq = str(placement.get("downstream_seq") or "").strip().upper()
+            if upstream_seq == "" or downstream_seq == "":
+                raise SchemaError("DenseGen promoter placement must include non-empty upstream_seq/downstream_seq")
+
+            upstream_start_raw = placement.get("upstream_start")
+            downstream_start_raw = placement.get("downstream_start")
+            if upstream_start_raw is None or downstream_start_raw is None:
+                raise SchemaError("DenseGen promoter placement must include upstream_start/downstream_start")
+
+            upstream_start = int(upstream_start_raw)
+            downstream_start = int(downstream_start_raw)
+            upstream_end = upstream_start + len(upstream_seq)
+            downstream_end = downstream_start + len(downstream_seq)
+            if upstream_start < 0 or upstream_end > len(seq_u):
+                raise SchemaError(
+                    "DenseGen promoter upstream placement is out of sequence bounds "
+                    f"(record={record_id}, start={upstream_start}, end={upstream_end}, n={len(seq_u)})"
+                )
+            if downstream_start < 0 or downstream_end > len(seq_u):
+                raise SchemaError(
+                    "DenseGen promoter downstream placement is out of sequence bounds "
+                    f"(record={record_id}, start={downstream_start}, end={downstream_end}, n={len(seq_u)})"
+                )
+            if seq_u[upstream_start:upstream_end] != upstream_seq:
+                raise SchemaError(
+                    "DenseGen promoter upstream placement does not match sequence "
+                    f"(record={record_id}, name={name}, expected={upstream_seq})"
+                )
+            if seq_u[downstream_start:downstream_end] != downstream_seq:
+                raise SchemaError(
+                    "DenseGen promoter downstream placement does not match sequence "
+                    f"(record={record_id}, name={name}, expected={downstream_seq})"
+                )
+
+            upstream_tag = f"promoter:{name}:upstream"
+            downstream_tag = f"promoter:{name}:downstream"
+            promoter_labels.setdefault(upstream_tag, "-35 site")
+            promoter_labels.setdefault(downstream_tag, "-10 site")
+            promoter_features.append(
+                Feature(
+                    id=f"{record_id}:promoter:{name}:{placement_index}:upstream",
+                    kind="kmer",
+                    span=Span(start=upstream_start, end=upstream_end, strand="fwd"),
+                    label=upstream_seq,
+                    tags=(upstream_tag,),
+                    attrs={"name": name, "component": "upstream", "source": "densegen_promoter"},
+                    render={"priority": 8},
+                )
+            )
+            promoter_features.append(
+                Feature(
+                    id=f"{record_id}:promoter:{name}:{placement_index}:downstream",
+                    kind="kmer",
+                    span=Span(start=downstream_start, end=downstream_end, strand="fwd"),
+                    label=downstream_seq,
+                    tags=(downstream_tag,),
+                    attrs={"name": name, "component": "downstream", "source": "densegen_promoter"},
+                    render={"priority": 8},
+                )
+            )
+
+        return (promoter_features, promoter_labels)
+
     def apply(self, row: dict, *, row_index: int) -> Record:
         sequence_col = str(self.columns.get("sequence"))
         ann_col = str(self.columns.get("annotations"))
@@ -194,6 +290,16 @@ class DensegenTfbsAdapter:
                 raise SchemaError(f"DenseGen row has blank required column '{col}'")
 
         features = self._parse_annotations(row.get(ann_col), sequence=sequence, record_id=record_id)
+        promoter_detail_col = self.columns.get("promoter_detail")
+        if promoter_detail_col is None and "densegen__promoter_detail" in row:
+            promoter_detail_col = "densegen__promoter_detail"
+        promoter_features, promoter_labels = self._parse_promoter_detail(
+            row.get(str(promoter_detail_col)) if promoter_detail_col is not None else None,
+            sequence=sequence,
+            record_id=record_id,
+        )
+        if promoter_features:
+            features.extend(promoter_features)
 
         min_required = int(self.policies["min_per_record"])
         require_non_empty = bool(self.policies["require_non_empty"])
@@ -209,7 +315,11 @@ class DensegenTfbsAdapter:
         for feat in features:
             for tag in feat.tags:
                 if tag.startswith("tf:") and tag not in tag_labels:
-                    tag_labels[tag] = tag[3:]
+                    tf_label = tag[3:]
+                    if tf_label.lower() == "background":
+                        tf_label = "Background"
+                    tag_labels[tag] = tf_label
+        tag_labels.update(promoter_labels)
 
         overlay_text = None
         if overlay_text_col is not None:

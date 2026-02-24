@@ -14,7 +14,7 @@ import logging
 from pathlib import Path
 from typing import Optional, Sequence
 
-from dnadesign.cruncher.artifacts.layout import run_plots_analysis_dir
+from dnadesign.cruncher.artifacts.layout import run_plots_dir
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ def _run_dir_from_analysis_root(analysis_root: Path) -> Path:
 
 
 def analysis_plots_root(analysis_root: Path) -> Path:
-    return run_plots_analysis_dir(_run_dir_from_analysis_root(analysis_root))
+    return run_plots_dir(_run_dir_from_analysis_root(analysis_root))
 
 
 def analysis_tables_root(analysis_root: Path) -> Path:

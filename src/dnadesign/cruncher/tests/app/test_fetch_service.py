@@ -201,6 +201,29 @@ class DatasetGuardAdapter(StubAdapter):
         )
 
 
+class DatasetMutationAdapter(StubAdapter):
+    def __init__(self):
+        self.source_id = "mutation"
+        self.calls: list[tuple[str | None, str | None, str | None]] = []
+
+    def list_sites(self, query: SiteQuery):
+        self.calls.append((query.dataset_id, query.tf_name, query.motif_id))
+        now = datetime.now(timezone.utc)
+        provenance = Provenance(retrieved_at=now, source_url="stub://", tags={"dataset_id": "tagged"})
+        yield SiteInstance(
+            source=self.source_id,
+            site_id="s1",
+            motif_ref=f"{self.source_id}:M1",
+            organism=None,
+            coordinate=GenomicInterval(contig="chr", start=0, end=4),
+            sequence="ACGT",
+            strand="+",
+            score=None,
+            evidence={},
+            provenance=provenance,
+        )
+
+
 def _write_meme_blocks(path: Path) -> None:
     path.write_text(
         "MEME version 4.12.0\n"
@@ -369,6 +392,16 @@ def test_fetch_sites_offline_ambiguous_raises(tmp_path):
 
     with pytest.raises(ValueError):
         fetch_sites(adapter, tmp_path, names=["tf"], offline=True)
+
+
+def test_fetch_sites_does_not_mutate_dataset_filter_between_query_modes(tmp_path: Path) -> None:
+    adapter = DatasetMutationAdapter()
+    written = fetch_sites(adapter, tmp_path, names=["tf"], motif_ids=["M1"], dataset_id=None)
+    assert written
+    assert adapter.calls
+    assert len(adapter.calls) == 2
+    assert adapter.calls[0][0] is None
+    assert adapter.calls[1][0] is None
 
 
 def test_fetch_sites_requires_hydration_for_coord_only(tmp_path):

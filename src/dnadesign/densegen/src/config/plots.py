@@ -26,6 +26,7 @@ class PlotConfig(BaseModel):
     options: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     style: Dict[str, Any] = Field(default_factory=dict)
     sample_rows: Optional[int] = None
+    allow_truncated: bool = False
 
     @field_validator("sample_rows")
     @classmethod

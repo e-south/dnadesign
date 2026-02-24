@@ -127,7 +127,7 @@ def test_round_robin_chunk_cap_subsample(tmp_path: Path) -> None:
                 "plan": [
                     {
                         "name": "default",
-                        "quota": 5,
+                        "sequences": 5,
                         "sampling": {"include_inputs": ["demo"]},
                         "regulator_constraints": {
                             "groups": [
@@ -245,7 +245,7 @@ def test_stall_detected_with_no_solutions(tmp_path: Path) -> None:
                 "plan": [
                     {
                         "name": "default",
-                        "quota": 1,
+                        "sequences": 1,
                         "sampling": {"include_inputs": ["demo"]},
                         "regulator_constraints": {
                             "groups": [

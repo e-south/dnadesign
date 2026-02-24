@@ -19,9 +19,38 @@ from dnadesign.densegen.src.adapters.sources.base import resolve_path
 from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.config.base import LATEST_SCHEMA_VERSION
 
+PACKAGED_WORKSPACE_IDS = (
+    "demo_tfbs_baseline",
+    "demo_sampling_baseline",
+    "study_constitutive_sigma_panel",
+    "study_stress_ethanol_cipro",
+)
+
+WORKSPACE_TUTORIAL_PATHS = {
+    "demo_tfbs_baseline": "src/dnadesign/densegen/docs/tutorials/demo_tfbs_baseline.md",
+    "demo_sampling_baseline": "src/dnadesign/densegen/docs/tutorials/demo_sampling_baseline.md",
+    "study_constitutive_sigma_panel": "src/dnadesign/densegen/docs/tutorials/study_constitutive_sigma_panel.md",
+    "study_stress_ethanol_cipro": "src/dnadesign/densegen/docs/tutorials/study_stress_ethanol_cipro.md",
+}
+
+USR_WORKSPACE_IDS = (
+    "demo_sampling_baseline",
+    "study_constitutive_sigma_panel",
+    "study_stress_ethanol_cipro",
+)
+
 
 def _demo_config_path(workspace_id: str) -> Path:
     return Path(__file__).resolve().parents[2] / "workspaces" / workspace_id / "config.yaml"
+
+
+def _assert_token_order(text: str, tokens: list[str], *, label: str) -> None:
+    cursor = -1
+    for token in tokens:
+        idx = text.find(token, cursor + 1)
+        assert idx >= 0, f"{label}: missing token: {token!r}"
+        assert idx > cursor, f"{label}: out-of-order token: {token!r}"
+        cursor = idx
 
 
 def test_demo_sampling_baseline_config_exists_and_loads() -> None:
@@ -234,6 +263,7 @@ def test_packaged_workspace_configs_exclude_stale_legacy_namespaces() -> None:
 def test_packaged_motif_artifact_manifests_are_workspace_local_and_current() -> None:
     workspace_ids = (
         "demo_sampling_baseline",
+        "study_constitutive_sigma_panel",
         "study_stress_ethanol_cipro",
     )
     for workspace_id in workspace_ids:
@@ -254,22 +284,42 @@ def test_packaged_motif_artifact_manifests_are_workspace_local_and_current() -> 
         assert not Path(config_path).is_absolute()
 
 
+def test_packaged_motif_artifact_manifests_use_active_cruncher_workspaces() -> None:
+    expected_config_paths = {
+        "demo_sampling_baseline": "src/dnadesign/cruncher/workspaces/demo_multitf/configs/config.yaml",
+        "study_stress_ethanol_cipro": "src/dnadesign/cruncher/workspaces/demo_multitf/configs/config.yaml",
+        "study_constitutive_sigma_panel": "src/dnadesign/cruncher/workspaces/pairwise_laci_arac/configs/config.yaml",
+    }
+    for workspace_id, expected_config in expected_config_paths.items():
+        manifest_path = _demo_config_path(workspace_id).parent / "inputs" / "motif_artifacts" / "artifact_manifest.json"
+        payload = json.loads(manifest_path.read_text())
+        config_path = str(payload.get("config_path") or "")
+        assert "densegen_prep_three_tf" not in config_path
+        assert config_path == expected_config
+        assert (Path(__file__).resolve().parents[5] / config_path).exists()
+
+
 def test_gitignore_workspaces_allowlist_matches_packaged_workspace_names() -> None:
     gitignore = (Path(__file__).resolve().parents[5] / ".gitignore").read_text()
     assert "!src/dnadesign/densegen/workspaces/demo_tfbs_baseline/" in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_sampling_baseline/" in gitignore
     assert "!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/" in gitignore
     assert "!src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/" in gitignore
+    assert "!src/dnadesign/densegen/workspaces/demo_tfbs_baseline/runbook.md" in gitignore
+    assert "!src/dnadesign/densegen/workspaces/demo_sampling_baseline/runbook.md" in gitignore
+    assert "!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/runbook.md" in gitignore
+    assert "!src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro/runbook.md" in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_binding_sites/" not in gitignore
     assert "!src/dnadesign/densegen/workspaces/demo_meme_three_tfs/" not in gitignore
 
 
 def test_study_constitutive_sigma_panel_focuses_on_fixed_elements() -> None:
     cfg = load_config(_demo_config_path("study_constitutive_sigma_panel"))
-    input_types = {inp.type for inp in cfg.root.densegen.inputs}
-    assert input_types == {"background_pool"}
+    input_types = [inp.type for inp in cfg.root.densegen.inputs]
+    assert input_types.count("background_pool") == 1
+    assert input_types.count("pwm_artifact") == 2
     plan = list(cfg.root.densegen.generation.plan or [])
-    assert len(plan) == 50
+    assert len(plan) == 48
 
     promoter_pairs: set[tuple[str, str]] = set()
     for item in plan:
@@ -285,29 +335,47 @@ def test_study_constitutive_sigma_panel_focuses_on_fixed_elements() -> None:
     assert len(promoter_pairs) == 48
 
 
-def test_study_constitutive_sigma_panel_uses_bounded_total_quota_templates() -> None:
+def test_study_constitutive_sigma_panel_uses_laci_arac_background_exclusion() -> None:
+    cfg = load_config(_demo_config_path("study_constitutive_sigma_panel"))
+    inputs = list(cfg.root.densegen.inputs)
+    pwm_inputs = [inp for inp in inputs if inp.type == "pwm_artifact"]
+    assert [inp.name for inp in pwm_inputs] == ["lacI_pwm", "araC_pwm"]
+    assert all(inp.sampling.trimming.window_length == 16 for inp in pwm_inputs)
+
+    cfg_path = _demo_config_path("study_constitutive_sigma_panel")
+    for inp in pwm_inputs:
+        resolved = resolve_path(cfg_path, inp.path)
+        assert resolved.exists()
+
+    background = next(inp for inp in inputs if inp.type == "background_pool")
+    assert background.sampling.n_sites == 1200
+    assert background.sampling.mining.batch_size == 25000
+    assert background.sampling.mining.budget.mode == "fixed_candidates"
+    assert background.sampling.mining.budget.candidates == 8_000_000
+    fimo_cfg = background.sampling.filters.fimo_exclude
+    assert fimo_cfg is not None
+    assert list(fimo_cfg.pwms_input) == ["lacI_pwm", "araC_pwm"]
+    assert fimo_cfg.allow_zero_hit_only is True
+    assert fimo_cfg.max_score_norm is None
+
+
+def test_study_constitutive_sigma_panel_uses_bounded_total_quota_limits() -> None:
     cfg = load_config(_demo_config_path("study_constitutive_sigma_panel"))
     generation = cfg.root.densegen.generation
-    templates = list(cfg.root.densegen.generation.plan_templates or [])
-    assert templates
-    for template in templates:
-        assert template.quota_per_variant is None
-        assert template.total_quota is not None
-    assert generation.plan_template_max_expanded_plans == 64
-    assert generation.plan_template_max_total_quota == 500
-    assert generation.total_quota() == 500
+    assert generation.expansion.max_plans == 64
+    assert generation.total_quota() == 48
 
 
 def test_study_constitutive_sigma_panel_expansion_uses_uniform_quota_units() -> None:
     cfg = load_config(_demo_config_path("study_constitutive_sigma_panel"))
     plans = list(cfg.root.densegen.generation.plan or [])
     assert plans
-    assert all(int(item.quota) == 10 for item in plans)
+    assert all(int(item.sequences) == 1 for item in plans)
+    assert all("__sig35=" in item.name and "__sig10=" in item.name for item in plans)
+    assert all("__up=" not in item.name and "__down=" not in item.name for item in plans)
 
     panel_plans = [item for item in plans if item.name.startswith("sigma70_panel__")]
-    topup_plans = [item for item in plans if item.name.startswith("sigma70_topup__")]
     assert len(panel_plans) == 48
-    assert len(topup_plans) == 2
 
 
 def test_study_constitutive_sigma_panel_runtime_allows_bounded_retries() -> None:
@@ -331,6 +399,19 @@ def test_packaged_workspace_plot_defaults_cover_primary_runtime_diagnostics() ->
         assert set(plots.default) == expected
 
 
+def test_matrix_studies_use_auto_scoped_stage_b_plot_defaults() -> None:
+    for workspace_id in ("study_constitutive_sigma_panel", "study_stress_ethanol_cipro"):
+        cfg = load_config(_demo_config_path(workspace_id))
+        plots = cfg.root.plots
+        assert plots is not None
+        placement_opts = dict((plots.options or {}).get("placement_map") or {})
+        tfbs_opts = dict((plots.options or {}).get("tfbs_usage") or {})
+        assert placement_opts.get("scope") == "auto"
+        assert int(placement_opts.get("max_plans", 0)) == 12
+        assert tfbs_opts.get("scope") == "auto"
+        assert int(tfbs_opts.get("max_plans", 0)) == 12
+
+
 def test_study_stress_ethanol_cipro_uses_pwm_artifact_sampling() -> None:
     cfg = load_config(_demo_config_path("study_stress_ethanol_cipro"))
     output = cfg.root.densegen.output
@@ -344,7 +425,11 @@ def test_study_stress_ethanol_cipro_uses_pwm_artifact_sampling() -> None:
     assert input_types.count("pwm_artifact") == 3
     assert input_types.count("background_pool") == 1
     plan_names = [item.name for item in cfg.root.densegen.generation.plan]
-    assert plan_names == ["ethanol", "ciprofloxacin", "ethanol_ciprofloxacin"]
+    assert len(plan_names) == 15
+    assert len([name for name in plan_names if name.startswith("ethanol__sig35=")]) == 5
+    assert len([name for name in plan_names if name.startswith("ciprofloxacin__sig35=")]) == 5
+    assert len([name for name in plan_names if name.startswith("ethanol_ciprofloxacin__sig35=")]) == 5
+    assert all("__sig35=" in name for name in plan_names)
 
     pwm_inputs = [inp for inp in cfg.root.densegen.inputs if inp.type == "pwm_artifact"]
     assert len(pwm_inputs) == 3
@@ -361,6 +446,26 @@ def test_study_stress_ethanol_cipro_uses_pwm_artifact_sampling() -> None:
     assert background.sampling.mining.budget.candidates == 5_000_000
     sampling = cfg.root.densegen.generation.sampling
     assert sampling.library_size == 10
+    assert cfg.root.densegen.generation.expansion.max_plans == 64
+    quotas_by_base = {
+        "ethanol": [
+            item.sequences for item in cfg.root.densegen.generation.plan if item.name.startswith("ethanol__sig35=")
+        ],
+        "ciprofloxacin": [
+            item.sequences
+            for item in cfg.root.densegen.generation.plan
+            if item.name.startswith("ciprofloxacin__sig35=")
+        ],
+        "ethanol_ciprofloxacin": [
+            item.sequences
+            for item in cfg.root.densegen.generation.plan
+            if item.name.startswith("ethanol_ciprofloxacin__sig35=")
+        ],
+    }
+    assert set(quotas_by_base["ethanol"]) == {12}
+    assert set(quotas_by_base["ciprofloxacin"]) == {12}
+    assert set(quotas_by_base["ethanol_ciprofloxacin"]) == {16}
+    assert cfg.root.densegen.generation.total_quota() == 200
     assert cfg.root.densegen.generation.sequence_constraints is not None
     assert "validate_final_sequence" not in cfg.root.densegen.postprocess.model_dump(exclude_none=False)
 
@@ -389,3 +494,167 @@ def test_packaged_workspace_stage_a_length_policy_is_range_16_20() -> None:
             length = inp.sampling.length
             assert length.policy == "range"
             assert tuple(length.range or ()) == (16, 20)
+
+
+def test_packaged_sampling_workspace_regulator_constraints_match_packaged_pwm_artifacts() -> None:
+    workspace_ids = ("demo_sampling_baseline", "study_stress_ethanol_cipro")
+    for workspace_id in workspace_ids:
+        cfg_path = _demo_config_path(workspace_id)
+        cfg = load_config(cfg_path)
+        available_motif_ids: set[str] = set()
+        for inp in cfg.root.densegen.inputs:
+            if inp.type != "pwm_artifact":
+                continue
+            artifact_path = resolve_path(cfg_path, inp.path)
+            payload = json.loads(artifact_path.read_text())
+            motif_id = str(payload.get("motif_id") or "").strip()
+            assert motif_id, f"{workspace_id}: missing motif_id in {artifact_path}"
+            available_motif_ids.add(motif_id)
+        assert available_motif_ids, f"{workspace_id}: no packaged pwm_artifact motif ids found"
+
+        for plan in cfg.root.densegen.generation.plan:
+            groups = list(plan.regulator_constraints.groups or [])
+            for group in groups:
+                missing = sorted(set(group.members or []) - available_motif_ids)
+                assert not missing, (
+                    f"{workspace_id}/{plan.name}/{group.name}: regulator constraints reference missing motifs: "
+                    f"{', '.join(missing)}. Available: {', '.join(sorted(available_motif_ids))}"
+                )
+
+
+def test_packaged_sampling_workspaces_allow_bounded_failed_solutions() -> None:
+    for workspace_id in ("demo_sampling_baseline", "study_stress_ethanol_cipro"):
+        cfg = load_config(_demo_config_path(workspace_id))
+        assert cfg.root.densegen.runtime.max_failed_solutions >= 1
+        assert cfg.root.densegen.runtime.max_failed_solutions_per_target > 0
+
+
+def test_packaged_workspace_runbooks_exist_with_fast_path_and_stepwise_flow() -> None:
+    workspace_root = Path(__file__).resolve().parents[2] / "workspaces"
+    required_tokens = (
+        "**Workspace Path**",
+        "**Regulators**",
+        "**Purpose**",
+        "**Run This Single Command**",
+        "Run this single command to do everything below:",
+        "### Step-by-Step Commands",
+        "set -euo pipefail",
+        "dense validate-config",
+        "dense run",
+        "dense inspect run",
+        "dense plot",
+        "dense notebook generate",
+        "dense campaign-reset",
+    )
+    for workspace_id in PACKAGED_WORKSPACE_IDS:
+        runbook_path = workspace_root / workspace_id / "runbook.md"
+        assert runbook_path.exists(), f"Missing packaged workspace runbook: {runbook_path}"
+        content = runbook_path.read_text()
+        assert content.lstrip().startswith("## "), f"{runbook_path}: runbook title must use level-2 header"
+        assert "### Workspace Path" not in content, (
+            f"{runbook_path}: Workspace Path should be a bold label, not a subheader"
+        )
+        assert "### Regulators" not in content, f"{runbook_path}: Regulators should be a bold label, not a subheader"
+        assert "### Purpose" not in content, f"{runbook_path}: Purpose should be a bold label, not a subheader"
+        assert "### Run This Single Command" not in content, (
+            f"{runbook_path}: Run This Single Command should be a bold label, not a subheader"
+        )
+        for token in required_tokens:
+            assert token in content, f"{runbook_path}: missing required runbook token: {token!r}"
+        _assert_token_order(
+            content,
+            [
+                "**Workspace Path**",
+                "**Regulators**",
+                "**Purpose**",
+                "**Run This Single Command**",
+                "Run this single command to do everything below:",
+                "### Step-by-Step Commands",
+                "set -euo pipefail",
+                "dense validate-config",
+                "dense run",
+                "dense inspect run",
+                "dense plot",
+                "dense notebook generate",
+                "dense campaign-reset",
+            ],
+            label=str(runbook_path),
+        )
+        if workspace_id in USR_WORKSPACE_IDS:
+            assert "dense workspace init" in content, (
+                f"{runbook_path}: runbook must stage a workspace for USR outputs before dense run"
+            )
+            assert "--output-mode both" in content, (
+                f"{runbook_path}: runbook must create workspace with usr+parquet sink wiring"
+            )
+            assert "cruncher catalog export-densegen" in content, (
+                f"{runbook_path}: runbook must include optional Cruncher artifact refresh command"
+            )
+            assert "### Optional artifact refresh from Cruncher" in content, (
+                f"{runbook_path}: optional artifact refresh section should be explicit"
+            )
+        assert "### Optional workspace reset" in content, (
+            f"{runbook_path}: optional workspace reset section should be explicit"
+        )
+
+
+def test_workspace_tutorials_link_to_workspace_runbooks_for_fast_path() -> None:
+    repo_root = Path(__file__).resolve().parents[5]
+    for workspace_id, tutorial_rel_path in WORKSPACE_TUTORIAL_PATHS.items():
+        tutorial_path = repo_root / tutorial_rel_path
+        assert tutorial_path.exists(), f"Missing tutorial: {tutorial_path}"
+        content = tutorial_path.read_text()
+        runbook_rel = f"../../workspaces/{workspace_id}/runbook.md"
+        assert runbook_rel in content, f"{tutorial_path}: missing runbook link {runbook_rel}"
+        assert "Run this single command" in content, f"{tutorial_path}: missing single-command fast-path wording"
+        if workspace_id in USR_WORKSPACE_IDS:
+            assert "dense workspace init" in content, (
+                f"{tutorial_path}: fast path must stage a workspace before running USR-backed flow"
+            )
+            assert "--output-mode both" in content, (
+                f"{tutorial_path}: fast path must use workspace init with both sinks"
+            )
+            assert "cruncher catalog export-densegen" in content, (
+                f"{tutorial_path}: tutorial must include Cruncher export refresh path"
+            )
+
+
+def test_usr_workspace_tutorials_reference_existing_cruncher_configs() -> None:
+    repo_root = Path(__file__).resolve().parents[5]
+    expected_config_paths = {
+        "demo_sampling_baseline": "src/dnadesign/cruncher/workspaces/demo_multitf/configs/config.yaml",
+        "study_constitutive_sigma_panel": "src/dnadesign/cruncher/workspaces/pairwise_laci_arac/configs/config.yaml",
+        "study_stress_ethanol_cipro": "src/dnadesign/cruncher/workspaces/demo_multitf/configs/config.yaml",
+    }
+    for workspace_id, expected_path in expected_config_paths.items():
+        tutorial_path = repo_root / WORKSPACE_TUTORIAL_PATHS[workspace_id]
+        content = tutorial_path.read_text()
+        assert expected_path in content, f"{tutorial_path}: expected Cruncher config path '{expected_path}' not found"
+        assert (repo_root / expected_path).exists(), (
+            f"{tutorial_path}: referenced Cruncher config path does not exist: {expected_path}"
+        )
+        stale_path = expected_path.replace("/configs/config.yaml", "/config.yaml")
+        assert stale_path not in content, f"{tutorial_path}: stale Cruncher config path detected: {stale_path}"
+
+
+def test_cruncher_pwm_handoff_howto_references_existing_cruncher_configs() -> None:
+    repo_root = Path(__file__).resolve().parents[5]
+    howto_path = repo_root / "src" / "dnadesign" / "densegen" / "docs" / "howto" / "cruncher_pwm_pipeline.md"
+    content = howto_path.read_text()
+
+    expected_paths = (
+        "src/dnadesign/cruncher/workspaces/demo_multitf/configs/config.yaml",
+        "src/dnadesign/cruncher/workspaces/pairwise_laci_arac/configs/config.yaml",
+    )
+    for expected_path in expected_paths:
+        assert expected_path in content, f"{howto_path}: expected Cruncher config path '{expected_path}' not found"
+        assert (repo_root / expected_path).exists(), (
+            f"{howto_path}: referenced Cruncher config path does not exist: {expected_path}"
+        )
+
+    stale_paths = (
+        "src/dnadesign/cruncher/workspaces/demo_multitf/config.yaml",
+        "src/dnadesign/cruncher/workspaces/pairwise_laci_arac/config.yaml",
+    )
+    for stale_path in stale_paths:
+        assert stale_path not in content, f"{howto_path}: stale Cruncher config path detected: {stale_path}"

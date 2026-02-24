@@ -22,6 +22,7 @@ from typing import Any
 class PlanManifest:
     input_name: str
     plan_name: str
+    quota: int
     generated: int
     duplicates_skipped: int
     failed_solutions: int
@@ -39,6 +40,7 @@ class PlanManifest:
         payload = {
             "input_name": self.input_name,
             "plan_name": self.plan_name,
+            "quota": int(self.quota),
             "generated": int(self.generated),
             "duplicates_skipped": int(self.duplicates_skipped),
             "failed_solutions": int(self.failed_solutions),
@@ -74,10 +76,20 @@ class RunManifest:
     solver_strands: str
     dense_arrays_version: str | None
     dense_arrays_version_source: str
+    total_quota: int
     items: list[PlanManifest]
 
     def to_dict(self) -> dict[str, Any]:
         total_generated = sum(item.generated for item in self.items)
+        resolved_total_quota = sum(item.quota for item in self.items)
+        if int(self.total_quota) != int(resolved_total_quota):
+            raise ValueError(
+                "run_manifest.total_quota must match the sum of item quotas "
+                f"({int(self.total_quota)} != {int(resolved_total_quota)})."
+            )
+        quota_progress_pct = (
+            (float(total_generated) / float(resolved_total_quota) * 100.0) if resolved_total_quota > 0 else 0.0
+        )
         return {
             "run_id": self.run_id,
             "created_at": self.created_at,
@@ -96,6 +108,8 @@ class RunManifest:
             "dense_arrays_version": self.dense_arrays_version,
             "dense_arrays_version_source": self.dense_arrays_version_source,
             "total_generated": int(total_generated),
+            "total_quota": int(resolved_total_quota),
+            "quota_progress_pct": float(quota_progress_pct),
             "items": [item.to_dict() for item in self.items],
         }
 
@@ -108,10 +122,21 @@ class RunManifest:
 
 def load_run_manifest(path: Path) -> RunManifest:
     data = json.loads(path.read_text())
+
+    def _required_int(payload: dict[str, Any], key: str, *, context: str) -> int:
+        if key not in payload:
+            raise ValueError(f"{context} missing required integer field `{key}`.")
+        raw = payload[key]
+        try:
+            return int(raw)
+        except Exception as exc:
+            raise ValueError(f"{context}.{key} must be an integer, got {raw!r}.") from exc
+
     items = [
         PlanManifest(
             input_name=str(item.get("input_name", "")),
             plan_name=str(item.get("plan_name", "")),
+            quota=_required_int(item, "quota", context=f"run_manifest.items[{idx}]"),
             generated=int(item.get("generated", 0)),
             duplicates_skipped=int(item.get("duplicates_skipped", 0)),
             failed_solutions=int(item.get("failed_solutions", 0)),
@@ -125,8 +150,15 @@ def load_run_manifest(path: Path) -> RunManifest:
             duplicate_solutions=int(item.get("duplicate_solutions", 0)),
             leaderboard_latest=item.get("leaderboard_latest"),
         )
-        for item in data.get("items", [])
+        for idx, item in enumerate(data.get("items", []))
     ]
+    total_quota = _required_int(data, "total_quota", context="run_manifest")
+    resolved_total_quota = sum(int(item.quota) for item in items)
+    if int(total_quota) != int(resolved_total_quota):
+        raise ValueError(
+            "run_manifest.total_quota must match the sum of item quotas "
+            f"({int(total_quota)} != {int(resolved_total_quota)})."
+        )
     return RunManifest(
         run_id=str(data.get("run_id", "")),
         created_at=str(data.get("created_at", "")),
@@ -144,5 +176,6 @@ def load_run_manifest(path: Path) -> RunManifest:
         solver_strands=str(data.get("solver_strands", "")),
         dense_arrays_version=data.get("dense_arrays_version"),
         dense_arrays_version_source=str(data.get("dense_arrays_version_source", "")),
+        total_quota=int(total_quota),
         items=items,
     )

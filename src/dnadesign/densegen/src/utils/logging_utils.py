@@ -210,7 +210,21 @@ def _register_native_stderr_patterns(patterns: Iterable[tuple[str, str | None]])
             existing.add(pat)
 
 
-def _install_native_stderr_deduper(patterns: Iterable[tuple[str, str | None]]) -> None:
+def _warn_native_stderr_install_failure(*, exc: Exception, strict: bool) -> None:
+    message = f"Native stderr deduper installation failed: {exc}"
+    if strict:
+        raise RuntimeError(message) from exc
+    if getattr(_install_native_stderr_deduper, "_warned_install_failure", False):
+        return
+    logging.getLogger("densegen.stderr").warning(message)
+    _install_native_stderr_deduper._warned_install_failure = True  # type: ignore[attr-defined]
+
+
+def _install_native_stderr_deduper(
+    patterns: Iterable[tuple[str, str | None]],
+    *,
+    strict: bool = False,
+) -> None:
     """
     Redirect the *process*'s stderr (FD=2) through a pipe and suppress repeated
     lines matching any of `patterns` (regex). The first time a pattern is seen,
@@ -230,18 +244,26 @@ def _install_native_stderr_deduper(patterns: Iterable[tuple[str, str | None]]) -
     # Duplicate current stderr FD (so we can still forward non-matching lines)
     try:
         orig_fd = os.dup(2)
-    except Exception:
-        # If we can't dup (unlikely), bail out silently.
+    except Exception as exc:
+        _warn_native_stderr_install_failure(exc=exc, strict=strict)
         return
 
-    r_fd, w_fd = os.pipe()
     try:
-        os.dup2(w_fd, 2)  # redirect process-level stderr to our pipe writer
-    finally:
+        r_fd, w_fd = os.pipe()
         try:
-            os.close(w_fd)
+            os.dup2(w_fd, 2)  # redirect process-level stderr to our pipe writer
+        finally:
+            try:
+                os.close(w_fd)
+            except Exception:
+                pass
+    except Exception as exc:
+        try:
+            os.close(orig_fd)
         except Exception:
             pass
+        _warn_native_stderr_install_failure(exc=exc, strict=strict)
+        return
 
     seen: set[str] = set()
 
@@ -273,7 +295,10 @@ def _install_native_stderr_deduper(patterns: Iterable[tuple[str, str | None]]) -
                             os.write(orig_fd, line + b"\n")
                         except Exception:
                             pass
-            except Exception:
+            except Exception as exc:
+                if not getattr(_install_native_stderr_deduper, "_warned_reader_failure", False):
+                    log.warning("Native stderr deduper reader failed: %s", exc)
+                    _install_native_stderr_deduper._warned_reader_failure = True  # type: ignore[attr-defined]
                 break
 
         try:
@@ -303,11 +328,11 @@ _SOLVER_STDERR_PATTERNS = [
 ]
 
 
-def install_native_stderr_filters(*, suppress_solver_messages: bool = True) -> None:
+def install_native_stderr_filters(*, suppress_solver_messages: bool = True, strict: bool = False) -> None:
     patterns = list(_PYARROW_STDERR_PATTERNS)
     if suppress_solver_messages:
         patterns.extend(_SOLVER_STDERR_PATTERNS)
-    _install_native_stderr_deduper(patterns=patterns)
+    _install_native_stderr_deduper(patterns=patterns, strict=strict)
 
 
 def setup_logging(

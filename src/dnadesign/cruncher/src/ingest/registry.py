@@ -35,6 +35,7 @@ from dnadesign.cruncher.ingest.adapters.regulondb import (
 )
 from dnadesign.cruncher.ingest.http_client import HttpRetryPolicy
 from dnadesign.cruncher.ingest.models import OrganismRef
+from dnadesign.cruncher.utils.paths import resolve_workspace_root
 
 AdapterFactory = Callable[[IngestConfig], SourceAdapter]
 
@@ -99,13 +100,13 @@ def _build_regulondb(config: IngestConfig) -> SourceAdapter:
 def _resolve_root(root: Path, *, config_path: Path | None) -> Path:
     if root.is_absolute() or config_path is None:
         return root
-    return (config_path.parent / root).resolve()
+    return (resolve_workspace_root(config_path) / root).resolve()
 
 
 def _resolve_path(path: Path, *, config_path: Path | None) -> Path:
     if path.is_absolute() or config_path is None:
         return path
-    return (config_path.parent / path).resolve()
+    return (resolve_workspace_root(config_path) / path).resolve()
 
 
 def _local_source_factory(

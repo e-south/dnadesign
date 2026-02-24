@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
+from dnadesign.cruncher.app.cache_readiness import cache_refresh_hint
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
 from dnadesign.cruncher.utils.hashing import sha256_lines, sha256_path
 
@@ -62,6 +63,13 @@ def resolve_lock(
     def _choose(candidates: List[CatalogEntry], *, tf_name: str) -> CatalogEntry:
         if not candidates:
             raise ValueError("No candidates available")
+        if preference:
+            preferred: list[CatalogEntry] = []
+            for pref in preference:
+                preferred.extend([entry for entry in candidates if entry.source == pref])
+            if not preferred:
+                raise ValueError("Multiple candidates found; no matching source_preference")
+            candidates = preferred
         if len(candidates) == 1:
             return candidates[0]
         if dataset_map and tf_name in dataset_map:
@@ -93,13 +101,10 @@ def resolve_lock(
         candidates = catalog.list(tf_name=name, include_synonyms=True)
         if not candidates:
             if pwm_source == "sites":
-                raise ValueError(f"No cached sites found for '{name}'. Run `cruncher fetch sites` first.")
+                raise ValueError(f"No cached sites found for '{name}'. {cache_refresh_hint(pwm_source='sites')}")
             if pwm_source == "matrix":
-                raise ValueError(f"No cached motifs found for '{name}'. Run `cruncher fetch motifs` first.")
-            raise ValueError(
-                f"No cached motifs or sites found for '{name}'. Run `cruncher fetch motifs` or "
-                "`cruncher fetch sites` first."
-            )
+                raise ValueError(f"No cached motifs found for '{name}'. {cache_refresh_hint(pwm_source='matrix')}")
+            raise ValueError(f"No cached motifs or sites found for '{name}'. {cache_refresh_hint(pwm_source=None)}")
         if pwm_source:
             if pwm_source == "matrix":
                 candidates = [c for c in candidates if c.has_matrix]

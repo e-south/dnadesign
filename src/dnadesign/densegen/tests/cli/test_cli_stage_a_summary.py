@@ -167,7 +167,7 @@ def _write_stage_a_config(tmp_path: Path) -> Path:
                 sequence_length: 30
                 plan:
                   - name: default
-                    quota: 1
+                    sequences: 1
                     sampling:
                       include_inputs: [toy_sites]
                     regulator_constraints:
@@ -247,7 +247,7 @@ def _write_pwm_stage_a_config(tmp_path: Path) -> Path:
                 sequence_length: 30
                 plan:
                   - name: default
-                    quota: 1
+                    sequences: 1
                     sampling:
                       include_inputs: [demo_pwm]
                     regulator_constraints:

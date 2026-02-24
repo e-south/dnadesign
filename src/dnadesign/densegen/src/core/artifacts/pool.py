@@ -157,10 +157,11 @@ class TFBSPoolArtifact:
             stage_a_sampling = item.get("stage_a_sampling")
             if stage_a_sampling is not None:
                 stage_a_sampling = dict(stage_a_sampling)
+            input_name = str(item.get("name"))
             entry = PoolInputEntry(
-                name=str(item.get("name")),
+                name=input_name,
                 input_type=str(item.get("type")),
-                pool_path=Path(item.get("pool_path")),
+                pool_path=_parse_manifest_pool_path(item.get("pool_path"), input_name=input_name),
                 rows=int(item.get("rows", 0)),
                 columns=list(item.get("columns") or []),
                 pool_mode=str(item.get("pool_mode") or POOL_MODE_TFBS),
@@ -228,7 +229,11 @@ def pool_status_by_input(cfg, cfg_path: Path, run_root: Path) -> dict[str, PoolI
         if entry is None:
             statuses[inp.name] = PoolInputStatus(name=inp.name, state="stale", reason="manifest_missing_entry")
             continue
-        pool_path = pool_dir / entry.pool_path
+        try:
+            pool_path = _resolve_pool_path(pool_dir, pool_path=entry.pool_path, input_name=inp.name)
+        except Exception as exc:
+            statuses[inp.name] = PoolInputStatus(name=inp.name, state="stale", reason=f"manifest_invalid:{exc}")
+            continue
         if not pool_path.exists():
             statuses[inp.name] = PoolInputStatus(name=inp.name, state="stale", reason="pool_file_missing")
             continue
@@ -426,6 +431,29 @@ def _pool_manifest_path(out_dir: Path) -> Path:
     return out_dir / "pool_manifest.json"
 
 
+def _parse_manifest_pool_path(value: object, *, input_name: str) -> Path:
+    text = str(value or "").strip()
+    if not text:
+        raise ValueError(f"Pool manifest missing pool_path for input '{input_name}'.")
+    path = Path(text)
+    if path.is_absolute() or any(part == ".." for part in path.parts):
+        raise ValueError(
+            f"Pool manifest pool_path for input '{input_name}' must be a relative path without '..': {text!r}"
+        )
+    return path
+
+
+def _resolve_pool_path(out_dir: Path, *, pool_path: Path, input_name: str) -> Path:
+    root = out_dir.resolve()
+    candidate = out_dir / pool_path
+    resolved = candidate.resolve()
+    try:
+        resolved.relative_to(root)
+    except ValueError as exc:
+        raise ValueError(f"Pool manifest pool_path for input '{input_name}' escapes pools root: {pool_path!s}") from exc
+    return candidate
+
+
 def load_pool_artifact(out_dir: Path) -> TFBSPoolArtifact:
     manifest_path = _pool_manifest_path(out_dir)
     if not manifest_path.exists():
@@ -464,7 +492,7 @@ def load_pool_data(out_dir: Path) -> tuple[TFBSPoolArtifact, dict[str, PoolData]
     artifact = load_pool_artifact(out_dir)
     pool_data: dict[str, PoolData] = {}
     for entry in artifact.inputs.values():
-        pool_path = out_dir / entry.pool_path
+        pool_path = _resolve_pool_path(out_dir, pool_path=entry.pool_path, input_name=entry.name)
         if not pool_path.exists():
             raise FileNotFoundError(f"Pool file listed in manifest is missing: {pool_path}")
         df = pd.read_parquet(pool_path)
@@ -537,9 +565,17 @@ def build_pool_artifact(
     rows: list[tuple[str, str, str, Path]] = []
     existing_entries: dict[str, PoolInputEntry] = {}
     preserved_entries: dict[str, PoolInputEntry] = {}
-    config_hash = _hash_pool_config(cfg)
-    fingerprints_by_input = {inp.name: _resolve_input_fingerprints(cfg_path, inp) for inp in cfg.inputs}
     inputs_by_name = {inp.name: inp for inp in cfg.inputs}
+    selected_names = set(selected_inputs or [])
+    if selected_names:
+        unknown_inputs = sorted(selected_names - set(inputs_by_name))
+        if unknown_inputs:
+            raise ValueError(f"Selected inputs not found in config: {', '.join(unknown_inputs)}")
+        inputs_to_build = [inp for inp in cfg.inputs if inp.name in selected_names]
+    else:
+        inputs_to_build = list(cfg.inputs)
+    config_hash = _hash_pool_config(cfg)
+    fingerprints_by_input = {inp.name: _resolve_input_fingerprints(cfg_path, inp) for inp in inputs_to_build}
 
     if not overwrite:
         manifest_path = _pool_manifest_path(out_dir)
@@ -563,7 +599,7 @@ def build_pool_artifact(
                 preserved_entries = {
                     name: entry for name, entry in existing_entries.items() if name not in selected_inputs
                 }
-            for inp in cfg.inputs:
+            for inp in inputs_to_build:
                 entry = existing_entries.get(inp.name)
                 if entry is None:
                     continue
@@ -576,13 +612,11 @@ def build_pool_artifact(
                 if _normalize_fingerprints(existing_fingerprints) != _normalize_fingerprints(current_fingerprints):
                     raise ValueError(f"Input files changed for '{inp.name}'. Use --fresh to rebuild pools.")
 
-    for inp in cfg.inputs:
-        if selected_inputs and inp.name not in selected_inputs:
-            continue
+    for inp in inputs_to_build:
         existing_entry = existing_entries.get(inp.name)
         existing_df = None
         if existing_entry is not None:
-            pool_path = out_dir / existing_entry.pool_path
+            pool_path = _resolve_pool_path(out_dir, pool_path=existing_entry.pool_path, input_name=inp.name)
             if not pool_path.exists():
                 raise FileNotFoundError(f"Pool file listed in manifest is missing: {pool_path}")
             existing_df = pd.read_parquet(pool_path)
@@ -608,6 +642,7 @@ def build_pool_artifact(
                 cfg_path=cfg_path,
                 sampling=inp.sampling,
                 input_name=inp.name,
+                motif_sets=dict(cfg.motif_sets or {}),
                 pwm_inputs=pwm_inputs,
             )
         else:
@@ -642,7 +677,7 @@ def build_pool_artifact(
             combined = pd.concat([existing_df, df], ignore_index=True)
             combined = combined.drop_duplicates(subset=[merge_key], keep="first")
             df = combined
-            dest = out_dir / existing_entry.pool_path
+            dest = _resolve_pool_path(out_dir, pool_path=existing_entry.pool_path, input_name=inp.name)
         else:
             base = _sanitize_filename(inp.name)
             count = used_names.get(base, 0)

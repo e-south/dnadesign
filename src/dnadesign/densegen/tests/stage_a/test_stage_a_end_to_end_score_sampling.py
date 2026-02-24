@@ -34,8 +34,8 @@ _FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
 def _artifact_paths() -> list[str]:
     base = Path(__file__).resolve().parents[2] / "workspaces" / "demo_sampling_baseline" / "inputs" / "motif_artifacts"
     return [
-        str(base / "lexA__meme_suite_meme__lexA_CTGTATAWAWWHACA.json"),
-        str(base / "cpxR__meme_suite_meme__cpxR_MANWWHTTTAM.json"),
+        str(base / "lexA__demo_merged_meme_oops_multitf__lexA_CTGTATAWAWWHACA.json"),
+        str(base / "cpxR__demo_merged_meme_oops_multitf__cpxR_MANWWHTTTAM.json"),
     ]
 
 
@@ -75,7 +75,7 @@ def _write_config(tmp_path: Path) -> Path:
                         "plan": [
                             {
                                 "name": "default",
-                                "quota": 1,
+                                "sequences": 1,
                                 "sampling": {"include_inputs": ["demo_pwm"]},
                                 "regulator_constraints": {"groups": []},
                             }

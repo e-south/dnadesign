@@ -1,0 +1,113 @@
+runbook:
+  schema_version: 1
+  name: demo_pairwise
+  steps:
+  - id: reset_workspace
+    run:
+    - workspaces
+    - reset
+    - --root
+    - .
+    - --confirm
+  - id: config_summary
+    run:
+    - config
+    - summary
+    - -c
+    - configs/config.yaml
+  - id: fetch_sites_demo_local_meme
+    run:
+    - fetch
+    - sites
+    - --source
+    - demo_local_meme
+    - --tf
+    - lexA
+    - --tf
+    - cpxR
+    - --update
+    - -c
+    - configs/config.yaml
+  - id: fetch_sites_regulondb
+    run:
+    - fetch
+    - sites
+    - --source
+    - regulondb
+    - --tf
+    - lexA
+    - --tf
+    - cpxR
+    - --update
+    - -c
+    - configs/config.yaml
+  - id: discover_motifs
+    run:
+    - discover
+    - motifs
+    - --set
+    - '1'
+    - --tool
+    - meme
+    - --meme-mod
+    - oops
+    - --source-id
+    - demo_merged_meme_oops
+    - -c
+    - configs/config.yaml
+  - id: lock_targets
+    run:
+    - lock
+    - -c
+    - configs/config.yaml
+  - id: parse_run
+    run:
+    - parse
+    - --force-overwrite
+    - -c
+    - configs/config.yaml
+  - id: sample_run
+    run:
+    - sample
+    - --force-overwrite
+    - -c
+    - configs/config.yaml
+  - id: analyze_summary
+    run:
+    - analyze
+    - --summary
+    - -c
+    - configs/config.yaml
+  - id: export_sequences_latest
+    run:
+    - export
+    - sequences
+    - --latest
+    - -c
+    - configs/config.yaml
+  - id: render_logos
+    run:
+    - catalog
+    - logos
+    - --source
+    - demo_merged_meme_oops
+    - --set
+    - '1'
+    - -c
+    - configs/config.yaml
+  - id: study_run_length_vs_score
+    description: Sweep sequence_length with a step-2 grid plus base-config anchor and emit length-vs-score aggregates.
+    run:
+    - study
+    - run
+    - --spec
+    - configs/studies/length_vs_score.study.yaml
+    - --force-overwrite
+  - id: study_run_diversity_vs_score
+    description: Sweep diversity from 0.00 to 1.00 at fixed workspace sequence_length and emit diversity-vs-score aggregates.
+    run:
+    - study
+    - run
+    - --spec
+    - configs/studies/diversity_vs_score.study.yaml
+    - --force-overwrite

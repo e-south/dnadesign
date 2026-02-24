@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.colors import to_rgb, to_rgba
 
-from .plot_common import _apply_style, _palette, _stage_b_plan_output_dir, _style
+from .plot_common import _apply_style, _palette, _save_figure, _stage_b_plan_output_dir, _style
 
 log = logging.getLogger(__name__)
 
@@ -53,16 +53,37 @@ def _require_columns(df: pd.DataFrame, required: set[str], label: str) -> None:
         raise ValueError(f"{label} missing required columns: {sorted(missing)}")
 
 
-def _promoter_constraints(cfg: dict, plan_name: str) -> list[dict]:
+def _promoter_constraints(cfg: dict, plan_name: str) -> tuple[list[dict], bool]:
     cfg = _plot_config(cfg)
     gen = cfg.get("generation", {}) if cfg else {}
     plan_items = gen.get("plan", []) or []
-    out = []
+    exact_matches: list[dict] = []
+    grouped_matches: list[dict] = []
+    grouped_prefix = f"{str(plan_name)}__"
     for item in plan_items:
         if not isinstance(item, dict):
             continue
-        if str(item.get("name") or "") != plan_name:
+        item_name = str(item.get("name") or "")
+        if item_name == str(plan_name):
+            exact_matches.append(item)
             continue
+        if grouped_prefix and item_name.startswith(grouped_prefix):
+            grouped_matches.append(item)
+    selected_items = exact_matches if exact_matches else grouped_matches
+    aggregate_fixed_components = bool(grouped_matches) and not bool(exact_matches)
+
+    out = []
+    seen: set[
+        tuple[
+            str,
+            str,
+            int | None,
+            int | None,
+            tuple[int, int] | None,
+            tuple[int, int] | None,
+        ]
+    ] = set()
+    for item in selected_items:
         fixed = item.get("fixed_elements") or {}
         pcs = fixed.get("promoter_constraints")
         pcs = [pcs] if isinstance(pcs, dict) else (pcs or [])
@@ -82,8 +103,22 @@ def _promoter_constraints(cfg: dict, plan_name: str) -> list[dict]:
             else:
                 spacer_min = None
                 spacer_max = None
-            upstream_pos = pc.get("upstream_pos")
-            downstream_pos = pc.get("downstream_pos")
+            upstream_pos_raw = pc.get("upstream_pos")
+            downstream_pos_raw = pc.get("downstream_pos")
+            upstream_pos = (
+                (int(upstream_pos_raw[0]), int(upstream_pos_raw[1]))
+                if isinstance(upstream_pos_raw, (list, tuple)) and len(upstream_pos_raw) == 2
+                else None
+            )
+            downstream_pos = (
+                (int(downstream_pos_raw[0]), int(downstream_pos_raw[1]))
+                if isinstance(downstream_pos_raw, (list, tuple)) and len(downstream_pos_raw) == 2
+                else None
+            )
+            key = (upstream, downstream, spacer_min, spacer_max, upstream_pos, downstream_pos)
+            if key in seen:
+                continue
+            seen.add(key)
             out.append(
                 {
                     "name": name,
@@ -91,32 +126,86 @@ def _promoter_constraints(cfg: dict, plan_name: str) -> list[dict]:
                     "downstream": downstream,
                     "spacer_min": spacer_min,
                     "spacer_max": spacer_max,
-                    "upstream_pos": upstream_pos,
-                    "downstream_pos": downstream_pos,
+                    "upstream_pos": list(upstream_pos) if upstream_pos is not None else upstream_pos_raw,
+                    "downstream_pos": list(downstream_pos) if downstream_pos is not None else downstream_pos_raw,
                 }
             )
-    return out
+    return out, aggregate_fixed_components
 
 
-def _fixed_labels(constraints: list[dict]) -> list[str]:
+def _fixed_label_name(pc: dict, idx: int, *, aggregate_fixed_components: bool) -> str:
+    if aggregate_fixed_components:
+        return "promoter"
+    return str(pc.get("name") or f"promoter_{idx + 1}")
+
+
+def _fixed_component_label(
+    pc: dict,
+    idx: int,
+    component: str,
+    *,
+    aggregate_fixed_components: bool,
+) -> str:
+    return f"fixed:{_fixed_label_name(pc, idx, aggregate_fixed_components=aggregate_fixed_components)}:{component}"
+
+
+def _fixed_labels(constraints: list[dict], *, aggregate_fixed_components: bool = False) -> list[str]:
     labels = []
     for idx, pc in enumerate(constraints):
-        name = pc.get("name") or f"promoter_{idx + 1}"
-        labels.append(f"fixed:{name}:-35")
-        labels.append(f"fixed:{name}:-10")
-    return labels
+        labels.append(_fixed_component_label(pc, idx, "-35", aggregate_fixed_components=aggregate_fixed_components))
+        labels.append(_fixed_component_label(pc, idx, "-10", aggregate_fixed_components=aggregate_fixed_components))
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for label in labels:
+        if label in seen:
+            continue
+        seen.add(label)
+        deduped.append(label)
+    return deduped
 
 
-def _fixed_label_sequences(constraints: list[dict]) -> dict[str, str]:
-    sequences: dict[str, str] = {}
+def _collapse_fixed_component_label(label: str, *, aggregate_fixed_components: bool) -> str:
+    label_text = str(label).strip()
+    if not aggregate_fixed_components:
+        return label_text
+    if not label_text.startswith("fixed:"):
+        return label_text
+    if label_text.endswith(":-35"):
+        return "fixed:promoter:-35"
+    if label_text.endswith(":-10"):
+        return "fixed:promoter:-10"
+    return label_text
+
+
+def _fixed_label_sequences(
+    constraints: list[dict],
+    *,
+    aggregate_fixed_components: bool = False,
+) -> dict[str, str]:
+    sequences_multi: dict[str, set[str]] = {}
     for idx, pc in enumerate(constraints):
-        name = str(pc.get("name") or f"promoter_{idx + 1}")
         upstream = str(pc.get("upstream") or "").strip().upper()
         downstream = str(pc.get("downstream") or "").strip().upper()
         if upstream:
-            sequences[f"fixed:{name}:-35"] = upstream
+            label_up = _fixed_component_label(
+                pc,
+                idx,
+                "-35",
+                aggregate_fixed_components=aggregate_fixed_components,
+            )
+            sequences_multi.setdefault(label_up, set()).add(upstream)
         if downstream:
-            sequences[f"fixed:{name}:-10"] = downstream
+            label_down = _fixed_component_label(
+                pc,
+                idx,
+                "-10",
+                aggregate_fixed_components=aggregate_fixed_components,
+            )
+            sequences_multi.setdefault(label_down, set()).add(downstream)
+    sequences: dict[str, str] = {}
+    for label, seq_set in sequences_multi.items():
+        if len(seq_set) == 1:
+            sequences[label] = next(iter(seq_set))
     return sequences
 
 
@@ -289,8 +378,9 @@ def _build_occupancy(
     seq_len: int,
     constraints: list[dict],
     max_categories: int,
+    aggregate_fixed_components: bool = False,
 ) -> tuple[dict[str, np.ndarray], list[str], dict[str, int]]:
-    fixed_labels = _fixed_labels(constraints)
+    fixed_labels = _fixed_labels(constraints, aggregate_fixed_components=aggregate_fixed_components)
     fixed_set = set(fixed_labels)
     if max_categories < len(fixed_labels):
         msg = (
@@ -300,7 +390,12 @@ def _build_occupancy(
         raise ValueError(msg)
 
     sub = sub.copy()
-    sub["tf_label"] = sub["tf"].map(lambda tf: _normalize_tf_label(tf, fixed_set))
+    sub["tf_label"] = sub["tf"].map(
+        lambda tf: _collapse_fixed_component_label(
+            _normalize_tf_label(tf, fixed_set),
+            aggregate_fixed_components=aggregate_fixed_components,
+        )
+    )
     regulator_labels = sorted(
         {str(tf) for tf in sub["tf_label"].astype(str).tolist() if str(tf).strip() and str(tf) not in fixed_set}
     )
@@ -349,12 +444,26 @@ def _build_occupancy(
         lo, hi = bounds
         occupancy[label][lo:hi] += 1.0
 
-    fixed_from_composition = set(sub["tf_label"]).intersection(fixed_set)
+    fixed_from_composition = {
+        _collapse_fixed_component_label(str(label), aggregate_fixed_components=aggregate_fixed_components)
+        for label in sub["tf_label"].astype(str).tolist()
+        if str(label).strip().startswith("fixed:")
+    }.intersection(fixed_set)
     missing_counts: dict[str, int] = {}
     for pc_idx, pc in enumerate(constraints):
-        name = pc.get("name") or f"promoter_{pc_idx + 1}"
-        label_up = f"fixed:{name}:-35"
-        label_down = f"fixed:{name}:-10"
+        name = _fixed_label_name(pc, pc_idx, aggregate_fixed_components=aggregate_fixed_components)
+        label_up = _fixed_component_label(
+            pc,
+            pc_idx,
+            "-35",
+            aggregate_fixed_components=aggregate_fixed_components,
+        )
+        label_down = _fixed_component_label(
+            pc,
+            pc_idx,
+            "-10",
+            aggregate_fixed_components=aggregate_fixed_components,
+        )
         for _, row in solutions.iterrows():
             seq = str(row.get("sequence") or "")
             pair = _select_promoter_pair(seq, pc)
@@ -381,27 +490,47 @@ def _build_tfbs_count_records(
     *,
     solutions: pd.DataFrame,
     constraints: list[dict],
+    aggregate_fixed_components: bool = False,
 ) -> pd.DataFrame:
-    fixed_labels = _fixed_labels(constraints)
+    fixed_labels = _fixed_labels(constraints, aggregate_fixed_components=aggregate_fixed_components)
     fixed_set = set(fixed_labels)
     records: list[dict[str, str]] = []
     for _, row in sub.iterrows():
-        tf_label = _normalize_tf_label(row.get("tf"), fixed_set)
+        tf_label = _collapse_fixed_component_label(
+            _normalize_tf_label(row.get("tf"), fixed_set),
+            aggregate_fixed_components=aggregate_fixed_components,
+        )
         tfbs = str(row.get("tfbs") or "").strip().upper()
         if not tf_label or not tfbs:
             continue
         records.append({"category_label": tf_label, "tfbs": tfbs})
 
-    composition_has_fixed = bool(set(sub["tf"].astype(str).tolist()).intersection(fixed_set))
+    composition_fixed_labels = {
+        _collapse_fixed_component_label(
+            _normalize_tf_label(label, fixed_set),
+            aggregate_fixed_components=aggregate_fixed_components,
+        )
+        for label in sub["tf"].astype(str).tolist()
+    }
+    composition_has_fixed = bool(composition_fixed_labels.intersection(fixed_set))
     if not composition_has_fixed:
         for pc_idx, pc in enumerate(constraints):
-            name = pc.get("name") or f"promoter_{pc_idx + 1}"
             upstream = str(pc.get("upstream") or "").strip().upper()
             downstream = str(pc.get("downstream") or "").strip().upper()
             if not upstream or not downstream:
                 continue
-            label_up = f"fixed:{name}:-35"
-            label_down = f"fixed:{name}:-10"
+            label_up = _fixed_component_label(
+                pc,
+                pc_idx,
+                "-35",
+                aggregate_fixed_components=aggregate_fixed_components,
+            )
+            label_down = _fixed_component_label(
+                pc,
+                pc_idx,
+                "-10",
+                aggregate_fixed_components=aggregate_fixed_components,
+            )
             for _, row in solutions.iterrows():
                 seq = str(row.get("sequence") or "")
                 pair = _select_promoter_pair(seq, pc)
@@ -463,25 +592,50 @@ def _build_available_tfbs_records(
     *,
     n_solutions: int,
     constraints: list[dict],
+    aggregate_fixed_components: bool = False,
 ) -> pd.DataFrame:
-    fixed_labels = _fixed_labels(constraints)
+    fixed_labels = _fixed_labels(constraints, aggregate_fixed_components=aggregate_fixed_components)
     fixed_set = set(fixed_labels)
     rows: list[dict[str, str | int]] = []
     for _, row in members.iterrows():
-        tf_label = _normalize_tf_label(row.get("tf"), fixed_set)
+        tf_label = _collapse_fixed_component_label(
+            _normalize_tf_label(row.get("tf"), fixed_set),
+            aggregate_fixed_components=aggregate_fixed_components,
+        )
         tfbs = str(row.get("tfbs") or "").strip().upper()
         if not tf_label or not tfbs:
             continue
         rows.append({"category_label": tf_label, "tfbs": tfbs, "weight": int(n_solutions)})
 
     for pc_idx, pc in enumerate(constraints):
-        name = pc.get("name") or f"promoter_{pc_idx + 1}"
         upstream = str(pc.get("upstream") or "").strip().upper()
         downstream = str(pc.get("downstream") or "").strip().upper()
         if not upstream or not downstream:
             continue
-        rows.append({"category_label": f"fixed:{name}:-35", "tfbs": upstream, "weight": int(n_solutions)})
-        rows.append({"category_label": f"fixed:{name}:-10", "tfbs": downstream, "weight": int(n_solutions)})
+        rows.append(
+            {
+                "category_label": _fixed_component_label(
+                    pc,
+                    pc_idx,
+                    "-35",
+                    aggregate_fixed_components=aggregate_fixed_components,
+                ),
+                "tfbs": upstream,
+                "weight": int(n_solutions),
+            }
+        )
+        rows.append(
+            {
+                "category_label": _fixed_component_label(
+                    pc,
+                    pc_idx,
+                    "-10",
+                    aggregate_fixed_components=aggregate_fixed_components,
+                ),
+                "tfbs": downstream,
+                "weight": int(n_solutions),
+            }
+        )
 
     if not rows:
         raise ValueError("placement_map could not derive available TFBS records from library members.")
@@ -799,14 +953,18 @@ def plot_placement_map(
     style: Optional[dict] = None,
     occupancy_alpha: float | None = None,
     occupancy_max_categories: int | None = None,
+    plan_col: str = "densegen__plan",
+    input_col: str = "densegen__input_name",
 ) -> list[Path]:
     if composition_df is None or composition_df.empty:
         raise ValueError("placement_map requires composition.parquet with placements.")
     if dense_arrays_df is None or dense_arrays_df.empty:
         raise ValueError("placement_map requires records.parquet with final sequences.")
+    plan_col = str(plan_col or "").strip() or "densegen__plan"
+    input_col = str(input_col or "").strip() or "densegen__input_name"
     _require_columns(
         dense_arrays_df,
-        {"id", "sequence", "densegen__input_name", "densegen__plan"},
+        {"id", "sequence", input_col, plan_col},
         "records.parquet",
     )
     _require_columns(
@@ -827,14 +985,14 @@ def plot_placement_map(
 
     seq_len = _sequence_length_from_cfg(cfg)
     dense_arrays_df = dense_arrays_df.copy()
-    dense_arrays_df["densegen__input_name"] = dense_arrays_df["densegen__input_name"].astype(str)
-    dense_arrays_df["densegen__plan"] = dense_arrays_df["densegen__plan"].astype(str)
+    dense_arrays_df[input_col] = dense_arrays_df[input_col].astype(str)
+    dense_arrays_df[plan_col] = dense_arrays_df[plan_col].astype(str)
     composition_df = composition_df.copy()
     composition_df["input_name"] = composition_df["input_name"].astype(str)
     composition_df["plan_name"] = composition_df["plan_name"].astype(str)
 
     paths: list[Path] = []
-    for (input_name, plan_name), solutions in dense_arrays_df.groupby(["densegen__input_name", "densegen__plan"]):
+    for (input_name, plan_name), solutions in dense_arrays_df.groupby([input_col, plan_col]):
         solution_ids = solutions["id"].astype(str).dropna().unique().tolist()
         if not solution_ids:
             raise ValueError(f"placement_map has no accepted solutions for {input_name}/{plan_name}.")
@@ -846,8 +1004,11 @@ def plot_placement_map(
         if sub.empty:
             raise ValueError(f"placement_map has no placements for {input_name}/{plan_name}.")
 
-        constraints = _promoter_constraints(cfg, str(plan_name))
-        fixed_label_sequences = _fixed_label_sequences(constraints)
+        constraints, aggregate_fixed_components = _promoter_constraints(cfg, str(plan_name))
+        fixed_label_sequences = _fixed_label_sequences(
+            constraints,
+            aggregate_fixed_components=aggregate_fixed_components,
+        )
         n_solutions = len(solution_ids)
         occupancy, categories, missing_counts = _build_occupancy(
             sub,
@@ -855,9 +1016,22 @@ def plot_placement_map(
             seq_len=seq_len,
             constraints=constraints,
             max_categories=max_cats,
+            aggregate_fixed_components=aggregate_fixed_components,
         )
 
-        if missing_counts:
+        if aggregate_fixed_components:
+            fixed_total = sum(
+                float(occupancy.get(label, np.zeros(seq_len, dtype=float)).sum())
+                for label in categories
+                if str(label).startswith("fixed:")
+            )
+            if fixed_total <= 0.0:
+                log.warning(
+                    "placement_map fixed promoter occupancy is empty for grouped scope %s/%s.",
+                    input_name,
+                    plan_name,
+                )
+        elif missing_counts:
             misses = ", ".join(f"{name}({count})" for name, count in sorted(missing_counts.items()))
             log.warning("placement_map promoter motifs not found for %s/%s: %s", input_name, plan_name, misses)
 
@@ -875,7 +1049,7 @@ def plot_placement_map(
         base_dir = _stage_b_plan_output_dir(out_path, input_name=str(input_name), plan_name=str(plan_name))
         base_dir.mkdir(parents=True, exist_ok=True)
         occ_path = base_dir / f"occupancy{out_path.suffix}"
-        fig_occ.savefig(occ_path)
+        _save_figure(fig_occ, occ_path, style=style)
         plt.close(fig_occ)
         paths.append(occ_path)
 

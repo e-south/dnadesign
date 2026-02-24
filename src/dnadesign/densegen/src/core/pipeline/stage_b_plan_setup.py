@@ -41,6 +41,7 @@ from .stage_b_runtime_types import (
     RuntimeSettings,
     SolverSettings,
 )
+from .stage_b_solution_rejections import resolve_failed_solution_cap
 
 log = logging.getLogger(__name__)
 
@@ -65,6 +66,11 @@ def _init_plan_settings(
     pool_strategy = str(sampling_cfg.pool_strategy)
 
     runtime_cfg = global_cfg.runtime
+    effective_max_failed_solutions = resolve_failed_solution_cap(
+        max_failed_solutions=int(runtime_cfg.max_failed_solutions),
+        max_failed_solutions_per_target=float(runtime_cfg.max_failed_solutions_per_target),
+        quota=quota,
+    )
     max_per_subsample = int(runtime_cfg.arrays_generated_before_resample)
     if pool_strategy != "iterative_subsample" and not one_subsample_only:
         max_per_subsample = quota
@@ -76,7 +82,7 @@ def _init_plan_settings(
         stall_warn_every=int(runtime_cfg.stall_warning_every_seconds),
         max_consecutive_failures=int(runtime_cfg.max_consecutive_failures),
         max_seconds_per_plan=int(runtime_cfg.max_seconds_per_plan),
-        max_failed_solutions=int(runtime_cfg.max_failed_solutions),
+        max_failed_solutions=effective_max_failed_solutions,
         leaderboard_every=int(runtime_cfg.leaderboard_every),
         checkpoint_every=int(execution_state.checkpoint_every or 0),
     )
@@ -233,7 +239,7 @@ def _load_plan_pool(
         }
     )
     pair_label = str(input_tf_tfbs_pair_count) if input_tf_tfbs_pair_count is not None else "-"
-    if progress_style != "screen":
+    if progress_style == "stream":
         log.info(
             "[%s/%s] Input summary: mode=%s rows=%d tfs=%d tfbs=%d pairs=%s",
             source_label,
@@ -290,7 +296,7 @@ def _load_plan_pool(
                     else "unset"
                 )
                 budget_label = f"tier={tier_label} max_candidates={budget_max_candidates}"
-            if progress_style != "screen":
+            if progress_style == "stream":
                 log.info(
                     "Stage-A PWM sampling for %s: motifs=%d | sites=%s | strategy=%s | backend=%s | "
                     "eligibility=%s | tiers=%s | mining=%s | budget=%s | length=%s",

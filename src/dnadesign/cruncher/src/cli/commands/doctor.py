@@ -19,8 +19,17 @@ from dnadesign.cruncher.cli.config_resolver import ConfigResolutionError, resolv
 from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
 from dnadesign.cruncher.integrations.meme_suite import check_meme_tools, resolve_tool_path
+from dnadesign.cruncher.utils.paths import resolve_workspace_root
 
 console = Console()
+
+
+def _load_config_or_exit(config_path: Path):
+    try:
+        return load_config(config_path)
+    except (ValueError, FileNotFoundError) as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1) from exc
 
 
 def doctor(
@@ -47,6 +56,7 @@ def doctor(
     ),
 ) -> None:
     config_path = None
+    workspace_root = None
     cfg = None
     if config or config_option:
         try:
@@ -61,8 +71,9 @@ def doctor(
             config_path = None
 
     if config_path is not None:
-        cfg = load_config(config_path)
-        console.print(f"Config: {render_path(config_path, base=config_path.parent)}")
+        cfg = _load_config_or_exit(config_path)
+        workspace_root = resolve_workspace_root(config_path)
+        console.print(f"Config: {render_path(config_path, base=workspace_root)}")
     else:
         console.print("Config: - (not resolved)")
 
@@ -83,7 +94,7 @@ def doctor(
     table.add_column("Path")
     table.add_column("Version")
     table.add_column("Hint")
-    base = config_path.parent if config_path is not None else None
+    base = workspace_root
     for status in statuses:
         path_val = status.path
         rendered_path = "-" if path_val in {None, "-"} else render_path(path_val, base=base)

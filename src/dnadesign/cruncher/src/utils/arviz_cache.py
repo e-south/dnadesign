@@ -33,7 +33,7 @@ def _suppress_arviz_refactor_future_warning() -> None:
     warnings.filterwarnings(
         "ignore",
         category=FutureWarning,
-        message=r"ArviZ is undergoing a major refactor.*",
+        message=r"\s*ArviZ is undergoing a major refactor.*",
         module=r"^arviz(\..*)?$",
     )
 

@@ -7,8 +7,10 @@ Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
+import importlib
 import json
 import re
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -31,10 +33,17 @@ from dnadesign.cruncher.cli.config_resolver import (
     WORKSPACE_ROOTS_ENV_VAR,
 )
 from dnadesign.cruncher.store.catalog_index import CatalogEntry, CatalogIndex
+from dnadesign.cruncher.study.manifest import (
+    StudyManifestV1,
+    StudyStatusV1,
+    StudyTrialRun,
+    write_study_manifest,
+    write_study_status,
+)
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mK]")
 runner = CliRunner()
-CONFIG_PATH = Path(__file__).resolve().parents[2] / "workspaces" / "demo_basics_two_tf" / "config.yaml"
+CONFIG_PATH = Path(__file__).resolve().parents[2] / "workspaces" / "demo_pairwise" / "configs" / "config.yaml"
 
 
 def invoke_cli(args: list[str], env: dict[str, str] | None = None):
@@ -75,22 +84,214 @@ def test_root_help_includes_command_descriptions() -> None:
     assert "workspaces" in result.output
 
 
+def test_export_command_module_defers_service_import() -> None:
+    command_module = "dnadesign.cruncher.cli.commands.export"
+    service_module = "dnadesign.cruncher.app.export_sequences_service"
+    sys.modules.pop(command_module, None)
+    sys.modules.pop(service_module, None)
+
+    importlib.import_module(command_module)
+
+    assert service_module not in sys.modules
+
+
+def test_study_command_module_defers_workflow_import() -> None:
+    command_module = "dnadesign.cruncher.cli.commands.study"
+    workflow_module = "dnadesign.cruncher.app.study_workflow"
+    sys.modules.pop(command_module, None)
+    sys.modules.pop(workflow_module, None)
+
+    importlib.import_module(command_module)
+
+    assert workflow_module not in sys.modules
+
+
+def test_portfolio_command_module_defers_workflow_import() -> None:
+    command_module = "dnadesign.cruncher.cli.commands.portfolio"
+    workflow_module = "dnadesign.cruncher.app.portfolio_workflow"
+    sys.modules.pop(command_module, None)
+    sys.modules.pop(workflow_module, None)
+
+    importlib.import_module(command_module)
+
+    assert workflow_module not in sys.modules
+
+
+def test_analyze_command_module_defers_config_load_import() -> None:
+    command_module = "dnadesign.cruncher.cli.commands.analyze"
+    config_load_module = "dnadesign.cruncher.config.load"
+    sys.modules.pop(command_module, None)
+    sys.modules.pop(config_load_module, None)
+
+    importlib.import_module(command_module)
+
+    assert config_load_module not in sys.modules
+
+
 def test_workspaces_list_includes_demo() -> None:
     result = invoke_cli(["workspaces", "list"], env={"COLUMNS": "200"})
     assert result.exit_code == 0
-    assert "demo_basics_two_tf" in result.output
+    assert "demo_pairwise" in result.output
+
+
+def test_workspaces_clean_transient_dry_run_preserves_files(tmp_path: Path) -> None:
+    root = tmp_path / "workspace_root"
+    pycache_dir = root / "pkg" / "__pycache__"
+    pycache_dir.mkdir(parents=True, exist_ok=True)
+    pyc_file = pycache_dir / "mod.cpython-312.pyc"
+    pyc_file.write_bytes(b"pyc")
+    ds_store = root / ".DS_Store"
+    ds_store.write_text("meta")
+
+    result = invoke_cli(["workspaces", "clean-transient", "--root", str(root)])
+    assert result.exit_code == 0
+    output = combined_output(result)
+    assert "Dry run only" in output
+    assert pycache_dir.exists()
+    assert pyc_file.exists()
+    assert ds_store.exists()
+
+
+def test_workspaces_clean_transient_confirm_deletes_files(tmp_path: Path) -> None:
+    root = tmp_path / "workspace_root"
+    pycache_dir = root / "pkg" / "__pycache__"
+    pycache_dir.mkdir(parents=True, exist_ok=True)
+    pyc_file = pycache_dir / "mod.cpython-312.pyc"
+    pyc_file.write_bytes(b"pyc")
+    ds_store = root / ".DS_Store"
+    ds_store.write_text("meta")
+
+    result = invoke_cli(["workspaces", "clean-transient", "--root", str(root), "--confirm"])
+    assert result.exit_code == 0
+    output = combined_output(result)
+    assert "Deleted" in output
+    assert not pycache_dir.exists()
+    assert not pyc_file.exists()
+    assert not ds_store.exists()
+
+
+def test_workspaces_clean_transient_include_catalog_cache_deletes_dot_cruncher(tmp_path: Path) -> None:
+    root = tmp_path / "workspace_root"
+    catalog_dir = root / ".cruncher"
+    catalog_dir.mkdir(parents=True, exist_ok=True)
+    (catalog_dir / "index.json").write_text("{}")
+
+    result = invoke_cli(
+        [
+            "workspaces",
+            "clean-transient",
+            "--root",
+            str(root),
+            "--include-catalog-cache",
+            "--confirm",
+        ]
+    )
+    assert result.exit_code == 0
+    output = combined_output(result)
+    assert "Deleted" in output
+    assert not catalog_dir.exists()
+
+
+def test_workspaces_list_includes_study_counts(tmp_path: Path) -> None:
+    roots = tmp_path / "workspaces"
+    workspace = roots / "demo"
+    config_dir = workspace / "configs"
+    config_dir.mkdir(parents=True)
+    config_path = config_dir / "config.yaml"
+    config_path.write_text(
+        "cruncher: {schema_version: 3, workspace: {out_dir: outputs, regulator_sets: [[lexA,cpxR]]}}\n"
+    )
+
+    spec_path = workspace / "configs" / "studies" / "diag.study.yaml"
+    spec_path.parent.mkdir(parents=True, exist_ok=True)
+    spec_path.write_text(
+        yaml.safe_dump(
+            {
+                "study": {
+                    "schema_version": 3,
+                    "name": "diag",
+                    "base_config": "config.yaml",
+                    "target": {"kind": "regulator_set", "set_index": 1},
+                    "execution": {
+                        "parallelism": 1,
+                        "on_trial_error": "continue",
+                        "exit_code_policy": "nonzero_if_any_error",
+                        "summarize_after_run": True,
+                    },
+                    "artifacts": {"trial_output_profile": "minimal"},
+                    "replicates": {"seed_path": "sample.seed", "seeds": [1]},
+                    "trials": [{"id": "L6", "factors": {"sample.sequence_length": 6}}],
+                }
+            }
+        )
+    )
+
+    run_dir = workspace / "outputs" / "studies" / "diag" / "study123"
+    manifest_file = run_dir / "study" / "study_manifest.json"
+    status_file = run_dir / "study" / "study_status.json"
+    manifest_file.parent.mkdir(parents=True, exist_ok=True)
+    write_study_manifest(
+        manifest_file,
+        StudyManifestV1(
+            study_name="diag",
+            study_id="study123",
+            spec_path=str(spec_path),
+            spec_sha256="spec",
+            base_config_path=str(config_path),
+            base_config_sha256="cfg",
+            created_at="2026-02-17T00:00:00+00:00",
+            trial_runs=[
+                StudyTrialRun(
+                    trial_id="L6",
+                    seed=1,
+                    target_set_index=1,
+                    target_tfs=["lexA", "cpxR"],
+                    status="success",
+                    run_dir=str(run_dir / "trials" / "L6" / "seed_1" / "run_a"),
+                )
+            ],
+        ),
+    )
+    write_study_status(
+        status_file,
+        StudyStatusV1(
+            study_name="diag",
+            study_id="study123",
+            status="completed",
+            total_runs=1,
+            pending_runs=0,
+            running_runs=0,
+            success_runs=1,
+            error_runs=0,
+            skipped_runs=0,
+            warnings=[],
+            started_at="2026-02-17T00:00:00+00:00",
+            updated_at="2026-02-17T00:00:00+00:00",
+            finished_at="2026-02-17T00:00:00+00:00",
+        ),
+    )
+
+    result = invoke_cli(
+        ["workspaces", "list"],
+        env={WORKSPACE_ROOTS_ENV_VAR: str(roots), NONINTERACTIVE_ENV_VAR: "1", "COLUMNS": "200"},
+    )
+    assert result.exit_code == 0
+    output = combined_output(result)
+    assert "Study Specs" in output
+    assert "Study Runs" in output
+    assert "demo" in output
 
 
 def test_fetch_motifs_requires_tf_or_motif_id() -> None:
     result = invoke_cli(["fetch", "motifs", str(CONFIG_PATH)])
     assert result.exit_code != 0
-    assert "Provide at least one --tf, --motif-id, or --campaign" in combined_output(result)
+    assert "Provide at least one --tf or --motif-id" in combined_output(result)
 
 
-def test_fetch_motifs_rejects_campaign_and_tf() -> None:
-    result = invoke_cli(["fetch", "motifs", "--campaign", "demo_pair", "--tf", "lexA", str(CONFIG_PATH)])
+def test_fetch_motifs_rejects_campaign_option() -> None:
+    result = invoke_cli(["fetch", "motifs", "--campaign", "demo_pair", str(CONFIG_PATH)])
     assert result.exit_code != 0
-    assert "--campaign cannot be combined with --tf or --motif-id" in combined_output(result)
+    assert "No such option: --campaign" in combined_output(result)
 
 
 def test_global_config_option_resolves_workspace() -> None:
@@ -113,131 +314,6 @@ def test_targets_status_rejects_site_kinds_with_matrix_pwm(tmp_path: Path) -> No
     result = invoke_cli(["targets", "status", "--site-kind", "curated", str(config_path)])
     assert result.exit_code != 0
     assert "--site-kind requires pwm_source=sites" in combined_output(result)
-
-
-def test_campaign_generate_defaults_to_workspace_campaign_state(tmp_path: Path) -> None:
-    config = {
-        "cruncher": {
-            "schema_version": 3,
-            "workspace": {
-                "out_dir": "runs",
-                "regulator_sets": [],
-                "regulator_categories": {"A": ["lexA"], "B": ["cpxR"]},
-            },
-            "campaigns": [
-                {
-                    "name": "demo",
-                    "categories": ["A", "B"],
-                    "across_categories": {"sizes": [2]},
-                }
-            ],
-            "catalog": {"root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
-        }
-    }
-    config_path = tmp_path / "config.yaml"
-    config_path.write_text(yaml.safe_dump(config))
-
-    result = invoke_cli(["campaign", "generate", "--campaign", "demo", str(config_path)])
-    assert result.exit_code == 0
-    generated = tmp_path / ".cruncher" / "campaigns" / "demo" / "generated.yaml"
-    manifest = tmp_path / ".cruncher" / "campaigns" / "demo" / "generated.campaign_manifest.json"
-    assert generated.exists()
-    assert manifest.exists()
-
-
-def test_campaign_generate_rejects_outside_workspace(tmp_path: Path) -> None:
-    config = {
-        "cruncher": {
-            "schema_version": 3,
-            "workspace": {
-                "out_dir": "runs",
-                "regulator_sets": [],
-                "regulator_categories": {"A": ["lexA"], "B": ["cpxR"]},
-            },
-            "campaigns": [
-                {
-                    "name": "demo",
-                    "categories": ["A", "B"],
-                    "across_categories": {"sizes": [2]},
-                }
-            ],
-            "catalog": {"root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
-        }
-    }
-    config_path = tmp_path / "config.yaml"
-    config_path.write_text(yaml.safe_dump(config))
-
-    outside = tmp_path.parent / f"{tmp_path.name}_outside"
-    outside.mkdir()
-    out_path = outside / "derived.yaml"
-
-    result = invoke_cli(["campaign", "generate", "--campaign", "demo", "--out", str(out_path), str(config_path)])
-    assert result.exit_code != 0
-    assert "--out must be inside" in combined_output(result)
-
-
-def test_lock_campaign_required_for_campaign_mode_config(tmp_path: Path) -> None:
-    config = {
-        "cruncher": {
-            "schema_version": 3,
-            "workspace": {
-                "out_dir": "runs",
-                "regulator_sets": [],
-                "regulator_categories": {"A": ["lexA"], "B": ["cpxR"]},
-            },
-            "campaigns": [
-                {
-                    "name": "demo",
-                    "categories": ["A", "B"],
-                    "across_categories": {"sizes": [2]},
-                }
-            ],
-            "catalog": {"root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
-        }
-    }
-    config_path = tmp_path / "config.yaml"
-    config_path.write_text(yaml.safe_dump(config))
-
-    result = invoke_cli(["lock", str(config_path)])
-    assert result.exit_code != 0
-    assert "--campaign" in combined_output(result)
-
-
-def test_sample_campaign_required_for_campaign_mode_config(tmp_path: Path) -> None:
-    config = {
-        "cruncher": {
-            "schema_version": 3,
-            "workspace": {
-                "out_dir": "runs",
-                "regulator_sets": [],
-                "regulator_categories": {"A": ["lexA"], "B": ["cpxR"]},
-            },
-            "campaigns": [
-                {
-                    "name": "demo",
-                    "categories": ["A", "B"],
-                    "across_categories": {"sizes": [2]},
-                }
-            ],
-            "sample": {
-                "seed": 1,
-                "sequence_length": 12,
-                "budget": {"tune": 1, "draws": 1},
-                "optimizer": {
-                    "kind": "gibbs_anneal",
-                    "chains": 2,
-                    "cooling": {"kind": "linear", "beta_start": 0.2, "beta_end": 1.0},
-                },
-                "elites": {"k": 1},
-            },
-        }
-    }
-    config_path = tmp_path / "config.yaml"
-    config_path.write_text(yaml.safe_dump(config))
-
-    result = invoke_cli(["sample", str(config_path)])
-    assert result.exit_code != 0
-    assert "--campaign" in combined_output(result)
 
 
 def test_sample_verbose_uses_runtime_progress_controls(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -288,6 +364,54 @@ def test_sample_verbose_uses_runtime_progress_controls(tmp_path: Path, monkeypat
     assert calls[0]["progress_every"] == 1000
 
 
+def test_sample_no_progress_disables_runtime_progress_controls(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config = {
+        "cruncher": {
+            "schema_version": 3,
+            "workspace": {"out_dir": "runs", "regulator_sets": [["lexA"]]},
+            "catalog": {"root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
+            "sample": {
+                "seed": 1,
+                "sequence_length": 12,
+                "budget": {"tune": 1, "draws": 1},
+                "optimizer": {"kind": "gibbs_anneal", "chains": 1, "cooling": {"kind": "fixed", "beta": 1.0}},
+                "elites": {"k": 1},
+            },
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    calls: list[dict[str, object]] = []
+
+    def _fake_run_sample(
+        cfg,
+        config_path_in: Path,
+        *,
+        force_overwrite: bool = False,
+        progress_bar: bool = True,
+        progress_every: int = 0,
+    ) -> None:
+        calls.append(
+            {
+                "config_path": config_path_in,
+                "force_overwrite": force_overwrite,
+                "progress_bar": progress_bar,
+                "progress_every": progress_every,
+            }
+        )
+
+    monkeypatch.setattr("dnadesign.cruncher.app.sample_workflow.run_sample", _fake_run_sample)
+
+    result = invoke_cli(["sample", "--no-progress", "--verbose", str(config_path)])
+    assert result.exit_code == 0
+    assert calls
+    assert calls[0]["config_path"] == config_path
+    assert calls[0]["force_overwrite"] is False
+    assert calls[0]["progress_bar"] is False
+    assert calls[0]["progress_every"] == 0
+
+
 def test_catalog_show_requires_source_ref() -> None:
     result = invoke_cli(["catalog", "show", str(CONFIG_PATH), "badref"])
     assert result.exit_code != 0
@@ -329,7 +453,8 @@ def test_sources_list_auto_detects_config_in_cwd(tmp_path, monkeypatch) -> None:
             },
         }
     }
-    config_path = tmp_path / "config.yaml"
+    config_path = tmp_path / "configs" / "config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(yaml.safe_dump(config))
     monkeypatch.chdir(tmp_path)
 
@@ -549,6 +674,22 @@ def test_lock_requires_config_with_hint() -> None:
     assert "No config argument provided" in result.output
 
 
+def test_lock_missing_catalog_data_hint_mentions_discovery_flow(tmp_path: Path) -> None:
+    config = {
+        "cruncher": {
+            "schema_version": 3,
+            "workspace": {"out_dir": "outputs", "regulator_sets": [["lexA"]]},
+            "catalog": {"root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    result = invoke_cli(["lock", str(config_path)])
+    assert result.exit_code != 0
+    assert "discover motifs" in combined_output(result)
+
+
 def test_parse_requires_config_with_hint() -> None:
     result = invoke_isolated(["parse"])
     assert result.exit_code != 0
@@ -667,6 +808,7 @@ def test_analyze_latest_requires_complete_artifacts(tmp_path: Path) -> None:
                 "adapt_sweeps": 1,
                 "top_k": 1,
                 "objective": {"bidirectional": True, "score_scale": "normalized-llr"},
+                "optimizer": {"kind": "gibbs_anneal"},
                 "optimizer_stats": {"beta_ladder_final": [1.0]},
                 "artifacts": [],
             },
@@ -738,3 +880,44 @@ def test_analyze_accepts_run_directory_path_override(monkeypatch: pytest.MonkeyP
     assert result.exit_code == 0
     assert captured.get("runs_override") == [str(run_dir.resolve())]
     assert captured.get("use_latest") is False
+
+
+def test_analyze_prints_next_steps_with_run_dir_not_analysis_dir(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    config = {
+        "cruncher": {
+            "schema_version": 3,
+            "workspace": {"out_dir": "outputs", "regulator_sets": [["lexA", "cpxR"]]},
+            "catalog": {"root": str(tmp_path / ".cruncher"), "pwm_source": "matrix"},
+            "sample": {
+                "seed": 7,
+                "sequence_length": 12,
+                "budget": {"tune": 1, "draws": 1},
+                "elites": {"k": 1},
+                "output": {"save_sequences": True, "save_trace": False},
+            },
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+
+    run_dir = tmp_path / "outputs"
+    analysis_dir = run_dir / "analysis"
+    report_dir = analysis_dir / "reports"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    (report_dir / "summary.json").write_text(json.dumps({"analysis_id": "aid-1"}))
+    (report_dir / "report.md").write_text("# report\n")
+
+    def _fake_run_analyze(cfg, config_path, *, runs_override=None, use_latest=False):
+        return [analysis_dir]
+
+    monkeypatch.setattr(analyze_workflow, "run_analyze", _fake_run_analyze)
+
+    result = invoke_cli(["analyze", "--latest", str(config_path)])
+
+    assert result.exit_code == 0
+    assert "cruncher runs show outputs -c" in result.output
+    assert "cruncher notebook --latest" in result.output
+    assert str(run_dir.resolve()) in result.output

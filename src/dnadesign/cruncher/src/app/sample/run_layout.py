@@ -19,7 +19,6 @@ from dnadesign.cruncher.app.run_service import update_run_index_from_manifest, u
 from dnadesign.cruncher.artifacts.atomic_write import atomic_write_gzip_json
 from dnadesign.cruncher.artifacts.entries import artifact_entry
 from dnadesign.cruncher.artifacts.layout import (
-    CAMPAIGN_ROOT_DIR,
     LOGOS_ROOT_DIR,
     build_run_dir,
     ensure_run_dirs,
@@ -37,7 +36,7 @@ from dnadesign.cruncher.core.pvalue import logodds_cache_info
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
 from dnadesign.cruncher.utils.paths import resolve_catalog_root, resolve_lock_path
 
-_PRESERVED_SAMPLE_ROOT_DIRS = frozenset({LOGOS_ROOT_DIR, CAMPAIGN_ROOT_DIR, "_archive"})
+_PRESERVED_SAMPLE_ROOT_DIRS = frozenset({LOGOS_ROOT_DIR, "_archive"})
 
 
 @dataclass(frozen=True)
@@ -63,6 +62,7 @@ def _materialize_optimizer_stats(
     optimizer_stats: object,
     *,
     stage: str,
+    include_move_stats: bool = True,
 ) -> tuple[dict[str, object], list[dict[str, object]], str | None]:
     if optimizer_stats is None:
         return {}, [], None
@@ -79,11 +79,13 @@ def _materialize_optimizer_stats(
         return manifest_stats, [], None
     if move_stats is not None and not isinstance(move_stats, list):
         raise ValueError("optimizer.stats()['move_stats'] must be a list.")
+    manifest_stats["move_stats_rows"] = len(move_stats)
+    if not include_move_stats:
+        return manifest_stats, [], None
     rel_path = Path("optimize") / "optimizer_move_stats.json.gz"
     sidecar_path = run_optimize_dir(run_dir) / "optimizer_move_stats.json.gz"
     sidecar_path.parent.mkdir(parents=True, exist_ok=True)
     sidecar_payload: dict[str, object] = {"move_stats": move_stats}
-    manifest_stats["move_stats_rows"] = len(move_stats)
     atomic_write_gzip_json(sidecar_path, sidecar_payload, allow_nan=False)
     manifest_stats["move_stats_path"] = str(rel_path)
     return (
@@ -115,6 +117,7 @@ def prepare_run_layout(
     chain_count: int,
     optimizer_kind: str,
     force_overwrite: bool,
+    register_run_in_index: bool = True,
 ) -> RunLayout:
     optimizer_kind = resolve_optimizer_kind(optimizer_kind, context="prepare_run_layout optimizer_kind")
     run_dir = build_run_dir(
@@ -156,12 +159,13 @@ def prepare_run_layout(
             "run_kind": run_kind,
         },
     )
-    update_run_index_from_status(
-        config_path,
-        run_dir,
-        status_writer.payload,
-        catalog_root=cfg.catalog.catalog_root,
-    )
+    if register_run_in_index:
+        update_run_index_from_status(
+            config_path,
+            run_dir,
+            status_writer.payload,
+            catalog_root=cfg.catalog.catalog_root,
+        )
     adapt_sweeps = int(sample_cfg.budget.tune)
     draws = int(sample_cfg.budget.draws)
     total_sweeps = adapt_sweeps + draws
@@ -202,6 +206,7 @@ def write_run_manifest_and_update(
     parse_signature: str | None,
     parse_inputs: dict[str, object] | None,
     status_writer: RunStatusWriter,
+    register_run_in_index: bool = True,
 ) -> Path:
     catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     catalog = CatalogIndex.load(catalog_root)
@@ -228,6 +233,7 @@ def write_run_manifest_and_update(
         run_dir,
         optimizer_stats,
         stage=stage,
+        include_move_stats=bool(sample_cfg.output.save_optimizer_move_stats),
     )
     manifest_artifacts = list(artifacts)
     manifest_artifacts.extend(optimizer_stat_artifacts)
@@ -247,6 +253,8 @@ def write_run_manifest_and_update(
             "seed_effective": sample_cfg.seed + set_index - 1,
             "record_tune": sample_cfg.output.include_tune_in_sequences,
             "save_trace": sample_cfg.output.save_trace,
+            "save_random_baseline": sample_cfg.output.save_random_baseline,
+            "save_optimizer_move_stats": sample_cfg.output.save_optimizer_move_stats,
             "chains": int(sample_cfg.optimizer.chains),
             "total_sweeps": int(sample_cfg.budget.tune + sample_cfg.budget.draws),
             "adapt_sweeps": int(sample_cfg.budget.tune),
@@ -277,17 +285,19 @@ def write_run_manifest_and_update(
         },
     )
     manifest_path_out = write_manifest(run_dir, manifest)
-    update_run_index_from_manifest(
-        config_path,
-        run_dir,
-        manifest,
-        catalog_root=cfg.catalog.catalog_root,
-    )
+    if register_run_in_index:
+        update_run_index_from_manifest(
+            config_path,
+            run_dir,
+            manifest,
+            catalog_root=cfg.catalog.catalog_root,
+        )
     status_writer.finish(status="completed", artifacts=manifest_artifacts)
-    update_run_index_from_status(
-        config_path,
-        run_dir,
-        status_writer.payload,
-        catalog_root=cfg.catalog.catalog_root,
-    )
+    if register_run_in_index:
+        update_run_index_from_status(
+            config_path,
+            run_dir,
+            status_writer.payload,
+            catalog_root=cfg.catalog.catalog_root,
+        )
     return manifest_path_out

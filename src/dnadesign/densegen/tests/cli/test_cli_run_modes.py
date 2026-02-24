@@ -53,7 +53,64 @@ def _write_config(run_root: Path) -> Path:
             sequence_length: 10
             plan:
               - name: demo_plan
-                quota: 1
+                sequences: 1
+                sampling:
+                  include_inputs: [demo_input]
+                regulator_constraints:
+                  groups:
+                    - name: all
+                      members: [lexA]
+                      min_required: 1
+          solver:
+            backend: CBC
+            strategy: iterate
+          postprocess:
+            pad:
+              mode: adaptive
+              end: 5prime
+              gc:
+                mode: range
+                min: 0.4
+                max: 0.6
+                target: 0.5
+                tolerance: 0.1
+                min_pad_length: 4
+          logging:
+            log_dir: outputs/logs
+        """.strip()
+        + "\n"
+    )
+    return cfg_path
+
+
+def _write_config_with_auxiliary_input(run_root: Path) -> Path:
+    cfg_path = run_root / "config.yaml"
+    cfg_path.write_text(
+        """
+        densegen:
+          schema_version: "2.9"
+          run:
+            id: demo
+            root: "."
+          inputs:
+            - name: demo_input
+              type: binding_sites
+              path: inputs.csv
+            - name: aux_input
+              type: binding_sites
+              path: missing.csv
+          output:
+            targets: [parquet]
+            schema:
+              bio_type: dna
+              alphabet: dna_4
+            parquet:
+              path: outputs/tables/records.parquet
+          generation:
+            sequence_length: 10
+            plan:
+              - name: demo_plan
+                sequences: 1
                 sampling:
                   include_inputs: [demo_input]
                 regulator_constraints:
@@ -142,7 +199,7 @@ def _write_pwm_config(run_root: Path) -> Path:
             sequence_length: 10
             plan:
               - name: demo_plan
-                quota: 1
+                sequences: 1
                 sampling:
                   include_inputs: [demo_pwm]
                 regulator_constraints:
@@ -219,7 +276,7 @@ def _write_usr_config(run_root: Path) -> Path:
             sequence_length: 10
             plan:
               - name: demo_plan
-                quota: 1
+                sequences: 1
                 sampling:
                   include_inputs: [demo_input]
                 regulator_constraints:
@@ -264,6 +321,23 @@ def test_run_auto_resumes_when_outputs_exist_and_pools_present(tmp_path: Path, m
     assert result.exit_code == 0, result.output
     assert captured["resume"] is True
     assert captured["build_stage_a"] is False
+
+
+def test_run_next_steps_use_plot_discovery_and_generic_plot_command(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_config(run_root)
+
+    monkeypatch.setattr(run_command, "run_pipeline", lambda *_args, **_kwargs: None)
+    runner = CliRunner()
+    result = runner.invoke(app, ["run", "--fresh", "--no-plot", "-c", str(cfg_path)])
+
+    assert result.exit_code == 0, result.output
+    normalized = result.output.replace("\n", " ")
+    assert "dense ls-plots" in normalized
+    assert "dense plot --only stage_a_summary" not in normalized
+    assert "render configured plot set" in normalized
 
 
 def test_help_lists_campaign_reset_command() -> None:
@@ -338,6 +412,42 @@ def test_run_auto_builds_stage_a_when_pools_missing(tmp_path: Path, monkeypatch)
     assert result.exit_code == 0, result.output
     assert captured["resume"] is True
     assert captured["build_stage_a"] is True
+
+
+def test_run_ignores_stale_auxiliary_inputs_not_in_active_plan(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_config_with_auxiliary_input(run_root)
+
+    outputs_dir = run_root / "outputs"
+    outputs_dir.mkdir(parents=True, exist_ok=True)
+    tables_dir = outputs_dir / "tables"
+    tables_dir.mkdir(parents=True, exist_ok=True)
+    (tables_dir / "records.parquet").write_text("seed")
+
+    captured: dict[str, bool] = {}
+
+    def _fake_run_pipeline(_loaded, *, resume, build_stage_a, **_kwargs):
+        captured["resume"] = bool(resume)
+        captured["build_stage_a"] = bool(build_stage_a)
+
+    monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
+    monkeypatch.setattr(
+        run_command,
+        "pool_status_by_input",
+        lambda *_args, **_kwargs: {
+            "demo_input": SimpleNamespace(name="demo_input", state="present"),
+            "aux_input": SimpleNamespace(name="aux_input", state="stale"),
+        },
+    )
+    runner = CliRunner()
+    result = runner.invoke(app, ["run", "-c", str(cfg_path)])
+
+    assert result.exit_code == 0, result.output
+    assert captured["resume"] is True
+    assert captured["build_stage_a"] is False
+    assert "Ignoring stale Stage-A pools for unused inputs: aux_input" in result.output
 
 
 def test_campaign_reset_removes_outputs(tmp_path: Path) -> None:
@@ -586,7 +696,7 @@ def test_run_auto_accepts_plan_quota_increase_on_resume(tmp_path: Path, monkeypa
     old_cfg = load_config(cfg_path).root.densegen.model_dump(by_alias=True, exclude_none=False)
     old_sha = hashlib.sha256(cfg_path.read_bytes()).hexdigest()
 
-    updated_text = cfg_path.read_text().replace("                quota: 1\n", "                quota: 2\n", 1)
+    updated_text = cfg_path.read_text().replace("                sequences: 1\n", "                sequences: 2\n", 1)
     cfg_path.write_text(updated_text)
     outputs_dir = run_root / "outputs"
     (outputs_dir / "tables").mkdir(parents=True, exist_ok=True)
@@ -663,7 +773,7 @@ def test_run_extend_quota_increases_plan_target_before_pipeline(tmp_path: Path, 
     captured: dict[str, int] = {}
 
     def _fake_run_pipeline(loaded, **_kwargs):
-        captured["quota"] = int(loaded.root.densegen.generation.plan[0].quota)
+        captured["quota"] = int(loaded.root.densegen.generation.plan[0].sequences)
         return SimpleNamespace(total_generated=4, per_plan={("demo_input", "demo_plan"): 4}, generated_this_run=4)
 
     monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
@@ -715,7 +825,7 @@ def test_run_extend_quota_anchors_to_existing_generated_rows(tmp_path: Path, mon
     captured: dict[str, int] = {}
 
     def _fake_run_pipeline(loaded, **_kwargs):
-        captured["quota"] = int(loaded.root.densegen.generation.plan[0].quota)
+        captured["quota"] = int(loaded.root.densegen.generation.plan[0].sequences)
         return SimpleNamespace(total_generated=7, per_plan={("demo_input", "demo_plan"): 7}, generated_this_run=3)
 
     monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
@@ -751,7 +861,7 @@ def test_run_resume_reuses_effective_quota_target_after_interrupted_extend(tmp_p
     )
 
     previous_cfg = load_config(cfg_path).root.densegen.model_dump(by_alias=True, exclude_none=False)
-    previous_cfg["generation"]["plan"][0]["quota"] = 6
+    previous_cfg["generation"]["plan"][0]["sequences"] = 6
     (outputs_dir / "meta" / "effective_config.json").write_text(
         json.dumps(
             {
@@ -764,7 +874,7 @@ def test_run_resume_reuses_effective_quota_target_after_interrupted_extend(tmp_p
     captured: dict[str, int] = {}
 
     def _fake_run_pipeline(loaded, **_kwargs):
-        captured["quota"] = int(loaded.root.densegen.generation.plan[0].quota)
+        captured["quota"] = int(loaded.root.densegen.generation.plan[0].sequences)
         return SimpleNamespace(total_generated=6, per_plan={("demo_input", "demo_plan"): 6}, generated_this_run=4)
 
     monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)

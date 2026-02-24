@@ -1,6 +1,8 @@
-# Cruncher intent and lifecycle
+## Cruncher intent and lifecycle
 
-## Contents
+**Last updated by:** cruncher-maintainers on 2026-02-23
+
+### Contents
 - [Intent](#intent)
 - [Intended use cases](#intended-use-cases)
 - [Non-goals](#non-goals)
@@ -15,7 +17,7 @@
 - [Architecture mapping](#architecture-mapping)
 - [Related docs](#related-docs)
 
-## Intent
+### Intent
 
 Cruncher is an **artifact-first, reproducible DNA sequence optimizer** for
 **fixed-length** designs under **multi-transcription-factor PWM objectives**.
@@ -29,20 +31,20 @@ preserving strict operational contracts. The system favors:
 **Practical mental model:** deterministic data prep + strict optimization +
 artifact-native analytics.
 
-## Intended use cases
+### Intended use cases
 
 - Multi-TF promoter/operator design under tight length constraints.
 - Tradeoff exploration when multiple TF motifs must co-exist in a constrained length.
 - Producing a small, diverse, high-quality candidate set for downstream assays.
-- Campaign sweeps across many regulator sets, then aggregate comparison.
+- Workspace-scoped studies for sweeps, then aggregate comparison.
 
-## Non-goals
+### Non-goals
 
 - **Posterior inference:** Gibbs annealing MCMC here is used as an optimization engine + diagnostics, not Bayesian inference.
 - **Variable-length design:** sequences are fixed length by contract.
 - **Motif discovery as the primary workflow:** discovery is supported (MEME/STREME integration), but Cruncher's core is sequence design under pinned PWMs.
 
-## Core behavior
+### Core behavior
 
 - **Fixed length** is a hard invariant: every candidate is exactly
   `sample.sequence_length`, and must be at least the widest PWM length.
@@ -54,7 +56,7 @@ artifact-native analytics.
 - **Artifact-only analysis**: analysis runs do not rescan sequences; they read
   sample artifacts and hit metadata only.
 
-## Math and scoring
+### Math and scoring
 
 Cruncher uses a FIMO-like scanning model without calling FIMO:
 
@@ -87,7 +89,7 @@ softmin(v; beta) = -(1 / beta) * log(sum_i exp(-beta * v_i))
 
 where larger `beta` makes the objective closer to hard `min`.
 
-## Per-sweep optimizer mechanics
+### Per-sweep optimizer mechanics
 
 For each chain, Cruncher maintains a discrete sequence state:
 
@@ -113,7 +115,7 @@ alpha = min(1, exp(beta_mcmc * (f(x') - f(x))))
 This is why cooling and move mix jointly determine stability: temperature
 controls downhill tolerance, and move scale controls proposal jump size.
 
-## Why raw trajectories look noisy
+### Why raw trajectories look noisy
 
 Raw chain paths are expected to jitter even when optimization is healthy:
 
@@ -127,7 +129,7 @@ For optimizer storytelling, interpret trajectory plots together with tail
 acceptance and elite outcomes. A monotone "best-so-far" overlay is often more
 informative than raw per-step score alone.
 
-## Diversity and elites
+### Diversity and elites
 
 Elites are selected with **TFBS-core MMR**:
 
@@ -141,7 +143,7 @@ When bidirectional scoring is enabled, Cruncher uses **canonical identity**
 (lexicographic min of sequence and reverse complement) for uniqueness, elite
 dedupe, and success counters.
 
-## Run lifecycle
+### Run lifecycle
 
 1. **fetch** -> cache motif/site records in the local catalog
 2. **lock** -> resolve TF names to exact records + hashes (reproducibility pin)
@@ -151,15 +153,15 @@ dedupe, and success counters.
 
 The demo workflows in `docs/demos/` follow this lifecycle end-to-end.
 
-## Artifacts and outputs
+### Artifacts and outputs
 
 Sampling writes (under `optimize/` unless noted):
 
-- `optimize/sequences.parquet` (per-draw scores + metadata)
-- `optimize/elites.parquet` (elite sequences + summaries)
-- `optimize/elites_hits.parquet` (per-elite x per-TF best-hit/core metadata)
-- `optimize/random_baseline.parquet` (baseline score cloud)
-- `optimize/random_baseline_hits.parquet` (baseline best-hit/core metadata)
+- `optimize/tables/sequences.parquet` (per-draw scores + metadata)
+- `optimize/tables/elites.parquet` (elite sequences + summaries)
+- `optimize/tables/elites_hits.parquet` (per-elite x per-TF best-hit/core metadata)
+- `optimize/tables/random_baseline.parquet` (baseline score cloud; default on via `sample.output.save_random_baseline=true` and `sample.output.random_baseline_n=10000`)
+- `optimize/tables/random_baseline_hits.parquet` (baseline best-hit/core metadata under the same baseline contract)
 - `provenance/lockfile.json` (snapshot of the pinned lockfile for reproducibility)
 
 Analysis writes:
@@ -170,7 +172,7 @@ Analysis writes:
 - `analysis/tables/table__*` (curated tabular artifacts)
 - `plots/*` (curated figures)
 
-## Config mapping
+### Config mapping
 
 Each config block maps directly to a lifecycle phase or runtime contract:
 
@@ -187,14 +189,14 @@ Crosswalk (behavior -> config -> modules -> artifacts):
 | Behavior / phase | Config keys (v3) | Primary layers | Writes |
 |---|---|---|---|
 | Fetch motifs/sites (cache) | `catalog.*`, `ingest.*`, `discover.*` | `ingest/`, `store/` | `<catalog.root>/normalized/...` + `catalog.json` |
-| Pin exact inputs (lock) | `workspace.regulator_sets` or `campaigns[]` + `--campaign`, `catalog.*` | `store/`, `app/` | `<workspace>/.cruncher/locks/<config>.lock.json` |
+| Pin exact inputs (lock) | `workspace.regulator_sets`, `catalog.*` | `store/`, `app/` | `<workspace>/.cruncher/locks/<config>.lock.json` |
 | Validate locked PWMs (parse) | (lockfile-driven) | `app/` | `<workspace>/.cruncher/parse/provenance/` |
 | Gibbs annealing optimization (sample) | `sample.*` | `core/`, `app/` | `<run_dir>/optimize/` + manifest/status updates |
 | Elite filter + TFBS-core MMR | `sample.elites.*` | `core/`, `app/` | `optimize/elites*.parquet` |
 | Artifact-only reporting (analyze) | `analysis.*` | `analysis/`, `app/` | `<run_dir>/analysis/` + `<run_dir>/plots/` |
-| Campaign expand + summarize | `campaigns[]`, `campaign` | `app/` | `outputs/campaign/<name>/{analysis,plots}` |
+| Study sweep + summarize | `configs/studies/*.study.yaml` | `study/`, `app/` | `outputs/studies/<study_name>/<study_id>/tables` + `outputs/plots/study__<study_name>__<study_id>__plot__*` |
 
-## Architecture mapping
+### Architecture mapping
 
 Cruncher is organized by responsibility:
 
@@ -208,9 +210,9 @@ Cruncher is organized by responsibility:
 For the full module layout and on-disk schema, see
 `docs/reference/architecture.md`.
 
-## Related docs
+### Related docs
 
 - [Sampling + analysis](sampling_and_analysis.md)
 - [Config reference](../reference/config.md)
 - [Architecture and artifacts](../reference/architecture.md)
-- [Two-TF demo (end-to-end)](../demos/demo_basics_two_tf.md)
+- [Two-TF demo (end-to-end)](../demos/demo_pairwise.md)

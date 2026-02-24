@@ -33,7 +33,8 @@ Use it when adding or changing behavior so tools remain decoupled, assertive, an
 ## Tool/package boundaries
 - Tool-local behavior belongs under `src/dnadesign/<tool>/`.
 - Shared logic belongs in shared modules (`src/dnadesign/devtools/` or dedicated shared packages), not by copying scripts across tools.
-- Cross-tool coupling should happen via documented artifacts/contracts (files, events, CLI contracts), not internal imports by convenience.
+- Cross-tool coupling should happen via documented artifacts/contracts (files, events, CLI contracts) or explicit public package APIs.
+- Internal `dnadesign.<tool>.src.*` imports across tool boundaries are non-contractual and disallowed.
 
 ## Documentation model
 - Root system-of-record docs define durable contracts and navigation.

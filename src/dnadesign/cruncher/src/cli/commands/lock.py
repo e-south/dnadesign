@@ -13,15 +13,15 @@ from pathlib import Path
 
 import typer
 
+from dnadesign.cruncher.app.cache_readiness import lock_refresh_hint
 from dnadesign.cruncher.app.lock_service import resolve_lock
-from dnadesign.cruncher.cli.campaign_targeting import resolve_runtime_targeting
 from dnadesign.cruncher.cli.config_resolver import (
     ConfigResolutionError,
     resolve_config_path,
 )
 from dnadesign.cruncher.cli.paths import render_path
 from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.utils.paths import resolve_catalog_root, resolve_lock_path
+from dnadesign.cruncher.utils.paths import resolve_catalog_root, resolve_lock_path, resolve_workspace_root
 
 
 def lock(
@@ -36,27 +36,15 @@ def lock(
         "-c",
         help="Path to cruncher config.yaml (overrides positional CONFIG).",
     ),
-    campaign: str | None = typer.Option(
-        None,
-        "--campaign",
-        "-n",
-        help="Campaign name to expand in-memory for this command.",
-    ),
 ) -> None:
     try:
         config_path = resolve_config_path(config_option or config)
     except ConfigResolutionError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1)
-    cfg = load_config(config_path)
     try:
-        cfg = resolve_runtime_targeting(
-            cfg=cfg,
-            config_path=config_path,
-            command_name="lock",
-            campaign_name=campaign,
-        ).cfg
-    except ValueError as exc:
+        cfg = load_config(config_path)
+    except (ValueError, FileNotFoundError) as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1)
     catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
@@ -80,6 +68,6 @@ def lock(
         )
     except ValueError as exc:
         typer.echo(f"Error: {exc}", err=True)
-        typer.echo("Hint: run cruncher fetch motifs/sites before locking.", err=True)
+        typer.echo(lock_refresh_hint(), err=True)
         raise typer.Exit(code=1)
-    typer.echo(render_path(lock_path, base=config_path.parent))
+    typer.echo(render_path(lock_path, base=resolve_workspace_root(config_path)))

@@ -11,7 +11,10 @@ from __future__ import annotations
 
 import pandas as pd
 
-from dnadesign.cruncher.analysis.diagnostics import summarize_sampling_diagnostics
+from dnadesign.cruncher.analysis.diagnostics import (
+    _tail_move_window_records,
+    summarize_sampling_diagnostics,
+)
 
 
 def test_acceptance_tail_from_move_stats() -> None:
@@ -88,3 +91,60 @@ def test_acceptance_tail_from_move_stats() -> None:
     assert optimizer_metrics["downhill_accept_tail_rugged"] == 0.5
     assert optimizer_metrics["gibbs_flip_rate_tail"] == 0.5
     assert optimizer_metrics["tail_step_hamming_mean"] == 1.2
+
+
+def test_tail_move_window_records_ignores_non_dict_rows() -> None:
+    move_stats = [
+        {
+            "sweep_idx": 0,
+            "phase": "draw",
+            "move_kind": "B",
+            "attempted": 1,
+            "accepted": 1,
+        },
+        "bad-row",
+        {
+            "sweep_idx": 1,
+            "phase": "draw",
+            "move_kind": "B",
+            "attempted": 1,
+            "accepted": 0,
+        },
+    ]
+    tail_rows, window, total_sweeps = _tail_move_window_records(move_stats, min_window=1, max_window=10)
+    assert len(tail_rows) == 1
+    assert int(tail_rows[0]["sweep_idx"]) == 1
+    assert window == 1
+    assert total_sweeps == 2
+
+
+def test_tail_move_window_records_requires_phase_column_when_filtering() -> None:
+    move_stats = [{"sweep_idx": 0, "move_kind": "B", "attempted": 1, "accepted": 1}]
+    tail_rows, window, total_sweeps = _tail_move_window_records(move_stats, phase="draw")
+    assert tail_rows == []
+    assert window is None
+    assert total_sweeps is None
+
+
+def test_tail_move_window_records_ignores_negative_counts() -> None:
+    move_stats = [
+        {"sweep_idx": 0, "phase": "draw", "move_kind": "B", "attempted": 1, "accepted": 1},
+        {"sweep_idx": 1, "phase": "draw", "move_kind": "B", "attempted": -4, "accepted": 0},
+    ]
+    tail_rows, window, total_sweeps = _tail_move_window_records(move_stats, min_window=1, max_window=10)
+    assert len(tail_rows) == 1
+    assert int(tail_rows[0]["sweep_idx"]) == 0
+    assert window == 1
+    assert total_sweeps == 1
+
+
+def test_tail_move_window_records_ignores_rows_with_accepted_gt_attempted() -> None:
+    move_stats = [
+        {"sweep_idx": 0, "phase": "draw", "move_kind": "B", "attempted": 1, "accepted": 1},
+        {"sweep_idx": 1, "phase": "draw", "move_kind": "B", "attempted": 2, "accepted": 3},
+    ]
+    tail_rows, window, total_sweeps = _tail_move_window_records(move_stats, min_window=1, max_window=10)
+    assert len(tail_rows) == 1
+    assert int(tail_rows[0]["sweep_idx"]) == 0
+    assert window == 1
+    assert total_sweeps == 1

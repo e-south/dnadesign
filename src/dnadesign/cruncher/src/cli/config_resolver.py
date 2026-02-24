@@ -18,12 +18,14 @@ from typing import Sequence
 
 logger = logging.getLogger(__name__)
 
+# Strict workspace layout contract:
+# <workspace>/configs/config.yaml
 CANDIDATE_CONFIG_FILENAMES: tuple[str, ...] = (
-    "cruncher.yaml",
-    "cruncher.yml",
-    "config.yaml",
-    "config.yml",
+    "configs/config.yaml",
+    "config.yaml (only when CWD is <workspace>/configs)",
 )
+WORKSPACE_CONFIG_DIR = "configs"
+WORKSPACE_CONFIG_NAME = "config.yaml"
 WORKSPACE_ENV_VAR = "CRUNCHER_WORKSPACE"
 WORKSPACE_ROOTS_ENV_VAR = "CRUNCHER_WORKSPACE_ROOTS"
 DEFAULT_WORKSPACE_ENV_VAR = "CRUNCHER_DEFAULT_WORKSPACE"
@@ -82,6 +84,10 @@ def _resolve_invocation_cwd(cwd: Path | None, *, log: bool) -> Path:
     return actual_cwd
 
 
+def resolve_invocation_cwd(cwd: Path | None = None) -> Path:
+    return _resolve_invocation_cwd(cwd, log=False)
+
+
 def _is_interactive() -> bool:
     if _env_truthy(NONINTERACTIVE_ENV_VAR) or _env_truthy("CI"):
         return False
@@ -108,7 +114,16 @@ def _resolve_explicit_config(config: Path, *, cwd: Path) -> Path:
 
 
 def _candidate_configs_in_dir(directory: Path) -> list[Path]:
-    return [directory / name for name in CANDIDATE_CONFIG_FILENAMES if (directory / name).is_file()]
+    candidates: list[Path] = []
+    workspace_config = directory / WORKSPACE_CONFIG_DIR / WORKSPACE_CONFIG_NAME
+    if workspace_config.is_file():
+        candidates.append(workspace_config)
+    # Allow direct resolution when commands are run from <workspace>/configs.
+    if directory.name == WORKSPACE_CONFIG_DIR:
+        direct_config = directory / WORKSPACE_CONFIG_NAME
+        if direct_config.is_file():
+            candidates.append(direct_config)
+    return candidates
 
 
 def _resolve_config_in_dir(directory: Path, *, cwd: Path, log: bool, label: str) -> Path | None:
@@ -168,7 +183,9 @@ def discover_workspaces(cwd: Path | None = None) -> list[WorkspaceCandidate]:
     for root in workspace_search_roots(cwd_path):
         if not root.is_dir():
             continue
-        for entry in sorted(root.iterdir()):
+        entries: list[Path] = [root]
+        entries.extend(sorted(item for item in root.iterdir() if item.is_dir()))
+        for entry in entries:
             if not entry.is_dir():
                 continue
             configs = _candidate_configs_in_dir(entry)
@@ -251,7 +268,7 @@ def _resolve_workspace_path(path: Path, *, cwd: Path) -> Path:
         if not matches:
             expected = ", ".join(CANDIDATE_CONFIG_FILENAMES)
             raise ConfigResolutionError(
-                f"No config file found in workspace directory: {normalized}\nExpected one of: {expected}"
+                f"No workspace config found in directory: {normalized}\nExpected one of: {expected}"
             )
         rendered = "\n".join(f"- {match.name}" for match in matches)
         raise ConfigResolutionError(
@@ -358,10 +375,9 @@ def resolve_config_path(config: Path | None, *, cwd: Path | None = None, log: bo
         roots = workspace_search_roots(cwd_path)
         roots_rendered = "\n".join(f"- {root}" for root in roots) if roots else "- (none)"
         raise ConfigResolutionError(
-            "No config argument provided and no default config file was found in the current directory.\n"
+            "No config argument provided and no workspace config was found from CWD/parents.\n"
             f"Expected one of: {expected}\n"
-            "Hint: pass --config PATH, set CRUNCHER_CONFIG, or create a config.yaml "
-            "(or cruncher.yaml) in this directory.\n"
+            "Hint: pass --config PATH, set CRUNCHER_CONFIG, or create <workspace>/configs/config.yaml.\n"
             "Workspace discovery searched:\n"
             f"{roots_rendered}\n"
             f"To add roots: set {WORKSPACE_ROOTS_ENV_VAR}=/path/a{os.pathsep}/path/b"

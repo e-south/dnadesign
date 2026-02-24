@@ -12,8 +12,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from dnadesign.cruncher.app.target_service import (
     has_blocking_target_errors,
+    select_catalog_entry,
     target_candidates,
     target_candidates_fuzzy,
     target_statuses,
@@ -417,3 +420,24 @@ def test_target_status_combine_sites_aggregates_counts(tmp_path: Path) -> None:
     statuses = target_statuses(cfg=cfg, config_path=tmp_path / "config.yaml")
     assert statuses[0].status == "ready"
     assert statuses[0].site_count == 7
+
+
+def test_select_catalog_entry_missing_matrix_hint_mentions_discovery_flow(tmp_path: Path) -> None:
+    catalog = CatalogIndex(entries={})
+
+    with pytest.raises(ValueError) as exc:
+        select_catalog_entry(
+            catalog=catalog,
+            tf_name="lexA",
+            pwm_source="matrix",
+            site_kinds=None,
+            combine_sites=False,
+            source_preference=[],
+            dataset_preference=[],
+            dataset_map={},
+            allow_ambiguous=False,
+        )
+
+    message = str(exc.value)
+    assert "fetch motifs" in message
+    assert "discover motifs" in message

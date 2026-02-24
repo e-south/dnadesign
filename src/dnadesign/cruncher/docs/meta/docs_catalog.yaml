@@ -1,0 +1,203 @@
+docs_catalog:
+  version: 1
+  pages:
+    - id: docs_readme
+      path: README.md
+      title: Cruncher Docs Map
+      kind: hub
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [index.md, demos/demo_pairwise.md]
+    - id: docs_index
+      path: index.md
+      title: Cruncher docs
+      kind: hub
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [README.md, reference/artifacts.md]
+    - id: demo_pairwise
+      path: demos/demo_pairwise.md
+      title: Pairwise Demo
+      kind: tutorial
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [guides/sampling_and_analysis.md, reference/runbook_steps.md]
+    - id: demo_multitf
+      path: demos/demo_multitf.md
+      title: MultiTF Demo
+      kind: tutorial
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [guides/sampling_and_analysis.md, reference/runbook_steps.md]
+    - id: demo_project_all_tfs
+      path: demos/project_all_tfs.md
+      title: Project Workspace Demo
+      kind: tutorial
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [guides/studies.md, guides/portfolio_aggregation.md]
+    - id: guide_ingestion
+      path: guides/ingestion.md
+      title: Ingestion
+      kind: guide
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [guides/meme_suite.md, guides/troubleshooting.md]
+    - id: guide_intent
+      path: guides/intent_and_lifecycle.md
+      title: Intent and Lifecycle
+      kind: guide
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [reference/architecture.md, reference/artifacts.md]
+    - id: guide_meme
+      path: guides/meme_suite.md
+      title: MEME Suite
+      kind: guide
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [guides/troubleshooting.md, guides/ingestion.md]
+    - id: guide_sampling
+      path: guides/sampling_and_analysis.md
+      title: Sampling and Analysis
+      kind: guide
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [reference/artifacts.md, reference/cli.md]
+    - id: guide_studies
+      path: guides/studies.md
+      title: Studies
+      kind: guide
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [guides/study_length_vs_score.md, guides/study_diversity_vs_score.md]
+    - id: guide_study_length
+      path: guides/study_length_vs_score.md
+      title: Study Length vs Score
+      kind: guide
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [guides/studies.md, reference/artifacts.md]
+    - id: guide_study_diversity
+      path: guides/study_diversity_vs_score.md
+      title: Study Diversity vs Score
+      kind: guide
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [guides/studies.md, reference/artifacts.md]
+    - id: guide_portfolio
+      path: guides/portfolio_aggregation.md
+      title: Portfolio Aggregation
+      kind: guide
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [reference/runbook_steps.md, guides/troubleshooting.md]
+    - id: guide_troubleshooting
+      path: guides/troubleshooting.md
+      title: Troubleshooting
+      kind: guide
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [reference/artifacts.md, reference/cli.md]
+    - id: ref_cli
+      path: reference/cli.md
+      title: CLI Reference
+      kind: reference
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [reference/config.md, reference/artifacts.md]
+    - id: ref_config
+      path: reference/config.md
+      title: Config Reference
+      kind: reference
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [guides/intent_and_lifecycle.md, reference/glossary.md]
+    - id: ref_architecture
+      path: reference/architecture.md
+      title: Architecture
+      kind: reference
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [reference/artifacts.md, internals/spec.md]
+    - id: ref_artifacts
+      path: reference/artifacts.md
+      title: Artifacts Reference
+      kind: reference
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [guides/troubleshooting.md, guides/sampling_and_analysis.md]
+    - id: ref_glossary
+      path: reference/glossary.md
+      title: Glossary
+      kind: reference
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [reference/config.md, reference/architecture.md]
+    - id: ref_conventions
+      path: reference/doc_conventions.md
+      title: Doc Conventions
+      kind: reference
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [meta/style_guide.md, reference/cli.md]
+    - id: ref_runbook_steps
+      path: reference/runbook_steps.md
+      title: Runbook Step Reference
+      kind: reference
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [demos/demo_pairwise.md, guides/portfolio_aggregation.md]
+    - id: internals_spec
+      path: internals/spec.md
+      title: Cruncher Internals Spec
+      kind: internals
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [reference/architecture.md, internals/optimizer_improvements_plan.md]
+    - id: internals_optimizer_plan
+      path: internals/optimizer_improvements_plan.md
+      title: Optimizer Improvements Plan
+      kind: internals
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [internals/spec.md, dev/journal.md]
+    - id: dev_journal
+      path: dev/journal.md
+      title: Dev Journal
+      kind: dev-note
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [meta/style_guide.md, reference/architecture.md]
+    - id: meta_style_guide
+      path: meta/style_guide.md
+      title: Docs Style Guide
+      kind: guide
+      audience: [cruncher-maintainers]
+      applies_to: schema_v3
+      last_verified: "2026-02-23"
+      next: [reference/doc_conventions.md, README.md]

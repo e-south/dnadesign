@@ -32,6 +32,11 @@ def _has_resumable_run_state(run_root: Path) -> bool:
     return any(path.exists() for path in candidates)
 
 
+def _is_plot_selection_error(message: str) -> bool:
+    lowered = message.lower()
+    return "unknown plot name requested" in lowered or "no plot names selected" in lowered
+
+
 def register_plot_commands(app: typer.Typer, *, context: CliContext) -> None:
     console = context.console
     make_table = context.make_table
@@ -59,6 +64,11 @@ def register_plot_commands(app: typer.Typer, *, context: CliContext) -> None:
         ctx: typer.Context,
         only: Optional[str] = typer.Option(None, help="Comma-separated plot names (subset of available plots)."),
         absolute: bool = typer.Option(False, "--absolute", help="Show absolute paths instead of workspace-relative."),
+        allow_truncated: bool = typer.Option(
+            False,
+            "--allow-truncated",
+            help="Allow sampled plotting when output records exceed the row materialization limit.",
+        ),
         config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
     ):
         cfg_path, is_default = context.resolve_config_path(ctx, config)
@@ -80,11 +90,21 @@ def register_plot_commands(app: typer.Typer, *, context: CliContext) -> None:
 
         run_root = Path(context.run_root_for(loaded))
         try:
-            run_plots_from_config(loaded.root, loaded.path, only=only, source="plot", absolute=absolute)
+            run_plots_from_config(
+                loaded.root,
+                loaded.path,
+                only=only,
+                source="plot",
+                absolute=absolute,
+                allow_truncated=allow_truncated,
+            )
         except Exception as exc:
             message = str(exc)
             console.print(f"[bold red]Plot generation failed:[/] {message}")
             console.print("[bold]Next step[/]:")
+            if _is_plot_selection_error(message):
+                console.print(context.workspace_command("dense ls-plots", cfg_path=cfg_path, run_root=run_root))
+                raise typer.Exit(code=1) from exc
             if _has_resumable_run_state(run_root):
                 rerun = "dense run --resume --no-plot"
             else:

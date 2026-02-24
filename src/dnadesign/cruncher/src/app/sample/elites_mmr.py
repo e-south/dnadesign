@@ -49,6 +49,21 @@ class EliteSelectionResult:
     kept_after_mmr: int
 
 
+def hydrate_candidate_hits(candidates: list[_EliteCandidate], *, scorer: Scorer) -> None:
+    for candidate in candidates:
+        if candidate.per_tf_hits is not None:
+            continue
+        per_tf_hits: dict[str, dict[str, object]] = {}
+        for tf_name in scorer.tf_names:
+            hit = scorer.best_hit(candidate.seq_arr, tf_name)
+            per_tf_hits[tf_name] = {
+                **hit,
+                "best_score_scaled": float(candidate.per_tf_map[tf_name]),
+                "best_score_norm": float(candidate.norm_map.get(tf_name, 0.0)),
+            }
+        candidate.per_tf_hits = per_tf_hits
+
+
 def build_elite_pool(
     *,
     optimizer: object,
@@ -81,14 +96,6 @@ def build_elite_pool(
             beta=beta_softmin_final,
             length=seq_arr.size,
         )
-        per_tf_hits: dict[str, dict[str, object]] = {}
-        for tf_name in scorer.tf_names:
-            hit = scorer.best_hit(seq_arr, tf_name)
-            per_tf_hits[tf_name] = {
-                **hit,
-                "best_score_scaled": float(per_tf_map[tf_name]),
-                "best_score_norm": float(norm_map.get(tf_name, 0.0)),
-            }
         raw_elites.append(
             _EliteCandidate(
                 seq_arr=seq_arr,
@@ -99,7 +106,7 @@ def build_elite_pool(
                 sum_norm=float(sum_norm),
                 per_tf_map=per_tf_map,
                 norm_map=norm_map,
-                per_tf_hits=per_tf_hits,
+                per_tf_hits=None,
             )
         )
 
@@ -225,6 +232,8 @@ def select_elites_mmr(
                     dsdna=dsdna_mode,
                 )
             else:
+                mmr_raw_pool = [raw_by_id[f"{cand.chain_id}:{cand.draw_idx}"] for cand in mmr_pool]
+                hydrate_candidate_hits(mmr_raw_pool, scorer=scorer)
                 core_maps = {
                     f"{cand.chain_id}:{cand.draw_idx}": tfbs_cores_from_hits(
                         cand.seq_arr,

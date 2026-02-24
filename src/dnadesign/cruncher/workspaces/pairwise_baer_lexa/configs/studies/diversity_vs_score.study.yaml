@@ -1,0 +1,48 @@
+study:
+  schema_version: 3
+  name: diversity_vs_score
+  base_config: config.yaml
+  target:
+    kind: regulator_set
+    set_index: 1
+  execution:
+    parallelism: 6
+    on_trial_error: continue
+    exit_code_policy: nonzero_if_any_error
+    summarize_after_run: true
+  artifacts:
+    trial_output_profile: minimal
+  replicates:
+    seed_path: sample.seed
+    seeds:
+    - 21
+  trials:
+  - id: BASE
+    factors: {}
+  replays:
+    mmr_sweep:
+      enabled: true
+      pool_size_values:
+      - auto
+      diversity_values:
+      - 0.0
+      - 0.05
+      - 0.1
+      - 0.15
+      - 0.2
+      - 0.25
+      - 0.3
+      - 0.35
+      - 0.4
+      - 0.45
+      - 0.5
+      - 0.55
+      - 0.6
+      - 0.65
+      - 0.7
+      - 0.75
+      - 0.8
+      - 0.85
+      - 0.9
+      - 0.95
+      - 1.0

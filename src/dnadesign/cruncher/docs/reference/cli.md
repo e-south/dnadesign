@@ -1,10 +1,14 @@
-# Cruncher CLI
+## Cruncher CLI
 
-## Contents
+**Last updated by:** cruncher-maintainers on 2026-02-23
+
+### Contents
 - [Cruncher CLI](#cruncher-cli)
 - [Workspace discovery and config resolution](#workspace-discovery-and-config-resolution)
 - [Quick command map](#quick-command-map)
 - [Core lifecycle commands](#core-lifecycle-commands)
+- [Study workflows](#study-workflows)
+- [Portfolio workflows](#portfolio-workflows)
 - [Discovery and inspection](#discovery-and-inspection)
 - [Global options](#global-options)
 
@@ -12,11 +16,11 @@ This reference summarizes the Cruncher CLI surface, grouped by lifecycle stage a
 
 > **Intent:** Cruncher is an optimization engine for **fixed-length** multi-TF PWM sequence design that returns a **diverse elite set** - not posterior inference.
 >
-> **When to use:** design under tight length constraints; explore motif compatibility tradeoffs; generate a small candidate set for assays; sweep many regulator sets via campaigns + summarize results.
+> **When to use:** design under tight length constraints; explore motif compatibility tradeoffs; generate a small candidate set for assays; run workspace-scoped studies and summarize aggregate outcomes.
 
-### Workspace discovery and config resolution
+#### Workspace discovery and config resolution
 
-Cruncher resolves config from `--config/-c` or `--workspace/-w`, then the nearest `config.yaml` in the current directory or parents, then known workspace roots. If multiple workspaces are found, **cruncher** prompts for a selection (interactive shells only).
+Cruncher resolves config from `--config/-c` or `--workspace/-w`, then `<workspace>/configs/config.yaml` from the current directory/parents (or `config.yaml` when CWD is already `<workspace>/configs`), then known workspace roots. If multiple workspaces are found, **cruncher** prompts for a selection (interactive shells only).
 
 See available workspaces with:
 
@@ -24,9 +28,15 @@ See available workspaces with:
 cruncher workspaces list
 ```
 
+List workspace-scoped Study specs and Study runs with:
+
+```
+cruncher study list
+```
+
 ---
 
-### Quick command map
+#### Quick command map
 
 * **Cache data** → `fetch motifs` / `fetch sites`
 * **Inspect cache** → `sources ...` / `catalog ...`
@@ -35,14 +45,15 @@ cruncher workspaces list
 * **Render logos** → `catalog logos`
 * **Optimize** → `sample`
 * **Analyze** → `analyze`, `notebook`
+* **Study sweeps** → `study list|run|summarize|show|clean`
+* **Cross-workspace handoff aggregation** → `portfolio run|show`
 * **Export sequences** → `export sequences`
-* **Campaigns** → `campaign validate|generate|summarize|notebook`
 * **Run management** → `runs list/show/latest/best/watch/clean`
-* **Workspace health** → `status`
+* **Workspace health + machine runbooks** → `status`, `workspaces run|reset`
 
 ---
 
-### Core lifecycle commands
+#### Core lifecycle commands
 
 #### `cruncher fetch motifs`
 
@@ -51,7 +62,7 @@ Caches motif matrices into `<catalog.root>/normalized/motifs/...`.
 Inputs:
 
 * optional config path (`--config/-c`), otherwise resolved from workspace/CWD
-* at least one of `--tf`, `--motif-id`, or `--campaign`
+* at least one of `--tf` or `--motif-id`
 
 Network:
 
@@ -67,13 +78,11 @@ Examples:
 * `cruncher fetch motifs --tf lexA --tf cpxR <config>`
 * `cruncher fetch motifs --motif-id RDBECOLITFC00214 <config>`
 * `cruncher fetch motifs --source omalley_ecoli_meme --tf lexA <config>`
-* `cruncher fetch motifs --campaign regulators_v1 <config>`
 * `cruncher fetch motifs --dry-run --tf lexA <config>`
 
 Common options:
 
-* `--tf`, `--motif-id`, `--campaign`, `--source`
-* `--apply-selectors/--no-selectors` (campaigns)
+* `--tf`, `--motif-id`, `--source`
 * `--dry-run`, `--all`, `--offline`, `--update`
 * `--summary/--no-summary`, `--paths`
 
@@ -84,8 +93,6 @@ Outputs:
 
 Note:
 
-* `--campaign` applies campaign selectors by default; use `--no-selectors` to fetch raw category TFs when the
-  local catalog is empty.
 * `--source` defaults to the first available entry in `catalog.source_preference` (skipping entries that are
   not registered ingest sources); if the list is empty or none are available you must pass `--source` explicitly.
 
@@ -98,7 +105,7 @@ Caches binding-site instances into `<catalog.root>/normalized/sites/...`.
 Inputs:
 
 * optional config path (`--config/-c`), otherwise resolved from workspace/CWD
-* at least one of `--tf`, `--motif-id`, `--campaign`, or `--hydrate`
+* at least one of `--tf`, `--motif-id`, or `--hydrate`
 
 Network:
 
@@ -116,12 +123,10 @@ Examples:
 * `cruncher fetch sites --dry-run --tf lexA <config>`
 * `cruncher fetch sites --dataset-id <id> --tf lexA <config>`
 * `cruncher fetch sites --genome-fasta genome.fna <config>`
-* `cruncher fetch sites --campaign regulators_v1 <config>`
 
 Common options:
 
-* `--tf`, `--motif-id`, `--campaign`, `--dataset-id`, `--limit`, `--source`
-* `--apply-selectors/--no-selectors` (campaigns)
+* `--tf`, `--motif-id`, `--dataset-id`, `--limit`, `--source`
 * `--hydrate` (hydrates missing sequences)
 * `--offline`, `--update`
 * `--genome-fasta`
@@ -135,24 +140,22 @@ Outputs:
 Note:
 
 * `--hydrate` with no `--tf/--motif-id` hydrates all cached site sets by default.
-* `--campaign` applies campaign selectors by default; use `--no-selectors` to fetch raw category TFs when the
-  local catalog is empty.
 * `--source` defaults to the first available entry in `catalog.source_preference` (skipping entries that are
   not registered ingest sources); if the list is empty or none are available you must pass `--source` explicitly.
+* with both curated and HT enabled, `--limit` requires explicit mode (`--dataset-id` or one source class disabled).
+* HT mode is strict: if HT discovery/fetch fails or returns zero rows for the selected mode, the command errors.
+* if `tfbinding` returns zero rows for a known dataset, switch `ingest.regulondb.ht_binding_mode` to `peaks`.
 
 ---
 
 #### `cruncher lock`
 
-Resolves TF names to exact cached artifacts (IDs + hashes) from either:
-- `workspace.regulator_sets` (direct mode), or
-- `--campaign <name>` expansion (campaign mode).
+Resolves TF names to exact cached artifacts (IDs + hashes) from `workspace.regulator_sets`.
 Writes `<workspace>/.cruncher/locks/<config>.lock.json`.
 
 Inputs:
 
 * optional config path (`--config/-c`), otherwise resolved from workspace/CWD
-* optional `--campaign <name>` (required when `workspace.regulator_sets: []`)
 * cached motifs/sites for the configured regulators
 
 Network:
@@ -167,125 +170,6 @@ When to use:
 Example:
 
 * `cruncher lock <config>`
-* `cruncher lock --campaign demo_pair <config>`
-
----
-
-#### `cruncher campaign generate`
-
-Expands a campaign into explicit `regulator_sets` and writes a generated config plus a manifest.
-
-Inputs:
-
-* CONFIG (explicit or resolved)
-* `--campaign <name>` matching a campaign in config
-
-Network:
-
-* no (uses cache only if selectors require metrics)
-
-Example:
-
-* `cruncher campaign generate --campaign regulators_v1 <config>`
-* `cruncher campaign generate --campaign regulators_v1 --out .cruncher/campaigns/regulators_v1/custom.yaml <config>`
-
-Notes:
-
-* The base config must define `regulator_categories` and `campaigns`.
-* Selector filters require cached motifs/sites; fetch before generating if you use them.
-* By default, files are written under `<workspace>/.cruncher/campaigns/<campaign>/`.
-* `--out`/`--manifest` must stay inside the workspace root.
-* `campaign generate` is optional; `lock`/`parse`/`sample`/`analyze` can run campaigns directly with `--campaign`.
-
----
-
-#### `cruncher campaign validate`
-
-Validate a campaign against cached motifs/sites and selector rules.
-
-Inputs:
-
-* CONFIG (explicit or resolved)
-* `--campaign <name>`
-
-Network:
-
-* no (cache-only; `--no-metrics` avoids cache requirements)
-
-Examples:
-
-* `cruncher campaign validate --campaign regulators_v1 <config>`
-* `cruncher campaign validate --campaign regulators_v1 --no-selectors <config>`
-* `cruncher campaign validate --campaign regulators_v1 --show-filtered <config>`
-
-Notes:
-
-* `--no-selectors` disables selector filtering; add `--no-metrics` to validate categories without cached data.
-* `--metrics` (default) computes per-TF metrics and requires a local catalog.
-
----
-
-#### `cruncher campaign summarize`
-
-Aggregates multiple campaign runs into summary tables and plots (offline).
-
-Inputs:
-
-* CONFIG (explicit or resolved)
-* `--campaign <name>`
-* `--runs` (optional; defaults to all sample runs)
-
-Network:
-
-* no (uses local run artifacts; `--metrics` requires local catalog)
-
-Examples:
-
-* `cruncher campaign summarize --campaign regulators_v1 --runs outputs/* --config <config>`
-* `cruncher campaign summarize --campaign regulators_v1 --no-metrics <config>`
-
-Outputs:
-
-* `analysis/campaign_summary.csv`, `analysis/campaign_best.csv`, `analysis/campaign_manifest.json`
-* plots under `plots/` (e.g., `best_jointscore_bar.png`,
-  `tf_coverage_heatmap.png`, `joint_trend.png`, `pareto_projection.png`)
-
-Notes:
-
-* `--metrics` requires a local catalog; fetch motifs/sites first.
-* Use `--force-overwrite` to replace an existing campaign summary directory.
-* When `--runs` is omitted, stale sample run-index entries are auto-repaired before summary.
-* `--skip-missing` skips runs missing required `table_manifest.json` entries/files for
-  `scores_summary` and `metrics_joint` (typically `table__scores_summary.parquet` and
-  `table__metrics_joint.parquet`).
-* With site-derived PWMs, `--metrics` also requires `catalog.site_window_lengths`
-  for TFs with variable site lengths. Use `--no-metrics` if you haven't set them.
-
----
-
-#### `cruncher campaign notebook`
-
-Generates a marimo notebook for exploring campaign summary outputs from
-`<campaign_latest>/analysis/` and `<campaign_latest>/plots/`.
-
-Inputs:
-
-* CONFIG (explicit or resolved)
-* `--campaign <name>`
-
-Network:
-
-* no (requires local summary outputs; marimo is a local dependency)
-
-Examples:
-
-* `cruncher campaign notebook --campaign regulators_v1 <config>`
-* `cruncher campaign notebook --campaign regulators_v1 --out outputs/campaign/regulators_v1 <config>`
-
-Notes:
-
-* Requires `cruncher campaign summarize` to have been run first (summary CSVs + manifest present).
-* Install marimo with `uv sync --locked`.
 
 ---
 
@@ -296,7 +180,6 @@ Validates cached PWMs (matrix- or site-derived) and writes parse-cache artifacts
 Inputs:
 
 * CONFIG (explicit or resolved)
-* optional `--campaign <name>` (required when `workspace.regulator_sets: []`)
 * lockfile (from `cruncher lock`)
 * optional `--force-overwrite` to replace an existing run directory
 
@@ -307,7 +190,6 @@ Network:
 Example:
 
 * `cruncher parse <config>`
-* `cruncher parse --campaign demo_pair <config>`
 
 Precondition:
 
@@ -333,7 +215,6 @@ Runs MCMC optimization to design sequences scoring well across TFs.
 Inputs:
 
 * CONFIG (explicit or resolved)
-* optional `--campaign <name>` (required when `workspace.regulator_sets: []`)
 * lockfile (from `cruncher lock`)
 
 Network:
@@ -344,8 +225,8 @@ Example:
 
 * `cruncher sample <config>`
 * `cruncher sample --verbose <config>`
+* `cruncher sample --no-progress <config>`
 * `cruncher sample --debug <config>`
-* `cruncher sample --campaign demo_pair <config>`
 
 Precondition:
 
@@ -355,6 +236,7 @@ Notes:
 
 * `sample.output.save_sequences: true` is required for later analysis.
 * `sample.output.save_trace: true` enables trace-based diagnostics.
+* `--no-progress` disables progress bars and periodic progress logging for quieter non-interactive runs.
 * `sample.output.save_trace: false` skips ArviZ trace construction and reduces sample runtime/memory overhead.
 * Sampling uses `sample.optimizer.*` (`kind: gibbs_anneal`) with chain count and cooling schedule under one explicit surface.
 * Replica exchange is disabled in `gibbs_anneal`; chains are tracked directly in trajectory outputs.
@@ -369,11 +251,11 @@ Generates diagnostics and plots for one or more sample runs.
 Inputs:
 
 * CONFIG (explicit or resolved)
-* optional `--campaign <name>` (required when `workspace.regulator_sets: []`)
 * runs via `analysis.run_selector`/`analysis.runs` or `--run` (defaults to latest sample run if empty)
-* run artifacts: `optimize/sequences.parquet` (required), `optimize/elites.parquet` (required),
-  `optimize/elites_hits.parquet` (required), `optimize/random_baseline.parquet` (required),
-  and `optimize/trace.nc` for trace-based plots
+* run artifacts: `optimize/tables/sequences.parquet` (required), `optimize/tables/elites.parquet` (required),
+  `optimize/tables/elites_hits.parquet` (required), `optimize/tables/random_baseline*.parquet` (required when
+  `sample.output.save_random_baseline=true`, default with `sample.output.random_baseline_n=10000`), and
+  `optimize/trace.nc` for trace-based plots
 
 Network:
 
@@ -384,11 +266,12 @@ Examples:
 * `cruncher analyze --latest <config>`
 * `cruncher analyze --run <run_name|run_dir> <config>`
 * `cruncher analyze --summary <config>`
-* `cruncher analyze --campaign demo_pair --summary <config>`
 
 Preconditions:
 
 * provide runs via `analysis.runs`/`--run` or rely on the default latest run
+* selected sample runs must be completed; analyze fails fast when latest run status is still `running`
+* run selection preflight happens before plotting/cache initialization, so missing/incomplete runs fail quickly with no Matplotlib/ArviZ cache setup
 * trace-dependent plots require `optimize/trace.nc`
 * each sample run snapshots the lockfile under `provenance/lockfile.json`; analysis uses that snapshot to avoid mismatch if the workspace lockfile changes later
 * if `analysis` is omitted from config, analyze uses schema defaults (including `run_selector=latest`)
@@ -402,10 +285,10 @@ Outputs:
   `analysis/tables/table__diagnostics_summary.json`, `analysis/tables/table__objective_components.json`,
   `analysis/tables/table__elites_mmr_summary.parquet`, `analysis/tables/table__elites_nn_distance.parquet`,
   `analysis/tables/table__elites_mmr_sweep.parquet` (when `analysis.mmr_sweep.enabled=true`)
-* plots: `plots/analysis/chain_trajectory_scatter.<plot_format>`,
-  `plots/analysis/chain_trajectory_sweep.<plot_format>`,
-  `plots/analysis/elites_nn_distance.<plot_format>`, `plots/analysis/elites_showcase.<plot_format>`,
-  `plots/analysis/health_panel.<plot_format>` (trace only)
+* plots: `plots/elite_score_space_context.<plot_format>`,
+  `plots/chain_trajectory_sweep.<plot_format>`,
+  `plots/elites_nn_distance.<plot_format>`, `plots/elites_showcase.<plot_format>`,
+  `plots/health_panel.<plot_format>` (trace only)
 * reports: `analysis/reports/report.json`, `analysis/reports/report.md`
 * summaries: `analysis/reports/summary.json`, `analysis/manifests/manifest.json`, `analysis/manifests/plot_manifest.json`, `analysis/manifests/table_manifest.json`
 
@@ -417,6 +300,215 @@ Note:
 
 ---
 
+#### Study workflows
+
+#### `cruncher study list`
+
+Lists Study specs and Study runs discovered under known workspace roots.
+
+Inputs:
+
+* optional `--workspace <name|index|path>` to scope listing to one workspace
+
+Network:
+
+* no
+
+Examples:
+
+* `cruncher study list`
+* `cruncher study list --workspace demo_pairwise`
+
+Notes:
+
+* Studies are workspace-scoped: specs live under `<workspace>/configs/studies/*.study.yaml`.
+* Study runs live under the canonical root `<workspace>/outputs/studies/<study_name>/<study_id>/`.
+* `--workspace` accepts a discovered workspace name/index or a direct workspace path.
+* `study list` fails fast if a discovered spec or run metadata is invalid.
+
+#### `cruncher study run`
+
+Executes a Study spec (`*.study.yaml`) to run sweep factors x replicate seeds, optional replay sweeps, and aggregate plots.
+
+Inputs:
+
+* required `--spec <workspace>/configs/studies/<name>.study.yaml`
+* optional `--resume` to continue from an existing manifest
+* optional `--force-overwrite` to delete/recreate the deterministic study run dir
+
+Network:
+
+* no (uses local cache and local run artifacts)
+
+Examples:
+
+* `cruncher study run --spec configs/studies/diversity_vs_score.study.yaml`
+* `cruncher study run --spec configs/studies/diversity_vs_score.study.yaml --resume`
+* `cruncher study run --spec configs/studies/diversity_vs_score.study.yaml --force-overwrite`
+
+Outputs:
+
+* `<workspace>/outputs/studies/<study_name>/<study_id>/study/spec_frozen.yaml`
+* `<workspace>/outputs/studies/<study_name>/<study_id>/study/study_manifest.json`
+* `<workspace>/outputs/studies/<study_name>/<study_id>/tables/table__trial_metrics.parquet`
+* `<workspace>/outputs/plots/study__<study_name>__<study_id>__plot__sequence_length_tradeoff.pdf`
+* `<workspace>/outputs/plots/study__<study_name>__<study_id>__plot__mmr_diversity_tradeoff.pdf` (when replay enabled)
+
+Notes:
+
+* Study specs are strict (`extra=forbid`); unknown keys and invalid factor dot-paths fail fast.
+* `study.base_config` is required and must exist; no CWD fallback.
+* Trial definitions can be explicit (`trials`) or grid-expanded (`trial_grids`); at least one source is required.
+* `study.schema_version` is v3 only (`study.schema_version: 3`).
+* Trial and grid definitions use `factors`, not `overrides`.
+* Studies inherit non-swept behavior from `configs/config.yaml`; only sweep-factor keys are allowed in study specs.
+* Every swept factor must include the base-config value in the study domain.
+* Trial-grid expansion is bounded (`<=500` combinations per grid and `<=500` total expanded trials).
+* Study trials do not register entries in workspace `run_index.json`.
+* `study.replays.mmr_sweep.enabled=true` requires persisted sequence artifacts (`sample.output.save_sequences=true`) for every trial after profile factors and requires replay diversity values to include the base-config diversity.
+* Preflight validates lockfile, target readiness, and parse-readiness before any trial executes.
+* When any trial fails, `study run` records errors and skips automatic summary generation; run `study summarize --allow-partial` to summarize successful subsets.
+
+#### `cruncher study summarize`
+
+Recomputes aggregate Study tables/plots from an existing study run directory.
+
+Inputs:
+
+* required `--run <study_run_dir>`
+* optional `--allow-partial` to include only successful trials when some runs/artifacts are missing
+
+Behavior:
+
+* with `--allow-partial`, aggregate tables include `n_missing_*` annotations (`n_missing_total`, `n_missing_non_success`, `n_missing_run_dirs`, `n_missing_metric_artifacts`, `n_missing_mmr_tables`).
+* if partial data was required and the frozen spec uses `exit_code_policy=nonzero_if_any_error`, command exits non-zero after writing refreshed outputs.
+
+Example:
+
+* `cruncher study summarize --run outputs/studies/diversity_vs_score/<study_id>`
+
+#### `cruncher study show`
+
+Prints Study status, trial counts, and key table/plot paths.
+
+Inputs:
+
+* required `--run <study_run_dir>`
+
+Example:
+
+* `cruncher study show --run outputs/studies/diversity_vs_score/<study_id>`
+
+#### `cruncher study clean`
+
+Deletes Study output artifact directories under `outputs/studies/...` for one workspace/study target.
+
+Inputs:
+
+* required `--workspace <name|index|path>`
+* required `--study <study_name>`
+* exactly one of:
+  * `--id <study_id>` for one run
+  * `--all` for all runs for that study in that workspace
+* optional `--confirm` to execute deletion (without `--confirm`, command is dry-run only)
+
+Behavior:
+
+* cleans output artifacts only; never modifies `*.study.yaml`
+* fail-fast contract for invalid workspace selector, missing study spec, missing run, or invalid flag combinations
+
+Examples:
+
+* `cruncher study clean --workspace demo_pairwise --study diversity_vs_score --id <study_id>`
+* `cruncher study clean --workspace demo_pairwise --study diversity_vs_score --all --confirm`
+
+---
+
+#### Portfolio workflows
+
+#### `cruncher portfolio run`
+
+Aggregates selected completed runs across multiple workspaces into a deterministic handoff package.
+
+Inputs:
+
+* required `--spec <portfolio_workspace>/configs/<name>.portfolio.yaml`
+* optional `--force-overwrite` to delete/recreate the deterministic portfolio run dir
+* optional `--prepare-ready {prompt|skip|rerun}` for `prepare_then_aggregate` when some sources are already ready
+
+Network:
+
+* no (run artifacts only)
+
+Examples:
+
+* `cruncher portfolio run --spec configs/master_all_workspaces.portfolio.yaml`
+* `cruncher portfolio run --spec configs/master_all_workspaces.portfolio.yaml --force-overwrite`
+* `cruncher portfolio run --spec configs/master_all_workspaces.portfolio.yaml --prepare-ready skip`
+
+Source preconditions (per source entry in spec):
+
+* `analysis/reports/summary.json`
+* `export/export_manifest.json` (with valid `files.elites` path)
+
+Outputs:
+
+* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/portfolio/portfolio_manifest.json`
+* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/portfolio/portfolio_status.json`
+* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/portfolio/logs/prepare__<source_id>.log` (when `execution.mode=prepare_then_aggregate`)
+* `<portfolio_workspace>/outputs/export/portfolios/<portfolio_name>/<portfolio_id>/table__handoff_windows_long.<csv|parquet>`
+* `<portfolio_workspace>/outputs/export/portfolios/<portfolio_name>/<portfolio_id>/table__handoff_elites_summary.<csv|parquet>`
+* `<portfolio_workspace>/outputs/export/portfolios/<portfolio_name>/<portfolio_id>/table__source_summary.<csv|parquet>`
+* `<portfolio_workspace>/outputs/export/portfolios/<portfolio_name>/<portfolio_id>/table__study_summary.<csv|parquet>` (when source `study_spec` is declared)
+* `<portfolio_workspace>/outputs/export/portfolios/<portfolio_name>/<portfolio_id>/table__handoff_sequence_length.<csv|parquet>` (when `studies.sequence_length_table.enabled: true`)
+* `<portfolio_workspace>/outputs/plots/portfolio__<portfolio_name>__<portfolio_id>__plot__source_tradeoff_score_vs_diversity.pdf` (when source diversity metrics are available)
+* `<portfolio_workspace>/outputs/plots/portfolio__<portfolio_name>__<portfolio_id>__plot__elite_showcase_cross_workspace.<pdf|png>` (when `plots.elite_showcase.enabled: true`)
+
+Default portfolio table output is parquet without CSV mirrors (`artifacts.table_format=parquet`, `artifacts.write_csv=false`).
+
+Notes:
+
+* Portfolio specs are strict (`extra=forbid`); unknown keys and invalid paths fail fast.
+* Sources are explicit only: no latest-run fallback, no workspace auto-selection fallback.
+* Source selection uses source run manifest `top_k` and export manifest `files.elites`; there is no portfolio-level top-k setting.
+* Source run manifest `top_k` must match export elites row count for each source.
+* Source run manifest stage must be `sample`.
+* `run_dir` must resolve inside its declared `workspace`.
+* For single-set workspaces, use `run_dir: outputs`; for multi-set workspaces use the specific set path (for example `outputs/set2_lexA-cpxR`).
+* Portfolio schema is v3 only (`portfolio.schema_version: 3`).
+* `execution.mode`:
+  * `aggregate_only`: aggregate current source runs only
+  * `prepare_then_aggregate`: execute each source `prepare.runbook` + `prepare.step_ids` before aggregation
+* `execution.max_parallel_sources` controls source preparation concurrency in `prepare_then_aggregate` (default `4`, must be `>= 1`).
+* In `prepare_then_aggregate`, every source must provide a runbook path inside its source workspace and a non-empty step list.
+* Optional source `study_spec` adds deterministic study summary rows into `table__study_summary`.
+* If `study_spec` is declared, the deterministic study run and `table__trial_metrics_agg.parquet` must exist (or be produced by prepare steps).
+* Optional `studies.ensure_specs` enforces workspace-scoped study specs per source and auto-runs/resumes those study runs when missing/incomplete.
+* Optional `studies.sequence_length_table` is global at portfolio scope and selects the first `top_n_lengths` shortest `sequence_length` rows per source.
+* `plots.elite_showcase` is enabled by default and renders a cross-workspace showcase using all processed source elites.
+* Set `plots.elite_showcase.top_n_per_source` to a positive integer when you want to cap elites per source.
+* `plots.elite_showcase.source_selectors` supports per-source multi-elite selection, with exactly one of `elite_ids` or `elite_ranks` per source selector.
+* In `aggregate_only`, Cruncher preflights all listed sources and reports every missing/invalid source artifact with actionable nudges.
+* In `prepare_then_aggregate`, `--prepare-ready` controls whether already-ready sources are reprocessed or skipped.
+* If source preparation fails, Cruncher reports source id, runbook path, configured `step_ids`, preflight issues, and explicit `workspaces run` nudge commands.
+* Portfolio nudges use `--workspace <source_workspace_path>` (resolved path), not workspace-name lookup, so they remain runnable for external workspaces.
+* When preflight shows missing foundational run artifacts (for example missing run manifest/elites), the failure message includes a full-runbook nudge in addition to configured-step nudges.
+* `--spec` must point to a `.portfolio.yaml` file path; passing a directory path fails fast with an explicit nudge.
+
+#### `cruncher portfolio show`
+
+Prints portfolio status plus table/plot paths for one portfolio run directory.
+
+Inputs:
+
+* required `--run <portfolio_run_dir>`
+
+Example:
+
+* `cruncher portfolio show --run outputs/portfolios/master_all_workspaces/<portfolio_id>`
+
+---
+
 #### `cruncher export sequences`
 
 Exports sequence-centric run tables for downstream wrappers and operators.
@@ -425,7 +517,7 @@ Inputs:
 
 * CONFIG (explicit or resolved)
 * exactly one run selector: `--run <run_name|run_dir>` (repeatable) or `--latest`
-* sample run artifacts: `optimize/tables/elites.parquet`, `optimize/tables/elites_hits.parquet`, `run/config_used.yaml`
+* sample run artifacts: `optimize/tables/elites.parquet`, `optimize/tables/elites_hits.parquet`, `meta/config_used.yaml`
 
 Network:
 
@@ -435,21 +527,19 @@ Examples:
 
 * `cruncher export sequences --latest <config>`
 * `cruncher export sequences --run sample/run_001 <config>`
-* `cruncher export sequences --latest --table-format csv --max-combo-size 3 <config>`
+* `cruncher export sequences --latest --table-format csv <config>`
 
 Outputs (under each run):
 
-* `export/sequences/table__monospecific_consensus_sites.<parquet|csv>`
-* `export/sequences/table__monospecific_elite_windows.<parquet|csv>`
-* `export/sequences/table__bispecific_elite_windows.<parquet|csv>`
-* `export/sequences/table__multispecific_elite_windows.<parquet|csv>`
-* `export/sequences/export_manifest.json`
+* `export/table__elites.csv`
+* `export/table__consensus_sites.<parquet|csv>`
+* `export/export_manifest.json`
 
 Notes:
 
 * Fail-fast contract: duplicate `(elite_id, tf)` rows, out-of-bounds windows, non-numeric scores, or inconsistent motif widths terminate export with an explicit error.
-* Export appends artifact entries to `run/run_manifest.json` using stage `export`.
-* `--max-combo-size` must be `>=2`; omit to emit all TF-group sizes up to TF count.
+* Export appends artifact entries to `meta/run_manifest.json` using stage `export`.
+* Default table format is CSV unless `--table-format parquet` is set.
 
 ---
 
@@ -477,7 +567,7 @@ Notes:
 * plot output status is refreshed from disk so missing files are shown accurately
 * the Refresh button re-scans analysis entries and updates plot/table status without restarting marimo
 * the notebook infers `run_dir` from its location; keep it under `<run_dir>/` or regenerate it
-* plots are loaded from `analysis/manifests/plot_manifest.json`; the curated keys are `chain_trajectory_scatter`, `chain_trajectory_sweep`, `elites_nn_distance`, `elites_showcase`, plus optional `health_panel` and `optimizer_vs_fimo` entries when generated
+* plots are loaded from `analysis/manifests/plot_manifest.json`; the curated keys are `elite_score_space_context`, `chain_trajectory_sweep`, `elites_nn_distance`, `elites_showcase`, plus optional `health_panel` and `optimizer_vs_fimo` entries when generated
 * the notebook includes:
   * Overview tab with run metadata and explicit warnings for missing/invalid analysis artifacts
   * Tables tab with a Top-K slider and per-table previews from `analysis/manifests/table_manifest.json`
@@ -485,7 +575,7 @@ Notes:
 
 ---
 
-### Discovery and inspection
+#### Discovery and inspection
 
 #### `cruncher workspaces`
 
@@ -493,7 +583,7 @@ List discoverable workspaces and their config paths.
 
 Inputs:
 
-* none
+* optional `--root <workspace_parent_dir>` for explicit workspace discovery scope
 
 Network:
 
@@ -502,6 +592,22 @@ Network:
 Example:
 
 * `cruncher workspaces list`
+* `cruncher workspaces list --root src/dnadesign/cruncher/workspaces`
+* `cruncher workspaces run --runbook configs/runbook.yaml`
+* `cruncher workspaces run --workspace demo_pairwise --step analyze_summary --step export_sequences_latest`
+* `cruncher workspaces reset --root .`
+* `cruncher workspaces reset --root . --confirm`
+* `cruncher workspaces reset --root src/dnadesign/cruncher/workspaces --all-workspaces --confirm`
+
+Notes:
+
+* `workspaces list` includes Study inventory columns: `Study Specs` and `Study Runs`, and reports workspace kind (`config+runbook` or `runbook-only`).
+* `workspaces run` executes typed runbook steps from `configs/runbook.yaml` in fail-fast order.
+* runbook steps are strict CLI-args only (`run: [<cruncher-subcommand>, ...]`); arbitrary shell is not supported.
+* `workspaces run --step ...` filters to explicit step ids while preserving runbook order.
+* when `--workspace` and a relative `--runbook` are both provided, `--runbook` resolves from the selected workspace root and must stay inside that workspace.
+* `workspaces reset` is a confirm-gated workspace reset surface that preserves `inputs/` and `configs/` while removing generated state (`outputs/`, `.cruncher/`, transient cache files).
+* `workspaces reset --all-workspaces` treats `--root` as a parent directory and applies the same reset contract to every discoverable child workspace.
 
 ---
 
@@ -533,7 +639,7 @@ Subcommands:
 * `catalog logos` — render PWM logos for selected TFs or motif refs
 
 Note: `catalog logos` is idempotent for identical inputs. If matching logos already exist
-under `outputs/plots/logos/`, it reports the existing path instead of writing new files.
+under `outputs/plots/`, it reports the existing path instead of writing new files.
 
 Examples:
 
@@ -543,14 +649,14 @@ Examples:
 * `cruncher catalog pwms <config>`
 * `cruncher catalog pwms --set 1 <config>`
 * `cruncher catalog export-sites --set 1 --out densegen/sites.csv <config>`
-* `cruncher catalog export-sites --set 1 --densegen-workspace demo_meme_three_tfs <config>`
+* `cruncher catalog export-sites --set 1 --densegen-workspace demo_tfbs_baseline <config>`
 * `cruncher catalog export-densegen --set 1 --out densegen/pwms <config>`
-* `cruncher catalog export-densegen --set 1 --densegen-workspace demo_meme_three_tfs <config>`
+* `cruncher catalog export-densegen --set 1 --densegen-workspace demo_sampling_baseline <config>`
 * `cruncher catalog logos --set 1 <config>`
 
-`catalog export-densegen` and `catalog export-sites` accept `--densegen-workspace` (workspace
-name under `src/dnadesign/densegen/workspaces/` or an absolute path). When provided, outputs
-default to the workspace `inputs/` locations and must stay within that directory.
+`catalog export-densegen` and `catalog export-sites` accept `--densegen-workspace` (packaged DenseGen
+workspace name, explicit workspace path, or name under `DNADESIGN_DENSEGEN_WORKSPACES_ROOT`).
+When provided, outputs default to the workspace `inputs/` locations and must stay within that directory.
 `catalog export-densegen` removes existing artifact JSONs for the selected TFs by default; use
 `--no-clean` to keep prior artifacts.
 
@@ -607,7 +713,7 @@ Notes:
 * `--meme-mod` applies to MEME only; use it when each sequence is expected to contain one site.
 * `--meme-prior` applies to MEME only; `addone` is a good default for sparse site sets.
 * Use `--tool-path` or the `MEME_BIN` environment variable to point at a specific install.
-  Relative `--tool-path` values resolve from the config file location.
+  Relative `--tool-path` values resolve from the workspace root.
 * MEME Suite is a system dependency; install `streme`/`meme` via your system package manager,
   pixi, or the official MEME Suite installer, and ensure they are discoverable.
   If you use the repo's pixi toolchain, run `pixi run cruncher -- discover ...` so MEME is on PATH
@@ -637,7 +743,7 @@ Examples:
 
 #### `cruncher targets`
 
-Check readiness for the configured `regulator_sets` (or a category/campaign preview).
+Check readiness for the configured `regulator_sets` (or a category preview).
 
 Inputs:
 
@@ -659,7 +765,6 @@ Examples:
 * `cruncher targets status <config>`
 * `cruncher targets candidates --fuzzy <config>`
 * `cruncher targets list --category Category2 <config>`
-* `cruncher targets status --campaign regulators_v1 <config>`
 
 ---
 
@@ -685,18 +790,18 @@ Subcommands:
 
 Example:
 
-* `cruncher sources list config.yaml`
-* `cruncher sources datasets regulondb config.yaml --tf lexA`
-* `cruncher sources summary config.yaml`
-* `cruncher sources summary --view combined config.yaml`
-* `cruncher sources summary --scope remote --format json config.yaml`
-* `cruncher sources summary --json-out summary.json config.yaml`
+* `cruncher sources list configs/config.yaml`
+* `cruncher sources datasets regulondb configs/config.yaml --tf lexA`
+* `cruncher sources summary configs/config.yaml`
+* `cruncher sources summary --view combined configs/config.yaml`
+* `cruncher sources summary --scope remote --format json configs/config.yaml`
+* `cruncher sources summary --json-out summary.json configs/config.yaml`
 
 Regulator inventory for a single source:
 
-* `cruncher sources summary --source regulondb --scope cache config.yaml`
-* `cruncher sources summary --source regulondb --scope remote --remote-limit 200 config.yaml`
-* `cruncher sources summary --source regulondb --view combined config.yaml`
+* `cruncher sources summary --source regulondb --scope cache configs/config.yaml`
+* `cruncher sources summary --source regulondb --scope remote --remote-limit 200 configs/config.yaml`
+* `cruncher sources summary --source regulondb --view combined configs/config.yaml`
 
 Note:
 
@@ -704,6 +809,7 @@ Note:
   Pass CONFIG (or set `CRUNCHER_CONFIG`/`CRUNCHER_WORKSPACE`) to include local sources from a workspace config.
 * Some sources do not expose full remote inventories; use `--remote-limit` (partial counts)
   or `--scope cache` if you only need cached regulators.
+* `sources datasets --dataset-source <X>` performs a strict row-level source filter on returned datasets.
 
 Example output (cache, abridged; captured with `CRUNCHER_LOG_LEVEL=WARNING` and `COLUMNS=200`):
 
@@ -795,7 +901,7 @@ Network:
 * `runs show <config> <run>` — show manifest + artifacts (run name or run dir)
 * `runs latest <config> --set-index 1` — print most recent run for a regulator set
 * `runs best <config> --set-index 1` — print best run by `best_score` for a regulator set
-* `runs watch <config> <run>` — live progress snapshot (run name or run dir; reads `run/run_status.json`, optionally `optimize/state/metrics.jsonl`)
+* `runs watch <config> <run>` — live progress snapshot (run name or run dir; reads `meta/run_status.json`, optionally `optimize/state/metrics.jsonl`)
 * `runs rebuild-index <config>` — rebuild `<workspace>/.cruncher/run_index.json`
 * `runs repair-index <config>` — validate and optionally remove index entries missing run directories/manifests (`--apply`)
 * `runs clean <config> --stale` — mark stale `running` runs as `aborted` (use `--drop` to remove from the index)
@@ -861,7 +967,7 @@ Note:
 
 ---
 
-### Global options
+#### Global options
 
 * `--log-level INFO|DEBUG|WARNING` (or set `CRUNCHER_LOG_LEVEL`)
 * `--config/-c <path>` (or set `CRUNCHER_CONFIG`) to pin a specific config file

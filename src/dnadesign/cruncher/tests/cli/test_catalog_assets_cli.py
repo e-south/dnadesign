@@ -75,6 +75,24 @@ def _write_densegen_workspace(tmp_path: Path, *, name: str = "demo_densegen") ->
     return workspace
 
 
+def _write_external_densegen_workspace(tmp_path: Path, *, name: str = "external_densegen") -> Path:
+    workspace = tmp_path / name
+    inputs_root = workspace / "inputs"
+    inputs_root.mkdir(parents=True, exist_ok=True)
+    payload = "\n".join(
+        [
+            "densegen:",
+            '  schema_version: "2.5"',
+            "  run:",
+            "    id: demo",
+            '    root: "."',
+            "",
+        ]
+    )
+    (workspace / "config.yaml").write_text(payload)
+    return workspace
+
+
 def test_catalog_pwms_defaults_to_regulator_sets(tmp_path: Path) -> None:
     catalog_root = tmp_path / ".cruncher"
     entries = {
@@ -157,6 +175,39 @@ def test_catalog_logos_writes_pngs(tmp_path: Path) -> None:
     assert "already rendered" in repeat.output
 
 
+def test_catalog_logos_default_output_is_flat_plots_dir(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    entry = CatalogEntry(
+        source="regulondb",
+        motif_id="RBM1",
+        tf_name="lexA",
+        kind="PFM",
+        has_matrix=True,
+        matrix_source="alignment",
+    )
+    CatalogIndex(entries={entry.key: entry}).save(catalog_root)
+    _write_motif(
+        catalog_root / "normalized" / "motifs" / "regulondb" / "RBM1.json",
+        source="regulondb",
+        motif_id="RBM1",
+        tf_name="lexA",
+    )
+
+    config_path = _write_config(tmp_path)
+    result = runner.invoke(
+        app,
+        ["catalog", "logos", "--tf", "lexA", str(config_path)],
+        color=False,
+    )
+    assert result.exit_code == 0, result.output
+
+    plots_root = tmp_path / "runs" / "plots"
+    assert plots_root.exists()
+    assert list(plots_root.glob("*_logo.png"))
+    assert (plots_root / "logo_manifest.json").exists()
+    assert not (plots_root / "logos").exists()
+
+
 def test_export_sites_ignores_pwm_source_for_selection(tmp_path: Path) -> None:
     catalog_root = tmp_path / ".cruncher"
     entry = CatalogEntry(
@@ -187,8 +238,9 @@ def test_export_sites_ignores_pwm_source_for_selection(tmp_path: Path) -> None:
     assert out_path.exists()
 
 
-def test_export_densegen_defaults_to_densegen_workspace(tmp_path: Path) -> None:
+def test_export_densegen_defaults_to_densegen_workspace(tmp_path: Path, monkeypatch) -> None:
     densegen_ws = _write_densegen_workspace(tmp_path)
+    monkeypatch.setenv("DNADESIGN_DENSEGEN_WORKSPACES_ROOT", str(densegen_ws.parent))
     catalog_root = tmp_path / ".cruncher"
     entry = CatalogEntry(
         source="regulondb",
@@ -212,14 +264,102 @@ def test_export_densegen_defaults_to_densegen_workspace(tmp_path: Path) -> None:
         color=False,
     )
     assert result.exit_code == 0, result.output
+    assert result.output.count("DenseGen motif artifacts") == 1
+    assert result.output.count("Wrote manifest:") == 1
     out_dir = densegen_ws / "inputs" / "motif_artifacts"
     assert out_dir.exists()
     assert list(out_dir.glob("*.json"))
     assert (out_dir / "artifact_manifest.json").exists()
 
 
-def test_export_densegen_cleans_existing_tf_artifacts(tmp_path: Path) -> None:
+def test_export_densegen_workspace_manifest_is_portable(tmp_path: Path, monkeypatch) -> None:
     densegen_ws = _write_densegen_workspace(tmp_path)
+    monkeypatch.setenv("DNADESIGN_DENSEGEN_WORKSPACES_ROOT", str(densegen_ws.parent))
+    catalog_root = tmp_path / ".cruncher"
+    entry = CatalogEntry(
+        source="regulondb",
+        motif_id="RBM1",
+        tf_name="lexA",
+        kind="PFM",
+        has_matrix=True,
+        matrix_source="alignment",
+    )
+    CatalogIndex(entries={entry.key: entry}).save(catalog_root)
+    _write_prob_motif(
+        catalog_root / "normalized" / "motifs" / "regulondb" / "RBM1.json",
+        source="regulondb",
+        motif_id="RBM1",
+        tf_name="lexA",
+    )
+
+    config_path = _write_config(tmp_path)
+    result = runner.invoke(
+        app,
+        ["catalog", "export-densegen", "--tf", "lexA", "--densegen-workspace", densegen_ws.name, str(config_path)],
+        color=False,
+    )
+    assert result.exit_code == 0, result.output
+
+    manifest_path = densegen_ws / "inputs" / "motif_artifacts" / "artifact_manifest.json"
+    payload = json.loads(manifest_path.read_text())
+    artifacts = list(payload.get("artifacts") or [])
+    assert len(artifacts) == 1
+    artifact_rel = Path(str(artifacts[0]["path"]))
+    assert artifact_rel.as_posix() == artifact_rel.name
+    assert not artifact_rel.is_absolute()
+    assert not Path(str(payload.get("catalog_root") or "")).is_absolute()
+    assert not Path(str(payload.get("config_path") or "")).is_absolute()
+
+
+def test_export_densegen_accepts_absolute_workspace_path(tmp_path: Path) -> None:
+    densegen_ws = _write_external_densegen_workspace(tmp_path)
+    catalog_root = tmp_path / ".cruncher"
+    entry = CatalogEntry(
+        source="regulondb",
+        motif_id="RBM1",
+        tf_name="lexA",
+        kind="PFM",
+        has_matrix=True,
+        matrix_source="alignment",
+    )
+    CatalogIndex(entries={entry.key: entry}).save(catalog_root)
+    _write_prob_motif(
+        catalog_root / "normalized" / "motifs" / "regulondb" / "RBM1.json",
+        source="regulondb",
+        motif_id="RBM1",
+        tf_name="lexA",
+    )
+
+    config_path = _write_config(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "export-densegen",
+            "--tf",
+            "lexA",
+            "--densegen-workspace",
+            str(densegen_ws.resolve()),
+            str(config_path),
+        ],
+        color=False,
+    )
+    assert result.exit_code == 0, result.output
+
+    out_dir = densegen_ws / "inputs" / "motif_artifacts"
+    assert out_dir.exists()
+    assert list(out_dir.glob("*.json"))
+    payload = json.loads((out_dir / "artifact_manifest.json").read_text())
+    artifacts = list(payload.get("artifacts") or [])
+    assert len(artifacts) == 1
+    rel = Path(str(artifacts[0]["path"]))
+    assert rel.as_posix() == rel.name
+    assert not rel.is_absolute()
+
+
+def test_export_densegen_cleans_existing_tf_artifacts(tmp_path: Path, monkeypatch) -> None:
+    densegen_ws = _write_densegen_workspace(tmp_path)
+    monkeypatch.setenv("DNADESIGN_DENSEGEN_WORKSPACES_ROOT", str(densegen_ws.parent))
     catalog_root = tmp_path / ".cruncher"
     entry = CatalogEntry(
         source="regulondb",
@@ -256,8 +396,9 @@ def test_export_densegen_cleans_existing_tf_artifacts(tmp_path: Path) -> None:
     assert list(out_dir.glob("lexA__*.json"))
 
 
-def test_export_sites_defaults_to_densegen_workspace(tmp_path: Path) -> None:
+def test_export_sites_defaults_to_densegen_workspace(tmp_path: Path, monkeypatch) -> None:
     densegen_ws = _write_densegen_workspace(tmp_path)
+    monkeypatch.setenv("DNADESIGN_DENSEGEN_WORKSPACES_ROOT", str(densegen_ws.parent))
     catalog_root = tmp_path / ".cruncher"
     entry = CatalogEntry(
         source="regulondb",

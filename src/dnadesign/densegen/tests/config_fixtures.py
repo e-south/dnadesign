@@ -39,7 +39,7 @@ def write_minimal_config(path: Path) -> None:
                 sequence_length: 10
                 plan:
                   - name: demo_plan
-                    quota: 1
+                    sequences: 1
                     sampling:
                       include_inputs: [demo_input]
                     regulator_constraints:

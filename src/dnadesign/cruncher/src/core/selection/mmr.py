@@ -12,13 +12,35 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Callable, Sequence
 
 import numpy as np
 
 from dnadesign.cruncher.core.pwm import PWM
-from dnadesign.cruncher.core.sequence import canon_int, revcomp_int
+from dnadesign.cruncher.core.selection.mmr_distance import (
+    compute_core_distance,
+    compute_position_weights,
+)
+from dnadesign.cruncher.core.selection.mmr_distance import (
+    core_hamming_bp as _core_hamming_bp,
+)
+from dnadesign.cruncher.core.selection.mmr_distance import (
+    full_sequence_distance as _full_sequence_distance,
+)
+from dnadesign.cruncher.core.selection.mmr_distance import (
+    full_sequence_distance_bp as _full_sequence_distance_bp,
+)
+from dnadesign.cruncher.core.selection.mmr_distance import (
+    tfbs_cores_from_hits as _tfbs_cores_from_hits,
+)
+from dnadesign.cruncher.core.selection.mmr_distance import (
+    tfbs_cores_from_scorer as _tfbs_cores_from_scorer,
+)
+from dnadesign.cruncher.core.sequence import canon_int
 from dnadesign.cruncher.core.state import SequenceState
+
+tfbs_cores_from_hits = _tfbs_cores_from_hits
+tfbs_cores_from_scorer = _tfbs_cores_from_scorer
 
 
 @dataclass(frozen=True)
@@ -51,110 +73,6 @@ class MmrSelectionResult:
     relax_steps_used: int = 0
 
 
-def compute_position_weights(pwm: PWM) -> np.ndarray:
-    matrix = np.asarray(pwm.matrix, dtype=float)
-    p = matrix + 1.0e-9
-    info = 2.0 + np.sum(p * np.log2(p), axis=1)
-    min_info = float(np.min(info))
-    max_info = float(np.max(info))
-    if max_info - min_info <= 0:
-        info_norm = np.zeros_like(info, dtype=float)
-    else:
-        info_norm = (info - min_info) / (max_info - min_info)
-    return 1.0 - info_norm
-
-
-def compute_core_distance(
-    cores_a: dict[str, np.ndarray],
-    cores_b: dict[str, np.ndarray],
-    *,
-    weights: dict[str, np.ndarray],
-    tf_names: Sequence[str],
-) -> float:
-    if not tf_names:
-        return 0.0
-    distances: list[float] = []
-    for tf in tf_names:
-        core_a = cores_a[tf]
-        core_b = cores_b[tf]
-        w = weights[tf]
-        if core_a.shape != core_b.shape or core_a.shape != w.shape:
-            raise ValueError(f"Core/weight shape mismatch for TF '{tf}'.")
-        mismatches = (core_a != core_b).astype(float)
-        denom = float(np.sum(w))
-        if denom <= 0:
-            raise ValueError(f"Non-positive weight sum for TF '{tf}'.")
-        tf_distance = float(np.sum(w * mismatches) / denom)
-        if tf_distance < -1.0e-12 or tf_distance > 1.0 + 1.0e-12:
-            raise ValueError(f"TF core distance for '{tf}' must be in [0, 1], got {tf_distance}.")
-        distances.append(float(np.clip(tf_distance, 0.0, 1.0)))
-    value = float(np.mean(distances))
-    if value < -1.0e-12 or value > 1.0 + 1.0e-12:
-        raise ValueError(f"Core distance must be in [0, 1], got {value}.")
-    return float(np.clip(value, 0.0, 1.0))
-
-
-def core_from_hit(seq_arr: np.ndarray, *, offset: int, width: int, strand: str) -> np.ndarray:
-    if width < 1:
-        raise ValueError("core_from_hit requires width >= 1")
-    if offset < 0:
-        raise ValueError("core_from_hit requires offset >= 0")
-    window = np.asarray(seq_arr, dtype=np.int8)[offset : offset + width]
-    if window.size != width:
-        raise ValueError("core_from_hit window is out of bounds for sequence length")
-    if strand == "-":
-        return revcomp_int(window)
-    return window
-
-
-def tfbs_cores_from_hits(
-    seq_arr: np.ndarray,
-    *,
-    per_tf_hits: dict[str, dict[str, object]],
-    tf_names: Sequence[str],
-) -> dict[str, np.ndarray]:
-    cores: dict[str, np.ndarray] = {}
-    for tf in tf_names:
-        hit = per_tf_hits.get(tf)
-        if not isinstance(hit, dict):
-            raise ValueError(f"Missing TF hit data for '{tf}'.")
-        offset = hit.get("offset")
-        width = hit.get("width")
-        strand = hit.get("strand")
-        if not isinstance(offset, int) or not isinstance(width, int) or not isinstance(strand, str):
-            raise ValueError(f"Invalid TF hit data for '{tf}'.")
-        cores[tf] = core_from_hit(seq_arr, offset=offset, width=width, strand=strand)
-    return cores
-
-
-def tfbs_cores_from_scorer(
-    seq_arr: np.ndarray,
-    *,
-    scorer: object,
-    tf_names: Sequence[str],
-) -> dict[str, np.ndarray]:
-    cores: dict[str, np.ndarray] = {}
-    seq_length = int(np.asarray(seq_arr).size)
-    if seq_length < 1:
-        raise ValueError("Core extraction requires non-empty sequences.")
-    for tf in tf_names:
-        raw_llr, offset, strand = scorer.best_llr(seq_arr, tf)
-        _ = raw_llr
-        width = int(scorer.pwm_width(tf))
-        if width > seq_length:
-            width = seq_length
-            offset = 0
-        if strand == "-":
-            rev = revcomp_int(seq_arr)
-            core = rev[offset : offset + width]
-        else:
-            core = seq_arr[offset : offset + width]
-        if core.size != width:
-            raise ValueError(f"Core extraction failed for '{tf}'.")
-        cores[tf] = core
-    return cores
-
-
 def _candidate_id(candidate: MmrCandidate) -> str:
     return f"{int(candidate.chain_id)}:{int(candidate.draw_idx)}"
 
@@ -165,45 +83,6 @@ def _sequence_string(seq_arr: np.ndarray) -> str:
 
 def _canonical_string(seq_arr: np.ndarray) -> str:
     return SequenceState(canon_int(seq_arr)).to_string()
-
-
-def _full_sequence_distance(a: np.ndarray, b: np.ndarray) -> float:
-    a_arr = np.asarray(a, dtype=np.int8)
-    b_arr = np.asarray(b, dtype=np.int8)
-    if a_arr.shape != b_arr.shape:
-        raise ValueError("Full-sequence distance requires equal-length sequence arrays.")
-    if a_arr.size == 0:
-        raise ValueError("Full-sequence distance requires non-empty sequence arrays.")
-    value = float(np.count_nonzero(a_arr != b_arr)) / float(a_arr.size)
-    if value < -1.0e-12 or value > 1.0 + 1.0e-12:
-        raise ValueError(f"Full-sequence distance must be in [0, 1], got {value}.")
-    return float(np.clip(value, 0.0, 1.0))
-
-
-def _full_sequence_distance_bp(a: np.ndarray, b: np.ndarray) -> int:
-    a_arr = np.asarray(a, dtype=np.int8)
-    b_arr = np.asarray(b, dtype=np.int8)
-    if a_arr.shape != b_arr.shape:
-        raise ValueError("Full-sequence distance requires equal-length sequence arrays.")
-    if a_arr.size == 0:
-        raise ValueError("Full-sequence distance requires non-empty sequence arrays.")
-    return int(np.count_nonzero(a_arr != b_arr))
-
-
-def _core_hamming_bp(
-    cores_a: dict[str, np.ndarray],
-    cores_b: dict[str, np.ndarray],
-    *,
-    tf_names: Sequence[str],
-) -> int:
-    total = 0
-    for tf in tf_names:
-        core_a = np.asarray(cores_a[tf], dtype=np.int8)
-        core_b = np.asarray(cores_b[tf], dtype=np.int8)
-        if core_a.shape != core_b.shape:
-            raise ValueError(f"Core shape mismatch for TF '{tf}'.")
-        total += int(np.count_nonzero(core_a != core_b))
-    return total
 
 
 def _percentile_ranks(values: Sequence[float]) -> list[float]:
@@ -375,6 +254,538 @@ def select_score_elites(
     )
 
 
+@dataclass(frozen=True)
+class _MmrChoice:
+    idx: int
+    utility: float
+    nearest_id: str | None
+    nearest_distance: float
+    nearest_similarity: float
+    nearest_full_distance: float
+    nearest_core_distance: float
+    nearest_core_bp: int
+
+
+def _empty_mmr_result(
+    *,
+    pool_size: int,
+    k: int,
+    alpha: float,
+    min_hamming_bp_requested: int | None,
+    min_hamming_bp_final: int | None,
+    min_core_hamming_bp_requested: int | None,
+    min_core_hamming_bp_final: int | None,
+    constraint_policy: str | None,
+    relax_steps_used: int = 0,
+) -> MmrSelectionResult:
+    return MmrSelectionResult(
+        selected=[],
+        meta=[],
+        pool_size=pool_size,
+        k=k,
+        alpha=alpha,
+        median_relevance_raw=None,
+        mean_pairwise_distance=None,
+        min_pairwise_distance=None,
+        min_hamming_bp_requested=min_hamming_bp_requested,
+        min_hamming_bp_final=min_hamming_bp_final,
+        min_core_hamming_bp_requested=min_core_hamming_bp_requested,
+        min_core_hamming_bp_final=min_core_hamming_bp_final,
+        constraint_policy=constraint_policy,
+        relax_steps_used=relax_steps_used,
+    )
+
+
+def _resolve_mmr_metric_and_policy(
+    *,
+    distance_metric: str | None,
+    constraint_policy: str,
+) -> tuple[str, str]:
+    resolved_metric = str(distance_metric or "core").strip().lower()
+    if resolved_metric not in {"full", "core", "hybrid"}:
+        raise ValueError(f"Unknown distance_metric '{distance_metric}'.")
+    policy = str(constraint_policy).strip().lower()
+    if policy not in {"relax", "strict"}:
+        raise ValueError("constraint_policy must be 'relax' or 'strict'.")
+    return resolved_metric, policy
+
+
+def _validate_mmr_runtime_inputs(
+    *,
+    relevance: str,
+    distance_metric: str | None,
+    constraint_policy: str,
+    min_hamming_bp: int | None,
+    min_core_hamming_bp: int | None,
+    relax_step_bp: int,
+    relax_min_bp: int,
+    hybrid_full_weight: float,
+    hybrid_core_weight: float,
+) -> tuple[str, str]:
+    if relevance not in {"min_tf_score", "joint_score"}:
+        raise ValueError(f"Unknown relevance '{relevance}'.")
+    resolved_metric, policy = _resolve_mmr_metric_and_policy(
+        distance_metric=distance_metric,
+        constraint_policy=constraint_policy,
+    )
+    if min_hamming_bp is not None and int(min_hamming_bp) < 0:
+        raise ValueError("min_hamming_bp must be >= 0 when provided.")
+    if min_core_hamming_bp is not None and int(min_core_hamming_bp) < 0:
+        raise ValueError("min_core_hamming_bp must be >= 0 when provided.")
+    if relax_step_bp < 1:
+        raise ValueError("relax_step_bp must be >= 1.")
+    if relax_min_bp < 0:
+        raise ValueError("relax_min_bp must be >= 0.")
+    if hybrid_full_weight <= 0 or hybrid_core_weight <= 0:
+        raise ValueError("hybrid_full_weight and hybrid_core_weight must be > 0.")
+    return resolved_metric, policy
+
+
+def _seed_meta_row(
+    *,
+    seed: MmrCandidate,
+    seed_idx: int,
+    seed_id: str,
+    alpha: float,
+    relevance_raw: Sequence[float],
+    relevance_scaled: Sequence[float],
+    core_maps: dict[str, dict[str, np.ndarray]],
+) -> dict[str, object]:
+    row: dict[str, object] = {
+        "elite_rank": 1,
+        "candidate_id": seed_id,
+        "sequence": _sequence_string(seed.seq_arr),
+        "canonical_sequence": _canonical_string(seed.seq_arr),
+        "utility": alpha * relevance_scaled[seed_idx],
+        "relevance_raw": relevance_raw[seed_idx],
+        "relevance_norm": relevance_scaled[seed_idx],
+        "nearest_selected_id": None,
+        "nearest_distance": None,
+        "nearest_similarity": None,
+    }
+    for tf, core in core_maps[seed_id].items():
+        row[f"core_{tf}"] = SequenceState(core).to_string()
+    return row
+
+
+def _remaining_candidate_indices(*, pool: Sequence[MmrCandidate], selected_ids: set[str]) -> list[int]:
+    return [idx for idx, cand in enumerate(pool) if _candidate_id(cand) not in selected_ids]
+
+
+def _best_choice_for_remaining(
+    *,
+    remaining_indices: Sequence[int],
+    selected_indices: Sequence[int],
+    id_by_index: Sequence[str],
+    pair_metrics: Callable[[int, int], tuple[float, float, float, int, int]],
+    alpha: float,
+    relevance_raw: Sequence[float],
+    relevance_scaled: Sequence[float],
+    min_hamming_bp: int | None,
+    min_core_hamming_bp: int | None,
+) -> _MmrChoice | None:
+    best_choice: _MmrChoice | None = None
+    for idx in remaining_indices:
+        choice = _evaluate_candidate_choice(
+            idx=idx,
+            selected_indices=selected_indices,
+            id_by_index=id_by_index,
+            pair_metrics=pair_metrics,
+            alpha=alpha,
+            relevance_scaled=relevance_scaled,
+            min_hamming_bp=min_hamming_bp,
+            min_core_hamming_bp=min_core_hamming_bp,
+        )
+        if choice is None:
+            continue
+        if _is_better_choice(
+            candidate=choice,
+            current_best=best_choice,
+            relevance_raw=relevance_raw,
+            id_by_index=id_by_index,
+        ):
+            best_choice = choice
+    return best_choice
+
+
+def _append_choice_selection(
+    *,
+    choice: _MmrChoice,
+    pool: Sequence[MmrCandidate],
+    id_by_index: Sequence[str],
+    core_maps: dict[str, dict[str, np.ndarray]],
+    alpha: float,
+    relevance_raw: Sequence[float],
+    relevance_scaled: Sequence[float],
+    selected: list[MmrCandidate],
+    selected_indices: list[int],
+    selected_ids: set[str],
+    meta_rows: list[dict[str, object]],
+) -> None:
+    cand = pool[choice.idx]
+    cand_id = id_by_index[choice.idx]
+    selected.append(cand)
+    selected_indices.append(choice.idx)
+    selected_ids.add(cand_id)
+    row: dict[str, object] = {
+        "elite_rank": len(selected),
+        "candidate_id": cand_id,
+        "sequence": _sequence_string(cand.seq_arr),
+        "canonical_sequence": _canonical_string(cand.seq_arr),
+        "utility": choice.utility,
+        "relevance_raw": relevance_raw[choice.idx],
+        "relevance_norm": relevance_scaled[choice.idx],
+        "nearest_selected_id": choice.nearest_id,
+        "nearest_distance": choice.nearest_distance,
+        "nearest_similarity": choice.nearest_similarity,
+        "nearest_distance_full": choice.nearest_full_distance,
+        "nearest_distance_core": choice.nearest_core_distance,
+        "nearest_distance_core_bp": choice.nearest_core_bp,
+    }
+    for tf, core in core_maps[cand_id].items():
+        row[f"core_{tf}"] = SequenceState(core).to_string()
+    meta_rows.append(row)
+
+
+def _resolve_mmr_pool(
+    *,
+    candidates: Sequence[MmrCandidate],
+    k: int,
+    pool_size: int,
+    relevance: str,
+    dsdna: bool,
+) -> list[MmrCandidate]:
+    candidates_sorted = sorted(
+        candidates,
+        key=lambda cand: (
+            cand.min_norm if relevance == "min_tf_score" else cand.combined_score,
+            _candidate_id(cand),
+        ),
+        reverse=True,
+    )
+    effective_pool_size = max(pool_size, k)
+    return _dedupe_pool(candidates_sorted[:effective_pool_size], dsdna=dsdna)
+
+
+def _resolve_relevance_scores(
+    *,
+    pool: Sequence[MmrCandidate],
+    relevance: str,
+) -> tuple[list[float], list[float]]:
+    relevance_raw: list[float] = []
+    for cand in pool:
+        if relevance == "joint_score":
+            relevance_raw.append(float(cand.combined_score))
+        else:
+            relevance_raw.append(float(cand.min_norm))
+    return relevance_raw, _percentile_ranks(relevance_raw)
+
+
+def _resolve_weights_by_tf(
+    *,
+    tf_names: Sequence[str] | None,
+    pwms: dict[str, PWM] | None,
+    core_maps: dict[str, dict[str, np.ndarray]] | None,
+) -> tuple[Sequence[str], dict[str, np.ndarray]]:
+    tf_names_resolved: Sequence[str] = tf_names or []
+    if tf_names is None or pwms is None:
+        raise ValueError("tf_names and pwms are required for TFBS core distances.")
+    if core_maps is None:
+        raise ValueError("core_maps are required for TFBS core distances.")
+    weights_by_tf: dict[str, np.ndarray] = {}
+    for tf in tf_names_resolved:
+        pwm = pwms.get(tf)
+        if pwm is None:
+            raise ValueError(f"Missing PWM for TF '{tf}'.")
+        weights_by_tf[tf] = compute_position_weights(pwm)
+    return tf_names_resolved, weights_by_tf
+
+
+def _select_seed_index(
+    *,
+    pool: Sequence[MmrCandidate],
+    relevance_raw: Sequence[float],
+    relevance_scaled: Sequence[float],
+) -> int:
+    return max(
+        range(len(pool)),
+        key=lambda idx: (relevance_scaled[idx], relevance_raw[idx], _candidate_id(pool[idx])),
+    )
+
+
+def _evaluate_candidate_choice(
+    *,
+    idx: int,
+    selected_indices: Sequence[int],
+    id_by_index: Sequence[str],
+    pair_metrics: Callable[[int, int], tuple[float, float, float, int, int]],
+    alpha: float,
+    relevance_scaled: Sequence[float],
+    min_hamming_bp: int | None,
+    min_core_hamming_bp: int | None,
+) -> _MmrChoice | None:
+    nearest_distance: float | None = None
+    nearest_id: str | None = None
+    nearest_full_distance: float | None = None
+    nearest_core_distance: float | None = None
+    nearest_core_bp: int | None = None
+    for sel_idx in selected_indices:
+        metric_distance, full_distance, core_distance, core_bp, full_bp = pair_metrics(idx, sel_idx)
+        if min_hamming_bp is not None and full_bp < min_hamming_bp:
+            return None
+        if min_core_hamming_bp is not None and core_bp < min_core_hamming_bp:
+            return None
+        if nearest_distance is None or metric_distance < nearest_distance:
+            nearest_distance = float(metric_distance)
+            nearest_id = id_by_index[sel_idx]
+        nearest_full_distance = (
+            float(full_distance) if nearest_full_distance is None else min(nearest_full_distance, float(full_distance))
+        )
+        nearest_core_distance = (
+            float(core_distance) if nearest_core_distance is None else min(nearest_core_distance, float(core_distance))
+        )
+        nearest_core_bp = int(core_bp) if nearest_core_bp is None else min(nearest_core_bp, int(core_bp))
+
+    nearest_distance_value = float(nearest_distance if nearest_distance is not None else 0.0)
+    nearest_full_value = float(nearest_full_distance if nearest_full_distance is not None else 0.0)
+    nearest_core_value = float(nearest_core_distance if nearest_core_distance is not None else 0.0)
+    nearest_core_bp_value = int(nearest_core_bp if nearest_core_bp is not None else 0)
+    nearest_similarity = 1.0 - nearest_distance_value
+    utility = alpha * relevance_scaled[idx] - (1.0 - alpha) * nearest_similarity
+    return _MmrChoice(
+        idx=idx,
+        utility=float(utility),
+        nearest_id=nearest_id,
+        nearest_distance=nearest_distance_value,
+        nearest_similarity=float(nearest_similarity),
+        nearest_full_distance=nearest_full_value,
+        nearest_core_distance=nearest_core_value,
+        nearest_core_bp=nearest_core_bp_value,
+    )
+
+
+def _is_better_choice(
+    *,
+    candidate: _MmrChoice,
+    current_best: _MmrChoice | None,
+    relevance_raw: Sequence[float],
+    id_by_index: Sequence[str],
+) -> bool:
+    if current_best is None:
+        return True
+    if candidate.utility != current_best.utility:
+        return candidate.utility > current_best.utility
+    candidate_relevance = relevance_raw[candidate.idx]
+    best_relevance = relevance_raw[current_best.idx]
+    if candidate_relevance != best_relevance:
+        return candidate_relevance > best_relevance
+    if candidate.nearest_full_distance != current_best.nearest_full_distance:
+        return candidate.nearest_full_distance > current_best.nearest_full_distance
+    return id_by_index[candidate.idx] < id_by_index[current_best.idx]
+
+
+def _relax_constraints(
+    *,
+    current_min_hamming_bp: int | None,
+    current_min_core_hamming_bp: int | None,
+    relax_step_bp: int,
+    relax_min_bp: int,
+) -> tuple[int | None, int | None, bool]:
+    relaxed = False
+    next_min_hamming_bp = current_min_hamming_bp
+    next_min_core_hamming_bp = current_min_core_hamming_bp
+    if next_min_hamming_bp is not None and next_min_hamming_bp > relax_min_bp:
+        next_min_hamming_bp = max(relax_min_bp, next_min_hamming_bp - relax_step_bp)
+        relaxed = True
+    if next_min_core_hamming_bp is not None and next_min_core_hamming_bp > relax_min_bp:
+        next_min_core_hamming_bp = max(relax_min_bp, next_min_core_hamming_bp - relax_step_bp)
+        relaxed = True
+    return next_min_hamming_bp, next_min_core_hamming_bp, relaxed
+
+
+def _run_mmr_selection(
+    *,
+    pool: Sequence[MmrCandidate],
+    k: int,
+    alpha: float,
+    relevance_raw: Sequence[float],
+    relevance_scaled: Sequence[float],
+    id_by_index: Sequence[str],
+    core_maps: dict[str, dict[str, np.ndarray]],
+    pair_metrics: Callable[[int, int], tuple[float, float, float, int, int]],
+    policy: str,
+    min_hamming_bp: int | None,
+    min_core_hamming_bp: int | None,
+    relax_step_bp: int,
+    relax_min_bp: int,
+) -> tuple[list[MmrCandidate], list[int], list[dict[str, object]], int | None, int | None, int]:
+    selected: list[MmrCandidate] = []
+    selected_indices: list[int] = []
+    selected_ids: set[str] = set()
+    meta_rows: list[dict[str, object]] = []
+
+    seed_idx = _select_seed_index(
+        pool=pool,
+        relevance_raw=relevance_raw,
+        relevance_scaled=relevance_scaled,
+    )
+    seed = pool[seed_idx]
+    seed_id = _candidate_id(seed)
+    seed_meta = _seed_meta_row(
+        seed=seed,
+        seed_idx=seed_idx,
+        seed_id=seed_id,
+        alpha=alpha,
+        relevance_raw=relevance_raw,
+        relevance_scaled=relevance_scaled,
+        core_maps=core_maps,
+    )
+    selected.append(seed)
+    selected_indices.append(seed_idx)
+    selected_ids.add(seed_id)
+    meta_rows.append(seed_meta)
+
+    current_min_hamming_bp = int(min_hamming_bp) if min_hamming_bp is not None else None
+    current_min_core_hamming_bp = int(min_core_hamming_bp) if min_core_hamming_bp is not None else None
+    relax_steps_used = 0
+
+    while len(selected) < k:
+        remaining_indices = _remaining_candidate_indices(pool=pool, selected_ids=selected_ids)
+        if not remaining_indices:
+            break
+        best_choice = _best_choice_for_remaining(
+            remaining_indices=remaining_indices,
+            selected_indices=selected_indices,
+            id_by_index=id_by_index,
+            pair_metrics=pair_metrics,
+            alpha=alpha,
+            relevance_raw=relevance_raw,
+            relevance_scaled=relevance_scaled,
+            min_hamming_bp=current_min_hamming_bp,
+            min_core_hamming_bp=current_min_core_hamming_bp,
+        )
+        if best_choice is None:
+            if current_min_hamming_bp is None and current_min_core_hamming_bp is None:
+                break
+            if policy == "strict":
+                raise ValueError(
+                    "Strict constrained MMR could not select "
+                    f"{k} elites with min_hamming_bp={current_min_hamming_bp} "
+                    f"and min_core_hamming_bp={current_min_core_hamming_bp}; "
+                    f"stopped at {len(selected)}."
+                )
+            current_min_hamming_bp, current_min_core_hamming_bp, relaxed = _relax_constraints(
+                current_min_hamming_bp=current_min_hamming_bp,
+                current_min_core_hamming_bp=current_min_core_hamming_bp,
+                relax_step_bp=relax_step_bp,
+                relax_min_bp=relax_min_bp,
+            )
+            if not relaxed:
+                break
+            relax_steps_used += 1
+            continue
+        _append_choice_selection(
+            choice=best_choice,
+            pool=pool,
+            id_by_index=id_by_index,
+            core_maps=core_maps,
+            alpha=alpha,
+            relevance_raw=relevance_raw,
+            relevance_scaled=relevance_scaled,
+            selected=selected,
+            selected_indices=selected_indices,
+            selected_ids=selected_ids,
+            meta_rows=meta_rows,
+        )
+    return (
+        selected,
+        selected_indices,
+        meta_rows,
+        current_min_hamming_bp,
+        current_min_core_hamming_bp,
+        relax_steps_used,
+    )
+
+
+def _build_pair_metrics(
+    *,
+    pool: Sequence[MmrCandidate],
+    id_by_index: Sequence[str],
+    core_maps: dict[str, dict[str, np.ndarray]],
+    tf_names_resolved: Sequence[str],
+    weights_by_tf: dict[str, np.ndarray],
+    resolved_metric: str,
+    hybrid_full_weight: float,
+    hybrid_core_weight: float,
+) -> Callable[[int, int], tuple[float, float, float, int, int]]:
+    pair_metric_cache: dict[tuple[int, int], tuple[float, float, float, int, int]] = {}
+
+    def _pair_metrics(
+        left_idx: int,
+        right_idx: int,
+    ) -> tuple[float, float, float, int, int]:
+        if left_idx == right_idx:
+            return 0.0, 0.0, 0.0, 0, 0
+        a_idx, b_idx = (left_idx, right_idx) if left_idx < right_idx else (right_idx, left_idx)
+        cache_key = (a_idx, b_idx)
+        cached = pair_metric_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        cand_a = pool[a_idx]
+        cand_b = pool[b_idx]
+        if cand_a.seq_arr.size != cand_b.seq_arr.size:
+            raise ValueError("MMR candidates must share sequence length for distance comparisons.")
+        cand_a_id = id_by_index[a_idx]
+        cand_b_id = id_by_index[b_idx]
+        core_a = core_maps[cand_a_id]
+        core_b = core_maps[cand_b_id]
+        core_dist = compute_core_distance(core_a, core_b, weights=weights_by_tf, tf_names=tf_names_resolved)
+        full_bp = _full_sequence_distance_bp(cand_a.seq_arr, cand_b.seq_arr)
+        full_dist = float(full_bp) / float(cand_a.seq_arr.size)
+        core_bp = _core_hamming_bp(core_a, core_b, tf_names=tf_names_resolved)
+        if resolved_metric == "full":
+            metric_dist = full_dist
+        elif resolved_metric == "hybrid":
+            denom = hybrid_full_weight + hybrid_core_weight
+            metric_dist = ((hybrid_full_weight * full_dist) + (hybrid_core_weight * core_dist)) / denom
+        else:
+            metric_dist = core_dist
+        payload = (float(metric_dist), float(full_dist), float(core_dist), int(core_bp), int(full_bp))
+        pair_metric_cache[cache_key] = payload
+        return payload
+
+    return _pair_metrics
+
+
+def _summarize_selected_distances(
+    *,
+    selected_indices: Sequence[int],
+    pair_metrics: Callable[[int, int], tuple[float, float, float, int, int]],
+) -> tuple[float | None, float | None]:
+    pairwise: list[float] = []
+    for idx, left_idx in enumerate(selected_indices):
+        for right_idx in selected_indices[idx + 1 :]:
+            metric_distance, _, _, _, _ = pair_metrics(left_idx, right_idx)
+            pairwise.append(metric_distance)
+    mean_pairwise_distance = float(np.mean(pairwise)) if pairwise else None
+    min_pairwise_distance = float(np.min(pairwise)) if pairwise else None
+    return mean_pairwise_distance, min_pairwise_distance
+
+
+def _selected_relevance_values(
+    *,
+    selected: Sequence[MmrCandidate],
+    index_by_id: dict[str, int],
+    relevance_raw: Sequence[float],
+) -> list[float]:
+    values: list[float] = []
+    for item in selected:
+        idx = index_by_id[_candidate_id(item)]
+        values.append(relevance_raw[idx])
+    return values
+
+
 def select_mmr_elites(
     candidates: Sequence[MmrCandidate],
     *,
@@ -402,300 +813,102 @@ def select_mmr_elites(
     if alpha < 0 or alpha > 1:
         raise ValueError("alpha must be in [0, 1]")
     if k == 0 or not candidates:
-        return MmrSelectionResult(
-            selected=[],
-            meta=[],
+        return _empty_mmr_result(
             pool_size=pool_size,
             k=k,
             alpha=alpha,
-            median_relevance_raw=None,
-            mean_pairwise_distance=None,
-            min_pairwise_distance=None,
             min_hamming_bp_requested=min_hamming_bp,
             min_hamming_bp_final=min_hamming_bp,
             min_core_hamming_bp_requested=min_core_hamming_bp,
             min_core_hamming_bp_final=min_core_hamming_bp,
             constraint_policy=constraint_policy,
-            relax_steps_used=0,
         )
 
-    if relevance not in {"min_tf_score", "joint_score"}:
-        raise ValueError(f"Unknown relevance '{relevance}'.")
-    resolved_metric = str(distance_metric or "core").strip().lower()
-    if resolved_metric not in {"full", "core", "hybrid"}:
-        raise ValueError(f"Unknown distance_metric '{distance_metric}'.")
-    policy = str(constraint_policy).strip().lower()
-    if policy not in {"relax", "strict"}:
-        raise ValueError("constraint_policy must be 'relax' or 'strict'.")
-    if min_hamming_bp is not None and int(min_hamming_bp) < 0:
-        raise ValueError("min_hamming_bp must be >= 0 when provided.")
-    if min_core_hamming_bp is not None and int(min_core_hamming_bp) < 0:
-        raise ValueError("min_core_hamming_bp must be >= 0 when provided.")
-    if relax_step_bp < 1:
-        raise ValueError("relax_step_bp must be >= 1.")
-    if relax_min_bp < 0:
-        raise ValueError("relax_min_bp must be >= 0.")
-    if hybrid_full_weight <= 0 or hybrid_core_weight <= 0:
-        raise ValueError("hybrid_full_weight and hybrid_core_weight must be > 0.")
-
-    candidates_sorted = sorted(
-        candidates,
-        key=lambda cand: (
-            cand.min_norm if relevance == "min_tf_score" else cand.combined_score,
-            _candidate_id(cand),
-        ),
-        reverse=True,
+    resolved_metric, policy = _validate_mmr_runtime_inputs(
+        relevance=relevance,
+        distance_metric=distance_metric,
+        constraint_policy=constraint_policy,
+        min_hamming_bp=min_hamming_bp,
+        min_core_hamming_bp=min_core_hamming_bp,
+        relax_step_bp=relax_step_bp,
+        relax_min_bp=relax_min_bp,
+        hybrid_full_weight=hybrid_full_weight,
+        hybrid_core_weight=hybrid_core_weight,
     )
-    effective_pool_size = max(pool_size, k)
-    pool = candidates_sorted[:effective_pool_size]
 
-    pool = _dedupe_pool(pool, dsdna=dsdna)
-
+    pool = _resolve_mmr_pool(
+        candidates=candidates,
+        k=k,
+        pool_size=pool_size,
+        relevance=relevance,
+        dsdna=dsdna,
+    )
     if not pool:
-        return MmrSelectionResult(
-            selected=[],
-            meta=[],
+        return _empty_mmr_result(
             pool_size=pool_size,
             k=k,
             alpha=alpha,
-            median_relevance_raw=None,
-            mean_pairwise_distance=None,
-            min_pairwise_distance=None,
             min_hamming_bp_requested=min_hamming_bp,
             min_hamming_bp_final=min_hamming_bp,
             min_core_hamming_bp_requested=min_core_hamming_bp,
             min_core_hamming_bp_final=min_core_hamming_bp,
             constraint_policy=policy,
-            relax_steps_used=0,
         )
 
-    relevance_raw: list[float] = []
-    for cand in pool:
-        if relevance == "joint_score":
-            relevance_raw.append(float(cand.combined_score))
-        elif relevance == "min_tf_score":
-            relevance_raw.append(float(cand.min_norm))
-
-    relevance_scaled = _percentile_ranks(relevance_raw)
-
-    tf_names_resolved: Sequence[str] = tf_names or []
-    if tf_names is None or pwms is None:
-        raise ValueError("tf_names and pwms are required for TFBS core distances.")
-    if core_maps is None:
-        raise ValueError("core_maps are required for TFBS core distances.")
-    weights_by_tf: dict[str, np.ndarray] = {}
-    for tf in tf_names_resolved:
-        pwm = pwms.get(tf)
-        if pwm is None:
-            raise ValueError(f"Missing PWM for TF '{tf}'.")
-        weights_by_tf[tf] = compute_position_weights(pwm)
-
-    selected: list[MmrCandidate] = []
-    selected_ids: set[str] = set()
-    meta_rows: list[dict[str, object]] = []
-    index_by_id = {_candidate_id(cand): idx for idx, cand in enumerate(pool)}
-    current_min_hamming_bp = int(min_hamming_bp) if min_hamming_bp is not None else None
-    current_min_core_hamming_bp = int(min_core_hamming_bp) if min_core_hamming_bp is not None else None
-    relax_steps_used = 0
-
-    seed_idx = max(
-        range(len(pool)),
-        key=lambda idx: (relevance_scaled[idx], relevance_raw[idx], _candidate_id(pool[idx])),
-    )
-    seed = pool[seed_idx]
-    seed_id = _candidate_id(seed)
-    seed_meta = {
-        "elite_rank": 1,
-        "candidate_id": seed_id,
-        "sequence": _sequence_string(seed.seq_arr),
-        "canonical_sequence": _canonical_string(seed.seq_arr),
-        "utility": alpha * relevance_scaled[seed_idx],
-        "relevance_raw": relevance_raw[seed_idx],
-        "relevance_norm": relevance_scaled[seed_idx],
-        "nearest_selected_id": None,
-        "nearest_distance": None,
-        "nearest_similarity": None,
-    }
-    if core_maps is not None:
-        for tf, core in core_maps[seed_id].items():
-            seed_meta[f"core_{tf}"] = SequenceState(core).to_string()
-    selected.append(seed)
-    selected_ids.add(seed_id)
-    meta_rows.append(seed_meta)
-
-    while len(selected) < k:
-        remaining_indices = [idx for idx, cand in enumerate(pool) if _candidate_id(cand) not in selected_ids]
-        if not remaining_indices:
-            break
-
-        feasible_indices: list[int] = []
-        for idx in remaining_indices:
-            cand = pool[idx]
-            cand_id = _candidate_id(cand)
-            core_cand = core_maps[cand_id]
-            feasible = True
-            for sel in selected:
-                sel_id = _candidate_id(sel)
-                if current_min_hamming_bp is not None:
-                    full_bp = _full_sequence_distance_bp(cand.seq_arr, sel.seq_arr)
-                    if full_bp < current_min_hamming_bp:
-                        feasible = False
-                        break
-                if current_min_core_hamming_bp is not None:
-                    core_bp = _core_hamming_bp(core_cand, core_maps[sel_id], tf_names=tf_names_resolved)
-                    if core_bp < current_min_core_hamming_bp:
-                        feasible = False
-                        break
-            if feasible:
-                feasible_indices.append(idx)
-
-        if not feasible_indices:
-            if current_min_hamming_bp is None and current_min_core_hamming_bp is None:
-                break
-            if policy == "strict":
-                raise ValueError(
-                    "Strict constrained MMR could not select "
-                    f"{k} elites with min_hamming_bp={current_min_hamming_bp} "
-                    f"and min_core_hamming_bp={current_min_core_hamming_bp}; "
-                    f"stopped at {len(selected)}."
-                )
-            relaxed = False
-            if current_min_hamming_bp is not None and current_min_hamming_bp > relax_min_bp:
-                current_min_hamming_bp = max(relax_min_bp, current_min_hamming_bp - relax_step_bp)
-                relaxed = True
-            if current_min_core_hamming_bp is not None and current_min_core_hamming_bp > relax_min_bp:
-                current_min_core_hamming_bp = max(relax_min_bp, current_min_core_hamming_bp - relax_step_bp)
-                relaxed = True
-            if not relaxed:
-                break
-            relax_steps_used += 1
-            continue
-
-        best_idx = None
-        best_utility = None
-        best_nearest = None
-        best_nearest_full = None
-        best_nearest_core = None
-        best_nearest_core_bp = None
-        best_nearest_id = None
-        for idx in feasible_indices:
-            cand = pool[idx]
-            cand_id = _candidate_id(cand)
-            core_cand = core_maps[_candidate_id(cand)]
-            distances: list[float] = []
-            full_distances: list[float] = []
-            core_distances: list[float] = []
-            core_bp_distances: list[int] = []
-            nearest_id = None
-            nearest_dist = None
-            for sel in selected:
-                sel_id = _candidate_id(sel)
-                dist = compute_core_distance(
-                    core_cand,
-                    core_maps[sel_id],
-                    weights=weights_by_tf,
-                    tf_names=tf_names_resolved,
-                )
-                full_dist = _full_sequence_distance(cand.seq_arr, sel.seq_arr)
-                if resolved_metric == "full":
-                    metric_distance = full_dist
-                elif resolved_metric == "hybrid":
-                    denom = hybrid_full_weight + hybrid_core_weight
-                    metric_distance = ((hybrid_full_weight * full_dist) + (hybrid_core_weight * dist)) / denom
-                else:
-                    metric_distance = dist
-                distances.append(float(metric_distance))
-                full_distances.append(float(full_dist))
-                core_distances.append(float(dist))
-                core_bp_distances.append(_core_hamming_bp(core_cand, core_maps[sel_id], tf_names=tf_names_resolved))
-                if nearest_dist is None or metric_distance < nearest_dist:
-                    nearest_dist = float(metric_distance)
-                    nearest_id = sel_id
-            nearest_distance = min(distances) if distances else 0.0
-            nearest_full_distance = min(full_distances) if full_distances else 0.0
-            nearest_core_distance = min(core_distances) if core_distances else 0.0
-            nearest_core_bp = min(core_bp_distances) if core_bp_distances else 0
-            nearest_similarity = 1.0 - nearest_distance
-            utility = alpha * relevance_scaled[idx] - (1.0 - alpha) * nearest_similarity
-            if best_utility is None or utility > best_utility:
-                best_utility = utility
-                best_idx = idx
-                best_nearest = (nearest_distance, nearest_similarity)
-                best_nearest_full = nearest_full_distance
-                best_nearest_core = nearest_core_distance
-                best_nearest_core_bp = nearest_core_bp
-                best_nearest_id = nearest_id
-            elif utility == best_utility and best_idx is not None:
-                if relevance_raw[idx] > relevance_raw[best_idx]:
-                    best_idx = idx
-                    best_nearest = (nearest_distance, nearest_similarity)
-                    best_nearest_full = nearest_full_distance
-                    best_nearest_core = nearest_core_distance
-                    best_nearest_core_bp = nearest_core_bp
-                    best_nearest_id = nearest_id
-                elif relevance_raw[idx] == relevance_raw[best_idx]:
-                    current_best_full = best_nearest_full if best_nearest_full is not None else -1.0
-                    if nearest_full_distance > current_best_full:
-                        best_idx = idx
-                        best_nearest = (nearest_distance, nearest_similarity)
-                        best_nearest_full = nearest_full_distance
-                        best_nearest_core = nearest_core_distance
-                        best_nearest_core_bp = nearest_core_bp
-                        best_nearest_id = nearest_id
-                    elif nearest_full_distance == current_best_full:
-                        best_id = _candidate_id(pool[best_idx])
-                        if cand_id < best_id:
-                            best_idx = idx
-                            best_nearest = (nearest_distance, nearest_similarity)
-                            best_nearest_full = nearest_full_distance
-                            best_nearest_core = nearest_core_distance
-                            best_nearest_core_bp = nearest_core_bp
-                            best_nearest_id = nearest_id
-
-        if best_idx is None:
-            break
-
-        cand = pool[best_idx]
-        cand_id = _candidate_id(cand)
-        selected.append(cand)
-        selected_ids.add(cand_id)
-        nearest_distance, nearest_similarity = best_nearest if best_nearest else (None, None)
-        row = {
-            "elite_rank": len(selected),
-            "candidate_id": cand_id,
-            "sequence": _sequence_string(cand.seq_arr),
-            "canonical_sequence": _canonical_string(cand.seq_arr),
-            "utility": best_utility,
-            "relevance_raw": relevance_raw[best_idx],
-            "relevance_norm": relevance_scaled[best_idx],
-            "nearest_selected_id": best_nearest_id,
-            "nearest_distance": nearest_distance,
-            "nearest_similarity": nearest_similarity,
-            "nearest_distance_full": best_nearest_full,
-            "nearest_distance_core": best_nearest_core,
-            "nearest_distance_core_bp": best_nearest_core_bp,
-        }
-        if core_maps is not None:
-            for tf, core in core_maps[cand_id].items():
-                row[f"core_{tf}"] = SequenceState(core).to_string()
-        meta_rows.append(row)
-
-    pairwise = _pairwise_distances(
-        selected,
-        tf_names=tf_names_resolved,
-        weights_by_tf=weights_by_tf,
+    relevance_raw, relevance_scaled = _resolve_relevance_scores(pool=pool, relevance=relevance)
+    tf_names_resolved, weights_by_tf = _resolve_weights_by_tf(
+        tf_names=tf_names,
+        pwms=pwms,
         core_maps=core_maps,
-        distance_metric=resolved_metric,
+    )
+    assert core_maps is not None
+
+    index_by_id = {_candidate_id(cand): idx for idx, cand in enumerate(pool)}
+    id_by_index = [_candidate_id(cand) for cand in pool]
+    _pair_metrics = _build_pair_metrics(
+        pool=pool,
+        id_by_index=id_by_index,
+        core_maps=core_maps,
+        tf_names_resolved=tf_names_resolved,
+        weights_by_tf=weights_by_tf,
+        resolved_metric=resolved_metric,
         hybrid_full_weight=hybrid_full_weight,
         hybrid_core_weight=hybrid_core_weight,
     )
-    selected_relevance = []
-    for sel in selected:
-        idx = index_by_id[_candidate_id(sel)]
-        selected_relevance.append(relevance_raw[idx])
+
+    (
+        selected,
+        selected_indices,
+        meta_rows,
+        current_min_hamming_bp,
+        current_min_core_hamming_bp,
+        relax_steps_used,
+    ) = _run_mmr_selection(
+        pool=pool,
+        k=k,
+        alpha=alpha,
+        relevance_raw=relevance_raw,
+        relevance_scaled=relevance_scaled,
+        id_by_index=id_by_index,
+        core_maps=core_maps,
+        pair_metrics=_pair_metrics,
+        policy=policy,
+        min_hamming_bp=min_hamming_bp,
+        min_core_hamming_bp=min_core_hamming_bp,
+        relax_step_bp=relax_step_bp,
+        relax_min_bp=relax_min_bp,
+    )
+
+    mean_pairwise_distance, min_pairwise_distance = _summarize_selected_distances(
+        selected_indices=selected_indices,
+        pair_metrics=_pair_metrics,
+    )
+    selected_relevance = _selected_relevance_values(
+        selected=selected,
+        index_by_id=index_by_id,
+        relevance_raw=relevance_raw,
+    )
     median_relevance_raw = float(np.median(selected_relevance)) if selected_relevance else None
-    mean_pairwise_distance = float(np.mean(pairwise)) if pairwise else None
-    min_pairwise_distance = float(np.min(pairwise)) if pairwise else None
 
     return MmrSelectionResult(
         selected=selected,

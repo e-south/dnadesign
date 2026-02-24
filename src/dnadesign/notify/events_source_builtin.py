@@ -24,7 +24,7 @@ ToolEventsSourceRegister = Callable[..., None]
 
 def _resolve_densegen_events_from_config(config_path: Path) -> Path:
     try:
-        from dnadesign.densegen.src.config import load_config, resolve_outputs_scoped_path, resolve_run_root
+        from dnadesign.densegen import load_config, resolve_outputs_scoped_path, resolve_run_root
     except Exception as exc:
         raise NotifyConfigError(f"failed to load DenseGen resolver dependencies: {exc}") from exc
 

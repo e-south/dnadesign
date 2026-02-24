@@ -114,25 +114,31 @@ def finalize_run_outputs(
     except Exception as exc:
         raise RuntimeError(f"Failed to write run_metrics.parquet: {exc}") from exc
 
-    manifest_items = [
-        PlanManifest(
-            input_name=key[0],
-            plan_name=key[1],
-            generated=plan_stats[key]["generated"],
-            duplicates_skipped=plan_stats[key]["duplicates_skipped"],
-            failed_solutions=plan_stats[key]["failed_solutions"],
-            total_resamples=plan_stats[key]["total_resamples"],
-            libraries_built=plan_stats[key]["libraries_built"],
-            stall_events=plan_stats[key]["stall_events"],
-            failed_min_count_per_tf=plan_stats[key]["failed_min_count_per_tf"],
-            failed_required_regulators=plan_stats[key]["failed_required_regulators"],
-            failed_min_count_by_regulator=plan_stats[key]["failed_min_count_by_regulator"],
-            failed_min_required_regulators=plan_stats[key]["failed_min_required_regulators"],
-            duplicate_solutions=plan_stats[key]["duplicate_solutions"],
-            leaderboard_latest=plan_leaderboards.get(key),
+    plan_quota_by_name = {str(item.name): int(item.quota) for item in plan_items}
+    manifest_items: list[PlanManifest] = []
+    for key in plan_order:
+        plan_name = str(key[1])
+        if plan_name not in plan_quota_by_name:
+            raise RuntimeError(f"Missing quota mapping for plan `{plan_name}` while writing run manifest.")
+        manifest_items.append(
+            PlanManifest(
+                input_name=key[0],
+                plan_name=plan_name,
+                quota=int(plan_quota_by_name[plan_name]),
+                generated=plan_stats[key]["generated"],
+                duplicates_skipped=plan_stats[key]["duplicates_skipped"],
+                failed_solutions=plan_stats[key]["failed_solutions"],
+                total_resamples=plan_stats[key]["total_resamples"],
+                libraries_built=plan_stats[key]["libraries_built"],
+                stall_events=plan_stats[key]["stall_events"],
+                failed_min_count_per_tf=plan_stats[key]["failed_min_count_per_tf"],
+                failed_required_regulators=plan_stats[key]["failed_required_regulators"],
+                failed_min_count_by_regulator=plan_stats[key]["failed_min_count_by_regulator"],
+                failed_min_required_regulators=plan_stats[key]["failed_min_required_regulators"],
+                duplicate_solutions=plan_stats[key]["duplicate_solutions"],
+                leaderboard_latest=plan_leaderboards.get(key),
+            )
         )
-        for key in plan_order
-    ]
     manifest = RunManifest(
         run_id=cfg.run.id,
         created_at=datetime.now(timezone.utc).isoformat(),
@@ -150,6 +156,7 @@ def finalize_run_outputs(
         solver_strands=str(cfg.solver.strands),
         dense_arrays_version=dense_arrays_version,
         dense_arrays_version_source=dense_arrays_version_source,
+        total_quota=int(sum(item.quota for item in manifest_items)),
         items=manifest_items,
     )
     manifest_path = run_manifest_path(run_root)

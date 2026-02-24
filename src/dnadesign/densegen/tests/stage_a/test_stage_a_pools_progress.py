@@ -49,6 +49,7 @@ def test_prepare_stage_a_pools_sets_progress_style(monkeypatch, tmp_path: Path) 
 
     monkeypatch.setattr(stage_a_pools, "build_pool_artifact", _fake_build_pool_artifact)
     monkeypatch.setattr(stage_a_pools, "load_pool_data", _fake_load_pool_data)
+    monkeypatch.setattr(stage_a_pools, "_active_input_names", lambda _plan_items: {"demo_pwm"})
 
     try:
         stage_a_pools.prepare_stage_a_pools(

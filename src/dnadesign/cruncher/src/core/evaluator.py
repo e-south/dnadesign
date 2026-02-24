@@ -166,6 +166,30 @@ class SequenceEvaluator:
         combined_val = self._apply_length_penalty(combined_val, length)
         return combined_val
 
+    def combined_from_raw_llr(
+        self,
+        raw_llr_by_tf: Dict[str, float],
+        beta: Optional[float] = None,
+        *,
+        length: int | None = None,
+    ) -> float:
+        """
+        Combine raw per-TF LLR values without allocating an intermediate per-TF scaled map.
+        """
+        if length is None:
+            raise ValueError("length must be provided when combining raw LLR values")
+        per_tf_vals = self._scorer.scaled_values_from_raw_llr(raw_llr_by_tf, length)
+        if beta is not None and self._use_softmin:
+            vals = np.asarray(per_tf_vals, dtype=float)
+            scaled = -beta * vals
+            max_scaled = float(np.max(scaled))
+            logsum = max_scaled + float(np.log(np.exp(scaled - max_scaled).sum()))
+            combined_val = -logsum / beta
+        else:
+            combined_val = float(self._combiner(per_tf_vals))
+        combined_val = self._apply_length_penalty(combined_val, length)
+        return combined_val
+
     def evaluate(
         self,
         state: SequenceState,

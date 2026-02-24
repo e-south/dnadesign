@@ -222,7 +222,8 @@ def test_demo_workspace_cli_without_config(tmp_path: Path, monkeypatch: pytest.M
             "sample": _sample_block(),
         }
     }
-    config_path = workspace / "config.yaml"
+    config_path = workspace / "configs" / "config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(yaml.safe_dump(config))
 
     adapter = RegulonDBAdapter(
@@ -252,20 +253,20 @@ def test_demo_workspace_cli_without_config(tmp_path: Path, monkeypatch: pytest.M
     assert result.exit_code == 0
 
 
-def test_demo_campaign_pair_local_only_generates_plots(tmp_path: Path) -> None:
+def test_demo_multitf_local_only_generates_plots(tmp_path: Path) -> None:
     package_root = Path(__file__).resolve().parents[2]
-    demo_workspace = package_root / "workspaces" / "demo_campaigns_multi_tf"
-    workspace = tmp_path / "demo_campaigns_multi_tf"
+    demo_workspace = package_root / "workspaces" / "demo_multitf"
+    workspace = tmp_path / "demo_multitf"
     shutil.copytree(demo_workspace, workspace)
     shutil.rmtree(workspace / "outputs", ignore_errors=True)
     shutil.rmtree(workspace / ".cruncher", ignore_errors=True)
     (workspace / "outputs").mkdir(parents=True, exist_ok=True)
 
-    config_path = workspace / "config.yaml"
+    config_path = workspace / "configs" / "config.yaml"
     config_payload = yaml.safe_load(config_path.read_text())
     cruncher_cfg = config_payload["cruncher"]
-    cruncher_cfg["workspace"]["regulator_sets"] = []
-    cruncher_cfg["catalog"]["root"] = str(workspace / ".cruncher" / "demo_campaigns_multi_tf")
+    cruncher_cfg["workspace"]["regulator_sets"] = [["lexA", "cpxR"]]
+    cruncher_cfg["catalog"]["root"] = str(workspace / ".cruncher" / "demo_multitf")
     # Keep this test local-only and MEME-independent.
     cruncher_cfg["catalog"]["pwm_source"] = "sites"
     cruncher_cfg["catalog"]["source_preference"] = ["demo_local_meme", "regulondb"]
@@ -294,11 +295,10 @@ def test_demo_campaign_pair_local_only_generates_plots(tmp_path: Path) -> None:
     assert result.exit_code == 0
 
     for command in (
-        ["lock", "--campaign", "demo_pair", "-c", str(config_path)],
-        ["parse", "--campaign", "demo_pair", "-c", str(config_path)],
-        ["sample", "--campaign", "demo_pair", "-c", str(config_path)],
-        ["analyze", "--campaign", "demo_pair", "--summary", "-c", str(config_path)],
-        ["campaign", "summarize", "--campaign", "demo_pair", "-c", str(config_path)],
+        ["lock", "-c", str(config_path)],
+        ["parse", "-c", str(config_path)],
+        ["sample", "-c", str(config_path)],
+        ["analyze", "--summary", "-c", str(config_path)],
     ):
         result = runner.invoke(app, command)
         assert result.exit_code == 0
@@ -306,44 +306,32 @@ def test_demo_campaign_pair_local_only_generates_plots(tmp_path: Path) -> None:
     analysis_dir = workspace / "outputs"
     assert analysis_dir.is_dir()
     assert manifest_path(analysis_dir).exists()
-    analysis_plots_dir = analysis_dir / "plots" / "analysis"
+    analysis_plots_dir = analysis_dir / "plots"
     plot_ext = str(cruncher_cfg["analysis"]["plot_format"])
-    assert (analysis_plots_dir / f"chain_trajectory_scatter.{plot_ext}").exists()
+    assert (analysis_plots_dir / f"elite_score_space_context.{plot_ext}").exists()
     assert (analysis_plots_dir / f"chain_trajectory_sweep.{plot_ext}").exists()
     assert (analysis_plots_dir / f"elites_nn_distance.{plot_ext}").exists()
     assert (analysis_plots_dir / f"elites_showcase.{plot_ext}").exists()
     assert (analysis_plots_dir / f"health_panel.{plot_ext}").exists()
 
-    campaign_dir = workspace / "outputs" / "campaign" / "demo_pair"
-    assert campaign_dir.is_dir()
-    assert (campaign_dir / "analysis" / "campaign_summary.csv").exists()
-    assert (campaign_dir / "analysis" / "campaign_best.csv").exists()
-    assert (campaign_dir / "analysis" / "campaign_manifest.json").exists()
-    campaign_plot = campaign_dir / "plots" / f"best_jointscore_bar.{plot_ext}"
-    if not campaign_plot.exists():
-        campaign_plot = campaign_dir / "plots" / "best_jointscore_bar.png"
-    assert campaign_plot.exists()
-    assert (campaign_dir / "plots" / "tf_coverage_heatmap.png").exists()
-    assert (campaign_dir / "plots" / "pairgrid_overview.png").exists()
-    assert (campaign_dir / "plots" / "joint_trend.png").exists()
-    assert (campaign_dir / "plots" / "pareto_projection.png").exists()
 
-
-def test_demo_basics_low_budget_analyze_survives_nonfinite_trajectory(tmp_path: Path) -> None:
+def test_demo_pairwise_low_budget_analyze_survives_nonfinite_trajectory(tmp_path: Path) -> None:
     package_root = Path(__file__).resolve().parents[2]
-    demo_workspace = package_root / "workspaces" / "demo_basics_two_tf"
-    workspace = tmp_path / "demo_basics_two_tf"
+    demo_workspace = package_root / "workspaces" / "demo_pairwise"
+    workspace = tmp_path / "demo_pairwise"
     shutil.copytree(demo_workspace, workspace)
     shutil.rmtree(workspace / "outputs", ignore_errors=True)
     shutil.rmtree(workspace / ".cruncher", ignore_errors=True)
     (workspace / "outputs").mkdir(parents=True, exist_ok=True)
 
-    config_path = workspace / "config.yaml"
+    config_path = workspace / "configs" / "config.yaml"
     config_payload = yaml.safe_load(config_path.read_text())
     cruncher_cfg = config_payload["cruncher"]
-    cruncher_cfg["catalog"]["root"] = str(workspace / ".cruncher" / "demo_basics_two_tf")
+    cruncher_cfg["catalog"]["root"] = str(workspace / ".cruncher" / "demo_pairwise")
+    cruncher_cfg["catalog"]["source_preference"] = ["demo_local_meme"]
     cruncher_cfg["sample"]["budget"]["tune"] = 180
     cruncher_cfg["sample"]["budget"]["draws"] = 360
+    cruncher_cfg["sample"]["motif_width"]["maxw"] = int(cruncher_cfg["sample"]["sequence_length"])
     cruncher_cfg["sample"]["elites"]["k"] = 3
     cruncher_cfg["analysis"]["max_points"] = 1000
     cruncher_cfg["analysis"]["fimo_compare"]["enabled"] = False

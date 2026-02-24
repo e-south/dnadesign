@@ -1,0 +1,42 @@
+study:
+  schema_version: 3
+  name: chains_vs_seeds_score_bullish
+  base_config: config.yaml
+  target:
+    kind: regulator_set
+    set_index: 1
+  execution:
+    parallelism: 6
+    on_trial_error: continue
+    exit_code_policy: nonzero_if_any_error
+    summarize_after_run: true
+  artifacts:
+    trial_output_profile: minimal
+  replicates:
+    seed_path: sample.seed
+    seeds:
+    - 101
+    - 102
+    - 103
+    - 104
+    - 105
+    - 106
+  trials:
+  - id: C02
+    factors:
+      sample.optimizer.chains: 2
+  - id: C04
+    factors:
+      sample.optimizer.chains: 4
+  - id: C06
+    factors:
+      sample.optimizer.chains: 6
+  - id: C08
+    factors:
+      sample.optimizer.chains: 8
+  - id: C10
+    factors:
+      sample.optimizer.chains: 10
+  replays:
+    mmr_sweep:
+      enabled: false

@@ -1,0 +1,186 @@
+{
+  "alphabet": "ACGT",
+  "background": {
+    "A": 0.35,
+    "C": 0.157,
+    "G": 0.126,
+    "T": 0.367
+  },
+  "checksums": {
+    "sha256_norm": "f9b643325dbcb66bee077d33f675b8644ce3ffe22cace204c62a723e68cd580d",
+    "sha256_raw": "4df59ee33883d56050c4256cc6ddc138a0b5b916ad3e9d1bf21f72aea199a43e"
+  },
+  "length": 11,
+  "log_odds": [
+    {
+      "A": -16.0,
+      "C": 171.0,
+      "G": -136.0,
+      "T": -158.0
+    },
+    {
+      "A": 75.0,
+      "C": -54.0,
+      "G": 18.0,
+      "T": -118.0
+    },
+    {
+      "A": -57.0,
+      "C": 32.0,
+      "G": 68.0,
+      "T": 0.0
+    },
+    {
+      "A": 35.0,
+      "C": -61.0,
+      "G": -36.0,
+      "T": -6.0
+    },
+    {
+      "A": -38.0,
+      "C": -75.0,
+      "G": 32.0,
+      "T": 39.0
+    },
+    {
+      "A": 7.0,
+      "C": 93.0,
+      "G": 2.0,
+      "T": -84.0
+    },
+    {
+      "A": -216.0,
+      "C": -91.0,
+      "G": 113.0,
+      "T": 62.0
+    },
+    {
+      "A": -216.0,
+      "C": -219.0,
+      "G": 49.0,
+      "T": 95.0
+    },
+    {
+      "A": -99.0,
+      "C": -400.0,
+      "G": -43.0,
+      "T": 97.0
+    },
+    {
+      "A": 123.0,
+      "C": -130.0,
+      "G": -87.0,
+      "T": -306.0
+    },
+    {
+      "A": 11.0,
+      "C": 195.0,
+      "G": -1432.0,
+      "T": -464.0
+    }
+  ],
+  "matrix_semantics": "probabilities",
+  "motif_id": "cpxR_MANWWHTTTAM",
+  "organism": {
+    "assembly": null,
+    "name": "Escherichia coli",
+    "strain": null,
+    "taxon": null
+  },
+  "probabilities": [
+    {
+      "A": 0.313725,
+      "C": 0.514706,
+      "G": 0.04902,
+      "T": 0.122549
+    },
+    {
+      "A": 0.588235,
+      "C": 0.107843,
+      "G": 0.142157,
+      "T": 0.161765
+    },
+    {
+      "A": 0.2352942352942353,
+      "C": 0.1960781960781961,
+      "G": 0.20098020098020097,
+      "T": 0.36764736764736766
+    },
+    {
+      "A": 0.44607844607844604,
+      "C": 0.10294110294110295,
+      "G": 0.09803909803909805,
+      "T": 0.352941352941353
+    },
+    {
+      "A": 0.269608,
+      "C": 0.093137,
+      "G": 0.156863,
+      "T": 0.480392
+    },
+    {
+      "A": 0.367647,
+      "C": 0.29902,
+      "G": 0.127451,
+      "T": 0.205882
+    },
+    {
+      "A": 0.07843107843107844,
+      "C": 0.08333308333308334,
+      "G": 0.2745102745102745,
+      "T": 0.5637255637255638
+    },
+    {
+      "A": 0.078431,
+      "C": 0.034314,
+      "G": 0.176471,
+      "T": 0.710784
+    },
+    {
+      "A": 0.176471,
+      "C": 0.009804,
+      "G": 0.093137,
+      "T": 0.720588
+    },
+    {
+      "A": 0.8235298235298235,
+      "C": 0.06372506372506373,
+      "G": 0.06862706862706862,
+      "T": 0.04411804411804412
+    },
+    {
+      "A": 0.377451,
+      "C": 0.607843,
+      "G": 0.0,
+      "T": 0.014706
+    }
+  ],
+  "producer": "cruncher",
+  "provenance": {
+    "citation": null,
+    "license": null,
+    "raw_artifact_paths": [
+      "/Users/Shockwing/Dropbox/projects/phd/dnadesign-cruncher-expanding/src/dnadesign/cruncher/.cruncher/demo_multitf/discoveries/discover_cpxR_20260218_205959_7eca65/meme.txt"
+    ],
+    "retrieved_at": "2026-02-19T01:59:59.444797+00:00",
+    "source_url": null,
+    "source_version": null,
+    "tags": {}
+  },
+  "schema_version": "1.0",
+  "source": "demo_merged_meme_oops_multitf",
+  "tags": {
+    "discovery_maxw": "tool_default",
+    "discovery_minw": "tool_default",
+    "discovery_nmotifs": "1",
+    "discovery_nsites": "204",
+    "discovery_run": "discover_cpxR_20260218_205959_7eca65",
+    "discovery_site_sets": "2",
+    "discovery_site_sources": "demo_local_meme, regulondb",
+    "discovery_tool": "meme",
+    "discovery_tool_path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign-cruncher-expanding/.pixi/envs/default/bin/meme",
+    "discovery_tool_version": "5.5.9",
+    "matrix_source": "meme"
+  },
+  "tf_name": "cpxR"
+}

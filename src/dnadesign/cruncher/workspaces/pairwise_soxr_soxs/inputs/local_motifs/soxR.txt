@@ -1,0 +1,231 @@
+********************************************************************************
+MEME - Motif discovery tool
+********************************************************************************
+MEME version 4.12.0 (Release date: Tue Jun 27 16:22:50 2017 -0700)
+
+For further information on how to interpret these results or to get
+a copy of the MEME software please access http://meme-suite.org .
+
+This file may be used as input to the MAST algorithm for searching
+sequence databases for matches to groups of motifs.  MAST is available
+for interactive use and downloading at http://meme-suite.org .
+********************************************************************************
+
+
+********************************************************************************
+REFERENCE
+********************************************************************************
+If you use this program in your research, please cite:
+
+Timothy L. Bailey and Charles Elkan,
+"Fitting a mixture model by expectation maximization to discover
+motifs in biopolymers", Proceedings of the Second International
+Conference on Intelligent Systems for Molecular Biology, pp. 28-36,
+AAAI Press, Menlo Park, California, 1994.
+********************************************************************************
+
+
+********************************************************************************
+TRAINING SET
+********************************************************************************
+DATAFILE= /global/projectb/scratch/leo/multiMotifs/soxR_B-GACAGTAG/soxR_B-GACAGTAG_summits_combined_sorted.fasta
+ALPHABET= ACGT
+Sequence name            Weight Length  Sequence name            Weight Length
+-------------            ------ ------  -------------            ------ ------
+Pseudomonas_aeruginosa_P 1.0000     60  Azospirillum_brasilense_ 1.0000     60
+Salmonella_enterica_LT2_ 1.0000     60  Enterobacter_cloacae_ATC 1.0000     60
+Escherichia_coli_MG1655_ 1.0000     60  Pseudomonas_aeruginosa_P 1.0000     60
+Escherichia_fergusonii_A 1.0000     60  Aliivibrio_fischeri_ATCC 1.0000     60
+Sphingomonas_koreensis_J 1.0000     60  Providencia_stuartii_ATC 1.0000     60
+Escherichia_coli_BW25113 1.0000     60  Klebsiella_oxytoca_M5al_ 1.0000     60
+Escherichia_coli_MG1655_ 1.0000     60  Shewanella_oneidensis_MR 1.0000     60
+********************************************************************************
+
+********************************************************************************
+COMMAND LINE SUMMARY
+********************************************************************************
+This information can also be useful in the event you wish to report a
+problem with the MEME software.
+
+command: meme /global/projectb/scratch/leo/multiMotifs/soxR_B-GACAGTAG/soxR_B-GACAGTAG_summits_combined_sorted.fasta -oc /global/projectb/scratch/leo/multiMotifs/soxR_B-GACAGTAG_motifs_summits -dna -revcomp -mod anr -nmotifs 3 -minw 8 -maxw 32 -maxsize 1000000
+
+model:  mod=           anr    nmotifs=         3    evt=           inf
+object function=  E-value of product of p-values
+width:  minw=            8    maxw=           32
+width:  wg=             11    ws=              1    endgaps=       yes
+nsites: minsites=        2    maxsites=       50    wnsites=       0.8
+theta:  spmap=         uni    spfuzz=        0.5
+global: substring=     yes    branching=      no    wbranch=        no
+em:     prior=   dirichlet    b=            0.01    maxiter=        50
+        distance=    1e-05
+data:   n=             840    N=              14    shuffle=        -1
+strands: + -
+sample: seed=            0    ctfrac=         -1    maxwords=       -1
+Letter frequencies in dataset:
+A 0.292 C 0.208 G 0.208 T 0.292
+Background letter frequencies (from dataset with add-one prior applied):
+A 0.292 C 0.208 G 0.208 T 0.292
+********************************************************************************
+
+
+********************************************************************************
+MOTIF soxR MEME-1	width =  28  sites =  10  llr = 338  E-value = 2.1e-073
+********************************************************************************
+--------------------------------------------------------------------------------
+	Motif soxR MEME-1 Description
+--------------------------------------------------------------------------------
+Simplified        A  :aa44::::aa::1aa::::a:::6aa:
+pos.-specific     C  :::::aa:9::11:::8:::::::4:::
+probability       G  :::::::::::9::::2::a:aa::::a
+matrix            T  a::66::a1:::99:::aa::::a::::
+
+         bits    2.3      **            * **    *
+                 2.0      **            * **    *
+                 1.8 ***  *******  ** ******* ***
+                 1.6 ***  *******  ********** ***
+Relative         1.4 ***  ******************* ***
+Entropy          1.1 ***  ******************* ***
+(48.8 bits)      0.9 ****************************
+                 0.7 ****************************
+                 0.5 ****************************
+                 0.2 ****************************
+                 0.0 ----------------------------
+
+Multilevel           TAATTCCTCAAGTTAACTTGAGGTAAAG
+consensus               AA           G       C
+sequence
+
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+	Motif soxR MEME-1 sites sorted by position p-value
+--------------------------------------------------------------------------------
+Sequence name            Strand  Start   P-value                        Site
+-------------            ------  ----- ---------            ----------------------------
+Klebsiella_oxytoca_M5al_     +     19  5.07e-17 CGGGCGAGTA TAATTCCTCAAGTTAACTTGAGGTAAAG CGCTTTATGG
+Escherichia_coli_BW25113     +     24  5.07e-17 TTGGGGAGTA TAATTCCTCAAGTTAACTTGAGGTAAAG CGATTTATG
+Escherichia_fergusonii_A     +     17  5.07e-17 TGGGCGAGTA TAATTCCTCAAGTTAACTTGAGGTAAAG CGATTTATGG
+Escherichia_coli_MG1655_     +     21  5.07e-17 TTGGGGAGTA TAATTCCTCAAGTTAACTTGAGGTAAAG CGATTTATGG
+Enterobacter_cloacae_ATC     +     18  5.07e-17 TGGGGGAGTA TAATTCCTCAAGTTAACTTGAGGTAAAG AGGTTTTATG
+Salmonella_enterica_LT2_     +     20  5.07e-17 CGGGCGAGTA TAATTCCTCAAGTTAACTTGAGGTAAAG CGATTTATGG
+Pseudomonas_aeruginosa_P     -     24  1.00e-15  CGGGGACTA TAAAACCTCAAGTTAAGTTGAGGTCAAG GGCGTCTGTG
+Azospirillum_brasilense_     -     30  2.00e-15        CTC TAAAACCTCAACTTAACTTGAGGTCAAG GGCTAAGAAC
+Providencia_stuartii_ATC     +     12  4.54e-15 GCTAGAACTA TAAAACCTTAAGTTAAGTTGAGGTCAAG AGCAGGTAGT
+Pseudomonas_aeruginosa_P     -     17  4.81e-15 CGGCCCAGGG TAAAACCTCAAGCAAACTTGAGGTCAAG CCAATCATGA
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+	Motif soxR MEME-1 block diagrams
+--------------------------------------------------------------------------------
+SEQUENCE NAME            POSITION P-VALUE  MOTIF DIAGRAM
+-------------            ----------------  -------------
+Klebsiella_oxytoca_M5al_          5.1e-17  18_[+1]_14
+Escherichia_coli_BW25113          5.1e-17  23_[+1]_9
+Escherichia_fergusonii_A          5.1e-17  16_[+1]_16
+Escherichia_coli_MG1655_          5.1e-17  20_[+1]_12
+Enterobacter_cloacae_ATC          5.1e-17  17_[+1]_15
+Salmonella_enterica_LT2_          5.1e-17  19_[+1]_13
+Pseudomonas_aeruginosa_P            1e-15  23_[-1]_9
+Azospirillum_brasilense_            2e-15  29_[-1]_3
+Providencia_stuartii_ATC          4.5e-15  11_[+1]_21
+Pseudomonas_aeruginosa_P          4.8e-15  16_[-1]_16
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+	Motif soxR MEME-1 in BLOCKS format
+--------------------------------------------------------------------------------
+BL   MOTIF soxR width=28 seqs=10
+Klebsiella_oxytoca_M5al_ (   19) TAATTCCTCAAGTTAACTTGAGGTAAAG  1
+Escherichia_coli_BW25113 (   24) TAATTCCTCAAGTTAACTTGAGGTAAAG  1
+Escherichia_fergusonii_A (   17) TAATTCCTCAAGTTAACTTGAGGTAAAG  1
+Escherichia_coli_MG1655_ (   21) TAATTCCTCAAGTTAACTTGAGGTAAAG  1
+Enterobacter_cloacae_ATC (   18) TAATTCCTCAAGTTAACTTGAGGTAAAG  1
+Salmonella_enterica_LT2_ (   20) TAATTCCTCAAGTTAACTTGAGGTAAAG  1
+Pseudomonas_aeruginosa_P (   24) TAAAACCTCAAGTTAAGTTGAGGTCAAG  1
+Azospirillum_brasilense_ (   30) TAAAACCTCAACTTAACTTGAGGTCAAG  1
+Providencia_stuartii_ATC (   12) TAAAACCTTAAGTTAAGTTGAGGTCAAG  1
+Pseudomonas_aeruginosa_P (   17) TAAAACCTCAAGCAAACTTGAGGTCAAG  1
+//
+
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+	Motif soxR MEME-1 position-specific scoring matrix
+--------------------------------------------------------------------------------
+log-odds matrix: alength= 4 w= 28 n= 462 bayes= 4.91725 E= 2.1e-073
+  -997   -997   -997    177
+   177   -997   -997   -997
+   177   -997   -997   -997
+    45   -997   -997    104
+    45   -997   -997    104
+  -997    226   -997   -997
+  -997    226   -997   -997
+  -997   -997   -997    177
+  -997    211   -997   -154
+   177   -997   -997   -997
+   177   -997   -997   -997
+  -997   -105    211   -997
+  -997   -105   -997    162
+  -154   -997   -997    162
+   177   -997   -997   -997
+   177   -997   -997   -997
+  -997    194     -6   -997
+  -997   -997   -997    177
+  -997   -997   -997    177
+  -997   -997    226   -997
+   177   -997   -997   -997
+  -997   -997    226   -997
+  -997   -997    226   -997
+  -997   -997   -997    177
+   104     94   -997   -997
+   177   -997   -997   -997
+   177   -997   -997   -997
+  -997   -997    226   -997
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+	Motif soxR MEME-1 position-specific probability matrix
+--------------------------------------------------------------------------------
+letter-probability matrix: alength= 4 w= 28 nsites= 10 E= 2.1e-073
+ 0.000000  0.000000  0.000000  1.000000
+ 1.000000  0.000000  0.000000  0.000000
+ 1.000000  0.000000  0.000000  0.000000
+ 0.400000  0.000000  0.000000  0.600000
+ 0.400000  0.000000  0.000000  0.600000
+ 0.000000  1.000000  0.000000  0.000000
+ 0.000000  1.000000  0.000000  0.000000
+ 0.000000  0.000000  0.000000  1.000000
+ 0.000000  0.900000  0.000000  0.100000
+ 1.000000  0.000000  0.000000  0.000000
+ 1.000000  0.000000  0.000000  0.000000
+ 0.000000  0.100000  0.900000  0.000000
+ 0.000000  0.100000  0.000000  0.900000
+ 0.100000  0.000000  0.000000  0.900000
+ 1.000000  0.000000  0.000000  0.000000
+ 1.000000  0.000000  0.000000  0.000000
+ 0.000000  0.800000  0.200000  0.000000
+ 0.000000  0.000000  0.000000  1.000000
+ 0.000000  0.000000  0.000000  1.000000
+ 0.000000  0.000000  1.000000  0.000000
+ 1.000000  0.000000  0.000000  0.000000
+ 0.000000  0.000000  1.000000  0.000000
+ 0.000000  0.000000  1.000000  0.000000
+ 0.000000  0.000000  0.000000  1.000000
+ 0.600000  0.400000  0.000000  0.000000
+ 1.000000  0.000000  0.000000  0.000000
+ 1.000000  0.000000  0.000000  0.000000
+ 0.000000  0.000000  1.000000  0.000000
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+	Motif soxR MEME-1 regular expression
+--------------------------------------------------------------------------------
+TAA[TA][TA]CCTCAAGTTAA[CG]TTGAGGT[AC]AAG
+--------------------------------------------------------------------------------
+
+
+
+
+Time  0.27 secs.
+
+********************************************************************************

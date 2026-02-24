@@ -46,10 +46,12 @@ def test_inspect_run_uses_relative_root(tmp_path: Path) -> None:
         "solver_strands": "double",
         "dense_arrays_version": None,
         "dense_arrays_version_source": "unknown",
+        "total_quota": 5,
         "items": [
             {
                 "input_name": PLAN_POOL_LABEL,
                 "plan_name": "demo_plan",
+                "quota": 5,
                 "generated": 0,
                 "duplicates_skipped": 0,
                 "failed_solutions": 0,
@@ -68,6 +70,53 @@ def test_inspect_run_uses_relative_root(tmp_path: Path) -> None:
     assert "Root: ." in result.output
 
 
+def test_inspect_run_reports_quota_progress(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\nTF1,AAA\n")
+    meta_root = tmp_path / "outputs" / "meta"
+    meta_root.mkdir(parents=True, exist_ok=True)
+    run_manifest = {
+        "run_id": "demo",
+        "created_at": "2026-01-14T00:00:00+00:00",
+        "schema_version": "2.9",
+        "config_sha256": "dummy",
+        "run_root": str(tmp_path),
+        "random_seed": 0,
+        "seed_stage_a": 0,
+        "seed_stage_b": 0,
+        "seed_solver": 0,
+        "solver_backend": "CBC",
+        "solver_strategy": "iterate",
+        "solver_time_limit_seconds": None,
+        "solver_threads": None,
+        "solver_strands": "double",
+        "dense_arrays_version": None,
+        "dense_arrays_version_source": "unknown",
+        "total_quota": 5,
+        "items": [
+            {
+                "input_name": PLAN_POOL_LABEL,
+                "plan_name": "demo_plan",
+                "quota": 5,
+                "generated": 4,
+                "duplicates_skipped": 0,
+                "failed_solutions": 0,
+                "total_resamples": 0,
+                "libraries_built": 1,
+                "stall_events": 0,
+            }
+        ],
+    }
+    (meta_root / "run_manifest.json").write_text(json.dumps(run_manifest))
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["inspect", "run", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    assert "4/5 (80.00%)" in result.output
+    assert "Quota:" in result.output
+
+
 def test_inspect_run_root_listing_uses_relative_config_paths(tmp_path: Path) -> None:
     workspace_root = tmp_path / "workspaces"
     workspace_root.mkdir()
@@ -84,16 +133,29 @@ def test_inspect_run_root_listing_uses_relative_config_paths(tmp_path: Path) -> 
     assert "demo_run/config.yaml" in result.output
 
 
-def test_inspect_config_missing_uses_relative_path(tmp_path: Path) -> None:
+def test_inspect_config_missing_uses_relative_path(tmp_path: Path, monkeypatch) -> None:
     cfg_path = tmp_path / "missing_config.yaml"
+    monkeypatch.chdir(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(app, ["inspect", "config", "-c", str(cfg_path)])
+    result = runner.invoke(app, ["inspect", "config", "-c", cfg_path.name])
     assert result.exit_code != 0
     assert "Config file not found:" in result.output
     shown_path = result.output.split("Config file not found:", 1)[1].replace("\n", "").strip()
     assert shown_path
     assert not Path(shown_path).is_absolute()
     assert shown_path.endswith("missing_config.yaml")
+
+
+def test_inspect_config_missing_absolute_path_stays_absolute(tmp_path: Path) -> None:
+    cfg_path = (tmp_path / "missing_absolute_config.yaml").resolve()
+    runner = CliRunner()
+    result = runner.invoke(app, ["inspect", "config", "-c", str(cfg_path)])
+    assert result.exit_code != 0
+    assert "Config file not found:" in result.output
+    shown_path = result.output.split("Config file not found:", 1)[1].replace("\n", "").strip()
+    assert shown_path
+    assert Path(shown_path).is_absolute()
+    assert shown_path == str(cfg_path)
 
 
 def test_inspect_run_usr_events_path_prints_absolute_path(tmp_path: Path) -> None:
@@ -123,7 +185,7 @@ def test_inspect_run_usr_events_path_prints_absolute_path(tmp_path: Path) -> Non
                 sequence_length: 10
                 plan:
                   - name: demo_plan
-                    quota: 1
+                    sequences: 1
                     sampling:
                       include_inputs: [demo_input]
                     regulator_constraints:

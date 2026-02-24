@@ -11,8 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import json
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -20,308 +18,56 @@ from typing import Optional
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib import ticker as mticker
 from matplotlib.lines import Line2D
-from matplotlib.patches import ConnectionPatch
 
-from .plot_common import _apply_style, _palette, _stage_b_plan_output_dir, _style
+from .plot_common import _apply_style, _palette, _save_figure, _style, plan_group_from_name
+from .plot_run_health_utils import (
+    aggregate_reason_pareto as _aggregate_reason_pareto,
+)
+from .plot_run_health_utils import (
+    link_panels_by_ticks as _link_panels_by_ticks,
+)
+from .plot_run_health_utils import (
+    rate_series_from_counts as _rate_series_from_counts,
+)
+from .plot_run_health_utils import (
+    solver_ticks as _solver_ticks,
+)
+from .plot_run_health_utils import (
+    subtitle as _subtitle,
+)
+from .plot_run_helpers import (
+    _ellipsize,
+    _normalize_plan_name,
+    _reason_family_label,
+)
+from .plot_run_helpers import (
+    _usage_category_label as _usage_category_label_helper,
+)
+from .plot_run_panels import (
+    _build_run_health_compression_ratio_figure as _build_run_health_compression_ratio_figure_panel,
+)
+from .plot_run_panels import (
+    _build_run_health_tfbs_length_by_regulator_figure as _build_run_health_tfbs_length_by_regulator_figure_panel,
+)
+from .plot_run_panels import (
+    _build_tfbs_usage_breakdown_figure as _build_tfbs_usage_breakdown_figure_panel,
+)
+from .plot_run_panels import (
+    plot_tfbs_usage as plot_tfbs_usage_panel,
+)
+
+_build_tfbs_usage_breakdown_figure = _build_tfbs_usage_breakdown_figure_panel
+plot_tfbs_usage = plot_tfbs_usage_panel
+_build_run_health_compression_ratio_figure = _build_run_health_compression_ratio_figure_panel
+_build_run_health_tfbs_length_by_regulator_figure = _build_run_health_tfbs_length_by_regulator_figure_panel
+_usage_category_label = _usage_category_label_helper
 
 _PLAN_MARKER_CYCLE = ("o", "s", "^", "D", "P", "X", "v", "<", ">", "*", "h")
 
 
-def _bin_attempts(values: np.ndarray, bins: int) -> tuple[np.ndarray, np.ndarray]:
-    if values.size == 0:
-        return np.array([]), np.array([])
-    lo = float(values.min())
-    hi = float(values.max())
-    if hi <= lo:
-        hi = lo + 1.0
-    edges = np.linspace(lo, hi, num=int(bins) + 1)
-    centers = (edges[:-1] + edges[1:]) / 2.0
-    return edges, centers
-
-
-def _axis_pixel_width(ax) -> float:
-    fig = ax.figure
-    width = fig.get_figwidth() * fig.dpi
-    return max(1.0, width * ax.get_position().width)
-
-
-def _resolution_bins(ax, n_points: int, *, min_bins: int = 25) -> int:
-    if n_points <= 0:
-        return int(min_bins)
-    px = _axis_pixel_width(ax)
-    return max(min_bins, min(int(px), int(n_points)))
-
-
-def _usage_category_label(value: object) -> str:
-    label = str(value or "").strip()
-    if not label:
-        return ""
-    if label.startswith("fixed:"):
-        return label
-    if "_" in label:
-        head, tail = label.split("_", 1)
-        tail_upper = tail.upper()
-        iupac = set("ACGTURYSWKMBDHVN")
-        if len(tail_upper) >= 6 and set(tail_upper).issubset(iupac):
-            return head
-    return label
-
-
 def _plan_markers(plan_names: list[str]) -> dict[str, str]:
     return {plan: _PLAN_MARKER_CYCLE[idx % len(_PLAN_MARKER_CYCLE)] for idx, plan in enumerate(plan_names)}
-
-
-def _usage_available_unique(
-    *,
-    input_name: str,
-    plan_name: str,
-    pools: dict[str, pd.DataFrame] | None,
-    library_members_df: pd.DataFrame | None,
-) -> tuple[dict[str, int], int]:
-    if library_members_df is not None and not library_members_df.empty:
-        required = {"input_name", "plan_name", "tf", "tfbs"}
-        missing = required - set(library_members_df.columns)
-        if missing:
-            raise ValueError(f"library_members.parquet missing required columns: {sorted(missing)}")
-        offered = library_members_df[
-            (library_members_df["input_name"].astype(str) == str(input_name))
-            & (library_members_df["plan_name"].astype(str) == str(plan_name))
-        ].copy()
-        if offered.empty:
-            return {}, 0
-        offered["category_label"] = offered["tf"].map(_usage_category_label)
-        offered["tfbs"] = offered["tfbs"].astype(str)
-        unique_pairs = offered[["category_label", "tfbs"]].drop_duplicates()
-        by_category = (
-            unique_pairs.groupby("category_label")[["tfbs"]].nunique().rename(columns={"tfbs": "unique_available"})
-        )
-        return by_category["unique_available"].to_dict(), int(len(unique_pairs))
-
-    if pools and input_name in pools:
-        pool_df = pools[input_name]
-        if pool_df.empty or "tf" not in pool_df.columns:
-            return {}, 0
-        tfbs_col = "tfbs_sequence" if "tfbs_sequence" in pool_df.columns else "tfbs"
-        if tfbs_col not in pool_df.columns:
-            return {}, 0
-        offered = pool_df.assign(
-            category_label=pool_df["tf"].map(_usage_category_label),
-            tfbs=pool_df[tfbs_col].astype(str),
-        )[["category_label", "tfbs"]]
-        unique_pairs = offered.drop_duplicates()
-        by_category = (
-            unique_pairs.groupby("category_label")[["tfbs"]].nunique().rename(columns={"tfbs": "unique_available"})
-        )
-        return by_category["unique_available"].to_dict(), int(len(unique_pairs))
-    return {}, 0
-
-
-def _build_tfbs_usage_breakdown_figure(
-    composition_df: pd.DataFrame,
-    *,
-    input_name: str,
-    plan_name: str,
-    style: Optional[dict] = None,
-    pools: dict[str, pd.DataFrame] | None = None,
-    library_members_df: pd.DataFrame | None = None,
-) -> tuple[plt.Figure, dict[str, plt.Axes]]:
-    style = _style(style)
-    sub = composition_df[
-        (composition_df["input_name"].astype(str) == str(input_name))
-        & (composition_df["plan_name"].astype(str) == str(plan_name))
-    ].copy()
-    if sub.empty:
-        raise ValueError(f"tfbs_usage found no placements for {input_name}/{plan_name}.")
-    sub["category_label"] = sub["tf"].map(_usage_category_label)
-    sub["tfbs"] = sub["tfbs"].astype(str)
-    counts = (
-        sub.groupby(["category_label", "tfbs"])
-        .size()
-        .reset_index(name="count")
-        .sort_values(by=["count", "category_label", "tfbs"], ascending=[False, True, True])
-        .reset_index(drop=True)
-    )
-    if counts.empty:
-        raise ValueError(f"tfbs_usage found no TFBS counts for {input_name}/{plan_name}.")
-
-    total = float(counts["count"].sum())
-    counts = counts.copy()
-    counts["global_rank"] = np.arange(1, len(counts) + 1, dtype=int)
-    all_values = counts["count"].astype(float).to_numpy()
-    available_by_category, available_total = _usage_available_unique(
-        input_name=input_name,
-        plan_name=plan_name,
-        pools=pools,
-        library_members_df=library_members_df,
-    )
-    category_totals = counts.groupby("category_label")["count"].sum().sort_values(ascending=False)
-    category_order = category_totals.index.astype(str).tolist()
-    category_unique_used = counts.groupby("category_label")[["tfbs"]].nunique().rename(columns={"tfbs": "unique_used"})
-    top10 = all_values[: min(10, len(all_values))].sum() / total if total > 0 else 0.0
-    top50 = all_values[: min(50, len(all_values))].sum() / total if total > 0 else 0.0
-
-    fig, (ax_usage, ax_cum) = plt.subplots(2, 1, figsize=(8.8, 6.0), sharex=False)
-    palette = _palette(style, max(1, len(category_order) + 1))
-    category_colors = {label: palette[idx + 1] for idx, label in enumerate(category_order)}
-    ax_usage.axhline(0.0, color="#999999", linewidth=0.8, alpha=0.8, zorder=1)
-    for label in category_order:
-        cat_points = counts[counts["category_label"] == label]
-        if cat_points.empty:
-            continue
-        x_vals = cat_points["global_rank"].astype(float).to_numpy()
-        y_vals = cat_points["count"].astype(float).to_numpy()
-        color = category_colors[label]
-        ax_usage.vlines(
-            x_vals,
-            0.0,
-            y_vals,
-            color=color,
-            linewidth=1.0,
-            alpha=0.55,
-            zorder=2,
-        )
-        ax_usage.scatter(
-            x_vals,
-            y_vals,
-            color=color,
-            s=18,
-            edgecolors="white",
-            linewidths=0.45,
-            alpha=0.95,
-            zorder=3,
-        )
-    ax_usage.set_ylabel("Usage count")
-    ax_usage.set_xlabel("TFBS rank (specific sequence)")
-    ax_usage.set_title(f"TFBS usage breakdown - {input_name}/{plan_name}")
-    max_rank_within_regulator = 1
-    for label in category_order:
-        cat_points = counts[counts["category_label"] == label].sort_values(
-            by=["count", "tfbs"],
-            ascending=[False, True],
-        )
-        if cat_points.empty:
-            continue
-        cat_values = cat_points["count"].astype(float).to_numpy()
-        cat_total = float(cat_values.sum())
-        cat_ranks = np.arange(1, len(cat_values) + 1, dtype=float)
-        cat_cum = np.cumsum(cat_values) / cat_total if cat_total > 0 else np.zeros_like(cat_values)
-        max_rank_within_regulator = max(max_rank_within_regulator, int(cat_ranks[-1]))
-        ax_cum.plot(
-            cat_ranks,
-            cat_cum,
-            color=category_colors[label],
-            linewidth=1.4,
-            marker="o",
-            markersize=2.8,
-            alpha=0.9,
-            zorder=3,
-        )
-    ax_cum.set_ylabel("Cumulative share within regulator")
-    ax_cum.set_xlabel("TFBS rank within regulator")
-    ax_cum.set_ylim(0.0, 1.03)
-    ax_cum.set_xlim(0.7, float(max_rank_within_regulator) + 0.3)
-    ax_cum.xaxis.set_major_locator(mticker.MaxNLocator(integer=True, nbins=6))
-
-    if all_values.size > 0:
-        y_max = float(np.nanmax(all_values)) * 1.08
-        if y_max <= 0:
-            y_max = 1.0
-        ax_usage.set_ylim(0.0, y_max)
-
-    summary_lines = [
-        f"placements in outputs: {int(total)}",
-        f"unique TFBS-pairs in outputs: {len(counts)}",
-        f"top10 share (specific TFBS rank): {top10:.1%}",
-        f"top50 share (specific TFBS rank): {top50:.1%}",
-    ]
-    if available_total > 0:
-        summary_lines.append(
-            f"unique TFBS-pairs used / available: {len(counts)}/{available_total} ({len(counts) / available_total:.1%})"
-        )
-    ax_usage.text(
-        0.98,
-        0.95,
-        "\n".join(summary_lines),
-        transform=ax_usage.transAxes,
-        ha="right",
-        va="top",
-        fontsize=8,
-        bbox=dict(boxstyle="round", facecolor="white", alpha=0.7, linewidth=0.5),
-    )
-    ax_usage.xaxis.set_major_locator(mticker.MaxNLocator(integer=True, nbins=8))
-
-    _apply_style(ax_usage, style)
-    _apply_style(ax_cum, style)
-    legend_handles: list[Line2D] = []
-    legend_labels: list[str] = []
-    for label in category_order:
-        cat_total = int(category_totals.loc[label])
-        share = (float(cat_total) / total) if total > 0 else 0.0
-        available_unique = int(available_by_category.get(label, 0))
-        used_unique = int(category_unique_used.loc[label, "unique_used"] if label in category_unique_used.index else 0)
-        legend_handles.append(
-            Line2D(
-                [0],
-                [0],
-                linestyle="",
-                marker="o",
-                markersize=6.0,
-                color=category_colors[label],
-            )
-        )
-        legend_labels.append(
-            f"{label}: placements {cat_total}/{int(total)} ({share:.1%}), "
-            f"unique {used_unique}/{max(1, available_unique)}"
-        )
-    if legend_handles:
-        fig.legend(
-            legend_handles,
-            legend_labels,
-            loc="lower center",
-            bbox_to_anchor=(0.5, 0.01),
-            ncol=2,
-            frameon=bool(style.get("legend_frame", False)),
-            fontsize=float(style.get("tick_size", style.get("font_size", 13.0) * 0.62)),
-        )
-    fig.tight_layout(rect=(0.0, 0.15, 1.0, 1.0))
-    return fig, {"usage": ax_usage, "cum": ax_cum}
-
-
-def plot_tfbs_usage(
-    df: pd.DataFrame,
-    out_path: Path,
-    *,
-    composition_df: pd.DataFrame,
-    pools: dict[str, pd.DataFrame] | None = None,
-    library_members_df: pd.DataFrame | None = None,
-    style: Optional[dict] = None,
-) -> list[Path]:
-    if composition_df is None or composition_df.empty:
-        raise ValueError("tfbs_usage requires composition.parquet with placements.")
-    required = {"input_name", "plan_name", "tf", "tfbs"}
-    missing = required - set(composition_df.columns)
-    if missing:
-        raise ValueError(f"composition.parquet missing required columns: {sorted(missing)}")
-    style = _style(style)
-    paths: list[Path] = []
-    for input_name, plan_name in composition_df[["input_name", "plan_name"]].drop_duplicates().itertuples(index=False):
-        fig, _axes = _build_tfbs_usage_breakdown_figure(
-            composition_df,
-            input_name=str(input_name),
-            plan_name=str(plan_name),
-            style=style,
-            pools=pools,
-            library_members_df=library_members_df,
-        )
-        target_dir = _stage_b_plan_output_dir(out_path, input_name=str(input_name), plan_name=str(plan_name))
-        target_dir.mkdir(parents=True, exist_ok=True)
-        path = target_dir / f"tfbs_usage{out_path.suffix}"
-        fig.savefig(path)
-        plt.close(fig)
-        paths.append(path)
-    return paths
 
 
 def _prepare_run_health_inputs(
@@ -352,6 +98,32 @@ def _prepare_run_health_inputs(
 
     plan_names_unique = sorted(set(attempts_df["plan_name"].astype(str).tolist()))
     quota_map = dict(plan_quotas or {})
+    plan_scope = str(style.get("run_health_plan_scope", "auto")).strip().lower()
+    if plan_scope not in {"auto", "per_plan", "per_group"}:
+        raise ValueError(f"run_health_plan_scope must be one of auto|per_plan|per_group, got {plan_scope!r}")
+    try:
+        max_labels = max(1, int(style.get("run_health_plan_max_labels", 14)))
+    except Exception as exc:
+        raise ValueError("run_health_plan_max_labels must be an integer > 0") from exc
+
+    grouped_plan_series = attempts_df["plan_name"].astype(str).map(plan_group_from_name)
+    grouped_unique = sorted({name for name in grouped_plan_series.astype(str).tolist() if str(name).strip()})
+    should_group = False
+    if plan_scope == "per_group":
+        should_group = True
+    elif plan_scope == "auto":
+        should_group = len(plan_names_unique) > max_labels and len(grouped_unique) < len(plan_names_unique)
+    if should_group:
+        attempts_df = attempts_df.copy()
+        attempts_df["plan_name"] = grouped_plan_series
+        if quota_map:
+            grouped_quota: dict[str, int] = {}
+            for plan_name, quota in quota_map.items():
+                grouped_name = plan_group_from_name(str(plan_name))
+                grouped_quota[grouped_name] = grouped_quota.get(grouped_name, 0) + int(quota)
+            quota_map = grouped_quota
+        plan_names_unique = sorted(set(attempts_df["plan_name"].astype(str).tolist()))
+
     if quota_map:
         plan_names = [name for name in quota_map.keys() if name in plan_names_unique]
         plan_names.extend([name for name in plan_names_unique if name not in set(plan_names)])
@@ -385,7 +157,8 @@ def _build_run_health_outcomes_figure(
     )
     fig_size = _style_cfg.get("run_health_outcomes_figsize")
     if fig_size is None:
-        fig_size = (12.8, 3.8)
+        fig_height = max(4.2, min(12.0, 0.28 * float(len(plan_names)) + 2.8))
+        fig_size = (13.6, fig_height)
     fig, ax = plt.subplots(figsize=(float(fig_size[0]), float(fig_size[1])), constrained_layout=True)
 
     plan_to_row = {name: i for i, name in enumerate(plan_names)}
@@ -531,7 +304,8 @@ def _build_run_health_detail_figure(
     )
     fig_size = _style_cfg.get("run_health_detail_figsize")
     if fig_size is None:
-        fig_size = (9.4, 4.9)
+        fig_height = max(5.2, min(10.5, 0.18 * float(len(plan_names)) + 4.6))
+        fig_size = (11.2, fig_height)
     fig, (ax_fail, ax_plan) = plt.subplots(
         1,
         2,
@@ -707,193 +481,15 @@ def _build_run_health_detail_figure(
         labels=[handle.get_label() for handle in handles],
         loc="lower center",
         bbox_to_anchor=(0.5, 0.0),
-        ncol=max(1, len(plan_names)),
+        ncol=max(1, min(3, len(plan_names))),
         frameon=False,
         fontsize=float(_style_cfg.get("label_size", _style_cfg.get("font_size", 13))),
     )
-    fig.tight_layout(rect=(0.0, 0.11, 1.0, 0.97))
+    legend_cols = max(1, min(3, len(plan_names)))
+    legend_rows = max(1, int(np.ceil(float(len(plan_names)) / float(legend_cols))))
+    bottom_pad = min(0.34, 0.08 + 0.045 * legend_rows)
+    fig.tight_layout(rect=(0.0, bottom_pad, 1.0, 0.97))
     return fig, {"fail": ax_fail, "plan": ax_plan}
-
-
-def _first_existing_column(df: pd.DataFrame, candidates: list[str], *, context: str) -> str:
-    for name in candidates:
-        if name in df.columns:
-            return name
-    raise ValueError(f"{context} requires one of columns: {', '.join(candidates)}.")
-
-
-def _build_run_health_compression_ratio_figure(
-    dense_arrays_df: pd.DataFrame,
-    *,
-    style: Optional[dict] = None,
-) -> tuple[plt.Figure, dict[str, plt.Axes]]:
-    if dense_arrays_df is None or dense_arrays_df.empty:
-        raise ValueError("run_health compression_ratio_distribution requires dense-array outputs.")
-    style = _style(style)
-    ratio_col = _first_existing_column(
-        dense_arrays_df,
-        ["densegen__compression_ratio", "compression_ratio"],
-        context="run_health compression_ratio_distribution",
-    )
-    plan_col = _first_existing_column(
-        dense_arrays_df,
-        ["densegen__plan", "plan_name"],
-        context="run_health compression_ratio_distribution",
-    )
-    frame = dense_arrays_df[[ratio_col, plan_col]].copy()
-    frame[ratio_col] = pd.to_numeric(frame[ratio_col], errors="coerce")
-    frame[plan_col] = frame[plan_col].map(_normalize_plan_name).fillna("all plans")
-    frame = frame.dropna(subset=[ratio_col]).reset_index(drop=True)
-    if frame.empty:
-        raise ValueError("run_health compression_ratio_distribution found no numeric compression_ratio values.")
-    plan_names = sorted(frame[plan_col].astype(str).unique().tolist())
-    fig_size = style.get("run_health_compression_figsize")
-    if fig_size is None:
-        fig_size = (8.0, 4.6)
-    fig, ax = plt.subplots(
-        figsize=(float(fig_size[0]), float(fig_size[1])),
-        constrained_layout=False,
-    )
-    values = frame[ratio_col].to_numpy(dtype=float)
-    bins = max(8, min(42, int(np.ceil(np.sqrt(values.size) * 2.0))))
-    edges, _centers = _bin_attempts(values, bins=bins)
-    palette = _palette(style, max(1, len(plan_names)))
-    for idx, plan in enumerate(plan_names):
-        plan_values = frame.loc[frame[plan_col].astype(str) == plan, ratio_col].to_numpy(dtype=float)
-        if plan_values.size == 0:
-            continue
-        ax.hist(
-            plan_values,
-            bins=edges,
-            alpha=0.45,
-            color=palette[idx],
-            edgecolor="white",
-            linewidth=0.55,
-            label=f"{_ellipsize(plan, max_len=24)} (n={plan_values.size})",
-        )
-    ax.set_xlabel("Compression ratio")
-    ax.set_ylabel("Count")
-    ax.set_title("Compression ratio distribution by plan")
-    ax.legend(
-        loc="upper left",
-        frameon=False,
-        fontsize=float(style.get("label_size", style.get("font_size", 13.0) * 0.88)),
-    )
-    _apply_style(ax, style)
-    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.98))
-    return fig, {"compression": ax}
-
-
-def _build_run_health_tfbs_length_by_regulator_figure(
-    composition_df: pd.DataFrame,
-    *,
-    library_members_df: pd.DataFrame | None = None,
-    style: Optional[dict] = None,
-) -> tuple[plt.Figure, dict[str, plt.Axes]]:
-    if composition_df is None or composition_df.empty:
-        raise ValueError("run_health tfbs_length_by_regulator requires composition.parquet with placements.")
-    required = {"tf", "tfbs"}
-    missing = required - set(composition_df.columns)
-    if missing:
-        raise ValueError(
-            "run_health tfbs_length_by_regulator requires composition columns: "
-            f"{', '.join(sorted(required))}. Missing: {', '.join(sorted(missing))}."
-        )
-    style = _style(style)
-    frame = composition_df.copy()
-    frame["regulator"] = frame["tf"].map(_usage_category_label).astype(str)
-    frame = frame[~frame["regulator"].str.startswith("fixed:")].copy()
-    if frame.empty:
-        raise ValueError("run_health tfbs_length_by_regulator found no regulator TFBS placements.")
-    if "length" in frame.columns:
-        frame["tfbs_length"] = pd.to_numeric(frame["length"], errors="coerce")
-    else:
-        frame["tfbs_length"] = frame["tfbs"].astype(str).str.len().astype(float)
-    frame = frame.dropna(subset=["tfbs_length"]).copy()
-    if frame.empty:
-        raise ValueError("run_health tfbs_length_by_regulator found no TFBS length values.")
-    frame["tfbs_length"] = frame["tfbs_length"].astype(int)
-
-    counts = (
-        frame.groupby(["regulator", "tfbs_length"])
-        .size()
-        .reset_index(name="count")
-        .sort_values(by=["regulator", "tfbs_length"], ascending=[True, True])
-    )
-    if counts.empty:
-        raise ValueError("run_health tfbs_length_by_regulator produced no regulator/length counts.")
-    pivot = counts.pivot(index="regulator", columns="tfbs_length", values="count").fillna(0).astype(int)
-    pivot["__total"] = pivot.sum(axis=1)
-    pivot = pivot.sort_values("__total", ascending=False).drop(columns=["__total"])
-    regulators = pivot.index.astype(str).tolist()
-    lengths = [int(v) for v in pivot.columns.tolist()]
-    fig_size = style.get("run_health_tfbs_length_figsize")
-    if fig_size is None:
-        fig_size = (10.4, 4.9)
-    fig, ax = plt.subplots(
-        figsize=(float(fig_size[0]), float(fig_size[1])),
-        constrained_layout=False,
-    )
-    x = np.arange(len(regulators), dtype=float)
-    width = 0.82 / max(1, len(lengths))
-    palette = _palette(style, max(1, len(lengths)))
-    for idx, length in enumerate(lengths):
-        offset = (float(idx) - (float(len(lengths) - 1) / 2.0)) * width
-        y = pivot[length].to_numpy(dtype=float)
-        ax.bar(
-            x + offset,
-            y,
-            width=width * 0.92,
-            color=palette[idx],
-            edgecolor="white",
-            linewidth=0.5,
-            label=f"{length} bp",
-        )
-    candidate_pool_sizes: dict[str, int] = {}
-    if library_members_df is not None and not library_members_df.empty:
-        lib = library_members_df.copy()
-        tf_col = "tf" if "tf" in lib.columns else ("regulator_id" if "regulator_id" in lib.columns else None)
-        tfbs_col = "tfbs" if "tfbs" in lib.columns else ("tfbs_sequence" if "tfbs_sequence" in lib.columns else None)
-        if tf_col is not None and tfbs_col is not None:
-            lib["regulator"] = lib[tf_col].map(_usage_category_label).astype(str)
-            lib = lib[~lib["regulator"].str.startswith("fixed:")].copy()
-            if not lib.empty:
-                candidate_pool_sizes = (
-                    lib[["regulator", tfbs_col]]
-                    .drop_duplicates()
-                    .groupby("regulator")[tfbs_col]
-                    .nunique()
-                    .astype(int)
-                    .to_dict()
-                )
-    if not candidate_pool_sizes:
-        candidate_pool_sizes = (
-            frame[["regulator", "tfbs"]].drop_duplicates().groupby("regulator")["tfbs"].nunique().astype(int).to_dict()
-        )
-    x_labels = [
-        f"{_ellipsize(label, max_len=20)}\n(n={int(candidate_pool_sizes.get(label, 0))})" for label in regulators
-    ]
-    rotate = 20 if len(regulators) > 4 else 0
-    ax.set_xticks(x)
-    ax.set_xticklabels(
-        x_labels,
-        rotation=rotate,
-        ha="right" if rotate else "center",
-    )
-    ax.set_xlabel("Regulator")
-    ax.set_ylabel("Count in accepted outputs")
-    ax.set_title("TFBS length counts by regulator across accepted outputs")
-    ax.legend(
-        loc="upper right",
-        title="TFBS length",
-        frameon=False,
-        fontsize=float(style.get("label_size", style.get("font_size", 13.0) * 0.86)),
-        title_fontsize=float(style.get("label_size", style.get("font_size", 13.0) * 0.9)),
-    )
-    ax.margins(y=0.08)
-    _apply_style(ax, style)
-    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.98))
-    return fig, {"length": ax}
 
 
 def plot_run_health(
@@ -935,17 +531,19 @@ def plot_run_health(
     tfbs_length_path = target_dir / f"tfbs_length_by_regulator{out_path.suffix}"
     legacy_detail_path = target_dir / f"run_health_detail{out_path.suffix}"
     legacy_detail_path.unlink(missing_ok=True)
-    fig_outcome.savefig(outcomes_path)
-    fig_detail.savefig(run_health_path)
-    fig_compression.savefig(compression_path)
-    fig_tfbs_length.savefig(tfbs_length_path)
+    _save_figure(fig_outcome, outcomes_path, style=style)
+    _save_figure(fig_detail, run_health_path, style=style)
+    _save_figure(fig_compression, compression_path, style=style)
+    _save_figure(fig_tfbs_length, tfbs_length_path, style=style)
     plt.close(fig_outcome)
     plt.close(fig_detail)
     plt.close(fig_compression)
     plt.close(fig_tfbs_length)
     summary_df = _run_health_summary_frame(_normalize_and_order_attempts(attempts_df), plan_quotas=plan_quotas)
     summary_df.to_csv(target_dir / "summary.csv", index=False)
-    return [outcomes_path, run_health_path, compression_path, tfbs_length_path]
+    summary_table_path = target_dir / f"summary_table{out_path.suffix}"
+    _render_run_health_summary_table_figure(summary_df, summary_table_path, style=style)
+    return [outcomes_path, run_health_path, compression_path, tfbs_length_path, summary_table_path]
 
 
 def _run_health_summary_frame(attempts_df: pd.DataFrame, *, plan_quotas: dict[str, int]) -> pd.DataFrame:
@@ -987,6 +585,36 @@ def _run_health_summary_frame(attempts_df: pd.DataFrame, *, plan_quotas: dict[st
             }
         )
     return pd.DataFrame(rows)
+
+
+def _render_run_health_summary_table_figure(
+    summary_df: pd.DataFrame,
+    out_path: Path,
+    *,
+    style: Optional[dict] = None,
+) -> None:
+    _style_cfg = _style(style)
+    display = summary_df.copy()
+    if "value" in display.columns:
+        display["value"] = display["value"].map(
+            lambda value: f"{float(value):.6g}" if isinstance(value, (float, np.floating)) else str(value)
+        )
+    fig_width = min(22.0, max(10.0, 2.25 * len(display.columns) + 2.0))
+    fig_height = min(24.0, max(4.0, 0.62 * max(1, len(display)) + 2.1))
+    fig, ax = plt.subplots(figsize=(float(fig_width), float(fig_height)), constrained_layout=False)
+    ax.axis("off")
+    table = ax.table(
+        cellText=display.values.tolist(),
+        colLabels=[str(col) for col in display.columns],
+        cellLoc="left",
+        loc="center",
+    )
+    table.auto_set_font_size(False)
+    table_font = max(11.0, float(_style_cfg.get("tick_size", _style_cfg.get("font_size", 13.0) * 0.78)))
+    table.set_fontsize(table_font)
+    table.scale(1.08, 1.45)
+    _save_figure(fig, out_path, style=_style_cfg)
+    plt.close(fig)
 
 
 @dataclass(frozen=True)
@@ -1070,136 +698,6 @@ def _aggregate_counts_for_progress(
         .sort_index()
     )
     return grouped.astype(float).reset_index(drop=True)
-
-
-def _rate_series_from_counts(counts: pd.DataFrame) -> dict[str, np.ndarray]:
-    ok = counts.get("ok", pd.Series(0.0, index=counts.index)).to_numpy(dtype=float)
-    rejected = counts.get("rejected", pd.Series(0.0, index=counts.index)).to_numpy(dtype=float)
-    duplicate = counts.get("duplicate", pd.Series(0.0, index=counts.index)).to_numpy(dtype=float)
-    failed = counts.get("failed", pd.Series(0.0, index=counts.index)).to_numpy(dtype=float)
-    totals = ok + rejected + duplicate + failed
-    safe_totals = np.where(totals > 0.0, totals, 1.0)
-    acceptance = ok / safe_totals
-    waste = (rejected + duplicate + failed) / safe_totals
-    duplicate_rate = duplicate / safe_totals
-    return {
-        "acceptance": acceptance,
-        "waste": waste,
-        "duplicate": duplicate_rate,
-        "totals": totals,
-    }
-
-
-def _subtitle(
-    ax: plt.Axes,
-    text: str,
-    *,
-    fontsize: float,
-    y: float = 1.02,
-    color: str = "#444444",
-) -> None:
-    ax.text(
-        0.0,
-        y,
-        text,
-        transform=ax.transAxes,
-        ha="left",
-        va="bottom",
-        fontsize=fontsize,
-        color=color,
-    )
-
-
-def _solver_ticks(values: np.ndarray, *, max_ticks: int = 10) -> np.ndarray:
-    if values.size == 0:
-        return np.array([], dtype=float)
-    unique = np.unique(values.astype(int))
-    lo = int(unique.min())
-    hi = int(unique.max())
-    if lo == hi:
-        return np.array([float(lo)], dtype=float)
-    span = hi - lo + 1
-    n_ticks = min(int(max_ticks), max(2, span))
-    raw = np.linspace(lo, hi, num=n_ticks)
-    ticks = np.unique(np.rint(raw).astype(int))
-    if ticks.size < 2:
-        ticks = np.array([lo, hi], dtype=int)
-    return ticks.astype(float)
-
-
-def _link_panels_by_ticks(fig: plt.Figure, ax_top: plt.Axes, ax_bottom: plt.Axes, ticks: np.ndarray) -> None:
-    if ticks.size == 0:
-        return
-    y_top = float(ax_top.get_ylim()[0])
-    y_bottom = float(ax_bottom.get_ylim()[1])
-    for x in ticks.tolist():
-        connector = ConnectionPatch(
-            xyA=(float(x), y_top),
-            coordsA=ax_top.transData,
-            xyB=(float(x), y_bottom),
-            coordsB=ax_bottom.transData,
-            axesA=ax_top,
-            axesB=ax_bottom,
-            linestyle="--",
-            linewidth=0.55,
-            color="#9a9a9a",
-            alpha=0.55,
-            zorder=0,
-            clip_on=False,
-        )
-        fig.add_artist(connector)
-
-
-def _save_axes_subset(fig: plt.Figure, path: Path, axes: list[plt.Axes | None], *, pad: float = 0.05) -> None:
-    selected = [ax for ax in axes if ax is not None]
-    if not selected:
-        raise ValueError(f"No axes provided for saving subset figure: {path}")
-    fig.canvas.draw()
-    renderer = fig.canvas.get_renderer()
-    bbox = selected[0].get_tightbbox(renderer)
-    for ax in selected[1:]:
-        bbox = bbox.union([bbox, ax.get_tightbbox(renderer)])
-    bbox_inches = bbox.transformed(fig.dpi_scale_trans.inverted())
-    fig.savefig(path, bbox_inches=bbox_inches.expanded(1.0 + pad, 1.0 + pad))
-
-
-def _aggregate_reason_pareto(problem_df: pd.DataFrame, *, top_k: int | None = 8) -> pd.DataFrame:
-    if problem_df is None or problem_df.empty:
-        return pd.DataFrame(columns=["rejected", "failed", "total"])
-    required = {"status", "reason"}
-    missing = required - set(problem_df.columns)
-    if missing:
-        raise ValueError(f"run_health reason analysis missing required columns: {sorted(missing)}")
-    reasons = problem_df.copy()
-    reasons["reason_family"] = reasons.apply(
-        lambda row: _reason_family_label(
-            str(row.get("status", "")),
-            row.get("reason"),
-            row.get("detail_json"),
-        ),
-        axis=1,
-    )
-    pivot = (
-        reasons.groupby(["reason_family", "status"])
-        .size()
-        .unstack(fill_value=0)
-        .reindex(columns=["rejected", "failed"], fill_value=0)
-    )
-    pivot["total"] = pivot.sum(axis=1)
-    pivot = pivot.sort_values("total", ascending=False)
-    if top_k is not None and len(pivot) > int(top_k):
-        head = pivot.head(int(top_k)).copy()
-        tail = pivot.iloc[int(top_k) :]
-        other = pd.DataFrame(
-            {
-                "rejected": [float(tail["rejected"].sum())],
-                "failed": [float(tail["failed"].sum())],
-                "total": [float(tail["total"].sum())],
-            },
-            index=["other"],
-        )
-        pivot = pd.concat([head, other], axis=0)
-    return pivot
 
 
 def _build_run_health_figure(
@@ -1525,28 +1023,6 @@ def _extract_plan_quotas(cfg: dict | None) -> dict[str, int]:
     return quotas
 
 
-def _normalize_plan_name(value: object) -> str | None:
-    if value is None:
-        return None
-    if pd.isna(value):
-        return None
-    label = str(value).strip()
-    if not label:
-        return None
-    if label.lower() in {"nan", "none"}:
-        return None
-    return label
-
-
-def _ellipsize(label: object, max_len: int = 18) -> str:
-    text = str(label or "")
-    if len(text) <= max_len:
-        return text
-    if max_len <= 3:
-        return text[:max_len]
-    return f"{text[: max_len - 3]}..."
-
-
 def _normalize_and_order_attempts(attempts_df: pd.DataFrame) -> pd.DataFrame:
     normalized = attempts_df.copy()
     normalized["status"] = normalized["status"].astype(str).str.strip().str.lower()
@@ -1566,84 +1042,3 @@ def _normalize_and_order_attempts(attempts_df: pd.DataFrame) -> pd.DataFrame:
     normalized["plan_name"] = normalized["plan_name"].map(_normalize_plan_name).fillna("all plans")
     normalized["run_order"] = np.arange(1, len(normalized) + 1, dtype=int)
     return normalized
-
-
-def _forbidden_kmer_tokens(value: object) -> list[str]:
-    tokens: set[str] = set()
-    text = str(value or "").strip()
-    if not text:
-        return []
-    json_match = re.search(r"\{.*\}", text)
-    if json_match:
-        try:
-            payload = json.loads(json_match.group(0))
-            if isinstance(payload, dict):
-                single = payload.get("forbidden_kmer")
-                if isinstance(single, str) and single.strip():
-                    tokens.add(single.strip().upper())
-                multi = payload.get("forbidden_kmers")
-                if isinstance(multi, list):
-                    for item in multi:
-                        if isinstance(item, str) and item.strip():
-                            tokens.add(item.strip().upper())
-                kmer = payload.get("kmer")
-                if isinstance(kmer, str) and kmer.strip():
-                    tokens.add(kmer.strip().upper())
-                kmers = payload.get("kmers")
-                if isinstance(kmers, list):
-                    for item in kmers:
-                        if isinstance(item, str) and item.strip():
-                            tokens.add(item.strip().upper())
-        except Exception:
-            pass
-    for match in re.findall(r'"forbidden_kmer"\s*:\s*"([acgtun]+)"', text):
-        tokens.add(match.upper())
-    list_match = re.search(r'"forbidden_kmers"\s*:\s*\[([^\]]*)\]', text)
-    if list_match:
-        for match in re.findall(r'"([acgtun]+)"', list_match.group(1)):
-            tokens.add(match.upper())
-    for match in re.findall(r'"kmer"\s*:\s*"([acgtun]+)"', text):
-        tokens.add(match.upper())
-    for match in re.findall(r"(?:forbidden_)?kmer(?:[:=]|_)?([acgtun]+)", text):
-        tokens.add(match.upper())
-    return sorted(tokens)
-
-
-def _reason_family_label(status: str, reason: object, detail_json: object | None = None) -> str:
-    reason_text = str(reason or "").strip()
-    value = reason_text.lower()
-    if status == "duplicate" or value == "output_duplicate":
-        return "duplicate output"
-    if value in {"", "none", "nan"}:
-        return "unknown"
-    if "forbidden_kmer" in value or value == "postprocess_forbidden_kmer":
-        tokens = sorted(set(_forbidden_kmer_tokens(reason_text)) | set(_forbidden_kmer_tokens(detail_json)))
-        if len(tokens) == 1:
-            return f"forbidden kmer: {tokens[0]}"
-        if len(tokens) > 1:
-            return f"forbidden kmers: {', '.join(tokens)}"
-        return "forbidden kmer"
-    replacements = {
-        "postprocess_forbidden_kmer": "forbidden kmer",
-        "stall_no_solution": "no solution",
-        "no_solution": "no solution",
-        "failed_required_regulators": "required regulators",
-        "failed_min_count_by_regulator": "min by regulator",
-        "failed_min_count_per_tf": "min per TF",
-        "failed_min_required_regulators": "min regulator groups",
-    }
-    if value in replacements:
-        return replacements[value]
-    if "no_solution" in value:
-        return "no solution"
-    if "required_regulator" in value:
-        return "required regulators"
-    if "min_count_by_regulator" in value:
-        return "min by regulator"
-    if "min_count_per_tf" in value:
-        return "min per TF"
-    if "min_required_regulators" in value:
-        return "min regulator groups"
-    if "solver" in value:
-        return "solver failure"
-    return value.replace("_", " ")

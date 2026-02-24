@@ -15,6 +15,7 @@ from typing import Any, Iterable
 import numpy as np
 import pandas as pd
 
+from dnadesign.cruncher.analysis.move_stats import move_stats_frame
 from dnadesign.cruncher.analysis.overlap import compute_overlap_tables
 from dnadesign.cruncher.core.optimizers.kinds import resolve_optimizer_kind
 from dnadesign.cruncher.core.sequence import identity_key
@@ -95,32 +96,11 @@ def _tail_move_window_records(
     min_window: int = 20,
     max_window: int = 200,
 ) -> tuple[list[dict[str, object]], int | None, int | None]:
-    if not move_stats:
+    cleaned = move_stats_frame(move_stats, phase=phase)
+    if cleaned.empty:
         return [], None, None
-    rows: list[dict[str, object]] = []
-    for row in move_stats:
-        if phase and row.get("phase") != phase:
-            continue
-        sweep_idx = _safe_int(row.get("sweep_idx"))
-        attempted = _safe_int(row.get("attempted"))
-        accepted = _safe_int(row.get("accepted"))
-        move_kind = row.get("move_kind")
-        if sweep_idx is None or attempted is None or accepted is None or not isinstance(move_kind, str):
-            continue
-        rows.append(
-            {
-                "sweep_idx": int(sweep_idx),
-                "attempted": int(attempted),
-                "accepted": int(accepted),
-                "move_kind": str(move_kind),
-                "delta": _safe_float(row.get("delta")),
-                "delta_hamming": _safe_float(row.get("delta_hamming")),
-                "gibbs_changed": row.get("gibbs_changed"),
-            }
-        )
-    if not rows:
-        return [], None, None
-    sweeps = sorted({int(row["sweep_idx"]) for row in rows})
+
+    sweeps = sorted(set(cleaned["sweep_idx"].tolist()))
     if not sweeps:
         return [], None, None
     total_sweeps = len(sweeps)
@@ -128,8 +108,20 @@ def _tail_move_window_records(
     window = max(min_window, min(max_window, window))
     window = min(window, total_sweeps)
     cutoff = sweeps[-window]
-    tail_rows = [row for row in rows if int(row["sweep_idx"]) >= cutoff]
-    return tail_rows, window, total_sweeps
+    tail = cleaned.loc[cleaned["sweep_idx"] >= cutoff, :]
+    rows = [
+        {
+            "sweep_idx": int(row["sweep_idx"]),
+            "attempted": int(row["attempted"]),
+            "accepted": int(row["accepted"]),
+            "move_kind": str(row["move_kind"]),
+            "delta": row.get("delta"),
+            "delta_hamming": row.get("delta_hamming"),
+            "gibbs_changed": row.get("gibbs_changed"),
+        }
+        for row in tail.to_dict(orient="records")
+    ]
+    return rows, window, total_sweeps
 
 
 def _acceptance_rate(
@@ -408,11 +400,12 @@ def summarize_sampling_diagnostics(
         total = int(len(draw_df))
         unique = None
         if has_canonical:
-            source = (
-                draw_df["canonical_sequence"] if "canonical_sequence" in draw_df.columns else draw_df["sequence"]
-            ).astype(str)
-            keys = source.map(lambda seq: identity_key(seq, bidirectional=True))
-            unique = int(keys.nunique())
+            if "canonical_sequence" in draw_df.columns:
+                unique = int(draw_df["canonical_sequence"].astype(str).str.strip().str.upper().nunique())
+            else:
+                source = draw_df["sequence"].astype(str)
+                keys = source.map(lambda seq: identity_key(seq, bidirectional=True))
+                unique = int(keys.nunique())
             seq_metrics["unique_sequences_canonical"] = unique
             seq_metrics["unique_sequences_raw"] = int(draw_df["sequence"].astype(str).nunique())
         else:

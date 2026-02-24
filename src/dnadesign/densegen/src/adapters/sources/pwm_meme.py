@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
-from dnadesign.cruncher.io.parsers.meme import MemeMotif, parse_meme_file
+from dnadesign.cruncher.meme import MemeMotif, parse_meme_file
 
 from ...config import PWMSamplingConfig
 from ...core.artifacts.ids import hash_pwm_motif, hash_tfbs_id

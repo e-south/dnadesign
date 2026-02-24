@@ -103,18 +103,37 @@ def _joint_score_ylabel(
 
 
 def _full_nn_xlabel() -> str:
-    return "NN full-seq Hamming to closest selected elite (bp)"
+    return "NN full-seq Hamming/edit to closest selected elite (bp)"
+
+
+def _levenshtein_bp(seq_a: str, seq_b: str) -> float:
+    if seq_a == seq_b:
+        return 0.0
+    if not seq_a:
+        return float(len(seq_b))
+    if not seq_b:
+        return float(len(seq_a))
+    if len(seq_a) < len(seq_b):
+        seq_a, seq_b = seq_b, seq_a
+    prev = list(range(len(seq_b) + 1))
+    for i, char_a in enumerate(seq_a, start=1):
+        curr = [i]
+        for j, char_b in enumerate(seq_b, start=1):
+            cost = 0 if char_a == char_b else 1
+            curr.append(min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost))
+        prev = curr
+    return float(prev[-1])
 
 
 def _hamming_distance_bp(seq_a: str, seq_b: str) -> float:
-    if len(seq_a) != len(seq_b):
-        raise ValueError("Elite full-sequence distance requires equal sequence lengths.")
-    if len(seq_a) == 0:
+    if len(seq_a) == 0 or len(seq_b) == 0:
         raise ValueError("Elite full-sequence distance requires non-empty sequences.")
-    mismatches = float(sum(int(base_a != base_b) for base_a, base_b in zip(seq_a, seq_b, strict=False)))
-    if mismatches < 0:
-        raise ValueError("Elite full-sequence Hamming distance must be non-negative.")
-    return mismatches
+    if len(seq_a) == len(seq_b):
+        mismatches = float(sum(int(base_a != base_b) for base_a, base_b in zip(seq_a, seq_b, strict=False)))
+        if mismatches < 0:
+            raise ValueError("Elite full-sequence Hamming distance must be non-negative.")
+        return mismatches
+    return _levenshtein_bp(seq_a, seq_b)
 
 
 def _full_distance_matrix(elites_df: pd.DataFrame) -> tuple[list[str], np.ndarray]:
@@ -146,6 +165,14 @@ def _nearest_neighbor_distances(ids: list[str], matrix: np.ndarray) -> dict[str,
         finite = row[np.isfinite(row)]
         result[str(elite_id)] = float(np.min(finite)) if finite.size else None
     return result
+
+
+def _annotation_offsets(*, n_items: int, base_dx: float = 4.0, base_dy: float = 3.0) -> list[tuple[float, float]]:
+    if n_items <= 1:
+        return [(base_dx, base_dy)]
+    radius = 4.0
+    angles = np.linspace(0.0, 2.0 * np.pi, n_items, endpoint=False)
+    return [(base_dx + radius * float(np.cos(theta)), base_dy + radius * float(np.sin(theta))) for theta in angles]
 
 
 def _text_panel(
@@ -237,22 +264,31 @@ def plot_elites_nn_distance(
         alpha=0.9,
     )
     if "rank" in scatter_df.columns:
-        for x_val, y_val, rank in zip(
-            scatter_df["d_full_nn"].to_numpy(dtype=float),
-            scatter_df["joint_score"].to_numpy(dtype=float),
-            scatter_df["rank"],
-            strict=False,
-        ):
-            if np.isnan(rank):
-                continue
-            ax_scatter.annotate(
-                str(int(rank)),
-                xy=(x_val, y_val),
-                xytext=(4, 3),
-                textcoords="offset points",
-                fontsize=8,
-                color="#1f1f1f",
-            )
+        rank_df = scatter_df[["d_full_nn", "joint_score", "rank"]].copy()
+        rank_df = rank_df[rank_df["rank"].notna()].reset_index(drop=True)
+        rank_df["_group_x"] = rank_df["d_full_nn"].astype(float).round(10)
+        rank_df["_group_y"] = rank_df["joint_score"].astype(float).round(10)
+        for _, group in rank_df.groupby(["_group_x", "_group_y"], sort=False, dropna=False):
+            offsets = _annotation_offsets(n_items=int(len(group)))
+            for offset_idx, (_, row) in enumerate(group.iterrows()):
+                x_val = float(row["d_full_nn"])
+                y_val = float(row["joint_score"])
+                rank_val = float(row["rank"])
+                dx, dy = offsets[offset_idx]
+                ax_scatter.annotate(
+                    str(int(rank_val)),
+                    xy=(x_val, y_val),
+                    xytext=(dx, dy),
+                    textcoords="offset points",
+                    fontsize=8,
+                    color="#1f1f1f",
+                )
+    x_values = scatter_df["d_full_nn"].to_numpy(dtype=float)
+    if x_values.size and np.isfinite(x_values).any():
+        x_min = int(np.floor(float(np.nanmin(x_values))))
+        x_max = int(np.ceil(float(np.nanmax(x_values))))
+        if x_max >= x_min:
+            ax_scatter.set_xticks(np.arange(x_min, x_max + 1, dtype=int))
     ax_scatter.set_xlabel(_full_nn_xlabel(), fontsize=13)
     ax_scatter.set_ylabel(
         _joint_score_ylabel(objective_config=objective_config, source_column=score_source),

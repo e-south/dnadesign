@@ -14,7 +14,6 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from itertools import combinations
 from pathlib import Path
 
 import pandas as pd
@@ -31,8 +30,10 @@ from dnadesign.cruncher.artifacts.layout import (
     elites_hits_path,
     elites_path,
     manifest_path,
+    run_export_dir,
     run_export_sequences_manifest_path,
     run_export_sequences_table_path,
+    run_export_table_path,
 )
 from dnadesign.cruncher.artifacts.manifest import load_manifest, write_manifest
 from dnadesign.cruncher.config.schema_v3 import CruncherConfig
@@ -43,71 +44,31 @@ _ELITES_REQUIRED_COLUMNS = {
     "sequence",
 }
 
-_WINDOW_COLUMNS = [
-    "elite_id",
-    "elite_rank",
-    "elite_sequence",
-    "tf",
-    "best_start",
-    "best_end",
-    "best_strand",
-    "best_window_seq",
-    "best_core_seq",
-    "best_score_raw",
-    "best_score_scaled",
-    "best_score_norm",
-    "pwm_ref",
-    "pwm_hash",
-    "pwm_width",
-    "core_width",
+_ELITES_EXPORT_OPTIONAL_COLUMNS = [
+    "norm_sum",
+    "min_norm",
+    "sum_norm",
+    "combined_score_final",
+    "combined_score_scaled",
+    "combined_score_raw",
+    "chain",
+    "chain_1based",
+    "draw_idx",
+    "draw_in_phase",
+    "canonical_sequence",
+    "meta_type",
+    "meta_source",
+    "meta_date",
 ]
 
-_BISPECIFIC_COLUMNS = [
+_ELITES_EXPORT_BASE_COLUMNS = [
     "elite_id",
     "elite_rank",
     "elite_sequence",
-    "tf_a",
-    "tf_b",
-    "window_a_seq",
-    "window_b_seq",
-    "core_a_seq",
-    "core_b_seq",
-    "start_a",
-    "end_a",
-    "start_b",
-    "end_b",
-    "strand_a",
-    "strand_b",
-    "score_norm_a",
-    "score_norm_b",
-    "pair_min_score_norm",
-    "pair_mean_score_norm",
-    "overlap_bp",
-    "gap_bp",
-    "pair_span_start",
-    "pair_span_end",
-    "pair_span_width",
-]
-
-_MULTISPECIFIC_COLUMNS = [
-    "elite_id",
-    "elite_rank",
-    "elite_sequence",
-    "combo_size",
-    "tf_combo_key",
-    "tf_members_json",
-    "member_windows_json",
-    "combo_min_score_norm",
-    "combo_mean_score_norm",
-    "combo_min_score_scaled",
-    "combo_mean_score_scaled",
-    "combo_span_start",
-    "combo_span_end",
-    "combo_span_width",
-    "combo_overlap_total_bp",
-    "forward_count",
-    "reverse_count",
-    "member_count",
+    "sequence_length",
+    "window_count",
+    "regulator_ids_csv",
+    "window_members_json",
 ]
 
 
@@ -171,21 +132,6 @@ def _split_ref(ref: str, *, tf_name: str) -> tuple[str, str]:
     if not source or not motif_id:
         raise ValueError(f"Invalid pwm_ref for TF '{tf_name}': {ref!r}; expected '<source>:<motif_id>'.")
     return source, motif_id
-
-
-def _interval_overlap(start_a: int, end_a: int, start_b: int, end_b: int) -> int:
-    return max(0, min(end_a, end_b) - max(start_a, start_b))
-
-
-def _interval_gap(start_a: int, end_a: int, start_b: int, end_b: int) -> int:
-    return max(0, max(start_a, start_b) - min(end_a, end_b))
-
-
-def _pairwise_overlap_total(intervals: list[tuple[int, int]]) -> int:
-    total = 0
-    for (start_a, end_a), (start_b, end_b) in combinations(intervals, 2):
-        total += _interval_overlap(start_a, end_a, start_b, end_b)
-    return int(total)
 
 
 def _validate_hits_contract(hits_df: pd.DataFrame) -> None:
@@ -301,6 +247,94 @@ def _build_window_rows(elites_df: pd.DataFrame, hits_df: pd.DataFrame) -> pd.Dat
     return window_df
 
 
+def _build_elites_export_rows(elites_df: pd.DataFrame, window_df: pd.DataFrame) -> pd.DataFrame:
+    _required_columns(elites_df, _ELITES_REQUIRED_COLUMNS, context="elites.parquet")
+    export_df = elites_df.copy()
+    if "combined_score_final" not in export_df.columns:
+        raise ValueError("elites.parquet missing required column: combined_score_final")
+    export_df["id"] = export_df["id"].astype(str)
+    export_df["sequence"] = export_df["sequence"].astype(str)
+    export_df["rank"] = pd.to_numeric(export_df["rank"], errors="coerce")
+    if export_df["rank"].isna().any():
+        raise ValueError("elites.parquet contains non-numeric rank values.")
+    export_df["rank"] = export_df["rank"].astype(int)
+    export_df["combined_score_final"] = pd.to_numeric(export_df["combined_score_final"], errors="coerce")
+    if export_df["combined_score_final"].isna().any():
+        raise ValueError("elites.parquet contains non-numeric combined_score_final values.")
+    inf_mask = (export_df["combined_score_final"] == float("inf")) | (
+        export_df["combined_score_final"] == float("-inf")
+    )
+    if inf_mask.any():
+        raise ValueError("elites.parquet contains non-finite combined_score_final values.")
+    export_df = export_df.rename(
+        columns={
+            "id": "elite_id",
+            "rank": "elite_rank",
+            "sequence": "elite_sequence",
+        }
+    )
+    export_df["sequence_length"] = export_df["elite_sequence"].astype(str).str.len().astype(int)
+
+    window_key_map: dict[tuple[str, int, str], tuple[str, str, int]] = {}
+    for (elite_id, elite_rank, elite_sequence), group in window_df.groupby(
+        ["elite_id", "elite_rank", "elite_sequence"], sort=True
+    ):
+        members: list[dict[str, object]] = []
+        for item in group.sort_values(["tf", "best_start", "best_end"]).to_dict(orient="records"):
+            members.append(
+                {
+                    "regulator_id": str(item["tf"]),
+                    "offset_start": int(item["best_start"]),
+                    "offset_end": int(item["best_end"]),
+                    "strand": str(item["best_strand"]),
+                    "window_kmer": str(item["best_window_seq"]),
+                    "core_kmer": str(item["best_core_seq"]),
+                    "score_name": "best_score_norm",
+                    "score": float(item["best_score_norm"]),
+                    "score_scaled_name": "best_score_scaled",
+                    "score_scaled": float(item["best_score_scaled"]),
+                    "score_raw_name": "best_score_raw",
+                    "score_raw": float(item["best_score_raw"]),
+                    "pwm_ref": str(item["pwm_ref"]),
+                    "pwm_hash": str(item["pwm_hash"]),
+                    "pwm_width": int(item["pwm_width"]),
+                    "core_width": int(item["core_width"]),
+                }
+            )
+        regulators = sorted({str(member["regulator_id"]) for member in members})
+        window_key_map[(str(elite_id), int(elite_rank), str(elite_sequence))] = (
+            json.dumps(members, sort_keys=True),
+            ",".join(regulators),
+            int(len(members)),
+        )
+
+    members_col: list[str] = []
+    regulators_col: list[str] = []
+    count_col: list[int] = []
+    for row in export_df.to_dict(orient="records"):
+        key = (str(row["elite_id"]), int(row["elite_rank"]), str(row["elite_sequence"]))
+        payload = window_key_map.get(key)
+        if payload is None:
+            raise ValueError(
+                "Missing elite window metadata for export row: "
+                f"elite_id={row['elite_id']!r} elite_rank={row['elite_rank']!r}"
+            )
+        members_col.append(payload[0])
+        regulators_col.append(payload[1])
+        count_col.append(payload[2])
+    export_df["window_members_json"] = members_col
+    export_df["regulator_ids_csv"] = regulators_col
+    export_df["window_count"] = count_col
+
+    optional_columns = [column for column in _ELITES_EXPORT_OPTIONAL_COLUMNS if column in export_df.columns]
+    score_columns = sorted(column for column in export_df.columns if column.startswith(("score_", "norm_")))
+    selected = list(_ELITES_EXPORT_BASE_COLUMNS)
+    for column in optional_columns + score_columns:
+        if column not in selected:
+            selected.append(column)
+    return export_df.loc[:, selected].sort_values(["elite_rank", "elite_id"]).reset_index(drop=True)
+
+
 def _build_consensus_rows(window_df: pd.DataFrame, pwms: dict[str, object]) -> tuple[pd.DataFrame, list[str]]:
     tf_names = sorted(window_df["tf"].astype(str).unique().tolist())
     if not tf_names:
@@ -347,138 +381,22 @@ def _build_consensus_rows(window_df: pd.DataFrame, pwms: dict[str, object]) -> t
     return consensus_df, tf_names
 
 
-def _build_bispecific_rows(window_df: pd.DataFrame) -> pd.DataFrame:
-    rows: list[dict[str, object]] = []
-    for (_, elite_id, elite_sequence), group in window_df.groupby(
-        ["elite_rank", "elite_id", "elite_sequence"], sort=True
-    ):
-        rank = int(group.iloc[0]["elite_rank"])
-        ordered = group.sort_values("tf").to_dict(orient="records")
-        for left, right in combinations(ordered, 2):
-            start_a = int(left["best_start"])
-            end_a = int(left["best_end"])
-            start_b = int(right["best_start"])
-            end_b = int(right["best_end"])
-            overlap_bp = _interval_overlap(start_a, end_a, start_b, end_b)
-            gap_bp = _interval_gap(start_a, end_a, start_b, end_b)
-            span_start = min(start_a, start_b)
-            span_end = max(end_a, end_b)
-            score_norm_a = float(left["best_score_norm"])
-            score_norm_b = float(right["best_score_norm"])
-            rows.append(
-                {
-                    "elite_id": str(elite_id),
-                    "elite_rank": rank,
-                    "elite_sequence": str(elite_sequence),
-                    "tf_a": str(left["tf"]),
-                    "tf_b": str(right["tf"]),
-                    "window_a_seq": str(left["best_window_seq"]),
-                    "window_b_seq": str(right["best_window_seq"]),
-                    "core_a_seq": str(left["best_core_seq"]),
-                    "core_b_seq": str(right["best_core_seq"]),
-                    "start_a": start_a,
-                    "end_a": end_a,
-                    "start_b": start_b,
-                    "end_b": end_b,
-                    "strand_a": str(left["best_strand"]),
-                    "strand_b": str(right["best_strand"]),
-                    "score_norm_a": score_norm_a,
-                    "score_norm_b": score_norm_b,
-                    "pair_min_score_norm": min(score_norm_a, score_norm_b),
-                    "pair_mean_score_norm": (score_norm_a + score_norm_b) / 2.0,
-                    "overlap_bp": int(overlap_bp),
-                    "gap_bp": int(gap_bp),
-                    "pair_span_start": int(span_start),
-                    "pair_span_end": int(span_end),
-                    "pair_span_width": int(span_end - span_start),
-                }
-            )
-    bispecific_df = pd.DataFrame(rows, columns=_BISPECIFIC_COLUMNS)
-    if not bispecific_df.empty:
-        bispecific_df = bispecific_df.sort_values(["elite_rank", "elite_id", "tf_a", "tf_b"]).reset_index(drop=True)
-    return bispecific_df
-
-
-def _resolve_max_combo_size(tf_count: int, max_combo_size: int | None) -> int:
-    if tf_count < 2:
-        return 1
-    if max_combo_size is None:
-        return tf_count
-    if max_combo_size < 2:
-        raise ValueError("max_combo_size must be >= 2 when provided.")
-    return min(max_combo_size, tf_count)
-
-
-def _build_multispecific_rows(window_df: pd.DataFrame, *, max_combo_size: int | None) -> tuple[pd.DataFrame, int]:
-    rows: list[dict[str, object]] = []
-    tf_count = int(window_df["tf"].nunique()) if not window_df.empty else 0
-    max_combo = _resolve_max_combo_size(tf_count, max_combo_size)
-    for (_, elite_id, elite_sequence), group in window_df.groupby(
-        ["elite_rank", "elite_id", "elite_sequence"], sort=True
-    ):
-        rank = int(group.iloc[0]["elite_rank"])
-        ordered = group.sort_values("tf").to_dict(orient="records")
-        for combo_size in range(3, max_combo + 1):
-            for members in combinations(ordered, combo_size):
-                tf_members = [str(member["tf"]) for member in members]
-                starts = [int(member["best_start"]) for member in members]
-                ends = [int(member["best_end"]) for member in members]
-                scores_norm = [float(member["best_score_norm"]) for member in members]
-                scores_scaled = [float(member["best_score_scaled"]) for member in members]
-                strands = [str(member["best_strand"]) for member in members]
-                member_windows = [
-                    {
-                        "tf": str(member["tf"]),
-                        "start": int(member["best_start"]),
-                        "end": int(member["best_end"]),
-                        "strand": str(member["best_strand"]),
-                        "window_seq": str(member["best_window_seq"]),
-                        "core_seq": str(member["best_core_seq"]),
-                        "score_norm": float(member["best_score_norm"]),
-                        "score_scaled": float(member["best_score_scaled"]),
-                        "pwm_ref": str(member["pwm_ref"]),
-                        "pwm_hash": str(member["pwm_hash"]),
-                    }
-                    for member in members
-                ]
-                intervals = list(zip(starts, ends))
-                span_start = min(starts)
-                span_end = max(ends)
-                rows.append(
-                    {
-                        "elite_id": str(elite_id),
-                        "elite_rank": rank,
-                        "elite_sequence": str(elite_sequence),
-                        "combo_size": combo_size,
-                        "tf_combo_key": "|".join(tf_members),
-                        "tf_members_json": json.dumps(tf_members, sort_keys=False),
-                        "member_windows_json": json.dumps(member_windows, sort_keys=True),
-                        "combo_min_score_norm": float(min(scores_norm)),
-                        "combo_mean_score_norm": float(sum(scores_norm) / len(scores_norm)),
-                        "combo_min_score_scaled": float(min(scores_scaled)),
-                        "combo_mean_score_scaled": float(sum(scores_scaled) / len(scores_scaled)),
-                        "combo_span_start": int(span_start),
-                        "combo_span_end": int(span_end),
-                        "combo_span_width": int(span_end - span_start),
-                        "combo_overlap_total_bp": _pairwise_overlap_total(intervals),
-                        "forward_count": sum(1 for strand in strands if strand == "+"),
-                        "reverse_count": sum(1 for strand in strands if strand == "-"),
-                        "member_count": len(members),
-                    }
-                )
-    multispecific_df = pd.DataFrame(rows, columns=_MULTISPECIFIC_COLUMNS)
-    if not multispecific_df.empty:
-        multispecific_df = multispecific_df.sort_values(
-            ["elite_rank", "elite_id", "combo_size", "tf_combo_key"]
-        ).reset_index(drop=True)
-    return multispecific_df, max_combo
-
-
 def _relative_to_run(path: Path, run_dir: Path) -> str:
     try:
         return str(path.resolve().relative_to(run_dir.resolve()))
     except ValueError as exc:
         raise ValueError(f"Export artifact path escapes run_dir: {path} (run_dir={run_dir})") from exc
+
+
+def _cleanup_export_tables(export_dir: Path, *, keep_files: set[str]) -> None:
+    if not export_dir.exists():
+        return
+    for path in export_dir.glob("table__*.*"):
+        if path.name in keep_files:
+            continue
+        if path.suffix.lower() not in {".csv", ".parquet"}:
+            continue
+        path.unlink()
 
 
 def _append_export_artifacts(
@@ -490,31 +408,17 @@ def _append_export_artifacts(
     run_manifest = load_manifest(run_dir)
     artifact_rows = [
         artifact_entry(
-            files["monospecific_consensus_sites"],
+            files["consensus_sites"],
             run_dir,
             kind="table",
-            label="Sequence export: monospecific consensus sites",
+            label="Sequence export: consensus sites",
             stage="export",
         ),
         artifact_entry(
-            files["monospecific_elite_windows"],
+            files["elites"],
             run_dir,
             kind="table",
-            label="Sequence export: monospecific elite windows",
-            stage="export",
-        ),
-        artifact_entry(
-            files["bispecific_elite_windows"],
-            run_dir,
-            kind="table",
-            label="Sequence export: bispecific elite windows",
-            stage="export",
-        ),
-        artifact_entry(
-            files["multispecific_elite_windows"],
-            run_dir,
-            kind="table",
-            label="Sequence export: multispecific elite windows",
+            label="Sequence export: elites table",
             stage="export",
         ),
         artifact_entry(
@@ -533,12 +437,9 @@ def export_sequences_for_run(
     run_dir: Path,
     *,
     run_name: str,
-    table_format: str = "parquet",
-    max_combo_size: int | None = None,
+    table_format: str = "csv",
 ) -> SequenceExportResult:
     normalized_format = _resolve_table_format(table_format)
-    if max_combo_size is not None and max_combo_size < 2:
-        raise ValueError("max_combo_size must be >= 2 when provided.")
     if not run_dir.exists():
         raise FileNotFoundError(f"Run directory does not exist: {run_dir}")
     if not manifest_path(run_dir).exists():
@@ -560,59 +461,37 @@ def export_sequences_for_run(
 
     pwms, _ = load_pwms_from_config(run_dir)
     windows_df = _build_window_rows(elites_df, hits_df)
+    elites_export_df = _build_elites_export_rows(elites_df, windows_df)
     consensus_df, tf_names = _build_consensus_rows(windows_df, pwms)
-    bispecific_df = _build_bispecific_rows(windows_df)
-    multispecific_df, resolved_max_combo_size = _build_multispecific_rows(windows_df, max_combo_size=max_combo_size)
 
     files = {
-        "monospecific_consensus_sites": run_export_sequences_table_path(
-            run_dir, table_name="monospecific_consensus_sites", fmt=normalized_format
+        "consensus_sites": run_export_sequences_table_path(
+            run_dir, table_name="consensus_sites", fmt=normalized_format
         ),
-        "monospecific_elite_windows": run_export_sequences_table_path(
-            run_dir, table_name="monospecific_elite_windows", fmt=normalized_format
-        ),
-        "bispecific_elite_windows": run_export_sequences_table_path(
-            run_dir, table_name="bispecific_elite_windows", fmt=normalized_format
-        ),
-        "multispecific_elite_windows": run_export_sequences_table_path(
-            run_dir, table_name="multispecific_elite_windows", fmt=normalized_format
-        ),
+        "elites": run_export_table_path(run_dir, table_name="elites", fmt="csv"),
     }
+    _cleanup_export_tables(run_export_dir(run_dir), keep_files={path.name for path in files.values()})
     for key, path in files.items():
         path.parent.mkdir(parents=True, exist_ok=True)
-        if key == "monospecific_consensus_sites":
+        if key == "consensus_sites":
             _write_table(consensus_df, path, table_format=normalized_format)
-        elif key == "monospecific_elite_windows":
-            _write_table(windows_df.loc[:, _WINDOW_COLUMNS], path, table_format=normalized_format)
-        elif key == "bispecific_elite_windows":
-            _write_table(bispecific_df.loc[:, _BISPECIFIC_COLUMNS], path, table_format=normalized_format)
         else:
-            _write_table(multispecific_df.loc[:, _MULTISPECIFIC_COLUMNS], path, table_format=normalized_format)
+            _write_table(elites_export_df, path, table_format="csv")
 
     row_counts = {
-        "monospecific_consensus_sites": int(len(consensus_df)),
-        "monospecific_elite_windows": int(len(windows_df)),
-        "bispecific_elite_windows": int(len(bispecific_df)),
-        "multispecific_elite_windows": int(len(multispecific_df)),
+        "consensus_sites": int(len(consensus_df)),
+        "elites": int(len(elites_export_df)),
     }
     manifest_output = run_export_sequences_manifest_path(run_dir)
-    max_multispecific_group_size: int | None = int(resolved_max_combo_size) if resolved_max_combo_size >= 3 else None
     manifest_payload = {
-        "schema_version": 2,
-        "kind": "sequence_export_v2",
+        "schema_version": 3,
+        "kind": "sequence_export_v3",
         "created_at": _utc_now(),
         "run_name": run_name,
         "run_dir": str(run_dir.resolve()),
         "table_format": normalized_format,
         "tf_names": tf_names,
-        "specificity": {
-            "monospecific": {"group_size": 1},
-            "bispecific": {"group_size": 2},
-            "multispecific": {
-                "min_group_size": 3,
-                "max_group_size": max_multispecific_group_size,
-            },
-        },
+        "export_tables": ["consensus_sites", "elites"],
         "inputs": {
             "elites_path": _relative_to_run(elites_file, run_dir),
             "elites_hits_path": _relative_to_run(hits_file, run_dir),
@@ -627,7 +506,7 @@ def export_sequences_for_run(
     return SequenceExportResult(
         run_name=run_name,
         run_dir=run_dir,
-        output_dir=manifest_output.parent,
+        output_dir=run_export_dir(run_dir),
         manifest_path=manifest_output,
         files=files,
         row_counts=row_counts,
@@ -670,8 +549,7 @@ def run_export_sequences(
     *,
     runs_override: list[str] | None = None,
     use_latest: bool = False,
-    table_format: str = "parquet",
-    max_combo_size: int | None = None,
+    table_format: str = "csv",
 ) -> list[SequenceExportResult]:
     run_names = _resolve_run_names(
         cfg,
@@ -688,7 +566,6 @@ def run_export_sequences(
             run.run_dir,
             run_name=run.name,
             table_format=table_format,
-            max_combo_size=max_combo_size,
         )
         results.append(result)
     return results

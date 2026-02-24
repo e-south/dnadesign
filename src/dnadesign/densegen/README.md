@@ -11,7 +11,7 @@ This section is the primary starting point for DenseGen docs navigation.
 This section gives the shortest practical progression from basic run validation to event-driven operations.
 
 - Run **[TFBS baseline tutorial](docs/tutorials/demo_tfbs_baseline.md)** first, then **[sampling baseline tutorial](docs/tutorials/demo_sampling_baseline.md)**.
-- Run **[constitutive sigma panel study tutorial](docs/tutorials/study_constitutive_sigma_panel.md)** for plan-template expansion behavior.
+- Run **[constitutive sigma panel study tutorial](docs/tutorials/study_constitutive_sigma_panel.md)** for fixed-element matrix expansion behavior.
 - Run **[stress ethanol and ciprofloxacin study tutorial](docs/tutorials/study_stress_ethanol_cipro.md)**, then **[DenseGen to USR to Notify tutorial](docs/tutorials/demo_usr_notify.md)** for watcher flows.
 
 ### Tutorials
@@ -19,7 +19,7 @@ This section is for progressive walkthroughs that run end-to-end in workspace or
 
 - Follow the **[TFBS baseline tutorial](docs/tutorials/demo_tfbs_baseline.md)** for `demo_tfbs_baseline` (smallest lifecycle run).
 - Follow the **[sampling baseline tutorial](docs/tutorials/demo_sampling_baseline.md)** for `demo_sampling_baseline` (Stage-A mining and Stage-B sampling).
-- Follow the **[constitutive sigma panel study tutorial](docs/tutorials/study_constitutive_sigma_panel.md)** for `study_constitutive_sigma_panel` (combinatorial promoter panel workflow).
+- Follow the **[constitutive sigma panel study tutorial](docs/tutorials/study_constitutive_sigma_panel.md)** for `study_constitutive_sigma_panel` (combinatorial promoter panel workflow with LacI/AraC background exclusion).
 - Follow the **[stress ethanol and ciprofloxacin study tutorial](docs/tutorials/study_stress_ethanol_cipro.md)** for `study_stress_ethanol_cipro` (three-plan campaign baseline).
 - Follow the **[DenseGen to USR to Notify tutorial](docs/tutorials/demo_usr_notify.md)** for event-driven operations.
 
@@ -42,6 +42,12 @@ This section is for exact commands, schema definitions, and output contracts.
 - Use the **[CLI reference](docs/reference/cli.md)** for command and flag contracts.
 - Use the **[config reference](docs/reference/config.md)** for schema keys, strict validation, and examples.
 - Use the **[outputs reference](docs/reference/outputs.md)** for artifact and event contracts.
+
+### Public interface contract
+This section defines what callers should import and what remains internal.
+
+- Import DenseGen Python APIs from `dnadesign.densegen` package root (for example `app`, `load_config`, `resolve_run_root`, `PLOT_SPECS`, `densegen_notebook_render_contract`).
+- Treat nested implementation modules as internal details, not stable external contracts.
 
 ### Developer notes
 This section is for maintainers working on DenseGen internals.

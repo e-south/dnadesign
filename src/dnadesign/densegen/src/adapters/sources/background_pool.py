@@ -21,7 +21,7 @@ from typing import Iterable
 import numpy as np
 import pandas as pd
 
-from dnadesign.cruncher.io.parsers.meme import parse_meme_file
+from dnadesign.cruncher.meme import parse_meme_file
 
 from ...config import BackgroundPoolSamplingConfig, resolve_relative_path
 from ...core.artifacts.ids import hash_label_motif, hash_tfbs_id
@@ -162,28 +162,65 @@ def _filter_forbidden_kmers(sequences: Iterable[str], kmers: list[str]) -> list[
     return filtered
 
 
-def _expand_forbidden_kmers(
-    kmers: list[str],
+def _append_forbidden_kmer(
+    out: list[str],
+    seen: set[str],
     *,
+    seq: str,
+    include_reverse_complements: bool,
+    strands: str,
+) -> None:
+    text = str(seq).strip().upper()
+    if not text:
+        return
+    if text not in seen:
+        seen.add(text)
+        out.append(text)
+    if include_reverse_complements or str(strands).strip().lower() == "both":
+        rc = reverse_complement(text)
+        if rc not in seen:
+            seen.add(rc)
+            out.append(rc)
+
+
+def _expand_forbidden_kmers(
+    entries: list[object],
+    *,
+    motif_sets: dict[str, dict[str, str]],
     include_reverse_complements: bool,
     strands: str,
 ) -> list[str]:
-    if not kmers:
+    if not entries:
         return []
     out: list[str] = []
     seen: set[str] = set()
-    for motif in kmers:
-        seq = str(motif).strip().upper()
-        if not seq:
+    for entry in entries:
+        if isinstance(entry, str):
+            _append_forbidden_kmer(
+                out,
+                seen,
+                seq=entry,
+                include_reverse_complements=bool(include_reverse_complements),
+                strands=str(strands),
+            )
             continue
-        if seq not in seen:
-            seen.add(seq)
-            out.append(seq)
-        if include_reverse_complements or str(strands).strip().lower() == "both":
-            rc = reverse_complement(seq)
-            if rc not in seen:
-                seen.add(rc)
-                out.append(rc)
+        patterns_from_sets = list(getattr(entry, "patterns_from_motif_sets", []) or [])
+        include_rc = bool(getattr(entry, "include_reverse_complements", False))
+        entry_strands = str(getattr(entry, "strands", "forward"))
+        for set_name in patterns_from_sets:
+            motif_set = motif_sets.get(set_name)
+            if motif_set is None:
+                raise ValueError(
+                    f"background_pool.sampling.filters.forbid_kmers references unknown motif set: {set_name}"
+                )
+            for motif in motif_set.values():
+                _append_forbidden_kmer(
+                    out,
+                    seen,
+                    seq=str(motif),
+                    include_reverse_complements=include_rc,
+                    strands=entry_strands,
+                )
     return out
 
 
@@ -289,6 +326,7 @@ class BackgroundPoolDataSource(BaseDataSource):
     cfg_path: Path
     sampling: BackgroundPoolSamplingConfig
     input_name: str
+    motif_sets: dict[str, dict[str, str]]
     pwm_inputs: list[object]
 
     def load_data(self, *, rng=None, outputs_root: Path | None = None, run_id: str | None = None):
@@ -310,6 +348,7 @@ class BackgroundPoolDataSource(BaseDataSource):
         forbid_kmers = list(filters.forbid_kmers or [])
         forbid_kmers_expanded = _expand_forbidden_kmers(
             forbid_kmers,
+            motif_sets=dict(self.motif_sets or {}),
             include_reverse_complements=bool(getattr(filters, "include_reverse_complements", False)),
             strands=str(getattr(filters, "strands", "forward")),
         )

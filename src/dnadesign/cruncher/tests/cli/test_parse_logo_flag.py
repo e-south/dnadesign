@@ -161,3 +161,118 @@ def test_parse_requires_force_overwrite_when_outputs_exist(tmp_path: Path) -> No
     )
     manifest = json.loads(parse_manifest_path(parse_dir).read_text())
     assert manifest.get("parse_signature")
+
+
+def test_parse_requires_lock_with_config_flag_hint(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    config = {
+        "cruncher": {
+            "schema_version": 3,
+            "workspace": {"out_dir": "runs", "regulator_sets": [["lexA"]]},
+            "catalog": {"root": str(catalog_root), "pwm_source": "matrix"},
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+    cfg = load_config(config_path)
+
+    with pytest.raises(ValueError) as exc_info:
+        run_parse(cfg, config_path)
+
+    message = str(exc_info.value)
+    assert "Lockfile is required" in message
+    assert f"cruncher lock -c {config_path.name}" in message
+
+
+def test_parse_reports_stale_lock_entries_with_actionable_hint(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    entry = CatalogEntry(
+        source="regulondb",
+        motif_id="RBM1",
+        tf_name="lexA",
+        kind="PFM",
+        has_matrix=True,
+        matrix_source="alignment",
+    )
+    CatalogIndex(entries={entry.key: entry}).save(catalog_root)
+
+    valid_motif_path = catalog_root / "normalized" / "motifs" / "regulondb" / "RBM1.json"
+    stale_motif_path = catalog_root / "normalized" / "motifs" / "regulondb" / "RBM_STALE.json"
+    _write_motif(valid_motif_path, source="regulondb", motif_id="RBM1", tf_name="lexA")
+    _write_motif(stale_motif_path, source="regulondb", motif_id="RBM_STALE", tf_name="lexA")
+
+    config = {
+        "cruncher": {
+            "schema_version": 3,
+            "workspace": {"out_dir": "runs", "regulator_sets": [["lexA"]]},
+            "catalog": {"root": str(catalog_root), "pwm_source": "matrix"},
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+    cfg = load_config(config_path)
+
+    lock_path = resolve_lock_path(config_path)
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path.write_text(
+        json.dumps(
+            {
+                "pwm_source": "matrix",
+                "resolved": {"lexA": {"source": "regulondb", "motif_id": "RBM_STALE", "sha256": "good"}},
+            }
+        )
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Lockfile references motifs missing from catalog index",
+    ):
+        run_parse(cfg, config_path)
+
+
+def test_parse_rejects_lock_sources_outside_source_preference(tmp_path: Path) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    entry = CatalogEntry(
+        source="fallback_source",
+        motif_id="RBM1",
+        tf_name="lexA",
+        kind="PFM",
+        has_matrix=True,
+        matrix_source="alignment",
+    )
+    CatalogIndex(entries={entry.key: entry}).save(catalog_root)
+
+    motif_path = catalog_root / "normalized" / "motifs" / "fallback_source" / "RBM1.json"
+    _write_motif(motif_path, source="fallback_source", motif_id="RBM1", tf_name="lexA")
+
+    config = {
+        "cruncher": {
+            "schema_version": 3,
+            "workspace": {"out_dir": "runs", "regulator_sets": [["lexA"]]},
+            "catalog": {
+                "root": str(catalog_root),
+                "pwm_source": "matrix",
+                "source_preference": ["preferred_source"],
+            },
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+    cfg = load_config(config_path)
+
+    lock_path = resolve_lock_path(config_path)
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path.write_text(
+        json.dumps(
+            {
+                "pwm_source": "matrix",
+                "resolved": {"lexA": {"source": "fallback_source", "motif_id": "RBM1", "sha256": "good"}},
+            }
+        )
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Lockfile sources do not match catalog.source_preference",
+    ):
+        run_parse(cfg, config_path)

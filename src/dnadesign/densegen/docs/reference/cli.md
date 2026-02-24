@@ -198,7 +198,8 @@ Key options:
 
 Notes:
 - If prior run outputs exist, default behavior is resume-like unless `--fresh` is set.
-- Missing/stale Stage-A pools are rebuilt automatically.
+- Missing/stale Stage-A pools for plan-active `include_inputs` are rebuilt automatically.
+- Stale pools for configured-but-unused inputs are ignored with an explicit warning.
 - For FIMO-backed inputs, ensure `fimo` is available (for example via `pixi run ...`).
 
 ### `dense campaign-reset`
@@ -248,9 +249,11 @@ Launches a DenseGen marimo notebook.
 
 Key options:
 - `--path PATH` (default: `<run_root>/outputs/notebooks/densegen_run_overview.py`)
-- `--mode run|edit` (default: `edit`)
+- `--mode run|edit` (default: `run`)
 - `--headless` (run mode only)
 - `--open/--no-open` (default: `--open`; run mode only)
+- `--reuse-server/--no-reuse-server` (default: `--no-reuse-server`; run mode only)
+- `--open-timeout FLOAT` (default: `30.0`; run mode with `--open` only)
 - `--host TEXT` (default: `127.0.0.1`)
 - `--port INTEGER` (default: `2718`)
 - `--absolute`
@@ -259,9 +262,19 @@ Key options:
 Notes:
 - `--mode run` launches a read-only notebook app for analysis.
 - `--mode edit` launches editable marimo cells.
-- Default launch mode is `edit`; use `--mode run` for read-only serving.
+- Default launch mode is `run`; use `--mode edit` when editing notebook cells.
 - `--headless` suppresses browser auto-open for remote/non-GUI shells when `--mode run` is used.
 - In run mode, `--no-open` maps to headless marimo launch.
-- In run mode with default `--open`, marimo handles browser auto-open and DenseGen prints `http://<host>:<port>`.
+- In run mode with default `--no-reuse-server`, if `--host:--port` is already serving the same notebook file, DenseGen reuses that server and prints the existing URL.
+- If `--host:--port` is serving a different notebook, DenseGen starts a fresh notebook server on a free port and prints the new URL.
+- Use `--reuse-server` to attach to an already-running notebook server on `--host:--port`.
+- `--open-timeout` must be greater than `0` and is only valid for `--mode run` with `--open`.
+- In run mode with default `--open`, DenseGen prints `http://<host>:<port>`, waits for notebook readiness, then opens the browser tab.
+- If readiness is not detected before the open timeout, DenseGen leaves the server running and prints a manual-open warning instead of opening an unreachable page.
+- DenseGen forwards termination signals (`SIGINT`, `SIGTERM`, `SIGHUP`) to the marimo child process, so stopping `dense notebook run` also stops the notebook server.
+- DenseGen prints an explicit lifecycle hint in run mode; keep the command running while using the notebook and stop with `Ctrl+C`.
+- Browser URLs are host-normalized for usability:
+  - wildcard bind hosts (`0.0.0.0`, `::`) print/open via `localhost`
+  - IPv6 literal hosts are URL-encoded as `http://[::1]:<port>`
 - `--open/--no-open` is rejected when `--mode edit` is selected.
 - `--host` must be non-empty and `--port` must be within `1-65535`.

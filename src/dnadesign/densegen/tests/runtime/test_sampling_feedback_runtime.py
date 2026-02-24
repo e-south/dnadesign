@@ -154,7 +154,7 @@ def test_runtime_iterative_sampling_uses_failure_feedback_across_libraries(tmp_p
                 "plan": [
                     {
                         "name": "default",
-                        "quota": 1,
+                        "sequences": 1,
                         "sampling": {"include_inputs": ["demo"]},
                         "regulator_constraints": {"groups": []},
                     }

@@ -28,13 +28,13 @@ densegen:
       unique_binding_cores: true
     plan:
       - name: baseline
-        quota: 9
+        sequences: 9
         sampling:
           include_inputs: [basic_sites]
         regulator_constraints:
           groups: []
       - name: baseline_sigma70
-        quota: 6
+        sequences: 6
         sampling:
           include_inputs: [basic_sites]
         fixed_elements:

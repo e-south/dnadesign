@@ -26,5 +26,5 @@ def load_config(path: Path) -> CruncherConfig:
     if payload.get("schema_version") != 3:
         raise ValueError("Config schema v3 required (schema_version: 3)")
     cfg = CruncherRoot.model_validate(raw).cruncher
-    # catalog_root remains relative; app orchestration resolves against the cruncher repo root
+    # catalog_root remains relative; app orchestration resolves against the workspace root
     return cfg

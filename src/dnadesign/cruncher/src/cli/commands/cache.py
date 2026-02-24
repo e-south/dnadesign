@@ -23,10 +23,18 @@ from dnadesign.cruncher.cli.config_resolver import (
     resolve_config_path,
 )
 from dnadesign.cruncher.config.load import load_config
-from dnadesign.cruncher.utils.paths import resolve_catalog_root
+from dnadesign.cruncher.utils.paths import resolve_catalog_root, resolve_workspace_root
 
 app = typer.Typer(no_args_is_help=True, help="Inspect cache stats or verify cached artifacts.")
 console = Console()
+
+
+def _load_config_or_exit(config_path: Path):
+    try:
+        return load_config(config_path)
+    except (ValueError, FileNotFoundError) as exc:
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1) from exc
 
 
 def _find_generated_cache_dirs(
@@ -82,7 +90,7 @@ def _resolve_clean_root(
             raise ValueError(f"--root must point to an existing directory: {root}")
         return root
     if scope == "workspace":
-        return config_path.parent.resolve()
+        return resolve_workspace_root(config_path)
     if scope == "package":
         return _package_root()
     return _repo_root_from(_package_root())
@@ -107,7 +115,7 @@ def stats(
     except ConfigResolutionError as exc:
         console.print(str(exc))
         raise typer.Exit(code=1)
-    cfg = load_config(config_path)
+    cfg = _load_config_or_exit(config_path)
     catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     stats = catalog_stats(catalog_root)
     table = Table(title="Cache stats", header_style="bold")
@@ -138,7 +146,7 @@ def verify(
     except ConfigResolutionError as exc:
         console.print(str(exc))
         raise typer.Exit(code=1)
-    cfg = load_config(config_path)
+    cfg = _load_config_or_exit(config_path)
     catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     issues = verify_cache(catalog_root)
     if not issues:

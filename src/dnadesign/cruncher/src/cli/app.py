@@ -16,7 +16,6 @@ import typer
 
 from dnadesign.cruncher.cli.commands.analyze import analyze as analyze_cmd
 from dnadesign.cruncher.cli.commands.cache import app as cache_app
-from dnadesign.cruncher.cli.commands.campaign import app as campaign_app
 from dnadesign.cruncher.cli.commands.catalog import app as catalog_app
 from dnadesign.cruncher.cli.commands.config import app as config_app
 from dnadesign.cruncher.cli.commands.discover import app as discover_app
@@ -27,10 +26,12 @@ from dnadesign.cruncher.cli.commands.lock import lock as lock_cmd
 from dnadesign.cruncher.cli.commands.notebook import notebook as notebook_cmd
 from dnadesign.cruncher.cli.commands.optimizers import app as optimizers_app
 from dnadesign.cruncher.cli.commands.parse import parse as parse_cmd
+from dnadesign.cruncher.cli.commands.portfolio import app as portfolio_app
 from dnadesign.cruncher.cli.commands.runs import app as runs_app
 from dnadesign.cruncher.cli.commands.sample import sample as sample_cmd
 from dnadesign.cruncher.cli.commands.sources import app as sources_app
 from dnadesign.cruncher.cli.commands.status import status as status_cmd
+from dnadesign.cruncher.cli.commands.study import app as study_app
 from dnadesign.cruncher.cli.commands.targets import app as targets_app
 from dnadesign.cruncher.cli.commands.workspaces import app as workspaces_app
 from dnadesign.cruncher.cli.config_resolver import CONFIG_ENV_VAR, WORKSPACE_ENV_VAR
@@ -100,12 +101,6 @@ app.command(
     help="Generate an optional marimo notebook for analysis.",
     short_help="Generate a marimo notebook.",
 )(notebook_cmd)
-app.add_typer(
-    campaign_app,
-    name="campaign",
-    help="Generate or summarize regulator campaigns.",
-    short_help="Generate campaign configs.",
-)
 app.add_typer(
     fetch_app,
     name="fetch",
@@ -180,6 +175,18 @@ app.add_typer(
     name="workspaces",
     help="List discoverable workspaces.",
     short_help="List workspaces.",
+)
+app.add_typer(
+    study_app,
+    name="study",
+    help="Run and summarize sweep studies with aggregate tradeoff plots.",
+    short_help="Run sweep studies.",
+)
+app.add_typer(
+    portfolio_app,
+    name="portfolio",
+    help="Aggregate selected workspace runs into one handoff package.",
+    short_help="Run portfolio aggregation.",
 )
 
 if __name__ == "__main__":
