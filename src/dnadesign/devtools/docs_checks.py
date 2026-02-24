@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/devtools/docs_checks.py
 
-Validates docs markdown naming and local relative links for CI checks.
+Validates docs markdown naming, local links, and public interface doc contracts.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -85,6 +85,17 @@ _EXEC_PLAN_REQUIRED_SECTIONS = (
     "Concrete Steps",
     "Validation and Acceptance",
 )
+PUBLIC_INTERFACE_DOC_PATHS = (
+    "src/dnadesign/cruncher/docs/demos",
+    "src/dnadesign/cruncher/docs/reference/cli.md",
+    "src/dnadesign/cruncher/workspaces",
+    "src/dnadesign/densegen/README.md",
+    "src/dnadesign/densegen/docs/howto",
+    "src/dnadesign/densegen/docs/tutorials",
+    "src/dnadesign/densegen/workspaces/README.md",
+)
+ABSOLUTE_DOC_PATH_TOKENS = ("/Users/", "/private/", "/tmp/", "/home/", "/var/", "C:\\")
+INTERNAL_SOURCE_INREACH_PATTERN = re.compile(r"(?:dnadesign\.[a-z0-9_]+\.src\.|src/dnadesign/[a-z0-9_-]+/src/)")
 
 
 def _collect_markdown_files(repo_root: Path) -> tuple[list[Path], list[Path]]:
@@ -557,6 +568,40 @@ def _extract_section_bodies(text: str) -> dict[str, str]:
     return {name: "\n".join(lines) for name, lines in sections.items()}
 
 
+def _collect_public_interface_markdown_files(repo_root: Path) -> list[Path]:
+    files: set[Path] = set()
+    for rel in PUBLIC_INTERFACE_DOC_PATHS:
+        target = repo_root / rel
+        if not target.exists():
+            continue
+        if target.is_file() and target.suffix == ".md":
+            files.add(target)
+            continue
+        if target.is_dir():
+            for path in target.rglob("*.md"):
+                files.add(path)
+    return sorted(files)
+
+
+def _find_public_interface_doc_contract_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    for path in _collect_public_interface_markdown_files(repo_root):
+        text = path.read_text(encoding="utf-8")
+        for token in ABSOLUTE_DOC_PATH_TOKENS:
+            if token in text:
+                issues.append(
+                    f"{path}: absolute filesystem path token '{token}' is not allowed; "
+                    "use workspace-relative commands/paths."
+                )
+                break
+        if INTERNAL_SOURCE_INREACH_PATTERN.search(text):
+            issues.append(
+                f"{path}: internal source inreach detected ('dnadesign.<tool>.src.*' or "
+                "'src/dnadesign/<tool>/src/'); use public CLI/artifact contracts."
+            )
+    return issues
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Check docs markdown naming and local links.")
     parser.add_argument("--repo-root", type=Path, default=Path("."))
@@ -604,6 +649,13 @@ def main(argv: list[str] | None = None) -> int:
     if runbook_metadata_issues:
         print("Docs runbook metadata check failed:")
         for issue in runbook_metadata_issues:
+            print(f" - {issue}")
+        return 1
+
+    interface_doc_issues = _find_public_interface_doc_contract_issues(repo_root)
+    if interface_doc_issues:
+        print("Public interface docs contract check failed:")
+        for issue in interface_doc_issues:
             print(f" - {issue}")
         return 1
 

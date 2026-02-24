@@ -780,6 +780,114 @@ def test_main_fails_when_codecov_component_default_rules_are_missing(tmp_path: P
     assert rc == 1
 
 
+def test_main_fails_when_public_interface_docs_use_absolute_paths(tmp_path: Path) -> None:
+    today = dt.date.today().isoformat()
+    _write(tmp_path / "docs" / "index.md", "# Index\n")
+    _write(
+        tmp_path / "ARCHITECTURE.md",
+        f"# ARCHITECTURE\n\n**Type:** system-of-record\n**Owner:** maintainers\n**Last verified:** {today}\n",
+    )
+    _write(tmp_path / "src" / "dnadesign" / "densegen" / "__init__.py", "")
+    _write(
+        tmp_path / "src" / "dnadesign" / "densegen" / "docs" / "tutorials" / "demo.md",
+        "Use `uv run cruncher catalog export-densegen --densegen-workspace /tmp/demo`.\n",
+    )
+    _write(
+        tmp_path / "README.md",
+        "\n".join(
+            [
+                "# dnadesign",
+                "",
+                "## Available tools",
+                "",
+                "| Tool | Description | Coverage |",
+                "| --- | --- | --- |",
+                "| [**densegen**](src/dnadesign/densegen) | densegen tool | "
+                "[Codecov](https://codecov.io/gh/example/repo?component=densegen) |",
+                "",
+            ]
+        ),
+    )
+    _write(
+        tmp_path / "codecov.yml",
+        "\n".join(
+            [
+                "component_management:",
+                "  default_rules:",
+                "    statuses:",
+                "      - type: project",
+                "        target: auto",
+                "        threshold: 0.5%",
+                "        if_ci_failed: error",
+                "        if_not_found: failure",
+                "  individual_components:",
+                "    - component_id: densegen",
+                "      name: densegen",
+                "      paths:",
+                "        - src/dnadesign/densegen/**",
+                "",
+            ]
+        ),
+    )
+
+    rc = main(["--repo-root", str(tmp_path)])
+    assert rc == 1
+
+
+def test_main_fails_when_public_interface_docs_use_internal_source_inreach(tmp_path: Path) -> None:
+    today = dt.date.today().isoformat()
+    _write(tmp_path / "docs" / "index.md", "# Index\n")
+    _write(
+        tmp_path / "ARCHITECTURE.md",
+        f"# ARCHITECTURE\n\n**Type:** system-of-record\n**Owner:** maintainers\n**Last verified:** {today}\n",
+    )
+    _write(tmp_path / "src" / "dnadesign" / "densegen" / "__init__.py", "")
+    _write(
+        tmp_path / "src" / "dnadesign" / "densegen" / "docs" / "howto" / "handoff.md",
+        "Call `python -m dnadesign.cruncher.src.cli.app` directly.\n",
+    )
+    _write(
+        tmp_path / "README.md",
+        "\n".join(
+            [
+                "# dnadesign",
+                "",
+                "## Available tools",
+                "",
+                "| Tool | Description | Coverage |",
+                "| --- | --- | --- |",
+                "| [**densegen**](src/dnadesign/densegen) | densegen tool | "
+                "[Codecov](https://codecov.io/gh/example/repo?component=densegen) |",
+                "",
+            ]
+        ),
+    )
+    _write(
+        tmp_path / "codecov.yml",
+        "\n".join(
+            [
+                "component_management:",
+                "  default_rules:",
+                "    statuses:",
+                "      - type: project",
+                "        target: auto",
+                "        threshold: 0.5%",
+                "        if_ci_failed: error",
+                "        if_not_found: failure",
+                "  individual_components:",
+                "    - component_id: densegen",
+                "      name: densegen",
+                "      paths:",
+                "        - src/dnadesign/densegen/**",
+                "",
+            ]
+        ),
+    )
+
+    rc = main(["--repo-root", str(tmp_path)])
+    assert rc == 1
+
+
 def test_main_passes_when_codecov_components_match_repo_tools(tmp_path: Path) -> None:
     today = dt.date.today().isoformat()
     _write(tmp_path / "docs" / "index.md", "# Index\n")
