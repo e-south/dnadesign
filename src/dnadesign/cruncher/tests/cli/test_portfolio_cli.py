@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import os
+import re
 import tempfile
 from pathlib import Path
 
@@ -21,6 +22,12 @@ import dnadesign.cruncher.cli.commands.portfolio as portfolio_cli
 from dnadesign.cruncher.cli.app import app
 
 runner = CliRunner()
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mK]")
+
+
+def combined_output(result) -> str:
+    stderr = getattr(result, "stderr", "")
+    return ANSI_RE.sub("", f"{result.output}{stderr}")
 
 
 def test_root_help_includes_portfolio_group() -> None:
@@ -32,7 +39,7 @@ def test_root_help_includes_portfolio_group() -> None:
 def test_portfolio_run_requires_spec_option() -> None:
     result = runner.invoke(app, ["portfolio", "run"])
     assert result.exit_code != 0
-    assert "--spec" in result.output
+    assert "--spec" in combined_output(result)
 
 
 def test_portfolio_run_spec_path_must_be_file_not_directory(tmp_path: Path) -> None:
@@ -423,7 +430,7 @@ def test_portfolio_run_prompt_prepare_ready_policy_requires_tty(monkeypatch) -> 
             env={"INIT_CWD": str(workspace)},
         )
         assert result.exit_code == 1
-        assert "--prepare-ready skip|rerun" in result.output
+        assert "--prepare-ready skip|rerun" in combined_output(result)
 
 
 def test_portfolio_run_non_tty_does_not_construct_progress(monkeypatch, tmp_path: Path) -> None:
@@ -471,7 +478,7 @@ def test_portfolio_run_non_tty_does_not_construct_progress(monkeypatch, tmp_path
         env={"INIT_CWD": str(workspace)},
     )
     assert result.exit_code == 1
-    assert "--force-overwrite" in result.output
+    assert "--force-overwrite" in combined_output(result)
 
 
 def test_run_with_noninteractive_env_sets_and_restores_value(monkeypatch) -> None:
@@ -499,7 +506,7 @@ def test_run_with_noninteractive_env_unsets_when_not_preexisting(monkeypatch) ->
 def test_portfolio_show_requires_run_option() -> None:
     result = runner.invoke(app, ["portfolio", "show"])
     assert result.exit_code != 0
-    assert "--run" in result.output
+    assert "--run" in combined_output(result)
 
 
 def test_portfolio_show_prints_source_selected_elite_counts(monkeypatch, tmp_path: Path) -> None:

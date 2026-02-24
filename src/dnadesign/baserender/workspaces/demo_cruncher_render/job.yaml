@@ -18,6 +18,7 @@ render:
     preset: presentation_default
     overrides:
       figure_scale: 1.60
+      padding_y: 24.0
       overlay_align: center
       layout:
         outer_pad_cells: 0.20

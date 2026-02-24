@@ -17,11 +17,6 @@ import pandas as pd
 import pytest
 
 from dnadesign.baserender import cruncher_showcase_style_overrides
-from dnadesign.baserender.src.config import resolve_style
-from dnadesign.baserender.src.render.effects.motif_logo import (
-    compute_motif_logo_geometry,
-)
-from dnadesign.baserender.src.render.layout import compute_layout
 from dnadesign.cruncher.analysis.plots.elites_showcase import (
     _overlay_text,
     build_elites_showcase_records,
@@ -118,16 +113,15 @@ def test_elites_showcase_reverse_hits_match_antisense_positioning() -> None:
     )
     assert len(records) == 1
     record = records[0]
-    style = resolve_style(preset=None, overrides=cruncher_showcase_style_overrides())
-    layout = compute_layout(record, style)
-    geometry = compute_motif_logo_geometry(record=record, effect_index=0, layout=layout, style=style)
-
-    expected = np.asarray(matrix, dtype=float)
-    expected = np.asarray(expected[::-1], dtype=float)
-    expected = expected / expected.sum(axis=1, keepdims=True)
-    got = np.asarray(geometry.matrix, dtype=float)
-    assert np.allclose(got, expected)
-    assert geometry.observed == "TATGTC"
+    assert len(record.features) == 1
+    feature = record.features[0]
+    assert feature.span.strand == "rev"
+    assert feature.label == "CTGTAT"
+    assert len(record.effects) == 1
+    effect = record.effects[0]
+    assert effect.kind == "motif_logo"
+    assert effect.target == {"feature_id": feature.id}
+    assert np.allclose(np.asarray(effect.params["matrix"], dtype=float), np.asarray(matrix, dtype=float))
 
 
 def test_elites_showcase_style_uses_match_window_coloring() -> None:

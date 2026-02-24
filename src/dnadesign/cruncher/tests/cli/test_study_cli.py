@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -28,6 +29,12 @@ from dnadesign.cruncher.study.manifest import (
 )
 
 runner = CliRunner()
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mK]")
+
+
+def combined_output(result) -> str:
+    stderr = getattr(result, "stderr", "")
+    return ANSI_RE.sub("", f"{result.output}{stderr}")
 
 
 def test_root_help_includes_study_group() -> None:
@@ -39,7 +46,7 @@ def test_root_help_includes_study_group() -> None:
 def test_study_run_requires_spec_option() -> None:
     result = runner.invoke(app, ["study", "run"])
     assert result.exit_code != 0
-    assert "--spec" in result.output
+    assert "--spec" in combined_output(result)
 
 
 def test_study_run_resolves_relative_spec_from_init_cwd(tmp_path: Path, monkeypatch) -> None:
@@ -150,7 +157,7 @@ def test_study_help_includes_clean_command() -> None:
 def test_study_list_help_includes_workspace_option() -> None:
     result = runner.invoke(app, ["study", "list", "--help"])
     assert result.exit_code == 0
-    assert "--workspace" in result.output
+    assert "--workspace" in combined_output(result)
 
 
 def test_study_summarize_allow_partial_nonzero_policy_exits_nonzero(monkeypatch) -> None:
