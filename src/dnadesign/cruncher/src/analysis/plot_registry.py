@@ -27,12 +27,12 @@ class PlotSpec:
 
 PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
-        "chain_trajectory_scatter",
-        "Chain trajectory scatter",
+        "elite_score_space_context",
+        "Elite score-space context",
         ("sequences",),
-        ("chain_trajectory_scatter.{ext}",),
+        ("elite_score_space_context.{ext}",),
         "summary",
-        "Best-so-far chain lineage updates in TF score-space with baseline and selected elite overlays.",
+        "Selected elite score-space context with random baseline and theoretical consensus maxima references.",
     ),
     PlotSpec(
         "chain_trajectory_sweep",
@@ -45,10 +45,13 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
     PlotSpec(
         "elites_nn_distance",
         "Elite nearest-neighbor distance",
-        ("elites", "baseline_hits"),
+        ("elites",),
         ("elites_nn_distance.{ext}",),
         "summary",
-        "Elite diversity panel combining motif-core context with full-sequence distance diagnostics.",
+        (
+            "Elite diversity panel combining motif-core context with full-sequence distance diagnostics; "
+            "baseline context is included when baseline hits are available."
+        ),
     ),
     PlotSpec(
         "elites_showcase",

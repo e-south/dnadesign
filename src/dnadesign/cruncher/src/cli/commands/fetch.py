@@ -18,7 +18,6 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from dnadesign.cruncher.app.campaign_service import resolve_campaign_tf_names
 from dnadesign.cruncher.app.fetch_service import (
     fetch_motifs,
     fetch_sites,
@@ -38,7 +37,7 @@ from dnadesign.cruncher.ingest.sequence_provider import (
     SequenceProvider,
 )
 from dnadesign.cruncher.store.catalog_index import CatalogIndex
-from dnadesign.cruncher.utils.paths import resolve_catalog_root
+from dnadesign.cruncher.utils.paths import resolve_catalog_root, resolve_workspace_root
 
 app = typer.Typer(
     no_args_is_help=True,
@@ -168,16 +167,6 @@ def motifs(
     ),
     tf: List[str] = typer.Option([], "--tf", help="TF name to fetch (repeatable)."),
     motif_id: List[str] = typer.Option([], "--motif-id", help="Motif ID to fetch (repeatable)."),
-    campaign: Optional[str] = typer.Option(
-        None,
-        "--campaign",
-        help="Fetch TFs implied by a named campaign.",
-    ),
-    apply_selectors: bool = typer.Option(
-        True,
-        "--apply-selectors/--no-selectors",
-        help="Apply campaign selectors when resolving TFs (requires local catalog).",
-    ),
     source: str | None = typer.Option(
         None,
         "--source",
@@ -196,24 +185,15 @@ def motifs(
     except ConfigResolutionError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1)
-    cfg = load_config(config_path)
-    if campaign and (tf or motif_id):
-        raise typer.BadParameter("--campaign cannot be combined with --tf or --motif-id.")
+    try:
+        cfg = load_config(config_path)
+    except (ValueError, FileNotFoundError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1)
     effective_tfs = list(tf)
-    if campaign:
-        try:
-            effective_tfs = resolve_campaign_tf_names(
-                cfg=cfg,
-                config_path=config_path,
-                campaign_name=campaign,
-                apply_selectors=apply_selectors,
-                include_metrics=False,
-            )
-        except ValueError as exc:
-            raise typer.BadParameter(str(exc))
     if not effective_tfs and not motif_id:
         raise typer.BadParameter(
-            "Provide at least one --tf, --motif-id, or --campaign. Hint: cruncher fetch motifs --tf lexA <config>"
+            "Provide at least one --tf or --motif-id. Hint: cruncher fetch motifs --tf lexA <config>"
         )
     if offline and update:
         raise typer.BadParameter(
@@ -239,7 +219,7 @@ def motifs(
         catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
         if dry_run:
             if not effective_tfs:
-                raise typer.BadParameter("--dry-run requires at least one --tf or --campaign.")
+                raise typer.BadParameter("--dry-run requires at least one --tf.")
             rows: list[tuple[str, str, str, str]] = []
             for name in effective_tfs:
                 results = adapter.list_motifs(MotifQuery(tf_name=name, limit=limit))
@@ -302,16 +282,6 @@ def sites(
     ),
     tf: List[str] = typer.Option([], "--tf", help="TF name to fetch (repeatable)."),
     motif_id: List[str] = typer.Option([], "--motif-id", help="Motif ID to fetch (repeatable)."),
-    campaign: Optional[str] = typer.Option(
-        None,
-        "--campaign",
-        help="Fetch TFs implied by a named campaign.",
-    ),
-    apply_selectors: bool = typer.Option(
-        True,
-        "--apply-selectors/--no-selectors",
-        help="Apply campaign selectors when resolving TFs (requires local catalog).",
-    ),
     source: str | None = typer.Option(
         None,
         "--source",
@@ -344,24 +314,15 @@ def sites(
     except ConfigResolutionError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1)
-    cfg = load_config(config_path)
-    if campaign and (tf or motif_id):
-        raise typer.BadParameter("--campaign cannot be combined with --tf or --motif-id.")
+    try:
+        cfg = load_config(config_path)
+    except (ValueError, FileNotFoundError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1)
     effective_tfs = list(tf)
-    if campaign:
-        try:
-            effective_tfs = resolve_campaign_tf_names(
-                cfg=cfg,
-                config_path=config_path,
-                campaign_name=campaign,
-                apply_selectors=apply_selectors,
-                include_metrics=False,
-            )
-        except ValueError as exc:
-            raise typer.BadParameter(str(exc))
     if not effective_tfs and not motif_id and not hydrate:
         raise typer.BadParameter(
-            "Provide at least one --tf, --motif-id, or --campaign. Hint: cruncher fetch sites --tf lexA <config>"
+            "Provide at least one --tf or --motif-id. Hint: cruncher fetch sites --tf lexA <config>"
         )
     if offline and update:
         raise typer.BadParameter(
@@ -399,7 +360,7 @@ def sites(
         catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
         if dry_run:
             if not effective_tfs:
-                raise typer.BadParameter("--dry-run requires --tf or --campaign to resolve HT datasets.")
+                raise typer.BadParameter("--dry-run requires --tf to resolve HT datasets.")
             if not hasattr(adapter, "list_datasets"):
                 raise typer.BadParameter(f"Source '{source}' does not support dataset discovery.")
             rows: list[tuple[str, str, str, str, str]] = []
@@ -429,9 +390,10 @@ def sites(
             console.print(table)
             return
         genome_path = genome_fasta or cfg.ingest.genome_fasta
+        workspace_root = resolve_workspace_root(config_path)
         if genome_path is not None:
             if not genome_path.is_absolute():
-                genome_path = (config_path.parent / genome_path).resolve()
+                genome_path = (workspace_root / genome_path).resolve()
             provider = FastaSequenceProvider(
                 genome_path,
                 assembly_id=cfg.ingest.genome_assembly,
@@ -442,7 +404,7 @@ def sites(
         elif cfg.ingest.genome_source == "ncbi":
             genome_cache = cfg.ingest.genome_cache
             if not genome_cache.is_absolute():
-                genome_cache = (config_path.parent / genome_cache).resolve()
+                genome_cache = (workspace_root / genome_cache).resolve()
             provider = NCBISequenceProvider(
                 cache_root=genome_cache,
                 email=cfg.ingest.ncbi_email,

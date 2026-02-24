@@ -1,0 +1,234 @@
+portfolio:
+  schema_version: 3
+  name: master_all_workspaces
+  execution:
+    mode: prepare_then_aggregate
+    max_parallel_sources: 4
+  artifacts:
+    table_format: parquet
+    write_csv: false
+  sources:
+  - id: demo_multitf
+    workspace: ../demo_multitf
+    run_dir: outputs
+    study_spec: configs/studies/diversity_vs_score.study.yaml
+    prepare:
+      runbook: configs/runbook.yaml
+      step_ids:
+      - fetch_sites_demo_local_meme
+      - fetch_sites_regulondb
+      - fetch_sites_baer_chip_exo
+      - discover_motifs
+      - render_logos
+      - lock_targets
+      - parse_run
+      - sample_run
+      - analyze_summary
+      - export_sequences_latest
+  - id: demo_pairwise
+    workspace: ../demo_pairwise
+    run_dir: outputs
+    study_spec: configs/studies/diversity_vs_score.study.yaml
+    prepare:
+      runbook: configs/runbook.yaml
+      step_ids:
+      - fetch_sites_demo_local_meme
+      - fetch_sites_regulondb
+      - discover_motifs
+      - render_logos
+      - lock_targets
+      - parse_run
+      - sample_run
+      - analyze_summary
+      - export_sequences_latest
+  - id: multitf_baer_lexa_soxr
+    workspace: ../multitf_baer_lexa_soxr
+    run_dir: outputs
+    study_spec: configs/studies/diversity_vs_score.study.yaml
+    prepare:
+      runbook: configs/runbook.yaml
+      step_ids:
+      - fetch_sites_demo_local_meme
+      - fetch_sites_regulondb
+      - fetch_sites_baer_chip_exo
+      - discover_motifs
+      - render_logos
+      - lock_targets
+      - parse_run
+      - sample_run
+      - analyze_summary
+      - export_sequences_latest
+  - id: multitf_baer_lexa_soxr_soxs
+    workspace: ../multitf_baer_lexa_soxr_soxs
+    run_dir: outputs
+    study_spec: configs/studies/diversity_vs_score.study.yaml
+    prepare:
+      runbook: configs/runbook.yaml
+      step_ids:
+      - fetch_sites_demo_local_meme
+      - fetch_sites_regulondb
+      - fetch_sites_baer_chip_exo
+      - discover_motifs
+      - render_logos
+      - lock_targets
+      - parse_run
+      - sample_run
+      - analyze_summary
+      - export_sequences_latest
+  - id: multitf_cpxr_baer_lexa
+    workspace: ../multitf_cpxr_baer_lexa
+    run_dir: outputs
+    study_spec: configs/studies/diversity_vs_score.study.yaml
+    prepare:
+      runbook: configs/runbook.yaml
+      step_ids:
+      - fetch_sites_demo_local_meme
+      - fetch_sites_regulondb
+      - fetch_sites_baer_chip_exo
+      - discover_motifs
+      - render_logos
+      - lock_targets
+      - parse_run
+      - sample_run
+      - analyze_summary
+      - export_sequences_latest
+  - id: pairwise_baer_lexa
+    workspace: ../pairwise_baer_lexa
+    run_dir: outputs
+    study_spec: configs/studies/diversity_vs_score.study.yaml
+    prepare:
+      runbook: configs/runbook.yaml
+      step_ids:
+      - fetch_sites_demo_local_meme
+      - fetch_sites_regulondb
+      - fetch_sites_baer_chip_exo
+      - discover_motifs
+      - render_logos
+      - lock_targets
+      - parse_run
+      - sample_run
+      - analyze_summary
+      - export_sequences_latest
+  - id: pairwise_baer_soxr
+    workspace: ../pairwise_baer_soxr
+    run_dir: outputs
+    study_spec: configs/studies/diversity_vs_score.study.yaml
+    prepare:
+      runbook: configs/runbook.yaml
+      step_ids:
+      - fetch_sites_demo_local_meme
+      - fetch_sites_regulondb
+      - fetch_sites_baer_chip_exo
+      - discover_motifs
+      - render_logos
+      - lock_targets
+      - parse_run
+      - sample_run
+      - analyze_summary
+      - export_sequences_latest
+  - id: pairwise_cpxr_baer
+    workspace: ../pairwise_cpxr_baer
+    run_dir: outputs
+    study_spec: configs/studies/diversity_vs_score.study.yaml
+    prepare:
+      runbook: configs/runbook.yaml
+      step_ids:
+      - fetch_sites_demo_local_meme
+      - fetch_sites_regulondb
+      - fetch_sites_baer_chip_exo
+      - discover_motifs
+      - render_logos
+      - lock_targets
+      - parse_run
+      - sample_run
+      - analyze_summary
+      - export_sequences_latest
+  - id: pairwise_cpxr_lexa
+    workspace: ../pairwise_cpxr_lexa
+    run_dir: outputs
+    study_spec: configs/studies/diversity_vs_score.study.yaml
+    prepare:
+      runbook: configs/runbook.yaml
+      step_ids:
+      - fetch_sites_demo_local_meme
+      - fetch_sites_regulondb
+      - discover_motifs
+      - render_logos
+      - lock_targets
+      - parse_run
+      - sample_run
+      - analyze_summary
+      - export_sequences_latest
+  - id: pairwise_cpxr_soxr
+    workspace: ../pairwise_cpxr_soxr
+    run_dir: outputs
+    study_spec: configs/studies/diversity_vs_score.study.yaml
+    prepare:
+      runbook: configs/runbook.yaml
+      step_ids:
+      - fetch_sites_demo_local_meme
+      - fetch_sites_regulondb
+      - discover_motifs
+      - render_logos
+      - lock_targets
+      - parse_run
+      - sample_run
+      - analyze_summary
+      - export_sequences_latest
+  - id: pairwise_laci_arac
+    workspace: ../pairwise_laci_arac
+    run_dir: outputs
+    study_spec: configs/studies/diversity_vs_score.study.yaml
+    prepare:
+      runbook: configs/runbook.yaml
+      step_ids:
+      - fetch_sites_demo_local_meme
+      - fetch_sites_regulondb
+      - discover_motifs
+      - render_logos
+      - lock_targets
+      - parse_run
+      - sample_run
+      - analyze_summary
+      - export_sequences_latest
+  - id: pairwise_soxr_soxs
+    workspace: ../pairwise_soxr_soxs
+    run_dir: outputs
+    study_spec: configs/studies/diversity_vs_score.study.yaml
+    prepare:
+      runbook: configs/runbook.yaml
+      step_ids:
+      - fetch_sites_demo_local_meme
+      - fetch_sites_regulondb
+      - discover_motifs
+      - render_logos
+      - lock_targets
+      - parse_run
+      - sample_run
+      - analyze_summary
+      - export_sequences_latest
+  - id: project_tfs_lexa_cpxr_baer_rcda_lrp_fur_fnr_acrr_soxr_soxs
+    workspace: ../project_tfs_lexa_cpxr_baer_rcda_lrp_fur_fnr_acrr_soxr_soxs
+    run_dir: outputs
+    study_spec: configs/studies/diversity_vs_score.study.yaml
+    prepare:
+      runbook: configs/runbook.yaml
+      step_ids:
+      - fetch_sites_demo_local_meme
+      - fetch_sites_regulondb
+      - fetch_sites_baer_chip_exo
+      - discover_motifs
+      - render_logos
+      - lock_targets
+      - parse_run
+      - sample_run
+      - analyze_summary
+      - export_sequences_latest
+  studies:
+    ensure_specs:
+    - configs/studies/length_vs_score.study.yaml
+    - configs/studies/diversity_vs_score.study.yaml
+    sequence_length_table:
+      enabled: true
+      study_spec: configs/studies/length_vs_score.study.yaml
+      top_n_lengths: 6

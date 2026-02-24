@@ -20,6 +20,7 @@ from dnadesign.cruncher.cli.config_resolver import (
     WORKSPACE_ENV_VAR,
     WORKSPACE_ROOTS_ENV_VAR,
     ConfigResolutionError,
+    discover_workspaces,
     parse_config_and_value,
     resolve_config_path,
 )
@@ -39,34 +40,32 @@ def _clear_workspace_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_resolve_config_from_cwd_single(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
-    config_path = tmp_path / "cruncher.yaml"
+    config_path = tmp_path / "configs" / "config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text("cruncher: {}\n")
     caplog.set_level(logging.INFO, logger="dnadesign.cruncher.cli.config_resolver")
 
     resolved = resolve_config_path(None, cwd=tmp_path)
 
     assert resolved == config_path.resolve()
-    assert any("Using config from CWD: ./cruncher.yaml" in record.message for record in caplog.records)
+    assert any("Using config from CWD: ./configs/config.yaml" in record.message for record in caplog.records)
 
 
 def test_resolve_config_from_cwd_none(tmp_path: Path) -> None:
     with pytest.raises(ConfigResolutionError) as excinfo:
         resolve_config_path(None, cwd=tmp_path, log=False)
     message = str(excinfo.value)
-    assert "No config argument provided" in message
+    assert "No config argument provided and no workspace config was found" in message
     for name in CANDIDATE_CONFIG_FILENAMES:
         assert name in message
 
 
-def test_resolve_config_from_cwd_multiple(tmp_path: Path) -> None:
-    (tmp_path / "cruncher.yaml").write_text("cruncher: {}\n")
+def test_resolve_config_from_cwd_root_level_config_is_ignored(tmp_path: Path) -> None:
     (tmp_path / "config.yaml").write_text("cruncher: {}\n")
     with pytest.raises(ConfigResolutionError) as excinfo:
         resolve_config_path(None, cwd=tmp_path, log=False)
     message = str(excinfo.value)
-    assert "Multiple config files found" in message
-    assert "cruncher.yaml" in message
-    assert "config.yaml" in message
+    assert "No config argument provided and no workspace config was found" in message
 
 
 def test_resolve_config_explicit_path(tmp_path: Path) -> None:
@@ -84,12 +83,13 @@ def test_resolve_config_explicit_path_uses_init_cwd_when_cwd_diff(
     repo_root = tmp_path / "repo"
     workspace = repo_root / "workspaces" / "demo"
     workspace.mkdir(parents=True)
-    config_path = workspace / "config.yaml"
+    config_path = workspace / "configs" / "config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text("cruncher: {}\n")
     monkeypatch.setenv("INIT_CWD", str(workspace))
     monkeypatch.chdir(repo_root)
 
-    resolved = resolve_config_path(Path("config.yaml"), log=False)
+    resolved = resolve_config_path(Path("configs/config.yaml"), log=False)
 
     assert resolved == config_path.resolve()
 
@@ -103,7 +103,8 @@ def test_resolve_config_invalid_invocation_cwd_errors(tmp_path: Path, monkeypatc
 
 
 def test_parse_config_and_value_single_config_path_errors(tmp_path: Path) -> None:
-    config_path = tmp_path / "config.yaml"
+    config_path = tmp_path / "configs" / "config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text("cruncher: {}\n")
 
     with pytest.raises(ConfigResolutionError) as excinfo:
@@ -120,7 +121,8 @@ def test_parse_config_and_value_single_config_path_errors(tmp_path: Path) -> Non
 
 
 def test_parse_config_and_value_single_value_uses_cwd_config(tmp_path: Path) -> None:
-    config_path = tmp_path / "config.yaml"
+    config_path = tmp_path / "configs" / "config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text("cruncher: {}\n")
 
     resolved_config, value = parse_config_and_value(
@@ -138,7 +140,8 @@ def test_parse_config_and_value_single_value_uses_cwd_config(tmp_path: Path) -> 
 def _make_workspace(root: Path, name: str) -> Path:
     workspace_dir = root / name
     workspace_dir.mkdir(parents=True)
-    config_path = workspace_dir / "config.yaml"
+    config_path = workspace_dir / "configs" / "config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text("cruncher: {}\n")
     return config_path
 
@@ -147,7 +150,8 @@ def test_resolve_config_from_parent_dir(tmp_path: Path) -> None:
     parent = tmp_path / "parent"
     child = parent / "child"
     child.mkdir(parents=True)
-    config_path = parent / "config.yaml"
+    config_path = parent / "configs" / "config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text("cruncher: {}\n")
 
     resolved = resolve_config_path(None, cwd=child, log=False)
@@ -165,6 +169,23 @@ def test_resolve_config_single_workspace_auto_select(tmp_path: Path, monkeypatch
     resolved = resolve_config_path(None, cwd=tmp_path, log=False)
 
     assert resolved == config_path.resolve()
+
+
+def test_discover_workspaces_includes_root_when_root_is_workspace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = tmp_path / "demo_workspace"
+    workspace.mkdir()
+    config_path = workspace / "configs" / "config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text("cruncher: {}\n")
+    monkeypatch.setenv(WORKSPACE_ROOTS_ENV_VAR, str(workspace))
+
+    candidates = discover_workspaces(cwd=tmp_path)
+
+    assert len(candidates) == 1
+    assert candidates[0].name == "demo_workspace"
+    assert candidates[0].config_path == config_path.resolve()
 
 
 def test_resolve_config_multiple_workspaces_error_list(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

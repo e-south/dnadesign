@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from dnadesign.cruncher.app.analyze_workflow import _resolve_optimizer_stats
+from dnadesign.cruncher.app.analyze.optimizer_stats import _resolve_optimizer_stats
 
 
 def test_resolve_optimizer_stats_loads_move_stats_sidecar(tmp_path: Path) -> None:

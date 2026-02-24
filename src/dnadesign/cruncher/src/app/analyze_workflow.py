@@ -11,29 +11,20 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import gzip
-import json
 import logging
 import os
 import shutil
+from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
-import yaml
 
-from dnadesign.cruncher.analysis.consensus import compute_consensus_anchors
 from dnadesign.cruncher.analysis.diagnostics import summarize_sampling_diagnostics
 from dnadesign.cruncher.analysis.diversity import (
     compute_baseline_nn_distances,
-    compute_elite_distance_matrix,
-    compute_elites_full_sequence_nn_table,
-    compute_elites_nn_distance_table,
-    representative_elite_ids,
-    summarize_elite_distances,
 )
 from dnadesign.cruncher.analysis.fimo_concordance import build_fimo_concordance_table
-from dnadesign.cruncher.analysis.hits import load_baseline_hits, load_elites_hits
 from dnadesign.cruncher.analysis.layout import (
     analysis_manifest_path,
     analysis_plot_path,
@@ -47,16 +38,13 @@ from dnadesign.cruncher.analysis.layout import (
     summary_path,
     table_manifest_path,
 )
-from dnadesign.cruncher.analysis.mmr_sweep import run_mmr_sweep
+from dnadesign.cruncher.analysis.mmr_sweep_service import run_mmr_sweep_for_run
 from dnadesign.cruncher.analysis.objective import compute_objective_components
 from dnadesign.cruncher.analysis.overlap import compute_overlap_tables
-from dnadesign.cruncher.analysis.parquet import read_parquet, write_parquet
 from dnadesign.cruncher.analysis.plot_registry import PLOT_SPECS
 from dnadesign.cruncher.analysis.report import build_report_payload, write_report_json, write_report_md
 from dnadesign.cruncher.analysis.trajectory import (
-    add_raw_llr_objective,
     build_chain_trajectory_points,
-    build_trajectory_points,
 )
 from dnadesign.cruncher.app.analyze.archive import _prune_latest_analysis_artifacts
 from dnadesign.cruncher.app.analyze.manifests import build_analysis_manifests
@@ -66,24 +54,46 @@ from dnadesign.cruncher.app.analyze.metadata import (
     _load_pwms_from_config,
     _resolve_sample_meta,
 )
+from dnadesign.cruncher.app.analyze.optimizer_stats import _resolve_optimizer_stats
+from dnadesign.cruncher.app.analyze.outputs import (
+    build_summary_payload,
+    build_table_artifacts,
+    build_table_entries,
+)
 from dnadesign.cruncher.app.analyze.plan import resolve_analysis_plan
-from dnadesign.cruncher.app.run_service import get_run, list_runs, load_run_status
-from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json, atomic_write_yaml
+from dnadesign.cruncher.app.analyze.run_resolution import _resolve_run_dir, _resolve_run_names
+from dnadesign.cruncher.app.analyze.staging import (
+    analysis_managed_paths,
+    analyze_lock_meta_path,
+    delete_path,
+    finalize_analysis_root,
+    prepare_analysis_root,
+    recoverable_analyze_lock_reason,
+)
+from dnadesign.cruncher.app.analyze_score_space import (
+    _project_trajectory_views_with_cleanup,
+    _resolve_objective_projection_inputs,
+    _resolve_score_space_context,
+    _ScoreSpaceContext,
+)
+from dnadesign.cruncher.app.analyze_support import (
+    _load_elites_meta,
+    _load_run_artifacts_for_analysis,
+    _objective_axis_label,
+    _resolve_baseline_seed,
+    _resolve_tf_names,
+    _summarize_elites_mmr,
+    _write_analysis_used,
+    _write_json,
+    _write_table,
+)
+from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json
 from dnadesign.cruncher.artifacts.entries import append_artifacts, artifact_entry
 from dnadesign.cruncher.artifacts.layout import (
-    elites_hits_path,
-    elites_path,
-    elites_yaml_path,
-    manifest_path,
-    random_baseline_hits_path,
-    random_baseline_path,
-    run_plots_analysis_dir,
-    sequences_path,
-    trace_path,
+    run_plots_dir,
 )
 from dnadesign.cruncher.artifacts.manifest import load_manifest, write_manifest
-from dnadesign.cruncher.config.schema_v3 import AnalysisConfig, CruncherConfig
-from dnadesign.cruncher.core.sequence import identity_key
+from dnadesign.cruncher.config.schema_v3 import CruncherConfig
 from dnadesign.cruncher.integrations.meme_suite import resolve_tool_path
 from dnadesign.cruncher.utils.arviz_cache import ensure_arviz_data_dir
 from dnadesign.cruncher.utils.hashing import sha256_path
@@ -91,483 +101,774 @@ from dnadesign.cruncher.utils.paths import resolve_catalog_root
 from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
 
 logger = logging.getLogger(__name__)
+_ANALYZE_SUPPORT_EXPORTS = (_load_elites_meta,)
 
 __all__ = ["run_analyze"]
 
-_ANALYZE_LOCK_META_FILE = ".analyze_lock.json"
+
+def _verify_manifest_lockfile(manifest: dict[str, object]) -> None:
+    lockfile_path = manifest.get("lockfile_path")
+    lockfile_sha = manifest.get("lockfile_sha256")
+    if not lockfile_path or not lockfile_sha:
+        return
+    lock_path = Path(str(lockfile_path))
+    if not lock_path.exists():
+        raise FileNotFoundError(f"Lockfile referenced by run manifest missing: {lock_path}")
+    current_sha = sha256_path(lock_path)
+    if str(current_sha) != str(lockfile_sha):
+        raise ValueError("Lockfile checksum mismatch (run manifest does not match current lockfile).")
 
 
-def _status_text(status: object) -> str:
-    return str(status or "").strip().lower()
-
-
-def _run_status_detail(run_dir: Path) -> str | None:
-    try:
-        payload = load_run_status(run_dir)
-    except ValueError:
-        return None
-    if not isinstance(payload, dict):
-        return None
-    error = payload.get("error")
-    if isinstance(error, str) and error.strip():
-        return error.strip()
-    status_message = payload.get("status_message")
-    if isinstance(status_message, str) and status_message.strip():
-        return status_message.strip()
-    return None
-
-
-def _is_analyzable_sample_run(run: object) -> bool:
-    status = _status_text(getattr(run, "status", None))
-    if status in {"failed", "aborted", "running"}:
-        return False
-    run_dir = getattr(run, "run_dir", None)
-    if not isinstance(run_dir, Path):
-        return False
-    return manifest_path(run_dir).exists()
-
-
-def _latest_unavailable_reason(run: object) -> str:
-    run_name = str(getattr(run, "name", "<unknown>"))
-    status = _status_text(getattr(run, "status", None)) or "unknown"
-    run_dir = getattr(run, "run_dir", None)
-    has_manifest = isinstance(run_dir, Path) and manifest_path(run_dir).exists()
-    detail = _run_status_detail(run_dir) if isinstance(run_dir, Path) else None
-    if not has_manifest:
-        if status in {"failed", "aborted"} and detail:
-            return f"run '{run_name}' {status}: {detail}"
-        return f"run '{run_name}' status={status} is missing run_manifest.json"
-    if status in {"failed", "aborted"}:
-        if detail:
-            return f"run '{run_name}' {status}: {detail}"
-        return f"run '{run_name}' status={status}"
-    if status == "running":
-        return f"run '{run_name}' is still running"
-    return f"run '{run_name}' is not ready for analysis (status={status})"
-
-
-def _resolve_run_names(
-    cfg: CruncherConfig,
-    config_path: Path,
+def _create_analyze_tmp_root(
     *,
-    analysis_cfg: AnalysisConfig,
-    runs_override: list[str] | None,
-    use_latest: bool,
-) -> list[str]:
-    if runs_override:
-        return runs_override
-    if analysis_cfg.run_selector == "explicit":
-        if not analysis_cfg.runs:
-            raise ValueError("analysis.run_selector=explicit requires analysis.runs to be non-empty")
-        return list(analysis_cfg.runs)
-    if use_latest or analysis_cfg.run_selector == "latest":
-        runs = list_runs(cfg, config_path, stage="sample")
-        if not runs:
-            raise ValueError("No sample runs found for analysis.")
-        for run in runs:
-            if _is_analyzable_sample_run(run):
-                return [run.name]
-        latest_reason = _latest_unavailable_reason(runs[0])
-        raise ValueError(
-            "No completed sample runs found for analysis. "
-            f"Latest sample run unavailable: {latest_reason}. "
-            "Re-run sampling with `cruncher sample -c <CONFIG>`."
-        )
-    raise ValueError("analysis.run_selector must be 'latest' or 'explicit'")
-
-
-def _resolve_run_dir(cfg: CruncherConfig, config_path: Path, run_name: str) -> Path:
-    run = get_run(cfg, config_path, run_name)
-    if run.stage != "sample":
-        raise ValueError(f"Run '{run_name}' is not a sample run (stage={run.stage}).")
-    return run.run_dir
-
-
-def _resolve_optimizer_stats(manifest: dict[str, object], run_dir: Path) -> dict[str, object] | None:
-    stats_payload = manifest.get("optimizer_stats")
-    if stats_payload is None:
-        return None
-    if not isinstance(stats_payload, dict):
-        raise ValueError("Run manifest field 'optimizer_stats' must be a dictionary.")
-    optimizer_stats = dict(stats_payload)
-    if "swap_events" in optimizer_stats:
-        raise ValueError("Run manifest field 'optimizer_stats.swap_events' is unsupported for gibbs_anneal.")
-    inline_move_stats = optimizer_stats.get("move_stats")
-    if inline_move_stats is not None and not isinstance(inline_move_stats, list):
-        raise ValueError("Run manifest field 'optimizer_stats.move_stats' must be a list when provided.")
-    move_stats_path = optimizer_stats.get("move_stats_path") or manifest.get("optimizer_stats_path")
-    if move_stats_path is None:
-        return optimizer_stats
-    if not isinstance(move_stats_path, str) or not move_stats_path:
-        raise ValueError("Run manifest field 'optimizer_stats_path' must be a non-empty string when provided.")
-    relative = Path(move_stats_path)
-    if relative.is_absolute():
-        raise ValueError("Run manifest field 'optimizer_stats_path' must be relative to the run directory.")
-    sidecar = (run_dir / relative).resolve()
-    try:
-        sidecar.relative_to(run_dir.resolve())
-    except ValueError as exc:
-        raise ValueError("Run manifest field 'optimizer_stats_path' must resolve within the run directory.") from exc
-    if not sidecar.exists():
-        raise FileNotFoundError(f"Missing optimizer stats sidecar: {sidecar}")
-    if sidecar.suffix == ".gz":
-        with gzip.open(sidecar, "rt", encoding="utf-8") as handle:
-            payload = json.load(handle)
-    else:
-        payload = json.loads(sidecar.read_text())
-    if not isinstance(payload, dict):
-        raise ValueError(f"Optimizer stats sidecar must contain an object: {sidecar}")
-    if "swap_events" in payload:
-        raise ValueError(f"Optimizer stats sidecar field 'swap_events' is unsupported: {sidecar}")
-    move_stats = payload.get("move_stats")
-    if move_stats is not None and not isinstance(move_stats, list):
-        raise ValueError(f"Optimizer stats sidecar field 'move_stats' must be a list when present: {sidecar}")
-    if move_stats is None:
-        raise ValueError(f"Optimizer stats sidecar missing required 'move_stats' list: {sidecar}")
-    if move_stats is not None:
-        optimizer_stats["move_stats"] = move_stats
-    return optimizer_stats
-
-
-def _load_elites_meta(path: Path) -> dict[str, object]:
-    if not path.exists():
-        raise FileNotFoundError(f"Missing elites metadata YAML: {path}")
-    try:
-        payload = yaml.safe_load(path.read_text())
-    except yaml.YAMLError as exc:
-        raise ValueError(f"Invalid elites metadata YAML at {path}: {exc}") from exc
-    if not isinstance(payload, dict):
-        raise ValueError(f"Elites metadata must contain a YAML mapping: {path}")
-    return payload
-
-
-def _resolve_tf_names(used_cfg: dict, pwms: dict[str, object]) -> list[str]:
-    active = used_cfg.get("active_regulator_set") if isinstance(used_cfg, dict) else None
-    if isinstance(active, dict):
-        tfs = active.get("tfs")
-        if isinstance(tfs, list) and tfs:
-            return [str(tf) for tf in tfs if str(tf)]
-    return sorted(pwms.keys())
-
-
-def _select_tf_pair(tf_names: list[str], pairwise: object) -> tuple[str, str] | None:
-    if pairwise == "off":
-        return None
-    if isinstance(pairwise, list) and len(pairwise) == 2:
-        a, b = str(pairwise[0]), str(pairwise[1])
-        if a not in tf_names or b not in tf_names:
-            raise ValueError("analysis.pairwise TFs must be present in the run.")
-        return (a, b)
-    if len(tf_names) >= 2:
-        return (tf_names[0], tf_names[1])
-    return None
-
-
-def _resolve_trajectory_tf_pair(tf_names: list[str], pairwise: object) -> tuple[str, str]:
-    selected = _select_tf_pair(tf_names, pairwise)
-    if selected is not None:
-        return selected
-    if len(tf_names) == 1:
-        tf_name = str(tf_names[0])
-        return (tf_name, tf_name)
-    raise ValueError("Trajectory scatter plot requires at least one TF.")
-
-
-def _write_json(path: Path, payload: dict[str, object]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    atomic_write_json(path, payload)
-
-
-def _write_table(df: pd.DataFrame, path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.suffix == ".parquet":
-        write_parquet(df, path)
-    else:
-        df.to_csv(path, index=False)
-
-
-def _write_analysis_used(
-    path: Path,
-    analysis_cfg: dict[str, object],
-    analysis_id: str,
+    analysis_root_path: Path,
     run_name: str,
-    *,
-    extras: dict[str, object] | None = None,
-) -> None:
-    payload = {
-        "analysis": analysis_cfg,
-        "analysis_id": analysis_id,
-        "run": run_name,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    if extras:
-        payload.update(extras)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    atomic_write_yaml(path, payload, sort_keys=False, default_flow_style=False)
-
-
-def _objective_caption(objective_cfg: dict[str, object]) -> str:
-    combine = str(objective_cfg.get("combine") or "min").strip().lower()
-    if combine == "sum":
-        base = "Joint objective: maximize sum_TF(score_TF). Each score_TF is the best-window scan score."
-    else:
-        base = "Joint objective: maximize min_TF(score_TF). Each score_TF is the best-window scan score."
-    softmin_cfg = objective_cfg.get("softmin")
-    if isinstance(softmin_cfg, dict) and bool(softmin_cfg.get("enabled")):
-        return f"{base} Soft-min shaping enabled."
-    return base
-
-
-def _objective_axis_label(objective_cfg: dict[str, object]) -> str:
-    score_scale = str(objective_cfg.get("score_scale") or "normalized-llr").strip().lower()
-    if score_scale in {"llr", "raw-llr", "raw_llr"}:
-        scale_label = "raw-LLR"
-    else:
-        scale_label = "norm-LLR"
-    combine = str(objective_cfg.get("combine") or "min").strip().lower()
-    softmin_cfg = objective_cfg.get("softmin")
-    softmin_enabled = isinstance(softmin_cfg, dict) and bool(softmin_cfg.get("enabled"))
-    if combine == "sum":
-        return f"Cruncher sum-TF best-window {scale_label}"
-    if softmin_enabled:
-        return f"Cruncher soft-min TF best-window {scale_label}"
-    return f"Cruncher min-TF best-window {scale_label}"
-
-
-def _resolve_baseline_seed(baseline_df: pd.DataFrame) -> int | None:
-    if "baseline_seed" not in baseline_df.columns or baseline_df.empty:
-        return None
-    raw_seed = baseline_df["baseline_seed"].iloc[0]
-    if pd.isna(raw_seed):
-        raise ValueError("random baseline metadata baseline_seed is missing in random_baseline.parquet")
+    analysis_id: str,
+    created_at: str,
+) -> Path:
+    tmp_root = analysis_state_root(analysis_root_path) / "tmp"
+    if tmp_root.exists():
+        recoverable_reason = recoverable_analyze_lock_reason(tmp_root)
+        if recoverable_reason is not None:
+            logger.warning(
+                "Recovering stale analyze lock for run '%s' at %s (%s).",
+                run_name,
+                tmp_root,
+                recoverable_reason,
+            )
+            shutil.rmtree(tmp_root, ignore_errors=True)
+        else:
+            raise RuntimeError(
+                f"Analyze already in progress for run '{run_name}' (lock: {tmp_root}). "
+                "If no analyze is running, remove the stale analysis temp directory."
+            )
     try:
-        return int(raw_seed)
-    except (TypeError, ValueError, OverflowError) as exc:
-        raise ValueError(f"random baseline metadata baseline_seed is not an integer: {raw_seed!r}") from exc
+        tmp_root.mkdir(parents=True, exist_ok=False)
+    except FileExistsError as exc:
+        raise RuntimeError(
+            f"Analyze already in progress for run '{run_name}' (lock: {tmp_root}). "
+            "If no analyze is running, remove the stale analysis temp directory."
+        ) from exc
+    atomic_write_json(
+        analyze_lock_meta_path(tmp_root),
+        {
+            "analysis_id": analysis_id,
+            "run": run_name,
+            "created_at": created_at,
+            "pid": os.getpid(),
+        },
+    )
+    return tmp_root
 
 
-def _summarize_elites_mmr(
+def _record_analysis_plot(
+    *,
+    plot_entries: list[dict[str, object]],
+    plot_artifacts: list[dict[str, object]],
+    spec_key: str,
+    output: Path,
+    generated: bool,
+    skip_reason: str | None,
+    run_dir: Path,
+) -> None:
+    spec = next(spec for spec in PLOT_SPECS if spec.key == spec_key)
+    try:
+        rel_output = output.relative_to(run_dir)
+    except ValueError as exc:
+        raise ValueError(f"analysis plot output must be inside run dir: {output}") from exc
+    plot_entries.append(
+        {
+            "key": spec.key,
+            "label": spec.label,
+            "group": spec.group,
+            "description": spec.description,
+            "requires": list(spec.requires),
+            "outputs": [{"path": str(rel_output), "exists": output.exists()}],
+            "generated": generated,
+            "skipped": not generated,
+            "skip_reason": skip_reason,
+        }
+    )
+    if generated and output.exists():
+        plot_artifacts.append(
+            artifact_entry(
+                output,
+                run_dir,
+                kind="plot",
+                label=spec.label,
+                stage="analysis",
+            )
+        )
+
+
+def _prepare_analysis_plot_dir(run_dir: Path) -> None:
+    plots_dir = run_plots_dir(run_dir)
+    plots_dir.mkdir(parents=True, exist_ok=True)
+
+    # Remove legacy nested analysis plot directory from previous layout versions.
+    legacy_analysis_dir = plots_dir / "analysis"
+    if legacy_analysis_dir.exists():
+        shutil.rmtree(legacy_analysis_dir)
+
+    # Rewrite analysis plot outputs on each run without touching logo files.
+    for spec in PLOT_SPECS:
+        for output in plots_dir.glob(f"{spec.key}.*"):
+            if output.is_file():
+                output.unlink()
+
+
+def _render_trajectory_analysis_plots(
+    *,
+    run_dir: Path,
+    tmp_root: Path,
+    plot_format: str,
+    plot_kwargs: dict[str, object],
+    trajectory_lines_df: pd.DataFrame,
+    baseline_plot_df: pd.DataFrame,
+    elites_plot_df: pd.DataFrame,
+    tf_names: list[str],
+    score_space_ctx: _ScoreSpaceContext,
+    analysis_cfg: object,
+    objective_from_manifest: dict[str, object],
+    optimizer_stats: dict[str, object] | None,
+    sample_meta: object,
+    plot_entries: list[dict[str, object]],
+    plot_artifacts: list[dict[str, object]],
+    plot_chain_trajectory_sweep: object,
+    plot_elite_score_space_context: object,
+) -> None:
+    plot_trajectory_path = analysis_plot_path(tmp_root, "elite_score_space_context", plot_format)
+    plot_trajectory_sweep_path = analysis_plot_path(tmp_root, "chain_trajectory_sweep", plot_format)
+    if trajectory_lines_df.empty:
+        _record_analysis_plot(
+            plot_entries=plot_entries,
+            plot_artifacts=plot_artifacts,
+            spec_key="elite_score_space_context",
+            output=plot_trajectory_path,
+            generated=False,
+            skip_reason="trajectory table is empty",
+            run_dir=run_dir,
+        )
+        _record_analysis_plot(
+            plot_entries=plot_entries,
+            plot_artifacts=plot_artifacts,
+            spec_key="chain_trajectory_sweep",
+            output=plot_trajectory_sweep_path,
+            generated=False,
+            skip_reason="trajectory table is empty",
+            run_dir=run_dir,
+        )
+        return
+
+    plot_elite_score_space_context(
+        trajectory_df=trajectory_lines_df,
+        baseline_df=baseline_plot_df,
+        elites_df=elites_plot_df,
+        tf_pair=score_space_ctx.trajectory_tf_pair,
+        scatter_scale=score_space_ctx.trajectory_scale,
+        consensus_anchors=score_space_ctx.consensus_anchors,
+        objective_caption=score_space_ctx.objective_caption,
+        out_path=plot_trajectory_path,
+        retain_elites=analysis_cfg.trajectory_scatter_retain_elites,
+        score_space_mode=score_space_ctx.mode,
+        tf_names=tf_names,
+        tf_pairs_grid=score_space_ctx.pairs if score_space_ctx.mode == "all_pairs_grid" else None,
+        consensus_anchors_by_pair=score_space_ctx.consensus_anchors_by_pair,
+        **plot_kwargs,
+    )
+    _record_analysis_plot(
+        plot_entries=plot_entries,
+        plot_artifacts=plot_artifacts,
+        spec_key="elite_score_space_context",
+        output=plot_trajectory_path,
+        generated=True,
+        skip_reason=None,
+        run_dir=run_dir,
+    )
+
+    plot_chain_trajectory_sweep(
+        trajectory_df=trajectory_lines_df,
+        y_column=str(analysis_cfg.trajectory_sweep_y_column),
+        y_mode=str(analysis_cfg.trajectory_sweep_mode),
+        objective_config=objective_from_manifest,
+        cooling_config=optimizer_stats.get("mcmc_cooling") if isinstance(optimizer_stats, dict) else None,
+        tune_sweeps=sample_meta.tune,
+        objective_caption=score_space_ctx.objective_caption,
+        out_path=plot_trajectory_sweep_path,
+        stride=analysis_cfg.trajectory_stride,
+        alpha_min=analysis_cfg.trajectory_particle_alpha_min,
+        alpha_max=analysis_cfg.trajectory_particle_alpha_max,
+        chain_overlay=analysis_cfg.trajectory_chain_overlay,
+        summary_overlay=analysis_cfg.trajectory_summary_overlay,
+        **plot_kwargs,
+    )
+    _record_analysis_plot(
+        plot_entries=plot_entries,
+        plot_artifacts=plot_artifacts,
+        spec_key="chain_trajectory_sweep",
+        output=plot_trajectory_sweep_path,
+        generated=True,
+        skip_reason=None,
+        run_dir=run_dir,
+    )
+
+
+def _render_static_analysis_plots(
+    *,
+    run_dir: Path,
+    tmp_root: Path,
+    plot_format: str,
+    plot_kwargs: dict[str, object],
+    nn_df: pd.DataFrame,
     elites_df: pd.DataFrame,
+    elites_plot_df: pd.DataFrame,
     hits_df: pd.DataFrame,
-    sequences_df: pd.DataFrame,
-    elites_meta: dict[str, object],
     tf_names: list[str],
     pwms: dict[str, object],
-    *,
-    bidirectional: bool,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    identity_mode = "canonical" if bidirectional else "raw"
-    identity_by_elite_id: dict[str, str] = {}
-    rank_by_elite_id: dict[str, int] = {}
-    if elites_df is not None and not elites_df.empty and "id" in elites_df.columns:
-        seq_series = elites_df["sequence"].astype(str)
-        if bidirectional and "canonical_sequence" in elites_df.columns:
-            seq_series = elites_df["canonical_sequence"].astype(str)
-        identity_by_elite_id = {
-            str(elite_id): identity_key(seq, bidirectional=bidirectional)
-            for elite_id, seq in zip(elites_df["id"].astype(str), seq_series)
-        }
-        if "rank" in elites_df.columns:
-            rank_by_elite_id = {
-                str(elite_id): int(rank)
-                for elite_id, rank in zip(elites_df["id"].astype(str), elites_df["rank"])
-                if rank is not None
-            }
-        else:
-            rank_by_elite_id = {str(elite_id): idx for idx, elite_id in enumerate(elites_df["id"].astype(str))}
+    baseline_nn: Sequence[float],
+    objective_from_manifest: dict[str, object],
+    trace_idata: object | None,
+    optimizer_stats: dict[str, object] | None,
+    analysis_cfg: object,
+    plot_entries: list[dict[str, object]],
+    plot_artifacts: list[dict[str, object]],
+    plot_elites_nn_distance: object,
+    plot_elites_showcase: object,
+    plot_health_panel: object,
+) -> None:
+    plot_nn_path = analysis_plot_path(tmp_root, "elites_nn_distance", plot_format)
+    plot_elites_nn_distance(
+        nn_df,
+        plot_nn_path,
+        elites_df=elites_plot_df,
+        baseline_nn=pd.Series(baseline_nn),
+        objective_config=objective_from_manifest,
+        **plot_kwargs,
+    )
+    _record_analysis_plot(
+        plot_entries=plot_entries,
+        plot_artifacts=plot_artifacts,
+        spec_key="elites_nn_distance",
+        output=plot_nn_path,
+        generated=True,
+        skip_reason=None,
+        run_dir=run_dir,
+    )
 
-    nn_df = compute_elites_nn_distance_table(
+    plot_showcase_path = analysis_plot_path(tmp_root, "elites_showcase", plot_format)
+    plot_elites_showcase(
+        elites_df=elites_df,
+        hits_df=hits_df,
+        tf_names=tf_names,
+        pwms=pwms,
+        out_path=plot_showcase_path,
+        max_panels=int(analysis_cfg.elites_showcase.max_panels),
+        **plot_kwargs,
+    )
+    _record_analysis_plot(
+        plot_entries=plot_entries,
+        plot_artifacts=plot_artifacts,
+        spec_key="elites_showcase",
+        output=plot_showcase_path,
+        generated=True,
+        skip_reason=None,
+        run_dir=run_dir,
+    )
+
+    plot_health_path = analysis_plot_path(tmp_root, "health_panel", plot_format)
+    if trace_idata is None:
+        _record_analysis_plot(
+            plot_entries=plot_entries,
+            plot_artifacts=plot_artifacts,
+            spec_key="health_panel",
+            output=plot_health_path,
+            generated=False,
+            skip_reason="trace disabled",
+            run_dir=run_dir,
+        )
+        return
+    plot_health_panel(optimizer_stats, plot_health_path, **plot_kwargs)
+    _record_analysis_plot(
+        plot_entries=plot_entries,
+        plot_artifacts=plot_artifacts,
+        spec_key="health_panel",
+        output=plot_health_path,
+        generated=True,
+        skip_reason=None,
+        run_dir=run_dir,
+    )
+
+
+def _render_fimo_analysis_plot(
+    *,
+    run_dir: Path,
+    tmp_root: Path,
+    plot_format: str,
+    plot_kwargs: dict[str, object],
+    analysis_cfg: object,
+    trajectory_df: pd.DataFrame,
+    tf_names: list[str],
+    pwms: dict[str, object],
+    bidirectional: bool,
+    resolved_meme_tool_path: object,
+    objective_from_manifest: dict[str, object],
+    plot_entries: list[dict[str, object]],
+    plot_artifacts: list[dict[str, object]],
+    plot_optimizer_vs_fimo: object,
+) -> None:
+    plot_fimo_path = analysis_plot_path(tmp_root, "optimizer_vs_fimo", plot_format)
+    if not analysis_cfg.fimo_compare.enabled:
+        _record_analysis_plot(
+            plot_entries=plot_entries,
+            plot_artifacts=plot_artifacts,
+            spec_key="optimizer_vs_fimo",
+            output=plot_fimo_path,
+            generated=False,
+            skip_reason="analysis.fimo_compare.enabled=false",
+            run_dir=run_dir,
+        )
+        return
+    fimo_tmp_dir = tmp_root / "_fimo_compare_tmp"
+    try:
+        concordance_df, _ = build_fimo_concordance_table(
+            points_df=trajectory_df,
+            tf_names=tf_names,
+            pwms=pwms,
+            bidirectional=bidirectional,
+            threshold=1.0,
+            work_dir=fimo_tmp_dir,
+            tool_path=resolved_meme_tool_path,
+        )
+        plot_optimizer_vs_fimo(
+            concordance_df,
+            plot_fimo_path,
+            x_label=_objective_axis_label(objective_from_manifest),
+            y_label="FIMO weakest-TF score (-log10 sequence p-value)",
+            title="Cruncher optimizer vs FIMO weakest-TF score",
+            **plot_kwargs,
+        )
+        _record_analysis_plot(
+            plot_entries=plot_entries,
+            plot_artifacts=plot_artifacts,
+            spec_key="optimizer_vs_fimo",
+            output=plot_fimo_path,
+            generated=True,
+            skip_reason=None,
+            run_dir=run_dir,
+        )
+    finally:
+        shutil.rmtree(fimo_tmp_dir, ignore_errors=True)
+
+
+def _finalize_analyze_root_with_recovery(
+    *,
+    analysis_root_path: Path,
+    analysis_id: str,
+    tmp_root: Path,
+    archive: bool,
+) -> None:
+    prev_root = None
+    try:
+        prev_root = prepare_analysis_root(
+            analysis_root_path,
+            analysis_id=analysis_id,
+        )
+        finalize_analysis_root(
+            analysis_root_path,
+            tmp_root,
+            archive=archive,
+            prev_root=prev_root,
+        )
+    except Exception:
+        if tmp_root.exists():
+            shutil.rmtree(tmp_root, ignore_errors=True)
+        if prev_root is not None and prev_root.exists():
+            for path in analysis_managed_paths(analysis_root_path):
+                delete_path(path)
+            for child in prev_root.iterdir():
+                shutil.move(str(child), analysis_root_path / child.name)
+            shutil.rmtree(prev_root, ignore_errors=True)
+        raise
+
+
+def _run_analyze_for_run(
+    *,
+    cfg: CruncherConfig,
+    config_path: Path,
+    analysis_cfg: object,
+    run_name: str,
+    resolved_meme_tool_path: object,
+    plot_elites_nn_distance: object,
+    plot_elites_showcase: object,
+    plot_optimizer_vs_fimo: object,
+    plot_health_panel: object,
+    plot_chain_trajectory_sweep: object,
+    plot_elite_score_space_context: object,
+) -> Path:
+    run_dir = _resolve_run_dir(cfg, config_path, run_name)
+    manifest = load_manifest(run_dir)
+    optimizer_stats = _resolve_optimizer_stats(manifest, run_dir)
+    _verify_manifest_lockfile(manifest)
+    pwms, used_cfg = _load_pwms_from_config(run_dir)
+    tf_names = _resolve_tf_names(used_cfg, pwms)
+    sample_meta = _resolve_sample_meta(used_cfg, manifest)
+    analysis_id = _analysis_id()
+    created_at = datetime.now(timezone.utc).isoformat()
+
+    analysis_root_path = analysis_root(run_dir)
+    tmp_root = _create_analyze_tmp_root(
+        analysis_root_path=analysis_root_path,
+        run_name=run_name,
+        analysis_id=analysis_id,
+        created_at=created_at,
+    )
+
+    analysis_used_file = analysis_used_path(tmp_root)
+
+    require_random_baseline = bool(cfg.sample is not None and cfg.sample.output.save_random_baseline)
+    artifacts = _load_run_artifacts_for_analysis(
+        run_dir,
+        require_random_baseline=require_random_baseline,
+    )
+    sequences_df = artifacts.sequences_df
+    elites_df = artifacts.elites_df
+    hits_df = artifacts.hits_df
+    baseline_df = artifacts.baseline_df
+    baseline_hits_df = artifacts.baseline_hits_df
+    trace_idata = artifacts.trace_idata
+    elites_meta = artifacts.elites_meta
+
+    table_ext = analysis_cfg.table_format
+    score_summary_path = analysis_table_path(tmp_root, "scores_summary", table_ext)
+    topk_path = analysis_table_path(tmp_root, "elites_topk", table_ext)
+    joint_metrics_path = analysis_table_path(tmp_root, "metrics_joint", table_ext)
+    overlap_pair_path = analysis_table_path(tmp_root, "overlap_pair_summary", table_ext)
+    overlap_elite_path = analysis_table_path(tmp_root, "overlap_per_elite", table_ext)
+    diagnostics_path = analysis_table_path(tmp_root, "diagnostics_summary", "json")
+    objective_path = analysis_table_path(tmp_root, "objective_components", "json")
+    elites_mmr_path = analysis_table_path(tmp_root, "elites_mmr_summary", table_ext)
+    elites_mmr_sweep_path = analysis_table_path(tmp_root, "elites_mmr_sweep", table_ext)
+    nn_distance_path = analysis_table_path(tmp_root, "elites_nn_distance", table_ext)
+    trajectory_path = analysis_table_path(tmp_root, "chain_trajectory_points", table_ext)
+    trajectory_lines_path = analysis_table_path(tmp_root, "chain_trajectory_lines", table_ext)
+
+    from dnadesign.cruncher.analysis.plots.summary import (
+        score_frame_from_df,
+        write_elite_topk,
+        write_joint_metrics,
+        write_score_summary,
+    )
+
+    score_df = score_frame_from_df(sequences_df, tf_names)
+    write_score_summary(score_df=score_df, tf_names=tf_names, out_path=score_summary_path)
+
+    top_k = sample_meta.top_k if sample_meta.top_k else len(elites_df)
+    write_elite_topk(elites_df=elites_df, tf_names=tf_names, out_path=topk_path, top_k=top_k)
+    write_joint_metrics(elites_df=elites_df, tf_names=tf_names, out_path=joint_metrics_path)
+
+    objective_from_manifest, bidirectional, pseudocounts_raw, log_odds_clip_raw, retain_sequences, beta_ladder = (
+        _resolve_objective_projection_inputs(
+            manifest=manifest,
+            sample_meta=sample_meta,
+            used_cfg=used_cfg,
+            elites_df=elites_df,
+            optimizer_stats=optimizer_stats if isinstance(optimizer_stats, dict) else None,
+        )
+    )
+
+    trajectory_df, baseline_plot_df, elites_plot_df = _project_trajectory_views_with_cleanup(
+        tmp_root=tmp_root,
+        sequences_df=sequences_df,
+        baseline_df=baseline_df,
+        elites_df=elites_df,
+        tf_names=tf_names,
+        pwms=pwms,
+        analysis_cfg=analysis_cfg,
+        objective_from_manifest=objective_from_manifest,
+        bidirectional=bidirectional,
+        pseudocounts_raw=pseudocounts_raw,
+        log_odds_clip_raw=log_odds_clip_raw,
+        beta_ladder=beta_ladder,
+        retain_sequences=retain_sequences,
+    )
+    _write_table(trajectory_df, trajectory_path)
+    trajectory_lines_df = build_chain_trajectory_points(
+        trajectory_df,
+        max_points=analysis_cfg.max_points,
+        retain_sequences=retain_sequences,
+    )
+    _write_table(trajectory_lines_df, trajectory_lines_path)
+
+    overlap_summary_df, elite_overlap_df, overlap_summary = compute_overlap_tables(
+        elites_df, hits_df, tf_names, include_sequences=False
+    )
+    _write_table(overlap_summary_df, overlap_pair_path)
+    _write_table(elite_overlap_df, overlap_elite_path)
+
+    diagnostics_payload = summarize_sampling_diagnostics(
+        trace_idata=trace_idata,
+        sequences_df=sequences_df,
+        elites_df=elites_df,
+        elites_hits_df=hits_df,
+        tf_names=tf_names,
+        optimizer=manifest.get("optimizer"),
+        optimizer_stats=optimizer_stats,
+        mode=sample_meta.mode,
+        optimizer_kind=sample_meta.optimizer_kind,
+        sample_meta={
+            "chains": sample_meta.chains,
+            "draws": sample_meta.draws,
+            "tune": sample_meta.tune,
+            "mode": sample_meta.mode,
+            "optimizer_kind": sample_meta.optimizer_kind,
+            "top_k": sample_meta.top_k,
+            "dsdna_canonicalize": sample_meta.bidirectional,
+        },
+        trace_required=False,
+        overlap_summary=overlap_summary,
+    )
+    _write_json(diagnostics_path, diagnostics_payload)
+
+    objective_components = compute_objective_components(
+        sequences_df=sequences_df,
+        tf_names=tf_names,
+        top_k=sample_meta.top_k,
+        overlap_total_bp_median=overlap_summary.get("overlap_total_bp_median"),
+    )
+    _write_json(objective_path, objective_components)
+
+    elites_mmr_df, nn_df = _summarize_elites_mmr(
+        elites_df,
         hits_df,
+        sequences_df,
+        elites_meta,
         tf_names,
         pwms,
-        identity_mode=identity_mode,
-        identity_by_elite_id=identity_by_elite_id or None,
-        rank_by_elite_id=rank_by_elite_id or None,
+        bidirectional=bool(sample_meta.bidirectional),
     )
-    full_nn_df, full_summary = compute_elites_full_sequence_nn_table(
-        elites_df,
-        identity_mode=identity_mode,
-        identity_by_elite_id=identity_by_elite_id or None,
-        rank_by_elite_id=rank_by_elite_id or None,
-    )
-    if not full_nn_df.empty:
-        nn_df = nn_df.merge(
-            full_nn_df,
-            on=["elite_id", "identity_mode"],
-            how="left",
+    _write_table(elites_mmr_df, elites_mmr_path)
+    _write_table(nn_df, nn_distance_path)
+    if analysis_cfg.mmr_sweep.enabled:
+        run_mmr_sweep_for_run(
+            run_dir,
+            pool_size_values=analysis_cfg.mmr_sweep.pool_size_values,
+            diversity_values=analysis_cfg.mmr_sweep.diversity_values,
+            out_path=elites_mmr_sweep_path,
         )
-    rep_by_identity = representative_elite_ids(identity_by_elite_id, rank_by_elite_id) if identity_by_elite_id else {}
-    hits_for_dist = hits_df
-    if rep_by_identity:
-        keep_ids = set(rep_by_identity.values())
-        hits_for_dist = hits_df[hits_df["elite_id"].isin(keep_ids)].copy()
-    elite_ids, dist = compute_elite_distance_matrix(hits_for_dist, tf_names, pwms)
-    dist_summary = summarize_elite_distances(dist)
-    min_norm = pd.to_numeric(elites_df.get("min_norm"), errors="coerce") if "min_norm" in elites_df.columns else None
-    median_relevance_raw = float(min_norm.median()) if min_norm is not None and not min_norm.empty else None
-    mmr_summary_meta = elites_meta.get("mmr_summary")
-    if isinstance(mmr_summary_meta, dict):
-        mmr_relevance_meta = mmr_summary_meta.get("median_relevance_raw")
-        try:
-            if mmr_relevance_meta is not None:
-                median_relevance_raw = float(mmr_relevance_meta)
-        except (TypeError, ValueError, OverflowError):
-            pass
-    draw_df = sequences_df[sequences_df.get("phase") == "draw"] if "phase" in sequences_df.columns else sequences_df
-    unique_draws = None
-    if "sequence" in draw_df.columns:
-        source = draw_df["sequence"].astype(str)
-        if bidirectional and "canonical_sequence" in draw_df.columns:
-            source = draw_df["canonical_sequence"].astype(str)
-        unique_draws = source.map(lambda seq: identity_key(seq, bidirectional=bidirectional)).nunique()
-    unique_elites = None
-    if "sequence" in elites_df.columns:
-        source = elites_df["sequence"].astype(str)
-        if bidirectional and "canonical_sequence" in elites_df.columns:
-            source = elites_df["canonical_sequence"].astype(str)
-        unique_elites = source.map(lambda seq: identity_key(seq, bidirectional=bidirectional)).nunique()
-    summary = {
-        "k": int(elites_meta.get("n_elites") or len(elites_df)),
-        "score_weight": elites_meta.get("selection_score_weight"),
-        "diversity_weight": elites_meta.get("selection_diversity_weight"),
-        "pool_size": elites_meta.get("pool_size"),
-        "relevance": elites_meta.get("selection_relevance"),
-        "median_relevance_raw": median_relevance_raw,
-        "mean_pairwise_distance": dist_summary.get("mean_pairwise_distance"),
-        "min_pairwise_distance": dist_summary.get("min_pairwise_distance"),
-        "sequence_length_bp": full_summary.get("sequence_length_bp"),
-        "mean_pairwise_full_bp": full_summary.get("mean_pairwise_full_bp"),
-        "min_pairwise_full_bp": full_summary.get("min_pairwise_full_bp"),
-        "median_nn_full_bp": full_summary.get("median_nn_full_bp"),
-        "mean_pairwise_full_distance": full_summary.get("mean_pairwise_full_distance"),
-        "min_pairwise_full_distance": full_summary.get("min_pairwise_full_distance"),
-        "median_nn_full_distance": full_summary.get("median_nn_full_distance"),
-        "unique_fraction_canonical_draws": (
-            unique_draws / float(len(draw_df)) if unique_draws is not None and len(draw_df) else None
-        ),
-        "unique_fraction_canonical_elites": (
-            unique_elites / float(len(elites_df)) if unique_elites is not None and len(elites_df) else None
-        ),
+
+    baseline_seed = _resolve_baseline_seed(baseline_df)
+    baseline_nn = compute_baseline_nn_distances(
+        baseline_hits_df,
+        tf_names,
+        pwms,
+        seed=baseline_seed,
+    )
+
+    plot_format = analysis_cfg.plot_format
+    plot_dpi = analysis_cfg.plot_dpi
+    plot_kwargs = {"dpi": plot_dpi, "png_compress_level": 9}
+    _prepare_analysis_plot_dir(run_dir)
+
+    score_space_ctx = _resolve_score_space_context(
+        tf_names=tf_names,
+        analysis_cfg=analysis_cfg,
+        elites_plot_df=elites_plot_df,
+        pwms=pwms,
+        sequences_df=sequences_df,
+        manifest=manifest,
+        objective_from_manifest=objective_from_manifest,
+    )
+
+    _write_analysis_used(
+        analysis_used_file,
+        analysis_cfg.model_dump(mode="json"),
+        analysis_id,
+        run_name,
+        extras={
+            "tf_pair_mode": analysis_cfg.pairwise,
+            "tf_pair_selected": list(score_space_ctx.focus_pair) if score_space_ctx.focus_pair else None,
+            "trajectory_tf_pair": list(score_space_ctx.trajectory_tf_pair),
+            "score_space_mode": score_space_ctx.mode,
+            "score_space_pairs": [list(pair) for pair in score_space_ctx.pairs],
+            "trajectory_scatter_scale": score_space_ctx.trajectory_scale,
+            "trajectory_scatter_retain_elites": analysis_cfg.trajectory_scatter_retain_elites,
+            "trajectory_sweep_y_column": analysis_cfg.trajectory_sweep_y_column,
+            "trajectory_sweep_mode": analysis_cfg.trajectory_sweep_mode,
+            "trajectory_summary_overlay": analysis_cfg.trajectory_summary_overlay,
+            "require_random_baseline": require_random_baseline,
+        },
+    )
+
+    plot_entries: list[dict[str, object]] = []
+    plot_artifacts: list[dict[str, object]] = []
+    _render_trajectory_analysis_plots(
+        run_dir=run_dir,
+        tmp_root=tmp_root,
+        plot_format=plot_format,
+        plot_kwargs=plot_kwargs,
+        trajectory_lines_df=trajectory_lines_df,
+        baseline_plot_df=baseline_plot_df,
+        elites_plot_df=elites_plot_df,
+        tf_names=tf_names,
+        score_space_ctx=score_space_ctx,
+        analysis_cfg=analysis_cfg,
+        objective_from_manifest=objective_from_manifest,
+        optimizer_stats=optimizer_stats if isinstance(optimizer_stats, dict) else None,
+        sample_meta=sample_meta,
+        plot_entries=plot_entries,
+        plot_artifacts=plot_artifacts,
+        plot_chain_trajectory_sweep=plot_chain_trajectory_sweep,
+        plot_elite_score_space_context=plot_elite_score_space_context,
+    )
+    _render_static_analysis_plots(
+        run_dir=run_dir,
+        tmp_root=tmp_root,
+        plot_format=plot_format,
+        plot_kwargs=plot_kwargs,
+        nn_df=nn_df,
+        elites_df=elites_df,
+        elites_plot_df=elites_plot_df,
+        hits_df=hits_df,
+        tf_names=tf_names,
+        pwms=pwms,
+        baseline_nn=baseline_nn,
+        objective_from_manifest=objective_from_manifest,
+        trace_idata=trace_idata,
+        optimizer_stats=optimizer_stats if isinstance(optimizer_stats, dict) else None,
+        analysis_cfg=analysis_cfg,
+        plot_entries=plot_entries,
+        plot_artifacts=plot_artifacts,
+        plot_elites_nn_distance=plot_elites_nn_distance,
+        plot_elites_showcase=plot_elites_showcase,
+        plot_health_panel=plot_health_panel,
+    )
+    _render_fimo_analysis_plot(
+        run_dir=run_dir,
+        tmp_root=tmp_root,
+        plot_format=plot_format,
+        plot_kwargs=plot_kwargs,
+        analysis_cfg=analysis_cfg,
+        trajectory_df=trajectory_df,
+        tf_names=tf_names,
+        pwms=pwms,
+        bidirectional=bidirectional,
+        resolved_meme_tool_path=resolved_meme_tool_path,
+        objective_from_manifest=objective_from_manifest,
+        plot_entries=plot_entries,
+        plot_artifacts=plot_artifacts,
+        plot_optimizer_vs_fimo=plot_optimizer_vs_fimo,
+    )
+
+    table_paths = {
+        "scores_summary": score_summary_path,
+        "elites_topk": topk_path,
+        "metrics_joint": joint_metrics_path,
+        "chain_trajectory_points": trajectory_path,
+        "chain_trajectory_lines": trajectory_lines_path,
+        "overlap_pair_summary": overlap_pair_path,
+        "overlap_per_elite": overlap_elite_path,
+        "diagnostics_summary": diagnostics_path,
+        "objective_components": objective_path,
+        "elites_mmr_summary": elites_mmr_path,
+        "elites_mmr_sweep": elites_mmr_sweep_path,
+        "elites_nn_distance": nn_distance_path,
     }
-    return pd.DataFrame([summary]), nn_df
+    table_entries = build_table_entries(
+        table_paths=table_paths,
+        mmr_sweep_enabled=analysis_cfg.mmr_sweep.enabled,
+    )
+    analysis_artifacts = build_table_artifacts(
+        analysis_root_path=analysis_root_path,
+        tmp_root=tmp_root,
+        run_dir=run_dir,
+        table_paths=table_paths,
+        mmr_sweep_enabled=analysis_cfg.mmr_sweep.enabled,
+    )
+    analysis_artifacts += plot_artifacts
 
+    build_analysis_manifests(
+        analysis_id=analysis_id,
+        created_at=created_at,
+        analysis_root=tmp_root,
+        analysis_used_file=analysis_used_file,
+        plot_entries=plot_entries,
+        table_entries=table_entries,
+        analysis_artifacts=analysis_artifacts,
+    )
+    report_json = report_json_path(tmp_root)
+    report_md = report_md_path(tmp_root)
+    report_payload = build_report_payload(
+        analysis_root=tmp_root,
+        summary_payload={
+            "analysis_id": analysis_id,
+            "run": run_name,
+            "tf_names": tf_names,
+            "diagnostics": diagnostics_payload,
+            "objective_components": objective_components,
+            "overlap_summary": overlap_summary,
+        },
+        diagnostics_payload=diagnostics_payload,
+        objective_components=objective_components,
+        overlap_summary=overlap_summary,
+        analysis_used_payload={"analysis": analysis_cfg.model_dump(mode="json")},
+    )
+    write_report_json(report_json, report_payload)
+    write_report_md(report_md, report_payload, analysis_root=tmp_root)
+    analysis_artifacts.append(
+        artifact_entry(report_json_path(analysis_root_path), run_dir, kind="meta", stage="analysis")
+    )
+    analysis_artifacts.append(
+        artifact_entry(report_md_path(analysis_root_path), run_dir, kind="meta", stage="analysis")
+    )
 
-def _prepare_analysis_root(
-    analysis_root_path: Path,
-    *,
-    analysis_id: str,
-) -> Path | None:
-    if not analysis_root_path.exists():
-        return None
-    managed_paths = _analysis_managed_paths(analysis_root_path)
-    if not managed_paths:
-        return None
-    prev_root = analysis_root_path / f".analysis_prev_{analysis_id}"
-    prev_root.mkdir(parents=True, exist_ok=False)
-    for path in managed_paths:
-        shutil.move(str(path), prev_root / path.name)
-    return prev_root
+    build_analysis_manifests(
+        analysis_id=analysis_id,
+        created_at=created_at,
+        analysis_root=tmp_root,
+        analysis_used_file=analysis_used_file,
+        plot_entries=plot_entries,
+        table_entries=table_entries,
+        analysis_artifacts=analysis_artifacts,
+    )
+    analysis_artifacts.append(
+        artifact_entry(plot_manifest_path(analysis_root_path), run_dir, kind="meta", stage="analysis")
+    )
+    analysis_artifacts.append(
+        artifact_entry(table_manifest_path(analysis_root_path), run_dir, kind="meta", stage="analysis")
+    )
+    analysis_artifacts.append(
+        artifact_entry(analysis_manifest_path(analysis_root_path), run_dir, kind="meta", stage="analysis")
+    )
 
+    summary_payload = build_summary_payload(
+        analysis_id=analysis_id,
+        run_name=run_name,
+        created_at=created_at,
+        analysis_root_path=analysis_root_path,
+        run_dir=run_dir,
+        tf_names=tf_names,
+        diagnostics_payload=diagnostics_payload,
+        objective_components=objective_components,
+        overlap_summary=overlap_summary,
+        artifacts=analysis_artifacts,
+        version=_get_version(),
+    )
 
-def _finalize_analysis_root(
-    analysis_root_path: Path,
-    tmp_root: Path,
-    *,
-    archive: bool,
-    prev_root: Path | None,
-) -> None:
-    for path in sorted(tmp_root.iterdir()):
-        shutil.move(str(path), analysis_root_path / path.name)
-    shutil.rmtree(tmp_root, ignore_errors=True)
-    if prev_root is None:
-        return
-    if not archive:
-        shutil.rmtree(prev_root, ignore_errors=True)
-        return
-    prev_id = None
-    summary_file = summary_path(prev_root)
-    if summary_file.exists():
-        try:
-            payload = json.loads(summary_file.read_text())
-            if isinstance(payload, dict):
-                prev_id = payload.get("analysis_id")
-        except Exception:
-            prev_id = None
-    if not prev_id:
-        prev_id = prev_root.name.replace(".analysis_prev_", "")
-    archive_root = analysis_state_root(analysis_root_path) / "_archive" / str(prev_id)
-    archive_root.parent.mkdir(parents=True, exist_ok=True)
-    if archive_root.exists():
-        shutil.rmtree(archive_root)
-    shutil.move(str(prev_root), archive_root)
+    summary_file = summary_path(tmp_root)
+    _write_json(summary_file, summary_payload)
 
+    _finalize_analyze_root_with_recovery(
+        analysis_root_path=analysis_root_path,
+        analysis_id=analysis_id,
+        tmp_root=tmp_root,
+        archive=analysis_cfg.archive,
+    )
 
-def _analysis_managed_paths(analysis_root_path: Path) -> list[Path]:
-    managed = [
-        analysis_root_path / "reports",
-        analysis_root_path / "manifests",
-        analysis_root_path / "tables",
-        analysis_root_path / "plots",
-        analysis_state_root(analysis_root_path) / "_archive",
-        analysis_root_path / "notebook__run_overview.py",
-    ]
-    return [path for path in managed if path.exists()]
+    _prune_latest_analysis_artifacts(manifest)
+    append_artifacts(manifest, analysis_artifacts)
+    write_manifest(run_dir, manifest)
 
-
-def _delete_path(path: Path) -> None:
-    if not path.exists():
-        return
-    if path.is_dir():
-        shutil.rmtree(path)
-        return
-    path.unlink()
-
-
-def _analyze_lock_meta_path(tmp_root: Path) -> Path:
-    return tmp_root / _ANALYZE_LOCK_META_FILE
-
-
-def _is_pid_alive(pid: int) -> bool:
-    if pid <= 0:
-        return False
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    except OSError:
-        return False
-    return True
-
-
-def _read_analyze_lock_pid(tmp_root: Path) -> int | None:
-    lock_meta_file = _analyze_lock_meta_path(tmp_root)
-    if not lock_meta_file.exists():
-        return None
-    try:
-        payload = json.loads(lock_meta_file.read_text())
-    except (OSError, ValueError, TypeError):
-        return None
-    pid = payload.get("pid") if isinstance(payload, dict) else None
-    if isinstance(pid, int):
-        return pid
-    if isinstance(pid, str):
-        stripped = pid.strip()
-        if stripped.isdigit():
-            return int(stripped)
-    return None
-
-
-def _recoverable_analyze_lock_reason(tmp_root: Path) -> str | None:
-    pid = _read_analyze_lock_pid(tmp_root)
-    if pid is None:
-        return "lock metadata missing"
-    if pid == os.getpid():
-        return f"lock owned by current process pid={pid}"
-    if not _is_pid_alive(pid):
-        return f"lock owned by non-running pid={pid}"
-    return None
+    return analysis_root_path
 
 
 def run_analyze(
@@ -577,20 +878,6 @@ def run_analyze(
     runs_override: list[str] | None = None,
     use_latest: bool = False,
 ) -> list[Path]:
-    catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
-    ensure_mpl_cache(catalog_root)
-    ensure_arviz_data_dir(catalog_root)
-    resolved_meme_tool_path = resolve_tool_path(cfg.discover.tool_path, config_path=config_path)
-
-    from dnadesign.cruncher.analysis.plots.elites_nn_distance import plot_elites_nn_distance
-    from dnadesign.cruncher.analysis.plots.elites_showcase import plot_elites_showcase
-    from dnadesign.cruncher.analysis.plots.fimo_concordance import plot_optimizer_vs_fimo
-    from dnadesign.cruncher.analysis.plots.health_panel import plot_health_panel
-    from dnadesign.cruncher.analysis.plots.opt_trajectory import (
-        plot_chain_trajectory_scatter,
-        plot_chain_trajectory_sweep,
-    )
-
     plan = resolve_analysis_plan(cfg)
     analysis_cfg = plan.analysis_cfg
     if not analysis_cfg.enabled:
@@ -602,699 +889,35 @@ def run_analyze(
         runs_override=runs_override,
         use_latest=use_latest,
     )
+    catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
+    ensure_mpl_cache(catalog_root)
+    ensure_arviz_data_dir(catalog_root)
+    resolved_meme_tool_path = resolve_tool_path(cfg.discover.tool_path, config_path=config_path)
+
+    from dnadesign.cruncher.analysis.plots.elites_nn_distance import plot_elites_nn_distance
+    from dnadesign.cruncher.analysis.plots.elites_showcase import plot_elites_showcase
+    from dnadesign.cruncher.analysis.plots.fimo_concordance import plot_optimizer_vs_fimo
+    from dnadesign.cruncher.analysis.plots.health_panel import plot_health_panel
+    from dnadesign.cruncher.analysis.plots.opt_trajectory import (
+        plot_chain_trajectory_sweep,
+        plot_elite_score_space_context,
+    )
+
     results: list[Path] = []
-
     for run_name in runs:
-        run_dir = _resolve_run_dir(cfg, config_path, run_name)
-        manifest = load_manifest(run_dir)
-        optimizer_stats = _resolve_optimizer_stats(manifest, run_dir)
-        lockfile_path = manifest.get("lockfile_path")
-        lockfile_sha = manifest.get("lockfile_sha256")
-        if lockfile_path and lockfile_sha:
-            lock_path = Path(str(lockfile_path))
-            if not lock_path.exists():
-                raise FileNotFoundError(f"Lockfile referenced by run manifest missing: {lock_path}")
-            current_sha = sha256_path(lock_path)
-            if str(current_sha) != str(lockfile_sha):
-                raise ValueError("Lockfile checksum mismatch (run manifest does not match current lockfile).")
-        pwms, used_cfg = _load_pwms_from_config(run_dir)
-        tf_names = _resolve_tf_names(used_cfg, pwms)
-        sample_meta = _resolve_sample_meta(used_cfg, manifest)
-        analysis_id = _analysis_id()
-        created_at = datetime.now(timezone.utc).isoformat()
-
-        analysis_root_path = analysis_root(run_dir)
-        tmp_root = analysis_state_root(analysis_root_path) / "tmp"
-        if tmp_root.exists():
-            recoverable_reason = _recoverable_analyze_lock_reason(tmp_root)
-            if recoverable_reason is not None:
-                logger.warning(
-                    "Recovering stale analyze lock for run '%s' at %s (%s).",
-                    run_name,
-                    tmp_root,
-                    recoverable_reason,
-                )
-                shutil.rmtree(tmp_root, ignore_errors=True)
-            else:
-                raise RuntimeError(
-                    f"Analyze already in progress for run '{run_name}' (lock: {tmp_root}). "
-                    "If no analyze is running, remove the stale analysis temp directory."
-                )
-        try:
-            tmp_root.mkdir(parents=True, exist_ok=False)
-        except FileExistsError as exc:
-            raise RuntimeError(
-                f"Analyze already in progress for run '{run_name}' (lock: {tmp_root}). "
-                "If no analyze is running, remove the stale analysis temp directory."
-            ) from exc
-        atomic_write_json(
-            _analyze_lock_meta_path(tmp_root),
-            {
-                "analysis_id": analysis_id,
-                "run": run_name,
-                "created_at": created_at,
-                "pid": os.getpid(),
-            },
-        )
-
-        prev_root = None
-
-        analysis_used_file = analysis_used_path(tmp_root)
-
-        sequences_file = sequences_path(run_dir)
-        elites_file = elites_path(run_dir)
-        hits_file = elites_hits_path(run_dir)
-        baseline_file = random_baseline_path(run_dir)
-        baseline_hits_file = random_baseline_hits_path(run_dir)
-        if not sequences_file.exists():
-            raise FileNotFoundError(f"Missing sequences parquet: {sequences_file}")
-        if not elites_file.exists():
-            raise FileNotFoundError(f"Missing elites parquet: {elites_file}")
-        if not hits_file.exists():
-            raise FileNotFoundError(f"Missing elites hits parquet: {hits_file}")
-        if not baseline_file.exists():
-            raise FileNotFoundError(f"Missing random baseline parquet: {baseline_file}")
-        if not baseline_hits_file.exists():
-            raise FileNotFoundError(f"Missing random baseline hits parquet: {baseline_hits_file}")
-
-        sequences_df = read_parquet(sequences_file)
-        elites_df = read_parquet(elites_file)
-        hits_df = load_elites_hits(hits_file)
-        baseline_df = read_parquet(baseline_file)
-        baseline_hits_df = load_baseline_hits(baseline_hits_file)
-
-        trace_file = trace_path(run_dir)
-        trace_idata = None
-        if trace_file.exists():
-            import arviz as az
-
-            trace_idata = az.from_netcdf(trace_file)
-
-        elites_meta = _load_elites_meta(elites_yaml_path(run_dir))
-
-        table_ext = analysis_cfg.table_format
-        score_summary_path = analysis_table_path(tmp_root, "scores_summary", table_ext)
-        topk_path = analysis_table_path(tmp_root, "elites_topk", table_ext)
-        joint_metrics_path = analysis_table_path(tmp_root, "metrics_joint", table_ext)
-        overlap_pair_path = analysis_table_path(tmp_root, "overlap_pair_summary", table_ext)
-        overlap_elite_path = analysis_table_path(tmp_root, "overlap_per_elite", table_ext)
-        diagnostics_path = analysis_table_path(tmp_root, "diagnostics_summary", "json")
-        objective_path = analysis_table_path(tmp_root, "objective_components", "json")
-        elites_mmr_path = analysis_table_path(tmp_root, "elites_mmr_summary", table_ext)
-        elites_mmr_sweep_path = analysis_table_path(tmp_root, "elites_mmr_sweep", table_ext)
-        nn_distance_path = analysis_table_path(tmp_root, "elites_nn_distance", table_ext)
-        trajectory_path = analysis_table_path(tmp_root, "chain_trajectory_points", table_ext)
-        trajectory_lines_path = analysis_table_path(tmp_root, "chain_trajectory_lines", table_ext)
-
-        from dnadesign.cruncher.analysis.plots.summary import (
-            score_frame_from_df,
-            write_elite_topk,
-            write_joint_metrics,
-            write_score_summary,
-        )
-
-        score_df = score_frame_from_df(sequences_df, tf_names)
-        write_score_summary(score_df=score_df, tf_names=tf_names, out_path=score_summary_path)
-
-        top_k = sample_meta.top_k if sample_meta.top_k else len(elites_df)
-        write_elite_topk(elites_df=elites_df, tf_names=tf_names, out_path=topk_path, top_k=top_k)
-        write_joint_metrics(elites_df=elites_df, tf_names=tf_names, out_path=joint_metrics_path)
-
-        objective_from_manifest = manifest.get("objective")
-        if objective_from_manifest is None:
-            objective_from_manifest = {}
-        if not isinstance(objective_from_manifest, dict):
-            raise ValueError("Run manifest field 'objective' must be an object when provided.")
-        total_sweeps_raw = manifest.get("total_sweeps")
-        if total_sweeps_raw is None:
-            if sample_meta.tune is None or sample_meta.draws is None:
-                raise ValueError(
-                    "Run metadata missing total_sweeps and sample tune/draws required for objective replay."
-                )
-            total_sweeps_raw = int(sample_meta.tune) + int(sample_meta.draws)
-        try:
-            total_sweeps = int(total_sweeps_raw)
-        except (TypeError, ValueError, OverflowError) as exc:
-            raise ValueError("Run manifest field 'total_sweeps' must be an integer.") from exc
-        if total_sweeps < 1:
-            raise ValueError("Run manifest field 'total_sweeps' must be >= 1.")
-        objective_from_manifest = {**objective_from_manifest, "total_sweeps": total_sweeps}
-        sample_payload = used_cfg.get("sample") if isinstance(used_cfg, dict) else None
-        objective_used = sample_payload.get("objective") if isinstance(sample_payload, dict) else None
-        scoring_used = objective_used.get("scoring") if isinstance(objective_used, dict) else None
-        pseudocounts_raw = 0.10
-        if isinstance(scoring_used, dict) and scoring_used.get("pwm_pseudocounts") is not None:
-            pseudocounts_raw = float(scoring_used.get("pwm_pseudocounts"))
-        log_odds_clip_raw = None
-        if isinstance(scoring_used, dict) and scoring_used.get("log_odds_clip") is not None:
-            log_odds_clip_raw = float(scoring_used.get("log_odds_clip"))
-        bidirectional = bool(objective_from_manifest.get("bidirectional", True))
-        beta_ladder = None
-        if isinstance(optimizer_stats, dict):
-            ladder_payload = optimizer_stats.get("beta_ladder_final")
-            if ladder_payload is not None:
-                if not isinstance(ladder_payload, list):
-                    raise ValueError("optimizer_stats.beta_ladder_final must be a list when provided.")
-                beta_ladder = [float(v) for v in ladder_payload]
-
-        try:
-            trajectory_df = build_trajectory_points(
-                sequences_df,
-                tf_names,
-                max_points=analysis_cfg.max_points,
-                objective_config=objective_from_manifest,
-                beta_ladder=beta_ladder,
+        results.append(
+            _run_analyze_for_run(
+                cfg=cfg,
+                config_path=config_path,
+                analysis_cfg=analysis_cfg,
+                run_name=run_name,
+                resolved_meme_tool_path=resolved_meme_tool_path,
+                plot_elites_nn_distance=plot_elites_nn_distance,
+                plot_elites_showcase=plot_elites_showcase,
+                plot_optimizer_vs_fimo=plot_optimizer_vs_fimo,
+                plot_health_panel=plot_health_panel,
+                plot_chain_trajectory_sweep=plot_chain_trajectory_sweep,
+                plot_elite_score_space_context=plot_elite_score_space_context,
             )
-            trajectory_df = add_raw_llr_objective(
-                trajectory_df,
-                tf_names,
-                pwms=pwms,
-                objective_config=objective_from_manifest,
-                bidirectional=bidirectional,
-                pwm_pseudocounts=pseudocounts_raw,
-                log_odds_clip=log_odds_clip_raw,
-            )
-            baseline_plot_df = add_raw_llr_objective(
-                baseline_df,
-                tf_names,
-                pwms=pwms,
-                objective_config=objective_from_manifest,
-                bidirectional=bidirectional,
-                pwm_pseudocounts=pseudocounts_raw,
-                log_odds_clip=log_odds_clip_raw,
-            )
-            elites_plot_df = add_raw_llr_objective(
-                elites_df,
-                tf_names,
-                pwms=pwms,
-                objective_config=objective_from_manifest,
-                bidirectional=bidirectional,
-                pwm_pseudocounts=pseudocounts_raw,
-                log_odds_clip=log_odds_clip_raw,
-            )
-        except Exception:
-            shutil.rmtree(tmp_root, ignore_errors=True)
-            raise
-        _write_table(trajectory_df, trajectory_path)
-        trajectory_lines_df = build_chain_trajectory_points(
-            trajectory_df,
-            max_points=analysis_cfg.max_points,
         )
-        _write_table(trajectory_lines_df, trajectory_lines_path)
-
-        overlap_summary_df, elite_overlap_df, overlap_summary = compute_overlap_tables(
-            elites_df, hits_df, tf_names, include_sequences=False
-        )
-        _write_table(overlap_summary_df, overlap_pair_path)
-        _write_table(elite_overlap_df, overlap_elite_path)
-
-        diagnostics_payload = summarize_sampling_diagnostics(
-            trace_idata=trace_idata,
-            sequences_df=sequences_df,
-            elites_df=elites_df,
-            elites_hits_df=hits_df,
-            tf_names=tf_names,
-            optimizer=manifest.get("optimizer"),
-            optimizer_stats=optimizer_stats,
-            mode=sample_meta.mode,
-            optimizer_kind=sample_meta.optimizer_kind,
-            sample_meta={
-                "chains": sample_meta.chains,
-                "draws": sample_meta.draws,
-                "tune": sample_meta.tune,
-                "mode": sample_meta.mode,
-                "optimizer_kind": sample_meta.optimizer_kind,
-                "top_k": sample_meta.top_k,
-                "dsdna_canonicalize": sample_meta.bidirectional,
-            },
-            trace_required=False,
-            overlap_summary=overlap_summary,
-        )
-        _write_json(diagnostics_path, diagnostics_payload)
-
-        objective_components = compute_objective_components(
-            sequences_df=sequences_df,
-            tf_names=tf_names,
-            top_k=sample_meta.top_k,
-            overlap_total_bp_median=overlap_summary.get("overlap_total_bp_median"),
-        )
-        _write_json(objective_path, objective_components)
-
-        elites_mmr_df, nn_df = _summarize_elites_mmr(
-            elites_df,
-            hits_df,
-            sequences_df,
-            elites_meta,
-            tf_names,
-            pwms,
-            bidirectional=bool(sample_meta.bidirectional),
-        )
-        _write_table(elites_mmr_df, elites_mmr_path)
-        _write_table(nn_df, nn_distance_path)
-        mmr_sweep_df = pd.DataFrame()
-        if analysis_cfg.mmr_sweep.enabled:
-            baseline_pool_size: str | int | None = None
-            if isinstance(sample_payload, dict):
-                elites_payload = sample_payload.get("elites")
-                if isinstance(elites_payload, dict):
-                    select_payload = elites_payload.get("select")
-                    if isinstance(select_payload, dict):
-                        baseline_pool_size = select_payload.get("pool_size")
-            if baseline_pool_size is None:
-                baseline_pool_size = elites_meta.get("pool_size")
-
-            baseline_diversity = elites_meta.get("selection_diversity")
-            try:
-                baseline_diversity = float(baseline_diversity) if baseline_diversity is not None else None
-            except (TypeError, ValueError, OverflowError):
-                baseline_diversity = None
-
-            mmr_sweep_df = run_mmr_sweep(
-                sequences_df=sequences_df,
-                elites_df=elites_df,
-                tf_names=tf_names,
-                pwms=pwms,
-                objective_config=objective_from_manifest,
-                bidirectional=bool(sample_meta.bidirectional),
-                elite_k=int(sample_meta.top_k or len(elites_df)),
-                pwm_pseudocounts=float(pseudocounts_raw),
-                log_odds_clip=log_odds_clip_raw,
-                pool_size_values=analysis_cfg.mmr_sweep.pool_size_values,
-                diversity_values=analysis_cfg.mmr_sweep.diversity_values,
-                baseline_pool_size=baseline_pool_size,
-                baseline_diversity=baseline_diversity,
-            )
-            _write_table(mmr_sweep_df, elites_mmr_sweep_path)
-
-        baseline_seed = _resolve_baseline_seed(baseline_df)
-        baseline_nn = compute_baseline_nn_distances(
-            baseline_hits_df,
-            tf_names,
-            pwms,
-            seed=baseline_seed,
-        )
-
-        plot_format = analysis_cfg.plot_format
-        plot_dpi = analysis_cfg.plot_dpi
-        plot_kwargs = {"dpi": plot_dpi, "png_compress_level": 9}
-        analysis_plots_dir = run_plots_analysis_dir(run_dir)
-        if analysis_plots_dir.exists():
-            shutil.rmtree(analysis_plots_dir)
-        analysis_plots_dir.mkdir(parents=True, exist_ok=True)
-
-        focus_pair = _select_tf_pair(tf_names, analysis_cfg.pairwise)
-        trajectory_tf_pair = _resolve_trajectory_tf_pair(tf_names, analysis_cfg.pairwise)
-        trajectory_scale = str(analysis_cfg.trajectory_scatter_scale)
-        sequence_length = manifest.get("sequence_length")
-        if sequence_length is None and "sequence" in sequences_df.columns and not sequences_df.empty:
-            sequence_length = int(sequences_df["sequence"].astype(str).str.len().iloc[0])
-        if sequence_length is None:
-            raise ValueError("Run manifest missing sequence_length required for trajectory consensus anchors.")
-        anchor_objective_cfg = dict(objective_from_manifest)
-        anchor_objective_cfg["score_scale"] = trajectory_scale
-        objective_caption = _objective_caption(objective_from_manifest)
-        consensus_anchors = compute_consensus_anchors(
-            pwms=pwms,
-            tf_names=tf_names,
-            sequence_length=int(sequence_length),
-            objective_config=anchor_objective_cfg,
-            x_metric=f"score_{trajectory_tf_pair[0]}",
-            y_metric=f"score_{trajectory_tf_pair[1]}",
-        )
-
-        _write_analysis_used(
-            analysis_used_file,
-            analysis_cfg.model_dump(mode="json"),
-            analysis_id,
-            run_name,
-            extras={
-                "tf_pair_mode": analysis_cfg.pairwise,
-                "tf_pair_selected": list(focus_pair) if focus_pair else None,
-                "trajectory_tf_pair": list(trajectory_tf_pair),
-                "trajectory_scatter_scale": trajectory_scale,
-                "trajectory_sweep_y_column": analysis_cfg.trajectory_sweep_y_column,
-                "trajectory_sweep_mode": analysis_cfg.trajectory_sweep_mode,
-            },
-        )
-
-        plot_entries: list[dict[str, object]] = []
-        plot_artifacts: list[dict[str, object]] = []
-
-        def _record_plot(spec_key: str, output: Path, generated: bool, skip_reason: str | None) -> None:
-            spec = next(spec for spec in PLOT_SPECS if spec.key == spec_key)
-            try:
-                rel_output = output.relative_to(run_dir)
-            except ValueError as exc:
-                raise ValueError(f"analysis plot output must be inside run dir: {output}") from exc
-            final_output = output
-            plot_entries.append(
-                {
-                    "key": spec.key,
-                    "label": spec.label,
-                    "group": spec.group,
-                    "description": spec.description,
-                    "requires": list(spec.requires),
-                    "outputs": [{"path": str(rel_output), "exists": output.exists()}],
-                    "generated": generated,
-                    "skipped": not generated,
-                    "skip_reason": skip_reason,
-                }
-            )
-            if generated and output.exists():
-                plot_artifacts.append(
-                    artifact_entry(
-                        final_output,
-                        run_dir,
-                        kind="plot",
-                        label=spec.label,
-                        stage="analysis",
-                    )
-                )
-
-        plot_trajectory_path = analysis_plot_path(tmp_root, "chain_trajectory_scatter", plot_format)
-        plot_trajectory_sweep_path = analysis_plot_path(tmp_root, "chain_trajectory_sweep", plot_format)
-        if trajectory_lines_df.empty:
-            _record_plot("chain_trajectory_scatter", plot_trajectory_path, False, "trajectory table is empty")
-            _record_plot("chain_trajectory_sweep", plot_trajectory_sweep_path, False, "trajectory table is empty")
-        else:
-            plot_chain_trajectory_scatter(
-                trajectory_df=trajectory_lines_df,
-                baseline_df=baseline_plot_df,
-                elites_df=elites_plot_df,
-                tf_pair=trajectory_tf_pair,
-                scatter_scale=trajectory_scale,
-                consensus_anchors=consensus_anchors,
-                objective_caption=objective_caption,
-                out_path=plot_trajectory_path,
-                stride=analysis_cfg.trajectory_stride,
-                alpha_min=analysis_cfg.trajectory_particle_alpha_min,
-                alpha_max=analysis_cfg.trajectory_particle_alpha_max,
-                chain_overlay=analysis_cfg.trajectory_chain_overlay,
-                **plot_kwargs,
-            )
-            _record_plot("chain_trajectory_scatter", plot_trajectory_path, True, None)
-
-            plot_chain_trajectory_sweep(
-                trajectory_df=trajectory_lines_df,
-                y_column=str(analysis_cfg.trajectory_sweep_y_column),
-                y_mode=str(analysis_cfg.trajectory_sweep_mode),
-                objective_config=objective_from_manifest,
-                cooling_config=optimizer_stats.get("mcmc_cooling") if isinstance(optimizer_stats, dict) else None,
-                tune_sweeps=sample_meta.tune,
-                objective_caption=objective_caption,
-                out_path=plot_trajectory_sweep_path,
-                stride=analysis_cfg.trajectory_stride,
-                alpha_min=analysis_cfg.trajectory_particle_alpha_min,
-                alpha_max=analysis_cfg.trajectory_particle_alpha_max,
-                chain_overlay=analysis_cfg.trajectory_chain_overlay,
-                **plot_kwargs,
-            )
-            _record_plot("chain_trajectory_sweep", plot_trajectory_sweep_path, True, None)
-
-        plot_nn_path = analysis_plot_path(tmp_root, "elites_nn_distance", plot_format)
-        plot_elites_nn_distance(
-            nn_df,
-            plot_nn_path,
-            elites_df=elites_plot_df,
-            baseline_nn=pd.Series(baseline_nn),
-            objective_config=objective_from_manifest,
-            **plot_kwargs,
-        )
-        _record_plot("elites_nn_distance", plot_nn_path, True, None)
-
-        plot_showcase_path = analysis_plot_path(tmp_root, "elites_showcase", plot_format)
-        plot_elites_showcase(
-            elites_df=elites_df,
-            hits_df=hits_df,
-            tf_names=tf_names,
-            pwms=pwms,
-            out_path=plot_showcase_path,
-            max_panels=int(analysis_cfg.elites_showcase.max_panels),
-            **plot_kwargs,
-        )
-        _record_plot("elites_showcase", plot_showcase_path, True, None)
-
-        plot_health_path = analysis_plot_path(tmp_root, "health_panel", plot_format)
-        if trace_idata is None:
-            _record_plot("health_panel", plot_health_path, False, "trace disabled")
-        else:
-            plot_health_panel(optimizer_stats, plot_health_path, **plot_kwargs)
-            _record_plot("health_panel", plot_health_path, True, None)
-
-        plot_fimo_path = analysis_plot_path(tmp_root, "optimizer_vs_fimo", plot_format)
-        if not analysis_cfg.fimo_compare.enabled:
-            _record_plot("optimizer_vs_fimo", plot_fimo_path, False, "analysis.fimo_compare.enabled=false")
-        else:
-            fimo_tmp_dir = tmp_root / "_fimo_compare_tmp"
-            try:
-                concordance_df, _ = build_fimo_concordance_table(
-                    points_df=trajectory_df,
-                    tf_names=tf_names,
-                    pwms=pwms,
-                    bidirectional=bidirectional,
-                    threshold=1.0,
-                    work_dir=fimo_tmp_dir,
-                    tool_path=resolved_meme_tool_path,
-                )
-                plot_optimizer_vs_fimo(
-                    concordance_df,
-                    plot_fimo_path,
-                    x_label=_objective_axis_label(objective_from_manifest),
-                    y_label="FIMO weakest-TF score (-log10 sequence p-value)",
-                    title="Cruncher optimizer vs FIMO weakest-TF score",
-                    **plot_kwargs,
-                )
-                _record_plot("optimizer_vs_fimo", plot_fimo_path, True, None)
-            finally:
-                shutil.rmtree(fimo_tmp_dir, ignore_errors=True)
-
-        table_entries = [
-            {
-                "key": "scores_summary",
-                "label": "Per-TF summary",
-                "path": score_summary_path.name,
-                "exists": True,
-            },
-            {
-                "key": "elites_topk",
-                "label": "Elite top-K",
-                "path": topk_path.name,
-                "exists": True,
-            },
-            {
-                "key": "metrics_joint",
-                "label": "Joint score metrics",
-                "path": joint_metrics_path.name,
-                "exists": True,
-            },
-            {
-                "key": "chain_trajectory_points",
-                "label": "Chain trajectory points",
-                "path": trajectory_path.name,
-                "purpose": "plot_support",
-                "exists": True,
-            },
-            {
-                "key": "chain_trajectory_lines",
-                "label": "Chain trajectory lines",
-                "path": trajectory_lines_path.name,
-                "purpose": "plot_support",
-                "exists": True,
-            },
-            {
-                "key": "overlap_pair_summary",
-                "label": "Overlap pair summary",
-                "path": overlap_pair_path.name,
-                "exists": True,
-            },
-            {
-                "key": "overlap_per_elite",
-                "label": "Overlap per elite",
-                "path": overlap_elite_path.name,
-                "exists": True,
-            },
-            {
-                "key": "diagnostics_summary",
-                "label": "Diagnostics summary",
-                "path": diagnostics_path.name,
-                "exists": True,
-            },
-            {
-                "key": "objective_components",
-                "label": "Objective components",
-                "path": objective_path.name,
-                "exists": True,
-            },
-            {
-                "key": "elites_mmr_summary",
-                "label": "Elites MMR summary",
-                "path": elites_mmr_path.name,
-                "exists": True,
-            },
-            {
-                "key": "elites_mmr_sweep",
-                "label": "Elites MMR sweep",
-                "path": elites_mmr_sweep_path.name,
-                "exists": bool(analysis_cfg.mmr_sweep.enabled),
-                "skip_reason": None if analysis_cfg.mmr_sweep.enabled else "analysis.mmr_sweep.enabled=false",
-            },
-            {
-                "key": "elites_nn_distance",
-                "label": "Elites NN distance",
-                "path": nn_distance_path.name,
-                "exists": True,
-            },
-        ]
-
-        analysis_artifacts = [
-            artifact_entry(
-                analysis_root_path / score_summary_path.relative_to(tmp_root), run_dir, kind="table", stage="analysis"
-            ),
-            artifact_entry(
-                analysis_root_path / topk_path.relative_to(tmp_root), run_dir, kind="table", stage="analysis"
-            ),
-            artifact_entry(
-                analysis_root_path / joint_metrics_path.relative_to(tmp_root), run_dir, kind="table", stage="analysis"
-            ),
-            artifact_entry(
-                analysis_root_path / trajectory_path.relative_to(tmp_root), run_dir, kind="table", stage="analysis"
-            ),
-            artifact_entry(
-                analysis_root_path / overlap_pair_path.relative_to(tmp_root), run_dir, kind="table", stage="analysis"
-            ),
-            artifact_entry(
-                analysis_root_path / overlap_elite_path.relative_to(tmp_root), run_dir, kind="table", stage="analysis"
-            ),
-            artifact_entry(
-                analysis_root_path / diagnostics_path.relative_to(tmp_root), run_dir, kind="table", stage="analysis"
-            ),
-            artifact_entry(
-                analysis_root_path / objective_path.relative_to(tmp_root), run_dir, kind="table", stage="analysis"
-            ),
-            artifact_entry(
-                analysis_root_path / elites_mmr_path.relative_to(tmp_root), run_dir, kind="table", stage="analysis"
-            ),
-            artifact_entry(
-                analysis_root_path / elites_mmr_sweep_path.relative_to(tmp_root),
-                run_dir,
-                kind="table",
-                stage="analysis",
-            )
-            if analysis_cfg.mmr_sweep.enabled
-            else None,
-            artifact_entry(
-                analysis_root_path / nn_distance_path.relative_to(tmp_root), run_dir, kind="table", stage="analysis"
-            ),
-            artifact_entry(
-                analysis_root_path / trajectory_lines_path.relative_to(tmp_root),
-                run_dir,
-                kind="table",
-                stage="analysis",
-            ),
-        ]
-        analysis_artifacts = [item for item in analysis_artifacts if item is not None] + plot_artifacts
-
-        build_analysis_manifests(
-            analysis_id=analysis_id,
-            created_at=created_at,
-            analysis_root=tmp_root,
-            analysis_used_file=analysis_used_file,
-            plot_entries=plot_entries,
-            table_entries=table_entries,
-            analysis_artifacts=analysis_artifacts,
-        )
-        report_json = report_json_path(tmp_root)
-        report_md = report_md_path(tmp_root)
-        report_payload = build_report_payload(
-            analysis_root=tmp_root,
-            summary_payload={
-                "analysis_id": analysis_id,
-                "run": run_name,
-                "tf_names": tf_names,
-                "diagnostics": diagnostics_payload,
-                "objective_components": objective_components,
-                "overlap_summary": overlap_summary,
-            },
-            diagnostics_payload=diagnostics_payload,
-            objective_components=objective_components,
-            overlap_summary=overlap_summary,
-            analysis_used_payload={"analysis": analysis_cfg.model_dump(mode="json")},
-        )
-        write_report_json(report_json, report_payload)
-        write_report_md(report_md, report_payload, analysis_root=tmp_root)
-        analysis_artifacts.append(
-            artifact_entry(report_json_path(analysis_root_path), run_dir, kind="meta", stage="analysis")
-        )
-        analysis_artifacts.append(
-            artifact_entry(report_md_path(analysis_root_path), run_dir, kind="meta", stage="analysis")
-        )
-
-        build_analysis_manifests(
-            analysis_id=analysis_id,
-            created_at=created_at,
-            analysis_root=tmp_root,
-            analysis_used_file=analysis_used_file,
-            plot_entries=plot_entries,
-            table_entries=table_entries,
-            analysis_artifacts=analysis_artifacts,
-        )
-        analysis_artifacts.append(
-            artifact_entry(plot_manifest_path(analysis_root_path), run_dir, kind="meta", stage="analysis")
-        )
-        analysis_artifacts.append(
-            artifact_entry(table_manifest_path(analysis_root_path), run_dir, kind="meta", stage="analysis")
-        )
-        analysis_artifacts.append(
-            artifact_entry(analysis_manifest_path(analysis_root_path), run_dir, kind="meta", stage="analysis")
-        )
-
-        summary_payload = {
-            "analysis_id": analysis_id,
-            "run": run_name,
-            "created_at": created_at,
-            "analysis_dir": str(analysis_root_path.resolve()),
-            "analysis_used": str(analysis_used_path(analysis_root_path).relative_to(run_dir)),
-            "plot_manifest": str(plot_manifest_path(analysis_root_path).relative_to(run_dir)),
-            "table_manifest": str(table_manifest_path(analysis_root_path).relative_to(run_dir)),
-            "report_json": str(report_json_path(analysis_root_path).relative_to(run_dir)),
-            "report_md": str(report_md_path(analysis_root_path).relative_to(run_dir)),
-            "tf_names": tf_names,
-            "diagnostics": diagnostics_payload,
-            "objective_components": objective_components,
-            "overlap_summary": overlap_summary,
-            "artifacts": analysis_artifacts,
-            "version": _get_version(),
-        }
-
-        summary_file = summary_path(tmp_root)
-        _write_json(summary_file, summary_payload)
-
-        try:
-            prev_root = _prepare_analysis_root(
-                analysis_root_path,
-                analysis_id=analysis_id,
-            )
-            _finalize_analysis_root(
-                analysis_root_path,
-                tmp_root,
-                archive=analysis_cfg.archive,
-                prev_root=prev_root,
-            )
-        except Exception:
-            if tmp_root.exists():
-                shutil.rmtree(tmp_root, ignore_errors=True)
-            if prev_root is not None and prev_root.exists():
-                for path in _analysis_managed_paths(analysis_root_path):
-                    _delete_path(path)
-                for child in prev_root.iterdir():
-                    shutil.move(str(child), analysis_root_path / child.name)
-                shutil.rmtree(prev_root, ignore_errors=True)
-            raise
-
-        _prune_latest_analysis_artifacts(manifest)
-        append_artifacts(manifest, analysis_artifacts)
-        write_manifest(run_dir, manifest)
-
-        results.append(analysis_root_path)
-
     return results

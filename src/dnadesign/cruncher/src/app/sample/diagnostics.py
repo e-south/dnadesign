@@ -29,7 +29,7 @@ class _EliteCandidate:
     sum_norm: float
     per_tf_map: dict[str, float]
     norm_map: dict[str, float]
-    per_tf_hits: dict[str, dict[str, object]]
+    per_tf_hits: dict[str, dict[str, object]] | None
 
 
 def _norm_map_for_elites(

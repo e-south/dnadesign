@@ -107,15 +107,14 @@ def test_list_sites_curated() -> None:
     assert sites[0].sequence == "ACGTAC"
 
 
-def test_list_sites_curated_with_missing_ht_warns(caplog: pytest.LogCaptureFixture) -> None:
+def test_list_sites_curated_with_missing_ht_raises() -> None:
     adapter = RegulonDBAdapter(
         RegulonDBAdapterConfig(curated_sites=True, ht_sites=True),
         transport=_fixture_transport_no_ht,
     )
-    with caplog.at_level("WARNING"):
-        sites = list(adapter.list_sites(SiteQuery(tf_name="lexA")))
-    assert len(sites) == 2
-    assert any("using curated sites only" in record.message for record in caplog.records)
+    with pytest.raises(RuntimeError) as excinfo:
+        list(adapter.list_sites(SiteQuery(tf_name="lexA")))
+    assert "RegulonDB returned no HT sources" in str(excinfo.value)
 
 
 def test_list_sites_ht() -> None:
@@ -136,6 +135,56 @@ def test_list_datasets_for_tf() -> None:
     datasets = adapter.list_datasets(DatasetQuery(tf_name="lexA"))
     assert datasets
     assert any(ds.dataset_id == LEXA_DATASET_ID for ds in datasets)
+
+
+def test_list_datasets_filters_row_level_dataset_source() -> None:
+    def transport(query: str, variables: dict) -> dict:
+        if "listAllHTSources" in query:
+            return {"listAllHTSources": ["GALAGAN"]}
+        if "listAllDatasetTypes" in query:
+            return {"listAllDatasetTypes": ["TFBINDING"]}
+        if "getDatasetsWithMetadata" in query:
+            return {
+                "getDatasetsWithMetadata": {
+                    "datasets": [
+                        {
+                            "_id": "RHTECOLIBSD03022",
+                            "collectionData": {"type": "TFBINDING", "source": "GALAGAN"},
+                            "objectsTested": [
+                                {
+                                    "name": "DNA-binding transcriptional repressor LexA",
+                                    "abbreviatedName": "LexA",
+                                    "synonyms": ["LexA"],
+                                }
+                            ],
+                            "referenceGenome": "U00096.3",
+                            "assemblyGenomeId": None,
+                        },
+                        {
+                            "_id": "RHTECOLIBSD02444",
+                            "collectionData": {"type": "TFBINDING", "source": "BAUMGART"},
+                            "objectsTested": [
+                                {
+                                    "name": "DNA-binding transcriptional repressor LexA",
+                                    "abbreviatedName": "LexA",
+                                    "synonyms": ["LexA"],
+                                }
+                            ],
+                            "referenceGenome": "U00096.3",
+                            "assemblyGenomeId": None,
+                        },
+                    ]
+                }
+            }
+        return {"getRegulonBy": {"data": []}}
+
+    adapter = RegulonDBAdapter(
+        RegulonDBAdapterConfig(curated_sites=False, ht_sites=True),
+        transport=transport,
+    )
+    datasets = adapter.list_datasets(DatasetQuery(tf_name="lexA", dataset_source="GALAGAN"))
+    assert [item.dataset_id for item in datasets] == ["RHTECOLIBSD03022"]
+    assert all(item.dataset_source == "GALAGAN" for item in datasets)
 
 
 def test_list_datasets_invalid_type_raises() -> None:
@@ -163,6 +212,26 @@ def test_list_sites_ht_peaks() -> None:
     assert sites[0].coordinate.contig == "U00096.3"
     assert sites[0].coordinate.assembly == "U00096.3"
     assert sites[0].provenance.tags.get("record_kind") == "ht_peak"
+
+
+def test_list_sites_ht_without_records_raises_even_with_curated() -> None:
+    adapter = RegulonDBAdapter(
+        RegulonDBAdapterConfig(curated_sites=True, ht_sites=True),
+        transport=_fixture_transport,
+    )
+    with pytest.raises(ValueError) as excinfo:
+        list(adapter.list_sites(SiteQuery(tf_name="cpxR")))
+    assert "No HT binding-site records returned for TF CpxR" in str(excinfo.value)
+
+
+def test_list_sites_curated_and_ht_with_limit_requires_explicit_mode() -> None:
+    adapter = RegulonDBAdapter(
+        RegulonDBAdapterConfig(curated_sites=True, ht_sites=True),
+        transport=_fixture_transport,
+    )
+    with pytest.raises(ValueError) as excinfo:
+        list(adapter.list_sites(SiteQuery(tf_name="lexA", limit=1)))
+    assert "explicit source mode" in str(excinfo.value)
 
 
 def test_list_motifs_requires_inventory_shape() -> None:

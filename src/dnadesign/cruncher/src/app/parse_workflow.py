@@ -61,11 +61,38 @@ def _store(cfg: CruncherConfig, config_path: Path):
     )
 
 
+def _validate_lock_sources_against_preference(
+    *,
+    lockfile: Lockfile,
+    required_tfs: set[str],
+    source_preference: list[str],
+) -> None:
+    preferred_sources = [source.strip() for source in source_preference if source.strip()]
+    if not preferred_sources:
+        return
+    preferred_set = set(preferred_sources)
+    mismatches: list[str] = []
+    for tf_name in sorted(required_tfs):
+        locked = lockfile.resolved.get(tf_name)
+        if locked is None:
+            continue
+        if locked.source not in preferred_set:
+            mismatches.append(f"{tf_name} -> {locked.source}:{locked.motif_id}")
+    if mismatches:
+        preferred = ", ".join(sorted(preferred_set))
+        details = "; ".join(mismatches)
+        raise ValueError(
+            "Lockfile sources do not match catalog.source_preference. "
+            f"preferred=[{preferred}] mismatches={details}. "
+            "Re-run `cruncher lock <config>`."
+        )
+
+
 def _lockmap_for(cfg: CruncherConfig, config_path: Path) -> tuple[Lockfile, dict[str, object]]:
     catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
     lock_path = resolve_lock_path(config_path)
     if not lock_path.exists():
-        raise ValueError(f"Lockfile is required: {lock_path}. Run `cruncher lock {config_path.name}`.")
+        raise ValueError(f"Lockfile is required: {lock_path}. Run `cruncher lock -c {config_path.name}`.")
     lockfile = read_lockfile(lock_path)
     required = {tf for group in cfg.regulator_sets for tf in group}
     validate_lockfile(
@@ -74,6 +101,11 @@ def _lockmap_for(cfg: CruncherConfig, config_path: Path) -> tuple[Lockfile, dict
         expected_site_kinds=cfg.catalog.site_kinds,
         expected_combine_sites=cfg.catalog.combine_sites,
         required_tfs=required,
+    )
+    _validate_lock_sources_against_preference(
+        lockfile=lockfile,
+        required_tfs=required,
+        source_preference=cfg.catalog.source_preference,
     )
     verify_lockfile_hashes(
         lockfile=lockfile,

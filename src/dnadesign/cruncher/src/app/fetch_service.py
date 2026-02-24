@@ -13,7 +13,7 @@ import json
 import logging
 from dataclasses import replace
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, TextIO, Tuple
+from typing import Callable, Dict, Iterable, List, Optional, TextIO, Tuple
 
 from dnadesign.cruncher.ingest.adapters.base import SourceAdapter
 from dnadesign.cruncher.ingest.models import (
@@ -153,13 +153,8 @@ def _sites_path(root: Path, source: str, motif_id: str) -> Path:
     return root / "normalized" / "sites" / source / f"{motif_id}.jsonl"
 
 
-def _hydrate_sites_file(
-    *,
-    path: Path,
-    provider: SequenceProvider,
-) -> Tuple[bool, Dict[str, object]]:
-    updated = False
-    counts: Dict[str, object] = {
+def _new_site_count_payload() -> Dict[str, object]:
+    return {
         "total": 0,
         "with_seq": 0,
         "organism": None,
@@ -174,100 +169,337 @@ def _hydrate_sites_file(
         "dataset_method": None,
         "reference_genome": None,
     }
+
+
+def _merge_count_label(payload: Dict[str, object], key: str, value: object) -> None:
+    if value in {None, ""}:
+        return
+    current = payload.get(key)
+    if current is None:
+        payload[key] = value
+    elif current != value:
+        payload[key] = "mixed"
+
+
+def _update_length_counts(
+    *,
+    payload: Dict[str, object],
+    length: int,
+    length_source: str,
+) -> None:
+    payload["length_sum"] = int(payload["length_sum"]) + int(length)
+    payload["length_count"] = int(payload["length_count"]) + 1
+    current_min = payload["length_min"]
+    current_max = payload["length_max"]
+    payload["length_min"] = length if current_min is None else min(current_min, length)
+    payload["length_max"] = length if current_max is None else max(current_max, length)
+    current_source = payload["length_source"]
+    if current_source is None:
+        payload["length_source"] = length_source
+    elif current_source != length_source:
+        payload["length_source"] = "mixed"
+
+
+def _update_site_counts(payload: Dict[str, object], site: SiteInstance) -> None:
+    payload["total"] = int(payload["total"]) + 1
+    if site.sequence:
+        payload["with_seq"] = int(payload["with_seq"]) + 1
+    if payload["organism"] is None and site.organism is not None:
+        payload["organism"] = {
+            "taxon": site.organism.taxon,
+            "name": site.organism.name,
+            "strain": site.organism.strain,
+            "assembly": site.organism.assembly,
+        }
+    tags = site.provenance.tags or {}
+    _merge_count_label(payload, "site_kind", tags.get("record_kind"))
+    _merge_count_label(payload, "dataset_id", tags.get("dataset_id"))
+    _merge_count_label(payload, "dataset_source", tags.get("dataset_source"))
+    _merge_count_label(payload, "dataset_method", tags.get("dataset_method"))
+    reference_genome = tags.get("reference_genome") or tags.get("sequence_assembly")
+    _merge_count_label(payload, "reference_genome", reference_genome)
+
+    length = None
+    length_source = None
+    if site.sequence:
+        length = len(site.sequence)
+        length_source = "sequence"
+    elif site.coordinate is not None:
+        length = site.coordinate.end - site.coordinate.start
+        length_source = "coordinate"
+    if length is None:
+        return
+
+    _update_length_counts(payload=payload, length=int(length), length_source=str(length_source))
+
+
+def _update_catalog_sites_from_counts(
+    *,
+    catalog: CatalogIndex,
+    key: str,
+    payload: Dict[str, object],
+    tf_name: str,
+) -> None:
+    site_total = int(payload["total"])
+    site_with_seq = int(payload["with_seq"])
+    source, motif_id = key.split(":", 1)
+    length_count = int(payload.get("length_count", 0))
+    mean = None
+    if length_count > 0:
+        mean = float(payload.get("length_sum", 0)) / length_count
+    catalog.upsert_sites(
+        source=source,
+        motif_id=motif_id,
+        tf_name=tf_name,
+        site_count=site_with_seq,
+        site_total=site_total,
+        organism=payload.get("organism"),
+        site_kind=payload.get("site_kind"),
+        site_length_mean=mean,
+        site_length_min=payload.get("length_min"),
+        site_length_max=payload.get("length_max"),
+        site_length_count=length_count,
+        site_length_source=payload.get("length_source"),
+        dataset_id=payload.get("dataset_id"),
+        dataset_source=payload.get("dataset_source"),
+        dataset_method=payload.get("dataset_method"),
+        reference_genome=payload.get("reference_genome"),
+    )
+
+
+def _collect_sites_for_query(
+    *,
+    adapter: SourceAdapter,
+    root: Path,
+    query: SiteQuery,
+    sequence_provider: Optional[SequenceProvider],
+    written: list[Path],
+) -> tuple[int, Dict[str, Dict[str, object]]]:
+    writers: Dict[str, Tuple[Path, TextIO]] = {}
+    counts: Dict[str, Dict[str, object]] = {}
+    seen = 0
+    try:
+        for site in adapter.list_sites(query):
+            site = _hydrate_site_sequence(site, sequence_provider)
+            seen += 1
+            source, motif_id = _parse_motif_ref(site.motif_ref)
+            key = f"{source}:{motif_id}"
+            if key not in writers:
+                dest = root / "normalized" / "sites" / source
+                dest.mkdir(parents=True, exist_ok=True)
+                path = dest / f"{motif_id}.jsonl"
+                writers[key] = (path, path.open("w"))
+                counts[key] = _new_site_count_payload()
+                written.append(path)
+            _, fh = writers[key]
+            _update_site_counts(counts[key], site)
+            fh.write(json.dumps(_site_to_dict(site)) + "\n")
+    finally:
+        for _, fh in writers.values():
+            fh.close()
+    return seen, counts
+
+
+def _hydrate_site_payload_in_place(
+    *,
+    payload: Dict[str, object],
+    provider: SequenceProvider,
+) -> tuple[bool, object]:
+    coord_payload = payload.get("coordinate")
+    seq = payload.get("sequence")
+    if seq is None and coord_payload:
+        interval = GenomicInterval(
+            contig=coord_payload["contig"],
+            start=int(coord_payload["start"]),
+            end=int(coord_payload["end"]),
+            assembly=coord_payload.get("assembly"),
+        )
+        seq = normalize_site_sequence(provider.fetch(interval), False)
+        payload["sequence"] = seq
+        provenance = payload.get("provenance") or {}
+        tags = dict(provenance.get("tags") or {})
+        tags["sequence_hydrated"] = True
+        tags["sequence_source"] = provider.source_id
+        if interval.assembly:
+            tags["sequence_assembly"] = interval.assembly
+        provenance["tags"] = tags
+        payload["provenance"] = provenance
+        return True, coord_payload
+    return False, coord_payload
+
+
+def _update_counts_from_site_payload(
+    *,
+    counts: Dict[str, object],
+    payload: Dict[str, object],
+    coord_payload: object,
+) -> None:
+    counts["total"] = int(counts["total"]) + 1
+    if payload.get("sequence"):
+        counts["with_seq"] = int(counts["with_seq"]) + 1
+    org = payload.get("organism")
+    if counts["organism"] is None and org is not None:
+        counts["organism"] = org
+    tags = (payload.get("provenance") or {}).get("tags") or {}
+    _merge_count_label(counts, "site_kind", tags.get("record_kind"))
+    _merge_count_label(counts, "dataset_id", tags.get("dataset_id"))
+    _merge_count_label(counts, "dataset_source", tags.get("dataset_source"))
+    _merge_count_label(counts, "dataset_method", tags.get("dataset_method"))
+    reference_genome = tags.get("reference_genome") or tags.get("sequence_assembly")
+    _merge_count_label(counts, "reference_genome", reference_genome)
+    length = None
+    length_source = None
+    if payload.get("sequence"):
+        length = len(payload["sequence"])
+        length_source = "sequence"
+    elif coord_payload:
+        length = int(coord_payload["end"]) - int(coord_payload["start"])
+        length_source = "coordinate"
+    if length is not None and length_source is not None:
+        _update_length_counts(payload=counts, length=int(length), length_source=str(length_source))
+
+
+def _hydrate_sites_file(
+    *,
+    path: Path,
+    provider: SequenceProvider,
+) -> Tuple[bool, Dict[str, object]]:
+    updated = False
+    counts: Dict[str, object] = _new_site_count_payload()
     temp_path = path.with_suffix(".jsonl.tmp")
     with path.open() as fh, temp_path.open("w") as out:
         for line in fh:
             if not line.strip():
                 continue
             payload = json.loads(line)
-            coord_payload = payload.get("coordinate")
-            seq = payload.get("sequence")
-            if seq is None and coord_payload:
-                interval = GenomicInterval(
-                    contig=coord_payload["contig"],
-                    start=int(coord_payload["start"]),
-                    end=int(coord_payload["end"]),
-                    assembly=coord_payload.get("assembly"),
-                )
-                seq = normalize_site_sequence(provider.fetch(interval), False)
-                payload["sequence"] = seq
-                provenance = payload.get("provenance") or {}
-                tags = dict(provenance.get("tags") or {})
-                tags["sequence_hydrated"] = True
-                tags["sequence_source"] = provider.source_id
-                if interval.assembly:
-                    tags["sequence_assembly"] = interval.assembly
-                provenance["tags"] = tags
-                payload["provenance"] = provenance
+            hydrated, coord_payload = _hydrate_site_payload_in_place(payload=payload, provider=provider)
+            if hydrated:
                 updated = True
-            counts["total"] = int(counts["total"]) + 1
-            if payload.get("sequence"):
-                counts["with_seq"] = int(counts["with_seq"]) + 1
-            org = payload.get("organism")
-            if counts["organism"] is None and org is not None:
-                counts["organism"] = org
-            tags = (payload.get("provenance") or {}).get("tags") or {}
-            record_kind = tags.get("record_kind")
-            if record_kind:
-                current = counts["site_kind"]
-                if current is None:
-                    counts["site_kind"] = record_kind
-                elif current != record_kind:
-                    counts["site_kind"] = "mixed"
-            dataset_id = tags.get("dataset_id")
-            if dataset_id:
-                current = counts["dataset_id"]
-                if current is None:
-                    counts["dataset_id"] = dataset_id
-                elif current != dataset_id:
-                    counts["dataset_id"] = "mixed"
-            dataset_source = tags.get("dataset_source")
-            if dataset_source:
-                current = counts["dataset_source"]
-                if current is None:
-                    counts["dataset_source"] = dataset_source
-                elif current != dataset_source:
-                    counts["dataset_source"] = "mixed"
-            dataset_method = tags.get("dataset_method")
-            if dataset_method:
-                current = counts["dataset_method"]
-                if current is None:
-                    counts["dataset_method"] = dataset_method
-                elif current != dataset_method:
-                    counts["dataset_method"] = "mixed"
-            reference_genome = tags.get("reference_genome") or tags.get("sequence_assembly")
-            if reference_genome:
-                current = counts["reference_genome"]
-                if current is None:
-                    counts["reference_genome"] = reference_genome
-                elif current != reference_genome:
-                    counts["reference_genome"] = "mixed"
-            length = None
-            length_source = None
-            if payload.get("sequence"):
-                length = len(payload["sequence"])
-                length_source = "sequence"
-            elif coord_payload:
-                length = int(coord_payload["end"]) - int(coord_payload["start"])
-                length_source = "coordinate"
-            if length is not None:
-                counts["length_sum"] = int(counts["length_sum"]) + int(length)
-                counts["length_count"] = int(counts["length_count"]) + 1
-                current_min = counts["length_min"]
-                current_max = counts["length_max"]
-                counts["length_min"] = length if current_min is None else min(current_min, length)
-                counts["length_max"] = length if current_max is None else max(current_max, length)
-                current_source = counts["length_source"]
-                if current_source is None:
-                    counts["length_source"] = length_source
-                elif current_source != length_source:
-                    counts["length_source"] = "mixed"
+            _update_counts_from_site_payload(counts=counts, payload=payload, coord_payload=coord_payload)
             out.write(json.dumps(payload) + "\n")
     if updated:
         temp_path.replace(path)
     else:
         temp_path.unlink(missing_ok=True)
     return updated, counts
+
+
+def _append_cached_motif_path(
+    *,
+    root: Path,
+    entry: object,
+    written: list[Path],
+) -> None:
+    if not entry.has_matrix:
+        raise ValueError(f"Cached entry '{entry.source}:{entry.motif_id}' has no motif matrix.")
+    path = _motif_path(root, entry.source, entry.motif_id)
+    if not path.exists():
+        raise FileNotFoundError(f"Missing cached motif file: {path}")
+    written.append(path)
+
+
+def _fetch_motif_offline_by_id(
+    *,
+    adapter: SourceAdapter,
+    root: Path,
+    catalog: CatalogIndex,
+    motif_id: str,
+    written: list[Path],
+) -> None:
+    candidates = [
+        entry
+        for entry in catalog.entries.values()
+        if entry.motif_id == motif_id and entry.source == adapter.source_id and entry.has_matrix
+    ]
+    if not candidates:
+        raise ValueError(f"No cached motif matrix found for motif_id '{motif_id}'.")
+    for entry in candidates:
+        _append_cached_motif_path(root=root, entry=entry, written=written)
+
+
+def _fetch_motif_online_by_id(
+    *,
+    adapter: SourceAdapter,
+    root: Path,
+    catalog: CatalogIndex,
+    motif_id: str,
+    update: bool,
+    written: list[Path],
+) -> None:
+    path = _motif_path(root, adapter.source_id, motif_id)
+    if path.exists() and not update:
+        logger.info("Skipping motif %s (already cached). Use --update to refresh.", motif_id)
+        written.append(path)
+        return
+    logger.info("Fetching motif by id: %s", motif_id)
+    record = adapter.get_motif(motif_id)
+    written.append(write_motif_record(root, record))
+    catalog.upsert_from_record(record)
+
+
+def _fetch_motif_offline_by_name(
+    *,
+    adapter: SourceAdapter,
+    root: Path,
+    catalog: CatalogIndex,
+    name: str,
+    fetch_all: bool,
+    written: list[Path],
+) -> None:
+    candidates = catalog.list(tf_name=name, source=adapter.source_id, include_synonyms=True)
+    if not candidates:
+        raise ValueError(f"No cached motifs found for '{name}'.")
+    if len(candidates) > 1 and not fetch_all:
+        options = ", ".join(f"{c.source}:{c.motif_id}" for c in candidates)
+        raise ValueError(
+            f"Multiple cached motifs found for '{name}'. Candidates: {options}. "
+            "Use --all or --motif-id to disambiguate."
+        )
+    selected = candidates if fetch_all else candidates[:1]
+    for entry in selected:
+        _append_cached_motif_path(root=root, entry=entry, written=written)
+
+
+def _fetch_motif_online_by_name(
+    *,
+    adapter: SourceAdapter,
+    root: Path,
+    catalog: CatalogIndex,
+    name: str,
+    fetch_all: bool,
+    update: bool,
+    written: list[Path],
+) -> None:
+    if not update:
+        cached = catalog.list(tf_name=name, source=adapter.source_id, include_synonyms=True)
+        if any(entry.has_matrix and _motif_path(root, entry.source, entry.motif_id).exists() for entry in cached):
+            logger.info(
+                "Skipping TF '%s' (cached motif exists). Use --update to refresh.",
+                name,
+            )
+            return
+    logger.info("Searching motifs for TF '%s'", name)
+    records = adapter.list_motifs(MotifQuery(tf_name=name))
+    if not records:
+        raise ValueError(f"No motifs found for {name}")
+    if len(records) > 1 and not fetch_all:
+        options = ", ".join(f"{rec.source}:{rec.motif_id}" for rec in records)
+        raise ValueError(f"Multiple motifs found for {name}. Candidates: {options}. Use --all to fetch all.")
+    selected = records if fetch_all else records[:1]
+    for rec in selected:
+        path = _motif_path(root, rec.source, rec.motif_id)
+        if path.exists() and not update:
+            logger.info(
+                "Skipping motif %s:%s (already cached). Use --update to refresh.",
+                rec.source,
+                rec.motif_id,
+            )
+            written.append(path)
+            continue
+        logger.info("Fetching motif %s:%s (%s)", rec.source, rec.motif_id, rec.tf_name)
+        record = adapter.get_motif(rec.motif_id)
+        written.append(write_motif_record(root, record))
+        catalog.upsert_from_record(record)
 
 
 def fetch_motifs(
@@ -290,81 +522,219 @@ def fetch_motifs(
         raise ValueError("offline and update are mutually exclusive")
     for motif_id in motif_ids:
         if offline:
-            candidates = [
-                entry
-                for entry in catalog.entries.values()
-                if entry.motif_id == motif_id and entry.source == adapter.source_id and entry.has_matrix
-            ]
-            if not candidates:
-                raise ValueError(f"No cached motif matrix found for motif_id '{motif_id}'.")
-            for entry in candidates:
-                path = _motif_path(root, entry.source, entry.motif_id)
-                if not path.exists():
-                    raise FileNotFoundError(f"Missing cached motif file: {path}")
-                written.append(path)
+            _fetch_motif_offline_by_id(
+                adapter=adapter,
+                root=root,
+                catalog=catalog,
+                motif_id=motif_id,
+                written=written,
+            )
             continue
-        path = _motif_path(root, adapter.source_id, motif_id)
-        if path.exists() and not update:
-            logger.info("Skipping motif %s (already cached). Use --update to refresh.", motif_id)
-            written.append(path)
-            continue
-        logger.info("Fetching motif by id: %s", motif_id)
-        record = adapter.get_motif(motif_id)
-        written.append(write_motif_record(root, record))
-        catalog.upsert_from_record(record)
+        _fetch_motif_online_by_id(
+            adapter=adapter,
+            root=root,
+            catalog=catalog,
+            motif_id=motif_id,
+            update=update,
+            written=written,
+        )
     for name in names:
         if offline:
-            candidates = catalog.list(tf_name=name, source=adapter.source_id, include_synonyms=True)
-            if not candidates:
-                raise ValueError(f"No cached motifs found for '{name}'.")
-            if len(candidates) > 1 and not fetch_all:
-                options = ", ".join(f"{c.source}:{c.motif_id}" for c in candidates)
-                raise ValueError(
-                    f"Multiple cached motifs found for '{name}'. Candidates: {options}. "
-                    "Use --all or --motif-id to disambiguate."
-                )
-            selected = candidates if fetch_all else candidates[:1]
-            for entry in selected:
-                if not entry.has_matrix:
-                    raise ValueError(f"Cached entry '{entry.source}:{entry.motif_id}' has no motif matrix.")
-                path = _motif_path(root, entry.source, entry.motif_id)
-                if not path.exists():
-                    raise FileNotFoundError(f"Missing cached motif file: {path}")
-                written.append(path)
+            _fetch_motif_offline_by_name(
+                adapter=adapter,
+                root=root,
+                catalog=catalog,
+                name=name,
+                fetch_all=fetch_all,
+                written=written,
+            )
             continue
-        if not update:
-            cached = catalog.list(tf_name=name, source=adapter.source_id, include_synonyms=True)
-            if any(entry.has_matrix and _motif_path(root, entry.source, entry.motif_id).exists() for entry in cached):
-                logger.info(
-                    "Skipping TF '%s' (cached motif exists). Use --update to refresh.",
-                    name,
-                )
-                continue
-        logger.info("Searching motifs for TF '%s'", name)
-        records = adapter.list_motifs(MotifQuery(tf_name=name))
-        if not records:
-            raise ValueError(f"No motifs found for {name}")
-        if len(records) > 1 and not fetch_all:
-            options = ", ".join(f"{rec.source}:{rec.motif_id}" for rec in records)
-            raise ValueError(f"Multiple motifs found for {name}. Candidates: {options}. Use --all to fetch all.")
-        selected = records if fetch_all else records[:1]
-        for rec in selected:
-            path = _motif_path(root, rec.source, rec.motif_id)
-            if path.exists() and not update:
-                logger.info(
-                    "Skipping motif %s:%s (already cached). Use --update to refresh.",
-                    rec.source,
-                    rec.motif_id,
-                )
-                written.append(path)
-                continue
-            logger.info("Fetching motif %s:%s (%s)", rec.source, rec.motif_id, rec.tf_name)
-            record = adapter.get_motif(rec.motif_id)
-            written.append(write_motif_record(root, record))
-            catalog.upsert_from_record(record)
+        _fetch_motif_online_by_name(
+            adapter=adapter,
+            root=root,
+            catalog=catalog,
+            name=name,
+            fetch_all=fetch_all,
+            update=update,
+            written=written,
+        )
     if written:
         catalog.save(root)
     return written
+
+
+def _append_cached_sites_path(
+    *,
+    root: Path,
+    entry: object,
+    written: list[Path],
+) -> None:
+    if not entry.has_sites:
+        raise ValueError(f"Cached entry '{entry.source}:{entry.motif_id}' has no binding sites.")
+    path = _sites_path(root, entry.source, entry.motif_id)
+    if not path.exists():
+        raise FileNotFoundError(f"Missing cached sites file: {path}")
+    written.append(path)
+
+
+def _update_catalog_from_site_counts(
+    *,
+    catalog: CatalogIndex,
+    counts: Dict[str, Dict[str, object]],
+    resolve_tf_name: Callable[[str], str],
+) -> None:
+    for key, payload in counts.items():
+        if int(payload.get("length_count", 0)) <= 0:
+            continue
+        _update_catalog_sites_from_counts(
+            catalog=catalog,
+            key=key,
+            payload=payload,
+            tf_name=resolve_tf_name(key),
+        )
+
+
+def _collect_sites_and_update_catalog(
+    *,
+    adapter: SourceAdapter,
+    root: Path,
+    query: SiteQuery,
+    sequence_provider: Optional[SequenceProvider],
+    written: list[Path],
+    catalog: CatalogIndex,
+    resolve_tf_name: Callable[[str], str],
+    empty_message: str,
+) -> None:
+    seen, counts = _collect_sites_for_query(
+        adapter=adapter,
+        root=root,
+        query=query,
+        sequence_provider=sequence_provider,
+        written=written,
+    )
+    if seen == 0:
+        raise ValueError(empty_message)
+    _update_catalog_from_site_counts(
+        catalog=catalog,
+        counts=counts,
+        resolve_tf_name=resolve_tf_name,
+    )
+
+
+def _fetch_sites_offline_by_motif_id(
+    *,
+    adapter: SourceAdapter,
+    root: Path,
+    catalog: CatalogIndex,
+    motif_id: str,
+    written: list[Path],
+) -> None:
+    candidates = [
+        entry for entry in catalog.entries.values() if entry.motif_id == motif_id and entry.source == adapter.source_id
+    ]
+    if not candidates:
+        raise ValueError(f"No cached entries found for motif_id '{motif_id}'.")
+    for entry in candidates:
+        _append_cached_sites_path(root=root, entry=entry, written=written)
+
+
+def _fetch_sites_online_by_motif_id(
+    *,
+    adapter: SourceAdapter,
+    root: Path,
+    catalog: CatalogIndex,
+    motif_id: str,
+    limit: Optional[int],
+    dataset_id: Optional[str],
+    update: bool,
+    sequence_provider: Optional[SequenceProvider],
+    written: list[Path],
+) -> None:
+    path = _sites_path(root, adapter.source_id, motif_id)
+    if path.exists() and not update:
+        logger.info(
+            "Skipping motif_id '%s' (cached sites exist). Use --update to refresh.",
+            motif_id,
+        )
+        written.append(path)
+        return
+    logger.info("Fetching binding sites for motif_id '%s'", motif_id)
+
+    def _resolve_tf_name(key: str) -> str:
+        existing = catalog.entries.get(key)
+        if existing is not None:
+            return existing.tf_name
+        return motif_id
+
+    _collect_sites_and_update_catalog(
+        adapter=adapter,
+        root=root,
+        query=SiteQuery(motif_id=motif_id, limit=limit, dataset_id=dataset_id),
+        sequence_provider=sequence_provider,
+        written=written,
+        catalog=catalog,
+        resolve_tf_name=_resolve_tf_name,
+        empty_message=f"No binding sites found for motif_id '{motif_id}'",
+    )
+
+
+def _fetch_sites_offline_by_name(
+    *,
+    adapter: SourceAdapter,
+    root: Path,
+    catalog: CatalogIndex,
+    name: str,
+    dataset_id: Optional[str],
+    written: list[Path],
+) -> None:
+    candidates = catalog.list(tf_name=name, source=adapter.source_id, include_synonyms=True)
+    if not candidates:
+        raise ValueError(f"No cached entries found for '{name}'.")
+    if dataset_id:
+        candidates = [c for c in candidates if c.dataset_id == dataset_id]
+        if not candidates:
+            raise ValueError(f"No cached entries found for '{name}' with dataset_id '{dataset_id}'.")
+    if len(candidates) > 1:
+        options = ", ".join(f"{c.source}:{c.motif_id}" for c in candidates)
+        raise ValueError(
+            f"Multiple cached site entries found for '{name}'. Candidates: {options}. Use --motif-id to disambiguate."
+        )
+    _append_cached_sites_path(root=root, entry=candidates[0], written=written)
+
+
+def _fetch_sites_online_by_name(
+    *,
+    adapter: SourceAdapter,
+    root: Path,
+    catalog: CatalogIndex,
+    name: str,
+    limit: Optional[int],
+    dataset_id: Optional[str],
+    update: bool,
+    sequence_provider: Optional[SequenceProvider],
+    written: list[Path],
+) -> None:
+    if not update:
+        cached = catalog.list(tf_name=name, source=adapter.source_id, include_synonyms=True)
+        if dataset_id:
+            cached = [entry for entry in cached if entry.dataset_id == dataset_id]
+        if any(entry.has_sites and _sites_path(root, entry.source, entry.motif_id).exists() for entry in cached):
+            logger.info(
+                "Skipping TF '%s' (cached sites exist). Use --update to refresh.",
+                name,
+            )
+            return
+    logger.info("Fetching binding sites for TF '%s'", name)
+    _collect_sites_and_update_catalog(
+        adapter=adapter,
+        root=root,
+        query=SiteQuery(tf_name=name, limit=limit, dataset_id=dataset_id),
+        sequence_provider=sequence_provider,
+        written=written,
+        catalog=catalog,
+        resolve_tf_name=lambda _key: name,
+        empty_message=f"No binding sites found for {name}",
+    )
 
 
 def fetch_sites(
@@ -389,337 +759,137 @@ def fetch_sites(
     motif_ids = list(motif_ids or [])
     for motif_id in motif_ids:
         if offline:
-            candidates = [
-                entry
-                for entry in catalog.entries.values()
-                if entry.motif_id == motif_id and entry.source == adapter.source_id
-            ]
-            if not candidates:
-                raise ValueError(f"No cached entries found for motif_id '{motif_id}'.")
-            for entry in candidates:
-                if not entry.has_sites:
-                    raise ValueError(f"Cached entry '{entry.source}:{entry.motif_id}' has no binding sites.")
-                path = _sites_path(root, entry.source, entry.motif_id)
-                if not path.exists():
-                    raise FileNotFoundError(f"Missing cached sites file: {path}")
-                written.append(path)
-            continue
-        path = _sites_path(root, adapter.source_id, motif_id)
-        if path.exists() and not update:
-            logger.info(
-                "Skipping motif_id '%s' (cached sites exist). Use --update to refresh.",
-                motif_id,
+            _fetch_sites_offline_by_motif_id(
+                adapter=adapter,
+                root=root,
+                catalog=catalog,
+                motif_id=motif_id,
+                written=written,
             )
-            written.append(path)
             continue
-        logger.info("Fetching binding sites for motif_id '%s'", motif_id)
-        writers: Dict[str, Tuple[Path, TextIO]] = {}
-        counts: Dict[str, Dict[str, object]] = {}
-        seen = 0
-        try:
-            for site in adapter.list_sites(SiteQuery(motif_id=motif_id, limit=limit, dataset_id=dataset_id)):
-                site = _hydrate_site_sequence(site, sequence_provider)
-                seen += 1
-                source, site_motif_id = _parse_motif_ref(site.motif_ref)
-                key = f"{source}:{site_motif_id}"
-                if key not in writers:
-                    dest = root / "normalized" / "sites" / source
-                    dest.mkdir(parents=True, exist_ok=True)
-                    path = dest / f"{site_motif_id}.jsonl"
-                    writers[key] = (path, path.open("w"))
-                    counts[key] = {
-                        "total": 0,
-                        "with_seq": 0,
-                        "organism": None,
-                        "length_sum": 0,
-                        "length_count": 0,
-                        "length_min": None,
-                        "length_max": None,
-                        "length_source": None,
-                        "site_kind": None,
-                        "dataset_id": None,
-                        "dataset_source": None,
-                        "dataset_method": None,
-                        "reference_genome": None,
-                    }
-                    written.append(path)
-                path, fh = writers[key]
-                site_total = int(counts[key]["total"])
-                site_with_seq = int(counts[key]["with_seq"])
-                if site.sequence:
-                    site_with_seq += 1
-                site_total += 1
-                if counts[key]["organism"] is None and site.organism is not None:
-                    counts[key]["organism"] = {
-                        "taxon": site.organism.taxon,
-                        "name": site.organism.name,
-                        "strain": site.organism.strain,
-                        "assembly": site.organism.assembly,
-                    }
-                tags = site.provenance.tags or {}
-                record_kind = tags.get("record_kind")
-                if record_kind:
-                    current = counts[key]["site_kind"]
-                    if current is None:
-                        counts[key]["site_kind"] = record_kind
-                    elif current != record_kind:
-                        counts[key]["site_kind"] = "mixed"
-                dataset_id = tags.get("dataset_id")
-                if dataset_id:
-                    current = counts[key]["dataset_id"]
-                    if current is None:
-                        counts[key]["dataset_id"] = dataset_id
-                    elif current != dataset_id:
-                        counts[key]["dataset_id"] = "mixed"
-                dataset_source = tags.get("dataset_source")
-                if dataset_source:
-                    current = counts[key]["dataset_source"]
-                    if current is None:
-                        counts[key]["dataset_source"] = dataset_source
-                    elif current != dataset_source:
-                        counts[key]["dataset_source"] = "mixed"
-                dataset_method = tags.get("dataset_method")
-                if dataset_method:
-                    current = counts[key]["dataset_method"]
-                    if current is None:
-                        counts[key]["dataset_method"] = dataset_method
-                    elif current != dataset_method:
-                        counts[key]["dataset_method"] = "mixed"
-                reference_genome = tags.get("reference_genome") or tags.get("sequence_assembly")
-                if reference_genome:
-                    current = counts[key]["reference_genome"]
-                    if current is None:
-                        counts[key]["reference_genome"] = reference_genome
-                    elif current != reference_genome:
-                        counts[key]["reference_genome"] = "mixed"
-                length = None
-                length_source = None
-                if site.sequence:
-                    length = len(site.sequence)
-                    length_source = "sequence"
-                elif site.coordinate is not None:
-                    length = site.coordinate.end - site.coordinate.start
-                    length_source = "coordinate"
-                if length is not None:
-                    counts[key]["length_sum"] = int(counts[key]["length_sum"]) + int(length)
-                    counts[key]["length_count"] = int(counts[key]["length_count"]) + 1
-                    current_min = counts[key]["length_min"]
-                    current_max = counts[key]["length_max"]
-                    counts[key]["length_min"] = length if current_min is None else min(current_min, length)
-                    counts[key]["length_max"] = length if current_max is None else max(current_max, length)
-                    current_source = counts[key]["length_source"]
-                    if current_source is None:
-                        counts[key]["length_source"] = length_source
-                    elif current_source != length_source:
-                        counts[key]["length_source"] = "mixed"
-                counts[key]["total"] = site_total
-                counts[key]["with_seq"] = site_with_seq
-                fh.write(json.dumps(_site_to_dict(site)) + "\n")
-        finally:
-            for _, fh in writers.values():
-                fh.close()
-        if seen == 0:
-            raise ValueError(f"No binding sites found for motif_id '{motif_id}'")
-        for key, payload in counts.items():
-            site_total = int(payload["total"])
-            site_with_seq = int(payload["with_seq"])
-            source, site_motif_id = key.split(":", 1)
-            tf_name = motif_id
-            existing = catalog.entries.get(key)
-            if existing is not None:
-                tf_name = existing.tf_name
-            length_count = int(payload.get("length_count", 0))
-            mean = None
-            if length_count > 0:
-                mean = float(payload.get("length_sum", 0)) / length_count
-                catalog.upsert_sites(
-                    source=source,
-                    motif_id=site_motif_id,
-                    tf_name=tf_name,
-                    site_count=site_with_seq,
-                    site_total=site_total,
-                    organism=payload.get("organism"),
-                    site_kind=payload.get("site_kind"),
-                    site_length_mean=mean,
-                    site_length_min=payload.get("length_min"),
-                    site_length_max=payload.get("length_max"),
-                    site_length_count=length_count,
-                    site_length_source=payload.get("length_source"),
-                    dataset_id=payload.get("dataset_id"),
-                    dataset_source=payload.get("dataset_source"),
-                    dataset_method=payload.get("dataset_method"),
-                    reference_genome=payload.get("reference_genome"),
-                )
+        _fetch_sites_online_by_motif_id(
+            adapter=adapter,
+            root=root,
+            catalog=catalog,
+            motif_id=motif_id,
+            limit=limit,
+            dataset_id=dataset_id,
+            update=update,
+            sequence_provider=sequence_provider,
+            written=written,
+        )
     for name in names:
         if offline:
-            candidates = catalog.list(tf_name=name, source=adapter.source_id, include_synonyms=True)
-            if not candidates:
-                raise ValueError(f"No cached entries found for '{name}'.")
-            if dataset_id:
-                candidates = [c for c in candidates if c.dataset_id == dataset_id]
-                if not candidates:
-                    raise ValueError(f"No cached entries found for '{name}' with dataset_id '{dataset_id}'.")
-            if len(candidates) > 1:
-                options = ", ".join(f"{c.source}:{c.motif_id}" for c in candidates)
-                raise ValueError(
-                    f"Multiple cached site entries found for '{name}'. Candidates: {options}. "
-                    "Use --motif-id to disambiguate."
-                )
-            entry = candidates[0]
-            if not entry.has_sites:
-                raise ValueError(f"Cached entry '{entry.source}:{entry.motif_id}' has no binding sites.")
-            path = _sites_path(root, entry.source, entry.motif_id)
-            if not path.exists():
-                raise FileNotFoundError(f"Missing cached sites file: {path}")
-            written.append(path)
+            _fetch_sites_offline_by_name(
+                adapter=adapter,
+                root=root,
+                catalog=catalog,
+                name=name,
+                dataset_id=dataset_id,
+                written=written,
+            )
             continue
-        if not update:
-            cached = catalog.list(tf_name=name, source=adapter.source_id, include_synonyms=True)
-            if dataset_id:
-                cached = [entry for entry in cached if entry.dataset_id == dataset_id]
-            if any(entry.has_sites and _sites_path(root, entry.source, entry.motif_id).exists() for entry in cached):
-                logger.info(
-                    "Skipping TF '%s' (cached sites exist). Use --update to refresh.",
-                    name,
-                )
-                continue
-        logger.info("Fetching binding sites for TF '%s'", name)
-        writers: Dict[str, Tuple[Path, TextIO]] = {}
-        counts: Dict[str, Dict[str, object]] = {}
-        seen = 0
-        try:
-            for site in adapter.list_sites(SiteQuery(tf_name=name, limit=limit, dataset_id=dataset_id)):
-                site = _hydrate_site_sequence(site, sequence_provider)
-                seen += 1
-                source, motif_id = _parse_motif_ref(site.motif_ref)
-                key = f"{source}:{motif_id}"
-                if key not in writers:
-                    dest = root / "normalized" / "sites" / source
-                    dest.mkdir(parents=True, exist_ok=True)
-                    path = dest / f"{motif_id}.jsonl"
-                    writers[key] = (path, path.open("w"))
-                    counts[key] = {
-                        "total": 0,
-                        "with_seq": 0,
-                        "organism": None,
-                        "length_sum": 0,
-                        "length_count": 0,
-                        "length_min": None,
-                        "length_max": None,
-                        "length_source": None,
-                        "site_kind": None,
-                        "dataset_id": None,
-                        "dataset_source": None,
-                        "dataset_method": None,
-                        "reference_genome": None,
-                    }
-                    written.append(path)
-                path, fh = writers[key]
-                site_total = int(counts[key]["total"])
-                site_with_seq = int(counts[key]["with_seq"])
-                if site.sequence:
-                    site_with_seq += 1
-                site_total += 1
-                if counts[key]["organism"] is None and site.organism is not None:
-                    counts[key]["organism"] = {
-                        "taxon": site.organism.taxon,
-                        "name": site.organism.name,
-                        "strain": site.organism.strain,
-                        "assembly": site.organism.assembly,
-                    }
-                tags = site.provenance.tags or {}
-                record_kind = tags.get("record_kind")
-                if record_kind:
-                    current = counts[key]["site_kind"]
-                    if current is None:
-                        counts[key]["site_kind"] = record_kind
-                    elif current != record_kind:
-                        counts[key]["site_kind"] = "mixed"
-                tag_dataset_id = tags.get("dataset_id")
-                if tag_dataset_id:
-                    current = counts[key]["dataset_id"]
-                    if current is None:
-                        counts[key]["dataset_id"] = tag_dataset_id
-                    elif current != tag_dataset_id:
-                        counts[key]["dataset_id"] = "mixed"
-                dataset_source = tags.get("dataset_source")
-                if dataset_source:
-                    current = counts[key]["dataset_source"]
-                    if current is None:
-                        counts[key]["dataset_source"] = dataset_source
-                    elif current != dataset_source:
-                        counts[key]["dataset_source"] = "mixed"
-                dataset_method = tags.get("dataset_method")
-                if dataset_method:
-                    current = counts[key]["dataset_method"]
-                    if current is None:
-                        counts[key]["dataset_method"] = dataset_method
-                    elif current != dataset_method:
-                        counts[key]["dataset_method"] = "mixed"
-                reference_genome = tags.get("reference_genome") or tags.get("sequence_assembly")
-                if reference_genome:
-                    current = counts[key]["reference_genome"]
-                    if current is None:
-                        counts[key]["reference_genome"] = reference_genome
-                    elif current != reference_genome:
-                        counts[key]["reference_genome"] = "mixed"
-                length = None
-                length_source = None
-                if site.sequence:
-                    length = len(site.sequence)
-                    length_source = "sequence"
-                elif site.coordinate is not None:
-                    length = site.coordinate.end - site.coordinate.start
-                    length_source = "coordinate"
-                if length is not None:
-                    counts[key]["length_sum"] = int(counts[key]["length_sum"]) + int(length)
-                    counts[key]["length_count"] = int(counts[key]["length_count"]) + 1
-                    current_min = counts[key]["length_min"]
-                    current_max = counts[key]["length_max"]
-                    counts[key]["length_min"] = length if current_min is None else min(current_min, length)
-                    counts[key]["length_max"] = length if current_max is None else max(current_max, length)
-                    current_source = counts[key]["length_source"]
-                    if current_source is None:
-                        counts[key]["length_source"] = length_source
-                    elif current_source != length_source:
-                        counts[key]["length_source"] = "mixed"
-                counts[key]["total"] = site_total
-                counts[key]["with_seq"] = site_with_seq
-                fh.write(json.dumps(_site_to_dict(site)) + "\n")
-        finally:
-            for _, fh in writers.values():
-                fh.close()
-        if seen == 0:
-            raise ValueError(f"No binding sites found for {name}")
-        for key, payload in counts.items():
-            site_total = int(payload["total"])
-            site_with_seq = int(payload["with_seq"])
-            source, motif_id = key.split(":", 1)
-            length_count = int(payload.get("length_count", 0))
-            mean = None
-            if length_count > 0:
-                mean = float(payload.get("length_sum", 0)) / length_count
-                catalog.upsert_sites(
-                    source=source,
-                    motif_id=motif_id,
-                    tf_name=name,
-                    site_count=site_with_seq,
-                    site_total=site_total,
-                    organism=payload.get("organism"),
-                    site_kind=payload.get("site_kind"),
-                    site_length_mean=mean,
-                    site_length_min=payload.get("length_min"),
-                    site_length_max=payload.get("length_max"),
-                    site_length_count=length_count,
-                    site_length_source=payload.get("length_source"),
-                    dataset_id=payload.get("dataset_id"),
-                    dataset_source=payload.get("dataset_source"),
-                    dataset_method=payload.get("dataset_method"),
-                    reference_genome=payload.get("reference_genome"),
-                )
+        _fetch_sites_online_by_name(
+            adapter=adapter,
+            root=root,
+            catalog=catalog,
+            name=name,
+            limit=limit,
+            dataset_id=dataset_id,
+            update=update,
+            sequence_provider=sequence_provider,
+            written=written,
+        )
     if written:
         catalog.save(root)
     return written
+
+
+def _targets_from_all_cached_sites(catalog: CatalogIndex) -> list[tuple[str, str, str]]:
+    targets: list[tuple[str, str, str]] = []
+    for entry in catalog.entries.values():
+        if entry.has_sites:
+            targets.append((entry.tf_name, entry.source, entry.motif_id))
+    return targets
+
+
+def _append_targets_for_motif_ids(
+    *,
+    catalog: CatalogIndex,
+    motif_ids: list[str],
+    targets: list[tuple[str, str, str]],
+) -> None:
+    for motif_id in motif_ids:
+        candidates = [entry for entry in catalog.entries.values() if entry.motif_id == motif_id]
+        if not candidates:
+            raise ValueError(f"No cached entries found for motif_id '{motif_id}'.")
+        for entry in candidates:
+            targets.append((entry.tf_name, entry.source, entry.motif_id))
+
+
+def _append_targets_for_names(
+    *,
+    catalog: CatalogIndex,
+    names: list[str],
+    targets: list[tuple[str, str, str]],
+) -> None:
+    for name in names:
+        candidates = catalog.list(tf_name=name, include_synonyms=True)
+        if not candidates:
+            raise ValueError(f"No cached entries found for '{name}'.")
+        for entry in candidates:
+            targets.append((entry.tf_name, entry.source, entry.motif_id))
+
+
+def _resolve_hydrate_targets(
+    *,
+    catalog: CatalogIndex,
+    names: Iterable[str] | None,
+    motif_ids: Iterable[str] | None,
+) -> list[tuple[str, str, str]]:
+    targets: list[tuple[str, str, str]] = []
+    motif_id_values = list(motif_ids or [])
+    name_values = list(names or [])
+    if not name_values and not motif_id_values:
+        targets = _targets_from_all_cached_sites(catalog)
+        if not targets:
+            raise ValueError("No cached binding sites found to hydrate.")
+        return targets
+    _append_targets_for_motif_ids(catalog=catalog, motif_ids=motif_id_values, targets=targets)
+    _append_targets_for_names(catalog=catalog, names=name_values, targets=targets)
+    return targets
+
+
+def _upsert_hydrated_site_counts(
+    *,
+    catalog: CatalogIndex,
+    tf_name: str,
+    source: str,
+    motif_id: str,
+    counts: Dict[str, object],
+) -> None:
+    length_count = int(counts.get("length_count", 0))
+    mean = None
+    if length_count > 0:
+        mean = float(counts.get("length_sum", 0)) / length_count
+    catalog.upsert_sites(
+        source=source,
+        motif_id=motif_id,
+        tf_name=tf_name,
+        site_count=int(counts.get("with_seq", 0)),
+        site_total=int(counts.get("total", 0)),
+        organism=counts.get("organism"),
+        site_kind=counts.get("site_kind"),
+        site_length_mean=mean,
+        site_length_min=counts.get("length_min"),
+        site_length_max=counts.get("length_max"),
+        site_length_count=length_count,
+        site_length_source=counts.get("length_source"),
+        dataset_id=counts.get("dataset_id"),
+        dataset_source=counts.get("dataset_source"),
+        dataset_method=counts.get("dataset_method"),
+        reference_genome=counts.get("reference_genome"),
+    )
 
 
 def hydrate_sites(
@@ -732,28 +902,12 @@ def hydrate_sites(
     if sequence_provider is None:
         raise ValueError("Sequence provider is required to hydrate cached sites.")
     catalog = CatalogIndex.load(root)
-    motif_ids = list(motif_ids or [])
-    names = list(names or [])
     written: list[Path] = []
-    targets: list[Tuple[str, str, str]] = []
-    if not names and not motif_ids:
-        for entry in catalog.entries.values():
-            if entry.has_sites:
-                targets.append((entry.tf_name, entry.source, entry.motif_id))
-        if not targets:
-            raise ValueError("No cached binding sites found to hydrate.")
-    for motif_id in motif_ids:
-        candidates = [entry for entry in catalog.entries.values() if entry.motif_id == motif_id]
-        if not candidates:
-            raise ValueError(f"No cached entries found for motif_id '{motif_id}'.")
-        for entry in candidates:
-            targets.append((entry.tf_name, entry.source, entry.motif_id))
-    for name in names:
-        candidates = catalog.list(tf_name=name, include_synonyms=True)
-        if not candidates:
-            raise ValueError(f"No cached entries found for '{name}'.")
-        for entry in candidates:
-            targets.append((entry.tf_name, entry.source, entry.motif_id))
+    targets = _resolve_hydrate_targets(
+        catalog=catalog,
+        names=names,
+        motif_ids=motif_ids,
+    )
     seen: set[str] = set()
     for tf_name, source, motif_id in targets:
         key = f"{source}:{motif_id}"
@@ -766,27 +920,12 @@ def hydrate_sites(
         updated, counts = _hydrate_sites_file(path=path, provider=sequence_provider)
         if updated:
             written.append(path)
-        length_count = int(counts.get("length_count", 0))
-        mean = None
-        if length_count > 0:
-            mean = float(counts.get("length_sum", 0)) / length_count
-        catalog.upsert_sites(
+        _upsert_hydrated_site_counts(
+            catalog=catalog,
+            tf_name=tf_name,
             source=source,
             motif_id=motif_id,
-            tf_name=tf_name,
-            site_count=int(counts.get("with_seq", 0)),
-            site_total=int(counts.get("total", 0)),
-            organism=counts.get("organism"),
-            site_kind=counts.get("site_kind"),
-            site_length_mean=mean,
-            site_length_min=counts.get("length_min"),
-            site_length_max=counts.get("length_max"),
-            site_length_count=length_count,
-            site_length_source=counts.get("length_source"),
-            dataset_id=counts.get("dataset_id"),
-            dataset_source=counts.get("dataset_source"),
-            dataset_method=counts.get("dataset_method"),
-            reference_genome=counts.get("reference_genome"),
+            counts=counts,
         )
     if written:
         catalog.save(root)

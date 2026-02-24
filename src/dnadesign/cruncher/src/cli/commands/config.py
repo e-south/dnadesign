@@ -99,13 +99,6 @@ def summary(
     table.add_row("regulator_sets", str(summary["regulator_sets"]))
     table.add_row("regulators_flat", ", ".join(summary["regulators_flat"]))
     table.add_row("regulator_categories", str(summary.get("regulator_categories") or {}))
-    campaign_names = summary.get("campaign_names") or []
-    table.add_row("campaigns", ", ".join(campaign_names) if campaign_names else "-")
-    campaign_meta = summary.get("campaign")
-    if campaign_meta:
-        table.add_row("campaign.name", campaign_meta.get("name", "-"))
-        table.add_row("campaign.id", campaign_meta.get("campaign_id", "-"))
-        table.add_row("campaign.manifest_path", campaign_meta.get("manifest_path", "-"))
     table.add_row("io.parsers.extra_modules", str(summary["io"]["parsers"]["extra_modules"]))
     table.add_row("catalog.root", summary["catalog"]["root"])
     table.add_row("catalog.pwm_source", summary["catalog"]["pwm_source"])
@@ -203,6 +196,9 @@ def summary(
         table.add_row("elites.pool_size", str(sample["elites"]["select"]["pool_size"]))
         table.add_row("output.save_sequences", str(sample["output"]["save_sequences"]))
         table.add_row("output.save_trace", str(sample["output"]["save_trace"]))
+        table.add_row("output.save_random_baseline", str(sample["output"]["save_random_baseline"]))
+        table.add_row("output.random_baseline_n", str(sample["output"]["random_baseline_n"]))
+        table.add_row("output.save_optimizer_move_stats", str(sample["output"]["save_optimizer_move_stats"]))
 
     analysis = summary.get("analysis")
     if analysis is None:

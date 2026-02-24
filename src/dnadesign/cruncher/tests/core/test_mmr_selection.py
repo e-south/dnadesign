@@ -258,3 +258,47 @@ def test_tfbs_cores_from_scorer_clips_width_to_sequence_length() -> None:
     cores = tfbs_cores_from_scorer(seq, scorer=_StubScorer(), tf_names=["tf"])
     assert "tf" in cores
     assert cores["tf"].shape == (4,)
+
+
+def test_mmr_selection_reuses_pairwise_core_distance_computations(monkeypatch: pytest.MonkeyPatch) -> None:
+    import dnadesign.cruncher.core.selection.mmr as mmr_module
+
+    candidates = [
+        _candidate("AAAAAA", chain=0, draw=1, combined=0.91, min_norm=0.91),
+        _candidate("AAAACA", chain=0, draw=2, combined=0.90, min_norm=0.90),
+        _candidate("AAACAA", chain=0, draw=3, combined=0.89, min_norm=0.89),
+        _candidate("AACAAA", chain=0, draw=4, combined=0.88, min_norm=0.88),
+        _candidate("ACAAAA", chain=0, draw=5, combined=0.87, min_norm=0.87),
+        _candidate("CAAAAA", chain=0, draw=6, combined=0.86, min_norm=0.86),
+    ]
+    tf_names = ["tf"]
+    core_maps = {f"{cand.chain_id}:{cand.draw_idx}": {"tf": cand.seq_arr.copy()} for cand in candidates}
+    pwm = _pwm("tf", [[0.25, 0.25, 0.25, 0.25]] * 6)
+
+    call_count = 0
+    original = mmr_module.compute_core_distance
+
+    def _counted(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(mmr_module, "compute_core_distance", _counted)
+
+    k = 4
+    n = len(candidates)
+    select_mmr_elites(
+        candidates,
+        k=k,
+        pool_size=n,
+        alpha=0.8,
+        relevance="min_tf_score",
+        dsdna=False,
+        tf_names=tf_names,
+        pwms={"tf": pwm},
+        core_maps=core_maps,
+    )
+
+    unique_pool_pairs = (n * (n - 1)) // 2
+    selected_pairwise_summary = (k * (k - 1)) // 2
+    assert call_count <= unique_pool_pairs + selected_pairwise_summary

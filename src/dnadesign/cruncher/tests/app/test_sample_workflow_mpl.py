@@ -106,3 +106,24 @@ def test_run_sample_forwards_runtime_progress_controls(tmp_path, monkeypatch) ->
 
     sample_workflow.run_sample(cfg, config_path, progress_bar=False, progress_every=37)
     assert captured == [{"progress_bar": False, "progress_every": 37}]
+
+
+def test_run_sample_forwards_run_index_registration_flag(tmp_path, monkeypatch) -> None:
+    catalog_root = tmp_path / ".cruncher"
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(_config_payload(catalog_root=catalog_root, save_trace=False)))
+    cfg = load_config(config_path)
+
+    captured: list[bool] = []
+
+    def _fake_run_set(*args, **kwargs):
+        captured.append(bool(kwargs.get("register_run_in_index", True)))
+        return tmp_path / "results" / "sample" / "dummy"
+
+    monkeypatch.setattr(sample_workflow, "_lockmap_for", lambda cfg, config_path: {})
+    monkeypatch.setattr(sample_workflow, "target_statuses", lambda **kwargs: [])
+    monkeypatch.setattr(sample_workflow, "has_blocking_target_errors", lambda statuses: False)
+    monkeypatch.setattr(sample_workflow, "_run_sample_for_set", _fake_run_set)
+
+    sample_workflow.run_sample(cfg, config_path, register_run_in_index=False)
+    assert captured == [False]

@@ -27,7 +27,7 @@ from dnadesign.cruncher.artifacts.layout import config_used_path
 from dnadesign.cruncher.config.schema_v3 import CruncherConfig
 from dnadesign.cruncher.core.labels import regulator_sets
 from dnadesign.cruncher.utils.arviz_cache import ensure_arviz_data_dir
-from dnadesign.cruncher.utils.paths import resolve_catalog_root
+from dnadesign.cruncher.utils.paths import resolve_catalog_root, resolve_workspace_root
 from dnadesign.cruncher.viz.mpl import ensure_mpl_cache
 
 logger = logging.getLogger(__name__)
@@ -66,6 +66,7 @@ def run_sample(
     force_overwrite: bool = False,
     progress_bar: bool = True,
     progress_every: int = 0,
+    register_run_in_index: bool = True,
 ) -> None:
     """
     Run MCMC sampler, save config/meta plus artifacts (trace.nc, sequences.parquet, elites.*).
@@ -112,12 +113,13 @@ def run_sample(
                 force_overwrite=force_overwrite,
                 progress_bar=progress_bar,
                 progress_every=progress_every,
+                register_run_in_index=register_run_in_index,
             )
             logger.info(
                 "Sample outputs -> %s",
-                _format_run_path(run_dir, base=config_path.parent),
+                _format_run_path(run_dir, base=resolve_workspace_root(config_path)),
             )
             logger.info(
                 "Config used -> %s",
-                _format_run_path(config_used_path(run_dir), base=config_path.parent),
+                _format_run_path(config_used_path(run_dir), base=resolve_workspace_root(config_path)),
             )

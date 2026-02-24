@@ -25,6 +25,7 @@ from dnadesign.cruncher.artifacts.layout import (
     elites_path,
     ensure_run_dirs,
     manifest_path,
+    run_export_dir,
     run_export_sequences_manifest_path,
     run_export_sequences_table_path,
 )
@@ -45,7 +46,7 @@ def _write_run_fixture(
     ensure_run_dirs(run_dir, meta=True, artifacts=True, live=False)
 
     sequence = "CTGCATATATTTTACAG"
-    elites = pd.DataFrame([{"id": "elite-1", "rank": 1, "sequence": sequence}])
+    elites = pd.DataFrame([{"id": "elite-1", "rank": 1, "sequence": sequence, "combined_score_final": 0.9}])
     elites_path(run_dir).parent.mkdir(parents=True, exist_ok=True)
     elites.to_parquet(elites_path(run_dir), engine="fastparquet")
 
@@ -152,43 +153,57 @@ def _write_run_fixture(
 
 def test_export_sequences_for_run_writes_expected_artifacts(tmp_path: Path) -> None:
     run_dir = _write_run_fixture(tmp_path)
+    stale_export = run_export_dir(run_dir) / "table__monospecific_elite_windows.csv"
+    stale_export.parent.mkdir(parents=True, exist_ok=True)
+    stale_export.write_text("stale\n")
 
     result = export_sequences_for_run(run_dir, run_name="sample_export")
 
-    consensus_path = run_export_sequences_table_path(run_dir, table_name="monospecific_consensus_sites", fmt="parquet")
-    windows_path = run_export_sequences_table_path(run_dir, table_name="monospecific_elite_windows", fmt="parquet")
-    pairwise_path = run_export_sequences_table_path(run_dir, table_name="bispecific_elite_windows", fmt="parquet")
-    combos_path = run_export_sequences_table_path(run_dir, table_name="multispecific_elite_windows", fmt="parquet")
+    consensus_path = run_export_sequences_table_path(run_dir, table_name="consensus_sites", fmt="csv")
+    elites_path_csv = run_export_dir(run_dir) / "table__elites.csv"
     manifest_out = run_export_sequences_manifest_path(run_dir)
 
     assert result.manifest_path == manifest_out
+    assert result.output_dir == run_export_dir(run_dir)
     assert consensus_path.exists()
-    assert windows_path.exists()
-    assert pairwise_path.exists()
-    assert combos_path.exists()
+    assert elites_path_csv.exists()
     assert manifest_out.exists()
+    assert not stale_export.exists()
 
-    consensus_df = pd.read_parquet(consensus_path, engine="fastparquet")
-    windows_df = pd.read_parquet(windows_path, engine="fastparquet")
-    pairwise_df = pd.read_parquet(pairwise_path, engine="fastparquet")
-    combos_df = pd.read_parquet(combos_path, engine="fastparquet")
+    consensus_df = pd.read_csv(consensus_path)
+    elites_csv_df = pd.read_csv(elites_path_csv)
     export_manifest = json.loads(manifest_out.read_text())
     run_manifest = json.loads(manifest_path(run_dir).read_text())
 
     assert len(consensus_df) == 2
-    assert len(windows_df) == 2
-    assert len(pairwise_df) == 1
-    assert len(combos_df) == 0
-    assert export_manifest["kind"] == "sequence_export_v2"
-    assert export_manifest["row_counts"]["bispecific_elite_windows"] == 1
-    assert export_manifest["row_counts"]["multispecific_elite_windows"] == 0
+    assert len(elites_csv_df) == 1
+    assert "sequence_length" in elites_csv_df.columns
+    assert "window_members_json" in elites_csv_df.columns
+    assert int(elites_csv_df.loc[0, "sequence_length"]) == len("CTGCATATATTTTACAG")
+    members = json.loads(str(elites_csv_df.loc[0, "window_members_json"]))
+    assert isinstance(members, list)
+    assert len(members) == 2
+    assert {
+        "regulator_id",
+        "offset_start",
+        "offset_end",
+        "window_kmer",
+        "core_kmer",
+        "strand",
+        "score_name",
+        "score",
+    }.issubset(set(members[0].keys()))
+    assert export_manifest["kind"] == "sequence_export_v3"
+    assert export_manifest["table_format"] == "csv"
+    assert export_manifest["files"]["elites"] == "export/table__elites.csv"
+    assert export_manifest["files"]["consensus_sites"] == "export/table__consensus_sites.csv"
+    assert export_manifest["row_counts"]["elites"] == 1
+    assert export_manifest["row_counts"]["consensus_sites"] == 2
 
     artifact_paths = {entry["path"] for entry in run_manifest.get("artifacts", [])}
-    assert "export/sequences/table__monospecific_consensus_sites.parquet" in artifact_paths
-    assert "export/sequences/table__monospecific_elite_windows.parquet" in artifact_paths
-    assert "export/sequences/table__bispecific_elite_windows.parquet" in artifact_paths
-    assert "export/sequences/table__multispecific_elite_windows.parquet" in artifact_paths
-    assert "export/sequences/export_manifest.json" in artifact_paths
+    assert "export/table__consensus_sites.csv" in artifact_paths
+    assert "export/table__elites.csv" in artifact_paths
+    assert "export/export_manifest.json" in artifact_paths
 
 
 def test_export_sequences_for_run_rejects_duplicate_tf_hits(tmp_path: Path) -> None:
@@ -198,17 +213,30 @@ def test_export_sequences_for_run_rejects_duplicate_tf_hits(tmp_path: Path) -> N
         export_sequences_for_run(run_dir, run_name="sample_export")
 
 
-def test_export_sequences_for_run_splits_bispecific_and_multispecific_rows(tmp_path: Path) -> None:
+def test_export_sequences_for_run_includes_rich_window_members_metadata(tmp_path: Path) -> None:
     run_dir = _write_run_fixture(tmp_path, include_third_tf=True)
 
-    export_sequences_for_run(run_dir, run_name="sample_export")
+    export_sequences_for_run(run_dir, run_name="sample_export", table_format="parquet")
 
-    pairwise_path = run_export_sequences_table_path(run_dir, table_name="bispecific_elite_windows", fmt="parquet")
-    combos_path = run_export_sequences_table_path(run_dir, table_name="multispecific_elite_windows", fmt="parquet")
+    elites_path_csv = run_export_dir(run_dir) / "table__elites.csv"
+    consensus_path = run_export_sequences_table_path(run_dir, table_name="consensus_sites", fmt="parquet")
 
-    pairwise_df = pd.read_parquet(pairwise_path, engine="fastparquet")
-    combos_df = pd.read_parquet(combos_path, engine="fastparquet")
+    elites_df = pd.read_csv(elites_path_csv)
+    consensus_df = pd.read_parquet(consensus_path, engine="fastparquet")
 
-    assert len(pairwise_df) == 3
-    assert len(combos_df) == 1
-    assert set(combos_df["combo_size"].tolist()) == {3}
+    assert len(elites_df) == 1
+    assert len(consensus_df) == 3
+    members = json.loads(str(elites_df.loc[0, "window_members_json"]))
+    assert len(members) == 3
+    assert sorted(item["regulator_id"] for item in members) == ["baeR", "cpxR", "lexA"]
+    assert all(item["score_name"] == "best_score_norm" for item in members)
+
+
+def test_export_sequences_for_run_requires_combined_score_final(tmp_path: Path) -> None:
+    run_dir = _write_run_fixture(tmp_path)
+    elites_df = pd.read_parquet(elites_path(run_dir), engine="fastparquet")
+    elites_df = elites_df.drop(columns=["combined_score_final"], errors="ignore")
+    elites_df.to_parquet(elites_path(run_dir), engine="fastparquet")
+
+    with pytest.raises(ValueError, match="combined_score_final"):
+        export_sequences_for_run(run_dir, run_name="sample_export")

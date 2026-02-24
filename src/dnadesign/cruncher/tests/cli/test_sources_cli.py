@@ -40,7 +40,8 @@ def test_sources_list_uses_workspace_config(tmp_path: Path) -> None:
             },
         }
     }
-    config_path = workspace / "config.yaml"
+    config_path = workspace / "configs" / "config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(yaml.safe_dump(config))
 
     result = runner.invoke(

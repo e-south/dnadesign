@@ -32,17 +32,54 @@ def test_analyze_workflow_has_no_top_level_plot_imports() -> None:
     assert not offending, "Move plot imports inside run_analyze after ensure_mpl_cache:\n" + "\n".join(offending)
 
 
-def test_analyze_cli_initializes_mpl_cache_before_loading_workflow() -> None:
+def test_run_analyze_resolves_runs_before_cache_setup_and_plot_imports() -> None:
+    cruncher_root = Path(__file__).resolve().parents[2]
+    workflow_path = cruncher_root / "src" / "app" / "analyze_workflow.py"
+    content = workflow_path.read_text()
+
+    runs_call = "runs = _resolve_run_names("
+    cache_call = "ensure_mpl_cache(catalog_root)"
+    plot_import = "from dnadesign.cruncher.analysis.plots.elites_nn_distance import plot_elites_nn_distance"
+
+    runs_idx = content.find(runs_call)
+    cache_idx = content.find(cache_call)
+    plot_idx = content.find(plot_import)
+
+    assert runs_idx >= 0, "Expected run_analyze to resolve run names."
+    assert cache_idx >= 0, "Expected run_analyze to initialize Matplotlib cache."
+    assert plot_idx >= 0, "Expected run_analyze to import plot modules lazily."
+    assert runs_idx < cache_idx, "run_analyze must resolve run names before cache setup."
+    assert cache_idx < plot_idx, "Matplotlib cache must be initialized before loading plot modules."
+
+
+def test_analyze_cli_defers_mpl_cache_to_workflow() -> None:
     cruncher_root = Path(__file__).resolve().parents[2]
     cli_path = cruncher_root / "src" / "cli" / "commands" / "analyze.py"
     content = cli_path.read_text()
 
-    cache_call = "ensure_mpl_cache(resolve_catalog_root(config_path, cfg.catalog.catalog_root))"
     workflow_import = "from dnadesign.cruncher.app.analyze_workflow import run_analyze"
 
-    cache_idx = content.find(cache_call)
     import_idx = content.find(workflow_import)
 
-    assert cache_idx >= 0, "Expected analyze CLI to initialize Matplotlib cache."
     assert import_idx >= 0, "Expected analyze CLI to import run_analyze lazily."
-    assert cache_idx < import_idx, "Matplotlib cache must be initialized before importing analyze_workflow."
+    assert "ensure_mpl_cache(" not in content, "Analyze CLI should delegate Matplotlib cache setup to run_analyze."
+
+
+def test_analyze_workflow_delegates_score_space_helpers_to_module() -> None:
+    cruncher_root = Path(__file__).resolve().parents[2]
+    workflow_path = cruncher_root / "src" / "app" / "analyze_workflow.py"
+    content = workflow_path.read_text()
+
+    helper_import = "from dnadesign.cruncher.app.analyze_score_space import ("
+    score_space_context_def = "def _resolve_score_space_context("
+    trajectory_projection_def = "def _project_trajectory_views_with_cleanup("
+    projection_inputs_def = "def _resolve_objective_projection_inputs("
+
+    assert helper_import in content, "Expected analyze_workflow to import score-space helpers from analyze_score_space."
+    assert score_space_context_def not in content, "analyze_workflow should not define _resolve_score_space_context."
+    assert trajectory_projection_def not in content, (
+        "analyze_workflow should not define _project_trajectory_views_with_cleanup."
+    )
+    assert projection_inputs_def not in content, (
+        "analyze_workflow should not define _resolve_objective_projection_inputs."
+    )

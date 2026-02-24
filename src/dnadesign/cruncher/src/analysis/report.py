@@ -156,7 +156,7 @@ def build_report_payload(
     if isinstance(analysis_cfg, dict):
         table_format = str(analysis_cfg.get("table_format") or table_format)
         plot_format = str(analysis_cfg.get("plot_format") or plot_format)
-    start_here_key = "chain_trajectory_scatter"
+    start_here_key = "elite_score_space_context"
 
     metrics = {}
     warnings = []
@@ -263,8 +263,8 @@ def build_report_payload(
     pointers = {
         "start_here_plot": _plot_path_from_manifest(analysis_root, start_here_key)
         or _plot_path(analysis_root, start_here_key, plot_format),
-        "trajectory_plot": _plot_path_from_manifest(analysis_root, "chain_trajectory_scatter")
-        or _plot_path(analysis_root, "chain_trajectory_scatter", plot_format),
+        "trajectory_plot": _plot_path_from_manifest(analysis_root, "elite_score_space_context")
+        or _plot_path(analysis_root, "elite_score_space_context", plot_format),
         "trajectory_sweep_plot": _plot_path_from_manifest(analysis_root, "chain_trajectory_sweep")
         or _plot_path(analysis_root, "chain_trajectory_sweep", plot_format),
         "diagnostics": _table_path(analysis_root, "diagnostics_summary", "json"),
@@ -375,8 +375,8 @@ def write_report_md(
             "",
             "## Start here",
             "",
-            f"- {pointers.get('start_here_plot') or 'plots/analysis/chain_trajectory_scatter.<ext>'}",
-            f"- {pointers.get('trajectory_sweep_plot') or 'plots/analysis/chain_trajectory_sweep.<ext>'}",
+            f"- {pointers.get('start_here_plot') or 'plots/elite_score_space_context.<ext>'}",
+            f"- {pointers.get('trajectory_sweep_plot') or 'plots/chain_trajectory_sweep.<ext>'}",
             f"- {pointers.get('diagnostics') or 'tables/table__diagnostics_summary.json'}",
             f"- {pointers.get('objective_components') or 'tables/table__objective_components.json'}",
         ]
@@ -404,8 +404,8 @@ def write_report_md(
         lines.extend([f"- {item}" for item in warnings])
 
     artifact_index = [
-        pointers.get("start_here_plot") or "plots/analysis/chain_trajectory_scatter.<ext>",
-        pointers.get("trajectory_sweep_plot") or "plots/analysis/chain_trajectory_sweep.<ext>",
+        pointers.get("start_here_plot") or "plots/elite_score_space_context.<ext>",
+        pointers.get("trajectory_sweep_plot") or "plots/chain_trajectory_sweep.<ext>",
         pointers.get("diagnostics") or "tables/table__diagnostics_summary.json",
         pointers.get("objective_components") or "tables/table__objective_components.json",
         pointers.get("elites_mmr_summary") or None,

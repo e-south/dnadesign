@@ -20,20 +20,36 @@ from dnadesign.cruncher.core.pwm import PWM
 from dnadesign.cruncher.core.selection.mmr import compute_position_weights
 
 
-def _weighted_hamming(a: str, b: str, weights: np.ndarray) -> float:
-    if len(a) != len(b) or not a:
+def _weighted_hamming(a: np.ndarray, b: np.ndarray, weights: np.ndarray) -> float:
+    if a.shape != b.shape or a.size == 0:
         return float("nan")
     weights_arr = np.asarray(weights, dtype=float)
-    if weights_arr.size != len(a):
+    if weights_arr.size != a.size:
         return float("nan")
     total = float(weights_arr.sum())
     if total <= 0 or not np.isfinite(total):
         return float("nan")
-    mismatch_weight = 0.0
-    for c0, c1, w in zip(a, b, weights_arr):
-        if c0 != c1:
-            mismatch_weight += float(w)
+    mismatch_weight = float(np.dot(weights_arr, np.not_equal(a, b)))
     return mismatch_weight / total
+
+
+def _levenshtein_bp(a: str, b: str) -> int:
+    if a == b:
+        return 0
+    if not a:
+        return len(b)
+    if not b:
+        return len(a)
+    if len(a) < len(b):
+        a, b = b, a
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, start=1):
+        curr = [i]
+        for j, cb in enumerate(b, start=1):
+            cost = 0 if ca == cb else 1
+            curr.append(min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost))
+        prev = curr
+    return int(prev[-1])
 
 
 def _tfbs_core_map(
@@ -41,9 +57,9 @@ def _tfbs_core_map(
     tf_names: Iterable[str],
     *,
     id_column: str,
-) -> dict[str, dict[str, str]]:
+) -> dict[str, dict[str, np.ndarray]]:
     tf_list = list(tf_names)
-    core_by_id: dict[str, dict[str, str]] = {}
+    core_by_id: dict[str, dict[str, np.ndarray]] = {}
     if hits_df is None or hits_df.empty:
         return core_by_id
     required_cols = [id_column, "tf", "best_core_seq"]
@@ -57,7 +73,7 @@ def _tfbs_core_map(
             continue
         if not isinstance(core_seq, str) or not core_seq:
             continue
-        core_by_id.setdefault(item_id, {})[str(tf_name)] = core_seq
+        core_by_id.setdefault(item_id, {})[str(tf_name)] = np.frombuffer(core_seq.encode("ascii"), dtype=np.uint8)
     return core_by_id
 
 
@@ -76,12 +92,27 @@ def compute_distance_matrix(
     if n == 0:
         return item_ids, dist
 
-    weights_by_tf: dict[str, np.ndarray] = {}
+    weights_by_tf: dict[str, tuple[np.ndarray, float]] = {}
     for tf in tf_list:
         pwm = pwms.get(tf)
         if pwm is None:
             continue
-        weights_by_tf[tf] = compute_position_weights(pwm)
+        weights_arr = np.asarray(compute_position_weights(pwm), dtype=float)
+        weight_total = float(weights_arr.sum())
+        if weights_arr.size == 0 or weight_total <= 0 or not np.isfinite(weight_total):
+            continue
+        weights_by_tf[tf] = (weights_arr, weight_total)
+
+    expected_width_by_tf = {tf: payload[0].size for tf, payload in weights_by_tf.items()}
+    for item_id, tf_cores in core_by_id.items():
+        for tf, core in tf_cores.items():
+            expected_width = expected_width_by_tf.get(tf)
+            if expected_width is None:
+                continue
+            if core.size != expected_width:
+                raise ValueError(
+                    f"core width mismatch for TF '{tf}' in item '{item_id}': expected {expected_width}, got {core.size}"
+                )
 
     for i, item_i in enumerate(item_ids):
         dist[i, i] = 0.0
@@ -92,13 +123,15 @@ def compute_distance_matrix(
             for tf in tf_list:
                 core_i = core_by_id[item_i].get(tf)
                 core_j = core_by_id[item_j].get(tf)
-                weights = weights_by_tf.get(tf)
-                if core_i is None or core_j is None or weights is None:
+                weight_payload = weights_by_tf.get(tf)
+                if core_i is None or core_j is None or weight_payload is None:
                     continue
-                distance = _weighted_hamming(core_i, core_j, weights)
-                if np.isfinite(distance):
-                    per_tf_sum += float(distance)
-                    per_tf_count += 1
+                weights_arr, weight_total = weight_payload
+                if core_i.shape != core_j.shape or core_i.size != weights_arr.size:
+                    continue
+                distance = float(np.dot(weights_arr, np.not_equal(core_i, core_j))) / weight_total
+                per_tf_sum += distance
+                per_tf_count += 1
             if per_tf_count == 0:
                 value = float("nan")
             else:
@@ -259,11 +292,8 @@ def compute_elites_full_sequence_nn_table(
         return empty_df, empty_summary
     if 0 in lengths:
         raise ValueError("elites.parquet contains empty sequence values; full-sequence diversity cannot be computed.")
-    if len(lengths) != 1:
-        raise ValueError(
-            "elites.parquet contains mixed sequence lengths; full-sequence diversity requires fixed-length sequences."
-        )
-    sequence_length = int(next(iter(lengths)))
+    mixed_lengths = len(lengths) != 1
+    sequence_length = None if mixed_lengths else int(next(iter(lengths)))
 
     rep_by_identity: dict[str, str] | None = None
     if identity_by_elite_id:
@@ -275,44 +305,72 @@ def compute_elites_full_sequence_nn_table(
 
     ids = work["id"].tolist()
     seq_by_id = dict(zip(work["id"], work["sequence"], strict=True))
+    length_by_id = {elite_id: len(seq_by_id[elite_id]) for elite_id in ids}
     n_items = len(ids)
     matrix = np.zeros((n_items, n_items), dtype=float)
+    matrix_dist = np.zeros((n_items, n_items), dtype=float)
     for i in range(n_items):
         seq_i = seq_by_id[ids[i]]
         for j in range(i + 1, n_items):
             seq_j = seq_by_id[ids[j]]
-            mismatches = float(sum(int(a != b) for a, b in zip(seq_i, seq_j, strict=False)))
+            if mixed_lengths:
+                mismatches = float(_levenshtein_bp(seq_i, seq_j))
+                norm_denom = float(max(length_by_id[ids[i]], length_by_id[ids[j]]))
+            else:
+                mismatches = float(sum(int(a != b) for a, b in zip(seq_i, seq_j, strict=False)))
+                norm_denom = float(sequence_length or 1)
             matrix[i, j] = mismatches
             matrix[j, i] = mismatches
+            norm_val = mismatches / norm_denom if norm_denom > 0 else float("nan")
+            matrix_dist[i, j] = norm_val
+            matrix_dist[j, i] = norm_val
 
     rows: list[dict[str, object]] = []
     nn_values_bp: list[float] = []
+    nn_values_dist: list[float] = []
     for i, elite_id in enumerate(ids):
-        other = np.delete(matrix[i, :], i)
-        if other.size == 0:
+        other_bp = np.delete(matrix[i, :], i)
+        other_dist = np.delete(matrix_dist[i, :], i)
+        if other_bp.size == 0:
             nn_bp = None
             mean_bp = None
             min_bp = None
+            nn_dist = None
+            mean_dist = None
+            min_dist = None
         else:
-            finite_other = other[np.isfinite(other)]
-            if finite_other.size == 0:
+            finite_other_bp = other_bp[np.isfinite(other_bp)]
+            finite_other_dist = other_dist[np.isfinite(other_dist)]
+            if finite_other_bp.size == 0:
                 nn_bp = None
                 mean_bp = None
                 min_bp = None
+                nn_dist = None
+                mean_dist = None
+                min_dist = None
             else:
-                nn_bp = float(np.min(finite_other))
-                mean_bp = float(np.mean(finite_other))
+                nn_bp = float(np.min(finite_other_bp))
+                mean_bp = float(np.mean(finite_other_bp))
                 min_bp = nn_bp
                 nn_values_bp.append(nn_bp)
+                if finite_other_dist.size == 0:
+                    nn_dist = None
+                    mean_dist = None
+                    min_dist = None
+                else:
+                    nn_dist = float(np.min(finite_other_dist))
+                    mean_dist = float(np.mean(finite_other_dist))
+                    min_dist = nn_dist
+                    nn_values_dist.append(nn_dist)
         rows.append(
             {
                 "elite_id": elite_id,
                 "nn_full_bp": nn_bp,
                 "mean_full_bp": mean_bp,
                 "min_full_bp": min_bp,
-                "nn_full_dist": (nn_bp / float(sequence_length)) if nn_bp is not None else None,
-                "mean_full_dist": (mean_bp / float(sequence_length)) if mean_bp is not None else None,
-                "min_full_dist": (min_bp / float(sequence_length)) if min_bp is not None else None,
+                "nn_full_dist": nn_dist,
+                "mean_full_dist": mean_dist,
+                "min_full_dist": min_dist,
                 "identity_mode": identity_mode,
             }
         )
@@ -335,22 +393,31 @@ def compute_elites_full_sequence_nn_table(
 
     upper = matrix[np.triu_indices(n_items, k=1)]
     upper = upper[np.isfinite(upper)]
+    upper_dist = matrix_dist[np.triu_indices(n_items, k=1)]
+    upper_dist = upper_dist[np.isfinite(upper_dist)]
     if upper.size == 0:
         pair_mean_bp = None
         pair_min_bp = None
     else:
         pair_mean_bp = float(np.mean(upper))
         pair_min_bp = float(np.min(upper))
+    if upper_dist.size == 0:
+        pair_mean_dist = None
+        pair_min_dist = None
+    else:
+        pair_mean_dist = float(np.mean(upper_dist))
+        pair_min_dist = float(np.min(upper_dist))
 
     median_nn_bp = float(np.median(nn_values_bp)) if nn_values_bp else None
+    median_nn_dist = float(np.median(nn_values_dist)) if nn_values_dist else None
     summary: dict[str, float | int | None] = {
         "sequence_length_bp": sequence_length,
         "mean_pairwise_full_bp": pair_mean_bp,
         "min_pairwise_full_bp": pair_min_bp,
         "median_nn_full_bp": median_nn_bp,
-        "mean_pairwise_full_distance": (pair_mean_bp / float(sequence_length) if pair_mean_bp is not None else None),
-        "min_pairwise_full_distance": (pair_min_bp / float(sequence_length) if pair_min_bp is not None else None),
-        "median_nn_full_distance": (median_nn_bp / float(sequence_length) if median_nn_bp is not None else None),
+        "mean_pairwise_full_distance": pair_mean_dist,
+        "min_pairwise_full_distance": pair_min_dist,
+        "median_nn_full_distance": median_nn_dist,
     }
     return full_df, summary
 

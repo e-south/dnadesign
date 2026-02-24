@@ -1,0 +1,223 @@
+cruncher:
+  schema_version: 3
+
+  workspace:
+    out_dir: outputs
+    regulator_sets:
+      - [baeR, soxR]
+
+  io:
+    parsers:
+      extra_modules: []
+
+  catalog:
+    root: .cruncher/pairwise_baer_soxr
+    source_preference: [pairwise_baer_soxr_merged_meme_oops]
+    allow_ambiguous: false
+    pwm_source: matrix
+    site_kinds: null
+    combine_sites: true
+    dataset_preference: []
+    dataset_map: {}
+    site_window_center: midpoint
+    min_sites_for_pwm: 2
+    allow_low_sites: false
+
+  discover:
+    enabled: true
+    tool: meme
+    source_id: pairwise_baer_soxr_merged_meme_oops
+    tool_path: ../../../../../.pixi/envs/default/bin
+    minw: null
+    maxw: null
+    meme_mod: oops
+
+  ingest:
+    genome_source: ncbi
+    genome_fasta: null
+    genome_cache: .cruncher/genomes
+    genome_assembly: null
+    contig_aliases: {}
+    ncbi_email: null
+    ncbi_tool: cruncher
+    ncbi_api_key: null
+    ncbi_timeout_seconds: 30
+    http:
+      retries: 3
+      backoff_seconds: 0.5
+      max_backoff_seconds: 8.0
+      retry_statuses: [429, 500, 502, 503, 504]
+      respect_retry_after: true
+    regulondb:
+      base_url: https://regulondb.ccg.unam.mx/graphql
+      verify_ssl: true
+      ca_bundle: null
+      timeout_seconds: 30
+      motif_matrix_source: alignment
+      alignment_matrix_semantics: probabilities
+      min_sites_for_pwm: 2
+      allow_low_sites: false
+      curated_sites: true
+      ht_sites: false
+      ht_dataset_sources: null
+      ht_dataset_type: TFBINDING
+      ht_binding_mode: tfbinding
+      uppercase_binding_site_only: true
+    local_sources:
+      - source_id: demo_local_meme
+        description: Local MEME motifs and sites for selected regulators
+        root: inputs/local_motifs
+        patterns: ["*.txt"]
+        recursive: false
+        format_map: {".txt": "MEME"}
+        tf_name_strategy: stem
+        matrix_semantics: probabilities
+        extract_sites: true
+        organism:
+          name: Escherichia coli
+        tags:
+          format: meme
+          assay: dapseq
+    site_sources:
+      - source_id: baer_chip_exo
+        description: Choudhary et al. BaeR ChIP-exo binding sites (processed FASTA)
+        path: ../../../../../../dnadesign-data/primary_literature/Choudhary_et_al/processed/BaeR_binding_sites.fasta
+        tf_name: BaeR
+        record_kind: chip_exo
+        organism:
+          name: Escherichia coli
+          strain: K-12 MG1655
+          assembly: NC_000913.3
+        citation: "Choudhary et al. 2020 (DOI: 10.1128/mSystems.00980-20)"
+        source_url: https://doi.org/10.1128/mSystems.00980-20
+        tags:
+          assay: chip_exo
+          doi: 10.1128/mSystems.00980-20
+  sample:
+    seed: 42
+    sequence_length: 18
+    motif_width:
+      minw: null
+      maxw: null
+      strategy: max_info
+    budget:
+      tune: 25000
+      draws: 150000
+    objective:
+      bidirectional: true
+      score_scale: normalized-llr
+      combine: min
+      scoring:
+        pwm_pseudocounts: 0.10
+        log_odds_clip: null
+      softmin:
+        enabled: true
+        schedule: linear
+        beta_start: 0.5
+        beta_end: 12.0
+    elites:
+      k: 8
+      select:
+        diversity: 0.05
+        pool_size: 32000
+    moves:
+      profile: balanced
+      overrides:
+        block_len_range: [2, 5]
+        multi_k_range: [1, 2]
+        slide_max_shift: 3
+        swap_len_range: [2, 6]
+        move_probs:
+          S: 0.70
+          B: 0.15
+          M: 0.08
+          L: 0.00
+          W: 0.00
+          I: 0.07
+        target_worst_tf_prob: 0.50
+        target_window_pad: 3
+        insertion_consensus_prob: 0.65
+        adaptive_weights:
+          enabled: false
+          window: 400
+          k: 0.25
+          min_prob: 0.02
+          max_prob: 0.75
+          kinds: [S, B, M, I]
+          targets:
+            S: 0.78
+            B: 0.30
+            M: 0.20
+            I: 0.22
+        proposal_adapt:
+          enabled: true
+          window: 800
+          step: 0.05
+          min_scale: 0.65
+          max_scale: 2.50
+          target_low: 0.14
+          target_high: 0.32
+          freeze_after_beta: 5.0
+        gibbs_inertia:
+          enabled: true
+          kind: linear
+          p_stay_start: 0.0
+          p_stay_end: 0.90
+        move_schedule:
+          enabled: true
+          kind: linear
+          end:
+            S: 0.50
+            B: 0.24
+            M: 0.14
+            L: 0.00
+            W: 0.00
+            I: 0.12
+    optimizer:
+      kind: gibbs_anneal
+      chains: 8
+      cooling:
+        kind: piecewise
+        stages:
+          - sweeps: 35000
+            beta: 0.2
+          - sweeps: 90000
+            beta: 1.2
+          - sweeps: 138000
+            beta: 6.0
+          - sweeps: 146000
+            beta: 12.0
+          - sweeps: 150000
+            beta: 24.0
+      early_stop:
+        enabled: false
+        patience: 0
+        min_delta: 0.0
+        require_min_unique: false
+        min_unique: 0
+        success_min_per_tf_norm: 0.0
+    output:
+      save_sequences: true
+      save_trace: true
+      include_tune_in_sequences: false
+      live_metrics: true
+
+  analysis:
+    enabled: true
+    run_selector: latest
+    runs: []
+    pairwise: [baeR, soxR]
+    plot_format: pdf
+    plot_dpi: 300
+    table_format: parquet
+    archive: false
+    max_points: 40000
+    trajectory_stride: 5
+    trajectory_scatter_scale: llr
+    trajectory_sweep_mode: best_so_far
+    trajectory_chain_overlay: false
+    trajectory_particle_alpha_max: 0.45
+    elites_showcase:
+      max_panels: 12
+    fimo_compare:
+      enabled: false

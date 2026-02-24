@@ -101,15 +101,15 @@ def test_build_run_dir_with_multiple_sets_uses_set_folder(tmp_path: Path) -> Non
 def test_run_artifacts_live_in_lifecycle_subdirs(tmp_path: Path) -> None:
     run_dir = tmp_path / "outputs"
 
-    assert run_meta_dir(run_dir) == run_dir / "run"
+    assert run_meta_dir(run_dir) == run_dir / "meta"
     assert run_provenance_dir(run_dir) == run_dir / "provenance"
     assert run_optimize_dir(run_dir) == run_dir / "optimize"
     assert run_optimize_tables_dir(run_dir) == run_dir / "optimize" / "tables"
     assert run_optimize_meta_dir(run_dir) == run_dir / "optimize" / "state"
 
-    assert manifest_path(run_dir) == run_dir / "run" / "run_manifest.json"
-    assert status_path(run_dir) == run_dir / "run" / "run_status.json"
-    assert config_used_path(run_dir) == run_dir / "run" / "config_used.yaml"
+    assert manifest_path(run_dir) == run_dir / "meta" / "run_manifest.json"
+    assert status_path(run_dir) == run_dir / "meta" / "run_status.json"
+    assert config_used_path(run_dir) == run_dir / "meta" / "config_used.yaml"
     assert lockfile_snapshot_path(run_dir) == run_dir / "provenance" / "lockfile.json"
     assert parse_manifest_path(run_dir) == run_dir / "provenance" / "parse_manifest.json"
     assert pwm_summary_path(run_dir) == run_dir / "provenance" / "pwm_summary.json"
@@ -137,9 +137,7 @@ def test_analysis_tables_and_plots_use_structured_semantic_filenames(tmp_path: P
     assert analysis_table_path(analysis_dir, "scores_summary", "parquet") == (
         analysis_dir / "tables" / "table__scores_summary.parquet"
     )
-    assert analysis_plot_path(analysis_dir, "opt_trajectory", "png") == (
-        run_dir / "plots" / "analysis" / "opt_trajectory.png"
-    )
+    assert analysis_plot_path(analysis_dir, "opt_trajectory", "png") == (run_dir / "plots" / "opt_trajectory.png")
     assert analysis_plot_path(analysis_dir, "opt_trajectory_sweep", "png") == (
-        run_dir / "plots" / "analysis" / "opt_trajectory_sweep.png"
+        run_dir / "plots" / "opt_trajectory_sweep.png"
     )

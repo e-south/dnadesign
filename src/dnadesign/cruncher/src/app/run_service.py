@@ -20,7 +20,7 @@ from typing import Iterable, Optional
 from dnadesign.cruncher.artifacts.entries import normalize_artifacts
 from dnadesign.cruncher.artifacts.layout import RUN_META_DIR, manifest_path, status_path
 from dnadesign.cruncher.config.schema_v3 import CruncherConfig
-from dnadesign.cruncher.utils.paths import resolve_run_index_path
+from dnadesign.cruncher.utils.paths import resolve_run_index_path, resolve_workspace_root
 
 
 @dataclass(frozen=True)
@@ -158,6 +158,8 @@ def _iter_run_dirs(stage_dir: Path) -> list[Path]:
             continue
         if rel.parts and rel.parts[0].startswith("."):
             continue
+        if rel.parts and rel.parts[0] in {"studies", "portfolios"}:
+            continue
         resolved = run_dir.resolve()
         if resolved in seen:
             continue
@@ -174,7 +176,7 @@ def _iter_workspace_run_dirs(out_dir: Path) -> list[Path]:
 
 def _run_dir_from_manifest_path(manifest_file: Path) -> Path:
     run_meta_dir = manifest_file.parent
-    if run_meta_dir.name in {RUN_META_DIR, "meta"}:
+    if run_meta_dir.name == RUN_META_DIR:
         return run_meta_dir.parent
     return run_meta_dir
 
@@ -291,7 +293,7 @@ def update_run_index_from_status(
 
 
 def rebuild_run_index(cfg: CruncherConfig, config_path: Path) -> Path:
-    out_dir = config_path.parent / cfg.out_dir
+    out_dir = resolve_workspace_root(config_path) / cfg.out_dir
     index: dict[str, dict] = {}
     if out_dir.exists():
         for child in _iter_workspace_run_dirs(out_dir):
@@ -313,7 +315,7 @@ def list_runs(cfg: CruncherConfig, config_path: Path, *, stage: Optional[str] = 
     index = load_run_index(config_path, cfg.catalog.catalog_root)
     runs: list[RunInfo] = []
     if index:
-        out_dir = config_path.parent / cfg.out_dir
+        out_dir = resolve_workspace_root(config_path) / cfg.out_dir
         for name, payload in index.items():
             if stage and payload.get("stage") != stage:
                 continue
@@ -321,7 +323,7 @@ def list_runs(cfg: CruncherConfig, config_path: Path, *, stage: Optional[str] = 
         runs.sort(key=lambda r: r.created_at or "", reverse=True)
         return runs
 
-    out_dir = config_path.parent / cfg.out_dir
+    out_dir = resolve_workspace_root(config_path) / cfg.out_dir
     if not out_dir.exists():
         return []
     for child in _iter_workspace_run_dirs(out_dir):
@@ -363,7 +365,7 @@ def _resolve_run_dir_from_arg(config_path: Path, run_name: str) -> Path | None:
             raise FileNotFoundError(f"Run directory not found: {resolved}")
     else:
         cwd_candidate = (Path.cwd() / candidate).resolve()
-        cfg_candidate = (config_path.parent / candidate).resolve()
+        cfg_candidate = (resolve_workspace_root(config_path) / candidate).resolve()
         cwd_exists = cwd_candidate.exists()
         cfg_exists = cfg_candidate.exists()
         if cwd_exists and cfg_exists and cwd_candidate != cfg_candidate:
@@ -408,7 +410,7 @@ def get_run(cfg: CruncherConfig, config_path: Path, run_name: str) -> RunInfo:
     index = load_run_index(config_path, cfg.catalog.catalog_root)
     if index and run_name in index:
         return RunInfo.from_payload(run_name, index[run_name])
-    out_dir = config_path.parent / cfg.out_dir
+    out_dir = resolve_workspace_root(config_path) / cfg.out_dir
     run_dir = None
     matches: list[Path] = []
     if out_dir.exists():

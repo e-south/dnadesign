@@ -11,8 +11,9 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
-from typing import Iterable, Mapping
+from typing import Callable, Iterable, Mapping
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -30,7 +31,8 @@ from dnadesign.baserender import (
 from dnadesign.cruncher.analysis.plots._savefig import savefig
 
 _DNA_COMP = str.maketrans("ACGTacgtNn", "TGCAtgcaNn")
-_OVERLAY_MAX_CHARS = 40
+_OVERLAY_MAX_CHARS = 80
+_NORM_SCORE_EPS = 1.0e-9
 
 
 def _revcomp(seq: str) -> str:
@@ -68,9 +70,46 @@ def _hits_index(hits_df: pd.DataFrame) -> dict[tuple[str, str], pd.Series]:
     return rows
 
 
+def _normalized_score_from_row(
+    elite_row: pd.Series,
+    *,
+    tf_name: str,
+) -> float:
+    norm_column = f"norm_{tf_name}"
+    if norm_column not in elite_row.index:
+        raise ValueError(f"elites_df missing required columns: ['{norm_column}']")
+    value = pd.to_numeric(elite_row.get(norm_column), errors="coerce")
+    if pd.isna(value):
+        raise ValueError(f"elites_df column '{norm_column}' must be numeric for showcase overlay titles.")
+    numeric = float(value)
+    if numeric < -_NORM_SCORE_EPS or numeric > 1.0 + _NORM_SCORE_EPS:
+        raise ValueError(f"elites_df column '{norm_column}' must be normalized in [0,1] for showcase overlay titles.")
+    if numeric < 0.0:
+        return 0.0
+    if numeric > 1.0:
+        return 1.0
+    return numeric
+
+
+def _validate_normalized_columns(elites_df: pd.DataFrame, *, tf_names: list[str]) -> None:
+    for tf_name in tf_names:
+        norm_column = f"norm_{tf_name}"
+        if norm_column not in elites_df.columns:
+            raise ValueError(f"elites_df missing required columns: ['{norm_column}']")
+        numeric = pd.to_numeric(elites_df[norm_column], errors="coerce")
+        if numeric.isna().any():
+            raise ValueError(f"elites_df column '{norm_column}' must be numeric for elites_showcase.")
+        below = numeric < -_NORM_SCORE_EPS
+        above = numeric > 1.0 + _NORM_SCORE_EPS
+        if bool(below.any()) or bool(above.any()):
+            raise ValueError(f"elites_df column '{norm_column}' must be normalized in [0,1] for elites_showcase.")
+        elites_df[norm_column] = numeric.astype(float).clip(lower=0.0, upper=1.0)
+
+
 def _overlay_text(
     elite_row: pd.Series,
     *,
+    tf_names: Iterable[str] | None = None,
     max_chars: int = _OVERLAY_MAX_CHARS,
 ) -> str:
     if max_chars < 6:
@@ -81,10 +120,30 @@ def _overlay_text(
         rank_numeric = pd.to_numeric(rank_value, errors="coerce")
         if pd.notna(rank_numeric):
             subject = f"Elite #{int(rank_numeric)}"
-    return subject[:max_chars].rstrip()
+    hash_token: str | None = None
+    hash_candidate = elite_row.get("hash_id")
+    if isinstance(hash_candidate, str) and hash_candidate.strip():
+        hash_token = hash_candidate.strip()
+    elif "sequence" in elite_row.index:
+        sequence = str(elite_row.get("sequence") or "").strip().upper()
+        elite_id = str(elite_row.get("id") or "").strip()
+        if sequence and elite_id:
+            hash_token = hashlib.sha256(f"{elite_id}|{sequence}".encode("utf-8")).hexdigest()[:12]
+    if hash_token:
+        subject = f"{subject} [{hash_token}]"
+    tf_list = [str(tf).strip() for tf in (tf_names or []) if str(tf).strip()]
+    if not tf_list:
+        return subject[:max_chars].rstrip()
+    score_tokens: list[str] = []
+    for tf_name in tf_list:
+        score_value = _normalized_score_from_row(elite_row, tf_name=tf_name)
+        score_tokens.append(f"{tf_name}={score_value:.2f}")
+    title = f"{subject}\n{' '.join(score_tokens)}"
+    return title[:max_chars].rstrip()
 
 
 _SHOWCASE_STYLE_OVERRIDES: Mapping[str, object] = cruncher_showcase_style_overrides()
+OverlayTextFn = Callable[[pd.Series, list[str]], str]
 
 
 def _matrix_from_pwm(pwm_obj) -> list[list[float]]:
@@ -97,17 +156,16 @@ def _matrix_from_pwm(pwm_obj) -> list[list[float]]:
     return [[float(v) for v in row[:4]] for row in arr.tolist()]
 
 
-def plot_elites_showcase(
+def build_elites_showcase_records(
     *,
     elites_df: pd.DataFrame,
     hits_df: pd.DataFrame,
     tf_names: Iterable[str],
     pwms: Mapping[str, object],
-    out_path: Path,
     max_panels: int,
-    dpi: int,
-    png_compress_level: int,
-) -> None:
+    overlay_text_fn: OverlayTextFn | None = None,
+    meta_source: str = "cruncher_elites_showcase",
+) -> list[Record]:
     if elites_df is None or elites_df.empty:
         raise ValueError("Elites table is required for elites_showcase.")
     if hits_df is None or hits_df.empty:
@@ -115,11 +173,12 @@ def plot_elites_showcase(
     if not isinstance(max_panels, int) or max_panels < 1:
         raise ValueError("analysis.elites_showcase.max_panels must be >= 1")
 
-    _required_columns(elites_df, ["id", "sequence"], context="elites_df")
-
     tf_list = [str(tf) for tf in tf_names]
     if not tf_list:
         raise ValueError("TF names are required for elites_showcase.")
+    required_elite_columns = ["id", "sequence", *[f"norm_{tf_name}" for tf_name in tf_list]]
+    _required_columns(elites_df, required_elite_columns, context="elites_df")
+    _validate_normalized_columns(elites_df, tf_names=tf_list)
     missing_tf_pwms = sorted(tf for tf in tf_list if tf not in pwms)
     if missing_tf_pwms:
         raise ValueError(f"Missing PWM(s) for elites_showcase TFs: {missing_tf_pwms}")
@@ -133,6 +192,11 @@ def plot_elites_showcase(
         )
 
     hit_by_key = _hits_index(hits_df)
+    overlay_builder = (
+        overlay_text_fn
+        if overlay_text_fn is not None
+        else (lambda elite_row, tf_list_: _overlay_text(elite_row, tf_names=tf_list_))
+    )
     records: list[Record] = []
     for _, elite in ordered.iterrows():
         elite_id = str(elite["id"])
@@ -209,13 +273,33 @@ def plot_elites_showcase(
                 features=tuple(features),
                 effects=tuple(effects),
                 display=Display(
-                    overlay_text=_overlay_text(elite),
+                    overlay_text=overlay_builder(elite, tf_list),
                     tag_labels=tag_labels,
                 ),
-                meta={"source": "cruncher_elites_showcase"},
+                meta={"source": meta_source},
             )
         )
+    return records
 
+
+def plot_elites_showcase(
+    *,
+    elites_df: pd.DataFrame,
+    hits_df: pd.DataFrame,
+    tf_names: Iterable[str],
+    pwms: Mapping[str, object],
+    out_path: Path,
+    max_panels: int,
+    dpi: int,
+    png_compress_level: int,
+) -> None:
+    records = build_elites_showcase_records(
+        elites_df=elites_df,
+        hits_df=hits_df,
+        tf_names=tf_names,
+        pwms=pwms,
+        max_panels=max_panels,
+    )
     ncols = len(records)
     fig = render_record_grid_figure(
         records,

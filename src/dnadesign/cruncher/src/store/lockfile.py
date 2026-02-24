@@ -130,7 +130,11 @@ def verify_lockfile_hashes(
     for tf_name, locked in lockfile.resolved.items():
         entry = catalog.entries.get(f"{locked.source}:{locked.motif_id}")
         if entry is None:
-            raise ValueError(f"Catalog entry missing for {locked.source}:{locked.motif_id}")
+            raise ValueError(
+                "Lockfile references motifs missing from catalog index: "
+                f"{tf_name} -> {locked.source}:{locked.motif_id}. "
+                "Re-run `cruncher lock <config>`."
+            )
         if expected_pwm_source == "matrix":
             motif_path = catalog_root / "normalized" / "motifs" / locked.source / f"{locked.motif_id}.json"
             if not motif_path.exists():

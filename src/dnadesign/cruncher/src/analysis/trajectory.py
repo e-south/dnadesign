@@ -34,17 +34,46 @@ def _validate_numeric(series: pd.Series, *, column: str) -> pd.Series:
     return values.astype(float)
 
 
-def _softmin(values: np.ndarray, beta: float) -> float:
-    finite_values = np.asarray(values, dtype=float)
-    finite_values = finite_values[np.isfinite(finite_values)]
-    if finite_values.size == 0:
-        return float("nan")
-    scaled = -beta * finite_values
-    max_scaled = float(np.max(scaled))
-    if not np.isfinite(max_scaled):
-        return float("nan")
-    logsum = max_scaled + float(np.log(np.exp(scaled - max_scaled).sum()))
-    return float(-logsum / beta)
+def _softmin_rows(scores: np.ndarray, beta: float | np.ndarray) -> np.ndarray:
+    score_arr = np.asarray(scores, dtype=float)
+    if score_arr.ndim != 2:
+        raise ValueError("Softmin score matrix must be 2-dimensional.")
+    if score_arr.size == 0:
+        return np.asarray([], dtype=float)
+    if not np.isfinite(score_arr).all():
+        raise ValueError("Trajectory objective score columns contain non-finite values.")
+
+    minima = np.min(score_arr, axis=1)
+
+    def _stable_softmin(row_scores: np.ndarray, row_betas: np.ndarray) -> np.ndarray:
+        scaled = -(row_scores * row_betas[:, None])
+        max_scaled = np.max(scaled, axis=1)
+        with np.errstate(over="ignore", under="ignore", invalid="ignore"):
+            centered = scaled - max_scaled[:, None]
+            exp_sum = np.exp(centered).sum(axis=1)
+            logsum = max_scaled + np.log(exp_sum)
+        return -logsum / row_betas
+
+    if np.isscalar(beta):
+        beta_value = float(beta)
+        if not np.isfinite(beta_value):
+            raise ValueError("Softmin beta must be finite.")
+        if beta_value <= 0:
+            return minima
+        beta_rows = np.full(score_arr.shape[0], beta_value, dtype=float)
+        return _stable_softmin(score_arr, beta_rows)
+
+    beta_arr = np.asarray(beta, dtype=float)
+    if beta_arr.ndim != 1 or beta_arr.shape[0] != score_arr.shape[0]:
+        raise ValueError("Softmin beta vector must align with the score matrix row count.")
+    if not np.isfinite(beta_arr).all():
+        raise ValueError("Softmin beta values must be finite.")
+
+    out = minima.copy()
+    positive_mask = beta_arr > 0.0
+    if bool(positive_mask.any()):
+        out[positive_mask] = _stable_softmin(score_arr[positive_mask], beta_arr[positive_mask])
+    return out
 
 
 def resolve_cold_chain(
@@ -123,6 +152,8 @@ def _resolve_objective_scalar(
     objective_cfg = objective_config if isinstance(objective_config, dict) else {}
     combine = str(objective_cfg.get("combine") or "min").strip().lower()
     scores = df[score_cols].to_numpy(dtype=float)
+    if not np.isfinite(scores).all():
+        raise ValueError("Trajectory objective score columns contain non-finite values.")
     if combine == "sum":
         return pd.Series(scores.sum(axis=1), index=df.index, dtype=float)
     if combine != "min":
@@ -152,9 +183,7 @@ def _resolve_objective_scalar(
                 beta_final = float(beta_value)
             except (TypeError, ValueError, OverflowError) as exc:
                 raise ValueError("objective.softmin_final_beta_used must be numeric.") from exc
-            if beta_final <= 0:
-                return pd.Series(scores.min(axis=1), index=df.index, dtype=float)
-            objective_vals = np.asarray([_softmin(row, beta_final) for row in scores], dtype=float)
+            objective_vals = _softmin_rows(scores, beta_final)
             return pd.Series(objective_vals, index=df.index, dtype=float)
 
         total_sweeps_raw = objective_cfg.get("total_sweeps")
@@ -189,11 +218,12 @@ def _resolve_objective_scalar(
             )
 
         beta_of = make_beta_scheduler(schedule_cfg, total_sweeps)
-        beta_rows = np.asarray([float(beta_of(int(sweep))) for sweep in sweep_values.tolist()], dtype=float)
-        objective_vals = np.asarray(
-            [_softmin(row, beta) if beta > 0 else float(np.min(row)) for row, beta in zip(scores, beta_rows)],
+        beta_rows = np.fromiter(
+            (float(beta_of(int(sweep))) for sweep in sweep_values.tolist()),
             dtype=float,
+            count=len(sweep_values),
         )
+        objective_vals = _softmin_rows(scores, beta_rows)
         return pd.Series(objective_vals, index=df.index, dtype=float)
     return pd.Series(scores.min(axis=1), index=df.index, dtype=float)
 
@@ -227,11 +257,125 @@ def _subsample_indices_early_priority(n: int, max_points: int) -> np.ndarray:
     return np.unique(np.concatenate([early_idx, tail_idx]))
 
 
-def _subsample_chainwise(out: pd.DataFrame, max_points: int) -> pd.DataFrame:
+def _priority_indices_for_objective(values: np.ndarray) -> list[int]:
+    priority: list[int] = []
+    n = int(values.size)
+    if n <= 0:
+        return priority
+    finite = np.isfinite(values)
+    if bool(finite.any()):
+        priority.append(int(np.nanargmax(values)))
+    last_idx = n - 1
+    if last_idx not in priority:
+        priority.append(last_idx)
+    return priority
+
+
+def _subsample_indices_with_priority(
+    n: int,
+    max_points: int,
+    *,
+    priority_indices: Iterable[int],
+) -> np.ndarray:
+    if max_points <= 0 or n <= max_points:
+        return np.arange(n, dtype=int)
+
+    priority: list[int] = []
+    priority_set: set[int] = set()
+    for raw_idx in priority_indices:
+        idx = int(raw_idx)
+        if idx < 0 or idx >= n or idx in priority_set:
+            continue
+        priority_set.add(idx)
+        priority.append(idx)
+    if len(priority) >= max_points:
+        return np.asarray(sorted(priority[:max_points]), dtype=int)
+
+    base = [int(v) for v in _subsample_indices_early_priority(n, max_points).tolist()]
+    non_priority = [idx for idx in base if idx not in priority_set]
+    needed = max_points - len(priority)
+    sampled_non_priority: list[int] = []
+    if needed > 0 and non_priority:
+        if len(non_priority) <= needed:
+            sampled_non_priority = list(non_priority)
+        else:
+            sampled_positions = _subsample_indices(len(non_priority), needed).tolist()
+            sampled_non_priority = [non_priority[int(pos)] for pos in sampled_positions]
+
+    selected: list[int] = []
+    selected_set: set[int] = set()
+    for idx in priority + sampled_non_priority:
+        if idx in selected_set:
+            continue
+        selected_set.add(idx)
+        selected.append(idx)
+
+    if len(selected) < max_points:
+        for idx in base:
+            if idx in selected_set:
+                continue
+            selected_set.add(idx)
+            selected.append(idx)
+            if len(selected) >= max_points:
+                break
+    if len(selected) < max_points:
+        for idx in range(n):
+            if idx in selected_set:
+                continue
+            selected_set.add(idx)
+            selected.append(idx)
+            if len(selected) >= max_points:
+                break
+
+    return np.asarray(sorted(selected[:max_points]), dtype=int)
+
+
+def _retain_priority_indices(
+    frame: pd.DataFrame,
+    *,
+    retain_column: str | None,
+    retain_values: set[str],
+) -> list[int]:
+    if not retain_values or retain_column is None:
+        return []
+    if retain_column not in frame.columns:
+        raise ValueError(f"Trajectory subsampling retain column '{retain_column}' is missing.")
+    values = frame[retain_column].astype(str).str.strip().tolist()
+    return [idx for idx, value in enumerate(values) if value in retain_values]
+
+
+def _subsample_chainwise(
+    out: pd.DataFrame,
+    max_points: int,
+    *,
+    objective_column: str,
+    retain_column: str | None = None,
+    retain_values: set[str] | None = None,
+) -> pd.DataFrame:
     if max_points <= 0 or len(out) <= max_points:
         return out
+    retain_set = {str(v).strip() for v in (retain_values or set()) if str(v).strip()}
+    if retain_set and retain_column is None:
+        raise ValueError("Trajectory subsampling retain values require retain_column.")
+    if retain_set and retain_column not in out.columns:
+        raise ValueError(f"Trajectory subsampling retain column '{retain_column}' is missing.")
     if "chain" not in out.columns:
-        idx = _subsample_indices_early_priority(len(out), max_points)
+        priority = [len(out) - 1]
+        if objective_column in out.columns:
+            values = pd.to_numeric(out[objective_column], errors="coerce").to_numpy(dtype=float)
+            priority = _priority_indices_for_objective(values)
+        retain_priority = _retain_priority_indices(
+            out,
+            retain_column=retain_column,
+            retain_values=retain_set,
+        )
+        if len(retain_priority) > max_points:
+            raise ValueError(
+                "Trajectory subsampling cannot retain requested sequences within max_points; "
+                f"required={len(retain_priority)} max_points={max_points}."
+            )
+        priority.extend(retain_priority)
+        idx = _subsample_indices_with_priority(len(out), max_points, priority_indices=priority)
         return out.iloc[idx].reset_index(drop=True)
 
     grouped = list(out.groupby("chain", sort=True, dropna=False))
@@ -245,13 +389,53 @@ def _subsample_chainwise(out: pd.DataFrame, max_points: int) -> pd.DataFrame:
     for idx, (_, chain_df) in enumerate(grouped):
         budget = budget_floor + (1 if idx < budget_remainder else 0)
         budget = min(len(chain_df), max(1, budget))
-        sampled_idx = _subsample_indices_early_priority(len(chain_df), budget)
+        priority = [len(chain_df) - 1]
+        if objective_column in chain_df.columns:
+            values = pd.to_numeric(chain_df[objective_column], errors="coerce").to_numpy(dtype=float)
+            priority = _priority_indices_for_objective(values)
+        retain_priority = _retain_priority_indices(
+            chain_df,
+            retain_column=retain_column,
+            retain_values=retain_set,
+        )
+        if len(retain_priority) > budget:
+            chain_id = int(chain_df["chain"].iloc[0]) if "chain" in chain_df.columns and not chain_df.empty else idx
+            raise ValueError(
+                "Trajectory subsampling cannot retain requested sequences within per-chain budget; "
+                f"chain={chain_id} required={len(retain_priority)} budget={budget}. "
+                "Increase analysis.max_points."
+            )
+        priority.extend(retain_priority)
+        sampled_idx = _subsample_indices_with_priority(
+            len(chain_df),
+            budget,
+            priority_indices=priority,
+        )
         sampled_parts.append(chain_df.iloc[sampled_idx])
 
     sampled = pd.concat(sampled_parts).sort_values(["chain", "sweep"]).reset_index(drop=True)
     if len(sampled) <= max_points:
         return sampled
-    keep_idx = _subsample_indices_early_priority(len(sampled), max_points)
+    priority = [len(sampled) - 1]
+    if objective_column in sampled.columns:
+        values = pd.to_numeric(sampled[objective_column], errors="coerce").to_numpy(dtype=float)
+        priority = _priority_indices_for_objective(values)
+    retain_priority = _retain_priority_indices(
+        sampled,
+        retain_column=retain_column,
+        retain_values=retain_set,
+    )
+    if len(retain_priority) > max_points:
+        raise ValueError(
+            "Trajectory subsampling cannot retain requested sequences after chain balancing; "
+            f"required={len(retain_priority)} max_points={max_points}."
+        )
+    priority.extend(retain_priority)
+    keep_idx = _subsample_indices_with_priority(
+        len(sampled),
+        max_points,
+        priority_indices=priority,
+    )
     return sampled.iloc[keep_idx].reset_index(drop=True)
 
 
@@ -282,6 +466,7 @@ def build_trajectory_points(
     max_points: int,
     objective_config: dict[str, object] | None = None,
     beta_ladder: list[float] | None = None,
+    retain_sequences: set[str] | None = None,
 ) -> pd.DataFrame:
     if sequences_df is None or sequences_df.empty:
         return pd.DataFrame()
@@ -340,7 +525,13 @@ def build_trajectory_points(
     out["worst_tf_score"] = worst
     out["second_worst_tf_score"] = second
     out["objective_scalar"] = _resolve_objective_scalar(df, tf_names, objective_config=objective_config)
-    return _subsample_chainwise(out.reset_index(drop=True), max_points)
+    return _subsample_chainwise(
+        out.reset_index(drop=True),
+        max_points,
+        objective_column="objective_scalar",
+        retain_column="sequence" if "sequence" in out.columns else None,
+        retain_values=retain_sequences,
+    )
 
 
 def add_raw_llr_objective(
@@ -352,6 +543,9 @@ def add_raw_llr_objective(
     bidirectional: bool,
     pwm_pseudocounts: float,
     log_odds_clip: float | None,
+    score_cache: dict[str, tuple[dict[str, float], dict[str, float]]] | None = None,
+    scorer_raw: Scorer | None = None,
+    scorer_norm: Scorer | None = None,
 ) -> pd.DataFrame:
     if trajectory_df is None or trajectory_df.empty:
         return pd.DataFrame()
@@ -363,27 +557,49 @@ def add_raw_llr_objective(
     missing_pwms = [tf for tf in tf_list if tf not in pwms]
     if missing_pwms:
         raise ValueError(f"Cannot compute raw-LLR objective; missing PWMs for TFs: {missing_pwms}")
-    scorer_raw = Scorer(
-        {tf: pwms[tf] for tf in tf_list},
-        bidirectional=bool(bidirectional),
-        scale="llr",
-        pseudocounts=float(pwm_pseudocounts),
-        log_odds_clip=log_odds_clip,
-    )
-    scorer_norm = Scorer(
-        {tf: pwms[tf] for tf in tf_list},
-        bidirectional=bool(bidirectional),
-        scale="normalized-llr",
-        pseudocounts=float(pwm_pseudocounts),
-        log_odds_clip=log_odds_clip,
-    )
+    if (scorer_raw is None) != (scorer_norm is None):
+        raise ValueError("add_raw_llr_objective requires both scorer_raw and scorer_norm when either is provided.")
+    if scorer_raw is None:
+        scorer_raw = Scorer(
+            {tf: pwms[tf] for tf in tf_list},
+            bidirectional=bool(bidirectional),
+            scale="llr",
+            pseudocounts=float(pwm_pseudocounts),
+            log_odds_clip=log_odds_clip,
+        )
+        scorer_norm = Scorer(
+            {tf: pwms[tf] for tf in tf_list},
+            bidirectional=bool(bidirectional),
+            scale="normalized-llr",
+            pseudocounts=float(pwm_pseudocounts),
+            log_odds_clip=log_odds_clip,
+        )
     out = trajectory_df.copy()
-    raw_payload: list[dict[str, float]] = []
-    norm_payload: list[dict[str, float]] = []
-    for row_idx, seq in out["sequence"].items():
-        seq_arr = _encode_sequence(seq, context=f"trajectory row {row_idx}")
-        raw_payload.append(scorer_raw.compute_all_per_pwm(seq_arr, int(seq_arr.size)))
-        norm_payload.append(scorer_norm.compute_all_per_pwm(seq_arr, int(seq_arr.size)))
+    sequence_keys = out["sequence"].astype(str).map(lambda seq: seq.strip().upper())
+    shared_cache = score_cache if score_cache is not None else {}
+    raw_by_sequence: dict[str, dict[str, float]] = {}
+    norm_by_sequence: dict[str, dict[str, float]] = {}
+    for row_idx, key in sequence_keys.items():
+        if key in shared_cache:
+            cached = shared_cache[key]
+            if not isinstance(cached, tuple) or len(cached) != 2:
+                raise ValueError("Trajectory score cache entries must be (raw_scores, norm_scores) tuples.")
+            raw_scores, norm_scores = cached
+            if not isinstance(raw_scores, dict) or not isinstance(norm_scores, dict):
+                raise ValueError("Trajectory score cache entries must contain score dictionaries.")
+            raw_by_sequence[key] = raw_scores
+            norm_by_sequence[key] = norm_scores
+            continue
+        if key in raw_by_sequence:
+            continue
+        seq_arr = _encode_sequence(key, context=f"trajectory row {row_idx}")
+        raw_scores = scorer_raw.compute_all_per_pwm(seq_arr, int(seq_arr.size))
+        norm_scores = scorer_norm.scaled_from_raw_llr(raw_scores, int(seq_arr.size))
+        raw_by_sequence[key] = raw_scores
+        norm_by_sequence[key] = norm_scores
+        shared_cache[key] = (raw_scores, norm_scores)
+    raw_payload = [raw_by_sequence[key] for key in sequence_keys]
+    norm_payload = [norm_by_sequence[key] for key in sequence_keys]
     raw_df = pd.DataFrame(raw_payload, index=out.index)
     norm_df = pd.DataFrame(norm_payload, index=out.index)
     raw_score_df = pd.DataFrame(index=out.index)
@@ -417,6 +633,7 @@ def build_chain_trajectory_points(
     trajectory_df: pd.DataFrame,
     *,
     max_points: int,
+    retain_sequences: set[str] | None = None,
 ) -> pd.DataFrame:
     if trajectory_df is None or trajectory_df.empty:
         return pd.DataFrame()
@@ -451,18 +668,12 @@ def build_chain_trajectory_points(
     out["y_tf"] = out["y"].astype(float)
 
     if max_points > 0 and len(out) > max_points:
-        grouped = list(out.groupby("chain", sort=True, dropna=False))
-        if grouped:
-            budget_floor = max(1, max_points // len(grouped))
-            budget_remainder = max_points - (budget_floor * len(grouped))
-            sampled_parts: list[pd.DataFrame] = []
-            for idx, (_, chain_df) in enumerate(grouped):
-                budget = budget_floor + (1 if idx < budget_remainder else 0)
-                budget = min(len(chain_df), max(1, budget))
-                sampled_idx = _subsample_indices_early_priority(len(chain_df), budget)
-                sampled_parts.append(chain_df.iloc[sampled_idx])
-            out = pd.concat(sampled_parts).sort_values(["chain", "sweep_idx"]).reset_index(drop=True)
-        else:
-            out = out.iloc[_subsample_indices_early_priority(len(out), max_points)].reset_index(drop=True)
+        out = _subsample_chainwise(
+            out,
+            max_points,
+            objective_column="objective_scalar",
+            retain_column="sequence" if "sequence" in out.columns else None,
+            retain_values=retain_sequences,
+        )
 
     return out.reset_index(drop=True)

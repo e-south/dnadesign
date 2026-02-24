@@ -87,7 +87,13 @@ def load_pwms_from_config(run_dir: Path) -> tuple[dict[str, PWM], dict]:
         matrix = info.get("pwm_matrix")
         if not matrix:
             raise ValueError(f"config_used.yaml missing pwm_matrix for TF '{tf_name}'.")
-        full_pwm = PWM(name=tf_name, matrix=np.array(matrix, dtype=float))
+        log_odds = info.get("log_odds_matrix")
+        log_odds_matrix = None if log_odds is None else np.array(log_odds, dtype=float)
+        full_pwm = PWM(
+            name=tf_name,
+            matrix=np.array(matrix, dtype=float),
+            log_odds_matrix=log_odds_matrix,
+        )
         if sampling_window is None:
             pwms[tf_name] = full_pwm
         else:
