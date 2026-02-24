@@ -29,18 +29,19 @@ DenseGen CLI is exposed as `dense` in this repo:
 ```bash
 uv run dense --help
 
-# Workspace-first demo flow (no repo-root paths).
-uv run dense workspace init --id demo --from-workspace demo_tfbs_baseline --copy-inputs --output-mode local
+# Workspace-first demo flow.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+uv run --project "$REPO_ROOT" dense workspace init --id demo --from-workspace demo_tfbs_baseline --copy-inputs --output-mode local
 cd demo
-uv run dense validate-config --probe-solver
-uv run dense inspect inputs
-uv run dense inspect config
-uv run dense stage-a build-pool
-uv run dense stage-b build-libraries
-uv run dense run
-uv run dense inspect run --library --events
-uv run dense ls-plots
-uv run dense plot --only stage_a_summary,placement_map
+uv run --project "$REPO_ROOT" dense validate-config --probe-solver
+uv run --project "$REPO_ROOT" dense inspect inputs
+uv run --project "$REPO_ROOT" dense inspect config
+uv run --project "$REPO_ROOT" dense stage-a build-pool
+uv run --project "$REPO_ROOT" dense stage-b build-libraries
+uv run --project "$REPO_ROOT" dense run
+uv run --project "$REPO_ROOT" dense inspect run --library --events
+uv run --project "$REPO_ROOT" dense ls-plots
+uv run --project "$REPO_ROOT" dense plot --only stage_a_summary,placement_map
 ```
 
 ### MEME Suite / FIMO pressure testing

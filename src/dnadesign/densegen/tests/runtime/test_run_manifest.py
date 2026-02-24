@@ -9,6 +9,7 @@ def test_run_manifest_roundtrip(tmp_path) -> None:
         PlanManifest(
             input_name="demo",
             plan_name="demo",
+            quota=8,
             generated=5,
             duplicates_skipped=1,
             failed_solutions=2,
@@ -45,6 +46,7 @@ def test_run_manifest_roundtrip(tmp_path) -> None:
         solver_strands="double",
         dense_arrays_version="0.0.0",
         dense_arrays_version_source="lock",
+        total_quota=8,
         items=items,
     )
     ensure_run_meta_dir(tmp_path)
@@ -57,6 +59,8 @@ def test_run_manifest_roundtrip(tmp_path) -> None:
     assert loaded.items[0].failed_min_count_per_tf == 1
     assert loaded.items[0].duplicate_solutions == 3
     assert loaded.items[0].leaderboard_latest is not None
+    assert loaded.items[0].quota == 8
+    assert loaded.total_quota == 8
     assert loaded.random_seed == 42
     assert loaded.solver_time_limit_seconds == 5.0
     assert loaded.solver_threads == 2

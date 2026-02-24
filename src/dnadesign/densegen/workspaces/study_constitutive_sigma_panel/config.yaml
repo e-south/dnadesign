@@ -24,15 +24,75 @@ densegen:
       H: TATAAT
 
   inputs:
+    - name: lacI_pwm
+      type: pwm_artifact
+      path: inputs/motif_artifacts/lacI__pairwise_laci_arac_merged_meme_oops__lacI_WWWTGTGAGCGNDTMACAA.json
+      sampling:
+        strategy: stochastic
+        n_sites: 150
+        mining:
+          batch_size: 5000
+          budget:
+            mode: fixed_candidates
+            candidates: 1200000
+            growth_factor: 1.25
+          log_every_batches: 1
+        length:
+          policy: range
+          range: [16, 20]
+        trimming:
+          window_length: 16
+        uniqueness:
+          key: core
+          cross_regulator_core_collisions: error
+        selection:
+          policy: mmr
+          rank_by: score_norm
+          alpha: 0.35
+          pool:
+            min_score_norm: 0.75
+            max_candidates: null
+            relevance_norm: minmax_raw_score
+        tier_fractions: [0.001, 0.01, 0.09]
+    - name: araC_pwm
+      type: pwm_artifact
+      path: inputs/motif_artifacts/araC__pairwise_laci_arac_merged_meme_oops__araC_TAKSRATWWWHHCSMTA.json
+      sampling:
+        strategy: stochastic
+        n_sites: 150
+        mining:
+          batch_size: 5000
+          budget:
+            mode: fixed_candidates
+            candidates: 1200000
+            growth_factor: 1.25
+          log_every_batches: 1
+        length:
+          policy: range
+          range: [16, 20]
+        trimming:
+          window_length: 16
+        uniqueness:
+          key: core
+          cross_regulator_core_collisions: error
+        selection:
+          policy: mmr
+          rank_by: score_norm
+          alpha: 0.35
+          pool:
+            min_score_norm: 0.75
+            max_candidates: null
+            relevance_norm: minmax_raw_score
+        tier_fractions: [0.001, 0.01, 0.09]
     - name: background
       type: background_pool
       sampling:
         n_sites: 1200
         mining:
-          batch_size: 20000
+          batch_size: 25000
           budget:
             mode: fixed_candidates
-            candidates: 2000000
+            candidates: 8000000
         length:
           policy: range
           range: [16, 20]
@@ -42,23 +102,15 @@ densegen:
           min: 0.40
           max: 0.60
         filters:
+          fimo_exclude:
+            pwms_input: [lacI_pwm, araC_pwm]
+            allow_zero_hit_only: true
           forbid_kmers:
-            - CCCGGG
-            - CTGACA
-            - TTGTGA
-            - TTTACA
-            - TAGACA
-            - TTGACA
-            - CCAGTC
-            - TATGTT
-            - TACTGT
-            - TAAATT
-            - GATACT
-            - GATAAT
-            - TATAGT
-            - TATAAT
-          include_reverse_complements: true
-          strands: both
+            - patterns_from_motif_sets:
+                - sigma70_upstream_35
+                - sigma70_downstream_10
+              include_reverse_complements: true
+              strands: both
 
   output:
     targets: [parquet, usr]
@@ -77,8 +129,8 @@ densegen:
 
   generation:
     sequence_length: 90
-    plan_template_max_expanded_plans: 64
-    plan_template_max_total_quota: 500
+    expansion:
+      max_plans: 64
     sampling:
       pool_strategy: subsample
       library_size: 16
@@ -88,40 +140,19 @@ densegen:
       max_sites_per_regulator: null
       relax_on_exhaustion: false
 
-    plan_templates:
-      - base_name: sigma70_panel
-        total_quota: 480
-        distribution_policy: uniform
+    plan:
+      - name: sigma70_panel
+        sequences: 48
+        expanded_name_template: "{base}__sig35={up}__sig10={down}"
         sampling:
           include_inputs: [background]
         fixed_elements:
-          promoter_matrix:
+          fixed_element_matrix:
             name: sigma70_core
             upstream_from_set: sigma70_upstream_35
             downstream_from_set: sigma70_downstream_10
             pairing:
               mode: cross_product
-            spacer_length: [16, 18]
-            upstream_pos: [0, 90]
-        regulator_constraints:
-          groups: []
-      - base_name: sigma70_topup
-        total_quota: 20
-        distribution_policy: uniform
-        sampling:
-          include_inputs: [background]
-        fixed_elements:
-          promoter_matrix:
-            name: sigma70_core
-            upstream_from_set: sigma70_upstream_35
-            downstream_from_set: sigma70_downstream_10
-            pairing:
-              mode: explicit_pairs
-              pairs:
-                - up: a
-                  down: A
-                - up: f
-                  down: H
             spacer_length: [16, 18]
             upstream_pos: [0, 90]
         regulator_constraints:
@@ -181,3 +212,10 @@ plots:
   out_dir: outputs/plots
   format: pdf
   default: [stage_a_summary, placement_map, run_health, tfbs_usage]
+  options:
+    placement_map:
+      scope: auto
+      max_plans: 12
+    tfbs_usage:
+      scope: auto
+      max_plans: 12

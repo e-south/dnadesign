@@ -155,6 +155,11 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
         absolute: bool = typer.Option(False, "--absolute", help="Show absolute paths instead of workspace-relative."),
         verbose: bool = typer.Option(False, "--verbose", "-v", help="Show failure breakdown columns."),
         library: bool = typer.Option(False, "--library", help="Include offered-vs-used library summaries."),
+        allow_partial: bool = typer.Option(
+            False,
+            "--allow-partial",
+            help="Allow partial library summaries when outputs are incomplete.",
+        ),
         show_tfbs: bool = typer.Option(False, "--show-tfbs", help="Show TFBS sequences in library summaries."),
         show_motif_ids: bool = typer.Option(
             False,
@@ -254,11 +259,17 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
             f"[bold]Run:[/] {manifest.run_id}  [bold]Root:[/] {root_label}  "
             f"[bold]Schema:[/] {schema_label}  [bold]dense-arrays:[/] {dense_arrays_label}"
         )
+        total_generated = int(sum(int(item.generated) for item in manifest.items))
+        total_quota = int(manifest.total_quota)
+        total_progress_pct = (float(total_generated) / float(total_quota) * 100.0) if total_quota > 0 else 0.0
+        context.console.print(f"[bold]Quota:[/] {total_generated}/{total_quota} ({total_progress_pct:.2f}%)")
         if verbose:
             table = context.make_table(
                 "input",
                 "plan",
                 "generated",
+                "quota",
+                "progress",
                 "dup_out",
                 "dup_sol",
                 "failed",
@@ -272,14 +283,28 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
             )
         else:
             table = context.make_table(
-                "input", "plan", "generated", "duplicates", "failed", "resamples", "libraries", "stalls"
+                "input",
+                "plan",
+                "generated",
+                "quota",
+                "progress",
+                "duplicates",
+                "failed",
+                "resamples",
+                "libraries",
+                "stalls",
             )
         for item in manifest.items:
+            quota = int(item.quota)
+            progress_pct = (float(item.generated) / float(quota) * 100.0) if quota > 0 else 0.0
+            progress_label = f"{int(item.generated)}/{quota} ({progress_pct:.2f}%)"
             if verbose:
                 table.add_row(
                     item.input_name,
                     item.plan_name,
                     str(item.generated),
+                    str(quota),
+                    progress_label,
                     str(item.duplicates_skipped),
                     str(item.duplicate_solutions),
                     str(item.failed_solutions),
@@ -296,6 +321,8 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
                     item.input_name,
                     item.plan_name,
                     str(item.generated),
+                    str(quota),
+                    progress_label,
                     str(item.duplicates_skipped),
                     str(item.failed_solutions),
                     str(item.total_resamples),
@@ -335,9 +362,18 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
                 raise typer.Exit(code=1)
             with context.suppress_pyarrow_sysctl_warnings():
                 try:
-                    bundle = collect_report_data(loaded.root, cfg_path, include_combinatorics=False)
+                    bundle = collect_report_data(
+                        loaded.root,
+                        cfg_path,
+                        include_combinatorics=False,
+                        strict=not allow_partial,
+                    )
                 except Exception as exc:
                     context.console.print(f"[bold red]Failed to build library summaries:[/] {exc}")
+                    if not allow_partial:
+                        context.console.print(
+                            "[bold]Tip[/]: add `--allow-partial` to inspect available partial outputs."
+                        )
                     entries = context.list_dir_entries(run_root, limit=8)
                     if entries:
                         context.console.print(f"[bold]Run root contents[/]: {', '.join(entries)}")
@@ -587,6 +623,11 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
             sampling_table.add_row("iterative_min_new_solutions", str(sampling.iterative_min_new_solutions))
         sampling_table.add_row("arrays_generated_before_resample", str(cfg.runtime.arrays_generated_before_resample))
         sampling_table.add_row("max_consecutive_failures", str(cfg.runtime.max_consecutive_failures))
+        sampling_table.add_row("max_failed_solutions", str(cfg.runtime.max_failed_solutions))
+        sampling_table.add_row(
+            "max_failed_solutions_per_target",
+            str(cfg.runtime.max_failed_solutions_per_target),
+        )
         context.console.print("[bold]Stage-B library sampling[/]")
         context.console.print(sampling_table)
 

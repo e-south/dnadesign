@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from dnadesign.cruncher.io.parsers.meme import parse_meme_file
+from dnadesign.cruncher.meme import parse_meme_file
 
 from ..adapters.sources.pwm_jaspar import _parse_jaspar
 from ..config import resolve_relative_path

@@ -248,7 +248,7 @@ class StageBLibraryRuntimeCallbacks:
         header = f"Stage-B library for {self._context.source_label}/{self._context.plan_name}"
         if library_index is not None:
             header = f"{header} (build {library_index})"
-        if self._context.progress_style != "screen":
+        if self._context.progress_style == "stream":
             if tf_summary:
                 self._context.logger.info(
                     "%s: %d motifs | TF counts: %s | library_bp=%s pool=%s stage_b_sampling=%s",

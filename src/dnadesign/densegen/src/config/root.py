@@ -27,7 +27,7 @@ from .base import (
     resolve_outputs_scoped_path,
     resolve_run_root,
 )
-from .generation import GenerationConfig, expand_plan_templates, normalize_motif_sets
+from .generation import GenerationConfig, expand_generation_plans, normalize_motif_sets
 from .inputs import InputConfig
 from .logging import LoggingConfig
 from .output import OutputConfig
@@ -76,15 +76,12 @@ class DenseGenConfig(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def _expand_plan_templates(self):
-        if not self.generation.plan_templates:
-            return self
-        self.generation.plan = expand_plan_templates(
-            plan_templates=list(self.generation.plan_templates),
+    def _expand_plan(self):
+        self.generation.plan = expand_generation_plans(
+            plan=list(self.generation.plan),
             motif_sets=dict(self.motif_sets or {}),
             sequence_length=int(self.generation.sequence_length),
-            max_expanded_plans=int(self.generation.plan_template_max_expanded_plans),
-            max_total_quota=int(self.generation.plan_template_max_total_quota),
+            max_plans=int(self.generation.expansion.max_plans),
         )
         return self
 
@@ -101,6 +98,27 @@ class DenseGenConfig(BaseModel):
                 raise ValueError(
                     f"generation.sequence_constraints.forbid_kmers references unknown motif_sets: {preview}."
                 )
+        return self
+
+    @model_validator(mode="after")
+    def _background_forbid_kmers_motif_sets(self):
+        known_sets = set(self.motif_sets)
+        for inp in self.inputs:
+            if getattr(inp, "type", None) != "background_pool":
+                continue
+            filters = getattr(inp.sampling, "filters", None)
+            if filters is None:
+                continue
+            for entry in list(getattr(filters, "forbid_kmers", []) or []):
+                if isinstance(entry, str):
+                    continue
+                patterns = list(getattr(entry, "patterns_from_motif_sets", []) or [])
+                missing = [name for name in patterns if name not in known_sets]
+                if missing:
+                    preview = ", ".join(missing[:10])
+                    raise ValueError(
+                        f"background_pool.sampling.filters.forbid_kmers references unknown motif_sets: {preview}."
+                    )
         return self
 
     @model_validator(mode="after")

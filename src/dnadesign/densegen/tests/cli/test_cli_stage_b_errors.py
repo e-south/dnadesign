@@ -64,7 +64,7 @@ def _write_stage_b_config(
                   cover_all_regulators: true
                 plan:
                   - name: default
-                    quota: 1
+                    sequences: 1
                     sampling:
                       include_inputs: [demo_input]
                     regulator_constraints:

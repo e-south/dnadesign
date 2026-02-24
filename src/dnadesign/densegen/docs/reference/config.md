@@ -22,7 +22,7 @@ This section covers contents.
 - [`densegen.output`](#densegenoutput) - output targets and schema.
 - [`densegen.generation`](#densegengeneration) - plan and fixed elements.
 - [`densegen.motif_sets`](#densegenmotifsets) - reusable motif dictionaries.
-- [`densegen.generation.plan_templates`](#densegengenerationplantemplates) - matrix plan expansion.
+- [`densegen.generation.plan[].fixed_elements.fixed_element_matrix`](#densegengenerationplanfixedelementsfixed_element_matrix) - deterministic matrix expansion.
 - [`densegen.generation.sequence_constraints`](#densegengenerationsequenceconstraints) - global final-sequence motif rules.
 - [`densegen.generation.sampling`](#densegengenerationsampling-stage-b-sampling) - Stage-B library building controls.
 - [`densegen.solver`](#densegensolver) - backend and strategy.
@@ -85,7 +85,12 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
     - `uniqueness.key`: `sequence` (only option)
     - `gc` (optional): `min`, `max` in [0, 1]
     - `filters`
-      - `forbid_kmers`: list of A/C/G/T kmers to exclude
+      - `forbid_kmers`: list of entries where each entry is either:
+        - a literal A/C/G/T kmer string, or
+        - a motif-set rule object:
+          - `patterns_from_motif_sets` (list of motif set names)
+          - `include_reverse_complements` (bool)
+          - `strands`: `forward | both`
       - `fimo_exclude` (optional):
         - `pwms_input`: list of PWM input names to screen against
         - `allow_zero_hit_only`: when true, reject any FIMO hit
@@ -221,12 +226,26 @@ This section covers densegen.generation.
 - `sequence_length` should be >= the widest required motif (library TFBS or fixed elements); if it
   is shorter, Stage‑B records infeasibility and warns.
 - `sampling` (Stage‑B; see below)
-- Exactly one of `plan` or `plan_templates` is required.
-  - `plan` (non-empty list)
-  - Each item: `name` and `quota` (int > 0)
+- `expansion.max_plans` (int > 0; default 256)
+  - Hard cap on total expanded plan count across all plans to prevent accidental combinatoric blow-ups.
+- `plan` (non-empty list)
+  - Each item: `name`, `sequences`
+  - Quota contract:
+    - `sequences` is always required and must be `> 0`.
+    - For matrix plans, `sequences` is interpreted as the base-plan total and divided evenly across expanded variants.
+    - Resume growth is runtime-only (`dense run --resume --extend-quota`) and does not change schema shape.
   - `sampling.include_inputs` (required) - input names that feed the plan‑scoped pool.
   - `fixed_elements.promoter_constraints[]` supports `name`, `upstream`, `downstream`,
     `spacer_length`, `upstream_pos`, `downstream_pos`
+  - `fixed_elements.fixed_element_matrix` (optional deterministic expansion):
+    - `name`
+    - `upstream_from_set`, optional `upstream_variant_ids`
+    - `downstream_from_set`, optional `downstream_variant_ids`
+    - `pairing.mode`: `zip | cross_product | explicit_pairs`
+    - `pairing.pairs` (required only when `mode=explicit_pairs`)
+    - `spacer_length`, `upstream_pos`, optional `downstream_pos`
+    - Optional `expanded_name_template` placeholders:
+      - `{base}`, `{up}`, `{down}`, `{up_seq}`, `{down_seq}`, `{spacer}`
   - Promoter motifs must be non-empty A/C/G/T strings (normalized to uppercase)
   - `fixed_elements.side_biases` supports motif placement preferences:
     - `left`: list of motifs biased toward the 5prime side
@@ -242,30 +261,18 @@ This section covers densegen.generation.
       - Keys must match group members.
       - DenseGen uses the maximum of this value and `runtime.min_count_per_tf`.
 
-#### `densegen.generation.plan_templates`
-This section describes template-driven plan expansion for combinatorial studies.
+#### `densegen.generation.plan[].fixed_elements.fixed_element_matrix`
+This section describes plan-local deterministic matrix expansion for combinatorial studies.
 
 For a worked example, use **[constitutive sigma panel study tutorial](../tutorials/study_constitutive_sigma_panel.md)**.
 
-- `plan_templates` (non-empty list; mutually exclusive with `plan`)
-  - Use this for combinatorial promoter panels without duplicating YAML.
-  - Template keys:
-    - `base_name`
-    - one quota mode: `quota_per_variant` or `total_quota` (`distribution_policy: uniform` required with `total_quota`)
-    - `sampling`, `regulator_constraints`
-    - `fixed_elements.promoter_matrix`:
-      - `name`
-      - `upstream_from_set`, `downstream_from_set` (motif set names)
-      - `pairing.mode`: `zip | cross_product | explicit_pairs`
-      - `pairing.pairs` (required only when `mode=explicit_pairs`)
-      - `spacer_length`, `upstream_pos`, optional `downstream_pos`
-- `plan_template_max_expanded_plans` (int > 0; default 256)
-  - Hard cap on total expanded plan count across all templates to prevent accidental config blow-ups.
-- `plan_template_max_total_quota` (int > 0; default 4096)
-  - Hard cap on total quota after template expansion to prevent accidental
-    `quota_per_variant x variants` run explosions.
-  - Prefer `total_quota` with `distribution_policy: uniform` for large
-    combinatorial templates when you want bounded library size.
+- Expansion is resolved at config load time.
+- Matrix plans treat `generation.plan[].sequences` as the base-plan target; DenseGen enforces an exact divisible split across expanded variants.
+- Expanded plans inherit:
+  - `sampling.include_inputs`
+  - `regulator_constraints`
+  - `fixed_elements.promoter_constraints` (plus one generated promoter constraint from matrix pair selection)
+- Expanded plan names default to `{base}__up={up}__down={down}` unless `expanded_name_template` is set.
 
 #### `densegen.generation.sequence_constraints`
 This section describes global final-sequence checks applied after layout assembly.
@@ -290,7 +297,10 @@ For conceptual behavior and troubleshooting, use **[generation model](../concept
 
 This section covers densegen.motifsets.
 
-- Optional dictionary used by `generation.plan_templates` and `generation.sequence_constraints`.
+- Optional dictionary used by:
+  - `generation.plan[].fixed_elements.fixed_element_matrix`
+  - `inputs[].sampling.filters.forbid_kmers` motif-set rules
+  - `generation.sequence_constraints`
 - Shape: `set_name -> { variant_id -> motif_sequence }`.
 - Motifs must be non-empty A/C/G/T strings.
 - Set names and variant IDs must be non-empty strings.
@@ -359,8 +369,13 @@ This section covers densegen.runtime.
 - `min_count_per_tf` (int >= 0)
 - `max_duplicate_solutions`, `stall_seconds_before_resample`, `stall_warning_every_seconds`
   - `stall_seconds_before_resample` controls how long to wait with no new solutions before resampling; the timer resets on each new solution; `0` disables.
-- `max_consecutive_failures`, `max_seconds_per_plan`, `max_failed_solutions`
+- `max_consecutive_failures`, `max_seconds_per_plan`
   - `max_consecutive_failures` stops the run after N consecutive libraries yield zero solutions; `0` disables.
+- `max_failed_solutions` (int >= 0)
+  - Absolute emergency cap on rejected solutions per plan. `0` disables the absolute cap.
+- `max_failed_solutions_per_target` (float >= 0)
+  - Quota-scaled cap on rejected solutions per plan (`ceil(quota * value)`). `0` disables the scaled cap.
+  - When both caps are set, DenseGen enforces the tighter cap.
 - `leaderboard_every` (int >= 0; 0 disables periodic leaderboard logs)
 - `checkpoint_every` (int >= 0; 0 disables run_state checkpoints)
 - `random_seed` (int)
@@ -438,8 +453,18 @@ This section covers plots.
 - `source`: `usr | parquet` (required if `output.targets` has multiple sinks)
 - `out_dir` (optional; default `outputs/plots`; must be inside `outputs/` under `densegen.run.root`)
 - `format` (optional; `png | pdf | svg`, default `pdf`)
-- `default`: list of plot names to run when `dense plot` is invoked (defaults to `stage_a_summary` and `placement_map`)
+- `default`: list of plot names to run when `dense plot` is invoked
 - `options`: dict keyed by plot name (strict; unknown options error)
+  - `placement_map`:
+    - `occupancy_alpha` (float in `(0, 1]`)
+    - `occupancy_max_categories` (int > 0)
+    - `scope`: `auto | per_plan | per_group`
+    - `max_plans` (int > 0; used when `scope=auto`)
+    - `drilldown_plans` (int >= 0; optional per-plan overlays when grouped)
+  - `tfbs_usage`:
+    - `scope`: `auto | per_plan | per_group`
+    - `max_plans` (int > 0; used when `scope=auto`)
+    - `drilldown_plans` (int >= 0; optional per-plan overlays when grouped)
 - `style`: global style dict applied to every plot (can be overridden per plot). Common keys:
   - `seaborn_style` (bool; default `true`) — set to `false` if seaborn styles are unavailable.
 - `sample_rows`: optional cap on rows loaded for plotting (reads the first N rows for speed)
@@ -477,7 +502,7 @@ densegen:
     sequence_length: 60
     plan:
       - name: default
-        quota: 100
+        sequences: 100
         sampling:
           include_inputs: [demo]
 
@@ -496,7 +521,8 @@ densegen:
     stall_warning_every_seconds: 15
     max_consecutive_failures: 25
     max_seconds_per_plan: 0
-    max_failed_solutions: 0
+    max_failed_solutions: 100000
+    max_failed_solutions_per_target: 2.0
     leaderboard_every: 50
     random_seed: 42
 

@@ -20,6 +20,7 @@ import pandas as pd
 import pytest
 
 from dnadesign.densegen.src.config import load_config
+from dnadesign.densegen.src.core import run_metrics as run_metrics_module
 from dnadesign.densegen.src.core.run_metrics import build_run_metrics
 
 PLAN_POOL_LABEL = "plan_pool__demo_plan"
@@ -50,7 +51,7 @@ def _write_config(tmp_path: Path) -> Path:
                 sequence_length: 20
                 plan:
                   - name: demo_plan
-                    quota: 1
+                    sequences: 1
                     sampling:
                       include_inputs: [demo_input]
                     regulator_constraints:
@@ -459,3 +460,123 @@ def test_build_run_metrics_rejects_dense_arrays_without_library_hash(tmp_path: P
     loaded = load_config(cfg_path)
     with pytest.raises(ValueError, match="densegen__sampling_library_hash"):
         build_run_metrics(cfg=loaded.root.densegen, run_root=tmp_path)
+
+
+def test_build_run_metrics_reads_projected_parquet_columns(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg_path = _write_config(tmp_path)
+    loaded = load_config(cfg_path)
+    tables_dir = tmp_path / "outputs" / "tables"
+    libraries_dir = tmp_path / "outputs" / "libraries"
+    tables_dir.mkdir(parents=True, exist_ok=True)
+    libraries_dir.mkdir(parents=True, exist_ok=True)
+    (tables_dir / "attempts.parquet").write_text("placeholder")
+    (libraries_dir / "library_builds.parquet").write_text("placeholder")
+    (libraries_dir / "library_members.parquet").write_text("placeholder")
+    (tables_dir / "composition.parquet").write_text("placeholder")
+
+    requested_columns: dict[str, list[str] | None] = {}
+
+    def _fake_read_parquet(path: Path, *args, **kwargs) -> pd.DataFrame:
+        name = Path(path).name
+        columns = kwargs.get("columns")
+        requested_columns[name] = list(columns) if columns is not None else None
+        if name == "attempts.parquet":
+            return pd.DataFrame(
+                [
+                    {
+                        "status": "success",
+                        "input_name": PLAN_POOL_LABEL,
+                        "plan_name": "demo_plan",
+                        "sampling_library_index": 1,
+                        "sampling_library_hash": "hash1",
+                        "library_tfs": ["TF_A", "TF_B"],
+                        "library_tfbs": ["AAAA", "CCCCCC"],
+                    }
+                ]
+            )
+        if name == "library_builds.parquet":
+            return pd.DataFrame(
+                [
+                    {
+                        "input_name": PLAN_POOL_LABEL,
+                        "plan_name": "demo_plan",
+                        "library_index": 1,
+                        "library_hash": "hash1",
+                        "library_size": 2,
+                    }
+                ]
+            )
+        if name == "library_members.parquet":
+            return pd.DataFrame(
+                [
+                    {
+                        "input_name": PLAN_POOL_LABEL,
+                        "plan_name": "demo_plan",
+                        "library_index": 1,
+                        "library_hash": "hash1",
+                        "tf": "TF_A",
+                        "tfbs": "AAAA",
+                    },
+                    {
+                        "input_name": PLAN_POOL_LABEL,
+                        "plan_name": "demo_plan",
+                        "library_index": 1,
+                        "library_hash": "hash1",
+                        "tf": "TF_B",
+                        "tfbs": "CCCCCC",
+                    },
+                ]
+            )
+        if name == "composition.parquet":
+            return pd.DataFrame(
+                [
+                    {
+                        "solution_id": "sol-1",
+                        "input_name": PLAN_POOL_LABEL,
+                        "plan_name": "demo_plan",
+                        "library_index": 1,
+                        "library_hash": "hash1",
+                        "tf": "TF_A",
+                        "tfbs": "AAAA",
+                        "offset": 0,
+                        "length": 4,
+                    }
+                ]
+            )
+        raise AssertionError(f"Unexpected parquet read: {path}")
+
+    monkeypatch.setattr(run_metrics_module.pd, "read_parquet", _fake_read_parquet)
+    monkeypatch.setattr(run_metrics_module, "load_events", lambda *_args, **_kwargs: pd.DataFrame())
+    monkeypatch.setattr(run_metrics_module, "_load_pool_frames", lambda *_args, **_kwargs: (None, "missing_pool_dir"))
+
+    metrics = build_run_metrics(cfg=loaded.root.densegen, run_root=tmp_path)
+    assert not metrics.empty
+    assert requested_columns.get("attempts.parquet") is not None
+    assert requested_columns.get("library_builds.parquet") is not None
+    assert requested_columns.get("library_members.parquet") is not None
+    assert requested_columns.get("composition.parquet") is not None
+
+
+def test_build_run_metrics_scans_dense_arrays_without_full_pandas_load(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cfg_path = _write_config(tmp_path)
+    _write_pool_manifest(tmp_path)
+    _write_libraries(tmp_path)
+    _write_attempts(tmp_path)
+    _write_dense_arrays(tmp_path)
+    composition_path = tmp_path / "outputs" / "tables" / "composition.parquet"
+    if composition_path.exists():
+        composition_path.unlink()
+
+    loaded = load_config(cfg_path)
+    original_read_parquet = run_metrics_module.pd.read_parquet
+
+    def _guard_records_read(path: Path, *args, **kwargs):
+        if Path(path).name == "records.parquet":
+            raise AssertionError("run_metrics should scan dense arrays in batches instead of pd.read_parquet(records)")
+        return original_read_parquet(path, *args, **kwargs)
+
+    monkeypatch.setattr(run_metrics_module.pd, "read_parquet", _guard_records_read)
+    metrics = build_run_metrics(cfg=loaded.root.densegen, run_root=tmp_path)
+    assert not metrics.empty

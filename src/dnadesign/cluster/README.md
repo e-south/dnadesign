@@ -14,7 +14,7 @@ Add to `pyproject.toml`:
 
 ```toml
 [project.scripts]
-cluster = "dnadesign.cluster.src.cli.app:main"
+cluster = "dnadesign.cluster.cli:main"
 ````
 
 ---

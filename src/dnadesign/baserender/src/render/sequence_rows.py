@@ -328,8 +328,40 @@ def _draw_inline_feature_labels(ax, record: Record, layout: LayoutContext, palet
     labels = dict(record.display.tag_labels)
     side_pref = str(style.legend_inline_side).lower()
     margin = float(style.legend_inline_margin_cells) * layout.cw
+    box_pad = float(style.kmer.pad_x_px)
     x_min = style.padding_x
     x_max = layout.width - style.padding_x
+
+    def _candidate_position(
+        side: str, *, x_left: float, x_right: float, text_w: float
+    ) -> tuple[float, str, float, float]:
+        if side == "right":
+            x_text = min(x_right, x_max - text_w)
+            return x_text, "left", x_text, x_text + text_w
+        x_text = max(x_left, x_min + text_w)
+        return x_text, "right", x_text - text_w, x_text
+
+    def _overlap_score(
+        *,
+        interval_x0: float,
+        interval_x1: float,
+        y_anchor: float,
+        own_feature_index: int,
+    ) -> float:
+        score = 0.0
+        for other in layout.placements:
+            if other.feature_index == own_feature_index:
+                continue
+            y0 = other.y - other.h / 2.0
+            y1 = other.y + other.h / 2.0
+            if not (y0 <= y_anchor <= y1):
+                continue
+            bx0 = other.x - box_pad
+            bx1 = other.x + other.w + box_pad
+            overlap = min(interval_x1, bx1) - max(interval_x0, bx0)
+            if overlap > 0.0:
+                score += overlap
+        return score
 
     for placement in layout.placements:
         feature = record.features[placement.feature_index]
@@ -353,12 +385,23 @@ def _draw_inline_feature_labels(ax, record: Record, layout: LayoutContext, palet
         else:
             side = "right" if right_room >= left_room else "left"
 
-        if side == "right":
-            x_text = min(x_right, x_max - text_w)
-            ha = "left"
-        else:
-            x_text = max(x_left, x_min + text_w)
-            ha = "right"
+        preferred = _candidate_position(side, x_left=x_left, x_right=x_right, text_w=text_w)
+        alternate_side = "left" if side == "right" else "right"
+        alternate = _candidate_position(alternate_side, x_left=x_left, x_right=x_right, text_w=text_w)
+        preferred_score = _overlap_score(
+            interval_x0=preferred[2],
+            interval_x1=preferred[3],
+            y_anchor=placement.y,
+            own_feature_index=placement.feature_index,
+        )
+        alternate_score = _overlap_score(
+            interval_x0=alternate[2],
+            interval_x1=alternate[3],
+            y_anchor=placement.y,
+            own_feature_index=placement.feature_index,
+        )
+        chosen = preferred if preferred_score <= alternate_score else alternate
+        x_text, ha = chosen[0], chosen[1]
 
         ax.text(
             x_text,

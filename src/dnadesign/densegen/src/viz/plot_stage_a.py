@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 
 from ..core.artifacts.pool import TFBSPoolArtifact
-from .plot_common import _apply_style, _safe_filename, _style
+from .plot_common import _apply_style, _safe_filename, _save_figure, _style
 from .plot_stage_a_diversity import _build_stage_a_diversity_figure
 from .plot_stage_a_strata import _build_stage_a_strata_overview_figure
 from .plot_stage_a_yield import _build_stage_a_yield_bias_figure
@@ -61,9 +61,9 @@ def _build_background_logo_figure(
         raise ValueError("Background logo requires at least one sequence length.")
     n_lengths = len(lengths)
     nrows = n_lengths
-    subplot_side = 3.4
-    width = max(4.4, subplot_side * 1.18)
-    height = max(3.6, subplot_side * float(nrows) + 0.5)
+    subplot_height = 3.8
+    width = max(10.5, 0.54 * float(max(lengths)) + 3.4)
+    height = max(4.2, subplot_height * float(nrows) + 0.7)
     fig, axes = plt.subplots(nrows, 1, figsize=(width, height), sharex=True, sharey=True)
     axes_list = list(np.atleast_1d(axes).ravel())
     used_axes: list[plt.Axes] = []
@@ -74,7 +74,6 @@ def _build_background_logo_figure(
         logomaker.Logo(df, ax=ax, shade_below=0.5)
         ax.set_title(f"L={length} (n={len(seqs)})")
         ax.set_ylabel("Probability")
-        ax.set_box_aspect(1.0)
         _apply_style(ax, style)
         ax.grid(False)
         used_axes.append(ax)
@@ -169,7 +168,7 @@ def plot_stage_a_summary(
                 show_column_titles=(idx == 0),
             )
         path = base_dir / f"pool_tiers{out_path.suffix}"
-        fig.savefig(path, bbox_inches="tight", pad_inches=0.08, facecolor="white")
+        _save_figure(fig, path, style=style)
         plt.close(fig)
         paths.append(path)
 
@@ -196,7 +195,7 @@ def plot_stage_a_summary(
                 show_column_titles=(idx == 0),
             )
         path2 = base_dir / f"yield_bias{out_path.suffix}"
-        fig2.savefig(path2, bbox_inches="tight", pad_inches=0.08, facecolor="white")
+        _save_figure(fig2, path2, style=style)
         plt.close(fig2)
         paths.append(path2)
 
@@ -222,7 +221,7 @@ def plot_stage_a_summary(
                 show_column_titles=(idx == 0),
             )
         path3 = base_dir / f"diversity{out_path.suffix}"
-        fig3.savefig(path3, bbox_inches="tight", pad_inches=0.08, facecolor="white")
+        _save_figure(fig3, path3, style=style)
         plt.close(fig3)
         paths.append(path3)
 
@@ -244,7 +243,31 @@ def plot_stage_a_summary(
         else:
             fname = f"{input_segment}__background_logo{out_path.suffix}"
         path = base_dir / fname
-        fig.savefig(path, bbox_inches="tight", pad_inches=0.08, facecolor="white")
+        _save_figure(fig, path, style=style)
         plt.close(fig)
         paths.append(path)
+    if not paths:
+        fig, ax = plt.subplots(figsize=(8.2, 2.8), constrained_layout=False)
+        ax.axis("off")
+        ax.text(
+            0.5,
+            0.65,
+            "No Stage-A diagnostic panels were generated for this run.",
+            ha="center",
+            va="center",
+            fontsize=float(style.get("label_size", style.get("font_size", 13.0) * 0.95)),
+        )
+        ax.text(
+            0.5,
+            0.35,
+            "Common causes: binding-site-only inputs, no PWM pool summaries, or no background pools.",
+            ha="center",
+            va="center",
+            fontsize=float(style.get("tick_size", style.get("font_size", 13.0) * 0.7)),
+            alpha=0.9,
+        )
+        fallback_path = base_dir / f"no_stage_a_panels{out_path.suffix}"
+        _save_figure(fig, fallback_path, style=style)
+        plt.close(fig)
+        paths.append(fallback_path)
     return paths

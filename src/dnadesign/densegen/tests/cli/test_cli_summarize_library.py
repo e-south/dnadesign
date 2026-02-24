@@ -48,7 +48,7 @@ def _write_config(path: Path) -> None:
             sequence_length: 10
             plan:
               - name: demo_plan
-                quota: 1
+                sequences: 1
                 sampling:
                   include_inputs: [demo_input]
                 regulator_constraints:
@@ -155,10 +155,12 @@ def test_summarize_library_grouping(tmp_path: Path) -> None:
         solver_strands="double",
         dense_arrays_version=None,
         dense_arrays_version_source="unknown",
+        total_quota=1,
         items=[
             PlanManifest(
                 input_name=PLAN_POOL_LABEL,
                 plan_name="demo_plan",
+                quota=1,
                 generated=1,
                 duplicates_skipped=0,
                 failed_solutions=0,
@@ -308,10 +310,12 @@ def test_summarize_library_show_tfbs_flag(tmp_path: Path) -> None:
         solver_strands="double",
         dense_arrays_version=None,
         dense_arrays_version_source="unknown",
+        total_quota=2,
         items=[
             PlanManifest(
                 input_name=PLAN_POOL_LABEL,
                 plan_name="demo_plan",
+                quota=2,
                 generated=2,
                 duplicates_skipped=0,
                 failed_solutions=0,

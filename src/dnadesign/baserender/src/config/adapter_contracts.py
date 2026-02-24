@@ -112,10 +112,10 @@ _CRUNCHER_POLICY_KEYS = ("on_missing_hit", "on_missing_pwm")
 
 ADAPTER_CONTRACTS: dict[str, AdapterContract] = {
     "densegen_tfbs": AdapterContract(
-        allowed_config_columns=("sequence", "annotations", "id", "overlay_text"),
+        allowed_config_columns=("sequence", "annotations", "promoter_detail", "id", "overlay_text"),
         required_config_columns=("sequence", "annotations"),
         required_source_columns=("sequence", "annotations"),
-        optional_source_columns=("id", "overlay_text"),
+        optional_source_columns=("promoter_detail", "id", "overlay_text"),
         allowed_policy_keys=_DENSEGEN_POLICY_KEYS,
         normalize_policies=_normalize_densegen_policies,
     ),

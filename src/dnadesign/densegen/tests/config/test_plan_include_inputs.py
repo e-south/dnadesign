@@ -69,7 +69,7 @@ def test_plan_include_inputs_required(tmp_path: Path) -> None:
         tmp_path,
         """
           - name: demo_plan
-            quota: 1
+            sequences: 1
             sampling: {}
             regulator_constraints:
               groups: []
@@ -84,7 +84,7 @@ def test_plan_include_inputs_unknown_input(tmp_path: Path) -> None:
         tmp_path,
         """
           - name: demo_plan
-            quota: 1
+            sequences: 1
             sampling:
               include_inputs: [missing]
             regulator_constraints:

@@ -89,7 +89,8 @@ def load_config_or_exit(
             console.print(f"[bold red]{missing_message}[/]")
         else:
             root = display_root or Path.cwd()
-            console.print(f"[bold red]Config file not found:[/] {display_path(cfg_path, root, absolute)}")
+            absolute_missing_path = absolute or cfg_path.is_absolute()
+            console.print(f"[bold red]Config file not found:[/] {display_path(cfg_path, root, absolute_missing_path)}")
         raise typer.Exit(code=1)
     except ConfigError as exc:
         console.print(f"[bold red]Config error:[/] {exc}")

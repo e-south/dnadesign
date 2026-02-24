@@ -27,6 +27,7 @@ from dnadesign.densegen.src.core.pipeline.stage_b_solution_rejections import (
     reject_sequence_validation_failure,
     reject_solution_and_enforce_cap,
     reject_solution_requirement_failure,
+    resolve_failed_solution_cap,
 )
 from dnadesign.densegen.src.core.pipeline.stage_b_solution_types import StageBRejectionContext
 
@@ -323,7 +324,7 @@ def test_reject_sequence_validation_failure_emits_event_and_returns_count(tmp_pa
     ]
 
 
-def test_reject_sequence_validation_failure_raises_on_zero_cap_with_cause(tmp_path: Path) -> None:
+def test_reject_sequence_validation_failure_allows_retries_when_cap_is_zero(tmp_path: Path) -> None:
     attempts_buffer: list[dict] = []
     next_index = 0
     logger = MagicMock()
@@ -344,34 +345,40 @@ def test_reject_sequence_validation_failure_raises_on_zero_cap_with_cause(tmp_pa
         next_attempt_index=_next_attempt_index,
     )
     cause = ValueError("invalid placement")
-    with pytest.raises(RuntimeError, match="sequence validation failed and runtime.max_failed_solutions=0") as exc:
-        reject_sequence_validation_failure(
-            rejection_context=context,
-            rejection_detail={"error": "invalid placement"},
-            rejection_event_payload=None,
-            validation_error=cause,
-            final_seq="TTGACA",
-            used_tf_counts={"lexA": 1},
-            used_tf_list=["lexA"],
-            sampling_library_index=2,
-            sampling_library_hash="abc123",
-            solver_status="optimal",
-            solver_objective=1.0,
-            solver_solve_time_s=0.1,
-            library_tfbs=["site-1"],
-            library_tfs=["lexA"],
-            library_site_ids=["site-1"],
-            library_sources=["sampling"],
-            failed_solutions=0,
-            max_failed_solutions=0,
-            source_label="demo",
-            plan_name="baseline",
-            events_path=tmp_path / "events.jsonl",
-            emit_event=MagicMock(),
-            logger=logger,
-        )
-    assert exc.value.__cause__ is cause
+    failed_solutions = reject_sequence_validation_failure(
+        rejection_context=context,
+        rejection_detail={"error": "invalid placement"},
+        rejection_event_payload=None,
+        validation_error=cause,
+        final_seq="TTGACA",
+        used_tf_counts={"lexA": 1},
+        used_tf_list=["lexA"],
+        sampling_library_index=2,
+        sampling_library_hash="abc123",
+        solver_status="optimal",
+        solver_objective=1.0,
+        solver_solve_time_s=0.1,
+        library_tfbs=["site-1"],
+        library_tfs=["lexA"],
+        library_site_ids=["site-1"],
+        library_sources=["sampling"],
+        failed_solutions=0,
+        max_failed_solutions=0,
+        source_label="demo",
+        plan_name="baseline",
+        events_path=tmp_path / "events.jsonl",
+        emit_event=MagicMock(),
+        logger=logger,
+    )
+    assert failed_solutions == 1
     assert len(attempts_buffer) == 1
+
+
+def test_resolve_failed_solution_cap_uses_scaled_and_absolute_limits() -> None:
+    assert resolve_failed_solution_cap(max_failed_solutions=0, max_failed_solutions_per_target=0.0, quota=100) == 0
+    assert resolve_failed_solution_cap(max_failed_solutions=0, max_failed_solutions_per_target=0.2, quota=100) == 20
+    assert resolve_failed_solution_cap(max_failed_solutions=10, max_failed_solutions_per_target=0.0, quota=100) == 10
+    assert resolve_failed_solution_cap(max_failed_solutions=50, max_failed_solutions_per_target=0.2, quota=100) == 20
 
 
 def test_handle_duplicate_sequence_accepts_new_sequence() -> None:

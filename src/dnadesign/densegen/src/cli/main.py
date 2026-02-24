@@ -20,7 +20,7 @@ Commands:
   - notebook        : Generate/run workspace-scoped marimo notebooks.
 
 Run:
-  python -m dnadesign.densegen.src.cli --help
+  python -m dnadesign.densegen --help
 
 Module Author(s): Eric J. South
 Dunlop Lab
@@ -43,19 +43,15 @@ from functools import partial
 from pathlib import Path
 from typing import Callable, Iterator, Optional, Sequence
 
-import numpy as np
 import typer
 from rich.console import Console
 from rich.traceback import install as rich_traceback
 
 from ..config import resolve_relative_path, resolve_run_root
-from ..core.artifacts.pool import PoolData
 from ..core.run_paths import display_path
-from ..core.stage_a.stage_a_summary import PWMSamplingSummary
 from ..utils.logging_utils import install_native_stderr_filters
 from ..utils.rich_style import make_table
 from .context import CliContext
-from .sampling import format_selection_label
 from .setup import (
     DEFAULT_CONFIG_FILENAME,
 )
@@ -71,6 +67,9 @@ from .setup import (
 from .setup import (
     resolve_outputs_path_or_exit as _resolve_outputs_path_or_exit_impl,
 )
+from .stage_a_summary_rows import _format_tier_counts, _stage_a_sampling_rows
+
+_STAGE_A_SUMMARY_EXPORTS = (_format_tier_counts,)
 
 
 def _build_console() -> Console:
@@ -152,55 +151,52 @@ def _apply_stage_a_overrides(
         sampling = getattr(inp, "sampling", None)
         if sampling is None:
             continue
-        sampling_updates: dict = {}
-        budget_updates: dict = {}
-        if n_sites is not None:
-            sampling_updates["n_sites"] = n_sites
-        mining_updates: dict = {}
-        if batch_size is not None:
-            mining_updates["batch_size"] = batch_size
-        if max_seconds is not None:
-            budget_updates["max_seconds"] = max_seconds
-        if mining_updates:
-            mining = sampling.mining
-            if mining is None:
-                raise typer.BadParameter("Stage-A sampling mining config is required for overrides")
-            sampling_updates["mining"] = mining.model_copy(update=mining_updates)
-        if budget_updates:
-            mining = sampling_updates.get("mining", sampling.mining)
-            if mining is None or getattr(mining, "budget", None) is None:
-                raise typer.BadParameter("Stage-A sampling mining.budget is required for overrides")
-            budget = mining.budget
-            mining_updates = dict(getattr(mining, "model_dump", lambda **_: {})()) or {}
-            mining_updates["budget"] = budget.model_copy(update=budget_updates)
-            sampling_updates["mining"] = mining.model_copy(update=mining_updates)
-        if sampling_updates:
-            inp.sampling = sampling.model_copy(update=sampling_updates)
+        inp.sampling = _with_stage_a_sampling_overrides(
+            sampling=sampling,
+            n_sites=n_sites,
+            batch_size=batch_size,
+            max_seconds=max_seconds,
+        )
         overrides = getattr(inp, "overrides_by_motif_id", None)
         if isinstance(overrides, dict) and overrides:
-            new_overrides = {}
-            for motif_id, override in overrides.items():
-                override_updates: dict = {}
-                override_budget_updates: dict = {}
-                if n_sites is not None:
-                    override_updates["n_sites"] = n_sites
-                if mining_updates:
-                    mining = override.mining
-                    if mining is None:
-                        raise typer.BadParameter("Stage-A sampling mining config is required for overrides")
-                    override_updates["mining"] = mining.model_copy(update=mining_updates)
-                if override_budget_updates:
-                    mining = override_updates.get("mining", override.mining)
-                    if mining is None or getattr(mining, "budget", None) is None:
-                        raise typer.BadParameter("Stage-A sampling mining.budget is required for overrides")
-                    budget = mining.budget
-                    mining_updates = dict(getattr(mining, "model_dump", lambda **_: {})()) or {}
-                    mining_updates["budget"] = budget.model_copy(update=override_budget_updates)
-                    override_updates["mining"] = mining.model_copy(update=mining_updates)
-                if override_updates:
-                    override = override.model_copy(update=override_updates)
-                new_overrides[motif_id] = override
-            inp.overrides_by_motif_id = new_overrides
+            inp.overrides_by_motif_id = {
+                motif_id: _with_stage_a_sampling_overrides(
+                    sampling=override,
+                    n_sites=n_sites,
+                    batch_size=batch_size,
+                    max_seconds=max_seconds,
+                )
+                for motif_id, override in overrides.items()
+            }
+
+
+def _with_stage_a_sampling_overrides(
+    *,
+    sampling,
+    n_sites: int | None,
+    batch_size: int | None,
+    max_seconds: float | None,
+):
+    updates: dict[str, object] = {}
+    if n_sites is not None:
+        updates["n_sites"] = n_sites
+
+    mining = sampling.mining
+    mining_updates: dict[str, object] = {}
+    if batch_size is not None:
+        if mining is None:
+            raise typer.BadParameter("Stage-A sampling mining config is required for overrides")
+        mining_updates["batch_size"] = batch_size
+    if max_seconds is not None:
+        if mining is None or getattr(mining, "budget", None) is None:
+            raise typer.BadParameter("Stage-A sampling mining.budget is required for overrides")
+        mining_updates["budget"] = mining.budget.model_copy(update={"max_seconds": max_seconds})
+
+    if mining_updates:
+        updates["mining"] = mining.model_copy(update=mining_updates)
+    if not updates:
+        return sampling
+    return sampling.model_copy(update=updates)
 
 
 def _dense_command_launcher() -> str:
@@ -219,10 +215,22 @@ def _resolve_workspace_hint_command(command: str) -> str:
     return stripped
 
 
+def _workspace_hint_path(path: Path, *, base: Path) -> str:
+    relative_label = display_path(path, base, absolute=False)
+    if Path(relative_label).parts[:1] == ("..",):
+        return display_path(path, base, absolute=True)
+    return relative_label
+
+
 def _workspace_command(command: str, *, cfg_path: Path | None = None, run_root: Path | None = None) -> str:
     resolved_command = _resolve_workspace_hint_command(command)
     root = run_root
     base = Path.cwd()
+    uses_pixi_launcher = resolved_command.startswith("pixi run ")
+    has_explicit_config_flag = " -c " in resolved_command or " --config " in resolved_command
+    if uses_pixi_launcher and cfg_path is not None and not has_explicit_config_flag:
+        cfg_label = _workspace_hint_path(cfg_path, base=base)
+        return f"{resolved_command} -c {shlex.quote(cfg_label)}"
     if root is not None:
         try:
             root_resolved = root.resolve()
@@ -232,10 +240,14 @@ def _workspace_command(command: str, *, cfg_path: Path | None = None, run_root: 
             return resolved_command
         candidate = root / DEFAULT_CONFIG_FILENAME
         if candidate.exists():
-            root_label = display_path(root, base, absolute=False)
+            root_label = _workspace_hint_path(root, base=base)
+            root_absolute_label = display_path(root, base, absolute=True)
+            if cfg_path is not None and root_label == root_absolute_label:
+                cfg_label = _workspace_hint_path(cfg_path, base=base)
+                return f"{resolved_command} -c {shlex.quote(cfg_label)}"
             return f"cd {shlex.quote(root_label)} && {resolved_command}"
     if cfg_path is not None:
-        cfg_label = display_path(cfg_path, base, absolute=False)
+        cfg_label = _workspace_hint_path(cfg_path, base=base)
         return f"{resolved_command} -c {shlex.quote(cfg_label)}"
     return resolved_command
 
@@ -314,296 +326,6 @@ def _resolve_workspace_source(
         display_path=_display_path,
         default_config_filename=DEFAULT_CONFIG_FILENAME,
     )
-
-
-def _format_sampling_ratio(value: int, target: int | None) -> str:
-    if target is None or target <= 0:
-        return str(int(value))
-    return f"{int(value)}/{int(target)}"
-
-
-def _format_count(value: int | None) -> str:
-    if value is None:
-        return "-"
-    return f"{int(value):,}"
-
-
-def _format_ratio(count: int | None, total: int | None) -> str:
-    if count is None:
-        return "-"
-    if total is None or int(total) <= 0:
-        return _format_count(count)
-    pct = 100.0 * float(count) / float(total)
-    return f"{_format_count(count)} ({pct:.0f}%)"
-
-
-def _format_sampling_lengths(
-    *,
-    min_len: int | None,
-    median_len: float | None,
-    mean_len: float | None,
-    max_len: int | None,
-    count: int | None,
-) -> str:
-    if count is None:
-        return "-"
-    if min_len is None or median_len is None or mean_len is None or max_len is None:
-        return f"{int(count)}/-/-/-/-"
-    return f"{int(count)}/{int(min_len)}/{median_len:.1f}/{mean_len:.1f}/{int(max_len)}"
-
-
-def _format_score_stats(
-    *,
-    min_score: float | None,
-    median_score: float | None,
-    mean_score: float | None,
-    max_score: float | None,
-) -> str:
-    if min_score is None or median_score is None or mean_score is None or max_score is None:
-        return "-"
-    return f"{min_score:.2f}/{median_score:.2f}/{mean_score:.2f}/{max_score:.2f}"
-
-
-def _format_diversity_value(value: float | None, *, show_sign: bool = False) -> str:
-    if value is None:
-        return "-"
-    if show_sign:
-        return f"{float(value):+.2f}"
-    return f"{float(value):.2f}"
-
-
-def _format_score_norm_summary(summary) -> str:
-    if summary is None:
-        return "-"
-    top = getattr(summary, "top_candidates", None)
-    diversified = getattr(summary, "diversified_candidates", None)
-    if top is None or diversified is None:
-        return "-"
-    return (
-        f"top {float(top.min):.2f}/{float(top.median):.2f}/{float(top.max):.2f} | "
-        f"div {float(diversified.min):.2f}/{float(diversified.median):.2f}/{float(diversified.max):.2f}"
-    )
-
-
-def _format_score_norm_triplet(summary, *, label: str) -> str:
-    if summary is None:
-        return "-"
-    block = getattr(summary, label, None)
-    if block is None:
-        return "-"
-    return f"{float(block.min):.2f}/{float(block.median):.2f}/{float(block.max):.2f}"
-
-
-def _format_tier_counts(eligible: list[int] | None, retained: list[int] | None) -> str:
-    if not eligible or not retained:
-        raise ValueError("Stage-A tier counts are required.")
-    if len(eligible) != len(retained):
-        raise ValueError("Stage-A tier counts length mismatch.")
-    parts = []
-    for idx in range(len(eligible)):
-        parts.append(f"t{idx} {int(eligible[idx])}/{int(retained[idx])}")
-    return " | ".join(parts)
-
-
-def _format_tier_fraction_label(fraction: float) -> str:
-    return f"{float(fraction) * 100:.3f}%"
-
-
-def _stage_a_row_from_pwm_summary(*, summary: PWMSamplingSummary, pool_name: str) -> dict[str, object]:
-    input_name = summary.input_name or pool_name
-    if summary.generated is None:
-        raise ValueError("Stage-A summary missing generated count.")
-    if not summary.regulator:
-        raise ValueError("Stage-A summary missing regulator.")
-    regulator = summary.regulator
-    if summary.candidates_with_hit is None:
-        raise ValueError("Stage-A summary missing candidates_with_hit.")
-    if summary.eligible_raw is None:
-        raise ValueError("Stage-A summary missing eligible_raw.")
-    if summary.eligible_unique is None:
-        raise ValueError("Stage-A summary missing eligible_unique.")
-    if summary.retained is None:
-        raise ValueError("Stage-A summary missing retained count.")
-    if summary.eligible_tier_counts is None or summary.retained_tier_counts is None:
-        raise ValueError("Stage-A summary missing tier counts.")
-    if len(summary.eligible_tier_counts) != len(summary.retained_tier_counts):
-        raise ValueError("Stage-A summary tier counts length mismatch.")
-    if summary.tier_fractions is None:
-        raise ValueError("Stage-A summary missing tier fractions.")
-    tier_fractions = list(summary.tier_fractions)
-    if len(summary.retained_tier_counts) not in {len(tier_fractions), len(tier_fractions) + 1}:
-        raise ValueError("Stage-A summary tier fraction/count length mismatch.")
-    if summary.selection_policy is None:
-        raise ValueError("Stage-A summary missing selection policy.")
-    if summary.diversity is None:
-        raise ValueError("Stage-A diversity summary missing.")
-    candidates = _format_count(summary.generated)
-    has_hit = _format_ratio(summary.candidates_with_hit, summary.generated)
-    eligible_raw = _format_ratio(summary.eligible_raw, summary.generated)
-    eligible_unique = _format_ratio(summary.eligible_unique, summary.eligible_raw)
-    retained = _format_count(summary.retained)
-    tier_target = "-"
-    if summary.tier_target_fraction is not None:
-        frac = float(summary.tier_target_fraction)
-        frac_label = f"{frac:.3%}"
-        if summary.tier_target_met is True:
-            tier_target = f"{frac_label} met"
-        elif summary.tier_target_met is False:
-            tier_target = f"{frac_label} unmet"
-    selection_label = format_selection_label(
-        policy=str(summary.selection_policy),
-        alpha=summary.selection_alpha,
-        relevance_norm=summary.selection_relevance_norm or "minmax_raw_score",
-    )
-    tier_counts = _format_tier_counts(summary.eligible_tier_counts, summary.retained_tier_counts)
-    tier_fill = "-"
-    if summary.retained_tier_counts:
-        tier_labels = [_format_tier_fraction_label(frac) for frac in tier_fractions]
-        if len(summary.retained_tier_counts) == len(tier_fractions) + 1:
-            tier_labels.append("rest")
-        last_idx = None
-        for idx, val in enumerate(summary.retained_tier_counts):
-            if int(val) > 0:
-                last_idx = idx
-        if last_idx is not None:
-            tier_fill = tier_labels[last_idx]
-    length_label = _format_sampling_lengths(
-        min_len=summary.retained_len_min,
-        median_len=summary.retained_len_median,
-        mean_len=summary.retained_len_mean,
-        max_len=summary.retained_len_max,
-        count=summary.retained,
-    )
-    score_label = _format_score_stats(
-        min_score=summary.retained_score_min,
-        median_score=summary.retained_score_median,
-        mean_score=summary.retained_score_mean,
-        max_score=summary.retained_score_max,
-    )
-    diversity = summary.diversity
-    core_hamming = diversity.core_hamming
-    pairwise = core_hamming.pairwise
-    if pairwise is None:
-        raise ValueError("Stage-A diversity missing pairwise summary.")
-    top_pairwise = pairwise.top_candidates
-    diversified_pairwise = pairwise.diversified_candidates
-    if int(diversified_pairwise.n_pairs) <= 0 or int(top_pairwise.n_pairs) <= 0:
-        pairwise_top_label = "n/a"
-        pairwise_div_label = "n/a"
-    else:
-        pairwise_top_label = _format_diversity_value(top_pairwise.median)
-        pairwise_div_label = _format_diversity_value(diversified_pairwise.median)
-    score_block = diversity.score_quantiles
-    if score_block.top_candidates is None or score_block.diversified_candidates is None:
-        raise ValueError("Stage-A diversity missing top/diversified score quantiles.")
-    score_norm_top = _format_score_norm_triplet(diversity.score_norm_summary, label="top_candidates")
-    score_norm_div = _format_score_norm_triplet(diversity.score_norm_summary, label="diversified_candidates")
-    if diversity.set_overlap_fraction is None or diversity.set_overlap_swaps is None:
-        raise ValueError("Stage-A diversity missing overlap stats.")
-    diversity_overlap = f"{float(diversity.set_overlap_fraction) * 100:.1f}%"
-    diversity_swaps = str(int(diversity.set_overlap_swaps))
-    if diversity.candidate_pool_size is None:
-        raise ValueError("Stage-A diversity missing pool size.")
-    pool_label = str(int(diversity.candidate_pool_size))
-    pool_source = "-"
-    if summary.selection_pool_capped:
-        pool_label = f"{pool_label}*"
-        if summary.selection_pool_cap_value is not None:
-            pool_source = f"cap={int(summary.selection_pool_cap_value)}"
-    elif summary.selection_pool_rung_fraction_used is not None:
-        pool_source = f"rung={float(summary.selection_pool_rung_fraction_used) * 100:.3f}%"
-    diversity_pool = pool_label
-    return {
-        "input_name": str(input_name),
-        "regulator": str(regulator),
-        "generated": candidates,
-        "has_hit": has_hit,
-        "eligible_raw": eligible_raw,
-        "eligible_unique": eligible_unique,
-        "retained": retained,
-        "tier_fill": tier_fill,
-        "tier_counts": tier_counts,
-        "tier_target": tier_target,
-        "selection": selection_label,
-        "score": score_label,
-        "length": length_label,
-        "pairwise_top": pairwise_top_label,
-        "pairwise_div": pairwise_div_label,
-        "score_norm_top": score_norm_top,
-        "score_norm_div": score_norm_div,
-        "set_overlap": diversity_overlap,
-        "set_swaps": diversity_swaps,
-        "diversity_pool": diversity_pool,
-        "diversity_pool_source": pool_source,
-        "tier0_score": summary.tier0_score,
-        "tier1_score": summary.tier1_score,
-        "tier2_score": summary.tier2_score,
-    }
-
-
-def _stage_a_row_from_sequence_pool(*, pool: PoolData) -> dict[str, object]:
-    total = len(pool.sequences)
-    lengths = [len(seq) for seq in pool.sequences]
-    if lengths:
-        arr = np.asarray(lengths, dtype=float)
-        length_label = _format_sampling_lengths(
-            min_len=int(arr.min()),
-            median_len=float(np.median(arr)),
-            mean_len=float(arr.mean()),
-            max_len=int(arr.max()),
-            count=int(total),
-        )
-    else:
-        length_label = _format_sampling_lengths(
-            min_len=None,
-            median_len=None,
-            mean_len=None,
-            max_len=None,
-            count=int(total),
-        )
-    return {
-        "input_name": str(pool.name),
-        "regulator": "-",
-        "generated": _format_count(total),
-        "has_hit": _format_ratio(total, total),
-        "eligible_raw": _format_ratio(total, total),
-        "eligible_unique": _format_ratio(total, total),
-        "retained": _format_count(total),
-        "tier_fill": "-",
-        "tier_counts": "-",
-        "tier_target": "-",
-        "selection": "-",
-        "score": "-",
-        "length": length_label,
-        "pairwise_top": "-",
-        "pairwise_div": "-",
-        "score_norm_top": "-",
-        "score_norm_div": "-",
-        "set_overlap": "-",
-        "set_swaps": "-",
-        "diversity_pool": "-",
-        "diversity_pool_source": "-",
-        "tier0_score": None,
-        "tier1_score": None,
-        "tier2_score": None,
-    }
-
-
-def _stage_a_sampling_rows(
-    pool_data: dict[str, PoolData],
-) -> list[dict[str, object]]:
-    rows: list[dict[str, object]] = []
-    for pool in pool_data.values():
-        summaries = pool.summaries or []
-        if summaries:
-            for summary in summaries:
-                if not isinstance(summary, PWMSamplingSummary):
-                    continue
-                rows.append(_stage_a_row_from_pwm_summary(summary=summary, pool_name=str(pool.name)))
-            continue
-        rows.append(_stage_a_row_from_sequence_pool(pool=pool))
-    rows.sort(key=lambda row: (row["input_name"], row["regulator"]))
-    return rows
 
 
 def _list_dir_entries(path: Path, *, limit: int = 10) -> list[str]:

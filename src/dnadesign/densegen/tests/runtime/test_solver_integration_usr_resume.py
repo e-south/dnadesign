@@ -66,7 +66,7 @@ def _write_config(path: Path) -> None:
                   relax_on_exhaustion: false
                 plan:
                   - name: baseline
-                    quota: 1
+                    sequences: 1
                     sampling:
                       include_inputs: [basic_sites]
                     regulator_constraints:
@@ -141,7 +141,7 @@ def _write_config_usr_only(path: Path) -> None:
                   relax_on_exhaustion: false
                 plan:
                   - name: baseline
-                    quota: 1
+                    sequences: 1
                     sampling:
                       include_inputs: [basic_sites]
                     regulator_constraints:

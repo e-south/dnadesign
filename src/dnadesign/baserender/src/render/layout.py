@@ -32,6 +32,13 @@ def revcomp(seq: str) -> str:
     return comp(seq)[::-1]
 
 
+def _overlay_line_count(text: str | None) -> int:
+    if text is None:
+        return 1
+    lines = [line for line in str(text).splitlines() if line.strip()]
+    return max(1, len(lines))
+
+
 def grid_x_left(layout: LayoutContext, col_idx: int) -> float:
     return layout.grid_x_left(col_idx)
 
@@ -533,7 +540,11 @@ def compute_layout(record: Record, style: Style, *, fixed_n: int | None = None) 
     y_reverse = y_reverse_base + shift
     content_bottom = content_bottom_raw + shift
     content_top = content_top_raw + shift
-    title_space = max((style.font_size_label / 72.0 * style.dpi) * 1.6, ch * 0.8)
+    label_height = style.font_size_label / 72.0 * style.dpi
+    title_space = max(label_height * 1.6, ch * 0.8)
+    overlay_lines = _overlay_line_count(record.display.overlay_text)
+    if overlay_lines > 1:
+        title_space += (overlay_lines - 1) * max(label_height * 1.05, ch * 0.5)
     height = content_top + style.padding_y + outer_pad + title_space
 
     return LayoutContext(

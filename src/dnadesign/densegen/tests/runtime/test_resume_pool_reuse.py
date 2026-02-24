@@ -113,7 +113,78 @@ def _write_config(path: Path, input_path: Path) -> None:
                 "plan": [
                     {
                         "name": "default",
-                        "quota": 1,
+                        "sequences": 1,
+                        "sampling": {"include_inputs": ["demo"]},
+                        "regulator_constraints": {
+                            "groups": [
+                                {
+                                    "name": "all",
+                                    "members": ["TF1"],
+                                    "min_required": 1,
+                                }
+                            ]
+                        },
+                    }
+                ],
+            },
+            "solver": {"backend": "CBC", "strategy": "iterate"},
+            "runtime": {
+                "round_robin": False,
+                "arrays_generated_before_resample": 1,
+                "min_count_per_tf": 0,
+                "max_duplicate_solutions": 1,
+                "stall_seconds_before_resample": 1,
+                "stall_warning_every_seconds": 1,
+                "max_consecutive_failures": 25,
+                "max_seconds_per_plan": 0,
+                "max_failed_solutions": 0,
+                "random_seed": 1,
+            },
+            "postprocess": {"pad": {"mode": "off"}},
+            "logging": {"log_dir": "outputs/logs", "level": "INFO"},
+        }
+    }
+    path.write_text(yaml.safe_dump(cfg))
+
+
+def _write_config_with_unused_input(path: Path, input_path: Path, unused_input_path: Path) -> None:
+    cfg = {
+        "densegen": {
+            "schema_version": "2.9",
+            "run": {"id": "demo", "root": "."},
+            "inputs": [
+                {
+                    "name": "demo",
+                    "type": "binding_sites",
+                    "path": str(input_path),
+                    "format": "csv",
+                },
+                {
+                    "name": "unused",
+                    "type": "binding_sites",
+                    "path": str(unused_input_path),
+                    "format": "csv",
+                },
+            ],
+            "output": {
+                "targets": ["parquet"],
+                "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+                "parquet": {"path": "outputs/tables/records.parquet"},
+            },
+            "generation": {
+                "sequence_length": 3,
+                "sampling": {
+                    "pool_strategy": "full",
+                    "library_size": 1,
+                    "cover_all_regulators": False,
+                    "unique_binding_sites": True,
+                    "max_sites_per_regulator": None,
+                    "relax_on_exhaustion": False,
+                },
+                "plan": [
+                    {
+                        "name": "default",
+                        "sequences": 1,
                         "sampling": {"include_inputs": ["demo"]},
                         "regulator_constraints": {
                             "groups": [
@@ -173,6 +244,32 @@ def test_resume_uses_existing_pool_without_inputs(tmp_path: Path) -> None:
     csv_path.unlink()
     with pytest.raises(RuntimeError, match="Stage-A pools missing or stale"):
         run_pipeline(loaded, deps=deps, resume=True, build_stage_a=False)
+
+
+def test_resume_ignores_unused_missing_inputs_when_active_pool_is_present(tmp_path: Path) -> None:
+    csv_path = tmp_path / "sites.csv"
+    csv_path.write_text("tf,tfbs\nTF1,AAA\n")
+    missing_path = tmp_path / "missing.csv"
+    cfg_path = tmp_path / "config.yaml"
+    _write_config_with_unused_input(cfg_path, csv_path, missing_path)
+
+    loaded = load_config(cfg_path)
+
+    def _sink_factory(_cfg, _path):
+        tables_root = tmp_path / "outputs" / "tables"
+        tables_root.mkdir(parents=True, exist_ok=True)
+        out_file = tables_root / "records.parquet"
+        return [ParquetSink(path=str(out_file), chunk_size=1)]
+
+    deps = PipelineDeps(
+        source_factory=data_source_factory,
+        sink_factory=_sink_factory,
+        optimizer=_DummyAdapter(),
+        pad=lambda *args, **kwargs: "",
+    )
+
+    run_pipeline(loaded, deps=deps, resume=False, build_stage_a=True)
+    run_pipeline(loaded, deps=deps, resume=True, build_stage_a=False)
 
 
 def test_run_pipeline_fails_when_effective_config_write_fails(tmp_path: Path, monkeypatch) -> None:

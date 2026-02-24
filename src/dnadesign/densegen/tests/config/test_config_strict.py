@@ -44,7 +44,7 @@ MIN_CONFIG = {
             "plan": [
                 {
                     "name": "default",
-                    "quota": 1,
+                    "sequences": 1,
                     "sampling": {"include_inputs": ["demo"]},
                     "regulator_constraints": {"groups": []},
                 }
@@ -104,6 +104,22 @@ def test_runtime_default_max_consecutive_failures(tmp_path: Path) -> None:
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
     loaded = load_config(cfg_path)
     assert loaded.root.densegen.runtime.max_consecutive_failures == 25
+
+
+def test_runtime_max_failed_solutions_per_target_accepts_non_negative(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["runtime"] = {"max_failed_solutions_per_target": 0.25}
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    assert loaded.root.densegen.runtime.max_failed_solutions_per_target == pytest.approx(0.25)
+
+
+def test_runtime_max_failed_solutions_per_target_rejects_negative(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["runtime"] = {"max_failed_solutions_per_target": -0.1}
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="max_failed_solutions_per_target"):
+        load_config(cfg_path)
 
 
 def test_pwm_artifact_set_partial_overrides_merge(tmp_path: Path) -> None:
@@ -260,7 +276,7 @@ def test_pad_mode_off_accepts_yaml_boolean(tmp_path: Path) -> None:
         sequence_length: 10
         plan:
           - name: default
-            quota: 1
+            sequences: 1
             sampling:
               include_inputs: [demo]
             regulator_constraints:
@@ -315,13 +331,13 @@ def test_generation_without_top_level_quota_uses_plan_quotas(tmp_path: Path) -> 
     cfg["densegen"]["generation"]["plan"] = [
         {
             "name": "a",
-            "quota": 2,
+            "sequences": 2,
             "sampling": {"include_inputs": ["demo"]},
             "regulator_constraints": {"groups": []},
         },
         {
             "name": "b",
-            "quota": 3,
+            "sequences": 3,
             "sampling": {"include_inputs": ["demo"]},
             "regulator_constraints": {"groups": []},
         },
@@ -475,6 +491,73 @@ def test_sequence_constraints_match_exact_coordinates_removed(tmp_path: Path) ->
         load_config(cfg_path)
 
 
+def test_background_forbid_kmers_accepts_motif_set_rules(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["motif_sets"] = {"sigma": {"consensus": "TTGACA"}}
+    cfg["densegen"]["inputs"] = [
+        {
+            "name": "background",
+            "type": "background_pool",
+            "sampling": {
+                "n_sites": 5,
+                "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 50}},
+                "length": {"policy": "range", "range": [16, 20]},
+                "uniqueness": {"key": "sequence"},
+                "filters": {
+                    "forbid_kmers": [
+                        {
+                            "patterns_from_motif_sets": ["sigma"],
+                            "include_reverse_complements": True,
+                            "strands": "both",
+                        }
+                    ]
+                },
+            },
+        }
+    ]
+    cfg["densegen"]["generation"]["plan"][0]["sampling"]["include_inputs"] = ["background"]
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    background = loaded.root.densegen.inputs[0]
+    filters = background.sampling.filters
+    assert len(filters.forbid_kmers) == 1
+    rule = filters.forbid_kmers[0]
+    assert not isinstance(rule, str)
+    assert list(rule.patterns_from_motif_sets) == ["sigma"]
+    assert bool(rule.include_reverse_complements) is True
+    assert str(rule.strands) == "both"
+
+
+def test_background_forbid_kmers_rule_requires_known_motif_sets(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["motif_sets"] = {"sigma": {"consensus": "TTGACA"}}
+    cfg["densegen"]["inputs"] = [
+        {
+            "name": "background",
+            "type": "background_pool",
+            "sampling": {
+                "n_sites": 5,
+                "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 50}},
+                "length": {"policy": "range", "range": [16, 20]},
+                "uniqueness": {"key": "sequence"},
+                "filters": {
+                    "forbid_kmers": [
+                        {
+                            "patterns_from_motif_sets": ["unknown_sigma"],
+                            "include_reverse_complements": True,
+                            "strands": "both",
+                        }
+                    ]
+                },
+            },
+        }
+    ]
+    cfg["densegen"]["generation"]["plan"][0]["sampling"]["include_inputs"] = ["background"]
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="forbid_kmers references unknown motif_sets"):
+        load_config(cfg_path)
+
+
 def test_output_paths_must_live_under_outputs(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
     cfg["densegen"]["output"]["parquet"]["path"] = "records.parquet"
@@ -609,7 +692,7 @@ def test_promoter_constraint_motif_validation(tmp_path: Path) -> None:
     cfg["densegen"]["generation"]["plan"] = [
         {
             "name": "bad",
-            "quota": 1,
+            "sequences": 1,
             "regulator_constraints": {"groups": []},
             "fixed_elements": {
                 "promoter_constraints": [{"upstream": "TTGAZ", "downstream": "TATAAT", "spacer_length": [16, 18]}]
@@ -689,7 +772,7 @@ def test_promoter_constraint_range_non_negative(tmp_path: Path) -> None:
     cfg["densegen"]["generation"]["plan"] = [
         {
             "name": "bad",
-            "quota": 1,
+            "sequences": 1,
             "regulator_constraints": {"groups": []},
             "fixed_elements": {
                 "promoter_constraints": [{"upstream": "TTGACA", "downstream": "TATAAT", "spacer_length": [-1, 18]}]
@@ -706,7 +789,7 @@ def test_side_biases_overlap_rejected(tmp_path: Path) -> None:
     cfg["densegen"]["generation"]["plan"] = [
         {
             "name": "bad",
-            "quota": 1,
+            "sequences": 1,
             "regulator_constraints": {"groups": []},
             "fixed_elements": {"side_biases": {"left": ["TTGACA"], "right": ["TTGACA"]}},
         }
@@ -736,7 +819,7 @@ def test_side_biases_invalid_motif_rejected(tmp_path: Path) -> None:
     cfg["densegen"]["generation"]["plan"] = [
         {
             "name": "bad",
-            "quota": 1,
+            "sequences": 1,
             "regulator_constraints": {"groups": []},
             "fixed_elements": {"side_biases": {"left": ["TTGAZ"], "right": []}},
         }

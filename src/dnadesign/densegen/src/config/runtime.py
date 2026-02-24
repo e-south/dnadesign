@@ -11,6 +11,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from math import isfinite
+
 from pydantic import BaseModel, ConfigDict, field_validator
 
 
@@ -25,6 +27,7 @@ class RuntimeConfig(BaseModel):
     max_consecutive_failures: int = 25
     max_seconds_per_plan: int = 0
     max_failed_solutions: int = 0
+    max_failed_solutions_per_target: float = 0.0
     leaderboard_every: int = 50
     checkpoint_every: int = 50
     random_seed: int = 1337
@@ -53,3 +56,13 @@ class RuntimeConfig(BaseModel):
         if v <= 0:
             raise ValueError("arrays_generated_before_resample must be > 0")
         return v
+
+    @field_validator("max_failed_solutions_per_target")
+    @classmethod
+    def _failed_solutions_per_target_non_negative(cls, v: float):
+        value = float(v)
+        if not isfinite(value):
+            raise ValueError("max_failed_solutions_per_target must be finite")
+        if value < 0:
+            raise ValueError("max_failed_solutions_per_target must be >= 0")
+        return value

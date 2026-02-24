@@ -16,6 +16,7 @@ from typing import Mapping
 
 _CRUNCHER_SHOWCASE_STYLE_OVERRIDES: dict[str, object] = {
     "figure_scale": 1.60,
+    "padding_y": 24.0,
     "overlay_align": "center",
     "layout": {
         "outer_pad_cells": 0.20,

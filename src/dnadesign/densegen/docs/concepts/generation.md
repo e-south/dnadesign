@@ -6,7 +6,7 @@ This concept page explains how DenseGen turns Stage-A pools into accepted sequen
 This section describes the generation-level contract each plan contributes to runtime behavior.
 
 - `sampling.include_inputs` selects which Stage-A pools feed the plan library.
-- `quota` sets how many accepted sequences the plan must produce.
+- `sequences` sets the per-plan milestone target for accepted sequences.
 - `regulator_constraints` sets minimum regulator presence rules.
 - `fixed_elements` sets hard sequence geometry such as promoter elements.
 
@@ -16,7 +16,7 @@ This section shows the smallest useful plan pattern and labels the intent of eac
 ```yaml
 plan:
   - name: sigma70_demo
-    quota: 24
+    sequences: 24
     sampling:
       include_inputs: [lexA_pwm, cpxR_pwm, background]
     regulator_constraints:
@@ -29,9 +29,66 @@ plan:
 ### How fixed elements work
 This section clarifies what fixed-element keys enforce as hard constraints versus preferences.
 
-- `promoter_constraints` and `promoter_matrix` are hard geometry constraints.
+- `promoter_constraints` and `fixed_element_matrix` are hard geometry constraints.
 - `side_biases` are placement preferences and may not be satisfiable in all solutions.
 - Motifs must be valid DNA alphabet (`A`, `C`, `G`, `T`) and infeasible geometry fails fast.
+
+### Fixed-element matrix expansion model
+This section explains the deterministic config-time expansion model behind `fixed_element_matrix`.
+
+#### Intent
+`fixed_element_matrix` lets one logical plan compile into many explicit concrete plans at config load time. The goal is compact configs with explicit, reproducible runtime behavior.
+
+#### Intended use cases
+- Combinatorial core/promoter panel studies without hand-writing many plans.
+- Stress-condition sweeps where one core element is fixed while a curated variant set is scanned.
+- Mixed workflows where matrix-expanded plans and plain non-expanded plans coexist in the same `generation.plan[]`.
+
+#### Core functionality
+- Defined at `generation.plan[].fixed_elements.fixed_element_matrix`.
+- Pulls upstream/downstream variants from named motif sets.
+- Supports pairing modes:
+  - `zip`: pair by shared variant IDs.
+  - `cross_product`: Cartesian product across selected upstream and downstream IDs.
+  - `explicit_pairs`: use only listed `(up, down)` pairs.
+- Optional selectors `upstream_variant_ids` and `downstream_variant_ids` constrain the expansion domain.
+- Optional `expanded_name_template` controls expanded plan names with placeholders like `{base}`, `{up}`, `{down}`, `{up_seq}`, `{down_seq}`.
+
+#### Math and quota operations
+- Expansion cardinality per plan:
+  - `zip`: number of matching IDs.
+  - `cross_product`: `|U| * |D|`.
+  - `explicit_pairs`: number of configured pairs.
+- Quota contract:
+  - Every plan must define `sequences > 0`.
+  - For matrix plans, `sequences` is split uniformly across expanded variants.
+  - `sequences` must divide evenly by the expanded variant count or validation fails.
+- Global guardrails are enforced after expansion:
+  - `generation.expansion.max_plans`
+
+#### Lifecycle
+1. Parse YAML and validate schema.
+2. Normalize motif-set structures.
+3. Expand `generation.plan[]` deterministically into concrete plans.
+4. Enforce uniqueness, geometry feasibility, quotas, and global expansion caps.
+5. Validate motif-set references used by sequence-constraint and background forbid rules.
+6. Run Stage-B using resolved concrete plans only.
+
+#### Policy and behavior guarantees
+- Fail-fast only: unknown motif sets, invalid variant IDs, pairing mismatches, quota math errors, duplicate expanded names, and cap overflow all hard-fail validation.
+- No adaptive runtime expansion: the expansion set is fixed at config load.
+- Reproducible compilation: the same config yields the same expanded plans and quotas.
+- Motif exclusion can use motif-set-derived rules in both background filters and global sequence constraints to reduce drift.
+
+#### Current packaged workspace behavior
+- `demo_tfbs_baseline` and `demo_sampling_baseline` do not use matrix expansion.
+- `study_constitutive_sigma_panel` uses matrix expansion for a full panel:
+  - `sigma70_panel`: `6 x 8 = 48` variants, `sequences: 48`, per-variant quota `1`.
+  - Total: `48` concrete plans, aggregate target `48`.
+- `study_stress_ethanol_cipro` uses curated upstream variants with fixed downstream consensus:
+  - Three base plans (`ethanol`, `ciprofloxacin`, `ethanol_ciprofloxacin`) each expand to `5` variants.
+  - Total: `15` concrete plans.
+  - Uniform per-variant quotas: `60/5=12`, `60/5=12`, `80/5=16`.
 
 ### How sequence constraints work
 This section explains how global sequence constraints apply after sequence assembly.

@@ -57,6 +57,7 @@ def test_background_pool_requires_pwm_inputs(tmp_path: Path) -> None:
         cfg_path=cfg_path,
         sampling=sampling,
         input_name="neutral_bg",
+        motif_sets={},
         pwm_inputs=[],
     )
     with pytest.raises(ValueError, match="background_pool.*pwms_input"):

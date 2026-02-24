@@ -64,7 +64,7 @@ class SamplingDiagnostics:
         )
 
     def log_snapshot(self) -> None:
-        if self.progress_style == "screen":
+        if self.progress_style != "stream":
             return
         tf_usage_display = self.map_tf_usage(self.tf_usage_counts)
         tfbs_usage_display = self.map_tfbs_usage(self.usage_counts) if self.show_tfbs else self.usage_counts

@@ -11,11 +11,30 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from math import ceil
 from pathlib import Path
 from typing import Any, Callable
 
 from .attempts import _log_rejection
 from .stage_b_solution_types import StageBRejectionContext
+
+
+def resolve_failed_solution_cap(
+    *,
+    max_failed_solutions: int,
+    max_failed_solutions_per_target: float,
+    quota: int,
+) -> int:
+    caps: list[int] = []
+    if int(max_failed_solutions) > 0:
+        caps.append(int(max_failed_solutions))
+    if float(max_failed_solutions_per_target) > 0:
+        scaled_cap = int(ceil(float(max_failed_solutions_per_target) * max(0, int(quota))))
+        if scaled_cap > 0:
+            caps.append(scaled_cap)
+    if not caps:
+        return 0
+    return int(min(caps))
 
 
 def enforce_failed_solution_cap(
@@ -340,14 +359,5 @@ def reject_sequence_validation_failure(
             payload=dict(rejection_event_payload),
             emit_event=emit_event,
             logger=logger,
-        )
-    if max_failed_solutions == 0:
-        if validation_error is not None:
-            raise RuntimeError(
-                f"[{source_label}/{plan_name}] sequence validation failed and "
-                f"runtime.max_failed_solutions=0 ({validation_error})."
-            ) from validation_error
-        raise RuntimeError(
-            f"[{source_label}/{plan_name}] sequence validation failed and runtime.max_failed_solutions=0."
         )
     return updated_failed_solutions

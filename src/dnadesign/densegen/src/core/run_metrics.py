@@ -32,6 +32,45 @@ from .run_paths import run_outputs_root, run_tables_root
 
 RUN_METRICS_VERSION = "1.0"
 DEFAULT_SCORE_QUANTILES = 5
+_ATTEMPTS_METRIC_COLUMNS = [
+    "status",
+    "input_name",
+    "plan_name",
+    "sampling_library_index",
+    "sampling_library_hash",
+    "library_tfs",
+    "library_tfbs",
+]
+_LIBRARY_BUILD_METRIC_COLUMNS = [
+    "input_name",
+    "plan_name",
+    "library_index",
+    "library_hash",
+    "library_size",
+]
+_LIBRARY_MEMBER_METRIC_COLUMNS = [
+    "input_name",
+    "plan_name",
+    "library_index",
+    "library_hash",
+    "tf",
+    "tfbs",
+]
+_COMPOSITION_METRIC_COLUMNS = [
+    "input_name",
+    "plan_name",
+    "library_index",
+    "library_hash",
+    "tf",
+    "tfbs",
+]
+_DENSE_ARRAY_METRIC_COLUMNS = [
+    "densegen__used_tfbs_detail",
+    "densegen__sampling_library_index",
+    "densegen__sampling_library_hash",
+    "densegen__input_name",
+    "densegen__plan",
+]
 
 
 def _load_pool_frames(run_root: Path, *, cfg) -> tuple[pd.DataFrame | None, str | None]:
@@ -66,38 +105,55 @@ def _load_pool_frames(run_root: Path, *, cfg) -> tuple[pd.DataFrame | None, str 
     return pd.concat(frames, ignore_index=True), None
 
 
+def _scan_dense_array_placements(path: Path) -> tuple[pd.DataFrame, int]:
+    import pyarrow.dataset as ds
+
+    dataset = ds.dataset(str(path), format="parquet")
+    dense_arrays_rows = int(dataset.count_rows())
+    if dense_arrays_rows <= 0:
+        return pd.DataFrame(), 0
+    scanner = ds.Scanner.from_dataset(dataset, columns=list(_DENSE_ARRAY_METRIC_COLUMNS), batch_size=65536)
+    placement_frames: list[pd.DataFrame] = []
+    for batch in scanner.to_batches():
+        batch_df = batch.to_pandas()
+        if batch_df.empty:
+            continue
+        placements = _placements_from_dense_arrays(batch_df)
+        if not placements.empty:
+            placement_frames.append(placements)
+    if not placement_frames:
+        return pd.DataFrame(), dense_arrays_rows
+    return pd.concat(placement_frames, ignore_index=True), dense_arrays_rows
+
+
 def build_run_metrics(*, cfg, run_root: Path) -> pd.DataFrame:
     outputs_root = run_outputs_root(run_root)
     tables_root = run_tables_root(run_root)
     attempts_path = tables_root / "attempts.parquet"
     if not attempts_path.exists():
         raise RuntimeError(f"attempts.parquet not found at {attempts_path}")
-    attempts_df = pd.read_parquet(attempts_path)
+    attempts_df = pd.read_parquet(attempts_path, columns=_ATTEMPTS_METRIC_COLUMNS)
 
     libraries_dir = outputs_root / "libraries"
     builds_path = libraries_dir / "library_builds.parquet"
     members_path = libraries_dir / "library_members.parquet"
     if not builds_path.exists() or not members_path.exists():
         raise RuntimeError("library_builds.parquet and library_members.parquet are required to build run metrics.")
-    builds_df = pd.read_parquet(builds_path)
-    members_df = pd.read_parquet(members_path)
+    builds_df = pd.read_parquet(builds_path, columns=_LIBRARY_BUILD_METRIC_COLUMNS)
+    members_df = pd.read_parquet(members_path, columns=_LIBRARY_MEMBER_METRIC_COLUMNS)
 
     composition_path = tables_root / "composition.parquet"
-    composition_df = pd.read_parquet(composition_path) if composition_path.exists() else pd.DataFrame()
+    composition_df = (
+        pd.read_parquet(composition_path, columns=_COMPOSITION_METRIC_COLUMNS)
+        if composition_path.exists()
+        else pd.DataFrame()
+    )
 
     dense_arrays_path = tables_root / "records.parquet"
-    dense_arrays_df = pd.DataFrame()
+    dense_arrays_rows = 0
+    dense_array_placements_df = pd.DataFrame()
     if composition_df.empty and dense_arrays_path.exists():
-        dense_arrays_df = pd.read_parquet(
-            dense_arrays_path,
-            columns=[
-                "densegen__used_tfbs_detail",
-                "densegen__sampling_library_index",
-                "densegen__sampling_library_hash",
-                "densegen__input_name",
-                "densegen__plan",
-            ],
-        )
+        dense_array_placements_df, dense_arrays_rows = _scan_dense_array_placements(dense_arrays_path)
 
     placement_source = "none"
     placements_df = pd.DataFrame()
@@ -108,8 +164,8 @@ def build_run_metrics(*, cfg, run_root: Path) -> pd.DataFrame:
         elif "used_tfbs_detail" in composition_df.columns:
             placements_df = _placements_from_composition(composition_df)
             placement_source = "composition"
-    elif not dense_arrays_df.empty:
-        placements_df = _placements_from_dense_arrays(dense_arrays_df)
+    elif not dense_array_placements_df.empty:
+        placements_df = dense_array_placements_df
         placement_source = "dense_arrays"
 
     events_path = outputs_root / "meta" / "events.jsonl"
@@ -140,8 +196,8 @@ def build_run_metrics(*, cfg, run_root: Path) -> pd.DataFrame:
             "library_member_rows": int(len(members_df)),
             "has_composition": bool(not composition_df.empty),
             "composition_rows": int(len(composition_df)) if not composition_df.empty else 0,
-            "has_dense_arrays": bool(not dense_arrays_df.empty),
-            "dense_arrays_rows": int(len(dense_arrays_df)) if not dense_arrays_df.empty else 0,
+            "has_dense_arrays": bool(dense_arrays_rows > 0),
+            "dense_arrays_rows": int(dense_arrays_rows),
             "placement_source": placement_source,
             "has_pools": pool_df is not None,
             "pool_rows": int(len(pool_df)) if pool_df is not None else 0,

@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/densegen/tests/config/test_plan_template_expansion.py
 
-Config expansion tests for generation.plan_templates.
+Config expansion tests for generation.plan fixed-element matrix expansion.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -41,14 +41,15 @@ MIN_TEMPLATE_CONFIG = {
         },
         "generation": {
             "sequence_length": 90,
-            "plan_templates": [
+            "expansion": {"max_plans": 256},
+            "plan": [
                 {
-                    "base_name": "sigma70",
-                    "quota_per_variant": 4,
+                    "name": "sigma70",
+                    "sequences": 8,
                     "sampling": {"include_inputs": ["background"]},
                     "regulator_constraints": {"groups": []},
                     "fixed_elements": {
-                        "promoter_matrix": {
+                        "fixed_element_matrix": {
                             "name": "sigma70_core",
                             "upstream_from_set": "up_core",
                             "downstream_from_set": "down_core",
@@ -84,7 +85,7 @@ def test_plan_templates_zip_expands_into_deterministic_plan_names(tmp_path: Path
 
 def test_plan_templates_cross_product_expands_all_pairs(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_TEMPLATE_CONFIG)
-    cfg["densegen"]["generation"]["plan_templates"][0]["fixed_elements"]["promoter_matrix"]["pairing"] = {
+    cfg["densegen"]["generation"]["plan"][0]["fixed_elements"]["fixed_element_matrix"]["pairing"] = {
         "mode": "cross_product"
     }
     cfg_path = _write(cfg, tmp_path / "config.yaml")
@@ -100,7 +101,7 @@ def test_plan_templates_cross_product_expands_all_pairs(tmp_path: Path) -> None:
 
 def test_plan_templates_explicit_pairs_expands_only_requested_pairs(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_TEMPLATE_CONFIG)
-    cfg["densegen"]["generation"]["plan_templates"][0]["fixed_elements"]["promoter_matrix"]["pairing"] = {
+    cfg["densegen"]["generation"]["plan"][0]["fixed_elements"]["fixed_element_matrix"]["pairing"] = {
         "mode": "explicit_pairs",
         "pairs": [{"up": "shift", "down": "consensus"}],
     }
@@ -114,26 +115,26 @@ def test_plan_templates_zip_requires_matching_keys(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_TEMPLATE_CONFIG)
     cfg["densegen"]["motif_sets"]["down_core"] = {"consensus": "TATAAT"}
     cfg_path = _write(cfg, tmp_path / "config.yaml")
-    with pytest.raises(ConfigError, match="matching keys"):
+    with pytest.raises(ConfigError, match="matching upstream/downstream"):
         load_config(cfg_path)
 
 
 def test_plan_templates_respect_expansion_cap(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_TEMPLATE_CONFIG)
-    cfg["densegen"]["generation"]["plan_template_max_expanded_plans"] = 2
-    cfg["densegen"]["generation"]["plan_templates"][0]["fixed_elements"]["promoter_matrix"]["pairing"] = {
+    cfg["densegen"]["generation"]["expansion"]["max_plans"] = 2
+    cfg["densegen"]["generation"]["plan"][0]["fixed_elements"]["fixed_element_matrix"]["pairing"] = {
         "mode": "cross_product"
     }
     cfg_path = _write(cfg, tmp_path / "config.yaml")
-    with pytest.raises(ConfigError, match="max_expanded_plans"):
+    with pytest.raises(ConfigError, match="max_plans"):
         load_config(cfg_path)
 
 
 def test_plan_templates_validate_geometry_at_load_time(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_TEMPLATE_CONFIG)
     cfg["densegen"]["generation"]["sequence_length"] = 20
-    cfg["densegen"]["generation"]["plan_templates"][0]["fixed_elements"]["promoter_matrix"]["spacer_length"] = [16, 18]
-    cfg["densegen"]["generation"]["plan_templates"][0]["fixed_elements"]["promoter_matrix"]["upstream_pos"] = [0, 1]
+    cfg["densegen"]["generation"]["plan"][0]["fixed_elements"]["fixed_element_matrix"]["spacer_length"] = [16, 18]
+    cfg["densegen"]["generation"]["plan"][0]["fixed_elements"]["fixed_element_matrix"]["upstream_pos"] = [0, 1]
     cfg_path = _write(cfg, tmp_path / "config.yaml")
     with pytest.raises(ConfigError, match="geometry"):
         load_config(cfg_path)
@@ -141,18 +142,94 @@ def test_plan_templates_validate_geometry_at_load_time(tmp_path: Path) -> None:
 
 def test_plan_templates_expansion_cap_applies_to_total_expanded_plan_count(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_TEMPLATE_CONFIG)
-    second_template = copy.deepcopy(cfg["densegen"]["generation"]["plan_templates"][0])
-    second_template["base_name"] = "sigma32"
-    cfg["densegen"]["generation"]["plan_templates"].append(second_template)
-    cfg["densegen"]["generation"]["plan_template_max_expanded_plans"] = 3
+    second_plan = copy.deepcopy(cfg["densegen"]["generation"]["plan"][0])
+    second_plan["name"] = "sigma32"
+    cfg["densegen"]["generation"]["plan"].append(second_plan)
+    cfg["densegen"]["generation"]["expansion"]["max_plans"] = 3
+    cfg_path = _write(cfg, tmp_path / "config.yaml")
+    with pytest.raises(ConfigError, match="max_plans"):
+        load_config(cfg_path)
+
+
+def test_plan_templates_accept_large_targets_without_global_quota_cap(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_TEMPLATE_CONFIG)
+    cfg["densegen"]["generation"]["plan"][0]["sequences"] = 6000
+    cfg["densegen"]["generation"]["plan"][0]["fixed_elements"]["fixed_element_matrix"]["pairing"] = {"mode": "zip"}
+    cfg_path = _write(cfg, tmp_path / "config.yaml")
+    loaded = load_config(cfg_path)
+    assert sum(int(item.quota) for item in loaded.root.densegen.generation.resolve_plan()) == 6000
+
+
+def test_plan_fixed_element_matrix_uniform_requires_even_division(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_TEMPLATE_CONFIG)
+    cfg["densegen"]["generation"]["plan"][0]["fixed_elements"]["fixed_element_matrix"]["pairing"] = {
+        "mode": "cross_product"
+    }
+    cfg["densegen"]["generation"]["plan"][0]["sequences"] = 10
+    cfg_path = _write(cfg, tmp_path / "config.yaml")
+    with pytest.raises(ConfigError, match="must divide evenly"):
+        load_config(cfg_path)
+
+
+def test_generation_rejects_legacy_plan_templates_key(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_TEMPLATE_CONFIG)
+    cfg["densegen"]["generation"]["plan_templates"] = [
+        {
+            "base_name": "legacy",
+            "quota_per_variant": 1,
+            "sampling": {"include_inputs": ["background"]},
+            "regulator_constraints": {"groups": []},
+        }
+    ]
+    cfg_path = _write(cfg, tmp_path / "config.yaml")
+    with pytest.raises(ConfigError, match="plan_templates"):
+        load_config(cfg_path)
+
+
+def test_generation_rejects_legacy_quota_key(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_TEMPLATE_CONFIG)
+    cfg["densegen"]["generation"]["plan"][0]["quota"] = 1
+    cfg_path = _write(cfg, tmp_path / "config.yaml")
+    with pytest.raises(ConfigError, match="quota"):
+        load_config(cfg_path)
+
+
+def test_generation_rejects_legacy_total_quota_key(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_TEMPLATE_CONFIG)
+    cfg["densegen"]["generation"]["plan"][0]["total_quota"] = 8
+    cfg_path = _write(cfg, tmp_path / "config.yaml")
+    with pytest.raises(ConfigError, match="total_quota"):
+        load_config(cfg_path)
+
+
+def test_generation_rejects_legacy_target_key(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_TEMPLATE_CONFIG)
+    cfg["densegen"]["generation"]["plan"][0].pop("sequences")
+    cfg["densegen"]["generation"]["plan"][0]["target"] = {"sequences": 8}
+    cfg_path = _write(cfg, tmp_path / "config.yaml")
+    with pytest.raises(ConfigError, match="target"):
+        load_config(cfg_path)
+
+
+def test_generation_rejects_legacy_distribution_policy_key(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_TEMPLATE_CONFIG)
+    cfg["densegen"]["generation"]["plan"][0]["distribution_policy"] = "uniform"
+    cfg_path = _write(cfg, tmp_path / "config.yaml")
+    with pytest.raises(ConfigError, match="distribution_policy"):
+        load_config(cfg_path)
+
+
+def test_generation_rejects_legacy_max_expanded_plans_key(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_TEMPLATE_CONFIG)
+    cfg["densegen"]["generation"]["max_expanded_plans"] = 4
     cfg_path = _write(cfg, tmp_path / "config.yaml")
     with pytest.raises(ConfigError, match="max_expanded_plans"):
         load_config(cfg_path)
 
 
-def test_plan_templates_default_total_quota_cap_blocks_astronomical_quota(tmp_path: Path) -> None:
+def test_generation_rejects_legacy_max_total_quota_key(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_TEMPLATE_CONFIG)
-    cfg["densegen"]["generation"]["plan_templates"][0]["quota_per_variant"] = 3000
+    cfg["densegen"]["generation"]["max_total_quota"] = 8
     cfg_path = _write(cfg, tmp_path / "config.yaml")
     with pytest.raises(ConfigError, match="max_total_quota"):
         load_config(cfg_path)

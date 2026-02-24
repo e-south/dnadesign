@@ -8,99 +8,99 @@
   },
   "checksums": {
     "sha256_norm": "e309999a13a454f3c45e0f6d0928562068a2ab314bdd8833b1a1d8c4c4416413",
-    "sha256_raw": "35beccc3bf023d05be3f10df9ace5db590af024af67624878de796e701174236"
+    "sha256_raw": "2b57567eeb33db4b24365b7b6a46089357329b944fc33838148c48f100944a3b"
   },
   "length": 15,
   "log_odds": [
     {
-      "A": -411.0,
-      "C": 232.0,
-      "G": -402.0,
-      "T": -346.0
+      "A": -505.0,
+      "C": 237.0,
+      "G": -1327.0,
+      "T": -398.0
     },
     {
-      "A": -511.0,
-      "C": -427.0,
-      "G": -402.0,
-      "T": 160.0
+      "A": -1327.0,
+      "C": -1327.0,
+      "G": -1327.0,
+      "T": 165.0
     },
     {
-      "A": -411.0,
-      "C": -427.0,
-      "G": 261.0,
-      "T": -504.0
+      "A": -505.0,
+      "C": -1327.0,
+      "G": 265.0,
+      "T": -1327.0
     },
     {
-      "A": -279.0,
-      "C": -227.0,
-      "G": -56.0,
-      "T": 133.0
+      "A": -305.0,
+      "C": -263.0,
+      "G": -64.0,
+      "T": 137.0
     },
     {
-      "A": 116.0,
-      "C": -195.0,
-      "G": -102.0,
-      "T": -134.0
+      "A": 120.0,
+      "C": -222.0,
+      "G": -116.0,
+      "T": -140.0
     },
     {
-      "A": -311.0,
-      "C": 5.0,
-      "G": -170.0,
-      "T": 117.0
+      "A": -346.0,
+      "C": 3.0,
+      "G": -197.0,
+      "T": 121.0
     },
     {
-      "A": 116.0,
-      "C": -269.0,
-      "G": -32.0,
-      "T": -172.0
+      "A": 120.0,
+      "C": -322.0,
+      "G": -38.0,
+      "T": -181.0
     },
     {
-      "A": 10.0,
-      "C": -57.0,
-      "G": -244.0,
-      "T": 60.0
+      "A": 12.0,
+      "C": -63.0,
+      "G": -296.0,
+      "T": 63.0
     },
     {
-      "A": 121.0,
-      "C": -147.0,
-      "G": -244.0,
-      "T": -134.0
+      "A": 125.0,
+      "C": -163.0,
+      "G": -296.0,
+      "T": -140.0
     },
     {
-      "A": 35.0,
-      "C": -57.0,
-      "G": -244.0,
-      "T": 39.0
+      "A": 38.0,
+      "C": -63.0,
+      "G": -296.0,
+      "T": 41.0
     },
     {
-      "A": 75.0,
-      "C": -147.0,
-      "G": -244.0,
-      "T": 9.0
+      "A": 78.0,
+      "C": -163.0,
+      "G": -296.0,
+      "T": 10.0
     },
     {
       "A": -30.0,
-      "C": 73.0,
-      "G": -144.0,
-      "T": 17.0
+      "C": 74.0,
+      "G": -164.0,
+      "T": 19.0
     },
     {
-      "A": 96.0,
-      "C": 53.0,
-      "G": -244.0,
-      "T": -272.0
+      "A": 99.0,
+      "C": 54.0,
+      "G": -296.0,
+      "T": -298.0
     },
     {
-      "A": -352.0,
-      "C": 228.0,
-      "G": -302.0,
-      "T": -304.0
+      "A": -405.0,
+      "C": 232.0,
+      "G": -396.0,
+      "T": -340.0
     },
     {
-      "A": 140.0,
-      "C": -327.0,
-      "G": -122.0,
-      "T": -346.0
+      "A": 144.0,
+      "C": -422.0,
+      "G": -138.0,
+      "T": -398.0
     }
   ],
   "matrix_semantics": "probabilities",
@@ -208,23 +208,25 @@
     "citation": null,
     "license": null,
     "raw_artifact_paths": [
-      "/Users/Shockwing/Dropbox/projects/phd/dnadesign/src/dnadesign/cruncher/.cruncher/discoveries/discover_lexA_20260203_103655_ec784b/meme.txt"
+      "/Users/Shockwing/Dropbox/projects/phd/dnadesign-cruncher-expanding/src/dnadesign/cruncher/.cruncher/demo_multitf/discoveries/discover_lexA_20260218_205958_941cc7/meme.txt"
     ],
-    "retrieved_at": "2026-02-03T15:36:55.534190+00:00",
+    "retrieved_at": "2026-02-19T01:59:59.065374+00:00",
     "source_url": null,
     "source_version": null,
     "tags": {}
   },
   "schema_version": "1.0",
-  "source": "meme_suite_meme",
+  "source": "demo_merged_meme_oops_multitf",
   "tags": {
-    "discovery_maxw": "22",
-    "discovery_minw": "15",
+    "discovery_maxw": "tool_default",
+    "discovery_minw": "tool_default",
     "discovery_nmotifs": "1",
     "discovery_nsites": "99",
-    "discovery_run": "discover_lexA_20260203_103655_ec784b",
+    "discovery_run": "discover_lexA_20260218_205958_941cc7",
+    "discovery_site_sets": "2",
+    "discovery_site_sources": "demo_local_meme, regulondb",
     "discovery_tool": "meme",
-    "discovery_tool_path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign/.pixi/envs/default/bin/meme",
+    "discovery_tool_path": "/Users/Shockwing/Dropbox/projects/phd/dnadesign-cruncher-expanding/.pixi/envs/default/bin/meme",
     "discovery_tool_version": "5.5.9",
     "matrix_source": "meme"
   },

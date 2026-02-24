@@ -55,7 +55,7 @@ def _write_config(path: Path, *, meme_path: Path) -> None:
             sequence_length: 10
             plan:
               - name: demo_plan
-                quota: 1
+                sequences: 1
                 sampling:
                   include_inputs: [demo_sites, demo_pwm]
                 regulator_constraints:

@@ -12,7 +12,9 @@ Dunlop Lab
 
 from __future__ import annotations
 
+import contextlib
 import json
+import logging
 import warnings
 from itertools import chain
 from pathlib import Path
@@ -24,6 +26,16 @@ if TYPE_CHECKING:
 from ...config import RootConfig, resolve_outputs_scoped_path, resolve_run_root
 from .base import DEFAULT_NAMESPACE
 from .parquet import validate_parquet_schema
+
+log = logging.getLogger(__name__)
+DEFAULT_RECORD_LOAD_LIMIT = 100_000
+
+
+@contextlib.contextmanager
+def _suppressed_pyarrow_sysctl_warnings() -> Iterator[None]:
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message=".*sysctlbyname.*", category=UserWarning)
+        yield
 
 
 def _maybe_json_load(val):
@@ -148,19 +160,19 @@ def scan_records_from_config(
         if root.exists() and root.is_dir():
             raise ValueError(f"Parquet path must be a file, got directory: {root}")
 
-        warnings.filterwarnings("ignore", message=".*sysctlbyname.*", category=UserWarning)
-
         if root.exists():
             import pyarrow.parquet as pq
 
             validate_parquet_schema(root, namespace=DEFAULT_NAMESPACE)
-            pf = pq.ParquetFile(root)
+            with _suppressed_pyarrow_sysctl_warnings():
+                pf = pq.ParquetFile(root)
             if pf.metadata is not None and pf.metadata.num_rows == 0:
                 raise RuntimeError(f"Parquet output has no rows: {root}")
-            rows = _iter_record_dicts_from_batches(
-                pf.iter_batches(batch_size=int(batch_size), columns=requested),
-                parse_json_in_namespaced_columns=False,
-            )
+            with _suppressed_pyarrow_sysctl_warnings():
+                rows = _iter_record_dicts_from_batches(
+                    pf.iter_batches(batch_size=int(batch_size), columns=requested),
+                    parse_json_in_namespaced_columns=False,
+                )
             rows = _limit_rows(rows, max_rows=max_rows)
             rows = _require_non_empty_rows(rows, empty_error=f"Parquet output has no rows: {root}")
             return rows, f"parquet:{root}"
@@ -169,10 +181,12 @@ def scan_records_from_config(
         if parts:
             import pyarrow.dataset as ds
 
-            dataset = ds.dataset([str(p) for p in parts], format="parquet")
+            with _suppressed_pyarrow_sysctl_warnings():
+                dataset = ds.dataset([str(p) for p in parts], format="parquet")
             if dataset.count_rows() == 0:
                 raise RuntimeError(f"Parquet parts have no rows: {root.parent}")
-            scanner = ds.Scanner.from_dataset(dataset, columns=requested, batch_size=int(batch_size))
+            with _suppressed_pyarrow_sysctl_warnings():
+                scanner = ds.Scanner.from_dataset(dataset, columns=requested, batch_size=int(batch_size))
             rows = _iter_record_dicts_from_batches(
                 scanner.to_batches(),
                 parse_json_in_namespaced_columns=False,
@@ -192,92 +206,46 @@ def load_records_from_config(
     columns: Iterable[str] | None = None,
     *,
     max_rows: int | None = None,
+    allow_truncated: bool = False,
 ) -> Tuple["pd.DataFrame", str]:
     """
     Load output records based on output.targets and plots.source (when multiple sinks).
     Returns (df, source_label), where source_label is 'parquet:<path>' or 'usr:<dataset>'.
     """
-    out_cfg = root_cfg.densegen.output
-    source, run_root = _resolve_source(root_cfg, cfg_path)
+    import pandas as pd
 
-    if source == "usr":
-        usr_cfg = out_cfg.usr
-        if usr_cfg is None:
-            raise ValueError("output.usr is required when source='usr'")
-        root = resolve_outputs_scoped_path(cfg_path, run_root, usr_cfg.root, label="output.usr.root")
-        try:
-            from dnadesign.usr import Dataset
-        except Exception as e:
-            raise RuntimeError(f"USR support is not available: {e}") from e
+    resolved_max_rows = int(max_rows) if max_rows is not None else int(DEFAULT_RECORD_LOAD_LIMIT)
+    if resolved_max_rows < 1:
+        raise ValueError("max_rows must be >= 1 when loading output records")
 
-        ds = Dataset(root, usr_cfg.dataset)
-        rp = ds.records_path
-        if not rp.exists():
-            raise FileNotFoundError(f"USR records not found at: {rp}")
-        requested = list(columns) if columns else None
-        if max_rows is not None:
-            df = ds.head(
-                n=int(max_rows),
-                columns=requested,
-                include_derived=True,
-                include_deleted=False,
-            )
-        else:
-            import pyarrow as pa
+    rows, source_label = scan_records_from_config(
+        root_cfg,
+        cfg_path,
+        columns=columns,
+        max_rows=resolved_max_rows + 1,
+    )
+    materialized_rows: list[dict[str, Any]] = []
+    truncated = False
+    for row in rows:
+        if len(materialized_rows) >= resolved_max_rows:
+            truncated = True
+            break
+        materialized_rows.append(row)
 
-            batches = list(
-                ds.scan(
-                    columns=requested,
-                    include_overlays=True,
-                    include_deleted=False,
-                )
-            )
-            if not batches:
-                raise RuntimeError(f"USR output has no rows: {rp}")
-            df = pa.Table.from_batches(batches).to_pandas()
-        if df.empty:
-            raise RuntimeError(f"USR output has no rows: {rp}")
-        for col in [c for c in df.columns if "__" in c]:
-            df[col] = df[col].map(_maybe_json_load)
-        return df, f"usr:{usr_cfg.dataset}"
+    if not materialized_rows:
+        raise RuntimeError("Output records could not be materialized into a dataframe.")
 
-    if source == "parquet":
-        pq_cfg = out_cfg.parquet
-        if pq_cfg is None:
-            raise ValueError("output.parquet is required when source='parquet'")
-        root = resolve_outputs_scoped_path(cfg_path, run_root, pq_cfg.path, label="output.parquet.path")
-        if root.exists() and root.is_dir():
-            raise ValueError(f"Parquet path must be a file, got directory: {root}")
+    df = pd.DataFrame.from_records(materialized_rows)
+    if df.empty:
+        raise RuntimeError("Output records dataframe is empty after materialization.")
 
-        warnings.filterwarnings("ignore", message=".*sysctlbyname.*", category=UserWarning)
-
-        if root.exists():
-            import pyarrow.parquet as pq
-
-            validate_parquet_schema(root, namespace=DEFAULT_NAMESPACE)
-            tbl = pq.read_table(root, columns=list(columns) if columns else None)
-            if tbl.num_rows == 0:
-                raise RuntimeError(f"Parquet output has no rows: {root}")
-            if max_rows is not None and tbl.num_rows > max_rows:
-                tbl = tbl.slice(0, max_rows)
-            df = tbl.to_pandas()
-            return df, f"parquet:{root}"
-
-        parts = sorted(root.parent.glob(f"{root.stem}__part-*.parquet"))
-        if parts:
-            import pyarrow.dataset as ds
-
-            dataset = ds.dataset([str(p) for p in parts], format="parquet")
-            if dataset.count_rows() == 0:
-                raise RuntimeError(f"Parquet parts have no rows: {root.parent}")
-            if max_rows is not None:
-                tbl = dataset.head(max_rows, columns=list(columns) if columns else None)
-            else:
-                scanner = ds.Scanner.from_dataset(dataset, columns=list(columns) if columns else None)
-                tbl = scanner.to_table()
-            df = tbl.to_pandas()
-            return df, f"parquet:{root} (parts)"
-
-        raise FileNotFoundError(f"Parquet output not found: {root}")
-
-    raise ValueError(f"Unknown plot source: {source}")
+    if truncated:
+        message = (
+            "Output records rows were truncated to "
+            f"{resolved_max_rows} (source={source_label}). "
+            "Increase plots.sample_rows or pass allow_truncated=True to proceed with sampled rows."
+        )
+        if not allow_truncated:
+            raise RuntimeError(message)
+        log.warning(message)
+    return df, source_label

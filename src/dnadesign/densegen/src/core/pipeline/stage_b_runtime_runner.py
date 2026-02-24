@@ -153,7 +153,7 @@ def _run_stage_b_sampling(
         f"backend={backend} strategy={strategy} strands={strands} "
         f"time_limit={time_limit}s threads={threads} seq_len={seq_len}"
     )
-    if progress_style != "screen":
+    if progress_style == "stream":
         log.info(
             "Stage-B solver settings: backend=%s strategy=%s strands=%s "
             "time_limit_seconds=%s threads=%s sequence_length=%s",

@@ -149,7 +149,7 @@ For type definitions and validation logic, see `src/dnadesign/densegen/src/core/
 DenseGen writes run-level JSON files under `outputs/meta/`:
 
 - `outputs/meta/run_state.json` — checkpointed progress for resumable runs (updated during execution).
-- `outputs/meta/run_manifest.json` — summary counts per input/plan plus solver settings and derived seeds (written on completion). Includes a `leaderboard_latest` snapshot (top TF/TFBS usage, failure hotspots, diversity coverage).
+- `outputs/meta/run_manifest.json` — summary counts and quotas per input/plan plus solver settings and derived seeds (written on completion). Includes `total_quota`, `quota_progress_pct`, and per-item `quota`, plus a `leaderboard_latest` snapshot (top TF/TFBS usage, failure hotspots, diversity coverage).
 - `outputs/meta/inputs_manifest.json` — resolved input paths and Stage‑A PWM sampling settings used for the run.
 - `outputs/meta/effective_config.json` — resolved config with derived seeds and Stage‑A sampling caps.
 
@@ -207,11 +207,11 @@ DenseGen writes `outputs/tables/solutions.parquet` (append-only) with the soluti
 
 - `<run_root>/outputs/notebooks/densegen_run_overview.py` (default path)
 
-The notebook reads run artifacts (`outputs/meta/*`, `outputs/tables/*`, `outputs/plots/plot_manifest.json`) and supports manual refresh for iterative sampling sessions.
+The notebook reads run artifacts (`outputs/meta/*`, `outputs/tables/*`, `outputs/plots/plot_manifest.json`) and reflects the current persisted run state each time you open or rerun notebook cells.
 
 DenseGen -> BaseRender contract for the scaffolded notebook:
 
-- Contract source: `dnadesign.densegen.src.integrations.baserender.notebook_contract:densegen_notebook_render_contract`
+- Contract source: `dnadesign.densegen:densegen_notebook_render_contract`
 - Records source path: resolved from output sink selection:
   - single sink in `output.targets` -> that sink (`parquet` or `usr`)
   - multiple sinks in `output.targets` -> `plots.source`
@@ -226,6 +226,19 @@ DenseGen -> BaseRender contract for the scaffolded notebook:
   - `id`
   - `sequence`
   - `densegen__used_tfbs_detail`
+- Notebook layout (run mode):
+  - `Workspace context`: workspace/config/output provenance and records path.
+  - `Run summary`: compact status (`run_id`, `quota status`, `plans at quota`, solver backend/strategy).
+  - `Records preview`: plan-filtered table with explicit dataset export controls (`parquet|csv`, output path).
+  - `BaseRender preview`: `Prev`/`Next` controls with centered index/id status (`i / N | id: ...`).
+- `Selected plot`: scope/type/plot controls stacked above the rendered plot.
+- `Plot gallery`: filtered inventory table for browsing and audit.
+- `Plot export`: export `selected|filtered|all` plots to one format (`pdf|png|svg`) under a target directory.
+- Plot scope labels:
+  - `all scopes (all plots)` includes run-level, stage-a, and plan-scoped artifacts.
+  - `run-level` refers to unscoped run diagnostics (for example `run_health`).
+  - `stage-a` refers to Stage-A pool diagnostics (`stage_a_summary`).
+  - plan-scoped entries map to concrete plan names from `plot_manifest.json`.
 
 ---
 
@@ -248,8 +261,7 @@ Core diagnostics plots:
 - `tfbs_usage` — TFBS usage diagnostics from accepted placements: specific TFBS rank-count curve
   plus cumulative share by regulator.
 
-The `demo_sampling_baseline` workspace defaults to `stage_a_summary` and `placement_map`
-for faster iteration. `study_stress_ethanol_cipro` enables all four plot families.
+Packaged DenseGen workspaces default to all four core plot families (`stage_a_summary`, `placement_map`, `run_health`, `tfbs_usage`).
 
 `stage_a_summary` consolidates PWM inputs into one image per plot type (one row per input),
 with outputs under `outputs/plots/stage_a/`:
@@ -257,6 +269,7 @@ with outputs under `outputs/plots/stage_a/`:
 - `yield_bias.pdf`
 - `diversity.pdf`
 - `<input>__background_logo.pdf` (background pools only)
+- `no_stage_a_panels.pdf` (explicit no-op artifact when no Stage-A diagnostics apply to available pools)
 
 `placement_map` writes one image under:
 `outputs/plots/stage_b/<plan>/` (or `outputs/plots/stage_b/<plan>/<input>/` when multiple non-redundant inputs map to the same plan)
@@ -265,17 +278,27 @@ with outputs under `outputs/plots/stage_a/`:
 `tfbs_usage` writes one image into the same plan directory:
 `outputs/plots/stage_b/<plan>/tfbs_usage.pdf` (or under `<input>/` for multi-input plans)
 
+Stage-B scoping options are strict and per-plot:
+- `plots.options.placement_map.scope: auto|per_plan|per_group`
+- `plots.options.tfbs_usage.scope: auto|per_plan|per_group`
+- `max_plans` (used by `auto`)
+- `drilldown_plans` (optional per-plan detail count when grouped)
+
+With `scope: auto`, DenseGen emits per-plan outputs for small plan sets and switches to grouped outputs when plan count exceeds `max_plans`. When grouping applies, plan-pool internal inputs are normalized to grouped plan scopes, so matrix-expanded runs do not fan out into one Stage-B file per expanded variant unless you request per-plan drilldowns.
+
 `run_health` writes:
 `outputs/plots/run_health/outcomes_over_time.pdf`
 `outputs/plots/run_health/run_health.pdf`
 `outputs/plots/run_health/compression_ratio_distribution.pdf`
 `outputs/plots/run_health/tfbs_length_by_regulator.pdf`
+`outputs/plots/run_health/summary_table.pdf`
 `outputs/plots/run_health/summary.csv`
 
 `run_health` uses status taxonomy `ok|rejected|duplicate|failed` from
 `outputs/tables/attempts.parquet` and plan quotas from
-`outputs/meta/effective_config.json` (`generation.plan[].quota`).
+`outputs/meta/effective_config.json` (`generation.plan[].sequences`).
 `summary.csv` is a compact numeric table with run-level totals and per-plan accepted/quota ratios.
+For large expanded runs, run-health plan rows auto-collapse to base plan groups unless overridden with plot style options (`run_health_plan_scope: per_plan|auto|per_group`, `run_health_plan_max_labels`).
 
 See `../concepts/sampling.md` for plot interpretation context.
 

@@ -15,7 +15,7 @@ densegen:
     # LexA + CpxR + BaeR artifacts exported from the Cruncher handoff workflow.
     - name: lexA_pwm
       type: pwm_artifact
-      path: inputs/motif_artifacts/lexA__meme_suite_meme__lexA_CTGTATAWAWWHACA.json
+      path: inputs/motif_artifacts/lexA__demo_merged_meme_oops_multitf__lexA_CTGTATAWAWWHACA.json
       sampling:
         strategy: stochastic
         n_sites: 100
@@ -43,7 +43,7 @@ densegen:
         tier_fractions: [0.001, 0.01, 0.09]
     - name: cpxR_pwm
       type: pwm_artifact
-      path: inputs/motif_artifacts/cpxR__meme_suite_meme__cpxR_MANWWHTTTAM.json
+      path: inputs/motif_artifacts/cpxR__demo_merged_meme_oops_multitf__cpxR_MANWWHTTTAM.json
       sampling:
         strategy: stochastic
         n_sites: 100
@@ -71,7 +71,7 @@ densegen:
         tier_fractions: [0.001, 0.01, 0.09]
     - name: baeR_pwm
       type: pwm_artifact
-      path: inputs/motif_artifacts/baeR__meme_suite_meme__baeR_WWDTYTCTSCMNNA.json
+      path: inputs/motif_artifacts/baeR__demo_merged_meme_oops_multitf__baeR_TTTCTSCVHNA.json
       sampling:
         strategy: stochastic
         n_sites: 100
@@ -150,7 +150,7 @@ densegen:
 
     plan:
       - name: ethanol
-        quota: 6
+        sequences: 6
         sampling:
           include_inputs: [cpxR_pwm, baeR_pwm, background]
         fixed_elements:
@@ -165,10 +165,10 @@ densegen:
             - name: ethanol_response
               members:
                 - cpxR_MANWWHTTTAM
-                - baeR_WWDTYTCTSCMNNA
+                - baeR_TTTCTSCVHNA
               min_required: 1
       - name: ciprofloxacin
-        quota: 6
+        sequences: 6
         sampling:
           include_inputs: [lexA_pwm, background]
         fixed_elements:
@@ -212,7 +212,8 @@ densegen:
     stall_warning_every_seconds: 10
     max_consecutive_failures: 25
     max_seconds_per_plan: 60
-    max_failed_solutions: 0
+    max_failed_solutions: 5000
+    max_failed_solutions_per_target: 2.0
     random_seed: 42
 
   postprocess:

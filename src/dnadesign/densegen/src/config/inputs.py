@@ -191,28 +191,61 @@ class BackgroundPoolFimoExcludeConfig(BaseModel):
         return self
 
 
+class BackgroundPoolForbidKmersRule(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    patterns_from_motif_sets: List[str]
+    include_reverse_complements: bool = False
+    strands: Literal["forward", "both"] = "both"
+
+    @field_validator("patterns_from_motif_sets")
+    @classmethod
+    def _patterns_from_sets_ok(cls, v: List[str]):
+        if not v:
+            raise ValueError(
+                "background_pool.sampling.filters.forbid_kmers[].patterns_from_motif_sets must be non-empty"
+            )
+        cleaned: list[str] = []
+        for raw in v:
+            text = str(raw).strip()
+            if not text:
+                raise ValueError(
+                    "background_pool.sampling.filters.forbid_kmers[].patterns_from_motif_sets entries must be non-empty"
+                )
+            cleaned.append(text)
+        if len(set(cleaned)) != len(cleaned):
+            raise ValueError("background_pool.sampling.filters.forbid_kmers[].patterns_from_motif_sets must be unique")
+        return cleaned
+
+
 class BackgroundPoolFiltersConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    forbid_kmers: List[str] = Field(default_factory=list)
+    forbid_kmers: List[Union[str, BackgroundPoolForbidKmersRule]] = Field(default_factory=list)
     include_reverse_complements: bool = False
     strands: Literal["forward", "both"] = "forward"
     fimo_exclude: Optional[BackgroundPoolFimoExcludeConfig] = None
 
     @field_validator("forbid_kmers")
     @classmethod
-    def _forbid_kmers_ok(cls, v: List[str]):
-        cleaned: list[str] = []
+    def _forbid_kmers_ok(cls, v: List[Union[str, BackgroundPoolForbidKmersRule]]):
+        literal_seen: set[str] = set()
+        cleaned: list[Union[str, BackgroundPoolForbidKmersRule]] = []
         for raw in v:
+            if isinstance(raw, BackgroundPoolForbidKmersRule):
+                cleaned.append(raw)
+                continue
             if not isinstance(raw, str):
-                raise ValueError("background_pool.sampling.filters.forbid_kmers must be strings")
+                raise ValueError(
+                    "background_pool.sampling.filters.forbid_kmers entries must be strings or motif-set rule objects"
+                )
             seq = raw.strip().upper()
             if not seq:
                 raise ValueError("background_pool.sampling.filters.forbid_kmers must be non-empty")
             if any(ch not in {"A", "C", "G", "T"} for ch in seq):
                 raise ValueError("background_pool.sampling.filters.forbid_kmers must contain only A/C/G/T")
+            if seq in literal_seen:
+                raise ValueError("background_pool.sampling.filters.forbid_kmers literal kmers must be unique")
+            literal_seen.add(seq)
             cleaned.append(seq)
-        if len(set(cleaned)) != len(cleaned):
-            raise ValueError("background_pool.sampling.filters.forbid_kmers must be unique")
         return cleaned
 
 
