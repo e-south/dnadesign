@@ -198,6 +198,7 @@ Key options:
 - `--log-file PATH`
 - `--show-tfbs`
 - `--show-solutions`
+- `--ensure-usr-registry / --no-ensure-usr-registry`
 - `-c, --config PATH`
 
 Notes:
@@ -205,13 +206,20 @@ Notes:
 - Missing/stale Stage-A pools for plan-active `include_inputs` are rebuilt automatically.
 - Stale pools for configured-but-unused inputs are ignored with an explicit warning.
 - For FIMO-backed inputs, ensure `fimo` is available (for example via `pixi run ...`).
+- When `output.targets` includes `usr`, DenseGen auto-seeds `output.usr.root/registry.yaml` from the repo default seed when missing (unless `--no-ensure-usr-registry` is set).
 
 ### `dense campaign-reset`
 
 Deletes run outputs while preserving config and inputs.
 
 Key options:
+- `--yes` (skip confirmation prompt)
+- `--purge-usr-registry` (remove `output.usr.root/registry.yaml` instead of preserving it)
 - `-c, --config PATH`
+
+Notes:
+- Runs in danger-zone mode by default and prompts before deleting outputs.
+- Preserves workspace-local USR registry by default so post-reset `dense run` remains ergonomic.
 
 ### `dense plot`
 

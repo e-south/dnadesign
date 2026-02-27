@@ -20,6 +20,7 @@ from types import SimpleNamespace as NS
 import typer
 
 from .cli_commands import datasets as dataset_commands
+from .cli_commands import deps as deps_commands
 from .cli_commands import error_output as error_output_commands
 from .cli_commands import maintenance as maintenance_commands
 from .cli_commands import materialize as materialize_commands
@@ -150,7 +151,7 @@ def _assert_not_legacy_dataset_path_for_read_views(path: Path, root: Path | None
 
 
 def _read_view_deps() -> read_views_commands.ReadViewDeps:
-    return read_views_commands.ReadViewDeps(
+    return deps_commands.build_read_view_deps(
         is_explicit_path_target=_is_explicit_path_target,
         exit_missing_path_target=_exit_missing_path_target,
         resolve_existing_dataset_id=_resolve_existing_dataset_id,
@@ -162,7 +163,7 @@ def _read_view_deps() -> read_views_commands.ReadViewDeps:
 
 
 def _runtime_deps() -> runtime_commands.RuntimeDeps:
-    return runtime_commands.RuntimeDeps(
+    return deps_commands.build_runtime_deps(
         resolve_dataset_for_read=_resolve_dataset_for_read,
         resolve_dataset_name_interactive=_resolve_dataset_name_interactive,
         resolve_output_format=_resolve_output_format,
@@ -172,7 +173,7 @@ def _runtime_deps() -> runtime_commands.RuntimeDeps:
 
 
 def _materialize_deps() -> materialize_commands.MaterializeDeps:
-    return materialize_commands.MaterializeDeps(
+    return deps_commands.build_materialize_deps(
         resolve_dataset_name_interactive=_resolve_dataset_name_interactive,
         is_interactive=_is_interactive,
         confirm=lambda message: typer.confirm(message, default=False),
@@ -180,24 +181,23 @@ def _materialize_deps() -> materialize_commands.MaterializeDeps:
 
 
 def _maintenance_deps() -> maintenance_commands.MaintenanceDeps:
-    return maintenance_commands.MaintenanceDeps(
+    return deps_commands.build_maintenance_deps(
         resolve_dataset_name_interactive=_resolve_dataset_name_interactive,
         prompt=input,
     )
 
 
 def _merge_deps() -> merge_commands.MergeDeps:
-    return merge_commands.MergeDeps(
+    return deps_commands.build_merge_deps(
         resolve_merge_policy=resolve_merge_policy,
         merge_usr_to_usr=merge_usr_to_usr,
         mode_require_same=MergeColumnsMode.REQUIRE_SAME,
         mode_union=MergeColumnsMode.UNION,
-        dataset_factory=Dataset,
     )
 
 
 def _namespace_deps() -> namespace_handlers_commands.NamespaceDeps:
-    return namespace_handlers_commands.NamespaceDeps(
+    return deps_commands.build_namespace_deps(
         load_registry=load_registry,
         parse_columns_spec=parse_columns_spec,
         register_namespace=register_namespace,
@@ -205,12 +205,11 @@ def _namespace_deps() -> namespace_handlers_commands.NamespaceDeps:
 
 
 def _tooling_deps() -> tooling_commands.ToolingDeps:
-    return tooling_commands.ToolingDeps(
+    return deps_commands.build_tooling_deps(
         resolve_dataset_name_interactive=_resolve_dataset_name_interactive,
         resolve_path_anywhere=_resolve_path_anywhere,
         create_mock_dataset=create_mock_dataset,
         add_demo_columns=add_demo_columns,
-        dataset_factory=Dataset,
     )
 
 

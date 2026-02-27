@@ -5,6 +5,7 @@
 
 
 This tutorial runs the constitutive sigma70 panel workspace with fixed-element expansion and strict LacI/AraC background filtering.
+Sigma70 -10/-35 literal source: DOI: 10.1038/s41467-017-02473-5 | www.nature.com/naturecommunications.
 
 ### Runbook command
 
@@ -36,31 +37,31 @@ pixi run dense validate-config --probe-solver -c src/dnadesign/densegen/workspac
 # src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/config.yaml
 densegen:
   generation:
-    sequence_length: 60          # Final sequence length for the panel.
+    sequence_length: 60                   # Final sequence length for the panel.
     expansion:
-      max_plans: 64              # Guardrail for expanded plan count.
+      max_plans: 64                       # Guardrail for expanded plan count.
     plan:
-      - name: sigma70_panel          # Identifier for this config entry.
-        sequences: 100           # Distributed across expanded variants in expansion order.
+      - name: sigma70_panel               # Plan identifier.
+        sequences: 100                    # Distributed across expanded variants in expansion order.
         fixed_elements:
           fixed_element_matrix:
             pairing:
-              mode: cross_product    # Budget policy for mining candidates.
-            spacer_length: [16, 18]  # Allowed spacer lengths between motif segments.
-            upstream_pos: [10, 25]  # Constrain -35 start window.
+              mode: cross_product          # Expand by pairing upstream/downstream motif sets.
+            spacer_length: [16, 18]        # Allowed spacer lengths between motif segments.
+            upstream_pos: [10, 25]         # Constrain -35 start window.
   runtime:
-    max_failed_solutions: 256        # Hard cap on failed solves before abort.
+    max_failed_solutions: 256              # Hard cap on failed solves before abort.
 ```
 
 ```yaml
 # LacI/AraC exclusion profile (same config file)
 inputs:
-  - name: background                        # Identifier for this config entry.
+  - name: background                        # Input identifier.
     sampling:
       filters:
         fimo_exclude:
           pwms_input: [lacI_pwm, araC_pwm]  # PWM inputs used by this exclusion filter.
-          allow_zero_hit_only: true   # Keep only background with zero LacI/AraC hits.
+          allow_zero_hit_only: true         # Keep only background with zero LacI/AraC hits.
 ```
 
 ### Step-by-step commands
@@ -75,6 +76,7 @@ USR_REGISTRY="$PWD/outputs/usr_datasets/registry.yaml"
 # Resolve repo-level baseline USR registry path.
 ROOT_REGISTRY="$(git rev-parse --show-toplevel)/src/dnadesign/usr/datasets/registry.yaml"
 
+# Seed a workspace-local USR registry when one is not present.
 if [ ! -f "$USR_REGISTRY" ]; then
   # Create the target directory if it does not already exist.
   mkdir -p "$(dirname "$USR_REGISTRY")"
@@ -96,6 +98,17 @@ pixi run dense plot -c "$CONFIG"
 pixi run dense notebook generate -c "$CONFIG"
 # Run notebook validation before opening or sharing it.
 uv run marimo check "$PWD/outputs/notebooks/densegen_run_overview.py"
+```
+
+### If outputs already exist (analysis-only)
+
+```bash
+# Enter the workspace directory so relative paths resolve correctly.
+cd src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel
+# Rebuild plots/notebook from existing run artifacts without regenerating sequences.
+./runbook.sh --analysis-only
+# Open the generated notebook in marimo app mode.
+pixi run dense notebook run -c "$PWD/config.yaml"
 ```
 
 ### Optional artifact refresh from Cruncher

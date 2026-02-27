@@ -32,6 +32,7 @@ from ..utils import logging_utils
 from ..utils.logging_utils import install_native_stderr_filters, setup_logging
 from ..utils.mpl_utils import ensure_mpl_cache_dir
 from .context import CliContext
+from .workspace import _seed_usr_registry
 
 QUOTA_PLAN_INLINE_THRESHOLD = 8
 
@@ -282,6 +283,55 @@ def _clear_outputs_preserving_notify(*, outputs_root: Path) -> None:
             shutil.rmtree(child)
         else:
             child.unlink()
+
+
+def _print_usr_registry_next_steps(*, console) -> None:
+    console.print("[bold]Next steps[/]:")
+    console.print("  - stage your run via `dense workspace init --output-mode usr|both` to seed registry.yaml")
+    console.print("  - or create `<output.usr.root>/registry.yaml` before running `dense run`")
+
+
+def _ensure_usr_registry_ready(
+    *,
+    cfg,
+    cfg_path: Path,
+    run_root: Path,
+    context: CliContext,
+    console,
+    ensure_usr_registry: bool,
+) -> None:
+    out_cfg = cfg.output
+    if "usr" not in out_cfg.targets or out_cfg.usr is None:
+        return
+    usr_root = context.resolve_outputs_path_or_exit(
+        cfg_path,
+        run_root,
+        Path(out_cfg.usr.root),
+        label="output.usr.root",
+    )
+    registry_path = usr_root / "registry.yaml"
+    if registry_path.exists() and registry_path.is_file():
+        return
+    if registry_path.exists() and not registry_path.is_file():
+        console.print(f"[bold red]USR registry path exists but is not a file:[/] {registry_path}")
+        raise typer.Exit(code=1)
+
+    if ensure_usr_registry:
+        _seed_usr_registry(
+            run_dir=run_root,
+            output=_model_to_dict(out_cfg),
+            console=console,
+            display_path=context.display_path,
+        )
+
+    if registry_path.exists() and registry_path.is_file():
+        return
+
+    console.print(
+        f"[bold red]USR registry not found at {registry_path}. Create registry.yaml before writing USR outputs.[/]"
+    )
+    _print_usr_registry_next_steps(console=console)
+    raise typer.Exit(code=1)
 
 
 def _resolve_resume_mode(
@@ -544,9 +594,7 @@ def _handle_run_runtime_error(
         raise typer.Exit(code=1)
     if "USR registry not found at " in message:
         console.print(f"[bold red]{message}[/]")
-        console.print("[bold]Next steps[/]:")
-        console.print("  - stage your run via `dense workspace init --output-mode usr|both` to seed registry.yaml")
-        console.print("  - or create `<output.usr.root>/registry.yaml` before running `dense run`")
+        _print_usr_registry_next_steps(console=console)
         raise typer.Exit(code=1)
     if "Exceeded max_consecutive_no_progress_resamples=" in message or "Exceeded max_failed_solutions=" in message:
         console.print(f"[bold red]{message}[/]")
@@ -594,6 +642,11 @@ def register_run_commands(
         ),
         show_tfbs: bool = typer.Option(False, "--show-tfbs", help="Show TFBS sequences in progress output."),
         show_solutions: bool = typer.Option(False, "--show-solutions", help="Show full solution sequences in output."),
+        ensure_usr_registry: bool = typer.Option(
+            True,
+            "--ensure-usr-registry/--no-ensure-usr-registry",
+            help="Auto-seed output.usr.root/registry.yaml from repository defaults when missing.",
+        ),
         config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
     ):
         cfg_path, is_default = context.resolve_config_path(ctx, config)
@@ -714,6 +767,15 @@ def register_run_commands(
             suppress_solver_stderr=bool(log_cfg.suppress_solver_stderr),
         )
 
+        _ensure_usr_registry_ready(
+            cfg=cfg,
+            cfg_path=cfg_path,
+            run_root=run_root,
+            context=context,
+            console=console,
+            ensure_usr_registry=ensure_usr_registry,
+        )
+
         # Plan & solver
         console.print("[bold]Quota plan[/]: " + _format_quota_plan_message(pl))
         try:
@@ -771,6 +833,12 @@ def register_run_commands(
     @app.command("campaign-reset", help="Remove run outputs to reset a workspace.")
     def campaign_reset(
         ctx: typer.Context,
+        yes: bool = typer.Option(False, "--yes", help="Skip the danger-zone confirmation prompt."),
+        purge_usr_registry: bool = typer.Option(
+            False,
+            "--purge-usr-registry",
+            help="Also remove output.usr.root/registry.yaml instead of preserving it.",
+        ),
         config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
     ):
         cfg_path, is_default = context.resolve_config_path(ctx, config)
@@ -791,8 +859,34 @@ def register_run_commands(
                 f"{context.display_path(outputs_root, run_root, absolute=False)}"
             )
             raise typer.Exit(code=1)
+
+        if not yes:
+            prompt = (
+                "Danger zone: this will remove run outputs under "
+                f"{context.display_path(outputs_root, run_root, absolute=False)}. Continue?"
+            )
+            if not typer.confirm(prompt, default=False):
+                console.print("[yellow]Reset aborted.[/]")
+                raise typer.Exit(code=1)
+
+        registry_snapshots: dict[Path, str] = {}
+        if not purge_usr_registry:
+            registry_snapshots = _capture_usr_registry_snapshots(
+                cfg=loaded.root.densegen,
+                cfg_path=cfg_path,
+                run_root=run_root,
+                context=context,
+            )
+
         shutil.rmtree(outputs_root)
+        if registry_snapshots:
+            _restore_usr_registry_snapshots(snapshots=registry_snapshots)
         console.print(
             ":broom: [bold green]Removed outputs under[/] "
             f"{context.display_path(outputs_root, run_root, absolute=False)}"
         )
+        if registry_snapshots:
+            preserved = ", ".join(
+                context.display_path(path, run_root, absolute=False) for path in sorted(registry_snapshots)
+            )
+            console.print(f":bookmark_tabs: [bold green]Preserved USR registry[/]: {preserved}")

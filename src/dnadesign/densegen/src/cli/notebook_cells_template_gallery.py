@@ -41,6 +41,8 @@ def _(Path, json, plot_manifest_path):
         _variant = str(variant or "").strip()
         _plot_name = str(plot_name or "").strip()
         _stem = str(stem or "").strip()
+        if _base and _variant and _variant != _base:
+            return f"{_base}/{_variant}"
         if _base:
             return _base
         if _variant:
@@ -73,12 +75,25 @@ def _(Path, json, plot_manifest_path):
                 _plot_id = str(_entry.get("plot_id") or _entry.get("name") or "").strip()
                 if not _plot_id:
                     _plot_id = _infer_plot_id_from_path(_rel_parts, _candidate.stem)
-                _plan_name = str(_entry.get("plan_name") or "unscoped")
+                _plan_name = str(_entry.get("plan_name") or "").strip()
+                if not _plan_name:
+                    if len(_rel_parts) >= 2 and _rel_parts[0] == "stage_b":
+                        _plan_name = str(_rel_parts[1]).strip() or "unscoped"
+                    elif len(_rel_parts) >= 1 and _rel_parts[0] == "stage_a":
+                        _plan_name = "stage_a"
+                    else:
+                        _plan_name = "unscoped"
                 _input_name = str(_entry.get("input_name") or "").strip()
                 if not _input_name and len(_rel_parts) >= 4 and _rel_parts[0] == "stage_b":
                     _input_name = str(_rel_parts[2]).strip()
+                if not _input_name and len(_rel_parts) >= 2 and _rel_parts[0] == "stage_a":
+                    _stem = str(_candidate.stem)
+                    if _stem == "background_logo":
+                        _input_name = "background"
+                    elif _stem.endswith("__background_logo"):
+                        _input_name = _stem[: -len("__background_logo")].strip()
                 _plot_name = str(_entry.get("name") or _candidate.stem)
-                _variant = str(_entry.get("variant") or "")
+                _variant = str(_entry.get("variant") or _candidate.stem or "")
                 plot_entries.append(
                     {
                         "path": _candidate,
@@ -94,6 +109,7 @@ def _(Path, json, plot_manifest_path):
                         "plot_name": _plot_name,
                         "variant": _variant,
                         "description": str(_entry.get("description") or ""),
+                        "_source_rank": 0,
                     }
                 )
 
@@ -119,9 +135,14 @@ def _(Path, json, plot_manifest_path):
                 _input_name = str(_relative_parts[2]).strip()
         elif len(_relative_parts) >= 1 and _relative_parts[0] == "stage_a":
             _plan_name = "stage_a"
+            _stem = str(_resolved.stem)
+            if _stem == "background_logo":
+                _input_name = "background"
+            elif _stem.endswith("__background_logo"):
+                _input_name = _stem[: -len("__background_logo")].strip()
         _inferred_plot_id = _infer_plot_id_from_path(_relative_parts, _resolved.stem)
         _plot_name = str(_resolved.stem)
-        _variant = ""
+        _variant = str(_resolved.stem)
         plot_entries.append(
             {
                 "path": _resolved,
@@ -137,8 +158,16 @@ def _(Path, json, plot_manifest_path):
                 "plot_name": _plot_name,
                 "variant": _variant,
                 "description": "",
+                "_source_rank": 1,
             }
         )
+
+    def _stem_priority(entry: dict[str, object]) -> tuple[int, int, int, str]:
+        _stem = str(getattr(entry["path"], "stem", "")).strip().lower()
+        _tail = _stem.rsplit("_", 1)[-1]
+        _has_numeric_tail = int("_" in _stem and _tail.isdigit())
+        _has_digest_like_token = int("__" in _stem)
+        return (_has_numeric_tail, _has_digest_like_token, len(_stem), _stem)
 
     def _suffix_priority(entry: dict[str, object]) -> tuple[int, str]:
         _suffix = str(getattr(entry["path"], "suffix", "")).lower()
@@ -148,16 +177,19 @@ def _(Path, json, plot_manifest_path):
             return (1, _suffix)
         return (2, _suffix)
 
-    preferred_entries: dict[tuple[str, str, str, str], dict[str, object]] = {}
+    def _entry_priority(entry: dict[str, object]) -> tuple[int, tuple[int, str], tuple[int, int, int, str]]:
+        _source_rank = int(entry.get("_source_rank", 1))
+        return (_source_rank, _suffix_priority(entry), _stem_priority(entry))
+
+    preferred_entries: dict[tuple[str, str, str], dict[str, object]] = {}
     for _entry in plot_entries:
         _key = (
             str(_entry.get("visual_plot_type") or ""),
             str(_entry.get("plan_name") or ""),
             str(_entry.get("input_name") or ""),
-            str(_entry.get("plot_name") or ""),
         )
         _current = preferred_entries.get(_key)
-        if _current is None or _suffix_priority(_entry) < _suffix_priority(_current):
+        if _current is None or _entry_priority(_entry) < _entry_priority(_current):
             preferred_entries[_key] = _entry
 
     plot_entries = sorted(
@@ -165,7 +197,6 @@ def _(Path, json, plot_manifest_path):
         key=lambda entry: (
             str(entry["plan_name"]),
             str(entry.get("visual_plot_type") or ""),
-            str(entry["plot_name"]),
             str(entry["path"]),
         ),
     )
@@ -175,10 +206,12 @@ def _(Path, json, plot_manifest_path):
 @app.cell
 def _(PLOT_SPECS, mo, plot_entries, plot_manifest_load_error, require):
     require(plot_manifest_load_error is not None, plot_manifest_load_error or "Plot manifest is invalid.")
-    require(
-        not plot_entries,
-        "No `outputs/plots/plot_manifest.json` plots found yet. Run `uv run dense plot`.",
-    )
+    plot_gallery_notice = ""
+    if not plot_entries:
+        plot_gallery_notice = (
+            "No `outputs/plots/plot_manifest.json` plots found yet. "
+            "Run `uv run dense plot` to generate plot artifacts for this run."
+        )
     available_plot_names = sorted(list(PLOT_SPECS.keys()))
     generated_plot_names = sorted(
         {
@@ -237,16 +270,22 @@ def _(PLOT_SPECS, mo, plot_entries, plot_manifest_load_error, require):
 
     plan_options = list(plan_label_to_name.keys())
     plot_scope_filter = mo.ui.dropdown(options=plan_options, value=plan_options[0], label="")
-    return all_scope_label, compact_plan_label, plan_label_to_name, plot_scope_filter
+    return all_scope_label, compact_plan_label, plan_label_to_name, plot_gallery_notice, plot_scope_filter
 
 
 @app.cell
 def _(PLOT_SPECS, all_scope_label, mo, pd, plan_label_to_name, plot_entries, plot_scope_filter):
     selected_scope_label = str(plot_scope_filter.value or all_scope_label)
     selected_plot_scope = str(plan_label_to_name.get(selected_scope_label, "all"))
+    hidden_plot_types = {"run_health/summary_table"}
     entries_for_scope = list(plot_entries)
     if selected_plot_scope != "all":
         entries_for_scope = [_entry for _entry in plot_entries if str(_entry["plan_name"]) == selected_plot_scope]
+    entries_for_scope = [
+        _entry
+        for _entry in entries_for_scope
+        if str(_entry.get("visual_plot_type") or "").strip() not in hidden_plot_types
+    ]
 
     known_plot_ids = sorted([str(_name) for _name in PLOT_SPECS.keys()])
 
@@ -255,19 +294,6 @@ def _(PLOT_SPECS, all_scope_label, mo, pd, plan_label_to_name, plot_entries, plo
         if "/" in _token:
             return str(_token.split("/", 1)[0]).strip()
         return _token
-
-    def _default_ids_for_scope(scope_name: str) -> list[str]:
-        if scope_name == "all":
-            return list(known_plot_ids)
-        if scope_name == "stage_a":
-            return [plot_id for plot_id in known_plot_ids if plot_id.startswith("stage_a")]
-        if scope_name == "unscoped":
-            return [plot_id for plot_id in known_plot_ids if plot_id == "run_health" or plot_id.startswith("run_")]
-        return [
-            plot_id
-            for plot_id in known_plot_ids
-            if plot_id not in {"run_health"} and not plot_id.startswith("stage_a")
-        ]
 
     def _ordered_unique(values: list[str]) -> list[str]:
         ordered: list[str] = []
@@ -282,25 +308,31 @@ def _(PLOT_SPECS, all_scope_label, mo, pd, plan_label_to_name, plot_entries, plo
 
     plot_ids_by_scope = {}
     generated_plot_ids_by_scope: dict[str, list[str]] = {}
-    _plot_ids_all_generated = sorted(
-        {
-            str(entry.get("visual_plot_type") or "").strip()
-            for entry in plot_entries
-            if str(entry.get("visual_plot_type") or "").strip()
-        }
-    )
+    _plot_ids_all_generated_raw = []
+    for entry in plot_entries:
+        _plot_id = str(entry.get("visual_plot_type") or "").strip()
+        if not _plot_id:
+            continue
+        if _plot_id in hidden_plot_types:
+            continue
+        _plot_ids_all_generated_raw.append(_plot_id)
+    _plot_ids_all_generated = sorted(set(_plot_ids_all_generated_raw))
     generated_plot_ids_by_scope["all"] = _plot_ids_all_generated
-    plot_ids_by_scope["all"] = _ordered_unique(_default_ids_for_scope("all") + _plot_ids_all_generated)
+    plot_ids_by_scope["all"] = _ordered_unique(_plot_ids_all_generated)
     for _plan_name in sorted({str(entry["plan_name"]) for entry in plot_entries}):
-        _plot_ids_scope_generated = sorted(
-            {
-                str(entry.get("visual_plot_type") or "").strip()
-                for entry in plot_entries
-                if str(entry["plan_name"]) == _plan_name and str(entry.get("visual_plot_type") or "").strip()
-            }
-        )
+        _plot_ids_scope_generated_raw = []
+        for entry in plot_entries:
+            if str(entry["plan_name"]) != _plan_name:
+                continue
+            _plot_id = str(entry.get("visual_plot_type") or "").strip()
+            if not _plot_id:
+                continue
+            if _plot_id in hidden_plot_types:
+                continue
+            _plot_ids_scope_generated_raw.append(_plot_id)
+        _plot_ids_scope_generated = sorted(set(_plot_ids_scope_generated_raw))
         generated_plot_ids_by_scope[_plan_name] = _plot_ids_scope_generated
-        plot_ids_by_scope[_plan_name] = _ordered_unique(_default_ids_for_scope(_plan_name) + _plot_ids_scope_generated)
+        plot_ids_by_scope[_plan_name] = _ordered_unique(_plot_ids_scope_generated)
 
     def _format_plot_id_list(values: list[str]) -> str:
         if not values:
@@ -308,12 +340,12 @@ def _(PLOT_SPECS, all_scope_label, mo, pd, plan_label_to_name, plot_entries, plo
         return ", ".join(f"`{plot_id}`" for plot_id in values)
 
     _scope_available_ids = list(plot_ids_by_scope.get(selected_plot_scope, []))
-    _scope_generated_ids = list(generated_plot_ids_by_scope.get(selected_plot_scope, []))
-    scope_available_plot_types_text = _format_plot_id_list(_scope_available_ids)
-    scope_generated_plot_types_text = _format_plot_id_list(_scope_generated_ids)
 
     plot_id_label_to_id = {}
-    _generated_set = set(_scope_generated_ids)
+    _generated_set = set(generated_plot_ids_by_scope.get(selected_plot_scope, []))
+    _generated_set.update(
+        base_plot_id(_plot_id) for _plot_id in list(_generated_set) if base_plot_id(_plot_id)
+    )
     for _plot_id in _scope_available_ids:
         _status = "generated" if _plot_id in _generated_set else "available"
         _label = f"{_plot_id} [{_status}]"
@@ -350,18 +382,6 @@ def _(PLOT_SPECS, all_scope_label, mo, pd, plan_label_to_name, plot_entries, plo
     )
 
     plot_id_filter = mo.ui.dropdown(options=plot_id_options, value=plot_id_options[0], label="")
-    scope_plot_types_text = scope_available_plot_types_text
-    if selected_plot_scope == "all":
-        scope_plot_types_message = scope_plot_types_text
-    else:
-        scope_plot_types_message = scope_plot_types_text + f" (`{selected_scope_label}`)"
-    scope_stage_note = ""
-    if selected_plot_scope == "stage_a" and all(
-        str(entry.get("plot_id") or "") == "stage_a_summary" for entry in entries_for_scope
-    ):
-        scope_stage_note = (
-            "Stage-A PWM sampling panels are absent for this run because only background pools were sampled."
-        )
     return (
         base_plot_id,
         entries_for_scope,
@@ -370,10 +390,8 @@ def _(PLOT_SPECS, all_scope_label, mo, pd, plan_label_to_name, plot_entries, plo
         plot_id_label_to_id,
         plot_id_filter,
         plot_scope_filter,
-        scope_plot_types_message,
         selected_plot_scope,
         selected_scope_label,
-        scope_stage_note,
     )
 
 
@@ -388,17 +406,22 @@ def _(
     pd,
     plot_id_filter,
     plot_scope_filter,
-    scope_plot_types_message,
     selected_plot_scope,
-    scope_stage_note,
     selected_scope_label,
 ):
     selected_plot_label = str(plot_id_filter.value or "")
     selected_plot_id = str(plot_id_label_to_id.get(selected_plot_label, selected_plot_label))
+
+    def _entry_matches_selected_plot_id(_entry: dict[str, object]) -> bool:
+        _visual_plot_type = str(_entry.get("visual_plot_type") or "").strip()
+        if not _visual_plot_type:
+            return False
+        return _visual_plot_type == selected_plot_id
+
     _filtered_entries = [
         _entry
         for _entry in entries_for_scope
-        if str(_entry.get("visual_plot_type") or "").strip() == selected_plot_id
+        if _entry_matches_selected_plot_id(_entry)
     ]
 
     label_to_entry = {}
@@ -414,7 +437,19 @@ def _(
         plot_options = ["(no plots for current filters)"]
     elif not _filtered_entries:
         _generated_plot_ids = set(generated_plot_ids_by_scope.get(selected_plot_scope, []))
-        if selected_plot_id and selected_plot_id not in _generated_plot_ids:
+        _generated_base_plot_ids = {
+            base_plot_id(_plot_id)
+            for _plot_id in _generated_plot_ids
+            if str(_plot_id).strip()
+        }
+        _generated_base_plot_ids = {
+            _plot_id for _plot_id in _generated_base_plot_ids if str(_plot_id).strip()
+        }
+        if (
+            selected_plot_id
+            and selected_plot_id not in _generated_plot_ids
+            and selected_plot_id not in _generated_base_plot_ids
+        ):
             _base_id = base_plot_id(selected_plot_id)
             _generation_hint = _base_id if _base_id else selected_plot_id
             plot_filter_message = (
@@ -453,7 +488,6 @@ def _(
         plot_filter_message,
         plot_availability_table,
         plot_id_filter,
-        scope_plot_types_message,
         plot_scope_filter,
         plot_selector,
     )
@@ -578,11 +612,10 @@ def _(
     plot_availability_table,
     plot_id_label_to_id,
     plot_id_filter,
+    plot_gallery_notice,
     plot_scope_filter,
     plot_selector,
     resolve_plot_preview_image,
-    scope_plot_types_message,
-    scope_stage_note,
 ):
     _selected_scope_label = str(plot_scope_filter.value or "")
     _selected_plot_type_label = str(plot_id_filter.value or "")
@@ -600,21 +633,6 @@ def _(
     gallery_metadata = mo.accordion(
         {
             "Plot availability": mo.ui.table(plot_availability_table),
-            "Scope definitions": mo.md(
-                "\\n".join(
-                    [
-                        "- `run-level`: run-health plots",
-                        "- `stage-a`: Stage-A pool diagnostics",
-                        "- `<plan>`: Stage-B plan-scoped plots",
-                        "- Configured plot types in selected scope: " + str(scope_plot_types_message or "`(none)`"),
-                    ]
-                    + (
-                        ["- Note: " + str(scope_stage_note)]
-                        if str(scope_stage_note or "").strip()
-                        else []
-                    )
-                )
-            ),
         },
         multiple=True,
     )
@@ -626,7 +644,10 @@ def _(
         gap=0.3,
         widths=[1.4, 1.6, 7.0],
     )
-    _content = [mo.md("### Plot gallery"), _filters_summary, gallery_metadata, _controls]
+    _content = [mo.md("### Plot gallery"), _filters_summary, gallery_metadata]
+    if str(plot_gallery_notice).strip():
+        _content.append(mo.md(str(plot_gallery_notice)))
+    _content.append(_controls)
     if active_plot_entry is None:
         _content.append(mo.md(str(active_plot_error or "No plot selected.")))
     else:
@@ -640,7 +661,7 @@ def _(
             mo.accordion(
                 {
                     "Selected plot metadata": mo.md(
-                        "\\n".join(
+                        "\n".join(
                             [
                                 f"- Plan scope: `{_plan_name}`",
                                 f"- Plot id: `{_plot_id or 'n/a'}`",
@@ -665,7 +686,16 @@ def _(
                 mo.image(
                     str(_preview_path),
                     rounded=True,
-                    style={"border-radius": "14px"},
+                    style={
+                        "border-radius": "14px",
+                        "width": "100%",
+                        "max-width": "860px",
+                        "max-height": "560px",
+                        "height": "auto",
+                        "object-fit": "contain",
+                        "margin": "0 auto",
+                        "display": "block",
+                    },
                 )
             )
         else:
@@ -709,7 +739,7 @@ def _(mo, run_root, to_repo_relative_path):
     plot_export_details = mo.accordion(
         {
             "Export behavior": mo.md(
-                "\\n".join(
+                "\n".join(
                     [
                         "Export selected, filtered, or all plots into one format. selected = currently visible plot, "
                         "filtered = every plot matching current gallery filters, all = all plots in this run.",

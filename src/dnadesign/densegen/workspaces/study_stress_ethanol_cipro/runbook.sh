@@ -13,4 +13,5 @@ densegen_runbook_main \
   --notebook "$NOTEBOOK" \
   --runner "pixi" \
   --ensure-usr-registry "true" \
-  --require-fimo "true"
+  --require-fimo "true" \
+  "$@"

@@ -20,6 +20,7 @@ import numpy as np
 import pandas as pd
 from matplotlib import ticker as mticker
 from matplotlib.lines import Line2D
+from matplotlib.patches import Rectangle
 
 from .plot_common import _apply_style, _palette, _save_figure, _style, plan_group_from_name
 from .plot_run_health_utils import (
@@ -150,6 +151,53 @@ def _prepare_run_health_inputs(
     return style, attempts_df, plan_names, quota_map, progress, solver_x, solver_x_label, legend_size
 
 
+def _prepare_run_health_outcomes_inputs(
+    attempts_df: pd.DataFrame,
+    *,
+    style: Optional[dict] = None,
+) -> tuple[dict, pd.DataFrame, list[str], float]:
+    if attempts_df is None or attempts_df.empty:
+        raise ValueError("run_health requires attempts.parquet.")
+    required = {"status", "plan_name"}
+    missing = required - set(attempts_df.columns)
+    if missing:
+        raise ValueError(f"attempts.parquet missing required columns: {sorted(missing)}")
+    style = _style(style)
+    attempts_df = _normalize_and_order_attempts(attempts_df)
+    normalized_plan_series = attempts_df["plan_name"].map(_normalize_plan_name)
+    if normalized_plan_series.isna().all():
+        attempts_df = attempts_df.copy()
+        attempts_df["plan_name"] = "all plans"
+    else:
+        attempts_df = attempts_df.copy()
+        attempts_df["plan_name"] = normalized_plan_series.fillna("all plans")
+    plan_names_unique = sorted(set(attempts_df["plan_name"].astype(str).tolist()))
+    plan_scope = str(style.get("run_health_outcomes_plan_scope", "per_group")).strip().lower()
+    if plan_scope not in {"auto", "per_plan", "per_group"}:
+        raise ValueError(f"run_health_outcomes_plan_scope must be one of auto|per_plan|per_group, got {plan_scope!r}")
+    try:
+        max_labels = max(1, int(style.get("run_health_outcomes_plan_max_labels", 48)))
+    except Exception as exc:
+        raise ValueError("run_health_outcomes_plan_max_labels must be an integer > 0") from exc
+    grouped_plan_series = attempts_df["plan_name"].astype(str).map(plan_group_from_name)
+    grouped_unique = sorted({name for name in grouped_plan_series.astype(str).tolist() if str(name).strip()})
+    should_group = False
+    if plan_scope == "per_group":
+        should_group = True
+    elif plan_scope == "auto":
+        should_group = len(plan_names_unique) > max_labels and len(grouped_unique) < len(plan_names_unique)
+    if should_group:
+        attempts_df = attempts_df.copy()
+        attempts_df["plan_name"] = grouped_plan_series
+        plan_names_unique = sorted(set(attempts_df["plan_name"].astype(str).tolist()))
+    plan_names = plan_names_unique or ["all plans"]
+    if not plan_names:
+        attempts_df["plan_name"] = "all plans"
+        plan_names = ["all plans"]
+    legend_size = float(style.get("legend_size", style.get("font_size", 13) * 0.74))
+    return style, attempts_df, plan_names, legend_size
+
+
 def _build_run_health_outcomes_figure(
     attempts_df: pd.DataFrame,
     *,
@@ -157,98 +205,132 @@ def _build_run_health_outcomes_figure(
     plan_quotas: dict[str, int] | None = None,
     style: Optional[dict] = None,
 ) -> tuple[plt.Figure, dict[str, plt.Axes]]:
-    _style_cfg, attempts_df, plan_names, _quota_map, _progress, solver_x, solver_x_label, legend_size = (
-        _prepare_run_health_inputs(
-            attempts_df,
-            plan_quotas=plan_quotas,
-            style=style,
-        )
+    del events_df
+    del plan_quotas
+    _style_cfg, attempts_df, plan_names, legend_size = _prepare_run_health_outcomes_inputs(
+        attempts_df,
+        style=style,
     )
+    try:
+        attempts_per_row = max(1, int(_style_cfg.get("run_health_outcomes_attempts_per_row", 10)))
+    except Exception as exc:
+        raise ValueError("run_health_outcomes_attempts_per_row must be an integer > 0") from exc
+
     fig_size = _style_cfg.get("run_health_outcomes_figsize")
     if fig_size is None:
-        fig_height = max(4.2, min(12.0, 0.28 * float(len(plan_names)) + 2.8))
-        fig_size = (13.6, fig_height)
+        plan_counts = attempts_df["plan_name"].astype(str).value_counts()
+        max_plan_attempts = int(plan_counts.max()) if not plan_counts.empty else int(len(attempts_df))
+        max_rows_estimate = max(1, int(np.ceil(float(max_plan_attempts) / float(attempts_per_row))))
+        max_cols_estimate = max(1, int(len(plan_names)) * int(attempts_per_row))
+        fig_height = max(2.8, min(6.2, 0.11 * float(max_rows_estimate) + 2.1))
+        fig_width = max(
+            5.4,
+            min(
+                12.0,
+                max(
+                    0.16 * float(max_cols_estimate) + 1.8,
+                    (float(max_cols_estimate) / max(1.0, float(max_rows_estimate))) * 1.8,
+                ),
+            ),
+        )
+        fig_size = (fig_width, fig_height)
     fig, ax = plt.subplots(figsize=(float(fig_size[0]), float(fig_size[1])), constrained_layout=True)
 
-    plan_to_row = {name: i for i, name in enumerate(plan_names)}
+    plan_to_col = {name: i for i, name in enumerate(plan_names)}
     plot_df = attempts_df.copy()
-    plot_df["_plan_row"] = plot_df["plan_name"].astype(str).map(plan_to_row).fillna(0).astype(float)
-    plot_df["_solver_x"] = solver_x.to_numpy(dtype=float)
-
-    accepted_or_duplicate = plot_df[plot_df["status"].isin(["ok", "duplicate"])]
-    rejected = plot_df[plot_df["status"] == "rejected"]
-    failed = plot_df[plot_df["status"] == "failed"]
-
-    run_x = plot_df["_solver_x"].to_numpy(dtype=float)
-    run_y = plot_df["_plan_row"].to_numpy(dtype=float)
-    valid = np.isfinite(run_x) & np.isfinite(run_y)
-    run_x = run_x[valid]
-    run_y = run_y[valid]
-    if run_x.size >= 2:
-        changed = np.ones(run_x.size, dtype=bool)
-        changed[1:] = (run_x[1:] != run_x[:-1]) | (run_y[1:] != run_y[:-1])
-        path_x = run_x[changed]
-        path_y = run_y[changed]
-        if path_x.size >= 2:
-            ax.plot(
-                path_x,
-                path_y,
-                color="#c7c7c7",
-                linewidth=2.5,
-                alpha=0.45,
-                zorder=1,
-            )
-
-    if not accepted_or_duplicate.empty:
-        ax.scatter(
-            accepted_or_duplicate["_solver_x"].to_numpy(dtype=float),
-            accepted_or_duplicate["_plan_row"].to_numpy(dtype=float),
-            s=34.0,
-            marker="s",
-            linewidths=0.35,
-            edgecolors="#c4c4c4",
-            color="#d9d9d9",
+    plot_df["_plan_col"] = plot_df["plan_name"].astype(str).map(plan_to_col).fillna(0).astype(float)
+    plot_df["_plan_attempt_rank"] = plot_df.groupby("plan_name", sort=False).cumcount().astype(int) + 1
+    plot_df["_attempt_row"] = ((plot_df["_plan_attempt_rank"] - 1) // attempts_per_row + 1).astype(float)
+    plot_df["_attempt_slot"] = ((plot_df["_plan_attempt_rank"] - 1) % attempts_per_row).astype(float)
+    max_attempt_rank = int(plot_df["_plan_attempt_rank"].max()) if not plot_df.empty else 0
+    max_rows = int(plot_df["_attempt_row"].max()) if not plot_df.empty else 1
+    total_columns = max(1, int(len(plan_names)) * int(attempts_per_row))
+    status_groups = {"accepted": {"ok", "duplicate"}, "rejected": {"rejected"}, "failed": {"failed"}}
+    group_colors = {"accepted": "#d9d9d9", "rejected": "#D55E00", "failed": "#8f2a13"}
+    tile_margin = 0.1
+    tile_side = 1.0 - tile_margin
+    tile_offset = tile_margin / 2.0
+    plan_col_idx = plot_df["_plan_col"].astype(int).to_numpy()
+    row_idx = plot_df["_attempt_row"].astype(int).to_numpy() - 1
+    slot_idx = plot_df["_attempt_slot"].astype(int).to_numpy()
+    col_idx = plan_col_idx * int(attempts_per_row) + slot_idx
+    status_values = plot_df["status"].astype(str).to_numpy()
+    valid = (row_idx >= 0) & (row_idx < max_rows) & (col_idx >= 0) & (col_idx < total_columns)
+    failed_marker_points: list[tuple[float, float]] = []
+    for idx in np.flatnonzero(valid):
+        status_value = str(status_values[idx]).strip().lower()
+        status_group = "accepted"
+        for group_name, group_statuses in status_groups.items():
+            if status_value in group_statuses:
+                status_group = group_name
+                break
+        x_cell = float(col_idx[idx])
+        y_cell = float(row_idx[idx])
+        if status_group == "failed":
+            failed_marker_points.append((x_cell + 0.5, y_cell + 0.5))
+            continue
+        tile = Rectangle(
+            (x_cell + tile_offset, y_cell + tile_offset),
+            tile_side,
+            tile_side,
+            facecolor=group_colors[status_group],
+            edgecolor="none",
+            linewidth=0.0,
             zorder=2,
-            label="_nolegend_",
         )
-    if not rejected.empty:
+        ax.add_patch(tile)
+    if failed_marker_points:
+        failed_x = np.array([item[0] for item in failed_marker_points], dtype=float)
+        failed_y = np.array([item[1] for item in failed_marker_points], dtype=float)
         ax.scatter(
-            rejected["_solver_x"].to_numpy(dtype=float),
-            rejected["_plan_row"].to_numpy(dtype=float),
-            s=40.0,
-            marker="s",
-            linewidths=0.35,
-            edgecolors="#c4c4c4",
+            failed_x,
+            failed_y,
+            marker="x",
+            s=20.0,
+            linewidths=1.0,
             color="#D55E00",
             zorder=3,
-            label="_nolegend_",
-        )
-    if not failed.empty:
-        ax.scatter(
-            failed["_solver_x"].to_numpy(dtype=float),
-            failed["_plan_row"].to_numpy(dtype=float),
-            s=46.0,
-            marker="x",
-            linewidths=1.2,
-            color="#D55E00",
-            zorder=4,
-            label="_nolegend_",
         )
 
-    for row in range(len(plan_names) - 1):
-        ax.axhline(row + 0.5, color="#d8d8d8", linewidth=0.7, alpha=0.6, zorder=1)
-    ax.set_yticks(np.arange(len(plan_names), dtype=float))
-    ax.set_yticklabels([_capitalize_first(_ellipsize(name, max_len=24)) for name in plan_names])
-    ax.set_ylim(-0.5, float(len(plan_names)) - 0.5)
-    ticks = _solver_ticks(solver_x.to_numpy(dtype=float))
-    if ticks.size > 0:
-        ax.set_xticks(ticks)
-    if solver_x.size > 0:
-        ax.set_xlim(float(solver_x.min()) - 0.5, float(solver_x.max()) + 0.5)
-    ax.set_xlabel(solver_x_label)
-    ax.set_ylabel("")
-    ax.grid(axis="x", linestyle="--", linewidth=0.55, alpha=0.35)
-    ax.set_title("Outcomes over time", pad=17.0)
+    try:
+        rows_per_block = max(1, int(_style_cfg.get("run_health_outcomes_rows_per_block", 50)))
+    except Exception as exc:
+        raise ValueError("run_health_outcomes_rows_per_block must be an integer > 0") from exc
+    for block_start in range(rows_per_block, max_attempt_rank + 1, rows_per_block):
+        boundary_row = int(np.ceil(float(block_start) / float(attempts_per_row)))
+        if boundary_row <= int(max_rows):
+            ax.axhline(float(boundary_row), color="#ececec", linewidth=0.65, alpha=0.9, zorder=3)
+    plan_centers = np.array(
+        [idx * int(attempts_per_row) + float(attempts_per_row) / 2.0 for idx in range(len(plan_names))],
+        dtype=float,
+    )
+    ax.set_xticks(plan_centers)
+    rotate = 45 if len(plan_names) > 4 else 0
+    ax.set_xticklabels(
+        [_capitalize_first(_ellipsize(name, max_len=22)) for name in plan_names],
+        rotation=rotate,
+        ha="right" if rotate else "center",
+    )
+    if max_attempt_rank > 0:
+        try:
+            max_yticks = max(2, int(_style_cfg.get("run_health_outcomes_max_yticks", 12)))
+        except Exception as exc:
+            raise ValueError("run_health_outcomes_max_yticks must be an integer >= 2") from exc
+        step_rows = max(1, int(np.ceil(float(max_rows) / float(max_yticks))))
+        tick_rows = list(range(1, max_rows + 1, step_rows))
+        if max_rows not in tick_rows:
+            tick_rows.append(max_rows)
+        tick_rows = sorted(set(tick_rows))
+        tick_labels = [str((row - 1) * attempts_per_row + 1) for row in tick_rows]
+        ax.set_yticks([float(item) - 0.5 for item in tick_rows])
+        ax.set_yticklabels(tick_labels)
+    ax.set_xlim(0.0, float(total_columns))
+    ax.set_ylim(float(max_rows), 0.0)
+    ax.set_xlabel("Plan")
+    ax.set_ylabel("Attempt index")
+    ax.set_aspect("equal", adjustable="box")
+    ax.grid(False)
+    ax.set_title("Attempt outcomes by plan", pad=17.0)
 
     legend_handles = [
         Line2D(
@@ -257,8 +339,8 @@ def _build_run_health_outcomes_figure(
             marker="s",
             linestyle="None",
             markerfacecolor="#d9d9d9",
-            markeredgecolor="#bcbcbc",
-            markeredgewidth=0.5,
+            markeredgecolor="none",
+            markeredgewidth=0.0,
             markersize=6.0,
             label="Accepted",
         ),
@@ -268,8 +350,8 @@ def _build_run_health_outcomes_figure(
             marker="s",
             linestyle="None",
             markerfacecolor="#D55E00",
-            markeredgecolor="#8f2a13",
-            markeredgewidth=0.5,
+            markeredgecolor="none",
+            markeredgewidth=0.0,
             markersize=6.0,
             label="Rejected",
         ),

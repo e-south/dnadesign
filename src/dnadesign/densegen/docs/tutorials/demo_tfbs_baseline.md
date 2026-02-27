@@ -34,28 +34,28 @@ uv run dense validate-config --probe-solver -c src/dnadesign/densegen/workspaces
 # src/dnadesign/densegen/workspaces/demo_tfbs_baseline/config.yaml
 densegen:
   output:
-    targets: [parquet]          # Write local records table only.
+    targets: [parquet]                   # Write local records table only.
   generation:
-    sequence_length: 100        # Final sequence length for both plans.
+    sequence_length: 100                 # Final sequence length for both plans.
     sampling:
       pool_strategy: iterative_subsample  # Stage-A/Stage-B pool sampling strategy.
-      iterative_max_libraries: 200  # Upper bound on Stage-B library resamples.
+      iterative_max_libraries: 200        # Upper bound on Stage-B library resamples.
     plan:
-      - name: baseline                    # Identifier for this config entry.
-        sequences: 50           # Unconstrained plan quota.
-      - name: baseline_sigma70            # Identifier for this config entry.
-        sequences: 50           # Sigma70-constrained plan quota.
+      - name: baseline                    # Plan identifier.
+        sequences: 50                     # Unconstrained plan quota.
+      - name: baseline_sigma70            # Plan identifier.
+        sequences: 50                     # Sigma70-constrained plan quota.
         fixed_elements:
           promoter_constraints:
-            - name: sigma70_consensus     # Identifier for this config entry.
-              spacer_length: [16, 18]  # Enforce spacing between -35 and -10 motifs.
+            - name: sigma70_consensus     # Constraint identifier.
+              spacer_length: [16, 18]     # Enforce spacing between -35 and -10 motifs.
   solver:
-    backend: CBC               # Dense-arrays backend.
-    strategy: iterate          # Iterative solve strategy.
+    backend: CBC                          # Dense-arrays backend.
+    strategy: iterate                     # Iterative solve strategy.
   runtime:
-    round_robin: true              # Keep sampling rounds until quotas are met.
-    max_accepted_per_library: 10  # Stage-B attempts before resampling.
-    max_failed_solutions: 0     # Disable failed-solution accumulation.
+    round_robin: true                     # Keep sampling rounds until quotas are met.
+    max_accepted_per_library: 10          # Stage-B attempts before resampling.
+    max_failed_solutions: 0               # Disable failed-solution accumulation.
 ```
 
 ### Step-by-step commands
@@ -78,6 +78,17 @@ uv run dense plot -c "$CONFIG"
 uv run dense notebook generate -c "$CONFIG"
 # Run notebook validation before opening or sharing it.
 uv run marimo check "$PWD/outputs/notebooks/densegen_run_overview.py"
+```
+
+### If outputs already exist (analysis-only)
+
+```bash
+# Enter the workspace directory so relative paths resolve correctly.
+cd src/dnadesign/densegen/workspaces/demo_tfbs_baseline
+# Rebuild plots/notebook from existing run artifacts without regenerating sequences.
+./runbook.sh --analysis-only
+# Open the generated notebook in marimo app mode.
+uv run dense notebook run -c "$PWD/config.yaml"
 ```
 
 ### Expected outputs

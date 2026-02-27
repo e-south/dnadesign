@@ -142,7 +142,7 @@ densegen:
 
     plan:
       - name: sigma70_panel
-        sequences: 100
+        sequences: 500
         expanded_name_template: "{base}__sig35={up}__sig10={down}"
         sampling:
           include_inputs: [background]
@@ -154,7 +154,7 @@ densegen:
             pairing:
               mode: cross_product
             spacer_length: [16, 18]
-            upstream_pos: [10, 35]
+            upstream_pos: [10, 25]
         regulator_constraints:
           groups: []
 

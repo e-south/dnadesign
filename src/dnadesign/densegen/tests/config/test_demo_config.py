@@ -435,7 +435,7 @@ def test_packaged_workspace_sequence_lengths_and_constitutive_upstream_window() 
     for item in constitutive_cfg.root.densegen.generation.plan:
         pcs = list(item.fixed_elements.promoter_constraints or [])
         assert len(pcs) == 1
-        assert tuple(pcs[0].upstream_pos or ()) == (10, 35)
+        assert tuple(pcs[0].upstream_pos or ()) == (10, 25)
 
 
 def test_study_constitutive_sigma_panel_runtime_allows_bounded_retries() -> None:

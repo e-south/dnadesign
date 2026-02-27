@@ -157,6 +157,7 @@ def test_workspace_runbooks_include_workspace_local_runbook_script() -> None:
                 f'--runner "{expected_runner[workspace_id]}"',
                 f'--ensure-usr-registry "{expected_usr_registry[workspace_id]}"',
                 f'--require-fimo "{expected_require_fimo[workspace_id]}"',
+                '"$@"',
             ],
             label=f"{workspace_id}: runbook.sh",
         )
@@ -276,6 +277,13 @@ def test_workspace_runbooks_single_command_matches_step_sequence() -> None:
         )
 
 
+def test_workspace_runbooks_include_analysis_only_shortcut() -> None:
+    for workspace_id in WORKSPACE_IDS:
+        text = _read_runbook(workspace_id)
+        assert "### Optional analysis-only mode (existing outputs)" in text
+        assert "./runbook.sh --analysis-only" in text
+
+
 def test_workspace_runbooks_keep_optional_commands_outside_canonical_step_block() -> None:
     for workspace_id in WORKSPACE_IDS:
         text = _read_runbook(workspace_id)
@@ -285,3 +293,26 @@ def test_workspace_runbooks_keep_optional_commands_outside_canonical_step_block(
         if workspace_id in USR_WORKSPACE_IDS:
             assert "cruncher catalog export-densegen" not in step_block
             assert "### Optional artifact refresh from Cruncher" in text
+
+
+def test_shared_runbook_lib_analysis_only_mode_requires_existing_outputs() -> None:
+    script = _read_shared_runbook_lib()
+    _assert_token_order(
+        script,
+        [
+            'local analysis_only="false"',
+            "--analysis-only)",
+            'analysis_only="true"',
+            'if [[ "$analysis_only" == "true" ]]; then',
+            'records_table="$(dirname "$config")/outputs/tables/records.parquet"',
+            'if [[ ! -f "$records_table" ]]; then',
+            'echo "Analysis-only mode requires existing outputs at: $records_table" >&2',
+            'echo "Run ./runbook.sh first to generate artifacts, then rerun with --analysis-only." >&2',
+            "local inspect_status=$?",
+            "if [[ $inspect_status -ne 0 ]]; then",
+            'echo "Analysis-only inspection failed. Existing artifacts may be stale or schema-incompatible." >&2',
+            'echo "Run ./runbook.sh for a fresh generation, then retry --analysis-only." >&2',
+            '"${dense_cmd[@]}" notebook generate --force -c "$config"',
+        ],
+        label="workspaces/_shared/runbook_lib.sh analysis-only guardrails",
+    )

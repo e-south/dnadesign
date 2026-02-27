@@ -40,16 +40,16 @@ cp src/dnadesign/usr/datasets/registry.yaml src/dnadesign/densegen/workspaces/de
 # src/dnadesign/densegen/workspaces/demo_sampling_baseline/config.yaml
 densegen:
   output:
-    targets: [parquet, usr]     # Keep local tables and USR event dataset in one run.
+    targets: [parquet, usr]              # Keep local tables and USR event dataset in one run.
   generation:
-    sequence_length: 100         # Final sequence length for both plans.
+    sequence_length: 100                  # Final sequence length for both plans.
     sampling:
       pool_strategy: subsample            # Stage-A/Stage-B pool sampling strategy.
-      library_size: 10           # Stage-B library breadth per plan.
+      library_size: 10                    # Stage-B library breadth per plan.
     plan:
-      - name: ethanol                     # Identifier for this config entry.
+      - name: ethanol                     # Plan identifier.
         sequences: 6                      # Requested sequence quota for this plan.
-      - name: ciprofloxacin               # Identifier for this config entry.
+      - name: ciprofloxacin               # Plan identifier.
         sequences: 6                      # Requested sequence quota for this plan.
   runtime:
     max_failed_solutions_per_target: 2.0  # Failed-solve tolerance scaled by target count.
@@ -58,14 +58,14 @@ densegen:
 ```yaml
 # Stage-A sampling profile (same config file)
 inputs:
-  - name: lexA_pwm                # Identifier for this config entry.
+  - name: lexA_pwm                        # Input identifier.
     sampling:
-      n_sites: 100               # Retained Stage-A sites for this regulator.
+      n_sites: 100                         # Retained Stage-A sites for this regulator.
       mining:
-        batch_size: 2000          # Candidate count evaluated per mining batch.
+        batch_size: 2000                   # Candidate count evaluated per mining batch.
         budget:
-          mode: fixed_candidates  # Budget policy for mining candidates.
-          candidates: 150000     # Mining effort cap per regulator.
+          mode: fixed_candidates           # Budget policy for mining candidates.
+          candidates: 150000               # Mining effort cap per regulator.
 ```
 
 ### Step-by-step commands
@@ -80,6 +80,7 @@ USR_REGISTRY="$PWD/outputs/usr_datasets/registry.yaml"
 # Resolve repo-level baseline USR registry path.
 ROOT_REGISTRY="$(git rev-parse --show-toplevel)/src/dnadesign/usr/datasets/registry.yaml"
 
+# Seed a workspace-local USR registry when one is not present.
 if [ ! -f "$USR_REGISTRY" ]; then
   # Create the target directory if it does not already exist.
   mkdir -p "$(dirname "$USR_REGISTRY")"
@@ -101,6 +102,17 @@ pixi run dense plot -c "$CONFIG"
 pixi run dense notebook generate -c "$CONFIG"
 # Run notebook validation before opening or sharing it.
 uv run marimo check "$PWD/outputs/notebooks/densegen_run_overview.py"
+```
+
+### If outputs already exist (analysis-only)
+
+```bash
+# Enter the workspace directory so relative paths resolve correctly.
+cd src/dnadesign/densegen/workspaces/demo_sampling_baseline
+# Rebuild plots/notebook from existing run artifacts without regenerating sequences.
+./runbook.sh --analysis-only
+# Open the generated notebook in marimo app mode.
+pixi run dense notebook run -c "$PWD/config.yaml"
 ```
 
 ### Optional artifact refresh from Cruncher

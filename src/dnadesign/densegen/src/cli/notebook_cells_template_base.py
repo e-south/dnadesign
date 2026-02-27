@@ -353,7 +353,7 @@ def _(df_window_filtered, mo, record_plan_filter, run_root, to_repo_relative_pat
     export_details = mo.accordion(
         {
             "Dataset export details": mo.md(
-                "\\n".join(
+                "\n".join(
                     [
                         f"- Rows in view: `{len(df_window_filtered)}`",
                         f"- Columns in view: `{len(df_window_filtered.columns)}`",
@@ -439,18 +439,22 @@ def _(json):
 
 
 @app.cell
-def _(contract, render_record_figure, workspace_name):
+def _(contract, render_record_figure, workspace_heading, workspace_name):
+    _workspace_title = str(workspace_heading or "").strip()
+    if not _workspace_title:
+        _workspace_title = str(workspace_name or "").strip().replace("_", " ").replace("-", " ")
+        _workspace_title = " ".join(_workspace_title.split()).title()
+
     def build_baserender_figure(record, *, core_summary: str):
-        _legend_pad_px = 20.0
+        _legend_pad_px = 24.0
         _legend_patch_h = 13.0
         _title_font_size = 14
-        _title_y = 0.968
         _figure = render_record_figure(
             record,
             style_preset=contract.style_preset,
             style_overrides={
                 "dpi": 320,
-                "padding_y": 10.0,
+                "padding_y": 12.0,
                 "layout": {"outer_pad_cells": 0.62},
                 "sequence": {"to_kmer_gap_cells": 0.38},
                 "legend_pad_px": _legend_pad_px,
@@ -466,16 +470,20 @@ def _(contract, render_record_figure, workspace_name):
             _axis.set_facecolor("white")
 
         _record_id = str(getattr(record, "id", "") or "unknown")
-        _header_text = f"{workspace_name} | sequence {_record_id}"
+        _record_display_id = _record_id
+        if len(_record_display_id) > 16:
+            _record_display_id = f"{_record_display_id[:8]}...{_record_display_id[-4:]}"
+        _header_text = f"{_workspace_title} | Sequence {_record_display_id}"
 
         _axis = _figure.axes[0] if _figure.axes else None
         if _axis is None:
             raise RuntimeError("BaseRender preview figure expected one axes for title placement.")
-        _axis.text(
+
+        _figure.text(
             0.5,
-            _title_y,
+            0.985,
             _header_text,
-            transform=_axis.transAxes,
+            transform=_figure.transFigure,
             ha="center",
             va="top",
             fontsize=_title_font_size,
@@ -549,8 +557,8 @@ def _(
         style={
             "border-radius": "14px",
             "width": "100%",
-            "max-height": "460px",
             "height": "auto",
+            "object-fit": "contain",
             "background": "white",
             "display": "block",
         },

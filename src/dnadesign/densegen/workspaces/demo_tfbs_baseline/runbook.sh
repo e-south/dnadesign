@@ -13,4 +13,5 @@ densegen_runbook_main \
   --notebook "$NOTEBOOK" \
   --runner "uv" \
   --ensure-usr-registry "false" \
-  --require-fimo "false"
+  --require-fimo "false" \
+  "$@"

@@ -24,6 +24,12 @@ RUNBOOK_TUTORIALS = (
     "study_constitutive_sigma_panel.md",
     "study_stress_ethanol_cipro.md",
 )
+ANALYSIS_NOTEBOOK_COMMAND = {
+    "demo_tfbs_baseline.md": 'uv run dense notebook run -c "$PWD/config.yaml"',
+    "demo_sampling_baseline.md": 'pixi run dense notebook run -c "$PWD/config.yaml"',
+    "study_constitutive_sigma_panel.md": 'pixi run dense notebook run -c "$PWD/config.yaml"',
+    "study_stress_ethanol_cipro.md": 'pixi run dense notebook run -c "$PWD/config.yaml"',
+}
 
 
 def _read(path: Path) -> str:
@@ -79,3 +85,12 @@ def test_densegen_howto_guides_keep_scope_sentence() -> None:
     for path in sorted(HOWTO.glob("*.md")):
         text = _read(path)
         assert "Read it when" in text, f"{path}: missing scope sentence using 'Read it when'"
+
+
+def test_densegen_tutorials_include_analysis_only_existing_outputs_path() -> None:
+    for name in RUNBOOK_TUTORIALS:
+        path = TUTORIALS / name
+        text = _read(path)
+        assert "### If outputs already exist (analysis-only)" in text
+        assert "./runbook.sh --analysis-only" in text
+        assert ANALYSIS_NOTEBOOK_COMMAND[name] in text

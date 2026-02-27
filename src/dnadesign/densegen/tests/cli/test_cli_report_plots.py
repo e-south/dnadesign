@@ -92,10 +92,17 @@ def test_notebook_generate_writes_workspace_notebook(tmp_path: Path) -> None:
         '"legend_font_size": 14,',
         '"legend_gap_patch_text": 11.0,',
         '"legend_gap_x": 44.0,',
-        '_header_text = f"{workspace_name} | sequence {_record_id}"',
         "_title_font_size = 14",
+        '_record_id = str(getattr(record, "id", "") or "unknown")',
+        "_record_display_id = _record_id",
+        "if len(_record_display_id) > 16:",
+        '_record_display_id = f"{_record_display_id[:8]}...{_record_display_id[-4:]}"',
+        '_workspace_title = str(workspace_heading or "").strip()',
+        '_header_text = f"{_workspace_title} | Sequence {_record_display_id}"',
+        "_legend_pad_px = 24.0",
+        '"padding_y": 12.0,',
+        "_figure.text(",
         "fontsize=_title_font_size,",
-        "_axis.text(",
         "@lru_cache(maxsize=64)",
         'preview_cache_dir = run_root / "outputs" / "notebooks" / ".baserender_preview_cache"',
         "def _cache_path(record_id: str) -> Path:",
@@ -105,9 +112,9 @@ def test_notebook_generate_writes_workspace_notebook(tmp_path: Path) -> None:
         "render_baserender_preview_path(_prefetch_id)",
         "_baserender_image = mo.image(",
         "render_baserender_preview_path(active_record_id)",
-        '"max-height": "460px",',
-        '"height": "auto",',
         '"width": "100%",',
+        '"height": "auto",',
+        '"object-fit": "contain",',
         '"display": "block",',
         'baserender_export_format = mo.ui.dropdown(options=["png", "pdf"], value="png", label="")',
         "baserender_export_path = mo.ui.text(",
@@ -134,7 +141,6 @@ def test_notebook_generate_writes_workspace_notebook(tmp_path: Path) -> None:
         'plot_filter_message = ""',
         "if not _filtered_entries:",
         "No plots found for scope `",
-        "Configured plot types in selected scope:",
         "(no plots for current filters)",
         'active_plot_error = str(plot_filter_message or "").strip()',
         "active_plot_entry = None",
@@ -145,6 +151,8 @@ def test_notebook_generate_writes_workspace_notebook(tmp_path: Path) -> None:
         "mo.image(",
         "rounded=True,",
         "mo.pdf(str(_plot_path))",
+        'hidden_plot_types = {"run_health/summary_table"}',
+        "if _plot_id in hidden_plot_types:",
         "plot_export_target = mo.ui.dropdown(",
         'plot_export_format = mo.ui.dropdown(options=["pdf", "png", "svg"], value="png", label="")',
         '"Dataset export details": mo.md(',
@@ -194,12 +202,13 @@ def test_notebook_generate_writes_workspace_notebook(tmp_path: Path) -> None:
         "### Selected plot",
         "Plan id",
         "_selected_plot_meta = mo.md(",
-        "_figure.text(",
         'label="Plot scope"',
         'label="Plot type"',
         'label="Plot"',
         'label="Plot export set"',
         'label="Plot export format"',
+        '"Scope definitions": mo.md(',
+        "Configured plot types in selected scope:",
         'plot_id_options = ["all"]',
         'default_plot_id = "all"',
         " | Plan: ",
@@ -244,7 +253,23 @@ def test_notebook_generate_handles_empty_plot_filter_intersection_without_error(
     assert "if not _filtered_entries:" in content
     assert "active_plot_entry = None" in content
     assert "No plots found for scope `" in content
-    assert "Configured plot types in selected scope:" in content
+    assert "Configured plot types in selected scope:" not in content
+
+
+def test_notebook_generate_shows_plot_gallery_notice_when_plots_are_missing(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
+    content = notebook_path.read_text()
+
+    assert 'plot_gallery_notice = ""' in content
+    assert "Run `uv run dense plot` to generate plot artifacts for this run." in content
+    assert "require(\n        not plot_entries," not in content
 
 
 def test_notebook_generate_includes_available_plot_ids_even_when_not_generated(tmp_path: Path) -> None:
@@ -259,7 +284,8 @@ def test_notebook_generate_includes_available_plot_ids_even_when_not_generated(t
     content = notebook_path.read_text()
 
     assert "known_plot_ids = sorted([str(_name) for _name in PLOT_SPECS.keys()])" in content
-    assert "def _default_ids_for_scope(scope_name: str) -> list[str]:" in content
+    assert "generated_plot_ids_by_scope: dict[str, list[str]] = {}" in content
+    assert 'plot_ids_by_scope["all"] = _ordered_unique(_plot_ids_all_generated)' in content
     assert "No generated plots for scope `" in content
     assert "Run `uv run dense plot --only " in content
     assert "def _infer_plot_id_from_path(relative_parts: tuple[str, ...], stem: str) -> str:" in content
@@ -301,11 +327,60 @@ def test_notebook_generate_uses_first_class_visual_plot_types_in_gallery_filters
 
     assert "def _visual_plot_type(plot_id: str, *, plot_name: str, variant: str, stem: str) -> str:" in content
     assert '"visual_plot_type": _visual_plot_type(' in content
+    assert "if _base and _variant and _variant != _base:" in content
+    assert 'return f"{_base}/{_variant}"' in content
     assert "if _base:" in content
     assert "return _base" in content
-    assert 'return f"{_base}/{_variant}"' not in content
+    assert '_variant = str(_entry.get("variant") or _candidate.stem or "")' in content
+    assert "_variant = str(_resolved.stem)" in content
+    assert 'if _stem.endswith("__background_logo"):' in content
     assert "def _entry_matches_selected_plot_id(_entry: dict[str, object]) -> bool:" in content
-    assert "return base_plot_id(_visual_plot_type) == selected_plot_id" in content
+    assert "return _visual_plot_type == selected_plot_id" in content
+
+
+def test_notebook_generate_constrains_plot_preview_image_size(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
+    content = notebook_path.read_text()
+
+    assert "mo.image(" in content
+    assert '"max-width": "860px",' in content
+    assert '"max-height": "560px",' in content
+    assert '"margin": "0 auto",' in content
+    assert '"width": "100%",' in content
+
+
+def test_notebook_generate_uses_real_newlines_in_plot_metadata_and_export_help(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
+    content = notebook_path.read_text()
+
+    selected_metadata_tail = content.split('"Selected plot metadata": mo.md(', 1)[1]
+    selected_metadata_block = selected_metadata_tail.split(")", 1)[0]
+    assert '"\\n".join(' in selected_metadata_block
+    assert '"\\\\n".join(' not in selected_metadata_block
+
+    export_behavior_tail = content.split('"Export behavior": mo.md(', 1)[1]
+    export_behavior_block = export_behavior_tail.split(")", 1)[0]
+    assert '"\\n".join(' in export_behavior_block
+    assert '"\\\\n".join(' not in export_behavior_block
+
+    dataset_export_tail = content.split('"Dataset export details": mo.md(', 1)[1]
+    dataset_export_block = dataset_export_tail.split(")", 1)[0]
+    assert '"\\n".join(' in dataset_export_block
+    assert '"\\\\n".join(' not in dataset_export_block
 
 
 def test_notebook_generate_skips_hidden_plot_cache_directories(tmp_path: Path) -> None:
@@ -348,11 +423,14 @@ def test_notebook_generate_baserender_preview_adds_title_and_legend_clearance(tm
     notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
     content = notebook_path.read_text()
 
-    assert '"padding_y": 10.0,' in content
-    assert "_legend_pad_px = 20.0" in content
+    assert '"padding_y": 12.0,' in content
+    assert "_legend_pad_px = 24.0" in content
     assert '"legend_pad_px": _legend_pad_px,' in content
-    assert "_title_y = 0.968" in content
-    assert "_axis.text(" in content
+    assert "_figure.text(" in content
+    assert '_record_id = str(getattr(record, "id", "") or "unknown")' in content
+    assert '_workspace_title = str(workspace_heading or "").strip()' in content
+    assert '_header_text = f"{_workspace_title} | Sequence {_record_display_id}"' in content
+    assert '_header_text = f"{workspace_name} | sequence {_record_display_id}"' not in content
 
 
 def test_notebook_generate_streamlines_summary_and_adds_plot_export_controls(tmp_path: Path) -> None:
@@ -615,7 +693,9 @@ def test_notebook_generate_exports_html_without_cell_execution_errors(tmp_path: 
                 "id": "row1",
                 "sequence": "AAAAAA",
                 "densegen__plan": "demo_plan",
-                "densegen__used_tfbs_detail": [{"tf": "lexA", "orientation": "fwd", "tfbs": "AAA", "offset": 0}],
+                "densegen__used_tfbs_detail": [
+                    {"regulator": "lexA", "orientation": "fwd", "sequence": "AAA", "offset": 0}
+                ],
             }
         ]
     ).to_parquet(tables_dir / "records.parquet", index=False)
@@ -641,6 +721,48 @@ def test_notebook_generate_exports_html_without_cell_execution_errors(tmp_path: 
     assert export_result.returncode == 0, output_text
     assert "MarimoExceptionRaisedError" not in output_text
     assert "cells failed to execute" not in output_text.lower()
+    assert html_out.exists()
+    assert html_out.stat().st_size > 0
+
+
+def test_notebook_generate_exports_html_without_plots_and_without_cell_errors(tmp_path: Path) -> None:
+    import pandas as pd
+
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\n")
+    tables_dir = tmp_path / "outputs" / "tables"
+    tables_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(
+        [
+            {
+                "id": "row1",
+                "sequence": "AAAAAA",
+                "densegen__plan": "demo_plan",
+                "densegen__used_tfbs_detail": [
+                    {"regulator": "lexA", "orientation": "fwd", "sequence": "AAA", "offset": 0}
+                ],
+            }
+        ]
+    ).to_parquet(tables_dir / "records.parquet", index=False)
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["notebook", "generate", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    notebook_path = tmp_path / "outputs" / "notebooks" / "densegen_run_overview.py"
+    assert notebook_path.exists()
+
+    html_out = tmp_path / "densegen_run_overview_no_plots.html"
+    export_result = subprocess.run(
+        [sys.executable, "-m", "marimo", "export", "html", str(notebook_path), "-o", str(html_out)],
+        capture_output=True,
+        text=True,
+    )
+    output_text = export_result.stdout + export_result.stderr
+    assert export_result.returncode == 0, output_text
+    assert "MarimoExceptionRaisedError" not in output_text
+    assert "cells failed to execute" not in output_text.lower()
+    assert "No `outputs/plots/plot_manifest.json` plots found yet. Run `uv run dense plot`." not in output_text
     assert html_out.exists()
     assert html_out.stat().st_size > 0
 

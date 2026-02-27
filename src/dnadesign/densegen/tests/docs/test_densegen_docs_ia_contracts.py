@@ -15,6 +15,8 @@ import re
 from pathlib import Path
 from urllib.parse import urlparse
 
+from dnadesign.baserender import DENSEGEN_TFBS_REQUIRED_KEYS
+
 ROOT = Path(__file__).resolve().parents[2]
 DOCS_ROOT = ROOT / "docs"
 WORKSPACES = ROOT / "workspaces"
@@ -26,6 +28,7 @@ WORKSPACE_IDS = (
     "study_constitutive_sigma_panel",
     "study_stress_ethanol_cipro",
 )
+SIGMA70_LITERAL_SOURCE_CITATION = "DOI: 10.1038/s41467-017-02473-5 | www.nature.com/naturecommunications"
 
 
 def _read(path: Path) -> str:
@@ -198,3 +201,23 @@ def test_densegen_markdown_heading_levels_use_single_h2_root() -> None:
         assert levels[0] == 2, f"{path}: first heading must be level-2 (##)"
         assert levels.count(2) == 1, f"{path}: only one level-2 heading is allowed"
         assert all(level >= 2 for level in levels), f"{path}: level-1 headings are not allowed"
+
+
+def test_sigma70_literal_docs_include_source_citation() -> None:
+    targets = (
+        WORKSPACES / "study_constitutive_sigma_panel" / "runbook.md",
+        WORKSPACES / "study_stress_ethanol_cipro" / "runbook.md",
+        DOCS_ROOT / "tutorials" / "study_constitutive_sigma_panel.md",
+        DOCS_ROOT / "tutorials" / "study_stress_ethanol_cipro.md",
+    )
+    for path in targets:
+        content = _read(path)
+        assert SIGMA70_LITERAL_SOURCE_CITATION in content, f"{path}: missing sigma70 literal source citation"
+
+
+def test_outputs_reference_documents_strict_notebook_render_contract() -> None:
+    content = _read(DOCS_ROOT / "reference" / "outputs.md")
+    assert "Adapter policy contract: `on_invalid_row=error`" in content
+    assert "Required TFBS entry keys inside `densegen__used_tfbs_detail`" in content
+    for key in DENSEGEN_TFBS_REQUIRED_KEYS:
+        assert f"`{key}`" in content

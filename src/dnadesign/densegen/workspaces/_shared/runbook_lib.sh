@@ -16,6 +16,7 @@ densegen_runbook_main() {
   local runner=""
   local ensure_usr_registry="false"
   local require_fimo="false"
+  local analysis_only="false"
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -38,6 +39,10 @@ densegen_runbook_main() {
       --require-fimo)
         require_fimo="$2"
         shift 2
+        ;;
+      --analysis-only)
+        analysis_only="true"
+        shift
         ;;
       *)
         echo "Unknown densegen_runbook_main option: $1" >&2
@@ -94,22 +99,44 @@ densegen_runbook_main() {
     pixi run fimo --version
   fi
 
-  "${dense_cmd[@]}" validate-config --probe-solver -c "$config"
+  if [[ "$analysis_only" == "true" ]]; then
+    local records_table
+    records_table="$(dirname "$config")/outputs/tables/records.parquet"
+    if [[ ! -f "$records_table" ]]; then
+      echo "Analysis-only mode requires existing outputs at: $records_table" >&2
+      echo "Run ./runbook.sh first to generate artifacts, then rerun with --analysis-only." >&2
+      return 2
+    fi
+    set +e
+    "${dense_cmd[@]}" inspect run --events --library -c "$config"
+    local inspect_status=$?
+    set -e
+    if [[ $inspect_status -ne 0 ]]; then
+      echo "Analysis-only inspection failed. Existing artifacts may be stale or schema-incompatible." >&2
+      echo "Run ./runbook.sh for a fresh generation, then retry --analysis-only." >&2
+      return "$inspect_status"
+    fi
+    "${dense_cmd[@]}" plot -c "$config"
+    "${dense_cmd[@]}" notebook generate --force -c "$config"
+  else
+    "${dense_cmd[@]}" validate-config --probe-solver -c "$config"
 
-  set +e
-  "${dense_cmd[@]}" run --fresh --no-plot -c "$config"
-  local run_status=$?
-  set -e
+    set +e
+    "${dense_cmd[@]}" run --fresh --no-plot -c "$config"
+    local run_status=$?
+    set -e
 
-  "${dense_cmd[@]}" inspect run --events --library -c "$config"
+    "${dense_cmd[@]}" inspect run --events --library -c "$config"
 
-  if [[ $run_status -ne 0 ]]; then
-    echo "dense run exited with status $run_status. inspect output above summarizes generated state." >&2
-    return "$run_status"
+    if [[ $run_status -ne 0 ]]; then
+      echo "dense run exited with status $run_status. inspect output above summarizes generated state." >&2
+      return "$run_status"
+    fi
+
+    "${dense_cmd[@]}" plot -c "$config"
+    "${dense_cmd[@]}" notebook generate -c "$config"
   fi
 
-  "${dense_cmd[@]}" plot -c "$config"
-  "${dense_cmd[@]}" notebook generate -c "$config"
   if [[ ! -f "$notebook" ]]; then
     echo "DenseGen notebook was not generated at: $notebook" >&2
     return 2

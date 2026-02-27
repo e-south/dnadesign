@@ -26,6 +26,17 @@ def test_cli_commands_dataset_helpers_available() -> None:
     assert hasattr(module, "resolve_existing_dataset_id")
 
 
+def test_cli_deps_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.deps")
+    assert hasattr(module, "build_read_view_deps")
+    assert hasattr(module, "build_runtime_deps")
+    assert hasattr(module, "build_materialize_deps")
+    assert hasattr(module, "build_maintenance_deps")
+    assert hasattr(module, "build_merge_deps")
+    assert hasattr(module, "build_namespace_deps")
+    assert hasattr(module, "build_tooling_deps")
+
+
 def test_cli_paths_module_exports_expected_symbols() -> None:
     module = importlib.import_module("dnadesign.usr.src.cli_paths")
     assert hasattr(module, "assert_supported_root")

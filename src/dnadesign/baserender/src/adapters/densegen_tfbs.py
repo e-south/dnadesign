@@ -236,9 +236,11 @@ class DensegenTfbsAdapter:
             sequence_literal = str(entry.get("sequence") or "").strip().upper()
             if sequence_literal == "":
                 raise SchemaError("DenseGen fixed-element entry is missing non-empty sequence")
-            start_raw = entry.get("offset")
+            start_raw = entry.get("offset_raw")
             if start_raw is None:
-                raise SchemaError("DenseGen fixed-element entry is missing offset")
+                start_raw = entry.get("offset")
+            if start_raw is None:
+                raise SchemaError("DenseGen fixed-element entry is missing offset or offset_raw")
             start = int(start_raw)
             end = start + len(sequence_literal)
             if start < 0 or end > len(seq_u):
