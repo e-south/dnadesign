@@ -13,7 +13,7 @@ This is the canonical docs entrypoint. Keep curated navigation here.
 - [RELIABILITY.md](../RELIABILITY.md): fail-fast model, observability, and operations map.
 - [PLANS.md](../PLANS.md): proposal, execution-plan, and ADR lifecycle.
 - [QUALITY_SCORE.md](../QUALITY_SCORE.md): quality rubric scaffold and improvement path.
-- [AGENTS.md](../AGENTS.md): contributor/agent task map and operational entrypoints.
+- [AGENTS.md](../AGENTS.md): contributor task map and operational entrypoints.
 - [docs/architecture/README.md](architecture/README.md): architecture-specific references and decisions.
 - [docs/security/README.md](security/README.md): security references and runbooks.
 - [docs/reliability/README.md](reliability/README.md): reliability references and runbooks.
@@ -45,6 +45,15 @@ This is the canonical docs entrypoint. Keep curated navigation here.
 - [Developer docs index](dev/README.md)
 - [Developer journal](dev/journal.md)
 - [CI workflow](../.github/workflows/ci.yaml)
+
+## Progressive workflows
+
+- USR sync (quick -> advanced -> failure diagnosis): [src/dnadesign/usr/docs/operations/sync.md](../src/dnadesign/usr/docs/operations/sync.md)
+- USR HPC sync flow (preflight -> run -> verify): [src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md](../src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md)
+- USR chained DenseGen+Infer loop (batch -> pull -> infer -> push): [src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-demo.md](../src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-demo.md)
+- BU SCC batch + Notify operations: [bu-scc/batch-notify.md](bu-scc/batch-notify.md)
+- DenseGen SCC workflow reference: [src/dnadesign/densegen/docs/howto/bu-scc.md](../src/dnadesign/densegen/docs/howto/bu-scc.md)
+- Infer CLI and runtime contract: [src/dnadesign/infer/README.md](../src/dnadesign/infer/README.md)
 
 ## Tool docs
 

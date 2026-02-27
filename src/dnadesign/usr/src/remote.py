@@ -16,8 +16,8 @@ import re
 import shlex
 import subprocess
 from contextlib import contextmanager
-from dataclasses import dataclass
-from pathlib import Path
+from dataclasses import dataclass, field
+from pathlib import Path, PurePosixPath
 from typing import Iterator, List, Optional, Tuple
 
 from .config import SSHRemoteConfig
@@ -39,7 +39,10 @@ class RemoteDatasetStat:
     primary: RemotePrimaryStat
     meta_mtime: Optional[str]
     events_lines: int
-    snapshot_names: List[str]  # e.g., ["records-20250101T120030.parquet", "records-20250101T120030123456.parquet"]
+    snapshot_names: List[str] = field(default_factory=list)
+    derived_files: List[str] = field(default_factory=list)
+    derived_hashes: dict[str, str] = field(default_factory=dict)
+    aux_files: List[str] = field(default_factory=list)
 
 
 class SSHRemote:
@@ -224,14 +227,62 @@ class SSHRemote:
         pat = re.compile(r"^records-\d{8}T\d{6,}\.parquet$")
         return [n for n in names if pat.match(n)]
 
+    def _remote_list_derived_files(self, derived_dir: str) -> List[str]:
+        # Returns file inventory relative to _derived for overlay-fidelity diffing.
+        rc, out, _ = self._ssh_run(
+            f"cd {shlex.quote(derived_dir)} 2>/dev/null && find . -type f -print",
+            check=False,
+        )
+        if rc != 0 or not out.strip():
+            return []
+        files = [line.strip() for line in out.splitlines() if line.strip()]
+        normalized = [item[2:] if item.startswith("./") else item for item in files]
+        return sorted(normalized)
+
+    def _remote_list_aux_files(self, dataset_dir: str) -> List[str]:
+        # Returns non-core file inventory relative to dataset root for full-fidelity sync planning.
+        rc, out, _ = self._ssh_run(
+            "cd "
+            + shlex.quote(dataset_dir)
+            + " 2>/dev/null && find . -type f "
+            + "! -path './records.parquet' "
+            + "! -path './meta.md' "
+            + "! -path './.events.log' "
+            + "! -path './.usr.lock' "
+            + "! -path './_snapshots/*' "
+            + "! -path './_derived/*' "
+            + "-print",
+            check=False,
+        )
+        if rc != 0 or not out.strip():
+            return []
+        files = [line.strip() for line in out.splitlines() if line.strip()]
+        normalized = [item[2:] if item.startswith("./") else item for item in files]
+        return sorted(normalized)
+
+    def _remote_hash_derived_files(self, derived_dir: str, derived_files: List[str]) -> dict[str, str]:
+        hashes: dict[str, str] = {}
+        for rel in derived_files:
+            full_path = str(PurePosixPath(derived_dir).joinpath(rel))
+            sha = self._remote_sha256(full_path)
+            if not sha:
+                raise RemoteUnavailableError(
+                    "verify-derived-hashes requires remote sha256 support (sha256sum or shasum)."
+                )
+            hashes[rel] = sha
+        return hashes
+
     # ---- Public: stat/pull/push ----
 
-    def stat_dataset(self, dataset: str, *, verify: str = "auto") -> RemoteDatasetStat:
+    def stat_dataset(
+        self, dataset: str, *, verify: str = "auto", include_derived_hashes: bool = False
+    ) -> RemoteDatasetStat:
         base = self.cfg.dataset_path(dataset)
         primary = f"{base}/records.parquet"
         meta = f"{base}/meta.md"
         events = f"{base}/.events.log"
         snaps_d = f"{base}/_snapshots"
+        derived_d = f"{base}/_derived"
 
         exists, size_b, mtime = self._remote_stat_file(primary)
         sha = rows = cols = None
@@ -249,6 +300,9 @@ class SSHRemote:
         evt_lines = self._remote_wc_lines(events)
 
         snapshot_names = self._remote_list_snapshots(snaps_d)
+        derived_files = self._remote_list_derived_files(derived_d)
+        derived_hashes = self._remote_hash_derived_files(derived_d, derived_files) if include_derived_hashes else {}
+        aux_files = self._remote_list_aux_files(base)
 
         return RemoteDatasetStat(
             primary=RemotePrimaryStat(
@@ -262,6 +316,9 @@ class SSHRemote:
             meta_mtime=meta_mtime,
             events_lines=evt_lines,
             snapshot_names=snapshot_names,
+            derived_files=derived_files,
+            derived_hashes=derived_hashes,
+            aux_files=aux_files,
         )
 
     def stat_file(self, remote_path: str, *, verify: str = "auto") -> RemotePrimaryStat:

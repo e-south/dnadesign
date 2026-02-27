@@ -205,6 +205,7 @@ def test_cmd_pull_accepts_namespaced_dataset_id_when_local_dataset_missing(tmp_p
         dry_run=False,
         yes=True,
         verify_sidecars=False,
+        no_verify_sidecars=True,
     )
 
     sync_commands.cmd_pull(args)
@@ -258,6 +259,211 @@ def test_cmd_pull_passes_verify_sidecars_option(tmp_path: Path, monkeypatch) -> 
     assert getattr(captured["opts"], "verify_sidecars", None) is True
 
 
+def test_cmd_pull_dataset_defaults_to_hash_and_strict_sidecars(tmp_path: Path, monkeypatch) -> None:
+    summary = SimpleNamespace(has_change=False, verify_notes=[])
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(sync_commands, "plan_diff", lambda *_args, **_kwargs: summary)
+    monkeypatch.setattr(sync_commands, "_print_verify_notes", lambda _summary: None)
+    monkeypatch.setattr(sync_commands, "_print_diff", lambda _summary, *, use_rich=None: None)
+    monkeypatch.setattr(sync_commands, "_confirm_or_abort", lambda _summary, *, assume_yes: None)
+
+    def _fake_execute_pull(root: Path, dataset: str, remote_name: str, opts):
+        captured["root"] = root
+        captured["dataset"] = dataset
+        captured["remote"] = remote_name
+        captured["opts"] = opts
+        return summary
+
+    monkeypatch.setattr(sync_commands, "execute_pull", _fake_execute_pull)
+
+    args = SimpleNamespace(
+        dataset="densegen/demo_hpc_remote_only",
+        remote="bu-scc",
+        root=tmp_path / "usr_root",
+        rich=False,
+        repo_root=None,
+        remote_path=None,
+        primary_only=False,
+        skip_snapshots=False,
+        dry_run=False,
+        yes=True,
+    )
+
+    sync_commands.cmd_pull(args)
+
+    assert getattr(captured["opts"], "verify", None) == "hash"
+    assert getattr(captured["opts"], "verify_sidecars", None) is True
+
+
+def test_cmd_pull_dataset_supports_no_verify_sidecars_opt_out(tmp_path: Path, monkeypatch) -> None:
+    summary = SimpleNamespace(has_change=False, verify_notes=[])
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(sync_commands, "plan_diff", lambda *_args, **_kwargs: summary)
+    monkeypatch.setattr(sync_commands, "_print_verify_notes", lambda _summary: None)
+    monkeypatch.setattr(sync_commands, "_print_diff", lambda _summary, *, use_rich=None: None)
+    monkeypatch.setattr(sync_commands, "_confirm_or_abort", lambda _summary, *, assume_yes: None)
+
+    def _fake_execute_pull(root: Path, dataset: str, remote_name: str, opts):
+        captured["root"] = root
+        captured["dataset"] = dataset
+        captured["remote"] = remote_name
+        captured["opts"] = opts
+        return summary
+
+    monkeypatch.setattr(sync_commands, "execute_pull", _fake_execute_pull)
+
+    args = SimpleNamespace(
+        dataset="densegen/demo_hpc_remote_only",
+        remote="bu-scc",
+        root=tmp_path / "usr_root",
+        rich=False,
+        repo_root=None,
+        remote_path=None,
+        primary_only=False,
+        skip_snapshots=False,
+        dry_run=False,
+        yes=True,
+        no_verify_sidecars=True,
+    )
+
+    sync_commands.cmd_pull(args)
+
+    assert getattr(captured["opts"], "verify", None) == "hash"
+    assert getattr(captured["opts"], "verify_sidecars", None) is False
+
+
+def test_cmd_pull_file_mode_defaults_to_hash_and_sidecars_off(tmp_path: Path, monkeypatch) -> None:
+    file_target = tmp_path / "records.parquet"
+    file_target.write_text("stub", encoding="utf-8")
+
+    summary = SimpleNamespace(has_change=False, verify_notes=[])
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(sync_commands, "plan_diff_file", lambda *_args, **_kwargs: summary)
+    monkeypatch.setattr(sync_commands, "_print_verify_notes", lambda _summary: None)
+    monkeypatch.setattr(sync_commands, "_print_diff", lambda _summary, *, use_rich=None: None)
+    monkeypatch.setattr(sync_commands, "_confirm_or_abort", lambda _summary, *, assume_yes: None)
+    monkeypatch.setattr(sync_commands, "_resolve_remote_path_for_file", lambda *_args, **_kwargs: "/remote/records")
+
+    def _fake_execute_pull_file(local_file: Path, remote_name: str, remote_path: str, opts):
+        captured["local_file"] = local_file
+        captured["remote"] = remote_name
+        captured["remote_path"] = remote_path
+        captured["opts"] = opts
+        return summary
+
+    monkeypatch.setattr(sync_commands, "execute_pull_file", _fake_execute_pull_file)
+
+    args = SimpleNamespace(
+        dataset=str(file_target),
+        remote="bu-scc",
+        root=tmp_path / "usr_root",
+        rich=False,
+        repo_root=None,
+        remote_path=None,
+        primary_only=False,
+        skip_snapshots=False,
+        dry_run=False,
+        yes=True,
+    )
+
+    sync_commands.cmd_pull(args)
+
+    assert getattr(captured["opts"], "verify", None) == "hash"
+    assert getattr(captured["opts"], "verify_sidecars", None) is False
+
+
+def test_cmd_pull_rejects_conflicting_sidecar_flags(tmp_path: Path) -> None:
+    args = SimpleNamespace(
+        dataset="densegen/demo_hpc_remote_only",
+        remote="bu-scc",
+        verify="hash",
+        root=tmp_path / "usr_root",
+        rich=False,
+        repo_root=None,
+        remote_path=None,
+        primary_only=False,
+        skip_snapshots=False,
+        dry_run=False,
+        yes=True,
+        verify_sidecars=True,
+        no_verify_sidecars=True,
+    )
+
+    try:
+        sync_commands.cmd_pull(args)
+    except SystemExit as exc:
+        assert "Cannot combine --verify-sidecars and --no-verify-sidecars" in str(exc)
+        return
+    raise AssertionError("expected conflicting sidecar flags to fail fast")
+
+
+def test_cmd_pull_passes_verify_derived_hashes_option(tmp_path: Path, monkeypatch) -> None:
+    summary = SimpleNamespace(has_change=False, verify_notes=[])
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(sync_commands, "plan_diff", lambda *_args, **_kwargs: summary)
+    monkeypatch.setattr(sync_commands, "_print_verify_notes", lambda _summary: None)
+    monkeypatch.setattr(sync_commands, "_print_diff", lambda _summary, *, use_rich=None: None)
+    monkeypatch.setattr(sync_commands, "_confirm_or_abort", lambda _summary, *, assume_yes: None)
+
+    def _fake_execute_pull(root: Path, dataset: str, remote_name: str, opts):
+        captured["root"] = root
+        captured["dataset"] = dataset
+        captured["remote"] = remote_name
+        captured["opts"] = opts
+        return summary
+
+    monkeypatch.setattr(sync_commands, "execute_pull", _fake_execute_pull)
+
+    args = SimpleNamespace(
+        dataset="densegen/demo_hpc_remote_only",
+        remote="bu-scc",
+        root=tmp_path / "usr_root",
+        rich=False,
+        repo_root=None,
+        remote_path=None,
+        primary_only=False,
+        skip_snapshots=False,
+        dry_run=False,
+        yes=True,
+        verify_derived_hashes=True,
+    )
+
+    sync_commands.cmd_pull(args)
+
+    assert getattr(captured["opts"], "verify", None) == "hash"
+    assert getattr(captured["opts"], "verify_sidecars", None) is True
+    assert getattr(captured["opts"], "verify_derived_hashes", None) is True
+
+
+def test_cmd_pull_rejects_verify_derived_hashes_with_no_verify_sidecars(tmp_path: Path) -> None:
+    args = SimpleNamespace(
+        dataset="densegen/demo_hpc_remote_only",
+        remote="bu-scc",
+        verify="hash",
+        root=tmp_path / "usr_root",
+        rich=False,
+        repo_root=None,
+        remote_path=None,
+        primary_only=False,
+        skip_snapshots=False,
+        dry_run=False,
+        yes=True,
+        no_verify_sidecars=True,
+        verify_derived_hashes=True,
+    )
+
+    try:
+        sync_commands.cmd_pull(args)
+    except SystemExit as exc:
+        assert "requires sidecar verification" in str(exc)
+        return
+    raise AssertionError("expected verify-derived-hashes with no-verify-sidecars to fail fast")
+
+
 def test_cmd_pull_sync_audit_uses_post_execution_summary(tmp_path: Path, monkeypatch) -> None:
     pre_summary = SimpleNamespace(has_change=True, verify_notes=[])
     post_summary = SimpleNamespace(has_change=False, verify_notes=[])
@@ -271,7 +477,9 @@ def test_cmd_pull_sync_audit_uses_post_execution_summary(tmp_path: Path, monkeyp
     monkeypatch.setattr(
         sync_commands,
         "_print_sync_audit",
-        lambda summary, *, action, dry_run, verify_sidecars: captured.update({"summary": summary, "action": action}),
+        lambda summary, *, action, dry_run, verify_sidecars, verify_derived_hashes: captured.update(
+            {"summary": summary, "action": action}
+        ),
     )
 
     args = SimpleNamespace(
@@ -309,7 +517,9 @@ def test_cmd_push_sync_audit_uses_post_execution_summary(tmp_path: Path, monkeyp
     monkeypatch.setattr(
         sync_commands,
         "_print_sync_audit",
-        lambda summary, *, action, dry_run, verify_sidecars: captured.update({"summary": summary, "action": action}),
+        lambda summary, *, action, dry_run, verify_sidecars, verify_derived_hashes: captured.update(
+            {"summary": summary, "action": action}
+        ),
     )
 
     args = SimpleNamespace(

@@ -30,6 +30,7 @@ from ..sync import (
 )
 from ..ui import render_diff_rich
 from .datasets import resolve_dataset_name_interactive
+from .sync_policy import resolve_sync_verify, resolve_verify_derived_hashes, resolve_verify_sidecars
 
 
 def _print_diff(summary, *, use_rich: bool | None = None) -> None:
@@ -46,6 +47,11 @@ def _print_diff(summary, *, use_rich: bool | None = None) -> None:
         render_diff_rich(summary)
         return
     pl, pr = summary.primary_local, summary.primary_remote
+    changes = dict(getattr(summary, "changes", {}) or {})
+    derived_local = len(getattr(summary, "derived_local_files", []) or [])
+    derived_remote = len(getattr(summary, "derived_remote_files", []) or [])
+    aux_local = len(getattr(summary, "aux_local_files", []) or [])
+    aux_remote = len(getattr(summary, "aux_remote_files", []) or [])
     print(f"Dataset: {summary.dataset}")
 
     local_line = f"Local  : {pl.sha256 or '?'}  size={fmt_sz(pl.size)}  rows={pl.rows or '?'}  cols={pl.cols or '?'}"
@@ -65,6 +71,16 @@ def _print_diff(summary, *, use_rich: bool | None = None) -> None:
         f"(+{delta_evt} on remote)"
     )
     print(f"_snapshots : remote_count={summary.snapshots.count}  newer_than_local={summary.snapshots.newer_than_local}")
+    print(
+        "_derived   : "
+        f"{'changed' if changes.get('derived_files_diff') else 'unchanged'}  "
+        f"local_files={derived_local}  remote_files={derived_remote}"
+    )
+    print(
+        "_auxiliary : "
+        f"{'changed' if changes.get('aux_files_diff') else 'unchanged'}  "
+        f"local_files={aux_local}  remote_files={aux_remote}"
+    )
     print("Status     :", "CHANGES" if summary.has_change else "up-to-date")
     print("Verify     :", summary.verify_mode)
 
@@ -86,7 +102,9 @@ def _confirm_or_abort(summary, *, assume_yes: bool) -> None:
         raise UserAbort("User cancelled.")
 
 
-def _print_sync_audit(summary, *, action: str, dry_run: bool, verify_sidecars: bool) -> None:
+def _print_sync_audit(
+    summary, *, action: str, dry_run: bool, verify_sidecars: bool, verify_derived_hashes: bool
+) -> None:
     has_change = bool(getattr(summary, "has_change", False))
     transfer_state = "DRY-RUN" if dry_run else ("TRANSFERRED" if has_change else "NO-OP")
     dataset_name = str(getattr(summary, "dataset", "<unknown>"))
@@ -98,9 +116,19 @@ def _print_sync_audit(summary, *, action: str, dry_run: bool, verify_sidecars: b
     snapshot_count = int(getattr(snapshots, "count", 0)) if snapshots is not None else 0
     snapshots_newer = int(getattr(snapshots, "newer_than_local", 0)) if snapshots is not None else 0
     snapshots_changed = bool(changes.get("snapshots_name_diff")) or snapshots_newer > 0
+    derived_local = len(getattr(summary, "derived_local_files", []) or [])
+    derived_remote = len(getattr(summary, "derived_remote_files", []) or [])
+    derived_changed = bool(changes.get("derived_files_diff"))
+    aux_local = len(getattr(summary, "aux_local_files", []) or [])
+    aux_remote = len(getattr(summary, "aux_remote_files", []) or [])
+    aux_changed = bool(changes.get("aux_files_diff"))
     print(f"{action.upper()} audit: {transfer_state}")
     print(f"Dataset    : {dataset_name}")
-    print(f"Verify     : primary={verify_mode} sidecars={'strict' if verify_sidecars else 'off'}")
+    print(
+        "Verify     : "
+        f"primary={verify_mode} sidecars={'strict' if verify_sidecars else 'off'} "
+        f"derived_hashes={'on' if verify_derived_hashes else 'off'}"
+    )
     print(f"Primary    : {'changed' if changes.get('primary_sha_diff') else 'unchanged'}")
     print(f"meta.md    : {'changed' if changes.get('meta_mtime_diff') else 'unchanged'}")
     print(f".events.log: local={events_local}  remote={events_remote}")
@@ -109,16 +137,26 @@ def _print_sync_audit(summary, *, action: str, dry_run: bool, verify_sidecars: b
         f"{'changed' if snapshots_changed else 'unchanged'}  "
         f"remote_count={snapshot_count}  newer_than_local={snapshots_newer}"
     )
+    print(
+        "_derived   : "
+        f"{'changed' if derived_changed else 'unchanged'}  "
+        f"local_files={derived_local}  remote_files={derived_remote}"
+    )
+    print(
+        f"_auxiliary : {'changed' if aux_changed else 'unchanged'}  local_files={aux_local}  remote_files={aux_remote}"
+    )
 
 
-def _opts_from_args(args) -> SyncOptions:
+def _opts_from_args(args, *, file_mode: bool) -> SyncOptions:
+    verify_sidecars = resolve_verify_sidecars(args, file_mode=file_mode)
     return SyncOptions(
         primary_only=bool(args.primary_only),
         skip_snapshots=bool(args.skip_snapshots),
         dry_run=bool(args.dry_run),
         assume_yes=bool(args.yes),
-        verify=str(getattr(args, "verify", "auto")),
-        verify_sidecars=bool(getattr(args, "verify_sidecars", False)),
+        verify=resolve_sync_verify(args),
+        verify_sidecars=verify_sidecars,
+        verify_derived_hashes=resolve_verify_derived_hashes(args, file_mode=file_mode, verify_sidecars=verify_sidecars),
     )
 
 
@@ -255,15 +293,16 @@ def cmd_diff(
 ) -> None:
     fmt = resolve_output_format(args)
     target = args.dataset
+    verify = resolve_sync_verify(args)
     if _is_file_mode_target(target):
         local_file = Path(target).resolve()
         if local_file.is_dir():
             raise SystemExit("FILE mode: pass a file path, not a directory.")
         remote_path = _resolve_remote_path_for_file(local_file, args)
-        summary = plan_diff_file(local_file, args.remote, remote_path=remote_path, verify=args.verify)
+        summary = plan_diff_file(local_file, args.remote, remote_path=remote_path, verify=verify)
     elif _is_dataset_dir_target(target):
         dataset_root, dataset = _resolve_dataset_dir_target(Path(target), Path(args.root))
-        summary = plan_diff(dataset_root, dataset, args.remote, verify=args.verify)
+        summary = plan_diff(dataset_root, dataset, args.remote, verify=verify)
     else:
         ds_name = _resolve_dataset_id_for_diff_or_pull(
             Path(args.root),
@@ -272,7 +311,7 @@ def cmd_diff(
         )
         if not ds_name:
             return
-        summary = plan_diff(args.root, ds_name, args.remote, verify=args.verify)
+        summary = plan_diff(args.root, ds_name, args.remote, verify=verify)
     if fmt == "json":
         print_json({"usr_output_version": output_version, "data": asdict(summary)})
         return
@@ -280,124 +319,118 @@ def cmd_diff(
     _print_diff(summary, use_rich=(fmt == "rich"))
 
 
-def cmd_pull(args) -> None:
+def _assert_dataset_only_flags_for_file_mode(args) -> None:
+    if (
+        args.primary_only
+        or args.skip_snapshots
+        or bool(getattr(args, "verify_sidecars", False))
+        or bool(getattr(args, "no_verify_sidecars", False))
+        or bool(getattr(args, "verify_derived_hashes", False))
+    ):
+        raise SystemExit(
+            "--primary-only/--skip-snapshots/--verify-sidecars/--no-verify-sidecars/--verify-derived-hashes are dataset-only flags (not valid in FILE mode)."  # noqa
+        )
+
+
+def _run_file_sync(args, *, action: str, execute_file: Callable) -> None:
+    _assert_dataset_only_flags_for_file_mode(args)
+    local_file = Path(args.dataset).resolve()
+    if local_file.is_dir():
+        raise SystemExit("FILE mode: pass a file path, not a directory.")
+    remote_path = _resolve_remote_path_for_file(local_file, args)
+    opts = _opts_from_args(args, file_mode=True)
+    summary = plan_diff_file(local_file, args.remote, remote_path=remote_path, verify=opts.verify)
+    _print_verify_notes(summary)
+    _print_diff(summary, use_rich=bool(getattr(args, "rich", False)))
+    _confirm_or_abort(summary, assume_yes=bool(args.yes))
+    summary = execute_file(local_file, args.remote, remote_path, opts)
+    _print_sync_audit(
+        summary,
+        action=action,
+        dry_run=bool(args.dry_run),
+        verify_sidecars=False,
+        verify_derived_hashes=False,
+    )
+
+
+def _resolve_pull_dataset_target(args) -> tuple[Path, str] | None:
     target = args.dataset
-    if _is_file_mode_target(target):
-        if args.primary_only or args.skip_snapshots or bool(getattr(args, "verify_sidecars", False)):
-            raise SystemExit(
-                "--primary-only/--skip-snapshots/--verify-sidecars are dataset-only flags (not valid in FILE mode)."
-            )
-        local_file = Path(target).resolve()
-        if local_file.is_dir():
-            raise SystemExit("FILE mode: pass a file path, not a directory.")
-        remote_path = _resolve_remote_path_for_file(local_file, args)
-        summary = plan_diff_file(local_file, args.remote, remote_path=remote_path, verify=args.verify)
-        _print_verify_notes(summary)
-        _print_diff(summary, use_rich=bool(getattr(args, "rich", False)))
-        _confirm_or_abort(summary, assume_yes=bool(args.yes))
-        summary = execute_pull_file(local_file, args.remote, remote_path, _opts_from_args(args))
-        _print_sync_audit(
-            summary,
-            action="pull",
-            dry_run=bool(args.dry_run),
-            verify_sidecars=False,
-        )
-    elif _is_dataset_dir_target(target):
-        dataset_root, dataset = _resolve_dataset_dir_target(Path(target), Path(args.root))
-        summary = plan_diff(dataset_root, dataset, args.remote, verify=args.verify)
-        _print_verify_notes(summary)
-        _print_diff(summary, use_rich=bool(getattr(args, "rich", False)))
-        _confirm_or_abort(summary, assume_yes=bool(args.yes))
-        summary = execute_pull(dataset_root, dataset, args.remote, _opts_from_args(args))
-        _print_sync_audit(
-            summary,
-            action="pull",
-            dry_run=bool(args.dry_run),
-            verify_sidecars=bool(getattr(args, "verify_sidecars", False)),
-        )
-    else:
-        root = Path(args.root)
-        if _strict_bootstrap_id_enabled(args):
-            _enforce_strict_bootstrap_dataset_id(
-                root,
-                str(getattr(args, "dataset", "")),
-                use_rich=bool(getattr(args, "rich", False)),
-            )
-        ds_name = _resolve_dataset_id_for_diff_or_pull(
+    if _is_dataset_dir_target(target):
+        return _resolve_dataset_dir_target(Path(target), Path(args.root))
+    root = Path(args.root)
+    if _strict_bootstrap_id_enabled(args):
+        _enforce_strict_bootstrap_dataset_id(
             root,
-            getattr(args, "dataset", None),
+            str(getattr(args, "dataset", "")),
             use_rich=bool(getattr(args, "rich", False)),
         )
-        if not ds_name:
-            return
-        summary = plan_diff(args.root, ds_name, args.remote, verify=args.verify)
-        _print_verify_notes(summary)
-        _print_diff(summary, use_rich=bool(getattr(args, "rich", False)))
-        _confirm_or_abort(summary, assume_yes=bool(args.yes))
-        summary = execute_pull(args.root, ds_name, args.remote, _opts_from_args(args))
-        _print_sync_audit(
-            summary,
+    ds_name = _resolve_dataset_id_for_diff_or_pull(
+        root,
+        getattr(args, "dataset", None),
+        use_rich=bool(getattr(args, "rich", False)),
+    )
+    if not ds_name:
+        return None
+    return root, ds_name
+
+
+def _resolve_push_dataset_target(args) -> tuple[Path, str] | None:
+    target = args.dataset
+    if _is_dataset_dir_target(target):
+        return _resolve_dataset_dir_target(Path(target), Path(args.root))
+    ds_name = resolve_dataset_name_interactive(
+        args.root,
+        getattr(args, "dataset", None),
+        bool(getattr(args, "rich", False)),
+    )
+    if not ds_name:
+        return None
+    return Path(args.root), ds_name
+
+
+def _run_dataset_sync(args, *, action: str, resolve_target: Callable, execute_dataset: Callable) -> None:
+    resolved = resolve_target(args)
+    if not resolved:
+        return
+    dataset_root, dataset = resolved
+    opts = _opts_from_args(args, file_mode=False)
+    summary = plan_diff(dataset_root, dataset, args.remote, verify=opts.verify)
+    _print_verify_notes(summary)
+    _print_diff(summary, use_rich=bool(getattr(args, "rich", False)))
+    _confirm_or_abort(summary, assume_yes=bool(args.yes))
+    summary = execute_dataset(dataset_root, dataset, args.remote, opts)
+    _print_sync_audit(
+        summary,
+        action=action,
+        dry_run=bool(args.dry_run),
+        verify_sidecars=opts.verify_sidecars,
+        verify_derived_hashes=opts.verify_derived_hashes,
+    )
+
+
+def cmd_pull(args) -> None:
+    if _is_file_mode_target(args.dataset):
+        _run_file_sync(args, action="pull", execute_file=execute_pull_file)
+    else:
+        _run_dataset_sync(
+            args,
             action="pull",
-            dry_run=bool(args.dry_run),
-            verify_sidecars=bool(getattr(args, "verify_sidecars", False)),
+            resolve_target=_resolve_pull_dataset_target,
+            execute_dataset=execute_pull,
         )
     if not args.dry_run:
         print("Pull complete.")
 
 
 def cmd_push(args) -> None:
-    target = args.dataset
-    if _is_file_mode_target(target):
-        if args.primary_only or args.skip_snapshots or bool(getattr(args, "verify_sidecars", False)):
-            raise SystemExit(
-                "--primary-only/--skip-snapshots/--verify-sidecars are dataset-only flags (not valid in FILE mode)."
-            )
-        local_file = Path(target).resolve()
-        if local_file.is_dir():
-            raise SystemExit("FILE mode: pass a file path, not a directory.")
-        remote_path = _resolve_remote_path_for_file(local_file, args)
-        summary = plan_diff_file(local_file, args.remote, remote_path=remote_path, verify=args.verify)
-        _print_verify_notes(summary)
-        _print_diff(summary, use_rich=bool(getattr(args, "rich", False)))
-        _confirm_or_abort(summary, assume_yes=bool(args.yes))
-        summary = execute_push_file(local_file, args.remote, remote_path, _opts_from_args(args))
-        _print_sync_audit(
-            summary,
-            action="push",
-            dry_run=bool(args.dry_run),
-            verify_sidecars=False,
-        )
-    elif _is_dataset_dir_target(target):
-        dataset_root, dataset = _resolve_dataset_dir_target(Path(target), Path(args.root))
-        summary = plan_diff(dataset_root, dataset, args.remote, verify=args.verify)
-        _print_verify_notes(summary)
-        _print_diff(summary, use_rich=bool(getattr(args, "rich", False)))
-        _confirm_or_abort(summary, assume_yes=bool(args.yes))
-        summary = execute_push(dataset_root, dataset, args.remote, _opts_from_args(args))
-        _print_sync_audit(
-            summary,
-            action="push",
-            dry_run=bool(args.dry_run),
-            verify_sidecars=bool(getattr(args, "verify_sidecars", False)),
-        )
+    if _is_file_mode_target(args.dataset):
+        _run_file_sync(args, action="push", execute_file=execute_push_file)
     else:
-        ds_name = resolve_dataset_name_interactive(
-            args.root,
-            getattr(args, "dataset", None),
-            bool(getattr(args, "rich", False)),
-        )
-        if not ds_name:
-            return
-        summary = plan_diff(args.root, ds_name, args.remote, verify=args.verify)
-        _print_verify_notes(summary)
-        _print_diff(summary, use_rich=bool(getattr(args, "rich", False)))
-        _confirm_or_abort(summary, assume_yes=bool(args.yes))
-        summary = execute_push(args.root, ds_name, args.remote, _opts_from_args(args))
-        _print_sync_audit(
-            summary,
+        _run_dataset_sync(
+            args,
             action="push",
-            dry_run=bool(args.dry_run),
-            verify_sidecars=bool(getattr(args, "verify_sidecars", False)),
+            resolve_target=_resolve_push_dataset_target,
+            execute_dataset=execute_push,
         )
     if not args.dry_run:
         print("Push complete.")

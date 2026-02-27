@@ -5,6 +5,7 @@
 - [Read order](#read-order)
 - [Integration](#integration)
 - [Operations](#operations)
+- [Progressive workflows](#progressive-workflows)
 
 ## At a glance
 
@@ -56,6 +57,19 @@ Boundary reminder:
 
 ## Operations
 
+- Operations index: [operations/README.md](operations/README.md)
 - Remote sync: [operations/sync.md](operations/sync.md)
   - Progressive disclosure path: Quick path -> Advanced path -> Failure diagnosis
+- HPC sync runbook: [operations/hpc-agent-sync-flow.md](operations/hpc-agent-sync-flow.md)
+- Chained DenseGen+Infer sync demo: [operations/chained-densegen-infer-sync-demo.md](operations/chained-densegen-infer-sync-demo.md)
 - Dev notes: [dev/journal.md](dev/journal.md)
+
+## Progressive workflows
+
+- Start with USR concepts + CLI basics: [../README.md](../README.md)
+- Move to SSH sync mechanics: [operations/sync.md](operations/sync.md)
+- Use the batch-safe operator loop: [operations/hpc-agent-sync-flow.md](operations/hpc-agent-sync-flow.md)
+- Use the chained DenseGen/Infer loop: [operations/chained-densegen-infer-sync-demo.md](operations/chained-densegen-infer-sync-demo.md)
+- Then apply sibling-tool docs:
+  - DenseGen: [../../densegen/README.md](../../densegen/README.md)
+  - Infer: [../../infer/README.md](../../infer/README.md)

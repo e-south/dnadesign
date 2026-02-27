@@ -78,16 +78,40 @@ class _FilesystemRemote:
             rows, cols = int(pf.metadata.num_rows), int(pf.metadata.num_columns)
         return RemotePrimaryStat(True, size, sha, rows, cols, mtime)
 
-    def stat_dataset(self, dataset: str, *, verify: str = "auto") -> RemoteDatasetStat:
+    def stat_dataset(
+        self, dataset: str, *, verify: str = "auto", include_derived_hashes: bool = False
+    ) -> RemoteDatasetStat:
         dataset_dir = self._dataset_dir(dataset)
         records_path = dataset_dir / "records.parquet"
         meta_path = dataset_dir / "meta.md"
         events_path = dataset_dir / ".events.log"
         snapshot_dir = dataset_dir / "_snapshots"
+        derived_dir = dataset_dir / "_derived"
         snapshot_re = re.compile(r"^records-\d{8}T\d{6,}\.parquet$")
         snapshot_names = []
         if snapshot_dir.exists():
             snapshot_names = sorted([item.name for item in snapshot_dir.iterdir() if snapshot_re.match(item.name)])
+        derived_files = []
+        if derived_dir.exists():
+            derived_files = sorted(
+                [item.relative_to(derived_dir).as_posix() for item in derived_dir.rglob("*") if item.is_file()]
+            )
+        derived_hashes = {}
+        if include_derived_hashes:
+            for rel in derived_files:
+                derived_hashes[rel] = _sha256(derived_dir / rel)
+        aux_files = []
+        if dataset_dir.exists():
+            for item in sorted(dataset_dir.rglob("*")):
+                if not item.is_file():
+                    continue
+                rel = item.relative_to(dataset_dir)
+                rel_text = rel.as_posix()
+                if rel_text in {"records.parquet", "meta.md", ".events.log", ".usr.lock"}:
+                    continue
+                if rel.parts and rel.parts[0] in {"_snapshots", "_derived"}:
+                    continue
+                aux_files.append(rel_text)
         events_lines = 0
         if events_path.exists():
             events_lines = sum(1 for _ in events_path.open("rb"))
@@ -97,6 +121,9 @@ class _FilesystemRemote:
             meta_mtime=meta_mtime,
             events_lines=events_lines,
             snapshot_names=snapshot_names,
+            derived_files=derived_files,
+            derived_hashes=derived_hashes,
+            aux_files=sorted(aux_files),
         )
 
     def _copy_dataset(self, src_dir: Path, dst_dir: Path, *, primary_only: bool, skip_snapshots: bool) -> None:
@@ -385,7 +412,6 @@ def test_iterative_cross_location_sidecar_fidelity_for_densegen_infer_updates(
         allow_missing=False,
     )
     local_dataset.log_event("infer_batch_complete", args={"phase": "local"})
-    local_dataset.snapshot()
 
     sync_module.execute_push(local_root, dataset_id, "bu-scc", opts)
     assert _dataset_file_fingerprints(local_dataset_dir, include_events=False) == _dataset_file_fingerprints(
@@ -414,3 +440,200 @@ def test_iterative_cross_location_sidecar_fidelity_for_densegen_infer_updates(
     remote_events_lines = sum(1 for _ in (remote_dataset_dir / ".events.log").open("rb"))
     assert local_events_lines == remote_events_lines + 1
     assert pq.read_table(local_dataset_dir / "records.parquet").num_rows == 3
+
+
+def test_pull_detects_overlay_drift_when_event_sidecar_delta_is_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    local_root = tmp_path / "local_usr"
+    remote_root = tmp_path / "remote_usr"
+    ensure_registry(local_root)
+    ensure_registry(remote_root)
+    register_test_namespace(remote_root, namespace="densegen", columns_spec="densegen__score:float64")
+    register_test_namespace(local_root, namespace="densegen", columns_spec="densegen__score:float64")
+    dataset_id = "densegen/demo_overlay_pull_gap"
+
+    remote_dataset = Dataset(remote_root, dataset_id)
+    remote_dataset.init(source="remote-seed")
+    remote_dataset.import_rows([_row("AAAA", "remote-seed")], source="remote-seed")
+
+    remote_cfg = SSHRemoteConfig(
+        name="bu-scc",
+        host="mock",
+        user="mock",
+        base_dir=str(remote_root),
+    )
+    _FilesystemRemote.fail_next_pull = False
+    _FilesystemRemote.fail_next_push = False
+    _FilesystemRemote.pull_transfer_calls = 0
+    _FilesystemRemote.push_transfer_calls = 0
+    _FilesystemRemote.remote_lock_calls = 0
+    monkeypatch.setattr(sync_module, "get_remote", lambda _name: remote_cfg)
+    monkeypatch.setattr(sync_module, "SSHRemote", _FilesystemRemote)
+
+    opts = sync_module.SyncOptions(verify="auto")
+    sync_module.execute_pull(local_root, dataset_id, "bu-scc", opts)
+    assert _FilesystemRemote.pull_transfer_calls == 1
+
+    events_path = remote_root / dataset_id / ".events.log"
+    baseline_lines = events_path.read_text(encoding="utf-8").splitlines()
+
+    remote_dataset.write_overlay_part(
+        "densegen",
+        pa.table({"sequence": ["AAAA"], "densegen__score": [0.91]}),
+        key="sequence",
+        key_col="sequence",
+        allow_missing=False,
+    )
+
+    # Simulate interrupted logging where overlay payload changed but event-sidecar line count did not.
+    events_path.write_text("\n".join(baseline_lines) + ("\n" if baseline_lines else ""), encoding="utf-8")
+
+    sync_module.execute_pull(local_root, dataset_id, "bu-scc", opts)
+
+    assert _FilesystemRemote.pull_transfer_calls == 2
+    assert _dataset_file_fingerprints(local_root / dataset_id, include_events=False) == _dataset_file_fingerprints(
+        remote_root / dataset_id, include_events=False
+    )
+
+
+def test_push_detects_overlay_drift_when_event_sidecar_delta_is_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    local_root = tmp_path / "local_usr"
+    remote_root = tmp_path / "remote_usr"
+    ensure_registry(local_root)
+    ensure_registry(remote_root)
+    register_test_namespace(remote_root, namespace="infer", columns_spec="infer__llr:float64")
+    register_test_namespace(local_root, namespace="infer", columns_spec="infer__llr:float64")
+    dataset_id = "densegen/demo_overlay_push_gap"
+
+    remote_dataset = Dataset(remote_root, dataset_id)
+    remote_dataset.init(source="remote-seed")
+    remote_dataset.import_rows([_row("AAAA", "remote-seed")], source="remote-seed")
+
+    remote_cfg = SSHRemoteConfig(
+        name="bu-scc",
+        host="mock",
+        user="mock",
+        base_dir=str(remote_root),
+    )
+    _FilesystemRemote.fail_next_pull = False
+    _FilesystemRemote.fail_next_push = False
+    _FilesystemRemote.pull_transfer_calls = 0
+    _FilesystemRemote.push_transfer_calls = 0
+    _FilesystemRemote.remote_lock_calls = 0
+    monkeypatch.setattr(sync_module, "get_remote", lambda _name: remote_cfg)
+    monkeypatch.setattr(sync_module, "SSHRemote", _FilesystemRemote)
+
+    opts = sync_module.SyncOptions(verify="auto")
+    sync_module.execute_pull(local_root, dataset_id, "bu-scc", opts)
+    assert _FilesystemRemote.pull_transfer_calls == 1
+    assert _FilesystemRemote.push_transfer_calls == 0
+
+    local_dataset = Dataset(local_root, dataset_id)
+    local_events_path = local_root / dataset_id / ".events.log"
+    baseline_lines = local_events_path.read_text(encoding="utf-8").splitlines()
+
+    local_dataset.write_overlay_part(
+        "infer",
+        pa.table({"sequence": ["AAAA"], "infer__llr": [1.7]}),
+        key="sequence",
+        key_col="sequence",
+        allow_missing=False,
+    )
+
+    # Simulate interrupted logging where overlay payload changed but event-sidecar line count did not.
+    local_events_path.write_text("\n".join(baseline_lines) + ("\n" if baseline_lines else ""), encoding="utf-8")
+
+    sync_module.execute_push(local_root, dataset_id, "bu-scc", opts)
+
+    assert _FilesystemRemote.push_transfer_calls == 1
+    assert _dataset_file_fingerprints(local_root / dataset_id, include_events=False) == _dataset_file_fingerprints(
+        remote_root / dataset_id, include_events=False
+    )
+
+
+def test_pull_detects_auxiliary_file_drift_when_event_sidecar_delta_is_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    local_root = tmp_path / "local_usr"
+    remote_root = tmp_path / "remote_usr"
+    ensure_registry(local_root)
+    ensure_registry(remote_root)
+    dataset_id = "densegen/demo_aux_pull_gap"
+
+    remote_dataset = Dataset(remote_root, dataset_id)
+    remote_dataset.init(source="remote-seed")
+    remote_dataset.import_rows([_row("AAAA", "remote-seed")], source="remote-seed")
+
+    remote_cfg = SSHRemoteConfig(
+        name="bu-scc",
+        host="mock",
+        user="mock",
+        base_dir=str(remote_root),
+    )
+    _FilesystemRemote.fail_next_pull = False
+    _FilesystemRemote.fail_next_push = False
+    _FilesystemRemote.pull_transfer_calls = 0
+    _FilesystemRemote.push_transfer_calls = 0
+    _FilesystemRemote.remote_lock_calls = 0
+    monkeypatch.setattr(sync_module, "get_remote", lambda _name: remote_cfg)
+    monkeypatch.setattr(sync_module, "SSHRemote", _FilesystemRemote)
+
+    opts = sync_module.SyncOptions(verify="auto")
+    sync_module.execute_pull(local_root, dataset_id, "bu-scc", opts)
+    assert _FilesystemRemote.pull_transfer_calls == 1
+
+    remote_aux = remote_root / dataset_id / "_artifacts" / "batch" / "checkpoint.json"
+    remote_aux.parent.mkdir(parents=True, exist_ok=True)
+    remote_aux.write_text('{"epoch": 7, "status": "running"}\n', encoding="utf-8")
+
+    sync_module.execute_pull(local_root, dataset_id, "bu-scc", opts)
+
+    assert _FilesystemRemote.pull_transfer_calls == 2
+    local_aux = local_root / dataset_id / "_artifacts" / "batch" / "checkpoint.json"
+    assert local_aux.read_text(encoding="utf-8") == remote_aux.read_text(encoding="utf-8")
+
+
+def test_push_detects_auxiliary_file_drift_when_event_sidecar_delta_is_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    local_root = tmp_path / "local_usr"
+    remote_root = tmp_path / "remote_usr"
+    ensure_registry(local_root)
+    ensure_registry(remote_root)
+    dataset_id = "densegen/demo_aux_push_gap"
+
+    remote_dataset = Dataset(remote_root, dataset_id)
+    remote_dataset.init(source="remote-seed")
+    remote_dataset.import_rows([_row("AAAA", "remote-seed")], source="remote-seed")
+
+    remote_cfg = SSHRemoteConfig(
+        name="bu-scc",
+        host="mock",
+        user="mock",
+        base_dir=str(remote_root),
+    )
+    _FilesystemRemote.fail_next_pull = False
+    _FilesystemRemote.fail_next_push = False
+    _FilesystemRemote.pull_transfer_calls = 0
+    _FilesystemRemote.push_transfer_calls = 0
+    _FilesystemRemote.remote_lock_calls = 0
+    monkeypatch.setattr(sync_module, "get_remote", lambda _name: remote_cfg)
+    monkeypatch.setattr(sync_module, "SSHRemote", _FilesystemRemote)
+
+    opts = sync_module.SyncOptions(verify="auto")
+    sync_module.execute_pull(local_root, dataset_id, "bu-scc", opts)
+    assert _FilesystemRemote.pull_transfer_calls == 1
+    assert _FilesystemRemote.push_transfer_calls == 0
+
+    local_aux = local_root / dataset_id / "_artifacts" / "batch" / "checkpoint.json"
+    local_aux.parent.mkdir(parents=True, exist_ok=True)
+    local_aux.write_text('{"epoch": 8, "status": "queued"}\n', encoding="utf-8")
+
+    sync_module.execute_push(local_root, dataset_id, "bu-scc", opts)
+
+    assert _FilesystemRemote.push_transfer_calls == 1
+    remote_aux = remote_root / dataset_id / "_artifacts" / "batch" / "checkpoint.json"
+    assert remote_aux.read_text(encoding="utf-8") == local_aux.read_text(encoding="utf-8")

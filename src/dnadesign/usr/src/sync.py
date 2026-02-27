@@ -11,8 +11,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 import os
-import re
 import shutil
 import tempfile
 from contextlib import nullcontext
@@ -31,6 +31,12 @@ from .errors import VerificationError
 from .events import record_event
 from .locks import dataset_write_lock
 from .remote import RemoteDatasetStat, SSHRemote
+from .sync_sidecars import (
+    ensure_sidecar_verify_compatible,
+    local_sidecar_state,
+    remote_sidecar_state,
+    verify_sidecar_state_match,
+)
 
 
 @dataclass
@@ -41,16 +47,10 @@ class SyncOptions:
     assume_yes: bool = False
     verify: str = "auto"
     verify_sidecars: bool = False
+    verify_derived_hashes: bool = False
 
 
-@dataclass(frozen=True)
-class SidecarState:
-    meta_mtime: str | None
-    events_lines: int
-    snapshot_names: tuple[str, ...]
-
-
-_SNAPSHOT_RE = re.compile(r"^records-\d{8}T\d{6,}\.parquet$")
+_SYNC_ONLY_ACTIONS = {"pull", "push", "pull_file", "push_file"}
 
 
 def _make_pull_staging_dir(root: Path, dataset: str) -> Path:
@@ -97,53 +97,13 @@ def _collect_staged_entries(staged: Path, *, skip_snapshots: bool) -> list[tuple
     return entries
 
 
-def _snapshot_names_from_dir(snapshot_dir: Path) -> tuple[str, ...]:
-    snapshot_dir = Path(snapshot_dir)
-    if not snapshot_dir.exists():
-        return ()
-    return tuple(
-        sorted([item.name for item in snapshot_dir.iterdir() if item.is_file() and _SNAPSHOT_RE.match(item.name)])
-    )
-
-
-def _local_sidecar_state(dataset_dir: Path) -> SidecarState:
-    from .diff import events_tail_count, file_mtime
-
-    dataset_dir = Path(dataset_dir)
-    return SidecarState(
-        meta_mtime=file_mtime(dataset_dir / "meta.md"),
-        events_lines=events_tail_count(dataset_dir / ".events.log"),
-        snapshot_names=_snapshot_names_from_dir(dataset_dir / "_snapshots"),
-    )
-
-
-def _remote_sidecar_state(remote_stat: RemoteDatasetStat) -> SidecarState:
-    return SidecarState(
-        meta_mtime=remote_stat.meta_mtime,
-        events_lines=int(remote_stat.events_lines),
-        snapshot_names=tuple(sorted(remote_stat.snapshot_names)),
-    )
-
-
-def _verify_sidecar_state_match(local: SidecarState, remote: SidecarState, *, context: str) -> None:
-    mismatches: list[str] = []
-    if local.meta_mtime != remote.meta_mtime:
-        mismatches.append(f"meta.md mtime local={local.meta_mtime or '-'} remote={remote.meta_mtime or '-'}")
-    if local.events_lines != remote.events_lines:
-        mismatches.append(f".events.log lines local={local.events_lines} remote={remote.events_lines}")
-    if local.snapshot_names != remote.snapshot_names:
-        mismatches.append(f"_snapshots names local={list(local.snapshot_names)} remote={list(remote.snapshot_names)}")
-    if mismatches:
-        raise VerificationError(f"{context}: sidecar mismatch; " + "; ".join(mismatches))
-
-
 def _ensure_sidecar_verify_compatible(opts: SyncOptions) -> None:
-    if not opts.verify_sidecars:
-        return
-    if opts.primary_only or opts.skip_snapshots:
-        raise VerificationError(
-            "--verify-sidecars requires full dataset transfer (no --primary-only/--skip-snapshots)."
-        )
+    ensure_sidecar_verify_compatible(
+        verify_sidecars=opts.verify_sidecars,
+        verify_derived_hashes=opts.verify_derived_hashes,
+        primary_only=opts.primary_only,
+        skip_snapshots=opts.skip_snapshots,
+    )
 
 
 def _remote_dataset_lock(remote: SSHRemote, dataset: str):
@@ -159,8 +119,9 @@ def _plan_diff_with_remote(
     dataset: str,
     *,
     verify: str,
+    include_derived_hashes: bool = False,
 ) -> tuple[DiffSummary, RemoteDatasetStat]:
-    remote_stat = remote.stat_dataset(dataset, verify=verify)
+    remote_stat = remote.stat_dataset(dataset, verify=verify, include_derived_hashes=include_derived_hashes)
     verify_mode, notes = resolve_verify_mode(verify, remote_stat.primary)
     summary = compute_diff(
         Path(root) / dataset,
@@ -170,6 +131,28 @@ def _plan_diff_with_remote(
         verify_notes=notes,
     )
     return summary, remote_stat
+
+
+def _event_delta_requires_push(events_path: Path, *, remote_lines: int) -> bool:
+    events_path = Path(events_path)
+    if not events_path.exists():
+        return False
+    start_line = max(0, int(remote_lines))
+    with events_path.open("r", encoding="utf-8") as handle:
+        for index, raw_line in enumerate(handle):
+            if index < start_line:
+                continue
+            line = raw_line.strip()
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise VerificationError(f"Failed to parse local event log line {index + 1}: {events_path}") from exc
+            action = str(payload.get("action", "")).strip()
+            if action and action not in _SYNC_ONLY_ACTIONS:
+                return True
+    return False
 
 
 def _promote_staged_pull(staged: Path, dest: Path, *, primary_only: bool, skip_snapshots: bool) -> None:
@@ -235,9 +218,13 @@ def _verify_after_pull(local_dir: Path, summary: DiffSummary) -> None:
     verify_primary_match(local, summary.primary_remote, summary.verify_mode, context="post-pull")
 
 
-def _verify_after_push(remote: SSHRemote, dataset: str, summary_before: DiffSummary) -> RemoteDatasetStat:
+def _verify_after_push(
+    remote: SSHRemote, dataset: str, summary_before: DiffSummary, *, include_derived_hashes: bool = False
+) -> RemoteDatasetStat:
     # Probe remote again and ensure it now matches local
-    after: RemoteDatasetStat = remote.stat_dataset(dataset, verify=summary_before.verify_mode)
+    after: RemoteDatasetStat = remote.stat_dataset(
+        dataset, verify=summary_before.verify_mode, include_derived_hashes=include_derived_hashes
+    )
     # Create a synthetic summary comparing local (previous local) to new remote
     from .diff import FileStat
 
@@ -259,7 +246,7 @@ def _verify_after_push(remote: SSHRemote, dataset: str, summary_before: DiffSumm
 def plan_diff(root: Path, dataset: str, remote_name: str, *, verify: str) -> DiffSummary:
     cfg: SSHRemoteConfig = get_remote(remote_name)
     rmt = SSHRemote(cfg)
-    summary, _ = _plan_diff_with_remote(rmt, root, dataset, verify=verify)
+    summary, _ = _plan_diff_with_remote(rmt, root, dataset, verify=verify, include_derived_hashes=False)
     return summary
 
 
@@ -276,7 +263,9 @@ def execute_pull(root: Path, dataset: str, remote_name: str, opts: SyncOptions) 
     rmt = SSHRemote(cfg)
     _ensure_sidecar_verify_compatible(opts)
 
-    summary, remote_before = _plan_diff_with_remote(rmt, root, dataset, verify=opts.verify)
+    summary, remote_before = _plan_diff_with_remote(
+        rmt, root, dataset, verify=opts.verify, include_derived_hashes=opts.verify_derived_hashes
+    )
     if not summary.primary_remote.exists:
         raise VerificationError(f"Refusing pull for dataset '{dataset}': remote records.parquet is missing.")
     # Transfer only when changes are detected
@@ -296,7 +285,9 @@ def execute_pull(root: Path, dataset: str, remote_name: str, opts: SyncOptions) 
 
     with dataset_write_lock(dest):
         with _remote_dataset_lock(rmt, dataset):
-            summary, remote_before = _plan_diff_with_remote(rmt, root, dataset, verify=opts.verify)
+            summary, remote_before = _plan_diff_with_remote(
+                rmt, root, dataset, verify=opts.verify, include_derived_hashes=opts.verify_derived_hashes
+            )
             if not summary.primary_remote.exists:
                 raise VerificationError(f"Refusing pull for dataset '{dataset}': remote records.parquet is missing.")
             if not summary.has_change and summary.primary_remote.exists:
@@ -313,9 +304,9 @@ def execute_pull(root: Path, dataset: str, remote_name: str, opts: SyncOptions) 
                 )
                 _verify_after_pull(staged_dir, summary)
                 if opts.verify_sidecars:
-                    _verify_sidecar_state_match(
-                        _local_sidecar_state(staged_dir),
-                        _remote_sidecar_state(remote_before),
+                    verify_sidecar_state_match(
+                        local_sidecar_state(staged_dir, include_derived_hashes=opts.verify_derived_hashes),
+                        remote_sidecar_state(remote_before, include_derived_hashes=opts.verify_derived_hashes),
                         context="post-pull-sidecars",
                     )
                 _promote_staged_pull(
@@ -334,6 +325,7 @@ def execute_pull(root: Path, dataset: str, remote_name: str, opts: SyncOptions) 
                     "from": remote_name,
                     "verify": summary.verify_mode,
                     "verify_sidecars": bool(opts.verify_sidecars),
+                    "verify_derived_hashes": bool(opts.verify_derived_hashes),
                     "rows": summary.primary_remote.rows,
                     "cols": summary.primary_remote.cols,
                 },
@@ -378,12 +370,16 @@ def execute_push(root: Path, dataset: str, remote_name: str, opts: SyncOptions) 
     rmt = SSHRemote(cfg)
     _ensure_sidecar_verify_compatible(opts)
 
-    summary, _ = _plan_diff_with_remote(rmt, root, dataset, verify=opts.verify)
+    summary, _ = _plan_diff_with_remote(
+        rmt, root, dataset, verify=opts.verify, include_derived_hashes=opts.verify_derived_hashes
+    )
     if not summary.primary_local.exists:
         raise VerificationError(f"Refusing push for dataset '{dataset}': local records.parquet is missing.")
     # If nothing to change, return
     if not summary.has_change and summary.primary_remote.exists:
-        return summary
+        src = Path(root) / dataset
+        if not _event_delta_requires_push(src / ".events.log", remote_lines=summary.events_remote_lines):
+            return summary
 
     src = Path(root) / dataset
     if opts.dry_run:
@@ -398,13 +394,20 @@ def execute_push(root: Path, dataset: str, remote_name: str, opts: SyncOptions) 
 
     with dataset_write_lock(src):
         with _remote_dataset_lock(rmt, dataset):
-            summary, _ = _plan_diff_with_remote(rmt, root, dataset, verify=opts.verify)
+            summary, _ = _plan_diff_with_remote(
+                rmt, root, dataset, verify=opts.verify, include_derived_hashes=opts.verify_derived_hashes
+            )
             if not summary.primary_local.exists:
                 raise VerificationError(f"Refusing push for dataset '{dataset}': local records.parquet is missing.")
             if not summary.has_change and summary.primary_remote.exists:
-                return summary
+                if not _event_delta_requires_push(src / ".events.log", remote_lines=summary.events_remote_lines):
+                    return summary
 
-            local_sidecars = _local_sidecar_state(src) if opts.verify_sidecars else None
+            local_sidecars = (
+                local_sidecar_state(src, include_derived_hashes=opts.verify_derived_hashes)
+                if opts.verify_sidecars
+                else None
+            )
             rmt.push_from_local(
                 dataset,
                 src,
@@ -412,11 +415,11 @@ def execute_push(root: Path, dataset: str, remote_name: str, opts: SyncOptions) 
                 skip_snapshots=opts.skip_snapshots,
                 dry_run=False,
             )
-            remote_after = _verify_after_push(rmt, dataset, summary)
+            remote_after = _verify_after_push(rmt, dataset, summary, include_derived_hashes=opts.verify_derived_hashes)
             if opts.verify_sidecars and local_sidecars is not None:
-                _verify_sidecar_state_match(
+                verify_sidecar_state_match(
                     local_sidecars,
-                    _remote_sidecar_state(remote_after),
+                    remote_sidecar_state(remote_after, include_derived_hashes=opts.verify_derived_hashes),
                     context="post-push-sidecars",
                 )
             record_event(
@@ -427,6 +430,7 @@ def execute_push(root: Path, dataset: str, remote_name: str, opts: SyncOptions) 
                     "to": remote_name,
                     "verify": summary.verify_mode,
                     "verify_sidecars": bool(opts.verify_sidecars),
+                    "verify_derived_hashes": bool(opts.verify_derived_hashes),
                 },
                 target_path=src / "records.parquet",
                 dataset_root=root,

@@ -31,7 +31,7 @@ def _remote_with_stat_failure(message: str = "remote stat unavailable"):
         def __init__(self, _cfg):
             pass
 
-        def stat_dataset(self, _dataset: str, *, verify: str = "auto"):
+        def stat_dataset(self, _dataset: str, *, verify: str = "auto", include_derived_hashes: bool = False):
             raise RemoteUnavailableError(f"{message}; verify={verify}")
 
         def pull_to_local(self, *_args, **_kwargs):
@@ -106,7 +106,7 @@ def test_execute_pull_refuses_transfer_when_remote_primary_missing(monkeypatch, 
         def __init__(self, _cfg):
             pass
 
-        def stat_dataset(self, _dataset: str, *, verify: str = "auto"):
+        def stat_dataset(self, _dataset: str, *, verify: str = "auto", include_derived_hashes: bool = False):
             return RemoteDatasetStat(
                 primary=RemotePrimaryStat(False, None, None, None, None, None),
                 meta_mtime=None,
@@ -144,7 +144,7 @@ def test_execute_push_refuses_transfer_when_local_primary_missing(monkeypatch, t
         def __init__(self, _cfg):
             pass
 
-        def stat_dataset(self, _dataset: str, *, verify: str = "auto"):
+        def stat_dataset(self, _dataset: str, *, verify: str = "auto", include_derived_hashes: bool = False):
             return RemoteDatasetStat(
                 primary=RemotePrimaryStat(False, None, None, None, None, None),
                 meta_mtime=None,

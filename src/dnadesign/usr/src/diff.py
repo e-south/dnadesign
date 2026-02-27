@@ -53,6 +53,10 @@ class DiffSummary:
     events_local_lines: int
     events_remote_lines: int
     snapshots: SnapshotStat
+    derived_local_files: List[str]
+    derived_remote_files: List[str]
+    aux_local_files: List[str]
+    aux_remote_files: List[str]
     has_change: bool
     changes: dict
     verify_mode: str
@@ -253,6 +257,7 @@ def compute_file_diff(
         "meta_mtime_diff": False,
         "events_new_remote_lines": 0,
         "snapshots_remote_newer": 0,
+        "derived_files_diff": False,
     }
     has_change = bool(changes["primary_sha_diff"])
     return DiffSummary(
@@ -264,6 +269,10 @@ def compute_file_diff(
         events_local_lines=0,
         events_remote_lines=0,
         snapshots=SnapshotStat(count=0, newest_ts=None, newer_than_local=0),
+        derived_local_files=[],
+        derived_remote_files=[],
+        aux_local_files=[],
+        aux_remote_files=[],
         has_change=has_change,
         changes=changes,
         verify_mode=verify_mode,
@@ -332,6 +341,36 @@ def snapshots_stat(dir_path: Path, remote_names: List[str]) -> SnapshotStat:
     )
 
 
+def _derived_file_inventory(derived_dir: Path) -> List[str]:
+    derived_dir = Path(derived_dir)
+    if not derived_dir.exists():
+        return []
+    files: list[str] = []
+    for item in sorted(derived_dir.rglob("*")):
+        if not item.is_file():
+            continue
+        files.append(item.relative_to(derived_dir).as_posix())
+    return files
+
+
+def _aux_file_inventory(dataset_dir: Path) -> List[str]:
+    dataset_dir = Path(dataset_dir)
+    if not dataset_dir.exists():
+        return []
+    files: list[str] = []
+    for item in sorted(dataset_dir.rglob("*")):
+        if not item.is_file():
+            continue
+        rel = item.relative_to(dataset_dir)
+        rel_text = rel.as_posix()
+        if rel_text in {"records.parquet", "meta.md", ".events.log", ".usr.lock"}:
+            continue
+        if rel.parts and rel.parts[0] in {"_snapshots", "_derived"}:
+            continue
+        files.append(rel_text)
+    return files
+
+
 def compute_diff(
     dataset_dir: Path,
     remote: RemoteDatasetStat,
@@ -356,6 +395,10 @@ def compute_diff(
                 local_snapshot_names.append(item.name)
     local_snapshot_names = sorted(local_snapshot_names)
     remote_snapshot_names = sorted(remote.snapshot_names)
+    local_derived_files = _derived_file_inventory(dataset_dir / "_derived")
+    remote_derived_files = sorted(remote.derived_files)
+    local_aux_files = _aux_file_inventory(dataset_dir)
+    remote_aux_files = sorted(remote.aux_files)
 
     # Convert remote stat to FileStat for unified view
     primary_remote = FileStat(
@@ -375,6 +418,8 @@ def compute_diff(
         "events_new_remote_lines": max(0, remote.events_lines - events_local),
         "snapshots_name_diff": (local_snapshot_names != remote_snapshot_names),
         "snapshots_remote_newer": snaps.newer_than_local,
+        "derived_files_diff": (local_derived_files != remote_derived_files),
+        "aux_files_diff": (local_aux_files != remote_aux_files),
     }
 
     has_change = bool(
@@ -383,6 +428,8 @@ def compute_diff(
         or changes["events_new_remote_lines"] > 0
         or changes["snapshots_name_diff"]
         or changes["snapshots_remote_newer"] > 0
+        or changes["derived_files_diff"]
+        or changes["aux_files_diff"]
     )
 
     return DiffSummary(
@@ -394,6 +441,10 @@ def compute_diff(
         events_local_lines=events_local,
         events_remote_lines=remote.events_lines,
         snapshots=snaps,
+        derived_local_files=local_derived_files,
+        derived_remote_files=remote_derived_files,
+        aux_local_files=local_aux_files,
+        aux_remote_files=remote_aux_files,
         has_change=has_change,
         changes=changes,
         verify_mode=verify_mode,

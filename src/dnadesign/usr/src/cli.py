@@ -1904,6 +1904,8 @@ def _sync_args(
     remote_path: str | None,
     strict_bootstrap_id: bool = False,
     verify_sidecars: bool = False,
+    no_verify_sidecars: bool = False,
+    verify_derived_hashes: bool = False,
 ) -> NS:
     return _ctx_args(
         ctx,
@@ -1919,6 +1921,8 @@ def _sync_args(
         remote_path=remote_path,
         strict_bootstrap_id=strict_bootstrap_id,
         verify_sidecars=verify_sidecars,
+        no_verify_sidecars=no_verify_sidecars,
+        verify_derived_hashes=verify_derived_hashes,
     )
 
 
@@ -1931,7 +1935,7 @@ def cli_diff(
     skip_snapshots: bool = typer.Option(False, "--skip-snapshots"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     yes: bool = typer.Option(False, "--yes"),
-    verify: str = typer.Option("auto", "--verify", help="Verification mode: auto|hash|size|parquet"),
+    verify: str = typer.Option("hash", "--verify", help="Verification mode: hash|auto|size|parquet"),
     format: str = typer.Option("auto", "--format", help="Output format: auto|rich|plain|json"),
     repo_root: str | None = typer.Option(None, "--repo-root"),
     remote_path: str | None = typer.Option(None, "--remote-path"),
@@ -1962,7 +1966,7 @@ def cli_status(
     skip_snapshots: bool = typer.Option(False, "--skip-snapshots"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     yes: bool = typer.Option(False, "--yes"),
-    verify: str = typer.Option("auto", "--verify", help="Verification mode: auto|hash|size|parquet"),
+    verify: str = typer.Option("hash", "--verify", help="Verification mode: hash|auto|size|parquet"),
     repo_root: str | None = typer.Option(None, "--repo-root"),
     remote_path: str | None = typer.Option(None, "--remote-path"),
 ) -> None:
@@ -1992,11 +1996,21 @@ def cli_pull(
     skip_snapshots: bool = typer.Option(False, "--skip-snapshots"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     yes: bool = typer.Option(False, "--yes"),
-    verify: str = typer.Option("auto", "--verify", help="Verification mode: auto|hash|size|parquet"),
+    verify: str = typer.Option("hash", "--verify", help="Verification mode: hash|auto|size|parquet"),
     verify_sidecars: bool = typer.Option(
         False,
         "--verify-sidecars",
-        help="Verify meta/events/snapshots sidecars for full-fidelity dataset transfer.",
+        help="Enable strict sidecar fidelity checks for dataset sync (already default for datasets).",
+    ),
+    no_verify_sidecars: bool = typer.Option(
+        False,
+        "--no-verify-sidecars",
+        help="Disable strict sidecar fidelity checks for dataset sync.",
+    ),
+    verify_derived_hashes: bool = typer.Option(
+        False,
+        "--verify-derived-hashes",
+        help="Also verify _derived file content hashes (high assurance, slower).",
     ),
     repo_root: str | None = typer.Option(None, "--repo-root"),
     remote_path: str | None = typer.Option(None, "--remote-path"),
@@ -2021,6 +2035,8 @@ def cli_pull(
             remote_path,
             strict_bootstrap_id,
             verify_sidecars,
+            no_verify_sidecars,
+            verify_derived_hashes,
         )
     )
 
@@ -2034,11 +2050,21 @@ def cli_push(
     skip_snapshots: bool = typer.Option(False, "--skip-snapshots"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     yes: bool = typer.Option(False, "--yes"),
-    verify: str = typer.Option("auto", "--verify", help="Verification mode: auto|hash|size|parquet"),
+    verify: str = typer.Option("hash", "--verify", help="Verification mode: hash|auto|size|parquet"),
     verify_sidecars: bool = typer.Option(
         False,
         "--verify-sidecars",
-        help="Verify meta/events/snapshots sidecars for full-fidelity dataset transfer.",
+        help="Enable strict sidecar fidelity checks for dataset sync (already default for datasets).",
+    ),
+    no_verify_sidecars: bool = typer.Option(
+        False,
+        "--no-verify-sidecars",
+        help="Disable strict sidecar fidelity checks for dataset sync.",
+    ),
+    verify_derived_hashes: bool = typer.Option(
+        False,
+        "--verify-derived-hashes",
+        help="Also verify _derived file content hashes (high assurance, slower).",
     ),
     repo_root: str | None = typer.Option(None, "--repo-root"),
     remote_path: str | None = typer.Option(None, "--remote-path"),
@@ -2058,6 +2084,8 @@ def cli_push(
             remote_path,
             False,
             verify_sidecars,
+            no_verify_sidecars,
+            verify_derived_hashes,
         )
     )
 

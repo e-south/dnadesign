@@ -48,7 +48,9 @@ class DummyRemote:
             snapshot_names=[],
         )
 
-    def stat_dataset(self, _dataset: str, *, verify: str = "auto") -> RemoteDatasetStat:
+    def stat_dataset(
+        self, _dataset: str, *, verify: str = "auto", include_derived_hashes: bool = False
+    ) -> RemoteDatasetStat:
         if self.pushed_file is not None:
             return self._stat_from_file(self.pushed_file)
         if self.remote_template is not None:
