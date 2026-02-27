@@ -1,17 +1,17 @@
-# Notify Operations
+## Notify Operations
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-02-18
 
 `dnadesign` includes a tool-agnostic notifier CLI for webhook delivery from local and batch workflows.
 
-## Choose a workflow
+### Choose a workflow
 
-- One-off notifications from scripts, notebooks, or jobs: use `notify send` (this page).
-- Long-running USR `.events.log` watcher operations: use [Notify USR events operator manual](usr-events.md).
-- BU SCC scheduler deployment patterns for watchers: use [BU SCC Batch + Notify runbook](../bu-scc/batch-notify.md).
+- Send one-off notifications from scripts, notebooks, or jobs: use `notify send` on this page.
+- Run long-lived USR `.events.log` watcher operations: [Notify USR events operator manual](usr-events.md).
+- Deploy watcher loops under SCC scheduler patterns: [BU SCC Batch + Notify runbook](../bu-scc/batch-notify.md).
 
-## `notify send` quick usage
+### `notify send` quick usage
 
 ```bash
 notify send \
@@ -32,7 +32,7 @@ Exactly one of `--url`, `--url-env`, or `--secret-ref` is required.
 Live HTTPS delivery requires trust roots via `--tls-ca-bundle` or `SSL_CERT_FILE` and fails fast when neither is provided.
 `--dry-run` does not post to the webhook and does not require a CA bundle.
 
-## Metadata payloads
+### Metadata payloads
 
 Attach metadata with a JSON file:
 
@@ -48,7 +48,7 @@ notify send \
 
 The metadata file must contain a JSON object, which is attached as `meta`.
 
-## Practical patterns
+### Practical patterns
 
 Wrap pipeline execution with success/failure notifications:
 
@@ -93,19 +93,19 @@ notify send --provider generic --status success --tool <tool-name> --run-id <run
   --message "Run finished"
 ```
 
-## Canonical runbooks
+### Canonical runbooks
 
-- USR watcher onboarding and operations: [usr-events.md](usr-events.md)
-- BU SCC batch deployment patterns: [BU SCC Batch + Notify runbook](../bu-scc/batch-notify.md)
-- Workload-specific examples for this repository: [SGE HPC Ops workload reference](../bu-scc/sge-hpc-ops/references/workload-dnadesign.md)
+- USR watcher onboarding, run lifecycle, and recovery flow: [usr-events.md](usr-events.md).
+- BU SCC batch submission patterns for Notify deployments: [BU SCC Batch + Notify runbook](../bu-scc/batch-notify.md).
+- Repository workload examples that compose SCC + Notify contracts: [SGE HPC Ops workload reference](../bu-scc/sge-hpc-ops/references/workload-dnadesign.md).
 
-## Documentation ownership
+### Documentation ownership
 
 - Keep watcher semantics and setup flow in `docs/notify/usr-events.md`.
 - Keep platform-specific submission examples in `docs/bu-scc/`.
 - Keep `src/dnadesign/notify/README.md` as module-local package documentation.
 
-## Dry run
+### Dry run
 
 Preview payloads without sending:
 

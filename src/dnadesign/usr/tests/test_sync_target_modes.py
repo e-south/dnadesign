@@ -654,6 +654,10 @@ def test_cmd_pull_writes_sync_audit_json_artifact(tmp_path: Path, monkeypatch) -
     assert payload["data"]["action"] == "pull"
     assert payload["data"]["verify"]["content_hashes"] == "on"
     assert payload["data"]["_derived"]["changed"] is True
+    assert payload["data"]["_derived"]["local_only"] == []
+    assert payload["data"]["_derived"]["remote_only"] == ["densegen/part-002.parquet"]
+    assert payload["data"]["_auxiliary"]["local_only"] == []
+    assert payload["data"]["_auxiliary"]["remote_only"] == []
 
 
 def test_cmd_push_writes_sync_audit_json_artifact(tmp_path: Path, monkeypatch) -> None:
@@ -700,6 +704,10 @@ def test_cmd_push_writes_sync_audit_json_artifact(tmp_path: Path, monkeypatch) -
     assert payload["data"]["action"] == "push"
     assert payload["data"]["transfer_state"] == "NO-OP"
     assert payload["data"]["verify"]["sidecars"] == "off"
+    assert payload["data"]["_derived"]["local_only"] == []
+    assert payload["data"]["_derived"]["remote_only"] == []
+    assert payload["data"]["_auxiliary"]["local_only"] == []
+    assert payload["data"]["_auxiliary"]["remote_only"] == []
 
 
 def test_cmd_diff_writes_sync_audit_json_artifact(tmp_path: Path, monkeypatch) -> None:
@@ -761,6 +769,10 @@ def test_cmd_diff_writes_sync_audit_json_artifact(tmp_path: Path, monkeypatch) -
     assert payload["data"]["action"] == "diff"
     assert payload["data"]["_derived"]["changed"] is True
     assert payload["data"]["_auxiliary"]["changed"] is True
+    assert payload["data"]["_derived"]["local_only"] == []
+    assert payload["data"]["_derived"]["remote_only"] == ["densegen/part-002.parquet"]
+    assert payload["data"]["_auxiliary"]["local_only"] == []
+    assert payload["data"]["_auxiliary"]["remote_only"] == ["_registry/b.yaml"]
     assert payload["data"][".events.log"]["remote"] == 3
 
 

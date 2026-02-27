@@ -1,8 +1,8 @@
-## tfkdanalysis
-
 ![tfkdanalysis banner](assets/tfkdanalysis-banner.svg)
 
 **tfkdanalysis** is a pipeline for analyzing transcription factor knockdown (TFKD) effects using data from **PPTP-seq (Promoter responses to TF perturbation sequencing)**. It processes promoter activity responses from CRISPRi-based TF knockdowns in *E. coli* and generates volcano and scatter plots to highlight significantly affected genes under specified conditions.
+
+See the [repository docs index](../../../docs/README.md) for broader workflow and runbook routing.
 
 This pipeline uses data from:
 

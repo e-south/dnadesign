@@ -1,5 +1,9 @@
 # USR HPC Sync Flow
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 Use this runbook when a dataset is produced incrementally on BU SCC (or similar HPC) and local analysis must stay in sync without moving data through git.
 
 Default sync contract:

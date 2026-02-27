@@ -1,5 +1,9 @@
 ## Expected Improvement Plugin (`expected_improvement`)
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This page documents `expected_improvement` acquisition behavior, equations, and failure conditions. For registry-level selection contracts and required fields, see [Selection](./selection.md).
 
 ### Purpose

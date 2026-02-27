@@ -1,5 +1,9 @@
 ## <Demo title>
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 **Last updated by:** cruncher-maintainers on 2026-02-23
 
 ### Contents
@@ -23,4 +27,4 @@ Document commands in machine runbook order.
 
 ### Inspect outputs
 Link to standard artifacts reference:
-- [`../reference/artifacts.md`](../reference/artifacts.md)
+- [`../../reference/artifacts.md`](../../reference/artifacts.md)

@@ -1,5 +1,9 @@
 ## DenseGen pipeline lifecycle
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This concept document explains the DenseGen lifecycle as an operator sequence from workspace initialization through run artifacts and reset. Read it when you need a stable mental model for debugging stage failures, resume behavior, and output placement.
 
 ### Lifecycle summary

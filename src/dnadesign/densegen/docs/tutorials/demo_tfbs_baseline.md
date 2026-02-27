@@ -1,5 +1,9 @@
 ## DenseGen TFBS baseline tutorial
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This tutorial runs the smallest DenseGen workflow with binding-site inputs and local parquet outputs.
 
 ### Runbook command

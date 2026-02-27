@@ -25,6 +25,8 @@ LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 README_TOOL_LINK_PATTERN = re.compile(r"\[\*\*(?P<tool>[a-z0-9_-]+)\*\*\]\((?P<link>[^)]+)\)")
 README_COVERAGE_LINK_PATTERN = re.compile(r"\[[^\]]+\]\((?P<link>[^)]+)\)")
 TOOL_README_BANNER_PATTERN = re.compile(r"!\[[^\]]*banner[^\]]*\]\((?P<link>[^)]+)\)", flags=re.IGNORECASE)
+MARKDOWN_HEADING_PATTERN = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
+TOOL_README_TOP_LINK_SCAN_LINES = 80
 RUNBOOK_DEMO_SHELL_LANGS = {"bash", "sh", "zsh"}
 RUNBOOK_DEMO_YAML_LANGS = {"yaml", "yml"}
 RUNBOOK_DEMO_HEREDOC_PATTERN = re.compile(r"""<<[-~]?\s*['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?""")
@@ -90,7 +92,7 @@ LAST_VERIFIED_PATTERN = re.compile(r"^\*\*Last verified:\*\*\s*(.+?)\s*$", re.MU
 TYPE_PATTERN = re.compile(r"^\*\*Type:\*\*\s*(.+?)\s*$", re.MULTILINE)
 STATUS_PATTERN = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)
 CREATED_PATTERN = re.compile(r"^\*\*Created:\*\*\s*(.+?)\s*$", re.MULTILINE)
-SECTION_HEADING_PATTERN = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+SECTION_HEADING_PATTERN = re.compile(r"^#{2,6}\s+(.+?)\s*$", re.MULTILINE)
 CHECKLIST_ITEM_PATTERN = re.compile(r"^\s*-\s*\[[ xX]\]\s+", re.MULTILINE)
 PROGRESS_ITEM_TIMESTAMP_PATTERN = re.compile(r"^\s*-\s*\[[ xX]\]\s+\(\d{4}-\d{2}-\d{2} \d{2}:\d{2}Z\)\s+.+$")
 _EXEC_PLAN_STATUSES = {"active", "paused", "completed"}
@@ -116,6 +118,10 @@ PUBLIC_INTERFACE_DOC_PATHS = (
 )
 ABSOLUTE_DOC_PATH_TOKENS = ("/Users/", "/private/", "/tmp/", "/home/", "/var/", "C:\\")
 INTERNAL_SOURCE_INREACH_PATTERN = re.compile(r"(?:dnadesign\.[a-z0-9_]+\.src\.|src/dnadesign/[a-z0-9_-]+/src/)")
+ENTRYPOINT_MARKDOWN_FILES = ("README.md", "docs/README.md")
+ENTRYPOINT_LOCAL_PATH_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9_./-])(?P<path>(?:\.\./|\.\/)?(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+\.[A-Za-z0-9._-]+)(?![A-Za-z0-9_./-])"
+)
 
 
 def _collect_markdown_files(repo_root: Path) -> tuple[list[Path], list[Path]]:
@@ -124,12 +130,30 @@ def _collect_markdown_files(repo_root: Path) -> tuple[list[Path], list[Path]]:
         raise FileNotFoundError("docs/ directory is missing")
 
     docs_md_files = sorted(docs_root.rglob("*.md"))
+    tool_docs_md_files = _collect_tool_docs_markdown_files(repo_root)
     all_md_files = list(docs_md_files)
+    all_md_files.extend(tool_docs_md_files)
     for name in ROOT_MARKDOWN_FILES:
         path = repo_root / name
         if path.exists():
             all_md_files.append(path)
-    return docs_md_files, all_md_files
+    deduped = sorted(set(all_md_files))
+    return docs_md_files, deduped
+
+
+def _collect_tool_docs_markdown_files(repo_root: Path) -> list[Path]:
+    src_root = repo_root / "src" / "dnadesign"
+    if not src_root.exists():
+        return []
+
+    tool_docs: set[Path] = set()
+    for tool_name in sorted(discover_repo_tools(repo_root=repo_root)):
+        docs_root = src_root / tool_name / "docs"
+        if not docs_root.exists():
+            continue
+        for path in docs_root.rglob("*.md"):
+            tool_docs.add(path)
+    return sorted(tool_docs)
 
 
 def _find_bad_doc_names(docs_md_files: list[Path]) -> list[Path]:
@@ -138,19 +162,52 @@ def _find_bad_doc_names(docs_md_files: list[Path]) -> list[Path]:
 
 def _find_broken_links(md_files: list[Path]) -> list[tuple[Path, str]]:
     broken: list[tuple[Path, str]] = []
+    anchor_cache: dict[Path, set[str]] = {}
     for src in md_files:
         text = src.read_text(encoding="utf-8")
         for raw in LINK_PATTERN.findall(text):
             link = raw.strip().split()[0]
             if link.startswith(("http://", "https://", "mailto:")):
                 continue
-            target_rel = link.split("#", 1)[0]
+            target_rel, anchor = (link.split("#", 1) + [""])[:2]
             if not target_rel:
-                continue
-            target = (src.parent / target_rel).resolve()
+                target = src.resolve()
+            else:
+                target = (src.parent / target_rel).resolve()
             if not target.exists():
                 broken.append((src, link))
+                continue
+            if anchor and target.suffix == ".md":
+                if target not in anchor_cache:
+                    anchor_cache[target] = _collect_markdown_anchors(target)
+                if anchor not in anchor_cache[target]:
+                    broken.append((src, f"{link} (missing anchor '{anchor}')"))
     return broken
+
+
+def _collect_markdown_anchors(path: Path) -> set[str]:
+    anchors: set[str] = set()
+    slug_counts: dict[str, int] = {}
+    for _, _, heading_text in _collect_markdown_headings_outside_fences(path):
+        slug = _slugify_markdown_heading(heading_text)
+        if not slug:
+            continue
+        count = slug_counts.get(slug, 0)
+        slug_counts[slug] = count + 1
+        if count == 0:
+            anchors.add(slug)
+        else:
+            anchors.add(f"{slug}-{count}")
+    return anchors
+
+
+def _slugify_markdown_heading(value: str) -> str:
+    chars: list[str] = []
+    for char in value.strip().lower():
+        if char.isalnum() or char in {" ", "-", "_"}:
+            chars.append(char)
+    slug = "".join(chars).replace(" ", "-")
+    return slug.strip("-")
 
 
 def _extract_level2_section_lines(text: str, heading: str) -> list[str]:
@@ -243,15 +300,17 @@ def _find_readme_tool_catalog_issues(repo_root: Path) -> list[str]:
             continue
         declared_tools.add(tool_name)
 
-        expected_rel = Path("src") / "dnadesign" / tool_name
+        expected_rel = Path("src") / "dnadesign" / tool_name / "README.md"
         if _normalize_relative_markdown_path(tool_link) != expected_rel.as_posix():
             issues.append(
                 f"{readme_path}: tool '{tool_name}' must link to '{expected_rel.as_posix()}' (found '{tool_link}')."
             )
 
-        tool_dir = (repo_root / tool_link).resolve()
-        if not tool_dir.exists() or not tool_dir.is_dir():
-            issues.append(f"{readme_path}: tool '{tool_name}' link target does not exist: {tool_link}.")
+        tool_readme = (repo_root / tool_link).resolve()
+        if not tool_readme.exists() or not tool_readme.is_file():
+            issues.append(
+                f"{readme_path}: tool '{tool_name}' link target does not exist as a markdown file: {tool_link}."
+            )
 
         coverage_match = README_COVERAGE_LINK_PATTERN.search(coverage_cell)
         if coverage_match is None:
@@ -273,6 +332,128 @@ def _find_readme_tool_catalog_issues(repo_root: Path) -> list[str]:
         issues.append(f"{readme_path}: missing tool rows for: {', '.join(missing_tools)}.")
     if extra_tools:
         issues.append(f"{readme_path}: unknown tool rows not found in src/dnadesign: {', '.join(extra_tools)}.")
+    return issues
+
+
+def _find_root_docs_entrypoint_issues(repo_root: Path) -> list[str]:
+    readme_path = repo_root / "README.md"
+    if not readme_path.exists():
+        return []
+
+    text = readme_path.read_text(encoding="utf-8")
+    if "dnadesign banner" not in text.lower():
+        return []
+
+    linked_targets: set[str] = set()
+    for raw in LINK_PATTERN.findall(text):
+        link = raw.strip().split()[0]
+        if link.startswith(("http://", "https://", "mailto:", "#")):
+            continue
+        target_rel = link.split("#", 1)[0].strip()
+        if not target_rel:
+            continue
+        linked_targets.add(_normalize_relative_markdown_path(target_rel))
+
+    issues: list[str] = []
+    if "docs/README.md" not in linked_targets:
+        issues.append(f"{readme_path}: bannered root README must include a markdown link to docs/README.md.")
+    return issues
+
+
+def _collect_markdown_headings_outside_fences(path: Path) -> list[tuple[int, int, str]]:
+    headings: list[tuple[int, int, str]] = []
+    in_fence = False
+    for line_no, raw_line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        stripped = raw_line.strip()
+        if stripped.startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+
+        match = MARKDOWN_HEADING_PATTERN.match(raw_line)
+        if match is None:
+            continue
+        level = len(match.group(1))
+        heading_text = match.group(2).strip()
+        headings.append((line_no, level, heading_text))
+    return headings
+
+
+def _find_docs_root_heading_style_issues(repo_root: Path) -> list[str]:
+    docs_root = repo_root / "docs"
+    if not docs_root.exists():
+        return []
+
+    issues: list[str] = []
+    for path in sorted(docs_root.rglob("*.md")):
+        headings = _collect_markdown_headings_outside_fences(path)
+        if not headings:
+            continue
+
+        first_line_no, first_level, _ = headings[0]
+        if first_level != 2:
+            issues.append(f"{path}:{first_line_no}: docs root markdown must start with '## ' heading style.")
+
+        level2_count = sum(1 for _, level, _ in headings if level == 2)
+        if level2_count > 1:
+            issues.append(
+                f"{path}: docs root markdown should use a single level-2 heading; use level-3+ for subsections."
+            )
+    return issues
+
+
+def _find_deprecated_docs_entrypoint_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    deprecated_start_here = repo_root / "docs" / "start-here.md"
+    if deprecated_start_here.exists():
+        issues.append(f"{deprecated_start_here}: deprecated docs shim must not exist; consolidate into docs/README.md.")
+
+    check_paths = (repo_root / "README.md", repo_root / "docs" / "README.md")
+    disallowed_targets = {"docs/start-here.md", "start-here.md"}
+    for path in check_paths:
+        if not path.exists():
+            continue
+        for raw in LINK_PATTERN.findall(path.read_text(encoding="utf-8")):
+            link = raw.strip().split()[0]
+            target_rel = link.split("#", 1)[0].strip()
+            if target_rel in disallowed_targets:
+                issues.append(f"{path}: must not link to docs/start-here.md; use docs/README.md.")
+    return issues
+
+
+def _find_entrypoint_local_path_literal_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+    for relative_path in ENTRYPOINT_MARKDOWN_FILES:
+        path = repo_root / relative_path
+        if not path.exists():
+            continue
+
+        lines = path.read_text(encoding="utf-8").splitlines()
+        in_fence = False
+        for line_no, line in enumerate(lines, start=1):
+            if line.strip().startswith("```"):
+                in_fence = not in_fence
+                continue
+            if in_fence:
+                continue
+
+            line_without_links = LINK_PATTERN.sub("", line)
+            for match in ENTRYPOINT_LOCAL_PATH_PATTERN.finditer(line_without_links):
+                token = match.group("path").strip("()[]{}<>.,:;!?")
+                if not token:
+                    continue
+                if token.startswith(("http://", "https://", "mailto:", "#")):
+                    continue
+
+                repo_target = (repo_root / token).resolve()
+                relative_target = (path.parent / token).resolve()
+                if not repo_target.exists() and not relative_target.exists():
+                    continue
+
+                issues.append(
+                    f"{path}:{line_no}: local path literal '{token}' should be a markdown hyperlink for navigation."
+                )
     return issues
 
 
@@ -446,34 +627,58 @@ def _find_runbook_metadata_issues(repo_root: Path, *, max_age_days: int) -> list
     )
 
 
+def _find_tool_docs_metadata_issues(repo_root: Path, *, max_age_days: int) -> list[str]:
+    tool_docs = _collect_tool_docs_markdown_files(repo_root)
+    return _find_owner_last_verified_metadata_issues_for_files(
+        paths=tool_docs,
+        max_age_days=max_age_days,
+    )
+
+
 def _find_owner_last_verified_metadata_issues(
     repo_root: Path,
     *,
     relative_paths: tuple[str, ...],
     max_age_days: int,
 ) -> list[str]:
+    files = [repo_root / relative_path for relative_path in relative_paths]
+    return _find_owner_last_verified_metadata_issues_for_files(
+        paths=files,
+        max_age_days=max_age_days,
+    )
+
+
+def _find_owner_last_verified_metadata_issues_for_files(
+    *,
+    paths: list[Path],
+    max_age_days: int,
+) -> list[str]:
     today = dt.date.today()
     issues: list[str] = []
 
-    for relative_path in relative_paths:
-        path = repo_root / relative_path
+    for path in paths:
         if not path.exists():
             continue
 
         text = path.read_text(encoding="utf-8")
         owner = _extract_metadata_field(text, OWNER_PATTERN)
+        owner_valid = True
         if owner is None:
             issues.append(f"{path}: missing '**Owner:**' metadata field.")
-            continue
-        if not owner:
+            owner_valid = False
+        elif not owner:
             issues.append(f"{path}: '**Owner:**' must not be empty.")
 
         last_verified_raw = _extract_metadata_field(text, LAST_VERIFIED_PATTERN)
+        last_verified_valid = True
         if last_verified_raw is None:
             issues.append(f"{path}: missing '**Last verified:**' metadata field.")
-            continue
-        if not last_verified_raw:
+            last_verified_valid = False
+        elif not last_verified_raw:
             issues.append(f"{path}: '**Last verified:**' must not be empty.")
+            last_verified_valid = False
+
+        if not owner_valid or not last_verified_valid:
             continue
 
         try:
@@ -579,8 +784,9 @@ def _extract_section_bodies(text: str) -> dict[str, str]:
     sections: dict[str, list[str]] = {}
     current: str | None = None
     for line in text.splitlines():
-        if line.startswith("## "):
-            current = line[3:].strip()
+        match = SECTION_HEADING_PATTERN.match(line)
+        if match is not None:
+            current = match.group(1).strip()
             sections.setdefault(current, [])
             continue
         if current is not None:
@@ -657,6 +863,52 @@ def _find_tool_readme_banner_issues(repo_root: Path) -> list[str]:
 
         if "placeholder" in top_block.lower():
             issues.append(f"{readme_path}: banner copy must not use placeholder wording.")
+
+    return issues
+
+
+def _find_tool_readme_structure_issues(repo_root: Path) -> list[str]:
+    src_root = repo_root / "src" / "dnadesign"
+    if not src_root.exists():
+        return []
+
+    issues: list[str] = []
+    for tool_name in sorted(discover_repo_tools(repo_root=repo_root)):
+        readme_path = src_root / tool_name / "README.md"
+        if not readme_path.exists():
+            continue
+
+        text = readme_path.read_text(encoding="utf-8")
+        lines = text.splitlines()
+        non_empty_indices = [idx for idx, line in enumerate(lines) if line.strip()]
+        if not non_empty_indices:
+            issues.append(f"{readme_path}: README is empty.")
+            continue
+
+        first_index = non_empty_indices[0]
+        first_line = lines[first_index].strip()
+        if TOOL_README_BANNER_PATTERN.search(first_line) is None:
+            issues.append(f"{readme_path}: first non-empty line must be the banner image line.")
+            continue
+
+        next_index = next((idx for idx in non_empty_indices if idx > first_index), None)
+        if next_index is not None and lines[next_index].lstrip().startswith("#"):
+            issues.append(
+                f"{readme_path}: line after the banner must be narrative text; avoid repeating a top title heading."
+            )
+
+        top_block = "\n".join(lines[:TOOL_README_TOP_LINK_SCAN_LINES])
+        has_local_markdown_link = False
+        for raw in LINK_PATTERN.findall(top_block):
+            link = raw.strip().split()[0]
+            if link.startswith(("http://", "https://", "mailto:", "#")):
+                continue
+            target_rel = link.split("#", 1)[0].strip()
+            if target_rel.lower().endswith(".md"):
+                has_local_markdown_link = True
+                break
+        if not has_local_markdown_link:
+            issues.append(f"{readme_path}: top section must include a local markdown link to deeper documentation.")
 
     return issues
 
@@ -855,6 +1107,13 @@ def main(argv: list[str] | None = None) -> int:
             print(f" - {issue}")
         return 1
 
+    tool_docs_metadata_issues = _find_tool_docs_metadata_issues(repo_root, max_age_days=args.max_sor_age_days)
+    if tool_docs_metadata_issues:
+        print("Tool docs metadata check failed:")
+        for issue in tool_docs_metadata_issues:
+            print(f" - {issue}")
+        return 1
+
     interface_doc_issues = _find_public_interface_doc_contract_issues(repo_root)
     if interface_doc_issues:
         print("Public interface docs contract check failed:")
@@ -876,10 +1135,45 @@ def main(argv: list[str] | None = None) -> int:
             print(f" - {issue}")
         return 1
 
+    tool_readme_structure_issues = _find_tool_readme_structure_issues(repo_root)
+    if tool_readme_structure_issues:
+        print("Tool README structure contract check failed:")
+        for issue in tool_readme_structure_issues:
+            print(f" - {issue}")
+        return 1
+
     readme_tool_catalog_issues = _find_readme_tool_catalog_issues(repo_root)
     if readme_tool_catalog_issues:
         print("README tool catalog check failed:")
         for issue in readme_tool_catalog_issues:
+            print(f" - {issue}")
+        return 1
+
+    root_docs_entrypoint_issues = _find_root_docs_entrypoint_issues(repo_root)
+    if root_docs_entrypoint_issues:
+        print("Root docs entrypoint check failed:")
+        for issue in root_docs_entrypoint_issues:
+            print(f" - {issue}")
+        return 1
+
+    deprecated_docs_entrypoint_issues = _find_deprecated_docs_entrypoint_issues(repo_root)
+    if deprecated_docs_entrypoint_issues:
+        print("Deprecated docs entrypoint check failed:")
+        for issue in deprecated_docs_entrypoint_issues:
+            print(f" - {issue}")
+        return 1
+
+    docs_root_heading_style_issues = _find_docs_root_heading_style_issues(repo_root)
+    if docs_root_heading_style_issues:
+        print("Docs root heading style check failed:")
+        for issue in docs_root_heading_style_issues:
+            print(f" - {issue}")
+        return 1
+
+    entrypoint_local_path_issues = _find_entrypoint_local_path_literal_issues(repo_root)
+    if entrypoint_local_path_issues:
+        print("Entrypoint local path hyperlink check failed:")
+        for issue in entrypoint_local_path_issues:
             print(f" - {issue}")
         return 1
 

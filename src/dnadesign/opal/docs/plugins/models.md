@@ -1,5 +1,9 @@
 ## OPAL Models — Registry
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This page documents model plugin contracts, config surface, and runtime wiring. For equations and detailed behavior, use the model-specific pages.
 
 ### Inventory

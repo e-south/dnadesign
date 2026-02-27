@@ -1,5 +1,9 @@
 # USR Refactoring Journal
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 ## 2026-02-05
 - Audit focus: streaming + dedup for large datasets; densegen/USR integration; notify integration patterns.
 - Observations:

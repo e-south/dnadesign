@@ -1,8 +1,8 @@
-## infer — model‑agnostic inference
-
 ![infer banner](assets/infer-banner.svg)
 
 **infer** runs biological sequence models and writes results back to datasets.
+
+See the [repository docs index](../../../docs/README.md) for workflow routes and operational references.
 
 - **Adapters:** `evo2` (implemented), `esm2` (stub)
 - **Ops (evo2):** `evo2.logits`, `evo2.embedding`, `evo2.log_likelihood`, `evo2.generate`

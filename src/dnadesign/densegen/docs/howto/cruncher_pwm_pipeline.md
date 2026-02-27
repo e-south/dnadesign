@@ -1,5 +1,9 @@
 ## Cruncher to DenseGen PWM handoff
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This how-to guide explains the current handoff contract from Cruncher motif artifacts into DenseGen PWM-driven workspaces. Read it when you need a reproducible path from motif discovery to Stage-A pools, Stage-B libraries, and solve-to-quota outputs.
 
 ### Current contract summary

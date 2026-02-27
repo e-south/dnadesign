@@ -1,5 +1,9 @@
 ## Stress ethanol and ciprofloxacin study tutorial
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This tutorial runs the largest packaged DenseGen campaign with expanded stress-condition plans and USR-ready outputs.
 
 ### Runbook command

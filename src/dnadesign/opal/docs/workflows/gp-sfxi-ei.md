@@ -1,5 +1,9 @@
 ## Uncertainty-aware OPAL rounds (GP + SFXI + EI)
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This demo involves a `gaussian_process` model that produces both predictions and predictive uncertainty, `sfxi_v1` turns those into a scalar score (and score uncertainty), and `expected_improvement` selects the next batch by balancing exploitation and exploration.
 
 Campaign: `src/dnadesign/opal/campaigns/demo_gp_ei/`

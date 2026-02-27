@@ -1,5 +1,9 @@
 ## OPAL Data Contracts
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This page documents the data and ledger contracts that OPAL reads and writes during ingest and round execution. Use it to validate schema expectations for `records.parquet`, label history, and append-only ledger sinks.
 
 ### Safety and validation

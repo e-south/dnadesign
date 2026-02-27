@@ -1,36 +1,36 @@
-# <Title>
+## <Title>
 
 **Type:** system-of-record
 **Owner:** <team-or-handle>
 **Last verified:** <YYYY-MM-DD or "never">
 
-## At a glance
+### At a glance
 - What this doc is the source of truth for.
 - What it is not.
 
-## Contents
+### Contents
 - [Context](#context)
 - [Invariants](#invariants)
 - [Interfaces](#interfaces)
 - [Operational notes](#operational-notes)
 - [Links](#links)
 
-## Context
+### Context
 <one or two paragraphs>
 
-## Invariants
+### Invariants
 - <invariant 1>
 - <invariant 2>
 
-## Interfaces
+### Interfaces
 - CLI:
 - Files:
 - Environment:
 
-## Operational notes
+### Operational notes
 - Failure modes:
 - Recovery:
 
-## Links
+### Links
 - Related docs:
 - Related code:

@@ -1,5 +1,9 @@
 # Workspace And Demo Guide
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This guide defines workspace operations and the curated demo entrypoints.
 
 ## Workspace Contract

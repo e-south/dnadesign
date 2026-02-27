@@ -1,5 +1,9 @@
 ## Constitutive sigma70 panel tutorial
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This tutorial runs the constitutive sigma70 panel workspace with fixed-element expansion and strict LacI/AraC background filtering.
 
 ### Runbook command

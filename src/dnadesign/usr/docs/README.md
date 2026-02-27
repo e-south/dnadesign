@@ -1,86 +1,50 @@
-# USR docs
+## USR docs
 
-## Contents
-- [At a glance](#at-a-glance)
-- [Read order](#read-order)
-- [Architecture introspection](#architecture-introspection)
-- [Integration](#integration)
-- [Operations](#operations)
-- [Progressive workflows](#progressive-workflows)
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
 
-## At a glance
+### Read order
 
-**Intent:** USR is the canonical, auditable sequence store and mutation/event boundary for `dnadesign`.
+1. [Top README](../README.md): package intent, hard boundaries, and where to branch next.
+2. [Getting started index](getting-started/README.md): first local run paths for CLI and notebook setup.
+3. [Operations index](operations/README.md): task-first sync runbooks for iterative remote and HPC updates.
+4. [Reference index](reference/README.md): authoritative contracts for schema, overlays, events, and API usage.
+5. [Architecture introspection](architecture-introspection.md): deep lifecycle and module interaction map for integration work.
 
-If you are new here:
-- read `../README.md` for the mental model and CLI quickstart
-- use `operations/sync.md` when you need SSH/HPC transfer workflows
-- use `dev/journal.md` for maintainers-only history and decisions
+### Getting started
 
-**When to use:**
-- Store canonical sequence datasets (generated and curated).
-- Attach derived metrics or annotations without rewriting base records.
-- Emit mutation events for operators and automation (Notify).
-- Govern derived columns with explicit namespace registry contracts.
+- [CLI quickstart](getting-started/cli-quickstart.md): create a dataset and execute the full local lifecycle once end-to-end.
+- [Interactive notebook](getting-started/notebook.md): inspect and iterate on datasets in marimo with path-first helpers.
 
-**When not to use:**
-- Not a sequence generator (use DenseGen and related tools).
-- Not an alerting transport (use Notify).
+### Operations
 
-**Boundary / contracts:**
-- `.events.log` is the integration boundary; Notify consumes this stream.
-- Derived columns must be namespaced as `<namespace>__<field>`.
-- Namespaces must be registered before attach/materialize operations.
+- [Operations index](operations/README.md): full runbook map with task shortcuts and an execution order.
+- [Workflow map](operations/workflow-map.md): choose a command chain by intent before diving into details.
+- [Sync over SSH](operations/sync.md): sync router page linking quickstart, setup, modes, and troubleshooting.
+- [Sync quickstart](operations/sync-quickstart.md): minimal daily loop for iterative HPC pull and push updates.
+- [Sync setup](operations/sync-setup.md): one-time SSH keys, remote profile wiring, and key rotation.
+- [Sync target modes](operations/sync-modes.md): path mapping for dataset-directory sync versus single-file sync.
+- [Sync troubleshooting](operations/sync-troubleshooting.md): failure signatures with deterministic diagnosis order.
+- [Sync audit loop](operations/sync-audit-loop.md): machine-readable transfer decisions for chained command execution.
+- [HPC sync flow](operations/hpc-agent-sync-flow.md): preflight/run/verify loop for batch-driven workspace updates.
+- [Chained DenseGen and Infer sync demo](operations/chained-densegen-infer-sync-demo.md): end-to-end cross-tool update loop with bidirectional sync.
+- [Sync fidelity drills](operations/sync-fidelity-drills.md): adversarial checks for sidecar, overlay, and hash parity.
 
-**Start here:**
-- [../README.md](../README.md) (concepts + CLI quickstart)
-- [../README.md#namespace-registry-required](../README.md#namespace-registry-required)
-- [../README.md#event-log-schema](../README.md#event-log-schema)
-- [operations/sync.md](operations/sync.md) (remote sync)
+### Reference
 
-## Read order
+- [Reference index](reference/README.md): entrypoint for stable USR contracts.
+- [Dataset layout and code map](reference/dataset-layout-and-code-map.md): on-disk structure and source module map.
+- [Schema contract](reference/schema-contract.md): required columns, types, and metadata keys.
+- [Overlay and registry contract](reference/overlay-and-registry.md): merge semantics and namespace governance.
+- [Event log contract](reference/event-log.md): `.events.log` payload fields and downstream integration boundary.
+- [Python API quickstart](reference/python-api.md): minimal `Dataset` usage flow for scripts and notebooks.
+- [Maintenance patterns](reference/maintenance.md): dedupe, merge, compaction, snapshot, and export routines.
 
-- USR concepts plus CLI quickstart: [../README.md](../README.md)
-- USR architecture/lifecycle/config introspection: [architecture-introspection.md](architecture-introspection.md)
-- Overlay plus registry contract: [../README.md#namespace-registry-required](../README.md#namespace-registry-required)
-- Overlay merge semantics: [../README.md#how-overlays-merge-conflict-resolution](../README.md#how-overlays-merge-conflict-resolution)
-- Event log schema (Notify input): [../README.md#event-log-schema](../README.md#event-log-schema)
+### Integration boundaries
 
-## Architecture introspection
-
-- Package intent, lifecycle, and interaction map: [architecture-introspection.md](architecture-introspection.md)
-- Use this when you need source-backed boundaries before changing sync/materialize/registry behavior.
-
-## Integration
-
-- DenseGen writes into USR via the `densegen` namespace:
-  - DenseGen outputs reference: [../../densegen/docs/reference/outputs.md](../../densegen/docs/reference/outputs.md)
-- Notify consumes USR `.events.log`:
-  - Notify operators doc: [../../../../docs/notify/usr-events.md](../../../../docs/notify/usr-events.md)
+- DenseGen outputs and overlays: [../../densegen/docs/reference/outputs.md](../../densegen/docs/reference/outputs.md) (write contracts for what DenseGen persists into USR).
+- Notify event consumer contract: [../../../../docs/notify/usr-events.md](../../../../docs/notify/usr-events.md) (read contract for how `.events.log` is consumed downstream).
 
 Boundary reminder:
-- DenseGen runtime telemetry (`outputs/meta/events.jsonl`) is not Notify input.
-- Notify reads USR dataset `.events.log` only.
-
-## Operations
-
-- Operations index: [operations/README.md](operations/README.md)
-- Workflow map (task-first command chains): [operations/workflow-map.md](operations/workflow-map.md)
-- Remote sync: [operations/sync.md](operations/sync.md)
-  - Progressive disclosure path: Quick path -> Advanced path -> Failure diagnosis
-- Sync audit loop: [operations/sync-audit-loop.md](operations/sync-audit-loop.md)
-- HPC sync runbook: [operations/hpc-agent-sync-flow.md](operations/hpc-agent-sync-flow.md)
-- Chained DenseGen+Infer sync demo: [operations/chained-densegen-infer-sync-demo.md](operations/chained-densegen-infer-sync-demo.md)
-- Dev notes: [dev/journal.md](dev/journal.md)
-
-## Progressive workflows
-
-- Start with USR concepts + CLI basics: [../README.md](../README.md)
-- Pick a command chain first: [operations/workflow-map.md](operations/workflow-map.md)
-- Move to SSH sync mechanics: [operations/sync.md](operations/sync.md)
-- Add machine-readable audit artifacts: [operations/sync-audit-loop.md](operations/sync-audit-loop.md)
-- Use the batch-safe operator loop: [operations/hpc-agent-sync-flow.md](operations/hpc-agent-sync-flow.md)
-- Use the chained DenseGen/Infer loop: [operations/chained-densegen-infer-sync-demo.md](operations/chained-densegen-infer-sync-demo.md)
-- Then apply sibling-tool docs:
-  - DenseGen: [../../densegen/README.md](../../densegen/README.md)
-  - Infer: [../../infer/README.md](../../infer/README.md)
+- DenseGen telemetry `outputs/meta/events.jsonl` is not Notify input.
+- Notify consumes USR dataset `.events.log`.

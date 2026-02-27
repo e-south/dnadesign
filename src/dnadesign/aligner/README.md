@@ -1,8 +1,8 @@
-## aligner
-
 ![aligner banner](assets/aligner-banner.svg)
 
 **aligner** computes Needleman–Wunsch global alignment scores between nucleotide sequences. It is designed to integrate into sibling pipelines such as **libshuffle**, **clustering**, and **billboard**. It uses Biopython's [PairwiseAligner](https://biopython.org/docs/dev/Tutorial/chapter_pairwise.html#chapter-pairwise) class and offers different output formats, normalization options, and lightweight caching.
+
+See the [repository docs index](../../../docs/README.md) for workflow routes and system runbooks.
 
 ```python
 aligner/

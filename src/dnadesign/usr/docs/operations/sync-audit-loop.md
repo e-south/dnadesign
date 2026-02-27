@@ -1,5 +1,9 @@
 # USR Sync Audit Loop
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 Use this runbook when you need machine-readable transfer decisions during iterative sync between HPC and local clones.
 
 ## Goal
@@ -26,8 +30,9 @@ AUDIT_DIR="${PWD}/.usr-sync-audit"
 # Create directory for audit JSON outputs.
 mkdir -p "$AUDIT_DIR"
 
-# 1) Preview before transfer.
-uv run usr diff "$DATASET_ID" "$REMOTE"
+# 1) Preview before transfer and persist machine-readable diff state.
+uv run usr diff "$DATASET_ID" "$REMOTE" \
+  --audit-json-out "$AUDIT_DIR/diff-before-transfer.json"
 
 # 2) Pull remote -> local and capture machine-readable audit.
 uv run usr pull "$DATASET_ID" "$REMOTE" -y \
@@ -49,11 +54,16 @@ jq -r '.data | [.action, .transfer_state, .primary.changed, ._derived.changed, .
 # Show contract version and verify profile.
 jq -r '[.usr_output_version, .data.verify.primary, .data.verify.sidecars, .data.verify.content_hashes] | @tsv' \
   "$AUDIT_DIR/pull.json"
+
+# Show concrete file deltas for sidecar decisions.
+jq -r '.data | {derived_local_only: ._derived.local_only, derived_remote_only: ._derived.remote_only, aux_local_only: ._auxiliary.local_only, aux_remote_only: ._auxiliary.remote_only}' \
+  "$AUDIT_DIR/pull.json"
 ```
 
 Interpretation:
 - `transfer_state=NO-OP` with no changed sections means repeated sync calls are safe.
 - `_derived.changed=true` or `_auxiliary.changed=true` means non-primary data moved and should be reviewed.
+- `_derived.local_only` / `_derived.remote_only` and `_auxiliary.local_only` / `_auxiliary.remote_only` list the exact file deltas to review.
 - `verify.content_hashes=on` confirms strict `_derived` and `_auxiliary` hash parity checks were active.
 
 ## Chained workflow usage

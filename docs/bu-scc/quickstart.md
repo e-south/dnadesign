@@ -1,9 +1,9 @@
-# BU SCC Quickstart: dnadesign (Interactive -> Batch -> Notify)
+## BU SCC Quickstart: dnadesign (Interactive -> Batch -> Notify)
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-02-18
 
-## At a glance
+### At a glance
 
 **Intent:** Provide one copy/paste path from SCC login through first batch submissions and Notify setup.
 
@@ -16,7 +16,7 @@
 - Deep dependency/debugging workflows (use [BU SCC Install bootstrap](install.md)).
 - Non-BU clusters (use scheduler-specific docs for your platform).
 
-## Contents
+### Contents
 
 - [Connect to SCC](#connect-to-scc)
 - [0) Scheduler constraints you must set](#0-scheduler-constraints-you-must-set)
@@ -29,7 +29,7 @@
 - [7) Submit first jobs](#7-submit-first-jobs)
 - [8) Add Notify](#8-add-notify)
 
-## Connect to SCC
+### Connect to SCC
 
 Run the quickstart on an SCC login shell:
 
@@ -41,7 +41,7 @@ ssh <BU_USERNAME>@scc1.bu.edu
 
 Reference: [BU SCC SSH access](https://www.bu.edu/tech/support/research/system-usage/connect-scc/ssh/)
 
-## 0) Scheduler constraints you must set
+### 0) Scheduler constraints you must set
 
 BU SCC scheduler is SGE (`qsub`) with `#$` directives.
 
@@ -58,7 +58,7 @@ References:
 - [BU SCC submitting jobs](https://www.bu.edu/tech/support/research/system-usage/running-jobs/submitting-jobs/)
 - [BU SCC interactive jobs](https://www.bu.edu/tech/support/research/system-usage/running-jobs/interactive-jobs/)
 
-## 1) Install uv
+### 1) Install uv
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -66,7 +66,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 Details: [BU SCC Install bootstrap: Install uv](install.md#1-install-uv-once)
 
-## 2) Clone repo
+### 2) Clone repo
 
 ```bash
 git clone https://github.com/e-south/dnadesign.git
@@ -75,7 +75,7 @@ cd dnadesign
 
 Details: [BU SCC Install bootstrap: Clone the repository](install.md#2-clone-the-repository)
 
-## 3) Set environment and caches
+### 3) Set environment and caches
 
 ```bash
 export UV_PROJECT_ENVIRONMENT="/projectnb/<project>/$USER/dnadesign/.venv"
@@ -86,7 +86,7 @@ export HF_HOME="${HF_HOME:-/projectnb/<project>/$USER/huggingface}"
 
 Details: [BU SCC Install bootstrap: Configure environment location and caches](install.md#3-configure-environment-location-and-caches)
 
-## 4) Load modules
+### 4) Load modules
 
 ```bash
 module purge
@@ -98,7 +98,7 @@ module load gcc/<version>
 
 Details: [BU SCC Install bootstrap: Load toolchain modules](install.md#4-load-toolchain-modules)
 
-## 5) Sync dependencies
+### 5) Sync dependencies
 
 ```bash
 uv python install 3.12
@@ -108,7 +108,7 @@ uv sync --locked --extra infer-evo2
 
 Details: [BU SCC Install bootstrap: Sync dependencies](install.md#5-sync-dependencies)
 
-## 6) Smoke tests
+### 6) Smoke tests
 
 ```bash
 uv run python - <<'PY'
@@ -121,9 +121,9 @@ PY
 For extended TE/FlashAttention/Evo2 checks:
 [BU SCC Install bootstrap: Smoke tests](install.md#6-smoke-tests)
 
-## 7) Submit first jobs
+### 7) Submit first jobs
 
-### 7.1 DenseGen CPU (template defaults)
+#### 7.1 DenseGen CPU (template defaults)
 
 ```bash
 qsub -P <project> \
@@ -131,7 +131,7 @@ qsub -P <project> \
   docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
-### 7.2 DenseGen + GUROBI (16-slot example)
+#### 7.2 DenseGen + GUROBI (16-slot example)
 
 Use this when your config sets `densegen.solver.backend: GUROBI`.
 
@@ -146,7 +146,7 @@ qsub -P <project> \
 
 In config, keep `densegen.solver.threads <= 16`.
 
-### 7.2b DenseGen iterative resume + quota extension
+#### 7.2b DenseGen iterative resume + quota extension
 
 Use this when continuing a workspace across multiple batch submissions.
 
@@ -156,7 +156,7 @@ qsub -P <project> \
   docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
-### 7.3 Evo2 GPU inference
+#### 7.3 Evo2 GPU inference
 
 ```bash
 qsub -P <project> \
@@ -170,7 +170,7 @@ Template details and overrides:
 Operational guidance:
 [BU SCC Batch + Notify runbook](batch-notify.md)
 
-## 8) Add Notify
+### 8) Add Notify
 
 Notify watches USR `.events.log` only. It does not consume DenseGen `outputs/meta/events.jsonl`.
 

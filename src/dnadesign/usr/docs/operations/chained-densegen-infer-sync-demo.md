@@ -1,5 +1,9 @@
 # Chained DenseGen and Infer Sync Demo
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 Use this runbook for the full asynchronous loop where DenseGen writes on HPC and Infer writes back overlays locally, with USR sync as the transfer contract.
 
 Default sync contract:

@@ -1,7 +1,7 @@
-# dnadesign Monorepo Organization Audit
+## dnadesign Monorepo Organization Audit
 
 
-## Contents
+### Contents
 - [Executive summary](#executive-summary)
 - [Current structure (observed)](#current-structure-observed)
 - [Top-level](#top-level)
@@ -26,7 +26,7 @@
 - [Open questions](#open-questions)
 - [Suggested next steps](#suggested-next-steps)
 
-## Executive summary
+### Executive summary
 
 The monorepo is already workable and pragmatic: tools are colocated under a single package namespace, CLI entry points are defined in one place, and uv is the primary dependency manager with a lockfile. The structure is opinionated (tool directories with nested `src/` for code) and provides good UX for tool-level IO and configs. The largest risks are inconsistent sub-structure across tools, global dependency coupling, and weak boundaries between tools (making change harder over time). These are fixable with convention, small reorganizations, and clearer package boundaries.
 
@@ -36,21 +36,21 @@ Top opportunities (highest impact, lowest disruption):
 - Use extras/dependency-groups or per-tool environments to reduce global dependency coupling.
 - Expand task aliases in uv/pixi for consistent entry points.
 
-## Current structure (observed)
+### Current structure (observed)
 
-### Top-level
+#### Top-level
 - Root docs: `docs/`
 - Package code: `src/dnadesign/`
 - Build/test configuration: `pyproject.toml`
 - Environment files: `uv.lock`, `pixi.toml`, `pixi.lock`
 - CI: `.github/workflows/ci.yaml` (not opened in this audit)
 
-### Tool directories under `src/dnadesign/`
+#### Tool directories under `src/dnadesign/`
 Observed tool roots:
 - `aligner`, `baserender`, `billboard`, `cluster`, `cruncher`, `densegen`, `infer`, `latdna`, `libshuffle`, `nmf`, `opal`, `permuter`, `tfkdanalysis`, `usr`
 - `archived/` and `prototypes/` are present (excluded from tests via `pytest` config)
 
-### Nested `src/` tool layout
+#### Nested `src/` tool layout
 Several tools include their own internal `src/`:
 - `baserender`, `cluster`, `cruncher`, `densegen`, `opal`, `permuter`, `usr` (and several under `archived/`)
 
@@ -65,21 +65,21 @@ src/dnadesign/<tool>/
   outputs/ (varies)
 ```
 
-### CLI entry points (from `pyproject.toml`)
+#### CLI entry points (from `pyproject.toml`)
 Scripts currently exposed:
 - `usr`, `opal`, `dense`, `infer`, `cluster`, `permuter`, `mb`, `baserender`, `cruncher`
 
 These scripts point to modules inside tool-specific `src/` folders (e.g., `dnadesign.cruncher.cli.app:app`).
 
-### Dependency and environment management
+#### Dependency and environment management
 - uv is the primary Python dependency manager with `uv.lock`.
 - `pixi.toml` exists with a minimal task list and a `meme` dependency.
 - `pyproject.toml` uses a single dependency list shared by all tools.
 - Dependency groups exist (`test`, `lint`, `dev`, `notebooks`).
 
-## Pragmatic programming principles: assessment and recommendations
+### Pragmatic programming principles: assessment and recommendations
 
-### 1) Decoupled design
+#### 1) Decoupled design
 
 Observations:
 - Tools share a common namespace (`dnadesign`), which is convenient but can hide coupling.
@@ -96,7 +96,7 @@ Recommendations:
 - Add a rule: tool-to-tool imports are not allowed except via shared packages.
 - If shared code is needed, move it to a common module and document it.
 
-### 2) Easier to change
+#### 2) Easier to change
 
 Observations:
 - Tool roots are grouped, which helps discoverability.
@@ -114,7 +114,7 @@ Recommendations:
 - Add a single “tool layout” reference doc in `docs/` and link it from each tool.
 - Create a small template (copyable) for new tools.
 
-### 3) Assertive programming
+#### 3) Assertive programming
 
 Observations:
 - The monorepo doesn't currently enforce guardrails at the layout level beyond `pytest` exclusions.
@@ -127,7 +127,7 @@ Recommendations:
 - Consider enforcing import boundaries with a lint rule or simple test (import graph sanity checks).
 - Prefer typed configuration objects (pydantic models already in dependencies) for tool configuration, with validation in CLI entry points.
 
-### 4) Robustness
+#### 4) Robustness
 
 Observations:
 - Global dependency list increases the chance that tools pick up unused but installed dependencies.
@@ -140,7 +140,7 @@ Recommendations:
 - For GPU-specific tools, keep GPU dependencies in explicit extras (as already done for `infer-evo2`).
 - Build minimal environments per tool to reduce “accidental coupling.”
 
-### 5) Extendibility
+#### 5) Extendibility
 
 Observations:
 - A single package with multiple subpackages is easy to extend initially.
@@ -152,7 +152,7 @@ Recommendations:
 - Establish a “tool registry” or list in docs, with pointers to each tool’s entry point and layout.
 - If new tools continue to appear, consider a sub-namespace: `dnadesign.tools.<tool>`.
 
-## Evaluating the current nested `src/` per tool
+### Evaluating the current nested `src/` per tool
 
 Your current approach (tool root with a nested `src/` for code and adjacent IO/config directories) is a valid and pragmatic pattern. It helps avoid a flat, cluttered top-level and keeps non-code assets next to the tool. The tradeoffs:
 
@@ -194,7 +194,7 @@ packages/
 
 Either is common. The single-package layout is simpler to maintain. The multi-package workspace scales better if tools have divergent dependencies or release cycles.
 
-## uv vs pixi for tool aliases and organization
+### uv vs pixi for tool aliases and organization
 
 Current state:
 - `pyproject.toml` defines all CLIs under `[project.scripts]` and uv runs them via `uv run <script>`.
@@ -209,23 +209,23 @@ Recommendations:
 
 Summary: uv already provides the standard aliasing mechanism for Python entry points. pixi is best used for system-level deps and task shortcuts (especially on clusters).
 
-## Recommendations by horizon
+### Recommendations by horizon
 
-### Low-risk, near-term
+#### Low-risk, near-term
 - Add a “Tool Layout Standard” doc with a canonical tree and naming conventions.
 - Add a “Tool Registry” doc listing tools, entry points, and where their code lives.
 - Establish one shared library namespace (example: `dnadesign/core`) and start moving shared code there.
 
-### Medium-term
+#### Medium-term
 - Introduce tool-specific dependency extras (e.g., `cruncher`, `opal`, `densegen`).
 - Add lint checks to discourage cross-tool imports (unless via shared libs).
 - Standardize tests layout per tool.
 
-### Long-term (optional)
+#### Long-term (optional)
 - Consider a uv workspace or multi-package layout if tools diverge heavily in dependencies or deployment lifecycle.
 - If you adopt multi-package layout, use a shared “dnadesign-core” package for common libraries.
 
-## Proposed standard tool layout (if keeping nested `src/`)
+### Proposed standard tool layout (if keeping nested `src/`)
 
 ```
 src/dnadesign/<tool>/
@@ -246,18 +246,18 @@ src/dnadesign/<tool>/
 
 This preserves your current preference while making the internal structure consistent across tools.
 
-## Risks to track
+### Risks to track
 
 - Tool sprawl without a shared “core” library can lead to duplicated utilities.
 - The root dependency list can balloon; extras help control this.
 - Archived/prototype code under `src/` can confuse packaging if it becomes importable.
 
-## Open questions
+### Open questions
 
 - Which tools are actively maintained vs legacy? This affects how strict the layout standard should be.
 - Do any tools require conflicting dependency versions? If yes, consider multi-package workspace sooner.
 
-## Suggested next steps
+### Suggested next steps
 
 - Decide on a single “tool layout standard” and document it.
 - Decide whether to keep the nested `src/` pattern and enforce it consistently.

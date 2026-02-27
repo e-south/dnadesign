@@ -1,5 +1,9 @@
 ## <Guide title>
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 **Last updated by:** cruncher-maintainers on 2026-02-23
 
 ### Contents
@@ -21,4 +25,4 @@ Additional options and contract details.
 
 ### Troubleshooting
 Route to the troubleshooting hub:
-- [`../guides/troubleshooting.md`](../guides/troubleshooting.md)
+- [`../../guides/troubleshooting.md`](../../guides/troubleshooting.md)

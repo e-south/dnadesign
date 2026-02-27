@@ -1,5 +1,9 @@
 ## Input model
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This concept page explains what DenseGen accepts as Stage-A inputs and how those inputs become retained candidate pools. Read it when you need to choose the right input type or diagnose Stage-A pool quality.
 
 ### How Stage-A builds input pools

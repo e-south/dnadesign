@@ -1,5 +1,9 @@
 # USR Workflow Map
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 Use this page to pick a command chain quickly, then open the linked runbook for full detail.
 
 ## Bootstrap from remote -> local clone
@@ -82,6 +86,8 @@ DATASET_ID="densegen/my_dataset"
 uv run usr diff "$DATASET_ID" bu-scc --audit-json-out /tmp/usr-sync-audit.json
 # Read the diff decision payload for orchestration logic.
 jq -r '.changes' /tmp/usr-sync-audit.json
+# Read exact sidecar file deltas for transfer decisions.
+jq -r '.data | {derived_local_only: ._derived.local_only, derived_remote_only: ._derived.remote_only, aux_local_only: ._auxiliary.local_only, aux_remote_only: ._auxiliary.remote_only}' /tmp/usr-sync-audit.json
 ```
 
 Details: [sync-audit-loop.md](sync-audit-loop.md)
@@ -90,6 +96,26 @@ Details: [sync-audit-loop.md](sync-audit-loop.md)
 
 - Sidecar and hash-fidelity drills: [sync-fidelity-drills.md](sync-fidelity-drills.md)
 - Full command contract and option semantics: [sync.md](sync.md)
+
+## Pressure-test loop (mock batch + adversarial schemas)
+
+Use this before or after sync/overlay refactors to validate iterative transfer behavior and schema hardening in one pass.
+
+```bash
+# Run deterministic harness cycle with optional sync-audit drill enabled.
+USR_HARNESS_RUN_SYNC_AUDIT_DRILL=1 \
+USR_HARNESS_REPORT_PATH=/tmp/usr-harness-report.json \
+USR_HARNESS_SYNC_AUDIT_REPORT_PATH=/tmp/usr-sync-audit-drill-report.json \
+  bash src/dnadesign/usr/scripts/run_usr_harness_cycle.sh
+
+# Re-run targeted adversarial suites directly when iterating quickly.
+uv run pytest -q \
+  src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py \
+  src/dnadesign/usr/tests/test_sync_schema_adversarial.py \
+  src/dnadesign/usr/tests/test_usr_sync_audit_drill_script.py
+```
+
+Details: [sync-fidelity-drills.md](sync-fidelity-drills.md), [sync-audit-loop.md](sync-audit-loop.md)
 
 ## Deterministic harness cycle
 
@@ -100,6 +126,10 @@ Use this when you want one reproducible preflight -> run -> verify pass before o
 bash src/dnadesign/usr/scripts/run_usr_harness_cycle.sh
 # Optional: emit machine-readable harness evidence.
 USR_HARNESS_REPORT_PATH=/tmp/usr-harness-report.json \
+  bash src/dnadesign/usr/scripts/run_usr_harness_cycle.sh
+# Optional: include the local sync audit drill in the harness cycle.
+USR_HARNESS_RUN_SYNC_AUDIT_DRILL=1 \
+USR_HARNESS_SYNC_AUDIT_REPORT_PATH=/tmp/usr-sync-audit-drill-report.json \
   bash src/dnadesign/usr/scripts/run_usr_harness_cycle.sh
 ```
 

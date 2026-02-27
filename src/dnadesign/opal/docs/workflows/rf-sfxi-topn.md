@@ -1,5 +1,9 @@
 ## Deterministic OPAL rounds (RF + SFXI + Top-n)
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This is the baseline OPAL “design-build-test-learn loop” walkthrough: ingest round-0 labels, fit a `random_forest` model, score candidates with `sfxi_v1`, select the next batch with `top_n`, and verify that the audit trail is consistent.
 
 Campaign: `src/dnadesign/opal/campaigns/demo_rf_sfxi_topn/`

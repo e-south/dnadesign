@@ -1,5 +1,9 @@
 ## RoundCtx and Contract Auditing
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 `RoundCtx` is a runtime companion to `campaign.yaml`: YAML chooses plugin graph. `RoundCtx`tracks what each stage computes and what downstream components consume. Use this page to understand runtime carriers, contract enforcement, and audit keys.
 
 The runner persists:

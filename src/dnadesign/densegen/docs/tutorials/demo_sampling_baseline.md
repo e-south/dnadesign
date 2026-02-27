@@ -1,5 +1,9 @@
 ## DenseGen sampling baseline tutorial
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This tutorial runs the sampling baseline with PWM artifacts, Stage-A mining, Stage-B generation, and dual-sink outputs.
 
 ### Runbook command

@@ -61,19 +61,33 @@ def test_usr_sync_audit_drill_script_runs_and_emits_audit_report(tmp_path: Path)
     assert diff_before_pull["transfer_state"] == "DIFF-ONLY"
     assert diff_before_pull["_derived"]["changed"] is True
     assert diff_before_pull["_auxiliary"]["changed"] is True
+    assert "_registry/operator-note.yaml" in diff_before_pull["_auxiliary"]["remote_only"]
+    assert diff_before_pull["_auxiliary"]["local_only"] == []
 
     assert pull["action"] == "pull"
     assert pull["transfer_state"] in {"TRANSFERRED", "NO-OP"}
+    assert "_registry/operator-note.yaml" in pull["_auxiliary"]["remote_only"]
 
     assert diff_before_push["action"] == "diff"
     assert diff_before_push["_derived"]["changed"] is True
     assert diff_before_push["_auxiliary"]["changed"] is True
+    assert "_registry/local-note.yaml" in diff_before_push["_auxiliary"]["local_only"]
+    assert any(
+        path.startswith("infer/part-") and path.endswith(".parquet")
+        for path in diff_before_push["_derived"]["local_only"]
+    )
 
     assert push["action"] == "push"
     assert push["transfer_state"] in {"TRANSFERRED", "NO-OP"}
+    assert "_registry/local-note.yaml" in push["_auxiliary"]["local_only"]
+    assert any(path.startswith("infer/part-") and path.endswith(".parquet") for path in push["_derived"]["local_only"])
 
     assert diff_after_push["action"] == "diff"
     assert diff_after_push["transfer_state"] == "DIFF-ONLY"
     assert diff_after_push["primary"]["changed"] is False
     assert diff_after_push["_derived"]["changed"] is False
     assert diff_after_push["_auxiliary"]["changed"] is False
+    assert diff_after_push["_derived"]["local_only"] == []
+    assert diff_after_push["_derived"]["remote_only"] == []
+    assert diff_after_push["_auxiliary"]["local_only"] == []
+    assert diff_after_push["_auxiliary"]["remote_only"] == []

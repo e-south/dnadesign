@@ -8,6 +8,8 @@ Contract-first sequence rendering with strict schemas and explicit adapters.
 - stable public API at `dnadesign.baserender`
 - tool-agnostic renderer with adapter-based integration
 
+See the [repository docs index](../../../docs/README.md) for broader workflow routing and operational references.
+
 ## What It Is
 
 `baserender` is a composable rendering runtime:

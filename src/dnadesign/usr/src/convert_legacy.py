@@ -14,40 +14,27 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import pandas as pd
 import pyarrow as pa
 
+from .convert_legacy_dedupe import apply_casefold_sequence_dedupe
+from .convert_legacy_inputs import (
+    Profile,
+    _coerce_logits,
+    _count_tf,
+    _ensure_pt_list_of_dicts,
+    _gather_pt_files,
+    _tf_from_parts,
+    profile_60bp_dual_promoter,
+)
+from .convert_legacy_tfbs import _detect_promoter_forward, _parse_tfbs_parts, _scan_used_tfbs
 from .dataset import Dataset
-from .errors import SchemaError, ValidationError
+from .errors import ValidationError
 from .events import record_event
 from .io import read_parquet, write_parquet_atomic
 from .normalize import compute_id, normalize_sequence
-
-# ---------------- profile typing (60bp_dual_promoter_cpxR_LexA) ----------------
-
-
-@dataclass(frozen=True)
-class Profile:
-    name: str
-    expected_length: Optional[int]
-    logits_key: str
-    logits_dst: str
-    logits_expected_dim: int
-    densegen_plan: str
-
-
-def profile_60bp_dual_promoter() -> Profile:
-    return Profile(
-        name="60bp_dual_promoter_cpxR_LexA",
-        expected_length=60,
-        logits_key="evo2_logits_mean_pooled",
-        logits_dst="infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__logits_mean",
-        logits_expected_dim=512,
-        densegen_plan="sigma70_mid",
-    )
-
 
 # Arrow types for derived columns in this profile
 PA = pa
@@ -64,99 +51,6 @@ PA_LIST_STRUCT_TFBS_DETAIL = PA.list_(
         ]
     )
 )
-
-
-# ---------------- small helpers ----------------
-
-
-def _require_torch():
-    try:
-        import torch
-    except ImportError as e:
-        raise SchemaError("torch is required for legacy conversion (convert-legacy).") from e
-    return torch
-
-
-def _coerce_logits(v: Any, *, want_dim: int) -> Optional[List[float]]:
-    """Return a flat list[float] of length want_dim, or None if unavailable."""
-    if v is None:
-        return None
-    # torch.Tensor path
-    mod = getattr(v.__class__, "__module__", "")
-    if mod.startswith("torch"):
-        torch = _require_torch()
-        if not isinstance(v, torch.Tensor):
-            raise ValidationError(f"logits type mismatch (module={mod})")
-        t = v.detach().cpu()
-        # Allow [1, D] or [D]
-        if t.ndim == 2 and t.shape[0] == 1:
-            t = t.reshape(t.shape[1])
-        if t.ndim != 1 or int(t.shape[0]) != want_dim:
-            raise ValidationError(f"logits shape mismatch (got {tuple(t.shape)}, expected [{want_dim}])")
-        # default to float32 then Python floats
-        return t.to(dtype=torch.float32).tolist()
-    # list-like path
-    if isinstance(v, (list, tuple)):
-        arr = list(v)
-        # flatten [1, D] to [D]
-        if len(arr) == 1 and isinstance(arr[0], (list, tuple)):
-            arr = list(arr[0])
-        if len(arr) != want_dim:
-            raise ValidationError(f"logits length mismatch (got {len(arr)}, expected {want_dim})")
-        return [float(x) for x in arr]
-    return None
-
-
-def _tf_from_parts(parts: Sequence[str]) -> List[str]:
-    """Extract unique TF names from strings like 'lexa:...' or 'cpxr:...'"""
-    out = set()
-    for s in parts:
-        if not isinstance(s, str):
-            continue
-        if ":" in s:
-            tf = s.split(":", 1)[0].strip().lower()
-            if tf:
-                out.add(tf)
-    return sorted(out)
-
-
-def _count_tf(parts: Sequence[str]) -> Dict[str, int]:
-    counts = {"cpxr": 0, "lexa": 0}
-    for s in parts:
-        if not isinstance(s, str):
-            continue
-        if s.lower().startswith("lexa:"):
-            counts["lexa"] += 1
-        elif s.lower().startswith("cpxr:"):
-            counts["cpxr"] += 1
-    return counts
-
-
-def _ensure_pt_list_of_dicts(p: Path) -> List[dict]:
-    torch = _require_torch()
-    checkpoint = torch.load(str(p), map_location=torch.device("cpu"))
-    if not isinstance(checkpoint, list) or not checkpoint:
-        raise SchemaError(f"{p} must be a non-empty list.")
-    for i, e in enumerate(checkpoint):
-        if not isinstance(e, dict):
-            raise SchemaError(f"{p} entry {i} is not a dict.")
-        if "sequence" not in e:
-            raise SchemaError(f"{p} entry {i} missing 'sequence'.")
-    return checkpoint
-
-
-def _gather_pt_files(paths: Iterable[Path]) -> List[Path]:
-    files: List[Path] = []
-    for p in paths:
-        if p.is_dir():
-            files.extend(sorted(p.rglob("*.pt")))
-        elif p.suffix == ".pt":
-            files.append(p)
-        else:
-            raise SchemaError(f"Not a .pt file or directory: {p}")
-    if not files:
-        raise SchemaError("No .pt files found.")
-    return files
 
 
 # ---------------- core conversion ----------------
@@ -449,108 +343,6 @@ def convert_legacy(
     )
 
 
-_PROMOTERS = {
-    "sigma70_high": {"upstream": "TTGACA", "downstream": "TATAAT"},
-    "sigma70_mid": {"upstream": "ACCGCG", "downstream": "TATAAT"},
-    "sigma70_low": {"upstream": "GCAGGT", "downstream": "TATAAT"},
-}
-
-_DNA_COMP = str.maketrans("ACGTacgt", "TGCAtgca")
-
-
-def _revcomp(s: str) -> str:
-    return s.translate(_DNA_COMP)[::-1]
-
-
-def _parse_tfbs_parts(parts: Sequence[str], *, min_len: int) -> list[tuple[str, str]]:
-    """
-    Parse ['tf:motif', ...] → [('tf', 'MOTIF'), ...], filtering out short motifs.
-    TF is lower-cased; motif upper-cased.
-    """
-    out: list[tuple[str, str]] = []
-    for raw in parts or []:
-        if not isinstance(raw, str) or ":" not in raw:
-            continue
-        tf, motif = raw.split(":", 1)
-        tf = (tf or "").strip().lower()
-        motif = (motif or "").strip().upper()
-        if not tf or not motif or len(motif) < int(min_len):
-            continue
-        out.append((tf, motif))
-    return out
-
-
-def _scan_used_tfbs(seq: str, tfbs_parts: list[tuple[str, str]]) -> tuple[list[str], list[dict], dict]:
-    """
-    From a sequence and cleaned parts [('tf','MOTIF')...], compute:
-      - used_tfbs: ['tf:motif', ...] for motifs found in seq (fwd or revcmp)
-      - used_tfbs_detail: [{'offset':int,'orientation':'fwd|rev','tf':str,'tfbs':str}, ...]
-      - used_tf_counts: {'cpxr':int, 'lexa':int}
-    Rule: take the *earliest* (lowest offset) match among fwd/rev per motif, one entry per part.
-    """
-    used_simple: list[str] = []
-    used_detail: list[dict] = []
-    counts = {"cpxr": 0, "lexa": 0}
-
-    sU = (seq or "").upper()
-
-    for tf, motif in tfbs_parts:
-        if not motif:
-            continue
-        fwd = sU.find(motif)
-        rev_m = _revcomp(motif)
-        rev = sU.find(rev_m)
-
-        if fwd < 0 and rev < 0:
-            continue
-
-        if fwd >= 0 and (rev < 0 or fwd <= rev):
-            used_simple.append(f"{tf}:{motif}")
-            used_detail.append({"offset": int(fwd), "orientation": "fwd", "tf": tf, "tfbs": motif})
-        else:
-            used_simple.append(f"{tf}:{motif}")
-            used_detail.append({"offset": int(rev), "orientation": "rev", "tf": tf, "tfbs": motif})
-
-        if tf in counts:
-            counts[tf] += 1
-
-    used_detail.sort(key=lambda d: (d["offset"], d["tf"]))
-    return used_simple, used_detail, counts
-
-
-def _detect_promoter_forward(seq: str, plan_name: str) -> list[dict]:
-    """
-    Find forward-strand promoter hexamers for the row's plan.
-    Adds entries in the same detail schema with 'tf' like 'sigma70_low_upstream'.
-    """
-    plan = (plan_name or "").strip() or profile_60bp_dual_promoter().densegen_plan
-    pc = _PROMOTERS.get(plan, _PROMOTERS[profile_60bp_dual_promoter().densegen_plan])
-    sU = (seq or "").upper()
-    extras: list[dict] = []
-
-    for key in ("upstream", "downstream"):
-        motif = pc.get(key, "")
-        if not motif:
-            continue
-        start = 0
-        while True:
-            idx = sU.find(motif, start)
-            if idx < 0:
-                break
-            extras.append(
-                {
-                    "offset": int(idx),
-                    "orientation": "fwd",
-                    "tf": f"{plan}_{key}",
-                    "tfbs": motif,
-                }
-            )
-            start = idx + 1  # allow multiple occurrences
-
-    extras.sort(key=lambda d: (d["offset"], d["tf"]))
-    return extras
-
-
 @dataclass
 class RepairStats:
     rows_total: int
@@ -595,60 +387,12 @@ def repair_densegen_used_tfbs(
     tbl = read_parquet(ds.records_path)
 
     # ----------- (optional) Case-insensitive de-duplication (pre-clean) -----------
-    if dedupe_policy and dedupe_policy.lower() != "off":
-        import pyarrow as _pa
-        import pyarrow.compute as _pc
-
-        df = tbl.select(["id", "bio_type", "sequence", "created_at"]).to_pandas()
-        df["_key"] = df["bio_type"].str.lower() + "|" + df["sequence"].str.upper()
-        groups = df.groupby("_key").agg({"id": "count"})
-        dup_keys = groups[groups["id"] > 1].index.tolist()
-        if not dup_keys:
-            print("[repair-densegen] dedupe: OK — no case-insensitive duplicates found.")
-        else:
-            # Decide which to keep/drop per group
-            keep_ids: list[str] = []
-            drop_ids: list[str] = []
-            for k, g in df[df["_key"].isin(dup_keys)].groupby("_key"):
-                # deterministic order: created_at then id
-                g_sorted = g.sort_values(["created_at", "id"], ascending=True, kind="stable")
-                if dedupe_policy == "keep-last":
-                    g_sorted = g.sort_values(["created_at", "id"], ascending=False, kind="stable")
-                if dedupe_policy == "ask" and not dry_run:
-                    print(f"\nduplicate sequence (casefold): {k.split('|', 1)[1]}")
-                    for i, r in enumerate(g_sorted.reset_index(drop=True).itertuples(index=False), start=1):
-                        print(f"  {i}: id={r.id}  created_at={r.created_at}")
-                    ans = input("Keep which row? [1..n], 0=drop all, s=skip group: ").strip().lower()
-                    if ans in {"s", "skip"}:
-                        keep_ids.extend(g_sorted["id"].tolist())
-                        continue
-                    if ans in {"0", "drop-all"}:
-                        drop_ids.extend(g_sorted["id"].tolist())
-                        continue
-                    try:
-                        kidx = int(ans)
-                    except ValueError as e:
-                        raise ValidationError(f"Invalid selection '{ans}' for de-duplication.") from e
-                    if 1 <= kidx <= len(g_sorted):
-                        keep_ids.append(g_sorted.iloc[kidx - 1]["id"])
-                        drop_ids.extend(g_sorted.drop(g_sorted.index[kidx - 1])["id"].tolist())
-                        continue
-                    raise ValidationError(f"Selection out of range for de-duplication: {kidx}.")
-                else:
-                    keep_ids.append(g_sorted.iloc[0]["id"])
-                    drop_ids.extend(g_sorted.iloc[1:]["id"].tolist())
-
-            print(f"[repair-densegen] dedupe plan: groups={len(dup_keys)}  would_drop={len(drop_ids)}")
-            if not dry_run and drop_ids:
-                if not assume_yes:
-                    ans2 = input("Proceed with de-duplication? [y/N]: ").strip().lower()
-                    if ans2 not in {"y", "yes"}:
-                        print("Skipping de-duplication.")
-                    else:
-                        drop_set = set(drop_ids)
-                        mask = _pc.is_in(tbl.column("id"), value_set=_pa.array(list(drop_set)))
-                        tbl = tbl.filter(_pc.invert(mask))
-                        print(f"[repair-densegen] dedupe: dropped {len(drop_set)} row(s); rows now {tbl.num_rows}.")
+    tbl = apply_casefold_sequence_dedupe(
+        tbl,
+        dedupe_policy=dedupe_policy,
+        dry_run=dry_run,
+        assume_yes=assume_yes,
+    )
 
     names = set(tbl.schema.names)
     need_cols = {"id", "sequence", "densegen__plan", "densegen__tfbs_parts"}
@@ -836,7 +580,6 @@ def repair_densegen_used_tfbs(
 
                     # Convert to simple boolean list for filtering arrays
                     keep_bools = [bool(u) for u in new_used_all]
-                    import pyarrow.compute as _pc
 
                     tbl = tbl.filter(_pa.array(keep_bools))
 

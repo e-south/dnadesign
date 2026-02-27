@@ -1,5 +1,9 @@
 ## DenseGen config reference
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 Use this page when you need exact YAML keys and constraints.
 Unknown keys are hard errors.
 All relative paths resolve from the config file directory.
@@ -21,9 +25,9 @@ This section covers contents.
 - [`densegen.run`](#densegenrun) - run identifier and root.
 - [`densegen.output`](#densegenoutput) - output targets and schema.
 - [`densegen.generation`](#densegengeneration) - plan and fixed elements.
-- [`densegen.motif_sets`](#densegenmotifsets) - reusable motif dictionaries.
+- [`densegen.motif_sets`](#densegenmotif_sets) - reusable motif dictionaries.
 - [`densegen.generation.plan[].fixed_elements.fixed_element_matrix`](#densegengenerationplanfixedelementsfixed_element_matrix) - deterministic matrix expansion.
-- [`densegen.generation.sequence_constraints`](#densegengenerationsequenceconstraints) - global final-sequence motif rules.
+- [`densegen.generation.sequence_constraints`](#densegengenerationsequence_constraints) - global final-sequence motif rules.
 - [`densegen.generation.sampling`](#densegengenerationsampling-stage-b-sampling) - Stage-B library building controls.
 - [`densegen.solver`](#densegensolver) - backend and strategy.
 - [`densegen.runtime`](#densegenruntime) - retry and guard rails.

@@ -1,5 +1,9 @@
 ## DenseGen outputs reference
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This page defines what DenseGen writes, where it writes it, and which event stream each
 consumer should read.
 
@@ -151,7 +155,7 @@ This section points to stream-boundary docs and keeps this file focused on artif
 
 See also:
 - DenseGen boundary and mistakes: **[observability and events](../concepts/observability_and_events.md)**
-- USR event schema: `../../../usr/README.md#event-log-schema`
+- USR event schema: `../../../usr/docs/reference/event-log.md`
 - Notify operators doc: `../../../../../docs/notify/usr-events.md`
 - DenseGen watcher walkthrough: **[DenseGen to USR to Notify tutorial](../tutorials/demo_usr_notify.md)**
 

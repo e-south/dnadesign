@@ -1,5 +1,9 @@
 # Cruncher Integration Contract
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This page defines Cruncher schema mappings used by `baserender`.
 
 ## Contract intent

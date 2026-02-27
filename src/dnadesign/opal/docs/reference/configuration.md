@@ -1,5 +1,9 @@
 ## OPAL Configuration (v2)
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This page documents the `campaign.yaml` configuration contract used by OPAL runtime and CLI commands.
 Use it as the source of truth for required keys, defaults, and model/objective/selection wiring.
 

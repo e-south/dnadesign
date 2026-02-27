@@ -1,9 +1,9 @@
-# DenseGen -> USR -> Notify Lifecycle Design
+## DenseGen -> USR -> Notify Lifecycle Design
 
 Date: 2026-02-12
 Status: Proposed (validated in brainstorming)
 
-## Scope and outcomes
+### Scope and outcomes
 
 This design defines what Notify should report for DenseGen lifecycle monitoring while keeping messages compact and operationally useful for Slack readers. The primary outcome is an action-oriented signal stream with controlled periodic health updates and strict, tool-scoped metrics contracts.
 
@@ -26,7 +26,7 @@ Out of scope for this pass:
 - dense, per-plan/per-array notification spam
 - fallback inference of DenseGen metrics in Notify
 
-## Contract changes and data model
+### Contract changes and data model
 
 DenseGen remains the source of truth for DenseGen runtime metrics; Notify remains a delivery and rendering component.
 
@@ -56,9 +56,9 @@ Contract policy:
 - Missing required DenseGen metrics in DenseGen lifecycle notifications are treated as schema failures for that policy, not silently dropped or inferred.
 - Generic policy behavior remains unchanged for non-DenseGen tools.
 
-## Notification content and formatting
+### Notification content and formatting
 
-### Message layout
+#### Message layout
 
 All DenseGen notifications use:
 1. One summary line
@@ -66,7 +66,7 @@ All DenseGen notifications use:
 
 No ASCII tables or pseudo-table blocks.
 
-### Message templates
+#### Message templates
 
 Started:
 - `DenseGen started | run=<run_id> | dataset=<dataset_name>`
@@ -95,7 +95,7 @@ Completed:
 - `• Final TFBS coverage: <final_cov>% (<used>/<library>)`
 - `• Final plan success: <solved>/<attempted> (<success_pct>%)`
 
-## Triggering, dedup, and noise controls
+### Triggering, dedup, and noise controls
 
 Health notification trigger (hybrid):
 - progress edge: send when quota crosses 10, 20, ..., 100
@@ -115,7 +115,7 @@ Reliability behavior:
 - Keep retry/backoff semantics unchanged.
 - Keep SCC TLS explicitness unchanged (`--tls-ca-bundle` / `SSL_CERT_FILE`).
 
-## Architecture and implementation plan
+### Architecture and implementation plan
 
 Implementation is split into two components:
 
@@ -137,7 +137,7 @@ Design constraints:
 - no mixed concerns: DenseGen computes metrics; Notify renders/transmits
 - maintain generic provider contract and existing CLI surface where possible
 
-## Testing strategy
+### Testing strategy
 
 Unit tests:
 - DenseGen metrics schema validation (required keys and value types)
@@ -161,7 +161,7 @@ Rendering tests:
 - snapshot-style checks for bullet-list message shape
 - explicit assertion that table-like formatting is not produced
 
-## Rollout and docs
+### Rollout and docs
 
 Rollout order:
 1. add metrics fields in DenseGen event emission and tests

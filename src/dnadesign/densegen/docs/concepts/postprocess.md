@@ -1,5 +1,9 @@
 ## Postprocessing model
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This concept page explains how DenseGen finalizes sequences when solved layouts are shorter than the target length. Read it when you need to reason about padding behavior, GC feasibility, and fail-fast semantics.
 
 ### Why postprocessing exists

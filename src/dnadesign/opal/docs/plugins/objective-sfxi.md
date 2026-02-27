@@ -1,5 +1,9 @@
 ## setpoint_fidelity_x_intensity `sfxi`
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This page documents `sfxi_v1` objective behavior, equations, and emitted channels.
 It explains how OPAL converts vec8 model outputs into selection-ready score and uncertainty channels.
 

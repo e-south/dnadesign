@@ -1,5 +1,9 @@
 # USR Architecture Introspection
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 ## Decision summary
 
 - Scope: `src/dnadesign/usr/src/` package behavior, with emphasis on sync reliability, overlay materialization, and operator-facing contracts.
@@ -65,11 +69,13 @@ Edge cases handled:
   - CLI/wiring: `cli.py`, `cli_commands/*`
   - Dataset core: `dataset.py`, `dataset_overlay_ops.py`, `dataset_overlay_maintenance.py`, `dataset_materialize.py`, `dataset_state.py`
   - Sync core: `sync.py`, `sync_sidecars.py`, `remote.py`, `diff.py`
+  - Legacy conversion/repair: `convert_legacy.py`, `convert_legacy_tfbs.py`, `convert_legacy_dedupe.py`
   - Contracts: `schema.py`, `registry.py`, `event_schema.py`
 - Component/function view:
   - Sync: `execute_pull`, `execute_push`, `verify_sidecar_state_match`, `stat_dataset`
   - Overlay materialize: `materialize_dataset`, `validate_overlay_schema`
   - Registry enforcement: `register_namespace`, `parse_columns_spec`
+  - Repair pre-clean dedupe: `apply_casefold_sequence_dedupe`
 
 Runtime interaction scenario:
 - HPC batch appends overlays -> local `usr pull` stages and verifies -> local analysis/infer writes overlays -> `usr push` verifies remote parity -> operators inspect sync audit and `.events.log`.
@@ -129,13 +135,19 @@ Precedence notes:
   - `src/dnadesign/usr/src/dataset_materialize.py`
   - `src/dnadesign/usr/src/registry.py`
   - `src/dnadesign/usr/src/schema.py`
+- Legacy repair decomposition:
+  - `src/dnadesign/usr/src/convert_legacy.py`
+  - `src/dnadesign/usr/src/convert_legacy_tfbs.py`
+  - `src/dnadesign/usr/src/convert_legacy_dedupe.py`
 - Behavior and reliability tests:
   - `src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py`
   - `src/dnadesign/usr/tests/test_sync_schema_adversarial.py`
+  - `src/dnadesign/usr/tests/test_convert_legacy_dedupe_module.py`
   - `src/dnadesign/usr/tests/test_usr_docs_contract.py`
 
 ## Open questions and risk notes
 
 - `dataset.py` remains a large orchestration surface; additional extraction slices should continue around query and reserved-overlay paths.
+- `repair_densegen_used_tfbs()` still combines multiple optional mutation/drop paths; next extraction slice should isolate single-TF and id/sequence-only drop policy handling.
 - High-assurance hash mode can add runtime cost on very large overlay trees; operators should choose cadence based on transfer window constraints.
 - Sync audit output is strong for decision support; adding machine-readable audit snapshots may further improve automated orchestration loops.

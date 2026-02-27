@@ -1,7 +1,7 @@
-# Stage-A Summary Plot Doc Alignment Design
+## Stage-A Summary Plot Doc Alignment Design
 
 
-## Contents
+### Contents
 - [Context](#context)
 - [Goal](#goal)
 - [Scope](#scope)
@@ -15,26 +15,26 @@
 - [Risks](#risks)
 - [Rollout](#rollout)
 
-## Context
+### Context
 Stage-A produces a three-figure plot bundle (`stage_a_summary`) that is used to explain sampling quality, yield, and diversity behavior. The current narrative is scattered across multiple docs, and the didactic takeaways can drift from what the plots actually show. The goal is to make the documentation semantically aligned with the visuals and keep it aligned over time.
 
-## Goal
+### Goal
 Create a single authoritative "How to read `stage_a_summary`" section in `sampling.md` that matches the current plot semantics and labels, and make other docs link to it rather than duplicating interpretation.
 
-## Scope
+### Scope
 - Documentation updates only.
 - No code changes.
 - No new tooling or automated tests.
 
-## Non-Goals
+### Non-Goals
 - Changing plot behavior or metrics.
 - Adding new plots or annotations.
 
-## Recommended Approach (A)
+### Recommended Approach (A)
 Move the full interpretive narrative into `src/dnadesign/densegen/docs/concepts/sampling.md` as a dedicated section and replace interpretive prose elsewhere with links to that section.
 
-## Proposed Changes
-### 1) Canonical narrative in sampling.md
+### Proposed Changes
+#### 1) Canonical narrative in sampling.md
 Add a section titled "How to read `stage_a_summary` (three figures)" with three subsections:
 
 1. **`stage_a_summary__<input>.png` (tiers)**
@@ -55,12 +55,12 @@ Add a short glossary for the inline metrics that appear in the plots:
 - **ΔJ**: MMR objective gain (diversified − top)
 - **overlap**: fraction of shared sequences between Top and Diversified sets
 
-### 2) Remove interpretive duplication elsewhere
+#### 2) Remove interpretive duplication elsewhere
 - `src/dnadesign/densegen/docs/reference/outputs.md`: keep plot inventory only; add a link to the sampling guide for interpretation.
 - `src/dnadesign/densegen/docs/tutorials/demo_pwm_artifacts.md`: replace interpretive text with a short link to the sampling guide section.
 - `src/dnadesign/densegen/docs/dev/audit_2026-01-30_stage_a.md`: keep run notes but remove plot interpretation; link to the sampling guide section.
 
-### 3) Drift prevention note
+#### 3) Drift prevention note
 Add a short "Doc-plot sync checklist" at the end of the new sampling.md section listing the exact plot labels that must match the docs:
 - Top Sequences
 - Diversified Sequences
@@ -68,13 +68,13 @@ Add a short "Doc-plot sync checklist" at the end of the new sampling.md section 
 - IUPAC consensus labels on entropy x-axis
 - Yield stage labels: Generated → Eligible → Unique core → MMR pool → Retained
 
-## Validation
+### Validation
 - Run `uv run dense plot --only stage_a_summary` and visually confirm labels and semantics match the sampling guide section.
 - Check all updated docs for consistent terminology and links.
 
-## Risks
+### Risks
 - Future plot label changes can reintroduce drift unless the checklist is followed.
 
-## Rollout
+### Rollout
 - Apply doc updates in a single commit.
 - Announce the new canonical location for plot interpretation to avoid future duplication.

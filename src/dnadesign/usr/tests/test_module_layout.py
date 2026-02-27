@@ -275,3 +275,26 @@ def test_sync_transfer_module_exports_expected_symbols() -> None:
     assert hasattr(module, "copy_file_atomic")
     assert hasattr(module, "collect_staged_entries")
     assert hasattr(module, "promote_staged_pull")
+
+
+def test_convert_legacy_inputs_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.convert_legacy_inputs")
+    assert hasattr(module, "Profile")
+    assert hasattr(module, "profile_60bp_dual_promoter")
+    assert hasattr(module, "_coerce_logits")
+    assert hasattr(module, "_tf_from_parts")
+    assert hasattr(module, "_count_tf")
+    assert hasattr(module, "_ensure_pt_list_of_dicts")
+    assert hasattr(module, "_gather_pt_files")
+
+
+def test_convert_legacy_tfbs_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.convert_legacy_tfbs")
+    assert hasattr(module, "_parse_tfbs_parts")
+    assert hasattr(module, "_scan_used_tfbs")
+    assert hasattr(module, "_detect_promoter_forward")
+
+
+def test_convert_legacy_dedupe_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.convert_legacy_dedupe")
+    assert hasattr(module, "apply_casefold_sequence_dedupe")

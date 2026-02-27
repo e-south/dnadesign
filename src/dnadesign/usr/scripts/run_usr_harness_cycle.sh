@@ -11,6 +11,8 @@
 set -euo pipefail
 
 REPORT_PATH="${USR_HARNESS_REPORT_PATH:-}"
+RUN_SYNC_AUDIT_DRILL="${USR_HARNESS_RUN_SYNC_AUDIT_DRILL:-0}"
+SYNC_AUDIT_REPORT_PATH="${USR_HARNESS_SYNC_AUDIT_REPORT_PATH:-}"
 STARTED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 STEP_LOG="$(mktemp -t usr-harness-steps.XXXXXX)"
 FAILED_STEP=""
@@ -87,6 +89,13 @@ run_step() {
   return "${status}"
 }
 
+is_truthy() {
+  case "$1" in
+    1|true|TRUE|yes|YES|on|ON) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 run_step "preflight-cli-help" bash -lc "uv run usr --help >/dev/null"
 run_step \
   "preflight-sync-focused-tests" \
@@ -94,6 +103,18 @@ run_step \
   src/dnadesign/usr/tests/test_sync_iterative_batch_flow.py \
   src/dnadesign/usr/tests/test_sync_schema_adversarial.py \
   src/dnadesign/usr/tests/test_sync_target_modes.py
+if is_truthy "${RUN_SYNC_AUDIT_DRILL}"; then
+  if [[ -n "${SYNC_AUDIT_REPORT_PATH}" ]]; then
+    run_step \
+      "preflight-sync-audit-drill" \
+      uv run python src/dnadesign/usr/scripts/run_usr_sync_audit_drill.py \
+      --report-json "${SYNC_AUDIT_REPORT_PATH}"
+  else
+    run_step \
+      "preflight-sync-audit-drill" \
+      uv run python src/dnadesign/usr/scripts/run_usr_sync_audit_drill.py
+  fi
+fi
 run_step "run-full-usr-tests" uv run pytest -q src/dnadesign/usr/tests
 run_step "verify-ruff-check" uv run ruff check src/dnadesign/usr/src src/dnadesign/usr/tests
 run_step "verify-ruff-format" uv run ruff format --check src/dnadesign/usr/src src/dnadesign/usr/tests

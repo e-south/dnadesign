@@ -1,5 +1,9 @@
 ## Generation model
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This concept page explains how DenseGen turns Stage-A pools into accepted sequences under plan constraints. Read it when you need to reason about quotas, fixed elements, and solver feasibility before editing generation config. For exact field definitions, use the **[config reference](../reference/config.md)**.
 
 ### What plans control

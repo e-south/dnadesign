@@ -1,5 +1,9 @@
 ## Score-driven OPAL rounds (GP + SFXI + Top-n)
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This demo swaps the surrogate model from `random_forest` to `gaussian_process` but keeps deterministic `top_n` selection. It’s the “model changed, selection unchanged” bridge between the random-forest baseline and Expected Improvement.
 
 Campaign: `src/dnadesign/opal/campaigns/demo_gp_topn/`

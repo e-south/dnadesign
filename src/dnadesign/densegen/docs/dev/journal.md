@@ -1,5 +1,9 @@
 ## DenseGen development journal
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This journal records DenseGen implementation decisions, audit findings, and validation commands over time. Read it when you need historical context for why specific architecture or runtime changes were made.
 
 ### 2026-02-03

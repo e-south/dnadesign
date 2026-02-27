@@ -1,11 +1,11 @@
-# Notify: consuming Universal Sequence Record events
+## Notify: consuming Universal Sequence Record events
 
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-02-18
 
 Notify consumes Universal Sequence Record mutation events from `.events.log` newline-delimited JSON files and sends selected events to webhook providers. The integration contract is Universal Sequence Record `.events.log` only; DenseGen runtime diagnostics (`outputs/meta/events.jsonl`) are out of scope for Notify.
 
-## Contents
+### Contents
 - [Minimal operator quickstart](#minimal-operator-quickstart)
 - [Artifact placement strategy](#artifact-placement-strategy)
 - [Command anatomy: `notify setup webhook`](#command-anatomy-notify-setup-webhook)
@@ -22,7 +22,7 @@ Notify consumes Universal Sequence Record mutation events from `.events.log` new
 
 ---
 
-## Minimal operator quickstart
+### Minimal operator quickstart
 
 ```bash
 # Run workspace (shorthand mode).
@@ -90,7 +90,7 @@ uv run notify spool drain --profile "$PROFILE"
 
 ---
 
-## Artifact placement strategy
+### Artifact placement strategy
 
 Default (recommended):
 - keep Notify runtime artifacts with the run workspace you are watching:
@@ -114,7 +114,7 @@ Avoid by default:
 
 ---
 
-## Command anatomy: `notify setup webhook`
+### Command anatomy: `notify setup webhook`
 
 Canonical command:
 
@@ -139,7 +139,7 @@ Common options:
 
 ---
 
-## Command anatomy: `notify setup slack`
+### Command anatomy: `notify setup slack`
 
 This command creates or updates a watch profile, so it must also resolve an events source.
 Pass either `--events` or resolver mode (`--tool` with exactly one of `--config`/`--workspace`).
@@ -200,7 +200,7 @@ uv run notify usr-events watch --tool densegen --config "$CONFIG" --follow --wai
 
 ---
 
-## Slack setup onboarding (3 minutes)
+### Slack setup onboarding (3 minutes)
 
 Use observer-only setup with DenseGen config resolution.
 `--config` below means your DenseGen `config.yaml` (not a notify file and not a Universal Sequence Record path).
@@ -321,7 +321,7 @@ qsub -P <project> \
 If you run env mode with explicit `EVENTS_PATH` instead of resolver mode, set both
 `NOTIFY_POLICY` and `NOTIFY_NAMESPACE` so filter defaults and state paths stay deterministic.
 
-## Common mistakes
+### Common mistakes
 
 1) Watching the wrong event log:
 - Correct: Universal Sequence Record `<dataset>/.events.log`
@@ -339,7 +339,7 @@ If you run env mode with explicit `EVENTS_PATH` instead of resolver mode, set bo
 
 ---
 
-## Required event fields (minimum contract)
+### Required event fields (minimum contract)
 
 Each newline-delimited JSON line must include:
 
@@ -360,7 +360,7 @@ Use `--allow-unknown-version` only during controlled migrations.
 
 ---
 
-## Quickstart: watch an event log and send to a webhook
+### Quickstart: watch an event log and send to a webhook
 
 ```bash
 # Start a watcher on a concrete .events.log path.
@@ -387,7 +387,7 @@ Behavior:
 
 ---
 
-## Secure webhook setup (real endpoints)
+### Secure webhook setup (real endpoints)
 
 Use `--url-env` or `--secret-ref` for deployed runs so webhook URLs are not committed to repo files.
 
@@ -427,7 +427,7 @@ Security rules:
 
 ---
 
-## Profile setup notes
+### Profile setup notes
 
 Use the Slack wizard quickstart above for onboarding. If you already have a profile:
 
@@ -462,7 +462,7 @@ Profile security contract:
 
 ---
 
-## Deployed pressure test: DenseGen Universal Sequence Record Notify
+### Deployed pressure test: DenseGen Universal Sequence Record Notify
 
 Run the watcher in dry-run mode first:
 
@@ -489,7 +489,7 @@ uv run dense run --resume --extend-quota 8 --no-plot
 
 ---
 
-## Provider choice: Slack vs email
+### Provider choice: Slack vs email
 
 - Slack (recommended pressure-test path): `--provider slack` with a Slack webhook address.
 - Email: use `--provider generic` to post to your email relay webhook endpoint.
@@ -497,7 +497,7 @@ uv run dense run --resume --extend-quota 8 --no-plot
 
 ---
 
-## Local test (no dependencies): run a tiny webhook receiver
+### Local test (no dependencies): run a tiny webhook receiver
 
 ```bash
 # Start local webhook receiver for end-to-end validation.
@@ -536,7 +536,7 @@ uv run notify usr-events watch \
 
 ---
 
-## Filtering (reduce noise first, then tighten)
+### Filtering (reduce noise first, then tighten)
 
 Two common filters:
 
@@ -561,7 +561,7 @@ Then refine once you have seen real traffic.
 
 ---
 
-## Spool and drain (cluster-friendly)
+### Spool and drain (cluster-friendly)
 
 If delivery fails and `--spool-dir` is set, Notify writes payload files locally.
 Drain later from a host with stable network access.
@@ -592,7 +592,7 @@ If `--provider` is omitted, drain uses the provider stored per spool file.
 
 ---
 
-## See also
+### See also
 
 - DenseGen documentation hub: [DenseGen docs index](../../src/dnadesign/densegen/docs/index.md)
 - DenseGen integration walkthrough: [DenseGen -> USR -> Notify tutorial](../../src/dnadesign/densegen/docs/tutorials/demo_usr_notify.md)

@@ -1,5 +1,9 @@
 ## Sampling + analysis
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 **Last updated by:** cruncher-maintainers on 2026-02-23
 
 ### Contents
@@ -11,7 +15,7 @@
 - [Gibbs annealing optimization model](#gibbs-annealing-optimization-model)
 - [What The Optimizer Is Optimizing](#what-the-optimizer-is-optimizing)
 - [Interpreting Noisy Trajectories](#interpreting-noisy-trajectories)
-- [Elites: filter -> MMR select](#elites-mmr-select-postprocess)
+- [Elites: filter -> MMR select](#elites-mmr-select--postprocess)
 - [Analysis outputs](#analysis-outputs)
 - [Diagnostics quick read](#diagnostics-quick-read)
 - [Run selection + paths](#run-selection--paths)

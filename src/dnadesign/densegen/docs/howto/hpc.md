@@ -1,5 +1,9 @@
 ## DenseGen HPC runbook
 
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-02-27
+
+
 This how-to guide provides scheduler-safe DenseGen execution patterns for batch environments. Read it when you need predictable preflight checks, resume behavior, and artifact generation on shared clusters.
 
 ### When to use this runbook

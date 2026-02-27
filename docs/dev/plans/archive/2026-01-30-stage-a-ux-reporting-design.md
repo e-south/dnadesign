@@ -1,7 +1,7 @@
-# Stage-A Progress + Recap UX Simplification
+## Stage-A Progress + Recap UX Simplification
 
 
-## Contents
+### Contents
 - [Context](#context)
 - [Goals](#goals)
 - [Non-goals](#non-goals)
@@ -13,24 +13,24 @@
 - [Testing Plan](#testing-plan)
 - [Docs Updates](#docs-updates)
 
-## Context
+### Context
 Stage-A live progress and recap tables are information-dense but confusing in practice.
 Non-monotonic percentages (from changing denominators), redundant columns, and verbose
 warnings between progress and recap increase cognitive load and hide key signals.
 
-## Goals
+### Goals
 - Make the live mining table monotonic and low-noise.
 - Keep the recap audit-grade but compact by default.
 - Remove ambiguous/low-signal columns (e.g., gen %, has_hit) from default views.
 - Enforce assertive contracts (no silent fallbacks for missing fields).
 - Preserve existing sampling semantics and metrics; only presentation changes.
 
-## Non-goals
+### Non-goals
 - Change Stage-A sampling or selection behavior.
 - Remove audit metrics from the manifest.
 - Reduce the ability to debug (verbose mode will keep full detail).
 
-## Decisions
+### Decisions
 - Live table removes `gen %` entirely. It shows only `generated/limit` (fixed)
   to avoid non-monotonic progress.
 - Live table drops `has_hit`, `eligible_raw`, and `tier target` columns.
@@ -39,7 +39,7 @@ warnings between progress and recap increase cognitive load and hide key signals
   No `get(...)` fallbacks in default views; missing fields are hard errors.
 - Stream (non-screen) mode prints phase transition lines only; no batch spam.
 
-## Live Table (Default)
+### Live Table (Default)
 Columns:
 - motif
 - phase
@@ -55,7 +55,7 @@ Notes:
   monotonic and stable.
 - `phase` explicitly shows `mining`, `fimo`, `postprocess` to explain stalls.
 
-## Recap Table (Default)
+### Recap Table (Default)
 Columns:
 - TF
 - generated
@@ -78,7 +78,7 @@ Verbose mode adds:
 - delta score (p10)
 - any additional diagnostics currently stored in the manifest
 
-## Data Contracts
+### Data Contracts
 Introduce typed row objects:
 - StageAProgressRow
 - StageARecapRow
@@ -86,19 +86,19 @@ Introduce typed row objects:
 Construction validates required fields and raises clear errors on missing data.
 This prevents silent regressions in CLI/plotting.
 
-## Logging Behavior
+### Logging Behavior
 - Screen mode: Live progress updates in place.
 - Stream mode: One line per phase transition; no batch spam.
 - Tier target warnings emitted once after progress completes; recap value only
   shows the tier fraction (no "unmet (need ...)" in table cells).
 
-## Testing Plan
+### Testing Plan
 - Unit tests for compact vs verbose recap columns.
 - Unit tests for live table headers (no gen % column).
 - Stream mode test to ensure phase transition output is single-line.
 - Contract tests to assert missing fields raise errors.
 
-## Docs Updates
+### Docs Updates
 - Update sampling and outputs docs to reflect compact/verbose modes and the
   new column definitions.
 - Document the stable denominator for `generated/limit` and rationale for

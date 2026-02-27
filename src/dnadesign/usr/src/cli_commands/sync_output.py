@@ -89,11 +89,19 @@ def build_sync_audit_payload(
     snapshot_count = int(getattr(snapshots, "count", 0)) if snapshots is not None else 0
     snapshots_newer = int(getattr(snapshots, "newer_than_local", 0)) if snapshots is not None else 0
     snapshots_changed = bool(changes.get("snapshots_name_diff")) or snapshots_newer > 0
-    derived_local = len(getattr(summary, "derived_local_files", []) or [])
-    derived_remote = len(getattr(summary, "derived_remote_files", []) or [])
+    derived_local_files = [str(path) for path in (getattr(summary, "derived_local_files", []) or [])]
+    derived_remote_files = [str(path) for path in (getattr(summary, "derived_remote_files", []) or [])]
+    derived_local = len(derived_local_files)
+    derived_remote = len(derived_remote_files)
+    derived_local_only = sorted(set(derived_local_files) - set(derived_remote_files))
+    derived_remote_only = sorted(set(derived_remote_files) - set(derived_local_files))
     derived_changed = bool(changes.get("derived_files_diff"))
-    aux_local = len(getattr(summary, "aux_local_files", []) or [])
-    aux_remote = len(getattr(summary, "aux_remote_files", []) or [])
+    aux_local_files = [str(path) for path in (getattr(summary, "aux_local_files", []) or [])]
+    aux_remote_files = [str(path) for path in (getattr(summary, "aux_remote_files", []) or [])]
+    aux_local = len(aux_local_files)
+    aux_remote = len(aux_remote_files)
+    aux_local_only = sorted(set(aux_local_files) - set(aux_remote_files))
+    aux_remote_only = sorted(set(aux_remote_files) - set(aux_local_files))
     aux_changed = bool(changes.get("aux_files_diff"))
     return {
         "action": action_text,
@@ -116,11 +124,15 @@ def build_sync_audit_payload(
             "changed": derived_changed,
             "local_files": derived_local,
             "remote_files": derived_remote,
+            "local_only": derived_local_only,
+            "remote_only": derived_remote_only,
         },
         "_auxiliary": {
             "changed": aux_changed,
             "local_files": aux_local,
             "remote_files": aux_remote,
+            "local_only": aux_local_only,
+            "remote_only": aux_remote_only,
         },
     }
 
@@ -155,9 +167,15 @@ def print_sync_audit(
     print(
         "_derived   : "
         f"{'changed' if payload['_derived']['changed'] else 'unchanged'}  "
-        f"local_files={payload['_derived']['local_files']}  remote_files={payload['_derived']['remote_files']}"
+        f"local_files={payload['_derived']['local_files']}  "
+        f"remote_files={payload['_derived']['remote_files']}  "
+        f"local_only={len(payload['_derived']['local_only'])}  "
+        f"remote_only={len(payload['_derived']['remote_only'])}"
     )
     print(
         f"_auxiliary : {'changed' if payload['_auxiliary']['changed'] else 'unchanged'}  "
-        f"local_files={payload['_auxiliary']['local_files']}  remote_files={payload['_auxiliary']['remote_files']}"
+        f"local_files={payload['_auxiliary']['local_files']}  "
+        f"remote_files={payload['_auxiliary']['remote_files']}  "
+        f"local_only={len(payload['_auxiliary']['local_only'])}  "
+        f"remote_only={len(payload['_auxiliary']['remote_only'])}"
     )
