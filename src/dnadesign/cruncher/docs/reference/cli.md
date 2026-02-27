@@ -453,16 +453,16 @@ Source preconditions (per source entry in spec):
 
 Outputs:
 
-* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/portfolio/portfolio_manifest.json`
-* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/portfolio/portfolio_status.json`
-* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/portfolio/logs/prepare__<source_id>.log` (when `execution.mode=prepare_then_aggregate`)
-* `<portfolio_workspace>/outputs/export/portfolios/<portfolio_name>/<portfolio_id>/table__handoff_windows_long.<csv|parquet>`
-* `<portfolio_workspace>/outputs/export/portfolios/<portfolio_name>/<portfolio_id>/table__handoff_elites_summary.<csv|parquet>`
-* `<portfolio_workspace>/outputs/export/portfolios/<portfolio_name>/<portfolio_id>/table__source_summary.<csv|parquet>`
-* `<portfolio_workspace>/outputs/export/portfolios/<portfolio_name>/<portfolio_id>/table__study_summary.<csv|parquet>` (when source `study_spec` is declared)
-* `<portfolio_workspace>/outputs/export/portfolios/<portfolio_name>/<portfolio_id>/table__handoff_sequence_length.<csv|parquet>` (when `studies.sequence_length_table.enabled: true`)
-* `<portfolio_workspace>/outputs/plots/portfolio__<portfolio_name>__<portfolio_id>__plot__source_tradeoff_score_vs_diversity.pdf` (when source diversity metrics are available)
-* `<portfolio_workspace>/outputs/plots/portfolio__<portfolio_name>__<portfolio_id>__plot__elite_showcase_cross_workspace.<pdf|png>` (when `plots.elite_showcase.enabled: true`)
+* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/meta/manifest.json`
+* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/meta/status.json`
+* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/meta/logs/prepare__<source_id>.log` (when `execution.mode=prepare_then_aggregate`)
+* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/tables/table__handoff_windows_long.<csv|parquet>`
+* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/tables/table__handoff_elites_summary.<csv|parquet>`
+* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/tables/table__source_summary.<csv|parquet>`
+* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/tables/table__study_summary.<csv|parquet>` (when source `study_spec` is declared)
+* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/tables/table__handoff_sequence_length.<csv|parquet>` (when `studies.sequence_length_table.enabled: true`)
+* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/plots/plot__source_tradeoff_score_vs_diversity.pdf` (when source diversity metrics are available)
+* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/plots/plot__elite_showcase_cross_workspace.<pdf|png>` (when `plots.elite_showcase.enabled: true`)
 
 Default portfolio table output is parquet without CSV mirrors (`artifacts.table_format=parquet`, `artifacts.write_csv=false`).
 

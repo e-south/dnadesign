@@ -537,6 +537,93 @@ def test_postprocess_converges_without_remaining_reverse_single_owner_improvemen
     assert remaining == []
 
 
+def test_postprocess_converges_after_edge_trim_reexposes_single_owner_edits() -> None:
+    pwms = {
+        "tf0": PWM(
+            name="tf0",
+            matrix=np.asarray(
+                [
+                    [0.765833, 0.002346, 0.068300, 0.163520],
+                    [0.014267, 0.961906, 0.002811, 0.021016],
+                    [0.029166, 0.053261, 0.000002, 0.917572],
+                    [0.155809, 0.174179, 0.640179, 0.029833],
+                    [0.035700, 0.000002, 0.894036, 0.070263],
+                    [0.007087, 0.059334, 0.933049, 0.000530],
+                    [0.007785, 0.001857, 0.002240, 0.988118],
+                ],
+                dtype=float,
+            ),
+        ),
+        "tf1": PWM(
+            name="tf1",
+            matrix=np.asarray(
+                [
+                    [0.011720, 0.834544, 0.151271, 0.002465],
+                    [0.047050, 0.874755, 0.002439, 0.075756],
+                    [0.150964, 0.844694, 0.003927, 0.000416],
+                    [0.250183, 0.093424, 0.202288, 0.454105],
+                    [0.002846, 0.000091, 0.019627, 0.977436],
+                    [0.005294, 0.862562, 0.129876, 0.002268],
+                    [0.041832, 0.827451, 0.119161, 0.011555],
+                ],
+                dtype=float,
+            ),
+        ),
+        "tf2": PWM(
+            name="tf2",
+            matrix=np.asarray(
+                [
+                    [0.019983, 0.002283, 0.012203, 0.965531],
+                    [0.002179, 0.000512, 0.338616, 0.658693],
+                    [0.011476, 0.163230, 0.821147, 0.004147],
+                    [0.001099, 0.015054, 0.983845, 0.000002],
+                    [0.039227, 0.008440, 0.175476, 0.776856],
+                    [0.867125, 0.057768, 0.013870, 0.061236],
+                    [0.083110, 0.784033, 0.057082, 0.075775],
+                ],
+                dtype=float,
+            ),
+        ),
+        "tf3": PWM(
+            name="tf3",
+            matrix=np.asarray(
+                [
+                    [0.162227, 0.073212, 0.693156, 0.071405],
+                    [0.035862, 0.085275, 0.037986, 0.840877],
+                    [0.006744, 0.001492, 0.932227, 0.059537],
+                    [0.047220, 0.026836, 0.924591, 0.001353],
+                    [0.019446, 0.834570, 0.037580, 0.108405],
+                    [0.000186, 0.903698, 0.092536, 0.003580],
+                    [0.000739, 0.858907, 0.004799, 0.135555],
+                ],
+                dtype=float,
+            ),
+        ),
+    }
+    scorer = Scorer(
+        pwms,
+        bidirectional=True,
+        scale="normalized-llr",
+    )
+    candidate = _elite_candidate("TTGGGGGTAAGTGCAATTACG", scorer)
+
+    processed, stats = _postprocess_elite_candidates(
+        candidates=[candidate],
+        scorer=scorer,
+        dsdna_mode=True,
+    )
+
+    assert len(processed) == 1
+    assert stats["trim_left"] > 0
+    assert stats["trim_right"] > 0
+    remaining = _remaining_single_owner_polish_improvements(
+        seq_arr=np.asarray(processed[0].seq_arr, dtype=np.int8),
+        per_tf_hits=processed[0].per_tf_hits,
+        scorer=scorer,
+    )
+    assert remaining == []
+
+
 def test_hits_match_polish_contract_rejects_reverse_flip_even_when_owner_score_improves() -> None:
     rows: list[list[float]] = []
     for base in "ATGC":

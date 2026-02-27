@@ -17,13 +17,9 @@ import pandas as pd
 
 from dnadesign.cruncher.analysis.parquet import write_parquet
 from dnadesign.cruncher.app.analyze.metadata import load_pwms_from_config
-from dnadesign.cruncher.artifacts.atomic_write import atomic_write_json
 from dnadesign.cruncher.portfolio.layout import (
-    portfolio_manifests_dir,
     portfolio_plot_path,
-    portfolio_plots_dir,
     portfolio_table_path,
-    portfolio_tables_dir,
 )
 from dnadesign.cruncher.portfolio.schema_models import PortfolioSpec
 
@@ -208,28 +204,6 @@ def _write_elite_showcase_plot(
     return out_path
 
 
-def _write_plot_manifests(
-    portfolio_run_dir: Path,
-    *,
-    table_entries: list[dict[str, object]],
-    plot_entries: list[dict[str, object]],
-) -> None:
-    manifests_dir = portfolio_manifests_dir(portfolio_run_dir)
-    manifests_dir.mkdir(parents=True, exist_ok=True)
-    table_manifest_file = manifests_dir / "table_manifest.json"
-    plot_manifest_file = manifests_dir / "plot_manifest.json"
-    atomic_write_json(table_manifest_file, {"tables": table_entries}, allow_nan=False)
-    atomic_write_json(plot_manifest_file, {"plots": plot_entries}, allow_nan=False)
-    atomic_write_json(
-        manifests_dir / "manifest.json",
-        {
-            "table_manifest": table_manifest_file.name,
-            "plot_manifest": plot_manifest_file.name,
-        },
-        allow_nan=False,
-    )
-
-
 def _materialize_portfolio_outputs(
     *,
     run_dir: Path,
@@ -322,21 +296,4 @@ def _materialize_portfolio_outputs(
     if showcase_plot is not None:
         plot_paths.append(showcase_plot)
 
-    table_entries = [
-        {
-            "key": path.stem.removeprefix("table__"),
-            "path": str(path.relative_to(portfolio_tables_dir(run_dir))),
-            "format": path.suffix.lstrip("."),
-        }
-        for path in table_paths
-    ]
-    plot_entries = [
-        {
-            "key": path.stem.removeprefix("plot__"),
-            "path": str(path.relative_to(portfolio_plots_dir(run_dir))),
-            "format": path.suffix.lstrip("."),
-        }
-        for path in plot_paths
-    ]
-    _write_plot_manifests(run_dir, table_entries=table_entries, plot_entries=plot_entries)
     return table_paths, plot_paths, elite_summary_df

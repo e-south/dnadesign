@@ -322,22 +322,14 @@ def test_layout_builds_expected_paths(tmp_path: Path) -> None:
     )
 
     assert run_dir == workspace_root / "outputs" / "portfolios" / "pairwise_handoff" / "abc123"
-    assert portfolio_manifest_path(run_dir) == run_dir / "portfolio" / "portfolio_manifest.json"
-    assert portfolio_status_path(run_dir) == run_dir / "portfolio" / "portfolio_status.json"
+    assert portfolio_manifest_path(run_dir) == run_dir / "meta" / "manifest.json"
+    assert portfolio_status_path(run_dir) == run_dir / "meta" / "status.json"
     assert (
         portfolio_table_path(
             run_dir,
             "handoff_windows_long",
             "parquet",
         )
-        == workspace_root
-        / "outputs"
-        / "export"
-        / "portfolios"
-        / "pairwise_handoff"
-        / "abc123"
-        / "table__handoff_windows_long.parquet"
+        == run_dir / "tables" / "table__handoff_windows_long.parquet"
     )
-    assert portfolio_plot_path(run_dir, "source_tradeoff", "pdf") == (
-        workspace_root / "outputs" / "plots" / "portfolio__pairwise_handoff__abc123__plot__source_tradeoff.pdf"
-    )
+    assert portfolio_plot_path(run_dir, "source_tradeoff", "pdf") == (run_dir / "plots" / "plot__source_tradeoff.pdf")

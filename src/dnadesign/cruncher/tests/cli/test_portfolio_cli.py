@@ -100,12 +100,10 @@ def test_portfolio_run_resolves_relative_spec_from_init_cwd(tmp_path: Path, monk
             "portfolio_name": "handoff",
             "portfolio_id": "abc123",
             "status": "completed",
-            "manifest_path": str(path / "portfolio" / "portfolio_manifest.json"),
-            "status_path": str(path / "portfolio" / "portfolio_status.json"),
+            "manifest_path": str(path / "meta" / "manifest.json"),
+            "status_path": str(path / "meta" / "status.json"),
             "table_paths": [str(path / "tables" / "table__handoff_windows_long.parquet")],
-            "plot_paths": [
-                str(workspace / "outputs" / "plots" / "portfolio__handoff__abc123__plot__source_tradeoff.pdf")
-            ],
+            "plot_paths": [str(path / "plots" / "plot__source_tradeoff.pdf")],
             "n_sources": 2,
             "n_selected_elites": 24,
         },
@@ -173,8 +171,8 @@ def test_portfolio_run_prepare_ready_skip_passes_policy_to_workflow(tmp_path: Pa
             "portfolio_name": "handoff",
             "portfolio_id": "abc123",
             "status": "completed",
-            "manifest_path": str(path / "portfolio" / "portfolio_manifest.json"),
-            "status_path": str(path / "portfolio" / "portfolio_status.json"),
+            "manifest_path": str(path / "meta" / "manifest.json"),
+            "status_path": str(path / "meta" / "status.json"),
             "table_paths": [str(path / "tables" / "table__handoff_windows_long.parquet")],
             "plot_paths": [],
             "n_sources": 2,
@@ -278,8 +276,8 @@ def test_portfolio_run_prepare_ready_skip_progress_totals_match_events(tmp_path:
             "portfolio_name": "handoff",
             "portfolio_id": "abc123",
             "status": "completed",
-            "manifest_path": str(path / "portfolio" / "portfolio_manifest.json"),
-            "status_path": str(path / "portfolio" / "portfolio_status.json"),
+            "manifest_path": str(path / "meta" / "manifest.json"),
+            "status_path": str(path / "meta" / "status.json"),
             "table_paths": [str(path / "tables" / "table__handoff_windows_long.parquet")],
             "plot_paths": [],
             "n_sources": 2,
@@ -378,8 +376,8 @@ def test_portfolio_run_progress_updates_task_descriptions(tmp_path: Path, monkey
             "portfolio_name": "handoff",
             "portfolio_id": "abc123",
             "status": "completed",
-            "manifest_path": str(path / "portfolio" / "portfolio_manifest.json"),
-            "status_path": str(path / "portfolio" / "portfolio_status.json"),
+            "manifest_path": str(path / "meta" / "manifest.json"),
+            "status_path": str(path / "meta" / "status.json"),
             "table_paths": [str(path / "tables" / "table__handoff_windows_long.parquet")],
             "plot_paths": [],
             "n_sources": 1,
@@ -481,6 +479,83 @@ def test_portfolio_run_non_tty_does_not_construct_progress(monkeypatch, tmp_path
     assert "--force-overwrite" in combined_output(result)
 
 
+def test_portfolio_run_plain_logs_study_progress(monkeypatch, tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    workspace = repo_root / "workspaces" / "portfolio_workspace"
+    workspace.mkdir(parents=True, exist_ok=True)
+    (workspace / "handoff.portfolio.yaml").write_text(
+        "portfolio: {schema_version: 3, name: handoff, execution: {mode: aggregate_only}, sources: []}\n"
+    )
+    emitted_run_dir = workspace / "outputs" / "portfolios" / "handoff" / "abc123"
+
+    def _fake_run_portfolio(
+        spec_path: Path,
+        *,
+        force_overwrite: bool = False,
+        prepare_ready_policy: str = "rerun",
+        on_event=None,
+    ) -> Path:
+        _ = (spec_path, force_overwrite, prepare_ready_policy)
+        assert on_event is not None
+        on_event(
+            "study_trial_progress",
+            {
+                "source_id": "pairwise_cpxr_baer",
+                "study_name": "length_vs_score",
+                "worker_count": 2,
+                "running_runs": 1,
+                "completed_runs": 1,
+                "total_runs": 2,
+                "error_runs": 0,
+                "queued_runs": 1,
+                "active_trial_ids": ["L6"],
+            },
+        )
+        return emitted_run_dir
+
+    monkeypatch.setattr(portfolio_cli, "run_portfolio", _fake_run_portfolio)
+    monkeypatch.setattr(portfolio_cli, "_progress_enabled", lambda: False)
+    monkeypatch.setattr(
+        portfolio_cli,
+        "portfolio_preflight_payload",
+        lambda path: {
+            "spec_path": str(path),
+            "execution_mode": "aggregate_only",
+            "ready_source_ids": [],
+            "unready_source_ids": [],
+            "source_count": 1,
+            "sources": [],
+        },
+    )
+    monkeypatch.setattr(
+        portfolio_cli,
+        "portfolio_show_payload",
+        lambda path: {
+            "portfolio_name": "handoff",
+            "portfolio_id": "abc123",
+            "status": "completed",
+            "manifest_path": str(path / "meta" / "manifest.json"),
+            "status_path": str(path / "meta" / "status.json"),
+            "table_paths": [str(path / "tables" / "table__handoff_windows_long.parquet")],
+            "plot_paths": [],
+            "n_sources": 1,
+            "n_selected_elites": 4,
+        },
+    )
+    monkeypatch.chdir(repo_root)
+
+    result = runner.invoke(
+        app,
+        ["portfolio", "run", "--spec", "handoff.portfolio.yaml"],
+        env={"INIT_CWD": str(workspace)},
+    )
+
+    assert result.exit_code == 0
+    output = combined_output(result)
+    assert "Study progress: source=pairwise_cpxr_baer study=length_vs_score" in output
+    assert "workers=1/2 done=1/2 error=0 queued=1 active=L6" in output
+
+
 def test_run_with_noninteractive_env_sets_and_restores_value(monkeypatch) -> None:
     monkeypatch.setenv("CRUNCHER_NONINTERACTIVE", "0")
     seen: list[str | None] = []
@@ -520,8 +595,8 @@ def test_portfolio_show_prints_source_selected_elite_counts(monkeypatch, tmp_pat
             "portfolio_name": "handoff",
             "portfolio_id": "abc123",
             "status": "completed",
-            "manifest_path": str(path / "portfolio" / "portfolio_manifest.json"),
-            "status_path": str(path / "portfolio" / "portfolio_status.json"),
+            "manifest_path": str(path / "meta" / "manifest.json"),
+            "status_path": str(path / "meta" / "status.json"),
             "table_paths": [str(path / "tables" / "table__handoff_windows_long.parquet")],
             "plot_paths": [],
             "n_sources": 2,

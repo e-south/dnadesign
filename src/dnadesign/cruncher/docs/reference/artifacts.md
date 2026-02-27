@@ -79,4 +79,4 @@ Produces:
 - Study outputs: `outputs/studies/<study_name>/<study_id>/`
 - Study aggregate plots: `outputs/plots/study__<study_name>__<study_id>__plot__*.pdf`
 - Portfolio outputs: `outputs/portfolios/<portfolio_name>/<portfolio_id>/`
-- Portfolio aggregate plots: `outputs/plots/portfolio__<portfolio_name>__<portfolio_id>__plot__*.pdf`
+- Portfolio aggregate plots: `outputs/portfolios/<portfolio_name>/<portfolio_id>/plots/plot__*.pdf`

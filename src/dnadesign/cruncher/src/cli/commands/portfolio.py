@@ -84,6 +84,55 @@ def _print_source_run_counts(payload: dict[str, object]) -> None:
             console.print(f"  source: {source_id} elites={selected}/{top_k}")
 
 
+def _as_int(payload: dict[str, object], key: str, *, default: int = 0) -> int:
+    value = payload.get(key, default)
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str) and value.strip():
+        try:
+            return int(value.strip())
+        except ValueError:
+            return default
+    return default
+
+
+def _study_name_from_payload(payload: dict[str, object]) -> str:
+    explicit = str(payload.get("study_name", "")).strip()
+    if explicit:
+        return explicit
+    spec_text = str(payload.get("study_spec", "")).strip()
+    if spec_text:
+        stem = Path(spec_text).stem
+        if stem.endswith(".study"):
+            return stem[: -len(".study")]
+        return stem
+    return "study"
+
+
+def _study_source_from_payload(payload: dict[str, object]) -> str:
+    source_id = str(payload.get("source_id", "")).strip()
+    return source_id or "unknown_source"
+
+
+def _active_trial_ids(payload: dict[str, object]) -> list[str]:
+    raw = payload.get("active_trial_ids")
+    if not isinstance(raw, list):
+        return []
+    return [str(item) for item in raw if str(item).strip()]
+
+
+def _format_active_trials(active_trial_ids: list[str], *, max_items: int = 3) -> str:
+    if not active_trial_ids:
+        return "-"
+    preview = active_trial_ids[:max_items]
+    suffix = ",..." if len(active_trial_ids) > max_items else ""
+    return ",".join(preview) + suffix
+
+
 @app.command("run", help="Execute a Portfolio spec and write aggregate handoff outputs.")
 def run_cmd(
     spec: Path = typer.Option(
@@ -132,6 +181,56 @@ def run_cmd(
             prepare_ready_policy = "skip" if skip_ready else "rerun"
         else:
             prepare_ready_policy = "skip" if prepare_ready == "skip" else "rerun"
+
+    study_progress_snapshots: dict[tuple[str, str], tuple[int, int, int, int, int, int, tuple[str, ...]]] = {}
+
+    def _render_study_progress_line(payload: dict[str, object]) -> str | None:
+        source_id = _study_source_from_payload(payload)
+        study_name = _study_name_from_payload(payload)
+        worker_count = max(_as_int(payload, "worker_count", default=1), 1)
+        running_runs = max(_as_int(payload, "running_runs", default=0), 0)
+        completed_runs = max(_as_int(payload, "completed_runs", default=0), 0)
+        total_runs = max(_as_int(payload, "total_runs", default=0), 0)
+        error_runs = max(_as_int(payload, "error_runs", default=0), 0)
+        queued_runs = max(_as_int(payload, "queued_runs", default=0), 0)
+        active_trials = _active_trial_ids(payload)
+        snapshot = (
+            running_runs,
+            worker_count,
+            completed_runs,
+            total_runs,
+            error_runs,
+            queued_runs,
+            tuple(active_trials),
+        )
+        key = (source_id, study_name)
+        if study_progress_snapshots.get(key) == snapshot:
+            return None
+        study_progress_snapshots[key] = snapshot
+        return (
+            "Study progress: "
+            f"source={source_id} "
+            f"study={study_name} "
+            f"workers={running_runs}/{worker_count} "
+            f"done={completed_runs}/{total_runs} "
+            f"error={error_runs} "
+            f"queued={queued_runs} "
+            f"active={_format_active_trials(active_trials)}"
+        )
+
+    def _render_study_ensure_line(name: str, payload: dict[str, object]) -> str | None:
+        source_id = _study_source_from_payload(payload)
+        study_name = _study_name_from_payload(payload)
+        if name == "study_ensure_started":
+            mode = "resume" if bool(payload.get("resume")) else "fresh"
+            return f"Study ensure: source={source_id} study={study_name} mode={mode}"
+        if name == "study_ensure_completed":
+            status = str(payload.get("study_status", "completed"))
+            return f"Study ensure complete: source={source_id} study={study_name} status={status}"
+        if name == "study_ensure_ready":
+            status = str(payload.get("study_status", "completed"))
+            return f"Study ready: source={source_id} study={study_name} status={status}"
+        return None
 
     def _run_with_progress(force_flag: bool) -> Path:
         def _render_source_label(source_id: str) -> str:
@@ -201,6 +300,14 @@ def run_cmd(
                 aggregate_done += 1
                 progress.advance(aggregate_task, 1)
                 progress.update(aggregate_task, description=f"Aggregate sources ({aggregate_done}/{aggregate_total})")
+            elif name in {"study_ensure_started", "study_ensure_completed", "study_ensure_ready"}:
+                line = _render_study_ensure_line(name, payload)
+                if line:
+                    progress.console.print(line, soft_wrap=True)
+            elif name == "study_trial_progress":
+                line = _render_study_progress_line(payload)
+                if line:
+                    progress.console.print(line, soft_wrap=True)
 
         with progress:
             return _run_with_noninteractive_env(
@@ -237,6 +344,14 @@ def run_cmd(
                         f"{source_id} ({completed} done, tables={table_count}, plots={plot_count}).",
                         soft_wrap=True,
                     )
+            elif name in {"study_ensure_started", "study_ensure_completed", "study_ensure_ready"}:
+                line = _render_study_ensure_line(name, payload)
+                if line:
+                    console.print(line, soft_wrap=True)
+            elif name == "study_trial_progress":
+                line = _render_study_progress_line(payload)
+                if line:
+                    console.print(line, soft_wrap=True)
 
         return run_portfolio(
             resolved_spec,

@@ -19,7 +19,7 @@ import shutil
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from dnadesign.cruncher.analysis.mmr_sweep_service import run_mmr_sweep_for_run
 from dnadesign.cruncher.app.sample.resources import _load_pwms_for_set, _lockmap_for
@@ -85,6 +85,13 @@ _PROFILE_OUTPUT_OVERRIDES: dict[str, dict[str, Any]] = {
     "analysis_ready": {},
 }
 logger = logging.getLogger(__name__)
+StudyEventCallback = Callable[[str, dict[str, object]], None]
+
+
+def _emit_study_event(on_event: StudyEventCallback | None, name: str, **payload: object) -> None:
+    if on_event is None:
+        return
+    on_event(name, dict(payload))
 
 
 def _preflight_trial_config_contracts(
@@ -540,6 +547,7 @@ def _run_study_trials(
     status: StudyStatusV1,
     progress_bar: bool,
     quiet_logs: bool,
+    on_event: StudyEventCallback | None,
 ) -> tuple[bool, bool]:
     if int(bootstrap.spec.execution.parallelism) <= 1:
         return _run_study_trials_serial(
@@ -548,11 +556,13 @@ def _run_study_trials(
             status=status,
             progress_bar=progress_bar,
             quiet_logs=quiet_logs,
+            on_event=on_event,
         )
     return _run_study_trials_parallel(
         bootstrap=bootstrap,
         manifest=manifest,
         status=status,
+        on_event=on_event,
     )
 
 
@@ -578,6 +588,49 @@ def _log_parallel_trial_progress(
     )
 
 
+def _study_trial_progress_payload(
+    *,
+    status: StudyStatusV1,
+    total_runs: int,
+    queued_count: int,
+    worker_count: int,
+    active_trial_ids: list[str],
+) -> dict[str, object]:
+    completed = int(status.success_runs + status.error_runs + status.skipped_runs)
+    return {
+        "completed_runs": int(completed),
+        "total_runs": int(total_runs),
+        "success_runs": int(status.success_runs),
+        "error_runs": int(status.error_runs),
+        "running_runs": int(status.running_runs),
+        "queued_runs": int(queued_count),
+        "worker_count": int(worker_count),
+        "active_trial_ids": list(active_trial_ids),
+    }
+
+
+def _emit_study_trial_progress(
+    on_event: StudyEventCallback | None,
+    *,
+    status: StudyStatusV1,
+    total_runs: int,
+    queued_count: int,
+    worker_count: int,
+    active_trial_ids: list[str],
+) -> None:
+    _emit_study_event(
+        on_event,
+        "study_trial_progress",
+        **_study_trial_progress_payload(
+            status=status,
+            total_runs=total_runs,
+            queued_count=queued_count,
+            worker_count=worker_count,
+            active_trial_ids=active_trial_ids,
+        ),
+    )
+
+
 def _shutdown_trial_worker_process(process: multiprocessing.Process, *, terminate: bool) -> None:
     if terminate and process.is_alive():
         process.terminate()
@@ -596,9 +649,19 @@ def _run_study_trials_serial(
     status: StudyStatusV1,
     progress_bar: bool,
     quiet_logs: bool,
+    on_event: StudyEventCallback | None,
 ) -> tuple[bool, bool]:
     any_errors = False
     aborted = False
+    pending_count = sum(1 for item in manifest.trial_runs if not _trial_run_is_complete(item))
+    if pending_count > 0:
+        _emit_study_event(
+            on_event,
+            "study_trial_phase_started",
+            worker_count=1,
+            total_runs=int(len(manifest.trial_runs)),
+            queued_runs=int(pending_count),
+        )
     for idx, trial_run in enumerate(manifest.trial_runs):
         if _trial_run_is_complete(trial_run):
             continue
@@ -613,6 +676,14 @@ def _run_study_trials_serial(
             status_file=bootstrap.status_file,
             manifest=manifest,
             status=status,
+        )
+        _emit_study_trial_progress(
+            on_event,
+            status=status,
+            total_runs=len(manifest.trial_runs),
+            queued_count=int(status.pending_runs),
+            worker_count=1,
+            active_trial_ids=[str(trial_run.trial_id)],
         )
 
         try:
@@ -654,6 +725,14 @@ def _run_study_trials_serial(
                 manifest=manifest,
                 status=status,
             )
+            _emit_study_trial_progress(
+                on_event,
+                status=status,
+                total_runs=len(manifest.trial_runs),
+                queued_count=int(status.pending_runs),
+                worker_count=1,
+                active_trial_ids=[],
+            )
         if aborted:
             break
     if aborted:
@@ -669,6 +748,7 @@ def _run_study_trials_parallel(
     bootstrap: _StudyBootstrap,
     manifest: StudyManifestV1,
     status: StudyStatusV1,
+    on_event: StudyEventCallback | None,
 ) -> tuple[bool, bool]:
     any_errors = False
     aborted = False
@@ -680,6 +760,13 @@ def _run_study_trials_parallel(
 
     worker_count = min(int(bootstrap.spec.execution.parallelism), len(pending_indexes))
     logger.info("Study trial phase running with parallelism=%d.", worker_count)
+    _emit_study_event(
+        on_event,
+        "study_trial_phase_started",
+        worker_count=int(worker_count),
+        total_runs=int(len(manifest.trial_runs)),
+        queued_runs=int(len(pending_indexes)),
+    )
     _append_log(
         bootstrap.study_run_dir,
         f"RUN_PARALLEL_START workers={worker_count} total={len(pending_indexes)}",
@@ -736,6 +823,14 @@ def _run_study_trials_parallel(
                     result_path=result_path,
                     trial_index=idx,
                 )
+                _emit_study_trial_progress(
+                    on_event,
+                    status=status,
+                    total_runs=len(manifest.trial_runs),
+                    queued_count=len(queued_indexes),
+                    worker_count=worker_count,
+                    active_trial_ids=sorted(str(manifest.trial_runs[item].trial_id) for item in in_flight),
+                )
 
             if not in_flight:
                 break
@@ -748,6 +843,14 @@ def _run_study_trials_parallel(
                         status=status,
                         total_runs=len(manifest.trial_runs),
                         queued_count=len(queued_indexes),
+                    )
+                    _emit_study_trial_progress(
+                        on_event,
+                        status=status,
+                        total_runs=len(manifest.trial_runs),
+                        queued_count=len(queued_indexes),
+                        worker_count=worker_count,
+                        active_trial_ids=sorted(str(manifest.trial_runs[item].trial_id) for item in in_flight),
                     )
                     last_progress_heartbeat = now
                 time.sleep(0.05)
@@ -806,6 +909,14 @@ def _run_study_trials_parallel(
                 total_runs=len(manifest.trial_runs),
                 queued_count=len(queued_indexes),
             )
+            _emit_study_trial_progress(
+                on_event,
+                status=status,
+                total_runs=len(manifest.trial_runs),
+                queued_count=len(queued_indexes),
+                worker_count=worker_count,
+                active_trial_ids=sorted(str(manifest.trial_runs[item].trial_id) for item in in_flight),
+            )
             last_progress_heartbeat = time.monotonic()
     except Exception:
         force_terminate = True
@@ -837,6 +948,15 @@ def _run_study_trials_parallel(
             manifest,
             reason="Skipped because execution aborted after earlier trial error.",
         )
+    _refresh_status(status, manifest)
+    _emit_study_trial_progress(
+        on_event,
+        status=status,
+        total_runs=len(manifest.trial_runs),
+        queued_count=int(status.pending_runs),
+        worker_count=worker_count,
+        active_trial_ids=[],
+    )
     return any_errors, aborted
 
 
@@ -846,12 +966,14 @@ def _run_study_replays(
     manifest: StudyManifestV1,
     status: StudyStatusV1,
     aborted: bool,
+    on_event: StudyEventCallback | None,
 ) -> tuple[bool, bool]:
     any_errors = False
     if not bootstrap.spec.replays.mmr_sweep.enabled or aborted:
         return any_errors, aborted
     replay_candidates = [item for item in manifest.trial_runs if item.status == "success" and bool(item.run_dir)]
     total_replays = len(replay_candidates)
+    _emit_study_event(on_event, "study_replay_phase_started", total_runs=int(total_replays))
     logger.info("Study replay phase starting: %d successful trial run(s).", total_replays)
     _append_log(
         bootstrap.study_run_dir,
@@ -877,6 +999,12 @@ def _run_study_replays(
                 diversity_values=bootstrap.spec.replays.mmr_sweep.diversity_values,
             )
             completed += 1
+            _emit_study_event(
+                on_event,
+                "study_replay_progress",
+                completed_runs=int(completed),
+                total_runs=int(total_replays),
+            )
             _append_log(
                 bootstrap.study_run_dir,
                 f"REPLAY_DONE trial={trial_run.trial_id} seed={trial_run.seed} target_set={trial_run.target_set_index}",
@@ -908,6 +1036,13 @@ def _run_study_replays(
                 )
                 break
     logger.info("Study replay phase complete: %d/%d replay run(s) finished.", completed, total_replays)
+    _emit_study_event(
+        on_event,
+        "study_replay_phase_completed",
+        completed_runs=int(completed),
+        total_runs=int(total_replays),
+        aborted=bool(aborted),
+    )
     return any_errors, aborted
 
 
@@ -916,8 +1051,10 @@ def _maybe_summarize_study(
     bootstrap: _StudyBootstrap,
     manifest: StudyManifestV1,
     status: StudyStatusV1,
+    on_event: StudyEventCallback | None,
 ) -> None:
     if not bootstrap.spec.execution.summarize_after_run:
+        _emit_study_event(on_event, "study_summarize_skipped", reason="summarize_after_run=false")
         return
     has_non_success = any(item.status != "success" for item in manifest.trial_runs)
     if has_non_success:
@@ -929,12 +1066,15 @@ def _maybe_summarize_study(
             status.warnings.append(warning)
         status.updated_at = utc_now_iso()
         write_study_status(bootstrap.status_file, status)
+        _emit_study_event(on_event, "study_summarize_skipped", reason="non_success_trial_status")
         return
+    _emit_study_event(on_event, "study_summarize_phase_started")
     logger.info("Study summarize phase starting.")
     _append_log(bootstrap.study_run_dir, "SUMMARIZE_START")
     summarize_study_run(bootstrap.study_run_dir, allow_partial=False)
     _append_log(bootstrap.study_run_dir, "SUMMARIZE_DONE")
     logger.info("Study summarize phase complete.")
+    _emit_study_event(on_event, "study_summarize_phase_completed")
 
 
 def run_study(
@@ -944,6 +1084,7 @@ def run_study(
     force_overwrite: bool = False,
     progress_bar: bool = True,
     quiet_logs: bool = False,
+    on_event: StudyEventCallback | None = None,
 ) -> Path:
     if resume and force_overwrite:
         raise ValueError("Use either resume or force_overwrite, not both.")
@@ -957,6 +1098,15 @@ def run_study(
         manifest=manifest,
         status=status,
     )
+    _emit_study_event(
+        on_event,
+        "study_started",
+        study_name=manifest.study_name,
+        study_id=manifest.study_id,
+        study_run_dir=str(bootstrap.study_run_dir),
+        total_runs=int(status.total_runs),
+        resumed=bool(resume),
+    )
 
     any_errors = False
     aborted = False
@@ -968,6 +1118,7 @@ def run_study(
             status=status,
             progress_bar=progress_bar,
             quiet_logs=quiet_logs,
+            on_event=on_event,
         )
         any_errors = any_errors or trial_errors
         replay_errors, aborted = _run_study_replays(
@@ -975,9 +1126,10 @@ def run_study(
             manifest=manifest,
             status=status,
             aborted=aborted,
+            on_event=on_event,
         )
         any_errors = any_errors or replay_errors
-        _maybe_summarize_study(bootstrap=bootstrap, manifest=manifest, status=status)
+        _maybe_summarize_study(bootstrap=bootstrap, manifest=manifest, status=status, on_event=on_event)
     except Exception as exc:
         fatal_exc = exc
     finally:
@@ -987,6 +1139,20 @@ def run_study(
             status_file=bootstrap.status_file,
             manifest=manifest,
             status=status,
+        )
+        _emit_study_event(
+            on_event,
+            "study_completed",
+            study_name=manifest.study_name,
+            study_id=manifest.study_id,
+            status=status.status,
+            total_runs=int(status.total_runs),
+            success_runs=int(status.success_runs),
+            error_runs=int(status.error_runs),
+            skipped_runs=int(status.skipped_runs),
+            pending_runs=int(status.pending_runs),
+            running_runs=int(status.running_runs),
+            failed=bool(aborted or fatal_exc is not None),
         )
 
     if fatal_exc is not None:

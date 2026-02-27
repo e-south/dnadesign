@@ -155,3 +155,39 @@ def test_study_run_parallel_logs_progress(tmp_path: Path, caplog: pytest.LogCapt
     caplog.set_level("INFO", logger="dnadesign.cruncher.app.study_workflow")
     run_study(spec_path, progress_bar=False, quiet_logs=True)
     assert any("Study trial progress:" in record.message for record in caplog.records)
+
+
+def test_study_run_parallel_emits_progress_events(tmp_path: Path) -> None:
+    write_workspace_config(tmp_path)
+    spec_path = tmp_path / "parallel_events.study.yaml"
+    write_study_spec(
+        spec_path,
+        profile="analysis_ready",
+        mmr_enabled=False,
+        seeds=[11],
+        trials=[
+            {"id": "L6", "factors": {"sample.sequence_length": 6}},
+            {"id": "L7", "factors": {"sample.sequence_length": 7}},
+        ],
+        parallelism=2,
+    )
+
+    events: list[tuple[str, dict[str, object]]] = []
+
+    def _on_event(name: str, payload: dict[str, object]) -> None:
+        events.append((name, payload))
+
+    run_study(spec_path, progress_bar=False, quiet_logs=True, on_event=_on_event)
+
+    names = [name for name, _ in events]
+    assert "study_started" in names
+    assert "study_trial_phase_started" in names
+    assert "study_trial_progress" in names
+    assert "study_completed" in names
+
+    trial_progress_events = [payload for name, payload in events if name == "study_trial_progress"]
+    final_progress = trial_progress_events[-1]
+    assert int(final_progress["completed_runs"]) == int(final_progress["total_runs"])
+    assert int(final_progress["queued_runs"]) == 0
+    assert int(final_progress["error_runs"]) == 0
+    assert isinstance(final_progress["active_trial_ids"], list)

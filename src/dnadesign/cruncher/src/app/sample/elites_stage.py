@@ -460,6 +460,80 @@ def _dedupe_postprocessed_candidates(
     return deduped, dropped
 
 
+def _polish_candidate_to_convergence(
+    *,
+    seq_arr: np.ndarray,
+    scorer: Scorer,
+) -> tuple[
+    np.ndarray,
+    dict[str, float],
+    dict[str, dict[str, object]],
+    dict[str, float],
+    float,
+    float,
+    int,
+]:
+    polished_seq = np.asarray(seq_arr, dtype=np.int8).copy()
+    per_tf_map, per_tf_hits, norm_map, min_norm, sum_norm = _candidate_payload(seq_arr=polished_seq, scorer=scorer)
+    edits = 0
+
+    while True:
+        expected_windows = _hit_window_map(per_tf_hits=per_tf_hits, scorer=scorer)
+        single_owner_positions = _windows_cover_ownership(windows=expected_windows, seq_length=int(polished_seq.size))
+        changed = False
+        for pos, tf_owner in single_owner_positions:
+            current_base = int(polished_seq[pos])
+            owner_score = _hit_raw_score(per_tf_hits=per_tf_hits, tf_name=tf_owner)
+            best_update: (
+                tuple[
+                    np.ndarray,
+                    dict[str, float],
+                    dict[str, dict[str, object]],
+                    dict[str, float],
+                    float,
+                    float,
+                ]
+                | None
+            ) = None
+            best_owner_score = owner_score
+            for base in (0, 1, 2, 3):
+                if int(base) == current_base:
+                    continue
+                trial = polished_seq.copy()
+                trial[pos] = int(base)
+                trial_per_tf_map, trial_hits, trial_norm_map, trial_min_norm, trial_sum_norm = _candidate_payload(
+                    seq_arr=trial,
+                    scorer=scorer,
+                )
+                if not _hits_match_polish_contract(
+                    per_tf_hits=trial_hits,
+                    expected_windows=expected_windows,
+                    owner_tf=tf_owner,
+                    owner_position=int(pos),
+                ):
+                    continue
+                trial_owner_score = _hit_raw_score(per_tf_hits=trial_hits, tf_name=tf_owner)
+                if trial_owner_score > best_owner_score + 1.0e-12:
+                    best_owner_score = trial_owner_score
+                    best_update = (
+                        trial,
+                        trial_per_tf_map,
+                        trial_hits,
+                        trial_norm_map,
+                        float(trial_min_norm),
+                        float(trial_sum_norm),
+                    )
+            if best_update is None:
+                continue
+            polished_seq, per_tf_map, per_tf_hits, norm_map, min_norm, sum_norm = best_update
+            edits += 1
+            changed = True
+        if not changed:
+            break
+
+    return polished_seq, per_tf_map, per_tf_hits, norm_map, float(min_norm), float(sum_norm), edits
+
+
 def _postprocess_elite_candidates(
     *,
     candidates: list[_EliteCandidate],
@@ -476,62 +550,11 @@ def _postprocess_elite_candidates(
         return candidates, stats
 
     for cand in candidates:
-        seq_arr = np.asarray(cand.seq_arr, dtype=np.int8).copy()
-        per_tf_map, per_tf_hits, norm_map, min_norm, sum_norm = _candidate_payload(seq_arr=seq_arr, scorer=scorer)
-
-        while True:
-            expected_windows = _hit_window_map(per_tf_hits=per_tf_hits, scorer=scorer)
-            single_owner_positions = _windows_cover_ownership(windows=expected_windows, seq_length=int(seq_arr.size))
-            changed = False
-            for pos, tf_owner in single_owner_positions:
-                current_base = int(seq_arr[pos])
-                owner_score = _hit_raw_score(per_tf_hits=per_tf_hits, tf_name=tf_owner)
-                best_update: (
-                    tuple[
-                        np.ndarray,
-                        dict[str, float],
-                        dict[str, dict[str, object]],
-                        dict[str, float],
-                        float,
-                        float,
-                    ]
-                    | None
-                ) = None
-                best_owner_score = owner_score
-                for base in (0, 1, 2, 3):
-                    if int(base) == current_base:
-                        continue
-                    trial = seq_arr.copy()
-                    trial[pos] = int(base)
-                    trial_per_tf_map, trial_hits, trial_norm_map, trial_min_norm, trial_sum_norm = _candidate_payload(
-                        seq_arr=trial,
-                        scorer=scorer,
-                    )
-                    if not _hits_match_polish_contract(
-                        per_tf_hits=trial_hits,
-                        expected_windows=expected_windows,
-                        owner_tf=tf_owner,
-                        owner_position=int(pos),
-                    ):
-                        continue
-                    trial_owner_score = _hit_raw_score(per_tf_hits=trial_hits, tf_name=tf_owner)
-                    if trial_owner_score > best_owner_score + 1.0e-12:
-                        best_owner_score = trial_owner_score
-                        best_update = (
-                            trial,
-                            trial_per_tf_map,
-                            trial_hits,
-                            trial_norm_map,
-                            float(trial_min_norm),
-                            float(trial_sum_norm),
-                        )
-                if best_update is None:
-                    continue
-                seq_arr, per_tf_map, per_tf_hits, norm_map, min_norm, sum_norm = best_update
-                stats["polish_edits"] += 1
-                changed = True
-            if not changed:
-                break
+        seq_arr, per_tf_map, per_tf_hits, norm_map, min_norm, sum_norm, polish_edits = _polish_candidate_to_convergence(
+            seq_arr=np.asarray(cand.seq_arr, dtype=np.int8),
+            scorer=scorer,
+        )
+        stats["polish_edits"] += int(polish_edits)
 
         cand.seq_arr = np.asarray(seq_arr, dtype=np.int8)
         cand.per_tf_map = per_tf_map
@@ -553,6 +576,25 @@ def _postprocess_elite_candidates(
             )
             stats["trim_left"] += int(trim_left)
             stats["trim_right"] += int(trim_right)
+            (
+                trimmed_seq_arr,
+                trimmed_per_tf_map,
+                trimmed_per_tf_hits,
+                trimmed_norm_map,
+                trimmed_min_norm,
+                trimmed_sum_norm,
+                post_trim_polish_edits,
+            ) = _polish_candidate_to_convergence(
+                seq_arr=np.asarray(cand.seq_arr, dtype=np.int8),
+                scorer=scorer,
+            )
+            cand.seq_arr = np.asarray(trimmed_seq_arr, dtype=np.int8)
+            cand.per_tf_map = trimmed_per_tf_map
+            cand.per_tf_hits = trimmed_per_tf_hits
+            cand.norm_map = trimmed_norm_map
+            cand.min_norm = float(trimmed_min_norm)
+            cand.sum_norm = float(trimmed_sum_norm)
+            stats["polish_edits"] += int(post_trim_polish_edits)
         remaining = _remaining_single_owner_polish_improvements(
             seq_arr=np.asarray(cand.seq_arr, dtype=np.int8),
             per_tf_hits=cand.per_tf_hits,

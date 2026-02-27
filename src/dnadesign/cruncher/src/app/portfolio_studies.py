@@ -31,6 +31,22 @@ def run_study(*args, **kwargs):
 
 
 RunStudyFn = Callable[..., Path]
+PortfolioStudyEventCallback = Callable[[str, dict[str, object]], None]
+
+
+def _emit_study_event(on_event: PortfolioStudyEventCallback | None, name: str, **payload: object) -> None:
+    if on_event is None:
+        return
+    on_event(name, dict(payload))
+
+
+def _source_study_event_context(source: PortfolioSource, resolved_spec: Path) -> dict[str, object]:
+    return {
+        "source_id": str(source.id),
+        "source_label": _resolve_source_label(source),
+        "workspace_name": source.workspace.name,
+        "study_spec": str(resolved_spec),
+    }
 
 
 def _ensure_required_columns(df: pd.DataFrame, required: list[str], *, context: str) -> None:
@@ -57,17 +73,46 @@ def _resolve_source_study_spec_path(source: PortfolioSource, *, study_spec: Path
     return resolved
 
 
-def _ensure_study_run_completed(study_spec_path: Path, *, run_study_fn: RunStudyFn) -> Path:
+def _ensure_study_run_completed(
+    study_spec_path: Path,
+    *,
+    source: PortfolioSource,
+    run_study_fn: RunStudyFn,
+    on_event: PortfolioStudyEventCallback | None = None,
+) -> Path:
     study_run_dir = resolve_deterministic_study_run_dir(study_spec_path)
+    context = _source_study_event_context(source, study_spec_path)
+
+    def _forward_study_event(name: str, payload: dict[str, object]) -> None:
+        merged = dict(context)
+        merged.update(payload)
+        _emit_study_event(on_event, name, **merged)
+
     if not study_run_dir.exists():
+        _emit_study_event(
+            on_event,
+            "study_ensure_started",
+            **context,
+            resume=False,
+            study_run_dir=str(study_run_dir),
+        )
         run_study_fn(
             study_spec_path,
             resume=False,
             force_overwrite=False,
             progress_bar=False,
             quiet_logs=True,
+            on_event=_forward_study_event,
         )
-        return resolve_deterministic_study_run_dir(study_spec_path)
+        resolved_run_dir = resolve_deterministic_study_run_dir(study_spec_path)
+        _emit_study_event(
+            on_event,
+            "study_ensure_completed",
+            **context,
+            resumed=False,
+            study_run_dir=str(resolved_run_dir),
+        )
+        return resolved_run_dir
 
     manifest_file = study_manifest_path(study_run_dir)
     status_file = study_status_path(study_run_dir)
@@ -78,14 +123,29 @@ def _ensure_study_run_completed(study_spec_path: Path, *, run_study_fn: RunStudy
         )
     status = load_study_status(status_file)
     if status.status in {"completed", "completed_with_errors"}:
+        _emit_study_event(
+            on_event,
+            "study_ensure_ready",
+            **context,
+            study_run_dir=str(study_run_dir),
+            study_status=str(status.status),
+        )
         return study_run_dir
 
+    _emit_study_event(
+        on_event,
+        "study_ensure_started",
+        **context,
+        resume=True,
+        study_run_dir=str(study_run_dir),
+    )
     run_study_fn(
         study_spec_path,
         resume=True,
         force_overwrite=False,
         progress_bar=False,
         quiet_logs=True,
+        on_event=_forward_study_event,
     )
     refreshed = load_study_status(status_file)
     if refreshed.status not in {"completed", "completed_with_errors"}:
@@ -93,11 +153,29 @@ def _ensure_study_run_completed(study_spec_path: Path, *, run_study_fn: RunStudy
             "Study run did not complete after resume and cannot be aggregated by portfolio: "
             f"study_run_dir={study_run_dir} status={refreshed.status!r}"
         )
+    _emit_study_event(
+        on_event,
+        "study_ensure_completed",
+        **context,
+        resumed=True,
+        study_run_dir=str(study_run_dir),
+        study_status=str(refreshed.status),
+    )
     return study_run_dir
 
 
-def _ensure_required_source_studies(spec: PortfolioSpec, *, run_study_fn: RunStudyFn) -> dict[tuple[str, str], Path]:
-    return _ensure_required_source_studies_for_sources(spec, spec.sources, run_study_fn=run_study_fn)
+def _ensure_required_source_studies(
+    spec: PortfolioSpec,
+    *,
+    run_study_fn: RunStudyFn,
+    on_event: PortfolioStudyEventCallback | None = None,
+) -> dict[tuple[str, str], Path]:
+    return _ensure_required_source_studies_for_sources(
+        spec,
+        spec.sources,
+        run_study_fn=run_study_fn,
+        on_event=on_event,
+    )
 
 
 def _ensure_required_source_studies_for_sources(
@@ -105,6 +183,7 @@ def _ensure_required_source_studies_for_sources(
     sources: list[PortfolioSource],
     *,
     run_study_fn: RunStudyFn,
+    on_event: PortfolioStudyEventCallback | None = None,
 ) -> dict[tuple[str, str], Path]:
     ensured: dict[tuple[str, str], Path] = {}
     if not spec.studies.ensure_specs:
@@ -117,12 +196,22 @@ def _ensure_required_source_studies_for_sources(
                 study_spec=relative_spec,
                 label="portfolio.studies.ensure_specs entry",
             )
-            run_dir = _ensure_study_run_completed(resolved_spec, run_study_fn=run_study_fn)
+            run_dir = _ensure_study_run_completed(
+                resolved_spec,
+                source=source,
+                run_study_fn=run_study_fn,
+                on_event=on_event,
+            )
             ensured[(str(source.id), str(resolved_spec))] = run_dir
     return ensured
 
 
-def _load_source_study_summary(source: PortfolioSource, *, run_study_fn: RunStudyFn) -> dict[str, object] | None:
+def _load_source_study_summary(
+    source: PortfolioSource,
+    *,
+    run_study_fn: RunStudyFn,
+    on_event: PortfolioStudyEventCallback | None = None,
+) -> dict[str, object] | None:
     study_spec = getattr(source, "study_spec", None)
     if study_spec is None:
         return None
@@ -134,7 +223,12 @@ def _load_source_study_summary(source: PortfolioSource, *, run_study_fn: RunStud
         study_spec=study_spec,
         label="portfolio.sources[].study_spec",
     )
-    study_run_dir = _ensure_study_run_completed(resolved_spec, run_study_fn=run_study_fn)
+    study_run_dir = _ensure_study_run_completed(
+        resolved_spec,
+        source=source,
+        run_study_fn=run_study_fn,
+        on_event=on_event,
+    )
     manifest = load_study_manifest(study_manifest_path(study_run_dir))
     status = load_study_status(study_status_path(study_run_dir))
     if status.status not in {"completed", "completed_with_errors"}:
@@ -193,6 +287,7 @@ def _load_source_sequence_length_rows(
     top_n_lengths: int,
     ensured_study_runs: dict[tuple[str, str], Path],
     run_study_fn: RunStudyFn,
+    on_event: PortfolioStudyEventCallback | None = None,
 ) -> list[dict[str, object]]:
     resolved_spec = _resolve_source_study_spec_path(
         source,
@@ -202,7 +297,12 @@ def _load_source_sequence_length_rows(
     run_key = (str(source.id), str(resolved_spec))
     study_run_dir = ensured_study_runs.get(run_key)
     if study_run_dir is None:
-        study_run_dir = _ensure_study_run_completed(resolved_spec, run_study_fn=run_study_fn)
+        study_run_dir = _ensure_study_run_completed(
+            resolved_spec,
+            source=source,
+            run_study_fn=run_study_fn,
+            on_event=on_event,
+        )
 
     manifest = load_study_manifest(study_manifest_path(study_run_dir))
     status = load_study_status(study_status_path(study_run_dir))

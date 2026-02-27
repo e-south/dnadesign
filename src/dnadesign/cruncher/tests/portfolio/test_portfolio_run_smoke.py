@@ -635,7 +635,88 @@ def test_portfolio_elite_showcase_uses_motif_logo_effects_and_multiline_scores(
     record = records[0]
     assert any(effect.kind == "motif_logo" for effect in record.effects)
     assert record.display.overlay_text.count("\n") >= 2
+    overlay_text = str(record.display.overlay_text)
+    assert "demo_pairwise_elite_1" in overlay_text
+    assert "(L=12)" in overlay_text
     assert "lexA=" in str(record.display.overlay_text)
+
+
+def test_portfolio_elite_showcase_wraps_overlay_for_dense_columns(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    tf_names = ["lexA", "cpxR", "baeR", "soxR", "soxS", "marA"]
+    selected_elites_df = pd.DataFrame(
+        [
+            {
+                "source_id": "demo_pairwise",
+                "source_label": "multitf_baer_lexa_soxr_soxs_long_workspace_label",
+                "elite_id": "demo_pairwise_elite_1",
+                "sequence": "AACCGGTTACGAAACCGGTTACGAAACCGG",
+            }
+        ]
+    )
+    handoff_rows: list[dict[str, object]] = []
+    for idx, tf_name in enumerate(tf_names):
+        start = idx * 2
+        handoff_rows.append(
+            {
+                "source_id": "demo_pairwise",
+                "elite_id": "demo_pairwise_elite_1",
+                "tf": tf_name,
+                "best_start": start,
+                "best_end": start + 4,
+                "best_strand": "+",
+                "best_window_seq": "ACCG",
+                "best_score_norm": 0.90 - idx * 0.02,
+            }
+        )
+    handoff_df = pd.DataFrame(handoff_rows)
+    pwm_matrix = np.array(
+        [
+            [0.6, 0.1, 0.2, 0.1],
+            [0.1, 0.6, 0.2, 0.1],
+            [0.1, 0.1, 0.7, 0.1],
+            [0.1, 0.2, 0.1, 0.6],
+        ],
+        dtype=float,
+    )
+    pwms_by_source = {"demo_pairwise": {tf_name: PWM(name=tf_name, matrix=pwm_matrix.copy()) for tf_name in tf_names}}
+    seen: dict[str, object] = {}
+
+    def _fake_grid(records, *, ncols, style_overrides):
+        rows = list(records)
+        seen["records"] = rows
+        seen["ncols"] = int(ncols)
+        return plt.figure(figsize=(2, 2), dpi=100)
+
+    monkeypatch.setattr(
+        "dnadesign.cruncher.portfolio.plots.elite_showcase.render_record_grid_figure",
+        _fake_grid,
+    )
+
+    out_path = tmp_path / "portfolio_showcase_wrapped_overlay.pdf"
+    plot_portfolio_elite_showcase(
+        selected_elites_df=selected_elites_df,
+        handoff_df=handoff_df,
+        pwms_by_source=pwms_by_source,
+        out_path=out_path,
+        ncols=6,
+        dpi=250,
+    )
+
+    assert out_path.exists()
+    assert seen["ncols"] == 6
+    records = seen["records"]
+    assert isinstance(records, list) and len(records) == 1
+    text = str(records[0].display.overlay_text)
+    lines = text.splitlines()
+    assert len(lines) >= 5
+    assert max(len(line) for line in lines) <= 30
+    assert "demo_pairwise_elite_1" in text
+    assert "(L=30)" in text
+    assert "lexA=0.90" in text
+    assert "marA=0.80" in text
 
 
 def test_portfolio_elite_showcase_fails_when_source_pwms_missing(tmp_path: Path) -> None:
@@ -824,6 +905,12 @@ def test_run_portfolio_writes_handoff_tables_and_payload(tmp_path: Path) -> None
 
     run_dir = run_portfolio(spec_path)
     payload = portfolio_show_payload(run_dir)
+    assert (run_dir / "meta" / "manifest.json").exists()
+    assert (run_dir / "meta" / "status.json").exists()
+    assert (run_dir / "tables").exists()
+    assert (run_dir / "plots").exists()
+    assert not (run_dir / "portfolio").exists()
+    assert not (run_dir / "manifests").exists()
 
     handoff_path = portfolio_table_path(run_dir, "handoff_windows_long", "parquet")
     elite_summary_path = portfolio_table_path(run_dir, "handoff_elites_summary", "parquet")
@@ -868,7 +955,7 @@ def test_run_portfolio_writes_handoff_tables_and_payload(tmp_path: Path) -> None
         "pairwise_cpxr_baer",
         "pairwise_cpxr_lexa",
     ]
-    manifest_payload = json.loads((run_dir / "portfolio" / "portfolio_manifest.json").read_text())
+    manifest_payload = json.loads((run_dir / "meta" / "manifest.json").read_text())
     assert manifest_payload["source_runs"][0]["source_top_k"] == 4
     assert manifest_payload["source_runs"][1]["source_top_k"] == 5
     showcase_plot = portfolio_workflow.portfolio_plot_path(run_dir, "elite_showcase_cross_workspace", "pdf")
@@ -1271,7 +1358,7 @@ def test_run_portfolio_schema_v3_prepare_mode_runs_source_runbooks(
     called_path, called_steps, output_log_path = calls[0]
     assert called_path == runbook_file.resolve()
     assert called_steps == ["analyze_summary", "export_sequences"]
-    assert output_log_path == (run_dir / "portfolio" / "logs" / "prepare__pairwise_cpxr_baer.log")
+    assert output_log_path == (run_dir / "meta" / "logs" / "prepare__pairwise_cpxr_baer.log")
 
 
 def test_run_portfolio_prepare_mode_submits_multiple_sources_before_waiting(
@@ -2229,7 +2316,9 @@ def test_run_portfolio_ensures_missing_studies_and_writes_sequence_length_table(
         force_overwrite: bool = False,
         progress_bar: bool = True,
         quiet_logs: bool = False,
+        on_event=None,
     ):
+        _ = on_event
         study_calls.append(path.resolve())
         assert resume is False
         assert force_overwrite is False
@@ -2339,10 +2428,11 @@ def test_run_portfolio_materializes_outputs_before_later_source_failure(
 
     load_source_rows = portfolio_workflow._load_source_rows
 
-    def _fail_second_source(source):
+    def _fail_second_source(source, *, on_event=None):
+        _ = on_event
         if str(source.id) == "pairwise_cpxr_lexa":
             raise RuntimeError("synthetic second source failure")
-        return load_source_rows(source)
+        return load_source_rows(source, on_event=on_event)
 
     monkeypatch.setattr(portfolio_workflow, "_load_source_rows", _fail_second_source)
 
@@ -2565,6 +2655,7 @@ def test_run_portfolio_prepare_mode_runs_prepare_before_ensured_studies(
     )
 
     call_order: list[str] = []
+    events: list[tuple[str, dict[str, object]]] = []
 
     def _fake_run_workspace_runbook(
         path: Path,
@@ -2598,9 +2689,26 @@ def test_run_portfolio_prepare_mode_runs_prepare_before_ensured_studies(
         force_overwrite: bool = False,
         progress_bar: bool = True,
         quiet_logs: bool = False,
+        on_event=None,
     ):
         assert path.resolve() == length_spec.resolve()
         call_order.append("study")
+        if on_event is not None:
+            on_event("study_started", {"study_name": "length_vs_score", "study_id": "abc123"})
+            on_event(
+                "study_trial_progress",
+                {
+                    "completed_runs": 1,
+                    "total_runs": 2,
+                    "success_runs": 1,
+                    "error_runs": 0,
+                    "running_runs": 1,
+                    "queued_runs": 0,
+                    "worker_count": 2,
+                    "active_trial_ids": ["BASE"],
+                },
+            )
+            on_event("study_completed", {"status": "completed"})
         lock_file = source / ".cruncher" / "locks" / "config.lock.json"
         if not lock_file.exists():
             raise FileNotFoundError(f"Missing lockfile for study run: {lock_file}")
@@ -2609,6 +2717,15 @@ def test_run_portfolio_prepare_mode_runs_prepare_before_ensured_studies(
     monkeypatch.setattr(portfolio_workflow, "run_workspace_runbook", _fake_run_workspace_runbook)
     monkeypatch.setattr(portfolio_workflow, "run_study", _fake_run_study)
 
-    run_dir = run_portfolio(spec_path, prepare_ready_policy="rerun")
+    def _on_event(name: str, payload: dict[str, object]) -> None:
+        events.append((name, payload))
+
+    run_dir = run_portfolio(spec_path, prepare_ready_policy="rerun", on_event=_on_event)
     assert run_dir.exists()
     assert call_order == ["prepare", "study"]
+    event_names = [name for name, _ in events]
+    assert "study_ensure_started" in event_names
+    assert "study_trial_progress" in event_names
+    assert "study_ensure_completed" in event_names
+    progress_payload = next(payload for name, payload in events if name == "study_trial_progress")
+    assert progress_payload["source_id"] == "pairwise_cpxr_baer"

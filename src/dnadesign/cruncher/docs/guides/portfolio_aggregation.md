@@ -147,23 +147,18 @@ Portfolio outputs are deterministic:
 <portfolio-workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/
 ```
 
-Canonical handoff table export root:
-
-- `<portfolio-workspace>/outputs/export/portfolios/<portfolio_name>/<portfolio_id>/`
-
 Primary artifacts:
 
-- `outputs/export/portfolios/<portfolio_name>/<portfolio_id>/table__handoff_windows_long.{csv|parquet}`
-- `outputs/export/portfolios/<portfolio_name>/<portfolio_id>/table__handoff_elites_summary.{csv|parquet}`
-- `outputs/export/portfolios/<portfolio_name>/<portfolio_id>/table__source_summary.{csv|parquet}`
-- `outputs/export/portfolios/<portfolio_name>/<portfolio_id>/table__study_summary.{csv|parquet}` (when one or more sources define `study_spec`)
-- `outputs/export/portfolios/<portfolio_name>/<portfolio_id>/table__handoff_sequence_length.{csv|parquet}` (when `studies.sequence_length_table.enabled: true`)
-- `<portfolio-workspace>/outputs/plots/portfolio__<portfolio_name>__<portfolio_id>__plot__source_tradeoff_score_vs_diversity.pdf` (when diversity metric is available)
-- `<portfolio-workspace>/outputs/plots/portfolio__<portfolio_name>__<portfolio_id>__plot__elite_showcase_cross_workspace.<pdf|png>` (when `plots.elite_showcase.enabled: true`)
-- `portfolio/portfolio_manifest.json`
-- `portfolio/portfolio_status.json`
-- `portfolio/logs/prepare__<source_id>.log` (prepare step logs per source, in `prepare_then_aggregate` mode)
-- `manifests/manifest.json` + `manifests/table_manifest.json` + `manifests/plot_manifest.json`
+- `outputs/portfolios/<portfolio_name>/<portfolio_id>/tables/table__handoff_windows_long.{csv|parquet}`
+- `outputs/portfolios/<portfolio_name>/<portfolio_id>/tables/table__handoff_elites_summary.{csv|parquet}`
+- `outputs/portfolios/<portfolio_name>/<portfolio_id>/tables/table__source_summary.{csv|parquet}`
+- `outputs/portfolios/<portfolio_name>/<portfolio_id>/tables/table__study_summary.{csv|parquet}` (when one or more sources define `study_spec`)
+- `outputs/portfolios/<portfolio_name>/<portfolio_id>/tables/table__handoff_sequence_length.{csv|parquet}` (when `studies.sequence_length_table.enabled: true`)
+- `outputs/portfolios/<portfolio_name>/<portfolio_id>/plots/plot__source_tradeoff_score_vs_diversity.pdf` (when diversity metric is available)
+- `outputs/portfolios/<portfolio_name>/<portfolio_id>/plots/plot__elite_showcase_cross_workspace.<pdf|png>` (when `plots.elite_showcase.enabled: true`)
+- `outputs/portfolios/<portfolio_name>/<portfolio_id>/meta/manifest.json`
+- `outputs/portfolios/<portfolio_name>/<portfolio_id>/meta/status.json`
+- `outputs/portfolios/<portfolio_name>/<portfolio_id>/meta/logs/prepare__<source_id>.log` (prepare step logs per source, in `prepare_then_aggregate` mode)
 
 Default portfolio table contract is single-format parquet (`artifacts.table_format: parquet`, `artifacts.write_csv: false`).
 Enable `write_csv: true` only when a downstream consumer explicitly requires CSV mirrors.

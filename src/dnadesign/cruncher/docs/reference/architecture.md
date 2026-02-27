@@ -249,9 +249,9 @@ Portfolio outputs live under:
 
 ```
 <portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/
-  portfolio/
+  meta/
   tables/
-  manifests/
+  plots/
 ```
 
 Key points:
@@ -259,8 +259,8 @@ Key points:
 - `portfolio_id` is deterministic from the frozen Portfolio spec payload.
 - Source run selection is explicit in spec (`workspace`, `run_dir` per source).
 - Source elite count is contract-driven from source run manifest `top_k` and `elites.parquet`.
-- Portfolio plots are workspace-flat under `outputs/plots/` as namespaced files
-  (`portfolio__<portfolio_name>__<portfolio_id>__plot__*`).
+- Portfolio plots are run-scoped under
+  `<portfolio_run_dir>/plots/plot__*`.
 - No implicit latest-run fallback is used during portfolio aggregation.
 - Handoff tables are source-provenance-first (`table__handoff_windows_long`, `table__handoff_elites_summary`, `table__source_summary`).
 
