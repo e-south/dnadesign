@@ -1,5 +1,7 @@
 ## Permuter
 
+![Permuter banner](assets/permuter-banner.svg)
+
 Mutate biological sequences, score them with pluggable evaluators, and export/plot the results — via a clean Typer CLI.
 
 - Run in‑silico deep mutational scans.

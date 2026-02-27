@@ -42,7 +42,7 @@ selection:                          # Selection strategy over objective channels
   params:                           # Selection contract fields
     top_k: 5                        # Number of candidates to select
     score_ref: sfxi_v1/sfxi         # Objective score channel used for ranking
-    objective_mode: maximize
+    objective_mode: maximize  # Sets `objective_mode` for this example configuration.
     tie_handling: competition_rank  # Tie policy for ranking output
 ```
 

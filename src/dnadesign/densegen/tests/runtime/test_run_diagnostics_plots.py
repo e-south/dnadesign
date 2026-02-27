@@ -15,6 +15,7 @@ import copy
 import json
 import warnings
 from pathlib import Path
+from unittest.mock import patch
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -37,6 +38,7 @@ from dnadesign.densegen.src.viz.plot_run import (
     _extract_plan_quotas,
     _progress_axis,
     _rate_series_from_counts,
+    _render_run_health_summary_table_figure,
     _usage_category_label,
     plot_run_health,
     plot_tfbs_usage,
@@ -623,6 +625,43 @@ def test_plot_run_health(tmp_path: Path) -> None:
     assert (tmp_path / "run_health" / "summary.csv").exists()
 
 
+def test_plot_run_health_supports_effective_config_sequences(tmp_path: Path) -> None:
+    matplotlib.use("Agg", force=True)
+    out_path = tmp_path / "run_health_sequences.png"
+    plan_a = "sigma70_panel__sig35=a__sig10=A"
+    plan_b = "sigma70_panel__sig35=a__sig10=B"
+
+    attempts = _attempts_df().copy()
+    attempts["plan_name"] = [plan_a, plan_b, plan_a]
+
+    dense_arrays = _dense_arrays_df().copy()
+    dense_arrays["densegen__plan"] = [plan_a if idx % 2 == 0 else plan_b for idx in range(len(dense_arrays))]
+
+    composition = _composition_df().copy()
+    composition["plan_name"] = [plan_a if idx % 2 == 0 else plan_b for idx in range(len(composition))]
+
+    paths = plot_run_health(
+        dense_arrays,
+        out_path,
+        attempts_df=attempts,
+        composition_df=composition,
+        events_df=_events_df(),
+        cfg={
+            "config": {
+                "generation": {
+                    "plan": [
+                        {"name": plan_a, "sequences": 2},
+                        {"name": plan_b, "sequences": 1},
+                    ]
+                }
+            }
+        },
+        style={},
+    )
+    assert len(paths) == 5
+    assert (tmp_path / "run_health" / "run_health.png").exists()
+
+
 def test_run_health_compression_ratio_distribution_uses_plan_hue() -> None:
     dense_arrays = pd.DataFrame(
         [
@@ -635,12 +674,18 @@ def test_run_health_compression_ratio_distribution_uses_plan_hue() -> None:
     fig, axes = _build_run_health_compression_ratio_figure(dense_arrays, style={})
     try:
         ax = axes["compression"]
+        fig_w, fig_h = fig.get_size_inches()
+        assert fig_w == pytest.approx(7.2)
+        assert fig_h == pytest.approx(4.0)
         assert ax.get_xlabel() == "Compression ratio"
         assert ax.get_ylabel() == "Count"
         assert ax.get_title() == "Compression ratio distribution by plan"
         legend = ax.get_legend()
         assert legend is not None
-        assert getattr(legend, "_loc", None) == 2
+        assert getattr(legend, "_loc", None) == 6
+        legend_bbox = legend.get_bbox_to_anchor()._bbox
+        assert legend_bbox.x0 >= 1.0
+        assert legend_bbox.y0 == pytest.approx(0.5)
         labels = [text.get_text() for text in legend.get_texts()]
         assert any("plan_a" in label for label in labels)
         assert any("plan_b" in label for label in labels)
@@ -739,6 +784,48 @@ def test_run_health_tfbs_length_by_regulator_groups_lengths() -> None:
         fig.clf()
 
 
+def test_run_health_tfbs_length_single_regulator_uses_length_axis() -> None:
+    composition = pd.DataFrame(
+        [
+            {"tf": "TF_A", "tfbs": "AAAA", "length": 4},
+            {"tf": "TF_A", "tfbs": "AAAAT", "length": 5},
+            {"tf": "TF_A", "tfbs": "AAAAT", "length": 5},
+        ]
+    )
+    library_members = pd.DataFrame(
+        [
+            {"tf": "TF_A", "tfbs": "AAAA"},
+            {"tf": "TF_A", "tfbs": "AAAAT"},
+            {"tf": "TF_A", "tfbs": "AAAATT"},
+        ]
+    )
+    fig, axes = _build_run_health_tfbs_length_by_regulator_figure(
+        composition,
+        style={},
+        library_members_df=library_members,
+    )
+    try:
+        ax = axes["length"]
+        assert ax.get_xlabel() == "TFBS length (bp)"
+        assert ax.get_ylabel() == "Count in accepted outputs"
+        assert ax.get_title() == "TFBS length distribution across accepted outputs"
+        size = fig.get_size_inches()
+        assert size[0] == pytest.approx(size[1], rel=0.01)
+        assert float(size[0]) <= 4.8
+        labels = [tick.get_text() for tick in ax.get_xticklabels()]
+        assert any(label == "4" for label in labels)
+        assert any(label == "5" for label in labels)
+        assert ax.get_legend() is None
+        patches = ax.patches
+        assert patches
+        face_color = patches[0].get_facecolor()
+        assert float(face_color[0]) > 0.3
+        assert float(face_color[1]) > 0.3
+        assert float(face_color[2]) > 0.3
+    finally:
+        fig.clf()
+
+
 def test_run_health_outcomes_legend_and_waste_subtitle() -> None:
     matplotlib.use("Agg", force=True)
     attempts = _attempts_df().copy()
@@ -756,18 +843,17 @@ def test_run_health_outcomes_legend_and_waste_subtitle() -> None:
         legend = ax.get_legend()
         assert legend is not None
         legend_labels = [text.get_text() for text in legend.get_texts()]
-        assert "accepted" in legend_labels
-        assert "rejected" in legend_labels
-        assert "failed" in legend_labels
+        assert "Accepted" in legend_labels
+        assert "Rejected" in legend_labels
+        assert "Failed" in legend_labels
         assert "duplicate" not in legend_labels
-        assert ax.get_ylabel() == ""
+        assert ax.get_xlabel() == "Plan"
+        assert ax.get_ylabel() == "Attempt index"
         assert ax._left_title.get_text() == ""
         label_size = ax.xaxis.label.get_size()
         assert all(text.get_size() == pytest.approx(label_size) for text in legend.get_texts())
         assert legend.get_bbox_to_anchor()._bbox.x0 >= 1.0
-        connector_lines = [line for line in ax.get_lines() if line.get_color() == "#c7c7c7"]
-        assert connector_lines
-        assert all(float(line.get_alpha() or 1.0) <= 0.55 for line in connector_lines)
+        assert len(ax.get_lines()) == 0
     finally:
         fig.clf()
 
@@ -788,36 +874,38 @@ def test_run_health_outcomes_plot_is_single_panel_event_map() -> None:
         assert fig._suptitle is None
         assert set(axes.keys()) == {"outcome"}
         ax = axes["outcome"]
-        assert ax.get_title() == "Outcomes over time"
+        assert ax.get_title() == "Attempt outcomes by plan"
         assert ax._left_title.get_text() == ""
-        assert ax.get_ylabel() == ""
+        assert ax.get_xlabel() == "Plan"
+        assert ax.get_ylabel() == "Attempt index"
         assert all("Rejected/failed reason composition" not in t.get_text() for t in ax.texts)
         assert all("Quota attainment by plan" not in t.get_text() for t in ax.texts)
         legend = ax.get_legend()
         assert legend is not None
         labels = [text.get_text() for text in legend.get_texts()]
-        assert labels == ["accepted", "rejected", "failed"]
+        assert labels == ["Accepted", "Rejected", "Failed"]
+        y_labels = [text.get_text().strip() for text in ax.get_yticklabels() if text.get_text().strip()]
+        assert y_labels
+        y_lim = ax.get_ylim()
+        assert float(y_lim[0]) > float(y_lim[1])
+        assert len(ax.get_lines()) == 0
+        assert ax.get_aspect() == pytest.approx(1.0)
+        assert ax.patches
+        assert len(ax.patches) == 2
+        widths = [float(patch.get_width()) for patch in ax.patches]
+        heights = [float(patch.get_height()) for patch in ax.patches]
+        assert widths
+        assert all(width == pytest.approx(height, rel=1e-6) for width, height in zip(widths, heights))
+        assert all(0.8 <= width <= 1.0 for width in widths)
+        assert all(float(p.get_linewidth()) == pytest.approx(0.0) for p in ax.patches)
+        assert ax.collections
+        marker_offsets = [coll.get_offsets() for coll in ax.collections if len(coll.get_offsets()) > 0]
+        assert marker_offsets
+        first_offsets = np.asarray(marker_offsets[0], dtype=float)
         assert any(
-            str(line.get_color())
-            in {
-                "#d0d0d0",
-                "#c7c7c7",
-                (0.8156862745098039, 0.8156862745098039, 0.8156862745098039, 1.0),
-            }
-            for line in ax.get_lines()
+            float(point[0]) == pytest.approx(2.5, abs=1e-6) and float(point[1]) == pytest.approx(0.5, abs=1e-6)
+            for point in first_offsets
         )
-        collections = ax.collections
-        assert collections
-        size_values = [float(np.max(coll.get_sizes())) for coll in collections if len(coll.get_sizes()) > 0]
-        assert size_values
-        assert min(size_values) >= 30.0
-        square_collections = [
-            coll
-            for coll in collections
-            if coll.get_paths() and len(coll.get_paths()[0].vertices) == 5 and len(coll.get_edgecolors()) > 0
-        ]
-        assert square_collections
-        assert all(float(np.mean(coll.get_edgecolors()[0][:3])) >= 0.65 for coll in square_collections)
     finally:
         fig.clf()
 
@@ -851,13 +939,12 @@ def test_run_health_outcomes_connectors_draw_with_step_gaps() -> None:
         plan_quotas={"demo_plan": 12},
     )
     try:
-        connector_lines = [line for line in axes["outcome"].get_lines() if line.get_color() in {"#d0d0d0", "#c7c7c7"}]
-        assert connector_lines
+        assert len(axes["outcome"].get_lines()) == 0
     finally:
         fig.clf()
 
 
-def test_run_health_outcomes_connectors_follow_actual_run_order() -> None:
+def test_run_health_outcomes_points_follow_actual_run_order() -> None:
     matplotlib.use("Agg", force=True)
     attempts = pd.DataFrame(
         [
@@ -898,16 +985,62 @@ def test_run_health_outcomes_connectors_follow_actual_run_order() -> None:
     fig, axes = _build_run_health_outcomes_figure(
         attempts,
         events_df=None,
-        style={},
+        style={"run_health_outcomes_attempts_per_row": 2},
         plan_quotas={"plan_a": 12, "plan_b": 12},
     )
     try:
-        connector_lines = [line for line in axes["outcome"].get_lines() if line.get_color() == "#c7c7c7"]
-        assert connector_lines
-        x_data = np.asarray(connector_lines[0].get_xdata(), dtype=float)
-        y_data = np.asarray(connector_lines[0].get_ydata(), dtype=float)
-        assert np.array_equal(x_data, np.array([1.0, 2.0, 3.0, 4.0]))
-        assert np.array_equal(y_data, np.array([0.0, 1.0, 0.0, 1.0]))
+        patches = axes["outcome"].patches
+        assert len(patches) == 4
+        centers = [
+            (float(patch.get_x() + patch.get_width() / 2.0), float(patch.get_y() + patch.get_height() / 2.0))
+            for patch in patches
+        ]
+        y_values = {round(y, 3) for _, y in centers}
+        assert y_values == {0.5}
+        x_values = sorted(round(x, 3) for x, _ in centers)
+        assert x_values == [0.5, 1.5, 2.5, 3.5]
+    finally:
+        fig.clf()
+
+
+def test_run_health_outcomes_tiles_attempts_by_plan_row() -> None:
+    matplotlib.use("Agg", force=True)
+    attempts = pd.DataFrame(
+        [
+            {
+                "attempt_index": idx + 1,
+                "created_at": f"2026-01-26T00:00:{idx:02d}+00:00",
+                "status": "ok",
+                "reason": "ok",
+                "plan_name": "plan_a",
+                "sampling_library_index": idx + 1,
+            }
+            for idx in range(12)
+        ]
+    )
+    fig, axes = _build_run_health_outcomes_figure(
+        attempts,
+        events_df=None,
+        style={"run_health_outcomes_attempts_per_row": 10},
+        plan_quotas={"plan_a": 12},
+    )
+    try:
+        patches = axes["outcome"].patches
+        assert len(patches) == 12
+        centers = [
+            (float(patch.get_x() + patch.get_width() / 2.0), float(patch.get_y() + patch.get_height() / 2.0))
+            for patch in patches
+        ]
+        row_one = sorted(x for x, y in centers if y == pytest.approx(0.5))
+        row_two = sorted(x for x, y in centers if y == pytest.approx(1.5))
+        assert len(row_one) == 10
+        assert len(row_two) == 2
+        assert row_one[0] == pytest.approx(0.5)
+        assert row_one[-1] == pytest.approx(9.5)
+        assert row_two == pytest.approx([0.5, 1.5])
+        tick_labels = [tick.get_text().strip() for tick in axes["outcome"].get_yticklabels() if tick.get_text().strip()]
+        assert "1" in tick_labels
+        assert "11" in tick_labels
     finally:
         fig.clf()
 
@@ -935,10 +1068,10 @@ def test_run_health_outcomes_xticks_use_regular_spacing() -> None:
     )
     try:
         ticks = axes["outcome"].get_xticks()
-        assert len(ticks) >= 4
-        diffs = np.diff(np.asarray(ticks, dtype=float))
-        assert diffs.size > 0
-        assert float(np.max(diffs) - np.min(diffs)) <= 1.0
+        assert len(ticks) == 1
+        labels = [tick.get_text() for tick in axes["outcome"].get_xticklabels()]
+        assert labels
+        assert "Plan_a" in labels[0]
     finally:
         fig.clf()
 
@@ -967,13 +1100,89 @@ def test_run_health_outcomes_auto_groups_expanded_plans() -> None:
     fig, axes = _build_run_health_outcomes_figure(
         attempts,
         events_df=None,
+        style={"run_health_outcomes_plan_scope": "auto", "run_health_outcomes_plan_max_labels": 6},
+        plan_quotas=quotas,
+    )
+    try:
+        labels = [tick.get_text() for tick in axes["outcome"].get_xticklabels()]
+        assert len(labels) == 2
+        assert any("Sigma70_panel" in label for label in labels)
+        assert any("Sigma70_topup" in label for label in labels)
+    finally:
+        fig.clf()
+
+
+def test_run_health_outcomes_defaults_to_parent_plan_ticks() -> None:
+    matplotlib.use("Agg", force=True)
+    attempts_rows = []
+    quotas: dict[str, int] = {}
+    for idx in range(12):
+        if idx < 6:
+            plan_name = f"sigma70_panel__sig35={idx % 3}__sig10={idx % 2}"
+        else:
+            plan_name = f"sigma70_topup__sig35={idx % 3}__sig10={idx % 2}"
+        attempts_rows.append(
+            {
+                "attempt_index": idx + 1,
+                "created_at": f"2026-01-26T00:00:{idx:02d}+00:00",
+                "status": "ok",
+                "reason": "ok",
+                "plan_name": plan_name,
+                "sampling_library_index": idx + 1,
+            }
+        )
+        quotas[plan_name] = quotas.get(plan_name, 0) + 1
+    attempts = pd.DataFrame(attempts_rows)
+    fig, axes = _build_run_health_outcomes_figure(
+        attempts,
+        events_df=None,
         style={},
         plan_quotas=quotas,
     )
     try:
-        labels = [tick.get_text() for tick in axes["outcome"].get_yticklabels()]
+        labels = [tick.get_text() for tick in axes["outcome"].get_xticklabels()]
         assert len(labels) == 2
-        assert set(labels) == {"sigma70_panel", "sigma70_topup"}
+        assert any("Sigma70_panel" in label for label in labels)
+        assert any("Sigma70_topup" in label for label in labels)
+    finally:
+        fig.clf()
+
+
+def test_run_health_outcomes_per_plan_scope_keeps_expanded_plan_ticks() -> None:
+    matplotlib.use("Agg", force=True)
+    attempts = pd.DataFrame(
+        [
+            {
+                "attempt_index": 1,
+                "created_at": "2026-01-26T00:00:00+00:00",
+                "status": "ok",
+                "reason": "ok",
+                "plan_name": "sigma70_panel__sig35=a__sig10=A",
+                "sampling_library_index": 1,
+            },
+            {
+                "attempt_index": 2,
+                "created_at": "2026-01-26T00:00:01+00:00",
+                "status": "ok",
+                "reason": "ok",
+                "plan_name": "sigma70_panel__sig35=a__sig10=B",
+                "sampling_library_index": 2,
+            },
+        ]
+    )
+    fig, axes = _build_run_health_outcomes_figure(
+        attempts,
+        events_df=None,
+        style={"run_health_outcomes_plan_scope": "per_plan"},
+        plan_quotas={
+            "sigma70_panel__sig35=a__sig10=A": 1,
+            "sigma70_panel__sig35=a__sig10=B": 1,
+        },
+    )
+    try:
+        labels = [tick.get_text() for tick in axes["outcome"].get_xticklabels()]
+        assert len(labels) == 2
+        assert all("Sigma70_panel" in label for label in labels)
     finally:
         fig.clf()
 
@@ -1015,7 +1224,8 @@ def test_run_health_detail_plot_has_square_panels_without_subtitles() -> None:
         assert axes["fail"].get_title() == "Reason for failed solve"
         labels = [tick.get_text() for tick in axes["fail"].get_yticklabels()]
         assert any("ATGC" in label or "GGGG" in label for label in labels)
-        assert axes["fail"].get_xlim()[1] > 1.0
+        assert axes["fail"].get_xlim()[1] >= 5.0
+        assert all(float(tick).is_integer() for tick in axes["fail"].get_xticks())
         y0, y1 = axes["fail"].get_ylim()
         low, high = min(y0, y1), max(y0, y1)
         assert low < -0.5
@@ -1041,6 +1251,49 @@ def test_run_health_detail_plot_has_square_panels_without_subtitles() -> None:
         assert (1.0 - plan_title_bbox.y1) >= 0.05
     finally:
         fig.clf()
+
+
+def test_run_health_detail_reason_labels_start_capitalized() -> None:
+    attempts = _attempts_df().copy()
+    attempts.loc[1, "status"] = "rejected"
+    attempts.loc[1, "reason"] = "postprocess_forbidden_kmer"
+
+    fig, axes = _build_run_health_detail_figure(
+        attempts,
+        events_df=None,
+        style={},
+        plan_quotas={"demo_plan": 12},
+    )
+    try:
+        labels = [tick.get_text() for tick in axes["fail"].get_yticklabels() if tick.get_text()]
+        assert labels
+        assert all(label[0] == label[0].upper() for label in labels)
+    finally:
+        fig.clf()
+
+
+def test_run_health_summary_table_uses_tighter_vertical_save_padding(monkeypatch, tmp_path: Path) -> None:
+    import dnadesign.densegen.src.viz.plot_run as plot_run_module
+
+    summary_df = pd.DataFrame(
+        [
+            {"scope": "run", "name": "attempts", "value": 10, "unit": "count"},
+            {"scope": "run", "name": "ok", "value": 7, "unit": "count"},
+        ]
+    )
+    observed: dict[str, object] = {}
+
+    def _fake_save_figure(fig, path, *, style=None):
+        observed["path"] = Path(path)
+        observed["style"] = dict(style or {})
+
+    monkeypatch.setattr(plot_run_module, "_save_figure", _fake_save_figure)
+    _render_run_health_summary_table_figure(summary_df, tmp_path / "summary_table.png", style={})
+
+    assert observed["path"] == tmp_path / "summary_table.png"
+    style = observed.get("style")
+    assert isinstance(style, dict)
+    assert float(style.get("save_pad_inches", 1.0)) <= 0.04
 
 
 def test_run_health_detail_legend_wraps_for_many_plans() -> None:
@@ -1515,6 +1768,24 @@ def test_extract_plan_quotas_supports_densegen_wrapped_effective_config() -> Non
     assert quotas == {"demo_plan": 12, "alt_plan": 4}
 
 
+def test_extract_plan_quotas_supports_effective_config_sequences() -> None:
+    cfg = {
+        "config": {
+            "generation": {
+                "plan": [
+                    {"name": "sigma70_panel__sig35=a__sig10=A", "sequences": 1},
+                    {"name": "sigma70_panel__sig35=a__sig10=B", "sequences": "2"},
+                ]
+            }
+        }
+    }
+    quotas = _extract_plan_quotas(cfg)
+    assert quotas == {
+        "sigma70_panel__sig35=a__sig10=A": 1,
+        "sigma70_panel__sig35=a__sig10=B": 2,
+    }
+
+
 def test_run_health_missing_plan_name_is_normalized() -> None:
     attempts = _attempts_df().copy()
     attempts.loc[0, "plan_name"] = np.nan
@@ -1626,8 +1897,8 @@ def test_plot_placement_map_accepts_effective_config(tmp_path: Path) -> None:
 def test_placement_map_label_sanitizer() -> None:
     assert _sanitize_tf_label("lexA_CTGTATAW") == "lexA"
     assert _sanitize_tf_label("cpxR") == "cpxR"
-    assert _sanitize_fixed_label("fixed:sigma70_consensus:-35") == "sigma70_consensus -35"
-    assert _sanitize_fixed_label("fixed:sigma70_consensus:-10") == "sigma70_consensus -10"
+    assert _sanitize_fixed_label("fixed:sigma70_consensus:-35") == "σ70 upstream site (-35)"
+    assert _sanitize_fixed_label("fixed:sigma70_consensus:-10") == "σ70 downstream site (-10)"
 
 
 def test_placement_bounds_uses_final_offset_when_present() -> None:
@@ -1654,6 +1925,38 @@ def test_plot_tfbs_usage(tmp_path: Path) -> None:
     path = Path(paths[0])
     assert path.exists()
     assert str(path.relative_to(tmp_path)) == "stage_b/demo_plan/tfbs_usage.png"
+
+
+def test_tfbs_usage_title_is_human_readable_and_legend_has_no_frame() -> None:
+    matplotlib.use("Agg", force=True)
+    fig, axes = _build_tfbs_usage_breakdown_figure(
+        _composition_df(),
+        input_name=PLAN_POOL_LABEL,
+        plan_name="demo_plan",
+        style={},
+        pools=None,
+        library_members_df=_library_members_df(),
+    )
+    try:
+        title = axes["usage"].get_title()
+        assert "plan_pool__" not in title
+        assert "for input" not in title.lower()
+        assert "and plan" not in title.lower()
+        assert "distribution" in title.lower()
+        assert "heatmap" in axes["cum"].get_title().lower()
+        if fig.legends:
+            assert fig.legends[0].get_frame_on() is False
+            assert min(text.get_fontsize() for text in fig.legends[0].get_texts()) >= 11.0
+        summary_blocks = [text for text in axes["usage"].texts if "Placements in outputs" in str(text.get_text())]
+        assert summary_blocks
+        summary_lines = [line for line in str(summary_blocks[0].get_text()).splitlines() if line.strip()]
+        assert summary_lines
+        assert all(line[0].isupper() for line in summary_lines)
+        assert float(summary_blocks[0].get_fontsize()) >= 10.0
+        for text in axes["usage"].texts:
+            assert text.get_bbox_patch() is None
+    finally:
+        fig.clf()
 
 
 def test_plot_tfbs_usage_saves_with_tight_bbox(monkeypatch, tmp_path: Path) -> None:
@@ -1774,20 +2077,32 @@ def test_tfbs_usage_breakdown_figure_has_category_curves() -> None:
         style={},
     )
     try:
-        assert axes["usage"].collections
+        assert axes["usage"].lines
         assert axes["usage"].get_yscale() == "linear"
-        right_lines = axes["cum"].get_lines()
+        assert axes["cum"].images
         expected_regulators = composition["tf"].map(_usage_category_label).nunique()
-        assert len(right_lines) == expected_regulators
+        heatmap = np.asarray(axes["cum"].images[0].get_array(), dtype=float)
+        assert heatmap.shape[0] == expected_regulators
+        assert axes["usage"].get_xlabel() == "Global TFBS rank (descending count)"
         assert axes["cum"].get_xlabel() == "TFBS rank within regulator"
+        assert axes["cum"].get_ylabel() == ""
+        usage_box = axes["usage"].get_position()
+        cum_box = axes["cum"].get_position()
+        assert abs(float(usage_box.y0) - float(cum_box.y0)) < 0.03
+        assert float(abs(usage_box.x0 - cum_box.x0)) > 0.2
+        assert axes["usage"].get_box_aspect() == pytest.approx(1.0, rel=0.01)
+        assert axes["cum"].get_box_aspect() == pytest.approx(1.0, rel=0.01)
+        y_labels = [tick.get_text().strip() for tick in axes["cum"].get_yticklabels() if tick.get_text().strip()]
+        assert y_labels
+        assert all(label[0].isupper() for label in y_labels if label[0].isalpha())
         legend = axes["usage"].get_legend()
         if legend is not None:
             legend_text = "\n".join(t.get_text() for t in legend.get_texts())
         else:
             assert fig.legends
             legend_text = "\n".join(t.get_text() for t in fig.legends[0].get_texts())
-        assert "fixed:sigma70:-35" in legend_text
-        assert axes["cum"].get_ylim()[1] > 1.0
+        assert "Fixed:sigma70:-35" in legend_text
+        assert len(fig.axes) >= 3
     finally:
         fig.clf()
 
@@ -1867,6 +2182,48 @@ def test_grouped_plan_occupancy_keeps_fixed_components() -> None:
     assert float(occupancy["fixed:promoter:-10"].sum()) > 0.0
 
 
+def test_build_occupancy_respects_upstream_position_window_for_inferred_fixed_components() -> None:
+    seq_chars = list("C" * 60)
+
+    def _write_motif(start: int, motif: str) -> None:
+        seq_chars[start : start + len(motif)] = list(motif)
+
+    _write_motif(4, "TTGACA")
+    _write_motif(12, "TTGACA")
+    _write_motif(26, "TATAAT")
+    _write_motif(34, "TATAAT")
+    sequence = "".join(seq_chars)
+
+    solutions = pd.DataFrame([{"id": "s1", "sequence": sequence}])
+    sub = pd.DataFrame(columns=["tf", "offset", "length", "end", "offset_raw", "pad_left"])
+    constraints = [
+        {
+            "name": "sigma70",
+            "upstream": "TTGACA",
+            "downstream": "TATAAT",
+            "spacer_min": 16,
+            "spacer_max": 16,
+            "upstream_pos": [10, 25],
+            "downstream_pos": None,
+        }
+    ]
+
+    occupancy, categories, _missing_counts = _build_occupancy(
+        sub,
+        solutions=solutions,
+        seq_len=60,
+        constraints=constraints,
+        max_categories=12,
+        aggregate_fixed_components=False,
+    )
+    label = "fixed:sigma70:-35"
+    assert label in categories
+    nonzero_positions = np.flatnonzero(np.asarray(occupancy[label], dtype=float) > 0.0)
+    assert nonzero_positions.size > 0
+    assert int(nonzero_positions.min()) == 12
+    assert int(nonzero_positions.max()) == 17
+
+
 def test_allocation_summary_lines_define_denominators() -> None:
     lines = _allocation_summary_lines(
         placements_used=36,
@@ -1912,16 +2269,25 @@ def test_occupancy_legend_is_below_xlabel() -> None:
         fig.canvas.draw()
         assert ax.get_title().startswith("Occupancy across sequence positions")
         assert not ax.get_title().endswith(".")
+        assert ax.title.get_size() >= 16.0
+        assert ax.xaxis.label.get_size() >= 15.0
+        assert ax.yaxis.label.get_size() >= 15.0
+        tick_sizes = [
+            tick.label1.get_fontsize()
+            for tick in list(ax.xaxis.get_major_ticks()) + list(ax.yaxis.get_major_ticks())
+            if tick.label1.get_text() != ""
+        ]
+        assert tick_sizes
+        assert min(tick_sizes) >= 14.0
         assert len(ax.patches) > 0
         assert fig.legends
         legend = fig.legends[0]
-        assert getattr(legend, "_ncols", None) < len(categories)
-        assert getattr(legend, "_ncols", 0) <= 3
+        assert 1 <= int(getattr(legend, "_ncols", 0)) <= len(categories)
         assert legend.get_frame_on() is False
-        assert min(text.get_fontsize() for text in legend.get_texts()) >= 9.0
+        assert min(text.get_fontsize() for text in legend.get_texts()) >= 12.0
         legend_text = "\n".join(text.get_text() for text in legend.get_texts())
-        assert "-35 (TTGACA)" in legend_text
-        assert "-10 (TATAAT)" in legend_text
+        assert "σ70 upstream site (-35)" in legend_text
+        assert "σ70 downstream site (-10)" in legend_text
         renderer = fig.canvas.get_renderer()
         xlab_bbox = ax.xaxis.get_label().get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
         legend_bbox = legend.get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
@@ -1948,6 +2314,128 @@ def test_occupancy_legend_is_below_xlabel() -> None:
         fig.clf()
 
 
+def test_occupancy_low_count_categories_render_on_top() -> None:
+    matplotlib.use("Agg", force=True)
+    seq_len = 12
+    occupancy = {
+        "TF_HIGH": np.full(seq_len, 4.0),
+        "TF_LOW": np.full(seq_len, 1.0),
+    }
+    categories = list(occupancy.keys())
+
+    fig, ax = _render_occupancy(
+        occupancy,
+        categories,
+        seq_len=seq_len,
+        input_name=PLAN_POOL_LABEL,
+        plan_name="demo_plan",
+        n_solutions=3,
+        alpha=0.22,
+        fixed_label_sequences={},
+        style={},
+    )
+    try:
+        high_z = max(float(patch.get_zorder()) for patch in ax.patches if abs(float(patch.get_height()) - 4.0) <= 1e-6)
+        low_z = max(float(patch.get_zorder()) for patch in ax.patches if abs(float(patch.get_height()) - 1.0) <= 1e-6)
+        assert low_z > high_z
+    finally:
+        fig.clf()
+
+
+def test_occupancy_legend_wraps_when_entries_are_too_wide() -> None:
+    matplotlib.use("Agg", force=True)
+    seq_len = 20
+    categories = [f"TF_{idx}_LONG_LABEL_FOR_OCCUPANCY_LEGEND" for idx in range(8)]
+    occupancy = {label: np.ones(seq_len) for label in categories}
+
+    fig, _ax = _render_occupancy(
+        occupancy,
+        categories,
+        seq_len=seq_len,
+        input_name=PLAN_POOL_LABEL,
+        plan_name="demo_plan",
+        n_solutions=2,
+        alpha=0.22,
+        fixed_label_sequences={},
+        style={},
+    )
+    try:
+        fig.canvas.draw()
+        assert fig.legends
+        legend = fig.legends[0]
+        assert getattr(legend, "_ncols", 0) < len(categories)
+    finally:
+        fig.clf()
+
+
+def test_occupancy_legend_orders_background_then_sigma_sites() -> None:
+    matplotlib.use("Agg", force=True)
+    seq_len = 20
+    occupancy = {
+        "TF_A": np.ones(seq_len),
+        "background": np.ones(seq_len),
+        "fixed:sigma70:-35": np.ones(seq_len),
+        "fixed:sigma70:-10": np.ones(seq_len),
+    }
+    categories = list(occupancy.keys())
+    fixed_label_sequences = {
+        "fixed:sigma70:-35": "TTGACA",
+        "fixed:sigma70:-10": "TATAAT",
+    }
+
+    fig, _ax = _render_occupancy(
+        occupancy,
+        categories,
+        seq_len=seq_len,
+        input_name=PLAN_POOL_LABEL,
+        plan_name="demo_plan",
+        n_solutions=2,
+        alpha=0.22,
+        fixed_label_sequences=fixed_label_sequences,
+        style={},
+    )
+    try:
+        fig.canvas.draw()
+        assert fig.legends
+        labels = [text.get_text() for text in fig.legends[0].get_texts()]
+        assert labels[0] == "Background"
+        assert labels[1].startswith("σ70 upstream site (-35)")
+        assert labels[2].startswith("σ70 downstream site (-10)")
+    finally:
+        fig.clf()
+
+
+def test_occupancy_legend_capitalizes_non_sigma_fixed_labels() -> None:
+    matplotlib.use("Agg", force=True)
+    seq_len = 20
+    occupancy = {
+        "background": np.ones(seq_len),
+        "fixed:promoter:-35": np.ones(seq_len),
+        "fixed:promoter:-10": np.ones(seq_len),
+    }
+    categories = list(occupancy.keys())
+    fig, _ax = _render_occupancy(
+        occupancy,
+        categories,
+        seq_len=seq_len,
+        input_name=PLAN_POOL_LABEL,
+        plan_name="demo_plan",
+        n_solutions=2,
+        alpha=0.22,
+        fixed_label_sequences={},
+        style={},
+    )
+    try:
+        fig.canvas.draw()
+        assert fig.legends
+        labels = [text.get_text() for text in fig.legends[0].get_texts()]
+        assert "Background" in labels
+        assert any(label.startswith("Promoter upstream site (-35)") for label in labels)
+        assert any(label.startswith("Promoter downstream site (-10)") for label in labels)
+    finally:
+        fig.clf()
+
+
 def test_category_display_label_background_and_fixed_sequence() -> None:
     fixed_label_sequences = {
         "fixed:sigma70_consensus:-35": "TTGACA",
@@ -1956,11 +2444,11 @@ def test_category_display_label_background_and_fixed_sequence() -> None:
     assert _category_display_label("neutral_bg", fixed_label_sequences=fixed_label_sequences) == "background"
     assert (
         _category_display_label("fixed:sigma70_consensus:-35", fixed_label_sequences=fixed_label_sequences)
-        == "-35 (TTGACA)"
+        == "σ70 upstream site (-35) (TTGACA)"
     )
     assert (
         _category_display_label("fixed:sigma70_consensus:-10", fixed_label_sequences=fixed_label_sequences)
-        == "-10 (TATAAT)"
+        == "σ70 downstream site (-10) (TATAAT)"
     )
 
 
@@ -2198,6 +2686,86 @@ def test_plot_stage_a_summary_background_logo_filename_avoids_double_background(
     )
     assert paths
     assert Path(paths[0]).name == "background_logo.png"
+
+
+def test_plot_stage_a_summary_background_logo_uses_compact_size_and_nonredundant_title(tmp_path: Path) -> None:
+    matplotlib.use("Agg", force=True)
+    out_path = tmp_path / "stage_a_summary_bg_style.png"
+    pool_df = pd.DataFrame(
+        {
+            "input_name": ["background"] * 4,
+            "tf": ["background"] * 4,
+            "tfbs": [
+                "A" * 60,
+                "C" * 60,
+                "G" * 60,
+                "T" * 60,
+            ],
+            "tfbs_core": [
+                "A" * 60,
+                "C" * 60,
+                "G" * 60,
+                "T" * 60,
+            ],
+            "tfbs_id": ["a", "b", "c", "d"],
+        }
+    )
+    pools = {"background": pool_df}
+    pools_dir = tmp_path / "pools_bg_style"
+    pools_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = pools_dir / "pool_manifest.json"
+    manifest_payload = {
+        "schema_version": "1.6",
+        "run_id": "demo",
+        "run_root": ".",
+        "config_path": "config.yaml",
+        "inputs": [
+            {
+                "name": "background",
+                "type": "background_pool",
+                "pool_path": "background__pool.parquet",
+                "rows": 4,
+                "columns": ["input_name", "tf", "tfbs", "tfbs_core", "tfbs_id"],
+                "pool_mode": "tfbs",
+                "stage_a_sampling": None,
+            }
+        ],
+    }
+    manifest_path.write_text(json.dumps(manifest_payload, indent=2), encoding="utf-8")
+    manifest = TFBSPoolArtifact.load(manifest_path)
+
+    captured: dict[str, object] = {}
+    original_savefig = Figure.savefig
+
+    def _capture_savefig(self, fname, *args, **kwargs):
+        if Path(str(fname)).name == "background_logo.png":
+            captured["size"] = tuple(float(v) for v in self.get_size_inches())
+            suptitle = getattr(self, "_suptitle", None)
+            captured["title"] = str(getattr(suptitle, "get_text", lambda: "")())
+            if self.axes and suptitle is not None:
+                self.canvas.draw()
+                renderer = self.canvas.get_renderer()
+                suptitle_bbox = suptitle.get_window_extent(renderer=renderer).transformed(self.transFigure.inverted())
+                first_axis_bbox = self.axes[0].get_position()
+                captured["title_gap"] = float(suptitle_bbox.y0 - first_axis_bbox.y1)
+        return original_savefig(self, fname, *args, **kwargs)
+
+    with patch.object(Figure, "savefig", _capture_savefig):
+        paths = plot_stage_a_summary(
+            pd.DataFrame(),
+            out_path,
+            pools=pools,
+            pool_manifest=manifest,
+            style={},
+        )
+
+    assert paths
+    assert Path(paths[0]).name == "background_logo.png"
+    assert captured.get("title") == "Background sequence logo"
+    width, height = captured["size"]  # type: ignore[misc]
+    assert width <= 11.0
+    assert height <= 3.0
+    assert float(captured.get("title_gap", 1.0)) <= 0.16
 
 
 def test_plot_stage_a_summary_requires_diversity(tmp_path: Path) -> None:

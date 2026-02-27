@@ -22,6 +22,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from .dataset import Dataset
+from .duckdb_runtime import connect_duckdb_utc
 from .errors import SchemaError, ValidationError
 from .events import record_event
 from .io import PARQUET_COMPRESSION, iter_parquet_batches, now_utc, write_parquet_atomic_batches
@@ -393,12 +394,10 @@ def merge_usr_to_usr(
         columns_total = len(fields)
         overlapping_columns = len(set(dest_schema.names).intersection(set(src_schema.names)))
 
-        try:
-            import duckdb  # type: ignore
-        except ImportError as e:
-            raise SchemaError("duckdb is required for merge-datasets (install duckdb).") from e
-
-        con = duckdb.connect()
+        con = connect_duckdb_utc(
+            missing_dependency_message="duckdb is required for merge-datasets (install duckdb).",
+            error_context="merge-datasets",
+        )
         try:
             dest_sql = str(ds_dest.records_path).replace("'", "''")
             src_sql = str(ds_src.records_path).replace("'", "''")

@@ -27,23 +27,16 @@ install_native_stderr_filters(suppress_solver_messages=False)
 
 def _meta_arrow_type(name: str, pa):
     list_str = {
-        "tf_list",
-        "tfbs_parts",
-        "used_tfbs",
         "input_pwm_ids",
+        "used_tfbs",
         "required_regulators",
     }
     list_float = set()
     list_int = set()
     int_fields = {
         "length",
-        "random_seed",
-        "input_tf_tfbs_pair_count",
-        "library_size",
         "library_unique_tf_count",
         "library_unique_tfbs_count",
-        "sampling_library_size",
-        "sampling_iterative_max_libraries",
         "sampling_library_index",
         "pad_bases",
     }
@@ -69,8 +62,16 @@ def _meta_arrow_type(name: str, pa):
         return pa.list_(
             pa.struct(
                 [
-                    pa.field("tf", pa.string()),
-                    pa.field("tfbs", pa.string()),
+                    pa.field("part_kind", pa.string()),
+                    pa.field("role", pa.string()),
+                    pa.field("constraint_name", pa.string()),
+                    pa.field("sequence", pa.string()),
+                    pa.field("core_sequence", pa.string()),
+                    pa.field("variant_id", pa.string()),
+                    pa.field("spacer_length", pa.int64()),
+                    pa.field("placement_index", pa.int64()),
+                    pa.field("part_index", pa.int64()),
+                    pa.field("regulator", pa.string()),
                     pa.field("motif_id", pa.string()),
                     pa.field("tfbs_id", pa.string()),
                     pa.field("orientation", pa.string()),
@@ -81,15 +82,19 @@ def _meta_arrow_type(name: str, pa):
                     pa.field("pad_left", pa.int64()),
                     pa.field("site_id", pa.string()),
                     pa.field("source", pa.string()),
-                    pa.field("stage_a_best_hit_score", pa.float64()),
-                    pa.field("stage_a_rank_within_regulator", pa.int64()),
-                    pa.field("stage_a_tier", pa.int64()),
-                    pa.field("stage_a_fimo_start", pa.int64()),
-                    pa.field("stage_a_fimo_stop", pa.int64()),
-                    pa.field("stage_a_fimo_strand", pa.string()),
-                    pa.field("stage_a_selection_rank", pa.int64()),
-                    pa.field("stage_a_selection_score_norm", pa.float64()),
-                    pa.field("stage_a_tfbs_core", pa.string()),
+                    pa.field("score_best_hit_raw", pa.float64()),
+                    pa.field("score_theoretical_max", pa.float64()),
+                    pa.field("score_relative_to_theoretical_max", pa.float64()),
+                    pa.field("rank_among_mined_positive", pa.int64()),
+                    pa.field("rank_among_selected", pa.int64()),
+                    pa.field("tier", pa.int64()),
+                    pa.field("selection_policy", pa.string()),
+                    pa.field("nearest_selected_similarity", pa.float64()),
+                    pa.field("nearest_selected_distance", pa.float64()),
+                    pa.field("nearest_selected_distance_norm", pa.float64()),
+                    pa.field("matched_start", pa.int64()),
+                    pa.field("matched_stop", pa.int64()),
+                    pa.field("matched_strand", pa.string()),
                 ]
             )
         )
@@ -104,51 +109,6 @@ def _meta_arrow_type(name: str, pa):
                 ]
             )
         )
-    if name == "fixed_elements":
-        promoter = pa.list_(
-            pa.struct(
-                [
-                    pa.field("name", pa.string()),
-                    pa.field("upstream", pa.string()),
-                    pa.field("downstream", pa.string()),
-                    pa.field("upstream_variant_id", pa.string()),
-                    pa.field("downstream_variant_id", pa.string()),
-                    pa.field("spacer_length", pa.list_(pa.int64())),
-                    pa.field("upstream_pos", pa.list_(pa.int64())),
-                    pa.field("downstream_pos", pa.list_(pa.int64())),
-                ]
-            )
-        )
-        side_biases = pa.struct(
-            [
-                pa.field("left", pa.list_(pa.string())),
-                pa.field("right", pa.list_(pa.string())),
-            ]
-        )
-        return pa.struct([pa.field("promoter_constraints", promoter), pa.field("side_biases", side_biases)])
-    if name == "promoter_detail":
-        placements = pa.list_(
-            pa.struct(
-                [
-                    pa.field("name", pa.string()),
-                    pa.field("upstream_seq", pa.string()),
-                    pa.field("downstream_seq", pa.string()),
-                    pa.field("upstream_start", pa.int64()),
-                    pa.field("downstream_start", pa.int64()),
-                    pa.field("spacer_length", pa.int64()),
-                    pa.field(
-                        "variant_ids",
-                        pa.struct(
-                            [
-                                pa.field("up_id", pa.string()),
-                                pa.field("down_id", pa.string()),
-                            ]
-                        ),
-                    ),
-                ]
-            )
-        )
-        return pa.struct([pa.field("placements", placements)])
     if name == "sequence_validation":
         violations = pa.list_(
             pa.struct(

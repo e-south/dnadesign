@@ -82,10 +82,10 @@ def draw_span_link(
 
     if lane == "top":
         center = layout.y_forward + layout.feature_track_base_offset_up + track * layout.feature_track_step
-        y = center + layout.kmer_box_height * 0.5
+        y = center
     else:
         center = layout.y_reverse - layout.feature_track_base_offset_down - track * layout.feature_track_step
-        y = center - layout.kmer_box_height * 0.5
+        y = center
 
     inner_margin_bp = effect.params.get("inner_margin_bp", style.span_link_inner_margin_bp)
     try:

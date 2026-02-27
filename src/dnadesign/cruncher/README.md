@@ -1,6 +1,6 @@
-![Cruncher elite showcase banner](images/banner_elites_showcase_multitf.png)
-
 ## Cruncher
+
+![Cruncher banner](assets/cruncher-banner.svg)
 
 Cruncher designs short, fixed-length DNA sequences that score highly across one or more transcription factor (TF) position weight matrices (PWMs), using Gibbs annealing and transcription-factor-binding-site core maximal marginal relevance (MMR) to select a diverse elite set. Use the demos for end-to-end workflows and the references for precise schema/command-line behavior.
 

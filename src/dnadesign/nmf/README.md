@@ -1,5 +1,7 @@
 ## nmf
 
+![nmf banner](assets/nmf-banner.svg)
+
 **nmf** applies Non-Negative Matrix Factorization (NMF) to dense-array DNA sequences, revealing higher-order **motif combinatoric programs**—groups of transcription factor (TF) motifs that co-occur across a designed library. Unlike simpler metrics (see the **billboard** pipeline), NMF provides a more abstract view of binding site architectures.
 
 ```bash

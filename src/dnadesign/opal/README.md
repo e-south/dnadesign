@@ -1,5 +1,7 @@
 ## OPAL — Optimization with Active Learning
 
+![OPAL banner](assets/opal-banner.svg)
+
 **OPAL** is an [EVOLVEpro-style](https://www.science.org/doi/10.1126/science.adr6006) active-learning engine for biological sequence design.
 
 1. Train a configured model on your chosen representation **X** and observed labels **Y**.

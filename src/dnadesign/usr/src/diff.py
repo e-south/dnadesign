@@ -158,14 +158,33 @@ def parquet_stats(path: Path, *, include_sha: bool = True, include_parquet: bool
     p = Path(path)
     if not p.exists():
         return FileStat(False, None, None, None, None, None)
-    mtime = str(int(p.stat().st_mtime))
-    size = int(p.stat().st_size)
-    sha = _sha256_file(p) if include_sha else None
+    try:
+        stat = p.stat()
+    except FileNotFoundError:
+        return FileStat(False, None, None, None, None, None)
+    except OSError as exc:
+        raise VerificationError(f"Failed to stat local file: {p}") from exc
+    mtime = str(int(stat.st_mtime))
+    size = int(stat.st_size)
+    if include_sha:
+        try:
+            sha = _sha256_file(p)
+        except FileNotFoundError:
+            return FileStat(False, None, None, None, None, None)
+        except OSError as exc:
+            raise VerificationError(f"Failed to hash local file: {p}") from exc
+    else:
+        sha = None
     rows = cols = None
     if include_parquet:
-        pf = pq.ParquetFile(str(p))
-        meta = pf.metadata
-        rows, cols = meta.num_rows, meta.num_columns
+        try:
+            pf = pq.ParquetFile(str(p))
+            meta = pf.metadata
+            rows, cols = meta.num_rows, meta.num_columns
+        except FileNotFoundError:
+            return FileStat(False, None, None, None, None, None)
+        except Exception as exc:
+            raise VerificationError(f"Failed to read local parquet file: {p}") from exc
     return FileStat(True, size, sha, rows, cols, mtime)
 
 
@@ -173,13 +192,32 @@ def file_stats(path: Path, *, include_sha: bool = True, include_parquet: bool = 
     p = Path(path)
     if not p.exists():
         return FileStat(False, None, None, None, None, None)
-    mtime = str(int(p.stat().st_mtime))
-    size = int(p.stat().st_size)
-    sha = _sha256_file(p) if include_sha else None
+    try:
+        stat = p.stat()
+    except FileNotFoundError:
+        return FileStat(False, None, None, None, None, None)
+    except OSError as exc:
+        raise VerificationError(f"Failed to stat local file: {p}") from exc
+    mtime = str(int(stat.st_mtime))
+    size = int(stat.st_size)
+    if include_sha:
+        try:
+            sha = _sha256_file(p)
+        except FileNotFoundError:
+            return FileStat(False, None, None, None, None, None)
+        except OSError as exc:
+            raise VerificationError(f"Failed to hash local file: {p}") from exc
+    else:
+        sha = None
     rows = cols = None
     if include_parquet and p.suffix.lower() == ".parquet":
-        pf = pq.ParquetFile(str(p))
-        rows, cols = pf.metadata.num_rows, pf.metadata.num_columns
+        try:
+            pf = pq.ParquetFile(str(p))
+            rows, cols = pf.metadata.num_rows, pf.metadata.num_columns
+        except FileNotFoundError:
+            return FileStat(False, None, None, None, None, None)
+        except Exception as exc:
+            raise VerificationError(f"Failed to read local parquet file: {p}") from exc
     return FileStat(True, size, sha, rows, cols, mtime)
 
 
@@ -245,8 +283,13 @@ def events_tail_count(path: Path) -> int:
     if not p.exists():
         return 0
     # Efficient enough for logs that are typically small
-    with p.open("rb") as f:
-        return sum(1 for _ in f)
+    try:
+        with p.open("rb") as f:
+            return sum(1 for _ in f)
+    except FileNotFoundError:
+        return 0
+    except OSError as exc:
+        raise VerificationError(f"Failed to read local events log: {p}") from exc
 
 
 def _snap_ts_from_name(name: str) -> Optional[str]:

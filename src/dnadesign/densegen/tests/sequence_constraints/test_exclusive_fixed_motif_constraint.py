@@ -11,6 +11,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import pytest
+
 from dnadesign.densegen.src.core.sequence_constraints.engine import (
     compile_sequence_constraints,
     validate_sequence_constraints,
@@ -92,3 +94,37 @@ def test_sequence_constraints_reject_extra_occurrence_outside_allowed_coordinate
     assert len(result.violations) >= 1
     assert result.violations[0]["constraint"] == "sigma_core"
     assert result.violations[0]["pattern"] in {"TTGACA", "TGTCAA", "TATAAT", "ATTATA"}
+
+
+def test_sequence_constraints_resolve_promoter_detail_without_forbid_rules() -> None:
+    compiled = compile_sequence_constraints(
+        sequence_constraints={},
+        motif_sets=_motif_sets(),
+        fixed_elements_dump=_fixed_elements_dump(),
+    )
+    result = validate_sequence_constraints(
+        sequence="TTGACAGGTATAAT",
+        compiled=compiled,
+        fixed_elements_dump=_fixed_elements_dump(),
+    )
+    assert result.validation_passed is True
+    assert result.violations == []
+    placements = result.promoter_detail["placements"]
+    assert len(placements) == 1
+    assert placements[0]["upstream_start"] == 0
+    assert placements[0]["downstream_start"] == 8
+    assert placements[0]["spacer_length"] == 2
+
+
+def test_sequence_constraints_without_forbid_rules_still_reject_missing_promoter_placement() -> None:
+    compiled = compile_sequence_constraints(
+        sequence_constraints={},
+        motif_sets=_motif_sets(),
+        fixed_elements_dump=_fixed_elements_dump(),
+    )
+    with pytest.raises(ValueError, match="could not resolve promoter placement"):
+        validate_sequence_constraints(
+            sequence="ACGTACGTACGTACGT",
+            compiled=compiled,
+            fixed_elements_dump=_fixed_elements_dump(),
+        )

@@ -14,7 +14,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping
 
+from dnadesign.baserender import DENSEGEN_TFBS_REQUIRED_KEYS
+
 REQUIRED_ADAPTER_COLUMN_KEYS = ("id", "sequence", "annotations")
+REQUIRED_TFBS_ENTRY_KEYS = DENSEGEN_TFBS_REQUIRED_KEYS
 
 
 @dataclass(frozen=True)
@@ -50,7 +53,7 @@ def densegen_notebook_render_contract() -> DenseGenNotebookRenderContract:
             "annotations": "densegen__used_tfbs_detail",
             "id": "id",
         },
-        adapter_policies={},
+        adapter_policies={"on_invalid_row": "error"},
         style_preset="presentation_default",
         record_window_limit=500,
     )

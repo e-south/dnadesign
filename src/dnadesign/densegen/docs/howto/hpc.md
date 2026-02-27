@@ -38,6 +38,7 @@ uv run dense inspect run --events --library -c "$CONFIG"
 
 # Render plots and notebook after core generation succeeds.
 uv run dense plot -c "$CONFIG"
+# Generate the run-overview marimo notebook artifact.
 uv run dense notebook generate -c "$CONFIG"
 ```
 

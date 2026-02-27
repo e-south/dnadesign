@@ -1,5 +1,7 @@
 ## billboard
 
+![billboard banner](assets/billboard-banner.svg)
+
 **billboard** quantifies regulatory diversity in dense‑array DNA libraries by extracting TFBS content and computing a small set of scalar “diversity” metrics and diagnostic plots.
 
 > **The pipeline helps to answer:**

@@ -17,6 +17,7 @@ from typing import Any, List, Optional, Sequence
 
 import pyarrow.parquet as pq
 
+from .duckdb_runtime import connect_duckdb_utc
 from .errors import NamespaceError, SchemaError
 from .events import fingerprint_parquet
 from .maintenance import require_maintenance
@@ -62,11 +63,6 @@ def materialize_dataset(
         require_registry = any(_overlay_ns(p) not in reserved_namespaces for p in overlays)
         registry = dataset._registry(required=require_registry) if require_registry else {}
 
-        try:
-            import duckdb  # type: ignore
-        except ImportError as e:
-            raise SchemaError("materialize requires duckdb (install duckdb).") from e
-
         def _key_expr(expr: str, *, key: str) -> str:
             if key == "sequence_ci":
                 return f"NULLIF(UPPER(TRIM(CAST({expr} AS VARCHAR))), '')"
@@ -77,7 +73,10 @@ def materialize_dataset(
         essential = {k for k, _ in REQUIRED_COLUMNS}
 
         tmp_path = dataset.records_path.with_suffix(".materialize.parquet")
-        con = duckdb.connect()
+        con = connect_duckdb_utc(
+            missing_dependency_message="materialize requires duckdb (install duckdb).",
+            error_context="materialize",
+        )
         try:
             base_sql = str(dataset.records_path).replace("'", "''")
             con.execute(f"CREATE TEMP VIEW base AS SELECT * FROM read_parquet('{base_sql}')")

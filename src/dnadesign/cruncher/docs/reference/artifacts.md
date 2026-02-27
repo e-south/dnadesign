@@ -10,7 +10,7 @@
 - [Study and portfolio artifacts](#study-and-portfolio-artifacts)
 
 ### Overview
-This is the canonical artifact contract for Cruncher outputs. Use this page as the source of truth for what each command must produce and what downstream commands consume.
+This is the standard artifact contract for Cruncher outputs. Use this page as the source of truth for what each command must produce and what downstream commands consume.
 
 ### Run directory layout
 Each run directory uses:
@@ -78,5 +78,5 @@ Produces:
 ### Study and portfolio artifacts
 - Study outputs: `outputs/studies/<study_name>/<study_id>/`
 - Study aggregate plots: `outputs/plots/study__<study_name>__<study_id>__plot__*.pdf`
-- Portfolio outputs: `outputs/portfolios/<portfolio_name>/<portfolio_id>/`
-- Portfolio aggregate plots: `outputs/portfolios/<portfolio_name>/<portfolio_id>/plots/plot__*.pdf`
+- Portfolio outputs: `outputs/<portfolio_name>/<portfolio_id>/`
+- Portfolio aggregate plots: `outputs/<portfolio_name>/<portfolio_id>/plots/plot__*.pdf`

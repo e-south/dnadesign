@@ -321,7 +321,7 @@ def test_layout_builds_expected_paths(tmp_path: Path) -> None:
         portfolio_id="abc123",
     )
 
-    assert run_dir == workspace_root / "outputs" / "portfolios" / "pairwise_handoff" / "abc123"
+    assert run_dir == workspace_root / "outputs" / "pairwise_handoff" / "abc123"
     assert portfolio_manifest_path(run_dir) == run_dir / "meta" / "manifest.json"
     assert portfolio_status_path(run_dir) == run_dir / "meta" / "status.json"
     assert (

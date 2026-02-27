@@ -546,9 +546,16 @@ def run_stage_a_pipeline(
     else:
         picked = ranked[: int(n_sites)]
         for idx, cand in enumerate(picked):
+            denom = score_norm_denominator_by_seq.get(cand.seq)
+            if denom is None:
+                raise ValueError("score_norm denominator missing entry for retained Stage-A candidate.")
+            denom_val = float(denom)
+            if denom_val <= 0.0:
+                raise ValueError("score_norm denominator must be > 0 for retained Stage-A candidate.")
             selection_meta[cand.seq] = SelectionMeta(
                 selection_rank=idx + 1,
                 selection_utility=None,
+                selection_score_norm=float(np.clip(float(cand.score) / denom_val, 0.0, 1.0)),
                 nearest_selected_similarity=None,
             )
         selection_diag = SelectionDiagnostics(
@@ -792,8 +799,15 @@ def run_stage_a_pipeline(
         selection_meta_row = selection_meta.get(cand.seq)
         if selection_meta_row is None:
             raise ValueError(f"Selection metadata missing for retained TFBS {cand.seq}.")
+        score_theoretical_max = score_norm_denominator_by_seq.get(cand.seq)
+        if score_theoretical_max is None:
+            raise ValueError(f"score_norm denominator missing entry for retained TFBS {cand.seq}.")
+        score_theoretical_max_value = float(score_theoretical_max)
+        if score_theoretical_max_value <= 0.0:
+            raise ValueError("score_norm denominator must be > 0 for retained TFBS metadata.")
         meta_by_seq[cand.seq] = TFBSMeta(
             best_hit_score=float(cand.score),
+            score_theoretical_max=score_theoretical_max_value,
             rank_within_regulator=int(rank_by_seq[cand.seq]),
             tier=int(tier_by_seq[cand.seq]),
             fimo_start=int(cand.start),

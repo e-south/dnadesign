@@ -50,7 +50,7 @@ def test_finalize_run_outputs_raises_on_invalid_existing_composition_parquet(
             seed=1,
             seeds={"stage_a": 1, "stage_b": 2, "solver": 3},
             chosen_solver="CBC",
-            solver_time_limit_seconds=5.0,
+            solver_attempt_timeout_seconds=5.0,
             solver_threads=1,
             dense_arrays_version="0.0.0",
             dense_arrays_version_source="lock",

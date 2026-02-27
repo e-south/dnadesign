@@ -45,7 +45,7 @@ Core contract:
 
 #### `ingest/` (ports/adapters)
 - source adapters (RegulonDB first)
-- normalization into canonical records (motifs + sites)
+- normalization into standard records (motifs + sites)
 - optional hydration (coordinates -> sequences) via genome providers
 
 #### `store/` (local persistence)
@@ -166,7 +166,7 @@ parse/inputs/{lockfile.json,parse_manifest.json,pwm_summary.json}
 
 #### Run outputs (`out_dir`, e.g. `outputs/`)
 
-Each regulator set gets one canonical run directory:
+Each regulator set gets one standard run directory:
 
 - single regulator set: `<workspace>/<out_dir>/`
 - multiple regulator sets: `<workspace>/<out_dir>/setN_<tf-slug>/`
@@ -193,7 +193,7 @@ A typical **sample** run directory contains:
 - `provenance/lockfile.json` - pinned input snapshot (reproducibility boundary)
 - `optimize/tables/sequences.parquet`, `optimize/tables/elites*`, `optimize/tables/random_baseline*` - sampling tables (`random_baseline*` defaults on with `sample.output.save_random_baseline=true`, `sample.output.random_baseline_n=10000`)
 - `optimize/state/trace.nc`, `optimize/state/metrics.jsonl`, `optimize/state/elites.{json,yaml}` - sampling metadata
-- `analysis/reports/summary.json` - canonical analysis summary
+- `analysis/reports/summary.json` - standard analysis summary
 - `analysis/reports/report.json` + `analysis/reports/report.md` - analysis report outputs from `cruncher analyze`
 - `analysis/manifests/plot_manifest.json` + `analysis/manifests/table_manifest.json` + `analysis/manifests/manifest.json` - analysis inventories
 - `export/table__elites.csv` + `export/table__*.{parquet|csv}` + `export/export_manifest.json` - sequence-export tables from `cruncher export sequences`
@@ -248,7 +248,7 @@ Portfolio specs live under:
 Portfolio outputs live under:
 
 ```
-<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/
+<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/
   meta/
   tables/
   plots/

@@ -28,8 +28,8 @@ Quick smoke path (main lifecycle only):
     CONFIG="$PWD/configs/config.yaml"
     cruncher() { uv run cruncher "$@"; }
 
-    # Canonical machine-runbook sequence (matches configs/runbook.yaml).
-    # Canonical transient cleanup command for workspace hygiene.
+    # Standard machine-runbook sequence (matches configs/runbook.yaml).
+    # Standard transient cleanup command for workspace hygiene.
     cruncher workspaces reset --root . --confirm
     # Optional config sanity check.
     cruncher config summary -c "$CONFIG"

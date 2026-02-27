@@ -22,5 +22,5 @@ Stop here if you only need the happy path.
 Document commands in machine runbook order.
 
 ### Inspect outputs
-Link to canonical artifacts reference:
+Link to standard artifacts reference:
 - [`../reference/artifacts.md`](../reference/artifacts.md)

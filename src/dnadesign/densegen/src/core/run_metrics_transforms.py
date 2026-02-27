@@ -150,8 +150,11 @@ def _placements_from_dense_arrays(df: pd.DataFrame) -> pd.DataFrame:
                 f"{input_name}/{plan_name} library_index={library_index}."
             )
         for item in _ensure_list_of_dicts(row.get("densegen__used_tfbs_detail")):
-            tf = str(item.get("tf") or "").strip()
-            tfbs = str(item.get("tfbs") or "").strip()
+            part_kind = str(item.get("part_kind") or "tfbs").strip().lower()
+            if part_kind != "tfbs":
+                continue
+            tf = str(item.get("regulator") or "").strip()
+            tfbs = str(item.get("sequence") or "").strip()
             if not tf or not tfbs:
                 continue
             rows.append(
@@ -173,7 +176,8 @@ def _placements_from_composition(df: pd.DataFrame) -> pd.DataFrame:
         "plan_name",
         "library_index",
         "library_hash",
-        "used_tfbs_detail",
+        "regulator",
+        "sequence",
     }
     missing = required - set(df.columns)
     if missing:
@@ -186,19 +190,21 @@ def _placements_from_composition(df: pd.DataFrame) -> pd.DataFrame:
             raise ValueError("composition.parquet missing input_name/plan_name metadata.")
         library_index = int(row.get("library_index") or 0)
         library_hash = str(row.get("library_hash") or "")
-        for item in _ensure_list_of_dicts(row.get("used_tfbs_detail")):
-            tf = str(item.get("tf") or "").strip()
-            tfbs = str(item.get("tfbs") or "").strip()
-            if not tf or not tfbs:
-                continue
-            rows.append(
-                {
-                    "input_name": input_name,
-                    "plan_name": plan_name,
-                    "library_index": library_index,
-                    "library_hash": library_hash,
-                    "tf": tf,
-                    "tfbs": tfbs,
-                }
-            )
+        part_kind = str(row.get("part_kind") or "tfbs").strip().lower()
+        if part_kind != "tfbs":
+            continue
+        tf = str(row.get("regulator") or "").strip()
+        tfbs = str(row.get("sequence") or "").strip()
+        if not tf or not tfbs:
+            continue
+        rows.append(
+            {
+                "input_name": input_name,
+                "plan_name": plan_name,
+                "library_index": library_index,
+                "library_hash": library_hash,
+                "tf": tf,
+                "tfbs": tfbs,
+            }
+        )
     return pd.DataFrame(rows)

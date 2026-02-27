@@ -322,7 +322,7 @@ Examples:
 Notes:
 
 * Studies are workspace-scoped: specs live under `<workspace>/configs/studies/*.study.yaml`.
-* Study runs live under the canonical root `<workspace>/outputs/studies/<study_name>/<study_id>/`.
+* Study runs live under the standard root `<workspace>/outputs/studies/<study_name>/<study_id>/`.
 * `--workspace` accepts a discovered workspace name/index or a direct workspace path.
 * `study list` fails fast if a discovered spec or run metadata is invalid.
 
@@ -453,16 +453,16 @@ Source preconditions (per source entry in spec):
 
 Outputs:
 
-* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/meta/manifest.json`
-* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/meta/status.json`
-* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/meta/logs/prepare__<source_id>.log` (when `execution.mode=prepare_then_aggregate`)
-* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/tables/table__handoff_windows_long.<csv|parquet>`
-* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/tables/table__handoff_elites_summary.<csv|parquet>`
-* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/tables/table__source_summary.<csv|parquet>`
-* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/tables/table__study_summary.<csv|parquet>` (when source `study_spec` is declared)
-* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/tables/table__handoff_sequence_length.<csv|parquet>` (when `studies.sequence_length_table.enabled: true`)
-* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/plots/plot__source_tradeoff_score_vs_diversity.pdf` (when source diversity metrics are available)
-* `<portfolio_workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>/plots/plot__elite_showcase_cross_workspace.<pdf|png>` (when `plots.elite_showcase.enabled: true`)
+* `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/meta/manifest.json`
+* `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/meta/status.json`
+* `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/meta/logs/prepare__<source_id>.log` (when `execution.mode=prepare_then_aggregate`)
+* `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/tables/table__handoff_windows_long.<csv|parquet>`
+* `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/tables/table__handoff_elites_summary.<csv|parquet>`
+* `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/tables/table__source_summary.<csv|parquet>`
+* `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/tables/table__study_summary.<csv|parquet>` (when source `study_spec` is declared)
+* `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/tables/table__handoff_sequence_length.<csv|parquet>` (when `studies.sequence_length_table.enabled: true`)
+* `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/plots/plot__source_tradeoff_score_vs_diversity.pdf` (when source diversity metrics are available)
+* `<portfolio_workspace>/outputs/<portfolio_name>/<portfolio_id>/plots/plot__elite_showcase_cross_workspace.<pdf|png>` (when `plots.elite_showcase.enabled: true`)
 
 Default portfolio table output is parquet without CSV mirrors (`artifacts.table_format=parquet`, `artifacts.write_csv=false`).
 
@@ -505,7 +505,7 @@ Inputs:
 
 Example:
 
-* `cruncher portfolio show --run outputs/portfolios/master_all_workspaces/<portfolio_id>`
+* `cruncher portfolio show --run outputs/master_all_workspaces/<portfolio_id>`
 
 ---
 

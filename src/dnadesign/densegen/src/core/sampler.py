@@ -82,6 +82,11 @@ class _LibraryState:
     stage_a_selection_ranks: list[int | None]
     stage_a_selection_score_norms: list[float | None]
     stage_a_tfbs_cores: list[str | None]
+    stage_a_score_theoretical_maxes: list[float | None]
+    stage_a_selection_policies: list[str | None]
+    stage_a_nearest_selected_similarities: list[float | None]
+    stage_a_nearest_selected_distances: list[float | None]
+    stage_a_nearest_selected_distance_norms: list[float | None]
     seen_tfbs: set[str]
     seen_cores: set[tuple[str, str]]
     used_per_tf: dict[str, int]
@@ -194,6 +199,11 @@ class TFSampler:
         has_stage_a_selection_rank: bool,
         has_stage_a_selection_score_norm: bool,
         has_stage_a_tfbs_core: bool,
+        has_stage_a_score_theoretical_max: bool,
+        has_stage_a_selection_policy: bool,
+        has_stage_a_nearest_selected_similarity: bool,
+        has_stage_a_nearest_selected_distance: bool,
+        has_stage_a_nearest_selected_distance_norm: bool,
         weight_by_tf: dict[str, float] | None,
         weight_fraction_by_tf: dict[str, float] | None,
         usage_count_by_tf: dict[str, int] | None,
@@ -222,6 +232,21 @@ class TFSampler:
                 state.stage_a_selection_score_norms if has_stage_a_selection_score_norm else None
             ),
             "stage_a_tfbs_core_by_index": state.stage_a_tfbs_cores if has_stage_a_tfbs_core else None,
+            "stage_a_score_theoretical_max_by_index": (
+                state.stage_a_score_theoretical_maxes if has_stage_a_score_theoretical_max else None
+            ),
+            "stage_a_selection_policy_by_index": (
+                state.stage_a_selection_policies if has_stage_a_selection_policy else None
+            ),
+            "stage_a_nearest_selected_similarity_by_index": (
+                state.stage_a_nearest_selected_similarities if has_stage_a_nearest_selected_similarity else None
+            ),
+            "stage_a_nearest_selected_distance_by_index": (
+                state.stage_a_nearest_selected_distances if has_stage_a_nearest_selected_distance else None
+            ),
+            "stage_a_nearest_selected_distance_norm_by_index": (
+                state.stage_a_nearest_selected_distance_norms if has_stage_a_nearest_selected_distance_norm else None
+            ),
             "selection_reason_by_index": state.reasons,
             "sampling_weight_by_tf": weight_by_tf,
             "sampling_weight_fraction_by_tf": weight_fraction_by_tf,
@@ -317,6 +342,11 @@ class TFSampler:
         has_stage_a_selection_rank = "selection_rank" in df.columns
         has_stage_a_selection_score_norm = "selection_score_norm" in df.columns
         has_stage_a_tfbs_core = "tfbs_core" in df.columns
+        has_stage_a_score_theoretical_max = "score_theoretical_max" in df.columns
+        has_stage_a_selection_policy = "selection_policy" in df.columns
+        has_stage_a_nearest_selected_similarity = "nearest_selected_similarity" in df.columns
+        has_stage_a_nearest_selected_distance = "nearest_selected_distance" in df.columns
+        has_stage_a_nearest_selected_distance_norm = "nearest_selected_distance_norm" in df.columns
         total_unique_tfbs = prepared.total_unique_tfbs
         total_unique_cores = prepared.total_unique_cores
         unique_tfs = prepared.unique_tfs
@@ -365,6 +395,11 @@ class TFSampler:
             stage_a_selection_ranks=[],
             stage_a_selection_score_norms=[],
             stage_a_tfbs_cores=[],
+            stage_a_score_theoretical_maxes=[],
+            stage_a_selection_policies=[],
+            stage_a_nearest_selected_similarities=[],
+            stage_a_nearest_selected_distances=[],
+            stage_a_nearest_selected_distance_norms=[],
             seen_tfbs=set(),
             seen_cores=set(),
             used_per_tf={},
@@ -429,6 +464,40 @@ class TFSampler:
             )
             stage_a_tfbs_core = _clean_optional(row["tfbs_core"]) if has_stage_a_tfbs_core else None
             state.stage_a_tfbs_cores.append(str(stage_a_tfbs_core) if stage_a_tfbs_core is not None else None)
+            stage_a_score_theoretical_max = (
+                _clean_optional(row["score_theoretical_max"]) if has_stage_a_score_theoretical_max else None
+            )
+            state.stage_a_score_theoretical_maxes.append(
+                float(stage_a_score_theoretical_max) if stage_a_score_theoretical_max is not None else None
+            )
+            stage_a_selection_policy = (
+                _clean_optional(row["selection_policy"]) if has_stage_a_selection_policy else None
+            )
+            state.stage_a_selection_policies.append(
+                str(stage_a_selection_policy) if stage_a_selection_policy is not None else None
+            )
+            stage_a_nearest_selected_similarity = (
+                _clean_optional(row["nearest_selected_similarity"]) if has_stage_a_nearest_selected_similarity else None
+            )
+            state.stage_a_nearest_selected_similarities.append(
+                float(stage_a_nearest_selected_similarity) if stage_a_nearest_selected_similarity is not None else None
+            )
+            stage_a_nearest_selected_distance = (
+                _clean_optional(row["nearest_selected_distance"]) if has_stage_a_nearest_selected_distance else None
+            )
+            state.stage_a_nearest_selected_distances.append(
+                float(stage_a_nearest_selected_distance) if stage_a_nearest_selected_distance is not None else None
+            )
+            stage_a_nearest_selected_distance_norm = (
+                _clean_optional(row["nearest_selected_distance_norm"])
+                if has_stage_a_nearest_selected_distance_norm
+                else None
+            )
+            state.stage_a_nearest_selected_distance_norms.append(
+                float(stage_a_nearest_selected_distance_norm)
+                if stage_a_nearest_selected_distance_norm is not None
+                else None
+            )
             return True
 
         def _pick_for_tf(tf: str, *, reason: str, cap_override: int | None = None) -> bool:
@@ -653,6 +722,11 @@ class TFSampler:
             has_stage_a_selection_rank=has_stage_a_selection_rank,
             has_stage_a_selection_score_norm=has_stage_a_selection_score_norm,
             has_stage_a_tfbs_core=has_stage_a_tfbs_core,
+            has_stage_a_score_theoretical_max=has_stage_a_score_theoretical_max,
+            has_stage_a_selection_policy=has_stage_a_selection_policy,
+            has_stage_a_nearest_selected_similarity=has_stage_a_nearest_selected_similarity,
+            has_stage_a_nearest_selected_distance=has_stage_a_nearest_selected_distance,
+            has_stage_a_nearest_selected_distance_norm=has_stage_a_nearest_selected_distance_norm,
             weight_by_tf=weight_by_tf,
             weight_fraction_by_tf=weight_fraction_by_tf,
             usage_count_by_tf=usage_count_by_tf,

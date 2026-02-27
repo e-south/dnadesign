@@ -125,7 +125,7 @@ class Style:
     connectors: bool = True
     connector_alpha: float = 0.45
     connector_width: float = 0.6
-    connector_dash: tuple[float, float] = (1.0, 3.0)
+    connector_dash: tuple[float, ...] = (1.0, 3.0)
 
     palette: Mapping[str, str] = field(default_factory=dict)
     span_link_inner_margin_bp: float = 0.25
@@ -208,6 +208,27 @@ class Style:
         )
         ensure(self.sequence.strand_gap_cells >= 0, "style.sequence.strand_gap_cells must be >= 0", SchemaError)
         ensure(self.sequence.to_kmer_gap_cells >= 0, "style.sequence.to_kmer_gap_cells must be >= 0", SchemaError)
+        dash_raw = self.connector_dash
+        if dash_raw is None:
+            dash_pattern: tuple[float, ...] = ()
+        else:
+            ensure(
+                isinstance(dash_raw, (tuple, list)),
+                "style.connector_dash must be a sequence of numbers",
+                SchemaError,
+            )
+            dash_pattern = tuple(float(value) for value in dash_raw)
+        ensure(
+            len(dash_pattern) in {0, 2},
+            "style.connector_dash must contain exactly 2 values or be empty",
+            SchemaError,
+        )
+        ensure(
+            all(value > 0 for value in dash_pattern),
+            "style.connector_dash values must be > 0",
+            SchemaError,
+        )
+        object.__setattr__(self, "connector_dash", dash_pattern)
         ensure(
             str(self.sequence.non_consensus_color).strip() != "",
             "style.sequence.non_consensus_color must be non-empty",

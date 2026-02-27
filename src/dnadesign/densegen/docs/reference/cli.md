@@ -242,6 +242,10 @@ Notes:
 - Source path resolution:
   - `parquet` source -> `output.parquet.path`
   - `usr` source -> `<output.usr.root>/<output.usr.dataset>/records.parquet`, with notebook preview materialized to `outputs/notebooks/records_with_overlays.parquet` when overlay columns are required.
+- First notebook markdown cell renders two deterministic sections from config + `outputs/meta/run_manifest.json`:
+  - `Run contract (what this run will try to do)` from validated config schema.
+  - `Run outcome (what happened)` from finalized manifest counters.
+  - Includes a collapsible lifecycle details block for Stage-B and guard semantics.
 
 ### `dense notebook run`
 
@@ -265,7 +269,7 @@ Notes:
 - Default launch mode is `run`; use `--mode edit` when editing notebook cells.
 - `--headless` suppresses browser auto-open for remote/non-GUI shells when `--mode run` is used.
 - In run mode, `--no-open` maps to headless marimo launch.
-- In run mode with default `--no-reuse-server`, if `--host:--port` is already serving the same notebook file, DenseGen reuses that server and prints the existing URL.
+- In run mode with default `--no-reuse-server`, if `--host:--port` is already serving any notebook (including the same file), DenseGen launches a fresh server on a free port.
 - If `--host:--port` is serving a different notebook, DenseGen starts a fresh notebook server on a free port and prints the new URL.
 - Use `--reuse-server` to attach to an already-running notebook server on `--host:--port`.
 - `--open-timeout` must be greater than `0` and is only valid for `--mode run` with `--open`.

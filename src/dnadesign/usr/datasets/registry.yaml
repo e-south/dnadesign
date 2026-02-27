@@ -27,85 +27,47 @@ namespaces:
       type: string
     - name: densegen__run_id
       type: string
-    - name: densegen__run_config_path
-      type: string
     - name: densegen__length
       type: int64
-    - name: densegen__random_seed
-      type: int64
-    - name: densegen__policy_sampling
-      type: string
-    - name: densegen__solver_backend
-      type: string
-    - name: densegen__solver_strands
-      type: string
-    - name: densegen__dense_arrays_version
-      type: string
     - name: densegen__plan
       type: string
-    - name: densegen__tf_list
-      type: list<string>
-    - name: densegen__tfbs_parts
-      type: list<string>
-    - name: densegen__used_tfbs
-      type: list<string>
-    - name: densegen__used_tfbs_detail
-      type: list<struct<tf:string,tfbs:string,motif_id:string,tfbs_id:string,orientation:string,offset:int64,offset_raw:int64,length:int64,end:int64,pad_left:int64,site_id:string,source:string,stage_a_best_hit_score:float64,stage_a_rank_within_regulator:int64,stage_a_tier:int64,stage_a_fimo_start:int64,stage_a_fimo_stop:int64,stage_a_fimo_strand:string,stage_a_selection_rank:int64,stage_a_selection_score_norm:float64,stage_a_tfbs_core:string>>
-    - name: densegen__used_tf_counts
-      type: list<struct<tf:string,count:int64>>
-    - name: densegen__covers_all_tfs_in_solution
-      type: bool
-    - name: densegen__required_regulators
-      type: list<string>
-    - name: densegen__min_count_by_regulator
-      type: list<struct<tf:string,min_count:int64>>
     - name: densegen__input_name
       type: string
     - name: densegen__input_mode
       type: string
     - name: densegen__input_pwm_ids
       type: list<string>
-    - name: densegen__input_tf_tfbs_pair_count
-      type: int64
-    - name: densegen__sampling_fraction
-      type: float64
-    - name: densegen__sampling_fraction_pairs
-      type: float64
-    - name: densegen__fixed_elements
-      type: struct<promoter_constraints:list<struct<name:string,upstream:string,downstream:string,upstream_variant_id:string,downstream_variant_id:string,spacer_length:list<int64>,upstream_pos:list<int64>,downstream_pos:list<int64>>>,side_biases:struct<left:list<string>,right:list<string>>>
-    - name: densegen__visual
-      type: string
-    - name: densegen__compression_ratio
-      type: float64
-    - name: densegen__library_size
-      type: int64
+    - name: densegen__used_tfbs
+      type: list<string>
+    - name: densegen__used_tfbs_detail
+      type: list<struct<part_kind:string,role:string,constraint_name:string,sequence:string,core_sequence:string,variant_id:string,spacer_length:int64,placement_index:int64,part_index:int64,regulator:string,motif_id:string,tfbs_id:string,orientation:string,offset:int64,offset_raw:int64,length:int64,end:int64,pad_left:int64,site_id:string,source:string,score_best_hit_raw:float64,score_theoretical_max:float64,score_relative_to_theoretical_max:float64,rank_among_mined_positive:int64,rank_among_selected:int64,tier:int64,selection_policy:string,nearest_selected_similarity:float64,nearest_selected_distance:float64,nearest_selected_distance_norm:float64,matched_start:int64,matched_stop:int64,matched_strand:string>>
+    - name: densegen__used_tf_counts
+      type: list<struct<tf:string,count:int64>>
     - name: densegen__library_unique_tf_count
       type: int64
     - name: densegen__library_unique_tfbs_count
       type: int64
-    - name: densegen__promoter_constraint
-      type: string
-    - name: densegen__promoter_detail
-      type: struct<placements:list<struct<name:string,upstream_seq:string,downstream_seq:string,upstream_start:int64,downstream_start:int64,spacer_length:int64,variant_ids:struct<up_id:string,down_id:string>>>>
-    - name: densegen__sequence_validation
-      type: struct<validation_passed:bool,violations:list<struct<constraint:string,pattern:string,strand:string,position:int64,matched_seq:string,context_window:string>>>
-    - name: densegen__sampling_pool_strategy
-      type: string
-    - name: densegen__sampling_library_size
-      type: int64
-    - name: densegen__sampling_library_strategy
-      type: string
-    - name: densegen__sampling_iterative_max_libraries
-      type: int64
+    - name: densegen__covers_all_tfs_in_solution
+      type: bool
+    - name: densegen__required_regulators
+      type: list<string>
+    - name: densegen__min_count_by_regulator
+      type: list<struct<tf:string,min_count:int64>>
+    - name: densegen__compression_ratio
+      type: float64
     - name: densegen__sampling_library_hash
       type: string
     - name: densegen__sampling_library_index
       type: int64
+    - name: densegen__sequence_validation
+      type: struct<validation_passed:bool,violations:list<struct<constraint:string,pattern:string,strand:string,position:int64,matched_seq:string,context_window:string>>>
     - name: densegen__pad_used
       type: bool
     - name: densegen__pad_bases
       type: int64
     - name: densegen__pad_end
+      type: string
+    - name: densegen__pad_literal
       type: string
     - name: densegen__gc_total
       type: float64

@@ -68,6 +68,7 @@ uv run opal validate -c configs/campaign.yaml
 If you run the campaign from a copied directory outside the repo tree, invoke OPAL through the project root:
 
 ```bash
+# Run OPAL from the repo root when executing outside the project tree.
 uv run --project /path/to/dnadesign opal <command> ...
 ```
 

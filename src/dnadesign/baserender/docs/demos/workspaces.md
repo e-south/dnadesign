@@ -18,9 +18,13 @@ Operational behavior:
 ## Workspace Commands
 
 ```bash
+# Initialize a new BaseRender workspace scaffold.
 uv run baserender workspace init demo_run
+# List available BaseRender workspaces.
 uv run baserender workspace list
+# Validate BaseRender job config and input contracts.
 uv run baserender job validate --workspace demo_run
+# Execute the BaseRender job for the selected workspace.
 uv run baserender job run --workspace demo_run
 
 # if workspaces are outside the default root:
@@ -46,9 +50,13 @@ Demo packaging rule:
 ## Run Curated Demos
 
 ```bash
+# Validate BaseRender job config and input contracts.
 uv run baserender job validate --workspace demo_densegen_render --workspace-root src/dnadesign/baserender/workspaces
+# Execute the BaseRender job for the selected workspace.
 uv run baserender job run --workspace demo_densegen_render --workspace-root src/dnadesign/baserender/workspaces
 
+# Validate BaseRender job config and input contracts.
 uv run baserender job validate --workspace demo_cruncher_render --workspace-root src/dnadesign/baserender/workspaces
+# Execute the BaseRender job for the selected workspace.
 uv run baserender job run --workspace demo_cruncher_render --workspace-root src/dnadesign/baserender/workspaces
 ```

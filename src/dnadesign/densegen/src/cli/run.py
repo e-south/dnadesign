@@ -32,6 +32,8 @@ from ..utils.logging_utils import install_native_stderr_filters, setup_logging
 from ..utils.mpl_utils import ensure_mpl_cache_dir
 from .context import CliContext
 
+QUOTA_PLAN_INLINE_THRESHOLD = 8
+
 
 def _resolve_progress_style(log_cfg) -> tuple[str, str | None]:
     requested = str(getattr(log_cfg, "progress_style", "stream"))
@@ -55,6 +57,23 @@ def _active_stage_a_inputs(plan_items: list) -> set[str]:
             if value:
                 names.add(value)
     return names
+
+
+def _format_quota_plan_message(plan_items: list) -> str:
+    if len(plan_items) <= QUOTA_PLAN_INLINE_THRESHOLD:
+        return ", ".join(f"{item.name}={item.quota}" for item in plan_items)
+
+    quota_counts: dict[int, int] = {}
+    quota_order: list[int] = []
+    for item in plan_items:
+        quota_value = int(getattr(item, "quota", 0))
+        if quota_value not in quota_counts:
+            quota_order.append(quota_value)
+            quota_counts[quota_value] = 0
+        quota_counts[quota_value] += 1
+
+    quota_pattern = "; ".join(f"{quota_counts[value]} plans at {value} each" for value in quota_order)
+    return f"{len(plan_items)} plans (quota pattern: {quota_pattern})"
 
 
 def _model_to_dict(value) -> dict:
@@ -528,19 +547,7 @@ def _handle_run_runtime_error(
         console.print("  - stage your run via `dense workspace init --output-mode usr|both` to seed registry.yaml")
         console.print("  - or create `<output.usr.root>/registry.yaml` before running `dense run`")
         raise typer.Exit(code=1)
-    if "Exceeded max_seconds_per_plan=" in message:
-        console.print(f"[bold red]{message}[/]")
-        console.print("[bold]Next steps[/]:")
-        inspect_cmd = context.workspace_command(
-            "dense inspect run --events --library",
-            cfg_path=cfg_path,
-            run_root=run_root,
-        )
-        console.print(f"  - {inspect_cmd}")
-        console.print("  - increase densegen.runtime.max_seconds_per_plan")
-        console.print("  - or reduce generation.plan[].sequences / Stage-B complexity")
-        raise typer.Exit(code=1)
-    if "Exceeded max_consecutive_failures=" in message or "Exceeded max_failed_solutions=" in message:
+    if "Exceeded max_consecutive_no_progress_resamples=" in message or "Exceeded max_failed_solutions=" in message:
         console.print(f"[bold red]{message}[/]")
         console.print("[bold]Next steps[/]:")
         inspect_cmd = context.workspace_command(
@@ -550,7 +557,8 @@ def _handle_run_runtime_error(
         )
         console.print(f"  - {inspect_cmd}")
         console.print(
-            "  - increase densegen.runtime.max_consecutive_failures, "
+            "  - increase densegen.runtime.no_progress_seconds_before_resample, "
+            "max_consecutive_no_progress_resamples, "
             "max_failed_solutions_per_target, or max_failed_solutions"
         )
         console.print("  - or relax constraints / lower quota for the affected plan")
@@ -706,7 +714,7 @@ def register_run_commands(
         )
 
         # Plan & solver
-        console.print("[bold]Quota plan[/]: " + ", ".join(f"{p.name}={p.quota}" for p in pl))
+        console.print("[bold]Quota plan[/]: " + _format_quota_plan_message(pl))
         try:
             summary = run_pipeline(
                 loaded,

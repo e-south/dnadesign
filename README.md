@@ -1,7 +1,7 @@
 [![CI](https://github.com/e-south/dnadesign/actions/workflows/ci.yaml/badge.svg)](https://github.com/e-south/dnadesign/actions/workflows/ci.yaml)
 [![Codecov](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg)](https://codecov.io/gh/e-south/dnadesign)
 
-# dnadesign
+![dnadesign banner](assets/dnadesign-banner.svg)
 
 `dnadesign` is a collection of modular bioinformatic pipelines and helper packages related to biological sequence design.
 It bundles reusable tool packages for sequence generation, inference, optimization, clustering, and workflow operations.

@@ -1,4 +1,4 @@
-# baserender
+![baserender banner](assets/baserender-banner.svg)
 
 Contract-first sequence rendering with strict schemas and explicit adapters.
 

@@ -12,8 +12,11 @@ For full operator procedures, use the canonical runbook:
 ## Fast path
 
 ```bash
+# Pin config path for repeated CLI calls.
 CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml
+# Resolve run root from the selected config path.
 RUN_ROOT="$(dirname "$CONFIG")"
+# Pin Notify output directory for profile and cursor files.
 NOTIFY_DIR="$RUN_ROOT/outputs/notify/densegen"
 
 # Validate profile fields and secret wiring.

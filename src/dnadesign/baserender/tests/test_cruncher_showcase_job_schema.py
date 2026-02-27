@@ -29,8 +29,8 @@ def _make_input_parquet(tmp_path: Path) -> Path:
                 "id": "r1",
                 "sequence": "TTGACAAAAAAAAAAAAAAAATATAAT",
                 "densegen__used_tfbs_detail": [
-                    {"tf": "lexA", "orientation": "fwd", "tfbs": "TTGACA", "offset": 0},
-                    {"tf": "cpxR", "orientation": "fwd", "tfbs": "TATAAT", "offset": 23},
+                    {"regulator": "lexA", "orientation": "fwd", "sequence": "TTGACA", "offset": 0},
+                    {"regulator": "cpxR", "orientation": "fwd", "sequence": "TATAAT", "offset": 23},
                 ],
                 "details": "row1",
             }

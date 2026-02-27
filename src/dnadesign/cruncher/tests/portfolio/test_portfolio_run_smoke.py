@@ -1143,7 +1143,7 @@ def test_run_portfolio_flat_configs_spec_writes_outputs_under_workspace_root(tmp
     )
 
     run_dir = run_portfolio(spec_path)
-    expected_root = (portfolio_workspace / "outputs" / "portfolios" / "pairwise_handoff").resolve()
+    expected_root = (portfolio_workspace / "outputs" / "pairwise_handoff").resolve()
     assert run_dir.parent == expected_root
 
 
@@ -2439,7 +2439,7 @@ def test_run_portfolio_materializes_outputs_before_later_source_failure(
     with pytest.raises(RuntimeError, match="synthetic second source failure"):
         run_portfolio(spec_path)
 
-    run_root = portfolio_workspace / "outputs" / "portfolios" / "pairwise_handoff"
+    run_root = portfolio_workspace / "outputs" / "pairwise_handoff"
     run_dirs = sorted(item for item in run_root.iterdir() if item.is_dir())
     assert len(run_dirs) == 1
     run_dir = run_dirs[0]
@@ -2580,7 +2580,7 @@ def test_run_portfolio_prepare_mode_materializes_before_later_prepare_failure(
     with pytest.raises(ValueError, match="synthetic prepare failure on second source"):
         run_portfolio(spec_path, prepare_ready_policy="rerun")
 
-    run_root = portfolio_workspace / "outputs" / "portfolios" / "pairwise_handoff"
+    run_root = portfolio_workspace / "outputs" / "pairwise_handoff"
     run_dirs = sorted(item for item in run_root.iterdir() if item.is_dir())
     assert len(run_dirs) == 1
     run_dir = run_dirs[0]

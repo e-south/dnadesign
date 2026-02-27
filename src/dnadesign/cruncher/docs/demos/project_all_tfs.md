@@ -19,6 +19,7 @@ Workspace path:
 Run this single command to do everything in this demo:
 
 ```bash
+# Execute the Cruncher machine runbook for this workspace.
 uv run cruncher workspaces run --runbook configs/runbook.yaml
 ```
 
@@ -34,7 +35,7 @@ Run one strict end-to-end lifecycle:
 2. discover merged MEME OOPS motifs into a pinned source,
 3. lock/parse/sample/analyze against that discovered source,
 4. generate exports and discovered-source logos for audit artifacts,
-5. run canonical study sweeps for portfolio aggregation.
+5. run standard study sweeps for portfolio aggregation.
 
 ### Source flow
 
@@ -50,8 +51,11 @@ Input parity note:
 ### End-to-end commands
 
 ```bash
+# Fail fast on command errors, unset vars, and pipe failures.
 set -euo pipefail
+# Enter the workspace directory so relative paths resolve correctly.
 cd src/dnadesign/cruncher/workspaces/project_tfs_lexa_cpxr_baer_rcda_lrp_fur_fnr_acrr_soxr_soxs
+# Pin config path for repeated CLI calls.
 CONFIG="$PWD/configs/config.yaml"
 cruncher() { uv run cruncher "$@"; }
 
@@ -63,7 +67,9 @@ cruncher config summary -c "$CONFIG"
 
 # 1) Fetch site sets from all configured sources.
 cruncher fetch sites --source demo_local_meme --tf lexA --tf cpxR --tf rcdA --tf lrp --tf acrR --tf soxR --update -c "$CONFIG"
+# Fetch TF binding sites from the configured source.
 cruncher fetch sites --source regulondb      --tf lexA --tf cpxR --tf baeR --tf rcdA --tf lrp --tf fur --tf fnr --tf acrR --tf soxR --tf soxS --update -c "$CONFIG"
+# Fetch TF binding sites from the configured source.
 cruncher fetch sites --source baer_chip_exo  --tf baeR --update -c "$CONFIG"
 
 # 2) Discover merged motifs for the project source (MEME OOPS).
@@ -72,10 +78,12 @@ cruncher discover motifs --set 1 --tool meme --meme-mod oops --source-id project
 # 3) Freeze motif refs and hashes, then stage parsed inputs.
 # If you change `catalog.source_preference` or discovery `--source-id`, re-run `cruncher lock -c "$CONFIG"` before parse.
 cruncher lock -c "$CONFIG"
+# Parse inputs into normalized Cruncher artifacts.
 cruncher parse --force-overwrite -c "$CONFIG"
 
 # 4) Optimize and analyze.
 cruncher sample --force-overwrite -c "$CONFIG"
+# Compute analysis summaries for generated sequence sets.
 cruncher analyze --summary -c "$CONFIG"
 
 # 5) Export sequence tables.
@@ -84,10 +92,11 @@ cruncher export sequences --latest -c "$CONFIG"
 # 6) Render discovered-source logos.
 cruncher catalog logos --source project_merged_meme_oops_all_tfs --set 1 -c "$CONFIG"
 
-# 7) Run canonical workspace studies used by portfolio aggregation.
+# 7) Run standard workspace studies used by portfolio aggregation.
 #    - length_vs_score: sequence_length sweep with step-2 spacing + base config anchor
 #    - diversity_vs_score: diversity sweep from 0.00 -> 1.00
 cruncher study run --spec configs/studies/length_vs_score.study.yaml --force-overwrite
+# Run the configured Cruncher parameter-sweep study.
 cruncher study run --spec configs/studies/diversity_vs_score.study.yaml --force-overwrite
 ```
 
@@ -115,6 +124,7 @@ If you want project `lexA/cpxR` logos to match the pairwise demo exactly, the lo
 ```bash
 # Compare local motif file checksums with pairwise workspace.
 shasum inputs/local_motifs/lexA.txt ../demo_pairwise/inputs/local_motifs/lexA.txt
+# Compare checksums to confirm motif inputs are byte-identical.
 shasum inputs/local_motifs/cpxR.txt ../demo_pairwise/inputs/local_motifs/cpxR.txt
 ```
 

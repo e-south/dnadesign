@@ -224,10 +224,20 @@ def _sanitize_fixed_label(label: str) -> str:
     label = str(label)
     if label.startswith("fixed:"):
         label = label[len("fixed:") :]
-    if ":" in label:
-        name, suffix = label.rsplit(":", 1)
-        return f"{name} {suffix}"
-    return label
+    if ":" not in label:
+        return label
+    name, suffix = label.rsplit(":", 1)
+    normalized = name.replace("_", "").replace("-", "").lower()
+    if normalized.startswith("sigma"):
+        suffix_digits = "".join(ch for ch in normalized[len("sigma") :] if ch.isdigit())
+        promoter_name = f"σ{suffix_digits}" if suffix_digits else "σ"
+    else:
+        promoter_name = name.replace("_", " ")
+    if suffix == "-35":
+        return f"{promoter_name} upstream site (-35)"
+    if suffix == "-10":
+        return f"{promoter_name} downstream site (-10)"
+    return f"{promoter_name} {suffix}".strip()
 
 
 def _normalize_tf_label(label: str, fixed_set: set[str]) -> str:
@@ -344,16 +354,18 @@ def _placement_bounds(row: pd.Series, seq_len: int) -> tuple[int, int] | None:
     return lo, hi
 
 
-def _category_display_label(label: str, *, fixed_label_sequences: dict[str, str] | None = None) -> str:
+def _category_display_label(
+    label: str,
+    *,
+    fixed_label_sequences: dict[str, str] | None = None,
+    include_fixed_sequence: bool = True,
+) -> str:
     if label.startswith("fixed:"):
         sequence = (fixed_label_sequences or {}).get(label)
-        if ":" in label:
-            suffix = label.rsplit(":", 1)[-1]
-        else:
-            suffix = _sanitize_fixed_label(label)
-        if sequence:
-            return f"{suffix} ({sequence})"
-        return str(suffix)
+        display_label = _sanitize_fixed_label(label)
+        if include_fixed_sequence and sequence:
+            return f"{display_label} ({sequence})"
+        return str(display_label)
     if str(label).strip() == "neutral_bg":
         return "background"
     return label
@@ -703,6 +715,26 @@ def _place_figure_legend_below_xlabel(
         fig.canvas.draw()
 
 
+def _normalize_occupancy_legend_label(label: str) -> str:
+    text = str(label).strip()
+    if text.lower() == "background":
+        text = "background"
+    if text and "a" <= text[0] <= "z":
+        return text[0].upper() + text[1:]
+    return text
+
+
+def _occupancy_legend_priority(label: str) -> int:
+    text = str(label).strip().lower()
+    if text == "background":
+        return 0
+    if "upstream site (-35)" in text or text.endswith(":-35"):
+        return 1
+    if "downstream site (-10)" in text or text.endswith(":-10"):
+        return 2
+    return 3
+
+
 def _render_occupancy(
     occupancy: dict[str, np.ndarray],
     categories: list[str],
@@ -719,10 +751,10 @@ def _render_occupancy(
     fig, ax = plt.subplots(1, 1, figsize=(width, 3.25))
     x_positions = np.arange(seq_len, dtype=float)
     colors = dict(zip(categories, _colorblind_palette(style, len(categories))))
-    fixed_categories = [label for label in categories if str(label).startswith("fixed:")]
-    regular_categories = [label for label in categories if label not in fixed_categories]
-    draw_order = regular_categories + fixed_categories
-    for label in draw_order:
+    category_totals = {label: float(np.nansum(np.asarray(occupancy[label], dtype=float))) for label in categories}
+    # Draw larger-count categories first so lower-count categories stay visible on top.
+    draw_order = sorted(categories, key=lambda label: (-category_totals.get(label, 0.0), str(label)))
+    for draw_rank, label in enumerate(draw_order):
         color = colors[label]
         y = occupancy[label]
         if y.shape[0] != seq_len:
@@ -735,7 +767,7 @@ def _render_occupancy(
         fill_rgb = _darken_color(color, factor=0.84 if is_fixed else 0.88)
         edge_rgb = _darken_color(color, factor=0.56 if is_fixed else 0.62)
         line_width = 0.75 if is_fixed else 0.6
-        z_base = 8 if is_fixed else 2
+        z_base = 2.0 + float(draw_rank)
         fill_color = to_rgba(fill_rgb, alpha=fill_alpha)
         edge_color = to_rgba(edge_rgb, alpha=1.0)
         ax.bar(
@@ -746,7 +778,11 @@ def _render_occupancy(
             color=fill_color,
             edgecolor=edge_color,
             linewidth=line_width,
-            label=_category_display_label(label, fixed_label_sequences=fixed_label_sequences),
+            label=_category_display_label(
+                label,
+                fixed_label_sequences=fixed_label_sequences,
+                include_fixed_sequence=False,
+            ),
             zorder=z_base + (0.5 if is_fixed else 0.0),
         )
 
@@ -763,26 +799,76 @@ def _render_occupancy(
         scope = f"{plan_label} / {input_label}"
     ax.set_title(f"Occupancy across sequence positions for {scope} (n={n_solutions})")
     _apply_style(ax, style)
+    font_size = float(style.get("font_size", 13.0))
+    tick_size = max(float(style.get("tick_size", font_size)), font_size + 1.0)
+    label_size = max(float(style.get("label_size", font_size)), font_size + 2.0)
+    title_size = max(float(style.get("title_size", font_size * 1.1)), font_size + 3.0)
+    ax.tick_params(axis="both", labelsize=tick_size)
+    ax.xaxis.label.set_size(label_size)
+    ax.yaxis.label.set_size(label_size)
+    ax.title.set_size(title_size)
     handles, labels = ax.get_legend_handles_labels()
     legend_rows = 1
+    legend_obj = None
     if handles:
         deduped: dict[str, object] = {}
         for handle, label in zip(handles, labels):
-            deduped[str(label)] = handle
-        entry_count = max(1, len(deduped))
-        ncol = max(1, min(3, int(np.ceil(np.sqrt(entry_count)))))
-        legend_rows = int(np.ceil(float(entry_count) / float(ncol)))
-        fig.legend(
-            deduped.values(),
-            deduped.keys(),
-            loc="lower center",
-            bbox_to_anchor=(0.5, 0.015),
-            ncol=ncol,
-            frameon=False,
-            fontsize=float(style.get("tick_size", style.get("font_size", 13.0) * 0.74)),
+            deduped[_normalize_occupancy_legend_label(str(label))] = handle
+        ordered_labels = list(deduped.keys())
+        insertion_order = {label: idx for idx, label in enumerate(ordered_labels)}
+        ordered_labels = sorted(
+            ordered_labels,
+            key=lambda label: (_occupancy_legend_priority(label), insertion_order[label]),
         )
+        entry_count = max(1, len(deduped))
+        legend_font_size = max(
+            12.0,
+            tick_size * 0.92,
+        )
+        legend_handles = [deduped[label] for label in ordered_labels]
+        legend_labels = ordered_labels
+
+        def _draw_legend(ncol: int):
+            return fig.legend(
+                legend_handles,
+                legend_labels,
+                loc="upper center",
+                bbox_to_anchor=(0.5, 0.015),
+                ncol=int(max(1, ncol)),
+                frameon=False,
+                fontsize=legend_font_size,
+            )
+
+        ncol = entry_count
+        legend = _draw_legend(ncol)
+        legend_obj = legend
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        legend_bbox = legend.get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+        max_legend_width = 0.92
+        if legend_bbox.width > max_legend_width and entry_count > 1:
+            legend.remove()
+            legend = None
+            for candidate_ncol in range(entry_count - 1, 0, -1):
+                candidate = _draw_legend(candidate_ncol)
+                fig.canvas.draw()
+                candidate_bbox = candidate.get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+                if candidate_bbox.width <= max_legend_width:
+                    legend = candidate
+                    ncol = int(candidate_ncol)
+                    legend_obj = legend
+                    break
+                candidate.remove()
+            if legend is None:
+                fallback_ncol = max(1, min(4, int(np.ceil(np.sqrt(entry_count)))))
+                legend = _draw_legend(fallback_ncol)
+                ncol = int(fallback_ncol)
+                legend_obj = legend
+        legend_rows = int(np.ceil(float(entry_count) / float(max(1, ncol))))
     bottom = max(0.31, 0.22 + 0.07 * float(legend_rows))
     fig.subplots_adjust(left=0.08, right=0.99, bottom=bottom, top=0.88)
+    if legend_obj is not None:
+        _place_figure_legend_below_xlabel(fig, ax_xlabel=ax, legend=legend_obj)
     return fig, ax
 
 

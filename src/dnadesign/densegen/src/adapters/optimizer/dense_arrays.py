@@ -45,7 +45,7 @@ class OptimizerAdapter(Protocol):
         required_regulators: list[str] | None = None,
         min_count_by_regulator: dict[str, int] | None = None,
         min_required_regulators: int | None = None,
-        solver_time_limit_seconds: float | None = None,
+        solver_attempt_timeout_seconds: float | None = None,
         solver_threads: int | None = None,
         extra_label: str | None = None,
     ) -> OptimizerRun: ...
@@ -130,18 +130,18 @@ def _apply_regulator_constraints(
 def _apply_solver_controls(
     opt: da.Optimizer,
     *,
-    time_limit_seconds: float | None,
+    solver_attempt_timeout_seconds: float | None,
     threads: int | None,
 ) -> None:
-    if time_limit_seconds is None and threads is None:
+    if solver_attempt_timeout_seconds is None and threads is None:
         return
-    if time_limit_seconds is not None:
+    if solver_attempt_timeout_seconds is not None:
         try:
-            time_limit_seconds = float(time_limit_seconds)
+            solver_attempt_timeout_seconds = float(solver_attempt_timeout_seconds)
         except (TypeError, ValueError) as exc:
-            raise ValueError("solver.time_limit_seconds must be a number of seconds > 0") from exc
-        if time_limit_seconds <= 0:
-            raise ValueError("solver.time_limit_seconds must be > 0")
+            raise ValueError("solver.solver_attempt_timeout_seconds must be a number of seconds > 0") from exc
+        if solver_attempt_timeout_seconds <= 0:
+            raise ValueError("solver.solver_attempt_timeout_seconds must be > 0")
     if threads is not None:
         try:
             threads = int(threads)
@@ -158,10 +158,10 @@ def _apply_solver_controls(
         model = getattr(opt, "model", None)
         if model is None:
             raise RuntimeError("Solver model not initialized; cannot apply solver controls.")
-        if time_limit_seconds is not None:
+        if solver_attempt_timeout_seconds is not None:
             if not hasattr(model, "SetTimeLimit"):
                 raise RuntimeError("Solver model does not support SetTimeLimit.")
-            model.SetTimeLimit(int(max(1, round(time_limit_seconds * 1000))))
+            model.SetTimeLimit(int(max(1, round(solver_attempt_timeout_seconds * 1000))))
         if threads is not None:
             if not hasattr(model, "SetNumThreads"):
                 raise RuntimeError("Solver model does not support SetNumThreads.")
@@ -195,7 +195,7 @@ class DenseArraysAdapter:
         required_regulators: list[str] | None = None,
         min_count_by_regulator: dict[str, int] | None = None,
         min_required_regulators: int | None = None,
-        solver_time_limit_seconds: float | None = None,
+        solver_attempt_timeout_seconds: float | None = None,
         solver_threads: int | None = None,
         extra_label: str | None = None,
     ) -> OptimizerRun:
@@ -220,7 +220,7 @@ class DenseArraysAdapter:
         )
         _apply_solver_controls(
             opt,
-            time_limit_seconds=solver_time_limit_seconds,
+            solver_attempt_timeout_seconds=solver_attempt_timeout_seconds,
             threads=solver_threads,
         )
         if strategy == "diverse":

@@ -79,6 +79,7 @@ def test_build_plan_pool_merges_tfbs_pools() -> None:
     assert pool.df is not None
     assert set(pool.df["input_name"].unique()) == {pool.name}
     assert set(pool.df["input_source_name"].unique()) == {"a", "b"}
+    assert set(pool.df["source"].dropna().unique()) == {"a", "b"}
     assert "best_hit_score" in pool.df.columns
 
 

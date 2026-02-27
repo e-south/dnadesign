@@ -271,7 +271,7 @@ sample:
 Notes:
 - `sequence_length` must be at least the widest PWM after applying `sample.motif_width` bounds.
 - `motif_width.maxw` enforces a contiguous max-information trim during sampling only.
-- Canonicalization is automatic when `objective.bidirectional=true`.
+- Orientation normalization is automatic when `objective.bidirectional=true`.
 - MMR uses a hybrid distance: full-sequence Hamming + motif-core weighted Hamming (low-information core positions get higher weight).
 - `moves.overrides.*` contains optional expert controls (operator mix + adaptation). Leave unset unless you are actively tuning proposals.
 - Default operator mix is `S=0.85, B=0.07, M=0.04, I=0.04, L=0, W=0` (not `P(S)=1`).

@@ -230,6 +230,96 @@ def open_browser_tab(
     return False
 
 
+def process_is_running(
+    pid: int,
+    *,
+    os_module=os,
+) -> bool:
+    pid_value = int(pid)
+    if pid_value <= 0:
+        return False
+    try:
+        os_module.kill(pid_value, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def terminate_process_tree(
+    pid: int,
+    *,
+    timeout_seconds: float = 3.0,
+    os_module=os,
+    signal_module=signal,
+    time_module=time,
+) -> bool:
+    pid_value = int(pid)
+    if pid_value <= 0:
+        return False
+    if not process_is_running(pid_value, os_module=os_module):
+        return True
+
+    def _is_alive() -> bool:
+        return process_is_running(pid_value, os_module=os_module)
+
+    if os_module.name == "posix":
+        try:
+            pgid = os_module.getpgid(pid_value)
+        except OSError:
+            pgid = None
+        try:
+            if pgid is not None:
+                os_module.killpg(pgid, signal_module.SIGTERM)
+            else:
+                os_module.kill(pid_value, signal_module.SIGTERM)
+        except ProcessLookupError:
+            return True
+        except OSError:
+            return False
+    else:
+        try:
+            os_module.kill(pid_value, signal_module.SIGTERM)
+        except ProcessLookupError:
+            return True
+        except OSError:
+            return False
+
+    deadline = time_module.monotonic() + float(timeout_seconds)
+    while time_module.monotonic() < deadline:
+        if not _is_alive():
+            return True
+        time_module.sleep(0.05)
+
+    if os_module.name == "posix":
+        try:
+            if pgid is not None:
+                os_module.killpg(pgid, signal_module.SIGKILL)
+            else:
+                os_module.kill(pid_value, signal_module.SIGKILL)
+        except ProcessLookupError:
+            return True
+        except OSError:
+            return False
+    else:
+        try:
+            os_module.kill(pid_value, signal_module.SIGKILL)
+        except ProcessLookupError:
+            return True
+        except OSError:
+            return False
+
+    kill_deadline = time_module.monotonic() + float(timeout_seconds)
+    while time_module.monotonic() < kill_deadline:
+        if not _is_alive():
+            return True
+        time_module.sleep(0.05)
+    return not _is_alive()
+
+
 def run_marimo_command(
     *,
     command: list[str],
@@ -237,6 +327,7 @@ def run_marimo_command(
     browser_url: str | None = None,
     open_timeout_seconds: float = BROWSER_READY_TIMEOUT_SECONDS,
     on_browser_open_failure: Callable[[str], None] | None = None,
+    on_process_start: Callable[[int], None] | None = None,
     subprocess_module=subprocess,
     signal_module=signal,
     os_module=os,
@@ -245,6 +336,11 @@ def run_marimo_command(
     open_browser_tab_fn: Callable[[str], bool] = open_browser_tab,
 ) -> bool:
     process = subprocess_module.Popen(command, env=env, start_new_session=(os_module.name == "posix"))
+    if on_process_start is not None:
+        try:
+            on_process_start(int(process.pid))
+        except Exception:
+            pass
     opened = False
     warned = False
     original_signal_handlers: dict[int, object] = {}

@@ -20,7 +20,7 @@ import pandas as pd
 
 from ...config import ResolvedPlanItem, SamplingConfig
 from ..artifacts.ids import hash_tfbs_id
-from ..artifacts.pool import POOL_MODE_TFBS, PoolData
+from ..artifacts.pool import POOL_MODE_SEQUENCE, POOL_MODE_TFBS, PoolData
 from ..sampler import TFSampler, compute_tf_weights
 from .progress import _aggregate_failure_counts_for_sampling
 
@@ -388,6 +388,11 @@ def build_library_for_plan(
         stage_a_selection_rank_by_index: list[int | None] | None,
         stage_a_selection_score_norm_by_index: list[float | None] | None,
         stage_a_tfbs_core_by_index: list[str | None] | None,
+        stage_a_score_theoretical_max_by_index: list[float | None] | None,
+        stage_a_selection_policy_by_index: list[str | None] | None,
+        stage_a_nearest_selected_similarity_by_index: list[float | None] | None,
+        stage_a_nearest_selected_distance_by_index: list[float | None] | None,
+        stage_a_nearest_selected_distance_norm_by_index: list[float | None] | None,
     ) -> tuple[list[str], list[str], list[str], dict]:
         nonlocal libraries_built
         libraries_built += 1
@@ -406,6 +411,11 @@ def build_library_for_plan(
         info["stage_a_selection_rank_by_index"] = stage_a_selection_rank_by_index
         info["stage_a_selection_score_norm_by_index"] = stage_a_selection_score_norm_by_index
         info["stage_a_tfbs_core_by_index"] = stage_a_tfbs_core_by_index
+        info["stage_a_score_theoretical_max_by_index"] = stage_a_score_theoretical_max_by_index
+        info["stage_a_selection_policy_by_index"] = stage_a_selection_policy_by_index
+        info["stage_a_nearest_selected_similarity_by_index"] = stage_a_nearest_selected_similarity_by_index
+        info["stage_a_nearest_selected_distance_by_index"] = stage_a_nearest_selected_distance_by_index
+        info["stage_a_nearest_selected_distance_norm_by_index"] = stage_a_nearest_selected_distance_norm_by_index
         return library, parts, reg_labels, info
 
     if meta_df is not None and isinstance(meta_df, pd.DataFrame):
@@ -526,6 +536,25 @@ def build_library_for_plan(
                 lib_df["selection_score_norm"].tolist() if "selection_score_norm" in lib_df.columns else None
             )
             stage_a_tfbs_core_by_index = lib_df["tfbs_core"].tolist() if "tfbs_core" in lib_df.columns else None
+            stage_a_score_theoretical_max_by_index = (
+                lib_df["score_theoretical_max"].tolist() if "score_theoretical_max" in lib_df.columns else None
+            )
+            stage_a_selection_policy_by_index = (
+                lib_df["selection_policy"].tolist() if "selection_policy" in lib_df.columns else None
+            )
+            stage_a_nearest_selected_similarity_by_index = (
+                lib_df["nearest_selected_similarity"].tolist()
+                if "nearest_selected_similarity" in lib_df.columns
+                else None
+            )
+            stage_a_nearest_selected_distance_by_index = (
+                lib_df["nearest_selected_distance"].tolist() if "nearest_selected_distance" in lib_df.columns else None
+            )
+            stage_a_nearest_selected_distance_norm_by_index = (
+                lib_df["nearest_selected_distance_norm"].tolist()
+                if "nearest_selected_distance_norm" in lib_df.columns
+                else None
+            )
             library_bp = _require_library_bp(
                 library,
                 seq_len,
@@ -560,6 +589,11 @@ def build_library_for_plan(
                 stage_a_selection_rank_by_index=stage_a_selection_rank_by_index,
                 stage_a_selection_score_norm_by_index=stage_a_selection_score_norm_by_index,
                 stage_a_tfbs_core_by_index=stage_a_tfbs_core_by_index,
+                stage_a_score_theoretical_max_by_index=stage_a_score_theoretical_max_by_index,
+                stage_a_selection_policy_by_index=stage_a_selection_policy_by_index,
+                stage_a_nearest_selected_similarity_by_index=stage_a_nearest_selected_similarity_by_index,
+                stage_a_nearest_selected_distance_by_index=stage_a_nearest_selected_distance_by_index,
+                stage_a_nearest_selected_distance_norm_by_index=stage_a_nearest_selected_distance_norm_by_index,
             )
 
         sampler = TFSampler(meta_df, np_rng)
@@ -626,6 +660,11 @@ def build_library_for_plan(
         stage_a_selection_rank_by_index = info.get("stage_a_selection_rank_by_index")
         stage_a_selection_score_norm_by_index = info.get("stage_a_selection_score_norm_by_index")
         stage_a_tfbs_core_by_index = info.get("stage_a_tfbs_core_by_index")
+        stage_a_score_theoretical_max_by_index = info.get("stage_a_score_theoretical_max_by_index")
+        stage_a_selection_policy_by_index = info.get("stage_a_selection_policy_by_index")
+        stage_a_nearest_selected_similarity_by_index = info.get("stage_a_nearest_selected_similarity_by_index")
+        stage_a_nearest_selected_distance_by_index = info.get("stage_a_nearest_selected_distance_by_index")
+        stage_a_nearest_selected_distance_norm_by_index = info.get("stage_a_nearest_selected_distance_norm_by_index")
         return _finalize(
             library,
             parts,
@@ -644,6 +683,17 @@ def build_library_for_plan(
             stage_a_selection_rank_by_index=stage_a_selection_rank_by_index,
             stage_a_selection_score_norm_by_index=stage_a_selection_score_norm_by_index,
             stage_a_tfbs_core_by_index=stage_a_tfbs_core_by_index,
+            stage_a_score_theoretical_max_by_index=stage_a_score_theoretical_max_by_index,
+            stage_a_selection_policy_by_index=stage_a_selection_policy_by_index,
+            stage_a_nearest_selected_similarity_by_index=stage_a_nearest_selected_similarity_by_index,
+            stage_a_nearest_selected_distance_by_index=stage_a_nearest_selected_distance_by_index,
+            stage_a_nearest_selected_distance_norm_by_index=stage_a_nearest_selected_distance_norm_by_index,
+        )
+
+    if pool.pool_mode == POOL_MODE_SEQUENCE:
+        raise ValueError(
+            f"Input '{source_label}' is sequence_library but Stage-B requires cognate regulator metadata "
+            "for clean parts_detail semantics."
         )
 
     if groups or plan_min_count_by_regulator:
@@ -716,6 +766,11 @@ def build_library_for_plan(
         stage_a_selection_rank_by_index=None,
         stage_a_selection_score_norm_by_index=None,
         stage_a_tfbs_core_by_index=None,
+        stage_a_score_theoretical_max_by_index=None,
+        stage_a_selection_policy_by_index=None,
+        stage_a_nearest_selected_similarity_by_index=None,
+        stage_a_nearest_selected_distance_by_index=None,
+        stage_a_nearest_selected_distance_norm_by_index=None,
     )
 
 

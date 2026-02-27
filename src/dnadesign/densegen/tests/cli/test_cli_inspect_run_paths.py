@@ -15,6 +15,7 @@ import json
 import textwrap
 from pathlib import Path
 
+import pandas as pd
 from typer.testing import CliRunner
 
 from dnadesign.densegen.src.cli.main import app
@@ -41,7 +42,7 @@ def test_inspect_run_uses_relative_root(tmp_path: Path) -> None:
         "seed_solver": 0,
         "solver_backend": "CBC",
         "solver_strategy": "iterate",
-        "solver_time_limit_seconds": None,
+        "solver_attempt_timeout_seconds": None,
         "solver_threads": None,
         "solver_strands": "double",
         "dense_arrays_version": None,
@@ -88,7 +89,7 @@ def test_inspect_run_reports_quota_progress(tmp_path: Path) -> None:
         "seed_solver": 0,
         "solver_backend": "CBC",
         "solver_strategy": "iterate",
-        "solver_time_limit_seconds": None,
+        "solver_attempt_timeout_seconds": None,
         "solver_threads": None,
         "solver_strands": "double",
         "dense_arrays_version": None,
@@ -115,6 +116,117 @@ def test_inspect_run_reports_quota_progress(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     assert "4/5 (80.00%)" in result.output
     assert "Quota:" in result.output
+
+
+def test_inspect_run_shows_explicit_failure_outcome_paths(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    write_minimal_config(cfg_path)
+    (tmp_path / "inputs.csv").write_text("tf,tfbs\nTF1,AAA\n")
+    meta_root = tmp_path / "outputs" / "meta"
+    tables_root = tmp_path / "outputs" / "tables"
+    meta_root.mkdir(parents=True, exist_ok=True)
+    tables_root.mkdir(parents=True, exist_ok=True)
+    run_manifest = {
+        "run_id": "demo",
+        "created_at": "2026-01-14T00:00:00+00:00",
+        "schema_version": "2.9",
+        "config_sha256": "dummy",
+        "run_root": str(tmp_path),
+        "random_seed": 0,
+        "seed_stage_a": 0,
+        "seed_stage_b": 0,
+        "seed_solver": 0,
+        "solver_backend": "CBC",
+        "solver_strategy": "iterate",
+        "solver_attempt_timeout_seconds": None,
+        "solver_threads": None,
+        "solver_strands": "double",
+        "dense_arrays_version": None,
+        "dense_arrays_version_source": "unknown",
+        "total_quota": 5,
+        "items": [
+            {
+                "input_name": PLAN_POOL_LABEL,
+                "plan_name": "demo_plan",
+                "quota": 5,
+                "generated": 0,
+                "duplicates_skipped": 0,
+                "failed_solutions": 2,
+                "total_resamples": 2,
+                "libraries_built": 2,
+                "stall_events": 1,
+            }
+        ],
+    }
+    (meta_root / "run_manifest.json").write_text(json.dumps(run_manifest))
+    attempts_df = pd.DataFrame(
+        [
+            {
+                "attempt_id": "a1",
+                "attempt_index": 1,
+                "run_id": "demo",
+                "input_name": PLAN_POOL_LABEL,
+                "plan_name": "demo_plan",
+                "created_at": "2026-01-14T00:00:01+00:00",
+                "status": "failed",
+                "reason": "no_solution",
+                "detail_json": "{}",
+                "sequence": "",
+                "sequence_hash": "",
+                "solution_id": "",
+                "used_tf_counts_json": "{}",
+                "used_tf_list": [],
+                "sampling_library_index": 1,
+                "sampling_library_hash": "h1",
+                "solver_status": "no_solution",
+                "solver_objective": None,
+                "solver_solve_time_s": 4.5,
+                "dense_arrays_version": None,
+                "dense_arrays_version_source": "unknown",
+                "library_tfbs": ["AAA", "CCC"],
+                "library_tfs": ["TF1", "TF1"],
+                "library_site_ids": ["s1", "s2"],
+                "library_sources": ["demo", "demo"],
+            },
+            {
+                "attempt_id": "a2",
+                "attempt_index": 2,
+                "run_id": "demo",
+                "input_name": PLAN_POOL_LABEL,
+                "plan_name": "demo_plan",
+                "created_at": "2026-01-14T00:00:02+00:00",
+                "status": "failed",
+                "reason": "stall_no_solution",
+                "detail_json": '{"stall_seconds": 10}',
+                "sequence": "",
+                "sequence_hash": "",
+                "solution_id": "",
+                "used_tf_counts_json": "{}",
+                "used_tf_list": [],
+                "sampling_library_index": 2,
+                "sampling_library_hash": "h2",
+                "solver_status": "stall_no_solution",
+                "solver_objective": None,
+                "solver_solve_time_s": 4.9,
+                "dense_arrays_version": None,
+                "dense_arrays_version_source": "unknown",
+                "library_tfbs": ["AAA", "CCC"],
+                "library_tfs": ["TF1", "TF1"],
+                "library_site_ids": ["s1", "s2"],
+                "library_sources": ["demo", "demo"],
+            },
+        ]
+    )
+    attempts_df.to_parquet(tables_root / "attempts.parquet", index=False)
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["inspect", "run", "-c", str(cfg_path)])
+    assert result.exit_code == 0, result.output
+    assert "Failure outcomes" in result.output
+    assert "no_solution" in result.output
+    assert "stall_no_solution" in result.output
+    assert "solver search exhausted with no accepted solution" in result.output
+    assert "stalled before any accepted solution and triggered resample" in result.output
 
 
 def test_inspect_run_root_listing_uses_relative_config_paths(tmp_path: Path) -> None:

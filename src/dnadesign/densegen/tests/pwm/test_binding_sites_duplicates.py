@@ -29,4 +29,6 @@ def test_binding_sites_duplicates_allowed(tmp_path: Path, caplog) -> None:
     assert len(entries) == 3
     assert isinstance(df, pd.DataFrame)
     assert df.shape[0] == 3
+    assert "source" in df.columns
+    assert set(df["source"].tolist()) == {str(csv_path)}
     assert "duplicate regulator/binding-site pairs" in caplog.text.lower()

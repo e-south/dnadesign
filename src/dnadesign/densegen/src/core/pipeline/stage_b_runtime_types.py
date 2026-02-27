@@ -30,10 +30,8 @@ class RuntimeSettings:
     max_per_subsample: int
     min_count_per_tf: int
     max_dupes: int
-    stall_seconds: int
-    stall_warn_every: int
-    max_consecutive_failures: int
-    max_seconds_per_plan: int
+    no_progress_seconds_before_resample: int
+    max_consecutive_no_progress_resamples: int
     max_failed_solutions: int
     leaderboard_every: int
     checkpoint_every: int
@@ -57,7 +55,7 @@ class PadSettings:
 class SolverSettings:
     strategy: str
     strands: str
-    time_limit_seconds: float | None
+    solver_attempt_timeout_seconds: float | None
     threads: int | None
 
 

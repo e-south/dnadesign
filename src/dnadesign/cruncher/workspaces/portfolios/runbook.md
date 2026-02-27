@@ -24,18 +24,18 @@ Run this single command to do everything below:
     cd src/dnadesign/cruncher/workspaces/portfolios
     cruncher() { uv run cruncher "$@"; }
 
-    # Canonical machine-runbook sequence (matches configs/runbook.yaml).
+    # Standard machine-runbook sequence (matches configs/runbook.yaml).
     cruncher portfolio run --spec configs/master_all_workspaces.portfolio.yaml --prepare-ready skip --force-overwrite
 
 ### Optional follow-up commands
 
     # Inspect an individual portfolio run id produced by the command above.
-    cruncher portfolio show --run outputs/portfolios/master_all_workspaces/<portfolio_id>
+    cruncher portfolio show --run outputs/master_all_workspaces/<portfolio_id>
 
     # Force full source-workspace re-prepare before aggregation.
     cruncher portfolio run --spec configs/master_all_workspaces.portfolio.yaml --prepare-ready rerun --force-overwrite
 
     # Verify handoff tables.
-    ls -1 outputs/portfolios/master_all_workspaces/<portfolio_id>/tables/table__handoff_windows_long.*
-    ls -1 outputs/portfolios/master_all_workspaces/<portfolio_id>/tables/table__handoff_elites_summary.*
-    ls -1 outputs/portfolios/master_all_workspaces/<portfolio_id>/tables/table__handoff_sequence_length.*
+    ls -1 outputs/master_all_workspaces/<portfolio_id>/tables/table__handoff_windows_long.*
+    ls -1 outputs/master_all_workspaces/<portfolio_id>/tables/table__handoff_elites_summary.*
+    ls -1 outputs/master_all_workspaces/<portfolio_id>/tables/table__handoff_sequence_length.*

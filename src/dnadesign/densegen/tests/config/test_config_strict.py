@@ -99,11 +99,40 @@ def test_sampling_defaults_cover_all_regulators_false(tmp_path: Path) -> None:
     assert loaded.root.densegen.generation.sampling.cover_all_regulators is False
 
 
-def test_runtime_default_max_consecutive_failures(tmp_path: Path) -> None:
+def test_runtime_default_max_consecutive_no_progress_resamples(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
     loaded = load_config(cfg_path)
-    assert loaded.root.densegen.runtime.max_consecutive_failures == 25
+    assert loaded.root.densegen.runtime.max_consecutive_no_progress_resamples == 25
+
+
+def test_round_robin_runtime_guards_are_independent(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["runtime"] = {
+        "round_robin": True,
+        "no_progress_seconds_before_resample": 60,
+        "max_consecutive_no_progress_resamples": 6,
+    }
+    cfg["densegen"]["solver"]["solver_attempt_timeout_seconds"] = 5
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    runtime = loaded.root.densegen.runtime
+    assert runtime.round_robin is True
+    assert runtime.no_progress_seconds_before_resample == 60
+    assert runtime.max_consecutive_no_progress_resamples == 6
+
+
+def test_round_robin_failure_budget_preserves_configured_values(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["runtime"] = {
+        "round_robin": True,
+        "no_progress_seconds_before_resample": 10,
+        "max_consecutive_no_progress_resamples": 6,
+    }
+    cfg["densegen"]["solver"]["solver_attempt_timeout_seconds"] = 5
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    assert loaded.root.densegen.runtime.max_consecutive_no_progress_resamples == 6
 
 
 def test_runtime_max_failed_solutions_per_target_accepts_non_negative(tmp_path: Path) -> None:
@@ -640,11 +669,11 @@ def test_solver_allow_unknown_options_removed(tmp_path: Path) -> None:
 def test_solver_controls_accepts_threads_and_time_limit(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
     cfg["densegen"]["solver"]["backend"] = "GUROBI"
-    cfg["densegen"]["solver"]["time_limit_seconds"] = 5
+    cfg["densegen"]["solver"]["solver_attempt_timeout_seconds"] = 5
     cfg["densegen"]["solver"]["threads"] = 2
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
     loaded = load_config(cfg_path)
-    assert loaded.root.densegen.solver.time_limit_seconds == 5
+    assert loaded.root.densegen.solver.solver_attempt_timeout_seconds == 5
     assert loaded.root.densegen.solver.threads == 2
 
 
@@ -652,7 +681,7 @@ def test_solver_controls_rejected_for_approximate(tmp_path: Path) -> None:
     cfg = copy.deepcopy(MIN_CONFIG)
     cfg["densegen"]["solver"]["strategy"] = "approximate"
     cfg["densegen"]["solver"]["backend"] = None
-    cfg["densegen"]["solver"]["time_limit_seconds"] = 5
+    cfg["densegen"]["solver"]["solver_attempt_timeout_seconds"] = 5
     cfg_path = _write(cfg, tmp_path / "cfg.yaml")
     with pytest.raises(ConfigError, match="approximate"):
         load_config(cfg_path)

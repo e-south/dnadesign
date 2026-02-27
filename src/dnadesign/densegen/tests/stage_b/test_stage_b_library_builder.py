@@ -29,9 +29,47 @@ from dnadesign.densegen.src.config.generation import (
     SamplingConfig,
 )
 from dnadesign.densegen.src.core.artifacts.library import LibraryRecord
-from dnadesign.densegen.src.core.artifacts.pool import POOL_MODE_TFBS, PoolData
+from dnadesign.densegen.src.core.artifacts.pool import POOL_MODE_SEQUENCE, POOL_MODE_TFBS, PoolData
 from dnadesign.densegen.src.core.pipeline.stage_b import _fixed_elements_label
 from dnadesign.densegen.src.core.pipeline.stage_b_library_builder import LibraryBuilder
+
+
+def test_build_library_for_plan_rejects_sequence_library_without_regulator_metadata() -> None:
+    plan_item = ResolvedPlanItem(
+        name="demo",
+        quota=1,
+        include_inputs=["demo"],
+        fixed_elements=FixedElements(),
+        regulator_constraints=RegulatorConstraints(groups=[]),
+    )
+    sampling_cfg = SamplingConfig(
+        pool_strategy="subsample",
+        library_source="build",
+        library_size=2,
+        library_sampling_strategy="tf_balanced",
+    )
+    pool = PoolData(
+        name="demo",
+        input_type="sequence_library",
+        pool_mode=POOL_MODE_SEQUENCE,
+        df=None,
+        sequences=["AAAA", "CCCC", "GGGG"],
+        pool_path=Path("."),
+    )
+    with pytest.raises(ValueError, match="requires cognate regulator metadata"):
+        stage_b_module.build_library_for_plan(
+            source_label="demo",
+            plan_item=plan_item,
+            pool=pool,
+            sampling_cfg=sampling_cfg,
+            seq_len=20,
+            min_count_per_tf=0,
+            usage_counts={},
+            failure_counts=None,
+            rng=random.Random(7),
+            np_rng=np.random.default_rng(11),
+            library_index_start=0,
+        )
 
 
 def test_library_builder_requires_required_regulators_for_groups() -> None:

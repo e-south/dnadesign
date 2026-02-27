@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
+import yaml
 from typer.testing import CliRunner
 
 from dnadesign.densegen.src.cli import run as run_command
@@ -80,6 +81,54 @@ def _write_config(run_root: Path) -> Path:
         """.strip()
         + "\n"
     )
+    return cfg_path
+
+
+def _write_many_plan_config(run_root: Path, *, plan_count: int, quota: int = 1) -> Path:
+    if plan_count <= 0:
+        raise ValueError("plan_count must be positive")
+    cfg_path = run_root / "config.yaml"
+    plan_items = []
+    for idx in range(plan_count):
+        plan_name = f"demo_plan_{idx + 1}"
+        plan_items.append(
+            {
+                "name": plan_name,
+                "sequences": int(quota),
+                "sampling": {"include_inputs": ["demo_input"]},
+                "regulator_constraints": {"groups": [{"name": "all", "members": ["lexA"], "min_required": 1}]},
+            }
+        )
+    payload = {
+        "densegen": {
+            "schema_version": "2.9",
+            "run": {"id": "demo", "root": "."},
+            "inputs": [{"name": "demo_input", "type": "binding_sites", "path": "inputs.csv"}],
+            "output": {
+                "targets": ["parquet"],
+                "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+                "parquet": {"path": "outputs/tables/records.parquet"},
+            },
+            "generation": {"sequence_length": 10, "plan": plan_items},
+            "solver": {"backend": "CBC", "strategy": "iterate"},
+            "postprocess": {
+                "pad": {
+                    "mode": "adaptive",
+                    "end": "5prime",
+                    "gc": {
+                        "mode": "range",
+                        "min": 0.4,
+                        "max": 0.6,
+                        "target": 0.5,
+                        "tolerance": 0.1,
+                        "min_pad_length": 4,
+                    },
+                }
+            },
+            "logging": {"log_dir": "outputs/logs"},
+        }
+    }
+    cfg_path.write_text(yaml.safe_dump(payload, sort_keys=False))
     return cfg_path
 
 
@@ -564,7 +613,7 @@ def test_run_handles_screen_progress_runtime_errors_with_actionable_next_steps(
     assert "progress_style: stream" in result.output
 
 
-def test_run_handles_max_seconds_runtime_errors_with_actionable_next_steps(
+def test_run_handles_max_consecutive_no_progress_runtime_errors_with_actionable_next_steps(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -574,7 +623,7 @@ def test_run_handles_max_seconds_runtime_errors_with_actionable_next_steps(
     cfg_path = _write_config(run_root)
 
     def _fake_run_pipeline(*_args, **_kwargs):
-        raise RuntimeError("[plan_pool__demo/demo_plan] Exceeded max_seconds_per_plan=120.")
+        raise RuntimeError("[plan_pool__demo/demo_plan] Exceeded max_consecutive_no_progress_resamples=120.")
 
     monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
     runner = CliRunner()
@@ -582,9 +631,9 @@ def test_run_handles_max_seconds_runtime_errors_with_actionable_next_steps(
 
     assert result.exit_code != 0, result.output
     normalized = result.output.replace("\n", " ")
-    assert "Exceeded max_seconds_per_plan=120" in normalized
+    assert "Exceeded max_consecutive_no_progress_resamples=120" in normalized
     assert "inspect run --events --library" in normalized
-    assert "increase densegen.runtime.max_seconds_per_plan" in normalized
+    assert "increase densegen.runtime.no_progress_seconds_before_resample" in normalized
     assert "Traceback" not in result.output
 
 
@@ -784,6 +833,25 @@ def test_run_extend_quota_increases_plan_target_before_pipeline(tmp_path: Path, 
     assert captured["quota"] == 4
     assert "Quota plan" in result.output
     assert "demo_plan=4" in result.output
+
+
+def test_run_quota_plan_output_is_grouped_for_large_plan_sets(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_many_plan_config(run_root, plan_count=9, quota=1)
+
+    def _fake_run_pipeline(*_args, **_kwargs):
+        return SimpleNamespace(total_generated=9, per_plan={}, generated_this_run=9)
+
+    monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
+    runner = CliRunner()
+    result = runner.invoke(app, ["run", "-c", str(cfg_path), "--fresh", "--no-plot"])
+
+    assert result.exit_code == 0, result.output
+    assert "Quota plan" in result.output
+    assert "9 plans (quota pattern: 9 plans at 1 each)" in result.output
+    assert "demo_plan_9=1" not in result.output
 
 
 def test_run_extend_quota_rejects_non_positive_values(tmp_path: Path) -> None:

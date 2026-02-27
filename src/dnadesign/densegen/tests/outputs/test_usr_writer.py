@@ -61,8 +61,9 @@ def test_usr_writer_writes_overlay_parts_with_typed_columns(tmp_path: Path) -> N
     assert len(parts) == 1
 
     schema = pq.ParquetFile(str(parts[0])).schema_arrow
-    assert pa.types.is_list(schema.field("densegen__tf_list").type)
-    assert pa.types.is_struct(schema.field("densegen__fixed_elements").type)
+    assert pa.types.is_list(schema.field("densegen__used_tfbs").type)
+    assert pa.types.is_list(schema.field("densegen__used_tfbs_detail").type)
+    assert pa.types.is_struct(schema.field("densegen__sequence_validation").type)
 
 
 def test_usr_writer_offloads_npz_fields(tmp_path: Path) -> None:

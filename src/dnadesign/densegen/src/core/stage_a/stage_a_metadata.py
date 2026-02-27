@@ -43,6 +43,7 @@ class TFBSMeta:
     tier_target_required_unique: Optional[int]
     tier_target_met: Optional[bool]
     tier_target_eligible_unique: int
+    score_theoretical_max: Optional[float] = None
 
     def __post_init__(self) -> None:
         if int(self.rank_within_regulator) <= 0:
@@ -57,6 +58,7 @@ class TFBSMeta:
     def to_dict(self) -> dict[str, object]:
         base = {
             "best_hit_score": float(self.best_hit_score),
+            "score_theoretical_max": self.score_theoretical_max,
             "rank_within_regulator": int(self.rank_within_regulator),
             "tier": int(self.tier),
             "fimo_start": int(self.fimo_start),

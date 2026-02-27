@@ -56,6 +56,7 @@ from .dataset_state import (
 from .dataset_state import (
     tombstone as dataset_tombstone,
 )
+from .duckdb_runtime import connect_duckdb_utc
 from .errors import (
     AlphabetError,
     DuplicateGroup,
@@ -602,10 +603,6 @@ class Dataset:
         limit: int | None = None,
     ):
         self._require_exists()
-        try:
-            import duckdb  # type: ignore
-        except ImportError as e:
-            raise SchemaError("duckdb is required for overlay joins (install duckdb).") from e
 
         if columns is not None and not include_deleted and any(c in TOMBSTONE_COLUMNS for c in columns):
             raise SchemaError("Tombstone columns require include_deleted=True.")
@@ -628,7 +625,10 @@ class Dataset:
                 return f"NULLIF(UPPER(TRIM(CAST({expr} AS VARCHAR))), '')"
             return f"NULLIF(TRIM(CAST({expr} AS VARCHAR)), '')"
 
-        con = duckdb.connect()
+        con = connect_duckdb_utc(
+            missing_dependency_message="duckdb is required for overlay joins (install duckdb).",
+            error_context="overlay joins",
+        )
         base_sql = str(self.records_path).replace("'", "''")
         con.execute(f"CREATE TEMP VIEW base AS SELECT * FROM read_parquet('{base_sql}')")
         base_view = "base"

@@ -19,7 +19,7 @@
 - **discovered source**: Discovery output source ID from `cruncher discover motifs` (for example `demo_merged_meme_oops`).
 - **motif matrix source**: `catalog.pwm_source=matrix`; use cached motif matrices.
 - **site source**: `catalog.pwm_source=sites`; build matrices from cached site sequences.
-- **canonicalization (bidirectional)**: Sequence identity normalization by lexicographic min of sequence and reverse-complement when bidirectional logic is enabled.
+- **orientation normalization (bidirectional)**: Sequence identity normalization by lexicographic min of sequence and reverse-complement when bidirectional logic is enabled.
 
 ### Run and analysis terms
 - **run directory**: Output tree for one regulator-set run under `outputs/`.

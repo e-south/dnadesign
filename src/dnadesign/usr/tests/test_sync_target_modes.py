@@ -87,3 +87,52 @@ def test_cmd_diff_accepts_dataset_directory_path(tmp_path: Path, monkeypatch) ->
     assert captured["dataset"] == "densegen/demo_hpc"
     assert captured["remote"] == "cluster"
     assert captured["verify"] == "size"
+
+
+def test_cmd_pull_accepts_densegen_workspace_dataset_directory_path(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "workspace" / "outputs" / "usr_datasets"
+    root.mkdir(parents=True)
+    (root / "registry.yaml").write_text("namespaces: {}\n", encoding="utf-8")
+    dataset_dir = root / "densegen" / "demo_hpc"
+    dataset_dir.mkdir(parents=True)
+    (dataset_dir / "records.parquet").write_text("stub", encoding="utf-8")
+    (dataset_dir / "_derived" / "densegen").mkdir(parents=True, exist_ok=True)
+    (dataset_dir / "_artifacts" / "pending_overlay").mkdir(parents=True, exist_ok=True)
+
+    summary = SimpleNamespace(has_change=False, verify_notes=[])
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(sync_commands, "plan_diff", lambda *_args, **_kwargs: summary)
+    monkeypatch.setattr(sync_commands, "_print_verify_notes", lambda _summary: None)
+    monkeypatch.setattr(sync_commands, "_print_diff", lambda _summary, *, use_rich=None: None)
+    monkeypatch.setattr(sync_commands, "_confirm_or_abort", lambda _summary, *, assume_yes: None)
+
+    def _fake_execute_pull(root: Path, dataset: str, remote_name: str, opts):
+        captured["root"] = root
+        captured["dataset"] = dataset
+        captured["remote"] = remote_name
+        captured["opts"] = opts
+        return summary
+
+    monkeypatch.setattr(sync_commands, "execute_pull", _fake_execute_pull)
+
+    args = SimpleNamespace(
+        dataset=str(dataset_dir),
+        remote="bu-scc",
+        verify="auto",
+        root=tmp_path / "ignored",
+        rich=False,
+        repo_root=None,
+        remote_path=None,
+        primary_only=False,
+        skip_snapshots=False,
+        dry_run=False,
+        yes=True,
+    )
+
+    sync_commands.cmd_pull(args)
+
+    assert captured["root"] == root
+    assert captured["dataset"] == "densegen/demo_hpc"
+    assert captured["remote"] == "bu-scc"
+    assert getattr(captured["opts"], "verify", None) == "auto"

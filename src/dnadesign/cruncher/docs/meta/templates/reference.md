@@ -15,7 +15,7 @@ Scope and intent.
 Strict behavior and invariants.
 
 ### Examples
-Minimal canonical examples.
+Minimal standard examples.
 
 ### Related references
 - [`../reference/doc_conventions.md`](../reference/doc_conventions.md)

@@ -69,7 +69,7 @@ def write_solution_output(
         fixed_elements=context.fixed_elements,
         chosen_solver=context.chosen_solver,
         solver_strategy=context.solver_strategy,
-        solver_time_limit_seconds=context.solver_time_limit_seconds,
+        solver_attempt_timeout_seconds=context.solver_attempt_timeout_seconds,
         solver_threads=context.solver_threads,
         solver_strands=context.solver_strands,
         seq_len=context.seq_len,
@@ -115,6 +115,7 @@ def write_solution_output(
         solver_solve_time_s=solver_solve_time_s,
         dense_arrays_version=context.dense_arrays_version,
         dense_arrays_version_source=context.dense_arrays_version_source,
+        final_sequence=final_seq,
     )
     if not derived:
         return "skipped_no_metadata", adjusted_tfbs_detail

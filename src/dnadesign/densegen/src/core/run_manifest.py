@@ -71,7 +71,7 @@ class RunManifest:
     seed_solver: int | None
     solver_backend: str | None
     solver_strategy: str
-    solver_time_limit_seconds: float | None
+    solver_attempt_timeout_seconds: float | None
     solver_threads: int | None
     solver_strands: str
     dense_arrays_version: str | None
@@ -102,7 +102,7 @@ class RunManifest:
             "seed_solver": self.seed_solver,
             "solver_backend": self.solver_backend,
             "solver_strategy": self.solver_strategy,
-            "solver_time_limit_seconds": self.solver_time_limit_seconds,
+            "solver_attempt_timeout_seconds": self.solver_attempt_timeout_seconds,
             "solver_threads": self.solver_threads,
             "solver_strands": self.solver_strands,
             "dense_arrays_version": self.dense_arrays_version,
@@ -171,7 +171,7 @@ def load_run_manifest(path: Path) -> RunManifest:
         seed_solver=data.get("seed_solver"),
         solver_backend=data.get("solver_backend"),
         solver_strategy=str(data.get("solver_strategy", "")),
-        solver_time_limit_seconds=data.get("solver_time_limit_seconds"),
+        solver_attempt_timeout_seconds=data.get("solver_attempt_timeout_seconds"),
         solver_threads=data.get("solver_threads"),
         solver_strands=str(data.get("solver_strands", "")),
         dense_arrays_version=data.get("dense_arrays_version"),

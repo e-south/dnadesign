@@ -18,9 +18,13 @@ For exact JSON field requirements, use **[motif artifact JSON contract](../refer
 For packaged workspace refresh from Cruncher:
 
 ```bash
+# Resolve repository root for stable absolute paths.
 REPO_ROOT="$(git rev-parse --show-toplevel)"
+# Export Cruncher motif artifacts into the DenseGen workspace.
 uv run cruncher catalog export-densegen --set 1 --source demo_merged_meme_oops_multitf --densegen-workspace demo_sampling_baseline -c "$REPO_ROOT/src/dnadesign/cruncher/workspaces/demo_multitf/configs/config.yaml"
+# Export Cruncher motif artifacts into the DenseGen workspace.
 uv run cruncher catalog export-densegen --set 1 --source demo_merged_meme_oops_multitf --densegen-workspace study_stress_ethanol_cipro -c "$REPO_ROOT/src/dnadesign/cruncher/workspaces/demo_multitf/configs/config.yaml"
+# Export Cruncher motif artifacts into the DenseGen workspace.
 uv run cruncher catalog export-densegen --set 1 --densegen-workspace study_constitutive_sigma_panel -c "$REPO_ROOT/src/dnadesign/cruncher/workspaces/pairwise_laci_arac/configs/config.yaml"
 ```
 
@@ -36,6 +40,7 @@ pixi install
 
 # Resolve repo root and pin workspace root so paths are deterministic.
 REPO_ROOT="$(git rev-parse --show-toplevel)"
+# Pin workspace root for deterministic init/output paths.
 WORKSPACE_ROOT="$REPO_ROOT/src/dnadesign/densegen/workspaces"
 
 # Initialize workspace from packaged sampling baseline.

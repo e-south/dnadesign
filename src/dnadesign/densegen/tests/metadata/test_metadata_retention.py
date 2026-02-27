@@ -31,7 +31,7 @@ def _build_for_input_mode(input_meta: dict) -> dict:
         fixed_elements=None,
         chosen_solver="CBC",
         solver_strategy="iterate",
-        solver_time_limit_seconds=None,
+        solver_attempt_timeout_seconds=None,
         solver_threads=None,
         solver_strands="double",
         seq_len=10,
@@ -60,7 +60,33 @@ def _build_for_input_mode(input_meta: dict) -> dict:
         input_meta=input_meta,
         fixed_elements_dump={"promoter_constraints": [], "side_biases": {"left": [], "right": []}},
         used_tfbs=["TF1:AAAA"],
-        used_tfbs_detail=[{"tf": "TF1", "tfbs": "AAAA", "orientation": "fwd", "offset": 0}],
+        used_tfbs_detail=[
+            {
+                "part_kind": "tfbs",
+                "part_index": 0,
+                "regulator": "TF1",
+                "sequence": "AAAA",
+                "core_sequence": "AAAA",
+                "orientation": "fwd",
+                "offset": 0,
+                "offset_raw": 0,
+                "pad_left": 0,
+                "length": 4,
+                "end": 4,
+                "source": "demo",
+                "motif_id": "motif_1",
+                "tfbs_id": "tfbs_1",
+                "score_best_hit_raw": 7.5,
+                "score_theoretical_max": 8.0,
+                "score_relative_to_theoretical_max": 0.9375,
+                "rank_among_mined_positive": 1,
+                "rank_among_selected": 1,
+                "selection_policy": "top_score",
+                "matched_start": 3,
+                "matched_stop": 7,
+                "matched_strand": "+",
+            }
+        ],
         used_tf_counts={"TF1": 1},
         used_tf_list=["TF1"],
         min_count_per_tf=0,
@@ -84,6 +110,7 @@ def _build_for_input_mode(input_meta: dict) -> dict:
         solver_status=None,
         solver_objective=None,
         solver_solve_time_s=None,
+        final_sequence="AAAACCCGGG",
     )
 
 
@@ -106,3 +133,12 @@ def test_build_metadata_keeps_pwm_fields_for_pwm_mode() -> None:
     input_meta = _input_meta_with_pwm_values("pwm_sampled")
     meta = _build_for_input_mode(input_meta)
     assert meta["input_pwm_ids"] == ["MOTIF_A"]
+
+
+def test_build_metadata_rejects_unknown_input_mode() -> None:
+    try:
+        _build_for_input_mode(_input_meta_with_pwm_values("unexpected_mode"))
+    except ValueError as exc:
+        assert "Unsupported input_mode" in str(exc)
+        return
+    raise AssertionError("build_metadata should reject unknown input_mode values.")

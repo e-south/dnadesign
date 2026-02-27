@@ -14,7 +14,11 @@ from __future__ import annotations
 import datetime as dt
 from pathlib import Path
 
-from dnadesign.devtools.docs_checks import main
+from dnadesign.devtools.docs_checks import (
+    _find_runbook_demo_snippet_issues,
+    _find_tool_readme_banner_issues,
+    main,
+)
 
 
 def _write(path: Path, text: str) -> None:
@@ -47,6 +51,84 @@ def test_main_fails_for_broken_relative_link_in_root_sor_doc(tmp_path: Path) -> 
 
     rc = main(["--repo-root", str(tmp_path)])
     assert rc == 1
+
+
+def test_tool_readme_banner_check_flags_missing_or_non_svg_banners(tmp_path: Path) -> None:
+    tool_root = tmp_path / "src" / "dnadesign"
+    _write(tool_root / "alpha" / "README.md", "## Alpha\n\nNo banner.\n")
+    _write(tool_root / "beta" / "README.md", "## Beta\n\n![Beta banner](images/beta-banner.png)\n")
+
+    issues = _find_tool_readme_banner_issues(tmp_path)
+
+    assert any("alpha/README.md" in issue and "missing top banner image" in issue for issue in issues)
+    assert any("beta/README.md" in issue and "must target a local .svg asset" in issue for issue in issues)
+
+
+def test_tool_readme_banner_check_accepts_existing_local_svg_banner(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "README.md",
+        "## Alpha\n\n![Alpha banner](assets/alpha-banner.svg)\n\nCompact subtitle.\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "assets" / "alpha-banner.svg",
+        "<svg xmlns='http://www.w3.org/2000/svg'></svg>\n",
+    )
+
+    issues = _find_tool_readme_banner_issues(tmp_path)
+
+    assert issues == []
+
+
+def test_runbook_demo_snippet_check_flags_missing_shell_and_yaml_comments(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "docs" / "tutorials" / "demo.md",
+        "\n".join(
+            [
+                "## Demo",
+                "",
+                "```bash",
+                "uv run alpha do-work",
+                "```",
+                "",
+                "```yaml",
+                "alpha:",
+                "  enabled: true",
+                "```",
+                "",
+            ]
+        ),
+    )
+
+    issues = _find_runbook_demo_snippet_issues(tmp_path)
+
+    assert any("command in shell block needs an explanatory comment" in issue for issue in issues)
+    assert any("yaml key/value in runbook/demo snippets needs a right-side inline comment" in issue for issue in issues)
+
+
+def test_runbook_demo_snippet_check_accepts_commented_shell_and_yaml_blocks(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "alpha" / "docs" / "tutorials" / "demo.md",
+        "\n".join(
+            [
+                "## Demo",
+                "",
+                "```bash",
+                "# Run the demo command.",
+                "uv run alpha do-work",
+                "```",
+                "",
+                "```yaml",
+                "alpha:",
+                "  enabled: true  # Toggle demo mode.",
+                "```",
+                "",
+            ]
+        ),
+    )
+
+    issues = _find_runbook_demo_snippet_issues(tmp_path)
+
+    assert issues == []
 
 
 def test_main_fails_when_root_sor_doc_missing_required_metadata(tmp_path: Path) -> None:

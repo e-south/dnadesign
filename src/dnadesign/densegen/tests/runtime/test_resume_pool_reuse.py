@@ -69,7 +69,7 @@ class _DummyAdapter:
         required_regulators=None,
         min_count_by_regulator=None,
         min_required_regulators=None,
-        solver_time_limit_seconds=None,
+        solver_attempt_timeout_seconds=None,
         solver_threads=None,
         extra_label=None,
     ):
@@ -130,13 +130,11 @@ def _write_config(path: Path, input_path: Path) -> None:
             "solver": {"backend": "CBC", "strategy": "iterate"},
             "runtime": {
                 "round_robin": False,
-                "arrays_generated_before_resample": 1,
+                "max_accepted_per_library": 1,
                 "min_count_per_tf": 0,
                 "max_duplicate_solutions": 1,
-                "stall_seconds_before_resample": 1,
-                "stall_warning_every_seconds": 1,
-                "max_consecutive_failures": 25,
-                "max_seconds_per_plan": 0,
+                "no_progress_seconds_before_resample": 1,
+                "max_consecutive_no_progress_resamples": 25,
                 "max_failed_solutions": 0,
                 "random_seed": 1,
             },
@@ -201,13 +199,11 @@ def _write_config_with_unused_input(path: Path, input_path: Path, unused_input_p
             "solver": {"backend": "CBC", "strategy": "iterate"},
             "runtime": {
                 "round_robin": False,
-                "arrays_generated_before_resample": 1,
+                "max_accepted_per_library": 1,
                 "min_count_per_tf": 0,
                 "max_duplicate_solutions": 1,
-                "stall_seconds_before_resample": 1,
-                "stall_warning_every_seconds": 1,
-                "max_consecutive_failures": 25,
-                "max_seconds_per_plan": 0,
+                "no_progress_seconds_before_resample": 1,
+                "max_consecutive_no_progress_resamples": 25,
                 "max_failed_solutions": 0,
                 "random_seed": 1,
             },
@@ -337,14 +333,23 @@ def test_run_pipeline_fails_when_stage_b_event_emit_fails(tmp_path: Path, monkey
             on_resample,
             already_generated,
             one_subsample_only,
-            plan_start,
+            initial_consecutive_failures=0,
+            initial_no_progress_seconds=0.0,
         ):
+            _ = (
+                initial_consecutive_failures,
+                initial_no_progress_seconds,
+            )
             on_resample(
                 SimpleNamespace(sampling_library_index=1, sampling_library_hash="forced-resample"),
                 "forced-test",
                 0,
             )
-            return SimpleNamespace(generated=0)
+            return SimpleNamespace(
+                generated=0,
+                consecutive_failures_end=1,
+                no_progress_seconds_end=0.0,
+            )
 
     def _raise_emit_error(*_args, **_kwargs) -> None:
         raise OSError("event stream unavailable")
@@ -452,13 +457,16 @@ def test_load_resume_state_uses_streaming_scan(monkeypatch, tmp_path: Path) -> N
             "densegen__run_id": "run-1",
             "densegen__input_name": "input_a",
             "densegen__plan": "plan_x",
-            "densegen__used_tfbs_detail": [{"tf": "TF1", "tfbs": "AAA"}],
+            "densegen__used_tfbs_detail": [{"part_kind": "tfbs", "regulator": "TF1", "sequence": "AAA"}],
         },
         {
             "densegen__run_id": "run-1",
             "densegen__input_name": "input_a",
             "densegen__plan": "plan_x",
-            "densegen__used_tfbs_detail": '[{"tf":"TF1","tfbs":"AAA"},{"tf":"TF2","tfbs":"CCC"}]',
+            "densegen__used_tfbs_detail": (
+                '[{"part_kind":"tfbs","regulator":"TF1","sequence":"AAA"},'
+                '{"part_kind":"tfbs","regulator":"TF2","sequence":"CCC"}]'
+            ),
         },
         {
             "densegen__run_id": "run-1",

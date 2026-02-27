@@ -81,15 +81,14 @@ def _plan_pool_input_meta(spec: PlanPoolSpec) -> dict:
         "input_type": PLAN_POOL_INPUT_TYPE,
         "input_name": spec.pool_name,
         "input_source_names": list(spec.include_inputs),
+        "input_mode": "plan_pool",
     }
     if spec.pool.pool_mode == POOL_MODE_TFBS:
-        meta["input_mode"] = "binding_sites"
         if spec.pool.df is not None and "tf" in spec.pool.df.columns:
             meta["input_pwm_ids"] = sorted(set(spec.pool.df["tf"].tolist()))
         else:
             meta["input_pwm_ids"] = []
     else:
-        meta["input_mode"] = "sequence_library"
         meta["input_pwm_ids"] = []
     return meta
 
@@ -255,8 +254,10 @@ def run_pipeline(
         deps.optimizer,
         strategy=str(cfg.solver.strategy),
     )
-    solver_time_limit_seconds = (
-        float(cfg.solver.time_limit_seconds) if cfg.solver.time_limit_seconds is not None else None
+    solver_attempt_timeout_seconds = (
+        float(cfg.solver.solver_attempt_timeout_seconds)
+        if cfg.solver.solver_attempt_timeout_seconds is not None
+        else None
     )
     solver_threads = int(cfg.solver.threads) if cfg.solver.threads is not None else None
     dense_arrays_version, dense_arrays_version_source = _resolve_dense_arrays_version(loaded.path)
@@ -458,6 +459,8 @@ def run_pipeline(
         composition_rows=composition_rows,
         events_path=events_path,
         display_map_by_input=display_map_by_input,
+        consecutive_failures_by_plan={},
+        no_progress_seconds_by_plan={},
     )
     try:
         plan_execution = run_plan_schedule(
@@ -489,7 +492,7 @@ def run_pipeline(
             seed=seed,
             seeds=seeds,
             chosen_solver=chosen_solver,
-            solver_time_limit_seconds=solver_time_limit_seconds,
+            solver_attempt_timeout_seconds=solver_attempt_timeout_seconds,
             solver_threads=solver_threads,
             dense_arrays_version=dense_arrays_version,
             dense_arrays_version_source=dense_arrays_version_source,

@@ -18,6 +18,7 @@ from typing import Optional
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib import ticker as mticker
 from matplotlib.lines import Line2D
 
 from .plot_common import _apply_style, _palette, _save_figure, _style, plan_group_from_name
@@ -64,6 +65,14 @@ _build_run_health_tfbs_length_by_regulator_figure = _build_run_health_tfbs_lengt
 _usage_category_label = _usage_category_label_helper
 
 _PLAN_MARKER_CYCLE = ("o", "s", "^", "D", "P", "X", "v", "<", ">", "*", "h")
+
+
+def _capitalize_first(text: str) -> str:
+    token = str(text)
+    for idx, ch in enumerate(token):
+        if ch.isalpha():
+            return token[:idx] + ch.upper() + token[idx + 1 :]
+    return token
 
 
 def _plan_markers(plan_names: list[str]) -> dict[str, str]:
@@ -229,7 +238,7 @@ def _build_run_health_outcomes_figure(
     for row in range(len(plan_names) - 1):
         ax.axhline(row + 0.5, color="#d8d8d8", linewidth=0.7, alpha=0.6, zorder=1)
     ax.set_yticks(np.arange(len(plan_names), dtype=float))
-    ax.set_yticklabels([_ellipsize(name, max_len=24) for name in plan_names])
+    ax.set_yticklabels([_capitalize_first(_ellipsize(name, max_len=24)) for name in plan_names])
     ax.set_ylim(-0.5, float(len(plan_names)) - 0.5)
     ticks = _solver_ticks(solver_x.to_numpy(dtype=float))
     if ticks.size > 0:
@@ -251,7 +260,7 @@ def _build_run_health_outcomes_figure(
             markeredgecolor="#bcbcbc",
             markeredgewidth=0.5,
             markersize=6.0,
-            label="accepted",
+            label="Accepted",
         ),
         Line2D(
             [0],
@@ -262,7 +271,7 @@ def _build_run_health_outcomes_figure(
             markeredgecolor="#8f2a13",
             markeredgewidth=0.5,
             markersize=6.0,
-            label="rejected",
+            label="Rejected",
         ),
         Line2D(
             [0],
@@ -271,7 +280,7 @@ def _build_run_health_outcomes_figure(
             linestyle="None",
             color="#D55E00",
             markersize=6.5,
-            label="failed",
+            label="Failed",
         ),
     ]
     label_size = float(_style_cfg.get("label_size", _style_cfg.get("font_size", 13)))
@@ -347,18 +356,17 @@ def _build_run_health_detail_figure(
         reason_counts = reason_counts.sort_values("total", ascending=False)
         positions = np.arange(len(reason_counts), dtype=float)
         totals_reason = reason_counts["total"].to_numpy(dtype=float)
-        denominator = max(1.0, float(totals_reason.sum()))
-        shares = totals_reason / denominator
+        counts_reason = totals_reason
         ax_fail.hlines(
             positions,
             0.0,
-            shares,
+            counts_reason,
             color="#4c78a8",
             linewidth=2.0,
             alpha=0.85,
         )
         ax_fail.scatter(
-            shares,
+            counts_reason,
             positions,
             s=36.0,
             color="#4c78a8",
@@ -367,13 +375,17 @@ def _build_run_health_detail_figure(
             zorder=3,
         )
         ax_fail.set_yticks(positions)
-        ax_fail.set_yticklabels([_ellipsize(item, max_len=30) for item in reason_counts.index.tolist()])
+        ax_fail.set_yticklabels(
+            [_capitalize_first(_ellipsize(item, max_len=30)) for item in reason_counts.index.tolist()]
+        )
         ax_fail.invert_yaxis()
-        x_pad = 0.03
+        x_pad = 5.0
         y_pad = 0.2
-        ax_fail.set_xlim(0.0, 1.0 + x_pad)
+        max_count = float(np.nanmax(counts_reason)) if counts_reason.size > 0 else 0.0
+        ax_fail.set_xlim(0.0, max_count + x_pad)
         ax_fail.set_ylim(float(len(reason_counts)) - 0.5 + y_pad, -0.5 - y_pad)
-        ax_fail.set_xlabel("Share of failed solves")
+        ax_fail.xaxis.set_major_locator(mticker.MaxNLocator(integer=True, nbins=7))
+        ax_fail.set_xlabel("Failed solve count")
         ax_fail.set_title("Reason for failed solve")
 
     max_progress = 0.0
@@ -599,8 +611,8 @@ def _render_run_health_summary_table_figure(
         display["value"] = display["value"].map(
             lambda value: f"{float(value):.6g}" if isinstance(value, (float, np.floating)) else str(value)
         )
-    fig_width = min(22.0, max(10.0, 2.25 * len(display.columns) + 2.0))
-    fig_height = min(24.0, max(4.0, 0.62 * max(1, len(display)) + 2.1))
+    fig_width = min(22.0, max(10.0, 2.2 * len(display.columns) + 1.7))
+    fig_height = min(22.0, max(3.0, 0.52 * max(1, len(display)) + 1.2))
     fig, ax = plt.subplots(figsize=(float(fig_width), float(fig_height)), constrained_layout=False)
     ax.axis("off")
     table = ax.table(
@@ -612,8 +624,10 @@ def _render_run_health_summary_table_figure(
     table.auto_set_font_size(False)
     table_font = max(11.0, float(_style_cfg.get("tick_size", _style_cfg.get("font_size", 13.0) * 0.78)))
     table.set_fontsize(table_font)
-    table.scale(1.08, 1.45)
-    _save_figure(fig, out_path, style=_style_cfg)
+    table.scale(1.03, 1.28)
+    save_style = dict(_style_cfg)
+    save_style["save_pad_inches"] = min(float(save_style.get("save_pad_inches", 0.08)), 0.02)
+    _save_figure(fig, out_path, style=save_style)
     plt.close(fig)
 
 
@@ -881,7 +895,9 @@ def _build_run_health_figure(
         denominator = max(1.0, float(totals_reason.sum()))
         ax_fail.barh(positions, totals_reason, color="#4c78a8")
         ax_fail.set_yticks(positions)
-        ax_fail.set_yticklabels([_ellipsize(item, max_len=28) for item in reason_pareto.index.tolist()])
+        ax_fail.set_yticklabels(
+            [_capitalize_first(_ellipsize(item, max_len=28)) for item in reason_pareto.index.tolist()]
+        )
         ax_fail.invert_yaxis()
         ax_fail.set_xlabel("Count")
         ax_fail.set_title("Rejected/failed reason composition")
@@ -977,6 +993,23 @@ def _build_run_health_figure(
 
 
 def _extract_plan_quotas(cfg: dict | None) -> dict[str, int]:
+    def _has_target_value(value: object | None) -> bool:
+        if value is None:
+            return False
+        if isinstance(value, float) and np.isnan(value):
+            return False
+        text = str(value).strip().lower()
+        return text not in {"", "none", "nan"}
+
+    def _plan_target(item: dict) -> object | None:
+        quota_raw = item.get("quota")
+        if _has_target_value(quota_raw):
+            return quota_raw
+        sequences_raw = item.get("sequences")
+        if _has_target_value(sequences_raw):
+            return sequences_raw
+        return None
+
     if not cfg:
         return {}
     if not isinstance(cfg, dict):
@@ -1001,7 +1034,7 @@ def _extract_plan_quotas(cfg: dict | None) -> dict[str, int]:
                 for item in node
                 if isinstance(item, dict)
                 and _normalize_plan_name(item.get("name")) is not None
-                and str(item.get("quota", "")).strip() != ""
+                and _plan_target(item) is not None
             ]
             if valid:
                 plan_items = valid
@@ -1011,7 +1044,7 @@ def _extract_plan_quotas(cfg: dict | None) -> dict[str, int]:
         if not isinstance(item, dict):
             continue
         name = _normalize_plan_name(item.get("name"))
-        quota_raw = item.get("quota")
+        quota_raw = _plan_target(item)
         if name is None:
             continue
         try:

@@ -1,4 +1,4 @@
-# Universal Sequence Record
+![Universal Sequence Record banner](assets/usr-banner.svg)
 
 ## Contents
 - [At a glance](#at-a-glance)
@@ -51,6 +51,7 @@ When running the full stack:
 
 - DenseGen can write sequences plus a `densegen` overlay namespace into a Universal Sequence Record dataset.
 - Notify reads Universal Sequence Record `.events.log` and sends webhook notifications.
+- DenseGen runtime telemetry (`outputs/meta/events.jsonl`) is not Notify input.
 
 Relevant docs:
 - DenseGen outputs plus event streams: `../densegen/docs/reference/outputs.md`
@@ -63,6 +64,7 @@ Relevant docs:
 - How overlays merge (conflict resolution): `#how-overlays-merge-conflict-resolution`
 - Event log schema (Notify input): `#event-log-schema`
 - Remote sync: `docs/operations/sync.md`
+- Remote sync runbook uses progressive disclosure: quick path -> advanced path -> failure diagnosis.
 
 ## Maintainer code map
 

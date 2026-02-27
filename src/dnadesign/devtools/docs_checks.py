@@ -24,6 +24,26 @@ from .ci_changes import discover_repo_tools
 LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 README_TOOL_LINK_PATTERN = re.compile(r"\[\*\*(?P<tool>[a-z0-9_-]+)\*\*\]\((?P<link>[^)]+)\)")
 README_COVERAGE_LINK_PATTERN = re.compile(r"\[[^\]]+\]\((?P<link>[^)]+)\)")
+TOOL_README_BANNER_PATTERN = re.compile(r"!\[[^\]]*banner[^\]]*\]\((?P<link>[^)]+)\)", flags=re.IGNORECASE)
+RUNBOOK_DEMO_SHELL_LANGS = {"bash", "sh", "zsh"}
+RUNBOOK_DEMO_YAML_LANGS = {"yaml", "yml"}
+RUNBOOK_DEMO_HEREDOC_PATTERN = re.compile(r"""<<[-~]?\s*['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?""")
+RUNBOOK_DEMO_YAML_VALUE_PATTERN = re.compile(r"^\s*(?:-\s*)?[A-Za-z0-9_\-]+\s*:\s*.+$")
+RUNBOOK_DEMO_CONTROL_PREFIXES = (
+    "if ",
+    "then",
+    "else",
+    "elif ",
+    "fi",
+    "for ",
+    "while ",
+    "do",
+    "done",
+    "case ",
+    "esac",
+    "function ",
+    "return ",
+)
 ROOT_MARKDOWN_FILES = (
     "README.md",
     "AGENTS.md",
@@ -602,6 +622,189 @@ def _find_public_interface_doc_contract_issues(repo_root: Path) -> list[str]:
     return issues
 
 
+def _find_tool_readme_banner_issues(repo_root: Path) -> list[str]:
+    src_root = repo_root / "src" / "dnadesign"
+    if not src_root.exists():
+        return []
+
+    issues: list[str] = []
+    for tool_name in sorted(discover_repo_tools(repo_root=repo_root)):
+        readme_path = src_root / tool_name / "README.md"
+        if not readme_path.exists():
+            continue
+
+        text = readme_path.read_text(encoding="utf-8")
+        top_block = "\n".join(text.splitlines()[:25])
+        banner_match = TOOL_README_BANNER_PATTERN.search(top_block)
+        if banner_match is None:
+            issues.append(f"{readme_path}: missing top banner image markdown line with '* banner' alt text.")
+            continue
+
+        link = banner_match.group("link").strip().split()[0]
+        parsed = urlparse(link)
+        if parsed.scheme or link.startswith("mailto:") or not link.lower().endswith(".svg"):
+            issues.append(f"{readme_path}: banner link must target a local .svg asset.")
+            continue
+
+        target_rel = link.split("#", 1)[0].strip()
+        if not target_rel:
+            issues.append(f"{readme_path}: banner link must include a relative asset path.")
+            continue
+
+        target_path = (readme_path.parent / target_rel).resolve()
+        if not target_path.exists():
+            issues.append(f"{readme_path}: banner asset target does not exist: {target_rel}.")
+
+        if "placeholder" in top_block.lower():
+            issues.append(f"{readme_path}: banner copy must not use placeholder wording.")
+
+    return issues
+
+
+def _is_runbook_demo_doc(*, path: Path, repo_root: Path) -> bool:
+    rel = path.relative_to(repo_root).as_posix()
+    if "/archived/" in rel or "/prototypes/" in rel:
+        return False
+    if rel == "src/dnadesign/notify/docs/usr-events.md":
+        return True
+    if rel == "src/dnadesign/densegen/workspaces/catalog.md":
+        return True
+    if rel.endswith("/runbook.md"):
+        return True
+    if "/docs/demos/" in rel:
+        return True
+    if "/docs/tutorials/" in rel:
+        return True
+    if "/docs/workflows/" in rel:
+        return True
+    if "/docs/howto/" in rel:
+        return True
+    if "/docs/operations/" in rel:
+        return True
+    if "/campaigns/demo_" in rel and rel.endswith("/README.md"):
+        return True
+    if rel.endswith("/workspaces/README.md"):
+        return True
+    if rel.startswith("src/dnadesign/densegen/workspaces/") and rel.endswith("/README.md"):
+        return True
+    return False
+
+
+def _collect_runbook_demo_markdown_files(repo_root: Path) -> list[Path]:
+    src_root = repo_root / "src" / "dnadesign"
+    if not src_root.exists():
+        return []
+
+    files: list[Path] = []
+    for tool_name in sorted(discover_repo_tools(repo_root=repo_root)):
+        tool_root = src_root / tool_name
+        if not tool_root.exists():
+            continue
+        for path in sorted(tool_root.rglob("*.md")):
+            if _is_runbook_demo_doc(path=path, repo_root=repo_root):
+                files.append(path)
+    return files
+
+
+def _is_shell_control_line(text: str) -> bool:
+    stripped = text.strip()
+    if not stripped:
+        return True
+    if stripped.startswith("#"):
+        return True
+    if stripped in {"{", "}", ";;", "in", "PY"}:
+        return True
+    if stripped.endswith(" then"):
+        return True
+    if stripped.endswith("{"):
+        return True
+    if any(stripped.startswith(prefix) for prefix in RUNBOOK_DEMO_CONTROL_PREFIXES):
+        return True
+    if stripped.startswith(("cruncher() {", "dense() {")):
+        return True
+    return False
+
+
+def _find_runbook_demo_snippet_issues(repo_root: Path) -> list[str]:
+    issues: list[str] = []
+
+    for path in _collect_runbook_demo_markdown_files(repo_root):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        line_idx = 0
+        while line_idx < len(lines):
+            line = lines[line_idx]
+            if not line.startswith("```"):
+                line_idx += 1
+                continue
+
+            lang = line[3:].strip().lower()
+            if lang not in RUNBOOK_DEMO_SHELL_LANGS and lang not in RUNBOOK_DEMO_YAML_LANGS:
+                line_idx += 1
+                continue
+
+            block_start = line_idx + 1  # 1-based line number of the first block line.
+            block_lines: list[str] = []
+            line_idx += 1
+            while line_idx < len(lines) and not lines[line_idx].startswith("```"):
+                block_lines.append(lines[line_idx])
+                line_idx += 1
+
+            if lang in RUNBOOK_DEMO_SHELL_LANGS:
+                heredoc_end: str | None = None
+                for idx, raw in enumerate(block_lines):
+                    stripped = raw.strip()
+
+                    if heredoc_end is not None:
+                        if stripped == heredoc_end:
+                            heredoc_end = None
+                        continue
+
+                    if _is_shell_control_line(raw):
+                        continue
+
+                    prev_non_empty: str | None = None
+                    for prev in range(idx - 1, -1, -1):
+                        previous = block_lines[prev].strip()
+                        if previous:
+                            prev_non_empty = block_lines[prev]
+                            break
+
+                    if prev_non_empty is not None and prev_non_empty.rstrip().endswith("\\"):
+                        continue
+
+                    has_inline_comment = " #" in raw
+                    prev_is_comment = prev_non_empty is not None and prev_non_empty.strip().startswith("#")
+                    if not has_inline_comment and not prev_is_comment:
+                        line_no = block_start + idx
+                        issues.append(f"{path}:{line_no}: command in shell block needs an explanatory comment.")
+
+                    heredoc_match = RUNBOOK_DEMO_HEREDOC_PATTERN.search(stripped)
+                    if heredoc_match is not None:
+                        heredoc_end = heredoc_match.group(1)
+
+            if lang in RUNBOOK_DEMO_YAML_LANGS:
+                for idx, raw in enumerate(block_lines):
+                    stripped = raw.strip()
+                    if not stripped or stripped.startswith("#"):
+                        continue
+                    if ":" not in raw:
+                        continue
+                    if not RUNBOOK_DEMO_YAML_VALUE_PATTERN.match(raw):
+                        continue
+                    _, value = raw.split(":", 1)
+                    value_text = value.strip()
+                    if not value_text or value_text in {"|", ">"}:
+                        continue
+                    if "#" in value:
+                        continue
+                    line_no = block_start + idx
+                    issues.append(
+                        f"{path}:{line_no}: yaml key/value in runbook/demo snippets needs a right-side inline comment."
+                    )
+
+    return issues
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Check docs markdown naming and local links.")
     parser.add_argument("--repo-root", type=Path, default=Path("."))
@@ -656,6 +859,20 @@ def main(argv: list[str] | None = None) -> int:
     if interface_doc_issues:
         print("Public interface docs contract check failed:")
         for issue in interface_doc_issues:
+            print(f" - {issue}")
+        return 1
+
+    runbook_demo_snippet_issues = _find_runbook_demo_snippet_issues(repo_root)
+    if runbook_demo_snippet_issues:
+        print("Runbook/demo snippet annotation check failed:")
+        for issue in runbook_demo_snippet_issues:
+            print(f" - {issue}")
+        return 1
+
+    tool_readme_banner_issues = _find_tool_readme_banner_issues(repo_root)
+    if tool_readme_banner_issues:
+        print("Tool README banner contract check failed:")
+        for issue in tool_readme_banner_issues:
             print(f" - {issue}")
         return 1
 

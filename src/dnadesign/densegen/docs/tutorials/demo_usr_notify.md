@@ -69,6 +69,7 @@ This step stages a workspace that writes dataset mutation events for Notify to c
 ```bash
 # Resolve repo root and pin workspace root so paths are deterministic.
 REPO_ROOT="$(git rev-parse --show-toplevel)"
+# Pin workspace root for deterministic init/output paths.
 WORKSPACE_ROOT="$REPO_ROOT/src/dnadesign/densegen/workspaces"
 
 # Create workspace from TFBS baseline in USR output mode.

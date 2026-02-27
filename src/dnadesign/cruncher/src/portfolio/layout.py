@@ -15,7 +15,7 @@ from pathlib import Path
 
 TABLE_FILE_PREFIX = "table__"
 PLOT_FILE_PREFIX = "plot__"
-PORTFOLIO_OUTPUT_ROOT = Path("outputs/portfolios")
+PORTFOLIO_OUTPUT_ROOT = Path("outputs")
 PORTFOLIO_META_DIR = "meta"
 PORTFOLIO_TABLES_DIR = "tables"
 PORTFOLIO_PLOTS_DIR = "plots"
@@ -39,14 +39,12 @@ def _portfolio_context(portfolio_run_dir: Path) -> tuple[Path, str, str]:
     resolved = portfolio_run_dir.resolve()
     portfolio_id = resolved.name
     portfolio_name = resolved.parent.name
-    portfolio_root = resolved.parent.parent
-    outputs_root = portfolio_root.parent
+    outputs_root = resolved.parent.parent
     workspace_root = outputs_root.parent
     expected_root = _resolve_portfolio_root(workspace_root)
-    if portfolio_root != expected_root:
+    if outputs_root != expected_root:
         raise ValueError(
-            "Portfolio run directory must be under <workspace>/outputs/portfolios/<portfolio_name>/<portfolio_id>: "
-            f"{resolved}"
+            f"Portfolio run directory must be under <workspace>/outputs/<portfolio_name>/<portfolio_id>: {resolved}"
         )
     return workspace_root, portfolio_name, portfolio_id
 

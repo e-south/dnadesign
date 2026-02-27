@@ -34,8 +34,38 @@ def test_record_solution_outputs_emits_composition_rows(tmp_path: Path) -> None:
     sink = _DummySink()
     composition_rows: list[dict] = []
     used_tfbs_detail = [
-        {"tf": "TF1", "tfbs": "AAA", "offset": 0, "length": 3, "end": 3, "orientation": "fwd"},
-        {"tf": "TF2", "tfbs": "TT", "offset": 3, "length": 2, "end": 5, "orientation": "rev"},
+        {
+            "part_kind": "tfbs",
+            "part_index": 0,
+            "regulator": "TF1",
+            "sequence": "AAA",
+            "core_sequence": "AAA",
+            "offset": 0,
+            "offset_raw": 0,
+            "pad_left": 0,
+            "length": 3,
+            "end": 3,
+            "orientation": "fwd",
+            "source": "unit",
+            "motif_id": "motif_1",
+            "tfbs_id": "tfbs_1",
+        },
+        {
+            "part_kind": "tfbs",
+            "part_index": 1,
+            "regulator": "TF2",
+            "sequence": "TT",
+            "core_sequence": "TT",
+            "offset": 3,
+            "offset_raw": 3,
+            "pad_left": 0,
+            "length": 2,
+            "end": 5,
+            "orientation": "rev",
+            "source": "unit",
+            "motif_id": "motif_2",
+            "tfbs_id": "tfbs_2",
+        },
     ]
     final_seq = "AAATT"
     record_solution_outputs(
@@ -79,7 +109,7 @@ def test_record_solution_outputs_emits_composition_rows(tmp_path: Path) -> None:
     ).id
     assert len(composition_rows) == len(used_tfbs_detail)
     assert {row["solution_id"] for row in composition_rows} == {expected_id}
-    assert {row["tf"] for row in composition_rows} == {"TF1", "TF2"}
+    assert {row["regulator"] for row in composition_rows} == {"TF1", "TF2"}
 
 
 def test_record_solution_outputs_preserves_stage_a_lineage_in_composition_rows(tmp_path: Path) -> None:
@@ -87,19 +117,32 @@ def test_record_solution_outputs_preserves_stage_a_lineage_in_composition_rows(t
     composition_rows: list[dict] = []
     used_tfbs_detail = [
         {
-            "tf": "lexA",
-            "tfbs": "AAA",
+            "part_kind": "tfbs",
+            "part_index": 0,
+            "regulator": "lexA",
+            "sequence": "AAA",
+            "core_sequence": "AAA",
             "orientation": "fwd",
             "offset": 0,
-            "stage_a_best_hit_score": 8.25,
-            "stage_a_rank_within_regulator": 2,
-            "stage_a_tier": 1,
-            "stage_a_fimo_start": 14,
-            "stage_a_fimo_stop": 17,
-            "stage_a_fimo_strand": "+",
-            "stage_a_selection_rank": 3,
-            "stage_a_selection_score_norm": 0.87,
-            "stage_a_tfbs_core": "AAA",
+            "offset_raw": 0,
+            "pad_left": 0,
+            "length": 3,
+            "end": 3,
+            "source": "unit",
+            "motif_id": "motif_1",
+            "tfbs_id": "tfbs_1",
+            "score_best_hit_raw": 8.25,
+            "score_theoretical_max": 9.50,
+            "score_relative_to_theoretical_max": 0.87,
+            "rank_among_mined_positive": 2,
+            "rank_among_selected": 3,
+            "selection_policy": "mmr",
+            "nearest_selected_similarity": 0.12,
+            "nearest_selected_distance": 4.0,
+            "nearest_selected_distance_norm": 0.50,
+            "matched_start": 14,
+            "matched_stop": 17,
+            "matched_strand": "+",
         }
     ]
     record_solution_outputs(
@@ -136,15 +179,18 @@ def test_record_solution_outputs_preserves_stage_a_lineage_in_composition_rows(t
 
     assert len(composition_rows) == 1
     row = composition_rows[0]
-    assert row["stage_a_best_hit_score"] == 8.25
-    assert row["stage_a_rank_within_regulator"] == 2
-    assert row["stage_a_tier"] == 1
-    assert row["stage_a_fimo_start"] == 14
-    assert row["stage_a_fimo_stop"] == 17
-    assert row["stage_a_fimo_strand"] == "+"
-    assert row["stage_a_selection_rank"] == 3
-    assert row["stage_a_selection_score_norm"] == 0.87
-    assert row["stage_a_tfbs_core"] == "AAA"
+    assert row["score_best_hit_raw"] == 8.25
+    assert row["score_theoretical_max"] == 9.50
+    assert row["score_relative_to_theoretical_max"] == 0.87
+    assert row["rank_among_mined_positive"] == 2
+    assert row["rank_among_selected"] == 3
+    assert row["selection_policy"] == "mmr"
+    assert row["nearest_selected_similarity"] == 0.12
+    assert row["nearest_selected_distance"] == 4.0
+    assert row["nearest_selected_distance_norm"] == 0.50
+    assert row["matched_start"] == 14
+    assert row["matched_stop"] == 17
+    assert row["matched_strand"] == "+"
 
 
 def test_record_solution_outputs_records_structured_solution_rows(tmp_path: Path) -> None:

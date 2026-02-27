@@ -5,12 +5,56 @@ For USR concepts and CLI basics, see [../../README.md](../../README.md).
 Commands below use `uv run usr ...` to match this monorepo workflow.
 
 ### Contents
+- [Quick path](#quick-path)
+- [Advanced path](#advanced-path)
+- [Failure diagnosis](#failure-diagnosis)
 - [0) HPC to local pattern (datasets are not in git)](#0-hpc-to-local-pattern-datasets-are-not-in-git)
 - [1) Prepare SSH keys (one-time)](#1-prepare-ssh-keys-one-time)
 - [2) Configure a USR remote](#2-configure-a-usr-remote)
 - [3) Daily sync workflow](#3-daily-sync-workflow)
 - [4) Dataset directory mode + file mode](#4-dataset-directory-mode-file-mode)
 - [5) Key rotation hygiene](#5-key-rotation-hygiene)
+
+---
+
+### Quick path
+
+Use this when you need the minimum reliable operator loop:
+
+1. One-time setup: sections [1](#1-prepare-ssh-keys-one-time) and [2](#2-configure-a-usr-remote).
+2. Every run: section [3](#3-daily-sync-workflow) (`diff` -> `pull`/`push`).
+3. For DenseGen runs: sync datasets under workspace `outputs/usr_datasets` and verify with `--verify auto`.
+
+Minimum command loop:
+
+```bash
+uv run usr diff densegen/my_dataset bu-scc
+uv run usr pull densegen/my_dataset bu-scc -y
+```
+
+### Advanced path
+
+Use this when basic dataset-id sync is not enough:
+
+- Dataset directory targets outside `--root`: section [4](#4-dataset-directory-mode-file-mode).
+- File-mode path mapping (`repo_root`, `local_repo_root`, `--remote-path`): section [4](#4-dataset-directory-mode-file-mode).
+- Transfer-heavy BU workflows and key rotation hygiene: sections [4](#4-dataset-directory-mode-file-mode) and [5](#5-key-rotation-hygiene).
+
+### Failure diagnosis
+
+Use this sequence when sync commands fail or verification blocks a transfer:
+
+1. Check remote wiring: `uv run usr remotes doctor --remote <name>`.
+2. Re-run with explicit verification mode: `--verify hash|size|parquet`.
+3. If `verify=auto` prints fallback warnings, resolve missing remote capabilities rather than ignoring warnings.
+4. For dataset directory mode, ensure target contains `records.parquet` and has a discoverable `registry.yaml` ancestor.
+5. For file mode, confirm remote path mapping with `--remote-path` or `remote.repo_root` plus local repo root mapping.
+
+Common failure signatures:
+
+- `verify=hash requires remote sha256`: remote host lacks hash utility in PATH.
+- `verify=parquet requires remote parquet row/col stats`: remote host lacks `pyarrow`.
+- `Dataset directory path is outside --root and no registry.yaml ancestor was found`: pass correct `--root` or use dataset id.
 
 ---
 
@@ -57,6 +101,7 @@ macOS keychain convenience:
 ```bash
 # Start agent and add key to macOS keychain.
 eval "$(ssh-agent -s)"
+# Add the SSH key to macOS keychain-backed ssh-agent.
 ssh-add --apple-use-keychain ~/.ssh/id_ed25519
 ```
 
@@ -113,10 +158,10 @@ File-based config example:
 # $USR_REMOTES_PATH
 remotes:
   bu-scc:
-    type: ssh
-    host: scc1.bu.edu
-    user: <user>
-    base_dir: /project/<user>/dnadesign/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets
+    type: ssh                                                                                          # Sets `type` for this example configuration.
+    host: scc1.bu.edu                                                                                  # Sets `host` for this example configuration.
+    user: <user>                                                                                       # Sets `user` for this example configuration.
+    base_dir: /project/<user>/dnadesign/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets  # Sets `base_dir` for this example configuration.
     # Optional explicit key via environment variable:
     # ssh_key_env: USR_SSH_KEY
 ```
@@ -124,6 +169,7 @@ remotes:
 If using `ssh_key_env`:
 
 ```bash
+# Export environment variables consumed by later commands.
 export USR_SSH_KEY="$HOME/.ssh/id_ed25519"
 ```
 
@@ -186,12 +232,12 @@ Remote config example with repo mapping:
 ```yaml
 remotes:
   bu-scc:
-    type: ssh
-    host: scc1.bu.edu
-    user: <user>
-    base_dir: /project/<user>/dnadesign/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets
-    repo_root: /path/to/remote/dnadesign
-    local_repo_root: /path/to/local/dnadesign
+    type: ssh                                                                                          # Sets `type` for this example configuration.
+    host: scc1.bu.edu                                                                                  # Sets `host` for this example configuration.
+    user: <user>                                                                                       # Sets `user` for this example configuration.
+    base_dir: /project/<user>/dnadesign/src/dnadesign/usr/workspaces/<workspace>/outputs/usr_datasets  # Sets `base_dir` for this example configuration.
+    repo_root: /path/to/remote/dnadesign                                                               # Sets `repo_root` for this example configuration.
+    local_repo_root: /path/to/local/dnadesign                                                          # Sets `local_repo_root` for this example configuration.
 ```
 
 Examples:
@@ -247,6 +293,7 @@ Keep permissions strict:
 ```bash
 # Keep key permissions strict.
 chmod 600 ~/.ssh/id_*
+# Lock down ~/.ssh directory permissions.
 chmod 700 ~/.ssh
 ```
 

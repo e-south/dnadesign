@@ -240,7 +240,9 @@ def _reject_removed_solver_options(raw: object) -> None:
     if not isinstance(solver, dict):
         return
     if "options" in solver:
-        raise ConfigError("solver.options has been removed. Use solver.time_limit_seconds or solver.threads instead.")
+        raise ConfigError(
+            "solver.options has been removed. Use solver.solver_attempt_timeout_seconds or solver.threads instead."
+        )
     if "allow_unknown_options" in solver:
         raise ConfigError("solver.allow_unknown_options has been removed.")
 

@@ -47,19 +47,32 @@ def test_parquet_and_usr_sinks_keep_same_metadata_and_stage_a_lineage(tmp_path: 
     meta = output_meta(library_hash="demo_hash", library_index=1)
     meta["used_tfbs_detail"] = [
         {
-            "tf": "lexA",
-            "tfbs": "AAA",
+            "part_kind": "tfbs",
+            "part_index": 0,
+            "regulator": "lexA",
+            "sequence": "AAA",
+            "core_sequence": "AAA",
             "orientation": "fwd",
             "offset": 0,
-            "stage_a_best_hit_score": 8.25,
-            "stage_a_rank_within_regulator": 2,
-            "stage_a_tier": 1,
-            "stage_a_fimo_start": 14,
-            "stage_a_fimo_stop": 17,
-            "stage_a_fimo_strand": "+",
-            "stage_a_selection_rank": 3,
-            "stage_a_selection_score_norm": 0.87,
-            "stage_a_tfbs_core": "AAA",
+            "offset_raw": 0,
+            "pad_left": 0,
+            "length": 3,
+            "end": 3,
+            "source": "unit",
+            "motif_id": "motif_1",
+            "tfbs_id": "tfbs_1",
+            "score_best_hit_raw": 8.25,
+            "score_theoretical_max": 9.50,
+            "score_relative_to_theoretical_max": 0.87,
+            "rank_among_mined_positive": 2,
+            "rank_among_selected": 3,
+            "selection_policy": "mmr",
+            "nearest_selected_similarity": 0.12,
+            "nearest_selected_distance": 4.0,
+            "nearest_selected_distance_norm": 0.50,
+            "matched_start": 14,
+            "matched_stop": 17,
+            "matched_strand": "+",
         }
     ]
     rec = OutputRecord.from_sequence(
@@ -88,15 +101,18 @@ def test_parquet_and_usr_sinks_keep_same_metadata_and_stage_a_lineage(tmp_path: 
     parquet_detail = parquet_table.column("densegen__used_tfbs_detail").to_pylist()[0][0]
     usr_detail = usr_table.column("densegen__used_tfbs_detail").to_pylist()[0][0]
     for detail in (parquet_detail, usr_detail):
-        assert detail["stage_a_best_hit_score"] == 8.25
-        assert detail["stage_a_rank_within_regulator"] == 2
-        assert detail["stage_a_tier"] == 1
-        assert detail["stage_a_fimo_start"] == 14
-        assert detail["stage_a_fimo_stop"] == 17
-        assert detail["stage_a_fimo_strand"] == "+"
-        assert detail["stage_a_selection_rank"] == 3
-        assert detail["stage_a_selection_score_norm"] == 0.87
-        assert detail["stage_a_tfbs_core"] == "AAA"
+        assert detail["score_best_hit_raw"] == 8.25
+        assert detail["score_theoretical_max"] == 9.50
+        assert detail["score_relative_to_theoretical_max"] == 0.87
+        assert detail["rank_among_mined_positive"] == 2
+        assert detail["rank_among_selected"] == 3
+        assert detail["selection_policy"] == "mmr"
+        assert detail["nearest_selected_similarity"] == 0.12
+        assert detail["nearest_selected_distance"] == 4.0
+        assert detail["nearest_selected_distance_norm"] == 0.50
+        assert detail["matched_start"] == 14
+        assert detail["matched_stop"] == 17
+        assert detail["matched_strand"] == "+"
 
 
 def test_usr_writer_dedupes_without_full_parquet_id_preload(tmp_path: Path, monkeypatch) -> None:

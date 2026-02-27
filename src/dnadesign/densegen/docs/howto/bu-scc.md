@@ -29,7 +29,6 @@ This section points to BU SCC repo-level docs so this page stays concise and non
 - Use the **[BU SCC install guide](../../../../../docs/bu-scc/install.md)** for environment bootstrap.
 - Use the **[BU SCC batch plus Notify runbook](../../../../../docs/bu-scc/batch-notify.md)** for watcher deployment patterns.
 - Use the **[BU SCC job templates](../../../../../docs/bu-scc/jobs/README.md)** for submit-ready scripts.
-- Use the **[BU SCC agent cheatsheet](../../../../../docs/bu-scc/agent-cheatsheet.md)** for command quick references.
 
 ### Event boundary reminder
 This section links to the event-boundary doc to avoid semantic drift.

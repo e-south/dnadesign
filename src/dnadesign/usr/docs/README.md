@@ -57,4 +57,5 @@ Boundary reminder:
 ## Operations
 
 - Remote sync: [operations/sync.md](operations/sync.md)
+  - Progressive disclosure path: Quick path -> Advanced path -> Failure diagnosis
 - Dev notes: [dev/journal.md](dev/journal.md)

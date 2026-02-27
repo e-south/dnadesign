@@ -1,56 +1,23 @@
 ## DenseGen
 
-DenseGen wraps the [dense-arrays](https://github.com/e-south/dense-arrays) solver to generate constraint-driven TFBS libraries and write audit-grade artifacts for debugging and downstream analysis. Read this page to pick the right DenseGen document; detailed operator guidance lives in the docs index.
+![DenseGen banner](assets/densegen-banner.svg)
 
-### Documentation
-This section is the primary starting point for DenseGen docs navigation.
+DenseGen wraps the [dense-arrays](https://github.com/e-south/dense-arrays) optimizer to execute full DNA library design workflows from workspace-local configuration and inputs. A run validates strict schema contracts, resolves input sources, builds Stage-A candidate pools when sampling is enabled, executes Stage-B library generation to quota, and writes reproducible artifacts (records, metadata, events, plots, and marimo notebooks) under the workspace `outputs/` tree. The package is designed for maintainable operations: explicit run state, strict fail-fast validation, deterministic path contracts, and direct integration points for downstream USR and Notify workflows.
 
-- Start with the **[DenseGen documentation index](docs/index.md)** for the full map of tutorials, how-to guides, concepts, reference, and dev notes.
+### Documentation map
 
-### End-to-end usage
-This section gives the shortest practical progression from basic run validation to event-driven operations.
-
-- Run **[TFBS baseline tutorial](docs/tutorials/demo_tfbs_baseline.md)** first, then **[sampling baseline tutorial](docs/tutorials/demo_sampling_baseline.md)**.
-- Run **[constitutive sigma panel study tutorial](docs/tutorials/study_constitutive_sigma_panel.md)** for fixed-element matrix expansion behavior.
-- Run **[stress ethanol and ciprofloxacin study tutorial](docs/tutorials/study_stress_ethanol_cipro.md)**, then **[DenseGen to USR to Notify tutorial](docs/tutorials/demo_usr_notify.md)** for watcher flows.
-
-### Tutorials
-This section is for progressive walkthroughs that run end-to-end in workspace order.
-
-- Follow the **[TFBS baseline tutorial](docs/tutorials/demo_tfbs_baseline.md)** for `demo_tfbs_baseline` (smallest lifecycle run).
-- Follow the **[sampling baseline tutorial](docs/tutorials/demo_sampling_baseline.md)** for `demo_sampling_baseline` (Stage-A mining and Stage-B sampling).
-- Follow the **[constitutive sigma panel study tutorial](docs/tutorials/study_constitutive_sigma_panel.md)** for `study_constitutive_sigma_panel` (combinatorial promoter panel workflow with LacI/AraC background exclusion).
-- Follow the **[stress ethanol and ciprofloxacin study tutorial](docs/tutorials/study_stress_ethanol_cipro.md)** for `study_stress_ethanol_cipro` (three-plan campaign baseline).
-- Follow the **[DenseGen to USR to Notify tutorial](docs/tutorials/demo_usr_notify.md)** for event-driven operations.
-
-### How-to guides
-This section is for task-oriented runbooks when you already know the basics.
-
-- Use the **[Cruncher to DenseGen PWM handoff guide](docs/howto/cruncher_pwm_pipeline.md)** when preparing motif artifacts for DenseGen.
-- Use the **[HPC runbook](docs/howto/hpc.md)** for scheduler-safe run and resume patterns.
-- Use the **[DenseGen on BU SCC guide](docs/howto/bu-scc.md)** for BU-specific submission details.
-
-### Concepts
-This section is for mental models and lifecycle behavior that explain why DenseGen behaves the way it does.
-
-- Read **[observability and events](docs/concepts/observability_and_events.md)** for the DenseGen diagnostics and USR event boundary.
-- Read **[pipeline lifecycle](docs/concepts/pipeline-lifecycle.md)** for Stage-A, Stage-B, solve, and post-run boundaries.
-
-### Reference
-This section is for exact commands, schema definitions, and output contracts.
-
-- Use the **[CLI reference](docs/reference/cli.md)** for command and flag contracts.
-- Use the **[config reference](docs/reference/config.md)** for schema keys, strict validation, and examples.
-- Use the **[outputs reference](docs/reference/outputs.md)** for artifact and event contracts.
-
-### Public interface contract
-This section defines what callers should import and what remains internal.
-
-- Import DenseGen Python APIs from `dnadesign.densegen` package root (for example `app`, `load_config`, `resolve_run_root`, `PLOT_SPECS`, `densegen_notebook_render_contract`).
-- Treat nested implementation modules as internal details, not stable external contracts.
-
-### Developer notes
-This section is for maintainers working on DenseGen internals.
-
-- Read the **[DenseGen architecture guide](docs/dev/architecture.md)** for module boundaries.
-- Read the **[DenseGen dev journal](docs/dev/journal.md)** for implementation history and rationale.
+1. [Docs overview](docs/README.md)
+2. [Workspace catalog](workspaces/catalog.md)
+3. [TFBS baseline tutorial](docs/tutorials/demo_tfbs_baseline.md)
+4. [Sampling baseline tutorial](docs/tutorials/demo_sampling_baseline.md)
+5. [Constitutive sigma panel tutorial](docs/tutorials/study_constitutive_sigma_panel.md)
+6. [Stress ethanol and ciprofloxacin tutorial](docs/tutorials/study_stress_ethanol_cipro.md)
+7. [DenseGen to USR to Notify tutorial](docs/tutorials/demo_usr_notify.md)
+8. [Quick checklist](docs/concepts/quick-checklist.md)
+9. [CLI reference](docs/reference/cli.md)
+10. [Config reference](docs/reference/config.md)
+11. [Outputs reference](docs/reference/outputs.md)
+12. [HPC runbook](docs/howto/hpc.md)
+13. [BU SCC run guide](docs/howto/bu-scc.md)
+14. [Architecture notes](docs/dev/architecture.md)
+15. [Development journal](docs/dev/journal.md)

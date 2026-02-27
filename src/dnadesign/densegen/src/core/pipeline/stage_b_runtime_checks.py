@@ -11,7 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from ..sequence_constraints import validate_sequence_constraints
+from ..sequence_constraints import CompiledSequenceConstraints, validate_sequence_constraints
 from .stage_b_runtime_types import SequenceConstraintEvaluation
 
 
@@ -169,7 +169,24 @@ def _evaluate_sequence_constraints(
 ) -> SequenceConstraintEvaluation:
     promoter_detail = {"placements": []}
     sequence_validation = {"validation_passed": True, "violations": []}
-    if compiled_sequence_constraints is None or not compiled_sequence_constraints.has_rules():
+    fixed_elements_dump = dict(fixed_elements_dump or {})
+    has_promoter_constraints = bool(list(fixed_elements_dump.get("promoter_constraints") or []))
+    compiled = compiled_sequence_constraints
+    if compiled is None:
+        if not has_promoter_constraints:
+            return SequenceConstraintEvaluation(
+                promoter_detail=promoter_detail,
+                sequence_validation=sequence_validation,
+                rejection_detail=None,
+                rejection_event_payload=None,
+                error=None,
+            )
+        compiled = CompiledSequenceConstraints(
+            forbid_rules=(),
+            allow_components=("upstream", "downstream"),
+            generation_forbidden_patterns=(),
+        )
+    elif not compiled.has_rules() and not has_promoter_constraints:
         return SequenceConstraintEvaluation(
             promoter_detail=promoter_detail,
             sequence_validation=sequence_validation,
@@ -180,8 +197,23 @@ def _evaluate_sequence_constraints(
     try:
         validation_result = validate_sequence_constraints(
             sequence=final_seq,
-            compiled=compiled_sequence_constraints,
+            compiled=compiled,
             fixed_elements_dump=fixed_elements_dump,
+        )
+    except ValueError as exc:
+        error_message = str(exc)
+        return SequenceConstraintEvaluation(
+            promoter_detail=promoter_detail,
+            sequence_validation={"validation_passed": False, "violations": []},
+            rejection_detail={"error": error_message},
+            rejection_event_payload={
+                "input_name": source_label,
+                "plan_name": plan_name,
+                "library_index": int(sampling_library_index),
+                "library_hash": str(sampling_library_hash),
+                "error": error_message,
+            },
+            error=exc,
         )
     except Exception as exc:
         raise RuntimeError(f"[{source_label}/{plan_name}] sequence constraint evaluation failed: {exc}") from exc

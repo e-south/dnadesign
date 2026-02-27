@@ -25,6 +25,29 @@ Required source columns for the default mapping:
 - DenseGen notebook preview window limit: `500` rows
 
 The adapter contract supports an optional `overlay_text` column key for notebook/UI overlays; DenseGen notebook scaffolding does not set it and reads only the records contract mapping above.
+The adapter also supports an optional `promoter_detail` column key (DenseGen writes `densegen__promoter_detail`).
+
+For each `densegen__used_tfbs_detail` TFBS entry (`part_kind=tfbs`), the active contract expects:
+- `regulator`
+- `sequence`
+- `orientation`
+- `offset`
+
+Legacy TFBS keys (`tf`, `tfbs`, `stage_a_*`) are not accepted by the DenseGen notebook render contract.
+DenseGen sets adapter policy `on_invalid_row=error` for notebook rendering so invalid rows fail immediately.
+
+## Fixed promoter elements
+
+When `promoter_detail.placements` is present, each placement contributes:
+- a `-35 site` feature (`upstream_seq` at `upstream_start`)
+- a `-10 site` feature (`downstream_seq` at `downstream_start`)
+- one spacer annotation effect between them with label `<distance> bp`
+
+Distance is resolved from realized sequence spans:
+- `distance = downstream_start - (upstream_start + len(upstream_seq))`
+
+If `spacer_length` is provided in the placement, it must match that resolved distance or the adapter fails.
+Promoter features and spacer annotation are pinned to the same render track per placement index so they stay visually aligned.
 
 ## Public API flow
 
@@ -63,4 +86,4 @@ uv run baserender job validate --workspace demo_densegen_render --workspace-root
 uv run baserender job run --workspace demo_densegen_render --workspace-root src/dnadesign/baserender/workspaces
 ```
 
-The demo parquet row includes the same nested DenseGen lineage-style fields (`motif_id`, `tfbs_id`, stage-A metadata, strand/offset fields) seen in real DenseGen outputs.
+The demo parquet row includes nested DenseGen lineage fields (`motif_id`, `tfbs_id`, `score_*`, `rank_*`, `matched_*`, strand/offset fields) seen in real DenseGen outputs.

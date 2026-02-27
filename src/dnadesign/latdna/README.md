@@ -2,6 +2,8 @@
 
 ## latdna (latent space analysis of DNA)
 
+![latdna banner](assets/latdna-banner.svg)
+
 **latdna** is a pipeline for latent space analysis of DNA sequences. It compares latent space diversity (via Evo2 embeddings) between dense array batches and synthetic (*latdna*) batches.
 
 ```bash

@@ -47,12 +47,27 @@ def _background_pwm_from_sequences(sequences: list[str]) -> np.ndarray:
     return counts / totals
 
 
+def _background_logo_title(input_name: str) -> str:
+    normalized = " ".join(str(input_name or "").strip().split())
+    if not normalized:
+        return "Background sequence logo"
+    if normalized.lower() == "background":
+        return "Background sequence logo"
+    return f"{normalized} sequence logo"
+
+
 def _build_background_logo_figure(
     *,
     input_name: str,
     sequences: list[str],
     style: dict,
 ) -> tuple[plt.Figure, list[plt.Axes]]:
+    def _coerce_float(value: object, default: float) -> float:
+        try:
+            return float(value)
+        except Exception:
+            return default
+
     length_groups: dict[int, list[str]] = {}
     for seq in sequences:
         length_groups.setdefault(len(seq), []).append(seq)
@@ -61,9 +76,18 @@ def _build_background_logo_figure(
         raise ValueError("Background logo requires at least one sequence length.")
     n_lengths = len(lengths)
     nrows = n_lengths
-    subplot_height = 3.8
-    width = max(10.5, 0.54 * float(max(lengths)) + 3.4)
-    height = max(4.2, subplot_height * float(nrows) + 0.7)
+    base_font_size = _coerce_float(style.get("font_size", 13.0), 13.0)
+    logo_style = dict(style)
+    logo_style["tick_size"] = max(_coerce_float(logo_style.get("tick_size", base_font_size), base_font_size), 14.0)
+    logo_style["label_size"] = max(_coerce_float(logo_style.get("label_size", base_font_size), base_font_size), 14.5)
+    logo_style["title_size"] = max(
+        _coerce_float(logo_style.get("title_size", base_font_size * 1.1), base_font_size * 1.1),
+        16.0,
+    )
+
+    subplot_height = 1.75
+    width = max(6.2, min(10.6, 0.12 * float(max(lengths)) + 4.4))
+    height = max(2.4, subplot_height * float(nrows) + 0.35)
     fig, axes = plt.subplots(nrows, 1, figsize=(width, height), sharex=True, sharey=True)
     axes_list = list(np.atleast_1d(axes).ravel())
     used_axes: list[plt.Axes] = []
@@ -74,7 +98,7 @@ def _build_background_logo_figure(
         logomaker.Logo(df, ax=ax, shade_below=0.5)
         ax.set_title(f"L={length} (n={len(seqs)})")
         ax.set_ylabel("Probability")
-        _apply_style(ax, style)
+        _apply_style(ax, logo_style)
         ax.grid(False)
         used_axes.append(ax)
     if used_axes:
@@ -84,8 +108,17 @@ def _build_background_logo_figure(
         used_axes[-1].set_xlabel("Position")
     for ax in axes_list[len(lengths) :]:
         ax.set_axis_off()
-    fig.suptitle(f"{input_name} background logo", fontsize=float(style.get("title_size", 14)), y=0.985)
-    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.965), h_pad=0.28)
+    suptitle_size = max(_coerce_float(logo_style.get("title_size", 16.0), 16.0) + 2.0, 18.0)
+    if int(nrows) <= 1:
+        top_margin = 0.82
+        bottom_margin = 0.19
+        title_y = 0.905
+    else:
+        top_margin = 0.88
+        bottom_margin = 0.11
+        title_y = 0.955
+    fig.tight_layout(rect=(0.0, bottom_margin, 1.0, top_margin), h_pad=0.22)
+    fig.suptitle(_background_logo_title(input_name), fontsize=suptitle_size, y=title_y)
     return fig, used_axes
 
 
@@ -243,7 +276,12 @@ def plot_stage_a_summary(
         else:
             fname = f"{input_segment}__background_logo{out_path.suffix}"
         path = base_dir / fname
-        _save_figure(fig, path, style=style)
+        logo_save_style = dict(style)
+        try:
+            logo_save_style["save_dpi"] = min(float(logo_save_style.get("save_dpi", 300.0)), 220.0)
+        except Exception:
+            logo_save_style["save_dpi"] = 220.0
+        _save_figure(fig, path, style=logo_save_style)
         plt.close(fig)
         paths.append(path)
     if not paths:

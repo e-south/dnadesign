@@ -11,9 +11,9 @@ Runbook coupling contract:
 - The `### Step-by-Step Commands` block in `runbook.md` must mirror
   `configs/runbook.yaml` command-for-command in the same order.
 - Optional verification or follow-up commands belong in a separate optional
-  section so the one-line run command never drifts from the canonical sequence.
+  section so the one-line run command never drifts from the standard sequence.
 
-For optimization workspaces (non-portfolio), keep canonical study specs:
+For optimization workspaces (non-portfolio), keep standard study specs:
 `configs/studies/length_vs_score.study.yaml` and
 `configs/studies/diversity_vs_score.study.yaml`.
 
@@ -63,36 +63,49 @@ For the nine pairwise/multitf optimization slices above, keep one shared
 `workspace.regulator_sets`, discovery/catalog source IDs, and analysis pairwise
 projection.
 
-Canonical lifecycle for any workspace:
+Standard lifecycle for any workspace:
 
 ```bash
+# Pin config path for repeated CLI calls.
 CONFIG="$PWD/configs/config.yaml"
+# Fetch TF binding sites from the configured source.
 cruncher fetch sites ... -c "$CONFIG"
+# Run motif discovery over fetched site evidence.
 cruncher discover motifs ... -c "$CONFIG"
+# Freeze motif/source provenance for deterministic downstream steps.
 cruncher lock -c "$CONFIG"
+# Parse inputs into normalized Cruncher artifacts.
 cruncher parse --force-overwrite -c "$CONFIG"
+# Generate candidate sequences from parsed motif artifacts.
 cruncher sample --force-overwrite -c "$CONFIG"
+# Compute analysis summaries for generated sequence sets.
 cruncher analyze --summary -c "$CONFIG"
+# Export latest elite sequences for downstream use.
 cruncher export sequences --latest -c "$CONFIG"
 ```
 
-Canonical machine runbook execution:
+Standard machine runbook execution:
 
 ```bash
+# Execute the Cruncher machine runbook for this workspace.
 cruncher workspaces run --runbook configs/runbook.yaml
 ```
 
-Canonical per-workspace study execution:
+Standard per-workspace study execution:
 
 ```bash
+# Run the configured Cruncher parameter-sweep study.
 cruncher study run --spec configs/studies/length_vs_score.study.yaml --force-overwrite
+# Run the configured Cruncher parameter-sweep study.
 cruncher study run --spec configs/studies/diversity_vs_score.study.yaml --force-overwrite
 ```
 
 Study compaction lifecycle (prune transient trial artifacts after summary plots/tables are emitted):
 
 ```bash
+# Compact completed study outputs to reduce disk usage.
 cruncher study compact --run outputs/studies/<study_name>/<study_id>
+# Compact completed study outputs to reduce disk usage.
 cruncher study compact --run outputs/studies/<study_name>/<study_id> --confirm
 ```
 
@@ -104,9 +117,13 @@ If you change `catalog.source_preference` or discovery `--source-id`, re-run `cr
 Workspace hygiene (dry-run by default):
 
 ```bash
+# Reset workspace outputs before a fresh Cruncher run.
 cruncher workspaces reset --root src/dnadesign/cruncher/workspaces --all-workspaces
+# Reset workspace outputs before a fresh Cruncher run.
 cruncher workspaces reset --root src/dnadesign/cruncher/workspaces
+# Reset workspace outputs before a fresh Cruncher run.
 cruncher workspaces reset --root src/dnadesign/cruncher/workspaces --confirm
+# Reset workspace outputs before a fresh Cruncher run.
 cruncher workspaces reset --root src/dnadesign/cruncher/workspaces --all-workspaces --confirm
 ```
 
@@ -117,9 +134,12 @@ Packaged workspace configs resolve `discover.tool_path` relative to their `confi
 Portfolio aggregation lifecycle (from a portfolio workspace):
 
 ```bash
+# Set `SPEC` for later commands in this block.
 SPEC="$PWD/configs/master_all_workspaces.portfolio.yaml"
+# Run portfolio aggregation across selected workspace studies.
 cruncher portfolio run --spec "$SPEC" --prepare-ready skip
-cruncher portfolio show --run outputs/portfolios/master_all_workspaces/<portfolio_id>
+# Show aggregated portfolio outputs for this run id.
+cruncher portfolio show --run outputs/master_all_workspaces/<portfolio_id>
 ```
 
 The portfolio template spec uses `portfolio.schema_version: 3` with
@@ -137,6 +157,8 @@ Portfolio source `run_dir` guidance:
 Portfolio source precondition per included workspace run:
 
 ```bash
+# Compute analysis summaries for generated sequence sets.
 cruncher analyze --summary -c <source_workspace>/configs/config.yaml
+# Export latest elite sequences for downstream use.
 cruncher export sequences --run <source_run_dir> -c <source_workspace>/configs/config.yaml
 ```

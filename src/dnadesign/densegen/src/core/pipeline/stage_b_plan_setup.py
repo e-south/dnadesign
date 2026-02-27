@@ -71,17 +71,15 @@ def _init_plan_settings(
         max_failed_solutions_per_target=float(runtime_cfg.max_failed_solutions_per_target),
         quota=quota,
     )
-    max_per_subsample = int(runtime_cfg.arrays_generated_before_resample)
+    max_per_subsample = int(runtime_cfg.max_accepted_per_library)
     if pool_strategy != "iterative_subsample" and not one_subsample_only:
         max_per_subsample = quota
     runtime = RuntimeSettings(
         max_per_subsample=max_per_subsample,
         min_count_per_tf=int(runtime_cfg.min_count_per_tf),
         max_dupes=int(runtime_cfg.max_duplicate_solutions),
-        stall_seconds=int(runtime_cfg.stall_seconds_before_resample),
-        stall_warn_every=int(runtime_cfg.stall_warning_every_seconds),
-        max_consecutive_failures=int(runtime_cfg.max_consecutive_failures),
-        max_seconds_per_plan=int(runtime_cfg.max_seconds_per_plan),
+        no_progress_seconds_before_resample=int(runtime_cfg.no_progress_seconds_before_resample),
+        max_consecutive_no_progress_resamples=int(runtime_cfg.max_consecutive_no_progress_resamples),
         max_failed_solutions=effective_max_failed_solutions,
         leaderboard_every=int(runtime_cfg.leaderboard_every),
         checkpoint_every=int(execution_state.checkpoint_every or 0),
@@ -107,8 +105,10 @@ def _init_plan_settings(
     solver = SolverSettings(
         strategy=str(solver_cfg.strategy),
         strands=str(solver_cfg.strands),
-        time_limit_seconds=(
-            float(solver_cfg.time_limit_seconds) if solver_cfg.time_limit_seconds is not None else None
+        solver_attempt_timeout_seconds=(
+            float(solver_cfg.solver_attempt_timeout_seconds)
+            if solver_cfg.solver_attempt_timeout_seconds is not None
+            else None
         ),
         threads=int(solver_cfg.threads) if solver_cfg.threads is not None else None,
     )
@@ -132,11 +132,9 @@ def _init_plan_settings(
     policy_solver = solver.strategy
     policy = RuntimePolicy(
         pool_strategy=pool_strategy,
-        arrays_generated_before_resample=runtime.max_per_subsample,
-        stall_seconds_before_resample=runtime.stall_seconds,
-        stall_warning_every_seconds=runtime.stall_warn_every,
-        max_consecutive_failures=runtime.max_consecutive_failures,
-        max_seconds_per_plan=runtime.max_seconds_per_plan,
+        max_accepted_per_library=runtime.max_per_subsample,
+        no_progress_seconds_before_resample=runtime.no_progress_seconds_before_resample,
+        max_consecutive_no_progress_resamples=runtime.max_consecutive_no_progress_resamples,
     )
 
     return PlanRunSettings(

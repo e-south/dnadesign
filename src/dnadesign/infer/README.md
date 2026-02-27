@@ -1,5 +1,7 @@
 ## infer — model‑agnostic inference
 
+![infer banner](assets/infer-banner.svg)
+
 **infer** runs biological sequence models and writes results back to datasets.
 
 - **Adapters:** `evo2` (implemented), `esm2` (stub)

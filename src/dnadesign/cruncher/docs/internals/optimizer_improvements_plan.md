@@ -12,7 +12,7 @@
 
 - Parallel tempering is the only optimizer and is treated as the default kernel.
 - Best-hit selection is deterministic (score, leftmost start, plus strand).
-- Elite selection is TFBS-core MMR with dsDNA canonicalization under bidirectional scoring.
+- Elite selection is TFBS-core MMR with dsDNA orientation normalization under bidirectional scoring.
 - Early stopping uses plateau detection and optional unique-success gating.
 - Run manifests record the effective PT ladder and resolved softmin settings for auditability.
 

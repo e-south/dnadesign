@@ -24,6 +24,7 @@ from .src.api import (
     validate_job,
     validate_sequence_rows_job,
 )
+from .src.contracts import DENSEGEN_TFBS_REQUIRED_KEYS
 from .src.core import ContractError, Display, Effect, Feature, LayoutError, Record, SchemaError, Span
 from .src.runtime import initialize_runtime
 
@@ -50,4 +51,5 @@ __all__ = [
     "render_record_figure",
     "render_record_grid_figure",
     "render_parquet_record_figure",
+    "DENSEGEN_TFBS_REQUIRED_KEYS",
 ]

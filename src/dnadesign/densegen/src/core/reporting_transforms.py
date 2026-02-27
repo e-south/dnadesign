@@ -56,10 +56,16 @@ def _explode_used(df: pd.DataFrame) -> pd.DataFrame:
                 "regenerate run outputs with the current DenseGen schema."
             )
         for entry in used_detail:
-            tf = str(entry.get("tf") or "").strip()
-            tfbs = str(entry.get("tfbs") or "").strip()
-            if not tf and not tfbs:
+            part_kind = str(entry.get("part_kind") or "tfbs").strip().lower()
+            if part_kind != "tfbs":
                 continue
+            regulator = str(entry.get("regulator") or "").strip()
+            sequence = str(entry.get("sequence") or "").strip()
+            if not regulator or not sequence:
+                raise ValueError(
+                    f"Output record '{seq_id}' has malformed {used_col} tfbs entry; "
+                    "expected non-empty regulator and sequence."
+                )
             records.append(
                 {
                     "solution_id": seq_id,
@@ -67,8 +73,8 @@ def _explode_used(df: pd.DataFrame) -> pd.DataFrame:
                     "library_index": library_index,
                     "plan": plan_name,
                     "input_name": input_name,
-                    "tf": tf,
-                    "tfbs": tfbs,
+                    "tf": regulator,
+                    "tfbs": sequence,
                     "motif_id": entry.get("motif_id"),
                     "tfbs_id": entry.get("tfbs_id"),
                     "orientation": entry.get("orientation"),

@@ -61,8 +61,9 @@ This section explains the deterministic config-time expansion model behind `fixe
   - `explicit_pairs`: number of configured pairs.
 - Quota contract:
   - Every plan must define `sequences > 0`.
-  - For matrix plans, `sequences` is split uniformly across expanded variants.
-  - `sequences` must divide evenly by the expanded variant count or validation fails.
+  - For matrix plans, `sequences` is distributed across expanded variants as evenly as possible.
+  - Distribution uses expansion order: each variant receives `floor(sequences / variants)` and the first `sequences % variants` variants receive one extra.
+  - If `sequences < variants`, only the first `sequences` variants are active (quota `1` each).
 - Global guardrails are enforced after expansion:
   - `generation.expansion.max_plans`
 
@@ -83,8 +84,8 @@ This section explains the deterministic config-time expansion model behind `fixe
 #### Current packaged workspace behavior
 - `demo_tfbs_baseline` and `demo_sampling_baseline` do not use matrix expansion.
 - `study_constitutive_sigma_panel` uses matrix expansion for a full panel:
-  - `sigma70_panel`: `6 x 8 = 48` variants, `sequences: 48`, per-variant quota `1`.
-  - Total: `48` concrete plans, aggregate target `48`.
+  - `sigma70_panel`: `6 x 8 = 48` variants, `sequences: 100`.
+  - Total: `48` concrete plans, aggregate target `100` (`4` variants at quota `3`, `44` variants at quota `2`).
 - `study_stress_ethanol_cipro` uses curated upstream variants with fixed downstream consensus:
   - Three base plans (`ethanol`, `ciprofloxacin`, `ethanol_ciprofloxacin`) each expand to `5` variants.
   - Total: `15` concrete plans.
@@ -102,7 +103,7 @@ This section describes how solver settings bound runtime behavior.
 
 - `solver.backend` chooses the installed backend (`CBC` or `GUROBI`).
 - `solver.strategy` selects dense-arrays solve strategy.
-- `solver.time_limit_seconds` caps per-attempt time.
+- `solver.solver_attempt_timeout_seconds` caps per-attempt time.
 - Runtime guardrails in `densegen.runtime` still apply even with permissive solver settings.
 
 ### Debugging generation failures

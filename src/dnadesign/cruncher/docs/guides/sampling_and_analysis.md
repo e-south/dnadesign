@@ -35,7 +35,7 @@ cruncher analyze --summary
 cruncher export sequences --latest
 ```
 
-Outputs are written under each run directory (typically `outputs/`). The canonical entrypoints are:
+Outputs are written under each run directory (typically `outputs/`). The standard entrypoints are:
 
 - `analysis/reports/summary.json`
 - `analysis/reports/report.md`
@@ -195,7 +195,7 @@ Elite selection is aligned with the optimization objective:
 3. Postprocess selected elites with strict hit-window invariants:
    - iterative single-owner nucleotide polish,
    - contiguous uncovered prefix/suffix trim,
-   - final dedupe over canonical/full sequence identity.
+   - final dedupe over standard/full sequence identity.
 4. Return the postprocessed elite set.
 
 Current MMR behavior is:
@@ -212,7 +212,7 @@ Current MMR behavior is:
 
 "Tolerant" weights are hard-coded: low-information PWM positions are weighted more (weight = `1 - info_norm`). This preserves consensus-critical positions while encouraging diversity where the motif is flexible.
 
-When `objective.bidirectional=true`, canonicalization is automatic: reverse complements (including palindromes) count as the same identity for uniqueness and MMR dedupe.
+When `objective.bidirectional=true`, orientation normalization is automatic: reverse complements (including palindromes) count as the same identity for uniqueness and MMR dedupe.
 
 If Cruncher cannot produce `sample.elites.k` candidates from the available candidate pool before postprocess, the run fails fast. Postprocess dedupe may reduce the persisted elite count below `k` when two candidates converge to the same final sequence.
 
@@ -276,7 +276,7 @@ Key signals:
 - `optimizer.gibbs_flip_rate_tail` and `optimizer.tail_step_hamming_mean` indicate whether late-chain motion is dominated by Gibbs micro-flips.
 - `chain_trajectory_sweep.*` should be read as optimizer-scalar progress; `best_so_far` is the default narrative, while `all` overlays raw exploration.
 - `elites_nn_distance.*` distinguishes motif-core collapse (`d_core ~ 0`) from full-sequence diversity (`d_full > 0`) so degenerate elite sets are visible.
-- `objective_components.unique_fraction_canonical` is present only when canonicalization is enabled.
+- `objective_components.unique_fraction_standard` is present only when orientation normalization is enabled.
 - `elites_mmr_summary` and `elites_nn_distance` indicate diversity strength and collapse risk.
 
 ### Run selection + paths

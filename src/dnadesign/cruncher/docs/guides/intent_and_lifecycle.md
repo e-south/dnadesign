@@ -139,7 +139,7 @@ Elites are selected with **TFBS-core MMR**:
   distance, preserving consensus-critical bases while encouraging diversity in
   flexible positions.
 
-When bidirectional scoring is enabled, Cruncher uses **canonical identity**
+When bidirectional scoring is enabled, Cruncher uses **standard identity**
 (lexicographic min of sequence and reverse complement) for uniqueness, elite
 dedupe, and success counters.
 
@@ -147,7 +147,7 @@ dedupe, and success counters.
 
 1. **fetch** -> cache motif/site records in the local catalog
 2. **lock** -> resolve TF names to exact records + hashes (reproducibility pin)
-3. **parse** -> validate/canonicalize locked PWMs into parse artifacts
+3. **parse** -> validate/standardize locked PWMs into parse artifacts
 4. **sample** -> run multi-chain Gibbs annealing and persist optimize artifacts
 5. **analyze** -> replay from artifacts only and write diagnostics/reports/plots
 

@@ -15,7 +15,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from ..core import Record, SchemaError, SkipRecord, Span
+from ..core import Effect, Record, SchemaError, SkipRecord, Span
 from ..core.record import Display, Feature, revcomp
 
 _DENSEGEN_POLICY_DEFAULTS: dict[str, object] = {
@@ -39,6 +39,43 @@ def _find_all(haystack: str, needle: str) -> list[int]:
     return out
 
 
+def _promoter_display_name(name: str) -> str:
+    raw = str(name).strip()
+    if raw == "":
+        return "promoter"
+    normalized = raw.replace("_", "").replace("-", "").lower()
+    if normalized.startswith("sigma"):
+        suffix = normalized[len("sigma") :]
+        digits = "".join(ch for ch in suffix if ch.isdigit())
+        if digits:
+            return f"σ{digits}"
+        return "σ"
+    return raw.replace("_", " ")
+
+
+def _promoter_component_label(name: str, component: str) -> str:
+    display_name = _promoter_display_name(name)
+    if str(component).strip().lower() == "upstream":
+        return f"{display_name} -35 site"
+    if str(component).strip().lower() == "downstream":
+        return f"{display_name} -10 site"
+    return display_name
+
+
+def _append_variant_suffix(label: str, variant_id: str | None) -> str:
+    variant = str(variant_id or "").strip()
+    if variant == "":
+        return label
+    return f"{label} ({variant})"
+
+
+def _title_case_first(value: str) -> str:
+    raw = str(value).strip()
+    if raw == "":
+        return raw
+    return raw[:1].upper() + raw[1:]
+
+
 @dataclass(frozen=True)
 class DensegenTfbsAdapter:
     columns: Mapping[str, Any]
@@ -50,9 +87,15 @@ class DensegenTfbsAdapter:
         merged.update(dict(self.policies or {}))
         object.__setattr__(self, "policies", merged)
 
-    def _parse_annotations(self, obj: Any, *, sequence: str, record_id: str) -> list[Feature]:
+    def _parse_annotations(
+        self,
+        obj: Any,
+        *,
+        sequence: str,
+        record_id: str,
+    ) -> tuple[list[Feature], list[dict[str, Any]]]:
         if obj is None:
-            return []
+            return ([], [])
         if isinstance(obj, str):
             try:
                 obj = json.loads(obj)
@@ -75,20 +118,28 @@ class DensegenTfbsAdapter:
 
         seq_u = sequence.upper()
         features: list[Feature] = []
+        fixed_entries: list[dict[str, Any]] = []
 
         for idx, item in enumerate(obj):
             if not isinstance(item, dict):
                 raise SchemaError("DenseGen annotation entries must be dicts")
 
-            tf_raw = item.get("tf")
-            tf = str(tf_raw or "").strip()
-            if tf == "":
-                raise SchemaError("DenseGen annotation dict missing non-empty key: tf")
+            part_kind = str(item.get("part_kind") or "tfbs").strip().lower()
+            if part_kind == "fixed_element":
+                fixed_entries.append(dict(item))
+                continue
+            if part_kind != "tfbs":
+                raise SchemaError(f"Unknown densegen part_kind value: {part_kind!r}")
 
-            tfbs_raw = item.get("tfbs")
-            tfbs = str(tfbs_raw or "").strip().upper()
-            if tfbs == "":
-                raise SchemaError("DenseGen annotation dict missing non-empty key: tfbs")
+            regulator_raw = item.get("regulator")
+            regulator = str(regulator_raw or "").strip()
+            if regulator == "":
+                raise SchemaError("DenseGen annotation dict missing non-empty key: regulator")
+
+            sequence_raw = item.get("sequence")
+            sequence_literal = str(sequence_raw or "").strip().upper()
+            if sequence_literal == "":
+                raise SchemaError("DenseGen annotation dict missing non-empty key: sequence")
 
             orientation = str(item.get("orientation", "")).strip().lower()
             strand = {"fwd": "fwd", "rev": "rev"}.get(orientation)
@@ -102,14 +153,15 @@ class DensegenTfbsAdapter:
                 raw = int(offset_val)
                 offset = None if (raw == 0 and zero_unspec) else raw
 
-            query = tfbs if strand == "fwd" else revcomp(tfbs)
+            query = sequence_literal if strand == "fwd" else revcomp(sequence_literal)
             hits = _find_all(seq_u, query)
 
             if not hits:
                 if on_missing == "skip_entry":
                     continue
                 raise SchemaError(
-                    f"DenseGen kmer not found in sequence (record={record_id}, tf={tf}, strand={strand}, tfbs={tfbs})"
+                    "DenseGen kmer not found in sequence "
+                    f"(record={record_id}, regulator={regulator}, strand={strand}, sequence={sequence_literal})"
                 )
 
             if len(hits) == 1:
@@ -119,7 +171,14 @@ class DensegenTfbsAdapter:
                     if ambiguous == "error":
                         raise SchemaError(
                             "Ambiguous DenseGen annotation with no offset "
-                            f"(record={record_id}, tf={tf}, strand={strand}, tfbs={tfbs}, hits={hits})"
+                            "(record={record_id}, regulator={regulator}, "
+                            "strand={strand}, sequence={sequence_literal}, hits={hits})".format(
+                                record_id=record_id,
+                                regulator=regulator,
+                                strand=strand,
+                                sequence_literal=sequence_literal,
+                                hits=hits,
+                            )
                         )
                     if ambiguous == "drop":
                         raise SkipRecord("densegen_tfbs ambiguous=drop triggered")
@@ -144,17 +203,152 @@ class DensegenTfbsAdapter:
                         start = hits[0] if ambiguous == "first" else hits[-1]
 
             feature = Feature(
-                id=f"{record_id}:tf:{tf}:{idx}",
+                id=f"{record_id}:tf:{regulator}:{idx}",
                 kind="kmer",
-                span=Span(start=start, end=start + len(tfbs), strand=strand),
-                label=tfbs,
-                tags=(f"tf:{tf}",),
-                attrs={"tf": tf, "source": "densegen_tfbs"},
+                span=Span(start=start, end=start + len(sequence_literal), strand=strand),
+                label=sequence_literal,
+                tags=(f"tf:{regulator}",),
+                attrs={"tf": regulator, "source": "densegen_tfbs"},
                 render={"priority": 10},
             )
             features.append(feature)
 
-        return features
+        return features, fixed_entries
+
+    def _parse_promoter_entries_from_annotations(
+        self,
+        entries: list[dict[str, Any]],
+        *,
+        sequence: str,
+        record_id: str,
+    ) -> tuple[list[Feature], list[Effect], dict[str, str]]:
+        if not entries:
+            return ([], [], {})
+        seq_u = sequence.upper()
+        grouped: dict[tuple[str, int], dict[str, dict[str, Any]]] = {}
+        for idx, entry in enumerate(entries):
+            role = str(entry.get("role") or "").strip().lower()
+            if role not in {"upstream", "downstream"}:
+                raise SchemaError(f"DenseGen fixed-element entry has unknown role: {role!r}")
+            name = str(entry.get("constraint_name") or "promoter").strip() or "promoter"
+            placement_index_raw = entry.get("placement_index")
+            placement_index = int(placement_index_raw) if placement_index_raw is not None else 0
+            sequence_literal = str(entry.get("sequence") or "").strip().upper()
+            if sequence_literal == "":
+                raise SchemaError("DenseGen fixed-element entry is missing non-empty sequence")
+            start_raw = entry.get("offset")
+            if start_raw is None:
+                raise SchemaError("DenseGen fixed-element entry is missing offset")
+            start = int(start_raw)
+            end = start + len(sequence_literal)
+            if start < 0 or end > len(seq_u):
+                raise SchemaError(
+                    "DenseGen fixed-element placement is out of sequence bounds "
+                    f"(record={record_id}, start={start}, end={end}, n={len(seq_u)})"
+                )
+            if seq_u[start:end] != sequence_literal:
+                raise SchemaError(
+                    "DenseGen fixed-element placement does not match sequence "
+                    f"(record={record_id}, name={name}, role={role}, expected={sequence_literal})"
+                )
+            length_raw = entry.get("length")
+            if length_raw is not None and int(length_raw) != len(sequence_literal):
+                raise SchemaError(
+                    "DenseGen fixed-element length does not match sequence literal length "
+                    f"(record={record_id}, name={name}, role={role}, "
+                    f"length={int(length_raw)}, expected={len(sequence_literal)})"
+                )
+            grouped.setdefault((name, placement_index), {})[role] = {
+                "sequence": sequence_literal,
+                "start": start,
+                "end": end,
+                "variant_id": str(entry.get("variant_id") or "").strip(),
+                "spacer_length": entry.get("spacer_length"),
+                "entry_index": int(idx),
+            }
+
+        features: list[Feature] = []
+        effects: list[Effect] = []
+        labels: dict[str, str] = {}
+        for (name, placement_index), components in sorted(grouped.items(), key=lambda item: (item[0][1], item[0][0])):
+            if "upstream" not in components or "downstream" not in components:
+                raise SchemaError(
+                    "DenseGen fixed-element entries must include both upstream and downstream components "
+                    f"(record={record_id}, name={name}, placement_index={placement_index})"
+                )
+            upstream = components["upstream"]
+            downstream = components["downstream"]
+            spacer_bp = int(downstream["start"]) - int(upstream["end"])
+            if spacer_bp < 0:
+                raise SchemaError(
+                    "DenseGen fixed-element downstream offset must be >= upstream end "
+                    f"(record={record_id}, name={name}, upstream_end={upstream['end']}, "
+                    f"downstream_start={downstream['start']})"
+                )
+            upstream_spacer = upstream.get("spacer_length")
+            if upstream_spacer is not None and int(upstream_spacer) != spacer_bp:
+                raise SchemaError(
+                    "DenseGen fixed-element upstream spacer_length does not match resolved span "
+                    f"(record={record_id}, name={name}, spacer_length={int(upstream_spacer)}, resolved={spacer_bp})"
+                )
+            downstream_spacer = downstream.get("spacer_length")
+            if downstream_spacer is not None and int(downstream_spacer) != spacer_bp:
+                raise SchemaError(
+                    "DenseGen fixed-element downstream spacer_length does not match resolved span "
+                    f"(record={record_id}, name={name}, spacer_length={int(downstream_spacer)}, resolved={spacer_bp})"
+                )
+
+            upstream_tag = f"promoter:{name}:upstream"
+            downstream_tag = f"promoter:{name}:downstream"
+            labels.setdefault(
+                upstream_tag,
+                _append_variant_suffix(_promoter_component_label(name, "upstream"), upstream.get("variant_id")),
+            )
+            labels.setdefault(
+                downstream_tag,
+                _append_variant_suffix(_promoter_component_label(name, "downstream"), downstream.get("variant_id")),
+            )
+
+            upstream_feature_id = f"{record_id}:promoter:{name}:{placement_index}:upstream"
+            downstream_feature_id = f"{record_id}:promoter:{name}:{placement_index}:downstream"
+            track = int(placement_index)
+            upstream_attrs = {"name": name, "component": "upstream", "source": "densegen_promoter"}
+            if upstream.get("variant_id"):
+                upstream_attrs["variant_id"] = upstream.get("variant_id")
+            downstream_attrs = {"name": name, "component": "downstream", "source": "densegen_promoter"}
+            if downstream.get("variant_id"):
+                downstream_attrs["variant_id"] = downstream.get("variant_id")
+            features.append(
+                Feature(
+                    id=upstream_feature_id,
+                    kind="kmer",
+                    span=Span(start=int(upstream["start"]), end=int(upstream["end"]), strand="fwd"),
+                    label=str(upstream["sequence"]),
+                    tags=(upstream_tag,),
+                    attrs=upstream_attrs,
+                    render={"priority": 8, "track": track},
+                )
+            )
+            features.append(
+                Feature(
+                    id=downstream_feature_id,
+                    kind="kmer",
+                    span=Span(start=int(downstream["start"]), end=int(downstream["end"]), strand="fwd"),
+                    label=str(downstream["sequence"]),
+                    tags=(downstream_tag,),
+                    attrs=downstream_attrs,
+                    render={"priority": 8, "track": track},
+                )
+            )
+            effects.append(
+                Effect(
+                    kind="span_link",
+                    target={"from_feature_id": upstream_feature_id, "to_feature_id": downstream_feature_id},
+                    params={"label": f"{spacer_bp} bp", "lane": "top"},
+                    render={"priority": 8, "track": track},
+                )
+            )
+        return features, effects, labels
 
     def _parse_promoter_detail(
         self,
@@ -162,9 +356,9 @@ class DensegenTfbsAdapter:
         *,
         sequence: str,
         record_id: str,
-    ) -> tuple[list[Feature], dict[str, str]]:
+    ) -> tuple[list[Feature], list[Effect], dict[str, str]]:
         if obj is None:
-            return ([], {})
+            return ([], [], {})
         if isinstance(obj, str):
             try:
                 obj = json.loads(obj)
@@ -181,6 +375,7 @@ class DensegenTfbsAdapter:
 
         seq_u = sequence.upper()
         promoter_features: list[Feature] = []
+        promoter_effects: list[Effect] = []
         promoter_labels: dict[str, str] = {}
 
         for placement_index, placement in enumerate(placements):
@@ -223,34 +418,98 @@ class DensegenTfbsAdapter:
                     f"(record={record_id}, name={name}, expected={downstream_seq})"
                 )
 
+            spacer_bp = downstream_start - upstream_end
+            if spacer_bp < 0:
+                raise SchemaError(
+                    "DenseGen promoter downstream_start must be >= upstream_end "
+                    f"(record={record_id}, name={name}, upstream_end={upstream_end}, "
+                    f"downstream_start={downstream_start})"
+                )
+            spacer_length_raw = placement.get("spacer_length")
+            if spacer_length_raw is not None:
+                try:
+                    spacer_length = int(spacer_length_raw)
+                except Exception as exc:
+                    raise SchemaError("DenseGen promoter placement spacer_length must be an integer") from exc
+                if spacer_length != spacer_bp:
+                    raise SchemaError(
+                        "DenseGen promoter spacer_length does not match resolved span "
+                        f"(record={record_id}, name={name}, spacer_length={spacer_length}, resolved={spacer_bp})"
+                    )
+
+            variant_ids = placement.get("variant_ids")
+            if hasattr(variant_ids, "as_py"):
+                variant_ids = variant_ids.as_py()
+            if not isinstance(variant_ids, Mapping):
+                variant_ids = {}
+            upstream_variant_id = str(variant_ids.get("up_id") or "").strip()
+            downstream_variant_id = str(variant_ids.get("down_id") or "").strip()
+
             upstream_tag = f"promoter:{name}:upstream"
             downstream_tag = f"promoter:{name}:downstream"
-            promoter_labels.setdefault(upstream_tag, "-35 site")
-            promoter_labels.setdefault(downstream_tag, "-10 site")
+            promoter_labels.setdefault(
+                upstream_tag,
+                _append_variant_suffix(_promoter_component_label(name, "upstream"), upstream_variant_id),
+            )
+            promoter_labels.setdefault(
+                downstream_tag,
+                _append_variant_suffix(_promoter_component_label(name, "downstream"), downstream_variant_id),
+            )
+            placement_track = int(placement_index)
+            upstream_feature_id = f"{record_id}:promoter:{name}:{placement_index}:upstream"
+            downstream_feature_id = f"{record_id}:promoter:{name}:{placement_index}:downstream"
+            upstream_attrs = {
+                "name": name,
+                "component": "upstream",
+                "source": "densegen_promoter",
+            }
+            if upstream_variant_id:
+                upstream_attrs["variant_id"] = upstream_variant_id
+            downstream_attrs = {
+                "name": name,
+                "component": "downstream",
+                "source": "densegen_promoter",
+            }
+            if downstream_variant_id:
+                downstream_attrs["variant_id"] = downstream_variant_id
             promoter_features.append(
                 Feature(
-                    id=f"{record_id}:promoter:{name}:{placement_index}:upstream",
+                    id=upstream_feature_id,
                     kind="kmer",
                     span=Span(start=upstream_start, end=upstream_end, strand="fwd"),
                     label=upstream_seq,
                     tags=(upstream_tag,),
-                    attrs={"name": name, "component": "upstream", "source": "densegen_promoter"},
-                    render={"priority": 8},
+                    attrs=upstream_attrs,
+                    render={"priority": 8, "track": placement_track},
                 )
             )
             promoter_features.append(
                 Feature(
-                    id=f"{record_id}:promoter:{name}:{placement_index}:downstream",
+                    id=downstream_feature_id,
                     kind="kmer",
                     span=Span(start=downstream_start, end=downstream_end, strand="fwd"),
                     label=downstream_seq,
                     tags=(downstream_tag,),
-                    attrs={"name": name, "component": "downstream", "source": "densegen_promoter"},
-                    render={"priority": 8},
+                    attrs=downstream_attrs,
+                    render={"priority": 8, "track": placement_track},
+                )
+            )
+            promoter_effects.append(
+                Effect(
+                    kind="span_link",
+                    target={
+                        "from_feature_id": upstream_feature_id,
+                        "to_feature_id": downstream_feature_id,
+                    },
+                    params={
+                        "label": f"{spacer_bp} bp",
+                        "lane": "top",
+                    },
+                    render={"priority": 8, "track": placement_track},
                 )
             )
 
-        return (promoter_features, promoter_labels)
+        return (promoter_features, promoter_effects, promoter_labels)
 
     def apply(self, row: dict, *, row_index: int) -> Record:
         sequence_col = str(self.columns.get("sequence"))
@@ -289,11 +548,23 @@ class DensegenTfbsAdapter:
                     raise SkipRecord(f"densegen_tfbs missing required_non_null col={col}")
                 raise SchemaError(f"DenseGen row has blank required column '{col}'")
 
-        features = self._parse_annotations(row.get(ann_col), sequence=sequence, record_id=record_id)
+        features, fixed_entries = self._parse_annotations(row.get(ann_col), sequence=sequence, record_id=record_id)
+        fixed_features, fixed_effects, fixed_labels = self._parse_promoter_entries_from_annotations(
+            fixed_entries,
+            sequence=sequence,
+            record_id=record_id,
+        )
+        if fixed_features:
+            features.extend(fixed_features)
         promoter_detail_col = self.columns.get("promoter_detail")
         if promoter_detail_col is None and "densegen__promoter_detail" in row:
             promoter_detail_col = "densegen__promoter_detail"
-        promoter_features, promoter_labels = self._parse_promoter_detail(
+        if fixed_features and promoter_detail_col is not None and row.get(str(promoter_detail_col)) is not None:
+            raise SchemaError(
+                "DenseGen row provided fixed elements in annotations and promoter_detail. "
+                "Provide a single source of fixed-element placements."
+            )
+        promoter_features, promoter_effects, promoter_labels = self._parse_promoter_detail(
             row.get(str(promoter_detail_col)) if promoter_detail_col is not None else None,
             sequence=sequence,
             record_id=record_id,
@@ -316,10 +587,10 @@ class DensegenTfbsAdapter:
             for tag in feat.tags:
                 if tag.startswith("tf:") and tag not in tag_labels:
                     tf_label = tag[3:]
-                    if tf_label.lower() == "background":
-                        tf_label = "Background"
+                    tf_label = _title_case_first(tf_label)
                     tag_labels[tag] = tf_label
         tag_labels.update(promoter_labels)
+        tag_labels.update(fixed_labels)
 
         overlay_text = None
         if overlay_text_col is not None:
@@ -332,7 +603,7 @@ class DensegenTfbsAdapter:
             alphabet=self.alphabet,
             sequence=sequence,
             features=tuple(features),
-            effects=(),
+            effects=tuple([*promoter_effects, *fixed_effects]),
             display=Display(overlay_text=overlay_text, tag_labels=tag_labels),
             meta={"row_index": row_index, "adapter": "densegen_tfbs"},
         )

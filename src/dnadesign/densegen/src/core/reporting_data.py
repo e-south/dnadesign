@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 import pandas as pd
+import pyarrow.parquet as pq
 
 from ..adapters.outputs import load_records_from_config
 from ..config import RootConfig, resolve_outputs_scoped_path, resolve_run_root
@@ -77,6 +78,59 @@ _COMPOSITION_REPORT_COLUMNS = [
     "tfbs",
     "length",
 ]
+
+
+def _resolve_composition_projection_columns(
+    path: Path,
+    columns: list[str] | None,
+) -> tuple[list[str] | None, dict[str, str]]:
+    if columns is None:
+        return None, {}
+    try:
+        available = set(pq.read_schema(path).names)
+    except Exception:
+        return columns, {}
+    read_cols: list[str] = []
+    aliases: dict[str, str] = {}
+    missing: list[str] = []
+    for col in columns:
+        if col == "tf":
+            if "regulator" in available:
+                read_cols.append("regulator")
+                aliases["tf"] = "regulator"
+            elif "tf" in available:
+                read_cols.append("tf")
+            else:
+                missing.append("tf")
+            continue
+        if col == "tfbs":
+            if "sequence" in available:
+                read_cols.append("sequence")
+                aliases["tfbs"] = "sequence"
+            elif "tfbs" in available:
+                read_cols.append("tfbs")
+            else:
+                missing.append("tfbs")
+            continue
+        if col in available:
+            read_cols.append(col)
+            continue
+        missing.append(col)
+    if missing:
+        raise ValueError(
+            "composition.parquet missing required columns: "
+            f"{sorted(set(missing))}. Available columns: {sorted(available)}"
+        )
+    return sorted(set(read_cols)), aliases
+
+
+def _read_composition_parquet(path: Path, *, columns: list[str] | None) -> pd.DataFrame:
+    read_columns, aliases = _resolve_composition_projection_columns(path, columns)
+    frame = pd.read_parquet(path, columns=read_columns)
+    for dest, source in aliases.items():
+        if dest not in frame.columns and source in frame.columns:
+            frame[dest] = frame[source]
+    return frame
 
 
 def _resolve_output_records_path(root_cfg: RootConfig, cfg_path: Path, run_root: Path, source_label: str) -> str | None:
@@ -562,7 +616,7 @@ def collect_report_data(
     composition_path = tables_root / "composition.parquet"
     if composition_path.exists():
         try:
-            composition = pd.read_parquet(composition_path, columns=_COMPOSITION_REPORT_COLUMNS)
+            composition = _read_composition_parquet(composition_path, columns=_COMPOSITION_REPORT_COLUMNS)
             if not composition.empty and "tf" in composition.columns and "input_name" in composition.columns:
                 composition["tf"] = composition.apply(
                     lambda row: _display_tf_label(str(row.get("input_name") or ""), str(row.get("tf") or "")),

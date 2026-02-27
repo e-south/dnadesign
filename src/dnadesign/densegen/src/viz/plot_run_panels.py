@@ -25,10 +25,19 @@ from .plot_run_helpers import (
     _bin_attempts,
     _ellipsize,
     _first_existing_column,
+    _humanize_scope_label,
     _normalize_plan_name,
     _usage_available_unique,
     _usage_category_label,
 )
+
+
+def _capitalize_first(text: str) -> str:
+    token = str(text)
+    for idx, char in enumerate(token):
+        if char.isalpha():
+            return token[:idx] + char.upper() + token[idx + 1 :]
+    return token
 
 
 def _build_tfbs_usage_breakdown_figure(
@@ -107,7 +116,9 @@ def _build_tfbs_usage_breakdown_figure(
         )
     ax_usage.set_ylabel("Usage count")
     ax_usage.set_xlabel("TFBS rank (specific sequence)")
-    ax_usage.set_title(f"TFBS usage breakdown - {input_name}/{plan_name}")
+    input_label = _humanize_scope_label(input_name) or str(input_name)
+    plan_label = _humanize_scope_label(plan_name) or str(plan_name)
+    ax_usage.set_title(f"TFBS usage breakdown for input {input_label} and plan {plan_label}")
     max_rank_within_regulator = 1
     for label in category_order:
         cat_points = counts[counts["category_label"] == label].sort_values(
@@ -153,6 +164,16 @@ def _build_tfbs_usage_breakdown_figure(
         summary_lines.append(
             f"unique TFBS-pairs used / available: {len(counts)}/{available_total} ({len(counts) / available_total:.1%})"
         )
+    summary_lines = [_capitalize_first(line) for line in summary_lines]
+    summary_font_size = float(
+        style.get(
+            "tfbs_usage_summary_size",
+            max(
+                10.0,
+                float(style.get("label_size", style.get("font_size", 13.0))) * 0.9,
+            ),
+        )
+    )
     ax_usage.text(
         0.98,
         0.95,
@@ -160,8 +181,7 @@ def _build_tfbs_usage_breakdown_figure(
         transform=ax_usage.transAxes,
         ha="right",
         va="top",
-        fontsize=8,
-        bbox=dict(boxstyle="round", facecolor="white", alpha=0.7, linewidth=0.5),
+        fontsize=summary_font_size,
     )
     ax_usage.xaxis.set_major_locator(mticker.MaxNLocator(integer=True, nbins=8))
 
@@ -195,7 +215,7 @@ def _build_tfbs_usage_breakdown_figure(
             loc="lower center",
             bbox_to_anchor=(0.5, 0.01),
             ncol=2,
-            frameon=bool(style.get("legend_frame", False)),
+            frameon=False,
             fontsize=float(style.get("tick_size", style.get("font_size", 13.0) * 0.62)),
         )
     fig.tight_layout(rect=(0.0, 0.15, 1.0, 1.0))
@@ -287,7 +307,7 @@ def _build_run_health_compression_ratio_figure(
     labeled_plans = set(plan_names[:legend_max])
     fig_size = style.get("run_health_compression_figsize")
     if fig_size is None:
-        fig_size = (8.0, 4.6)
+        fig_size = (7.2, 4.0)
     fig, ax = plt.subplots(
         figsize=(float(fig_size[0]), float(fig_size[1])),
         constrained_layout=False,
@@ -315,9 +335,10 @@ def _build_run_health_compression_ratio_figure(
         ax.set_title("Compression ratio distribution by plan group")
     else:
         ax.set_title("Compression ratio distribution by plan")
-    legend_ncol = 1 if len(labeled_plans) <= 8 else 2
+    legend_ncol = 1
     ax.legend(
-        loc="upper left",
+        loc="center left",
+        bbox_to_anchor=(1.02, 0.5),
         frameon=False,
         ncol=legend_ncol,
         fontsize=float(style.get("label_size", style.get("font_size", 13.0) * 0.88)),
@@ -334,6 +355,7 @@ def _build_run_health_compression_ratio_figure(
             fontsize=float(style.get("label_size", style.get("font_size", 13.0) * 0.82)),
             alpha=0.86,
         )
+    fig.subplots_adjust(right=0.74)
     _apply_style(ax, style)
     return fig, {"compression": ax}
 

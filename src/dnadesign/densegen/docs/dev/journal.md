@@ -18,7 +18,7 @@ This entry captures the initial monolith-reduction refactor and associated valid
 
 ### 2026-02-04
 This entry captures runtime, Stage-A, and reporting hardening work plus audit outcomes.
-- Fixed Stage-B stall handling for zero-solution generators: exit the library loop so stall detection triggers, and ensure max_consecutive_failures is enforced even with one_subsample_only.
+- Fixed Stage-B stall handling for zero-solution generators: exit the library loop so stall detection triggers, and ensure max_consecutive_no_progress_resamples is enforced even with one_subsample_only.
 - Tests: `uv run pytest -q src/dnadesign/densegen/tests/runtime/test_round_robin_chunk_cap.py`.
 - Refactored `_process_plan_for_source` to delegate to `_run_stage_b_sampling`, separating plan setup, pool loading, and Stage-B execution.
 - Tests: `uv run pytest -q src/dnadesign/densegen/tests/runtime/test_round_robin_chunk_cap.py src/dnadesign/densegen/tests/runtime/test_source_cache.py`.

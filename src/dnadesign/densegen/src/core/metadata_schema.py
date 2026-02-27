@@ -30,23 +30,20 @@ META_FIELDS: list[MetaField] = [
     MetaField("schema_version", (str,), "DenseGen schema version (e.g., 2.7)."),
     MetaField("created_at", (str,), "UTC ISO8601 timestamp for record creation."),
     MetaField("run_id", (str,), "Run identifier (densegen.run.id)."),
-    MetaField("run_config_path", (str,), "Run config path (relative to run root when possible)."),
     MetaField("length", (int,), "Actual output sequence length."),
-    MetaField("random_seed", (int,), "Global RNG seed used for the run."),
-    MetaField("policy_sampling", (str,), "Stage-B sampling policy label (pool strategy)."),
-    MetaField("solver_backend", (str,), "Solver backend name (null when approximate).", allow_none=True),
-    MetaField("solver_strands", (str,), "Solver strands mode (single|double)."),
-    MetaField("dense_arrays_version", (str,), "dense-arrays package version.", allow_none=True),
     MetaField("plan", (str,), "Plan item name."),
-    MetaField("tf_list", (list,), "All TFs present in the Stage-B sampled library."),
-    MetaField("tfbs_parts", (list,), "TF:TFBS strings used to build the Stage-B library."),
+    MetaField("input_name", (str,), "Input source name."),
+    MetaField("input_mode", (str,), "Input mode (binding_sites | sequence_library | pwm_sampled | plan_pool)."),
+    MetaField("input_pwm_ids", (list,), "Stage-A PWM motif IDs used for sampling (pwm_* inputs)."),
     MetaField("used_tfbs", (list,), "TF:TFBS strings used in the final sequence."),
     MetaField(
         "used_tfbs_detail",
         (list,),
-        "Per-placement detail: tf/tfbs/motif_id/tfbs_id/orientation/offset (offset uses final coordinates).",
+        "Per-placement parts detail for TFBS and fixed elements.",
     ),
     MetaField("used_tf_counts", (list,), "Per-TF placement counts ({tf, count})."),
+    MetaField("library_unique_tf_count", (int,), "Unique TF count in the Stage-B sampled library."),
+    MetaField("library_unique_tfbs_count", (int,), "Unique TFBS count in the Stage-B sampled library."),
     MetaField("covers_all_tfs_in_solution", (bool,), "Whether min_count_per_tf coverage was satisfied."),
     MetaField(
         "required_regulators",
@@ -54,54 +51,24 @@ META_FIELDS: list[MetaField] = [
         "Regulators required for this library (selected from regulator_constraints groups).",
     ),
     MetaField("min_count_by_regulator", (list,), "Per-regulator minimum counts ({tf, min_count})."),
-    MetaField("input_name", (str,), "Input source name."),
-    MetaField("input_mode", (str,), "Input mode (binding_sites | sequence_library | pwm_sampled)."),
-    MetaField("input_pwm_ids", (list,), "Stage-A PWM motif IDs used for sampling (pwm_* inputs)."),
-    MetaField(
-        "input_tf_tfbs_pair_count",
-        (int,),
-        "Unique (TF, TFBS) pair count in the input pool (binding_sites only).",
-        allow_none=True,
-    ),
-    MetaField(
-        "sampling_fraction",
-        (numbers.Real,),
-        "Stage-B unique TFBS count in the sampled library divided by input_tfbs_count (1.0 when pool_strategy=full).",
-        allow_none=True,
-    ),
-    MetaField(
-        "sampling_fraction_pairs",
-        (numbers.Real,),
-        "Stage-B unique TF:TFBS pair count in the sampled library divided by input_tf_tfbs_pair_count.",
-        allow_none=True,
-    ),
-    MetaField("fixed_elements", (dict,), "Fixed-element constraints (promoters + side biases)."),
-    MetaField("visual", (str,), "ASCII visual layout of placements."),
     MetaField("compression_ratio", (numbers.Real,), "Solution compression ratio.", allow_none=True),
-    MetaField("library_size", (int,), "Number of motifs in the Stage-B sampled library."),
-    MetaField("library_unique_tf_count", (int,), "Unique TF count in the Stage-B sampled library."),
-    MetaField("library_unique_tfbs_count", (int,), "Unique TFBS count in the Stage-B sampled library."),
-    MetaField("promoter_constraint", (str,), "Primary promoter constraint name (if set).", allow_none=True),
-    MetaField("promoter_detail", (dict,), "Resolved promoter placements for fixed promoter constraints."),
-    MetaField(
-        "sequence_validation",
-        (dict,),
-        "Final-sequence validation summary ({validation_passed, violations}).",
-    ),
-    MetaField("sampling_pool_strategy", (str,), "Stage-B sampling pool strategy (full|subsample|iterative_subsample)."),
-    MetaField("sampling_library_size", (int,), "Stage-B configured library size for subsampling."),
-    MetaField("sampling_library_strategy", (str,), "Stage-B library sampling strategy.", allow_none=True),
-    MetaField("sampling_iterative_max_libraries", (int,), "Stage-B max libraries for iterative subsampling."),
     MetaField("sampling_library_hash", (str,), "Stage-B stable hash for the sampled library."),
     MetaField("sampling_library_index", (int,), "Stage-B 1-based index of the sampled library."),
     MetaField("pad_used", (bool,), "Whether pad bases were applied."),
     MetaField("pad_bases", (int,), "Number of bases padded.", allow_none=True),
     MetaField("pad_end", (str,), "Pad end (5prime/3prime).", allow_none=True),
+    MetaField("pad_literal", (str,), "Literal sequence used for pad bases.", allow_none=True),
+    MetaField(
+        "sequence_validation",
+        (dict,),
+        "Final-sequence validation summary ({validation_passed, violations}).",
+    ),
     MetaField("gc_total", (numbers.Real,), "GC fraction of the final sequence."),
     MetaField("gc_core", (numbers.Real,), "GC fraction of the pre-pad core sequence."),
 ]
 
 _FIELD_BY_NAME = {field.name: field for field in META_FIELDS}
+_ALLOWED_INPUT_MODES = {"binding_sites", "sequence_library", "pwm_sampled", "plan_pool"}
 
 
 def validate_metadata(meta: Mapping[str, Any]) -> None:
@@ -131,8 +98,6 @@ def validate_metadata(meta: Mapping[str, Any]) -> None:
 
 def _validate_list_fields(meta: Mapping[str, Any]) -> None:
     list_of_str = {
-        "tf_list",
-        "tfbs_parts",
         "used_tfbs",
         "input_pwm_ids",
         "required_regulators",
@@ -151,12 +116,60 @@ def _validate_list_fields(meta: Mapping[str, Any]) -> None:
         vals = meta["used_tfbs_detail"]
         if isinstance(vals, (str, bytes)) or not isinstance(vals, Sequence):
             raise TypeError("Metadata field 'used_tfbs_detail' must be a list of dicts")
+        input_mode = str(meta.get("input_mode") or "").strip().lower()
         for item in vals:
             if not isinstance(item, dict):
                 raise TypeError("Metadata field 'used_tfbs_detail' must contain dict entries")
-            for key in ("tf", "tfbs", "orientation", "offset"):
-                if key not in item:
-                    raise ValueError(f"used_tfbs_detail entries must include '{key}'")
+            part_kind = str(item.get("part_kind") or "tfbs").strip().lower()
+            if part_kind == "tfbs":
+                for key in (
+                    "part_index",
+                    "regulator",
+                    "sequence",
+                    "core_sequence",
+                    "orientation",
+                    "offset",
+                    "offset_raw",
+                    "pad_left",
+                    "length",
+                    "end",
+                    "source",
+                    "motif_id",
+                    "tfbs_id",
+                ):
+                    if key not in item or item.get(key) is None:
+                        raise ValueError(f"used_tfbs_detail tfbs entries must include '{key}'")
+                for key in ("regulator", "sequence", "core_sequence", "source", "motif_id", "tfbs_id"):
+                    if not str(item.get(key) or "").strip():
+                        raise ValueError(f"used_tfbs_detail tfbs entries must use non-empty '{key}'")
+                orientation = str(item.get("orientation") or "").strip().lower()
+                if orientation not in {"fwd", "rev"}:
+                    raise ValueError("used_tfbs_detail tfbs entries must use orientation 'fwd' or 'rev'")
+                if input_mode == "pwm_sampled":
+                    for key in (
+                        "score_best_hit_raw",
+                        "score_theoretical_max",
+                        "score_relative_to_theoretical_max",
+                        "rank_among_mined_positive",
+                        "rank_among_selected",
+                        "selection_policy",
+                        "matched_start",
+                        "matched_stop",
+                        "matched_strand",
+                    ):
+                        if key not in item or item.get(key) is None:
+                            raise ValueError(f"used_tfbs_detail tfbs entries for pwm_sampled must include '{key}'")
+                    if not str(item.get("matched_strand") or "").strip():
+                        raise ValueError(
+                            "used_tfbs_detail tfbs entries for pwm_sampled must use non-empty matched_strand"
+                        )
+                continue
+            if part_kind == "fixed_element":
+                for key in ("role", "sequence", "offset_raw", "pad_left", "offset", "length", "end"):
+                    if key not in item or item.get(key) is None:
+                        raise ValueError(f"used_tfbs_detail fixed_element entries must include '{key}'")
+                continue
+            raise ValueError(f"used_tfbs_detail entries must use supported part_kind values; got '{part_kind}'")
 
     if "used_tf_counts" in meta:
         vals = meta["used_tf_counts"]
@@ -184,51 +197,14 @@ def _validate_list_fields(meta: Mapping[str, Any]) -> None:
 
 
 def _validate_struct_fields(meta: Mapping[str, Any]) -> None:
+    input_mode = str(meta.get("input_mode") or "").strip()
+    if input_mode not in _ALLOWED_INPUT_MODES:
+        allowed = ", ".join(sorted(_ALLOWED_INPUT_MODES))
+        raise ValueError(f"Metadata field 'input_mode' must be one of: {allowed}")
+
     sampling_library_hash = str(meta.get("sampling_library_hash") or "").strip()
     if not sampling_library_hash:
         raise ValueError("Metadata field 'sampling_library_hash' is required and cannot be empty")
-
-    if "fixed_elements" in meta:
-        fixed = meta["fixed_elements"]
-        if not isinstance(fixed, dict):
-            raise TypeError("fixed_elements must be a dict")
-        if "promoter_constraints" not in fixed or "side_biases" not in fixed:
-            raise ValueError("fixed_elements must include 'promoter_constraints' and 'side_biases'")
-        pcs = fixed.get("promoter_constraints")
-        if not isinstance(pcs, list):
-            raise TypeError("fixed_elements.promoter_constraints must be a list")
-        for pc in pcs:
-            if not isinstance(pc, dict):
-                raise TypeError("fixed_elements.promoter_constraints entries must be dicts")
-        sb = fixed.get("side_biases")
-        if not isinstance(sb, dict):
-            raise TypeError("fixed_elements.side_biases must be a dict")
-        for side in ("left", "right"):
-            vals = sb.get(side)
-            if not isinstance(vals, list):
-                raise TypeError(f"fixed_elements.side_biases.{side} must be a list")
-
-    if "promoter_detail" in meta:
-        detail = meta["promoter_detail"]
-        if not isinstance(detail, dict):
-            raise TypeError("promoter_detail must be a dict")
-        placements = detail.get("placements")
-        if not isinstance(placements, list):
-            raise TypeError("promoter_detail.placements must be a list")
-        for placement in placements:
-            if not isinstance(placement, dict):
-                raise TypeError("promoter_detail.placements entries must be dicts")
-            required = {
-                "upstream_seq",
-                "downstream_seq",
-                "upstream_start",
-                "downstream_start",
-                "spacer_length",
-                "variant_ids",
-            }
-            missing = [key for key in required if key not in placement]
-            if missing:
-                raise ValueError(f"promoter_detail placement missing required keys: {missing}")
 
     if "sequence_validation" in meta:
         block = meta["sequence_validation"]

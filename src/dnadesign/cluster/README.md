@@ -1,4 +1,7 @@
 ## cluster
+
+![cluster banner](assets/cluster-banner.svg)
+
 This CLI clusters sequences, computes UMAP embeddings, renders plots for many **hues** (cluster labels, GC, numeric/categorical columns, highlights), and runs post-hoc analyses (composition, diversity, differential, numeric summaries). It records everything in a **run store** (`results/`) and lets you reuse runs.
 
 The system is built around two *composable* concepts:
