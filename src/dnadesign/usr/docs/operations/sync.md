@@ -36,9 +36,9 @@ uv run usr pull densegen/my_dataset bu-scc -y
 ```
 
 Default sync contract:
-- Dataset sync defaults to `--verify hash` plus strict sidecar fidelity checks.
+- Dataset sync defaults to `--verify hash` plus strict sidecar and `_derived`/`_auxiliary` content-hash fidelity checks.
 - Use `--no-verify-sidecars` only when you intentionally trade fidelity for speed.
-- Use `--verify-derived-hashes` for strict `_derived` file-content hash parity (high assurance, slower).
+- Use `--no-verify-derived-hashes` only when you intentionally keep sidecar inventory checks but skip content-hash parity.
 - Use `--verify auto|size|parquet` only when hash verification is intentionally unavailable.
 
 ### Advanced path
@@ -71,6 +71,7 @@ Common failure signatures:
 
 Use the standalone runbooks for operator loops:
 
+- [sync-audit-loop.md](sync-audit-loop.md)
 - [hpc-agent-sync-flow.md](hpc-agent-sync-flow.md)
 - [chained-densegen-infer-sync-demo.md](chained-densegen-infer-sync-demo.md)
 
@@ -227,7 +228,9 @@ Useful flags:
 - `--verify {hash,auto,size,parquet}`: primary verification mode (default: `hash`)
 - `--verify-sidecars`: explicitly enable strict sidecar fidelity checks
 - `--no-verify-sidecars`: disable strict sidecar checks for dataset sync
-- `--verify-derived-hashes`: verify `_derived` file-content hashes in addition to sidecar inventory
+- `--verify-derived-hashes`: explicitly require `_derived` and `_auxiliary` file-content hash parity (already default for dataset sync)
+- `--no-verify-derived-hashes`: disable `_derived` and `_auxiliary` file-content hash parity while keeping sidecar inventory checks
+- `--audit-json-out <path>`: write machine-readable sync audit JSON for automation and chained workflows
 - `--strict-bootstrap-id`: require `<namespace>/<dataset>` for bootstrap pulls when local dataset is missing
 
 ---
@@ -272,7 +275,8 @@ Safety guardrails:
 - Pull transfers stage into a temporary directory and only promote after verification.
 - Staged pull payloads reject symlink and unsupported entry types before promotion.
 - `--verify-sidecars` enforces exact sidecar parity and fails fast on mismatch.
-- Strict sidecar fidelity checks are enabled by default for dataset sync.
+- Strict sidecar and `_derived`/`_auxiliary` content-hash fidelity checks are enabled by default for dataset sync.
+- `--no-verify-derived-hashes` keeps strict sidecar inventory checks while disabling content-hash parity checks.
 - `--verify-sidecars` requires full dataset transfer and is incompatible with `--primary-only` / `--skip-snapshots`.
 - Re-run `usr pull`/`usr push` after transient transfer failure; post-transfer verification is always enforced.
 - Every pull/push prints a post-action sync audit summary for fast operator decisions.

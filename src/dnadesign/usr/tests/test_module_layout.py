@@ -40,6 +40,54 @@ def test_dataset_query_module_exports_expected_symbols() -> None:
     assert hasattr(module, "create_overlay_view")
 
 
+def test_dataset_reporting_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.dataset_reporting")
+    assert hasattr(module, "manifest_dataset")
+    assert hasattr(module, "manifest_dict_dataset")
+    assert hasattr(module, "describe_dataset")
+
+
+def test_dataset_views_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.dataset_views")
+    assert hasattr(module, "scan_dataset")
+    assert hasattr(module, "head_dataset")
+    assert hasattr(module, "get_dataset")
+    assert hasattr(module, "grep_dataset")
+    assert hasattr(module, "export_dataset")
+
+
+def test_dataset_ingest_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.dataset_ingest")
+    assert hasattr(module, "prepare_import_rows_dataset")
+    assert hasattr(module, "write_import_df_dataset")
+    assert hasattr(module, "import_rows_dataset")
+    assert hasattr(module, "add_sequences_dataset")
+    assert hasattr(module, "import_csv_dataset")
+    assert hasattr(module, "import_jsonl_dataset")
+
+
+def test_dataset_validate_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.dataset_validate")
+    assert hasattr(module, "validate_dataset")
+
+
+def test_dataset_overlay_maintenance_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.dataset_overlay_maintenance")
+    assert hasattr(module, "list_overlay_infos")
+    assert hasattr(module, "remove_overlay_namespace")
+    assert hasattr(module, "compact_overlay_namespace")
+
+
+def test_dataset_reserved_overlay_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.dataset_reserved_overlay")
+    assert hasattr(module, "write_reserved_overlay")
+
+
+def test_dataset_overlay_query_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.dataset_overlay_query")
+    assert hasattr(module, "build_overlay_query")
+
+
 def test_cli_sync_module_exports_expected_symbols() -> None:
     module = importlib.import_module("dnadesign.usr.src.cli_commands.sync")
     assert hasattr(module, "cmd_diff")
@@ -49,6 +97,7 @@ def test_cli_sync_module_exports_expected_symbols() -> None:
 
 def test_cli_sync_output_module_exports_expected_symbols() -> None:
     module = importlib.import_module("dnadesign.usr.src.cli_commands.sync_output")
+    assert hasattr(module, "build_sync_audit_payload")
     assert hasattr(module, "print_diff")
     assert hasattr(module, "print_verify_notes")
     assert hasattr(module, "print_sync_audit")
@@ -66,6 +115,7 @@ def test_cli_sync_targets_module_exports_expected_symbols() -> None:
 def test_cli_sync_execution_module_exports_expected_symbols() -> None:
     module = importlib.import_module("dnadesign.usr.src.cli_commands.sync_execution")
     assert hasattr(module, "SyncExecutionDeps")
+    assert hasattr(module, "SyncRunResult")
     assert hasattr(module, "assert_dataset_only_flags_for_file_mode")
     assert hasattr(module, "run_file_sync")
     assert hasattr(module, "resolve_pull_dataset_target")
@@ -101,6 +151,11 @@ def test_cli_lifecycle_registration_module_exports_register_function() -> None:
 def test_cli_ops_registration_module_exports_register_function() -> None:
     module = importlib.import_module("dnadesign.usr.src.cli_commands.ops_cli")
     assert hasattr(module, "register_ops_commands")
+
+
+def test_cli_surface_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.cli_surface")
+    assert hasattr(module, "build_cli_apps")
 
 
 def test_cli_read_module_exports_expected_symbols() -> None:
@@ -194,3 +249,11 @@ def test_dataset_state_module_exports_expected_symbols() -> None:
     assert hasattr(module, "set_state")
     assert hasattr(module, "clear_state")
     assert hasattr(module, "get_state")
+
+
+def test_sync_transfer_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.sync_transfer")
+    assert hasattr(module, "make_pull_staging_dir")
+    assert hasattr(module, "copy_file_atomic")
+    assert hasattr(module, "collect_staged_entries")
+    assert hasattr(module, "promote_staged_pull")

@@ -43,6 +43,7 @@ class RemoteDatasetStat:
     derived_files: List[str] = field(default_factory=list)
     derived_hashes: dict[str, str] = field(default_factory=dict)
     aux_files: List[str] = field(default_factory=list)
+    aux_hashes: dict[str, str] = field(default_factory=dict)
 
 
 class SSHRemote:
@@ -236,8 +237,7 @@ class SSHRemote:
         if rc != 0 or not out.strip():
             return []
         files = [line.strip() for line in out.splitlines() if line.strip()]
-        normalized = [item[2:] if item.startswith("./") else item for item in files]
-        return sorted(normalized)
+        return self._normalize_inventory_paths(files, context="remote derived inventory")
 
     def _remote_list_aux_files(self, dataset_dir: str) -> List[str]:
         # Returns non-core file inventory relative to dataset root for full-fidelity sync planning.
@@ -257,13 +257,35 @@ class SSHRemote:
         if rc != 0 or not out.strip():
             return []
         files = [line.strip() for line in out.splitlines() if line.strip()]
-        normalized = [item[2:] if item.startswith("./") else item for item in files]
+        return self._normalize_inventory_paths(files, context="remote auxiliary inventory")
+
+    def _normalize_inventory_paths(self, entries: List[str], *, context: str) -> List[str]:
+        normalized: List[str] = []
+        for raw in entries:
+            entry = raw[2:] if raw.startswith("./") else raw
+            entry = entry.strip()
+            path = PurePosixPath(entry)
+            if not entry or path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
+                raise RemoteUnavailableError(f"{context} contains unsafe relative path '{raw}'.")
+            normalized.append(path.as_posix())
         return sorted(normalized)
 
     def _remote_hash_derived_files(self, derived_dir: str, derived_files: List[str]) -> dict[str, str]:
         hashes: dict[str, str] = {}
         for rel in derived_files:
             full_path = str(PurePosixPath(derived_dir).joinpath(rel))
+            sha = self._remote_sha256(full_path)
+            if not sha:
+                raise RemoteUnavailableError(
+                    "verify-derived-hashes requires remote sha256 support (sha256sum or shasum)."
+                )
+            hashes[rel] = sha
+        return hashes
+
+    def _remote_hash_aux_files(self, dataset_dir: str, aux_files: List[str]) -> dict[str, str]:
+        hashes: dict[str, str] = {}
+        for rel in aux_files:
+            full_path = str(PurePosixPath(dataset_dir).joinpath(rel))
             sha = self._remote_sha256(full_path)
             if not sha:
                 raise RemoteUnavailableError(
@@ -303,6 +325,7 @@ class SSHRemote:
         derived_files = self._remote_list_derived_files(derived_d)
         derived_hashes = self._remote_hash_derived_files(derived_d, derived_files) if include_derived_hashes else {}
         aux_files = self._remote_list_aux_files(base)
+        aux_hashes = self._remote_hash_aux_files(base, aux_files) if include_derived_hashes else {}
 
         return RemoteDatasetStat(
             primary=RemotePrimaryStat(
@@ -319,6 +342,7 @@ class SSHRemote:
             derived_files=derived_files,
             derived_hashes=derived_hashes,
             aux_files=aux_files,
+            aux_hashes=aux_hashes,
         )
 
     def stat_file(self, remote_path: str, *, verify: str = "auto") -> RemotePrimaryStat:

@@ -3,8 +3,8 @@
 Use this runbook for the full asynchronous loop where DenseGen writes on HPC and Infer writes back overlays locally, with USR sync as the transfer contract.
 
 Default sync contract:
-- Dataset sync defaults to `--verify hash` plus strict sidecar fidelity checks.
-- Use `--verify-derived-hashes` when strict `_derived` file-content parity is required.
+- Dataset sync defaults to `--verify hash` plus strict sidecar and `_derived`/`_auxiliary` content-hash fidelity checks.
+- Use `--no-verify-derived-hashes` only when an operator intentionally trades content-hash fidelity for speed.
 
 ## Scope
 
@@ -110,7 +110,7 @@ Every pull/push prints an audit summary. Use it for low-friction decisions:
 Recommended operator rule:
 
 1. If `_derived` or `_auxiliary` is `changed`, run transfer even when `.events.log` delta is small.
-2. If sidecar strict mode is required, keep `--verify-sidecars` on and avoid `--primary-only`/`--skip-snapshots`.
+2. If strict fidelity is required, keep default checks enabled and avoid `--no-verify-sidecars`, `--no-verify-derived-hashes`, `--primary-only`, and `--skip-snapshots`.
 3. Re-run `diff` after transfer; expected result is `up-to-date`.
 
 ## Failure drills

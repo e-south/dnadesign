@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Optional
 
 
 @dataclass(frozen=True)
@@ -34,6 +34,13 @@ class SyncExecutionDeps:
     print_sync_audit: Callable[[object, str, bool, bool, bool], None]
 
 
+@dataclass(frozen=True)
+class SyncRunResult:
+    summary: object
+    verify_sidecars: bool
+    verify_derived_hashes: bool
+
+
 def assert_dataset_only_flags_for_file_mode(args) -> None:
     if (
         args.primary_only
@@ -41,13 +48,14 @@ def assert_dataset_only_flags_for_file_mode(args) -> None:
         or bool(getattr(args, "verify_sidecars", False))
         or bool(getattr(args, "no_verify_sidecars", False))
         or bool(getattr(args, "verify_derived_hashes", False))
+        or bool(getattr(args, "no_verify_derived_hashes", False))
     ):
         raise SystemExit(
-            "--primary-only/--skip-snapshots/--verify-sidecars/--no-verify-sidecars/--verify-derived-hashes are dataset-only flags (not valid in FILE mode)."  # noqa
+            "--primary-only/--skip-snapshots/--verify-sidecars/--no-verify-sidecars/--verify-derived-hashes/--no-verify-derived-hashes are dataset-only flags (not valid in FILE mode)."  # noqa
         )
 
 
-def run_file_sync(args, *, action: str, execute_file: Callable, deps: SyncExecutionDeps) -> None:
+def run_file_sync(args, *, action: str, execute_file: Callable, deps: SyncExecutionDeps) -> SyncRunResult:
     assert_dataset_only_flags_for_file_mode(args)
     local_file = Path(args.dataset).resolve()
     if local_file.is_dir():
@@ -60,6 +68,7 @@ def run_file_sync(args, *, action: str, execute_file: Callable, deps: SyncExecut
     deps.confirm_or_abort(summary, bool(args.yes))
     summary = execute_file(local_file, args.remote, remote_path, opts)
     deps.print_sync_audit(summary, action, bool(args.dry_run), False, False)
+    return SyncRunResult(summary=summary, verify_sidecars=False, verify_derived_hashes=False)
 
 
 def resolve_pull_dataset_target(args, *, deps: SyncExecutionDeps) -> tuple[Path, str] | None:
@@ -99,10 +108,10 @@ def resolve_push_dataset_target(args, *, deps: SyncExecutionDeps) -> tuple[Path,
 
 def run_dataset_sync(
     args, *, action: str, resolve_target: Callable, execute_dataset: Callable, deps: SyncExecutionDeps
-) -> None:
+) -> Optional[SyncRunResult]:
     resolved = resolve_target(args)
     if not resolved:
-        return
+        return None
     dataset_root, dataset = resolved
     opts = deps.opts_from_args(args, False)
     summary = deps.plan_diff(dataset_root, dataset, args.remote, verify=opts.verify)
@@ -116,4 +125,9 @@ def run_dataset_sync(
         bool(args.dry_run),
         opts.verify_sidecars,
         opts.verify_derived_hashes,
+    )
+    return SyncRunResult(
+        summary=summary,
+        verify_sidecars=bool(opts.verify_sidecars),
+        verify_derived_hashes=bool(opts.verify_derived_hashes),
     )

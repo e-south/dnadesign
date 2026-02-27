@@ -57,6 +57,7 @@ from .cli_paths import (
 from .cli_paths import (
     resolve_path_anywhere as _resolve_path_anywhere_impl,
 )
+from .cli_surface import build_cli_apps
 from .dataset import LEGACY_DATASET_PREFIX, Dataset
 from .errors import SequencesError, UserAbort
 from .merge_datasets import (
@@ -473,25 +474,16 @@ def cmd_dedupe_sequences(args):
 
 
 # ---------- Typer CLI (library-first adapter) ----------
-app = typer.Typer(add_completion=True, no_args_is_help=True, help="USR datasets CLI (Typer).")
-remotes_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Manage SSH remotes.")
-legacy_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Legacy dataset utilities.")
-maintenance_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Dataset maintenance utilities.")
-densegen_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Densegen-specific utilities.")
-dev_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Developer utilities (unstable).")
-namespace_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Manage namespace registry.")
-events_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Inspect dataset events.")
-state_app = typer.Typer(add_completion=False, no_args_is_help=True, help="Record state utilities.")
-
-app.add_typer(remotes_app, name="remotes")
-app.add_typer(legacy_app, name="legacy")
-app.add_typer(maintenance_app, name="maintenance")
-app.add_typer(densegen_app, name="densegen")
-app.add_typer(namespace_app, name="namespace")
-app.add_typer(events_app, name="events")
-app.add_typer(state_app, name="state")
-if os.getenv("USR_SHOW_DEV_COMMANDS") == "1":
-    app.add_typer(dev_app, name="dev")
+_cli_apps = build_cli_apps(show_dev_commands=os.getenv("USR_SHOW_DEV_COMMANDS") == "1")
+app = _cli_apps.app
+remotes_app = _cli_apps.remotes_app
+legacy_app = _cli_apps.legacy_app
+maintenance_app = _cli_apps.maintenance_app
+densegen_app = _cli_apps.densegen_app
+dev_app = _cli_apps.dev_app
+namespace_app = _cli_apps.namespace_app
+events_app = _cli_apps.events_app
+state_app = _cli_apps.state_app
 
 
 def _ctx_args(ctx: typer.Context, **kwargs) -> NS:

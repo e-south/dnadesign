@@ -39,11 +39,20 @@ def resolve_verify_sidecars(args, *, file_mode: bool) -> bool:
 
 
 def resolve_verify_derived_hashes(args, *, file_mode: bool, verify_sidecars: bool) -> bool:
-    enabled = bool(getattr(args, "verify_derived_hashes", False))
-    if not enabled:
-        return False
+    explicit_on = bool(getattr(args, "verify_derived_hashes", False))
+    explicit_off = bool(getattr(args, "no_verify_derived_hashes", False))
+    if explicit_on and explicit_off:
+        raise SystemExit("Cannot combine --verify-derived-hashes and --no-verify-derived-hashes.")
     if file_mode:
-        raise SystemExit("--verify-derived-hashes is a dataset-only flag (not valid in FILE mode).")
+        if explicit_on or explicit_off:
+            raise SystemExit(
+                "--verify-derived-hashes/--no-verify-derived-hashes are dataset-only flags (not valid in FILE mode)."
+            )
+        return False
     if not verify_sidecars:
-        raise SystemExit("--verify-derived-hashes requires sidecar verification.")
+        if explicit_on:
+            raise SystemExit("--verify-derived-hashes requires sidecar verification.")
+        return False
+    if explicit_off:
+        return False
     return True

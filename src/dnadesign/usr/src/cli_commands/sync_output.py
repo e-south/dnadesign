@@ -71,9 +71,9 @@ def print_verify_notes(summary) -> None:
         print(f"WARNING: {note}")
 
 
-def print_sync_audit(
+def build_sync_audit_payload(
     summary, *, action: str, dry_run: bool, verify_sidecars: bool, verify_derived_hashes: bool
-) -> None:
+) -> dict:
     has_change = bool(getattr(summary, "has_change", False))
     transfer_state = "DRY-RUN" if dry_run else ("TRANSFERRED" if has_change else "NO-OP")
     dataset_name = str(getattr(summary, "dataset", "<unknown>"))
@@ -91,26 +91,69 @@ def print_sync_audit(
     aux_local = len(getattr(summary, "aux_local_files", []) or [])
     aux_remote = len(getattr(summary, "aux_remote_files", []) or [])
     aux_changed = bool(changes.get("aux_files_diff"))
-    print(f"{action.upper()} audit: {transfer_state}")
-    print(f"Dataset    : {dataset_name}")
+    return {
+        "action": str(action),
+        "transfer_state": transfer_state,
+        "dataset": dataset_name,
+        "verify": {
+            "primary": verify_mode,
+            "sidecars": "strict" if verify_sidecars else "off",
+            "content_hashes": "on" if verify_derived_hashes else "off",
+        },
+        "primary": {"changed": bool(changes.get("primary_sha_diff"))},
+        "meta": {"changed": bool(changes.get("meta_mtime_diff"))},
+        ".events.log": {"local": events_local, "remote": events_remote},
+        "_snapshots": {
+            "changed": snapshots_changed,
+            "remote_count": snapshot_count,
+            "newer_than_local": snapshots_newer,
+        },
+        "_derived": {
+            "changed": derived_changed,
+            "local_files": derived_local,
+            "remote_files": derived_remote,
+        },
+        "_auxiliary": {
+            "changed": aux_changed,
+            "local_files": aux_local,
+            "remote_files": aux_remote,
+        },
+    }
+
+
+def print_sync_audit(
+    summary, *, action: str, dry_run: bool, verify_sidecars: bool, verify_derived_hashes: bool
+) -> None:
+    payload = build_sync_audit_payload(
+        summary,
+        action=action,
+        dry_run=dry_run,
+        verify_sidecars=verify_sidecars,
+        verify_derived_hashes=verify_derived_hashes,
+    )
+    print(f"{str(payload['action']).upper()} audit: {payload['transfer_state']}")
+    print(f"Dataset    : {payload['dataset']}")
     print(
         "Verify     : "
-        f"primary={verify_mode} sidecars={'strict' if verify_sidecars else 'off'} "
-        f"derived_hashes={'on' if verify_derived_hashes else 'off'}"
+        f"primary={payload['verify']['primary']} "
+        f"sidecars={payload['verify']['sidecars']} "
+        f"content_hashes={payload['verify']['content_hashes']}"
     )
-    print(f"Primary    : {'changed' if changes.get('primary_sha_diff') else 'unchanged'}")
-    print(f"meta.md    : {'changed' if changes.get('meta_mtime_diff') else 'unchanged'}")
-    print(f".events.log: local={events_local}  remote={events_remote}")
+    print(f"Primary    : {'changed' if payload['primary']['changed'] else 'unchanged'}")
+    print(f"meta.md    : {'changed' if payload['meta']['changed'] else 'unchanged'}")
+    print(f".events.log: local={payload['.events.log']['local']}  remote={payload['.events.log']['remote']}")
     print(
         "_snapshots : "
-        f"{'changed' if snapshots_changed else 'unchanged'}  "
-        f"remote_count={snapshot_count}  newer_than_local={snapshots_newer}"
+        f"{'changed' if payload['_snapshots']['changed'] else 'unchanged'}  "
+        f"remote_count={payload['_snapshots']['remote_count']}  "
+        f"newer_than_local={payload['_snapshots']['newer_than_local']}"
     )
     print(
         "_derived   : "
-        f"{'changed' if derived_changed else 'unchanged'}  "
-        f"local_files={derived_local}  remote_files={derived_remote}"
+        f"{'changed' if payload['_derived']['changed'] else 'unchanged'}  "
+        f"local_files={payload['_derived']['local_files']}  remote_files={payload['_derived']['remote_files']}"
     )
     print(
-        f"_auxiliary : {'changed' if aux_changed else 'unchanged'}  local_files={aux_local}  remote_files={aux_remote}"
+        f"_auxiliary : {'changed' if payload['_auxiliary']['changed'] else 'unchanged'}  "
+        f"local_files={payload['_auxiliary']['local_files']}  remote_files={payload['_auxiliary']['remote_files']}"
     )

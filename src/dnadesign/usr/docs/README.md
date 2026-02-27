@@ -3,6 +3,7 @@
 ## Contents
 - [At a glance](#at-a-glance)
 - [Read order](#read-order)
+- [Architecture introspection](#architecture-introspection)
 - [Integration](#integration)
 - [Operations](#operations)
 - [Progressive workflows](#progressive-workflows)
@@ -40,9 +41,15 @@ If you are new here:
 ## Read order
 
 - USR concepts plus CLI quickstart: [../README.md](../README.md)
+- USR architecture/lifecycle/config introspection: [architecture-introspection.md](architecture-introspection.md)
 - Overlay plus registry contract: [../README.md#namespace-registry-required](../README.md#namespace-registry-required)
 - Overlay merge semantics: [../README.md#how-overlays-merge-conflict-resolution](../README.md#how-overlays-merge-conflict-resolution)
 - Event log schema (Notify input): [../README.md#event-log-schema](../README.md#event-log-schema)
+
+## Architecture introspection
+
+- Package intent, lifecycle, and interaction map: [architecture-introspection.md](architecture-introspection.md)
+- Use this when you need source-backed boundaries before changing sync/materialize/registry behavior.
 
 ## Integration
 
@@ -58,8 +65,10 @@ Boundary reminder:
 ## Operations
 
 - Operations index: [operations/README.md](operations/README.md)
+- Workflow map (task-first command chains): [operations/workflow-map.md](operations/workflow-map.md)
 - Remote sync: [operations/sync.md](operations/sync.md)
   - Progressive disclosure path: Quick path -> Advanced path -> Failure diagnosis
+- Sync audit loop: [operations/sync-audit-loop.md](operations/sync-audit-loop.md)
 - HPC sync runbook: [operations/hpc-agent-sync-flow.md](operations/hpc-agent-sync-flow.md)
 - Chained DenseGen+Infer sync demo: [operations/chained-densegen-infer-sync-demo.md](operations/chained-densegen-infer-sync-demo.md)
 - Dev notes: [dev/journal.md](dev/journal.md)
@@ -67,7 +76,9 @@ Boundary reminder:
 ## Progressive workflows
 
 - Start with USR concepts + CLI basics: [../README.md](../README.md)
+- Pick a command chain first: [operations/workflow-map.md](operations/workflow-map.md)
 - Move to SSH sync mechanics: [operations/sync.md](operations/sync.md)
+- Add machine-readable audit artifacts: [operations/sync-audit-loop.md](operations/sync-audit-loop.md)
 - Use the batch-safe operator loop: [operations/hpc-agent-sync-flow.md](operations/hpc-agent-sync-flow.md)
 - Use the chained DenseGen/Infer loop: [operations/chained-densegen-infer-sync-demo.md](operations/chained-densegen-infer-sync-demo.md)
 - Then apply sibling-tool docs:

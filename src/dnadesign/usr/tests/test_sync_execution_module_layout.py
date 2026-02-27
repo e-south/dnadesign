@@ -20,6 +20,7 @@ from dnadesign.usr.src.cli_commands import sync as sync_commands
 def test_sync_execution_module_importable() -> None:
     module = importlib.import_module("dnadesign.usr.src.cli_commands.sync_execution")
     assert hasattr(module, "SyncExecutionDeps")
+    assert hasattr(module, "SyncRunResult")
     assert hasattr(module, "assert_dataset_only_flags_for_file_mode")
     assert hasattr(module, "run_file_sync")
     assert hasattr(module, "resolve_pull_dataset_target")

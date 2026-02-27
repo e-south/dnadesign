@@ -11,10 +11,11 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import asdict
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Optional
 
 from ..config import get_remote
 from ..dataset import normalize_dataset_id
@@ -33,6 +34,8 @@ from . import sync_output as sync_output_commands
 from . import sync_targets as sync_targets_commands
 from .datasets import resolve_dataset_name_interactive
 from .sync_policy import resolve_sync_verify, resolve_verify_derived_hashes, resolve_verify_sidecars
+
+USR_OUTPUT_VERSION = 1
 
 
 def _print_diff(summary, *, use_rich: bool | None = None) -> None:
@@ -65,6 +68,32 @@ def _print_sync_audit(
         verify_sidecars=verify_sidecars,
         verify_derived_hashes=verify_derived_hashes,
     )
+
+
+def _write_sync_audit_json(
+    summary,
+    *,
+    action: str,
+    dry_run: bool,
+    verify_sidecars: bool,
+    verify_derived_hashes: bool,
+    out_path: str | None,
+    output_version: int,
+) -> None:
+    raw_path = str(out_path or "").strip()
+    if not raw_path:
+        return
+    payload = sync_output_commands.build_sync_audit_payload(
+        summary,
+        action=action,
+        dry_run=dry_run,
+        verify_sidecars=verify_sidecars,
+        verify_derived_hashes=verify_derived_hashes,
+    )
+    wrapped = {"usr_output_version": int(output_version), "data": payload}
+    target = Path(raw_path).expanduser()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(wrapped, separators=(",", ":")) + "\n", encoding="utf-8")
 
 
 def _opts_from_args(args, *, file_mode: bool) -> SyncOptions:
@@ -205,8 +234,8 @@ def _assert_dataset_only_flags_for_file_mode(args) -> None:
     sync_execution_commands.assert_dataset_only_flags_for_file_mode(args)
 
 
-def _run_file_sync(args, *, action: str, execute_file: Callable) -> None:
-    sync_execution_commands.run_file_sync(
+def _run_file_sync(args, *, action: str, execute_file: Callable) -> sync_execution_commands.SyncRunResult:
+    return sync_execution_commands.run_file_sync(
         args,
         action=action,
         execute_file=execute_file,
@@ -225,8 +254,10 @@ def _resolve_push_dataset_target(args) -> tuple[Path, str] | None:
     return sync_execution_commands.resolve_push_dataset_target(args, deps=_execution_deps())
 
 
-def _run_dataset_sync(args, *, action: str, resolve_target: Callable, execute_dataset: Callable) -> None:
-    sync_execution_commands.run_dataset_sync(
+def _run_dataset_sync(
+    args, *, action: str, resolve_target: Callable, execute_dataset: Callable
+) -> Optional[sync_execution_commands.SyncRunResult]:
+    return sync_execution_commands.run_dataset_sync(
         args,
         action=action,
         resolve_target=resolve_target,
@@ -236,28 +267,50 @@ def _run_dataset_sync(args, *, action: str, resolve_target: Callable, execute_da
 
 
 def cmd_pull(args) -> None:
+    result: Optional[sync_execution_commands.SyncRunResult]
     if _is_file_mode_target(args.dataset):
-        _run_file_sync(args, action="pull", execute_file=execute_pull_file)
+        result = _run_file_sync(args, action="pull", execute_file=execute_pull_file)
     else:
-        _run_dataset_sync(
+        result = _run_dataset_sync(
             args,
             action="pull",
             resolve_target=_resolve_pull_dataset_target,
             execute_dataset=execute_pull,
+        )
+    if result is not None:
+        _write_sync_audit_json(
+            result.summary,
+            action="pull",
+            dry_run=bool(args.dry_run),
+            verify_sidecars=result.verify_sidecars,
+            verify_derived_hashes=result.verify_derived_hashes,
+            out_path=getattr(args, "audit_json_out", None),
+            output_version=USR_OUTPUT_VERSION,
         )
     if not args.dry_run:
         print("Pull complete.")
 
 
 def cmd_push(args) -> None:
+    result: Optional[sync_execution_commands.SyncRunResult]
     if _is_file_mode_target(args.dataset):
-        _run_file_sync(args, action="push", execute_file=execute_push_file)
+        result = _run_file_sync(args, action="push", execute_file=execute_push_file)
     else:
-        _run_dataset_sync(
+        result = _run_dataset_sync(
             args,
             action="push",
             resolve_target=_resolve_push_dataset_target,
             execute_dataset=execute_push,
+        )
+    if result is not None:
+        _write_sync_audit_json(
+            result.summary,
+            action="push",
+            dry_run=bool(args.dry_run),
+            verify_sidecars=result.verify_sidecars,
+            verify_derived_hashes=result.verify_derived_hashes,
+            out_path=getattr(args, "audit_json_out", None),
+            output_version=USR_OUTPUT_VERSION,
         )
     if not args.dry_run:
         print("Push complete.")

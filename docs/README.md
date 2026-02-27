@@ -5,6 +5,9 @@
 
 This is the canonical docs entrypoint. Keep curated navigation here.
 
+Quick entrypoint:
+- [Start here](start-here.md): lightweight workflow-first navigation.
+
 ## Repository knowledge base
 
 - [ARCHITECTURE.md](../ARCHITECTURE.md): high-level architecture map and boundary contracts.
@@ -46,9 +49,22 @@ This is the canonical docs entrypoint. Keep curated navigation here.
 - [Developer journal](dev/journal.md)
 - [CI workflow](../.github/workflows/ci.yaml)
 
+## Workflow index (task-first)
+
+| Need | Primary workflow | Supporting references |
+| --- | --- | --- |
+| Need a task-first USR command chain before detailed runbooks | [USR workflow map](../src/dnadesign/usr/docs/operations/workflow-map.md) | [USR operations index](../src/dnadesign/usr/docs/operations/README.md), [USR sync contract](../src/dnadesign/usr/docs/operations/sync.md) |
+| Need to sync iterative HPC batch outputs into local analysis | [USR HPC sync flow](../src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md) | [USR sync contract](../src/dnadesign/usr/docs/operations/sync.md), [BU SCC quickstart](bu-scc/quickstart.md) |
+| Need machine-readable sync decisions for chained runs | [USR sync audit loop](../src/dnadesign/usr/docs/operations/sync-audit-loop.md) | [USR sync contract](../src/dnadesign/usr/docs/operations/sync.md), [USR HPC sync flow](../src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md) |
+| Need a chained DenseGen -> USR -> Infer -> USR loop | [USR chained DenseGen+Infer demo](../src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-demo.md) | [DenseGen docs](../src/dnadesign/densegen/README.md), [Infer docs](../src/dnadesign/infer/README.md) |
+| Need to pressure test sync fidelity and failure recovery | [USR sync fidelity drills](../src/dnadesign/usr/docs/operations/sync-fidelity-drills.md) | [USR sync contract](../src/dnadesign/usr/docs/operations/sync.md) |
+| Need to audit USR event boundary integration | [Notify USR events operator manual](notify/usr-events.md) | [USR README event schema](../src/dnadesign/usr/README.md#event-log-schema) |
+
 ## Progressive workflows
 
 - USR sync (quick -> advanced -> failure diagnosis): [src/dnadesign/usr/docs/operations/sync.md](../src/dnadesign/usr/docs/operations/sync.md)
+- USR workflow map (task-first command chains): [src/dnadesign/usr/docs/operations/workflow-map.md](../src/dnadesign/usr/docs/operations/workflow-map.md)
+- USR sync audit loop (machine-readable decisions + chained calls): [src/dnadesign/usr/docs/operations/sync-audit-loop.md](../src/dnadesign/usr/docs/operations/sync-audit-loop.md)
 - USR HPC sync flow (preflight -> run -> verify): [src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md](../src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md)
 - USR chained DenseGen+Infer loop (batch -> pull -> infer -> push): [src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-demo.md](../src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-demo.md)
 - BU SCC batch + Notify operations: [bu-scc/batch-notify.md](bu-scc/batch-notify.md)

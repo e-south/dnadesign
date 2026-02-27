@@ -3,8 +3,8 @@
 Use this runbook when a dataset is produced incrementally on BU SCC (or similar HPC) and local analysis must stay in sync without moving data through git.
 
 Default sync contract:
-- Dataset sync defaults to `--verify hash` plus strict sidecar fidelity checks.
-- Use `--verify-derived-hashes` when strict `_derived` file-content parity is required.
+- Dataset sync defaults to `--verify hash` plus strict sidecar and `_derived`/`_auxiliary` content-hash fidelity checks.
+- Use `--no-verify-derived-hashes` only when an operator intentionally trades content-hash fidelity for speed.
 
 ## Scope
 
@@ -52,6 +52,28 @@ Short form when your active shell already points at the intended USR root:
 uv run usr diff "$DATASET_ID" bu-scc
 ```
 
+## Bootstrap from either side
+
+Use this section when only one side currently has dataset contents.
+
+### HPC has dataset, local does not
+
+```bash
+# Preview remote-first dataset state.
+uv run usr diff "$DATASET_ID" bu-scc
+# Bootstrap local dataset contents from HPC.
+uv run usr pull "$DATASET_ID" bu-scc -y
+```
+
+### Local has dataset, HPC does not
+
+```bash
+# Preview local-first dataset state.
+uv run usr diff "$DATASET_ID" bu-scc
+# Bootstrap HPC dataset contents from local.
+uv run usr push "$DATASET_ID" bu-scc -y
+```
+
 ## Run loop (HPC side writes, local side reads)
 
 1. Submit or continue batch jobs on HPC that append to the dataset.
@@ -87,7 +109,7 @@ uv run usr --root "$LOCAL_USR_ROOT" diff "$DATASET_ID" bu-scc
 - meta/events/snapshot indicators
 - `_auxiliary` indicator for non-core file inventory drift
 
-3. If strict fidelity is required, always run with `--verify-sidecars` and avoid `--primary-only` / `--skip-snapshots`.
+3. If strict fidelity is required, keep default checks enabled and avoid `--no-verify-sidecars`, `--no-verify-derived-hashes`, `--primary-only`, and `--skip-snapshots`.
 
 ## Local annotations back to HPC
 

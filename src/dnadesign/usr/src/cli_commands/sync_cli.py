@@ -106,7 +106,12 @@ def register_sync_commands(
         verify_derived_hashes: bool = typer.Option(
             False,
             "--verify-derived-hashes",
-            help="Also verify _derived file content hashes (high assurance, slower).",
+            help="Verify _derived and _auxiliary file content hashes (enabled by default for dataset sync).",
+        ),
+        no_verify_derived_hashes: bool = typer.Option(
+            False,
+            "--no-verify-derived-hashes",
+            help="Disable _derived and _auxiliary file-content hash parity checks for dataset sync.",
         ),
         repo_root: str | None = typer.Option(None, "--repo-root"),
         remote_path: str | None = typer.Option(None, "--remote-path"),
@@ -114,6 +119,11 @@ def register_sync_commands(
             False,
             "--strict-bootstrap-id",
             help="Require namespace-qualified dataset ids (<namespace>/<dataset>) for bootstrap pulls.",
+        ),
+        audit_json_out: str | None = typer.Option(
+            None,
+            "--audit-json-out",
+            help="Write machine-readable sync audit JSON to this path.",
         ),
     ) -> None:
         cmd_pull(
@@ -133,6 +143,8 @@ def register_sync_commands(
                 verify_sidecars=verify_sidecars,
                 no_verify_sidecars=no_verify_sidecars,
                 verify_derived_hashes=verify_derived_hashes,
+                no_verify_derived_hashes=no_verify_derived_hashes,
+                audit_json_out=audit_json_out,
             )
         )
 
@@ -159,7 +171,17 @@ def register_sync_commands(
         verify_derived_hashes: bool = typer.Option(
             False,
             "--verify-derived-hashes",
-            help="Also verify _derived file content hashes (high assurance, slower).",
+            help="Verify _derived and _auxiliary file content hashes (enabled by default for dataset sync).",
+        ),
+        no_verify_derived_hashes: bool = typer.Option(
+            False,
+            "--no-verify-derived-hashes",
+            help="Disable _derived and _auxiliary file-content hash parity checks for dataset sync.",
+        ),
+        audit_json_out: str | None = typer.Option(
+            None,
+            "--audit-json-out",
+            help="Write machine-readable sync audit JSON to this path.",
         ),
         repo_root: str | None = typer.Option(None, "--repo-root"),
         remote_path: str | None = typer.Option(None, "--remote-path"),
@@ -181,5 +203,7 @@ def register_sync_commands(
                 verify_sidecars=verify_sidecars,
                 no_verify_sidecars=no_verify_sidecars,
                 verify_derived_hashes=verify_derived_hashes,
+                no_verify_derived_hashes=no_verify_derived_hashes,
+                audit_json_out=audit_json_out,
             )
         )

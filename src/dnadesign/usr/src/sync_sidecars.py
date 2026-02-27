@@ -29,6 +29,7 @@ class SidecarState:
     derived_files: tuple[str, ...]
     derived_hashes: tuple[tuple[str, str], ...]
     aux_files: tuple[str, ...]
+    aux_hashes: tuple[tuple[str, str], ...]
 
 
 _SNAPSHOT_RE = re.compile(r"^records-\d{8}T\d{6,}\.parquet$")
@@ -86,6 +87,13 @@ def _derived_hashes_from_dir(derived_dir: Path, derived_files: tuple[str, ...]) 
     return tuple(entries)
 
 
+def _aux_hashes_from_dir(dataset_dir: Path, aux_files: tuple[str, ...]) -> tuple[tuple[str, str], ...]:
+    entries: list[tuple[str, str]] = []
+    for rel in aux_files:
+        entries.append((rel, _sha256_file(Path(dataset_dir) / rel)))
+    return tuple(entries)
+
+
 def local_sidecar_state(dataset_dir: Path, *, include_derived_hashes: bool = False) -> SidecarState:
     dataset_dir = Path(dataset_dir)
     derived_files = _derived_names_from_dir(dataset_dir / "_derived")
@@ -110,6 +118,7 @@ def local_sidecar_state(dataset_dir: Path, *, include_derived_hashes: bool = Fal
             _derived_hashes_from_dir(dataset_dir / "_derived", derived_files) if include_derived_hashes else ()
         ),
         aux_files=tuple(aux_files),
+        aux_hashes=_aux_hashes_from_dir(dataset_dir, tuple(aux_files)) if include_derived_hashes else (),
     )
 
 
@@ -125,6 +134,11 @@ def remote_sidecar_state(remote_stat: RemoteDatasetStat, *, include_derived_hash
             else ()
         ),
         aux_files=tuple(sorted(remote_stat.aux_files)),
+        aux_hashes=(
+            tuple(sorted((str(k), str(v)) for k, v in dict(remote_stat.aux_hashes).items()))
+            if include_derived_hashes
+            else ()
+        ),
     )
 
 
@@ -142,5 +156,7 @@ def verify_sidecar_state_match(local: SidecarState, remote: SidecarState, *, con
         mismatches.append(f"_derived hashes local={list(local.derived_hashes)} remote={list(remote.derived_hashes)}")
     if local.aux_files != remote.aux_files:
         mismatches.append(f"auxiliary files local={list(local.aux_files)} remote={list(remote.aux_files)}")
+    if local.aux_hashes != remote.aux_hashes:
+        mismatches.append(f"auxiliary hashes local={list(local.aux_hashes)} remote={list(remote.aux_hashes)}")
     if mismatches:
         raise VerificationError(f"{context}: sidecar mismatch; " + "; ".join(mismatches))

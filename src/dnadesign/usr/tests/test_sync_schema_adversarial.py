@@ -783,6 +783,148 @@ def test_execute_push_verify_derived_hashes_rejects_remote_hash_mismatch(tmp_pat
         )
 
 
+def test_execute_pull_verify_derived_hashes_rejects_auxiliary_hash_mismatch(tmp_path: Path, monkeypatch) -> None:
+    local_root = tmp_path / "local_usr"
+    dataset_id = "densegen/demo_pull_aux_hash_mismatch"
+    local_dataset_dir = local_root / dataset_id
+    _write_records(local_dataset_dir / "records.parquet", rows=1)
+
+    remote_records = tmp_path / "remote_records.parquet"
+    _write_records(remote_records, rows=2)
+    remote_size = int(remote_records.stat().st_size)
+    remote_mtime = str(int(remote_records.stat().st_mtime))
+    remote_aux = tmp_path / "remote_checkpoint.json"
+    remote_aux.write_text('{"state":"remote"}\n', encoding="utf-8")
+
+    class _Remote:
+        def __init__(self, _cfg) -> None:
+            pass
+
+        def stat_dataset(self, _dataset: str, *, verify: str = "auto", include_derived_hashes: bool = False):
+            return RemoteDatasetStat(
+                primary=RemotePrimaryStat(
+                    exists=True,
+                    size=remote_size,
+                    sha256=None,
+                    rows=2,
+                    cols=7,
+                    mtime=remote_mtime,
+                ),
+                meta_mtime=None,
+                events_lines=0,
+                snapshot_names=[],
+                aux_files=["_artifacts/checkpoint.json"],
+                aux_hashes={"_artifacts/checkpoint.json": _sha256(remote_aux)},
+            )
+
+        def pull_to_local(
+            self,
+            _dataset: str,
+            dest_dir: Path,
+            *,
+            primary_only: bool = False,
+            skip_snapshots: bool = False,
+            dry_run: bool = False,
+        ) -> None:
+            assert dry_run is False
+            assert primary_only is False
+            assert skip_snapshots is False
+            dest_dir = Path(dest_dir)
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            _write_records(dest_dir / "records.parquet", rows=2)
+            staged_aux = dest_dir / "_artifacts" / "checkpoint.json"
+            staged_aux.parent.mkdir(parents=True, exist_ok=True)
+            staged_aux.write_text('{"state":"local-mismatch"}\n', encoding="utf-8")
+
+    monkeypatch.setattr(sync_module, "get_remote", lambda _name: object())
+    monkeypatch.setattr(sync_module, "SSHRemote", _Remote)
+
+    with pytest.raises(VerificationError, match=r"post-pull-sidecars: sidecar mismatch; .*auxiliary hashes"):
+        sync_module.execute_pull(
+            local_root,
+            dataset_id,
+            "mock-remote",
+            sync_module.SyncOptions(verify="parquet", verify_sidecars=True, verify_derived_hashes=True),
+        )
+
+
+def test_execute_push_verify_derived_hashes_rejects_remote_auxiliary_hash_mismatch(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "datasets"
+    ensure_registry(root)
+    dataset_id = "densegen/demo_push_aux_hash_mismatch"
+    ds = Dataset(root, dataset_id)
+    ds.init(source="unit-test")
+    ds.import_rows([_row("ACGT", "unit-test")], source="unit-test")
+
+    local_dataset_dir = root / dataset_id
+    local_records = local_dataset_dir / "records.parquet"
+    local_size = int(local_records.stat().st_size)
+    local_mtime = str(int(local_records.stat().st_mtime))
+    local_meta_path = local_dataset_dir / "meta.md"
+    local_meta_mtime = str(int(local_meta_path.stat().st_mtime)) if local_meta_path.exists() else None
+    local_events_lines = sum(1 for _ in (local_dataset_dir / ".events.log").open("rb"))
+    local_snapshot_dir = local_dataset_dir / "_snapshots"
+    local_snapshot_names = sorted([item.name for item in local_snapshot_dir.glob("records-*.parquet")])
+    local_aux = local_dataset_dir / "_artifacts" / "checkpoint.json"
+    local_aux.parent.mkdir(parents=True, exist_ok=True)
+    local_aux.write_text('{"state":"local"}\n', encoding="utf-8")
+
+    stat_calls = {"count": 0}
+
+    class _Remote:
+        def __init__(self, _cfg) -> None:
+            pass
+
+        def dataset_transfer_lock(self, _dataset: str):
+            @contextmanager
+            def _ctx():
+                yield
+
+            return _ctx()
+
+        def stat_dataset(self, _dataset: str, *, verify: str = "auto", include_derived_hashes: bool = False):
+            stat_calls["count"] += 1
+            if stat_calls["count"] <= 2:
+                return RemoteDatasetStat(
+                    primary=RemotePrimaryStat(False, None, None, None, None, None),
+                    meta_mtime=None,
+                    events_lines=0,
+                    snapshot_names=[],
+                )
+            return RemoteDatasetStat(
+                primary=RemotePrimaryStat(True, local_size, None, None, None, local_mtime),
+                meta_mtime=local_meta_mtime,
+                events_lines=local_events_lines,
+                snapshot_names=local_snapshot_names,
+                aux_files=["_artifacts/checkpoint.json"],
+                aux_hashes={"_artifacts/checkpoint.json": "deadbeef"},
+            )
+
+        def push_from_local(
+            self,
+            _dataset: str,
+            _src_dir: Path,
+            *,
+            primary_only: bool = False,
+            skip_snapshots: bool = False,
+            dry_run: bool = False,
+        ) -> None:
+            assert dry_run is False
+            assert primary_only is False
+            assert skip_snapshots is False
+
+    monkeypatch.setattr(sync_module, "get_remote", lambda _name: object())
+    monkeypatch.setattr(sync_module, "SSHRemote", _Remote)
+
+    with pytest.raises(VerificationError, match=r"post-push-sidecars: sidecar mismatch; .*auxiliary hashes"):
+        sync_module.execute_push(
+            root,
+            dataset_id,
+            "mock-remote",
+            sync_module.SyncOptions(verify="size", verify_sidecars=True, verify_derived_hashes=True),
+        )
+
+
 def test_verify_sidecars_requires_full_dataset_transfer_options(tmp_path: Path, monkeypatch) -> None:
     class _Remote:
         def __init__(self, _cfg) -> None:

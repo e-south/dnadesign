@@ -182,3 +182,32 @@ def test_pull_help_mentions_verify_derived_hashes_option() -> None:
     result = runner.invoke(app, ["pull", "--help"])
     assert result.exit_code == 0
     assert "--verify-derived-hashes" in result.stdout
+
+
+def test_pull_help_mentions_no_verify_derived_hashes_option() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["pull", "--help"])
+    assert result.exit_code == 0
+    assert "--no-verify-derived-hashes" in result.stdout
+
+
+def test_pull_help_mentions_audit_json_output_option() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["pull", "--help"])
+    assert result.exit_code == 0
+    assert "--audit-json-out" in result.stdout
+
+
+def test_push_help_mentions_audit_json_output_option() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["push", "--help"])
+    assert result.exit_code == 0
+    assert "--audit-json-out" in result.stdout
+
+
+def test_root_help_mentions_workflow_map_and_default_sync_contract() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["--help"])
+    assert result.exit_code == 0
+    assert "workflow-map.md" in result.stdout
+    assert "verify=hash" in result.stdout

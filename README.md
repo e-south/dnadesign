@@ -8,6 +8,16 @@ It bundles reusable tool packages for sequence generation, inference, optimizati
 
 ---
 
+## Quick paths
+
+- [Start here](docs/start-here.md): workflow-first entrypoint.
+- [Docs index](docs/README.md): task map and full navigation.
+- [USR workflow map](src/dnadesign/usr/docs/operations/workflow-map.md): quick command chains for sync/bootstrap/chained runs.
+- [USR iterative HPC sync loop](src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md): preflight/run/verify sync pattern.
+- [USR chained DenseGen -> Infer workflow](src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-demo.md): bidirectional dataset sync in a tool chain.
+
+---
+
 ## Repository layout
 
 ```text
@@ -30,6 +40,7 @@ dnadesign/
 
 ## Documentation
 
+- [Start here](docs/start-here.md): lightweight workflow-first navigation.
 - [Documentation index](docs/README.md): consolidated docs navigation.
 - [Installation guide](docs/installation.md): environment bootstrap.
 - [BU SCC operations guide](docs/bu-scc/README.md): cluster operations/runbooks.

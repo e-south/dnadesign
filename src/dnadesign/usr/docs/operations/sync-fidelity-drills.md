@@ -7,8 +7,9 @@ Use this runbook to pressure test strict sync fidelity for iterative batch workf
 - Validate overlay fidelity when transfers are interrupted or partial.
 - Validate schema contract enforcement for overlay write paths.
 - Keep transfer decisions low-friction using `diff` and sync audit output.
-- Exercise the default dataset sync contract (`hash` primary verification plus strict sidecar checks).
-- Optionally exercise strict `_derived` content-hash parity with `--verify-derived-hashes`.
+- Exercise the default dataset sync contract (`hash` primary verification plus strict sidecar and `_derived`/`_auxiliary` content-hash checks).
+- Use `--verify-derived-hashes` when you want scripts to state content-hash enforcement explicitly (same behavior as default).
+- If required for emergency throughput, explicitly opt out of content hashes with `--no-verify-derived-hashes`.
 - Include `_auxiliary` inventory checks so non-core files remain in lockstep.
 
 ## Preconditions
@@ -37,7 +38,7 @@ Expected contract:
 
 Operator decision:
 - Re-run after fixing remote payload integrity; do not disable `--verify-sidecars`.
-- If you must trade fidelity for emergency transfer speed, use `--no-verify-sidecars` explicitly and record that decision.
+- If you must trade fidelity for emergency transfer speed, use `--no-verify-sidecars` or `--no-verify-derived-hashes` explicitly and record that decision.
 
 ## Drill 2: Push must fail when remote misses local overlays
 
