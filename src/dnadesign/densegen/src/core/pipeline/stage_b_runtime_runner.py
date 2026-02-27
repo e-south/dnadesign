@@ -310,6 +310,10 @@ def _run_stage_b_sampling(
         next_attempt_index=next_attempt_index,
     )
 
+    def _flush_checkpoint_sinks() -> None:
+        for sink in sinks:
+            sink.flush()
+
     progress_context = StageBProgressContext(
         source_label=source_label,
         plan_name=plan_name,
@@ -329,6 +333,7 @@ def _run_stage_b_sampling(
         tf_usage_counts=tf_usage_counts,
         diagnostics=diagnostics,
         logger=log,
+        flush_sinks=_flush_checkpoint_sinks,
     )
 
     callback_context = StageBLibraryRuntimeContext(

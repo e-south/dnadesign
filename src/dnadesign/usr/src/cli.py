@@ -1902,6 +1902,8 @@ def _sync_args(
     format: str | None,
     repo_root: str | None,
     remote_path: str | None,
+    strict_bootstrap_id: bool = False,
+    verify_sidecars: bool = False,
 ) -> NS:
     return _ctx_args(
         ctx,
@@ -1915,6 +1917,8 @@ def _sync_args(
         format=format,
         repo_root=repo_root,
         remote_path=remote_path,
+        strict_bootstrap_id=strict_bootstrap_id,
+        verify_sidecars=verify_sidecars,
     )
 
 
@@ -1989,8 +1993,18 @@ def cli_pull(
     dry_run: bool = typer.Option(False, "--dry-run"),
     yes: bool = typer.Option(False, "--yes"),
     verify: str = typer.Option("auto", "--verify", help="Verification mode: auto|hash|size|parquet"),
+    verify_sidecars: bool = typer.Option(
+        False,
+        "--verify-sidecars",
+        help="Verify meta/events/snapshots sidecars for full-fidelity dataset transfer.",
+    ),
     repo_root: str | None = typer.Option(None, "--repo-root"),
     remote_path: str | None = typer.Option(None, "--remote-path"),
+    strict_bootstrap_id: bool = typer.Option(
+        False,
+        "--strict-bootstrap-id",
+        help="Require namespace-qualified dataset ids (<namespace>/<dataset>) for bootstrap pulls.",
+    ),
 ) -> None:
     cmd_pull(
         _sync_args(
@@ -2005,6 +2019,8 @@ def cli_pull(
             None,
             repo_root,
             remote_path,
+            strict_bootstrap_id,
+            verify_sidecars,
         )
     )
 
@@ -2019,6 +2035,11 @@ def cli_push(
     dry_run: bool = typer.Option(False, "--dry-run"),
     yes: bool = typer.Option(False, "--yes"),
     verify: str = typer.Option("auto", "--verify", help="Verification mode: auto|hash|size|parquet"),
+    verify_sidecars: bool = typer.Option(
+        False,
+        "--verify-sidecars",
+        help="Verify meta/events/snapshots sidecars for full-fidelity dataset transfer.",
+    ),
     repo_root: str | None = typer.Option(None, "--repo-root"),
     remote_path: str | None = typer.Option(None, "--remote-path"),
 ) -> None:
@@ -2035,6 +2056,8 @@ def cli_push(
             None,
             repo_root,
             remote_path,
+            False,
+            verify_sidecars,
         )
     )
 

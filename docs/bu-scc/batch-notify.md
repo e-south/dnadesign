@@ -113,6 +113,22 @@ qsub -P <project> \
   docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
+Iterative contribution submit (resume + quota growth):
+
+```bash
+qsub -P <project> \
+  -pe omp 16 \
+  -l h_rt=08:00:00 \
+  -l mem_per_core=8G \
+  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--resume --extend-quota 8 --no-plot' \
+  docs/bu-scc/jobs/densegen-cpu.qsub
+```
+
+`densegen-cpu.qsub` defaults are:
+- validation: `--probe-solver`
+- run: `--no-plot`
+- override via `DENSEGEN_VALIDATE_ARGS` and `DENSEGEN_RUN_ARGS` at submit time.
+
 Before long runs:
 
 ```bash
@@ -217,7 +233,7 @@ set -euo pipefail
 
 # Example: transfer-only operations
 # uv run python scripts/prefetch_models.py
-# uv run usr pull densegen/demo_hpc --remote bu-scc -y
+# uv run usr pull densegen/demo_hpc bu-scc -y
 QSUB
 ```
 

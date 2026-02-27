@@ -37,6 +37,13 @@ class ResumeStateLoadError(RuntimeError):
     pass
 
 
+def _is_missing_or_empty_output_error(exc: Exception) -> bool:
+    if isinstance(exc, FileNotFoundError):
+        return True
+    message = str(exc).lower()
+    return "output not found" in message or "records not found" in message or "has no rows" in message
+
+
 def load_resume_state(
     *,
     resume: bool,
@@ -64,6 +71,8 @@ def load_resume_state(
     library_build_counts = _load_existing_library_build_count_by_plan(tables_root)
     if loaded.root.densegen.output.targets:
         run_ids: set[str] = set()
+        rows = iter(())
+        source_label = "outputs"
         try:
             rows, source_label = scan_records_from_config(
                 loaded.root,
@@ -76,7 +85,10 @@ def load_resume_state(
                 ],
             )
         except Exception as exc:
-            raise ResumeStateLoadError("Failed to scan existing output records while preparing resume state.") from exc
+            if not _is_missing_or_empty_output_error(exc):
+                raise ResumeStateLoadError(
+                    "Failed to scan existing output records while preparing resume state."
+                ) from exc
         try:
             for row in rows:
                 run_id = row.get("densegen__run_id")

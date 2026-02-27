@@ -152,3 +152,10 @@ def test_merge_defaults_are_strict(tmp_path: Path, monkeypatch) -> None:
     assert result.exit_code == 0
     assert captured["duplicate_policy"] == MergePolicy.ERROR
     assert captured["overlap_coercion"] == "none"
+
+
+def test_pull_help_mentions_verify_sidecars_option() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["pull", "--help"])
+    assert result.exit_code == 0
+    assert "--verify-sidecars" in result.stdout

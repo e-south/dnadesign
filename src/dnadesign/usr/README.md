@@ -518,7 +518,12 @@ usr remotes doctor --remote bu-scc
 usr diff densegen/60bp_dual_promoter_cpxR_LexA bu-scc --verify auto
 usr pull densegen/60bp_dual_promoter_cpxR_LexA bu-scc -y
 usr push densegen/60bp_dual_promoter_cpxR_LexA bu-scc -y
+
+# Strict full-fidelity transfer check for sidecars.
+usr pull densegen/60bp_dual_promoter_cpxR_LexA bu-scc -y --verify-sidecars
 ```
+
+Dataset pull/push transfers acquire the shared remote `.usr.lock` and print a post-action sync audit summary.
 
 **Dataset directory mode** supports explicit dataset paths outside `--root`:
 

@@ -52,7 +52,7 @@ META_BLOCKING_FILES = {
     "effective_config.json",
     ID_INDEX_NAME,
 }
-META_NON_BLOCKING_FILES = {"events.jsonl"}
+META_NON_BLOCKING_FILES = {"events.jsonl", "run.lock"}
 USR_ROOT_NON_BLOCKING_FILES = {"registry.yaml"}
 
 

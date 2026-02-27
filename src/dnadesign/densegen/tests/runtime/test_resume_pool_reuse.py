@@ -572,7 +572,7 @@ def test_load_resume_state_rejects_stream_records_with_mismatched_run_id(monkeyp
         )
 
 
-def test_load_resume_state_fails_fast_when_record_scan_errors(monkeypatch, tmp_path: Path) -> None:
+def test_load_resume_state_treats_missing_outputs_as_empty(monkeypatch, tmp_path: Path) -> None:
     loaded = SimpleNamespace(
         root=SimpleNamespace(
             densegen=SimpleNamespace(
@@ -585,6 +585,47 @@ def test_load_resume_state_fails_fast_when_record_scan_errors(monkeypatch, tmp_p
 
     def _scan_records_from_config(*_args, **_kwargs):
         raise FileNotFoundError("records missing")
+
+    monkeypatch.setattr(
+        resume_state_module,
+        "_load_failure_counts_from_attempts",
+        lambda _tables_root: {},
+    )
+    monkeypatch.setattr(
+        resume_state_module,
+        "_load_existing_attempt_index_by_plan",
+        lambda _tables_root: {},
+    )
+    monkeypatch.setattr(
+        resume_state_module,
+        "scan_records_from_config",
+        _scan_records_from_config,
+    )
+
+    state = load_resume_state(
+        resume=True,
+        loaded=loaded,
+        tables_root=tmp_path / "outputs" / "tables",
+        config_sha="abc123",
+        allowed_config_sha256=None,
+    )
+    assert state.existing_counts == {}
+    assert state.existing_usage_by_plan == {}
+
+
+def test_load_resume_state_fails_fast_when_record_scan_errors(monkeypatch, tmp_path: Path) -> None:
+    loaded = SimpleNamespace(
+        root=SimpleNamespace(
+            densegen=SimpleNamespace(
+                run=SimpleNamespace(id="run-1"),
+                output=SimpleNamespace(targets=["parquet"]),
+            )
+        ),
+        path=tmp_path / "config.yaml",
+    )
+
+    def _scan_records_from_config(*_args, **_kwargs):
+        raise ValueError("broken output schema")
 
     monkeypatch.setattr(
         resume_state_module,

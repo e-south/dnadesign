@@ -25,6 +25,7 @@ import typer
 
 from ..core.artifacts.pool import pool_status_by_input
 from ..core.pipeline import resolve_plan, run_pipeline
+from ..core.run_lock import RunLockError, acquire_run_lock
 from ..core.run_paths import has_existing_run_outputs, run_outputs_root, run_state_path
 from ..core.run_state import load_run_state
 from ..utils import logging_utils
@@ -716,14 +717,27 @@ def register_run_commands(
         # Plan & solver
         console.print("[bold]Quota plan[/]: " + _format_quota_plan_message(pl))
         try:
-            summary = run_pipeline(
-                loaded,
-                resume=resume_run,
-                build_stage_a=build_stage_a,
-                show_tfbs=show_tfbs,
-                show_solutions=show_solutions,
-                allow_config_mismatch=allow_config_mismatch,
+            with acquire_run_lock(run_root=run_root, run_id=str(cfg.run.id)):
+                summary = run_pipeline(
+                    loaded,
+                    resume=resume_run,
+                    build_stage_a=build_stage_a,
+                    show_tfbs=show_tfbs,
+                    show_solutions=show_solutions,
+                    allow_config_mismatch=allow_config_mismatch,
+                )
+        except RunLockError as exc:
+            console.print(f"[bold red]{exc}[/]")
+            console.print("[bold]Next steps[/]:")
+            inspect_cmd = context.workspace_command(
+                "dense inspect run --events --library",
+                cfg_path=cfg_path,
+                run_root=run_root,
             )
+            console.print("  - wait for the active run to finish, then retry")
+            console.print("  - if this lock is stale, remove outputs/meta/run.lock and rerun")
+            console.print(f"  - {inspect_cmd}")
+            raise typer.Exit(code=1)
         except FileNotFoundError as exc:
             render_missing_input_hint(cfg_path, loaded, exc)
             raise typer.Exit(code=1)

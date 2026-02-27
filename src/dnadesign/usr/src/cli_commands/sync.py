@@ -17,7 +17,8 @@ from pathlib import Path, PurePosixPath
 from typing import Callable
 
 from ..config import get_remote
-from ..errors import UserAbort
+from ..dataset import normalize_dataset_id
+from ..errors import SequencesError, UserAbort
 from ..sync import (
     SyncOptions,
     execute_pull,
@@ -85,6 +86,31 @@ def _confirm_or_abort(summary, *, assume_yes: bool) -> None:
         raise UserAbort("User cancelled.")
 
 
+def _print_sync_audit(summary, *, action: str, dry_run: bool, verify_sidecars: bool) -> None:
+    has_change = bool(getattr(summary, "has_change", False))
+    transfer_state = "DRY-RUN" if dry_run else ("TRANSFERRED" if has_change else "NO-OP")
+    dataset_name = str(getattr(summary, "dataset", "<unknown>"))
+    verify_mode = str(getattr(summary, "verify_mode", "auto"))
+    changes = dict(getattr(summary, "changes", {}) or {})
+    events_local = int(getattr(summary, "events_local_lines", 0))
+    events_remote = int(getattr(summary, "events_remote_lines", 0))
+    snapshots = getattr(summary, "snapshots", None)
+    snapshot_count = int(getattr(snapshots, "count", 0)) if snapshots is not None else 0
+    snapshots_newer = int(getattr(snapshots, "newer_than_local", 0)) if snapshots is not None else 0
+    snapshots_changed = bool(changes.get("snapshots_name_diff")) or snapshots_newer > 0
+    print(f"{action.upper()} audit: {transfer_state}")
+    print(f"Dataset    : {dataset_name}")
+    print(f"Verify     : primary={verify_mode} sidecars={'strict' if verify_sidecars else 'off'}")
+    print(f"Primary    : {'changed' if changes.get('primary_sha_diff') else 'unchanged'}")
+    print(f"meta.md    : {'changed' if changes.get('meta_mtime_diff') else 'unchanged'}")
+    print(f".events.log: local={events_local}  remote={events_remote}")
+    print(
+        "_snapshots : "
+        f"{'changed' if snapshots_changed else 'unchanged'}  "
+        f"remote_count={snapshot_count}  newer_than_local={snapshots_newer}"
+    )
+
+
 def _opts_from_args(args) -> SyncOptions:
     return SyncOptions(
         primary_only=bool(args.primary_only),
@@ -92,6 +118,7 @@ def _opts_from_args(args) -> SyncOptions:
         dry_run=bool(args.dry_run),
         assume_yes=bool(args.yes),
         verify=str(getattr(args, "verify", "auto")),
+        verify_sidecars=bool(getattr(args, "verify_sidecars", False)),
     )
 
 
@@ -181,6 +208,44 @@ def _resolve_remote_path_for_file(local_file: Path, args) -> str:
     return str(PurePosixPath(cfg.repo_root).joinpath(rel.as_posix()))
 
 
+def _resolve_dataset_id_for_diff_or_pull(root: Path, dataset: str | None, *, use_rich: bool) -> str | None:
+    if dataset is None:
+        return resolve_dataset_name_interactive(root, None, use_rich)
+    target = str(dataset)
+    if "/" in target:
+        try:
+            return normalize_dataset_id(target)
+        except SequencesError as exc:
+            raise SystemExit(str(exc)) from None
+    return resolve_dataset_name_interactive(root, target, use_rich)
+
+
+def _env_flag_true(name: str) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return False
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _strict_bootstrap_id_enabled(args) -> bool:
+    return bool(getattr(args, "strict_bootstrap_id", False)) or _env_flag_true("USR_SYNC_STRICT_BOOTSTRAP_ID")
+
+
+def _enforce_strict_bootstrap_dataset_id(root: Path, dataset: str, *, use_rich: bool) -> None:
+    if "/" in dataset:
+        return
+    try:
+        resolved = resolve_dataset_name_interactive(root, dataset, use_rich)
+    except SystemExit:
+        resolved = None
+    if resolved:
+        return
+    raise SystemExit(
+        "Strict bootstrap mode requires a namespace-qualified dataset id (<namespace>/<dataset>) "
+        "for pulls when local dataset is missing."
+    )
+
+
 def cmd_diff(
     args,
     *,
@@ -200,10 +265,10 @@ def cmd_diff(
         dataset_root, dataset = _resolve_dataset_dir_target(Path(target), Path(args.root))
         summary = plan_diff(dataset_root, dataset, args.remote, verify=args.verify)
     else:
-        ds_name = resolve_dataset_name_interactive(
-            args.root,
+        ds_name = _resolve_dataset_id_for_diff_or_pull(
+            Path(args.root),
             getattr(args, "dataset", None),
-            bool(getattr(args, "rich", False)),
+            use_rich=bool(getattr(args, "rich", False)),
         )
         if not ds_name:
             return
@@ -218,8 +283,10 @@ def cmd_diff(
 def cmd_pull(args) -> None:
     target = args.dataset
     if _is_file_mode_target(target):
-        if args.primary_only or args.skip_snapshots:
-            raise SystemExit("--primary-only/--skip-snapshots are dataset-only flags (not valid in FILE mode).")
+        if args.primary_only or args.skip_snapshots or bool(getattr(args, "verify_sidecars", False)):
+            raise SystemExit(
+                "--primary-only/--skip-snapshots/--verify-sidecars are dataset-only flags (not valid in FILE mode)."
+            )
         local_file = Path(target).resolve()
         if local_file.is_dir():
             raise SystemExit("FILE mode: pass a file path, not a directory.")
@@ -228,19 +295,38 @@ def cmd_pull(args) -> None:
         _print_verify_notes(summary)
         _print_diff(summary, use_rich=bool(getattr(args, "rich", False)))
         _confirm_or_abort(summary, assume_yes=bool(args.yes))
-        execute_pull_file(local_file, args.remote, remote_path, _opts_from_args(args))
+        summary = execute_pull_file(local_file, args.remote, remote_path, _opts_from_args(args))
+        _print_sync_audit(
+            summary,
+            action="pull",
+            dry_run=bool(args.dry_run),
+            verify_sidecars=False,
+        )
     elif _is_dataset_dir_target(target):
         dataset_root, dataset = _resolve_dataset_dir_target(Path(target), Path(args.root))
         summary = plan_diff(dataset_root, dataset, args.remote, verify=args.verify)
         _print_verify_notes(summary)
         _print_diff(summary, use_rich=bool(getattr(args, "rich", False)))
         _confirm_or_abort(summary, assume_yes=bool(args.yes))
-        execute_pull(dataset_root, dataset, args.remote, _opts_from_args(args))
+        summary = execute_pull(dataset_root, dataset, args.remote, _opts_from_args(args))
+        _print_sync_audit(
+            summary,
+            action="pull",
+            dry_run=bool(args.dry_run),
+            verify_sidecars=bool(getattr(args, "verify_sidecars", False)),
+        )
     else:
-        ds_name = resolve_dataset_name_interactive(
-            args.root,
+        root = Path(args.root)
+        if _strict_bootstrap_id_enabled(args):
+            _enforce_strict_bootstrap_dataset_id(
+                root,
+                str(getattr(args, "dataset", "")),
+                use_rich=bool(getattr(args, "rich", False)),
+            )
+        ds_name = _resolve_dataset_id_for_diff_or_pull(
+            root,
             getattr(args, "dataset", None),
-            bool(getattr(args, "rich", False)),
+            use_rich=bool(getattr(args, "rich", False)),
         )
         if not ds_name:
             return
@@ -248,7 +334,13 @@ def cmd_pull(args) -> None:
         _print_verify_notes(summary)
         _print_diff(summary, use_rich=bool(getattr(args, "rich", False)))
         _confirm_or_abort(summary, assume_yes=bool(args.yes))
-        execute_pull(args.root, ds_name, args.remote, _opts_from_args(args))
+        summary = execute_pull(args.root, ds_name, args.remote, _opts_from_args(args))
+        _print_sync_audit(
+            summary,
+            action="pull",
+            dry_run=bool(args.dry_run),
+            verify_sidecars=bool(getattr(args, "verify_sidecars", False)),
+        )
     if not args.dry_run:
         print("Pull complete.")
 
@@ -256,8 +348,10 @@ def cmd_pull(args) -> None:
 def cmd_push(args) -> None:
     target = args.dataset
     if _is_file_mode_target(target):
-        if args.primary_only or args.skip_snapshots:
-            raise SystemExit("--primary-only/--skip-snapshots are dataset-only flags (not valid in FILE mode).")
+        if args.primary_only or args.skip_snapshots or bool(getattr(args, "verify_sidecars", False)):
+            raise SystemExit(
+                "--primary-only/--skip-snapshots/--verify-sidecars are dataset-only flags (not valid in FILE mode)."
+            )
         local_file = Path(target).resolve()
         if local_file.is_dir():
             raise SystemExit("FILE mode: pass a file path, not a directory.")
@@ -266,14 +360,26 @@ def cmd_push(args) -> None:
         _print_verify_notes(summary)
         _print_diff(summary, use_rich=bool(getattr(args, "rich", False)))
         _confirm_or_abort(summary, assume_yes=bool(args.yes))
-        execute_push_file(local_file, args.remote, remote_path, _opts_from_args(args))
+        summary = execute_push_file(local_file, args.remote, remote_path, _opts_from_args(args))
+        _print_sync_audit(
+            summary,
+            action="push",
+            dry_run=bool(args.dry_run),
+            verify_sidecars=False,
+        )
     elif _is_dataset_dir_target(target):
         dataset_root, dataset = _resolve_dataset_dir_target(Path(target), Path(args.root))
         summary = plan_diff(dataset_root, dataset, args.remote, verify=args.verify)
         _print_verify_notes(summary)
         _print_diff(summary, use_rich=bool(getattr(args, "rich", False)))
         _confirm_or_abort(summary, assume_yes=bool(args.yes))
-        execute_push(dataset_root, dataset, args.remote, _opts_from_args(args))
+        summary = execute_push(dataset_root, dataset, args.remote, _opts_from_args(args))
+        _print_sync_audit(
+            summary,
+            action="push",
+            dry_run=bool(args.dry_run),
+            verify_sidecars=bool(getattr(args, "verify_sidecars", False)),
+        )
     else:
         ds_name = resolve_dataset_name_interactive(
             args.root,
@@ -286,6 +392,12 @@ def cmd_push(args) -> None:
         _print_verify_notes(summary)
         _print_diff(summary, use_rich=bool(getattr(args, "rich", False)))
         _confirm_or_abort(summary, assume_yes=bool(args.yes))
-        execute_push(args.root, ds_name, args.remote, _opts_from_args(args))
+        summary = execute_push(args.root, ds_name, args.remote, _opts_from_args(args))
+        _print_sync_audit(
+            summary,
+            action="push",
+            dry_run=bool(args.dry_run),
+            verify_sidecars=bool(getattr(args, "verify_sidecars", False)),
+        )
     if not args.dry_run:
         print("Push complete.")

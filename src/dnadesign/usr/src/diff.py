@@ -39,7 +39,7 @@ class FileStat:
 @dataclass
 class SnapshotStat:
     count: int
-    newest_ts: Optional[str]  # "YYYYMMDDThhmmss"
+    newest_ts: Optional[str]  # "YYYYMMDDThhmmss[ffffff]"
     newer_than_local: int  # computed relative to other side
 
 
@@ -59,7 +59,7 @@ class DiffSummary:
     verify_notes: List[str]
 
 
-_PAT_TS = re.compile(r"records-(\d{8}T\d{6})\.parquet$")
+_PAT_TS = re.compile(r"records-(\d{8}T\d{6,})\.parquet$")
 
 
 def _sha256_file(path: Path, chunk: int = 1 << 16) -> str:
@@ -348,6 +348,14 @@ def compute_diff(
     )
     meta_local = file_mtime(dataset_dir / "meta.md")
     events_local = events_tail_count(dataset_dir / ".events.log")
+    local_snapshot_names: list[str] = []
+    local_snapshot_dir = dataset_dir / "_snapshots"
+    if local_snapshot_dir.exists():
+        for item in local_snapshot_dir.iterdir():
+            if item.is_file() and _PAT_TS.match(item.name):
+                local_snapshot_names.append(item.name)
+    local_snapshot_names = sorted(local_snapshot_names)
+    remote_snapshot_names = sorted(remote.snapshot_names)
 
     # Convert remote stat to FileStat for unified view
     primary_remote = FileStat(
@@ -365,6 +373,7 @@ def compute_diff(
         "primary_sha_diff": _primary_diff(primary_local, primary_remote, verify_mode),
         "meta_mtime_diff": (meta_local != remote.meta_mtime),
         "events_new_remote_lines": max(0, remote.events_lines - events_local),
+        "snapshots_name_diff": (local_snapshot_names != remote_snapshot_names),
         "snapshots_remote_newer": snaps.newer_than_local,
     }
 
@@ -372,6 +381,7 @@ def compute_diff(
         changes["primary_sha_diff"]
         or changes["meta_mtime_diff"]
         or changes["events_new_remote_lines"] > 0
+        or changes["snapshots_name_diff"]
         or changes["snapshots_remote_newer"] > 0
     )
 

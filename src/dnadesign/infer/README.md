@@ -10,8 +10,13 @@
 - **Outputs:** columnar dict; with USR attach, columns are:
 
 ```bash
-infer__<model_id>**<job_id>**<out_id>
-````
+infer__<model_id>__<job_id>__<out_id>
+```
+
+USR write-back contract:
+- Infer writes USR outputs in chunk-sized attaches for resumable long runs.
+- Resume scan requires a readable USR `records.parquet`; unreadable tables fail fast.
+
 > Evo2 is from the Arc Institute: install [`evo2`](https://github.com/ArcInstitute/evo2) before use.
 
 ---

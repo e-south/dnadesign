@@ -64,3 +64,22 @@ def test_usr_sync_docs_follow_progressive_disclosure_flow() -> None:
     assert "Advanced path" in sync_ops
     assert "Failure diagnosis" in sync_ops
     assert "progressive disclosure" in usr_readme.lower()
+
+
+def test_usr_sync_docs_cover_iterative_hpc_clone_safety_loop() -> None:
+    sync_ops = _read("src/dnadesign/usr/docs/operations/sync.md")
+
+    assert "Iterative batch loop (HPC clone -> local clone)" in sync_ops
+    assert "uv run usr diff densegen/my_dataset bu-scc" in sync_ops
+    assert "uv run usr pull densegen/my_dataset bu-scc -y" in sync_ops
+    assert "uv run usr push densegen/my_dataset bu-scc -y" in sync_ops
+    assert "fails fast when remote `records.parquet` is missing" in sync_ops
+    assert "fails fast when local `records.parquet` is missing" in sync_ops
+    assert "skip transfer when no changes are detected" in sync_ops
+    assert "shared remote dataset lock (`.usr.lock`)" in sync_ops
+    assert "--verify-sidecars" in sync_ops
+    assert "--strict-bootstrap-id" in sync_ops
+    assert "USR_SYNC_STRICT_BOOTSTRAP_ID=1" in sync_ops
+    assert "stage into a temporary directory and only promote after verification" in sync_ops
+    assert "reject symlink and unsupported entry types before promotion" in sync_ops
+    assert "post-action sync audit summary" in sync_ops

@@ -262,6 +262,7 @@ def attach_dataset(
                 if col == key:
                     continue
                 if col in combined.columns:
+                    combined = combined.reindex(combined.index.union(new_df.index))
                     combined.loc[new_df.index, col] = new_df[col]
                 else:
                     combined = combined.join(new_df[[col]], how="outer")

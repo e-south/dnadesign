@@ -26,6 +26,23 @@ qsub -P <project> \
   docs/bu-scc/jobs/densegen-cpu.qsub
 ```
 
+`densegen-cpu.qsub` command defaults:
+- validation: `uv run dense validate-config --probe-solver -c "$DENSEGEN_CONFIG"`
+- run: `uv run dense run --no-plot -c "$DENSEGEN_CONFIG"`
+- actor tags: `USR_ACTOR_TOOL=densegen`, `USR_ACTOR_RUN_ID=$JOB_ID.$SGE_TASK_ID`
+
+Override command args at submit time when needed:
+- `DENSEGEN_VALIDATE_ARGS` (example: `--probe-solver`)
+- `DENSEGEN_RUN_ARGS` (example: `--resume --extend-quota 8 --no-plot`)
+
+Resume + quota extension submission:
+
+```bash
+qsub -P <project> \
+  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--resume --extend-quota 8 --no-plot' \
+  docs/bu-scc/jobs/densegen-cpu.qsub
+```
+
 DenseGen + GUROBI with explicit 16-slot cap:
 
 ```bash

@@ -146,6 +146,16 @@ qsub -P <project> \
 
 In config, keep `densegen.solver.threads <= 16`.
 
+### 7.2b DenseGen iterative resume + quota extension
+
+Use this when continuing a workspace across multiple batch submissions.
+
+```bash
+qsub -P <project> \
+  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--resume --extend-quota 8 --no-plot' \
+  docs/bu-scc/jobs/densegen-cpu.qsub
+```
+
 ### 7.3 Evo2 GPU inference
 
 ```bash

@@ -54,6 +54,14 @@ def test_existing_outputs_ignores_events_log(tmp_path: Path) -> None:
     assert not has_existing_run_outputs(run_root)
 
 
+def test_existing_outputs_ignores_run_lock(tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    meta_root = run_meta_root(run_root)
+    meta_root.mkdir(parents=True)
+    (meta_root / "run.lock").write_text("{}")
+    assert not has_existing_run_outputs(run_root)
+
+
 def test_existing_outputs_ignores_usr_root_with_only_registry(tmp_path: Path) -> None:
     run_root = tmp_path / "run"
     outputs_root = run_outputs_root(run_root)

@@ -89,3 +89,4 @@ class StageBProgressContext:
     tf_usage_counts: dict[str, int]
     diagnostics: Any
     logger: Any
+    flush_sinks: Callable[[], None] | None = None

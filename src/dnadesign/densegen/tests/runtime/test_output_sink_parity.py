@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 
 import pyarrow.parquet as pq
+import pytest
 
 import dnadesign.usr as usr_pkg
 from dnadesign.densegen.src.adapters.outputs.parquet import ParquetSink
@@ -24,7 +25,7 @@ from dnadesign.densegen.src.core.metadata_schema import META_FIELDS
 from dnadesign.densegen.tests.meta_fixtures import output_meta
 
 
-def _make_usr_writer(tmp_path: Path, *, deduplicate: bool = True) -> tuple[Path, USRWriter]:
+def _make_usr_writer(tmp_path: Path, *, deduplicate: bool = True, chunk_size: int = 1) -> tuple[Path, USRWriter]:
     root = tmp_path / "usr"
     registry_src = Path(usr_pkg.__file__).resolve().parent / "datasets" / "registry.yaml"
     registry_dst = root / "registry.yaml"
@@ -34,7 +35,7 @@ def _make_usr_writer(tmp_path: Path, *, deduplicate: bool = True) -> tuple[Path,
         dataset="demo",
         root=root,
         namespace="densegen",
-        chunk_size=1,
+        chunk_size=int(chunk_size),
         deduplicate=deduplicate,
     )
     return root, writer
@@ -310,3 +311,46 @@ def test_usr_writer_flush_uses_batch_lookup_for_dedup(tmp_path: Path, monkeypatc
     )
     monkeypatch.setattr(writer._id_index, "contains_many", lambda ids: set(ids), raising=False)
     writer.flush()
+
+
+def test_usr_writer_replays_persisted_overlay_backlog_after_restart(tmp_path: Path, monkeypatch) -> None:
+    root, writer = _make_usr_writer(tmp_path, chunk_size=2)
+    meta = output_meta(library_hash="demo_hash", library_index=1)
+    meta["run_id"] = "run-backlog"
+    rec = OutputRecord.from_sequence(
+        sequence="ACGTACGTAA",
+        meta=meta,
+        source="unit",
+        bio_type="dna",
+        alphabet="dna_4",
+    )
+    assert writer.add(rec) is True
+
+    def _fail_overlay(_namespace, _table, **_kwargs):
+        raise RuntimeError("simulated overlay write failure")
+
+    monkeypatch.setattr(writer.ds, "write_overlay_part", _fail_overlay)
+    with pytest.raises(RuntimeError, match="simulated overlay write failure"):
+        writer.flush()
+
+    backlog_root = root / "demo" / "_artifacts" / "pending_overlay"
+    backlog_parts = sorted(backlog_root.glob("*.parquet"))
+    assert len(backlog_parts) == 1
+    assert pq.read_table(root / "demo" / "records.parquet").num_rows == 1
+    overlay_dir = root / "demo" / "_derived" / "densegen"
+    assert not sorted(overlay_dir.glob("part-*.parquet"))
+
+    replay_writer = USRWriter(
+        dataset="demo",
+        root=root,
+        namespace="densegen",
+        chunk_size=1,
+        deduplicate=True,
+    )
+    replay_writer.flush()
+
+    assert sorted(overlay_dir.glob("part-*.parquet"))
+    assert not sorted(backlog_root.glob("*.parquet"))
+    latest = sorted(overlay_dir.glob("part-*.parquet"))[-1]
+    overlay_ids = set(pq.read_table(latest, columns=["id"]).column("id").to_pylist())
+    assert rec.id in overlay_ids

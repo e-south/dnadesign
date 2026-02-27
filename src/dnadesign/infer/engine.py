@@ -11,6 +11,7 @@ Dunlop Lab
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from ._logging import get_logger
@@ -150,24 +151,43 @@ def _plan_resume_for_usr(
         pf = pq.ParquetFile(rec_path)
         present = set(pf.schema_arrow.names)  # type: ignore[attr-defined]
         want_cols = ["id"] + [c for c in infer_cols.values() if c in present]
-        if len(want_cols) == 1:
-            return list(range(N)), existing
+        if len(want_cols) > 1:
+            tbl = pq.read_table(rec_path, columns=want_cols)
+            t_ids = tbl.column("id").to_pylist()
+            pos = {rid: i for i, rid in enumerate(t_ids)}
 
-        tbl = pq.read_table(rec_path, columns=want_cols)
-        t_ids = tbl.column("id").to_pylist()
-        pos = {rid: i for i, rid in enumerate(t_ids)}
+            for out in outputs:
+                colname = infer_cols[out.id]
+                if colname in present:
+                    vals = tbl.column(colname).to_pylist()
+                    for j, rid in enumerate(ids):
+                        i_tbl = pos.get(rid)
+                        if i_tbl is not None:
+                            existing[out.id][j] = vals[i_tbl]
 
-        for out in outputs:
-            colname = infer_cols[out.id]
-            if colname in present:
-                vals = tbl.column(colname).to_pylist()
-                for j, rid in enumerate(ids):
-                    i_tbl = pos.get(rid)
-                    if i_tbl is not None:
-                        existing[out.id][j] = vals[i_tbl]
+        if hasattr(ds, "list_overlays"):
+            overlays = ds.list_overlays()  # type: ignore[attr-defined]
+            infer_overlay = next((ov for ov in overlays if getattr(ov, "namespace", None) == "infer"), None)
+            if infer_overlay is not None:
+                overlay_path = Path(str(infer_overlay.path))
+                overlay_pf = pq.ParquetFile(str(overlay_path))
+                overlay_present = set(overlay_pf.schema_arrow.names)
+                overlay_cols = ["id"] + [c for c in infer_cols.values() if c in overlay_present]
+                if len(overlay_cols) > 1:
+                    overlay_tbl = pq.read_table(str(overlay_path), columns=overlay_cols)
+                    overlay_ids = overlay_tbl.column("id").to_pylist()
+                    overlay_pos = {rid: i for i, rid in enumerate(overlay_ids)}
+                    for out in outputs:
+                        colname = infer_cols[out.id]
+                        if colname not in overlay_present:
+                            continue
+                        vals = overlay_tbl.column(colname).to_pylist()
+                        for j, rid in enumerate(ids):
+                            i_tbl = overlay_pos.get(rid)
+                            if i_tbl is not None and vals[i_tbl] is not None:
+                                existing[out.id][j] = vals[i_tbl]
     except Exception as e:
-        _LOG.debug("Resume scan skipped (could not read USR table): %s", e)
-        return list(range(N)), existing
+        raise WriteBackError(f"USR resume scan failed for records table {ds.records_path}: {e}") from e
 
     todo_idx: List[int] = []
     for j in range(N):
@@ -337,14 +357,6 @@ def run_extract_job(
         elif source == "usr":
             if ids is None or ds is None:
                 raise WriteBackError("USR write-back requires ids and dataset handle")
-            write_back_usr(
-                ds,
-                ids=ids,
-                model_id=model.id,
-                job_id=job.id,
-                columnar=columnar,
-                overwrite=job.io.overwrite,
-            )
         else:
             raise WriteBackError("write_back not supported for this ingest source")
 

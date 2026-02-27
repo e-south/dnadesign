@@ -15,9 +15,10 @@ import os
 import re
 import shlex
 import subprocess
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Iterator, List, Optional, Tuple
 
 from .config import SSHRemoteConfig
 from .errors import RemoteUnavailableError, TransferError
@@ -38,7 +39,7 @@ class RemoteDatasetStat:
     primary: RemotePrimaryStat
     meta_mtime: Optional[str]
     events_lines: int
-    snapshot_names: List[str]  # e.g., ["records-20250101T120030.parquet", ...]
+    snapshot_names: List[str]  # e.g., ["records-20250101T120030.parquet", "records-20250101T120030123456.parquet"]
 
 
 class SSHRemote:
@@ -88,6 +89,80 @@ class SSHRemote:
         if check and proc.returncode != 0:
             raise RemoteUnavailableError(f"ssh failed ({proc.returncode}): {remote_cmd}\n{proc.stderr.strip()}")
         return proc.returncode, proc.stdout, proc.stderr
+
+    def _dataset_lock_script(self, dataset: str, *, timeout_seconds: int) -> str:
+        dataset_dir = shlex.quote(self.cfg.dataset_path(dataset))
+        lock_path = shlex.quote(str(Path(self.cfg.dataset_path(dataset)) / ".usr.lock"))
+        timeout = max(1, int(timeout_seconds))
+        return (
+            "set -eu; "
+            f"mkdir -p {dataset_dir}; "
+            f"exec 9>>{lock_path}; "
+            f"if ! flock -x -w {timeout} 9; then echo USR_REMOTE_LOCK_TIMEOUT; exit 73; fi; "
+            "echo USR_REMOTE_LOCK_ACQUIRED; "
+            "IFS= read -r _usr_sync_unlock || true"
+        )
+
+    @contextmanager
+    def dataset_transfer_lock(self, dataset: str, *, timeout_seconds: int = 300) -> Iterator[None]:
+        script = self._dataset_lock_script(dataset, timeout_seconds=timeout_seconds)
+        proc = subprocess.Popen(
+            self._ssh_cmd() + ["sh", "-lc", script],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        marker = ""
+        if proc.stdout is not None:
+            marker = proc.stdout.readline().strip()
+        if marker != "USR_REMOTE_LOCK_ACQUIRED":
+            stderr_text = ""
+            if proc.stderr is not None:
+                stderr_text = proc.stderr.read().strip()
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(timeout=2)
+            if marker == "USR_REMOTE_LOCK_TIMEOUT":
+                raise TransferError(
+                    f"Remote dataset lock timeout for '{dataset}' on {self.cfg.ssh_target} "
+                    f"after {max(1, int(timeout_seconds))} seconds."
+                )
+            detail = stderr_text or marker or "missing lock handshake marker"
+            raise TransferError(
+                f"Failed to acquire remote dataset lock for '{dataset}' on {self.cfg.ssh_target}: {detail}"
+            )
+
+        release_error: str | None = None
+        body_raised = False
+        try:
+            yield
+        except Exception:
+            body_raised = True
+            raise
+        finally:
+            if proc.poll() is None:
+                try:
+                    if proc.stdin is not None:
+                        proc.stdin.write("release\n")
+                        proc.stdin.flush()
+                        proc.stdin.close()
+                except (BrokenPipeError, OSError):
+                    pass
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait(timeout=2)
+            if proc.returncode not in (0, None):
+                stderr_text = ""
+                if proc.stderr is not None:
+                    stderr_text = proc.stderr.read().strip()
+                release_error = stderr_text or f"remote lock session exited with code {proc.returncode}"
+            if release_error is not None and not body_raised:
+                raise TransferError(
+                    f"Remote dataset lock release failed for '{dataset}' on {self.cfg.ssh_target}: {release_error}"
+                )
 
     # ---- STAT helpers on remote ----
 
@@ -141,12 +216,12 @@ class SSHRemote:
         return 0
 
     def _remote_list_snapshots(self, snap_dir: str) -> List[str]:
-        # Names like records-YYYYMMDDThhmmss.parquet
+        # Names like records-YYYYMMDDThhmmss.parquet or records-YYYYMMDDThhmmssffffff.parquet
         rc, out, _ = self._ssh_run(f"ls -1 {shlex.quote(snap_dir)} 2>/dev/null", check=False)
         if rc != 0 or not out.strip():
             return []
         names = [ln.strip() for ln in out.splitlines() if ln.strip()]
-        pat = re.compile(r"^records-\d{8}T\d{6}\.parquet$")
+        pat = re.compile(r"^records-\d{8}T\d{6,}\.parquet$")
         return [n for n in names if pat.match(n)]
 
     # ---- Public: stat/pull/push ----

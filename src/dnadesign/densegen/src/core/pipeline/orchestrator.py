@@ -22,10 +22,12 @@ import numpy as np
 
 from ...adapters.optimizer import OptimizerAdapter
 from ...adapters.outputs import resolve_bio_alphabet
+from ...adapters.outputs.usr_writer import USRWriter
 from ...config import (
     DenseGenConfig,
     LoadedConfig,
     ResolvedPlanItem,
+    resolve_outputs_scoped_path,
     resolve_run_root,
 )
 from ...utils.logging_utils import install_native_stderr_filters
@@ -50,7 +52,7 @@ from .progress_runtime import _build_shared_dashboard
 from .resume_state import load_resume_state
 from .run_finalization import finalize_run_outputs
 from .run_setup import build_display_map_by_input, init_plan_stats, init_state_counts, validate_resume_outputs
-from .run_state_manager import assert_state_matches_outputs, init_run_state, write_run_state
+from .run_state_manager import init_run_state, reconcile_run_state_with_outputs, write_run_state
 from .stage_a_pools import prepare_stage_a_pools
 from .stage_b_plan_setup import _init_plan_settings, _load_plan_pool
 from .stage_b_runtime_runner import _run_stage_b_sampling
@@ -64,6 +66,61 @@ class RunSummary:
     total_generated: int
     per_plan: dict[tuple[str, str], int]
     generated_this_run: int = 0
+
+
+def _pending_usr_overlay_backlog_parts(dataset_dir: Path) -> list[Path]:
+    backlog_root = dataset_dir / "_artifacts" / "pending_overlay"
+    if not backlog_root.exists():
+        return []
+    return sorted(backlog_root.glob("part-*.parquet"))
+
+
+def _replay_usr_overlay_backlog_for_resume(
+    *,
+    cfg: DenseGenConfig,
+    cfg_path: Path,
+    run_root: Path,
+) -> int:
+    output_cfg = cfg.output
+    usr_cfg = output_cfg.usr
+    if "usr" not in output_cfg.targets or usr_cfg is None:
+        return 0
+    dataset_name = str(usr_cfg.dataset).strip()
+    if not dataset_name:
+        raise RuntimeError("output.usr.dataset must be a non-empty string.")
+
+    usr_root = resolve_outputs_scoped_path(cfg_path, run_root, usr_cfg.root, label="output.usr.root")
+    dataset_dir = (usr_root / dataset_name).resolve()
+    pending_before = _pending_usr_overlay_backlog_parts(dataset_dir)
+    if not pending_before:
+        return 0
+
+    records_path = dataset_dir / "records.parquet"
+    if not records_path.exists():
+        raise RuntimeError(
+            f"USR overlay backlog exists but records.parquet is missing at {records_path}. "
+            "Restore the dataset or reset the workspace before resuming."
+        )
+
+    log.warning(
+        "Found %d pending USR overlay backlog part(s); replaying before resume-state scan.",
+        len(pending_before),
+    )
+    writer = USRWriter(
+        dataset=dataset_name,
+        root=usr_root,
+        namespace="densegen",
+        chunk_size=max(1, int(getattr(usr_cfg, "chunk_size", 1) or 1)),
+        run_id=str(cfg.run.id),
+    )
+    writer.flush()
+    pending_after = _pending_usr_overlay_backlog_parts(dataset_dir)
+    if pending_after:
+        raise RuntimeError(
+            "USR overlay backlog replay failed; "
+            f"{len(pending_after)} part(s) still pending under {dataset_dir / '_artifacts' / 'pending_overlay'}."
+        )
+    return len(pending_before)
 
 
 def _candidate_logging_enabled(cfg: DenseGenConfig) -> bool:
@@ -334,6 +391,13 @@ def run_pipeline(
         allow_config_mismatch=allow_config_mismatch,
     )
 
+    if resume:
+        _replay_usr_overlay_backlog_for_resume(
+            cfg=cfg,
+            cfg_path=loaded.path,
+            run_root=run_root,
+        )
+
     resume_state = load_resume_state(
         resume=resume,
         loaded=loaded,
@@ -354,7 +418,24 @@ def run_pipeline(
             total,
             len(existing_counts),
         )
-    assert_state_matches_outputs(state_path=state_ctx.path, existing_counts=existing_counts)
+    reconciliation = reconcile_run_state_with_outputs(
+        path=state_ctx.path,
+        run_id=str(cfg.run.id),
+        schema_version=str(cfg.schema_version),
+        config_sha256=config_sha,
+        accepted_config_sha256=state_ctx.accepted_config_sha256,
+        run_root=str(run_root),
+        created_at=state_ctx.created_at,
+        existing_counts=existing_counts,
+    )
+    if reconciliation.updated:
+        direction = "ahead" if reconciliation.state_total > reconciliation.durable_total else "behind"
+        log.warning(
+            "Reconciled run_state.json (%s durable outputs): state_total=%d durable_total=%d.",
+            direction,
+            reconciliation.state_total,
+            reconciliation.durable_total,
+        )
     existing_total = sum(existing_counts.values())
 
     plan_stats, plan_order = init_plan_stats(

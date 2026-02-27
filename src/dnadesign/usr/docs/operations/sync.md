@@ -28,7 +28,9 @@ Use this when you need the minimum reliable operator loop:
 Minimum command loop:
 
 ```bash
+# Preview local-vs-remote diff.
 uv run usr diff densegen/my_dataset bu-scc
+# Pull remote state into local dataset path.
 uv run usr pull densegen/my_dataset bu-scc -y
 ```
 
@@ -49,11 +51,13 @@ Use this sequence when sync commands fail or verification blocks a transfer:
 3. If `verify=auto` prints fallback warnings, resolve missing remote capabilities rather than ignoring warnings.
 4. For dataset directory mode, ensure target contains `records.parquet` and has a discoverable `registry.yaml` ancestor.
 5. For file mode, confirm remote path mapping with `--remote-path` or `remote.repo_root` plus local repo root mapping.
+6. If doctor reports `Remote flock is unavailable`, install `flock` (util-linux) on the remote host.
 
 Common failure signatures:
 
 - `verify=hash requires remote sha256`: remote host lacks hash utility in PATH.
 - `verify=parquet requires remote parquet row/col stats`: remote host lacks `pyarrow`.
+- `Remote flock is unavailable`: remote host cannot provide cross-host dataset lock for sync transfers.
 - `Dataset directory path is outside --root and no registry.yaml ancestor was found`: pass correct `--root` or use dataset id.
 
 ---
@@ -207,6 +211,68 @@ Useful flags:
 - `--skip-snapshots`: exclude `_snapshots/`
 - `--dry-run`: preview only
 - `--verify {auto,hash,size,parquet}`: verification mode
+- `--verify-sidecars`: strict sidecar fidelity check (`meta.md`, `.events.log`, `_snapshots`) for full dataset transfers
+- `--strict-bootstrap-id`: require `<namespace>/<dataset>` for bootstrap pulls when local dataset is missing
+
+---
+
+### 3a) Iterative batch loop (HPC clone -> local clone)
+
+Use this when datasets are produced on HPC and are too large to move through git.
+
+One-time bootstrap on local:
+
+```bash
+# Local dataset may not exist yet; this is supported for namespaced ids.
+uv run usr diff densegen/my_dataset bu-scc
+# Materialize remote dataset locally.
+uv run usr pull densegen/my_dataset bu-scc -y
+```
+
+After each batch increment on HPC:
+
+```bash
+# Pull latest remote state before local analysis/notebook work.
+uv run usr diff densegen/my_dataset bu-scc
+# Apply remote updates to local workspace copy.
+uv run usr pull densegen/my_dataset bu-scc -y
+```
+
+If you add local overlays/annotations and want them back on HPC:
+
+```bash
+# Preview whether local overlays diverged from remote.
+uv run usr diff densegen/my_dataset bu-scc
+# Push local changes back to the HPC dataset root.
+uv run usr push densegen/my_dataset bu-scc -y
+```
+
+Safety guardrails:
+
+- `usr pull` fails fast when remote `records.parquet` is missing.
+- `usr push` fails fast when local `records.parquet` is missing.
+- Dataset transfers acquire the shared remote dataset lock (`.usr.lock`) to avoid cross-host write races.
+- `usr pull` and `usr push` skip transfer when no changes are detected, so repeated loop calls are safe.
+- Pull transfers stage into a temporary directory and only promote after verification.
+- Staged pull payloads reject symlink and unsupported entry types before promotion.
+- `--verify-sidecars` enforces exact sidecar parity and fails fast on mismatch.
+- `--verify-sidecars` requires full dataset transfer and is incompatible with `--primary-only` / `--skip-snapshots`.
+- Re-run `usr pull`/`usr push` after transient transfer failure; post-transfer verification is always enforced.
+- Every pull/push prints a post-action sync audit summary for fast operator decisions.
+
+Optional strict bootstrap mode:
+
+```bash
+# Enforce namespace-qualified ids for bootstrap pulls.
+uv run usr pull demo_dataset bu-scc -y --strict-bootstrap-id
+```
+
+Environment equivalent:
+
+```bash
+# Enable strict bootstrap id mode for current shell session.
+export USR_SYNC_STRICT_BOOTSTRAP_ID=1
+```
 
 ---
 

@@ -664,6 +664,38 @@ def test_run_handles_missing_usr_registry_runtime_errors_with_actionable_next_st
     assert "Traceback" not in result.output
 
 
+def test_run_fails_fast_when_workspace_lock_is_held(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    _write_inputs(run_root)
+    cfg_path = _write_config(run_root)
+
+    called = {"run_pipeline": False}
+
+    def _fake_run_pipeline(*_args, **_kwargs):
+        called["run_pipeline"] = True
+
+    class _FailingLock:
+        def __enter__(self):
+            raise run_command.RunLockError(
+                "Run lock is held for this workspace. lock=/tmp/run.lock owner_pid=123 owner_host=node."
+            )
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
+    monkeypatch.setattr(run_command, "acquire_run_lock", lambda **_kwargs: _FailingLock())
+    runner = CliRunner()
+    result = runner.invoke(app, ["run", "--fresh", "--no-plot", "-c", str(cfg_path)])
+
+    assert result.exit_code == 1, result.output
+    assert "Run lock is held for this workspace" in result.output
+    assert "campaign-reset" not in result.output
+    assert "Traceback" not in result.output
+    assert called["run_pipeline"] is False
+
+
 def test_run_fresh_rebuilds_stage_a(tmp_path: Path, monkeypatch) -> None:
     run_root = tmp_path / "run"
     run_root.mkdir(parents=True)

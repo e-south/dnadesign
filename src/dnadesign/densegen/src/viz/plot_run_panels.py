@@ -155,22 +155,22 @@ def _build_tfbs_usage_breakdown_figure(
         ax_usage.set_ylim(0.0, y_max)
 
     summary_lines = [
-        f"placements in outputs: {int(total)}",
-        f"unique TFBS-pairs in outputs: {len(counts)}",
-        f"top10 share (specific TFBS rank): {top10:.1%}",
-        f"top50 share (specific TFBS rank): {top50:.1%}",
+        f"Placements in outputs: {int(total)}",
+        f"Unique TFBS-pairs in outputs: {len(counts)}",
+        f"Top10 share (specific TFBS rank): {top10:.1%}",
+        f"Top50 share (specific TFBS rank): {top50:.1%}",
     ]
     if available_total > 0:
         summary_lines.append(
-            f"unique TFBS-pairs used / available: {len(counts)}/{available_total} ({len(counts) / available_total:.1%})"
+            f"Unique TFBS-pairs used / available: {len(counts)}/{available_total} ({len(counts) / available_total:.1%})"
         )
     summary_lines = [_capitalize_first(line) for line in summary_lines]
     summary_font_size = float(
         style.get(
             "tfbs_usage_summary_size",
             max(
-                10.0,
-                float(style.get("label_size", style.get("font_size", 13.0))) * 0.9,
+                10.8,
+                float(style.get("label_size", style.get("font_size", 13.0))) * 0.86,
             ),
         )
     )

@@ -283,6 +283,8 @@ def record_accepted_solution_progress(
     _update_usage_summary(context.usage_counts, context.tf_usage_counts, used_tfbs_detail)
 
     if context.checkpoint_every > 0 and global_generated % max(1, context.checkpoint_every) == 0:
+        if context.flush_sinks is not None:
+            context.flush_sinks()
         _flush_attempts(context.tables_root, context.attempts_buffer)
         if context.solution_rows is not None:
             _flush_solutions(context.tables_root, context.solution_rows)

@@ -1952,7 +1952,9 @@ def test_tfbs_usage_title_is_human_readable_and_legend_has_no_frame() -> None:
         summary_lines = [line for line in str(summary_blocks[0].get_text()).splitlines() if line.strip()]
         assert summary_lines
         assert all(line[0].isupper() for line in summary_lines)
-        assert float(summary_blocks[0].get_fontsize()) >= 10.0
+        summary_font_size = float(summary_blocks[0].get_fontsize())
+        assert summary_font_size >= 10.8
+        assert summary_font_size <= 11.6
         for text in axes["usage"].texts:
             assert text.get_bbox_patch() is None
     finally:

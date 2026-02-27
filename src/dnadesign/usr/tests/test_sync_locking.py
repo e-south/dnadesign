@@ -34,6 +34,7 @@ class DummyRemote:
     def __init__(self, remote_template: Path | None = None):
         self.remote_template = remote_template
         self.pushed_file: Path | None = None
+        self.remote_lock_calls = 0
 
     def _stat_from_file(self, path: Path) -> RemoteDatasetStat:
         size = int(path.stat().st_size)
@@ -69,14 +70,23 @@ class DummyRemote:
     def push_from_local(self, _dataset: str, src: Path, **_kwargs) -> None:
         self.pushed_file = Path(src) / "records.parquet"
 
+    def dataset_transfer_lock(self, _dataset: str):
+        @contextmanager
+        def _ctx():
+            self.remote_lock_calls += 1
+            yield
+
+        return _ctx()
+
 
 def test_execute_pull_uses_lock(tmp_path: Path, monkeypatch) -> None:
     ensure_registry(tmp_path)
     remote_file = tmp_path / "remote" / "records.parquet"
     _write_min_parquet(remote_file)
+    remote = DummyRemote(remote_file)
 
     def _remote_factory(_cfg):
-        return DummyRemote(remote_file)
+        return remote
 
     lock_called = {"value": False}
 
@@ -95,6 +105,7 @@ def test_execute_pull_uses_lock(tmp_path: Path, monkeypatch) -> None:
     opts = sync_module.SyncOptions(verify="size")
     sync_module.execute_pull(tmp_path, "demo", "remote", opts)
     assert lock_called["value"] is True
+    assert remote.remote_lock_calls == 1
 
 
 def test_execute_push_uses_lock(tmp_path: Path, monkeypatch) -> None:
@@ -137,3 +148,4 @@ def test_execute_push_uses_lock(tmp_path: Path, monkeypatch) -> None:
     opts = sync_module.SyncOptions(verify="size")
     sync_module.execute_push(root, "demo", "remote", opts)
     assert lock_called["value"] is True
+    assert remote.remote_lock_calls == 1

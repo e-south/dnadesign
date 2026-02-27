@@ -81,3 +81,30 @@ def test_attach_duplicate_ids_is_error(tmp_path: Path) -> None:
 
     with pytest.raises(SchemaError):
         ds.attach(path, namespace="mock", key="id", key_col="id", columns=["score"])
+
+
+def test_attach_allow_overwrite_appends_new_ids_for_existing_column(tmp_path: Path) -> None:
+    ds = _make_dataset(tmp_path)
+    ids = ds.head(2, columns=["id"])["id"].tolist()
+
+    first = pd.DataFrame({"id": [ids[0]], "score": [1.0]})
+    first_path = tmp_path / "attach_first.csv"
+    first.to_csv(first_path, index=False)
+    ds.attach(first_path, namespace="mock", key="id", key_col="id", columns=["score"])
+
+    second = pd.DataFrame({"id": [ids[1]], "score": [2.0]})
+    second_path = tmp_path / "attach_second.csv"
+    second.to_csv(second_path, index=False)
+    ds.attach(
+        second_path,
+        namespace="mock",
+        key="id",
+        key_col="id",
+        columns=["score"],
+        allow_overwrite=True,
+    )
+
+    out = ds.head(2, columns=["id", "mock__score"])
+    by_id = {row["id"]: row["mock__score"] for _, row in out.iterrows()}
+    assert by_id[ids[0]] == 1.0
+    assert by_id[ids[1]] == 2.0
