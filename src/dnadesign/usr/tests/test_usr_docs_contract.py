@@ -129,6 +129,19 @@ def test_start_here_doc_exposes_lightweight_workflow_navigation() -> None:
     assert "docs/start-here.md" in readme
 
 
+def test_start_here_doc_includes_workflow_decision_ladders() -> None:
+    start_here = _read("docs/start-here.md")
+
+    assert "Decision ladders" in start_here
+    assert "Need iterative HPC sync for large datasets" in start_here
+    assert "Need DenseGen -> USR -> Infer chained updates" in start_here
+    assert "Need to diagnose sidecar or overlay fidelity mismatches" in start_here
+    assert "workflow-map.md" in start_here
+    assert "hpc-agent-sync-flow.md" in start_here
+    assert "chained-densegen-infer-sync-demo.md" in start_here
+    assert "sync-fidelity-drills.md" in start_here
+
+
 def test_top_level_readme_exposes_workflow_quick_paths() -> None:
     readme = _read("README.md")
 
@@ -138,6 +151,19 @@ def test_top_level_readme_exposes_workflow_quick_paths() -> None:
     assert "src/dnadesign/usr/docs/operations/workflow-map.md" in readme
     assert "src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md" in readme
     assert "src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-demo.md" in readme
+
+
+def test_docs_index_includes_progressive_entrypoint_ladders() -> None:
+    docs_index = _read("docs/README.md")
+
+    assert "Entrypoint ladders" in docs_index
+    assert "iterative HPC sync loop" in docs_index
+    assert "DenseGen -> USR -> Infer -> USR chain" in docs_index
+    assert "sync fidelity/adversarial diagnosis loop" in docs_index
+    assert "src/dnadesign/usr/docs/operations/workflow-map.md" in docs_index
+    assert "src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md" in docs_index
+    assert "src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-demo.md" in docs_index
+    assert "src/dnadesign/usr/docs/operations/sync-fidelity-drills.md" in docs_index
 
 
 def test_usr_docs_index_exposes_agent_sync_runbook() -> None:
@@ -218,6 +244,28 @@ def test_usr_workflow_map_runbook_is_indexed_with_command_chains() -> None:
     assert 'uv run usr pull "$DATASET_ID" bu-scc -y' in workflow_map
     assert 'uv run usr push "$DATASET_ID" bu-scc -y' in workflow_map
     assert "--audit-json-out" in workflow_map
+
+
+def test_usr_harness_script_is_documented_in_workflow_map() -> None:
+    workflow_map = _read("src/dnadesign/usr/docs/operations/workflow-map.md")
+    script_path = _repo_root() / "src/dnadesign/usr/scripts/run_usr_harness_cycle.sh"
+
+    assert script_path.exists()
+    assert "run_usr_harness_cycle.sh" in workflow_map
+    assert "preflight -> run -> verify" in workflow_map
+    assert "USR_HARNESS_REPORT_PATH" in workflow_map
+
+
+def test_usr_sync_audit_drill_script_is_documented_in_workflow_map() -> None:
+    workflow_map = _read("src/dnadesign/usr/docs/operations/workflow-map.md")
+    ops_index = _read("src/dnadesign/usr/docs/operations/README.md")
+    script_path = _repo_root() / "src/dnadesign/usr/scripts/run_usr_sync_audit_drill.py"
+
+    assert script_path.exists()
+    assert "run_usr_sync_audit_drill.py" in workflow_map
+    assert "--report-json" in workflow_map
+    assert "diff/pull/push" in workflow_map
+    assert "run_usr_sync_audit_drill.py" in ops_index
 
 
 def test_usr_introspection_doc_covers_lifecycle_and_config_mapping() -> None:

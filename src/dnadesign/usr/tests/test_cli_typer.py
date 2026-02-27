@@ -205,6 +205,13 @@ def test_push_help_mentions_audit_json_output_option() -> None:
     assert "--audit-json-out" in result.stdout
 
 
+def test_diff_help_mentions_audit_json_output_option() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["diff", "--help"])
+    assert result.exit_code == 0
+    assert "--audit-json-out" in result.stdout
+
+
 def test_root_help_mentions_workflow_map_and_default_sync_contract() -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["--help"])

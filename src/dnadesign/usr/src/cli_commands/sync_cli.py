@@ -35,6 +35,11 @@ def register_sync_commands(
         yes: bool = typer.Option(False, "--yes"),
         verify: str = typer.Option("hash", "--verify", help="Verification mode: hash|auto|size|parquet"),
         format: str = typer.Option("auto", "--format", help="Output format: auto|rich|plain|json"),
+        audit_json_out: str | None = typer.Option(
+            None,
+            "--audit-json-out",
+            help="Write machine-readable sync audit JSON to this path.",
+        ),
         repo_root: str | None = typer.Option(None, "--repo-root"),
         remote_path: str | None = typer.Option(None, "--remote-path"),
     ) -> None:
@@ -49,6 +54,7 @@ def register_sync_commands(
                 yes=yes,
                 verify=verify,
                 format=format,
+                audit_json_out=audit_json_out,
                 repo_root=repo_root,
                 remote_path=remote_path,
             )

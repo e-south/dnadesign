@@ -223,6 +223,15 @@ def cmd_diff(
         if not ds_name:
             return
         summary = plan_diff(args.root, ds_name, args.remote, verify=verify)
+    _write_sync_audit_json(
+        summary,
+        action="diff",
+        dry_run=False,
+        verify_sidecars=False,
+        verify_derived_hashes=False,
+        out_path=getattr(args, "audit_json_out", None),
+        output_version=output_version,
+    )
     if fmt == "json":
         print_json({"usr_output_version": output_version, "data": asdict(summary)})
         return

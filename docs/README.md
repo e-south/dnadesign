@@ -60,6 +60,21 @@ Quick entrypoint:
 | Need to pressure test sync fidelity and failure recovery | [USR sync fidelity drills](../src/dnadesign/usr/docs/operations/sync-fidelity-drills.md) | [USR sync contract](../src/dnadesign/usr/docs/operations/sync.md) |
 | Need to audit USR event boundary integration | [Notify USR events operator manual](notify/usr-events.md) | [USR README event schema](../src/dnadesign/usr/README.md#event-log-schema) |
 
+## Entrypoint ladders
+
+- iterative HPC sync loop:
+  1. [USR workflow map](../src/dnadesign/usr/docs/operations/workflow-map.md)
+  2. [USR HPC sync flow](../src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md)
+  3. [USR sync audit loop](../src/dnadesign/usr/docs/operations/sync-audit-loop.md)
+- DenseGen -> USR -> Infer -> USR chain:
+  1. [USR workflow map](../src/dnadesign/usr/docs/operations/workflow-map.md)
+  2. [USR chained DenseGen+Infer demo](../src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-demo.md)
+  3. [Infer CLI and runtime contract](../src/dnadesign/infer/README.md)
+- sync fidelity/adversarial diagnosis loop:
+  1. [USR sync command contract](../src/dnadesign/usr/docs/operations/sync.md)
+  2. [USR sync fidelity drills](../src/dnadesign/usr/docs/operations/sync-fidelity-drills.md)
+  3. [USR sync audit loop](../src/dnadesign/usr/docs/operations/sync-audit-loop.md)
+
 ## Progressive workflows
 
 - USR sync (quick -> advanced -> failure diagnosis): [src/dnadesign/usr/docs/operations/sync.md](../src/dnadesign/usr/docs/operations/sync.md)

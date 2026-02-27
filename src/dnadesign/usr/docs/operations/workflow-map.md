@@ -90,3 +90,29 @@ Details: [sync-audit-loop.md](sync-audit-loop.md)
 
 - Sidecar and hash-fidelity drills: [sync-fidelity-drills.md](sync-fidelity-drills.md)
 - Full command contract and option semantics: [sync.md](sync.md)
+
+## Deterministic harness cycle
+
+Use this when you want one reproducible preflight -> run -> verify pass before or after refactors.
+
+```bash
+# Run the deterministic USR harness cycle from repo root.
+bash src/dnadesign/usr/scripts/run_usr_harness_cycle.sh
+# Optional: emit machine-readable harness evidence.
+USR_HARNESS_REPORT_PATH=/tmp/usr-harness-report.json \
+  bash src/dnadesign/usr/scripts/run_usr_harness_cycle.sh
+```
+
+## Deterministic sync audit drill
+
+Use this when you want an end-to-end `diff/pull/push` drill with machine-readable audit artifacts across `_derived`, `_auxiliary`, and `_registry` perturbations.
+
+```bash
+# Run the local sync audit drill with an explicit report path.
+uv run python src/dnadesign/usr/scripts/run_usr_sync_audit_drill.py \
+  --report-json /tmp/usr-sync-audit-drill-report.json
+# Optional: keep local and remote drill roots for manual inspection.
+uv run python src/dnadesign/usr/scripts/run_usr_sync_audit_drill.py \
+  --work-dir /tmp/usr-sync-audit-drill \
+  --report-json /tmp/usr-sync-audit-drill-report.json
+```

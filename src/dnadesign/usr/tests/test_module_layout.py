@@ -88,6 +88,16 @@ def test_dataset_overlay_query_module_exports_expected_symbols() -> None:
     assert hasattr(module, "build_overlay_query")
 
 
+def test_dataset_state_facade_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.dataset_state_facade")
+    assert hasattr(module, "ensure_dataset_ids_exist")
+    assert hasattr(module, "tombstone_dataset_rows")
+    assert hasattr(module, "restore_dataset_rows")
+    assert hasattr(module, "set_dataset_state_fields")
+    assert hasattr(module, "clear_dataset_state_fields")
+    assert hasattr(module, "get_dataset_state_frame")
+
+
 def test_cli_sync_module_exports_expected_symbols() -> None:
     module = importlib.import_module("dnadesign.usr.src.cli_commands.sync")
     assert hasattr(module, "cmd_diff")
@@ -171,6 +181,14 @@ def test_cli_read_views_module_exports_expected_symbols() -> None:
     assert hasattr(module, "cmd_cols")
     assert hasattr(module, "cmd_describe")
     assert hasattr(module, "cmd_cell")
+
+
+def test_cli_read_parquet_targets_module_exports_expected_symbols() -> None:
+    module = importlib.import_module("dnadesign.usr.src.cli_commands.read_parquet_targets")
+    assert hasattr(module, "_list_parquet_candidates")
+    assert hasattr(module, "_resolve_parquet_from_dir")
+    assert hasattr(module, "_resolve_parquet_target")
+    assert hasattr(module, "_select_parquet_target_interactive")
 
 
 def test_cli_runtime_module_exports_expected_symbols() -> None:

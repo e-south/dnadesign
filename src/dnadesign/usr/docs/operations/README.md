@@ -12,6 +12,7 @@ This directory holds operator runbooks in progressive order.
 | Iterate HPC batch writes with local pull/verify loops | [hpc-agent-sync-flow.md](hpc-agent-sync-flow.md) |
 | Chain DenseGen and Infer updates with bidirectional sync | [chained-densegen-infer-sync-demo.md](chained-densegen-infer-sync-demo.md) |
 | Pressure test schema/fidelity failure paths | [sync-fidelity-drills.md](sync-fidelity-drills.md) |
+| Run deterministic local diff/pull/push audit drill | [workflow-map.md](workflow-map.md#deterministic-sync-audit-drill) |
 
 ## Read order
 
@@ -21,6 +22,7 @@ This directory holds operator runbooks in progressive order.
 4. [hpc-agent-sync-flow.md](hpc-agent-sync-flow.md): preflight/run/verify loop for iterative HPC pulls.
 5. [chained-densegen-infer-sync-demo.md](chained-densegen-infer-sync-demo.md): chained DenseGen and Infer workflow with bidirectional sync.
 6. [sync-fidelity-drills.md](sync-fidelity-drills.md): adversarial drills for strict sidecar plus overlay fidelity.
+7. [workflow-map.md#deterministic-sync-audit-drill](workflow-map.md#deterministic-sync-audit-drill): deterministic `run_usr_sync_audit_drill.py` command path with machine-readable audit output.
 
 ## Operator contract
 

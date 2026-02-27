@@ -47,23 +47,13 @@ from .dataset_overlay_query import build_overlay_query
 from .dataset_query import create_overlay_view, sql_ident, sql_str
 from .dataset_reporting import describe_dataset, manifest_dataset, manifest_dict_dataset
 from .dataset_reserved_overlay import write_reserved_overlay
-from .dataset_state import (
-    clear_state as dataset_clear_state,
-)
-from .dataset_state import (
-    ensure_ids_exist as dataset_ensure_ids_exist,
-)
-from .dataset_state import (
-    get_state as dataset_get_state,
-)
-from .dataset_state import (
-    restore as dataset_restore,
-)
-from .dataset_state import (
-    set_state as dataset_set_state,
-)
-from .dataset_state import (
-    tombstone as dataset_tombstone,
+from .dataset_state_facade import (
+    clear_dataset_state_fields,
+    ensure_dataset_ids_exist,
+    get_dataset_state_frame,
+    restore_dataset_rows,
+    set_dataset_state_fields,
+    tombstone_dataset_rows,
 )
 from .dataset_validate import validate_dataset
 from .dataset_views import export_dataset, get_dataset, grep_dataset, head_dataset, scan_dataset
@@ -924,7 +914,7 @@ class Dataset:
         )
 
     def _ensure_ids_exist(self, ids: list[str]) -> None:
-        dataset_ensure_ids_exist(self, ids)
+        ensure_dataset_ids_exist(self, ids)
 
     def tombstone(
         self,
@@ -934,7 +924,7 @@ class Dataset:
         deleted_at: Optional[str] = None,
         allow_missing: bool = False,
     ) -> int:
-        return dataset_tombstone(
+        return tombstone_dataset_rows(
             self,
             ids,
             reason=reason,
@@ -944,7 +934,7 @@ class Dataset:
         )
 
     def restore(self, ids: Sequence[str], *, allow_missing: bool = False) -> int:
-        return dataset_restore(
+        return restore_dataset_rows(
             self,
             ids,
             allow_missing=allow_missing,
@@ -962,7 +952,7 @@ class Dataset:
         lineage: Optional[Sequence[str] | str] = None,
         allow_missing: bool = False,
     ) -> int:
-        return dataset_set_state(
+        return set_dataset_state_fields(
             self,
             ids,
             masked=masked,
@@ -978,7 +968,7 @@ class Dataset:
         )
 
     def clear_state(self, ids: Sequence[str], *, allow_missing: bool = False) -> int:
-        return dataset_clear_state(
+        return clear_dataset_state_fields(
             self,
             ids,
             allow_missing=allow_missing,
@@ -992,7 +982,7 @@ class Dataset:
         *,
         allow_missing: bool = False,
     ) -> pd.DataFrame:
-        return dataset_get_state(
+        return get_dataset_state_frame(
             self,
             ids,
             allow_missing=allow_missing,

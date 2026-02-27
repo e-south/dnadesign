@@ -12,6 +12,21 @@ Use this page as a lightweight entrypoint before diving into full references.
 - Chained DenseGen -> USR -> Infer workflow: [src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-demo.md](../src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-demo.md)
 - Adversarial sync fidelity drills: [src/dnadesign/usr/docs/operations/sync-fidelity-drills.md](../src/dnadesign/usr/docs/operations/sync-fidelity-drills.md)
 
+## Decision ladders
+
+- Need iterative HPC sync for large datasets:
+  1. [USR workflow map](../src/dnadesign/usr/docs/operations/workflow-map.md)
+  2. [USR HPC sync flow](../src/dnadesign/usr/docs/operations/hpc-agent-sync-flow.md)
+  3. [USR sync audit loop](../src/dnadesign/usr/docs/operations/sync-audit-loop.md)
+- Need DenseGen -> USR -> Infer chained updates:
+  1. [USR workflow map](../src/dnadesign/usr/docs/operations/workflow-map.md)
+  2. [USR chained DenseGen+Infer demo](../src/dnadesign/usr/docs/operations/chained-densegen-infer-sync-demo.md)
+  3. [Infer README](../src/dnadesign/infer/README.md)
+- Need to diagnose sidecar or overlay fidelity mismatches:
+  1. [USR sync command contract](../src/dnadesign/usr/docs/operations/sync.md)
+  2. [USR sync fidelity drills](../src/dnadesign/usr/docs/operations/sync-fidelity-drills.md)
+  3. [USR sync audit loop](../src/dnadesign/usr/docs/operations/sync-audit-loop.md)
+
 ## Task shortcuts
 
 - Need to bootstrap a repo clone and environment: [docs/installation.md](installation.md)

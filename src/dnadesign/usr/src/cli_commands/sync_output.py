@@ -75,7 +75,11 @@ def build_sync_audit_payload(
     summary, *, action: str, dry_run: bool, verify_sidecars: bool, verify_derived_hashes: bool
 ) -> dict:
     has_change = bool(getattr(summary, "has_change", False))
-    transfer_state = "DRY-RUN" if dry_run else ("TRANSFERRED" if has_change else "NO-OP")
+    action_text = str(action)
+    if action_text == "diff":
+        transfer_state = "DIFF-ONLY"
+    else:
+        transfer_state = "DRY-RUN" if dry_run else ("TRANSFERRED" if has_change else "NO-OP")
     dataset_name = str(getattr(summary, "dataset", "<unknown>"))
     verify_mode = str(getattr(summary, "verify_mode", "auto"))
     changes = dict(getattr(summary, "changes", {}) or {})
@@ -92,7 +96,7 @@ def build_sync_audit_payload(
     aux_remote = len(getattr(summary, "aux_remote_files", []) or [])
     aux_changed = bool(changes.get("aux_files_diff"))
     return {
-        "action": str(action),
+        "action": action_text,
         "transfer_state": transfer_state,
         "dataset": dataset_name,
         "verify": {

@@ -637,3 +637,88 @@ def test_push_detects_auxiliary_file_drift_when_event_sidecar_delta_is_missing(
     assert _FilesystemRemote.push_transfer_calls == 1
     remote_aux = remote_root / dataset_id / "_artifacts" / "batch" / "checkpoint.json"
     assert remote_aux.read_text(encoding="utf-8") == local_aux.read_text(encoding="utf-8")
+
+
+def test_pull_detects_registry_auxiliary_drift_when_event_sidecar_delta_is_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    local_root = tmp_path / "local_usr"
+    remote_root = tmp_path / "remote_usr"
+    ensure_registry(local_root)
+    ensure_registry(remote_root)
+    dataset_id = "densegen/demo_registry_pull_gap"
+
+    remote_dataset = Dataset(remote_root, dataset_id)
+    remote_dataset.init(source="remote-seed")
+    remote_dataset.import_rows([_row("AAAA", "remote-seed")], source="remote-seed")
+
+    remote_cfg = SSHRemoteConfig(
+        name="bu-scc",
+        host="mock",
+        user="mock",
+        base_dir=str(remote_root),
+    )
+    _FilesystemRemote.fail_next_pull = False
+    _FilesystemRemote.fail_next_push = False
+    _FilesystemRemote.pull_transfer_calls = 0
+    _FilesystemRemote.push_transfer_calls = 0
+    _FilesystemRemote.remote_lock_calls = 0
+    monkeypatch.setattr(sync_module, "get_remote", lambda _name: remote_cfg)
+    monkeypatch.setattr(sync_module, "SSHRemote", _FilesystemRemote)
+
+    opts = sync_module.SyncOptions(verify="auto")
+    sync_module.execute_pull(local_root, dataset_id, "bu-scc", opts)
+    assert _FilesystemRemote.pull_transfer_calls == 1
+
+    remote_registry_note = remote_root / dataset_id / "_registry" / "operator-note.yaml"
+    remote_registry_note.parent.mkdir(parents=True, exist_ok=True)
+    remote_registry_note.write_text("source: hpc\nphase: batch-2\n", encoding="utf-8")
+
+    sync_module.execute_pull(local_root, dataset_id, "bu-scc", opts)
+
+    assert _FilesystemRemote.pull_transfer_calls == 2
+    local_registry_note = local_root / dataset_id / "_registry" / "operator-note.yaml"
+    assert local_registry_note.read_text(encoding="utf-8") == remote_registry_note.read_text(encoding="utf-8")
+
+
+def test_push_detects_registry_auxiliary_drift_when_event_sidecar_delta_is_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    local_root = tmp_path / "local_usr"
+    remote_root = tmp_path / "remote_usr"
+    ensure_registry(local_root)
+    ensure_registry(remote_root)
+    dataset_id = "densegen/demo_registry_push_gap"
+
+    remote_dataset = Dataset(remote_root, dataset_id)
+    remote_dataset.init(source="remote-seed")
+    remote_dataset.import_rows([_row("AAAA", "remote-seed")], source="remote-seed")
+
+    remote_cfg = SSHRemoteConfig(
+        name="bu-scc",
+        host="mock",
+        user="mock",
+        base_dir=str(remote_root),
+    )
+    _FilesystemRemote.fail_next_pull = False
+    _FilesystemRemote.fail_next_push = False
+    _FilesystemRemote.pull_transfer_calls = 0
+    _FilesystemRemote.push_transfer_calls = 0
+    _FilesystemRemote.remote_lock_calls = 0
+    monkeypatch.setattr(sync_module, "get_remote", lambda _name: remote_cfg)
+    monkeypatch.setattr(sync_module, "SSHRemote", _FilesystemRemote)
+
+    opts = sync_module.SyncOptions(verify="auto")
+    sync_module.execute_pull(local_root, dataset_id, "bu-scc", opts)
+    assert _FilesystemRemote.pull_transfer_calls == 1
+    assert _FilesystemRemote.push_transfer_calls == 0
+
+    local_registry_note = local_root / dataset_id / "_registry" / "operator-note.yaml"
+    local_registry_note.parent.mkdir(parents=True, exist_ok=True)
+    local_registry_note.write_text("source: local\nphase: post-analysis\n", encoding="utf-8")
+
+    sync_module.execute_push(local_root, dataset_id, "bu-scc", opts)
+
+    assert _FilesystemRemote.push_transfer_calls == 1
+    remote_registry_note = remote_root / dataset_id / "_registry" / "operator-note.yaml"
+    assert remote_registry_note.read_text(encoding="utf-8") == local_registry_note.read_text(encoding="utf-8")

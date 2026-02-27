@@ -702,6 +702,68 @@ def test_cmd_push_writes_sync_audit_json_artifact(tmp_path: Path, monkeypatch) -
     assert payload["data"]["verify"]["sidecars"] == "off"
 
 
+def test_cmd_diff_writes_sync_audit_json_artifact(tmp_path: Path, monkeypatch) -> None:
+    audit_path = tmp_path / "audit" / "diff.json"
+    summary = SimpleNamespace(
+        dataset="densegen/demo",
+        has_change=True,
+        verify_mode="hash",
+        changes={
+            "primary_sha_diff": True,
+            "meta_mtime_diff": True,
+            "snapshots_name_diff": False,
+            "derived_files_diff": True,
+            "aux_files_diff": True,
+        },
+        events_local_lines=1,
+        events_remote_lines=3,
+        snapshots=SimpleNamespace(count=2, newer_than_local=1),
+        derived_local_files=["densegen/part-001.parquet"],
+        derived_remote_files=["densegen/part-001.parquet", "densegen/part-002.parquet"],
+        aux_local_files=["_registry/a.yaml"],
+        aux_remote_files=["_registry/a.yaml", "_registry/b.yaml"],
+        primary_local=SimpleNamespace(sha256="a", size=1, rows=1, cols=1),
+        primary_remote=SimpleNamespace(sha256="b", size=2, rows=2, cols=1),
+        verify_notes=[],
+        meta_local_mtime="1",
+        meta_remote_mtime="2",
+    )
+    monkeypatch.setattr(sync_commands, "_is_file_mode_target", lambda _target: False)
+    monkeypatch.setattr(sync_commands, "_is_dataset_dir_target", lambda _target: False)
+    monkeypatch.setattr(
+        sync_commands,
+        "_resolve_dataset_id_for_diff_or_pull",
+        lambda _root, _dataset, *, use_rich: "densegen/demo",
+    )
+    monkeypatch.setattr(sync_commands, "plan_diff", lambda *_args, **_kwargs: summary)
+    monkeypatch.setattr(sync_commands, "_print_verify_notes", lambda _summary: None)
+    monkeypatch.setattr(sync_commands, "_print_diff", lambda _summary, *, use_rich=None: None)
+
+    args = SimpleNamespace(
+        dataset="densegen/demo",
+        remote="bu-scc",
+        verify="hash",
+        root=tmp_path / "usr_root",
+        rich=False,
+        repo_root=None,
+        remote_path=None,
+        format="plain",
+        audit_json_out=str(audit_path),
+    )
+    sync_commands.cmd_diff(
+        args,
+        resolve_output_format=lambda _args: "plain",
+        print_json=lambda _payload: None,
+        output_version=sync_commands.USR_OUTPUT_VERSION,
+    )
+    payload = json.loads(audit_path.read_text(encoding="utf-8"))
+    assert payload["usr_output_version"] == sync_commands.USR_OUTPUT_VERSION
+    assert payload["data"]["action"] == "diff"
+    assert payload["data"]["_derived"]["changed"] is True
+    assert payload["data"]["_auxiliary"]["changed"] is True
+    assert payload["data"][".events.log"]["remote"] == 3
+
+
 def test_cmd_pull_file_mode_rejects_verify_sidecars(tmp_path: Path) -> None:
     file_target = tmp_path / "records.parquet"
     file_target.write_text("stub", encoding="utf-8")

@@ -28,6 +28,7 @@ from ..ui import (
     print_df_plain,
     render_table_rich,
 )
+from . import read_parquet_targets
 
 
 @dataclass(frozen=True)
@@ -41,80 +42,12 @@ class ReadViewDeps:
     legacy_dataset_path_error: str
 
 
-def _list_parquet_candidates(dir_path: Path, glob: str | None = None) -> list[Path]:
-    dir_path = Path(dir_path)
-    if not dir_path.exists() or not dir_path.is_dir():
-        return []
-    seen: dict[Path, None] = {}
-
-    def _add(p: Path) -> None:
-        if p.exists() and p.is_file() and p.suffix.lower() == ".parquet":
-            seen[p.resolve()] = None
-
-    if glob:
-        for p in sorted(dir_path.glob(glob)):
-            _add(p)
-    _add(dir_path / "records.parquet")
-    _add(dir_path / "events.parquet")
-    for p in sorted(dir_path.glob("events*.parquet")):
-        _add(p)
-    for p in sorted(dir_path.glob("*.parquet")):
-        _add(p)
-    cands = list(seen.keys())
-    cands.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-    return cands
+def _resolve_parquet_from_dir(dir_path: Path, glob: str | None = None) -> Path:
+    return read_parquet_targets._resolve_parquet_from_dir(dir_path, glob=glob)
 
 
-def _human_size(n: int | None) -> str:
-    if not isinstance(n, int):
-        return "?"
-    units = ["B", "KB", "MB", "GB", "TB"]
-    i = 0
-    x = float(n)
-    while x >= 1024 and i < len(units) - 1:
-        x /= 1024.0
-        i += 1
-    return f"{x:.0f}{units[i]}"
-
-
-def _prompt_pick_parquet(cands: list[Path], use_rich: bool) -> Path | None:
-    if not cands:
-        return None
-    if len(cands) == 1:
-        return cands[0]
-    rows = []
-    for idx, p in enumerate(cands, start=1):
-        pf = pq.ParquetFile(str(p))
-        rows.append(
-            {
-                "#": idx,
-                "file": p.name,
-                "rows": pf.metadata.num_rows,
-                "cols": pf.metadata.num_columns,
-                "size": _human_size(int(p.stat().st_size)),
-            }
-        )
-    df = pd.DataFrame(rows, columns=["#", "file", "rows", "cols", "size"])
-    msg = "Multiple Parquet files found. Choose one by number (Enter = newest, q = abort):"
-    if use_rich:
-        render_table_rich(df, title="Pick a Parquet file", caption=msg)
-    else:
-        print_df_plain(df)
-        print(msg)
-    sel = input("> ").strip().lower()
-    if sel in {"q", "quit", "n"}:
-        print("Aborted.")
-        return None
-    if not sel:
-        return cands[0]
-    try:
-        k = int(sel)
-        if 1 <= k <= len(cands):
-            return cands[k - 1]
-    except ValueError:
-        pass
-    print("Invalid selection. Aborted.")
-    return None
+def _resolve_parquet_target(path_like: Path, glob: str | None = None) -> Path:
+    return read_parquet_targets._resolve_parquet_target(path_like, glob=glob)
 
 
 def _select_parquet_target_interactive(
@@ -126,54 +59,14 @@ def _select_parquet_target_interactive(
     root: Path | None = None,
     confirm_if_inferred: bool = False,
 ) -> Path | None:
-    _ = confirm_if_inferred
-    p = Path(path_like)
-    if p.exists():
-        deps.assert_not_legacy_dataset_path(p, root)
-    if p.is_file() and p.suffix.lower() == ".parquet":
-        return p
-    if p.is_dir():
-        cands = _list_parquet_candidates(p, glob=glob)
-        if not cands:
-            print(f"(no Parquet files found under {p})")
-            print(
-                "Tip: cd into a dataset folder (with records.parquet) or pass a dataset name (e.g., 'usr cols demo')."
-            )
-            return None
-        if len(cands) == 1:
-            return cands[0]
-        return _prompt_pick_parquet(cands, use_rich)
-    return None
-
-
-def _resolve_parquet_from_dir(dir_path: Path, glob: str | None = None) -> Path:
-    dir_path = Path(dir_path)
-    if not dir_path.exists() or not dir_path.is_dir():
-        raise FileNotFoundError(f"{dir_path} is not a directory")
-    cands = []
-    if (dir_path / "events.parquet").exists():
-        return dir_path / "events.parquet"
-    if glob:
-        cands = sorted(dir_path.glob(glob))
-    if not cands:
-        cands = sorted(dir_path.glob("events*.parquet"))
-    if not cands and (dir_path / "records.parquet").exists():
-        return dir_path / "records.parquet"
-    if not cands:
-        cands = sorted(dir_path.glob("*.parquet"))
-    if not cands:
-        raise FileNotFoundError(f"No Parquet files found under {dir_path}")
-    cands.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-    return cands[0]
-
-
-def _resolve_parquet_target(path_like: Path, glob: str | None = None) -> Path:
-    p = Path(path_like)
-    if p.is_file() and p.suffix.lower() == ".parquet":
-        return p
-    if p.is_dir():
-        return _resolve_parquet_from_dir(p, glob=glob)
-    raise FileNotFoundError(f"Target not found: {p}")
+    return read_parquet_targets._select_parquet_target_interactive(
+        path_like,
+        glob,
+        use_rich,
+        deps=deps,
+        root=root,
+        confirm_if_inferred=confirm_if_inferred,
+    )
 
 
 def _print_df(df: pd.DataFrame) -> None:
