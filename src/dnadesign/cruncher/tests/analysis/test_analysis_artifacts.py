@@ -1694,7 +1694,7 @@ def test_analyze_generates_optimizer_vs_fimo_plot_when_enabled(tmp_path: Path, m
         return {"n_points": int(len(concordance_df))}
 
     monkeypatch.setattr(
-        "dnadesign.cruncher.app.analyze_workflow.build_fimo_concordance_table",
+        "dnadesign.cruncher.app.analyze.plotting_static.build_fimo_concordance_table",
         _fake_build_fimo_concordance_table,
     )
     monkeypatch.setattr(

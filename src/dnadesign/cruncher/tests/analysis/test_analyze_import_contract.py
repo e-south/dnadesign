@@ -83,3 +83,64 @@ def test_analyze_workflow_delegates_score_space_helpers_to_module() -> None:
     assert projection_inputs_def not in content, (
         "analyze_workflow should not define _resolve_objective_projection_inputs."
     )
+
+
+def test_analyze_workflow_delegates_plot_rendering_helpers_to_module() -> None:
+    cruncher_root = Path(__file__).resolve().parents[2]
+    workflow_path = cruncher_root / "src" / "app" / "analyze_workflow.py"
+    content = workflow_path.read_text()
+
+    helper_import = "from dnadesign.cruncher.app.analyze.plotting import ("
+    delegated_defs = (
+        "def _record_analysis_plot(",
+        "def _prepare_analysis_plot_dir(",
+        "def _render_trajectory_analysis_plots(",
+        "def _render_trajectory_video_plot(",
+        "def _render_static_analysis_plots(",
+        "def _render_fimo_analysis_plot(",
+    )
+
+    assert helper_import in content, "Expected analyze_workflow to import plot helpers from app.analyze.plotting."
+    for delegated_def in delegated_defs:
+        assert delegated_def not in content, f"analyze_workflow should not define {delegated_def}."
+
+
+def test_analyze_plotting_module_delegates_rendering_to_submodules() -> None:
+    cruncher_root = Path(__file__).resolve().parents[2]
+    plotting_path = cruncher_root / "src" / "app" / "analyze" / "plotting.py"
+    content = plotting_path.read_text()
+
+    assert "from dnadesign.cruncher.app.analyze.plotting_trajectory import (" in content
+    assert "from dnadesign.cruncher.app.analyze.plotting_static import (" in content
+    assert "from dnadesign.cruncher.app.analyze.plotting_registry import _prepare_analysis_plot_dir" in content
+
+    delegated_defs = (
+        "def _record_analysis_plot(",
+        "def _render_trajectory_analysis_plots(",
+        "def _render_trajectory_video_plot(",
+        "def _render_static_analysis_plots(",
+        "def _render_fimo_analysis_plot(",
+    )
+    for delegated_def in delegated_defs:
+        assert delegated_def not in content, f"plotting.py should not define {delegated_def}."
+
+
+def test_analyze_workflow_delegates_output_publication_to_module() -> None:
+    cruncher_root = Path(__file__).resolve().parents[2]
+    workflow_path = cruncher_root / "src" / "app" / "analyze_workflow.py"
+    content = workflow_path.read_text()
+
+    assert "from dnadesign.cruncher.app.analyze.publish import publish_analysis_outputs" in content
+    assert "publish_analysis_outputs(" in content
+
+    non_orchestration_calls = (
+        "build_table_entries(",
+        "build_table_artifacts(",
+        "build_analysis_manifests(",
+        "build_report_payload(",
+        "write_report_json(",
+        "write_report_md(",
+        "build_summary_payload(",
+    )
+    for call_text in non_orchestration_calls:
+        assert call_text not in content, f"analyze_workflow should delegate {call_text}."
