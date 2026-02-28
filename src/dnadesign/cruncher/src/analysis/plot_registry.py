@@ -43,6 +43,14 @@ PLOT_SPECS: tuple[PlotSpec, ...] = (
         "Per-chain joint objective progression over sweeps with tune/cooling context when available.",
     ),
     PlotSpec(
+        "chain_trajectory_video",
+        "Chain trajectory video",
+        ("sequences",),
+        ("chain_trajectory_video.mp4",),
+        "diagnostics",
+        "Best-chain trajectory video with optional monotonic best-so-far timeline rendering.",
+    ),
+    PlotSpec(
         "elites_nn_distance",
         "Elite nearest-neighbor distance",
         ("elites",),
