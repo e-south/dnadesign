@@ -210,6 +210,7 @@ src/dnadesign/densegen/src/adapters/outputs/**/*.pyc
 # DenseGen workspaces: ignore everything by default, allow demo + README
 src/dnadesign/densegen/workspaces/**
 !src/dnadesign/densegen/workspaces/README.md
+!src/dnadesign/densegen/workspaces/catalog.md
 !src/dnadesign/densegen/workspaces/demo_tfbs_baseline/
 !src/dnadesign/densegen/workspaces/demo_tfbs_baseline/README.md
 !src/dnadesign/densegen/workspaces/demo_tfbs_baseline/config.yaml
