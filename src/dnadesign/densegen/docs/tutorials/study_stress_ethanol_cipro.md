@@ -144,3 +144,6 @@ uv run cruncher catalog export-densegen --set 1 --source demo_merged_meme_oops_m
 - [DenseGen to USR to Notify tutorial](demo_usr_notify.md)
 - [Outputs reference](../reference/outputs.md)
 - [Workspace catalog](../../workspaces/catalog.md)
+- [BU SCC Quickstart](../../../../../docs/bu-scc/quickstart.md)
+- [BU SCC Batch + Notify runbook](../../../../../docs/bu-scc/batch-notify.md)
+- [BU SCC job templates](../../../../../docs/bu-scc/jobs/README.md)
