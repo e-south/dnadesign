@@ -60,8 +60,8 @@ Use pixi for toolchains such as MEME Suite that are required by some workflows b
 # Install or update the pinned pixi environment.
 pixi install --locked
 
-# Run a task that depends on pixi-managed binaries.
-pixi run cruncher -- doctor -c src/dnadesign/cruncher/workspaces/demo_pairwise/configs/config.yaml
+# Verify MEME/FIMO is available in the pixi environment.
+pixi run -- fimo --version
 
 # Add or update a pixi-managed system package.
 pixi add bioconda::meme
