@@ -30,6 +30,7 @@ _REQUIRED_COLUMNS = (
     "densegen__plan",
     "densegen__used_tfbs_detail",
 )
+_OVERLAY_TEXT_COLUMN = "densegen__video_overlay_text"
 _SAFE_SEGMENT_RE = re.compile(r"[^A-Za-z0-9._-]+")
 
 
@@ -100,6 +101,22 @@ def _normalize_source_rows(df: pd.DataFrame) -> pd.DataFrame:
             raise ValueError("Dense-array video densegen__used_tfbs_detail includes non-JSON values.") from exc
     frame["densegen__used_tfbs_detail"] = encoded_annotations
     return frame
+
+
+def _display_record_id(record_id: str) -> str:
+    record_text = str(record_id or "unknown")
+    if len(record_text) > 16:
+        return f"{record_text[:8]}...{record_text[-4:]}"
+    return record_text
+
+
+def _attach_overlay_text(frame: pd.DataFrame) -> pd.DataFrame:
+    enriched = frame.copy()
+    enriched[_OVERLAY_TEXT_COLUMN] = [
+        f"TFBS arrangement snapshot for sequence {_display_record_id(record_id)}"
+        for record_id in enriched["id"].astype(str).tolist()
+    ]
+    return enriched
 
 
 def _ordered_rows_for_mode(frame: pd.DataFrame, *, video_cfg: PlotVideoConfig) -> pd.DataFrame:
@@ -247,6 +264,7 @@ def plot_dense_array_video_showcase(
         max_source_rows=int(video_cfg.sampling.max_source_rows),
         max_snapshots=snapshot_cap,
     )
+    sampled = _attach_overlay_text(sampled)
     if len(sampled) > target_total_frames:
         raise ValueError(
             "Dense-array video snapshot count exceeds playback frame budget; "
@@ -276,7 +294,10 @@ def plot_dense_array_video_showcase(
                 "path": str(records_path),
                 "adapter": {
                     "kind": str(contract.adapter_kind),
-                    "columns": dict(contract.adapter_columns),
+                    "columns": {
+                        **dict(contract.adapter_columns),
+                        "overlay_text": _OVERLAY_TEXT_COLUMN,
+                    },
                     "policies": dict(contract.adapter_policies),
                 },
                 "alphabet": "DNA",
@@ -290,7 +311,13 @@ def plot_dense_array_video_showcase(
             },
             "render": {
                 "renderer": "sequence_rows",
-                "style": {"preset": str(contract.style_preset)},
+                "style": {
+                    "preset": str(contract.style_preset),
+                    "overrides": {
+                        "overlay_align": "center",
+                        "font_size_label": 15,
+                    },
+                },
             },
             "outputs": [
                 {

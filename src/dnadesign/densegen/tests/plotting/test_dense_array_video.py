@@ -142,10 +142,12 @@ def _patch_video_job_capture(monkeypatch, captured: dict[str, object]) -> None:
         captured["kind"] = kind
         captured["caller_root"] = caller_root
         captured["job_mapping"] = job_mapping
+        captured["adapter_columns"] = dict(job_mapping["input"]["adapter"]["columns"])
         selection_path = Path(str(job_mapping["selection"]["path"]))
         with selection_path.open(newline="") as handle:
             rows = list(csv.DictReader(handle))
         captured["selection_ids"] = [str(row["id"]) for row in rows]
+        captured["records_df"] = pd.read_parquet(Path(str(job_mapping["input"]["path"])))
         out_path = Path(str(job_mapping["outputs"][0]["path"]))
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_bytes(b"fake-mp4")
@@ -287,6 +289,39 @@ playback:
     run_plots_from_config(loaded.root, cfg_path, only="dense_array_video_showcase")
 
     assert len(captured["selection_ids"]) <= 24
+
+
+def test_dense_array_video_uses_notebook_style_overlay_titles(monkeypatch, tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    run_root.mkdir(parents=True)
+    cfg_path = run_root / "config.yaml"
+    _write_video_config(cfg_path)
+    (run_root / "inputs.csv").write_text("tf,tfbs\n")
+
+    records_path = run_root / "outputs" / "tables" / "records.parquet"
+    records_path.parent.mkdir(parents=True, exist_ok=True)
+    records_path.write_bytes(b"placeholder")
+
+    records_df = _base_records_df().copy()
+    records_df.loc[1, "id"] = "abcdefghijklmnopqrstu"
+    _patch_records_loader(monkeypatch, records_df, records_path)
+
+    captured: dict[str, object] = {}
+    _patch_video_job_capture(monkeypatch, captured)
+
+    loaded = load_config(cfg_path)
+    run_plots_from_config(loaded.root, cfg_path, only="dense_array_video_showcase")
+
+    assert captured["adapter_columns"]["overlay_text"] == "densegen__video_overlay_text"
+    assert captured["job_mapping"]["render"]["style"]["overrides"]["overlay_align"] == "center"
+    assert captured["job_mapping"]["render"]["style"]["overrides"]["font_size_label"] == 15
+    rendered_df = captured["records_df"]
+    assert rendered_df["densegen__video_overlay_text"].tolist() == [
+        "TFBS arrangement snapshot for sequence abcdefgh...rstu",
+        "TFBS arrangement snapshot for sequence rec_b_1",
+        "TFBS arrangement snapshot for sequence rec_a_2",
+        "TFBS arrangement snapshot for sequence rec_b_2",
+    ]
 
 
 def test_dense_array_video_rejects_duplicate_ids(monkeypatch, tmp_path: Path) -> None:
