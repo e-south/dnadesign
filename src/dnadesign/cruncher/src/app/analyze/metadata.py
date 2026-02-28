@@ -102,11 +102,6 @@ def load_pwms_from_config(run_dir: Path) -> tuple[dict[str, PWM], dict]:
     return pwms, cruncher_cfg
 
 
-def _load_pwms_from_config(run_dir: Path) -> tuple[dict[str, PWM], dict]:
-    # Backward-compatible alias used by existing analysis imports.
-    return load_pwms_from_config(run_dir)
-
-
 def _resolve_sample_meta(used_cfg: dict, manifest: dict) -> SampleMeta:
     if not isinstance(used_cfg, dict):
         raise ValueError("config_used.yaml missing cruncher config; re-run `cruncher sample`.")

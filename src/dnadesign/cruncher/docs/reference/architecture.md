@@ -86,8 +86,13 @@ Core contract:
 - translates CLI intent + config into concrete runs and artifacts
 - analyze orchestration is split by concern:
   - run-level assembly/state transitions in `app/analyze_workflow.py`
+  - run-level metadata/artifact context resolution in `app/analyze/execution.py`
+  - run-level compute/score-space context resolution in `app/analyze/run_context.py`
+  - table/metric computation + persistence in `app/analyze/computation.py`
   - score-space projection helpers in `app/analyze_score_space.py`
   - plot orchestration surface in `app/analyze/plotting.py`
+  - run-level plot render orchestration in `app/analyze/rendering.py`
+  - lazy plot callable resolution in `app/analyze/plot_resolver.py`
   - plot artifact bookkeeping in `app/analyze/plotting_registry.py`
   - trajectory plot/video render paths in `app/analyze/plotting_trajectory.py`
   - static and FIMO plot render paths in `app/analyze/plotting_static.py`

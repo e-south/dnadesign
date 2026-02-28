@@ -20,9 +20,7 @@ from dnadesign.cruncher.app.analyze.score_space import (
     _resolve_trajectory_tf_pair,
     _resolve_worst_second_tf_pair,
 )
-from dnadesign.cruncher.app.analyze_workflow import (
-    _summarize_elites_mmr,
-)
+from dnadesign.cruncher.app.analyze_support import _summarize_elites_mmr
 
 
 def test_resolve_trajectory_tf_pair_uses_selected_pair() -> None:
