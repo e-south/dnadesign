@@ -3,14 +3,7 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-02-28
 
-This guide is the first-run setup path for local development and CLI usage. Complete the required path once, then choose optional branches only when you need them.
-
-### Guide structure
-Use this order for progressive setup:
-
-1. Confirm your platform lane and version contracts.
-2. Run the required install path and baseline verification.
-3. Add optional branches only after the baseline passes.
+This guide is the first-run setup path for local development and CLI usage: confirm platform/version contracts, run the required install and baseline verification, then add optional branches only when needed.
 
 ### 1) Choose your platform lane
 
@@ -68,7 +61,8 @@ Run this only when a workflow needs pixi-managed tools such as MEME/FIMO.
 
 ```bash
 pixi install --locked
-pixi run cruncher -- doctor -c src/dnadesign/cruncher/workspaces/demo_pairwise/configs/config.yaml
+# Verify MEME/FIMO is available in the pixi environment.
+pixi run -- fimo --version
 ```
 
 Dependency maintenance operations (add/update/remove) are documented in **[docs/dependencies.md](dependencies.md)**.
