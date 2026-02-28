@@ -2,7 +2,7 @@
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-19
+**Last verified:** 2026-02-28
 
 ## At a glance
 `dnadesign` is a uv-managed monorepo of modular bioinformatics tools under `src/dnadesign/`, with shared CI/devtools and operator runbooks in `docs/`.
@@ -40,7 +40,7 @@ This file is the architecture map: it names system boundaries, major flows, and 
 ## Where to go deeper
 - Maintainer index: `docs/dev/README.md`
 - Monorepo organization audit: `docs/dev/monorepo-organization-audit.md`
-- BU SCC operational source of truth: `docs/bu-scc/sge-hpc-ops/SKILL.md`
+- BU SCC operational source of truth: `docs/bu-scc/README.md`, `docs/bu-scc/quickstart.md`, and `docs/bu-scc/batch-notify.md`
 - Notify event contract: `docs/notify/usr-events.md`
 - Reliability operations: `RELIABILITY.md`
 - Security policy and secrets handling: `SECURITY.md`
