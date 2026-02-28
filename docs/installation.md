@@ -1,67 +1,44 @@
 ## Installation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-02-28
 
-This document covers initial repository setup for local development and CLI usage. Read it when bootstrapping a new environment; detailed dependency maintenance guidance lives in `docs/dependencies.md`.
+This document is the setup path for new machines. It starts with the shortest runnable install, then adds optional paths for development tools, pixi-managed system binaries, and Linux GPU extras.
 
-### Install uv
-This section installs the package manager used by this monorepo.
+### Platform support
+Use this table to pick the correct setup path before running commands.
+
+| Environment | Status | Notes |
+| --- | --- | --- |
+| macOS (`arm64`, `x86_64`) | Supported | Run the quick install path below. |
+| Linux (`x86_64`) | Supported | Primary `uv.lock` target. |
+| Windows 10/11 via WSL2 | Supported | Run all commands inside your WSL Linux shell. |
+| Native Windows (PowerShell/CMD) | Not supported | `pyproject.toml` `tool.uv.environments` and `pixi.toml` platforms do not include Windows. |
+
+### Version contracts
+These versions are constrained by repository configuration and should be treated as installation requirements.
+
+- Python: `>=3.12,<3.13` (`pyproject.toml` `[project] requires-python`)
+- uv: `>=0.9.18,<0.10` (`pyproject.toml` `[tool.uv] required-version`)
+- pixi platforms: `osx-arm64`, `osx-64`, `linux-64` (`pixi.toml` `[workspace] platforms`)
+
+### Quick install (Linux/macOS/WSL)
+Run this path first. It sets up a reproducible base environment from committed lockfiles.
 
 ```bash
-# Install uv on macOS/Linux.
 curl -LsSf https://astral.sh/uv/install.sh | sh
-```
+# If uv is not on PATH yet, start a new shell session.
 
-### Clone the repository
-This section checks out the project source locally.
-
-```bash
-# Clone the repository and enter the project directory.
 git clone https://github.com/e-south/dnadesign.git
 cd dnadesign
-```
 
-### Sync the project environment
-This section creates or updates the project virtual environment from the committed lockfile.
-
-```bash
-# Ensure Python 3.12 is available to uv.
+uv --version
 uv python install 3.12
-
-# Create or sync the project environment from uv.lock.
 uv sync --locked
 
-# Run a basic import sanity check.
+# Baseline verification.
 uv run python -c "import dnadesign, pandas, pyarrow; print('ok')"
-```
-
-### Optional dev-tool setup
-This section installs lint/test tooling used during development.
-
-```bash
-# Install optional dev dependencies.
-uv sync --locked --group dev
-
-# Confirm linter and test runner are available (not installed without --group dev).
-uv run ruff --version
-uv run pytest --version
-```
-
-### Run CLI entrypoints
-This section shows the standard non-activated workflow for project CLIs.
-
-```bash
-# Show help for repository CLIs.
 uv run usr --help
-uv run dense --help
-uv run notify --help
-uv run cruncher --help
-uv run baserender --help
-uv run infer --help
-uv run cluster --help
-uv run opal --help
-uv run permuter --help
 ```
 
 ### Environment note (matplotlib cache)
@@ -70,6 +47,30 @@ Some CLI help paths import matplotlib. On systems where `~/.matplotlib` is not w
 ```bash
 # Use a writable cache location for matplotlib-backed CLI commands.
 export MPLCONFIGDIR="${TMPDIR:-/tmp}/matplotlib"
+```
+
+### Optional dev-tool setup
+Install this only when you will run lint/test commands locally.
+
+```bash
+uv sync --locked --group dev
+uv run ruff --version
+uv run pytest --version
+```
+
+### Optional pixi system dependencies
+Use this when workflows need system binaries such as MEME/FIMO.
+
+```bash
+pixi install --locked
+pixi run cruncher -- doctor -c src/dnadesign/cruncher/workspaces/demo_pairwise/configs/config.yaml
+```
+
+### Optional GPU extra (`infer-evo2`)
+This extra is Linux `x86_64` only.
+
+```bash
+uv sync --locked --extra infer-evo2
 ```
 
 ### BU SCC links
