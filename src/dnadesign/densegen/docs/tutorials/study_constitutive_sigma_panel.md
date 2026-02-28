@@ -5,7 +5,7 @@
 
 
 This tutorial runs the constitutive sigma70 panel workspace with fixed-element expansion and strict LacI/AraC background filtering.
-Sigma70 -10/-35 literal source: DOI: 10.1038/s41467-017-02473-5 | www.nature.com/naturecommunications.
+Sigma70 -10/-35 literal source: Tuning the dynamic range of bacterial promoters regulated by ligand-inducible transcription factors. DOI: 10.1038/s41467-017-02473-5 | https://www.nature.com/articles/s41467-017-02473-5.
 
 ### Runbook command
 
