@@ -42,6 +42,8 @@ def test_notify_docs_readme_keeps_operator_progressive_disclosure() -> None:
         text,
         [
             "### Choose a workflow",
+            "### Progressive disclosure path",
+            "### Prompt-to-command router",
             "### 2-minute operator path",
             "### Interface contract summary",
             "### Command surface map",
@@ -50,7 +52,9 @@ def test_notify_docs_readme_keeps_operator_progressive_disclosure() -> None:
         ],
         label="docs/notify/README.md",
     )
-    assert "### Progressive disclosure path" in text
+    assert "start a densegen workspace watcher and send to slack" in text
+    assert "i already have a profile, just validate wiring" in text
+    assert "resume failed deliveries from spool" in text
     assert "`notify setup slack` mode contract" in text
     assert "`notify usr-events watch` mode contract" in text
 

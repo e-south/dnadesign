@@ -19,6 +19,15 @@ Use this page as the route map; deep watcher procedures live in `docs/notify/usr
 3. Move to [Notify USR events operator manual](usr-events.md) for setup/run/recover command anatomy and failure handling.
 4. Use [BU SCC Batch + Notify runbook](../bu-scc/batch-notify.md) only when running under scheduler-managed loops.
 
+### Prompt-to-command router
+
+| If the user asks... | Run this first | Then verify with |
+| --- | --- | --- |
+| "start a densegen workspace watcher and send to slack" | `notify setup slack --tool densegen --workspace <workspace> --secret-source auto --policy densegen` | `notify profile doctor --profile <config-dir>/outputs/notify/densegen/profile.json` |
+| "i already have a profile, just validate wiring" | `notify profile doctor --profile <profile.json>` | `notify usr-events watch --profile <profile.json> --dry-run` |
+| "resume failed deliveries from spool" | `notify spool drain --profile <profile.json>` | `notify spool drain --profile <profile.json> --fail-fast` |
+| "watch this workspace without passing profile path" | `notify usr-events watch --tool <tool> --workspace <workspace> --follow` | `notify setup resolve-events --tool <tool> --workspace <workspace>` |
+
 ### 2-minute operator path
 
 ```bash
