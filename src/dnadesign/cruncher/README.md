@@ -4,6 +4,12 @@ Cruncher designs short, fixed-length DNA sequences that score highly across one 
 
 See the [repository docs index](../../../docs/README.md) for cross-tool workflow routing.
 
+Interface contracts are layered:
+
+- Repository-level contracts: [Architecture](../../../ARCHITECTURE.md), [Design](../../../DESIGN.md), [Reliability](../../../RELIABILITY.md), [Security](../../../SECURITY.md)
+- Tool-level contracts: [Config reference](docs/reference/config.md), [CLI reference](docs/reference/cli.md), [Artifacts reference](docs/reference/artifacts.md), [Architecture reference](docs/reference/architecture.md)
+- Workflow entrypoints: [Demos](docs/README.md#documentation-by-workflow) and then targeted guides
+
 - **What it is:** an optimization engine for designing **short, fixed-length DNA** sequences that jointly satisfy one or more transcription factor position weight matrices, then returning a **diverse elite set**.
 - **When to use:** multi-transcription-factor promoter/operator design under tight length constraints; motif-compatibility tradeoff exploration; producing a small, diverse candidate set for assays; workspace-scoped parameter studies with aggregate comparison.
 - **Mental model:** deterministic data prep (`fetch`/`lock`) + strict Gibbs annealing optimization (`sample`) + artifact-native analytics (`analyze`).
