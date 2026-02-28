@@ -113,7 +113,7 @@ def _display_record_id(record_id: str) -> str:
 def _attach_overlay_text(frame: pd.DataFrame) -> pd.DataFrame:
     enriched = frame.copy()
     enriched[_OVERLAY_TEXT_COLUMN] = [
-        f"TFBS arrangement for {_display_record_id(record_id)}" for record_id in enriched["id"].astype(str).tolist()
+        f"TFBS arrangement {_display_record_id(record_id)}" for record_id in enriched["id"].astype(str).tolist()
     ]
     return enriched
 

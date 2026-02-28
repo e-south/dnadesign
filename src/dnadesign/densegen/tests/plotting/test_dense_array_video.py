@@ -317,10 +317,10 @@ def test_dense_array_video_uses_notebook_style_overlay_titles(monkeypatch, tmp_p
     assert captured["job_mapping"]["render"]["style"]["overrides"]["font_size_label"] == 15
     rendered_df = captured["records_df"]
     assert rendered_df["densegen__video_overlay_text"].tolist() == [
-        "TFBS arrangement for abcdefgh...rstu",
-        "TFBS arrangement for rec_b_1",
-        "TFBS arrangement for rec_a_2",
-        "TFBS arrangement for rec_b_2",
+        "TFBS arrangement abcdefgh...rstu",
+        "TFBS arrangement rec_b_1",
+        "TFBS arrangement rec_a_2",
+        "TFBS arrangement rec_b_2",
     ]
 
 
