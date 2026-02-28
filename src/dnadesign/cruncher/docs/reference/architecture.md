@@ -1,10 +1,10 @@
 ## Cruncher architecture
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-02-28
 
 
-**Last updated by:** cruncher-maintainers on 2026-02-23
+**Last updated by:** cruncher-maintainers on 2026-02-28
 
 ### Contents
 - [Cruncher architecture](#cruncher-architecture)
@@ -61,6 +61,12 @@ Core contract:
 - plot registry, per-PWM summaries, and analysis helpers
 - plot implementations live under `analysis/plots/`
 - baserender-backed elites showcase lives in `analysis/plots/elites_showcase.py`
+- trajectory score-space elite mapping/sampling helpers live in `analysis/plots/trajectory_score_space.py`
+- trajectory score-space panel rendering helpers live in `analysis/plots/trajectory_score_space_panel.py`
+- trajectory score-space plot orchestration lives in `analysis/plots/trajectory_score_space_plot.py`
+- chain-trajectory video orchestration lives in `analysis/trajectory_video.py`
+- trajectory frame/timeline selection helpers live in `analysis/trajectory_video_timeline.py`
+- baserender video contract assembly lives in `analysis/trajectory_video_contract.py`
 
 #### `artifacts/` (run layout + manifests)
 - run directory layout + status helpers
@@ -91,7 +97,7 @@ Cruncher integrates with baserender through the **public package root only**:
 - Allowed: `from dnadesign.baserender import ...`
 - Disallowed: `dnadesign.baserender.src.*` deep imports
 
-Current Cruncher handoff for `elites_showcase.*`:
+Current Cruncher handoff for `elites_showcase.*` and `chain_trajectory_video.mp4`:
 
 1. Cruncher resolves run data into rendering primitives:
    - sequence per elite
@@ -102,7 +108,9 @@ Current Cruncher handoff for `elites_showcase.*`:
    - or equivalent in-memory `Record` objects through baserender public APIs
 3. Baserender validates contracts, performs layout/rendering, and emits assets.
 
-The showcase renderer does not require overlap tables; overlap metrics remain separate analysis artifacts.
+For `chain_trajectory_video.mp4`, Cruncher first resolves selected-chain trajectory rows and sampled frame indices, then writes temporary record rows and passes a strict sequence-rows video job contract to baserender.
+
+The showcase/video renderers do not require overlap tables; overlap metrics remain separate analysis artifacts.
 
 This keeps responsibilities decoupled:
 - Cruncher owns analysis semantics and motif provenance.
@@ -202,6 +210,7 @@ A typical **sample** run directory contains:
 - `analysis/manifests/plot_manifest.json` + `analysis/manifests/table_manifest.json` + `analysis/manifests/manifest.json` - analysis inventories
 - `export/table__elites.csv` + `export/table__*.{parquet|csv}` + `export/export_manifest.json` - sequence-export tables from `cruncher export sequences`
 - `plots/*` - curated analysis plots and catalog logo renders
+- `plots/chain_trajectory_video.mp4` - optional trajectory-video artifact (`analysis.trajectory_video.enabled=true`)
 - `analysis/tables/table__*` - curated table outputs
 
 ---

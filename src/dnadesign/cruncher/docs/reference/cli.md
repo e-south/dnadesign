@@ -1,10 +1,10 @@
 ## Cruncher CLI
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
+**Last verified:** 2026-02-28
 
 
-**Last updated by:** cruncher-maintainers on 2026-02-23
+**Last updated by:** cruncher-maintainers on 2026-02-28
 
 ### Contents
 - [Cruncher CLI](#cruncher-cli)
@@ -292,7 +292,7 @@ Outputs:
 * plots: `plots/elite_score_space_context.<plot_format>`,
   `plots/chain_trajectory_sweep.<plot_format>`,
   `plots/elites_nn_distance.<plot_format>`, `plots/elites_showcase.<plot_format>`,
-  `plots/health_panel.<plot_format>` (trace only)
+  `plots/health_panel.<plot_format>` (trace only), `plots/chain_trajectory_video.mp4` (optional, when `analysis.trajectory_video.enabled=true`)
 * reports: `analysis/reports/report.json`, `analysis/reports/report.md`
 * summaries: `analysis/reports/summary.json`, `analysis/manifests/manifest.json`, `analysis/manifests/plot_manifest.json`, `analysis/manifests/table_manifest.json`
 
@@ -571,7 +571,7 @@ Notes:
 * plot output status is refreshed from disk so missing files are shown accurately
 * the Refresh button re-scans analysis entries and updates plot/table status without restarting marimo
 * the notebook infers `run_dir` from its location; keep it under `<run_dir>/` or regenerate it
-* plots are loaded from `analysis/manifests/plot_manifest.json`; the curated keys are `elite_score_space_context`, `chain_trajectory_sweep`, `elites_nn_distance`, `elites_showcase`, plus optional `health_panel` and `optimizer_vs_fimo` entries when generated
+* plots are loaded from `analysis/manifests/plot_manifest.json`; the curated keys are `elite_score_space_context`, `chain_trajectory_sweep`, `elites_nn_distance`, `elites_showcase`, plus optional `chain_trajectory_video`, `health_panel`, and `optimizer_vs_fimo` entries when generated
 * the notebook includes:
   * Overview tab with run metadata and explicit warnings for missing/invalid analysis artifacts
   * Tables tab with a Top-K slider and per-table previews from `analysis/manifests/table_manifest.json`
