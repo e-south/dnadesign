@@ -26,7 +26,7 @@ This table is generated from workspace machine runbooks and is the standard cros
 | `demo_multitf` | `lock_targets` |  | `cruncher lock -c configs/config.yaml` |
 | `demo_multitf` | `parse_run` |  | `cruncher parse --force-overwrite -c configs/config.yaml` |
 | `demo_multitf` | `sample_run` |  | `cruncher sample --force-overwrite -c configs/config.yaml` |
-| `demo_multitf` | `analyze_summary` |  | `cruncher analyze --summary -c configs/config.yaml` |
+| `demo_multitf` | `analyze_summary` | Analyze run outputs; set analysis.trajectory_video.enabled=true in configs/config.yaml to emit plots/chain_trajectory_video.mp4. | `cruncher analyze --summary -c configs/config.yaml` |
 | `demo_multitf` | `export_sequences_latest` |  | `cruncher export sequences --latest -c configs/config.yaml` |
 | `demo_multitf` | `render_logos` |  | `cruncher catalog logos --source demo_merged_meme_oops_multitf --set 1 -c configs/config.yaml` |
 | `demo_multitf` | `study_run_length_vs_score` | Sweep sequence_length with a step-2 grid plus base-config anchor and emit length-vs-score aggregates. | `cruncher study run --spec configs/studies/length_vs_score.study.yaml --force-overwrite` |
@@ -39,7 +39,7 @@ This table is generated from workspace machine runbooks and is the standard cros
 | `demo_pairwise` | `lock_targets` |  | `cruncher lock -c configs/config.yaml` |
 | `demo_pairwise` | `parse_run` |  | `cruncher parse --force-overwrite -c configs/config.yaml` |
 | `demo_pairwise` | `sample_run` |  | `cruncher sample --force-overwrite -c configs/config.yaml` |
-| `demo_pairwise` | `analyze_summary` |  | `cruncher analyze --summary -c configs/config.yaml` |
+| `demo_pairwise` | `analyze_summary` | Analyze run outputs; set analysis.trajectory_video.enabled=true in configs/config.yaml to emit plots/chain_trajectory_video.mp4. | `cruncher analyze --summary -c configs/config.yaml` |
 | `demo_pairwise` | `export_sequences_latest` |  | `cruncher export sequences --latest -c configs/config.yaml` |
 | `demo_pairwise` | `render_logos` |  | `cruncher catalog logos --source demo_merged_meme_oops --set 1 -c configs/config.yaml` |
 | `demo_pairwise` | `study_run_length_vs_score` | Sweep sequence_length with a step-2 grid plus base-config anchor and emit length-vs-score aggregates. | `cruncher study run --spec configs/studies/length_vs_score.study.yaml --force-overwrite` |
@@ -53,7 +53,7 @@ This table is generated from workspace machine runbooks and is the standard cros
 | `multitf_baer_lexa_soxr` | `lock_targets` |  | `cruncher lock -c configs/config.yaml` |
 | `multitf_baer_lexa_soxr` | `parse_run` |  | `cruncher parse --force-overwrite -c configs/config.yaml` |
 | `multitf_baer_lexa_soxr` | `sample_run` |  | `cruncher sample --force-overwrite -c configs/config.yaml` |
-| `multitf_baer_lexa_soxr` | `analyze_summary` |  | `cruncher analyze --summary -c configs/config.yaml` |
+| `multitf_baer_lexa_soxr` | `analyze_summary` | Analyze run outputs; set analysis.trajectory_video.enabled=true in configs/config.yaml to emit plots/chain_trajectory_video.mp4. | `cruncher analyze --summary -c configs/config.yaml` |
 | `multitf_baer_lexa_soxr` | `export_sequences_latest` |  | `cruncher export sequences --latest -c configs/config.yaml` |
 | `multitf_baer_lexa_soxr` | `render_logos` |  | `cruncher catalog logos --source multitf_baer_lexa_soxr_merged_meme_oops --set 1 -c configs/config.yaml` |
 | `multitf_baer_lexa_soxr` | `study_run_length_vs_score` | Sweep sequence_length with a step-2 grid plus base-config anchor and emit length-vs-score aggregates. | `cruncher study run --spec configs/studies/length_vs_score.study.yaml --force-overwrite` |
@@ -67,7 +67,7 @@ This table is generated from workspace machine runbooks and is the standard cros
 | `multitf_baer_lexa_soxr_soxs` | `lock_targets` |  | `cruncher lock -c configs/config.yaml` |
 | `multitf_baer_lexa_soxr_soxs` | `parse_run` |  | `cruncher parse --force-overwrite -c configs/config.yaml` |
 | `multitf_baer_lexa_soxr_soxs` | `sample_run` |  | `cruncher sample --force-overwrite -c configs/config.yaml` |
-| `multitf_baer_lexa_soxr_soxs` | `analyze_summary` |  | `cruncher analyze --summary -c configs/config.yaml` |
+| `multitf_baer_lexa_soxr_soxs` | `analyze_summary` | Analyze run outputs; set analysis.trajectory_video.enabled=true in configs/config.yaml to emit plots/chain_trajectory_video.mp4. | `cruncher analyze --summary -c configs/config.yaml` |
 | `multitf_baer_lexa_soxr_soxs` | `export_sequences_latest` |  | `cruncher export sequences --latest -c configs/config.yaml` |
 | `multitf_baer_lexa_soxr_soxs` | `render_logos` |  | `cruncher catalog logos --source multitf_baer_lexa_soxr_soxs_merged_meme_oops --set 1 -c configs/config.yaml` |
 | `multitf_baer_lexa_soxr_soxs` | `study_run_length_vs_score` | Sweep sequence_length with a step-2 grid plus base-config anchor and emit length-vs-score aggregates. | `cruncher study run --spec configs/studies/length_vs_score.study.yaml --force-overwrite` |
@@ -81,7 +81,7 @@ This table is generated from workspace machine runbooks and is the standard cros
 | `multitf_cpxr_baer_lexa` | `lock_targets` |  | `cruncher lock -c configs/config.yaml` |
 | `multitf_cpxr_baer_lexa` | `parse_run` |  | `cruncher parse --force-overwrite -c configs/config.yaml` |
 | `multitf_cpxr_baer_lexa` | `sample_run` |  | `cruncher sample --force-overwrite -c configs/config.yaml` |
-| `multitf_cpxr_baer_lexa` | `analyze_summary` |  | `cruncher analyze --summary -c configs/config.yaml` |
+| `multitf_cpxr_baer_lexa` | `analyze_summary` | Analyze run outputs; set analysis.trajectory_video.enabled=true in configs/config.yaml to emit plots/chain_trajectory_video.mp4. | `cruncher analyze --summary -c configs/config.yaml` |
 | `multitf_cpxr_baer_lexa` | `export_sequences_latest` |  | `cruncher export sequences --latest -c configs/config.yaml` |
 | `multitf_cpxr_baer_lexa` | `render_logos` |  | `cruncher catalog logos --source multitf_cpxr_baer_lexa_merged_meme_oops --set 1 -c configs/config.yaml` |
 | `multitf_cpxr_baer_lexa` | `study_run_length_vs_score` | Sweep sequence_length with a step-2 grid plus base-config anchor and emit length-vs-score aggregates. | `cruncher study run --spec configs/studies/length_vs_score.study.yaml --force-overwrite` |
@@ -95,7 +95,7 @@ This table is generated from workspace machine runbooks and is the standard cros
 | `pairwise_baer_lexa` | `lock_targets` |  | `cruncher lock -c configs/config.yaml` |
 | `pairwise_baer_lexa` | `parse_run` |  | `cruncher parse --force-overwrite -c configs/config.yaml` |
 | `pairwise_baer_lexa` | `sample_run` |  | `cruncher sample --force-overwrite -c configs/config.yaml` |
-| `pairwise_baer_lexa` | `analyze_summary` |  | `cruncher analyze --summary -c configs/config.yaml` |
+| `pairwise_baer_lexa` | `analyze_summary` | Analyze run outputs; set analysis.trajectory_video.enabled=true in configs/config.yaml to emit plots/chain_trajectory_video.mp4. | `cruncher analyze --summary -c configs/config.yaml` |
 | `pairwise_baer_lexa` | `export_sequences_latest` |  | `cruncher export sequences --latest -c configs/config.yaml` |
 | `pairwise_baer_lexa` | `render_logos` |  | `cruncher catalog logos --source pairwise_baer_lexa_merged_meme_oops --set 1 -c configs/config.yaml` |
 | `pairwise_baer_lexa` | `study_run_length_vs_score` | Sweep sequence_length with a step-2 grid plus base-config anchor and emit length-vs-score aggregates. | `cruncher study run --spec configs/studies/length_vs_score.study.yaml --force-overwrite` |
@@ -109,7 +109,7 @@ This table is generated from workspace machine runbooks and is the standard cros
 | `pairwise_baer_soxr` | `lock_targets` |  | `cruncher lock -c configs/config.yaml` |
 | `pairwise_baer_soxr` | `parse_run` |  | `cruncher parse --force-overwrite -c configs/config.yaml` |
 | `pairwise_baer_soxr` | `sample_run` |  | `cruncher sample --force-overwrite -c configs/config.yaml` |
-| `pairwise_baer_soxr` | `analyze_summary` |  | `cruncher analyze --summary -c configs/config.yaml` |
+| `pairwise_baer_soxr` | `analyze_summary` | Analyze run outputs; set analysis.trajectory_video.enabled=true in configs/config.yaml to emit plots/chain_trajectory_video.mp4. | `cruncher analyze --summary -c configs/config.yaml` |
 | `pairwise_baer_soxr` | `export_sequences_latest` |  | `cruncher export sequences --latest -c configs/config.yaml` |
 | `pairwise_baer_soxr` | `render_logos` |  | `cruncher catalog logos --source pairwise_baer_soxr_merged_meme_oops --set 1 -c configs/config.yaml` |
 | `pairwise_baer_soxr` | `study_run_length_vs_score` | Sweep sequence_length with a step-2 grid plus base-config anchor and emit length-vs-score aggregates. | `cruncher study run --spec configs/studies/length_vs_score.study.yaml --force-overwrite` |
@@ -123,7 +123,7 @@ This table is generated from workspace machine runbooks and is the standard cros
 | `pairwise_cpxr_baer` | `lock_targets` |  | `cruncher lock -c configs/config.yaml` |
 | `pairwise_cpxr_baer` | `parse_run` |  | `cruncher parse --force-overwrite -c configs/config.yaml` |
 | `pairwise_cpxr_baer` | `sample_run` |  | `cruncher sample --force-overwrite -c configs/config.yaml` |
-| `pairwise_cpxr_baer` | `analyze_summary` |  | `cruncher analyze --summary -c configs/config.yaml` |
+| `pairwise_cpxr_baer` | `analyze_summary` | Analyze run outputs; set analysis.trajectory_video.enabled=true in configs/config.yaml to emit plots/chain_trajectory_video.mp4. | `cruncher analyze --summary -c configs/config.yaml` |
 | `pairwise_cpxr_baer` | `export_sequences_latest` |  | `cruncher export sequences --latest -c configs/config.yaml` |
 | `pairwise_cpxr_baer` | `render_logos` |  | `cruncher catalog logos --source pairwise_cpxr_baer_merged_meme_oops --set 1 -c configs/config.yaml` |
 | `pairwise_cpxr_baer` | `study_run_length_vs_score` | Sweep sequence_length with a step-2 grid plus base-config anchor and emit length-vs-score aggregates. | `cruncher study run --spec configs/studies/length_vs_score.study.yaml --force-overwrite` |
@@ -136,7 +136,7 @@ This table is generated from workspace machine runbooks and is the standard cros
 | `pairwise_cpxr_lexa` | `lock_targets` |  | `cruncher lock -c configs/config.yaml` |
 | `pairwise_cpxr_lexa` | `parse_run` |  | `cruncher parse --force-overwrite -c configs/config.yaml` |
 | `pairwise_cpxr_lexa` | `sample_run` |  | `cruncher sample --force-overwrite -c configs/config.yaml` |
-| `pairwise_cpxr_lexa` | `analyze_summary` |  | `cruncher analyze --summary -c configs/config.yaml` |
+| `pairwise_cpxr_lexa` | `analyze_summary` | Analyze run outputs; set analysis.trajectory_video.enabled=true in configs/config.yaml to emit plots/chain_trajectory_video.mp4. | `cruncher analyze --summary -c configs/config.yaml` |
 | `pairwise_cpxr_lexa` | `export_sequences_latest` |  | `cruncher export sequences --latest -c configs/config.yaml` |
 | `pairwise_cpxr_lexa` | `render_logos` |  | `cruncher catalog logos --source pairwise_cpxr_lexa_merged_meme_oops --set 1 -c configs/config.yaml` |
 | `pairwise_cpxr_lexa` | `study_run_length_vs_score` | Sweep sequence_length with a step-2 grid plus base-config anchor and emit length-vs-score aggregates. | `cruncher study run --spec configs/studies/length_vs_score.study.yaml --force-overwrite` |
@@ -149,7 +149,7 @@ This table is generated from workspace machine runbooks and is the standard cros
 | `pairwise_cpxr_soxr` | `lock_targets` |  | `cruncher lock -c configs/config.yaml` |
 | `pairwise_cpxr_soxr` | `parse_run` |  | `cruncher parse --force-overwrite -c configs/config.yaml` |
 | `pairwise_cpxr_soxr` | `sample_run` |  | `cruncher sample --force-overwrite -c configs/config.yaml` |
-| `pairwise_cpxr_soxr` | `analyze_summary` |  | `cruncher analyze --summary -c configs/config.yaml` |
+| `pairwise_cpxr_soxr` | `analyze_summary` | Analyze run outputs; set analysis.trajectory_video.enabled=true in configs/config.yaml to emit plots/chain_trajectory_video.mp4. | `cruncher analyze --summary -c configs/config.yaml` |
 | `pairwise_cpxr_soxr` | `export_sequences_latest` |  | `cruncher export sequences --latest -c configs/config.yaml` |
 | `pairwise_cpxr_soxr` | `render_logos` |  | `cruncher catalog logos --source pairwise_cpxr_soxr_merged_meme_oops --set 1 -c configs/config.yaml` |
 | `pairwise_cpxr_soxr` | `study_run_length_vs_score` | Sweep sequence_length with a step-2 grid plus base-config anchor and emit length-vs-score aggregates. | `cruncher study run --spec configs/studies/length_vs_score.study.yaml --force-overwrite` |
@@ -162,7 +162,7 @@ This table is generated from workspace machine runbooks and is the standard cros
 | `pairwise_laci_arac` | `lock_targets` |  | `cruncher lock -c configs/config.yaml` |
 | `pairwise_laci_arac` | `parse_run` |  | `cruncher parse --force-overwrite -c configs/config.yaml` |
 | `pairwise_laci_arac` | `sample_run` |  | `cruncher sample --force-overwrite -c configs/config.yaml` |
-| `pairwise_laci_arac` | `analyze_summary` |  | `cruncher analyze --summary -c configs/config.yaml` |
+| `pairwise_laci_arac` | `analyze_summary` | Analyze run outputs; set analysis.trajectory_video.enabled=true in configs/config.yaml to emit plots/chain_trajectory_video.mp4. | `cruncher analyze --summary -c configs/config.yaml` |
 | `pairwise_laci_arac` | `export_sequences_latest` |  | `cruncher export sequences --latest -c configs/config.yaml` |
 | `pairwise_laci_arac` | `render_logos` |  | `cruncher catalog logos --source pairwise_laci_arac_merged_meme_oops --set 1 -c configs/config.yaml` |
 | `pairwise_laci_arac` | `export_densegen` |  | `cruncher catalog export-densegen --set 1 --densegen-workspace study_constitutive_sigma_panel -c configs/config.yaml` |
@@ -176,7 +176,7 @@ This table is generated from workspace machine runbooks and is the standard cros
 | `pairwise_soxr_soxs` | `lock_targets` |  | `cruncher lock -c configs/config.yaml` |
 | `pairwise_soxr_soxs` | `parse_run` |  | `cruncher parse --force-overwrite -c configs/config.yaml` |
 | `pairwise_soxr_soxs` | `sample_run` |  | `cruncher sample --force-overwrite -c configs/config.yaml` |
-| `pairwise_soxr_soxs` | `analyze_summary` |  | `cruncher analyze --summary -c configs/config.yaml` |
+| `pairwise_soxr_soxs` | `analyze_summary` | Analyze run outputs; set analysis.trajectory_video.enabled=true in configs/config.yaml to emit plots/chain_trajectory_video.mp4. | `cruncher analyze --summary -c configs/config.yaml` |
 | `pairwise_soxr_soxs` | `export_sequences_latest` |  | `cruncher export sequences --latest -c configs/config.yaml` |
 | `pairwise_soxr_soxs` | `render_logos` |  | `cruncher catalog logos --source pairwise_soxr_soxs_merged_meme_oops --set 1 -c configs/config.yaml` |
 | `pairwise_soxr_soxs` | `study_run_length_vs_score` | Sweep sequence_length with a step-2 grid plus base-config anchor and emit length-vs-score aggregates. | `cruncher study run --spec configs/studies/length_vs_score.study.yaml --force-overwrite` |
@@ -191,7 +191,7 @@ This table is generated from workspace machine runbooks and is the standard cros
 | `project_tfs_lexa_cpxr_baer_rcda_lrp_fur_fnr_acrr_soxr_soxs` | `lock_targets` |  | `cruncher lock -c configs/config.yaml` |
 | `project_tfs_lexa_cpxr_baer_rcda_lrp_fur_fnr_acrr_soxr_soxs` | `parse_run` |  | `cruncher parse --force-overwrite -c configs/config.yaml` |
 | `project_tfs_lexa_cpxr_baer_rcda_lrp_fur_fnr_acrr_soxr_soxs` | `sample_run` |  | `cruncher sample --force-overwrite -c configs/config.yaml` |
-| `project_tfs_lexa_cpxr_baer_rcda_lrp_fur_fnr_acrr_soxr_soxs` | `analyze_summary` |  | `cruncher analyze --summary -c configs/config.yaml` |
+| `project_tfs_lexa_cpxr_baer_rcda_lrp_fur_fnr_acrr_soxr_soxs` | `analyze_summary` | Analyze run outputs; set analysis.trajectory_video.enabled=true in configs/config.yaml to emit plots/chain_trajectory_video.mp4. | `cruncher analyze --summary -c configs/config.yaml` |
 | `project_tfs_lexa_cpxr_baer_rcda_lrp_fur_fnr_acrr_soxr_soxs` | `export_sequences_latest` |  | `cruncher export sequences --latest -c configs/config.yaml` |
 | `project_tfs_lexa_cpxr_baer_rcda_lrp_fur_fnr_acrr_soxr_soxs` | `render_logos` |  | `cruncher catalog logos --source project_merged_meme_oops_all_tfs --set 1 -c configs/config.yaml` |
 | `project_tfs_lexa_cpxr_baer_rcda_lrp_fur_fnr_acrr_soxr_soxs` | `study_run_length_vs_score` | Sweep sequence_length with a step-2 grid plus base-config anchor and emit length-vs-score aggregates. | `cruncher study run --spec configs/studies/length_vs_score.study.yaml --force-overwrite` |
