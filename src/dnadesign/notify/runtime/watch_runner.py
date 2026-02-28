@@ -15,17 +15,11 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .watch_runner_contract import (
-    normalize_on_invalid_event_mode,
-    resolve_optional_profile_bool,
-    resolve_progress_min_seconds,
-    resolve_progress_step_pct,
     validate_watch_request_contract,
 )
+from .watch_runner_inputs import resolve_watch_runner_inputs
 from .watch_runner_resolution import (
-    resolve_events_path,
     resolve_watch_mode,
-    resolve_webhook_delivery,
-    resolve_webhook_sources,
     validate_profile_events_source_match,
 )
 
@@ -118,121 +112,73 @@ def run_usr_events_watch(
         profile_data=profile_data,
         resolve_profile_events_source=resolve_profile_events_source,
     )
-
-    provider_value = resolve_string_value(field="provider", cli_value=provider, profile_data=profile_data)
-    events_path = resolve_events_path(
-        events=events,
+    resolved_inputs = resolve_watch_runner_inputs(
         mode=mode,
         profile_data=profile_data,
-        resolve_path_value=resolve_path_value,
-        resolve_profile_events_source=resolve_profile_events_source,
-        resolve_tool_events_path=resolve_tool_events_path,
-        resolve_usr_events_path=resolve_usr_events_path,
-    )
-    cursor_path = resolve_optional_path_value(
-        field="cursor",
-        cli_value=cursor,
-        profile_data=profile_data,
-        profile_path=mode.profile_path,
-    )
-    only_actions_value = resolve_optional_string_value(
-        field="only_actions",
-        cli_value=only_actions,
-        profile_data=profile_data,
-    )
-    only_tools_value = resolve_optional_string_value(
-        field="only_tools",
-        cli_value=only_tools,
-        profile_data=profile_data,
-    )
-    progress_step_pct_value = resolve_progress_step_pct(
-        progress_step_pct=progress_step_pct,
-        profile_data=profile_data,
-    )
-    progress_min_seconds_value = resolve_progress_min_seconds(
-        progress_min_seconds=progress_min_seconds,
-        profile_data=profile_data,
-    )
-    spool_dir_value = resolve_optional_path_value(
-        field="spool_dir",
-        cli_value=spool_dir,
-        profile_data=profile_data,
-        profile_path=mode.profile_path,
-    )
-    include_args_value = resolve_optional_profile_bool(
-        cli_value=include_args,
-        profile_data=profile_data,
-        field="include_args",
-    )
-    include_context_value = resolve_optional_profile_bool(
-        cli_value=include_context,
-        profile_data=profile_data,
-        field="include_context",
-    )
-    include_raw_event_value = resolve_optional_profile_bool(
-        cli_value=include_raw_event,
-        profile_data=profile_data,
-        field="include_raw_event",
-    )
-
-    url_env_value, secret_ref_value, profile_tls_ca_bundle = resolve_webhook_sources(
-        profile_data=profile_data,
+        provider=provider,
+        url=url,
         url_env=url_env,
         secret_ref=secret_ref,
         tls_ca_bundle=tls_ca_bundle,
-        profile_path=mode.profile_path,
+        events=events,
+        cursor=cursor,
+        only_actions=only_actions,
+        only_tools=only_tools,
+        progress_step_pct=progress_step_pct,
+        progress_min_seconds=progress_min_seconds,
+        on_invalid_event=on_invalid_event,
+        spool_dir=spool_dir,
+        include_args=include_args,
+        include_context=include_context,
+        include_raw_event=include_raw_event,
+        dry_run=dry_run,
+        resolve_string_value=resolve_string_value,
+        resolve_path_value=resolve_path_value,
+        resolve_optional_path_value=resolve_optional_path_value,
+        resolve_optional_string_value=resolve_optional_string_value,
+        resolve_profile_events_source=resolve_profile_events_source,
+        resolve_tool_events_path=resolve_tool_events_path,
+        resolve_usr_events_path=resolve_usr_events_path,
         resolve_profile_webhook_source=resolve_profile_webhook_source,
         resolve_cli_optional_string=resolve_cli_optional_string,
-        resolve_optional_path_value=resolve_optional_path_value,
-    )
-    webhook_url, resolved_tls_ca_bundle = resolve_webhook_delivery(
-        dry_run=dry_run,
-        url=url,
-        url_env_value=url_env_value,
-        secret_ref_value=secret_ref_value,
-        provider_value=provider_value,
-        profile_tls_ca_bundle=profile_tls_ca_bundle,
         resolve_webhook_url=resolve_webhook_url,
-        validate_provider_webhook_url=validate_provider_webhook_url,
         resolve_tls_ca_bundle=resolve_tls_ca_bundle,
+        validate_provider_webhook_url=validate_provider_webhook_url,
+        split_csv=split_csv,
     )
-
-    action_filter = set(split_csv(only_actions_value))
-    tool_filter = set(split_csv(only_tools_value))
-    on_invalid_event_mode = normalize_on_invalid_event_mode(on_invalid_event)
 
     watch_usr_events_loop(
-        events_path=events_path,
-        cursor_path=cursor_path,
+        events_path=resolved_inputs.events_path,
+        cursor_path=resolved_inputs.cursor_path,
         on_truncate=on_truncate,
         follow=follow,
         wait_for_events=wait_for_events,
         idle_timeout_seconds=idle_timeout,
         poll_interval_seconds=poll_interval_seconds,
         should_advance_cursor=(not dry_run) or bool(advance_cursor_on_dry_run),
-        on_invalid_event_mode=on_invalid_event_mode,
+        on_invalid_event_mode=resolved_inputs.on_invalid_event_mode,
         allow_unknown_version=allow_unknown_version,
-        action_filter=action_filter,
-        tool_filter=tool_filter,
-        progress_step_pct=progress_step_pct_value,
-        progress_min_seconds=progress_min_seconds_value,
+        action_filter=resolved_inputs.action_filter,
+        tool_filter=resolved_inputs.tool_filter,
+        progress_step_pct=resolved_inputs.progress_step_pct_value,
+        progress_min_seconds=resolved_inputs.progress_min_seconds_value,
         tool=mode.tool_value_for_events,
         run_id=run_id,
-        provider_value=provider_value,
+        provider_value=resolved_inputs.provider_value,
         message=message,
-        include_args_value=bool(include_args_value),
-        include_context_value=bool(include_context_value),
-        include_raw_event_value=bool(include_raw_event_value),
+        include_args_value=resolved_inputs.include_args_value,
+        include_context_value=resolved_inputs.include_context_value,
+        include_raw_event_value=resolved_inputs.include_raw_event_value,
         dry_run=dry_run,
         stop_on_terminal_status=stop_on_terminal_status,
-        webhook_url=webhook_url,
-        resolved_tls_ca_bundle=resolved_tls_ca_bundle,
+        webhook_url=resolved_inputs.webhook_url,
+        resolved_tls_ca_bundle=resolved_inputs.resolved_tls_ca_bundle,
         connect_timeout=connect_timeout,
         read_timeout=read_timeout,
         retry_max=retry_max,
         retry_base_seconds=retry_base_seconds,
         fail_fast=fail_fast,
-        spool_dir_value=spool_dir_value,
+        spool_dir_value=resolved_inputs.spool_dir_value,
         validate_usr_event=validate_usr_event,
         status_for_action=status_for_action,
         event_message=event_message,
