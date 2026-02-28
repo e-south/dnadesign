@@ -17,13 +17,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from dnadesign.cruncher.analysis.trajectory_video import (
-    _best_so_far_source_indices,
-    _linear_taper_extra_frames,
-    _phase_filter_rows,
-    _sample_indices,
-    _select_chain_rows,
-    render_chain_trajectory_video,
+from dnadesign.cruncher.analysis.trajectory_video import render_chain_trajectory_video
+from dnadesign.cruncher.analysis.trajectory_video_timeline import (
+    allocate_taper_extra_frames,
+    filter_rows_by_phase_scope,
+    sample_frame_indices,
+    select_chain_rows,
+    source_indices_for_best_so_far_timeline,
 )
 from dnadesign.cruncher.config.schema_v3 import AnalysisTrajectoryVideoConfig, AnalysisTrajectoryVideoSelectionConfig
 from dnadesign.cruncher.core.pwm import PWM
@@ -32,13 +32,13 @@ from dnadesign.cruncher.core.pwm import PWM
 def test_best_so_far_source_indices_are_monotonic() -> None:
     objective = np.asarray([0.1, 0.05, 0.4, 0.2, 0.9], dtype=float)
     sampled = [0, 1, 2, 3, 4]
-    source = _best_so_far_source_indices(objective_values=objective, sampled_indices=sampled)
+    source = source_indices_for_best_so_far_timeline(objective_values=objective, sampled_indices=sampled)
     assert source == [0, 0, 2, 2, 4]
 
 
 def test_sample_indices_respect_budget_and_endpoints() -> None:
     objective = np.asarray([0.1, 0.2, 0.15, 0.5, 0.4, 0.6, 0.55, 0.9], dtype=float)
-    selected, effective_stride, best_updates = _sample_indices(
+    selected, effective_stride, best_updates = sample_frame_indices(
         objective_values=objective,
         sampling_stride=2,
         include_best_updates=True,
@@ -53,7 +53,7 @@ def test_sample_indices_respect_budget_and_endpoints() -> None:
 
 
 def test_linear_taper_extra_frames_prefers_later_frames() -> None:
-    extras = _linear_taper_extra_frames(point_count=6, total_extra_frames=9)
+    extras = allocate_taper_extra_frames(point_count=6, total_extra_frames=9)
     assert len(extras) == 6
     assert sum(extras) == 9
     assert extras[-1] >= extras[0]
@@ -69,7 +69,7 @@ def test_phase_filter_prefers_tune_and_draw_when_tune_exists() -> None:
             "objective_scalar": [0.1, 0.2, 0.05],
         }
     )
-    filtered = _phase_filter_rows(frame, phase_scope="tune_and_draw_if_present")
+    filtered = filter_rows_by_phase_scope(frame, phase_scope="tune_and_draw_if_present")
     assert filtered["phase"].tolist() == ["tune", "draw"]
 
 
@@ -86,7 +86,7 @@ def test_phase_filter_if_present_fails_without_tune_or_draw() -> None:
         ValueError,
         "no tune/draw rows",
     ):
-        _phase_filter_rows(frame, phase_scope="tune_and_draw_if_present")
+        filter_rows_by_phase_scope(frame, phase_scope="tune_and_draw_if_present")
 
 
 def test_phase_filter_required_fails_without_tune() -> None:
@@ -102,7 +102,7 @@ def test_phase_filter_required_fails_without_tune() -> None:
         ValueError,
         "requires tune rows",
     ):
-        _phase_filter_rows(frame, phase_scope="tune_and_draw_required")
+        filter_rows_by_phase_scope(frame, phase_scope="tune_and_draw_required")
 
 
 def test_select_chain_rows_uses_best_chain_by_default() -> None:
@@ -115,7 +115,7 @@ def test_select_chain_rows_uses_best_chain_by_default() -> None:
         }
     )
     cfg = AnalysisTrajectoryVideoConfig()
-    selected, chain_idx = _select_chain_rows(frame, config=cfg)
+    selected, chain_idx = select_chain_rows(frame, config=cfg)
     assert chain_idx == 1
     assert selected["chain"].tolist() == [1, 1]
 
@@ -132,7 +132,7 @@ def test_select_chain_rows_explicit_chain_policy() -> None:
     cfg = AnalysisTrajectoryVideoConfig(
         selection=AnalysisTrajectoryVideoSelectionConfig(chain_policy="explicit", explicit_chain_1based=1)
     )
-    selected, chain_idx = _select_chain_rows(frame, config=cfg)
+    selected, chain_idx = select_chain_rows(frame, config=cfg)
     assert chain_idx == 0
     assert selected["chain"].tolist() == [0, 0]
 
@@ -151,7 +151,7 @@ def test_select_chain_rows_rejects_negative_chain_or_sweep() -> None:
         ValueError,
         "negative chain/sweep",
     ):
-        _select_chain_rows(frame, config=cfg)
+        select_chain_rows(frame, config=cfg)
 
 
 def test_select_chain_rows_explicit_chain_must_exist() -> None:
@@ -170,7 +170,7 @@ def test_select_chain_rows_explicit_chain_must_exist() -> None:
         ValueError,
         "explicit chain 2 was not found",
     ):
-        _select_chain_rows(frame, config=cfg)
+        select_chain_rows(frame, config=cfg)
 
 
 def test_render_chain_trajectory_video_uses_strict_baserender_run_contract(tmp_path, monkeypatch) -> None:
