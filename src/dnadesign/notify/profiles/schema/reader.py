@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/notify/profiles/schema.py
+src/dnadesign/notify/profiles/schema/reader.py
 
-Profile schema parsing, validation, and source-resolution helpers for notify.
+Profile file parsing and schema validation for notify profile payloads.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -15,68 +15,15 @@ import json
 from pathlib import Path
 from typing import Any
 
-from ..errors import NotifyConfigError
-from ..events.source import normalize_tool_name
-from .policy import normalize_policy_name, supported_workflow_policies
-
-PROFILE_VERSION = 2
-PROFILE_REQUIRED_KEYS = {"provider", "events", "webhook"}
-PROFILE_ALLOWED_KEYS = {
-    "profile_version",
-    "provider",
-    "events",
-    "events_source",
-    "webhook",
-    "cursor",
-    "only_actions",
-    "only_tools",
-    "progress_step_pct",
-    "progress_min_seconds",
-    "spool_dir",
-    "include_args",
-    "include_context",
-    "include_raw_event",
-    "policy",
-    "tls_ca_bundle",
-}
-WEBHOOK_SOURCES = {"env", "secret_ref"}
-
-
-def validate_events_source_config(data: dict[str, Any]) -> None:
-    events_source = data.get("events_source")
-    if events_source is None:
-        return
-    if not isinstance(events_source, dict):
-        raise NotifyConfigError("profile field 'events_source' must be an object")
-    unknown = sorted(set(events_source.keys()) - {"tool", "config"})
-    if unknown:
-        raise NotifyConfigError(f"profile field 'events_source' contains unsupported keys: {', '.join(unknown)}")
-    tool = events_source.get("tool")
-    config = events_source.get("config")
-    if not isinstance(tool, str) or not tool.strip():
-        raise NotifyConfigError("profile field 'events_source.tool' must be a non-empty string")
-    if not isinstance(config, str) or not config.strip():
-        raise NotifyConfigError("profile field 'events_source.config' must be a non-empty string path")
-    normalize_tool_name(tool)
-
-
-def validate_webhook_config(data: dict[str, Any]) -> None:
-    webhook = data.get("webhook")
-    if not isinstance(webhook, dict):
-        raise NotifyConfigError("profile field 'webhook' must be an object")
-    unknown = sorted(set(webhook.keys()) - {"source", "ref"})
-    if unknown:
-        raise NotifyConfigError(f"profile field 'webhook' contains unsupported keys: {', '.join(unknown)}")
-    source = webhook.get("source")
-    ref = webhook.get("ref")
-    if not isinstance(source, str) or not source.strip():
-        raise NotifyConfigError("profile field 'webhook.source' must be a non-empty string")
-    source_norm = source.strip().lower()
-    if source_norm not in WEBHOOK_SOURCES:
-        allowed = ", ".join(sorted(WEBHOOK_SOURCES))
-        raise NotifyConfigError(f"profile field 'webhook.source' must be one of: {allowed}")
-    if not isinstance(ref, str) or not ref.strip():
-        raise NotifyConfigError("profile field 'webhook.ref' must be a non-empty string")
+from ...errors import NotifyConfigError
+from ..policy import normalize_policy_name, supported_workflow_policies
+from .contract import (
+    PROFILE_ALLOWED_KEYS,
+    PROFILE_REQUIRED_KEYS,
+    PROFILE_VERSION,
+    validate_events_source_config,
+    validate_webhook_config,
+)
 
 
 def read_profile(profile_path: Path) -> dict[str, Any]:
@@ -156,49 +103,3 @@ def read_profile(profile_path: Path) -> dict[str, Any]:
         if float(progress_min_seconds) <= 0.0:
             raise NotifyConfigError("profile field 'progress_min_seconds' must be > 0 when provided")
     return data
-
-
-def resolve_profile_webhook_source(profile_data: dict[str, Any]) -> tuple[str | None, str | None]:
-    if not profile_data:
-        return None, None
-    version = profile_data.get("profile_version")
-    if version != PROFILE_VERSION:
-        raise NotifyConfigError(f"profile_version must be {PROFILE_VERSION}; found {version!r}")
-    webhook = profile_data.get("webhook")
-    if not isinstance(webhook, dict):
-        raise NotifyConfigError("profile field 'webhook' must be an object")
-    source = str(webhook.get("source") or "").strip().lower()
-    ref = str(webhook.get("ref") or "").strip()
-    if source not in WEBHOOK_SOURCES:
-        allowed = ", ".join(sorted(WEBHOOK_SOURCES))
-        raise NotifyConfigError(f"profile field 'webhook.source' must be one of: {allowed}")
-    if not ref:
-        raise NotifyConfigError("profile field 'webhook.ref' must be a non-empty string")
-    if source == "env":
-        return ref, None
-    return None, ref
-
-
-def resolve_profile_events_source(
-    *,
-    profile_data: dict[str, Any],
-    profile_path: Path | None,
-) -> tuple[str, Path] | None:
-    events_source = profile_data.get("events_source")
-    if events_source is None:
-        return None
-    if not isinstance(events_source, dict):
-        raise NotifyConfigError("profile field 'events_source' must be an object")
-    tool_raw = events_source.get("tool")
-    config_raw = events_source.get("config")
-    if not isinstance(tool_raw, str) or not tool_raw.strip():
-        raise NotifyConfigError("profile field 'events_source.tool' must be a non-empty string")
-    if not isinstance(config_raw, str) or not config_raw.strip():
-        raise NotifyConfigError("profile field 'events_source.config' must be a non-empty string path")
-    tool_name = normalize_tool_name(tool_raw)
-    if tool_name is None:
-        raise NotifyConfigError("profile field 'events_source.tool' must be a non-empty string")
-    config_path = Path(config_raw).expanduser()
-    if profile_path is not None and not config_path.is_absolute():
-        config_path = profile_path.parent / config_path
-    return tool_name, config_path.resolve()
