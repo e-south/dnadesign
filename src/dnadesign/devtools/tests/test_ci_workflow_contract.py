@@ -24,6 +24,7 @@ def _workflow() -> dict:
 def test_ci_workflow_uses_core_and_external_integration_lane_ids() -> None:
     workflow = _workflow()
     jobs = workflow["jobs"]
+    assert "secrets-hygiene" in jobs
     assert "core-lint-test-build" in jobs
     assert "external-integration" in jobs
     assert "ci-gate" in jobs
@@ -43,10 +44,26 @@ def test_ci_gate_is_the_required_aggregate_check() -> None:
     assert gate_job["if"] == "always()"
     assert gate_job["needs"] == [
         "detect-ci-scope",
+        "secrets-hygiene",
         "core-lint-test-build",
         "external-integration",
         "quality-score-inputs",
     ]
+
+
+def test_secrets_hygiene_job_runs_baseline_and_full_tree_scans() -> None:
+    workflow = _workflow()
+    steps = workflow["jobs"]["secrets-hygiene"]["steps"]
+    baseline_step = next(step for step in steps if step.get("name") == "Detect-secrets baseline path hygiene")
+    full_tree_step = next(step for step in steps if step.get("name") == "Detect-secrets full-tree check")
+
+    baseline_run = str(baseline_step.get("run", ""))
+    assert "uv run python -m dnadesign.devtools.secrets_baseline_check" in baseline_run
+    assert "--repo-root ." in baseline_run
+    assert "--baseline .secrets.baseline" in baseline_run
+
+    full_tree_run = str(full_tree_step.get("run", ""))
+    assert "uv run pre-commit run detect-secrets --all-files" in full_tree_run
 
 
 def test_scope_outputs_expose_core_external_integration_keys() -> None:

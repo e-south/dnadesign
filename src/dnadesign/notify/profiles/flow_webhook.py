@@ -16,7 +16,7 @@ from pathlib import Path
 
 import typer
 
-from ..delivery.secrets import is_secret_backend_available, resolve_secret_ref, store_secret_ref
+from ..delivery.secrets import is_secret_backend_available, parse_secret_ref, resolve_secret_ref, store_secret_ref
 from ..errors import NotifyConfigError
 from .policy import DEFAULT_WEBHOOK_ENV
 from .resolve import resolve_cli_optional_string
@@ -25,6 +25,39 @@ from .resolve import resolve_cli_optional_string
 def _default_file_secret_path(secret_name: str) -> Path:
     notify_root = Path(__file__).resolve().parents[1]
     return (notify_root / ".secrets" / f"{secret_name}.webhook").resolve()
+
+
+def _path_is_within(*, parent: Path, child: Path) -> bool:
+    try:
+        child.relative_to(parent)
+    except ValueError:
+        return False
+    return True
+
+
+def _repo_root(start: Path) -> Path | None:
+    for candidate in (start, *start.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    return None
+
+
+def _enforce_file_secret_ref_scope(secret_ref: str) -> None:
+    parsed = parse_secret_ref(secret_ref)
+    if parsed.backend != "file" or parsed.file_path is None:
+        return
+
+    repo_root = _repo_root(Path(__file__).resolve())
+    if repo_root is None:
+        return
+
+    allowed_secret_root = (Path(__file__).resolve().parents[1] / ".secrets").resolve()
+    resolved_file_path = parsed.file_path.resolve()
+    if _path_is_within(parent=repo_root, child=resolved_file_path) and not _path_is_within(
+        parent=allowed_secret_root,
+        child=resolved_file_path,
+    ):
+        raise NotifyConfigError(f"file secret_ref inside the repository must be under {allowed_secret_root}")
 
 
 def resolve_webhook_config(
@@ -80,6 +113,9 @@ def resolve_webhook_config(
             secret_refs = [secret_path.as_uri()]
         else:
             secret_refs = [f"{mode}://dnadesign.notify/{secret_name}"]
+
+    for value in secret_refs:
+        _enforce_file_secret_ref_scope(value)
 
     if not store_webhook:
         return {"source": "secret_ref", "ref": secret_refs[0]}
