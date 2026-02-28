@@ -986,7 +986,7 @@ def test_analyze_latest_reports_failed_reason_when_no_completed_runs(tmp_path: P
     assert failed_error in str(exc.value)
 
 
-def test_analyze_opt_trajectory_multi_tf(tmp_path: Path) -> None:
+def test_analyze_trajectory_score_space_multi_tf(tmp_path: Path) -> None:
     catalog_root = tmp_path / ".cruncher"
     config = _base_config(
         catalog_root=catalog_root,
@@ -1035,7 +1035,7 @@ def test_analyze_opt_trajectory_multi_tf(tmp_path: Path) -> None:
     assert analysis_plot_path(analysis_dir, "chain_trajectory_sweep", "png").exists()
 
 
-def test_analyze_opt_trajectory_single_tf(tmp_path: Path) -> None:
+def test_analyze_trajectory_score_space_single_tf(tmp_path: Path) -> None:
     catalog_root = tmp_path / ".cruncher"
     config = _base_config(
         catalog_root=catalog_root,
@@ -1756,12 +1756,15 @@ def test_analyze_fails_when_required_plot_generation_raises(tmp_path: Path, monk
     )
 
     def _explode(*args, **kwargs) -> None:
-        raise RuntimeError("intentional opt trajectory error")
+        raise RuntimeError("intentional trajectory score-space error")
 
-    monkeypatch.setattr("dnadesign.cruncher.analysis.plots.opt_trajectory.plot_elite_score_space_context", _explode)
+    monkeypatch.setattr(
+        "dnadesign.cruncher.analysis.plots.trajectory_score_space_plot.plot_elite_score_space_context",
+        _explode,
+    )
 
     cfg = load_config(config_path)
-    with pytest.raises(RuntimeError, match="opt trajectory error"):
+    with pytest.raises(RuntimeError, match="trajectory score-space error"):
         run_analyze(cfg, config_path)
 
 
@@ -1807,7 +1810,7 @@ def test_analyze_fails_fast_on_trajectory_value_error(tmp_path: Path, monkeypatc
         raise ValueError("intentional trajectory value error")
 
     monkeypatch.setattr(
-        "dnadesign.cruncher.analysis.plots.opt_trajectory.plot_elite_score_space_context",
+        "dnadesign.cruncher.analysis.plots.trajectory_score_space_plot.plot_elite_score_space_context",
         _explode_value,
     )
 

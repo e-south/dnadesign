@@ -982,10 +982,8 @@ def run_analyze(
     from dnadesign.cruncher.analysis.plots.elites_showcase import plot_elites_showcase
     from dnadesign.cruncher.analysis.plots.fimo_concordance import plot_optimizer_vs_fimo
     from dnadesign.cruncher.analysis.plots.health_panel import plot_health_panel
-    from dnadesign.cruncher.analysis.plots.opt_trajectory import (
-        plot_chain_trajectory_sweep,
-        plot_elite_score_space_context,
-    )
+    from dnadesign.cruncher.analysis.plots.trajectory_score_space_plot import plot_elite_score_space_context
+    from dnadesign.cruncher.analysis.plots.trajectory_sweep import plot_chain_trajectory_sweep
 
     results: list[Path] = []
     for run_name in runs:
