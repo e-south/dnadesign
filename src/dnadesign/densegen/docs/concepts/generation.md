@@ -1,13 +1,10 @@
 ## Generation model
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
-
-
+**Last verified:** 2026-02-28
 This concept page explains how DenseGen turns Stage-A pools into accepted sequences under plan constraints. Read it when you need to reason about quotas, fixed elements, and solver feasibility before editing generation config. For exact field definitions, use the **[config reference](../reference/config.md)**.
 
 ### What plans control
-This section describes the generation-level contract each plan contributes to runtime behavior.
 
 - `sampling.include_inputs` selects which Stage-A pools feed the plan library.
 - `sequences` sets the per-plan milestone target for accepted sequences.
@@ -15,7 +12,6 @@ This section describes the generation-level contract each plan contributes to ru
 - `fixed_elements` sets hard sequence geometry such as promoter elements.
 
 ### Minimal plan shape
-This section shows the smallest useful plan pattern and labels the intent of each key.
 
 ```yaml
 plan:
@@ -31,14 +27,12 @@ plan:
 ```
 
 ### How fixed elements work
-This section clarifies what fixed-element keys enforce as hard constraints versus preferences.
 
 - `promoter_constraints` and `fixed_element_matrix` are hard geometry constraints.
 - `side_biases` are placement preferences and may not be satisfiable in all solutions.
 - Motifs must be valid DNA alphabet (`A`, `C`, `G`, `T`) and infeasible geometry fails fast.
 
 ### Fixed-element matrix expansion model
-This section explains the deterministic config-time expansion model behind `fixed_element_matrix`.
 
 #### Intent
 `fixed_element_matrix` lets one logical plan compile into many explicit concrete plans at config load time. The goal is compact configs with explicit, reproducible runtime behavior.
@@ -96,14 +90,12 @@ This section explains the deterministic config-time expansion model behind `fixe
   - Uniform per-variant quotas: `60/5=12`, `60/5=12`, `80/5=16`.
 
 ### How sequence constraints work
-This section explains how global sequence constraints apply after sequence assembly.
 
 - `sequence_constraints.forbid_kmers` can enforce strand-aware motif exclusion.
 - `sequence_constraints.allowlist` defines explicit fixed-element exceptions.
 - Final validation occurs on assembled sequences, so join-spanning and pad-created motifs are checked.
 
 ### Solver settings and limits
-This section describes how solver settings bound runtime behavior.
 
 - `solver.backend` chooses the installed backend (`CBC` or `GUROBI`).
 - `solver.strategy` selects dense-arrays solve strategy.
@@ -111,7 +103,6 @@ This section describes how solver settings bound runtime behavior.
 - Runtime guardrails in `densegen.runtime` still apply even with permissive solver settings.
 
 ### Debugging generation failures
-This section gives the shortest route to diagnose infeasible plans.
 
 1. Validate config expansion and inspect resolved plans.
 2. Inspect Stage-B library summaries for input starvation.

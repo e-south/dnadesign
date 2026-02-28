@@ -1,9 +1,7 @@
 ## DenseGen outputs reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
-
-
+**Last verified:** 2026-02-28
 This page defines what DenseGen writes, where it writes it, and which event stream each
 consumer should read.
 
@@ -13,7 +11,6 @@ For a compact run-and-artifact checklist, use **[DenseGen quick checklist](../co
 
 ### Contents
 
-This section covers contents.
 - [Deterministic IDs](#deterministic-ids) - deterministic sequence identifiers.
 - [Parquet](#parquet) - dataset layout and deduplication.
 - [USR](#usr) - attach semantics and optional dependency.
@@ -27,8 +24,7 @@ This section covers contents.
 
 ### Event boundary paths
 
-This section records event artifact paths only; the boundary explanation lives in
-**[observability and events](../concepts/observability_and_events.md)**.
+Use **[observability and events](../concepts/observability_and_events.md)** for stream-boundary behavior; this section lists only artifact paths.
 
 - DenseGen runtime diagnostics: `outputs/meta/events.jsonl`
 - USR mutation events: `<usr_root>/<dataset>/.events.log`
@@ -37,7 +33,6 @@ This section records event artifact paths only; the boundary explanation lives i
 
 ### Deterministic IDs
 
-This section covers deterministic ids.
 
 - Sequence IDs use USR's algorithm:
   - `normalize_sequence(sequence, bio_type, alphabet)`
@@ -151,7 +146,6 @@ DenseGen writes `outputs/meta/events.jsonl` (JSON lines) with structured events 
 
 ### Related event docs
 
-This section points to stream-boundary docs and keeps this file focused on artifact contracts.
 
 See also:
 - DenseGen boundary and mistakes: **[observability and events](../concepts/observability_and_events.md)**

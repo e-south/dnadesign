@@ -1,21 +1,17 @@
 ## Workspace templates
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-02-27
-
-
+**Last verified:** 2026-02-28
 This concept page explains how packaged DenseGen workspaces are organized and how to choose between demo and study templates. Read it when you need a consistent path from first-run tutorials to real study workspaces.
 
 For the full DenseGen doc map, use the **[DenseGen documentation index](../index.md)**.
 
 ### Template types
-This section defines the two template categories and their intended usage.
 
 - `demo_*` templates are didactic and designed for short end-to-end walkthroughs.
 - `study_*` templates are larger campaign-style baselines for realistic workloads.
 
 ### Packaged templates
-This section lists the four packaged templates and their primary intent.
 
 | Template id | Class | Intent | Additional requirements |
 | --- | --- | --- | --- |
@@ -25,7 +21,6 @@ This section lists the four packaged templates and their primary intent.
 | `study_stress_ethanol_cipro` | study | Larger stress-response campaign with three plans | Solver backend plus FIMO |
 
 ### Tutorial mapping
-This section maps template classes to the tutorials that teach them.
 
 - Use **[TFBS baseline tutorial](../tutorials/demo_tfbs_baseline.md)** for `demo_tfbs_baseline`.
 - Use **[sampling baseline tutorial](../tutorials/demo_sampling_baseline.md)** for `demo_sampling_baseline`.
@@ -34,7 +29,6 @@ This section maps template classes to the tutorials that teach them.
 - Use **[DenseGen to USR to Notify tutorial](../tutorials/demo_usr_notify.md)** when validating watcher delivery on any USR-enabled workspace.
 
 ### Standard study workflow
-This section gives a reusable command flow for `study_*` templates.
 
 ```bash
 # Choose a packaged study template.
@@ -65,7 +59,6 @@ uv run dense notebook generate -c "$CONFIG"
 ```
 
 ### Study data notes
-This section describes where to put private or non-tracked study instructions.
 
 Keep private study notes in workspace-local non-tracked files or external private docs, and keep packaged template docs focused on reusable behavior and schema contracts.
 
