@@ -474,9 +474,9 @@ This section covers plots.
   - `sampling`
     - `stride` (int >= 1, default `5`)
     - `max_source_rows` (int >= 1, default `20000`)
-    - `max_snapshots` (int >= 1, default `120`)
+    - `max_snapshots` (int >= 1, default `140`)
   - `playback`
-    - `target_duration_sec` (float in `[3, 20]`, default `8`)
+    - `target_duration_sec` (float in `[3, 20]`, default `14`)
     - `fps` (int in `[8, 20]`, default `12`)
   - `limits`
     - `max_total_frames` (int >= 2, default `180`)

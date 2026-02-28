@@ -10,7 +10,7 @@
 - Run the stress campaign workspace with dual-sink outputs, expanded plans, and workspace-local plot/notebook generation.
 
 **Sigma70 Literal Source**
-- DOI: 10.1038/s41467-017-02473-5 | www.nature.com/naturecommunications
+- Tuning the dynamic range of bacterial promoters regulated by ligand-inducible transcription factors. DOI: 10.1038/s41467-017-02473-5 | https://www.nature.com/articles/s41467-017-02473-5
 
 **Runbook command**
 
@@ -51,8 +51,9 @@ Run this command from the workspace root:
     pixi run dense inspect run --events --library -c "$CONFIG"
     # Render DenseGen analysis artifacts from current run outputs.
     # `dense plot` is the analysis entry point; static plots always render.
-    # Set plots.video.enabled: true in config to also emit a sampled Stage-B showcase video
-    # at outputs/plots/stage_b/all_plans/showcase.mp4.
+    # This workspace enables plots.video.enabled: true by default, emitting a sampled
+    # Stage-B showcase video at outputs/plots/stage_b/all_plans/showcase.mp4.
+    # Disable by setting plots.video.enabled: false in config.
     pixi run dense plot -c "$CONFIG"
     # Optional analysis shortcut: render only the Stage-B showcase video artifact.
     # pixi run dense plot --only dense_array_video_showcase -c "$CONFIG"
