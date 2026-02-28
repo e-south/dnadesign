@@ -50,6 +50,10 @@ def test_notify_cli_command_modules_importable() -> None:
     assert importlib.import_module("dnadesign.notify.cli.bindings.runtime")
     assert importlib.import_module("dnadesign.notify.cli.bindings.helpers")
     assert importlib.import_module("dnadesign.notify.cli.bindings.deps")
+    assert importlib.import_module("dnadesign.notify.cli.bindings.deps.profile")
+    assert importlib.import_module("dnadesign.notify.cli.bindings.deps.setup")
+    assert importlib.import_module("dnadesign.notify.cli.bindings.deps.runtime")
+    assert importlib.import_module("dnadesign.notify.cli.bindings.deps.send")
     assert importlib.import_module("dnadesign.notify.cli.bindings.registry")
     assert importlib.import_module("dnadesign.notify.cli.handlers.profile")
     assert importlib.import_module("dnadesign.notify.cli.handlers.profile.init_cmd")
@@ -81,12 +85,14 @@ def test_notify_legacy_top_level_cli_module_paths_are_not_importable() -> None:
 
 def test_notify_cli_command_monolith_files_removed() -> None:
     commands_root = _notify_root() / "cli" / "commands"
+    bindings_root = _notify_root() / "cli" / "bindings"
     assert not (commands_root / "profile.py").exists()
     assert not (commands_root / "setup.py").exists()
     assert not (commands_root / "send.py").exists()
     assert not (commands_root / "providers.py").exists()
     assert not (commands_root / "usr_events.py").exists()
     assert not (commands_root / "spool.py").exists()
+    assert not (bindings_root / "deps.py").exists()
 
 
 def test_notify_help_lists_usr_events_and_spool_groups() -> None:
